@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { createAssert, createIs } from 'typia';
-import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { isLast } from './parts.js';
 import type { Wire, WirePart } from './wire.js';
@@ -88,8 +88,24 @@ interface WireUsage {
   cache_creation_input_tokens?: TokenCount | null;
 }
 
+/**
+ * Why this shape says the model stopped. `tool_use` and `pause_turn` are not
+ * mapped: this package has no tools, so neither can arrive, and naming them
+ * here would claim a meaning nothing has tested.
+ */
+const stopReasons: Readonly<Record<string, StopReason>> = {
+  end_turn: 'end',
+  stop_sequence: 'end',
+  max_tokens: 'maxTokens',
+  refusal: 'refusal',
+};
+
+const asStop = (named: string | null | undefined): StopReason | undefined =>
+  named === null || named === undefined ? undefined : (stopReasons[named] ?? 'unknown');
+
 interface Reply {
   content: { type: string; text?: string }[];
+  stop_reason?: string | null;
   usage: {
     input_tokens: TokenCount;
     output_tokens: TokenCount;
@@ -119,6 +135,11 @@ interface UsageEvent {
   usage: WireUsage;
 }
 
+/** `message_delta` carries the stop reason beside the output count. */
+interface StopEvent {
+  delta: { stop_reason: string };
+}
+
 /** `message_start` carries the input counts and `message_delta` the output count. */
 interface StartEvent {
   message: UsageEvent;
@@ -130,12 +151,14 @@ const isDelta = createIs<DeltaEvent>();
 const isThinking = createIs<ThinkingEvent>();
 const isSignature = createIs<SignatureEvent>();
 const isUsage = createIs<UsageEvent>();
+const isStop = createIs<StopEvent>();
 const isStart = createIs<StartEvent>();
 
 const toReply = (raw: unknown): ModelReply => {
   const parsed = assertReply(raw);
   return {
     content: parsed.content.map(part => part.text ?? '').join(''),
+    stop: asStop(parsed.stop_reason) ?? 'unknown',
     usage: {
       inputTokens: parsed.usage.input_tokens,
       outputTokens: parsed.usage.output_tokens,
@@ -173,12 +196,16 @@ const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {
   return isUsage(event) ? readUsage(event.usage) : undefined;
 };
 
+const toStop = (event: unknown): StopReason | undefined =>
+  isStop(event) ? asStop(event.delta.stop_reason) : undefined;
+
 const messagesWire: Wire = {
   path: '/api/gateway/v1/messages',
   toBody,
   toReply,
   toDelta,
   toUsage,
+  toStop,
 };
 
 export type { ContentBlock, MessagesBody, WireUsage };

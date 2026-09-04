@@ -1,0 +1,115 @@
+/**
+ * Proves each shape reports why the model stopped.
+ *
+ * A unit test can only prove this package reads the field it was given. Which
+ * field a gateway actually sends, and what it puts in it, is a live question,
+ * and the three shapes answer it three different ways.
+ *
+ * Each shape is asked twice: once with room to finish, and once with a ceiling
+ * far too low to. The second must come back `maxTokens`. A shape that reported
+ * `end` for both would let a caller store half a sentence as a finished answer
+ * and build every later request on it.
+ */
+import assert from 'node:assert/strict';
+import { Effect, Layer, Stream } from 'effect';
+import type { ApiKind } from '../src/core/catalog.js';
+import type { StopReason } from '../src/core/model.js';
+import { openSession } from '../src/core/run.js';
+import type { SessionHandle } from '../src/core/wiring.js';
+import { layerTableCatalog } from '../src/plugins/catalog/table.js';
+import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
+import { layerKiloGateway } from '../src/plugins/gateway/index.js';
+import { layerAssembler } from '../src/plugins/prompt/default.js';
+import { layerBackoff } from '../src/plugins/retry/backoff.js';
+import { layerStaticToken } from '../src/plugins/token/static.js';
+import { kiloToken, nodeFetch } from './node-fetch.js';
+
+const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
+const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+const model = process.env['KILO_MODEL'] ?? 'openai/gpt-5.6-luna';
+
+const system = 'You answer exactly what you are asked, with no preamble.';
+const short = 'Answer with the single word: yes';
+const long = 'Write three hundred words about the history of the wheel.';
+
+interface Answer {
+  readonly said: string;
+  readonly stop: StopReason | undefined;
+}
+
+const empty: Answer = { said: '', stop: undefined };
+
+const ask = (session: SessionHandle, text: string, maxTokens: number) =>
+  Stream.runFold(session.ask(text, { maxTokens }), empty, (held, event) => {
+    if (event.kind === 'delta') {
+      return { ...held, said: held.said + event.text };
+    }
+    return event.kind === 'done' ? { ...held, stop: event.stop } : held;
+  });
+
+const token = await kiloToken();
+
+const runShape = async (kind: ApiKind) => {
+  const catalog = layerTableCatalog({}, { apiKinds: [kind] });
+  const layers = Layer.mergeAll(
+    layerAssembler,
+    layerWebCrypto,
+    catalog,
+    layerKiloGateway({
+      baseUrl,
+      org: { kind: 'organization', id: organizationId },
+      fetch: nodeFetch,
+    }).pipe(Layer.provide(Layer.mergeAll(catalog, layerStaticToken(token), layerBackoff())))
+  );
+
+  /* Two sessions, because a truncated answer left in the first one would
+     change what the second question is answering. */
+  const program = Effect.gen(function* () {
+    const finished = yield* Effect.flatMap(openSession({ system, model }), session =>
+      ask(session, short, 64)
+    );
+    const cut = yield* Effect.flatMap(openSession({ system, model }), session =>
+      ask(session, long, 24)
+    );
+    return { finished, cut };
+  });
+
+  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
+};
+
+const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
+
+console.log('model', model);
+console.log('\nshape             finished  cut off   said when cut');
+
+const failures: string[] = [];
+
+for (const kind of kinds) {
+  const result = await runShape(kind);
+  if (result._tag === 'Left') {
+    console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.left)}`);
+    failures.push(`${kind}: the call failed`);
+    continue;
+  }
+
+  const { finished, cut } = result.right;
+  console.log(
+    `${kind.padEnd(18)}${String(finished.stop).padEnd(10)}${String(cut.stop).padEnd(10)}` +
+      JSON.stringify(cut.said.slice(0, 30))
+  );
+
+  if (finished.stop !== 'end') {
+    failures.push(
+      `${kind}: an answer that finished was reported as ${String(finished.stop)}, not end`
+    );
+  }
+  if (cut.stop !== 'maxTokens') {
+    failures.push(
+      `${kind}: an answer cut off at the ceiling was reported as ${String(cut.stop)}; a caller ` +
+        'would store half a sentence as a finished answer'
+    );
+  }
+}
+
+assert.equal(failures.length, 0, `\n  ${failures.join('\n  ')}\n`);
+console.log('\nPASS: every shape tells a finished answer from one the ceiling cut off.');

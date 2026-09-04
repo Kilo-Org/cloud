@@ -6,6 +6,7 @@ import {
   type ModelReply,
   type ModelRequest,
   type ModelUsage,
+  type StopReason,
   zeroUsage,
 } from '../../core/model.js';
 
@@ -22,6 +23,8 @@ interface FakeReply {
   readonly fail?: ModelError;
   /** Closes the thinking, the way a provider does, on its own event. */
   readonly signature?: string;
+  /** Why the model stopped. A scripted answer finished unless it says so. */
+  readonly stop?: StopReason;
   /** Never reaches `done`, so a test can interrupt the stream part way. */
   readonly stall?: boolean;
 }
@@ -51,6 +54,7 @@ const fakeModel = (
     const done = Stream.succeed<ModelEvent>({
       kind: 'done',
       usage: { ...zeroUsage, ...reply.usage },
+      stop: reply.stop ?? 'end',
     });
     if (reply.stall === true) {
       return Stream.concat(deltas, Stream.never);
@@ -66,6 +70,7 @@ const fakeModel = (
       ? Effect.succeed({
           content: reply.deltas.join(''),
           usage: { ...zeroUsage, ...reply.usage },
+          stop: reply.stop ?? 'end',
         })
       : Effect.fail(reply.fail);
   };

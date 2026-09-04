@@ -177,7 +177,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:image`, `…:cancel`, `…:reasoning`, `…:shapes`, `…:session`, `…:models` |
+| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `shapes`, `session`, `models` |
 
 `pnpm test:perf` is a separate config because its files must not run beside the
 unit tests: parallel workers compete for the CPU being measured. Its ceilings
@@ -548,6 +548,25 @@ disagree with each other, so each is read on its own terms.
 ponytail: one reasoning part per turn. A model interleaves thinking with tool
 calls, so several blocks arrive per turn once this package has tools, and each
 needs its own signature. Give the wire the block boundary then.
+
+### Why the model stopped is part of the answer
+
+`done` carries a `StopReason` beside the counts: `end`, `maxTokens`, `refusal`,
+or `unknown`. Without it a caller cannot tell a finished answer from one the
+ceiling cut off mid-sentence, and would store half a thought and build every
+later request on it.
+
+The truncated turn is still kept. It is what was paid for, and dropping it would
+shorten the prompt that follows.
+
+`unknown` is the honest answer for a name this package has not seen, and it is
+never a guess. `tool_use` and `tool_calls` map to `unknown` on purpose: this
+package has no tools, so naming them would claim a meaning nothing has tested.
+
+The three shapes report it in three places — `message_delta.delta.stop_reason`,
+`response.incomplete.response.incomplete_details.reason`, and
+`choices[].finish_reason` — so `pnpm test:e2e:stop` asks each shape twice, once
+with room to finish and once with a ceiling of 24 tokens.
 
 ### A dropped stream stops the call
 

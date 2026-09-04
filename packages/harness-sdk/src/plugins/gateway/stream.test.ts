@@ -38,7 +38,7 @@ it('streams the text of an Anthropic reply and ends with the token counts', asyn
       },
       { type: 'content_block_delta', delta: { text: 'he' } },
       { type: 'content_block_delta', delta: { text: 'llo' } },
-      { type: 'message_delta', usage: { output_tokens: 4 } }
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 4 } }
     )
   );
   expect(JSON.parse(calls[0]?.request.body ?? '')).toMatchObject({ stream: true });
@@ -46,6 +46,7 @@ it('streams the text of an Anthropic reply and ends with the token counts', asyn
   expect(events.at(-1)).toEqual({
     kind: 'done',
     usage: { inputTokens: 5, outputTokens: 4, cacheReadTokens: 95, cacheWriteTokens: 0 },
+    stop: 'end',
   });
 });
 

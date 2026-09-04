@@ -1,6 +1,6 @@
 import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
-import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptPart } from '../../../core/prompt.js';
 import { dataUri } from './parts.js';
 import type { Wire, WirePart } from './wire.js';
@@ -63,8 +63,31 @@ interface Counts {
 
 interface Reply {
   output: { content?: { text?: string }[] | null }[];
+  status?: string | null;
+  incomplete_details?: { reason?: string | null } | null;
   usage: Counts;
 }
+
+/**
+ * Why this shape says the model stopped. A finished response says so in its
+ * status; an unfinished one names the wall it hit.
+ */
+const incompleteReasons: Readonly<Record<string, StopReason>> = {
+  max_output_tokens: 'maxTokens',
+  content_filter: 'refusal',
+};
+
+const asStop = (
+  status: string | null | undefined,
+  reason: string | null | undefined
+): StopReason => {
+  if (status === 'completed') {
+    return 'end';
+  }
+  return reason === null || reason === undefined
+    ? 'unknown'
+    : (incompleteReasons[reason] ?? 'unknown');
+};
 
 /** This shape names its frames, so the two events are matched on `type`. */
 interface DeltaEvent {
@@ -77,6 +100,16 @@ interface CompletedEvent {
   response: { usage: Counts };
 }
 
+/**
+ * The frame that says the answer ended, whether it finished or was cut off.
+ * The usage frame cannot say: a completed response and one stopped at the wall
+ * both report their counts the same way.
+ */
+interface EndEvent {
+  type: 'response.completed' | 'response.incomplete' | 'response.failed';
+  response: { status?: string | null; incomplete_details?: { reason?: string | null } | null };
+}
+
 /** This shape streams the thinking as a summary, under a name of its own. */
 interface ReasoningEvent {
   type: 'response.reasoning_summary_text.delta';
@@ -86,6 +119,7 @@ interface ReasoningEvent {
 const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
 const isCompleted = createIs<CompletedEvent>();
+const isEnd = createIs<EndEvent>();
 const isReasoning = createIs<ReasoningEvent>();
 
 /** The cached count is reported inside the input total, so it is subtracted out. */
@@ -106,6 +140,7 @@ const toReply = (raw: unknown): ModelReply => {
       .flatMap(item => item.content ?? [])
       .map(part => part.text ?? '')
       .join(''),
+    stop: asStop(parsed.status, parsed.incomplete_details?.reason),
     usage: {
       inputTokens: counts.inputTokens ?? 0,
       outputTokens: counts.outputTokens ?? 0,
@@ -125,12 +160,21 @@ const toDelta = (event: unknown): WirePart | undefined => {
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
   isCompleted(event) ? readUsage(event.response.usage) : undefined;
 
+const toStop = (event: unknown): StopReason | undefined =>
+  isEnd(event)
+    ? asStop(
+        event.response.status ?? (event.type === 'response.completed' ? 'completed' : undefined),
+        event.response.incomplete_details?.reason
+      )
+    : undefined;
+
 const responsesWire: Wire = {
   path: '/api/gateway/v1/responses',
   toBody,
   toReply,
   toDelta,
   toUsage,
+  toStop,
 };
 
 export type { ResponsesBody };

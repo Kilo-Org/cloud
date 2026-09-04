@@ -1,4 +1,4 @@
-import type { ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 
 /**
  * What one streamed event says, when it says anything.
@@ -17,8 +17,9 @@ interface WirePart {
  * `toReply` and `toBody` throw when a shape cannot carry what it was given; the
  * caller wraps them.
  *
- * A stream event is an edge, so `toDelta` and `toUsage` validate what they read.
- * One event carries text, or reasoning, or token counts, or nothing.
+ * A stream event is an edge, so every reader below validates what it finds.
+ * One event carries text, or reasoning, or token counts, or a stop reason, or
+ * nothing at all.
  */
 interface Wire {
   readonly path: string;
@@ -26,6 +27,8 @@ interface Wire {
   readonly toReply: (raw: unknown) => ModelReply;
   readonly toDelta: (event: unknown) => WirePart | undefined;
   readonly toUsage: (event: unknown) => Partial<ModelUsage> | undefined;
+  /** Absent until the event that says why the model stopped. */
+  readonly toStop: (event: unknown) => StopReason | undefined;
 }
 
 export type { Wire, WirePart };

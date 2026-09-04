@@ -1,6 +1,12 @@
 import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
-import type { Effort, ModelReply, ModelRequest, ModelUsage } from '../../../core/model.js';
+import type {
+  Effort,
+  ModelReply,
+  ModelRequest,
+  ModelUsage,
+  StopReason,
+} from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri, isLast } from './parts.js';
 import type { Wire, WirePart } from './wire.js';
@@ -91,9 +97,19 @@ interface Counts {
 }
 
 interface Reply {
-  choices: { message: { content?: string | null } }[];
+  choices: { message: { content?: string | null }; finish_reason?: string | null }[];
   usage: Counts;
 }
+
+/** Why this shape says the model stopped. `tool_calls` waits on tool support. */
+const stopReasons: Readonly<Record<string, StopReason>> = {
+  stop: 'end',
+  length: 'maxTokens',
+  content_filter: 'refusal',
+};
+
+const asStop = (named: string | null | undefined): StopReason | undefined =>
+  named === null || named === undefined ? undefined : (stopReasons[named] ?? 'unknown');
 
 interface DeltaEvent {
   choices: { delta: { content?: string | null } }[];
@@ -111,10 +127,16 @@ interface UsageEvent {
   usage: Counts;
 }
 
+/** The last content frame of a choice names why that choice ended. */
+interface StopEvent {
+  choices: { finish_reason: string }[];
+}
+
 const assertReply = createAssert<Reply>();
 const isDelta = createIs<DeltaEvent>();
 const isReasoning = createIs<ReasoningEvent>();
 const isUsage = createIs<UsageEvent>();
+const isStop = createIs<StopEvent>();
 
 /** The cached count is reported inside the prompt total, so it is subtracted out. */
 const readUsage = (usage: Counts): Partial<ModelUsage> => {
@@ -131,6 +153,7 @@ const toReply = (raw: unknown): ModelReply => {
   const counts = readUsage(parsed.usage);
   return {
     content: parsed.choices.map(choice => choice.message.content ?? '').join(''),
+    stop: asStop(parsed.choices[0]?.finish_reason) ?? 'unknown',
     usage: {
       inputTokens: counts.inputTokens ?? 0,
       outputTokens: counts.outputTokens ?? 0,
@@ -161,12 +184,16 @@ const toDelta = (event: unknown): WirePart | undefined => {
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>
   isUsage(event) ? readUsage(event.usage) : undefined;
 
+const toStop = (event: unknown): StopReason | undefined =>
+  isStop(event) ? asStop(event.choices[0]?.finish_reason) : undefined;
+
 const completionsWire: Wire = {
   path: '/api/gateway/v1/chat/completions',
   toBody,
   toReply,
   toDelta,
   toUsage,
+  toStop,
 };
 
 export type { CompletionsBody, ContentBlock };

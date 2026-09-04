@@ -12,6 +12,7 @@ const reply: Reply = {
   status: 200,
   body: JSON.stringify({
     content: [{ type: 'text', text: 'hi' }],
+    stop_reason: 'end_turn',
     usage: {
       input_tokens: 7,
       output_tokens: 3,
@@ -74,6 +75,7 @@ it('reads the token counts out of the reply', async () => {
   expect(Either.getOrThrow(result)).toEqual({
     content: 'hi',
     usage: { inputTokens: 7, outputTokens: 3, cacheReadTokens: 900, cacheWriteTokens: 100 },
+    stop: 'end',
   });
 });
 

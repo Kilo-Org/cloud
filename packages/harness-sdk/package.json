@@ -27,6 +27,7 @@
     "test:e2e:reasoning": "ttsx e2e/reasoning.ts",
     "test:e2e:session": "ttsx e2e/session.ts",
     "test:e2e:shapes": "ttsx e2e/shapes.ts",
+    "test:e2e:stop": "ttsx e2e/stop.ts",
     "test:perf": "vitest run --config vitest.perf.config.ts",
     "test:watch": "vitest",
     "typecheck": "ttsc --noEmit",

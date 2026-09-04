@@ -37,9 +37,20 @@ interface ModelUsage {
   readonly cacheWriteTokens: number;
 }
 
+/**
+ * Why the model stopped talking.
+ *
+ * `end` is a finished answer. `maxTokens` is a wall: the answer stops
+ * mid-sentence, and a caller that treats it as finished stores half a thought
+ * and builds every later request on it. `refusal` is the model declining.
+ * `unknown` is a shape that reported nothing, which is not an error.
+ */
+type StopReason = 'end' | 'maxTokens' | 'refusal' | 'unknown';
+
 interface ModelReply {
   readonly content: string;
   readonly usage: ModelUsage;
+  readonly stop: StopReason;
 }
 
 /** A model call failed. `status` is the HTTP status when the transport has one. */
@@ -62,7 +73,7 @@ class ModelError extends Data.TaggedError('harness/ModelError')<{
 type ModelEvent =
   | { readonly kind: 'delta'; readonly text: string }
   | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
-  | { readonly kind: 'done'; readonly usage: ModelUsage };
+  | { readonly kind: 'done'; readonly usage: ModelUsage; readonly stop: StopReason };
 
 const zeroUsage: ModelUsage = {
   inputTokens: 0,
@@ -82,5 +93,13 @@ interface ModelClientService {
 
 class ModelClient extends Context.Tag('harness/ModelClient')<ModelClient, ModelClientService>() {}
 
-export type { Effort, ModelClientService, ModelEvent, ModelReply, ModelRequest, ModelUsage };
+export type {
+  Effort,
+  ModelClientService,
+  ModelEvent,
+  ModelReply,
+  ModelRequest,
+  ModelUsage,
+  StopReason,
+};
 export { ModelClient, ModelError, zeroUsage };

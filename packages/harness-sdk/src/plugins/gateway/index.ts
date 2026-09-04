@@ -15,6 +15,7 @@ import {
   type ModelReply,
   type ModelRequest,
   type ModelUsage,
+  type StopReason,
   zeroUsage,
 } from '../../core/model.js';
 import { RetryPolicy } from '../../core/retry.js';
@@ -82,14 +83,24 @@ const chunksOf = (response: { readonly stream?: () => AsyncIterable<string> }) =
     : Stream.fromAsyncIterable(body(), cause => new ModelError({ reason: 'transport', cause }));
 };
 
-const eventsOf = (wire: Wire, usage: Ref.Ref<ModelUsage>, data: string) =>
+/** What one stream collects on the way past, to report when it ends. */
+interface Tally {
+  readonly usage: Ref.Ref<ModelUsage>;
+  readonly stop: Ref.Ref<StopReason>;
+}
+
+const eventsOf = (wire: Wire, tally: Tally, data: string) =>
   Effect.try({
     try: () => JSON.parse(data) as unknown,
     catch: cause => new ModelError({ reason: 'body', cause }),
   }).pipe(
     Effect.tap(event => {
       const part = wire.toUsage(event);
-      return part === undefined ? Effect.void : Ref.update(usage, held => raise(held, part));
+      return part === undefined ? Effect.void : Ref.update(tally.usage, held => raise(held, part));
+    }),
+    Effect.tap(event => {
+      const reason = wire.toStop(event);
+      return reason === undefined ? Effect.void : Ref.set(tally.stop, reason);
     }),
     Effect.map(event => Option.fromNullable(wire.toDelta(event)))
   );
@@ -115,33 +126,39 @@ const streamWith = (
   request: ModelRequest,
   handle: AbortHandle | undefined
 ): Effect.Effect<Stream.Stream<ModelEvent, ModelError>> =>
-  Effect.map(Ref.make(zeroUsage), usage => {
-    const read = sseReader();
-    return Stream.unwrap(
-      Effect.map(wireFor(gateway.catalog, request.model), wire =>
-        Stream.fromEffect(
-          bodyFor(gateway, { wire, request: { ...request, stream: true }, handle })
-        ).pipe(
-          Stream.flatMap(chunksOf),
-          Stream.mapConcat(chunk => read(chunk)),
-          Stream.mapEffect(data => eventsOf(wire, usage, data)),
-          Stream.filterMap(part => part),
-          Stream.map(
-            (part): ModelEvent => ({
-              kind: part.kind,
-              text: part.text,
-              ...(part.signature === undefined ? {} : { signature: part.signature }),
-            })
-          ),
-          Stream.concat(
-            Stream.fromEffect(Ref.get(usage)).pipe(
-              Stream.map((counts): ModelEvent => ({ kind: 'done', usage: counts }))
+  Effect.all({ usage: Ref.make(zeroUsage), stop: Ref.make<StopReason>('unknown') }).pipe(
+    Effect.map(tally => {
+      const read = sseReader();
+      return Stream.unwrap(
+        Effect.map(wireFor(gateway.catalog, request.model), wire =>
+          Stream.fromEffect(
+            bodyFor(gateway, { wire, request: { ...request, stream: true }, handle })
+          ).pipe(
+            Stream.flatMap(chunksOf),
+            Stream.mapConcat(chunk => read(chunk)),
+            Stream.mapEffect(data => eventsOf(wire, tally, data)),
+            Stream.filterMap(part => part),
+            Stream.map(
+              (part): ModelEvent => ({
+                kind: part.kind,
+                text: part.text,
+                ...(part.signature === undefined ? {} : { signature: part.signature }),
+              })
+            ),
+            Stream.concat(
+              Stream.fromEffect(
+                Effect.all({ usage: Ref.get(tally.usage), stop: Ref.get(tally.stop) })
+              ).pipe(
+                Stream.map(
+                  (ended): ModelEvent => ({ kind: 'done', usage: ended.usage, stop: ended.stop })
+                )
+              )
             )
           )
         )
-      )
-    );
-  });
+      );
+    })
+  );
 
 /**
  * The kilo gateway plugin. It picks the best shape the model speaks.

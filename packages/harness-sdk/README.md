@@ -44,48 +44,10 @@ context window goes, and without one a session never compacts.
 
 `layerKilo` is the wiring almost every caller writes: the prompt assembler, the
 entropy source, the model catalog, and the gateway with its token and retry
-policy under it. Every one of them is still a plugin. A caller who needs a
-catalog that asks the gateway composes the layers themselves — see "Plugin
-points" below.
-
-## A credential that expires
-
-`token` takes a string or a `TokenSource`. The string is one credential for the
-life of the process; the source is asked for every call, which is what a
-session outliving its token needs. It is the one plugin most callers replace,
-so it is an option here rather than a reason to rewire by hand.
-
-```ts
-import { TokenError, TokenSource, type TokenSourceService } from '@kilocode/harness-sdk';
-
-let held: { value: string; until: number } | undefined;
-
-const refreshing: TokenSourceService = {
-  // Suspended, so every attempt reads the cache again. A failed call is
-  // retried by re-running this effect, so `Effect.succeed(held.value)` would
-  // hand the same expired credential to all three attempts.
-  get: () =>
-    Effect.suspend(() =>
-      held !== undefined && held.until > Date.now()
-        ? Effect.succeed(held.value)
-        : Effect.tryPromise({
-            try: async () => {
-              held = await mintFromYourAuthServer();
-              return held.value;
-            },
-            catch: cause => new TokenError({ cause }),
-          })
-    ),
-};
-
-const layers = layerKilo({ baseUrl, org, fetch: myFetch, token: refreshing });
-```
-
-The call is on the request path, so a source that fetches must cache: the
-package asks every time and caches nothing on a plugin's behalf.
-
-The session is scoped, so `Effect.scoped` is not optional: closing the scope is
-what tells the store to write what it still holds.
+policy under it. Every one of them is still a plugin. `token` also takes a
+source that is asked per call — see "A credential that expires" — and a caller
+who needs a catalog that asks the gateway composes the layers themselves; see
+"Plugin points" below.
 
 ## Your fetch
 
@@ -264,6 +226,45 @@ made, so a turn replayed after a summary fails on its signature.
 does — one changing subject, say. It takes the same lock a question takes, so
 it fails with `SessionBusyError` while an answer is still streaming rather than
 rewriting the conversation under it.
+
+## A credential that expires
+
+`token` takes a string or a `TokenSource`. The string is one credential for the
+life of the process; the source is asked for every call, which is what a
+session outliving its token needs. It is the one plugin most callers replace,
+so it is an option here rather than a reason to rewire by hand.
+
+```ts
+import { TokenError, TokenSource, type TokenSourceService } from '@kilocode/harness-sdk';
+
+let held: { value: string; until: number } | undefined;
+
+const refreshing: TokenSourceService = {
+  // Suspended, so every attempt reads the cache again. A failed call is
+  // retried by re-running this effect, so `Effect.succeed(held.value)` would
+  // hand the same expired credential to all three attempts.
+  get: () =>
+    Effect.suspend(() =>
+      held !== undefined && held.until > Date.now()
+        ? Effect.succeed(held.value)
+        : Effect.tryPromise({
+            try: async () => {
+              held = await mintFromYourAuthServer();
+              return held.value;
+            },
+            catch: cause => new TokenError({ cause }),
+          })
+    ),
+};
+
+const layers = layerKilo({ baseUrl, org, fetch: myFetch, token: refreshing });
+```
+
+The call is on the request path, so a source that fetches must cache: the
+package asks every time and caches nothing on a plugin's behalf.
+
+The session is scoped, so `Effect.scoped` is not optional: closing the scope is
+what tells the store to write what it still holds.
 
 ## The model cache
 

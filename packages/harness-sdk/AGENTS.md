@@ -259,6 +259,15 @@ Because the transform rewrites source, the package ships `dist/` and not
 version. Run `pnpm build` after changing a validated shape, or a dependent
 package reads a stale check.
 
+Every test here runs against `src/`; a consumer runs against `dist/`, through
+the `exports` map. `pnpm check:package` is the only thing that reads the build
+the way a caller does: it imports all six subpaths, asks each for a name it
+promises, and then asks one session a question through the built gateway
+against a `fetch` that answers from memory. That last part runs a compiled
+validator over a stream event, which nothing else does. Both halves were shown
+to fail on purpose on 2026-09-04 — a subpath pointed at a file that is not
+there, and a built `toDelta` that returns nothing.
+
 The first `ttsc` run on a machine compiles typia's plugin from Go and takes
 minutes. Later runs read a cache and take about a second.
 
@@ -286,7 +295,8 @@ package.
 - Name a file in kebab case. Export a type with `export type`.
 - Run `pnpm check` in this directory before you commit. It runs the compiler
   over `src/` and over `e2e/`, the linter, the boundary check, the migration
-  check, the tests, the build, the platform check, and the timing gate.
+  check, the tests, the build, the platform check, the package check, and the
+  timing gate.
 - If you change a code block in the README, change `e2e/readme-check.ts` with
   it. It is every README snippet against this source tree, and it is
   typechecked and never run: a snippet that does not compile is worse than no

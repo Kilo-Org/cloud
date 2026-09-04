@@ -398,22 +398,23 @@ is to learn everything that broke. Name one or more to run a subset, as in
 `pnpm test:e2e:all stop reasoning`. These runs cost real money and real time, so
 they are not part of `pnpm check` and never will be.
 
-The whole sweep, 2026-09-04, 4 minutes 27 seconds:
+The whole sweep, 2026-09-04, 7 minutes 32 seconds:
 
 ```
-PASS  live         9s   the second call read the prefix from the cache
-PASS  shapes      20s   every shape carried the conversation
-PASS  stop        22s   a finished answer, told from one the ceiling cut off
-PASS  tools       26s   every shape ran a tool, and a late answer drove a round
-PASS  image       15s   every shape carried the picture and replayed it
-PASS  cancel      15s   the call stopped when the caller did
-PASS  session     27s   the prefix held across 10 calls, a busy session refused
-PASS  resume      11s   the stored count is the provider's own
-PASS  clone       11s   the clone read the prefix from the cache and wrote none
-PASS  reasoning   26s   every shape took its own thinking back
-PASS  replay      24s   every shape took back thinking that had been stored
-PASS  compact     11s   the session compacted itself and kept what it was told
-PASS  models      60s   10 of 10 models answered every turn
+PASS  live        20s  the second call read the prefix from the cache
+PASS  shapes      26s  every shape carried the conversation
+PASS  stop        26s  a finished answer, told from one the ceiling cut off
+PASS  tools       80s  every shape ran a tool, and a late answer drove a round
+PASS  image       19s  every shape carried the picture and replayed it
+PASS  cancel      15s  the call stopped when the caller did
+PASS  queue       11s  two handed over while busy, one taken back, order kept
+PASS  session     27s  the prefix held across 10 calls, a busy session refused
+PASS  resume      15s  the stored count is the provider's own
+PASS  clone       43s  the clone read 11848 tokens of prefix and wrote 0
+PASS  reasoning   29s  every shape took its own thinking back
+PASS  replay      33s  every shape took back thinking that had been stored
+PASS  compact     21s  the session compacted itself and kept what it was told
+PASS  models      87s  10 of 10 models answered every turn
 ```
 
 `models` fails about one run in five on a single third-party model that answers
@@ -501,6 +502,41 @@ two calls in one turn overlapped by 600ms
 asked, not waited: "I'm waiting for your answer about your favourite colour."
 told later:        "You said your favourite colour is ultramarine."
 ```
+
+### The line, against a model that remembers
+
+`pnpm test:e2e:queue` proves the line is a conversation. A fake proves the line
+forms; only the provider proves a queued message is answered from the same
+transcript, in the order it joined.
+
+One session and three questions. Two messages are handed over from inside the
+first answer's own stream, which is the one moment the session is certainly
+held, and neither refuses. A third is queued between them and cancelled while
+it waits: it is never said to the model, and cancelling it twice answers false
+the second time. The first queued message asks the model for the word it last
+answered, so an answer carrying that word is the round running in this session
+and not beside it.
+
+Measured 2026-09-04, `anthropic/claude-haiku-4.5`:
+
+```
+asked while free:  "ferret"
+round 1 answered:  "ferret"
+round 2 answered:  "badger"
+
+waiting while busy: ["Answer with the word you last answered.","Answer with the word 'pangolin'.","Answer with the word 'badger'."]
+took one back: true, and again: false
+left in the line: 0
+what the session was asked: ["Answer with the word 'ferret'.","Answer with the word you last answered.","Answer with the word 'badger'."]
+```
+
+The run has its own system prompt rather than the shared one. The shared prompt
+forbids everything but a single word, and the model read "answer with the word
+you last answered" as a rule it had to refuse — which failed the run for the
+prompt rather than for the line.
+
+Breaking `cancelQueued` so it removes nothing fails five of the run's claims,
+including `the cancelled message was said to the model anyway`.
 
 ### A picture, and a caller who walks away
 

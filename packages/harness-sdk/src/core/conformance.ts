@@ -170,7 +170,10 @@ const checkTurns = (store: SessionStoreService, id: string): Effect.Effect<Broke
     const first: readonly Turn[] = [questionFor(id), answerFor(id)];
     const second: readonly Turn[] = [laterFor(id)];
     const one = yield* tried(store.append({ sessionId: id, turns: first, prompted: 11 }), 'append');
-    const two = yield* tried(store.append({ sessionId: id, turns: second, prompted: 22 }), 'append');
+    const two = yield* tried(
+      store.append({ sessionId: id, turns: second, prompted: 22 }),
+      'append'
+    );
     const flushed = yield* tried(store.flush(), 'flush');
     const loaded = yield* tried(store.load(id), 'load');
     const got = Option.getOrElse(loaded.got, (): readonly Turn[] => []);
@@ -211,7 +214,10 @@ const checkApart = (store: SessionStoreService, id: string): Effect.Effect<Broke
   Effect.gen(function* () {
     const other = `${id}_other`;
     yield* tried(store.create(sessionFor(other)), 'create');
-    yield* tried(store.append({ sessionId: other, turns: [laterFor(other)], prompted: 1 }), 'append');
+    yield* tried(
+      store.append({ sessionId: other, turns: [laterFor(other)], prompted: 1 }),
+      'append'
+    );
     const loaded = yield* tried(store.load(id), 'load');
     const got = Option.getOrElse(loaded.got, (): readonly Turn[] => []);
     return [
@@ -255,8 +261,7 @@ const builtBy = (assembler: PromptAssemblerService, turns: readonly Turn[]) =>
  * with every turn while nothing that was sent changes. Holding it against an
  * assembler would fail the one this package ships.
  */
-const said = (prompt: Prompt) =>
-  prompt.messages.map(({ cache: _cache, ...rest }) => rest);
+const said = (prompt: Prompt) => prompt.messages.map(({ cache: _cache, ...rest }) => rest);
 
 /**
  * Checks a `PromptAssembler` plugin against the two invariants that decide
@@ -285,8 +290,7 @@ const checkAssembler = (assembler: PromptAssemblerService): Broken => {
         'every question from then on.'
     ),
     ...wrongIf(
-      JSON.stringify(said(after).slice(0, before.messages.length)) !==
-        JSON.stringify(said(before)),
+      JSON.stringify(said(after).slice(0, before.messages.length)) !== JSON.stringify(said(before)),
       'assemble rewrote what came before an appended turn. Everything up to the new ' +
         'turn must be byte for byte what it was, or the prefix moves and the whole ' +
         'conversation is written to the cache again on every question.'

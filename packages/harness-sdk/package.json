@@ -32,6 +32,7 @@
     "test:e2e:clone": "ttsx e2e/clone.ts",
     "test:e2e:image": "ttsx e2e/image.ts",
     "test:e2e:models": "ttsx e2e/models.ts",
+    "test:e2e:queue": "ttsx e2e/queue.ts",
     "test:e2e:probe": "ttsx e2e/probe.ts",
     "test:e2e:resume": "ttsx e2e/resume.ts",
     "test:e2e:replay": "ttsx e2e/replay.ts",

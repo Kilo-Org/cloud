@@ -20,6 +20,7 @@ const runs = [
   'tools',
   'image',
   'cancel',
+  'queue',
   'session',
   'resume',
   'clone',

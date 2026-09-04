@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
-import { useManager } from './CloudAgentProvider';
+import { useCloudAgent, useManager } from './CloudAgentProvider';
 import { useWorktreeChatCreation, useWorktreeChatTabs } from './CloudSidebarLayout';
 import { MobileSidebarToggle } from './MobileSidebarToggle';
 import { ChatHeader } from './ChatHeader';
@@ -56,6 +56,9 @@ import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import { WorktreeChangesDrawer } from './WorktreeChanges';
 import { WorktreeFilePane } from './WorktreeFilePane';
 import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
+import { WorktreeReviewDialog } from './WorktreeReviewDialog';
+import { useWorktreeReview } from './useWorktreeReview';
+import type { WorktreeReviewComment } from './worktree-review';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { canOpenWorktreeChanges } from './worktree-changes';
 import {
@@ -146,6 +149,7 @@ export default function CloudChatPage({
   organizationRole,
 }: CloudChatPageProps) {
   const manager = useManager();
+  const reviewApi = useCloudAgent();
   const { createWorktreeChat, creatingWorktreeSourceSessionId } = useWorktreeChatCreation();
   const {
     selectedWorktreeId,
@@ -681,6 +685,96 @@ export default function CloudChatPage({
     [canOpenChanges]
   );
 
+  const handleReviewAccepted = useCallback(
+    (destinationKiloSessionId: string) => {
+      setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
+      openSession(destinationKiloSessionId);
+    },
+    [openSession]
+  );
+  const review = useWorktreeReview({
+    userId: currentUserId,
+    organizationId,
+    worktreeId: selectedWorktreeId,
+    activeKiloSessionId: sessionIdFromParams,
+    activeSessionConfig:
+      isCurrentSession &&
+      activeSessionType === 'cloud-agent' &&
+      sessionConfig?.sessionId === sessionId
+        ? sessionConfig
+        : null,
+    enabled: Boolean(
+      currentUserId &&
+      selectedWorktreeId &&
+      (!sessionIdFromParams ||
+        (canOpenChanges &&
+          activeSessionType === 'cloud-agent' &&
+          fetchedSessionData?.worktreeId === selectedWorktreeId &&
+          !deletingSessionIds.includes(sessionIdFromParams)))
+    ),
+    worktreeChats,
+    deletingSessionIds,
+    api: reviewApi,
+    onAccepted: handleReviewAccepted,
+  });
+  const reviewAgainFile = useRef<{
+    userId: string;
+    organizationId?: string;
+    workspaceScope: string;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+    path: string;
+  } | null>(null);
+  const handleReviewAgain = (comment: WorktreeReviewComment) => {
+    if (!review.scope || review.locked) return;
+    const source = review.destinations.find(
+      destination =>
+        destination.cloudAgentSessionId === comment.anchor.capture.sourceCloudAgentSessionId
+    );
+    if (!source || !review.removeComment(comment.id)) return;
+    review.setOpen(false);
+    if (source.sessionId === sessionIdFromParams && canOpenChanges) {
+      setWorkspaceTabs(state =>
+        setFileTabMode(openFileTab(state, comment.anchor.path), comment.anchor.path, 'diff')
+      );
+    } else {
+      reviewAgainFile.current = {
+        ...review.scope,
+        kiloSessionId: source.sessionId,
+        cloudAgentSessionId: source.cloudAgentSessionId,
+        path: comment.anchor.path,
+      };
+      openSession(source.sessionId);
+    }
+  };
+  useEffect(() => {
+    const file = reviewAgainFile.current;
+    if (!file) return;
+    if (
+      file.userId !== currentUserId ||
+      file.organizationId !== organizationId ||
+      file.workspaceScope !== workspaceTabScope
+    ) {
+      reviewAgainFile.current = null;
+      return;
+    }
+    if (
+      !canOpenChanges ||
+      sessionIdFromParams !== file.kiloSessionId ||
+      sessionId !== file.cloudAgentSessionId
+    )
+      return;
+    reviewAgainFile.current = null;
+    setWorkspaceTabs(state => setFileTabMode(openFileTab(state, file.path), file.path, 'diff'));
+  }, [
+    canOpenChanges,
+    currentUserId,
+    organizationId,
+    sessionId,
+    sessionIdFromParams,
+    workspaceTabScope,
+  ]);
+
   const handleCloseFileTab = useCallback((path: string) => {
     setWorkspaceTabs(state => closeFileTab(state, path));
   }, []);
@@ -1152,6 +1246,7 @@ export default function CloudChatPage({
                       />
                     )}
                   </div>
+                  <WorktreeReviewDialog review={review} onReviewAgain={handleReviewAgain} />
                   {sessionIdFromParams && <div className="ml-auto shrink-0">{sessionActions}</div>}
                 </div>
 
@@ -1413,6 +1508,8 @@ export default function CloudChatPage({
                                 organizationId={organizationId}
                                 path={tab.path}
                                 mode={tab.mode}
+                                review={review.scope ? review.bindings : undefined}
+                                reviewScope={review.scope ?? undefined}
                                 onModeChange={mode =>
                                   setWorkspaceTabs(state => setFileTabMode(state, tab.path, mode))
                                 }

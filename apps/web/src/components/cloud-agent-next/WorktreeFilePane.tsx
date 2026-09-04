@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useWorktreeFile } from './useWorktreeFile';
 import type { WorktreeFileViewMode } from './workspace-tabs';
+import type { WorktreeReviewCapture } from './worktree-review';
+import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
 
 const WorktreeFileRenderer = lazy(() => import('./WorktreeFileRenderer'));
 
@@ -88,12 +90,16 @@ export function WorktreeFilePane({
   path,
   mode,
   onModeChange,
+  review,
+  reviewScope,
 }: {
   cloudAgentSessionId: string;
   organizationId?: string;
   path: string;
   mode?: WorktreeFileViewMode;
   onModeChange: (mode: WorktreeFileViewMode) => void;
+  review?: WorktreeFileReviewBindings;
+  reviewScope?: { userId: string; organizationId?: string; workspaceScope: string };
 }) {
   const { state, isFetching, reload } = useWorktreeFile({
     cloudAgentSessionId,
@@ -101,6 +107,22 @@ export function WorktreeFilePane({
     path,
   });
   const statusProps = { path, isFetching, onReload: () => void reload() };
+  const reviewCapture: WorktreeReviewCapture | undefined =
+    review &&
+    reviewScope &&
+    reviewScope.organizationId === organizationId &&
+    cloudAgentSessionId.startsWith('workspace_') &&
+    'file' in state
+      ? {
+          userId: reviewScope.userId,
+          organizationId: reviewScope.organizationId,
+          workspaceScope: reviewScope.workspaceScope,
+          sourceCloudAgentSessionId: cloudAgentSessionId,
+          revision: state.file.revision,
+          capturedAt: state.capturedAt,
+          comparison: state.comparison,
+        }
+      : undefined;
 
   return (
     <div
@@ -128,6 +150,8 @@ export function WorktreeFilePane({
               onModeChange={onModeChange}
               isFetching={isFetching}
               onReload={statusProps.onReload}
+              review={reviewCapture ? review : undefined}
+              reviewCapture={reviewCapture}
             />
           </Suspense>
         </RendererBoundary>

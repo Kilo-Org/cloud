@@ -65,7 +65,12 @@ jest.mock('@tanstack/react-query', () => ({
   useQueryClient: () => mockQueryClient,
 }));
 jest.mock('@/lib/trpc/utils', () => ({ useTRPC: () => mockTrpc }));
-jest.mock('./CloudAgentProvider', () => ({ useManager: () => mockManager }));
+jest.mock('./CloudAgentProvider', () => ({
+  useManager: () => mockManager,
+  useCloudAgent: () => ({}),
+}));
+jest.mock('./useWorktreeReview', () => ({ useWorktreeReview: () => ({ scope: null }) }));
+jest.mock('./WorktreeReviewDialog', () => ({ WorktreeReviewDialog: () => null }));
 jest.mock('./CloudSidebarLayout', () => ({
   useWorktreeChatCreation: () => ({
     createWorktreeChat: jest.fn(),

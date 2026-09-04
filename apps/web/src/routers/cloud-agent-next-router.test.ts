@@ -1,6 +1,7 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
 import { cli_sessions_v2, organizations, type User } from '@kilocode/db/schema';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
+import type { CloudAgentNextClient } from '@/lib/cloud-agent-next/cloud-agent-client';
 import type * as MinimumVersionModule from '@/lib/trpc/min-version';
 import { db } from '@/lib/drizzle';
 import { eq } from 'drizzle-orm';
@@ -69,6 +70,7 @@ const mockGenerateCloudAgentAttachmentDownloadUrl = jest.fn<
 >(() => Promise.resolve({ signedUrl: 'signed', key: 'key', expiresAt: 'expires' }));
 
 const mockGetSession = jest.fn<(cloudAgentSessionId: string) => Promise<{ model?: string }>>();
+const mockGetMessageResult = jest.fn<CloudAgentNextClient['getMessageResult']>();
 const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
@@ -88,6 +90,7 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
+  getMessageResult: mockGetMessageResult,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
   getWorktreeChanges: mockGetWorktreeChanges,
@@ -213,8 +216,15 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     worktreeId: string;
     replayed?: boolean;
   }>;
+  getMessageResult: (input: {
+    cloudAgentSessionId: string;
+    expectedWorktreeId: `worktree_${string}`;
+    messageId: string;
+  }) => ReturnType<CloudAgentNextClient['getMessageResult']>;
   sendMessage: (input: {
     cloudAgentSessionId: string;
+    expectedWorktreeId?: `worktree_${string}`;
+    messageId?: string;
     payload:
       | { type: 'prompt'; prompt: string; mode: string; model: string }
       | { type: 'command'; command: string; arguments: string };
@@ -256,6 +266,8 @@ beforeAll(async () => {
 describe('cloudAgentNextRouter worktree changes access', () => {
   const personalSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const orgSessionId = 'workspace_12345678-1234-4234-9234-123456789abd';
+  const worktreeId = 'worktree_12345678-1234-4234-9234-123456789abc';
+  const reviewMessageId = 'msg_123456789abc123456789ABCDE';
   let owner: User;
   let otherUser: User;
 
@@ -273,6 +285,7 @@ describe('cloudAgentNextRouter worktree changes access', () => {
       {
         session_id: 'ses_changes_personal',
         cloud_agent_session_id: personalSessionId,
+        cloud_agent_worktree_id: worktreeId,
         kilo_user_id: owner.id,
         created_on_platform: 'cloud-agent-web',
       },
@@ -295,6 +308,106 @@ describe('cloudAgentNextRouter worktree changes access', () => {
     mockGetWorktreeChanges.mockResolvedValue({ snapshot: null });
     mockRefreshWorktreeChanges.mockResolvedValue({ status: 'offline', snapshot: null });
     mockGetWorktreeFile.mockResolvedValue({ status: 'not_captured' });
+  });
+
+  describe.each(['sendMessage', 'getMessageResult'] as const)('review %s', procedure => {
+    const payload = {
+      type: 'prompt' as const,
+      prompt: 'Review feedback',
+      mode: 'code',
+      model: 'model/target',
+    };
+    function call(
+      user: User,
+      cloudAgentSessionId = personalSessionId,
+      expectedWorktreeId: `worktree_${string}` = worktreeId
+    ) {
+      const caller = createCaller({ user });
+      const input = { cloudAgentSessionId, expectedWorktreeId, messageId: reviewMessageId };
+      return procedure === 'sendMessage'
+        ? caller.sendMessage({ ...input, payload })
+        : caller.getMessageResult(input);
+    }
+
+    beforeEach(() => {
+      mockGetMessageResult.mockResolvedValue({
+        cloudAgentSessionId: personalSessionId,
+        messageId: reviewMessageId,
+        status: 'completed',
+        acceptedAt: 1,
+      });
+      mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+        isFree: false,
+        hasUserByokAvailable: false,
+      });
+    });
+
+    it('checks the exact worktree and keeps its guard out of the Worker payload', async () => {
+      await call(owner);
+      if (procedure === 'sendMessage') {
+        expect(mockSendMessage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            cloudAgentSessionId: personalSessionId,
+            payload,
+            messageId: reviewMessageId,
+          })
+        );
+        expect(mockSendMessage.mock.calls[0]?.[0]).not.toHaveProperty('expectedWorktreeId');
+        expect(mockComputeCloudAgentNextBalanceCheckEligibility).toHaveBeenCalledWith(
+          expect.objectContaining({ user: owner, modelId: payload.model })
+        );
+      } else {
+        expect(mockGetMessageResult).toHaveBeenCalledWith({
+          cloudAgentSessionId: personalSessionId,
+          messageId: reviewMessageId,
+        });
+        expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+        expect(mockSendMessage).not.toHaveBeenCalled();
+      }
+    });
+
+    it('rejects the wrong worktree before any Worker call', async () => {
+      await expect(
+        call(owner, personalSessionId, 'worktree_22345678-1234-4234-9234-123456789abc')
+      ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
+    });
+
+    it('denies other owners and cross-organization targets', async () => {
+      await expect(call(otherUser)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(call(owner, orgSessionId)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+
+    it('rejects missing targets and non-control-plane references', async () => {
+      await expect(
+        call(owner, 'workspace_22345678-1234-4234-9234-123456789abc')
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(call(owner, 'agent_12345678-1234-4234-9234-123456789abc')).rejects.toMatchObject(
+        { code: 'BAD_REQUEST' }
+      );
+      expect(mockSendMessage).not.toHaveBeenCalled();
+      expect(mockGetMessageResult).not.toHaveBeenCalled();
+    });
+  });
+
+  it('bounds follow-up prompts on the server', async () => {
+    await expect(
+      createCaller({ user: owner }).sendMessage({
+        cloudAgentSessionId: personalSessionId,
+        expectedWorktreeId: worktreeId,
+        payload: {
+          type: 'prompt',
+          prompt: 'a'.repeat(100_001),
+          mode: 'code',
+          model: 'model/target',
+        },
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockSendMessage).not.toHaveBeenCalled();
   });
 
   it('rechecks ownership after a saved-file session is deleted', async () => {

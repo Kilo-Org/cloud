@@ -46,6 +46,14 @@ file before you change any file in this package.
     tool result, a caller's input. Do not validate a value the package already
     made; that costs CPU and proves nothing.
 
+    A caller's input is the one edge with no runtime check today, and that is
+    a decision rather than an omission. The package ships types, a caller who
+    holds them cannot build a bad part without a cast, and a check here would
+    need a public error tag of its own for a case nobody has hit. The one
+    caller value that is checked is an image's media type, in
+    `wire/messages.ts`, because there the shape genuinely cannot carry what a
+    string allows. Add the rest when a caller arrives who needs it.
+
     The TypeScript type is the schema. `createIs<T>()` returns a boolean and
     `createAssert<T>()` throws; both are rewritten into inlined checks when
     `ttsc` compiles the file, so no schema object exists at run time.

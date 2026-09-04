@@ -400,24 +400,24 @@ is to learn everything that broke. Name one or more to run a subset, as in
 `pnpm test:e2e:all stop reasoning`. These runs cost real money and real time, so
 they are not part of `pnpm check` and never will be.
 
-The whole sweep, 2026-09-04, 6 minutes 41 seconds:
+The whole sweep, 2026-09-04, 4 minutes 32 seconds:
 
 ```
-PASS  live         9s  the second call read the prefix from the cache
-PASS  shapes      17s  every shape carried the conversation
-PASS  stop        19s  a finished answer, told from one the ceiling cut off
-PASS  tools       27s  every shape ran a tool, and a late answer drove a round
-PASS  image       22s  every shape carried the picture and replayed it
-PASS  cancel      19s  the call stopped when the caller did
-PASS  queue       16s  two handed over while busy, one taken back, order kept
-PASS  together    53s  a late answer and a typed message shared one line
-PASS  session     28s  the prefix held across 10 calls, a busy session refused
-PASS  resume      17s  the stored count is the provider's own
-PASS  clone       15s  the clone read 11848 tokens of prefix and wrote 0
-PASS  reasoning   27s  every shape took its own thinking back
-PASS  replay      37s  every shape took back thinking that had been stored
-PASS  compact     22s  the session compacted itself and kept what it was told
-PASS  models      67s  10 of 10 models answered every turn
+PASS  live         7s  the second call read the prefix from the cache
+PASS  shapes      13s  every shape carried the conversation
+PASS  stop        12s  a finished answer, told from one the ceiling cut off
+PASS  tools       23s  every shape ran a tool, and a late answer drove a round
+PASS  image       12s  every shape carried the picture and replayed it
+PASS  cancel      10s  the call stopped when the caller did
+PASS  queue        8s  two handed over while busy, one taken back, order kept
+PASS  together    24s  a late answer and a typed message shared one line
+PASS  session     24s  the prefix held across 10 calls, a busy session refused
+PASS  resume      11s  the stored count is the provider's own
+PASS  clone       10s  the clone read 11848 tokens of prefix and wrote 0
+PASS  reasoning   29s  every shape took its own thinking back
+PASS  replay      25s  every shape took back thinking that had been stored
+PASS  compact     12s  the session compacted itself and kept what it was told
+PASS  models      50s  10 of 10 models answered every turn
 ```
 
 `models` fails about one run in five on a single third-party model that answers

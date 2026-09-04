@@ -276,7 +276,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `tool-matrix` |
+| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix` |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
@@ -293,7 +293,7 @@ package reads a stale check.
 
 Every test here runs against `src/`; a consumer runs against `dist/`, through
 the `exports` map. `pnpm check:package` is the only thing that reads the build
-the way a caller does: it imports all six subpaths, asks each for a name it
+the way a caller does: it imports every subpath, asks each for a name it
 promises, and then asks one session a question through the built gateway
 against a `fetch` that answers from memory. That last part runs a compiled
 validator over a stream event, which nothing else does. Both halves were shown
@@ -491,8 +491,10 @@ The second call read the whole prefix and wrote only what the first exchange
 added. The hit ratio was 0.9995. That is the healthy shape; a growing `input`
 or a repeated large `cache write` means the prefix moved.
 
-`e2e/node-fetch.ts` is the whole Node adapter, about ten lines. That is the
-measure of what `FetchLike` asks of a caller.
+`webFetch` is the whole adapter for a runtime that has a WHATWG `fetch`, and
+`src/plugins/fetch/web.ts` is about twenty lines of which fifteen are the
+ambient declarations. That is the measure of what `FetchLike` asks of a
+caller.
 
 ### The shapes, and a session that grows
 
@@ -1396,7 +1398,9 @@ package already asks the caller for a `fetch`. A runtime without one still
 works and simply cannot stop a call early.
 
 The package declares only the part of a signal it hands on, so an adapter names
-the type its own runtime has. `e2e/node-fetch.ts` shows the one line.
+the type its own runtime has. `src/plugins/fetch/web.ts` shows how the package
+itself avoids the cast: it declares the members it uses and passes the signal
+through as `unknown`.
 
 ### An exchange is written whole, or not at all
 
@@ -1579,15 +1583,6 @@ returning a random identifier typechecks, passes every test, and breaks the
 cache one reload later. The ordering is not a choice; where the randomness
 comes from is, and that is `EntropySource`.
 
-**A shipped `fetch` adapter.** Every caller writes the same twenty lines to
-join their runtime's `fetch` to `FetchLike`, and it was tried as
-`plugins/fetch/web.ts`. It cannot be written here: `AbortLike` is deliberately
-not `AbortSignal`, so the adapter needs one cast that only code holding the
-runtime's own type can make honestly, and `no-unsafe-type-assertion` is on for
-a reason. The adapter is in the README instead, and in `e2e/node-fetch.ts`
-where every live run uses it. React Native needs its own regardless: its
-`fetch` does not stream a response body without a polyfill.
-
 **The token ceiling.** It was the third of three ways to set one number and
 fired only when a caller set neither of the other two. `ModelCatalog` already
 knows a model's own limit, so `ask.ts` reads
@@ -1603,7 +1598,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | Path | Purpose |
 |---|---|
 | `src/index.ts` | The public entry point; what a caller uses, and every owned plugin |
-| `src/core/index.ts` | The `/core` entry point; every core module, no plugin |
+| `src/core/index.ts` | The `/core` entry point. Every core module a plugin author reaches, no plugin. The five that only a session runs — `background`, `exchange`, `loop`, `tools`, `waiting` — are reached by path |
 | `src/core/run.ts` | `openSession`: a new session |
 | `src/core/resume.ts` | `continueSession` and `cloneSession`: one the store already holds |
 | `src/core/wiring.ts` | What every session shares: the options, the handle, the bridge |
@@ -1614,6 +1609,8 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/loop.ts` | The rounds one question makes, and the three ways they end |
 | `src/core/tool.ts` | The `ToolRegistry` plugin point, and what a tool is |
 | `src/core/tools.ts` | Running the calls of one turn, under a deadline they can outlive |
+| `src/core/waiting.ts` | How long each call is waited for, and what the model is told when it is not |
+| `src/core/compact.ts` | Summarising a session that has filled the window |
 | `src/core/background.ts` | The driver: what the session says when nobody is streaming |
 | `src/core/usage.ts` | Token counts and the cache hit ratio |
 | `src/core/session.ts` | The session and its append-only turns |
@@ -1625,11 +1622,13 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/entropy.ts` | The `EntropySource` plugin point; random bytes |
 | `src/core/conformance.ts` | `checkStore` and `checkAssembler`: what a plugin author runs |
 | `src/core/session-fixture.ts` | What the session tests share. Excluded from `dist/` |
+| `src/core/resume-fixture.ts` | What the resume tests share. Excluded from `dist/` |
 | `src/perf.perf.test.ts` | The timing gate; run by `pnpm test:perf`, not `pnpm test` |
 | `src/core/catalog.ts` | The `ModelCatalog` plugin point; shapes and output limit |
 | `src/core/token.ts` | The `TokenSource` plugin point; the credential per call |
 | `src/core/retry.ts` | The `RetryPolicy` plugin point; an effect `Schedule` |
 | `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
+| `src/plugins/fetch/web.ts` | `webFetch`: that seam filled for a runtime with a WHATWG `fetch` |
 | `src/plugins/kilo.ts` | `layerKilo`: the five layers a session needs, in one call |
 | `src/plugins/model/fake.ts` | A scripted model, for this package's tests. Excluded from `dist/` |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
@@ -1680,16 +1679,23 @@ replacing it by hand means rebuilding the shared catalog — the trap this
 function closes. One line here against twelve a caller would have copied. Every
 other plugin is still replaced by composing the layers instead.
 
-There are seven entry points: `@kilocode/harness-sdk`, `/core`,
-`/plugins/gateway`, `/plugins/prompt`, `/plugins/tools`, `/plugins/store/node`
-and `/plugins/store/expo`. The two stores have subpaths of their own because each
-names a platform: exporting them from the root would pull `node:sqlite` or
-`expo-sqlite` into every bundle. The catalog, token and retry plugins have
-none — a consumer reaches them through the root barrel, which also pulls the
-gateway. Add a subpath when one of them is wanted on its own.
+There are nine entry points: `@kilocode/harness-sdk`, `/core`,
+`/plugins/fetch`, `/plugins/gateway`, `/plugins/prompt`, `/plugins/tools`,
+`/plugins/store/node`, `/plugins/store/expo` and `/testing`. The two stores have
+subpaths of their own because each names a platform: exporting them from the
+root would pull `node:sqlite` or `expo-sqlite` into every bundle. `/plugins/fetch`
+and `/testing` have theirs because an entry point is what a consumer bundles and
+neither runs in production — a caller with a `fetch` of their own should not
+carry this one, and the conformance checks belong to a plugin author's test
+suite. The catalog, token and retry plugins have none — a consumer reaches them
+through the root barrel, which also pulls the gateway. Add a subpath when one of
+them is wanted on its own.
+
+`scripts/check-package.ts` reads `package.json` and the README's own table, so a
+tenth entry point that reaches neither this list nor that one fails the build.
 
 The root is narrower than `/core` on purpose. It re-exports whole only the
-modules a caller uses whole, and names what it takes from the seven that hold
+modules a caller uses whole, and names what it takes from the ones that hold
 the machinery a session runs on: `wiringFor`, `makeId`, `sinceSummary`,
 `onStore` and the rest are reached through `/core` instead. The tool contracts
 are at the root — a caller writes tools — while `resolveTools`, `toolNamed`,
@@ -1744,6 +1750,17 @@ by the type system alone.
 as exceptions, because each is a call, not a constructor.
 
 `isolatedDeclarations` is off. It cannot infer a typia validator's type.
+
+**The `fetch` adapter was once recorded here as impossible, and it is not.**
+The entry said `AbortLike` is deliberately not `AbortSignal`, so an adapter
+needs one cast that only code holding the runtime's own type can make honestly,
+and `no-unsafe-type-assertion` is on. That is true of a caller who has the DOM
+types and false of this package, which does not: `src/plugins/fetch/web.ts`
+declares the four members of `fetch`, `Response` and `TextDecoder` it uses,
+passes the signal straight through as `unknown`, and needs no cast at all.
+`lib: ["esnext"]` and `types: []` both still hold. The README keeps the
+hand-written version below `webFetch`, for a runtime whose `fetch` does not
+stream — React Native without a polyfill is the one that matters.
 
 `import/group-exports` stays on. Declare a name, then export it in one
 `export type { ... }` block and one `export { ... }` block at the end of the

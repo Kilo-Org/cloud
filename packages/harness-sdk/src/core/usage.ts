@@ -24,8 +24,14 @@ const raise = (held: ModelUsage, part: Partial<ModelUsage>): ModelUsage => ({
 });
 
 /**
- * The share of the input that came from the cache. This must stay above 0.95.
- * Returns zero when nothing has been read yet.
+ * The share of the input that came from the cache. Returns zero when nothing has
+ * been read yet.
+ *
+ * There is no floor to hold this to, and one used to be written here. The
+ * number is partly the provider's: the same prompt through the same code read
+ * 0.79 on one run and 0.99 on the next, and the model run spans 0.28 to 0.9997
+ * across providers. A live run asserts `cacheReadTokens > 0` instead — see
+ * "Many models, a longer conversation" in AGENTS.md.
  */
 const hitRatio = (usage: ModelUsage): number => {
   const total = usage.cacheReadTokens + usage.inputTokens;

@@ -4,7 +4,7 @@
  * These runs cost real money and real time, so they are not part of
  * `pnpm check` and never will be. This exists because a change to the wire or
  * to the session has to be answered by the provider, not by a fake, and
- * running nine commands by hand invites running eight.
+ * running seventeen commands by hand invites running sixteen.
  *
  * `pnpm test:e2e:all`. One failure does not stop the rest: the point of a
  * sweep is to learn everything that broke, not the first thing. Name runs to

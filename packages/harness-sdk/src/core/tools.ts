@@ -173,4 +173,4 @@ const callsIn = (turn: Turn): readonly ToolCall[] =>
     .filter(part => part.kind === 'toolCall')
     .map(part => ({ id: part.callId, name: part.name, arguments: part.body }));
 
-export { callsIn, lateText, resultsTurn, runCalls };
+export { callsIn, resultsTurn, runCalls };

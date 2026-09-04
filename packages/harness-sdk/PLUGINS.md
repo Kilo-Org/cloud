@@ -271,10 +271,11 @@ Every block on this page is typechecked against the source tree, in
 
 ## What is not a plugin
 
-`FetchLike` is not a tag. The gateway takes a `fetch` directly, because an
-adapter needs one cast that only code holding the runtime's own type can make
-honestly. `e2e/node-fetch.ts` is the whole Node adapter, about ten lines, and
-the README has it.
+`FetchLike` is not a tag. The gateway takes a `fetch` directly, and a runtime
+that has a WHATWG `fetch` needs no adapter of its own: import `webFetch` from
+`@kilocode/harness-sdk/plugins/fetch`. It is an entry point rather than part of
+the root, so a caller who brings their own carries nothing. The README has the
+hand-written version for a runtime whose `fetch` does not stream.
 
 There is no generic `layerModelClient(...)` helper, and there will not be.
 `Layer.succeed(ModelClient, yours)` is already one line, it is the Effect idiom

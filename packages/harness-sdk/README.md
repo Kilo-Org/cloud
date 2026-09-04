@@ -64,8 +64,8 @@ const layers = layerKilo({ baseUrl, org, token, fetch: webFetch });
 ```
 
 It is an entry point of its own, so a caller who brings their own carries
-nothing. `e2e/node-fetch.ts` re-exports it and every live run goes through it,
-which is how it is proven rather than described.
+nothing. Every live run in `e2e/` imports it the way a consumer would, which is
+how it is proven rather than described.
 
 A runtime without one writes one, and this is the whole of it:
 

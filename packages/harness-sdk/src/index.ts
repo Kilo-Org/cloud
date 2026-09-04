@@ -1,11 +1,14 @@
 /**
  * What a consumer imports.
  *
- * The modules a caller uses whole are re-exported whole. The eight below are not:
- * they hold the machinery a session runs on, and a caller who reads `history`
- * has no use for `wiringFor`, `makeId` or `sinceSummary`. Everything left out
- * here is still reachable from `@kilocode/harness-sdk/core`, which is the whole
- * of the core and is where a plugin author goes.
+ * The modules a caller uses whole are re-exported whole. The ones named below
+ * are not: they hold the machinery a session runs on, and a caller who reads
+ * `history` has no use for `wiringFor`, `makeId` or `sinceSummary`. Everything
+ * left out here is still reachable from `@kilocode/harness-sdk/core`, which is
+ * where a plugin author goes.
+ *
+ * No count is written here on purpose. One was, twice, and both were wrong
+ * within two commits. `src/index.test.ts` is what holds this honest.
  *
  * `conformance.ts` is not here either, and for a different reason: `checkStore`
  * and `checkAssembler` are run by a plugin author in their own test suite, and

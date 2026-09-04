@@ -1,6 +1,7 @@
 import type { ApiKind, ModelFacts } from '../src/core/catalog.js';
 import { layerKilo, type KiloSetup } from '../src/plugins/kilo.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { webFetch } from '../src/plugins/fetch/web.js';
+import { kiloToken } from './token.js';
 
 /**
  * What every live run wires: the package's own composed layer, pointed at the
@@ -32,7 +33,7 @@ const kilo = (
   layerKilo({
     baseUrl,
     org: { kind: 'organization', id: organizationId },
-    fetch: nodeFetch,
+    fetch: webFetch,
     token,
     fallback: facts,
     ...over,

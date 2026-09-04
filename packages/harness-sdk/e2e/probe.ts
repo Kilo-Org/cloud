@@ -5,7 +5,8 @@
  *
  * `pnpm test:e2e:probe [shape] [model]`
  */
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { webFetch } from '../src/plugins/fetch/web.js';
+import { kiloToken } from './token.js';
 
 const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
 const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
@@ -48,7 +49,7 @@ const bodies: Readonly<Record<keyof typeof paths, unknown>> = {
   },
 };
 
-const response = await nodeFetch(`${baseUrl}${paths[shape]}`, {
+const response = await webFetch(`${baseUrl}${paths[shape]}`, {
   method: 'POST',
   headers: {
     'content-type': 'application/json',

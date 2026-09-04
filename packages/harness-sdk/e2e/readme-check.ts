@@ -13,9 +13,8 @@ import { hitRatio } from '../src/core/usage.js';
 import type { Continued } from '../src/core/queue.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { DatabaseSync } from 'node:sqlite';
-import { nodeFetch } from './node-fetch.js';
-import { said } from '../src/core/model.js';
 import { webFetch } from '../src/plugins/fetch/web.js';
+import { said } from '../src/core/model.js';
 
 /* README, "Your fetch": the adapter the package ships. */
 const shipped = layerKilo({
@@ -29,7 +28,7 @@ void shipped;
 const layers = layerKilo({
   baseUrl: 'https://app.kilo.ai',
   org: { kind: 'organization', id: 'org_...' },
-  fetch: nodeFetch,
+  fetch: webFetch,
   token: '...',
   fallback: { apiKinds: ['messages'] },
 });
@@ -118,7 +117,7 @@ const refreshing: TokenSourceService = {
 export const refreshed = layerKilo({
   baseUrl: 'https://app.kilo.ai',
   org: { kind: 'organization', id: 'org_...' },
-  fetch: nodeFetch,
+  fetch: webFetch,
   token: refreshing,
 });
 

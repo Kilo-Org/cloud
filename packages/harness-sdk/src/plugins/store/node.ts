@@ -9,7 +9,9 @@ import { layerSqliteStore } from './sqlite.js';
  * that name a platform, which is why it is a plugin and why nothing else
  * imports it.
  *
- * `node:sqlite` needs Node 24, or Node 22.5 with `--experimental-sqlite`.
+ * `node:sqlite` needs Node 22.13, which is where it stopped asking for
+ * `--experimental-sqlite`. On 22.5 to 22.12 the import fails without the flag,
+ * and before 22.5 the module does not exist.
  */
 
 /**

@@ -17,7 +17,7 @@ import type { AbortLike, FetchLike } from '../src/core/fetch.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { kilo } from './setup.js';
-import { nodeFetch } from './node-fetch.js';
+import { webFetch } from '../src/plugins/fetch/web.js';
 
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 
@@ -40,7 +40,7 @@ process.on('unhandledRejection', reason => loose.push(reason));
 const signals: (AbortLike | undefined)[] = [];
 const watchedFetch: FetchLike = (url, request) => {
   signals.push(request.signal);
-  return nodeFetch(url, request);
+  return webFetch(url, request);
 };
 
 const layers = kilo({ apiKinds: ['messages'] }, { fetch: watchedFetch });

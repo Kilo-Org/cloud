@@ -29,7 +29,7 @@ const remember = (wiring: Wiring, turn: Turn): Effect.Effect<void> =>
  *
  * One record rather than a ref per field. Copying the other three on every
  * token costs 0.054 us against 0.402 for the update alone, measured
- * 2026-09-04 over 200000 rounds, which is a third of a percent of the 17.8 us
+ * 2026-09-04 over 200000 rounds, which is a third of a percent of the 18.1 us
  * a token costs through the whole session. `finish` reads it once.
  */
 interface Spoken {

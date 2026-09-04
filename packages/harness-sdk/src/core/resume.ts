@@ -57,7 +57,8 @@ const continueSession = (
     const store = yield* SessionStore;
     const stored = yield* storedOf(store, sessionId);
     const turns = yield* store.load(sessionId);
-    return handleOf(yield* wiringFor(optionsOf(stored), { id: sessionId, turns }, stored.prompted));
+    const wiring = yield* wiringFor(optionsOf(stored), { id: sessionId, turns }, stored.prompted);
+    return yield* handleOf(wiring);
   });
 
 /**
@@ -110,7 +111,7 @@ const cloneSession = (
     const prompted = stored.prompted ?? 0;
     yield* store.create({ ...options, id: opened.id, prompted });
     const turns = yield* copyTurns(store, entropy, { sessionId: opened.id, source, prompted });
-    return handleOf(yield* wiringFor(options, { id: opened.id, turns }, prompted));
+    return yield* handleOf(yield* wiringFor(options, { id: opened.id, turns }, prompted));
   });
 
 export type { ResumeContext, ResumeError };

@@ -16,11 +16,7 @@ import { type Tool, type ToolCall, ToolFailure, ToolRegistry } from './tool.js';
 
 const call = (id: string, name: string, args = '{}'): ToolCall => ({ id, name, arguments: args });
 
-const tool = (
-  name: string,
-  run: Tool['run'],
-  concurrent?: boolean
-): Tool => ({
+const tool = (name: string, run: Tool['run'], concurrent?: boolean): Tool => ({
   definition: { name, description: name, parameters: { type: 'object', properties: {} } },
   ...(concurrent === undefined ? {} : { concurrent }),
   run,
@@ -61,11 +57,7 @@ it('runs the tool, answers the model with it, and asks again', async () => {
   expect(calls).toHaveLength(2);
   /* The second request carries the call and the result, in that order and in
      that shape. Anything else and the provider refuses the request outright. */
-  expect(shapeOf(calls[1])).toEqual([
-    'user:text',
-    'assistant:toolCall',
-    'user:toolResult',
-  ]);
+  expect(shapeOf(calls[1])).toEqual(['user:text', 'assistant:toolCall', 'user:toolResult']);
   expect(resultsIn(value)).toEqual([{ callId: 'tc_1', body: 'it rains', failed: false }]);
 });
 
@@ -255,9 +247,7 @@ it('leaves nothing behind when the caller walks away mid-loop', async () => {
       { deltas: ['a'], stall: true },
     ],
     use: session =>
-      Effect.ignore(
-        Effect.timeout(Stream.runDrain(session.ask('out?')), Duration.millis(50))
-      ),
+      Effect.ignore(Effect.timeout(Stream.runDrain(session.ask('out?')), Duration.millis(50))),
   });
 
   /* The tool ran, and nothing was written: the exchange never finished, so the

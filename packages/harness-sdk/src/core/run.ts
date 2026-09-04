@@ -21,7 +21,7 @@ const openSession = (
     const opened = yield* makeSession(entropy);
     const wiring = yield* wiringFor(options, opened);
     yield* onStore(wiring.store, plugin => plugin.create({ ...options, id: opened.id }));
-    return handleOf(wiring);
+    return yield* handleOf(wiring);
   });
 
 export { openSession };

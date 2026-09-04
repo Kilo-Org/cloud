@@ -1,17 +1,35 @@
-import { type Duration, Effect, type Option, Ref, type Scope } from 'effect';
+import {
+  type Duration,
+  Effect,
+  type Option,
+  PubSub,
+  Queue,
+  Ref,
+  type Scope,
+  type Take,
+} from 'effect';
+import type { SessionBusyError } from './ask.js';
 import { ModelCatalog, type ModelCatalogService } from './catalog.js';
 import { EntropySource, type EntropySourceService } from './entropy.js';
 import {
   type Effort,
   ModelClient,
   type ModelClientService,
+  type ModelError,
+  type ModelEvent,
   type ModelUsage,
   zeroUsage,
 } from './model.js';
 import { PromptAssembler, type PromptAssemblerService } from './prompt.js';
 import type { Session } from './session.js';
-import { onStore, SessionStore, type SessionStoreService } from './storage.js';
-import { locksFor, resolveTools, type Tool, type ToolMissingError } from './tool.js';
+import { onStore, SessionStore, type SessionStoreService, type StoreError } from './storage.js';
+import {
+  type LateResult,
+  locksFor,
+  resolveTools,
+  type Tool,
+  type ToolMissingError,
+} from './tool.js';
 
 /**
  * What a session is opened with. Every value is frozen for the life of the
@@ -94,7 +112,35 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
    * queue rather than run together. A tool that allows overlap has no entry.
    */
   readonly locks: ReadonlyMap<string, Effect.Semaphore>;
+  /**
+   * The session's own scope. Work that has to outlive the question that started
+   * it is forked here: a backgrounded tool, and the thing that drives what it
+   * eventually says. Closing the session stops all of it.
+   */
+  readonly scope: Scope.Scope;
+  /** Results that arrived after the model stopped waiting. See `background.ts`. */
+  readonly late: Queue.Queue<LateResult>;
+  /**
+   * What the session did without being asked, for a caller that wants to show
+   * it. Values are dropped rather than held when nobody is listening: these are
+   * for display, and the transcript is the record.
+   */
+  readonly continued: PubSub.PubSub<Take.Take<ModelEvent, ContinuedError>>;
 }
+
+/**
+ * Why a round the session started on its own did not happen. `SessionBusyError`
+ * is here because such a round waits for the question in flight, and gives up
+ * rather than waiting forever on a session that never goes quiet.
+ */
+type ContinuedError = ModelError | StoreError | SessionBusyError;
+
+/**
+ * How many unwatched rounds the session keeps before it drops the oldest. It is
+ * a display buffer, not a log, so it is small and it slides rather than blocking
+ * the round that is publishing.
+ */
+const continuedCapacity = 256;
 
 /** Everything a session needs from its context, whether it is new or resumed. */
 type SessionContext = PromptAssembler | ModelClient | ModelCatalog | EntropySource | Scope.Scope;
@@ -132,6 +178,9 @@ const wiringFor = (
       busy: yield* Ref.make(false),
       tools,
       locks: yield* locksFor(tools),
+      scope: yield* Effect.scope,
+      late: yield* Queue.unbounded<LateResult>(),
+      continued: yield* PubSub.sliding<Take.Take<ModelEvent, ContinuedError>>(continuedCapacity),
     };
     yield* Effect.addFinalizer(() =>
       Effect.ignore(onStore(wiring.store, plugin => plugin.flush()))
@@ -139,5 +188,5 @@ const wiringFor = (
     return wiring;
   });
 
-export type { SessionContext, SessionOptions, Wiring };
+export type { ContinuedError, SessionContext, SessionOptions, Wiring };
 export { wiringFor };

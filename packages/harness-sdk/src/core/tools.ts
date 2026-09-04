@@ -1,4 +1,4 @@
-import { Cause, Effect, Option } from 'effect';
+import { Cause, Duration, Effect, type Exit, Fiber, Option, Queue } from 'effect';
 import { type Tool, type ToolCall, type ToolFailure, type ToolResult, toolNamed } from './tool.js';
 import { makeTurn, type PartDraft, type Turn } from './turn.js';
 import type { Wiring } from './wiring.js';
@@ -44,13 +44,34 @@ const reasonOf = (cause: Cause.Cause<ToolFailure>): string =>
   });
 
 /**
- * One call, under its permit when it has one.
+ * How long the model waits before a call goes to the background. Half a minute
+ * is long enough for anything that reads a file or asks a server, and short
+ * enough that a request is not left open on something slower.
+ */
+const defaultInlineFor = Duration.seconds(30);
+
+const waitFor = (wiring: Wiring, tool: Tool): Duration.DurationInput =>
+  tool.inlineFor ?? wiring.inlineFor ?? defaultInlineFor;
+
+/** What the model is told about a call it will hear about later. */
+const stillRunning = (call: ToolCall): ToolResult => ({
+  callId: call.id,
+  body:
+    'This call is still running. Its result will reach you in a later message. ' +
+    'Carry on with whatever does not depend on it.',
+  /* Not a failure. Nothing went wrong; the answer is simply not here yet, and a
+     model told this had failed would start again rather than wait. */
+  failed: false,
+});
+
+/**
+ * The work itself, without the waiting.
  *
  * Interruption passes through rather than becoming a result: a session the
  * caller stopped has nobody left to tell, and a result written after the stream
  * was dropped would land in a transcript nobody asked for.
  */
-const under = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<ToolResult> => {
+const working = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<ToolResult> => {
   const work: Effect.Effect<ToolResult> = tool.run(call).pipe(
     Effect.map((body): ToolResult => ({ callId: call.id, body, failed: false })),
     Effect.catchAllCause(cause =>
@@ -62,6 +83,46 @@ const under = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<ToolRe
   const permit = wiring.locks.get(tool.definition.name);
   return permit === undefined ? work : permit.withPermits(1)(work);
 };
+
+/**
+ * One call, run under a deadline it can outlive.
+ *
+ * Every call is forked, so the deadline moves the model on rather than
+ * cancelling anything: the work keeps running in the session's own scope, and
+ * what it eventually says goes on the queue that `background.ts` drains. That
+ * is why any tool at all can be backgrounded — the harness decides when to stop
+ * waiting, not the tool, and a tool that always outlives a request says
+ * `inlineFor: 0` and is backgrounded from the start. Zero is read rather than
+ * timed: a zero-length deadline raced against the work is a race the work
+ * usually wins, and a tool that asked never to be waited for would be waited
+ * for anyway.
+ */
+const under = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<ToolResult> =>
+  Effect.gen(function* () {
+    const fiber = yield* Effect.forkIn(working(wiring, tool, call), wiring.scope);
+    const wait = Duration.decode(waitFor(wiring, tool));
+    const ended = Duration.isZero(wait)
+      ? Option.none<Exit.Exit<ToolResult>>()
+      : yield* Effect.timeoutOption(Fiber.await(fiber), wait);
+    return yield* Option.match(ended, {
+      onSome: (exit: Exit.Exit<ToolResult>) => exit,
+      onNone: () => later(wiring, call, fiber),
+    });
+  });
+
+/** Hands the model on, and puts what the call says on the queue when it says it. */
+const later = (
+  wiring: Wiring,
+  call: ToolCall,
+  fiber: Fiber.RuntimeFiber<ToolResult>
+): Effect.Effect<ToolResult> =>
+  Effect.as(
+    Effect.forkIn(
+      Effect.flatMap(Fiber.join(fiber), result => Queue.offer(wiring.late, { call, result })),
+      wiring.scope
+    ),
+    stillRunning(call)
+  );
 
 /** One call, whatever it asked for. A name the session does not offer is a refusal. */
 const runOne = (wiring: Wiring, call: ToolCall): Effect.Effect<ToolResult> =>
@@ -91,10 +152,7 @@ const partOf = (result: ToolResult): PartDraft => ({
  * model rather than something the model said. Every shape agrees on that, even
  * though each writes it differently.
  */
-const resultsTurn = (
-  wiring: Wiring,
-  results: readonly ToolResult[]
-): Effect.Effect<Turn> =>
+const resultsTurn = (wiring: Wiring, results: readonly ToolResult[]): Effect.Effect<Turn> =>
   makeTurn(wiring.entropy, {
     sessionId: wiring.id,
     role: 'user',
@@ -107,4 +165,4 @@ const callsIn = (turn: Turn): readonly ToolCall[] =>
     .filter(part => part.kind === 'toolCall')
     .map(part => ({ id: part.callId, name: part.name, arguments: part.body }));
 
-export { callsIn, resultsTurn, runCalls };
+export { callsIn, defaultInlineFor, resultsTurn, runCalls };

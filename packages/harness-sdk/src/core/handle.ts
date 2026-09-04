@@ -1,10 +1,11 @@
 import { Effect, Ref, type Stream } from 'effect';
 import { type AskOptions, askWith, type SessionBusyError, whileFree } from './ask.js';
+import { continuedOf, driveLate } from './background.js';
 import { compactSession } from './compact.js';
 import type { ModelError, ModelEvent, ModelUsage } from './model.js';
 import type { StoreError } from './storage.js';
 import type { PartDraft, Turn } from './turn.js';
-import type { Wiring } from './wiring.js';
+import type { ContinuedError, Wiring } from './wiring.js';
 
 /** A live session. It owns the turns, so a caller cannot lose one. */
 interface SessionHandle {
@@ -24,15 +25,36 @@ interface SessionHandle {
    * is for a caller that knows sooner, such as one changing subject.
    */
   readonly compact: Effect.Effect<void, ModelError | StoreError | SessionBusyError>;
+  /**
+   * The rounds the session ran without being asked, because a backgrounded tool
+   * finished. It is empty for a session with no tools, and reading it a second
+   * time starts a second subscription rather than continuing the first.
+   *
+   * The rounds happen whether or not anybody reads this. A caller that does not
+   * watch loses the events, never the work, and the transcript holds all of it.
+   */
+  readonly continued: Stream.Stream<ModelEvent, ContinuedError>;
 }
 
-const handleOf = (wiring: Wiring): SessionHandle => ({
-  id: wiring.id,
-  ask: askWith(wiring),
-  history: Effect.map(Ref.get(wiring.state), session => session.turns),
-  usage: Ref.get(wiring.totals),
-  compact: whileFree(wiring, compactSession(wiring)),
-});
+/**
+ * The handle, and the thing that drives what the session does on its own.
+ *
+ * The driver is forked into the session's scope, so it lives as long as the
+ * session and stops with it. A session with no tools starts none: nothing can
+ * ever reach its queue.
+ */
+const handleOf = (wiring: Wiring): Effect.Effect<SessionHandle> =>
+  Effect.as(
+    wiring.tools.length === 0 ? Effect.void : Effect.forkIn(driveLate(wiring), wiring.scope),
+    {
+      id: wiring.id,
+      ask: askWith(wiring),
+      history: Effect.map(Ref.get(wiring.state), session => session.turns),
+      usage: Ref.get(wiring.totals),
+      compact: whileFree(wiring, compactSession(wiring)),
+      continued: continuedOf(wiring),
+    }
+  );
 
 export type { SessionHandle };
 export { handleOf };

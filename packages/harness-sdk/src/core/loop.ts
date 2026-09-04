@@ -124,20 +124,15 @@ const heard = (round: Round, event: ModelEvent): Effect.Effect<void, StoreError>
 
 /** Whether the model may be asked once more with its tools in hand. */
 const mayContinue = (wiring: Wiring, rounds: number): Effect.Effect<boolean> =>
-  Effect.map(
-    isFull(wiring),
-    full => !full && rounds < (wiring.maxRounds ?? defaultMaxRounds)
-  );
+  Effect.map(isFull(wiring), full => !full && rounds < (wiring.maxRounds ?? defaultMaxRounds));
 
 const roundsFrom = (round: Round, offer: boolean): Answer =>
   Stream.unwrap(
-    Effect.map(
-      Effect.zipRight(nextRound(round.exchange), requestFor(round, offer)),
-      request =>
-        round.wiring.client.stream(request).pipe(
-          Stream.tap(event => heard(round, event)),
-          Stream.concat(Stream.unwrap(afterRound(round, offer)))
-        )
+    Effect.map(Effect.zipRight(nextRound(round.exchange), requestFor(round, offer)), request =>
+      round.wiring.client.stream(request).pipe(
+        Stream.tap(event => heard(round, event)),
+        Stream.concat(Stream.unwrap(afterRound(round, offer)))
+      )
     )
   );
 

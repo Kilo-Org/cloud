@@ -17,6 +17,7 @@ const runs = [
   'live',
   'shapes',
   'stop',
+  'tools',
   'image',
   'cancel',
   'session',

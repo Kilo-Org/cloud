@@ -12,6 +12,7 @@ export type TRPCContext = {
   gastownAccess: boolean;
   orgMemberships: JwtOrgMembership[];
   controlToken: string;
+  usesModernToken: boolean;
 };
 
 const t = initTRPC.context<TRPCContext>().create();

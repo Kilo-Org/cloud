@@ -11,10 +11,14 @@ export async function handleReauthorizeTownRuntime(
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
   const town = getTownDOStub(c.env, params.townId);
-  const identity = await town.getPrivateTownIdentity();
+  const identityState = await town.getTownIdentityState();
+  if (identityState.type === 'invalid') {
+    return c.json(resError('Town authorization state is invalid'), 403);
+  }
+  const identity = identityState.identity;
   if (!identity) return c.json(resError('Town requires recreation'), 409);
   let modernAuthorization;
-  if (identity.runtimeMode === 'modern') {
+  if (identityState.type === 'modern') {
     try {
       modernAuthorization = await authorizeTown(
         c.env,

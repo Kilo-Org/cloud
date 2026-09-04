@@ -1,5 +1,5 @@
 import { Effect, type Option, Ref, type Scope, type Stream } from 'effect';
-import { type AskOptions, askWith, type SessionBusyError } from './ask.js';
+import { type AskOptions, askWith, type SessionBusyError, whileFree } from './ask.js';
 import { ModelCatalog, type ModelCatalogService } from './catalog.js';
 import { compactSession } from './compact.js';
 import { EntropySource, type EntropySourceService } from './entropy.js';
@@ -84,7 +84,7 @@ interface SessionHandle {
    * window says. A session does this on its own when it fills the window; this
    * is for a caller that knows sooner, such as one changing subject.
    */
-  readonly compact: Effect.Effect<void, ModelError | StoreError>;
+  readonly compact: Effect.Effect<void, ModelError | StoreError | SessionBusyError>;
 }
 
 /** Everything a session needs from its context, whether it is new or resumed. */
@@ -126,7 +126,7 @@ const handleOf = (wiring: Wiring): SessionHandle => ({
   ask: askWith(wiring),
   history: Effect.map(Ref.get(wiring.state), session => session.turns),
   usage: Ref.get(wiring.totals),
-  compact: compactSession(wiring),
+  compact: whileFree(wiring, compactSession(wiring)),
 });
 
 export type { SessionContext, SessionHandle, SessionOptions, Wiring };

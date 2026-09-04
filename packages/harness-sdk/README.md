@@ -128,8 +128,9 @@ yield* Stream.runForEach(session.ask('Name three fruits.'), event =>
 The handle also carries `history` (every turn, as a plain array), `usage` (the
 counts of every call so far — pass it to `hitRatio`), and `compact`.
 
-One session answers one question at a time. A second question asked while the
-first is still streaming fails with `SessionBusyError` rather than queueing.
+One session does one thing at a time. A second question, or a `compact`,
+started while the first answer is still streaming fails with
+`SessionBusyError` rather than queueing.
 
 ## When it fails
 
@@ -141,7 +142,7 @@ by hand.
 |---|---|---|
 | `harness/ModelError` | The call did not come back. `reason` is `transport`, `status`, `body`, or `unsupported`, and `status` is the HTTP status when there is one | The retry policy has already tried. A `status` of 402 or 429 is the account, not the code |
 | `harness/StoreError` | The store could not read or write. `operation` names which one | The turn is in memory and the answer is intact. The conversation cannot be continued later |
-| `harness/SessionBusyError` | A second question was asked while the first was streaming | Wait for the first stream to end, then ask again |
+| `harness/SessionBusyError` | A second question, or a compaction, was started while the first answer was still streaming | Wait for the stream to end, then try again |
 | `harness/SessionNotFoundError` | `continueSession` or `cloneSession` was given an id the store does not hold | Open a new session |
 | `harness/TokenError` | The `TokenSource` could not produce a credential | Reported as a `ModelError` with `reason: 'transport'`, because it is the one failure this package cannot tell from a flaky network |
 | `harness/CatalogError` | The catalog does not know the model | Never fatal on its own: the ceiling falls back to 4096 and compaction is skipped |
@@ -192,7 +193,9 @@ refused: a thinking block is signed against the history that stood when it was
 made, so a turn replayed after a summary fails on its signature.
 
 `session.compact` runs it now, for a caller who knows sooner than the window
-does — one changing subject, say.
+does — one changing subject, say. It takes the same lock a question takes, so
+it fails with `SessionBusyError` while an answer is still streaming rather than
+rewriting the conversation under it.
 
 ## The model cache
 

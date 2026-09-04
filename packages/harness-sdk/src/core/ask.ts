@@ -133,5 +133,25 @@ const askWith =
       )
     );
 
+/**
+ * Runs the work only when nothing else holds the session.
+ *
+ * Compaction rewrites the whole conversation, and a question in flight holds
+ * the session as it stood before it was asked, to put back if no answer comes.
+ * Both at once lose the summary from memory while the store keeps it. So
+ * compaction takes the same lock a question takes, and is refused the same way.
+ */
+const whileFree = <A, E>(
+  wiring: Wiring,
+  work: Effect.Effect<A, E>
+): Effect.Effect<A, E | SessionBusyError> =>
+  Effect.acquireUseRelease(
+    Effect.flatMap(Ref.getAndSet(wiring.busy, true), held =>
+      held ? Effect.fail(new SessionBusyError({ sessionId: wiring.id })) : Effect.void
+    ),
+    () => work,
+    () => Ref.set(wiring.busy, false)
+  );
+
 export type { AskOptions };
-export { askWith, SessionBusyError };
+export { askWith, SessionBusyError, whileFree };

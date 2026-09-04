@@ -1,4 +1,4 @@
-import { Effect, Stream } from 'effect';
+import { Effect, Either, Fiber, Option, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { ModelError } from './model.js';
 import { textIn } from './prompt.js';
@@ -206,4 +206,29 @@ it('leaves the session alone when the summary call fails, and tries again', asyn
     'user:three',
     'assistant:after',
   ]);
+});
+
+it('refuses to compact while a question is still streaming', async () => {
+  /* Compaction rewrites the whole conversation, and a question already in
+     flight holds the session as it stood before it was asked, to put back if
+     no answer comes. The two together lose the summary from memory while the
+     store keeps it, so the session and its record disagree. One session does
+     one thing at a time, which is the rule `ask` already follows. */
+  const { value, calls } = await runWith({
+    replies: [{ deltas: ['said'], stall: true }, { deltas: ['the notes'] }],
+    use: session =>
+      Effect.gen(function* () {
+        const reading = yield* Effect.fork(Stream.runDrain(session.ask('why')));
+        yield* Effect.sleep('10 millis');
+        const refused = yield* Effect.either(session.compact);
+        yield* Fiber.interrupt(reading);
+        return refused;
+      }),
+  });
+
+  expect(Either.getLeft(value).pipe(Option.map(error => error._tag))).toStrictEqual(
+    Option.some('harness/SessionBusyError')
+  );
+  /* One call, the question. A summary was never asked for. */
+  expect(calls).toHaveLength(1);
 });

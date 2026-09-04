@@ -550,9 +550,16 @@ cache. Three places may set it, and the nearest one wins:
 3. The `ModelCatalog` plugin's `maxOutputTokens`, when neither names one.
 4. `4096`, when the catalog names none either.
 
-One session answers one question at a time, because two answers built on one
-prefix means the second one misses the cache. A second question asked while
-the first still streams fails with `SessionBusyError`.
+One session does one thing at a time, because two answers built on one prefix
+means the second one misses the cache. A second question asked while the first
+still streams fails with `SessionBusyError`.
+
+`session.compact` takes the same lock. Compaction rewrites the whole
+conversation, and a question in flight holds the session as it stood before it
+was asked, to put back if no answer comes; both at once put the pre-summary
+session back while the store keeps the summary, and the two then disagree
+forever. `whileFree` in `ask.ts` is the lock, and `compactIfFull` does not take
+it — it runs inside a question that already holds it.
 
 It is refused rather than queued. Queueing cannot work: under `Stream.merge`
 the merged stream holds every child resource until all children finish, so the

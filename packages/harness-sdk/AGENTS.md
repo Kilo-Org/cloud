@@ -122,10 +122,12 @@ A change that adds an allocation on a hot path needs a measurement. A change
 that reorders or rewrites the prompt prefix breaks the cache; treat it as a
 regression until a measurement says otherwise.
 
-The cache hit ratio is a requirement on this package's own work: place the
-breakpoints so the prefix stays byte-identical as the session grows. It is not
-a requirement on the number a given provider returns, which the package does
-not control. See the model run below, where served models range from 0.28 to
+The cache hit ratio is a requirement on this package's own work: keep the
+prefix byte-identical as the session grows. That, and not the breakpoint this
+package marks, is what holds it — measured on 2026-09-04, this gateway places
+its own breakpoints and caches the same whether the marker is sent or not. It
+is not a requirement on the number a given provider returns, which the package
+does not control. See the model run below, where served models range from 0.28 to
 0.9997 on identical breakpoints, and where the same model moved from 0.80 to
 0.9987 between two runs of the same prompts.
 

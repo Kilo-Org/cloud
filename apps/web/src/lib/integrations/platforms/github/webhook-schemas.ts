@@ -55,6 +55,10 @@ export const InstallationDeletedPayloadSchema = z.object({
   sender: GitHubSenderSchema.optional(),
 });
 
+export const InstallationDeletedWebhookPayloadSchema = InstallationDeletedPayloadSchema.extend({
+  installation: InstallationDeletedPayloadSchema.shape.installation.nullable(),
+});
+
 // installation.suspend webhook payload
 export const InstallationSuspendPayloadSchema = z.object({
   action: z.literal('suspend'),

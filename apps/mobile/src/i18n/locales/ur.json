@@ -370,7 +370,6 @@
         "closed": "یہ پل ریکویسٹ بند ہے"
       },
       "partialSuccessBanner": {
-        "title": "مرج شدہ",
         "body": "برانچ حذف نہیں ہو سکی: {{reason}}۔",
         "accessibility": "مرج ہو گیا۔ برانچ حذف نہیں ہو سکی: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "قبول کریں",
       "replyBadRequest": "یہ جواب پوسٹ نہیں ہو سکتا۔ شاید تھریڈ تبدیل ہو گیا ہے۔",
       "replyForbidden": "آپ کو اس پل ریکویسٹ پر جواب دینے کی اجازت نہیں ہے۔",
-      "couldNotReply": "جواب نہیں بھیجا جا سکا۔",
       "moderation": {
         "reportContent": {
           "terminal": "اس تبصرے کی شکایت نہیں کی جا سکتی۔",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub ایپ کی ترتیبات نہیں کھل سکیں۔",
     "installKiloGitHubApp": "Kilo GitHub ایپ انسٹال کریں",
-    "connectionExpiredTitle": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
-    "connectionExpiredDescription": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
     "checkConnection": "کنکشن چیک کریں",
     "couldNotLoadPullRequest": "پل ریکویسٹ لوڈ نہیں ہو سکی۔",
     "description": "تفصیل",
@@ -572,7 +568,6 @@
       "shareA11y": "پل ریکویسٹ شیئر کریں"
     },
     "submit": {
-      "title": "جائزہ جمع کریں",
       "loadFailedTitle": "جائزہ جمع کرنے کی اسکرین لوڈ نہیں ہو سکی۔",
       "deletePendingTitle": "زیر التوا تبصرہ حذف کریں؟",
       "deletePendingMessage": "یہ تبصرہ جائزے کی قطار سے ہٹا دیا جائے گا۔",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub سے کنکشن کی مدت ختم ہو گئی۔",
-      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔",
-      "checkConnection": "کنکشن چیک کریں"
+      "message": "آپ کا GitHub کنکشن اب قابل استعمال نہیں ہے۔ کنکشن دوبارہ چیک کریں — ضرورت پڑی تو آپ سے دوبارہ منسلک کرنے کو کہا جائے گا۔"
     },
     "eventChips": {
       "comment": "تبصرہ",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}} پر موجود پرانے زیر التوا تبصرے میں ترمیم کریں",
       "editA11y": "{{location}} پر موجود زیر التوا تبصرے میں ترمیم کریں",
-      "emptyBody": "(خالی)",
-      "outdated": "متروک",
       "staleHint": "آپ کے یہ تبصرہ لکھنے کے بعد PR میں تبدیلیاں ہوئی ہیں۔",
       "deleteA11y": "{{location}} پر زیر التوا تبصرہ حذف کریں",
       "deletedAnnouncement": "زیر التوا تبصرہ حذف ہو گیا",
@@ -703,7 +695,6 @@
       "security": "شناخت شدہ سیکیورٹی مسائل"
     },
     "category": {
-      "chatMessagesTitle": "چیٹ کے پیغامات",
       "chatMessagesSubtitle": "آپ کی گفتگو میں جوابات",
       "agentAttentionTitle": "ایجنٹ کو آپ کی ضرورت ہے",
       "agentAttentionSubtitle": "سوالات، اجازت یا آپ کے جواب کی ضرورت",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "کام کے دوران ایجنٹ کے پیغامات",
       "sessionStatusTitle": "سیشن کی حالت",
       "sessionStatusSubtitle": "مکمل / ناکام / کنٹرول کے لیے تیار",
-      "kiloclawActivityTitle": "KiloClaw کی سرگرمی",
       "kiloclawActivitySubtitle": "انسٹینس تیار یا ناکام، مقررہ وقت کے کام",
-      "balanceAlertsTitle": "بیلنس کی تنبیہات",
       "balanceAlertsSubtitle": "تنظیم کا بیلنس کم ہونے کے انتباہات",
-      "securityFindingsTitle": "شناخت شدہ سیکیورٹی مسائل",
       "securityFindingsSubtitle": "نئی دریافتیں اور SLA کی یاد دہانیاں"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail، Calendar، Docs",
       "modelDescription": "AI ماڈل کا انتخاب",
       "secretsDescription": "رمز بند تصدیقی معلومات",
-      "versionPinDescription": "کسی مخصوص ورژن پر پن کریں",
-      "versionPinLabel": "ورژن برقرار رکھنا"
+      "versionPinDescription": "کسی مخصوص ورژن پر پن کریں"
     },
     "avatar": {
       "arcade": "آرکیڈ",
@@ -1440,7 +1427,6 @@
       "severityHigh": "زیادہ",
       "severityMedium": "درمیانی",
       "severityLow": "کم",
-      "outcomeNotExploitable": "قابلِ استحصال نہیں",
       "outcomeTriageComplete": "ابتدائی جانچ مکمل",
       "sortSeverityDesc": "شدت: زیادہ سے کم",
       "sortSeverityAsc": "شدت: کم سے زیادہ",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "غیر حل شدہ مسائل",
-      "openFindingsDetail": "{{critical}} سنگین، {{high}} زیادہ",
-      "confirmedExploitable": "قابلِ استحصال ہونے کی تصدیق",
       "confirmedExploitableDetail": "تجزیے سے پروجیکٹ کو لاحق خطرے کی تصدیق ہو گئی",
-      "needsReview": "آپ کے جائزے کی ضرورت ہے",
       "needsReviewDetail": "انسانی فیصلہ درکار",
-      "analysisIncomplete": "تجزیہ مکمل نہیں",
       "analysisIncompleteDetail": "پروجیکٹ کو لاحق خطرہ ابھی نامعلوم",
       "slaCompliance": "SLA کی تعمیل",
-      "notMeasured": "پیمائش نہیں کی گئی",
       "withinDeadlineDetail": "{{total}} میں سے {{within}} مقررہ مہلت کے اندر",
       "noDeadlineData": "ابھی کسی مسئلے کے لیے SLA کی آخری تاریخ مقرر نہیں",
       "deadlinePassed": "آخری تاریخ گزر گئی",
@@ -1601,7 +1582,6 @@
       "source": "ماخذ",
       "sourceId": "ماخذ کی شناخت",
       "viewAdvisory": "GitHub پر حفاظتی اطلاع دیکھیں",
-      "statusSuperseded": "نئے اندراج سے بدل دیا گیا",
       "statusOpen": "کھولیں",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "اصلاح پہلے ہی شروع ہو چکی ہے",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "جائزے کے بعد"
     },
     "settingsOverview": {
-      "title": "ترتیبات",
       "couldNotLoadSettings": "سکیورٹی ایجنٹ کی ترتیبات لوڈ نہیں ہو سکیں۔",
       "couldNotLoadPermissions": "اجازتیں لوڈ نہیں ہو سکیں۔",
       "on": "فعال",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} ریپوزٹریز منتخب",
       "repositoriesCount_other": "{{displayCount}} ریپوزٹریز منتخب",
       "selectRepositoriesSubtitle": "وہ ریپوزٹریز منتخب کریں جن کی نگرانی سکیورٹی ایجنٹ کرے گا",
-      "modelsAndAnalysis": "ماڈلز اور تجزیہ",
       "analysisModeSubtitle": "تجزیہ: {{mode}}",
-      "automation": "خودکاری",
       "automationAllOff": "سب بند",
       "automationCount": "3 میں سے {{displayCount}} فعال",
       "notificationsCount": "2 میں سے {{displayCount}} فعال",
-      "slaPolicy": "SLA کی پالیسی",
       "disabledNoManage": "سکیورٹی ایجنٹ غیر فعال ہے۔ صرف تنظیم کے مالکان اور بلنگ مینیجر اسے فعال کر سکتے ہیں۔",
       "disabledNoRepo": "سکیورٹی ایجنٹ فعال کرنے سے پہلے کم از کم ایک ریپوزٹری منتخب کریں۔",
       "disabledPrompt": "Dependabot کی اطلاعات ہم آہنگ کرنے، ریپوزٹریز منتخب کرنے اور خودکار کارروائیوں کی ترتیبات طے کرنے کے لیے سکیورٹی ایجنٹ فعال کریں۔"
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "منسوخی کی درخواست بھیج دی گئی",
       "cancelled": "اصلاح منسوخ",
       "couldNotLoad": "اصلاح کی حالت لوڈ نہیں ہو سکی۔",
-      "noAnalysisTitle": "ابھی کوئی تجزیہ نہیں",
-      "noAnalysisDescription": "تفصیلات کے ٹیب سے تجزیہ شروع کریں۔",
       "start": "اصلاح شروع کریں",
       "retry": "اصلاح کی دوبارہ کوشش کریں",
       "cancelTitle": "یہ اصلاح منسوخ کریں؟",
@@ -1652,10 +1626,8 @@
       "retryQueued": "اصلاح کی دوبارہ کوشش قطار میں شامل کر دی گئی",
       "timeline": {
         "queued": "اصلاح کی درخواست کی گئی",
-        "prOpened": "PR کھولا گیا",
         "failed": "اصلاح ناکام",
-        "blocked": "اصلاح مسدود",
-        "noChangesNeeded": "کوئی تبدیلی درکار نہیں"
+        "blocked": "اصلاح مسدود"
       },
       "unavailable": "اس شناخت شدہ مسئلے کی اصلاح دستیاب نہیں ہے۔"
     },
@@ -1663,9 +1635,6 @@
       "title": "ماڈلز اور تجزیہ",
       "couldNotLoad": "تجزیے کی ترتیبات لوڈ نہیں ہو سکیں۔",
       "depth": "تجزیے کی گہرائی",
-      "modeAuto": "خودکار",
-      "modeShallow": "سطحی",
-      "modeDeep": "گہرا",
       "triageModel": "ابتدائی جانچ کا ماڈل",
       "analysisModel": "تجزیے کا ماڈل",
       "remediationModel": "اصلاح کا ماڈل"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "مسئلہ",
       "tabAnalysis": "تجزیہ",
-      "tabRemediation": "اصلاح",
-      "notFound": "شناخت شدہ مسئلہ نہیں ملا",
-      "notFoundDescription": "ممکن ہے یہ مسئلہ ہٹا دیا گیا ہو یا اب آپ کو اس تک رسائی نہ ہو۔",
-      "couldNotLoad": "یہ شناخت شدہ مسئلہ لوڈ نہیں ہو سکا۔"
+      "tabRemediation": "اصلاح"
     },
     "findingList": {
       "couldNotLoad": "مسائل لوڈ نہیں ہو سکے۔",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "اصلاح جاری ہے",
       "nextRetryRemediation": "اصلاح کی دوبارہ کوشش ممکن ہے",
       "nextRemediationAvailable": "اصلاح دستیاب",
-      "retryAnalysis": "دوبارہ تجزیہ کریں",
       "runAnalysis": "تجزیہ شروع کریں",
-      "nextNeedsManualReview": "دستی جائزہ درکار ہے",
       "nextViewDetails": "تفصیلات دیکھیں",
       "viewPr": "PR دیکھیں",
       "analyze": "تجزیہ کریں",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "ہر نیا مسئلہ ہم آہنگ ہونے پر اطلاع بھیجی جاتی ہے، پہلی ہم آہنگی کے وقت بھی۔",
       "slaLeadTimeAccessibility": "SLA کی آخری تاریخ سے کتنے دن پہلے انتباہ بھیجنا ہے",
       "slaLeadTimeError": "دنوں کی تعداد 1 سے 365 تک صحیح عدد میں درج کریں۔",
-      "slaLeadTimeHint": "1 سے 365 تک کوئی صحیح عدد درج کریں",
       "slaLeadTimeLabel": "SLA کی آخری تاریخ سے پہلے انتباہ (دن)",
       "slaPersonalTitle": "مجھے SLA کے انتباہات کے بارے میں ای میل کریں",
       "slaSection": "SLA کے انتباہ کی اطلاع",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "تجزیہ قطار میں ہے",
-      "queuedTitle": "تجزیہ قطار میں ہے",
       "queuedDescription": "تجزیے کی گنجائش دستیاب ہونے کا انتظار ہے۔",
       "analyzing": "تجزیہ ہو رہا ہے",
       "analyzingDescription": "یہ جانچ جاری ہے کہ آیا ایپلیکیشن کا کوڈ متاثرہ فیچر تک پہنچ سکتا ہے۔",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "تکنیکی رپورٹ کو منظم نتیجے میں تبدیل نہیں کیا جا سکا۔",
       "exploitableDescription": "ایپلیکیشن کا کوڈ متاثرہ فیچر تک پہنچ سکتا ہے۔",
       "notExploitable": "ناقابل رسائی",
-      "notExploitableTitle": "ناقابل رسائی",
       "notExploitableDescription": "اس ریپوزٹری میں کوئی قابلِ رسائی راستہ نہیں ملا۔",
       "unknown": "جائزہ درکار",
       "unknownDescription": "تجزیے سے اس بات کی تصدیق نہیں ہو سکی کہ آیا حفاظتی خامی والے فیچر تک رسائی ممکن ہے۔",
@@ -1843,7 +1804,6 @@
       "dueInDays": "آخری تاریخ میں {{count}} دن باقی"
     },
     "remediationStatus": {
-      "cancellationRequested": "منسوخی کی درخواست بھیج دی گئی",
       "notStarted": "شروع نہیں ہوئی",
       "starting": "شروع ہو رہا ہے",
       "inProgress": "جاری ہے",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "مسئلہ اب غیر حل شدہ حالت میں نہیں ہے۔",
       "repoNotInScope": "ریپوزٹری سکیورٹی ایجنٹ کے لیے منتخب نہیں ہے۔",
       "analysisRequired": "اصلاح شروع کرنے سے پہلے کوڈ بیس کا تجزیہ کریں۔",
-      "sandboxAnalysisRequired": "اصلاح شروع کرنے سے پہلے کوڈ بیس کا تجزیہ کریں۔",
       "staleAnalysis": "تجزیے کے بعد مسئلہ تبدیل ہو گیا۔ اصلاح شروع کرنے سے پہلے دوبارہ تجزیہ کریں۔",
       "notExploitable": "تجزیے میں حفاظتی خامی تک رسائی کا کوئی راستہ نہیں ملا۔ خودکار اصلاح دستیاب نہیں ہے۔",
       "exploitabilityUnknown": "تجزیے سے حملے کے امکان کی تصدیق نہیں ہو سکی۔ ایک کلک سے اصلاح کرنے سے پہلے دستی جائزہ درکار ہے۔",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "خودکار اصلاح غیر فعال ہے۔ حفاظتی شرائط پوری ہونے پر دستی اصلاح پھر بھی شروع کی جا سکتی ہے۔",
       "includeExistingDisabled": "موجودہ مسائل خودکار اصلاح میں شامل نہیں ہیں۔",
       "belowThreshold": "مسئلے کی شدت خودکار اصلاح کی مقررہ حد سے کم ہے۔ حفاظتی شرائط پوری ہونے پر دستی اصلاح پھر بھی شروع کی جا سکتی ہے۔",
-      "beforeEnablement": "خودکار اصلاح فعال ہونے سے پہلے تجزیہ مکمل ہوا تھا۔ حفاظتی شرائط پوری ہونے پر دستی اصلاح پھر بھی شروع کی جا سکتی ہے۔",
-      "generic": "اس شناخت شدہ مسئلے کی اصلاح دستیاب نہیں ہے۔"
+      "beforeEnablement": "خودکار اصلاح فعال ہونے سے پہلے تجزیہ مکمل ہوا تھا۔ حفاظتی شرائط پوری ہونے پر دستی اصلاح پھر بھی شروع کی جا سکتی ہے۔"
     },
     "commandFailure": {
       "ownerCapReached": "مزید تجزیوں کی گنجائش نہیں ہے۔ کسی جاری تجزیے کے مکمل ہونے کا انتظار کریں، پھر دوبارہ کوشش کریں۔",
-      "githubTokenUnavailable": "GitHub کی اجازت میں مسئلہ ہے۔ GitHub ایپ کو دوبارہ اجازت دیں، پھر دوبارہ کوشش کریں۔",
       "githubAuthInvalid": "GitHub کی اجازت میں مسئلہ ہے۔ GitHub ایپ کو دوبارہ اجازت دیں، پھر دوبارہ کوشش کریں۔",
       "findingUnavailable": "مسئلہ اب دستیاب نہیں ہے۔ مسائل کی فہرست تازہ کریں اور اگر یہ اب بھی غیر حل شدہ ہو تو دوبارہ کوشش کریں۔",
       "repositoryUnavailable": "GitHub ایپ کو اب ریپوزٹری تک رسائی نہیں ہے۔ ریپوزٹری کی رسائی تازہ کریں، پھر دوبارہ کوشش کریں۔",
@@ -1965,10 +1922,8 @@
       "title": "سیشن",
       "copyErrorDetails": "خرابی کی تفصیلات کاپی کریں",
       "backToSessions": "سیشنز پر واپس جائیں",
-      "accessDeniedDescription": "آپ کو یہ دیکھنے کی اجازت نہیں ہے۔",
       "couldNotLoad": "سیشن لوڈ نہیں ہو سکا۔",
       "failedToLoadDetails": "سیشن کی تفصیلات لوڈ نہیں ہو سکیں۔",
-      "notFoundDescription": "ممکن ہے یہ آئٹم ہٹا دیا گیا ہو یا اب دستیاب نہ ہو۔",
       "failedToStopExecution": "کام کو روکا نہیں جا سکا۔",
       "renameSession": "سیشن کا نام تبدیل کریں",
       "renamePlaceholder": "سیشن کا نام",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "سیشن سائن آؤٹ ہو گیا۔",
     "signOutThisDeviceTitle": "اس ڈیوائس سے سائن آؤٹ کریں؟",
     "signOutThisSessionTitle": "اس سیشن سے سائن آؤٹ کریں؟",
-    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔",
-    "signOutMessage": "اپنے ورک اسپیس تک رسائی کے لیے آپ کو دوبارہ سائن ان کرنا ہوگا۔"
+    "signOutThisSessionMessage": "{{device}} سے سائن آؤٹ ہو جائے گا۔ اس کی API تک رسائی مزید ایک گھنٹے تک برقرار رہ سکتی ہے۔"
   },
   "forceUpdate": {
     "couldNotOpenStore": "ایپ اسٹور نہیں کھل سکا۔",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "حساب میں ردوبدل",
         "credits_expired": "کریڈٹس کی میعاد ختم"
       },
-      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
       "truncated": "کریڈٹس کا پرانا ریکارڈ دستیاب ہے۔"
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "پرانی انوائسیں دستیاب ہیں۔"
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ای میل پتہ",
       "enableA11y": "بیلنس کم ہونے کی اطلاع فعال کریں",
       "notifyEmailsLabel": "اطلاع وصول کرنے والے ای میل پتے",
       "permissionDenied": "آپ کو بلنگ کی اطلاعات کا انتظام کرنے کی اجازت نہیں ہے۔",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "اس تنظیم میں مل کر کام کرنے کے لیے اپنے ساتھیوں کو دعوت دیں۔",
       "emptyDescriptionCannotInvite": "ٹیم کے ساتھیوں کو دعوت دینے کے لیے مالک یا بلنگ مینیجر سے کہیں۔",
       "emptyTitle": "ابھی کوئی رکن نہیں",
-      "inviteMember": "رکن کو دعوت دیں",
       "invitedDate": "{{date}} کو دعوت دی گئی",
       "limitPerDay": "{{amount}}/دن",
       "manageA11y": "{{name}} کے اختیارات کھولیں",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "حالت لوڈ نہیں ہو سکی",
       "creditProcessingDelayed": "کریڈٹ پروسیسنگ میں تاخیر · خود بخود دوبارہ کوشش ہو رہی ہے",
       "ended": "ختم شدہ",
-      "manageHint": "ویب پر Kilo Pass کے انتظام کا صفحہ کھولتا ہے۔",
       "notSubscribed": "سبسکرائب نہیں",
       "overallocated": "تفویض کردہ پاسز کی تعداد خریدی گئی سیٹوں سے زیادہ ہے",
       "paidSeat_one": "{{displayCount}} خریدی گئی سیٹ",

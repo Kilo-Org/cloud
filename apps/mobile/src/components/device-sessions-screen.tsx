@@ -112,7 +112,7 @@ export function DeviceSessionsScreen() {
     if (session.isCurrent) {
       // The current device signs out through the normal signOut() flow so the
       // full local teardown (tokens, metadata, cache) stays truthful.
-      Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('deviceSessions.signOutMessage'), [
+      Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('profile.signOutMessage'), [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('common.signOut'),

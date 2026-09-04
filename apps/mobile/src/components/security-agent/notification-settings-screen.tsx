@@ -253,7 +253,7 @@ export function NotificationSettingsScreen({ scope }: Readonly<{ scope: string }
                   accessibilityHint={
                     isValidDayCount(slaNotificationWarningDays)
                       ? undefined
-                      : t('securityAgent.notifications.slaLeadTimeHint')
+                      : t('securityAgent.sla.enterWholeNumber')
                   }
                   className={cn(
                     'h-11 rounded-lg bg-secondary px-3 text-sm leading-[normal] text-foreground',

@@ -61,7 +61,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.openFindings'),
           value: number(data.analysis.total),
-          detail: i18n.t('securityAgent.dashboardMetrics.openFindingsDetail', {
+          detail: i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', {
             critical: number(data.severity.critical),
             high: number(data.severity.high),
           }),
@@ -69,21 +69,21 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       }
       case 'exploitable': {
         return Object.assign(metric, {
-          label: i18n.t('securityAgent.dashboardMetrics.confirmedExploitable'),
+          label: i18n.t('securityAgent.dashboard.confirmedExploitable'),
           value: number(data.analysis.exploitable),
           detail: i18n.t('securityAgent.dashboardMetrics.confirmedExploitableDetail'),
         });
       }
       case 'needsReview': {
         return Object.assign(metric, {
-          label: i18n.t('securityAgent.dashboardMetrics.needsReview'),
+          label: i18n.t('securityAgent.dashboard.needsYourReview'),
           value: number(data.analysis.needsReview),
           detail: i18n.t('securityAgent.dashboardMetrics.needsReviewDetail'),
         });
       }
       case 'analysisIncomplete': {
         return Object.assign(metric, {
-          label: i18n.t('securityAgent.dashboardMetrics.analysisIncomplete'),
+          label: i18n.t('securityAgent.dashboard.analysisNotComplete'),
           value: number(getAnalysisIncompleteCount(data.analysis)),
           detail: i18n.t('securityAgent.dashboardMetrics.analysisIncompleteDetail'),
         });
@@ -97,7 +97,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
           value:
             compliance === null
-              ? i18n.t('securityAgent.dashboardMetrics.notMeasured')
+              ? i18n.t('securityAgent.dashboard.notMeasured')
               : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {

@@ -370,7 +370,6 @@
         "closed": "Codsigan isku-darka waa xiran yahay"
       },
       "partialSuccessBanner": {
-        "title": "La isku daray",
         "body": "Laanta lama tirtiri karin: {{reason}}.",
         "accessibility": "Waa la isku daray. Laanta lama tirtiri karin: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Aqbal",
       "replyBadRequest": "Jawaabtan lama daabici karo. Waxaa laga yaabaa in dooddu isbeddeshay.",
       "replyForbidden": "Ma haysatid oggolaansho aad uga jawaabto codsigan isku-darka.",
-      "couldNotReply": "Lama jawaabi karin.",
       "moderation": {
         "reportContent": {
           "terminal": "Faalladan lama soo sheegi karo.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Dejinta abka GitHub lama furi karin.",
     "installKiloGitHubApp": "Rakib barnaamijka Kilo ee GitHub",
-    "connectionExpiredTitle": "Muddadii xiriirka GitHub way dhammaatay.",
-    "connectionExpiredDescription": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
     "checkConnection": "Hubi xiriirka",
     "couldNotLoadPullRequest": "Codsiga isku-darka lama soo rari karin.",
     "description": "Sharaxaad",
@@ -572,7 +568,6 @@
       "shareA11y": "La wadaag codsiga isku-darka"
     },
     "submit": {
-      "title": "Gudbi dib-u-eegista",
       "loadFailedTitle": "Goobta gudbinta dib-u-eegista lama soo rari karin.",
       "deletePendingTitle": "Ma la tirtiraa faallada sugaysa dirista?",
       "deletePendingMessage": "Faalladan waxaa laga saari doonaa safka dib-u-eegista.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "Muddadii xiriirka GitHub way dhammaatay.",
-      "message": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
-      "checkConnection": "Hubi xiriirka"
+      "message": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo."
     },
     "eventChips": {
       "comment": "Faallo",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Wax ka beddel faallada duugoobay ee sugaysa dirista kuna taal {{location}}",
       "editA11y": "Wax ka beddel faallada sugaysa dirista ee ku taal {{location}}",
-      "emptyBody": "(madhan)",
-      "outdated": "Duugoobay",
       "staleHint": "PR-ka waa la beddelay tan iyo markii aad tan qortay.",
       "deleteA11y": "Tirtir faallada sugaysa dirista ee ku taal {{location}}",
       "deletedAnnouncement": "Faalladii sugaysay dirista waa la tirtiray",
@@ -703,7 +695,6 @@
       "security": "Natiijooyinka amniga"
     },
     "category": {
-      "chatMessagesTitle": "Fariimaha sheekaysiga",
       "chatMessagesSubtitle": "jawaabaha wadahadalladaada",
       "agentAttentionTitle": "Wakiilku wuu kuu baahan yahay",
       "agentAttentionSubtitle": "su'aalo, oggolaansho iyo xog loo baahan yahay",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "farriimaha wakiilku diro inta hawshu socoto",
       "sessionStatusTitle": "Xaaladda kalfadhiga",
       "sessionStatusSubtitle": "dhammaaday / fashilmay / diyaar u ah in la xakameeyo",
-      "kiloclawActivityTitle": "Hawlaha KiloClaw",
       "kiloclawActivitySubtitle": "nuqul diyaar ah ama fashilmay, ficillo la jadwaleeyay",
-      "balanceAlertsTitle": "Digniinaha haraaga",
       "balanceAlertsSubtitle": "digniinaha hadhaaga yar ee ururka",
-      "securityFindingsTitle": "Natiijooyinka amniga",
       "securityFindingsSubtitle": "natiijooyin cusub iyo xusuusinno SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Doorashada moodeelka AI",
       "secretsDescription": "Xogta aqoonsiga oo la sireeyay",
-      "versionPinDescription": "Ku xaddid nooc gaar ah",
-      "versionPinLabel": "Ku sugidda nooc gaar ah"
+      "versionPinDescription": "Ku xaddid nooc gaar ah"
     },
     "avatar": {
       "arcade": "Mashiinka ciyaaraha",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Sare",
       "severityMedium": "Dhexdhexaad",
       "severityLow": "Hoose",
-      "outcomeNotExploitable": "Lagama faa'iidaysan karo",
       "outcomeTriageComplete": "Kala saaristu way dhammaatay",
       "sortSeverityDesc": "Heerka halista: sare ilaa hoose",
       "sortSeverityAsc": "Heerka halista: hoose ilaa sare",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Natiijooyin furan",
-      "openFindingsDetail": "{{critical}} halis daran, {{high}} sare",
-      "confirmedExploitable": "La xaqiijiyay in laga faa'iidaysan karo",
       "confirmedExploitableDetail": "Falanqayntu waxay xaqiijisay khatarta mashruuca",
-      "needsReview": "U baahan dib-u-eegistaada",
       "needsReviewDetail": "Go'aan qof gaaro ayaa loo baahan yahay",
-      "analysisIncomplete": "Falanqayntu ma dhamma",
       "analysisIncompleteDetail": "Khatarta mashruuca weli lama garanayo",
       "slaCompliance": "U hoggaansanaanta SLA",
-      "notMeasured": "Lama cabirin",
       "withinDeadlineDetail": "{{within}} ka mid ah {{total}} ayaan waqtigoodu dhammaan",
       "noDeadlineData": "Weli ma jiraan natiijooyin loo cayimay waqtiga kama dambaysta ah ee SLA",
       "deadlinePassed": "Waqtiga kama dambaysta ah wuu dhaafay",
@@ -1601,7 +1582,6 @@
       "source": "Asalka",
       "sourceId": "Aqoonsiga isha",
       "viewAdvisory": "GitHub ka eeg ogeysiiska amniga",
-      "statusSuperseded": "La beddelay",
       "statusOpen": "Furan",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Hagaajin ayaa mar hore bilaabatay",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "dib-u-eegis ka dib"
     },
     "settingsOverview": {
-      "title": "Dejinta",
       "couldNotLoadSettings": "Dejinta Wakiilka amniga lama soo dejin karin.",
       "couldNotLoadPermissions": "Oggolaanshaha lama soo dejin karin.",
       "on": "Shidan",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} kayd oo la doortay",
       "repositoriesCount_other": "{{displayCount}} kayd oo la doortay",
       "selectRepositoriesSubtitle": "Dooro kaydadka uu Wakiilka amnigu la soconayo",
-      "modelsAndAnalysis": "Moodeellada iyo falanqaynta",
       "analysisModeSubtitle": "Falanqaynta {{mode}}",
-      "automation": "Otomaatigayn",
       "automationAllOff": "Dhammaan way dansan yihiin",
       "automationCount": "{{displayCount}} oo ka mid ah 3 ayaa shidan",
       "notificationsCount": "{{displayCount}} oo ka mid ah 2 ayaa shidan",
-      "slaPolicy": "Siyaasadda SLA",
       "disabledNoManage": "Wakiilka amniga waa la damiyay. Milkiilayaasha ururka iyo maamulayaasha biilasha oo keliya ayaa shidi kara.",
       "disabledNoRepo": "Dooro ugu yaraan hal kayd ka hor intaadan shidin Wakiilka amniga.",
       "disabledPrompt": "Shid Wakiilka amniga si aad u isku waafajiso digniinaha Dependabot, u doorato kaydadka, una dejiso hawlaha otomaatigga ah."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Joojinta ayaa la codsaday",
       "cancelled": "Hagaajinta waa la joojiyay",
       "couldNotLoad": "Xaaladda hagaajinta lama soo dejin karin.",
-      "noAnalysisTitle": "Weli falanqayn lama samayn",
-      "noAnalysisDescription": "Falanqayn ka bilow tabka Faahfaahin.",
       "start": "Bilow hagaajinta",
       "retry": "Mar kale isku day hagaajinta",
       "cancelTitle": "Ma joojinaysaa hagaajintan?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Isku dayga kale ee hagaajinta ayaa safka la geliyay",
       "timeline": {
         "queued": "Hagaajinta waa la codsaday",
-        "prOpened": "PR waa la furay",
         "failed": "Hagaajintu way fashilantay",
-        "blocked": "Hagaajinta waa la xannibay",
-        "noChangesNeeded": "Wax isbeddel ah looma baahna"
+        "blocked": "Hagaajinta waa la xannibay"
       },
       "unavailable": "Hagaajin looma heli karo natiijadan."
     },
@@ -1663,9 +1635,6 @@
       "title": "Moodeellada iyo falanqaynta",
       "couldNotLoad": "Dejinta falanqaynta lama soo dejin karin.",
       "depth": "Qotada falanqaynta",
-      "modeAuto": "Otomaatig",
-      "modeShallow": "Dusha sare",
-      "modeDeep": "Qoto dheer",
       "triageModel": "Moodeelka kala saarista",
       "analysisModel": "Moodeelka falanqaynta",
       "remediationModel": "Moodeelka hagaajinta"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Natiijo",
       "tabAnalysis": "Falanqayn",
-      "tabRemediation": "Hagaajin",
-      "notFound": "Natiijada lama helin",
-      "notFoundDescription": "Waxaa laga yaabaa in natiijadan la saaray ama aadan mar dambe fasax u haysan inaad aragto.",
-      "couldNotLoad": "Natiijadan lama soo rari karin."
+      "tabRemediation": "Hagaajin"
     },
     "findingList": {
       "couldNotLoad": "Natiijooyinka lama soo dejin karin.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Hagaajintu way socotaa",
       "nextRetryRemediation": "Hagaajinta mar kale ayaa la isku dayi karaa",
       "nextRemediationAvailable": "Hagaajinta waa la heli karaa",
-      "retryAnalysis": "Mar kale isku day falanqaynta",
       "runAnalysis": "Socodsii falanqaynta",
-      "nextNeedsManualReview": "U baahan dib-u-eegis qof sameeyo",
       "nextViewDetails": "Eeg faahfaahinta",
       "viewPr": "Eeg PR",
       "analyze": "Falanqee",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Waxaa la diraa mar kasta oo natiijo cusub la isku waafajiyo, oo ay ku jirto isku waafajinta koowaad.",
       "slaLeadTimeAccessibility": "Tirada maalmaha digniinta SLA la sii hormarinayo",
       "slaLeadTimeError": "Geli tirada maalmaha oo u dhaxaysa 1 iyo 365, adigoo isticmaalaya tiro dhan.",
-      "slaLeadTimeHint": "Geli tiro dhan oo u dhaxaysa 1 iyo 365",
       "slaLeadTimeLabel": "Muddada digniinta SLA la sii hormarinayo (maalmo)",
       "slaPersonalTitle": "Iimayl iiga soo dir digniinaha SLA",
       "slaSection": "Ogeysiinta digniinta SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Falanqaynta ayaa safan",
-      "queuedTitle": "Falanqaynta ayaa safan",
       "queuedDescription": "Waxaa la sugayaa in boos loo helo falanqaynta.",
       "analyzing": "La falanqaynayo",
       "analyzingDescription": "Waxaa la hubinayaa in koodhka abku gaari karo shaqada ay cilladdu saamaysay.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Warbixinta farsamada looma rogi karin natiijo habaysan.",
       "exploitableDescription": "Koodhka abku wuxuu gaari karaa shaqada ay cilladdu saamaysay.",
       "notExploitable": "Lama gaari karo",
-      "notExploitableTitle": "Lama gaari karo",
       "notExploitableDescription": "Kaydkan lagama helin waddo lagu gaari karo shaqada nugul.",
       "unknown": "U baahan dib-u-eegis",
       "unknownDescription": "Falanqayntu ma xaqiijin karin in shaqada nugul la gaari karo.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "{{count}} maalmood ayaa ka harsan"
     },
     "remediationStatus": {
-      "cancellationRequested": "Joojinta ayaa la codsaday",
       "notStarted": "Ma bilaaban",
       "starting": "Bilaabanaya",
       "inProgress": "Way socotaa",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Natiijadu mar dambe furan ma aha.",
       "repoNotInScope": "Kaydka looma dooran Wakiilka amniga.",
       "analysisRequired": "Socodsii falanqaynta koodhka oo dhan ka hor intaadan bilaabin hagaajinta.",
-      "sandboxAnalysisRequired": "Socodsii falanqaynta koodhka oo dhan ka hor intaadan bilaabin hagaajinta.",
       "staleAnalysis": "Natiijadu way isbeddashay falanqayntii ka dib. Dib u socodsii falanqaynta ka hor intaadan bilaabin hagaajinta.",
       "notExploitable": "Falanqayntu ma helin waddo lagu gaari karo shaqo nugul. Hagaajinta otomaatigga ah lama heli karo.",
       "exploitabilityUnknown": "Falanqayntu ma xaqiijin karin in weerar la fulin karo. Qof waa inuu dib u eegaa ka hor hagaajinta hal taabasho lagu bilaabo.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Hagaajinta otomaatigga ah waa la damiyay. Weli adigu waad bilaabi kartaa hagaajinta marka hubinta badbaadadu guulaysato.",
       "includeExistingDisabled": "Natiijooyinka jira kuma jiraan hagaajinta otomaatigga ah.",
       "belowThreshold": "Heerka halista natiijadu wuxuu ka hooseeyaa xadka hagaajinta otomaatigga ah. Weli adigu waad bilaabi kartaa hagaajinta marka hubinta badbaadadu guulaysato.",
-      "beforeEnablement": "Falanqayntu waxay dhammaatay ka hor intaan la shidin hagaajinta otomaatigga ah. Weli adigu waad bilaabi kartaa hagaajinta marka hubinta badbaadadu guulaysato.",
-      "generic": "Hagaajin looma heli karo natiijadan."
+      "beforeEnablement": "Falanqayntu waxay dhammaatay ka hor intaan la shidin hagaajinta otomaatigga ah. Weli adigu waad bilaabi kartaa hagaajinta marka hubinta badbaadadu guulaysato."
     },
     "commandFailure": {
       "ownerCapReached": "Awoodda falanqayntu way buuxdaa. Sug inta ay dhammaanayso mid ka mid ah falanqaymaha socda, ka dibna mar kale isku day.",
-      "githubTokenUnavailable": "Oggolaanshaha GitHub wuxuu u baahan yahay in wax laga qabto. Mar kale oggolaansho sii abka GitHub, ka dibna mar kale isku day.",
       "githubAuthInvalid": "Oggolaanshaha GitHub wuxuu u baahan yahay in wax laga qabto. Mar kale oggolaansho sii abka GitHub, ka dibna mar kale isku day.",
       "findingUnavailable": "Natiijada mar dambe lama heli karo. Cusboonaysii natiijooyinka oo mar kale isku day haddii ay weli furan tahay.",
       "repositoryUnavailable": "Abka GitHub mar dambe ma geli karo kaydka. Cusboonaysii oggolaanshaha gelitaanka kaydka, ka dibna mar kale isku day.",
@@ -1965,10 +1922,8 @@
       "title": "Kalfadhi",
       "copyErrorDetails": "Nuqul ka samee faahfaahinta ciladda",
       "backToSessions": "Ku noqo kalfadhiyada",
-      "accessDeniedDescription": "Ma haysatid oggolaansho aad tan ku aragto.",
       "couldNotLoad": "Kalfadhiga lama soo shubi karin.",
       "failedToLoadDetails": "Faahfaahinta kalfadhiga lama soo shubi karin.",
-      "notFoundDescription": "Waxaa dhici karta in shaygan la saaray ama aan mar dambe la heli karin.",
       "failedToStopExecution": "Fulinta lama joojin karin.",
       "renameSession": "Beddel magaca kalfadhiga",
       "renamePlaceholder": "Magaca kalfadhiga",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "Ma ka saaraysaa aaladdan akoonka?",
     "signOutThisSessionTitle": "Ma ka baxaysaa kalfadhigan?",
     "signOutThisSessionMessage": "{{device}} waa laga saarayaa akoonka. Gelitaanka API wuxuu sii shaqayn karaa ilaa saacad.",
-    "signOutMessage": "Si aad goobtaada shaqada u isticmaasho, waa inaad mar kale soo gashaa.",
     "webBrowser": "Biraawsarka internetka"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Hagaajinta xisaabta",
         "credits_expired": "Lacagta isticmaalka ee dhacday"
       },
-      "loadMoreFailed": "Kuwo kale lama soo rari karin.",
       "truncated": "Dhaqdhaqaaqii hore ee lacagta isticmaalka waa la heli karaa."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Qaansheegyada hore waa la heli karaa."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "magac@company.com",
       "enableA11y": "Daar digniinta hadhaaga yar",
       "notifyEmailsLabel": "Iimayllada ogeysiiska loo dirayo",
       "permissionDenied": "Ma lihid oggolaansho aad ku maamusho digniinaha biilasha.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Casuun xubnaha kooxdaada si aad ururkan uga wada shaqaysaan.",
       "emptyDescriptionCannotInvite": "Ka codso mulkiilaha ama maareeyaha biilasha inuu casuumo xubnaha kooxdaada.",
       "emptyTitle": "Weli ma jiraan xubno",
-      "inviteMember": "Casuum xubin",
       "invitedDate": "La casuumay {{date}}",
       "limitPerDay": "{{amount}}/maalin",
       "manageA11y": "Maamul {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Xaaladda lama soo shubi karin",
       "creditProcessingDelayed": "Habaynta lacagta isticmaalka way daahday · si toos ah ayaa mar kale la isku dayayaa",
       "ended": "Wuu dhammaaday",
-      "manageHint": "Wuxuu bogga internetka ka furaa maareynta Kilo Pass.",
       "notSubscribed": "Rukumasho ma jirto",
       "overallocated": "Qoondaynta Pass waxay ka badan tahay boosaska la bixiyay",
       "paidSeat_one": "{{displayCount}} boos oo la bixiyay",

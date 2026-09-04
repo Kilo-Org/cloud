@@ -260,7 +260,6 @@
     "previewFullDescription": "As notificações mostram o texto da mensagem na tela de bloqueio.",
     "previewGenericDescription": "As notificações apenas avisam que há novidades. Abra o Kilo para ler a mensagem.",
     "category": {
-      "chatMessagesTitle": "Mensagens da conversa",
       "chatMessagesSubtitle": "respostas nas suas conversas",
       "agentAttentionTitle": "O agente precisa de você",
       "agentAttentionSubtitle": "perguntas, pedidos de permissão e de informações",
@@ -268,11 +267,8 @@
       "agentUpdatesSubtitle": "mensagens do agente durante a tarefa",
       "sessionStatusTitle": "Status da sessão",
       "sessionStatusSubtitle": "sessão concluída, com falha ou pronta para você controlar",
-      "kiloclawActivityTitle": "Atividade do KiloClaw",
       "kiloclawActivitySubtitle": "instância pronta ou com falha, ações agendadas",
-      "balanceAlertsTitle": "Alertas de saldo",
       "balanceAlertsSubtitle": "avisos de saldo baixo da organização",
-      "securityFindingsTitle": "Problemas de segurança",
       "securityFindingsSubtitle": "novos problemas de segurança e lembretes de SLA"
     }
   },
@@ -746,8 +742,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Seleção de modelo de IA",
       "secretsDescription": "Credenciais criptografadas",
-      "versionPinDescription": "Fixar em uma versão específica",
-      "versionPinLabel": "Fixação de versão"
+      "versionPinDescription": "Fixar em uma versão específica"
     },
     "avatar": {
       "arcade": "Fliperama",
@@ -990,7 +985,6 @@
       "title": "Filtrar ocorrências",
       "fixed": "Corrigido",
       "outcome": "Resultado",
-      "outcomeNotExploitable": "Não explorável",
       "outcomeTriageComplete": "Triagem concluída",
       "overdueOnly": "Somente em atraso",
       "reset": "Redefinir",
@@ -1036,9 +1030,6 @@
       "analysisModel": "Modelo de análise",
       "couldNotLoad": "Não foi possível carregar as configurações de análise.",
       "depth": "Profundidade da análise",
-      "modeAuto": "Automático",
-      "modeDeep": "Profunda",
-      "modeShallow": "Superficial",
       "remediationModel": "Modelo de correção",
       "title": "Modelos e análise",
       "triageModel": "Modelo de triagem"
@@ -1133,15 +1124,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Ocorrências em aberto",
-      "openFindingsDetail": "{{critical}} críticos, {{high}} de nível alto",
-      "confirmedExploitable": "Exploração possível confirmada",
       "confirmedExploitableDetail": "Risco do projeto confirmado pela análise",
-      "needsReview": "Precisa da sua revisão",
       "needsReviewDetail": "Decisão humana necessária",
-      "analysisIncomplete": "Análise não concluída",
       "analysisIncompleteDetail": "Risco do projeto ainda desconhecido",
       "slaCompliance": "Cumprimento do SLA",
-      "notMeasured": "Não medido",
       "withinDeadlineDetail": "{{within}} de {{total}} dentro do prazo",
       "noDeadlineData": "Ainda não há ocorrências com prazo de SLA definido",
       "deadlinePassed": "Prazo vencido",
@@ -1172,9 +1158,6 @@
       "title": "Ignorar problema"
     },
     "findingDetail": {
-      "couldNotLoad": "Não foi possível carregar este problema.",
-      "notFound": "Problema não encontrado",
-      "notFoundDescription": "Esta ocorrência pode ter sido removida ou você não tem mais acesso a ela.",
       "tabAnalysis": "Análise",
       "tabRemediation": "Correção",
       "title": "Ocorrência"
@@ -1197,7 +1180,6 @@
       "supersededByDescription": "Toque para abrir o registro atual e consultar o status, a análise e a correção.",
       "viewAdvisory": "Ver aviso de segurança no GitHub",
       "vulnerableVersions": "Versões vulneráveis",
-      "statusSuperseded": "Substituído",
       "statusOpen": "Abrir",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Correção já iniciada",
@@ -1219,13 +1201,11 @@
       "a11y": "Ocorrência de gravidade {{severity}}: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Ocorrência de gravidade {{severity}}: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Analisar",
-      "nextNeedsManualReview": "Precisa de revisão manual",
       "nextRemediationAvailable": "Correção disponível",
       "nextRemediationInProgress": "Correção em andamento",
       "nextRemediationPrOpen": "PR de correção aberto",
       "nextRetryRemediation": "Nova tentativa de correção disponível",
       "nextViewDetails": "Ver detalhes",
-      "retryAnalysis": "Tentar analisar novamente",
       "runAnalysis": "Executar análise",
       "viewPr": "Ver PR"
     },
@@ -1238,7 +1218,6 @@
       "newFindingSubtitle": "Enviada sempre que uma nova ocorrência é sincronizada, inclusive na primeira sincronização.",
       "slaLeadTimeAccessibility": "Antecedência do aviso de SLA em dias",
       "slaLeadTimeError": "Digite um número inteiro de dias entre 1 e 365.",
-      "slaLeadTimeHint": "Digite um número inteiro entre 1 e 365",
       "slaLeadTimeLabel": "Antecedência do aviso de SLA (dias)",
       "slaPersonalTitle": "Receber avisos de SLA por e-mail",
       "slaSection": "Notificações de prazo de SLA",
@@ -1254,8 +1233,6 @@
       "cancellationRequested": "Cancelamento solicitado",
       "cancelled": "Correção cancelada",
       "couldNotLoad": "Não foi possível carregar o status da correção.",
-      "noAnalysisDescription": "Inicie uma análise na aba Detalhes.",
-      "noAnalysisTitle": "Nenhuma análise realizada",
       "openDraftPullRequest": "Abrir PR em rascunho{{number}}",
       "openPullRequest": "Abrir PR{{number}}",
       "progress": "Progresso",
@@ -1265,8 +1242,6 @@
       "timeline": {
         "blocked": "Correção bloqueada",
         "failed": "Falha na correção",
-        "noChangesNeeded": "Nenhuma alteração necessária",
-        "prOpened": "PR aberto",
         "queued": "Correção solicitada"
       },
       "queued": "Correção na fila",
@@ -1294,7 +1269,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Análise {{mode}}",
-      "automation": "Automação",
       "automationAllOff": "Tudo desativado",
       "automationCount": "{{displayCount}} de 3 ativadas",
       "couldNotLoadPermissions": "Não foi possível carregar as permissões.",
@@ -1302,15 +1276,12 @@
       "disabledNoManage": "O agente de segurança está desativado. Somente proprietários da organização e gerentes de cobrança podem ativá-lo.",
       "disabledNoRepo": "Selecione pelo menos um repositório antes de ativar o agente de segurança.",
       "disabledPrompt": "Ative o agente de segurança para sincronizar alertas do Dependabot, escolher repositórios e configurar a automação.",
-      "modelsAndAnalysis": "Modelos e análise",
       "notificationsCount": "{{displayCount}} de 2 ativadas",
       "on": "Ativado",
       "repositoriesCount": "{{displayCount}} repositórios selecionados",
       "repositoriesCount_other": "{{displayCount}} repositórios selecionados",
       "repositoriesCount_one": "{{displayCount}} repositório selecionado",
       "selectRepositoriesSubtitle": "Escolha quais repositórios o agente de segurança monitora",
-      "slaPolicy": "Política de SLA",
-      "title": "Configurações",
       "repositoriesCount_many": "{{displayCount}} repositórios selecionados"
     },
     "settingsSave": {
@@ -1359,7 +1330,6 @@
     },
     "analysisState": {
       "queued": "Análise na fila",
-      "queuedTitle": "Análise na fila",
       "queuedDescription": "A análise aguarda a liberação de capacidade para começar.",
       "analyzing": "Analisando",
       "analyzingDescription": "A análise verifica se o código do aplicativo pode acessar a funcionalidade afetada.",
@@ -1368,7 +1338,6 @@
       "extractionFailedDescription": "Não foi possível transformar o relatório técnico em um resultado estruturado.",
       "exploitableDescription": "O código do aplicativo pode acessar a funcionalidade afetada.",
       "notExploitable": "Inalcançável",
-      "notExploitableTitle": "Inalcançável",
       "notExploitableDescription": "Não foi encontrado nenhum caminho de execução que acesse a funcionalidade afetada neste repositório.",
       "unknown": "Precisa de revisão",
       "unknownDescription": "A análise não conseguiu confirmar se a funcionalidade vulnerável pode ser acessada pelo código.",
@@ -1406,7 +1375,6 @@
       "dueInDays": "Vence em {{count}} dias"
     },
     "remediationStatus": {
-      "cancellationRequested": "Cancelamento solicitado",
       "notStarted": "Não iniciada",
       "starting": "Iniciando",
       "inProgress": "Em andamento",
@@ -1425,7 +1393,6 @@
       "findingNotOpen": "A ocorrência não está mais em aberto.",
       "repoNotInScope": "O repositório não está selecionado para o agente de segurança.",
       "analysisRequired": "Execute a análise do código antes de iniciar a correção.",
-      "sandboxAnalysisRequired": "Execute a análise do código antes de iniciar a correção.",
       "staleAnalysis": "A ocorrência mudou após a análise. Execute a análise novamente antes de iniciar a correção.",
       "notExploitable": "A análise não encontrou nenhum caminho de execução que acesse a funcionalidade vulnerável. A correção automática está indisponível.",
       "exploitabilityUnknown": "A análise não conseguiu confirmar se a vulnerabilidade pode ser explorada. É necessária uma revisão manual antes da correção com um clique.",
@@ -1441,12 +1408,10 @@
       "autoRemediationDisabled": "A correção automática está desativada. A correção manual ainda pode ser iniciada se as verificações de segurança forem aprovadas.",
       "includeExistingDisabled": "As ocorrências existentes não são incluídas na correção automática.",
       "belowThreshold": "A gravidade da ocorrência está abaixo do mínimo exigido para a correção automática. A correção manual ainda pode ser iniciada se as verificações de segurança forem aprovadas.",
-      "beforeEnablement": "A análise foi concluída antes da ativação da correção automática. A correção manual ainda pode ser iniciada se as verificações de segurança forem aprovadas.",
-      "generic": "A correção não está disponível para este problema."
+      "beforeEnablement": "A análise foi concluída antes da ativação da correção automática. A correção manual ainda pode ser iniciada se as verificações de segurança forem aprovadas."
     },
     "commandFailure": {
       "ownerCapReached": "O limite de análises simultâneas foi atingido. Aguarde uma análise em andamento terminar e tente novamente.",
-      "githubTokenUnavailable": "A autorização do GitHub precisa de atenção. Reautorize o app do GitHub e tente novamente.",
       "githubAuthInvalid": "A autorização do GitHub precisa de atenção. Reautorize o app do GitHub e tente novamente.",
       "findingUnavailable": "A ocorrência não está mais disponível. Atualize a lista de ocorrências e tente novamente se ela continuar em aberto.",
       "repositoryUnavailable": "O repositório não está mais disponível para o app do GitHub. Atualize o acesso ao repositório e tente novamente.",
@@ -1531,10 +1496,8 @@
       "title": "Sessão",
       "copyErrorDetails": "Copiar detalhes do erro",
       "backToSessions": "Voltar para as sessões",
-      "accessDeniedDescription": "Você não tem permissão para ver este conteúdo.",
       "couldNotLoad": "Não foi possível carregar a sessão.",
       "failedToLoadDetails": "Não foi possível carregar os detalhes da sessão.",
-      "notFoundDescription": "Este item pode ter sido removido ou não está mais disponível.",
       "failedToStopExecution": "Não foi possível interromper a execução.",
       "renameSession": "Renomear sessão",
       "renamePlaceholder": "Nome da sessão",
@@ -2105,7 +2068,6 @@
     "signOutThisDeviceTitle": "Sair deste dispositivo?",
     "signOutThisSessionTitle": "Encerrar esta sessão?",
     "signOutThisSessionMessage": "{{device}} será desconectado. Ele pode manter o acesso à API por até uma hora.",
-    "signOutMessage": "Você precisará entrar novamente para acessar seu espaço de trabalho.",
     "webBrowser": "Navegador"
   },
   "forceUpdate": {
@@ -2386,8 +2348,6 @@
       "reconnectTitle": "Reconexão com o GitHub"
     },
     "connectionExpired": "A conexão com o GitHub expirou.",
-    "connectionExpiredDescription": "Sua conexão com o GitHub não é mais válida. Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte.",
-    "connectionExpiredTitle": "A conexão com o GitHub expirou.",
     "couldNotLoadPullRequest": "Não foi possível carregar o pull request.",
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as configurações do aplicativo do GitHub.",
     "description": "Descrição",
@@ -2403,7 +2363,6 @@
       "comment_other": "{{displayCount}} comentários",
       "couldNotLoad": "Não foi possível carregar a discussão.",
       "couldNotLoadMore": "Não foi possível carregar mais comentários.",
-      "couldNotReply": "Não foi possível responder.",
       "loadMoreComments": "Carregar mais comentários",
       "loading": "Carregando discussão",
       "moderation": {
@@ -2619,8 +2578,7 @@
       "noEnabledMethods": "Este repositório não tem métodos de mesclagem ativados. Peça a um administrador do repositório para ativar a mesclagem com um commit de mesclagem, com agrupamento de commits ou com reaplicação de commits.",
       "partialSuccessBanner": {
         "accessibility": "Mesclado. Não foi possível excluir o branch: {{reason}}",
-        "body": "Não foi possível excluir o branch: {{reason}}.",
-        "title": "Mesclado"
+        "body": "Não foi possível excluir o branch: {{reason}}."
       },
       "refreshMergeability": "Verificar novamente se é possível mesclar",
       "terminal": {
@@ -2684,9 +2642,7 @@
       "deletedAnnouncement": "Comentário pendente excluído",
       "editA11y": "Editar comentário pendente em {{location}}",
       "editOutdatedA11y": "Editar comentário pendente desatualizado em {{location}}",
-      "emptyBody": "(vazio)",
       "noCommentsQueued": "Não há comentários na fila. A revisão será enviada apenas com o tipo selecionado acima.",
-      "outdated": "Desatualizado",
       "staleHint": "o PR foi atualizado depois que você escreveu este comentário.",
       "staleQueueHint": "Comentários sobre um commit mais antigo não são enviados. Eles ficam na fila para você editar ou excluir.",
       "summaryA11y": "Resumo da revisão",
@@ -2695,7 +2651,6 @@
     "pullRequestUnavailable": "Pull request indisponível",
     "pullRequestUnavailableDescription": "Não é possível abrir este PR. Ele pode ter sido excluído, o repositório pode ser privado ou o aplicativo do Kilo para GitHub pode não estar instalado nele.",
     "reconnectNotice": {
-      "checkConnection": "Verificar conexão",
       "message": "Sua conexão com o GitHub não é mais válida. Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte.",
       "title": "A conexão com o GitHub expirou."
     },
@@ -2721,7 +2676,6 @@
       "pendingComment_other": "comentários pendentes",
       "pendingComment_one": "comentário pendente",
       "summaryOptional": "Resumo (opcional)",
-      "title": "Enviar revisão",
       "partialPostedMessage": "Comentários publicados: {{displayFreshCount}}. Comentários mantidos na fila por se referirem a um commit mais antigo: {{displayStaleCount}}.",
       "submitCountOfTotal": "Enviar {{displayFreshCount}} de {{displayTotalCount}} comentários",
       "submitReview": "Enviar revisão",
@@ -2798,7 +2752,6 @@
         "accounting_adjustment": "Ajuste contábil",
         "credits_expired": "Créditos expirados"
       },
-      "loadMoreFailed": "Não foi possível carregar mais itens.",
       "truncated": "Há movimentações de créditos anteriores disponíveis."
     },
     "hub": {
@@ -2834,7 +2787,6 @@
       "truncated": "Há faturas anteriores disponíveis."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "nome@empresa.com",
       "enableA11y": "Ativar alerta de saldo baixo",
       "notifyEmailsLabel": "E-mails para receber alertas",
       "permissionDenied": "Você não tem permissão para gerenciar alertas de cobrança.",
@@ -2859,7 +2811,6 @@
       "emptyDescriptionCanInvite": "Convide colegas para começar a colaborar nesta organização.",
       "emptyDescriptionCannotInvite": "Peça a um proprietário ou gerente de cobrança para convidar colegas.",
       "emptyTitle": "Nenhum membro ainda",
-      "inviteMember": "Convidar membro",
       "invitedDate": "Convidado em {{date}}",
       "limitPerDay": "{{amount}}/dia",
       "manageA11y": "Gerenciar {{name}}",
@@ -2895,7 +2846,6 @@
       "couldNotLoadStatus": "Não foi possível carregar o status",
       "creditProcessingDelayed": "Processamento de créditos atrasado · tentando novamente automaticamente",
       "ended": "Encerrado",
-      "manageHint": "Abre o gerenciamento do Kilo Pass no site.",
       "notSubscribed": "Sem assinatura",
       "overallocated": "As atribuições do Pass excedem as licenças pagas",
       "paidSeat_one": "{{displayCount}} licença paga",

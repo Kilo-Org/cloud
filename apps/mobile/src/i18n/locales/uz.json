@@ -370,7 +370,6 @@
         "closed": "Bu PR yopilgan"
       },
       "partialSuccessBanner": {
-        "title": "Birlashtirilgan",
         "body": "Tarmoqni o'chirib bo'lmadi: {{reason}}.",
         "accessibility": "Birlashtirildi. Tarmoqni o'chirib bo'lmadi: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Qabul qilish",
       "replyBadRequest": "Bu javobni joylab bo'lmaydi. Izohlar zanjiri o'zgargan bo'lishi mumkin.",
       "replyForbidden": "Bu PRga javob yozishga ruxsatingiz yo'q.",
-      "couldNotReply": "Javob yuborib bo‘lmadi.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu izoh ustidan shikoyat qilib bo'lmaydi.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub ilovasi sozlamalarini ochib bo‘lmadi.",
     "installKiloGitHubApp": "Kilo GitHub ilovasini o'rnatish",
-    "connectionExpiredTitle": "GitHub bilan ulanish muddati tugadi.",
-    "connectionExpiredDescription": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
     "checkConnection": "Ulanishni tekshirish",
     "couldNotLoadPullRequest": "PRni yuklab bo'lmadi.",
     "description": "Tavsif",
@@ -572,7 +568,6 @@
       "shareA11y": "PRni ulashish"
     },
     "submit": {
-      "title": "Ko‘rib chiqish natijasini yuborish",
       "loadFailedTitle": "Ko'rib chiqish natijasini yuborish oynasini yuklab bo'lmadi.",
       "deletePendingTitle": "Navbatdagi izoh o'chirilsinmi?",
       "deletePendingMessage": "Bu izoh ko'rib chiqish navbatidan o'chiriladi.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
-      "checkConnection": "Ulanishni tekshirish"
+      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
     },
     "eventChips": {
       "comment": "Izoh",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}}dagi eskirgan navbatdagi izohni tahrirlash",
       "editA11y": "{{location}}dagi navbatdagi izohni tahrirlash",
-      "emptyBody": "(bo‘sh)",
-      "outdated": "Eskirgan",
       "staleHint": "siz bu izohni yozganingizdan keyin PR yangilangan.",
       "deleteA11y": "{{location}}dagi navbatdagi izohni o'chirish",
       "deletedAnnouncement": "Navbatdagi izoh o'chirildi",
@@ -703,7 +695,6 @@
       "security": "Aniqlangan xavfsizlik muammolari"
     },
     "category": {
-      "chatMessagesTitle": "Suhbat xabarlari",
       "chatMessagesSubtitle": "suhbatlaringizdagi javoblar",
       "agentAttentionTitle": "Agentga yordamingiz kerak",
       "agentAttentionSubtitle": "savollar, ruxsat va ma'lumot so'rovlari",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "vazifa bajarilayotganda agent yuborgan xabarlar",
       "sessionStatusTitle": "Sessiya holati",
       "sessionStatusSubtitle": "tugadi / xatolik yuz berdi / boshqarishga tayyor",
-      "kiloclawActivityTitle": "KiloClaw faoliyati",
       "kiloclawActivitySubtitle": "nusxa tayyor yoki xatolik yuz berdi, rejalashtirilgan amallar",
-      "balanceAlertsTitle": "Balans haqida ogohlantirishlar",
       "balanceAlertsSubtitle": "tashkilot balansi kamaygani haqida ogohlantirishlar",
-      "securityFindingsTitle": "Aniqlangan xavfsizlik muammolari",
       "securityFindingsSubtitle": "aniqlangan yangi zaifliklar va SLA eslatmalari"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Sun'iy intellekt modelini tanlash",
       "secretsDescription": "Shifrlangan kirish ma'lumotlari",
-      "versionPinDescription": "Muayyan versiyaga biriktirish",
-      "versionPinLabel": "Versiyani belgilab qo‘yish"
+      "versionPinDescription": "Muayyan versiyaga biriktirish"
     },
     "avatar": {
       "arcade": "Arkada",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Yuqori",
       "severityMedium": "O‘rta",
       "severityLow": "Past",
-      "outcomeNotExploitable": "Hujumda foydalanib bo‘lmaydi",
       "outcomeTriageComplete": "Dastlabki baholash yakunlandi",
       "sortSeverityDesc": "Xavf darajasi: yuqoridan pastga",
       "sortSeverityAsc": "Xavf darajasi: pastdan yuqoriga",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Ochiq muammolar",
-      "openFindingsDetail": "{{critical}} ta o‘ta yuqori, {{high}} ta yuqori",
-      "confirmedExploitable": "Hujumda foydalanish mumkinligi tasdiqlangan",
       "confirmedExploitableDetail": "Loyiha xavfi tahlil bilan tasdiqlandi",
-      "needsReview": "Ko‘rib chiqishingiz kerak",
       "needsReviewDetail": "Odam ko'rib chiqib, qaror berishi kerak",
-      "analysisIncomplete": "Tahlil tugallanmagan",
       "analysisIncompleteDetail": "Loyiha xavfi hali noma'lum",
       "slaCompliance": "SLA talablariga muvofiqlik",
-      "notMeasured": "O‘lchanmagan",
       "withinDeadlineDetail": "{{total}} tadan {{within}} tasining muddati o'tmagan",
       "noDeadlineData": "Hali hech bir muammo uchun SLA muddati belgilanmagan",
       "deadlinePassed": "Muddat o'tdi",
@@ -1601,7 +1582,6 @@
       "source": "Manba",
       "sourceId": "Manba identifikatori",
       "viewAdvisory": "GitHubda xavfsizlik xabarnomasini ko'rish",
-      "statusSuperseded": "Almashtirildi",
       "statusOpen": "Ochiq",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Tuzatish allaqachon boshlangan",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "ko'rib chiqilgach"
     },
     "settingsOverview": {
-      "title": "Sozlamalar",
       "couldNotLoadSettings": "Xavfsizlik agenti sozlamalarini yuklab bo'lmadi.",
       "couldNotLoadPermissions": "Ruxsatlarni yuklab bo'lmadi.",
       "on": "Yoniq",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} ta repozitoriy tanlangan",
       "repositoriesCount_other": "{{displayCount}} ta repozitoriy tanlangan",
       "selectRepositoriesSubtitle": "Xavfsizlik agenti kuzatadigan repozitoriyalarni tanlang",
-      "modelsAndAnalysis": "Modellar va tahlil",
       "analysisModeSubtitle": "{{mode}} tahlil",
-      "automation": "Avtomatlashtirish",
       "automationAllOff": "Hammasi o'chiq",
       "automationCount": "3 tadan {{displayCount}} tasi yoqilgan",
       "notificationsCount": "2 tadan {{displayCount}} tasi yoqilgan",
-      "slaPolicy": "SLA siyosati",
       "disabledNoManage": "Xavfsizlik agenti o'chirilgan. Faqat tashkilot egalari va hisob-kitob menejerlari uni yoqishi mumkin.",
       "disabledNoRepo": "Xavfsizlik agentini yoqishdan oldin kamida bitta repozitoriyani tanlang.",
       "disabledPrompt": "Dependabot ogohlantirishlarini sinxronlash, repozitoriyalarni tanlash va avtomatlashtirishni sozlash uchun Xavfsizlik agentini yoqing."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Bekor qilish so‘rovi yuborildi",
       "cancelled": "Tuzatish bekor qilindi",
       "couldNotLoad": "Tuzatish holatini yuklab bo'lmadi.",
-      "noAnalysisTitle": "Hali tahlil qilinmagan",
-      "noAnalysisDescription": "Tafsilotlar bo‘limidan tahlilni boshlang.",
       "start": "Tuzatishni boshlash",
       "retry": "Qayta tuzatishga urinish",
       "cancelTitle": "Bu tuzatish bekor qilinsinmi?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Qayta tuzatish urinishi navbatga qo'yildi",
       "timeline": {
         "queued": "Tuzatish so'raldi",
-        "prOpened": "PR ochildi",
         "failed": "Tuzatish amalga oshmadi",
-        "blocked": "Tuzatishga to'siq bor",
-        "noChangesNeeded": "O‘zgartirish kerak emas"
+        "blocked": "Tuzatishga to'siq bor"
       },
       "unavailable": "Bu muammoni avtomatik tuzatish imkoni yo‘q."
     },
@@ -1663,9 +1635,6 @@
       "title": "Modellar va tahlil",
       "couldNotLoad": "Tahlil sozlamalarini yuklab bo'lmadi.",
       "depth": "Tahlil chuqurligi",
-      "modeAuto": "Avto",
-      "modeShallow": "Yuzaki",
-      "modeDeep": "Chuqur",
       "triageModel": "Dastlabki baholash modeli",
       "analysisModel": "Tahlil modeli",
       "remediationModel": "Tuzatish modeli"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Muammo",
       "tabAnalysis": "Tahlil",
-      "tabRemediation": "Tuzatish",
-      "notFound": "Muammo topilmadi",
-      "notFoundDescription": "Bu muammo o'chirilgan yoki uni ko'rish huquqingiz bekor qilingan bo'lishi mumkin.",
-      "couldNotLoad": "Bu muammo haqidagi ma’lumotlarni yuklab bo‘lmadi."
+      "tabRemediation": "Tuzatish"
     },
     "findingList": {
       "couldNotLoad": "Muammolarni yuklab bo'lmadi.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Tuzatish davom etmoqda",
       "nextRetryRemediation": "Qayta tuzatishga urinish mumkin",
       "nextRemediationAvailable": "Tuzatish mumkin",
-      "retryAnalysis": "Qayta tahlil qilish",
       "runAnalysis": "Tahlilni ishga tushirish",
-      "nextNeedsManualReview": "Qo‘lda ko‘rib chiqish kerak",
       "nextViewDetails": "Tafsilotlarni ko'rish",
       "viewPr": "PRni ko'rish",
       "analyze": "Tahlil qilish",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Har safar yangi muammo sinxronlanganda, jumladan, birinchi sinxronlashda ham yuboriladi.",
       "slaLeadTimeAccessibility": "SLA muddati tugashidan necha kun oldin ogohlantirish",
       "slaLeadTimeError": "Kunlar sonini 1 dan 365 gacha bo'lgan butun son bilan kiriting.",
-      "slaLeadTimeHint": "1 dan 365 gacha bo‘lgan butun sonni kiriting",
       "slaLeadTimeLabel": "SLA muddati tugashidan oldin ogohlantirish (kun)",
       "slaPersonalTitle": "SLA ogohlantirishlari haqida menga elektron xat yuborish",
       "slaSection": "SLA ogohlantirish bildirishnomasi",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Tahlil navbatda",
-      "queuedTitle": "Tahlil navbatda",
       "queuedDescription": "Yangi tahlil uchun joy bo'shashi kutilmoqda.",
       "analyzing": "Tahlil qilinmoqda",
       "analyzingDescription": "Ilova kodi zaiflik mavjud funksiyani chaqira olishi tekshirilmoqda.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Texnik hisobotni tuzilmali natijaga aylantirib bo'lmadi.",
       "exploitableDescription": "Ilova kodi zaiflik mavjud funksiyani chaqira oladi.",
       "notExploitable": "Kodga yetib borib bo‘lmaydi",
-      "notExploitableTitle": "Kodga yetib borib bo‘lmaydi",
       "notExploitableDescription": "Bu repozitoriyada zaiflik mavjud funksiyaga olib boradigan kod yo'li topilmadi.",
       "unknown": "Ko‘rib chiqish kerak",
       "unknownDescription": "Tahlil zaiflik mavjud funksiyani chaqirish mumkinligini tasdiqlay olmadi.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Muddat tugashiga {{count}} kun qoldi"
     },
     "remediationStatus": {
-      "cancellationRequested": "Bekor qilish so‘rovi yuborildi",
       "notStarted": "Boshlanmagan",
       "starting": "Boshlanmoqda",
       "inProgress": "Davom etmoqda",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Muammo endi ochiq emas.",
       "repoNotInScope": "Repozitoriya Xavfsizlik agenti uchun tanlanmagan.",
       "analysisRequired": "Tuzatishni boshlashdan oldin kod bazasi tahlilini ishga tushiring.",
-      "sandboxAnalysisRequired": "Tuzatishni boshlashdan oldin kod bazasi tahlilini ishga tushiring.",
       "staleAnalysis": "Muammo tahlildan keyin o'zgardi. Tuzatishni boshlashdan oldin tahlilni qayta ishga tushiring.",
       "notExploitable": "Tahlilda zaiflik mavjud funksiyaga olib boradigan kod yo'li topilmadi. Avtomatik tuzatish imkoni yo'q.",
       "exploitabilityUnknown": "Tahlil zaiflikdan hujumda foydalanish mumkinligini tasdiqlay olmadi. Bir bosishda tuzatishdan oldin qo'lda ko'rib chiqish kerak.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Avtomatik tuzatish o'chirilgan. Xavfsizlik tekshiruvlaridan o'tgach, tuzatishni qo'lda boshlash mumkin.",
       "includeExistingDisabled": "Mavjud muammolar avtomatik tuzatishga kiritilmagan.",
       "belowThreshold": "Muammoning xavf darajasi avtomatik tuzatish chegarasidan past. Xavfsizlik tekshiruvlaridan o'tgach, tuzatishni qo'lda boshlash mumkin.",
-      "beforeEnablement": "Tahlil avtomatik tuzatish yoqilishidan oldin yakunlangan. Xavfsizlik tekshiruvlaridan o'tgach, tuzatishni qo'lda boshlash mumkin.",
-      "generic": "Bu muammoni avtomatik tuzatish imkoni yo‘q."
+      "beforeEnablement": "Tahlil avtomatik tuzatish yoqilishidan oldin yakunlangan. Xavfsizlik tekshiruvlaridan o'tgach, tuzatishni qo'lda boshlash mumkin."
     },
     "commandFailure": {
       "ownerCapReached": "Bir vaqtda bajariladigan tahlillar soni chegaraga yetdi. Davom etayotgan tahlillardan biri tugashini kuting, so'ng qayta urinib ko'ring.",
-      "githubTokenUnavailable": "GitHub ruxsatlarini tekshirish kerak. GitHub ilovasiga qayta ruxsat bering, so'ng qayta urinib ko'ring.",
       "githubAuthInvalid": "GitHub ruxsatlarini tekshirish kerak. GitHub ilovasiga qayta ruxsat bering, so'ng qayta urinib ko'ring.",
       "findingUnavailable": "Muammo endi mavjud emas. Muammolar ro'yxatini yangilang. Muammo hali ochiq bo'lsa, qayta urinib ko'ring.",
       "repositoryUnavailable": "GitHub ilovasi endi repozitoriyaga kira olmaydi. Repozitoriyaga kirish huquqini yangilang, so'ng qayta urinib ko'ring.",
@@ -1965,10 +1922,8 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xato tafsilotlarini nusxalash",
       "backToSessions": "Sessiyalarga qaytish",
-      "accessDeniedDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
       "couldNotLoad": "Sessiyani yuklab bo'lmadi.",
       "failedToLoadDetails": "Sessiya tafsilotlarini yuklab bo'lmadi.",
-      "notFoundDescription": "Bu element olib tashlangan yoki undan endi foydalanib bo‘lmaydigan bo‘lishi mumkin.",
       "failedToStopExecution": "Bajarishni to'xtatib bo'lmadi.",
       "renameSession": "Sessiya nomini o'zgartirish",
       "renamePlaceholder": "Sessiya nomi",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "Sessiyadan chiqildi.",
     "signOutThisDeviceTitle": "Bu qurilmada tizimdan chiqilsinmi?",
     "signOutThisSessionTitle": "Bu sessiya tugatilsinmi?",
-    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin.",
-    "signOutMessage": "Ish maydoningizdan foydalanish uchun hisobingizga qayta kirishingiz kerak bo‘ladi."
+    "signOutThisSessionMessage": "{{device}} qurilmasi tizimdan chiqariladi. Unda API orqali kirish huquqi yana bir soatgacha saqlanishi mumkin."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Ilova do'konini ochib bo'lmadi.",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Buxgalteriya tuzatmasi",
         "credits_expired": "Kreditlarning muddati tugadi"
       },
-      "loadMoreFailed": "Qolganlarini yuklab bo‘lmadi.",
       "truncated": "Kreditlar bo'yicha oldingi amallar ham mavjud."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Oldingi hisob-fakturalar ham mavjud."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ism@kompaniya.com",
       "enableA11y": "Balans kamayishi haqida ogohlantirishni yoqish",
       "notifyEmailsLabel": "Xabar yuboriladigan manzillar",
       "permissionDenied": "To'lov ogohlantirishlarini boshqarishga ruxsatingiz yo'q.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Bu tashkilotda hamkorlikni boshlash uchun hamkasblarni taklif qiling.",
       "emptyDescriptionCannotInvite": "Tashkilot egasidan yoki to'lov menejeridan hamkasblarni taklif qilishni so'rang.",
       "emptyTitle": "Hali a'zolar yo'q",
-      "inviteMember": "A’zo taklif qilish",
       "invitedDate": "Taklif qilingan sana: {{date}}",
       "limitPerDay": "kuniga {{amount}}",
       "manageA11y": "A'zoni boshqarish: {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Holatni yuklab bo'lmadi",
       "creditProcessingDelayed": "Kreditlarni hisobga o'tkazish kechikmoqda · avtomatik qayta urinilmoqda",
       "ended": "Yakunlandi",
-      "manageHint": "Kilo Pass boshqaruv sahifasini saytda ochadi.",
       "notSubscribed": "Obuna yo'q",
       "overallocated": "Tayinlangan Kilo Pass obunalari soni to'langan o'rinlar sonidan ko'p",
       "paidSeat_one": "{{displayCount}} ta to'langan o'rin",

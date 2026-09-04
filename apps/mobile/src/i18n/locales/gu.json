@@ -370,7 +370,6 @@
         "closed": "આ પુલ રિક્વેસ્ટ બંધ છે"
       },
       "partialSuccessBanner": {
-        "title": "મર્જ થયું",
         "body": "બ્રાન્ચ કાઢી નાખી શકાઈ નહીં: {{reason}}.",
         "accessibility": "મર્જ થયું. બ્રાન્ચ કાઢી નાખી શકાઈ નહીં: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "સ્વીકારો",
       "replyBadRequest": "આ જવાબ પોસ્ટ કરી શકાતો નથી. થ્રેડ બદલાયો હોઈ શકે છે.",
       "replyForbidden": "તમને આ પુલ રિક્વેસ્ટ પર જવાબ આપવાની પરવાનગી નથી.",
-      "couldNotReply": "જવાબ આપી શકાયો નહીં.",
       "moderation": {
         "reportContent": {
           "terminal": "આ ટિપ્પણી વિશે ફરિયાદ કરી શકાતી નથી.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub ઍપનાં સેટિંગ્સ ખોલી શકાયાં નહીં.",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
-    "connectionExpiredTitle": "GitHub સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
-    "connectionExpiredDescription": "તમારું GitHub કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે.",
     "checkConnection": "જોડાણ તપાસો",
     "couldNotLoadPullRequest": "પુલ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
     "description": "વર્ણન",
@@ -572,7 +568,6 @@
       "shareA11y": "પુલ રિક્વેસ્ટ શેર કરો"
     },
     "submit": {
-      "title": "સમીક્ષા મોકલો",
       "loadFailedTitle": "સમીક્ષા મોકલવાનું ફૉર્મ લોડ કરી શકાયું નહીં.",
       "deletePendingTitle": "બાકી ટિપ્પણી કાઢી નાખવી છે?",
       "deletePendingMessage": "આ ટિપ્પણી સમીક્ષાની કતારમાંથી કાઢી નાખવામાં આવશે.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
-      "message": "તમારું GitHub કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે.",
-      "checkConnection": "જોડાણ તપાસો"
+      "message": "તમારું GitHub કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે."
     },
     "eventChips": {
       "comment": "ટિપ્પણી",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}} પરની જૂની બાકી ટિપ્પણીમાં ફેરફાર કરો",
       "editA11y": "{{location}} પરની બાકી ટિપ્પણીમાં ફેરફાર કરો",
-      "emptyBody": "(ખાલી)",
-      "outdated": "જૂનું",
       "staleHint": "તમે આ લખ્યું તે પછી PRમાં ફેરફાર થયો છે.",
       "deleteA11y": "{{location}} પરની બાકી ટિપ્પણી કાઢી નાખો",
       "deletedAnnouncement": "બાકી ટિપ્પણી કાઢી નાખવામાં આવી",
@@ -703,7 +695,6 @@
       "security": "સુરક્ષા તપાસનાં તારણો"
     },
     "category": {
-      "chatMessagesTitle": "ચેટના સંદેશા",
       "chatMessagesSubtitle": "તમારી વાતચીતમાં જવાબો",
       "agentAttentionTitle": "એજન્ટને તમારી જરૂર છે",
       "agentAttentionSubtitle": "પ્રશ્નોના જવાબ, પરવાનગી કે માહિતીની જરૂર",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "એજન્ટ તરફથી કાર્ય દરમિયાનના સંદેશાઓ",
       "sessionStatusTitle": "સત્રની સ્થિતિ",
       "sessionStatusSubtitle": "પૂર્ણ / નિષ્ફળ / નિયંત્રિત કરવા તૈયાર",
-      "kiloclawActivityTitle": "KiloClawની પ્રવૃત્તિ",
       "kiloclawActivitySubtitle": "ઇન્સ્ટન્સ તૈયાર/નિષ્ફળ, નિર્ધારિત ક્રિયાઓ",
-      "balanceAlertsTitle": "બેલેન્સ અંગેની ચેતવણીઓ",
       "balanceAlertsSubtitle": "સંસ્થાનું બેલેન્સ ઓછું થવાની ચેતવણીઓ",
-      "securityFindingsTitle": "સુરક્ષા તપાસનાં તારણો",
       "securityFindingsSubtitle": "નવા તારણો અને SLA રીમાઇન્ડર"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "AI મોડેલની પસંદગી",
       "secretsDescription": "ઍક્સેસ માટેની એન્ક્રિપ્ટ કરેલી વિગતો",
-      "versionPinDescription": "ચોક્કસ સંસ્કરણ પર પિન કરો",
-      "versionPinLabel": "સંસ્કરણ સ્થિર રાખવું"
+      "versionPinDescription": "ચોક્કસ સંસ્કરણ પર પિન કરો"
     },
     "avatar": {
       "arcade": "આર્કેડ",
@@ -1440,7 +1427,6 @@
       "severityHigh": "ઉચ્ચ",
       "severityMedium": "મધ્યમ",
       "severityLow": "ઓછું",
-      "outcomeNotExploitable": "દુરુપયોગ શક્ય નથી",
       "outcomeTriageComplete": "પ્રાથમિક તપાસ પૂર્ણ",
       "sortSeverityDesc": "ગંભીરતા: વધુથી ઓછી",
       "sortSeverityAsc": "ગંભીરતા: ઓછીથી વધુ",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "ખુલ્લાં તારણો",
-      "openFindingsDetail": "{{critical}} ગંભીર, {{high}} ઉચ્ચ",
-      "confirmedExploitable": "દુરુપયોગ શક્ય હોવાની પુષ્ટિ",
       "confirmedExploitableDetail": "વિશ્લેષણમાં પ્રોજેક્ટના જોખમની પુષ્ટિ થઈ",
-      "needsReview": "તમારી સમીક્ષાની જરૂર છે",
       "needsReviewDetail": "માનવીય નિર્ણય જરૂરી",
-      "analysisIncomplete": "વિશ્લેષણ પૂર્ણ નથી",
       "analysisIncompleteDetail": "પ્રોજેક્ટનું જોખમ હજુ અજ્ઞાત છે",
       "slaCompliance": "SLA નું પાલન",
-      "notMeasured": "માપ્યું નથી",
       "withinDeadlineDetail": "{{total}} માંથી {{within}} સમયમર્યાદાની અંદર",
       "noDeadlineData": "હજુ કોઈ તારણ માટે SLA ની સમયમર્યાદા નક્કી કરેલી નથી",
       "deadlinePassed": "સમયમર્યાદા વટાવી",
@@ -1601,7 +1582,6 @@
       "source": "સ્ત્રોત",
       "sourceId": "સ્ત્રોતનું ID",
       "viewAdvisory": "GitHub પર સુરક્ષા સૂચના જુઓ",
-      "statusSuperseded": "નવા તારણે સ્થાન લીધું",
       "statusOpen": "ખોલો",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "સુધારવાનું કામ શરૂ થઈ ગયું છે",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "સમીક્ષા પછી"
     },
     "settingsOverview": {
-      "title": "સેટિંગ્સ",
       "couldNotLoadSettings": "સુરક્ષા એજન્ટની સેટિંગ્સ લોડ કરી શકાઈ નહીં.",
       "couldNotLoadPermissions": "પરવાનગીઓ લોડ કરી શકાઈ નહીં.",
       "on": "ચાલુ",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} રિપોઝિટરીઓ પસંદ કરેલી",
       "repositoriesCount_other": "{{displayCount}} રિપોઝિટરીઓ પસંદ કરેલી",
       "selectRepositoriesSubtitle": "સુરક્ષા એજન્ટ કઈ રિપોઝિટરીઓ પર નજર રાખે તે પસંદ કરો",
-      "modelsAndAnalysis": "મોડેલ અને વિશ્લેષણ",
       "analysisModeSubtitle": "{{mode}} વિશ્લેષણ",
-      "automation": "ઓટોમેશન",
       "automationAllOff": "બધું બંધ",
       "automationCount": "3 માંથી {{displayCount}} ચાલુ",
       "notificationsCount": "2 માંથી {{displayCount}} ચાલુ",
-      "slaPolicy": "SLA નીતિ",
       "disabledNoManage": "સુરક્ષા એજન્ટ બંધ છે. માત્ર સંસ્થાના માલિકો અને બિલિંગ મેનેજરો જ તેને ચાલુ કરી શકે છે.",
       "disabledNoRepo": "સુરક્ષા એજન્ટ ચાલુ કરતાં પહેલાં ઓછામાં ઓછી એક રિપોઝિટરી પસંદ કરો.",
       "disabledPrompt": "Dependabot ની ચેતવણીઓ સિંક કરવા, રિપોઝિટરીઓ પસંદ કરવા અને સ્વચાલન ગોઠવવા સુરક્ષા એજન્ટ ચાલુ કરો."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "રદ કરવાની વિનંતી મોકલી",
       "cancelled": "સુધારણા રદ થઈ",
       "couldNotLoad": "સુધારણાની સ્થિતિ લોડ કરી શકાઈ નહીં.",
-      "noAnalysisTitle": "હજુ વિશ્લેષણ થયું નથી",
-      "noAnalysisDescription": "વિગતો ટૅબમાંથી વિશ્લેષણ શરૂ કરો.",
       "start": "સુધારણા શરૂ કરો",
       "retry": "સુધારણાનો ફરી પ્રયાસ કરો",
       "cancelTitle": "આ સુધારણા રદ કરવી છે?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "સુધારણાનો ફરી પ્રયાસ કતારમાં મૂકાયો",
       "timeline": {
         "queued": "સુધારણા માટે વિનંતી કરી",
-        "prOpened": "PR ખોલી",
         "failed": "સુધારણા નિષ્ફળ",
-        "blocked": "સુધારણા અવરોધિત",
-        "noChangesNeeded": "કોઈ ફેરફારની જરૂર નથી"
+        "blocked": "સુધારણા અવરોધિત"
       },
       "unavailable": "આ તારણ માટે સુધારણા ઉપલબ્ધ નથી."
     },
@@ -1663,9 +1635,6 @@
       "title": "મોડેલ અને વિશ્લેષણ",
       "couldNotLoad": "વિશ્લેષણની સેટિંગ્સ લોડ કરી શકાઈ નહીં.",
       "depth": "વિશ્લેષણની ઊંડાઈ",
-      "modeAuto": "આપમેળે",
-      "modeShallow": "પ્રાથમિક",
-      "modeDeep": "સઘન",
       "triageModel": "પ્રાથમિક તપાસનું મોડલ",
       "analysisModel": "વિશ્લેષણનું મોડલ",
       "remediationModel": "સુધારણાનું મોડલ"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "તારણ",
       "tabAnalysis": "વિશ્લેષણ",
-      "tabRemediation": "સુધારણા",
-      "notFound": "તારણ મળ્યું નથી",
-      "notFoundDescription": "આ તારણ દૂર કરવામાં આવ્યું હોઈ શકે છે અથવા હવે તમને તે જોવાની પરવાનગી નથી.",
-      "couldNotLoad": "આ તારણ લોડ કરી શકાયું નહીં."
+      "tabRemediation": "સુધારણા"
     },
     "findingList": {
       "couldNotLoad": "તારણો લોડ કરી શકાયાં નહીં.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "સુધારણા ચાલુ છે",
       "nextRetryRemediation": "સુધારણાનો ફરી પ્રયાસ કરી શકાય છે",
       "nextRemediationAvailable": "સુધારણા ઉપલબ્ધ",
-      "retryAnalysis": "વિશ્લેષણનો ફરી પ્રયાસ કરો",
       "runAnalysis": "વિશ્લેષણ ચલાવો",
-      "nextNeedsManualReview": "વ્યક્તિ દ્વારા સમીક્ષા જરૂરી",
       "nextViewDetails": "વિગતો જુઓ",
       "viewPr": "PR જુઓ",
       "analyze": "વિશ્લેષણ કરો",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "દરેક નવું તારણ સિંક થાય ત્યારે સૂચના મોકલાય છે. આમાં પ્રથમ સિંકનો પણ સમાવેશ થાય છે.",
       "slaLeadTimeAccessibility": "SLA ની સમયમર્યાદા પહેલાં ચેતવણી આપવાનો સમય દિવસોમાં",
       "slaLeadTimeError": "દિવસોની સંખ્યા 1 થી 365 વચ્ચેની પૂર્ણ સંખ્યામાં દાખલ કરો.",
-      "slaLeadTimeHint": "1થી 365 સુધીનો પૂર્ણાંક દાખલ કરો",
       "slaLeadTimeLabel": "SLA ની સમયમર્યાદા પહેલાં ચેતવણી (દિવસોમાં)",
       "slaPersonalTitle": "SLA ચેતવણીઓ વિશે મને ઇમેઇલ કરો",
       "slaSection": "SLA અંગે ચેતવણીની સૂચના",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "વિશ્લેષણ કતારમાં છે",
-      "queuedTitle": "વિશ્લેષણ કતારમાં છે",
       "queuedDescription": "નવું વિશ્લેષણ શરૂ કરવાની ક્ષમતા ઉપલબ્ધ થાય તેની રાહ જોવાઈ રહી છે.",
       "analyzing": "વિશ્લેષણ ચાલુ છે",
       "analyzingDescription": "ઍપ્લિકેશનના કોડમાંથી અસરગ્રસ્ત સુવિધા સુધી પહોંચી શકાય છે કે નહીં તેની તપાસ ચાલી રહી છે.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "તકનીકી અહેવાલને નિર્ધારિત માળખાવાળા પરિણામમાં ફેરવી શકાયો નહીં.",
       "exploitableDescription": "ઍપ્લિકેશનના કોડમાંથી અસરગ્રસ્ત સુવિધા સુધી પહોંચી શકાય છે.",
       "notExploitable": "અપ્રાપ્ય",
-      "notExploitableTitle": "અપ્રાપ્ય",
       "notExploitableDescription": "આ રિપોઝિટરીમાં અસરગ્રસ્ત સુવિધા સુધી પહોંચતો કોઈ કોડ માર્ગ મળ્યો નથી.",
       "unknown": "સમીક્ષાની જરૂર છે",
       "unknownDescription": "સુરક્ષા ખામીવાળી સુવિધા સુધી પહોંચી શકાય છે કે નહીં તેની વિશ્લેષણમાં પુષ્ટિ થઈ શકી નહીં.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "મુદત પૂરી થવામાં {{count}} દિવસ"
     },
     "remediationStatus": {
-      "cancellationRequested": "રદ કરવાની વિનંતી મોકલી",
       "notStarted": "શરૂ કરેલ નથી",
       "starting": "શરૂ થઈ રહ્યું છે",
       "inProgress": "ચાલુ છે",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "તારણ હવે ખુલ્લું નથી.",
       "repoNotInScope": "સુરક્ષા એજન્ટ માટે આ રિપોઝિટરી પસંદ કરેલી નથી.",
       "analysisRequired": "સુધારણા શરૂ કરતાં પહેલાં કોડબેઝનું વિશ્લેષણ કરો.",
-      "sandboxAnalysisRequired": "સુધારણા શરૂ કરતાં પહેલાં કોડબેઝનું વિશ્લેષણ કરો.",
       "staleAnalysis": "વિશ્લેષણ પછી તારણ બદલાયું છે. સુધારણા શરૂ કરતાં પહેલાં વિશ્લેષણ ફરી ચલાવો.",
       "notExploitable": "વિશ્લેષણમાં સુરક્ષા ખામી સુધી પહોંચતો કોઈ કોડ માર્ગ મળ્યો નથી. સ્વચાલિત સુધારણા ઉપલબ્ધ નથી.",
       "exploitabilityUnknown": "વિશ્લેષણમાં દુરુપયોગની શક્યતાની પુષ્ટિ થઈ શકી નહીં. એક ક્લિકથી સુધારણા કરતાં પહેલાં માનવીય સમીક્ષા જરૂરી છે.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "સ્વચાલિત સુધારણા બંધ છે. સુરક્ષાની શરતો પૂરી થાય તો સુધારણા જાતે શરૂ કરી શકાય છે.",
       "includeExistingDisabled": "હાલનાં તારણોને સ્વચાલિત સુધારણામાંથી બાકાત રાખ્યાં છે.",
       "belowThreshold": "તારણની ગંભીરતા સ્વચાલિત સુધારણા માટે જરૂરી ન્યૂનતમ સ્તરથી ઓછી છે. સુરક્ષાની શરતો પૂરી થાય તો સુધારણા જાતે શરૂ કરી શકાય છે.",
-      "beforeEnablement": "સ્વચાલિત સુધારણા ચાલુ થઈ તે પહેલાં વિશ્લેષણ પૂર્ણ થયું હતું. સુરક્ષાની શરતો પૂરી થાય તો સુધારણા જાતે શરૂ કરી શકાય છે.",
-      "generic": "આ તારણ માટે સુધારણા ઉપલબ્ધ નથી."
+      "beforeEnablement": "સ્વચાલિત સુધારણા ચાલુ થઈ તે પહેલાં વિશ્લેષણ પૂર્ણ થયું હતું. સુરક્ષાની શરતો પૂરી થાય તો સુધારણા જાતે શરૂ કરી શકાય છે."
     },
     "commandFailure": {
       "ownerCapReached": "એકસાથે ચાલી શકે તેટલાં વિશ્લેષણ ચાલુ છે. તેમાંથી એક પૂરું થાય ત્યાં સુધી રાહ જુઓ, પછી ફરી પ્રયાસ કરો.",
-      "githubTokenUnavailable": "GitHub ની અધિકૃતતામાં સમસ્યા છે. GitHub ઍપને ફરી અધિકૃત કરો, પછી ફરી પ્રયાસ કરો.",
       "githubAuthInvalid": "GitHub ની અધિકૃતતામાં સમસ્યા છે. GitHub ઍપને ફરી અધિકૃત કરો, પછી ફરી પ્રયાસ કરો.",
       "findingUnavailable": "તારણ હવે ઉપલબ્ધ નથી. તારણોની યાદી રિફ્રેશ કરો. જો તારણ હજી ખુલ્લું હોય, તો ફરી પ્રયાસ કરો.",
       "repositoryUnavailable": "GitHub ઍપને હવે રિપોઝિટરીની ઍક્સેસ નથી. રિપોઝિટરીની ઍક્સેસ રિફ્રેશ કરો, પછી ફરી પ્રયાસ કરો.",
@@ -1965,10 +1922,8 @@
       "title": "સત્ર",
       "copyErrorDetails": "ભૂલની વિગતોની નકલ કરો",
       "backToSessions": "સત્રો પર પાછા જાઓ",
-      "accessDeniedDescription": "તમને આ જોવાની મંજૂરી નથી.",
       "couldNotLoad": "સત્ર લોડ કરી શકાયું નહીં.",
       "failedToLoadDetails": "સત્રની વિગતો લોડ કરી શકાઈ નહીં.",
-      "notFoundDescription": "આ વસ્તુ દૂર કરવામાં આવી હોઈ શકે છે અથવા હવે ઉપલબ્ધ નથી.",
       "failedToStopExecution": "ચાલી રહેલું કાર્ય રોકી શકાયું નહીં.",
       "renameSession": "સત્રનું નામ બદલો",
       "renamePlaceholder": "સત્રનું નામ",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "આ ઉપકરણમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionTitle": "આ સત્રમાંથી સાઇન આઉટ કરવું છે?",
     "signOutThisSessionMessage": "{{device}}માંથી સાઇન આઉટ થશે. તેનો API ઍક્સેસ એક કલાક સુધી ચાલુ રહી શકે છે.",
-    "signOutMessage": "તમારા વર્કસ્પેસનો ઉપયોગ કરવા માટે તમારે ફરી સાઇન ઇન કરવું પડશે.",
     "webBrowser": "વેબ બ્રાઉઝર"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "હિસાબી સુધારો",
         "credits_expired": "ક્રેડિટની મુદત પૂરી થઈ"
       },
-      "loadMoreFailed": "વધુ લોડ કરી શકાયું નહીં.",
       "truncated": "ક્રેડિટના જૂના વ્યવહારો ઉપલબ્ધ છે."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "જૂના ઇનવોઇસ ઉપલબ્ધ છે."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "નામ@કંપની.com",
       "enableA11y": "બેલેન્સ ઓછું થાય ત્યારે ચેતવણી ચાલુ કરો",
       "notifyEmailsLabel": "ચેતવણી મેળવવાનાં ઇમેઇલ સરનામાં",
       "permissionDenied": "તમને બિલિંગની ચેતવણીઓનું સંચાલન કરવાની પરવાનગી નથી.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "આ સંસ્થામાં સાથે કામ કરવાનું શરૂ કરવા ટીમના સાથીઓને આમંત્રિત કરો.",
       "emptyDescriptionCannotInvite": "ટીમના સાથીઓને આમંત્રિત કરવા માલિક અથવા બિલિંગ મેનેજરને કહો.",
       "emptyTitle": "હજી કોઈ સભ્ય નથી",
-      "inviteMember": "સભ્યને આમંત્રિત કરો",
       "invitedDate": "{{date}}ના રોજ આમંત્રણ મોકલ્યું",
       "limitPerDay": "{{amount}}/દિવસ",
       "manageA11y": "{{name}}નું સંચાલન કરો",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "સ્થિતિ લોડ કરી શકાઈ નહીં",
       "creditProcessingDelayed": "ક્રેડિટની પ્રક્રિયામાં વિલંબ · આપમેળે ફરી પ્રયાસ થઈ રહ્યો છે",
       "ended": "સમાપ્ત",
-      "manageHint": "વેબ પર Kilo Pass સંચાલન ખોલે છે.",
       "notSubscribed": "સબસ્ક્રાઇબ કરેલ નથી",
       "overallocated": "ફાળવેલા પાસની સંખ્યા ચૂકવણી કરેલી સીટો કરતાં વધુ છે",
       "paidSeat_one": "{{displayCount}} ચૂકવણી કરેલી સીટ",

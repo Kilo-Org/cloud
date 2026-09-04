@@ -370,7 +370,6 @@
         "closed": "Denne PR-en er lukket"
       },
       "partialSuccessBanner": {
-        "title": "Flettet",
         "body": "Kunne ikke slette grenen: {{reason}}.",
         "accessibility": "Flettet. Kunne ikke slette grenen: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Godta",
       "replyBadRequest": "Dette svaret kan ikke publiseres. Tråden kan ha endret seg.",
       "replyForbidden": "Du har ikke tillatelse til å svare på denne PR-en.",
-      "couldNotReply": "Kunne ikke sende svaret.",
       "moderation": {
         "reportContent": {
           "terminal": "Denne kommentaren kan ikke rapporteres.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Kunne ikke åpne innstillingene for GitHub-appen.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
-    "connectionExpiredTitle": "GitHub-tilkoblingen er utløpt.",
-    "connectionExpiredDescription": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
     "checkConnection": "Sjekk tilkoblingen",
     "couldNotLoadPullRequest": "Kunne ikke laste inn PR-en.",
     "description": "Beskrivelse",
@@ -572,7 +568,6 @@
       "shareA11y": "Del PR"
     },
     "submit": {
-      "title": "Send gjennomgang",
       "loadFailedTitle": "Kunne ikke laste inn skjemaet for å sende inn kodegjennomgangen.",
       "deletePendingTitle": "Slette usendt kommentar?",
       "deletePendingMessage": "Denne kommentaren fjernes fra køen for kodegjennomgangen.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub-tilkoblingen er utløpt.",
-      "message": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
-      "checkConnection": "Sjekk tilkoblingen"
+      "message": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov."
     },
     "eventChips": {
       "comment": "Kommenter",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediger utdatert, usendt kommentar ved {{location}}",
       "editA11y": "Rediger usendt kommentar ved {{location}}",
-      "emptyBody": "(tom)",
-      "outdated": "Utdatert",
       "staleHint": "PR-en er endret siden du skrev dette.",
       "deleteA11y": "Slett usendt kommentar ved {{location}}",
       "deletedAnnouncement": "Usendt kommentar slettet",
@@ -703,7 +695,6 @@
       "security": "Sikkerhetsfunn"
     },
     "category": {
-      "chatMessagesTitle": "Samtalemeldinger",
       "chatMessagesSubtitle": "svar i samtalene dine",
       "agentAttentionTitle": "Agenten trenger deg",
       "agentAttentionSubtitle": "spørsmål og behov for tillatelse eller svar",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "meldinger fra agenten underveis i oppgaven",
       "sessionStatusTitle": "Øktstatus",
       "sessionStatusSubtitle": "fullført / mislykket / klar for fjernstyring",
-      "kiloclawActivityTitle": "KiloClaw-aktivitet",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
-      "balanceAlertsTitle": "Saldovarsler",
       "balanceAlertsSubtitle": "advarsler om lav organisasjonssaldo",
-      "securityFindingsTitle": "Sikkerhetsfunn",
       "securityFindingsSubtitle": "nye funn og SLA-påminnelser"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Valg av KI-modell",
       "secretsDescription": "Krypterte påloggingsopplysninger",
-      "versionPinDescription": "Lås til en bestemt versjon",
-      "versionPinLabel": "Versjonslåsing"
+      "versionPinDescription": "Lås til en bestemt versjon"
     },
     "avatar": {
       "arcade": "Arkade",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Høy",
       "severityMedium": "Middels",
       "severityLow": "Lav",
-      "outcomeNotExploitable": "Kan ikke utnyttes",
       "outcomeTriageComplete": "Innledende vurdering fullført",
       "sortSeverityDesc": "Alvorlighetsgrad: høy til lav",
       "sortSeverityAsc": "Alvorlighetsgrad: lav til høy",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Åpne funn",
-      "openFindingsDetail": "{{critical}} kritiske, {{high}} med høy alvorlighetsgrad",
-      "confirmedExploitable": "Bekreftet at sårbarheten kan utnyttes",
       "confirmedExploitableDetail": "Analysen bekrefter risiko i prosjektet",
-      "needsReview": "Må gjennomgås av deg",
       "needsReviewDetail": "Krever en avgjørelse fra et menneske",
-      "analysisIncomplete": "Analysen er ikke fullført",
       "analysisIncompleteDetail": "Prosjektrisikoen er fortsatt ukjent",
       "slaCompliance": "SLA-etterlevelse",
-      "notMeasured": "Ikke målt",
       "withinDeadlineDetail": "{{within}} av {{total}} innen fristen",
       "noDeadlineData": "Ingen funn har en SLA-frist ennå",
       "deadlinePassed": "Fristen er overskredet",
@@ -1601,7 +1582,6 @@
       "source": "Kilde",
       "sourceId": "Kilde-ID",
       "viewAdvisory": "Vis sikkerhetsvarsel på GitHub",
-      "statusSuperseded": "Erstattet",
       "statusOpen": "Åpne",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "retting er allerede i gang",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "etter gjennomgang"
     },
     "settingsOverview": {
-      "title": "Innstillinger",
       "couldNotLoadSettings": "Kunne ikke laste inn innstillingene for sikkerhetsagenten.",
       "couldNotLoadPermissions": "Kunne ikke laste inn tillatelsene.",
       "on": "På",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} kodelagre valgt",
       "repositoriesCount_other": "{{displayCount}} kodelagre valgt",
       "selectRepositoriesSubtitle": "Velg hvilke kodelagre sikkerhetsagenten overvåker",
-      "modelsAndAnalysis": "Modeller og analyse",
       "analysisModeSubtitle": "Analyse: {{mode}}",
-      "automation": "Automatisering",
       "automationAllOff": "Alt er deaktivert",
       "automationCount": "{{displayCount}} av 3 aktivert",
       "notificationsCount": "{{displayCount}} av 2 aktivert",
-      "slaPolicy": "SLA-regler",
       "disabledNoManage": "Sikkerhetsagenten er deaktivert. Bare organisasjonseiere og faktureringsansvarlige kan aktivere den.",
       "disabledNoRepo": "Velg minst ett kodelager før du aktiverer sikkerhetsagenten.",
       "disabledPrompt": "Aktiver sikkerhetsagenten for å synkronisere Dependabot-varsler, velge kodelagre og sette opp automatisering."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Avbrudd forespurt",
       "cancelled": "Utbedring avbrutt",
       "couldNotLoad": "Kunne ikke laste inn statusen for utbedringen.",
-      "noAnalysisTitle": "Ingen analyse ennå",
-      "noAnalysisDescription": "Start en analyse fra fanen Detaljer.",
       "start": "Start utbedring",
       "retry": "Prøv utbedring på nytt",
       "cancelTitle": "Avbryte denne utbedringen?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Nytt utbedringsforsøk satt i kø",
       "timeline": {
         "queued": "Utbedring er bestilt",
-        "prOpened": "PR åpnet",
         "failed": "Utbedring mislyktes",
-        "blocked": "Utbedring blokkert",
-        "noChangesNeeded": "Ingen endringer trengs"
+        "blocked": "Utbedring blokkert"
       },
       "unavailable": "Utbedring er ikke tilgjengelig for dette funnet."
     },
@@ -1663,9 +1635,6 @@
       "title": "Modeller og analyse",
       "couldNotLoad": "Kunne ikke laste inn analyseinnstillingene.",
       "depth": "Analysedybde",
-      "modeAuto": "Automatisk",
-      "modeShallow": "Overflatisk",
-      "modeDeep": "Grundig",
       "triageModel": "Modell for innledende vurdering",
       "analysisModel": "Analysemodell",
       "remediationModel": "Utbedringsmodell"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Funn",
       "tabAnalysis": "Analyse",
-      "tabRemediation": "Utbedring",
-      "notFound": "Fant ikke funnet",
-      "notFoundDescription": "Dette funnet kan ha blitt fjernet, eller du har ikke lenger tilgang til det.",
-      "couldNotLoad": "Kunne ikke laste inn dette funnet."
+      "tabRemediation": "Utbedring"
     },
     "findingList": {
       "couldNotLoad": "Kunne ikke laste inn funnene.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Utbedring pågår",
       "nextRetryRemediation": "Utbedring kan prøves på nytt",
       "nextRemediationAvailable": "Utbedring tilgjengelig",
-      "retryAnalysis": "Kjør analysen på nytt",
       "runAnalysis": "Kjør analyse",
-      "nextNeedsManualReview": "Må gjennomgås manuelt",
       "nextViewDetails": "Vis detaljer",
       "viewPr": "Vis PR",
       "analyze": "Analyser",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Sendes hver gang et nytt funn synkroniseres, også ved første synkronisering.",
       "slaLeadTimeAccessibility": "Antall dager før SLA-fristen det skal varsles",
       "slaLeadTimeError": "Skriv inn et helt antall dager mellom 1 og 365.",
-      "slaLeadTimeHint": "Skriv inn et heltall mellom 1 og 365",
       "slaLeadTimeLabel": "Varsle før SLA-fristen (dager)",
       "slaPersonalTitle": "Send meg e-post om SLA-varsler",
       "slaSection": "Varsling om SLA-frister",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Analyse i kø",
-      "queuedTitle": "Analyse i kø",
       "queuedDescription": "Venter på ledig analysekapasitet.",
       "analyzing": "Analyserer",
       "analyzingDescription": "Sjekker om programkoden kan nå den berørte funksjonen.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Den tekniske rapporten kunne ikke gjøres om til et strukturert resultat.",
       "exploitableDescription": "Programkoden kan nå den berørte funksjonen.",
       "notExploitable": "Kan ikke nås",
-      "notExploitableTitle": "Kan ikke nås",
       "notExploitableDescription": "Fant ingen kjøringsvei til den sårbare funksjonen i dette kodelageret.",
       "unknown": "Må gjennomgås",
       "unknownDescription": "Analysen kunne ikke bekrefte om programkoden kan nå den sårbare funksjonen.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Frist om {{count}} dager"
     },
     "remediationStatus": {
-      "cancellationRequested": "Avbrudd forespurt",
       "notStarted": "Ikke startet",
       "starting": "Starter",
       "inProgress": "Pågår",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Funnet er ikke lenger åpent.",
       "repoNotInScope": "Kodelageret er ikke valgt for sikkerhetsagenten.",
       "analysisRequired": "Analyser kodebasen før du starter utbedringen.",
-      "sandboxAnalysisRequired": "Analyser kodebasen før du starter utbedringen.",
       "staleAnalysis": "Funnet endret seg etter analysen. Kjør analysen på nytt før du starter utbedringen.",
       "notExploitable": "Analysen fant ingen kjøringsvei til den sårbare funksjonen. Automatisk utbedring er ikke tilgjengelig.",
       "exploitabilityUnknown": "Analysen kunne ikke bekrefte om sårbarheten kan utnyttes. Manuell gjennomgang kreves før utbedring med ett trykk.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Automatisk utbedring er deaktivert. Manuell utbedring kan fortsatt startes når sikkerhetskravene er oppfylt.",
       "includeExistingDisabled": "Eksisterende funn er ikke inkludert i automatisk utbedring.",
       "belowThreshold": "Funnets alvorlighetsgrad er under terskelen for automatisk utbedring. Manuell utbedring kan fortsatt startes når sikkerhetskravene er oppfylt.",
-      "beforeEnablement": "Analysen ble fullført før automatisk utbedring ble aktivert. Manuell utbedring kan fortsatt startes når sikkerhetskravene er oppfylt.",
-      "generic": "Utbedring er ikke tilgjengelig for dette funnet."
+      "beforeEnablement": "Analysen ble fullført før automatisk utbedring ble aktivert. Manuell utbedring kan fortsatt startes når sikkerhetskravene er oppfylt."
     },
     "commandFailure": {
       "ownerCapReached": "All analysekapasitet er i bruk. Vent til en pågående analyse er ferdig, og prøv igjen.",
-      "githubTokenUnavailable": "Det er et problem med GitHub-autorisasjonen. Autoriser GitHub-appen på nytt, og prøv igjen.",
       "githubAuthInvalid": "Det er et problem med GitHub-autorisasjonen. Autoriser GitHub-appen på nytt, og prøv igjen.",
       "findingUnavailable": "Funnet er ikke lenger tilgjengelig. Oppdater funnene og prøv igjen hvis det fortsatt er åpent.",
       "repositoryUnavailable": "GitHub-appen har ikke lenger tilgang til kodelageret. Oppdater tilgangen til kodelageret, og prøv igjen.",
@@ -1965,10 +1922,8 @@
       "title": "Økt",
       "copyErrorDetails": "Kopier feildetaljer",
       "backToSessions": "Tilbake til økter",
-      "accessDeniedDescription": "Du har ikke tillatelse til å se dette.",
       "couldNotLoad": "Kunne ikke laste inn økten.",
       "failedToLoadDetails": "Kunne ikke laste inn øktdetaljene.",
-      "notFoundDescription": "Dette elementet kan ha blitt fjernet eller er ikke lenger tilgjengelig.",
       "failedToStopExecution": "Kunne ikke stoppe kjøringen.",
       "renameSession": "Gi økten nytt navn",
       "renamePlaceholder": "Øktnavn",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "Logge ut denne enheten?",
     "signOutThisSessionTitle": "Logge ut denne økten?",
     "signOutThisSessionMessage": "{{device}} vil bli logget ut. Den kan beholde API-tilgang i opptil en time.",
-    "signOutMessage": "Du må logge inn igjen for å få tilgang til arbeidsområdet ditt.",
     "webBrowser": "Nettleser"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Regnskapsjustering",
         "credits_expired": "Kreditter utløpt"
       },
-      "loadMoreFailed": "Kunne ikke laste inn flere.",
       "truncated": "Eldre kredittbevegelser er tilgjengelige."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Tidligere fakturaer er tilgjengelige."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "navn@firma.no",
       "enableA11y": "Aktiver varsel om lav saldo",
       "notifyEmailsLabel": "E-postadresser for varsler",
       "permissionDenied": "Du har ikke tillatelse til å administrere faktureringsvarsler.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Inviter kolleger for å begynne å samarbeide i denne organisasjonen.",
       "emptyDescriptionCannotInvite": "Be en eier eller faktureringsansvarlig om å invitere kolleger.",
       "emptyTitle": "Ingen medlemmer ennå",
-      "inviteMember": "Inviter medlem",
       "invitedDate": "Invitert {{date}}",
       "limitPerDay": "{{amount}}/dag",
       "manageA11y": "Administrer {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Kunne ikke laste inn status",
       "creditProcessingDelayed": "Behandlingen av kreditter er forsinket · prøver automatisk igjen",
       "ended": "Avsluttet",
-      "manageHint": "Åpner administrasjonen av Kilo Pass i nettleseren.",
       "notSubscribed": "Intet abonnement",
       "overallocated": "Flere Pass er tildelt enn det er betalte plasser",
       "paidSeat_one": "{{displayCount}} betalt plass",

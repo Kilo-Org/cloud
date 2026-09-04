@@ -278,7 +278,6 @@
       "security": "Güvenlik bulguları"
     },
     "category": {
-      "chatMessagesTitle": "Sohbet mesajları",
       "chatMessagesSubtitle": "konuşmalarındaki yanıtlar",
       "agentAttentionTitle": "Ajan seni bekliyor",
       "agentAttentionSubtitle": "sorular, izin ve bilgi istekleri",
@@ -286,11 +285,8 @@
       "agentUpdatesSubtitle": "görev sırasında ajandan gelen mesajlar",
       "sessionStatusTitle": "Oturum durumu",
       "sessionStatusSubtitle": "bitti / başarısız / kontrol edilmeye hazır",
-      "kiloclawActivityTitle": "KiloClaw etkinliği",
       "kiloclawActivitySubtitle": "örnek hazır/başarısız, zamanlanmış eylemler",
-      "balanceAlertsTitle": "Bakiye uyarıları",
       "balanceAlertsSubtitle": "düşük kuruluş bakiyesi uyarıları",
-      "securityFindingsTitle": "Güvenlik bulguları",
       "securityFindingsSubtitle": "yeni bulgular ve SLA hatırlatmaları"
     }
   },
@@ -762,8 +758,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Yapay zekâ modeli seçimi",
       "secretsDescription": "Şifrelenmiş kimlik bilgileri",
-      "versionPinDescription": "Belirli bir sürüme sabitle",
-      "versionPinLabel": "Sürüm sabitleme"
+      "versionPinDescription": "Belirli bir sürüme sabitle"
     },
     "avatar": {
       "arcade": "Atari",
@@ -1006,7 +1001,6 @@
       "title": "Bulgu filtreleri",
       "fixed": "Düzeltildi",
       "outcome": "Sonuç",
-      "outcomeNotExploitable": "İstismar edilemez",
       "outcomeTriageComplete": "Ön değerlendirme tamamlandı",
       "overdueOnly": "Yalnızca gecikenler",
       "reset": "Sıfırla",
@@ -1052,9 +1046,6 @@
       "analysisModel": "Analiz modeli",
       "couldNotLoad": "Analiz ayarları yüklenemedi.",
       "depth": "Analiz derinliği",
-      "modeAuto": "Otomatik",
-      "modeDeep": "Derin",
-      "modeShallow": "Yüzeysel",
       "remediationModel": "Düzeltme modeli",
       "title": "Modeller ve analiz",
       "triageModel": "Ön değerlendirme modeli"
@@ -1148,15 +1139,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Açık bulgular",
-      "openFindingsDetail": "{{critical}} kritik, {{high}} yüksek",
-      "confirmedExploitable": "İstismar edilebilirliği doğrulandı",
       "confirmedExploitableDetail": "Proje riski analizle doğrulandı",
-      "needsReview": "İncelemen gerekiyor",
       "needsReviewDetail": "Bir kişinin karar vermesi gerekiyor",
-      "analysisIncomplete": "Analiz tamamlanmadı",
       "analysisIncompleteDetail": "Proje riski henüz bilinmiyor",
       "slaCompliance": "SLA uyumu",
-      "notMeasured": "Ölçülmedi",
       "withinDeadlineDetail": "Toplam {{total}} bulgu içinde süresi dolmayan: {{within}}",
       "noDeadlineData": "Henüz SLA son tarihi olan bulgu yok",
       "deadlinePassed": "Son tarih geçti",
@@ -1187,9 +1173,6 @@
       "title": "Bulguyu yok say"
     },
     "findingDetail": {
-      "couldNotLoad": "Bu bulgu yüklenemedi.",
-      "notFound": "Bulgu bulunamadı",
-      "notFoundDescription": "Bu bulgu kaldırılmış olabilir veya artık bu bulguya erişimin yok.",
       "tabAnalysis": "Analiz",
       "tabRemediation": "Düzeltme",
       "title": "Bulgu"
@@ -1212,7 +1195,6 @@
       "supersededByDescription": "Durum, analiz ve düzeltme bilgileri için güncel kayda dokun.",
       "viewAdvisory": "GitHub'da güvenlik bildirimini görüntüle",
       "vulnerableVersions": "Güvenlik açığı içeren sürümler",
-      "statusSuperseded": "Yerini yenisi aldı",
       "statusOpen": "Açık",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Düzeltmeye başlandı",
@@ -1234,13 +1216,11 @@
       "a11y": "Önem derecesi {{severity}} olan bulgu: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Önem derecesi {{severity}} olan bulgu: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Analiz et",
-      "nextNeedsManualReview": "Manuel inceleme gerekiyor",
       "nextRemediationAvailable": "Düzeltme yapılabilir",
       "nextRemediationInProgress": "Düzeltme sürüyor",
       "nextRemediationPrOpen": "Düzeltme PR'ı açık",
       "nextRetryRemediation": "Düzeltme tekrar denenebilir",
       "nextViewDetails": "Ayrıntıları görüntüle",
-      "retryAnalysis": "Analizi tekrar dene",
       "runAnalysis": "Analizi çalıştır",
       "viewPr": "PR'ı görüntüle"
     },
@@ -1253,7 +1233,6 @@
       "newFindingSubtitle": "İlk eşitleme dahil, yeni bir bulgu eşitlendiğinde gönderilir.",
       "slaLeadTimeAccessibility": "SLA uyarısının kaç gün önce gönderileceği",
       "slaLeadTimeError": "Gün sayısı olarak 1 ile 365 arasında bir tam sayı gir.",
-      "slaLeadTimeHint": "1 ile 365 arasında bir tam sayı gir",
       "slaLeadTimeLabel": "SLA uyarısını önceden gönder (gün)",
       "slaPersonalTitle": "SLA uyarıları hakkında bana e-posta gönder",
       "slaSection": "SLA uyarı bildirimi",
@@ -1269,8 +1248,6 @@
       "cancellationRequested": "İptal talebi gönderildi",
       "cancelled": "Düzeltme iptal edildi",
       "couldNotLoad": "Düzeltme durumu yüklenemedi.",
-      "noAnalysisDescription": "Ayrıntılar sekmesinden analiz başlat.",
-      "noAnalysisTitle": "Henüz analiz yapılmadı",
       "openDraftPullRequest": "Taslak çekme isteğini{{number}} aç",
       "openPullRequest": "Çekme isteğini{{number}} aç",
       "progress": "İlerleme",
@@ -1280,8 +1257,6 @@
       "timeline": {
         "blocked": "Düzeltme engellendi",
         "failed": "Düzeltme başarısız oldu",
-        "noChangesNeeded": "Değişiklik gerekmiyor",
-        "prOpened": "PR açıldı",
         "queued": "Düzeltme istendi"
       },
       "queued": "Düzeltme kuyruğa alındı",
@@ -1309,7 +1284,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Analiz modu: {{mode}}",
-      "automation": "Otomasyon",
       "automationAllOff": "Tümü kapalı",
       "automationCount": "Etkin özellik: {{displayCount}} / 3",
       "couldNotLoadPermissions": "İzinler yüklenemedi.",
@@ -1317,15 +1291,12 @@
       "disabledNoManage": "Güvenlik ajanı devre dışı. Yalnızca kuruluş sahipleri ve faturalandırma yöneticileri etkinleştirebilir.",
       "disabledNoRepo": "Güvenlik ajanını etkinleştirmeden önce en az bir depo seç.",
       "disabledPrompt": "Dependabot uyarılarını eşitlemek, depoları seçmek ve otomasyonu yapılandırmak için Güvenlik ajanını etkinleştir.",
-      "modelsAndAnalysis": "Modeller ve analiz",
       "notificationsCount": "Etkin bildirim: {{displayCount}} / 2",
       "on": "Açık",
       "repositoriesCount": "{{displayCount}} depo seçildi",
       "repositoriesCount_other": "{{displayCount}} depo seçildi",
       "repositoriesCount_one": "{{displayCount}} depo seçili",
-      "selectRepositoriesSubtitle": "Güvenlik ajanının izleyeceği depoları seç",
-      "slaPolicy": "SLA ilkesi",
-      "title": "Ayarlar"
+      "selectRepositoriesSubtitle": "Güvenlik ajanının izleyeceği depoları seç"
     },
     "settingsSave": {
       "keepEditing": "Düzenlemeye devam et",
@@ -1373,7 +1344,6 @@
     },
     "analysisState": {
       "queued": "Analiz kuyruğa alındı",
-      "queuedTitle": "Analiz kuyruğa alındı",
       "queuedDescription": "Analiz için kapasite açılması bekleniyor.",
       "analyzing": "Analiz ediliyor",
       "analyzingDescription": "Uygulama kodunun etkilenen özelliğe ulaşıp ulaşamadığı kontrol ediliyor.",
@@ -1382,7 +1352,6 @@
       "extractionFailedDescription": "Teknik rapor yapılandırılmış bir sonuca dönüştürülemedi.",
       "exploitableDescription": "Uygulama kodu etkilenen özelliğe ulaşabiliyor.",
       "notExploitable": "Ulaşılamaz",
-      "notExploitableTitle": "Ulaşılamaz",
       "notExploitableDescription": "Bu depoda güvenlik açığı içeren özelliğe ulaşan bir kod yolu bulunamadı.",
       "unknown": "İnceleme gerekiyor",
       "unknownDescription": "Analiz, güvenlik açığı olan özelliğin ulaşılabilir olup olmadığını doğrulayamadı.",
@@ -1418,7 +1387,6 @@
       "dueInDays": "{{count}} gün kaldı"
     },
     "remediationStatus": {
-      "cancellationRequested": "İptal talebi gönderildi",
       "notStarted": "Başlatılmadı",
       "starting": "Başlatılıyor",
       "inProgress": "Devam ediyor",
@@ -1437,7 +1405,6 @@
       "findingNotOpen": "Bulgu artık açık değil.",
       "repoNotInScope": "Depo, Güvenlik ajanı için seçilmedi.",
       "analysisRequired": "Düzeltmeyi başlatmadan önce kod tabanını analiz et.",
-      "sandboxAnalysisRequired": "Düzeltmeyi başlatmadan önce kod tabanını analiz et.",
       "staleAnalysis": "Bulgu, analizden sonra değişti. Düzeltmeyi başlatmadan önce analizi yeniden çalıştır.",
       "notExploitable": "Analizde, güvenlik açığı içeren özelliğe ulaşan bir kod yolu bulunamadı. Otomatik düzeltme kullanılamıyor.",
       "exploitabilityUnknown": "Analiz, istismar edilebilirliği doğrulayamadı. Tek dokunuşla düzeltmeden önce bulgunun bir kişi tarafından incelenmesi gerekiyor.",
@@ -1453,12 +1420,10 @@
       "autoRemediationDisabled": "Otomatik düzeltme devre dışı. Güvenlik kontrolleri başarılı olursa düzeltmeyi yine de manuel olarak başlatabilirsin.",
       "includeExistingDisabled": "Mevcut bulgular otomatik düzeltmenin dışında tutulur.",
       "belowThreshold": "Bulgunun önem derecesi, otomatik düzeltme eşiğinin altında. Güvenlik kontrolleri başarılı olursa düzeltmeyi yine de manuel olarak başlatabilirsin.",
-      "beforeEnablement": "Analiz, otomatik düzeltme etkinleştirilmeden önce tamamlandı. Güvenlik kontrolleri başarılı olursa düzeltmeyi yine de manuel olarak başlatabilirsin.",
-      "generic": "Bu bulgu için düzeltme yapılamıyor."
+      "beforeEnablement": "Analiz, otomatik düzeltme etkinleştirilmeden önce tamamlandı. Güvenlik kontrolleri başarılı olursa düzeltmeyi yine de manuel olarak başlatabilirsin."
     },
     "commandFailure": {
       "ownerCapReached": "Analiz kapasitesi dolu. Devam eden bir analizin bitmesini bekle, ardından tekrar dene.",
-      "githubTokenUnavailable": "GitHub yetkilendirmesinde bir sorun var. GitHub uygulamasını yeniden yetkilendir, ardından tekrar dene.",
       "githubAuthInvalid": "GitHub yetkilendirmesinde bir sorun var. GitHub uygulamasını yeniden yetkilendir, ardından tekrar dene.",
       "findingUnavailable": "Bulguya artık erişilemiyor. Bulguları yenile ve bulgu hâlâ açıksa tekrar dene.",
       "repositoryUnavailable": "GitHub uygulaması artık depoya erişemiyor. Depo erişimini yenile, ardından tekrar dene.",
@@ -1540,10 +1505,8 @@
       "title": "Oturum",
       "copyErrorDetails": "Hata ayrıntılarını kopyala",
       "backToSessions": "Oturumlara geri dön",
-      "accessDeniedDescription": "Bunu görüntüleme iznin yok.",
       "couldNotLoad": "Oturum yüklenemedi.",
       "failedToLoadDetails": "Oturum ayrıntıları yüklenemedi.",
-      "notFoundDescription": "Bu öğe kaldırılmış veya artık kullanılamıyor olabilir.",
       "failedToStopExecution": "Çalışan işlem durdurulamadı.",
       "renameSession": "Oturumu yeniden adlandır",
       "renamePlaceholder": "Oturum adı",
@@ -2091,8 +2054,7 @@
     "sessionSignedOut": "Oturum kapatıldı.",
     "signOutThisDeviceTitle": "Bu cihazın oturumu kapatılsın mı?",
     "signOutThisSessionTitle": "Bu oturum kapatılsın mı?",
-    "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Cihazın API erişimi bir saat daha devam edebilir.",
-    "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek."
+    "signOutThisSessionMessage": "{{device}} cihazındaki oturum kapatılacak. Cihazın API erişimi bir saat daha devam edebilir."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Uygulama mağazası açılamadı.",
@@ -2372,8 +2334,6 @@
       "reconnectTitle": "GitHub'a yeniden bağlan"
     },
     "connectionExpired": "GitHub bağlantısının süresi doldu.",
-    "connectionExpiredDescription": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
-    "connectionExpiredTitle": "GitHub bağlantısının süresi doldu.",
     "couldNotLoadPullRequest": "Çekme isteği yüklenemedi.",
     "couldNotOpenGitHubAppSettings": "GitHub uygulaması ayarları açılamadı.",
     "description": "Açıklama",
@@ -2389,7 +2349,6 @@
       "comment_other": "{{displayCount}} yorum",
       "couldNotLoad": "Tartışma yüklenemedi.",
       "couldNotLoadMore": "Daha fazla yorum yüklenemedi.",
-      "couldNotReply": "Yanıt verilemedi.",
       "loadMoreComments": "Daha fazla yorum yükle",
       "loading": "Tartışma yükleniyor",
       "moderation": {
@@ -2601,8 +2560,7 @@
       "noEnabledMethods": "Bu depoda etkin bir birleştirme yöntemi yok. Bir depo yöneticisinden birleştirme, sıkıştırma veya yeniden temellendirme yöntemlerinden birini etkinleştirmesini iste.",
       "partialSuccessBanner": {
         "accessibility": "Birleştirildi. Dal silinemedi: {{reason}}",
-        "body": "Dal silinemedi: {{reason}}.",
-        "title": "Birleştirildi"
+        "body": "Dal silinemedi: {{reason}}."
       },
       "refreshMergeability": "Birleştirme durumunu yenile",
       "terminal": {
@@ -2664,9 +2622,7 @@
       "deletedAnnouncement": "Bekleyen yorum silindi",
       "editA11y": "{{location}} konumundaki bekleyen yorumu düzenle",
       "editOutdatedA11y": "{{location}} konumundaki güncel olmayan bekleyen yorumu düzenle",
-      "emptyBody": "(boş)",
       "noCommentsQueued": "Kuyrukta yorum yok. İnceleme yalnızca yukarıda seçilen türle gönderilecek.",
-      "outdated": "Güncel değil",
       "staleHint": "bu yorumu yazdığından beri PR değişti.",
       "staleQueueHint": "Eski bir işlemeyle ilgili yorumlar gönderilmez. Düzenleyebilmen veya silebilmen için kuyrukta kalır.",
       "summaryA11y": "İnceleme özeti",
@@ -2675,7 +2631,6 @@
     "pullRequestUnavailable": "Çekme isteği kullanılamıyor",
     "pullRequestUnavailableDescription": "Bu PR açılamıyor. Silinmiş olabilir, depo özel olabilir veya depoda Kilo GitHub uygulaması kurulu olmayabilir.",
     "reconnectNotice": {
-      "checkConnection": "Bağlantıyı kontrol et",
       "message": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
       "title": "GitHub bağlantısının süresi doldu."
     },
@@ -2701,7 +2656,6 @@
       "pendingComment_other": "bekleyen yorum",
       "pendingComment_one": "bekleyen yorum",
       "summaryOptional": "Özet (isteğe bağlı)",
-      "title": "İncelemeyi gönder",
       "partialPostedMessage": "{{displayFreshCount}} yorum gönderildi. {{displayStaleCount}} yorum eski bir işlemeyle ilgili olduğu için kuyrukta kaldı.",
       "submitCountOfTotal": "{{displayTotalCount}} yorumun {{displayFreshCount}} tanesini gönder",
       "submitReview": "İncelemeyi gönder",
@@ -2777,7 +2731,6 @@
         "accounting_adjustment": "Muhasebe düzeltmesi",
         "credits_expired": "Kredilerin süresi doldu"
       },
-      "loadMoreFailed": "Daha fazlası yüklenemedi.",
       "truncated": "Daha eski kredi hareketleri mevcut."
     },
     "hub": {
@@ -2813,7 +2766,6 @@
       "truncated": "Daha eski faturalar mevcut."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ad@sirket.com",
       "enableA11y": "Düşük bakiye uyarısını etkinleştir",
       "notifyEmailsLabel": "Bildirim gönderilecek e-posta adresleri",
       "permissionDenied": "Faturalandırma uyarılarını yönetme iznin yok.",
@@ -2838,7 +2790,6 @@
       "emptyDescriptionCanInvite": "Bu kuruluşta birlikte çalışmak için ekip arkadaşlarını davet et.",
       "emptyDescriptionCannotInvite": "Kuruluş sahibinden veya faturalandırma yöneticisinden ekip arkadaşlarını davet etmesini iste.",
       "emptyTitle": "Henüz üye yok",
-      "inviteMember": "Üye davet et",
       "invitedDate": "Davet tarihi: {{date}}",
       "limitPerDay": "{{amount}}/gün",
       "manageA11y": "{{name}} adlı üyeyi yönet",
@@ -2874,7 +2825,6 @@
       "couldNotLoadStatus": "Durum yüklenemedi",
       "creditProcessingDelayed": "Kredi işlemi gecikti · otomatik olarak tekrar deneniyor",
       "ended": "Sona erdi",
-      "manageHint": "Kilo Pass yönetimini web sitesinde açar.",
       "notSubscribed": "Abonelik yok",
       "overallocated": "Kilo Pass atamaları ücretli kullanıcı lisansı sayısını aşıyor",
       "paidSeat_one": "{{displayCount}} ücretli kullanıcı lisansı",

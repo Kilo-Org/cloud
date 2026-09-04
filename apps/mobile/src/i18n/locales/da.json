@@ -370,7 +370,6 @@
         "closed": "Denne pull request er lukket"
       },
       "partialSuccessBanner": {
-        "title": "Flettet",
         "body": "Grenen kunne ikke slettes: {{reason}}.",
         "accessibility": "Flettet. Kunne ikke slette grenen: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Acceptér",
       "replyBadRequest": "Dette svar kan ikke sendes. Tråden kan have ændret sig.",
       "replyForbidden": "Du har ikke tilladelse til at svare på denne pull request.",
-      "couldNotReply": "Svaret kunne ikke sendes.",
       "moderation": {
         "reportContent": {
           "terminal": "Denne kommentar kan ikke anmeldes.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Indstillingerne for GitHub-appen kunne ikke åbnes.",
     "installKiloGitHubApp": "Installer Kilo GitHub-appen",
-    "connectionExpiredTitle": "GitHub-forbindelsen er udløbet.",
-    "connectionExpiredDescription": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
     "checkConnection": "Tjek forbindelsen",
     "couldNotLoadPullRequest": "Denne pull request kunne ikke indlæses.",
     "description": "Beskrivelse",
@@ -572,7 +568,6 @@
       "shareA11y": "Del pull request"
     },
     "submit": {
-      "title": "Send gennemgang",
       "loadFailedTitle": "Formularen til at sende gennemgangen kunne ikke indlæses.",
       "deletePendingTitle": "Slet ventende kommentar?",
       "deletePendingMessage": "Denne kommentar fjernes fra køen til gennemgangen.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub-forbindelsen er udløbet.",
-      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
-      "checkConnection": "Tjek forbindelsen"
+      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
     },
     "eventChips": {
       "comment": "Kommentar",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediger forældet, ventende kommentar ved {{location}}",
       "editA11y": "Rediger ventende kommentar ved {{location}}",
-      "emptyBody": "(tom)",
-      "outdated": "Forældet",
       "staleHint": "PR'en er blevet opdateret, siden du skrev dette.",
       "deleteA11y": "Slet ventende kommentar ved {{location}}",
       "deletedAnnouncement": "Ventende kommentar slettet",
@@ -703,7 +695,6 @@
       "security": "Sikkerhedsfund"
     },
     "category": {
-      "chatMessagesTitle": "Chatbeskeder",
       "chatMessagesSubtitle": "svar i dine samtaler",
       "agentAttentionTitle": "Agenten har brug for dig",
       "agentAttentionSubtitle": "spørgsmål, anmodninger om tilladelse og behov for svar",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "beskeder fra agenten under arbejdet",
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "afsluttet / mislykket / klar til styring",
-      "kiloclawActivityTitle": "KiloClaw-aktivitet",
       "kiloclawActivitySubtitle": "instans klar eller mislykket, planlagte handlinger",
-      "balanceAlertsTitle": "Advarsler om saldo",
       "balanceAlertsSubtitle": "advarsler om lav saldo i organisationen",
-      "securityFindingsTitle": "Sikkerhedsfund",
       "securityFindingsSubtitle": "nye fund og SLA-påmindelser"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Valg af AI-model",
       "secretsDescription": "Krypterede adgangsoplysninger",
-      "versionPinDescription": "Fastlås til en bestemt version",
-      "versionPinLabel": "Versionslåsning"
+      "versionPinDescription": "Fastlås til en bestemt version"
     },
     "avatar": {
       "arcade": "Arkadespil",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Høj",
       "severityMedium": "Middel",
       "severityLow": "Lav",
-      "outcomeNotExploitable": "Kan ikke udnyttes",
       "outcomeTriageComplete": "Indledende vurdering afsluttet",
       "sortSeverityDesc": "Alvorlighed: høj til lav",
       "sortSeverityAsc": "Alvorlighed: lav til høj",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Åbne fund",
-      "openFindingsDetail": "{{critical}} med kritisk risiko, {{high}} med høj risiko",
-      "confirmedExploitable": "Bekræftet mulighed for udnyttelse",
       "confirmedExploitableDetail": "Risiko for projektet bekræftet af analysen",
-      "needsReview": "Afventer din gennemgang",
       "needsReviewDetail": "Kræver en menneskelig beslutning",
-      "analysisIncomplete": "Analyse ikke afsluttet",
       "analysisIncompleteDetail": "Risiko for projektet stadig ukendt",
       "slaCompliance": "SLA-overholdelse",
-      "notMeasured": "Ikke målt",
       "withinDeadlineDetail": "{{within}} af {{total}} inden for fristen",
       "noDeadlineData": "Ingen fund har en SLA-frist endnu",
       "deadlinePassed": "Frist overskredet",
@@ -1601,7 +1582,6 @@
       "source": "Kilde",
       "sourceId": "Kilde-ID",
       "viewAdvisory": "Se sikkerhedsbulletin på GitHub",
-      "statusSuperseded": "Erstattet",
       "statusOpen": "Åben",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "rettelsen er allerede i gang",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "efter gennemgang"
     },
     "settingsOverview": {
-      "title": "Indstillinger",
       "couldNotLoadSettings": "Indstillingerne for Security Agent kunne ikke indlæses.",
       "couldNotLoadPermissions": "Tilladelserne kunne ikke indlæses.",
       "on": "Til",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} kodelagre valgt",
       "repositoriesCount_other": "{{displayCount}} kodelagre valgt",
       "selectRepositoriesSubtitle": "Vælg, hvilke kodelagre Security Agent overvåger",
-      "modelsAndAnalysis": "Modeller og analyse",
       "analysisModeSubtitle": "{{mode}} analyse",
-      "automation": "Automatisering",
       "automationAllOff": "Alt slået fra",
       "automationCount": "{{displayCount}} af 3 aktiveret",
       "notificationsCount": "{{displayCount}} af 2 aktiveret",
-      "slaPolicy": "SLA-politik",
       "disabledNoManage": "Security Agent er deaktiveret. Kun organisationsejere og faktureringsadministratorer kan aktivere den.",
       "disabledNoRepo": "Vælg mindst ét kodelager, før du aktiverer Security Agent.",
       "disabledPrompt": "Aktivér Security Agent for at synkronisere Dependabot-advarsler, vælge kodelagre og indstille automatisering."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Anmodet om annullering",
       "cancelled": "Udbedring annulleret",
       "couldNotLoad": "Status for udbedringen kunne ikke indlæses.",
-      "noAnalysisTitle": "Ingen analyse endnu",
-      "noAnalysisDescription": "Start en analyse fra fanen Detaljer.",
       "start": "Start udbedring",
       "retry": "Prøv udbedring igen",
       "cancelTitle": "Vil du annullere udbedringen?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Nyt forsøg på udbedring sat i kø",
       "timeline": {
         "queued": "Anmodet om udbedring",
-        "prOpened": "PR åbnet",
         "failed": "Udbedring mislykkedes",
-        "blocked": "Udbedring blokeret",
-        "noChangesNeeded": "Ingen ændringer nødvendige"
+        "blocked": "Udbedring blokeret"
       },
       "unavailable": "Dette fund kan ikke afhjælpes."
     },
@@ -1663,9 +1635,6 @@
       "title": "Modeller og analyse",
       "couldNotLoad": "Analyseindstillingerne kunne ikke indlæses.",
       "depth": "Analysedybde",
-      "modeAuto": "Auto",
-      "modeShallow": "Overfladisk",
-      "modeDeep": "Dybdegående",
       "triageModel": "Model til indledende vurdering",
       "analysisModel": "Analysemodel",
       "remediationModel": "Model til udbedring"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Fund",
       "tabAnalysis": "Analyse",
-      "tabRemediation": "Udbedring",
-      "notFound": "Fundet findes ikke",
-      "notFoundDescription": "Dette fund kan være blevet fjernet, eller du har ikke længere adgang til det.",
-      "couldNotLoad": "Fundet kunne ikke indlæses."
+      "tabRemediation": "Udbedring"
     },
     "findingList": {
       "couldNotLoad": "Fundene kunne ikke indlæses.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Udbedring i gang",
       "nextRetryRemediation": "Udbedring kan prøves igen",
       "nextRemediationAvailable": "Udbedring tilgængelig",
-      "retryAnalysis": "Kør analysen igen",
       "runAnalysis": "Kør analyse",
-      "nextNeedsManualReview": "Kræver manuel gennemgang",
       "nextViewDetails": "Vis detaljer",
       "viewPr": "Vis PR",
       "analyze": "Analysér",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Sendes, hver gang et nyt fund synkroniseres, også ved den første synkronisering.",
       "slaLeadTimeAccessibility": "Antal dage før SLA-fristen, hvor advarslen sendes",
       "slaLeadTimeError": "Indtast et helt antal dage mellem 1 og 365.",
-      "slaLeadTimeHint": "Indtast et helt tal mellem 1 og 365",
       "slaLeadTimeLabel": "Advarsel før SLA-frist (dage)",
       "slaPersonalTitle": "Send mig e-mail om SLA-advarsler",
       "slaSection": "Notifikation om SLA-advarsler",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Analyse i kø",
-      "queuedTitle": "Analyse i kø",
       "queuedDescription": "Analysen venter på ledig kapacitet.",
       "analyzing": "Analyserer",
       "analyzingDescription": "Analysen undersøger, om programkoden kan nå den berørte funktion.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Den tekniske rapport kunne ikke omdannes til et struktureret resultat.",
       "exploitableDescription": "Programkoden kan nå den berørte funktion.",
       "notExploitable": "Kan ikke nås",
-      "notExploitableTitle": "Kan ikke nås",
       "notExploitableDescription": "Analysen fandt ingen eksekveringsvej til den sårbare funktion i dette kodelager.",
       "unknown": "Kræver gennemgang",
       "unknownDescription": "Analysen kunne ikke bekræfte, om den sårbare funktion kan nås.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Frist om {{count}} dage"
     },
     "remediationStatus": {
-      "cancellationRequested": "Anmodet om annullering",
       "notStarted": "Ikke startet",
       "starting": "Starter",
       "inProgress": "I gang",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Fundet er ikke længere åbent.",
       "repoNotInScope": "Kodelageret er ikke valgt til Security Agent.",
       "analysisRequired": "Analysér kodebasen, før du starter afhjælpningen.",
-      "sandboxAnalysisRequired": "Analysér kodebasen, før du starter afhjælpningen.",
       "staleAnalysis": "Fundet har ændret sig siden analysen. Kør analysen igen, før du starter udbedringen.",
       "notExploitable": "Analysen fandt ingen eksekveringsvej til den sårbare funktion. Automatisk udbedring er ikke tilgængelig.",
       "exploitabilityUnknown": "Analysen kunne ikke bekræfte, om sårbarheden kan udnyttes. En manuel gennemgang er nødvendig før udbedring med ét klik.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Automatisk udbedring er deaktiveret. Du kan stadig starte en manuel udbedring, når sikkerhedskravene er opfyldt.",
       "includeExistingDisabled": "Eksisterende fund er ikke omfattet af automatisk udbedring.",
       "belowThreshold": "Fundets alvorlighed er under grænsen for automatisk udbedring. Du kan stadig starte en manuel udbedring, når sikkerhedskravene er opfyldt.",
-      "beforeEnablement": "Analysen blev fuldført, før automatisk udbedring blev aktiveret. Du kan stadig starte en manuel udbedring, når sikkerhedskravene er opfyldt.",
-      "generic": "Dette fund kan ikke afhjælpes."
+      "beforeEnablement": "Analysen blev fuldført, før automatisk udbedring blev aktiveret. Du kan stadig starte en manuel udbedring, når sikkerhedskravene er opfyldt."
     },
     "commandFailure": {
       "ownerCapReached": "Der er ikke plads til flere analyser. Vent, til en igangværende analyse er færdig, og prøv igen.",
-      "githubTokenUnavailable": "Godkendelsen til GitHub kræver handling. Godkend GitHub-appen igen, og prøv derefter igen.",
       "githubAuthInvalid": "Godkendelsen til GitHub kræver handling. Godkend GitHub-appen igen, og prøv derefter igen.",
       "findingUnavailable": "Fundet er ikke længere tilgængeligt. Opdatér fundene, og prøv igen, hvis det stadig er åbent.",
       "repositoryUnavailable": "GitHub-appen har ikke længere adgang til kodelageret. Opdatér adgangen til kodelageret, og prøv igen.",
@@ -1965,10 +1922,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiér fejloplysninger",
       "backToSessions": "Tilbage til sessioner",
-      "accessDeniedDescription": "Du har ikke tilladelse til at se dette.",
       "couldNotLoad": "Kunne ikke indlæse sessionen.",
       "failedToLoadDetails": "Kunne ikke indlæse oplysninger om sessionen.",
-      "notFoundDescription": "Indholdet er muligvis fjernet eller ikke længere tilgængeligt.",
       "failedToStopExecution": "Kunne ikke stoppe kørslen.",
       "renameSession": "Omdøb session",
       "renamePlaceholder": "Sessionens navn",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "Log ud af denne enhed?",
     "signOutThisSessionTitle": "Log ud af denne session?",
     "signOutThisSessionMessage": "{{device}} bliver logget ud. Enheden kan stadig have API-adgang i op til en time.",
-    "signOutMessage": "Du skal logge ind igen for at få adgang til dit arbejdsområde.",
     "webBrowser": "Webbrowser"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Regnskabsmæssig justering",
         "credits_expired": "Udløbne kreditter"
       },
-      "loadMoreFailed": "Det lykkedes ikke at indlæse flere.",
       "truncated": "Du kan se ældre bevægelser på kreditsaldoen."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Ældre fakturaer er tilgængelige."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "navn@virksomhed.dk",
       "enableA11y": "Aktivér advarsel om lav saldo",
       "notifyEmailsLabel": "Modtagernes e-mailadresser",
       "permissionDenied": "Du har ikke tilladelse til at administrere advarsler om fakturering.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Inviter kolleger til at samarbejde i denne organisation.",
       "emptyDescriptionCannotInvite": "Bed en ejer eller faktureringsansvarlig om at invitere kolleger.",
       "emptyTitle": "Ingen medlemmer endnu",
-      "inviteMember": "Invitér medlem",
       "invitedDate": "Inviteret {{date}}",
       "limitPerDay": "{{amount}}/dag",
       "manageA11y": "Administrer {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Kunne ikke indlæse status",
       "creditProcessingDelayed": "Tildelingen af kreditter er forsinket · prøver automatisk igen",
       "ended": "Afsluttet",
-      "manageHint": "Åbner administrationen af Kilo Pass på hjemmesiden.",
       "notSubscribed": "Intet abonnement",
       "overallocated": "Der er tildelt flere Kilo Pass end betalte pladser",
       "paidSeat_one": "{{displayCount}} betalt plads",

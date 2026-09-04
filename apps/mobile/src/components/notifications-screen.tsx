@@ -112,7 +112,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
 const CATEGORY_META = [
   {
     key: 'chatMessages',
-    titleKey: 'notifications.category.chatMessagesTitle',
+    titleKey: 'notifications.channel.chat',
     subtitleKey: 'notifications.category.chatMessagesSubtitle',
     icon: MessageSquare,
   },
@@ -136,19 +136,19 @@ const CATEGORY_META = [
   },
   {
     key: 'kiloclawActivity',
-    titleKey: 'notifications.category.kiloclawActivityTitle',
+    titleKey: 'notifications.channel.kiloclaw',
     subtitleKey: 'notifications.category.kiloclawActivitySubtitle',
     icon: Sparkles,
   },
   {
     key: 'balanceAlerts',
-    titleKey: 'notifications.category.balanceAlertsTitle',
+    titleKey: 'notifications.channel.balance',
     subtitleKey: 'notifications.category.balanceAlertsSubtitle',
     icon: Wallet,
   },
   {
     key: 'securityFindings',
-    titleKey: 'notifications.category.securityFindingsTitle',
+    titleKey: 'notifications.channel.security',
     subtitleKey: 'notifications.category.securityFindingsSubtitle',
     icon: ShieldAlert,
   },

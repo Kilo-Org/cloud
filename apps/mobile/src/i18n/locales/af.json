@@ -370,7 +370,6 @@
         "closed": "Hierdie trekversoek is gesluit"
       },
       "partialSuccessBanner": {
-        "title": "Saamgevoeg",
         "body": "Kon nie die tak skrap nie: {{reason}}.",
         "accessibility": "Saamgevoeg. Kon nie die tak skrap nie: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Aanvaar",
       "replyBadRequest": "Hierdie antwoord kan nie geplaas word nie. Die draad het dalk verander.",
       "replyForbidden": "Jy het nie toestemming om op hierdie trekversoek te antwoord nie.",
-      "couldNotReply": "Die antwoord kon nie gestuur word nie.",
       "moderation": {
         "reportContent": {
           "terminal": "Hierdie kommentaar kan nie gerapporteer word nie.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Die GitHub-toepassing se instellings kon nie oopgemaak word nie.",
     "installKiloGitHubApp": "Installeer die Kilo GitHub-toep",
-    "connectionExpiredTitle": "Die GitHub-verbinding het verval.",
-    "connectionExpiredDescription": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig.",
     "checkConnection": "Kontroleer verbinding",
     "couldNotLoadPullRequest": "Kon nie die trekversoek laai nie.",
     "description": "Beskrywing",
@@ -572,7 +568,6 @@
       "shareA11y": "Deel trekversoek"
     },
     "submit": {
-      "title": "Dien hersiening in",
       "loadFailedTitle": "Kon nie die indieningskerm vir die hersiening laai nie.",
       "deletePendingTitle": "Skrap hangende kommentaar?",
       "deletePendingMessage": "Hierdie kommentaar sal uit die hersieningswaglys verwyder word.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "Die GitHub-verbinding het verval.",
-      "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig.",
-      "checkConnection": "Kontroleer verbinding"
+      "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
     },
     "eventChips": {
       "comment": "Kommentaar",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Wysig verouderde hangende kommentaar op {{location}}",
       "editA11y": "Wysig hangende kommentaar op {{location}}",
-      "emptyBody": "(leeg)",
-      "outdated": "Verouderd",
       "staleHint": "die PR is bygewerk sedert jy dit geskryf het.",
       "deleteA11y": "Skrap hangende kommentaar op {{location}}",
       "deletedAnnouncement": "Hangende kommentaar geskrap",
@@ -703,7 +695,6 @@
       "security": "Sekuriteitsbevindings"
     },
     "category": {
-      "chatMessagesTitle": "Kletsboodskappe",
       "chatMessagesSubtitle": "antwoorde in jou gesprekke",
       "agentAttentionTitle": "Agent het jou nodig",
       "agentAttentionSubtitle": "vrae en versoeke om toestemming of insette",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "boodskappe van die agent terwyl die taak aan die gang is",
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "klaar / misluk / gereed om te beheer",
-      "kiloclawActivityTitle": "KiloClaw-aktiwiteit",
       "kiloclawActivitySubtitle": "instansie gereed/misluk, geskeduleerde aksies",
-      "balanceAlertsTitle": "Saldowaarskuwings",
       "balanceAlertsSubtitle": "waarskuwings oor die organisasie se lae saldo",
-      "securityFindingsTitle": "Sekuriteitsbevindings",
       "securityFindingsSubtitle": "nuwe bevindings en SLA-herinneringe"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "KI-modelkeuse",
       "secretsDescription": "Geënkripteerde aanmeldbesonderhede",
-      "versionPinDescription": "Pen op 'n spesifieke weergawe vas",
-      "versionPinLabel": "Vaste weergawe"
+      "versionPinDescription": "Pen op 'n spesifieke weergawe vas"
     },
     "avatar": {
       "arcade": "Speletjie",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Hoog",
       "severityMedium": "Matig",
       "severityLow": "Laag",
-      "outcomeNotExploitable": "Nie uitbuitbaar nie",
       "outcomeTriageComplete": "Aanvanklike beoordeling voltooi",
       "sortSeverityDesc": "Ernsgraad: hoog na laag",
       "sortSeverityAsc": "Ernsgraad: laag na hoog",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Oop bevindings",
-      "openFindingsDetail": "{{critical}} krities, {{high}} hoog",
-      "confirmedExploitable": "As uitbuitbaar bevestig",
       "confirmedExploitableDetail": "Projekrisiko deur ontleding bevestig",
-      "needsReview": "Moet deur jou hersien word",
       "needsReviewDetail": "Menslike besluit vereis",
-      "analysisIncomplete": "Ontleding nog nie voltooi nie",
       "analysisIncompleteDetail": "Projekrisiko nog onbekend",
       "slaCompliance": "SLA-nakoming",
-      "notMeasured": "Nie gemeet nie",
       "withinDeadlineDetail": "{{within}} van {{total}} binne sperdatum",
       "noDeadlineData": "Geen bevindings het nog 'n SLA-sperdatum nie",
       "deadlinePassed": "Sperdatum verby",
@@ -1601,7 +1582,6 @@
       "source": "Bron",
       "sourceId": "Bron-ID",
       "viewAdvisory": "Bekyk sekuriteitskennisgewing op GitHub",
-      "statusSuperseded": "Vervang",
       "statusOpen": "Oop",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Regstelling reeds begin",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "na hersiening"
     },
     "settingsOverview": {
-      "title": "Instellings",
       "couldNotLoadSettings": "Die Sekuriteitsagent se instellings kon nie gelaai word nie.",
       "couldNotLoadPermissions": "Die toestemmings kon nie gelaai word nie.",
       "on": "Aan",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} bewaarplekke gekies",
       "repositoriesCount_other": "{{displayCount}} bewaarplekke gekies",
       "selectRepositoriesSubtitle": "Kies watter bewaarplekke die Sekuriteitsagent monitor",
-      "modelsAndAnalysis": "Modelle en ontleding",
       "analysisModeSubtitle": "Ontleding: {{mode}}",
-      "automation": "Outomatisering",
       "automationAllOff": "Alles af",
       "automationCount": "{{displayCount}} van 3 geaktiveer",
       "notificationsCount": "{{displayCount}} van 2 geaktiveer",
-      "slaPolicy": "SLA-beleid",
       "disabledNoManage": "Die Sekuriteitsagent is gedeaktiveer. Slegs organisasie-eienaars en faktureringsbestuurders kan dit aktiveer.",
       "disabledNoRepo": "Kies ten minste een bewaarplek voordat jy die Sekuriteitsagent aktiveer.",
       "disabledPrompt": "Aktiveer die Sekuriteitsagent om Dependabot-waarskuwings te sinkroniseer, bewaarplekke te kies en outomatisering op te stel."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Kansellasie versoek",
       "cancelled": "Regstelling gekanselleer",
       "couldNotLoad": "Die regstellingsstatus kon nie gelaai word nie.",
-      "noAnalysisTitle": "Nog geen ontleding nie",
-      "noAnalysisDescription": "Begin 'n ontleding op die Besonderhede-oortjie.",
       "start": "Begin regstelling",
       "retry": "Probeer regstelling weer",
       "cancelTitle": "Kanselleer hierdie regstelling?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Nuwe regstellingspoging in die tou geplaas",
       "timeline": {
         "queued": "Regstelling versoek",
-        "prOpened": "PR geopen",
         "failed": "Regstelling misluk",
-        "blocked": "Regstelling geblokkeer",
-        "noChangesNeeded": "Geen veranderinge nodig nie"
+        "blocked": "Regstelling geblokkeer"
       },
       "unavailable": "Geen regstelling is vir hierdie bevinding beskikbaar nie."
     },
@@ -1663,9 +1635,6 @@
       "title": "Modelle en ontleding",
       "couldNotLoad": "Die ontledingsinstellings kon nie gelaai word nie.",
       "depth": "Ontledingsdiepte",
-      "modeAuto": "Outo",
-      "modeShallow": "Vlak",
-      "modeDeep": "Diep",
       "triageModel": "Model vir aanvanklike beoordeling",
       "analysisModel": "Ontledingsmodel",
       "remediationModel": "Regstellingsmodel"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Bevinding",
       "tabAnalysis": "Ontleding",
-      "tabRemediation": "Regstelling",
-      "notFound": "Bevinding nie gevind nie",
-      "notFoundDescription": "Hierdie bevinding is moontlik verwyder, of jy het nie meer toegang daartoe nie.",
-      "couldNotLoad": "Hierdie bevinding kon nie gelaai word nie."
+      "tabRemediation": "Regstelling"
     },
     "findingList": {
       "couldNotLoad": "Die bevindings kon nie gelaai word nie.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Regstelling aan die gang",
       "nextRetryRemediation": "Regstelling kan weer probeer word",
       "nextRemediationAvailable": "Regstelling beskikbaar",
-      "retryAnalysis": "Probeer weer ontleed",
       "runAnalysis": "Voer ontleding uit",
-      "nextNeedsManualReview": "Handmatige hersiening nodig",
       "nextViewDetails": "Bekyk besonderhede",
       "viewPr": "Bekyk PR",
       "analyze": "Ontleed",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Word gestuur wanneer 'n nuwe bevinding gesinkroniseer word, ook tydens die eerste sinkronisasie.",
       "slaLeadTimeAccessibility": "Aantal dae voor die SLA-sperdatum vir waarskuwings",
       "slaLeadTimeError": "Voer 'n aantal dae tussen 1 en 365 as 'n heelgetal in.",
-      "slaLeadTimeHint": "Voer 'n heelgetal tussen 1 en 365 in",
       "slaLeadTimeLabel": "Waarskuwing voor SLA-sperdatum (dae)",
       "slaPersonalTitle": "E-pos my oor SLA-waarskuwings",
       "slaSection": "Kennisgewing oor SLA-waarskuwings",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Ontleding in die tou",
-      "queuedTitle": "Ontleding in die tou",
       "queuedDescription": "Die ontleding wag totdat kapasiteit beskikbaar is.",
       "analyzing": "Word ontleed",
       "analyzingDescription": "Die ontleding bepaal of die toepassingskode die betrokke funksie kan bereik.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Die tegniese verslag kon nie in 'n gestruktureerde resultaat omskep word nie.",
       "exploitableDescription": "Die toepassingskode kan die betrokke funksie bereik.",
       "notExploitable": "Onbereikbaar",
-      "notExploitableTitle": "Onbereikbaar",
       "notExploitableDescription": "Geen bereikbare pad is in hierdie bewaarplek gevind nie.",
       "unknown": "Hersiening nodig",
       "unknownDescription": "Die ontleding kon nie bevestig of die kwesbare funksie bereikbaar is nie.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Sperdatum oor {{count}} dae"
     },
     "remediationStatus": {
-      "cancellationRequested": "Kansellasie versoek",
       "notStarted": "Nie begin nie",
       "starting": "Begin tans",
       "inProgress": "Aan die gang",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Die bevinding is nie meer oop nie.",
       "repoNotInScope": "Die bewaarplek is nie vir die Sekuriteitsagent gekies nie.",
       "analysisRequired": "Ontleed die kodebasis voordat jy met regstelling begin.",
-      "sandboxAnalysisRequired": "Ontleed die kodebasis voordat jy met regstelling begin.",
       "staleAnalysis": "Die bevinding het ná die ontleding verander. Voer die ontleding weer uit voordat jy met die regstelling begin.",
       "notExploitable": "Die ontleding het geen bereikbare kwesbare kodepad gevind nie. Outomatiese regstelling is nie beskikbaar nie.",
       "exploitabilityUnknown": "Die ontleding kon nie uitbuitbaarheid bevestig nie. Handmatige hersiening is nodig voordat regstelling met een klik beskikbaar is.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Outomatiese regstelling is gedeaktiveer. Handmatige regstelling kan steeds begin as die veiligheidskontroles slaag.",
       "includeExistingDisabled": "Bestaande bevindings word van outomatiese regstelling uitgesluit.",
       "belowThreshold": "Die bevinding se ernsgraad is onder die drempel vir outomatiese regstelling. Handmatige regstelling kan steeds begin as die veiligheidskontroles slaag.",
-      "beforeEnablement": "Die ontleding is voltooi voordat outomatiese regstelling geaktiveer is. Handmatige regstelling kan steeds begin as die veiligheidskontroles slaag.",
-      "generic": "Geen regstelling is vir hierdie bevinding beskikbaar nie."
+      "beforeEnablement": "Die ontleding is voltooi voordat outomatiese regstelling geaktiveer is. Handmatige regstelling kan steeds begin as die veiligheidskontroles slaag."
     },
     "commandFailure": {
       "ownerCapReached": "Alle ontledingskapasiteit is in gebruik. Wag totdat 'n aktiewe ontleding klaar is en probeer dan weer.",
-      "githubTokenUnavailable": "Die GitHub-magtiging verg aandag. Magtig die GitHub-app weer en probeer dan weer.",
       "githubAuthInvalid": "Die GitHub-magtiging verg aandag. Magtig die GitHub-app weer en probeer dan weer.",
       "findingUnavailable": "Die bevinding is nie meer beskikbaar nie. Verfris die bevindings en probeer weer as dit steeds oop is.",
       "repositoryUnavailable": "Die GitHub-app het nie meer toegang tot die bewaarplek nie. Verfris die bewaarplektoegang en probeer dan weer.",
@@ -1965,10 +1922,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Kopieer foutbesonderhede",
       "backToSessions": "Terug na sessies",
-      "accessDeniedDescription": "Jy het nie toestemming om dit te bekyk nie.",
       "couldNotLoad": "Die sessie kon nie gelaai word nie.",
       "failedToLoadDetails": "Die sessiebesonderhede kon nie gelaai word nie.",
-      "notFoundDescription": "Hierdie item is moontlik verwyder of is nie meer beskikbaar nie.",
       "failedToStopExecution": "Die uitvoering kon nie gestop word nie.",
       "renameSession": "Hernoem sessie",
       "renamePlaceholder": "Sessienaam",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "Sessie uitgeteken.",
     "signOutThisDeviceTitle": "Hierdie toestel uitteken?",
     "signOutThisSessionTitle": "Hierdie sessie uitteken?",
-    "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Dit kan nog tot 'n uur lank API-toegang behou.",
-    "signOutMessage": "Jy sal weer moet aanmeld om toegang tot jou werkruimte te kry."
+    "signOutThisSessionMessage": "{{device}} sal uitgeteken word. Dit kan nog tot 'n uur lank API-toegang behou."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Kon nie die toepwinkel oopmaak nie.",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Boekhoudkundige aanpassing",
         "credits_expired": "Krediete het verval"
       },
-      "loadMoreFailed": "Meer items kon nie gelaai word nie.",
       "truncated": "Ouer kredietaktiwiteit is beskikbaar."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Ouer fakture is beskikbaar."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "naam@maatskappy.com",
       "enableA11y": "Aktiveer waarskuwing vir lae saldo",
       "notifyEmailsLabel": "E-posadresse vir kennisgewings",
       "permissionDenied": "Jy het nie toestemming om faktureringswaarskuwings te bestuur nie.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Nooi spanmaats om in hierdie organisasie te begin saamwerk.",
       "emptyDescriptionCannotInvite": "Vra 'n eienaar of faktureringsbestuurder om spanmaats te nooi.",
       "emptyTitle": "Nog geen lede nie",
-      "inviteMember": "Nooi lid uit",
       "invitedDate": "Genooi op {{date}}",
       "limitPerDay": "{{amount}}/dag",
       "manageA11y": "Bestuur {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Kon nie status laai nie",
       "creditProcessingDelayed": "Kredietverwerking vertraag · probeer outomaties weer",
       "ended": "Geëindig",
-      "manageHint": "Maak Kilo Pass-bestuur op die web oop.",
       "notSubscribed": "Nie ingeteken nie",
       "overallocated": "Kilo Pass-toewysings oorskry die aantal betaalde gebruikersplekke",
       "paidSeat_one": "{{displayCount}} betaalde gebruikersplek",

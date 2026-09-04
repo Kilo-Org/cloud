@@ -20,7 +20,7 @@ export function PrMergePartialSuccessBanner({ reason }: Readonly<{ reason: strin
       accessibilityLabel={t('prReview.merge.partialSuccessBanner.accessibility', { reason })}
     >
       <Text className="text-sm font-medium text-accent-soft-foreground">
-        {t('prReview.merge.partialSuccessBanner.title')}
+        {t('prReview.overview.stateMerged')}
       </Text>
       <Text className="text-xs text-accent-soft-foreground">
         {t('prReview.merge.partialSuccessBanner.body', { reason })}

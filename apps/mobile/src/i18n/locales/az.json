@@ -370,7 +370,6 @@
         "closed": "Bu birləşdirmə sorğusu bağlanıb"
       },
       "partialSuccessBanner": {
-        "title": "Birləşdirilib",
         "body": "Budağı silmək mümkün olmadı. Səbəb: {{reason}}",
         "accessibility": "Birləşdirildi. Budağı silmək mümkün olmadı. Səbəb: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Qəbul et",
       "replyBadRequest": "Bu cavabı göndərmək mümkün deyil. Müzakirə dəyişmiş ola bilər.",
       "replyForbidden": "Bu birləşdirmə sorğusuna cavab vermək icazən yoxdur.",
-      "couldNotReply": "Cavab vermək mümkün olmadı.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu şərhdən şikayət etmək mümkün deyil.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub tətbiqinin parametrlərini açmaq mümkün olmadı.",
     "installKiloGitHubApp": "Kilo GitHub tətbiqini quraşdır",
-    "connectionExpiredTitle": "GitHub bağlantısının müddəti bitdi.",
-    "connectionExpiredDescription": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq.",
     "checkConnection": "Bağlantını yoxla",
     "couldNotLoadPullRequest": "Birləşdirmə sorğusunu yükləmək mümkün olmadı.",
     "description": "Təsvir",
@@ -572,7 +568,6 @@
       "shareA11y": "Birləşdirmə sorğusunu paylaş"
     },
     "submit": {
-      "title": "Yoxlamanı göndər",
       "loadFailedTitle": "Kod baxışını göndərmə ekranını yükləmək mümkün olmadı.",
       "deletePendingTitle": "Göndərilməmiş şərh silinsin?",
       "deletePendingMessage": "Bu şərh kod baxışı növbəsindən silinəcək.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub bağlantısının müddəti bitdi.",
-      "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq.",
-      "checkConnection": "Bağlantını yoxla"
+      "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
     },
     "eventChips": {
       "comment": "Şərh",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}} yerindəki köhnəlmiş, göndərilməmiş şərhi redaktə et",
       "editA11y": "{{location}} yerindəki göndərilməmiş şərhi redaktə et",
-      "emptyBody": "(boş)",
-      "outdated": "Köhnəlmiş",
       "staleHint": "bunu yazdıqdan sonra PR dəyişib.",
       "deleteA11y": "{{location}} yerindəki göndərilməmiş şərhi sil",
       "deletedAnnouncement": "Göndərilməmiş şərh silindi",
@@ -703,7 +695,6 @@
       "security": "Təhlükəsizlik problemləri"
     },
     "category": {
-      "chatMessagesTitle": "Söhbət mesajları",
       "chatMessagesSubtitle": "söhbətlərindəki cavablar",
       "agentAttentionTitle": "Agentin sənə ehtiyacı var",
       "agentAttentionSubtitle": "suallar, icazə və məlumat sorğuları",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "tapşırıq zamanı agentdən gələn mesajlar",
       "sessionStatusTitle": "Sessiya statusu",
       "sessionStatusSubtitle": "tamamlanıb / uğursuz olub / idarəetməyə hazırdır",
-      "kiloclawActivityTitle": "KiloClaw fəaliyyəti",
       "kiloclawActivitySubtitle": "nüsxə hazırdır/uğursuz olub, planlaşdırılmış əməliyyatlar",
-      "balanceAlertsTitle": "Balans bildirişləri",
       "balanceAlertsSubtitle": "təşkilatın balansının azalması barədə xəbərdarlıqlar",
-      "securityFindingsTitle": "Təhlükəsizlik problemləri",
       "securityFindingsSubtitle": "yeni aşkarlamalar və SLA xatırlatmaları"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Süni intellekt modelinin seçimi",
       "secretsDescription": "Şifrələnmiş giriş məlumatları",
-      "versionPinDescription": "Müəyyən bir versiyaya sabitlə",
-      "versionPinLabel": "Versiyanın sabitlənməsi"
+      "versionPinDescription": "Müəyyən bir versiyaya sabitlə"
     },
     "avatar": {
       "arcade": "Oyun avtomatı",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Yüksək",
       "severityMedium": "Orta",
       "severityLow": "Aşağı",
-      "outcomeNotExploitable": "İstismar edilə bilməz",
       "outcomeTriageComplete": "İlkin qiymətləndirmə tamamlanıb",
       "sortSeverityDesc": "Ciddilik: yüksəkdən aşağıya",
       "sortSeverityAsc": "Ciddilik: aşağıdan yüksəyə",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Açıq tapıntılar",
-      "openFindingsDetail": "{{critical}} kritik, {{high}} yüksək",
-      "confirmedExploitable": "İstismar oluna bildiyi təsdiqlənib",
       "confirmedExploitableDetail": "Layihə riski təhlillə təsdiqlənib",
-      "needsReview": "Yoxlamanı gözləyir",
       "needsReviewDetail": "İnsan tərəfindən qərar verilməlidir",
-      "analysisIncomplete": "Təhlil tamamlanmayıb",
       "analysisIncompleteDetail": "Layihə riski hələ məlum deyil",
       "slaCompliance": "SLA-ya uyğunluq",
-      "notMeasured": "Ölçülməyib",
       "withinDeadlineDetail": "{{total}} tapıntıdan {{within}} tapıntının müddəti keçməyib",
       "noDeadlineData": "Hələ heç bir tapıntının SLA müddəti yoxdur",
       "deadlinePassed": "Müddət başa çatıb",
@@ -1601,7 +1582,6 @@
       "source": "Mənbə",
       "sourceId": "Mənbə identifikatoru",
       "viewAdvisory": "GitHub-da təhlükəsizlik bildirişinə bax",
-      "statusSuperseded": "Əvəz edilib",
       "statusOpen": "Açıq",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Düzəlişə artıq başlanıb",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "yoxlamadan sonra"
     },
     "settingsOverview": {
-      "title": "Parametrlər",
       "couldNotLoadSettings": "Təhlükəsizlik agentinin parametrlərini yükləmək mümkün olmadı.",
       "couldNotLoadPermissions": "İcazələri yükləmək mümkün olmadı.",
       "on": "Aktiv",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} repozitoriya seçilib",
       "repositoriesCount_other": "{{displayCount}} repozitoriya seçilib",
       "selectRepositoriesSubtitle": "Təhlükəsizlik agentinin izləyəcəyi repozitoriyaları seç",
-      "modelsAndAnalysis": "Modellər və təhlil",
       "analysisModeSubtitle": "{{mode}} təhlil",
-      "automation": "Avtomatlaşdırma",
       "automationAllOff": "Hamısı deaktivdir",
       "automationCount": "3 seçimdən {{displayCount}} seçim aktivdir",
       "notificationsCount": "2 seçimdən {{displayCount}} seçim aktivdir",
-      "slaPolicy": "SLA siyasəti",
       "disabledNoManage": "Təhlükəsizlik agenti deaktivdir. Onu yalnız təşkilat sahibləri və ödəniş menecerləri aktivləşdirə bilər.",
       "disabledNoRepo": "Təhlükəsizlik agentini aktivləşdirməzdən əvvəl ən azı bir repozitoriya seç.",
       "disabledPrompt": "Dependabot bildirişlərini sinxronlaşdırmaq, repozitoriyaları seçmək və avtomatlaşdırmanı tənzimləmək üçün təhlükəsizlik agentini aktivləşdir."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Ləğv sorğusu göndərildi",
       "cancelled": "Düzəliş ləğv edildi",
       "couldNotLoad": "Düzəliş statusunu yükləmək mümkün olmadı.",
-      "noAnalysisTitle": "Hələ təhlil aparılmayıb",
-      "noAnalysisDescription": "Detallar bölməsindən təhlili başlat.",
       "start": "Düzəlişə başla",
       "retry": "Düzəlişə yenidən cəhd et",
       "cancelTitle": "Bu düzəliş ləğv edilsin?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Təkrar düzəliş cəhdi növbəyə əlavə edildi",
       "timeline": {
         "queued": "Düzəliş tələb edildi",
-        "prOpened": "PR açıldı",
         "failed": "Düzəliş uğursuz oldu",
-        "blocked": "Düzəliş bloklandı",
-        "noChangesNeeded": "Dəyişiklik lazım deyil"
+        "blocked": "Düzəliş bloklandı"
       },
       "unavailable": "Bu problem üçün düzəliş funksiyası əlçatan deyil."
     },
@@ -1663,9 +1635,6 @@
       "title": "Modellər və təhlil",
       "couldNotLoad": "Təhlil parametrlərini yükləmək mümkün olmadı.",
       "depth": "Təhlilin dərinliyi",
-      "modeAuto": "Avtomatik",
-      "modeShallow": "Səthi",
-      "modeDeep": "Dərin",
       "triageModel": "İlkin qiymətləndirmə modeli",
       "analysisModel": "Təhlil modeli",
       "remediationModel": "Düzəliş modeli"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Tapıntı",
       "tabAnalysis": "Təhlil",
-      "tabRemediation": "Düzəliş",
-      "notFound": "Problem tapılmadı",
-      "notFoundDescription": "Bu tapıntı silinmiş ola bilər və ya artıq ona girişin yoxdur.",
-      "couldNotLoad": "Bu problem barədə məlumatı yükləmək mümkün olmadı."
+      "tabRemediation": "Düzəliş"
     },
     "findingList": {
       "couldNotLoad": "Tapıntıları yükləmək mümkün olmadı.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Düzəliş davam edir",
       "nextRetryRemediation": "Düzəlişə yenidən cəhd etmək olar",
       "nextRemediationAvailable": "Düzəliş mövcuddur",
-      "retryAnalysis": "Təhlili təkrarla",
       "runAnalysis": "Təhlili başlat",
-      "nextNeedsManualReview": "Əl ilə yoxlanmalıdır",
       "nextViewDetails": "Ətraflı məlumata bax",
       "viewPr": "PR-ə bax",
       "analyze": "Təhlil et",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "İlk sinxronlaşdırma da daxil olmaqla, hər dəfə yeni tapıntı sinxronlaşdırıldıqda göndərilir.",
       "slaLeadTimeAccessibility": "SLA xəbərdarlığının neçə gün əvvəl göndəriləcəyi",
       "slaLeadTimeError": "Gün sayını 1–365 aralığında tam ədədlə daxil et.",
-      "slaLeadTimeHint": "1-dən 365-ə qədər tam ədəd daxil et",
       "slaLeadTimeLabel": "SLA xəbərdarlığını əvvəlcədən göndər (gün)",
       "slaPersonalTitle": "SLA xəbərdarlıqları haqqında mənə e-poçt göndər",
       "slaSection": "SLA xəbərdarlıq bildirişi",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Təhlil növbəyə alınıb",
-      "queuedTitle": "Təhlil növbəyə alınıb",
       "queuedDescription": "Yeni təhlilə başlamaq üçün yerin boşalması gözlənilir.",
       "analyzing": "Təhlil edilir",
       "analyzingDescription": "Tətbiq kodunun boşluq olan funksiyanı çağıra bilib-bilmədiyi yoxlanılır.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Texniki hesabat strukturlaşdırılmış nəticəyə çevrilə bilmədi.",
       "exploitableDescription": "Tətbiq kodu boşluq olan funksiyanı çağıra bilər.",
       "notExploitable": "Çatıla bilməz",
-      "notExploitableTitle": "Çatıla bilməz",
       "notExploitableDescription": "Bu repozitoriyada boşluq olan funksiyaya çatan icra yolu tapılmadı.",
       "unknown": "Yoxlanmalıdır",
       "unknownDescription": "Təhlil boşluq olan funksiyanın çağırıla bilib-bilmədiyini təsdiqləyə bilmədi.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Son tarixə {{count}} gün qalıb"
     },
     "remediationStatus": {
-      "cancellationRequested": "Ləğv sorğusu göndərildi",
       "notStarted": "Başlamayıb",
       "starting": "Başladılır",
       "inProgress": "Davam edir",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Tapıntı artıq açıq deyil.",
       "repoNotInScope": "Repozitoriya təhlükəsizlik agenti üçün seçilməyib.",
       "analysisRequired": "Düzəlişə başlamazdan əvvəl kod bazasının təhlilini başlat.",
-      "sandboxAnalysisRequired": "Düzəlişə başlamazdan əvvəl kod bazasının təhlilini başlat.",
       "staleAnalysis": "Tapıntı təhlildən sonra dəyişib. Düzəlişə başlamazdan əvvəl təhlili yenidən başlat.",
       "notExploitable": "Təhlil boşluq olan funksiyaya çatan icra yolu tapmadı. Avtomatik düzəliş mümkün deyil.",
       "exploitabilityUnknown": "Təhlil istismar imkanını təsdiqləyə bilmədi. Bir toxunuşla düzəlişdən əvvəl insan tərəfindən yoxlama tələb olunur.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Avtomatik düzəliş deaktivdir. Təhlükəsizlik yoxlamaları uğurla keçdikdə düzəlişi yenə də əl ilə başlatmaq olar.",
       "includeExistingDisabled": "Mövcud tapıntılar avtomatik düzəlişə daxil edilmir.",
       "belowThreshold": "Tapıntının ciddilik dərəcəsi avtomatik düzəliş üçün tələb olunan həddən aşağıdır. Təhlükəsizlik yoxlamaları uğurla keçdikdə düzəlişi yenə də əl ilə başlatmaq olar.",
-      "beforeEnablement": "Təhlil avtomatik düzəliş aktivləşdirilməzdən əvvəl tamamlanıb. Təhlükəsizlik yoxlamaları uğurla keçdikdə düzəlişi yenə də əl ilə başlatmaq olar.",
-      "generic": "Bu problem üçün düzəliş funksiyası əlçatan deyil."
+      "beforeEnablement": "Təhlil avtomatik düzəliş aktivləşdirilməzdən əvvəl tamamlanıb. Təhlükəsizlik yoxlamaları uğurla keçdikdə düzəlişi yenə də əl ilə başlatmaq olar."
     },
     "commandFailure": {
       "ownerCapReached": "Eyni vaxtda aparılan təhlillərin say həddinə çatılıb. Aktiv təhlillərdən birinin bitməsini gözlə, sonra yenidən cəhd et.",
-      "githubTokenUnavailable": "GitHub giriş icazəsində problem var. GitHub tətbiqinə yenidən icazə ver, sonra yenidən cəhd et.",
       "githubAuthInvalid": "GitHub giriş icazəsində problem var. GitHub tətbiqinə yenidən icazə ver, sonra yenidən cəhd et.",
       "findingUnavailable": "Tapıntı artıq əlçatan deyil. Tapıntıları yenilə və hələ açıqdırsa, yenidən cəhd et.",
       "repositoryUnavailable": "GitHub tətbiqinin artıq bu repozitoriyaya girişi yoxdur. Repozitoriyaya giriş icazəsini yenilə, sonra yenidən cəhd et.",
@@ -1965,10 +1922,8 @@
       "title": "Sessiya",
       "copyErrorDetails": "Xətanın təfərrüatlarını kopyala",
       "backToSessions": "Sessiyalara qayıt",
-      "accessDeniedDescription": "Buna baxmağa icazən yoxdur.",
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
-      "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq əlçatan deyil.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
       "renameSession": "Sessiyanın adını dəyiş",
       "renamePlaceholder": "Sessiya adı",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "Sessiyadan çıxıldı.",
     "signOutThisDeviceTitle": "Bu cihazdan çıxış edilsin?",
     "signOutThisSessionTitle": "Bu sessiyadan çıxış edilsin?",
-    "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Cihazın API-yə girişi bir saata qədər davam edə bilər.",
-    "signOutMessage": "İş sahənə daxil olmaq üçün hesabına yenidən giriş etməlisən."
+    "signOutThisSessionMessage": "{{device}} cihazındakı hesabdan çıxılacaq. Cihazın API-yə girişi bir saata qədər davam edə bilər."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Tətbiq mağazası açıla bilmədi.",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Mühasibat düzəlişi",
         "credits_expired": "Kreditlərin müddəti bitib"
       },
-      "loadMoreFailed": "Daha çox məlumat yükləmək mümkün olmadı.",
       "truncated": "Əvvəlki kredit əməliyyatlarına da baxmaq olar."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Əvvəlki hesab-fakturalara da baxmaq olar."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ad@sirket.com",
       "enableA11y": "Aşağı balans xəbərdarlığını aktivləşdir",
       "notifyEmailsLabel": "Bildiriş üçün e-poçt ünvanları",
       "permissionDenied": "Ödəniş xəbərdarlıqlarını idarə etmək icazən yoxdur.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Bu təşkilatda birlikdə işləməyə başlamaq üçün komanda yoldaşlarını dəvət et.",
       "emptyDescriptionCannotInvite": "Təşkilat sahibindən və ya ödəniş menecerindən komanda yoldaşlarını dəvət etməsini istə.",
       "emptyTitle": "Hələ üzv yoxdur",
-      "inviteMember": "Üzv dəvət et",
       "invitedDate": "{{date}} tarixində dəvət edilib",
       "limitPerDay": "gündə {{amount}}",
       "manageA11y": "{{name}} adlı üzvü idarə et",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Status yüklənə bilmədi",
       "creditProcessingDelayed": "Kreditlərin emalı gecikir · avtomatik yenidən cəhd edilir",
       "ended": "Bitdi",
-      "manageHint": "Kilo Pass idarəetmə səhifəsini saytda açır.",
       "notSubscribed": "Abunə deyil",
       "overallocated": "Təyin edilmiş Kilo Pass abunəliklərinin sayı ödənişli yerlərin sayından çoxdur",
       "paidSeat_one": "{{displayCount}} ödənişli yer",

@@ -78,7 +78,7 @@ function titleForClass(cls: TerminalErrorClass): string {
 /** The reader's own copy for a class. The English original goes to Copy only. */
 function messageForClass(cls: TerminalErrorClass): string {
   if (cls === 'permission') {
-    return i18n.t('agentChat.session.accessDeniedDescription');
+    return i18n.t('queryError.permissionDescription');
   }
   if (cls === 'credits') {
     return i18n.t('agentChat.session.notEnoughCredits');
@@ -90,7 +90,7 @@ function messageForClass(cls: TerminalErrorClass): string {
     return i18n.t('agentChat.session.modelUnavailable');
   }
   if (cls === 'gone') {
-    return i18n.t('agentChat.session.notFoundDescription');
+    return i18n.t('queryError.notFoundDescription');
   }
   if (cls === 'unavailable') {
     return i18n.t('agentChat.session.serviceUnavailable');

@@ -278,7 +278,6 @@
       "security": "Temuan keamanan"
     },
     "category": {
-      "chatMessagesTitle": "Pesan obrolan",
       "chatMessagesSubtitle": "balasan dalam percakapanmu",
       "agentAttentionTitle": "Agen membutuhkanmu",
       "agentAttentionSubtitle": "pertanyaan, permintaan izin, atau masukan yang dibutuhkan",
@@ -286,11 +285,8 @@
       "agentUpdatesSubtitle": "pesan dari agen saat tugas berlangsung",
       "sessionStatusTitle": "Status sesi",
       "sessionStatusSubtitle": "selesai / gagal / siap dikendalikan",
-      "kiloclawActivityTitle": "Aktivitas KiloClaw",
       "kiloclawActivitySubtitle": "instans siap/gagal, tindakan terjadwal",
-      "balanceAlertsTitle": "Peringatan saldo",
       "balanceAlertsSubtitle": "peringatan saat saldo organisasi rendah",
-      "securityFindingsTitle": "Temuan keamanan",
       "securityFindingsSubtitle": "temuan baru dan pengingat SLA"
     }
   },
@@ -762,8 +758,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Pemilihan model AI",
       "secretsDescription": "Kredensial terenkripsi",
-      "versionPinDescription": "Kunci ke versi tertentu",
-      "versionPinLabel": "Penguncian versi"
+      "versionPinDescription": "Kunci ke versi tertentu"
     },
     "avatar": {
       "arcade": "Arkade",
@@ -1006,7 +1001,6 @@
       "title": "Filter temuan",
       "fixed": "Diperbaiki",
       "outcome": "Hasil",
-      "outcomeNotExploitable": "Tidak dapat dieksploitasi",
       "outcomeTriageComplete": "Triase selesai",
       "overdueOnly": "Hanya yang terlambat",
       "reset": "Atur ulang",
@@ -1052,9 +1046,6 @@
       "analysisModel": "Model analisis",
       "couldNotLoad": "Tidak dapat memuat pengaturan analisis.",
       "depth": "Kedalaman analisis",
-      "modeAuto": "Otomatis",
-      "modeDeep": "Mendalam",
-      "modeShallow": "Dasar",
       "remediationModel": "Model perbaikan",
       "title": "Model dan analisis",
       "triageModel": "Model triase"
@@ -1148,15 +1139,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Temuan terbuka",
-      "openFindingsDetail": "{{critical}} kritis, {{high}} tinggi",
-      "confirmedExploitable": "Terbukti dapat dieksploitasi",
       "confirmedExploitableDetail": "Analisis mengonfirmasi risiko pada proyek",
-      "needsReview": "Perlu kamu tinjau",
       "needsReviewDetail": "Perlu keputusan manusia",
-      "analysisIncomplete": "Analisis belum selesai",
       "analysisIncompleteDetail": "Risiko proyek masih belum diketahui",
       "slaCompliance": "Kepatuhan SLA",
-      "notMeasured": "Belum diukur",
       "withinDeadlineDetail": "{{within}} dari {{total}} belum melewati tenggat",
       "noDeadlineData": "Belum ada temuan yang memiliki tenggat SLA",
       "deadlinePassed": "Tenggat terlewati",
@@ -1187,9 +1173,6 @@
       "title": "Abaikan temuan"
     },
     "findingDetail": {
-      "couldNotLoad": "Tidak dapat memuat temuan ini.",
-      "notFound": "Temuan tidak ditemukan",
-      "notFoundDescription": "Temuan ini mungkin telah dihapus atau kamu tidak lagi memiliki akses ke temuan ini.",
       "tabAnalysis": "Analisis",
       "tabRemediation": "Perbaikan",
       "title": "Temuan"
@@ -1212,7 +1195,6 @@
       "supersededByDescription": "Ketuk untuk membuka catatan terbaru dan melihat status, analisis, serta perbaikannya.",
       "viewAdvisory": "Lihat pemberitahuan keamanan di GitHub",
       "vulnerableVersions": "Versi rentan",
-      "statusSuperseded": "Digantikan",
       "statusOpen": "Buka",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "perbaikan sudah dimulai",
@@ -1234,13 +1216,11 @@
       "a11y": "Temuan {{severity}}: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Temuan {{severity}}: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Analisis",
-      "nextNeedsManualReview": "Perlu ditinjau secara manual",
       "nextRemediationAvailable": "Perbaikan tersedia",
       "nextRemediationInProgress": "Perbaikan sedang berlangsung",
       "nextRemediationPrOpen": "PR perbaikan terbuka",
       "nextRetryRemediation": "Perbaikan dapat dicoba lagi",
       "nextViewDetails": "Lihat detail",
-      "retryAnalysis": "Ulangi analisis",
       "runAnalysis": "Jalankan analisis",
       "viewPr": "Lihat PR"
     },
@@ -1253,7 +1233,6 @@
       "newFindingSubtitle": "Dikirim setiap kali temuan baru disinkronkan, termasuk pada sinkronisasi pertama.",
       "slaLeadTimeAccessibility": "Jumlah hari sebelum tenggat SLA untuk mengirim peringatan",
       "slaLeadTimeError": "Masukkan jumlah hari berupa bilangan bulat dari 1 hingga 365.",
-      "slaLeadTimeHint": "Masukkan bilangan bulat antara 1 dan 365",
       "slaLeadTimeLabel": "Peringatan sebelum tenggat SLA (hari)",
       "slaPersonalTitle": "Kirim peringatan SLA melalui email kepada saya",
       "slaSection": "Notifikasi peringatan SLA",
@@ -1269,8 +1248,6 @@
       "cancellationRequested": "Pembatalan diminta",
       "cancelled": "Perbaikan dibatalkan",
       "couldNotLoad": "Tidak dapat memuat status perbaikan.",
-      "noAnalysisDescription": "Jalankan analisis dari tab Detail.",
-      "noAnalysisTitle": "Belum ada analisis",
       "openDraftPullRequest": "Buka draf PR{{number}}",
       "openPullRequest": "Buka PR{{number}}",
       "progress": "Kemajuan",
@@ -1280,8 +1257,6 @@
       "timeline": {
         "blocked": "Perbaikan terhambat",
         "failed": "Perbaikan gagal",
-        "noChangesNeeded": "Tidak perlu perubahan",
-        "prOpened": "PR dibuka",
         "queued": "Perbaikan diminta"
       },
       "queued": "Perbaikan diantrekan",
@@ -1309,7 +1284,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Analisis {{mode}}",
-      "automation": "Otomatisasi",
       "automationAllOff": "Semua nonaktif",
       "automationCount": "{{displayCount}} dari 3 aktif",
       "couldNotLoadPermissions": "Tidak dapat memuat izin.",
@@ -1317,15 +1291,12 @@
       "disabledNoManage": "Agen keamanan dinonaktifkan. Hanya pemilik organisasi dan manajer penagihan yang dapat mengaktifkannya.",
       "disabledNoRepo": "Pilih setidaknya satu repositori sebelum mengaktifkan Agen keamanan.",
       "disabledPrompt": "Aktifkan Agen keamanan untuk menyinkronkan peringatan Dependabot, memilih repositori, dan mengatur otomatisasi.",
-      "modelsAndAnalysis": "Model dan analisis",
       "notificationsCount": "{{displayCount}} dari 2 aktif",
       "on": "Aktif",
       "repositoriesCount": "{{displayCount}} repositori dipilih",
       "repositoriesCount_other": "{{displayCount}} repositori dipilih",
       "repositoriesCount_one": "{{displayCount}} repositori dipilih",
-      "selectRepositoriesSubtitle": "Pilih repositori yang dipantau Agen keamanan",
-      "slaPolicy": "Kebijakan SLA",
-      "title": "Pengaturan"
+      "selectRepositoriesSubtitle": "Pilih repositori yang dipantau Agen keamanan"
     },
     "settingsSave": {
       "keepEditing": "Lanjutkan menyunting",
@@ -1373,7 +1344,6 @@
     },
     "analysisState": {
       "queued": "Analisis dalam antrean",
-      "queuedTitle": "Analisis dalam antrean",
       "queuedDescription": "Menunggu kapasitas analisis tersedia.",
       "analyzing": "Sedang dianalisis",
       "analyzingDescription": "Memeriksa apakah kode aplikasi dapat menjangkau fitur yang terdampak.",
@@ -1382,7 +1352,6 @@
       "extractionFailedDescription": "Laporan teknis tidak dapat diubah menjadi hasil terstruktur.",
       "exploitableDescription": "Kode aplikasi dapat menjangkau fitur yang terdampak.",
       "notExploitable": "Tidak terjangkau",
-      "notExploitableTitle": "Tidak terjangkau",
       "notExploitableDescription": "Tidak ditemukan jalur kode yang dapat dijangkau di repositori ini.",
       "unknown": "Perlu ditinjau",
       "unknownDescription": "Analisis tidak dapat mengonfirmasi apakah fitur yang rentan dapat dijangkau.",
@@ -1418,7 +1387,6 @@
       "dueInDays_one": "Jatuh tempo dalam {{count}} hari"
     },
     "remediationStatus": {
-      "cancellationRequested": "Pembatalan diminta",
       "notStarted": "Belum dimulai",
       "starting": "Memulai",
       "inProgress": "Sedang berlangsung",
@@ -1437,7 +1405,6 @@
       "findingNotOpen": "Temuan tidak lagi berstatus terbuka.",
       "repoNotInScope": "Repositori tidak dipilih untuk Agen keamanan.",
       "analysisRequired": "Jalankan analisis basis kode sebelum memulai perbaikan.",
-      "sandboxAnalysisRequired": "Jalankan analisis basis kode sebelum memulai perbaikan.",
       "staleAnalysis": "Temuan berubah setelah analisis. Jalankan ulang analisis sebelum memulai perbaikan.",
       "notExploitable": "Analisis tidak menemukan jalur kode rentan yang dapat dijangkau. Perbaikan otomatis tidak tersedia.",
       "exploitabilityUnknown": "Analisis tidak dapat memastikan apakah kerentanan dapat dieksploitasi. Tinjauan manual diperlukan sebelum perbaikan sekali klik.",
@@ -1453,12 +1420,10 @@
       "autoRemediationDisabled": "Perbaikan otomatis dinonaktifkan. Perbaikan manual tetap dapat dimulai jika semua pemeriksaan keamanan berhasil.",
       "includeExistingDisabled": "Temuan lama tidak disertakan dalam perbaikan otomatis.",
       "belowThreshold": "Tingkat keparahan temuan ini di bawah ambang perbaikan otomatis. Perbaikan manual tetap dapat dimulai jika semua pemeriksaan keamanan berhasil.",
-      "beforeEnablement": "Analisis selesai sebelum perbaikan otomatis diaktifkan. Perbaikan manual tetap dapat dimulai jika semua pemeriksaan keamanan berhasil.",
-      "generic": "Perbaikan tidak tersedia untuk temuan ini."
+      "beforeEnablement": "Analisis selesai sebelum perbaikan otomatis diaktifkan. Perbaikan manual tetap dapat dimulai jika semua pemeriksaan keamanan berhasil."
     },
     "commandFailure": {
       "ownerCapReached": "Kapasitas analisis penuh. Tunggu hingga salah satu analisis yang berjalan selesai, lalu coba lagi.",
-      "githubTokenUnavailable": "Otorisasi GitHub bermasalah. Otorisasi ulang aplikasi GitHub, lalu coba lagi.",
       "githubAuthInvalid": "Otorisasi GitHub bermasalah. Otorisasi ulang aplikasi GitHub, lalu coba lagi.",
       "findingUnavailable": "Temuan tidak lagi tersedia. Muat ulang temuan, lalu coba lagi jika masih terbuka.",
       "repositoryUnavailable": "Aplikasi GitHub tidak lagi dapat mengakses repositori ini. Perbarui akses repositori, lalu coba lagi.",
@@ -1540,10 +1505,8 @@
       "title": "Sesi",
       "copyErrorDetails": "Salin detail kesalahan",
       "backToSessions": "Kembali ke sesi",
-      "accessDeniedDescription": "Kamu tidak punya izin untuk melihat ini.",
       "couldNotLoad": "Tidak dapat memuat sesi.",
       "failedToLoadDetails": "Gagal memuat detail sesi.",
-      "notFoundDescription": "Item ini mungkin telah dihapus atau tidak lagi tersedia.",
       "failedToStopExecution": "Gagal menghentikan eksekusi.",
       "renameSession": "Ganti nama sesi",
       "renamePlaceholder": "Nama sesi",
@@ -2091,7 +2054,6 @@
     "signOutThisDeviceTitle": "Keluar dari perangkat ini?",
     "signOutThisSessionTitle": "Keluar dari sesi ini?",
     "signOutThisSessionMessage": "Sesi masuk di {{device}} akan diakhiri. Perangkat tersebut masih dapat mengakses API hingga satu jam.",
-    "signOutMessage": "Kamu perlu masuk lagi untuk mengakses ruang kerjamu.",
     "webBrowser": "Peramban web"
   },
   "forceUpdate": {
@@ -2372,8 +2334,6 @@
       "reconnectTitle": "Hubungkan ulang GitHub"
     },
     "connectionExpired": "Koneksi GitHub kedaluwarsa.",
-    "connectionExpiredDescription": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
-    "connectionExpiredTitle": "Koneksi GitHub kedaluwarsa.",
     "couldNotLoadPullRequest": "Tidak dapat memuat PR.",
     "couldNotOpenGitHubAppSettings": "Tidak dapat membuka pengaturan aplikasi GitHub.",
     "description": "Deskripsi",
@@ -2389,7 +2349,6 @@
       "comment_other": "{{displayCount}} komentar",
       "couldNotLoad": "Tidak dapat memuat diskusi.",
       "couldNotLoadMore": "Tidak dapat memuat komentar lainnya.",
-      "couldNotReply": "Tidak dapat membalas.",
       "loadMoreComments": "Muat komentar lainnya",
       "loading": "Memuat diskusi",
       "moderation": {
@@ -2601,8 +2560,7 @@
       "noEnabledMethods": "Belum ada metode penggabungan yang aktif di repositori ini. Minta admin repositori mengaktifkan penggabungan dengan commit penggabungan, peringkasan commit, atau perubahan basis.",
       "partialSuccessBanner": {
         "accessibility": "Sudah digabungkan. Tidak dapat menghapus cabang: {{reason}}",
-        "body": "Tidak dapat menghapus cabang: {{reason}}.",
-        "title": "Digabungkan"
+        "body": "Tidak dapat menghapus cabang: {{reason}}."
       },
       "refreshMergeability": "Periksa ulang apakah PR dapat digabungkan",
       "terminal": {
@@ -2664,9 +2622,7 @@
       "deletedAnnouncement": "Komentar dalam antrean dihapus",
       "editA11y": "Ubah komentar dalam antrean di {{location}}",
       "editOutdatedA11y": "Ubah komentar dalam antrean yang sudah tidak sesuai di {{location}}",
-      "emptyBody": "(kosong)",
       "noCommentsQueued": "Tidak ada komentar dalam antrean. Tinjauan akan dikirim hanya dengan jenis tinjauan yang dipilih di atas.",
-      "outdated": "Usang",
       "staleHint": "PR sudah berubah sejak kamu menulis komentar ini.",
       "staleQueueHint": "Komentar yang merujuk ke commit lama tidak dikirim. Komentar tersebut tetap ada di antreanmu agar bisa kamu ubah atau hapus.",
       "summaryA11y": "Ringkasan tinjauan",
@@ -2675,7 +2631,6 @@
     "pullRequestUnavailable": "PR tidak tersedia",
     "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
     "reconnectNotice": {
-      "checkConnection": "Periksa koneksi",
       "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
       "title": "Koneksi GitHub kedaluwarsa."
     },
@@ -2701,7 +2656,6 @@
       "pendingComment_other": "komentar belum dikirim",
       "pendingComment_one": "komentar dalam antrean",
       "summaryOptional": "Ringkasan (opsional)",
-      "title": "Kirim tinjauan",
       "partialPostedMessage": "{{displayFreshCount}} komentar terkirim. {{displayStaleCount}} komentar merujuk ke commit lama dan tetap berada di antreanmu.",
       "submitCountOfTotal": "Kirim {{displayFreshCount}} dari {{displayTotalCount}} komentar",
       "submitReview": "Kirim tinjauan",
@@ -2777,7 +2731,6 @@
         "accounting_adjustment": "Penyesuaian akuntansi",
         "credits_expired": "Kredit kedaluwarsa"
       },
-      "loadMoreFailed": "Tidak dapat memuat lebih banyak data.",
       "truncated": "Masih ada aktivitas kredit sebelumnya."
     },
     "hub": {
@@ -2813,7 +2766,6 @@
       "truncated": "Masih ada faktur sebelumnya."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "nama@perusahaan.com",
       "enableA11y": "Aktifkan peringatan saldo rendah",
       "notifyEmailsLabel": "Alamat email penerima",
       "permissionDenied": "Kamu tidak memiliki izin untuk mengelola peringatan penagihan.",
@@ -2838,7 +2790,6 @@
       "emptyDescriptionCanInvite": "Undang rekan tim untuk mulai berkolaborasi di organisasi ini.",
       "emptyDescriptionCannotInvite": "Minta pemilik atau manajer penagihan untuk mengundang rekan tim.",
       "emptyTitle": "Belum ada anggota",
-      "inviteMember": "Undang anggota",
       "invitedDate": "Diundang pada {{date}}",
       "limitPerDay": "{{amount}}/hari",
       "manageA11y": "Kelola {{name}}",
@@ -2874,7 +2825,6 @@
       "couldNotLoadStatus": "Tidak dapat memuat status",
       "creditProcessingDelayed": "Pemrosesan kredit tertunda · mencoba ulang secara otomatis",
       "ended": "Berakhir",
-      "manageHint": "Membuka pengelolaan Kilo Pass di web.",
       "notSubscribed": "Tidak berlangganan",
       "overallocated": "Jumlah alokasi Pass melebihi lisensi berbayar",
       "paidSeat_one": "{{displayCount}} lisensi berbayar",

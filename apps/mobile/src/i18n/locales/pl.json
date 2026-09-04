@@ -278,7 +278,6 @@
       "security": "Wykryte problemy z bezpieczeństwem"
     },
     "category": {
-      "chatMessagesTitle": "Wiadomości na czacie",
       "chatMessagesSubtitle": "odpowiedzi w twoich rozmowach",
       "agentAttentionTitle": "Agent czeka na reakcję",
       "agentAttentionSubtitle": "pytania, prośby o zgodę lub dodatkowe informacje",
@@ -286,11 +285,8 @@
       "agentUpdatesSubtitle": "wiadomości agenta w trakcie zadania",
       "sessionStatusTitle": "Status sesji",
       "sessionStatusSubtitle": "zakończona / nieudana / gotowa do sterowania",
-      "kiloclawActivityTitle": "Aktywność KiloClaw",
       "kiloclawActivitySubtitle": "gotowość lub błąd instancji, zaplanowane działania",
-      "balanceAlertsTitle": "Powiadomienia o saldzie",
       "balanceAlertsSubtitle": "ostrzeżenia o niskim saldzie organizacji",
-      "securityFindingsTitle": "Wykryte problemy z bezpieczeństwem",
       "securityFindingsSubtitle": "nowe wykryte problemy i przypomnienia o terminach SLA"
     }
   },
@@ -766,8 +762,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Wybór modelu AI",
       "secretsDescription": "Zaszyfrowane poświadczenia",
-      "versionPinDescription": "Przypnij konkretną wersję",
-      "versionPinLabel": "Przypinanie wersji"
+      "versionPinDescription": "Przypnij konkretną wersję"
     },
     "avatar": {
       "arcade": "Automat do gier",
@@ -1010,7 +1005,6 @@
       "title": "Filtrowanie problemów",
       "fixed": "Naprawione",
       "outcome": "Wynik",
-      "outcomeNotExploitable": "Nie można wykorzystać w ataku",
       "outcomeTriageComplete": "Wstępna ocena zakończona",
       "overdueOnly": "Tylko po terminie",
       "reset": "Wyczyść",
@@ -1056,9 +1050,6 @@
       "analysisModel": "Model analizy",
       "couldNotLoad": "Nie udało się wczytać ustawień analizy.",
       "depth": "Szczegółowość analizy",
-      "modeAuto": "Automatyczna",
-      "modeDeep": "Szczegółowa",
-      "modeShallow": "Podstawowa",
       "remediationModel": "Model naprawy",
       "title": "Modele i analiza",
       "triageModel": "Model wstępnej oceny"
@@ -1154,15 +1145,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Otwarte problemy",
-      "openFindingsDetail": "Poziom krytyczny: {{critical}}, wysoki: {{high}}",
-      "confirmedExploitable": "Potwierdzona możliwość wykorzystania w ataku",
       "confirmedExploitableDetail": "Ryzyko projektu potwierdzone analizą",
-      "needsReview": "Wymaga sprawdzenia przez ciebie",
       "needsReviewDetail": "Wymagana decyzja człowieka",
-      "analysisIncomplete": "Analiza nieukończona",
       "analysisIncompleteDetail": "Ryzyko projektu wciąż nieznane",
       "slaCompliance": "Zgodność z SLA",
-      "notMeasured": "Nie zmierzono",
       "withinDeadlineDetail": "{{within}} z {{total}} w terminie",
       "noDeadlineData": "Żaden problem nie ma jeszcze terminu SLA",
       "deadlinePassed": "Termin minął",
@@ -1193,9 +1179,6 @@
       "title": "Odrzuć wykryty problem"
     },
     "findingDetail": {
-      "couldNotLoad": "Nie udało się wczytać tego problemu.",
-      "notFound": "Nie znaleziono tego problemu",
-      "notFoundDescription": "Ten problem mógł zostać usunięty lub nie masz już do niego dostępu.",
       "tabAnalysis": "Analiza",
       "tabRemediation": "Naprawa",
       "title": "Problem"
@@ -1218,7 +1201,6 @@
       "supersededByDescription": "Dotknij, aby wyświetlić aktualny wpis ze statusem, analizą i informacjami o naprawie.",
       "viewAdvisory": "Zobacz biuletyn bezpieczeństwa w serwisie GitHub",
       "vulnerableVersions": "Podatne wersje",
-      "statusSuperseded": "Zastąpione",
       "statusOpen": "Otwarte",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Naprawa już trwa",
@@ -1240,13 +1222,11 @@
       "a11y": "Problem: {{title}}. Krytyczność: {{severity}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Problem: {{title}}. Krytyczność: {{severity}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Analizuj",
-      "nextNeedsManualReview": "Wymaga ręcznego sprawdzenia",
       "nextRemediationAvailable": "Naprawa dostępna",
       "nextRemediationInProgress": "Naprawa w toku",
       "nextRemediationPrOpen": "Otwarty PR z poprawką",
       "nextRetryRemediation": "Można ponowić naprawę",
       "nextViewDetails": "Wyświetl szczegóły",
-      "retryAnalysis": "Ponów analizę",
       "runAnalysis": "Uruchom analizę",
       "viewPr": "Wyświetl PR"
     },
@@ -1259,7 +1239,6 @@
       "newFindingSubtitle": "Powiadomienie jest wysyłane przy synchronizacji każdego nowego problemu, także podczas pierwszej synchronizacji.",
       "slaLeadTimeAccessibility": "Liczba dni przed terminem SLA, kiedy ma zostać wysłane ostrzeżenie",
       "slaLeadTimeError": "Wpisz całkowitą liczbę dni od 1 do 365.",
-      "slaLeadTimeHint": "Wpisz liczbę całkowitą od 1 do 365",
       "slaLeadTimeLabel": "Ostrzeżenie przed terminem SLA (dni)",
       "slaPersonalTitle": "Wysyłaj mi e-maile o ostrzeżeniach SLA",
       "slaSection": "Powiadomienia o terminach SLA",
@@ -1275,8 +1254,6 @@
       "cancellationRequested": "Wysłano prośbę o anulowanie",
       "cancelled": "Anulowano naprawę",
       "couldNotLoad": "Nie udało się wczytać statusu naprawy.",
-      "noAnalysisDescription": "Uruchom analizę na karcie Szczegóły.",
-      "noAnalysisTitle": "Brak analizy",
       "openDraftPullRequest": "Otwórz wersję roboczą PR{{number}}",
       "openPullRequest": "Otwórz PR{{number}}",
       "progress": "Postęp",
@@ -1286,8 +1263,6 @@
       "timeline": {
         "blocked": "Naprawa zablokowana",
         "failed": "Naprawa nie powiodła się",
-        "noChangesNeeded": "Zmiany nie są potrzebne",
-        "prOpened": "Otwarto PR",
         "queued": "Zlecono naprawę"
       },
       "queued": "Dodano naprawę do kolejki",
@@ -1315,7 +1290,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Analiza: {{mode}}",
-      "automation": "Automatyzacja",
       "automationAllOff": "Wszystko wyłączone",
       "automationCount": "Włączono {{displayCount}} z 3",
       "couldNotLoadPermissions": "Nie udało się wczytać uprawnień.",
@@ -1323,15 +1297,12 @@
       "disabledNoManage": "Agent bezpieczeństwa jest wyłączony. Tylko właściciele organizacji i administratorzy rozliczeń mogą go włączyć.",
       "disabledNoRepo": "Wybierz co najmniej jedno repozytorium przed włączeniem agenta bezpieczeństwa.",
       "disabledPrompt": "Włącz agenta bezpieczeństwa, aby synchronizować alerty Dependabot, wybierać repozytoria i konfigurować automatyzację.",
-      "modelsAndAnalysis": "Modele i analiza",
       "notificationsCount": "Włączono {{displayCount}} z 2",
       "on": "Wł.",
       "repositoriesCount": "Wybrano {{displayCount}} repozytorium",
       "repositoriesCount_other": "Wybrano {{displayCount}} repozytorium",
       "repositoriesCount_one": "Wybrano {{displayCount}} repozytorium",
       "selectRepositoriesSubtitle": "Wybierz repozytoria monitorowane przez agenta bezpieczeństwa",
-      "slaPolicy": "Zasady SLA",
-      "title": "Ustawienia",
       "repositoriesCount_few": "Wybrano {{displayCount}} repozytoria",
       "repositoriesCount_many": "Wybrano {{displayCount}} repozytoriów"
     },
@@ -1381,7 +1352,6 @@
     },
     "analysisState": {
       "queued": "Analiza w kolejce",
-      "queuedTitle": "Analiza w kolejce",
       "queuedDescription": "Analiza czeka na dostępne zasoby.",
       "analyzing": "Analiza w toku",
       "analyzingDescription": "Trwa sprawdzanie, czy kod aplikacji może wywołać funkcję z podatnością.",
@@ -1390,7 +1360,6 @@
       "extractionFailedDescription": "Nie udało się przekształcić raportu technicznego w wynik o uporządkowanej strukturze.",
       "exploitableDescription": "Kod aplikacji może wywołać funkcję z podatnością.",
       "notExploitable": "Nieosiągalne",
-      "notExploitableTitle": "Nieosiągalne",
       "notExploitableDescription": "W tym repozytorium nie znaleziono ścieżki wykonania prowadzącej do funkcji z podatnością.",
       "unknown": "Wymaga sprawdzenia",
       "unknownDescription": "Analiza nie potwierdziła, czy kod może wywołać funkcję z podatnością.",
@@ -1430,7 +1399,6 @@
       "dueInDays": "Za {{count}} dnia"
     },
     "remediationStatus": {
-      "cancellationRequested": "Wysłano prośbę o anulowanie",
       "notStarted": "Nie rozpoczęto",
       "starting": "Uruchamianie",
       "inProgress": "W toku",
@@ -1449,7 +1417,6 @@
       "findingNotOpen": "Problem nie jest już otwarty.",
       "repoNotInScope": "Nie wybrano tego repozytorium do monitorowania przez agenta bezpieczeństwa.",
       "analysisRequired": "Przed rozpoczęciem naprawy uruchom analizę kodu.",
-      "sandboxAnalysisRequired": "Przed rozpoczęciem naprawy uruchom analizę kodu.",
       "staleAnalysis": "Problem zmienił się po analizie. Uruchom analizę ponownie przed rozpoczęciem naprawy.",
       "notExploitable": "Analiza nie wykazała ścieżki wykonania prowadzącej do funkcji z podatnością. Automatyczna naprawa jest niedostępna.",
       "exploitabilityUnknown": "Analiza nie potwierdziła możliwości wykorzystania podatności. Naprawa jednym kliknięciem wymaga wcześniejszej ręcznej weryfikacji.",
@@ -1465,12 +1432,10 @@
       "autoRemediationDisabled": "Automatyczna naprawa jest wyłączona. Nadal możesz uruchomić naprawę ręcznie, jeśli kontrole bezpieczeństwa zakończą się pomyślnie.",
       "includeExistingDisabled": "Istniejące problemy są wykluczone z automatycznej naprawy.",
       "belowThreshold": "Krytyczność problemu jest poniżej progu automatycznej naprawy. Nadal możesz uruchomić naprawę ręcznie, jeśli kontrole bezpieczeństwa zakończą się pomyślnie.",
-      "beforeEnablement": "Analiza zakończyła się przed włączeniem automatycznej naprawy. Nadal możesz uruchomić naprawę ręcznie, jeśli kontrole bezpieczeństwa zakończą się pomyślnie.",
-      "generic": "Nie można uruchomić naprawy tego problemu."
+      "beforeEnablement": "Analiza zakończyła się przed włączeniem automatycznej naprawy. Nadal możesz uruchomić naprawę ręcznie, jeśli kontrole bezpieczeństwa zakończą się pomyślnie."
     },
     "commandFailure": {
       "ownerCapReached": "Osiągnięto limit równoczesnych analiz. Poczekaj na zakończenie jednej z nich i spróbuj ponownie.",
-      "githubTokenUnavailable": "Wystąpił problem z autoryzacją GitHub. Autoryzuj ponownie aplikację GitHub i spróbuj jeszcze raz.",
       "githubAuthInvalid": "Wystąpił problem z autoryzacją GitHub. Autoryzuj ponownie aplikację GitHub i spróbuj jeszcze raz.",
       "findingUnavailable": "Problem nie jest już dostępny. Odśwież listę problemów i spróbuj ponownie, jeśli problem nadal jest otwarty.",
       "repositoryUnavailable": "Repozytorium nie jest już dostępne dla aplikacji GitHub. Odśwież dostęp do repozytorium, a następnie spróbuj ponownie.",
@@ -1558,10 +1523,8 @@
       "title": "Sesja",
       "copyErrorDetails": "Kopiuj szczegóły błędu",
       "backToSessions": "Wróć do sesji",
-      "accessDeniedDescription": "Nie masz uprawnień, aby to wyświetlić.",
       "couldNotLoad": "Nie udało się wczytać sesji.",
       "failedToLoadDetails": "Nie udało się wczytać szczegółów sesji.",
-      "notFoundDescription": "Ten element mógł zostać usunięty lub nie jest już dostępny.",
       "failedToStopExecution": "Nie udało się zatrzymać wykonywania zadania.",
       "renameSession": "Zmień nazwę sesji",
       "renamePlaceholder": "Nazwa sesji",
@@ -2119,7 +2082,6 @@
     "signOutThisDeviceTitle": "Wylogować to urządzenie?",
     "signOutThisSessionTitle": "Zakończyć tę sesję logowania?",
     "signOutThisSessionMessage": "Urządzenie {{device}} zostanie wylogowane. Może nadal mieć dostęp do API przez maksymalnie godzinę.",
-    "signOutMessage": "Aby wrócić do swojego obszaru roboczego, musisz zalogować się ponownie.",
     "webBrowser": "Przeglądarka internetowa"
   },
   "forceUpdate": {
@@ -2400,8 +2362,6 @@
       "reconnectTitle": "Połącz ponownie konto GitHub"
     },
     "connectionExpired": "Połączenie z serwisem GitHub wygasło.",
-    "connectionExpiredDescription": "Połączenie z kontem GitHub wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
-    "connectionExpiredTitle": "Połączenie z serwisem GitHub wygasło.",
     "couldNotLoadPullRequest": "Nie udało się wczytać PR.",
     "couldNotOpenGitHubAppSettings": "Nie udało się otworzyć ustawień aplikacji GitHub.",
     "description": "Opis",
@@ -2417,7 +2377,6 @@
       "comment_other": "{{displayCount}} komentarza",
       "couldNotLoad": "Nie udało się wczytać dyskusji.",
       "couldNotLoadMore": "Nie udało się wczytać kolejnych komentarzy.",
-      "couldNotReply": "Nie udało się odpowiedzieć.",
       "loadMoreComments": "Wczytaj kolejne komentarze",
       "loading": "Wczytywanie dyskusji",
       "moderation": {
@@ -2637,8 +2596,7 @@
       "noEnabledMethods": "W tym repozytorium nie włączono żadnej metody scalania. Poproś administratora o włączenie scalania z commitem scalającym, połączeniem commitów lub zmianą bazy.",
       "partialSuccessBanner": {
         "accessibility": "Scalono. Nie udało się usunąć gałęzi: {{reason}}",
-        "body": "Nie udało się usunąć gałęzi: {{reason}}.",
-        "title": "Scalono"
+        "body": "Nie udało się usunąć gałęzi: {{reason}}."
       },
       "refreshMergeability": "Sprawdź ponownie możliwość scalenia",
       "terminal": {
@@ -2704,9 +2662,7 @@
       "deletedAnnouncement": "Usunięto komentarz do wysłania",
       "editA11y": "Edytuj komentarz do wysłania: {{location}}",
       "editOutdatedA11y": "Edytuj nieaktualny komentarz do wysłania: {{location}}",
-      "emptyBody": "(brak treści)",
       "noCommentsQueued": "Nie ma komentarzy do wysłania. Przegląd zostanie wysłany tylko z wybranym powyżej rodzajem przeglądu.",
-      "outdated": "Nieaktualny",
       "staleHint": "PR zmienił się od czasu napisania tego komentarza.",
       "staleQueueHint": "Komentarze dotyczące starszego commita nie są wysyłane. Pozostają w kolejce. Możesz je edytować lub usunąć.",
       "summaryA11y": "Podsumowanie przeglądu",
@@ -2715,7 +2671,6 @@
     "pullRequestUnavailable": "PR niedostępny",
     "pullRequestUnavailableDescription": "Nie można otworzyć tego PR. Być może został usunięty, repozytorium jest prywatne lub nie zainstalowano w nim aplikacji Kilo dla GitHub.",
     "reconnectNotice": {
-      "checkConnection": "Sprawdź połączenie",
       "message": "Połączenie z kontem GitHub wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
       "title": "Połączenie z serwisem GitHub wygasło."
     },
@@ -2741,7 +2696,6 @@
       "pendingComment_other": "oczekującego komentarza",
       "pendingComment_one": "komentarz do wysłania",
       "summaryOptional": "Podsumowanie (opcjonalne)",
-      "title": "Prześlij wynik przeglądu",
       "partialPostedMessage": "Liczba opublikowanych komentarzy: {{displayFreshCount}}. Komentarze dotyczące starszego commita pozostały w kolejce. Ich liczba: {{displayStaleCount}}.",
       "submitCountOfTotal": "Wyślij {{displayFreshCount}} z {{displayTotalCount}} komentarzy",
       "submitReview": "Prześlij wynik przeglądu",
@@ -2819,7 +2773,6 @@
         "accounting_adjustment": "Korekta księgowa",
         "credits_expired": "Wygaśnięcie środków"
       },
-      "loadMoreFailed": "Nie udało się wczytać kolejnych wyników.",
       "truncated": "Dostępne są wcześniejsze operacje na saldzie."
     },
     "hub": {
@@ -2855,7 +2808,6 @@
       "truncated": "Dostępne są starsze faktury."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "imie@example.com",
       "enableA11y": "Włącz powiadomienie o niskim saldzie",
       "notifyEmailsLabel": "Adresy e-mail odbiorców",
       "permissionDenied": "Nie masz uprawnień do zarządzania powiadomieniami o rozliczeniach.",
@@ -2880,7 +2832,6 @@
       "emptyDescriptionCanInvite": "Zaproś członków zespołu, aby rozpocząć współpracę w tej organizacji.",
       "emptyDescriptionCannotInvite": "Poproś właściciela lub osobę zarządzającą rozliczeniami o zaproszenie członków zespołu.",
       "emptyTitle": "Brak członków",
-      "inviteMember": "Zaproś członka",
       "invitedDate": "Zaproszono {{date}}",
       "limitPerDay": "{{amount}}/dzień",
       "manageA11y": "Zarządzaj członkiem: {{name}}",
@@ -2916,7 +2867,6 @@
       "couldNotLoadStatus": "Nie udało się wczytać statusu",
       "creditProcessingDelayed": "Przetwarzanie środków opóźnione · automatyczne ponawianie",
       "ended": "Zakończono",
-      "manageHint": "Otwiera zarządzanie Kilo Pass w przeglądarce.",
       "notSubscribed": "Brak subskrypcji",
       "overallocated": "Liczba przydziałów Kilo Pass przekracza liczbę opłaconych miejsc",
       "paidSeat_one": "{{displayCount}} opłacone miejsce",

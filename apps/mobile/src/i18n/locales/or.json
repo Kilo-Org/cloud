@@ -370,7 +370,6 @@
         "closed": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ବନ୍ଦ ଅଛି"
       },
       "partialSuccessBanner": {
-        "title": "ମର୍ଜ୍ ହେଲା",
         "body": "ଶାଖା ବିଲୋପ ହୋଇପାରିଲା ନାହିଁ: {{reason}}।",
         "accessibility": "ମର୍ଜ୍ ହେଲା। ଶାଖା ବିଲୋପ ହୋଇପାରିଲା ନାହିଁ: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "ଗ୍ରହଣ କରନ୍ତୁ",
       "replyBadRequest": "ଏହି ଉତ୍ତର ପୋଷ୍ଟ କରିହେବ ନାହିଁ। ଥ୍ରେଡ୍ ବଦଳିଥାଇପାରେ।",
       "replyForbidden": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
-      "couldNotReply": "ଉତ୍ତର ଦିଆଯାଇପାରିଲା ନାହିଁ।",
       "moderation": {
         "reportContent": {
           "terminal": "ଏହି ମନ୍ତବ୍ୟ ବିଷୟରେ ରିପୋର୍ଟ କରିହେବ ନାହିଁ।",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub ଆପ୍‌ର ସେଟିଂସ୍ ଖୋଲିହେଲା ନାହିଁ।",
     "installKiloGitHubApp": "Kilo GitHub ଆପ୍ ଇନଷ୍ଟଲ୍ କରନ୍ତୁ",
-    "connectionExpiredTitle": "GitHub ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-    "connectionExpiredDescription": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।",
     "checkConnection": "ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ",
     "couldNotLoadPullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "description": "ବିବରଣୀ",
@@ -572,7 +568,6 @@
       "shareA11y": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ସେୟାର କରନ୍ତୁ"
     },
     "submit": {
-      "title": "ସମୀକ୍ଷା ଦାଖଲ କରନ୍ତୁ",
       "loadFailedTitle": "ସମୀକ୍ଷା ଦାଖଲ ସ୍କ୍ରିନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "deletePendingTitle": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ ବିଲୋପ କରିବେ?",
       "deletePendingMessage": "ସମୀକ୍ଷା ପାଇଁ ରଖାଯାଇଥିବା ମନ୍ତବ୍ୟ ତାଲିକାରୁ ଏହି ମନ୍ତବ୍ୟ ହଟାଯିବ।",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "message": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।",
-      "checkConnection": "ସଂଯୋଗ ଯାଞ୍ଚ କରନ୍ତୁ"
+      "message": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।"
     },
     "eventChips": {
       "comment": "ମନ୍ତବ୍ୟ",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}}ରେ ପୁରୁଣା କମିଟ୍ ସମ୍ବନ୍ଧୀୟ ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ ସମ୍ପାଦନ କରନ୍ତୁ",
       "editA11y": "{{location}}ରେ ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ ସମ୍ପାଦନ କରନ୍ତୁ",
-      "emptyBody": "(ଖାଲି)",
-      "outdated": "ପୁରୁଣା",
       "staleHint": "ଆପଣ ଏହା ଲେଖିବା ପରେ PR ବଦଳିଛି।",
       "deleteA11y": "{{location}}ରେ ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ ବିଲୋପ କରନ୍ତୁ",
       "deletedAnnouncement": "ଦାଖଲ ହୋଇନଥିବା ମନ୍ତବ୍ୟ ବିଲୋପ ହେଲା",
@@ -703,7 +695,6 @@
       "security": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା"
     },
     "category": {
-      "chatMessagesTitle": "ଚାଟ୍ ସନ୍ଦେଶ",
       "chatMessagesSubtitle": "ଆପଣଙ୍କ ବାର୍ତ୍ତାଳାପର ଉତ୍ତର",
       "agentAttentionTitle": "ଏଜେଣ୍ଟକୁ ଆପଣଙ୍କ ସାହାଯ୍ୟ ଦରକାର",
       "agentAttentionSubtitle": "ପ୍ରଶ୍ନ, ଅନୁମତି, ଇନପୁଟ୍ ଆବଶ୍ୟକ",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "କାମ ଚାଲିଥିବା ବେଳେ ଏଜେଣ୍ଟର ବାର୍ତ୍ତା",
       "sessionStatusTitle": "ସେସନ୍ ସ୍ଥିତି",
       "sessionStatusSubtitle": "ସମାପ୍ତ / ବିଫଳ / ନିୟନ୍ତ୍ରଣ ପାଇଁ ପ୍ରସ୍ତୁତ",
-      "kiloclawActivityTitle": "KiloClaw କାର୍ଯ୍ୟକଳାପ",
       "kiloclawActivitySubtitle": "ଇନଷ୍ଟାନ୍ସ ପ୍ରସ୍ତୁତ/ବିଫଳ, ନିର୍ଦ୍ଧାରିତ କାର୍ଯ୍ୟ",
-      "balanceAlertsTitle": "ଅବଶିଷ୍ଟ ରାଶି ସମ୍ବନ୍ଧୀୟ ସତର୍କ ସୂଚନା",
       "balanceAlertsSubtitle": "ସଂଗଠନର କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା",
-      "securityFindingsTitle": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା",
       "securityFindingsSubtitle": "ନୂଆ ସୁରକ୍ଷା ସମସ୍ୟା ଓ SLA ସ୍ମାରକ"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "AI ମଡେଲ ଚୟନ",
       "secretsDescription": "ଏନକ୍ରିପ୍ଟ ହୋଇଥିବା ପ୍ରମାଣୀକରଣ ତଥ୍ୟ",
-      "versionPinDescription": "ଏକ ନିର୍ଦ୍ଦିଷ୍ଟ ସଂସ୍କରଣରେ ପିନ୍ କରନ୍ତୁ",
-      "versionPinLabel": "ସଂସ୍କରଣ ସ୍ଥିର ରଖିବା"
+      "versionPinDescription": "ଏକ ନିର୍ଦ୍ଦିଷ୍ଟ ସଂସ୍କରଣରେ ପିନ୍ କରନ୍ତୁ"
     },
     "avatar": {
       "arcade": "ଆର୍କେଡ୍",
@@ -1440,7 +1427,6 @@
       "severityHigh": "ଉଚ୍ଚ",
       "severityMedium": "ମଧ୍ୟମ",
       "severityLow": "ନିମ୍ନ",
-      "outcomeNotExploitable": "ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ନୁହେଁ",
       "outcomeTriageComplete": "ପ୍ରାଥମିକ ଯାଞ୍ଚ ସମାପ୍ତ",
       "sortSeverityDesc": "ତୀବ୍ରତା: ଉଚ୍ଚରୁ ନିମ୍ନ",
       "sortSeverityAsc": "ତୀବ୍ରତା: ନିମ୍ନରୁ ଉଚ୍ଚ",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା",
-      "openFindingsDetail": "{{critical}} ଗୁରୁତର, {{high}} ଉଚ୍ଚ",
-      "confirmedExploitable": "ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "confirmedExploitableDetail": "ବିଶ୍ଳେଷଣରେ ପ୍ରୋଜେକ୍ଟର ବିପଦ ନିଶ୍ଚିତ ହୋଇଛି",
-      "needsReview": "ଆପଣଙ୍କ ସମୀକ୍ଷା ଆବଶ୍ୟକ",
       "needsReviewDetail": "ମଣିଷର ନିଷ୍ପତ୍ତି ଆବଶ୍ୟକ",
-      "analysisIncomplete": "ବିଶ୍ଳେଷଣ ଅସମ୍ପୂର୍ଣ୍ଣ",
       "analysisIncompleteDetail": "ପ୍ରୋଜେକ୍ଟର ବିପଦ ଏପର୍ଯ୍ୟନ୍ତ ଜଣାନାହିଁ",
       "slaCompliance": "SLA ଅନୁପାଳନ",
-      "notMeasured": "ମାପ ହୋଇନାହିଁ",
       "withinDeadlineDetail": "{{total}} ମଧ୍ୟରୁ {{within}} ସମୟସୀମା ଭିତରେ",
       "noDeadlineData": "କୌଣସି ଚିହ୍ନଟ ସମସ୍ୟା ପାଇଁ ଏପର୍ଯ୍ୟନ୍ତ SLA ସମୟସୀମା ଧାର୍ଯ୍ୟ ହୋଇନାହିଁ",
       "deadlinePassed": "ସମୟସୀମା ପାର ହୋଇଛି",
@@ -1601,7 +1582,6 @@
       "source": "ଉତ୍ସ",
       "sourceId": "ଉତ୍ସ ID",
       "viewAdvisory": "GitHub ରେ ସୁରକ୍ଷା ସୂଚନା ଦେଖନ୍ତୁ",
-      "statusSuperseded": "ନୂଆଟି ଦ୍ୱାରା ପ୍ରତିସ୍ଥାପିତ",
       "statusOpen": "ଖୋଲା",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "ସମାଧାନ କାମ ଆରମ୍ଭ ହୋଇସାରିଛି",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "ସମୀକ୍ଷା ପରେ"
     },
     "settingsOverview": {
-      "title": "ସେଟିଂସ୍",
       "couldNotLoadSettings": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ସେଟିଂସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadPermissions": "ଅନୁମତି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "on": "ଚାଲୁ",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
       "repositoriesCount_other": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
       "selectRepositoriesSubtitle": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ କେଉଁ ରିପୋଜିଟୋରୀଗୁଡ଼ିକୁ ନଜରରେ ରଖିବ ତାହା ବାଛନ୍ତୁ",
-      "modelsAndAnalysis": "ମଡେଲ୍ ଓ ବିଶ୍ଳେଷଣ",
       "analysisModeSubtitle": "{{mode}} ବିଶ୍ଳେଷଣ",
-      "automation": "ସ୍ୱୟଂଚାଳନ",
       "automationAllOff": "ସବୁ ବନ୍ଦ",
       "automationCount": "3ଟି ମଧ୍ୟରୁ {{displayCount}}ଟି ଚାଲୁ",
       "notificationsCount": "2ଟି ମଧ୍ୟରୁ {{displayCount}}ଟି ଚାଲୁ",
-      "slaPolicy": "SLA ନୀତି",
       "disabledNoManage": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ବନ୍ଦ ଅଛି। କେବଳ ସଂଗଠନର ମାଲିକ ଏବଂ ବିଲିଂ ପରିଚାଳକମାନେ ଏହାକୁ ଚାଲୁ କରିପାରିବେ।",
       "disabledNoRepo": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁ କରିବା ପୂର୍ବରୁ ଅତି କମରେ ଗୋଟିଏ ରିପୋଜିଟୋରୀ ଚୟନ କରନ୍ତୁ।",
       "disabledPrompt": "Dependabot ସତର୍କତା ସିଙ୍କ୍ କରିବାକୁ, ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏବଂ ସ୍ୱୟଂଚାଳନ ସେଟିଂସ୍ ନିର୍ଦ୍ଧାରଣ କରିବାକୁ ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁ କରନ୍ତୁ।"
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "ବାତିଲ କରିବାକୁ ଅନୁରୋଧ କରାଯାଇଛି",
       "cancelled": "ସମାଧାନ ବାତିଲ ହୋଇଛି",
       "couldNotLoad": "ସମାଧାନର ସ୍ଥିତି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "noAnalysisTitle": "ଏପର୍ଯ୍ୟନ୍ତ ବିଶ୍ଳେଷଣ ହୋଇନାହିଁ",
-      "noAnalysisDescription": "ବିବରଣୀ ଟ୍ୟାବ୍‌ରୁ ବିଶ୍ଳେଷଣ ଆରମ୍ଭ କରନ୍ତୁ।",
       "start": "ସମାଧାନ ଆରମ୍ଭ କରନ୍ତୁ",
       "retry": "ସମାଧାନ ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "cancelTitle": "ଏହି ସମାଧାନ ବାତିଲ କରିବେ?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "ସମାଧାନର ପରବର୍ତ୍ତୀ ପ୍ରୟାସ ଅପେକ୍ଷା ତାଲିକାରେ ରଖାଗଲା",
       "timeline": {
         "queued": "ସମାଧାନ ପାଇଁ ଅନୁରୋଧ କରାଯାଇଛି",
-        "prOpened": "PR ଖୋଲାଯାଇଛି",
         "failed": "ସମାଧାନ ବିଫଳ ହୋଇଛି",
-        "blocked": "ସମାଧାନ ଅବରୁଦ୍ଧ",
-        "noChangesNeeded": "କୌଣସି ପରିବର୍ତ୍ତନ ଆବଶ୍ୟକ ନାହିଁ"
+        "blocked": "ସମାଧାନ ଅବରୁଦ୍ଧ"
       },
       "unavailable": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟା ପାଇଁ ସମାଧାନ ଉପଲବ୍ଧ ନାହିଁ।"
     },
@@ -1663,9 +1635,6 @@
       "title": "ମଡେଲ୍ ଓ ବିଶ୍ଳେଷଣ",
       "couldNotLoad": "ବିଶ୍ଳେଷଣ ସେଟିଂସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "depth": "ବିଶ୍ଳେଷଣର ଗଭୀରତା",
-      "modeAuto": "ସ୍ୱୟଂଚାଳିତ",
-      "modeShallow": "ପ୍ରାଥମିକ",
-      "modeDeep": "ଗଭୀର",
       "triageModel": "ପ୍ରାଥମିକ ଯାଞ୍ଚ ମଡେଲ୍",
       "analysisModel": "ବିଶ୍ଳେଷଣ ମଡେଲ୍",
       "remediationModel": "ସମାଧାନ ମଡେଲ୍"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "ଚିହ୍ନଟ ସମସ୍ୟା",
       "tabAnalysis": "ବିଶ୍ଳେଷଣ",
-      "tabRemediation": "ସମାଧାନ",
-      "notFound": "ଚିହ୍ନଟ ସମସ୍ୟା ମିଳିଲା ନାହିଁ",
-      "notFoundDescription": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟା ହଟାଯାଇଥାଇପାରେ କିମ୍ବା ଏହାକୁ ଦେଖିବାର ଅନୁମତି ଆପଣଙ୍କର ଆଉ ନାହିଁ।",
-      "couldNotLoad": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।"
+      "tabRemediation": "ସମାଧାନ"
     },
     "findingList": {
       "couldNotLoad": "ଚିହ୍ନଟ ସମସ୍ୟାଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "ସମାଧାନ ଚାଲିଛି",
       "nextRetryRemediation": "ସମାଧାନ ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରିପାରିବେ",
       "nextRemediationAvailable": "ସମାଧାନ ଉପଲବ୍ଧ",
-      "retryAnalysis": "ପୁଣି ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
       "runAnalysis": "ବିଶ୍ଳେଷଣ ଆରମ୍ଭ କରନ୍ତୁ",
-      "nextNeedsManualReview": "ମଣିଷ ଦ୍ୱାରା ସମୀକ୍ଷା ଆବଶ୍ୟକ",
       "nextViewDetails": "ବିବରଣୀ ଦେଖନ୍ତୁ",
       "viewPr": "PR ଦେଖନ୍ତୁ",
       "analyze": "ବିଶ୍ଳେଷଣ କରନ୍ତୁ",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "ପ୍ରଥମ ସିଙ୍କ୍ ସମେତ ପ୍ରତିଥର ନୂଆ ଚିହ୍ନଟ ସମସ୍ୟା ସିଙ୍କ୍ ହେଲେ ଏହି ବିଜ୍ଞପ୍ତି ପଠାଯାଏ।",
       "slaLeadTimeAccessibility": "SLA ସମୟସୀମାର କେତେ ଦିନ ପୂର୍ବରୁ ଚେତାବନୀ ଦିଆଯିବ",
       "slaLeadTimeError": "ଦିନ ସଂଖ୍ୟା ପାଇଁ 1 ରୁ 365 ମଧ୍ୟରେ ଏକ ପୂର୍ଣ୍ଣ ସଂଖ୍ୟା ଲେଖନ୍ତୁ।",
-      "slaLeadTimeHint": "1ରୁ 365 ମଧ୍ୟରେ ଏକ ପୂର୍ଣ୍ଣ ସଂଖ୍ୟା ଲେଖନ୍ତୁ",
       "slaLeadTimeLabel": "SLA ଚେତାବନୀ କେତେ ଦିନ ପୂର୍ବରୁ",
       "slaPersonalTitle": "SLA ଚେତାବନୀ ବିଷୟରେ ମୋତେ ଇମେଲ୍ ପଠାନ୍ତୁ",
       "slaSection": "SLA ଚେତାବନୀ ବିଜ୍ଞପ୍ତି",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "ବିଶ୍ଳେଷଣ ଅପେକ୍ଷା ତାଲିକାରେ",
-      "queuedTitle": "ବିଶ୍ଳେଷଣ ଅପେକ୍ଷା ତାଲିକାରେ",
       "queuedDescription": "ବିଶ୍ଳେଷଣ ଆରମ୍ଭ କରିବା ପାଇଁ କ୍ଷମତା ଉପଲବ୍ଧ ହେବାକୁ ଅପେକ୍ଷା କରୁଛି।",
       "analyzing": "ବିଶ୍ଳେଷଣ ଚାଲିଛି",
       "analyzingDescription": "ଆପ୍ଲିକେସନ୍ କୋଡ୍‌ରୁ ପ୍ରଭାବିତ ସୁବିଧା ବ୍ୟବହାର କରିହେବ କି ନାହିଁ ଯାଞ୍ଚ କରାଯାଉଛି।",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "ବୈଷୟିକ ରିପୋର୍ଟକୁ ନିର୍ଦ୍ଦିଷ୍ଟ ଢାଞ୍ଚାର ଫଳାଫଳରେ ପରିଣତ କରାଯାଇପାରିଲା ନାହିଁ।",
       "exploitableDescription": "ଆପ୍ଲିକେସନ୍ କୋଡ୍‌ରୁ ପ୍ରଭାବିତ ସୁବିଧା ବ୍ୟବହାର କରିହେବ।",
       "notExploitable": "ଅଗମ୍ୟ",
-      "notExploitableTitle": "ଅଗମ୍ୟ",
       "notExploitableDescription": "ଏହି ରିପୋଜିଟୋରୀରେ ପ୍ରଭାବିତ ସୁବିଧାକୁ ପହଞ୍ଚୁଥିବା କୌଣସି କୋଡ୍ ପଥ ମିଳିଲା ନାହିଁ।",
       "unknown": "ସମୀକ୍ଷା ଆବଶ୍ୟକ",
       "unknownDescription": "ଅସୁରକ୍ଷିତ ସୁବିଧାକୁ କୋଡ୍‌ରୁ ପହଞ୍ଚିହେବ କି ନାହିଁ ବିଶ୍ଳେଷଣରେ ନିଶ୍ଚିତ ହୋଇପାରିଲା ନାହିଁ।",
@@ -1843,7 +1804,6 @@
       "dueInDays": "ସମୟସୀମାକୁ ଆଉ {{count}} ଦିନ"
     },
     "remediationStatus": {
-      "cancellationRequested": "ବାତିଲ କରିବାକୁ ଅନୁରୋଧ କରାଯାଇଛି",
       "notStarted": "ଆରମ୍ଭ ହୋଇନାହିଁ",
       "starting": "ଆରମ୍ଭ ହେଉଛି",
       "inProgress": "ଚାଲିଛି",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "ଚିହ୍ନଟ ସମସ୍ୟା ଆଉ ଅସମାପ୍ତ ସ୍ଥିତିରେ ନାହିଁ।",
       "repoNotInScope": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ପାଇଁ ଏହି ରିପୋଜିଟୋରୀ ଚୟନ କରାଯାଇନାହିଁ।",
       "analysisRequired": "ସମାଧାନ ଆରମ୍ଭ କରିବା ପୂର୍ବରୁ କୋଡ୍‌ବେସ୍ ବିଶ୍ଳେଷଣ କରନ୍ତୁ।",
-      "sandboxAnalysisRequired": "ସମାଧାନ ଆରମ୍ଭ କରିବା ପୂର୍ବରୁ କୋଡ୍‌ବେସ୍ ବିଶ୍ଳେଷଣ କରନ୍ତୁ।",
       "staleAnalysis": "ବିଶ୍ଳେଷଣ ପରେ ଚିହ୍ନଟ ସମସ୍ୟା ବଦଳିଛି। ସମାଧାନ ଆରମ୍ଭ କରିବା ପୂର୍ବରୁ ପୁଣି ବିଶ୍ଳେଷଣ କରନ୍ତୁ।",
       "notExploitable": "ବିଶ୍ଳେଷଣରେ ଅସୁରକ୍ଷିତ ସୁବିଧାକୁ ପହଞ୍ଚୁଥିବା କୌଣସି କୋଡ୍ ପଥ ମିଳିଲା ନାହିଁ। ସ୍ୱୟଂଚାଳିତ ସମାଧାନ ଉପଲବ୍ଧ ନାହିଁ।",
       "exploitabilityUnknown": "ଆକ୍ରମଣରେ ବ୍ୟବହାର ହୋଇପାରିବ କି ନାହିଁ ବିଶ୍ଳେଷଣରେ ନିଶ୍ଚିତ ହୋଇପାରିଲା ନାହିଁ। ଗୋଟିଏ କ୍ଲିକ୍‌ରେ ସମାଧାନ ପୂର୍ବରୁ ମଣିଷ ଦ୍ୱାରା ସମୀକ୍ଷା ଆବଶ୍ୟକ।",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "ସ୍ୱୟଂଚାଳିତ ସମାଧାନ ବନ୍ଦ ଅଛି। ସୁରକ୍ଷା ଯାଞ୍ଚରେ ଉତ୍ତୀର୍ଣ୍ଣ ହେଲେ ଆପଣ ନିଜେ ସମାଧାନ ଆରମ୍ଭ କରିପାରିବେ।",
       "includeExistingDisabled": "ପୂର୍ବରୁ ଚିହ୍ନଟ ସମସ୍ୟାଗୁଡ଼ିକୁ ସ୍ୱୟଂଚାଳିତ ସମାଧାନରୁ ବାଦ ଦିଆଯାଇଛି।",
       "belowThreshold": "ଚିହ୍ନଟ ସମସ୍ୟାର ତୀବ୍ରତା ସ୍ୱୟଂଚାଳିତ ସମାଧାନ ପାଇଁ ଧାର୍ଯ୍ୟ ସର୍ବନିମ୍ନ ସ୍ତରଠାରୁ କମ୍। ସୁରକ୍ଷା ଯାଞ୍ଚରେ ଉତ୍ତୀର୍ଣ୍ଣ ହେଲେ ଆପଣ ନିଜେ ସମାଧାନ ଆରମ୍ଭ କରିପାରିବେ।",
-      "beforeEnablement": "ସ୍ୱୟଂଚାଳିତ ସମାଧାନ ଚାଲୁ ହେବା ପୂର୍ବରୁ ବିଶ୍ଳେଷଣ ସମାପ୍ତ ହୋଇଥିଲା। ସୁରକ୍ଷା ଯାଞ୍ଚରେ ଉତ୍ତୀର୍ଣ୍ଣ ହେଲେ ଆପଣ ନିଜେ ସମାଧାନ ଆରମ୍ଭ କରିପାରିବେ।",
-      "generic": "ଏହି ଚିହ୍ନଟ ସମସ୍ୟା ପାଇଁ ସମାଧାନ ଉପଲବ୍ଧ ନାହିଁ।"
+      "beforeEnablement": "ସ୍ୱୟଂଚାଳିତ ସମାଧାନ ଚାଲୁ ହେବା ପୂର୍ବରୁ ବିଶ୍ଳେଷଣ ସମାପ୍ତ ହୋଇଥିଲା। ସୁରକ୍ଷା ଯାଞ୍ଚରେ ଉତ୍ତୀର୍ଣ୍ଣ ହେଲେ ଆପଣ ନିଜେ ସମାଧାନ ଆରମ୍ଭ କରିପାରିବେ।"
     },
     "commandFailure": {
       "ownerCapReached": "ଏକାସାଙ୍ଗରେ ଚାଲିପାରୁଥିବା ବିଶ୍ଳେଷଣ ସଂଖ୍ୟାର ସୀମା ପୂରଣ ହୋଇଛି। ଚାଲୁଥିବା ଏକ ବିଶ୍ଳେଷଣ ସରିବା ପର୍ଯ୍ୟନ୍ତ ଅପେକ୍ଷା କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-      "githubTokenUnavailable": "GitHub ଅନୁମତିରେ ସମସ୍ୟା ଅଛି। GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "githubAuthInvalid": "GitHub ଅନୁମତିରେ ସମସ୍ୟା ଅଛି। GitHub ଆପ୍‌କୁ ପୁଣି ଅନୁମତି ଦିଅନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "findingUnavailable": "ଚିହ୍ନଟ ସମସ୍ୟା ଆଉ ଉପଲବ୍ଧ ନାହିଁ। ଚିହ୍ନଟ ସମସ୍ୟା ତାଲିକା ରିଫ୍ରେସ୍ କରନ୍ତୁ। ଏହା ଏବେ ବି ଅସମାପ୍ତ ଥିଲେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "repositoryUnavailable": "GitHub ଆପ୍ ଆଉ ଏହି ରିପୋଜିଟୋରୀ ବ୍ୟବହାର କରିପାରୁନାହିଁ। ରିପୋଜିଟୋରୀର ଅନୁମତି ରିଫ୍ରେସ୍ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -1965,10 +1922,8 @@
       "title": "ସେସନ୍",
       "copyErrorDetails": "ତ୍ରୁଟି ବିବରଣୀ କପି କରନ୍ତୁ",
       "backToSessions": "ସେସନ୍ ତାଲିକାକୁ ଫେରନ୍ତୁ",
-      "accessDeniedDescription": "ଏହା ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "failedToLoadDetails": "ସେସନ୍ ବିବରଣୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "notFoundDescription": "ଏହି ଆଇଟମ୍‌ଟି ହଟାଯାଇଥାଇପାରେ କିମ୍ବା ଆଉ ଉପଲବ୍ଧ ନାହିଁ।",
       "failedToStopExecution": "ଚାଲୁଥିବା କାମ ବନ୍ଦ ହୋଇପାରିଲା ନାହିଁ।",
       "renameSession": "ସେସନ୍ ନାମ ବଦଳାନ୍ତୁ",
       "renamePlaceholder": "ସେସନ୍ ନାମ",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionTitle": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରିବେ?",
     "signOutThisSessionMessage": "{{device}} ରୁ ସାଇନ୍ ଆଉଟ୍ ହେବ। ତଥାପି ଏହା ଏକ ଘଣ୍ଟା ପର୍ଯ୍ୟନ୍ତ API ବ୍ୟବହାର କରିପାରିବ।",
-    "signOutMessage": "ଆପଣଙ୍କ ୱାର୍କସ୍ପେସ୍ ବ୍ୟବହାର କରିବାକୁ ପୁଣି ସାଇନ୍ ଇନ୍ କରିବାକୁ ପଡ଼ିବ।",
     "webBrowser": "ୱେବ୍ ବ୍ରାଉଜର"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "ହିସାବ ସଂଶୋଧନ",
         "credits_expired": "କ୍ରେଡିଟ୍‌ର ମିଆଦ ଶେଷ"
       },
-      "loadMoreFailed": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "truncated": "ପୁରୁଣା କ୍ରେଡିଟ୍ ଲେଣଦେଣର ବିବରଣୀ ଉପଲବ୍ଧ ଅଛି।"
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "ପୁରୁଣା ଇନଭଏସ୍ ଉପଲବ୍ଧ ଅଛି।"
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ନାମ@କମ୍ପାନୀ.com",
       "enableA11y": "କମ୍ ବ୍ୟାଲାନ୍ସ ସତର୍କତା ଚାଲୁ କରନ୍ତୁ",
       "notifyEmailsLabel": "ସତର୍କତା ପାଇବା ପାଇଁ ଇମେଲ୍ ଠିକଣା",
       "permissionDenied": "ବିଲିଂ ସତର୍କତା ପରିଚାଳନା କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "ଏହି ସଂଗଠନରେ ମିଶି କାମ କରିବାକୁ ସହକର୍ମୀଙ୍କୁ ନିମନ୍ତ୍ରଣ କରନ୍ତୁ।",
       "emptyDescriptionCannotInvite": "ସହକର୍ମୀଙ୍କୁ ନିମନ୍ତ୍ରଣ କରିବାକୁ ଜଣେ ମାଲିକ କିମ୍ବା ବିଲିଂ ପରିଚାଳକଙ୍କୁ କୁହନ୍ତୁ।",
       "emptyTitle": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସଦସ୍ୟ ନାହିଁ",
-      "inviteMember": "ସଦସ୍ୟଙ୍କୁ ନିମନ୍ତ୍ରଣ କରନ୍ତୁ",
       "invitedDate": "{{date}}ରେ ନିମନ୍ତ୍ରିତ",
       "limitPerDay": "{{amount}}/ଦିନ",
       "manageA11y": "{{name}} ଙ୍କ ସଦସ୍ୟତା ପରିଚାଳନା କରନ୍ତୁ",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "ସ୍ଥିତି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "creditProcessingDelayed": "କ୍ରେଡିଟ୍ ପ୍ରକ୍ରିୟାକରଣରେ ବିଳମ୍ବ · ଆପେ ପୁଣି ଚେଷ୍ଟା ହେଉଛି",
       "ended": "ସମାପ୍ତ",
-      "manageHint": "ୱେବ୍‌ରେ Kilo Pass ପରିଚାଳନା ପୃଷ୍ଠା ଖୋଲେ।",
       "notSubscribed": "ସବସ୍କ୍ରିପସନ୍ ନାହିଁ",
       "overallocated": "ପୈଠ ହୋଇଥିବା ସିଟ୍ ସଂଖ୍ୟାଠାରୁ ଅଧିକ ପାସ୍ ବଣ୍ଟାଯାଇଛି",
       "paidSeat_one": "{{displayCount}}ଟି ପୈଠ ହୋଇଥିବା ସିଟ୍",

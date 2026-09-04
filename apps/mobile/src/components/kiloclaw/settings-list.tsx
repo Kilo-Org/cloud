@@ -54,7 +54,7 @@ const SETTINGS_ITEMS = [
   },
   {
     icon: Pin,
-    labelKey: 'kiloclaw.settings.versionPinLabel',
+    labelKey: 'kiloclaw.versionPin.title',
     descriptionKey: 'kiloclaw.settings.versionPinDescription',
     path: 'settings/version-pin',
   },

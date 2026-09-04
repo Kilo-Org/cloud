@@ -120,7 +120,7 @@ function LowBalanceAlertForm({ organizationId, settings }: LowBalanceAlertFormPr
             <FormField
               label={t('organization.lowBalanceAlert.notifyEmailsLabel')}
               required
-              placeholder={t('organization.lowBalanceAlert.emailPlaceholder')}
+              placeholder={t('organization.inviteMember.emailPlaceholder')}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}

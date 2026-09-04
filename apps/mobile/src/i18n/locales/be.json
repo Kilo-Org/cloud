@@ -374,7 +374,6 @@
         "closed": "Гэты запыт на зліццё закрыты"
       },
       "partialSuccessBanner": {
-        "title": "Зліта",
         "body": "Не атрымалася выдаліць галіну: {{reason}}.",
         "accessibility": "Зліта. Не атрымалася выдаліць галіну: {{reason}}"
       },
@@ -445,7 +444,6 @@
       "acceptTerms": "Прыняць",
       "replyBadRequest": "Немагчыма апублікаваць гэты адказ. Магчыма, абмеркаванне змянілася.",
       "replyForbidden": "У цябе няма дазволу адказваць у гэтым запыце на зліццё.",
-      "couldNotReply": "Не атрымалася адказаць.",
       "moderation": {
         "reportContent": {
           "terminal": "На гэты каментар немагчыма паскардзіцца.",
@@ -502,8 +500,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Не атрымалася адкрыць налады праграмы GitHub.",
     "installKiloGitHubApp": "Усталяваць праграму Kilo для GitHub",
-    "connectionExpiredTitle": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
-    "connectionExpiredDescription": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў.",
     "checkConnection": "Праверыць злучэнне",
     "couldNotLoadPullRequest": "Не атрымалася загрузіць запыт на зліццё.",
     "description": "Апісанне",
@@ -580,7 +576,6 @@
       "shareA11y": "Падзяліцца запытам на зліццё"
     },
     "submit": {
-      "title": "Адправіць вынікі праверкі",
       "loadFailedTitle": "Не атрымалася загрузіць форму адпраўкі праверкі кода.",
       "deletePendingTitle": "Выдаліць неадпраўлены каментар?",
       "deletePendingMessage": "Гэты каментар будзе выдалены з чаргі праверкі кода.",
@@ -598,8 +593,7 @@
     },
     "reconnectNotice": {
       "title": "Тэрмін дзеяння падключэння да GitHub скончыўся.",
-      "message": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў.",
-      "checkConnection": "Праверыць злучэнне"
+      "message": "Тваё падключэнне да GitHub больш не дзейнічае. Правер яго яшчэ раз — пры патрэбе табе прапануюць падключыцца зноў."
     },
     "eventChips": {
       "comment": "Каментаваць",
@@ -627,8 +621,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Рэдагаваць састарэлы неадпраўлены каментар: {{location}}",
       "editA11y": "Рэдагаваць неадпраўлены каментар: {{location}}",
-      "emptyBody": "(пуста)",
-      "outdated": "Састарэла",
       "staleHint": "PR змяніўся пасля напісання гэтага каментара.",
       "deleteA11y": "Выдаліць неадпраўлены каментар: {{location}}",
       "deletedAnnouncement": "Неадпраўлены каментар выдалены",
@@ -717,7 +709,6 @@
       "security": "Выяўленыя праблемы бяспекі"
     },
     "category": {
-      "chatMessagesTitle": "Паведамленні ў чаце",
       "chatMessagesSubtitle": "адказы ў вашых размовах",
       "agentAttentionTitle": "Агенту патрэбна ваша ўвага",
       "agentAttentionSubtitle": "пытанні, запыты дазволаў і даных",
@@ -725,11 +716,8 @@
       "agentUpdatesSubtitle": "паведамленні ад агента падчас выканання задачы",
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершаны / памылка / гатовы да кіравання",
-      "kiloclawActivityTitle": "Актыўнасць KiloClaw",
       "kiloclawActivitySubtitle": "экзэмпляр гатовы або завяршыўся з памылкай, запланаваныя дзеянні",
-      "balanceAlertsTitle": "Апавяшчэнні аб балансе",
       "balanceAlertsSubtitle": "папярэджанні аб нізкім балансе арганізацыі",
-      "securityFindingsTitle": "Выяўленыя праблемы бяспекі",
       "securityFindingsSubtitle": "новыя праблемы бяспекі і напамінкі аб SLA"
     }
   },
@@ -1205,8 +1193,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Выбар мадэлі ШІ",
       "secretsDescription": "Зашыфраваныя ўліковыя даныя",
-      "versionPinDescription": "Замацаваць канкрэтную версію",
-      "versionPinLabel": "Замацаванне версіі"
+      "versionPinDescription": "Замацаваць канкрэтную версію"
     },
     "avatar": {
       "arcade": "Гульнявы аўтамат",
@@ -1458,7 +1445,6 @@
       "severityHigh": "Высокі",
       "severityMedium": "Сярэдні",
       "severityLow": "Нізкі",
-      "outcomeNotExploitable": "Эксплуатацыя немагчымая",
       "outcomeTriageComplete": "Першасная ацэнка завершана",
       "sortSeverityDesc": "Небяспека: ад высокай да нізкай",
       "sortSeverityAsc": "Небяспека: ад нізкай да высокай",
@@ -1565,15 +1551,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Адкрытыя праблемы",
-      "openFindingsDetail": "Крытычны ўзровень: {{critical}}, высокі: {{high}}",
-      "confirmedExploitable": "Магчымасць эксплуатацыі пацверджана",
       "confirmedExploitableDetail": "Рызыка праекта пацверджана аналізам",
-      "needsReview": "Патрабуе тваёй праверкі",
       "needsReviewDetail": "Патрабуецца рашэнне чалавека",
-      "analysisIncomplete": "Аналіз не завершаны",
       "analysisIncompleteDetail": "Рызыка праекта яшчэ невядомая",
       "slaCompliance": "Выкананне SLA",
-      "notMeasured": "Не вымерана",
       "withinDeadlineDetail": "Тэрмін не мінуў: {{within}} з {{total}}",
       "noDeadlineData": "Яшчэ ні для адной праблемы не зададзены тэрмін SLA",
       "deadlinePassed": "Тэрмін мінуў",
@@ -1621,7 +1602,6 @@
       "source": "Крыніца",
       "sourceId": "Ідэнтыфікатар крыніцы",
       "viewAdvisory": "Праглядзець бюлетэнь бяспекі на GitHub",
-      "statusSuperseded": "Заменена",
       "statusOpen": "Адкрыта",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Выпраўленне ўжо пачата",
@@ -1632,7 +1612,6 @@
       "reasonAfterReview": "пасля праверкі"
     },
     "settingsOverview": {
-      "title": "Налады",
       "couldNotLoadSettings": "Не атрымалася загрузіць налады агента бяспекі.",
       "couldNotLoadPermissions": "Не атрымалася загрузіць правы доступу.",
       "on": "Уключана",
@@ -1640,13 +1619,10 @@
       "repositoriesCount": "Выбрана {{displayCount}} рэпазіторыя",
       "repositoriesCount_other": "Выбрана {{displayCount}} рэпазіторыя",
       "selectRepositoriesSubtitle": "Выбраць рэпазіторыі, якія адсочвае агент бяспекі",
-      "modelsAndAnalysis": "Мадэлі і аналіз",
       "analysisModeSubtitle": "Рэжым аналізу: {{mode}}",
-      "automation": "Аўтаматызацыя",
       "automationAllOff": "Усё выключана",
       "automationCount": "уключана {{displayCount}} з 3",
       "notificationsCount": "уключана {{displayCount}} з 2",
-      "slaPolicy": "Палітыка SLA",
       "disabledNoManage": "Агент бяспекі выключаны. Толькі ўладальнікі арганізацыі і адміністратары аплаты могуць яго ўключыць.",
       "disabledNoRepo": "Выберыце хаця б адзін рэпазіторый, перш чым уключаць агента бяспекі.",
       "disabledPrompt": "Уключыце агента бяспекі, каб сінхранізаваць апавяшчэнні Dependabot, выбіраць рэпазіторыі і наладжваць аўтаматызацыю.",
@@ -1657,8 +1633,6 @@
       "cancellationRequested": "Запыт на адмену адпраўлены",
       "cancelled": "Выпраўленне адменена",
       "couldNotLoad": "Не атрымалася загрузіць стан выпраўлення.",
-      "noAnalysisTitle": "Аналізу яшчэ няма",
-      "noAnalysisDescription": "Запусці аналіз на ўкладцы «Падрабязнасці».",
       "start": "Пачаць выпраўленне",
       "retry": "Паўтарыць выпраўленне",
       "cancelTitle": "Адмяніць гэтае выпраўленне?",
@@ -1674,10 +1648,8 @@
       "retryQueued": "Паўторнае выпраўленне ў чарзе",
       "timeline": {
         "queued": "Запыт на выпраўленне атрыманы",
-        "prOpened": "PR адкрыты",
         "failed": "Не атрымалася выканаць выпраўленне",
-        "blocked": "Выпраўленне заблакіравана",
-        "noChangesNeeded": "Змены не патрэбныя"
+        "blocked": "Выпраўленне заблакіравана"
       },
       "unavailable": "Выпраўленне гэтай праблемы недаступнае."
     },
@@ -1685,9 +1657,6 @@
       "title": "Мадэлі і аналіз",
       "couldNotLoad": "Не атрымалася загрузіць налады аналізу.",
       "depth": "Глыбіня аналізу",
-      "modeAuto": "Аўта",
-      "modeShallow": "Павярхоўны",
-      "modeDeep": "Глыбокі",
       "triageModel": "Мадэль першаснай ацэнкі",
       "analysisModel": "Мадэль аналізу",
       "remediationModel": "Мадэль выпраўлення"
@@ -1713,10 +1682,7 @@
     "findingDetail": {
       "title": "Праблема",
       "tabAnalysis": "Аналіз",
-      "tabRemediation": "Выпраўленне",
-      "notFound": "Праблема не знойдзена",
-      "notFoundDescription": "Магчыма, гэтую праблему выдалілі або ў вас больш няма доступу да яе.",
-      "couldNotLoad": "Не атрымалася загрузіць звесткі пра гэтую праблему."
+      "tabRemediation": "Выпраўленне"
     },
     "findingList": {
       "couldNotLoad": "Не атрымалася загрузіць праблемы.",
@@ -1731,9 +1697,7 @@
       "nextRemediationInProgress": "Выпраўленне выконваецца",
       "nextRetryRemediation": "Можна паўтарыць выпраўленне",
       "nextRemediationAvailable": "Выпраўленне даступна",
-      "retryAnalysis": "Паўтарыць аналіз",
       "runAnalysis": "Запусціць аналіз",
-      "nextNeedsManualReview": "Патрабуе ручной праверкі",
       "nextViewDetails": "Праглядзець падрабязнасці",
       "viewPr": "Праглядзець PR",
       "analyze": "Прааналізаваць",
@@ -1775,7 +1739,6 @@
       "newFindingSubtitle": "Апавяшчэнне дасылаецца пры кожнай сінхранізацыі новай праблемы, у тым ліку пры першай сінхранізацыі.",
       "slaLeadTimeAccessibility": "За колькі дзён да тэрміну SLA папярэджваць",
       "slaLeadTimeError": "Увядзіце цэлы лік дзён ад 1 да 365.",
-      "slaLeadTimeHint": "Увядзі цэлы лік ад 1 да 365",
       "slaLeadTimeLabel": "За колькі дзён да тэрміну SLA папярэджваць",
       "slaPersonalTitle": "Дасылаць мне лісты з папярэджаннямі SLA",
       "slaSection": "Апавяшчэнні пра тэрміны SLA",
@@ -1820,7 +1783,6 @@
     },
     "analysisState": {
       "queued": "Аналіз у чарзе",
-      "queuedTitle": "Аналіз у чарзе",
       "queuedDescription": "Аналіз чакае, пакуль вызваліцца месца для запуску.",
       "analyzing": "Аналіз",
       "analyzingDescription": "Правяраецца, ці можа код праграмы выклікаць уразлівую функцыю.",
@@ -1829,7 +1791,6 @@
       "extractionFailedDescription": "Тэхнічную справаздачу не атрымалася пераўтварыць у структураваны вынік.",
       "exploitableDescription": "Код праграмы можа выклікаць уразлівую функцыю.",
       "notExploitable": "Код недасягальны",
-      "notExploitableTitle": "Код недасягальны",
       "notExploitableDescription": "У гэтым рэпазіторыі не знойдзены шлях выканання да ўразлівай функцыі.",
       "unknown": "Патрабуе праверкі",
       "unknownDescription": "Аналіз не пацвердзіў, ці можа код выклікаць уразлівую функцыю.",
@@ -1869,7 +1830,6 @@
       "dueInDays": "Тэрмін праз {{count}} дня"
     },
     "remediationStatus": {
-      "cancellationRequested": "Запыт на адмену адпраўлены",
       "notStarted": "Не пачата",
       "starting": "Запуск",
       "inProgress": "Выконваецца",
@@ -1888,7 +1848,6 @@
       "findingNotOpen": "Праблема больш не адкрытая.",
       "repoNotInScope": "Рэпазіторый не выбраны для агента бяспекі.",
       "analysisRequired": "Перад выпраўленнем запусці аналіз кодавай базы.",
-      "sandboxAnalysisRequired": "Перад выпраўленнем запусці аналіз кодавай базы.",
       "staleAnalysis": "Праблема змянілася пасля аналізу. Паўторна запусціце аналіз перад пачаткам выпраўлення.",
       "notExploitable": "Аналіз не выявіў шляху выканання да ўразлівага кода. Аўтаматычнае выпраўленне недаступна.",
       "exploitabilityUnknown": "Аналіз не пацвердзіў магчымасці выкарыстання ў атацы. Перад выпраўленнем адным націскам патрабуецца ручная праверка.",
@@ -1904,12 +1863,10 @@
       "autoRemediationDisabled": "Аўтаматычнае выпраўленне выключана. Выпраўленне можна запусціць уручную пасля паспяховых праверак бяспекі.",
       "includeExistingDisabled": "Наяўныя праблемы выключаны з аўтаматычнага выпраўлення.",
       "belowThreshold": "Узровень небяспекі праблемы ніжэйшы за парог аўтаматычнага выпраўлення. Выпраўленне можна запусціць уручную пасля паспяховых праверак бяспекі.",
-      "beforeEnablement": "Аналіз завяршыўся да ўключэння аўтаматычнага выпраўлення. Выпраўленне можна запусціць уручную пасля паспяховых праверак бяспекі.",
-      "generic": "Выпраўленне гэтай праблемы недаступнае."
+      "beforeEnablement": "Аналіз завяршыўся да ўключэння аўтаматычнага выпраўлення. Выпраўленне можна запусціць уручную пасля паспяховых праверак бяспекі."
     },
     "commandFailure": {
       "ownerCapReached": "Дасягнуты ліміт адначасовых аналізаў. Дачакайцеся завяршэння аднаго з іх і паўтарыце спробу.",
-      "githubTokenUnavailable": "Узнікла праблема з аўтарызацыяй GitHub. Паўторна аўтарызуйце праграму GitHub і паўтарыце спробу.",
       "githubAuthInvalid": "Узнікла праблема з аўтарызацыяй GitHub. Паўторна аўтарызуйце праграму GitHub і паўтарыце спробу.",
       "findingUnavailable": "Праблема больш недаступная. Абнавіце спіс праблем і паўтарыце спробу, калі яна застаецца адкрытай.",
       "repositoryUnavailable": "Рэпазіторый больш недаступны праграме GitHub. Абнавіце доступ да рэпазіторыя і паўтарыце спробу.",
@@ -1997,10 +1954,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Капіяваць падрабязнасці памылкі",
       "backToSessions": "Назад да сеансаў",
-      "accessDeniedDescription": "У цябе няма дазволу на прагляд.",
       "couldNotLoad": "Не ўдалося загрузіць сеанс.",
       "failedToLoadDetails": "Не ўдалося загрузіць падрабязнасці сеанса.",
-      "notFoundDescription": "Магчыма, гэты элемент быў выдалены або больш недаступны.",
       "failedToStopExecution": "Не ўдалося спыніць выкананне.",
       "renameSession": "Перайменаваць сеанс",
       "renamePlaceholder": "Назва сеанса",
@@ -2558,8 +2513,7 @@
     "sessionSignedOut": "Сеанс завершаны.",
     "signOutThisDeviceTitle": "Выйсці з уліковага запісу на гэтай прыладзе?",
     "signOutThisSessionTitle": "Завяршыць гэты сеанс?",
-    "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Доступ да API можа захоўвацца яшчэ да гадзіны.",
-    "signOutMessage": "Каб вярнуцца ў сваю працоўную прастору, трэба будзе ўвайсці зноў."
+    "signOutThisSessionMessage": "Сеанс на прыладзе {{device}} будзе завершаны. Доступ да API можа захоўвацца яшчэ да гадзіны."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Не атрымалася адкрыць краму праграм.",
@@ -2827,7 +2781,6 @@
         "accounting_adjustment": "Бухгалтарская карэкціроўка",
         "credits_expired": "Тэрмін дзеяння крэдытаў скончыўся"
       },
-      "loadMoreFailed": "Не атрымалася загрузіць наступныя запісы.",
       "truncated": "Даступныя ранейшыя аперацыі з крэдытамі."
     },
     "inviteMember": {
@@ -2856,7 +2809,6 @@
       "truncated": "Даступныя ранейшыя рахункі."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "імя@company.com",
       "enableA11y": "Уключыць апавяшчэнне аб нізкім балансе",
       "notifyEmailsLabel": "Адрасы для апавяшчэнняў",
       "permissionDenied": "У вас няма дазволу кіраваць апавяшчэннямі аб плацяжах.",
@@ -2881,7 +2833,6 @@
       "emptyDescriptionCanInvite": "Запрасіце калег, каб пачаць сумесную працу ў гэтай арганізацыі.",
       "emptyDescriptionCannotInvite": "Папрасіце ўладальніка або кіраўніка плацяжоў запрасіць калег.",
       "emptyTitle": "Яшчэ няма ўдзельнікаў",
-      "inviteMember": "Запрасіць удзельніка",
       "invitedDate": "Дата запрашэння: {{date}}",
       "limitPerDay": "{{amount}}/дзень",
       "manageA11y": "Кіраваць удзельнікам: {{name}}",
@@ -2924,7 +2875,6 @@
       "couldNotLoadStatus": "Не ўдалося загрузіць статус",
       "creditProcessingDelayed": "Залічэнне крэдытаў затрымліваецца · аўтаматычная паўторная спроба",
       "ended": "Завершана",
-      "manageHint": "Адкрывае кіраванне падпіскай Kilo Pass на сайце.",
       "notSubscribed": "Няма падпіскі",
       "overallocated": "Прызначана больш Kilo Pass, чым аплачана месцаў",
       "paidSeat_one": "{{displayCount}} аплачанае месца",

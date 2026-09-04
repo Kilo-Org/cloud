@@ -250,7 +250,6 @@
       "security": "Beveiligingsbevindingen"
     },
     "category": {
-      "chatMessagesTitle": "Chatberichten",
       "chatMessagesSubtitle": "antwoorden in je gesprekken",
       "agentAttentionTitle": "De agent heeft je nodig",
       "agentAttentionSubtitle": "vragen en verzoeken om toestemming of invoer",
@@ -258,11 +257,8 @@
       "agentUpdatesSubtitle": "tussentijdse berichten van de agent",
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "voltooid / mislukt / klaar voor bediening",
-      "kiloclawActivityTitle": "KiloClaw-activiteit",
       "kiloclawActivitySubtitle": "instantie klaar of mislukt, geplande acties",
-      "balanceAlertsTitle": "Saldowaarschuwingen",
       "balanceAlertsSubtitle": "waarschuwingen voor laag organisatiesaldo",
-      "securityFindingsTitle": "Beveiligingsbevindingen",
       "securityFindingsSubtitle": "nieuwe bevindingen en SLA-herinneringen"
     },
     "liveActivities": "Liveactiviteiten",
@@ -762,8 +758,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Keuze van AI-model",
       "secretsDescription": "Versleutelde inloggegevens",
-      "versionPinDescription": "Een specifieke versie vastzetten",
-      "versionPinLabel": "Versie vastzetten"
+      "versionPinDescription": "Een specifieke versie vastzetten"
     },
     "avatar": {
       "arcade": "Speelautomaat",
@@ -1006,7 +1001,6 @@
       "title": "Bevindingen filteren",
       "fixed": "Opgelost",
       "outcome": "Uitkomst",
-      "outcomeNotExploitable": "Niet misbruikbaar",
       "outcomeTriageComplete": "Eerste beoordeling voltooid",
       "overdueOnly": "Alleen met overschreden deadline",
       "reset": "Opnieuw instellen",
@@ -1052,9 +1046,6 @@
       "analysisModel": "Analysemodel",
       "couldNotLoad": "De analyse-instellingen konden niet worden geladen.",
       "depth": "Analysediepte",
-      "modeAuto": "Automatisch",
-      "modeDeep": "Diepgaand",
-      "modeShallow": "Oppervlakkig",
       "remediationModel": "Herstelmodel",
       "title": "Modellen en analyse",
       "triageModel": "Model voor de eerste beoordeling"
@@ -1148,15 +1139,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Open bevindingen",
-      "openFindingsDetail": "{{critical}} kritiek, {{high}} hoog",
-      "confirmedExploitable": "Aantoonbaar misbruikbaar",
       "confirmedExploitableDetail": "Projectrisico bevestigd door analyse",
-      "needsReview": "Door jou te beoordelen",
       "needsReviewDetail": "Menselijke beslissing vereist",
-      "analysisIncomplete": "Analyse niet voltooid",
       "analysisIncompleteDetail": "Projectrisico nog onbekend",
       "slaCompliance": "SLA-naleving",
-      "notMeasured": "Niet gemeten",
       "withinDeadlineDetail": "{{within}} van {{total}} binnen de deadline",
       "noDeadlineData": "Nog geen bevindingen met een SLA-deadline",
       "deadlinePassed": "Deadline verstreken",
@@ -1187,9 +1173,6 @@
       "title": "Bevinding negeren"
     },
     "findingDetail": {
-      "couldNotLoad": "Deze bevinding kon niet worden geladen.",
-      "notFound": "Bevinding niet gevonden",
-      "notFoundDescription": "Deze bevinding is mogelijk verwijderd of je hebt er geen toegang meer toe.",
       "tabAnalysis": "Analyse",
       "tabRemediation": "Herstel",
       "title": "Bevinding"
@@ -1212,7 +1195,6 @@
       "supersededByDescription": "Tik om de huidige bevinding te openen en de status, analyse en het herstel te bekijken.",
       "viewAdvisory": "Beveiligingsadvies bekijken op GitHub",
       "vulnerableVersions": "Kwetsbare versies",
-      "statusSuperseded": "Vervangen",
       "statusOpen": "Openen",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "er wordt al aan een oplossing gewerkt",
@@ -1234,13 +1216,11 @@
       "a11y": "Bevinding: {{title}}. Ernst: {{severity}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Bevinding: {{title}}. Ernst: {{severity}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Analyseren",
-      "nextNeedsManualReview": "Handmatige beoordeling nodig",
       "nextRemediationAvailable": "Herstel beschikbaar",
       "nextRemediationInProgress": "Herstel wordt uitgevoerd",
       "nextRemediationPrOpen": "Herstel-PR open",
       "nextRetryRemediation": "Nieuwe herstelpoging mogelijk",
       "nextViewDetails": "Details bekijken",
-      "retryAnalysis": "Opnieuw analyseren",
       "runAnalysis": "Analyse uitvoeren",
       "viewPr": "PR bekijken"
     },
@@ -1253,7 +1233,6 @@
       "newFindingSubtitle": "Je ontvangt een e-mail zodra een nieuwe bevinding wordt gesynchroniseerd, ook bij de eerste synchronisatie.",
       "slaLeadTimeAccessibility": "Aantal dagen voor de SLA-deadline waarop je een waarschuwing ontvangt",
       "slaLeadTimeError": "Voer een geheel aantal dagen in tussen 1 en 365.",
-      "slaLeadTimeHint": "Voer een geheel getal in tussen 1 en 365",
       "slaLeadTimeLabel": "Dagen voor de SLA-deadline waarschuwen",
       "slaPersonalTitle": "E-mails met SLA-waarschuwingen ontvangen",
       "slaSection": "SLA-waarschuwingen",
@@ -1269,8 +1248,6 @@
       "cancellationRequested": "Annulering aangevraagd",
       "cancelled": "Herstel geannuleerd",
       "couldNotLoad": "De herstelstatus kon niet worden geladen.",
-      "noAnalysisDescription": "Voer een analyse uit via het tabblad Gegevens.",
-      "noAnalysisTitle": "Nog geen analyse",
       "openDraftPullRequest": "Concept-PR{{number}} openen",
       "openPullRequest": "PR{{number}} openen",
       "progress": "Voortgang",
@@ -1280,8 +1257,6 @@
       "timeline": {
         "blocked": "Herstel geblokkeerd",
         "failed": "Herstel mislukt",
-        "noChangesNeeded": "Geen wijzigingen nodig",
-        "prOpened": "PR geopend",
         "queued": "Herstel aangevraagd"
       },
       "queued": "Herstel in de wachtrij gezet",
@@ -1309,7 +1284,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Analyse: {{mode}}",
-      "automation": "Automatisering",
       "automationAllOff": "Alles uit",
       "automationCount": "{{displayCount}} van de 3 ingeschakeld",
       "couldNotLoadPermissions": "De rechten konden niet worden geladen.",
@@ -1317,15 +1291,12 @@
       "disabledNoManage": "Security Agent is uitgeschakeld. Alleen organisatie-eigenaren en factureringsbeheerders kunnen Security Agent inschakelen.",
       "disabledNoRepo": "Selecteer minimaal één repository voordat je Security Agent inschakelt.",
       "disabledPrompt": "Schakel Security Agent in om Dependabot-waarschuwingen te synchroniseren, repositories te kiezen en automatisering te configureren.",
-      "modelsAndAnalysis": "Modellen en analyse",
       "notificationsCount": "{{displayCount}} van de 2 ingeschakeld",
       "on": "Aan",
       "repositoriesCount": "{{displayCount}} coderepository's geselecteerd",
       "repositoriesCount_other": "{{displayCount}} coderepository's geselecteerd",
       "repositoriesCount_one": "{{displayCount}} repository geselecteerd",
-      "selectRepositoriesSubtitle": "Kies welke repositories Security Agent bewaakt",
-      "slaPolicy": "SLA-beleid",
-      "title": "Instellingen"
+      "selectRepositoriesSubtitle": "Kies welke repositories Security Agent bewaakt"
     },
     "settingsSave": {
       "keepEditing": "Verder bewerken",
@@ -1373,7 +1344,6 @@
     },
     "analysisState": {
       "queued": "Analyse in de wachtrij",
-      "queuedTitle": "Analyse in de wachtrij",
       "queuedDescription": "De analyse wacht tot er capaciteit beschikbaar is.",
       "analyzing": "Analyse bezig",
       "analyzingDescription": "Security Agent controleert of de applicatiecode het kwetsbare onderdeel kan aanroepen.",
@@ -1382,7 +1352,6 @@
       "extractionFailedDescription": "Het technische rapport kon niet worden omgezet in een gestructureerd resultaat.",
       "exploitableDescription": "De applicatiecode kan het kwetsbare onderdeel aanroepen.",
       "notExploitable": "Onbereikbaar",
-      "notExploitableTitle": "Onbereikbaar",
       "notExploitableDescription": "In deze repository is geen codepad gevonden dat het kwetsbare onderdeel kan aanroepen.",
       "unknown": "Beoordeling nodig",
       "unknownDescription": "De analyse kon niet bevestigen of het kwetsbare onderdeel kan worden aangeroepen.",
@@ -1418,7 +1387,6 @@
       "dueInDays": "Nog {{count}} dagen"
     },
     "remediationStatus": {
-      "cancellationRequested": "Annulering aangevraagd",
       "notStarted": "Niet gestart",
       "starting": "Opstarten",
       "inProgress": "Bezig",
@@ -1437,7 +1405,6 @@
       "findingNotOpen": "De bevinding is niet meer open.",
       "repoNotInScope": "De repository is niet geselecteerd voor Security Agent.",
       "analysisRequired": "Analyseer de codebase voordat je het herstel start.",
-      "sandboxAnalysisRequired": "Analyseer de codebase voordat je het herstel start.",
       "staleAnalysis": "De bevinding is na de analyse gewijzigd. Voer de analyse opnieuw uit voordat je het herstel start.",
       "notExploitable": "De analyse heeft geen codepad gevonden dat het kwetsbare onderdeel kan aanroepen. Automatisch herstel is niet beschikbaar.",
       "exploitabilityUnknown": "De analyse kon niet bevestigen of misbruik mogelijk is. Handmatige beoordeling is nodig voordat je herstel met één klik kunt starten.",
@@ -1453,12 +1420,10 @@
       "autoRemediationDisabled": "Automatisch herstel is uitgeschakeld. Je kunt nog wel handmatig herstel starten als de veiligheidscontroles slagen.",
       "includeExistingDisabled": "Bestaande bevindingen zijn uitgesloten van automatisch herstel.",
       "belowThreshold": "De ernst van de bevinding ligt onder de drempel voor automatisch herstel. Je kunt nog wel handmatig herstel starten als de veiligheidscontroles slagen.",
-      "beforeEnablement": "De analyse is voltooid voordat automatisch herstel werd ingeschakeld. Je kunt nog wel handmatig herstel starten als de veiligheidscontroles slagen.",
-      "generic": "Herstel is niet beschikbaar voor deze bevinding."
+      "beforeEnablement": "De analyse is voltooid voordat automatisch herstel werd ingeschakeld. Je kunt nog wel handmatig herstel starten als de veiligheidscontroles slagen."
     },
     "commandFailure": {
       "ownerCapReached": "Alle analysecapaciteit is in gebruik. Wacht tot een lopende analyse is afgerond en probeer het opnieuw.",
-      "githubTokenUnavailable": "De GitHub-toegang moet worden bijgewerkt. Geef de GitHub-app opnieuw toegang en probeer het opnieuw.",
       "githubAuthInvalid": "De GitHub-toegang moet worden bijgewerkt. Geef de GitHub-app opnieuw toegang en probeer het opnieuw.",
       "findingUnavailable": "De bevinding is niet meer beschikbaar. Vernieuw de bevindingen en probeer het opnieuw als deze nog open is.",
       "repositoryUnavailable": "De GitHub-app heeft geen toegang meer tot de repository. Werk de toegang tot de repository bij en probeer het opnieuw.",
@@ -1540,10 +1505,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Foutdetails kopiëren",
       "backToSessions": "Terug naar sessies",
-      "accessDeniedDescription": "Je hebt geen toestemming om dit te bekijken.",
       "couldNotLoad": "De sessie kon niet worden geladen.",
       "failedToLoadDetails": "De sessiedetails konden niet worden geladen.",
-      "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar.",
       "failedToStopExecution": "De uitvoering kon niet worden gestopt.",
       "renameSession": "Sessie hernoemen",
       "renamePlaceholder": "Sessienaam",
@@ -2091,7 +2054,6 @@
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",
     "signOutThisSessionMessage": "{{device}} wordt afgemeld. Het apparaat kan daarna nog maximaal een uur toegang tot de API hebben.",
-    "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "webBrowser": "Webbrowser"
   },
   "forceUpdate": {
@@ -2372,8 +2334,6 @@
       "reconnectTitle": "GitHub opnieuw verbinden"
     },
     "connectionExpired": "De GitHub-koppeling is verlopen.",
-    "connectionExpiredDescription": "Je GitHub-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
-    "connectionExpiredTitle": "De GitHub-koppeling is verlopen.",
     "couldNotLoadPullRequest": "De PR kon niet worden geladen.",
     "couldNotOpenGitHubAppSettings": "De instellingen van de GitHub-app konden niet worden geopend.",
     "description": "Beschrijving",
@@ -2389,7 +2349,6 @@
       "comment_other": "{{displayCount}} opmerkingen",
       "couldNotLoad": "De discussie kon niet worden geladen.",
       "couldNotLoadMore": "Er konden geen extra opmerkingen worden geladen.",
-      "couldNotReply": "Het antwoord kon niet worden verzonden.",
       "loadMoreComments": "Meer opmerkingen laden",
       "loading": "Discussie laden",
       "moderation": {
@@ -2601,8 +2560,7 @@
       "noEnabledMethods": "Voor deze repository zijn geen samenvoegmethoden ingeschakeld. Vraag een repositorybeheerder om samenvoegen met een merge-commit, squashen of rebasen in te schakelen.",
       "partialSuccessBanner": {
         "accessibility": "Samengevoegd. De branch kon niet worden verwijderd. Reden: {{reason}}",
-        "body": "De branch kon niet worden verwijderd. Reden: {{reason}}",
-        "title": "Samengevoegd"
+        "body": "De branch kon niet worden verwijderd. Reden: {{reason}}"
       },
       "refreshMergeability": "Opnieuw controleren of samenvoegen mogelijk is",
       "terminal": {
@@ -2664,9 +2622,7 @@
       "deletedAnnouncement": "Nog niet verzonden opmerking verwijderd",
       "editA11y": "Nog niet verzonden opmerking bij {{location}} bewerken",
       "editOutdatedA11y": "Verouderde, nog niet verzonden opmerking bij {{location}} bewerken",
-      "emptyBody": "(leeg)",
       "noCommentsQueued": "Er staan geen opmerkingen in de wachtrij. De beoordeling wordt alleen met de hierboven gekozen actie verzonden.",
-      "outdated": "Verouderd",
       "staleHint": "de PR is gewijzigd sinds je dit schreef.",
       "staleQueueHint": "Opmerkingen die bij een oudere commit zijn geschreven, worden niet verzonden. Ze blijven in je wachtrij zodat je ze kunt bewerken of verwijderen.",
       "summaryA11y": "Samenvatting van de beoordeling",
@@ -2675,7 +2631,6 @@
     "pullRequestUnavailable": "PR niet beschikbaar",
     "pullRequestUnavailableDescription": "Deze PR kan niet worden geopend. Mogelijk is de PR verwijderd, is de repository privé of is de Kilo GitHub-app niet voor deze repository geïnstalleerd.",
     "reconnectNotice": {
-      "checkConnection": "Verbinding controleren",
       "message": "Je GitHub-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
       "title": "De GitHub-koppeling is verlopen."
     },
@@ -2701,7 +2656,6 @@
       "pendingComment_other": "nog niet verzonden opmerkingen",
       "pendingComment_one": "nog niet verzonden opmerking",
       "summaryOptional": "Samenvatting (optioneel)",
-      "title": "Beoordeling verzenden",
       "partialPostedMessage": "Geplaatste opmerkingen: {{displayFreshCount}}. Opmerkingen bij een oudere commit die in je wachtrij blijven staan: {{displayStaleCount}}.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Beoordeling verzenden",
@@ -2777,7 +2731,6 @@
         "accounting_adjustment": "Boekhoudkundige correctie",
         "credits_expired": "Tegoed verlopen"
       },
-      "loadMoreFailed": "Meer laden is mislukt.",
       "truncated": "Er zijn oudere tegoedtransacties beschikbaar."
     },
     "hub": {
@@ -2813,7 +2766,6 @@
       "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "naam@bedrijf.nl",
       "enableA11y": "Waarschuwing voor laag saldo inschakelen",
       "notifyEmailsLabel": "E-mailadressen voor meldingen",
       "permissionDenied": "Je hebt geen toestemming om factureringswaarschuwingen te beheren.",
@@ -2838,7 +2790,6 @@
       "emptyDescriptionCanInvite": "Nodig teamleden uit om in deze organisatie te gaan samenwerken.",
       "emptyDescriptionCannotInvite": "Vraag een eigenaar of factuurbeheerder om teamleden uit te nodigen.",
       "emptyTitle": "Nog geen leden",
-      "inviteMember": "Lid uitnodigen",
       "invitedDate": "Uitgenodigd op {{date}}",
       "limitPerDay": "{{amount}}/dag",
       "manageA11y": "{{name}} beheren",
@@ -2874,7 +2825,6 @@
       "couldNotLoadStatus": "Status laden mislukt",
       "creditProcessingDelayed": "Verwerking van tegoed vertraagd · nieuwe poging volgt automatisch",
       "ended": "Beëindigd",
-      "manageHint": "Opent het beheer van Kilo Pass op de website.",
       "notSubscribed": "Geen abonnement",
       "overallocated": "Er zijn meer passen toegewezen dan er betaalde licenties zijn",
       "paidSeat_one": "{{displayCount}} betaalde licentie",

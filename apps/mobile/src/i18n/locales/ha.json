@@ -370,7 +370,6 @@
         "closed": "An rufe wannan buƙatar haɗawa"
       },
       "partialSuccessBanner": {
-        "title": "An haɗa",
         "body": "Ba a iya share reshen ba: {{reason}}.",
         "accessibility": "An haɗa. Ba a iya share reshen ba: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Amince",
       "replyBadRequest": "Ba za a iya wallafa wannan amsar ba. Wataƙila silsilar tattaunawar ta canza.",
       "replyForbidden": "Ba ka da izinin amsa wannan buƙatar haɗawa.",
-      "couldNotReply": "An kasa amsawa.",
       "moderation": {
         "reportContent": {
           "terminal": "Ba za a iya kai rahoton wannan tsokacin ba.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "An kasa buɗe saitunan manhajar GitHub.",
     "installKiloGitHubApp": "Shigar da manhajar Kilo ta GitHub",
-    "connectionExpiredTitle": "Wa'adin haɗin GitHub ya ƙare.",
-    "connectionExpiredDescription": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
     "checkConnection": "Duba haɗi",
     "couldNotLoadPullRequest": "Ba a iya loda buƙatar haɗawa ba.",
     "description": "Bayani",
@@ -572,7 +568,6 @@
       "shareA11y": "Raba buƙatar haɗawa"
     },
     "submit": {
-      "title": "Aika bita",
       "loadFailedTitle": "Ba a iya loda wurin aika bita ba.",
       "deletePendingTitle": "Share tsokacin da ke jira?",
       "deletePendingMessage": "Za a cire wannan tsokaci daga jerin bita.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
-      "checkConnection": "Duba haɗi"
+      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
     },
     "eventChips": {
       "comment": "Yi tsokaci",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Gyara tsohon tsokacin da ke jira a {{location}}",
       "editA11y": "Gyara tsokacin da ke jira a {{location}}",
-      "emptyBody": "(marar komai)",
-      "outdated": "Ya tsufa",
       "staleHint": "an sabunta PR tun lokacin da ka rubuta wannan.",
       "deleteA11y": "Share tsokacin da ke jira a {{location}}",
       "deletedAnnouncement": "An share tsokacin da ke jira",
@@ -703,7 +695,6 @@
       "security": "Sakamakon binciken tsaro"
     },
     "category": {
-      "chatMessagesTitle": "Saƙonnin tattaunawa",
       "chatMessagesSubtitle": "amsoshi a cikin tattaunawarka",
       "agentAttentionTitle": "Wakili yana buƙatar ka",
       "agentAttentionSubtitle": "tambayoyi, buƙatar izini ko bayani",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "saƙonnin wakili yayin da aiki ke gudana",
       "sessionStatusTitle": "Halin zaman",
       "sessionStatusSubtitle": "an gama / an kasa / a shirye don sarrafawa",
-      "kiloclawActivityTitle": "Ayyukan KiloClaw",
       "kiloclawActivitySubtitle": "kwafin shirin ya shirya ko ya gaza, ayyukan da aka tsara",
-      "balanceAlertsTitle": "Faɗakarwar ragowar kuɗi",
       "balanceAlertsSubtitle": "gargaɗin ƙarancin kuɗin ƙungiya",
-      "securityFindingsTitle": "Sakamakon binciken tsaro",
       "securityFindingsSubtitle": "sabbin sakamakon bincike da tunatarwar SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Zaɓin samfurin AI",
       "secretsDescription": "Bayanan shiga da aka ɓoye",
-      "versionPinDescription": "Kulle amfani da takamaiman siga",
-      "versionPinLabel": "Riƙe siga"
+      "versionPinDescription": "Kulle amfani da takamaiman siga"
     },
     "avatar": {
       "arcade": "Na'urar wasan bidiyo",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Babba",
       "severityMedium": "Matsakaici",
       "severityLow": "Ƙarami",
-      "outcomeNotExploitable": "Ba a iya kai hari ta hanyarsa ba",
       "outcomeTriageComplete": "An kammala tantancewa",
       "sortSeverityDesc": "Tsanani: daga babba zuwa ƙarami",
       "sortSeverityAsc": "Tsanani: daga ƙarami zuwa babba",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Matsalolin da ba a warware ba",
-      "openFindingsDetail": "Masu tsanani: {{critical}}, manya: {{high}}",
-      "confirmedExploitable": "An tabbatar ana iya kai hari ta hanyarsa",
       "confirmedExploitableDetail": "Haɗarin aikin da nazari ya tabbatar",
-      "needsReview": "Yana buƙatar bitarka",
       "needsReviewDetail": "Ana buƙatar shawarar mutum",
-      "analysisIncomplete": "Ba a kammala nazarin ba",
       "analysisIncompleteDetail": "Har yanzu ba a san haɗarin aikin ba",
       "slaCompliance": "Bin SLA",
-      "notMeasured": "Ba a auna ba",
       "withinDeadlineDetail": "{{within}} daga cikin {{total}} suna cikin wa'adi",
       "noDeadlineData": "Har yanzu ba a saita wa'adin SLA ga wata matsala ba",
       "deadlinePassed": "Wa'adin ya wuce",
@@ -1601,7 +1582,6 @@
       "source": "Tushe",
       "sourceId": "ID na tushe",
       "viewAdvisory": "Duba sanarwar tsaro a GitHub",
-      "statusSuperseded": "An maye gurbinsa",
       "statusOpen": "Buɗe",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "An riga an fara gyara",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "bayan bita"
     },
     "settingsOverview": {
-      "title": "Saituna",
       "couldNotLoadSettings": "An kasa loda saitunan Wakilin tsaro.",
       "couldNotLoadPermissions": "An kasa loda izini.",
       "on": "A kunne",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "An zaɓi ma'ajiyoyi {{displayCount}}",
       "repositoriesCount_other": "An zaɓi ma'ajiyoyi {{displayCount}}",
       "selectRepositoriesSubtitle": "Zaɓi ma'ajiyoyin da Wakilin tsaro zai sa ido a kansu",
-      "modelsAndAnalysis": "Samfura da nazari",
       "analysisModeSubtitle": "Nazarin {{mode}}",
-      "automation": "Aiki na atomatik",
       "automationAllOff": "Duk a kashe",
       "automationCount": "An kunna {{displayCount}} daga cikin 3",
       "notificationsCount": "An kunna {{displayCount}} daga cikin 2",
-      "slaPolicy": "Manufar SLA",
       "disabledNoManage": "An kashe Wakilin tsaro. Masu mallakar ƙungiya da masu kula da biyan kuɗi kawai za su iya kunna shi.",
       "disabledNoRepo": "Zaɓi aƙalla ma'ajiya ɗaya kafin kunna Wakilin tsaro.",
       "disabledPrompt": "Kunna Wakilin tsaro don daidaita faɗakarwar Dependabot, zaɓar ma'ajiyoyi da saita aiki na atomatik."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "An nemi sokewa",
       "cancelled": "An soke gyara",
       "couldNotLoad": "An kasa loda halin gyara.",
-      "noAnalysisTitle": "Ba a yi nazari ba tukuna",
-      "noAnalysisDescription": "Fara nazari daga shafin Cikakkun bayanai.",
       "start": "Fara gyara",
       "retry": "Sake gwada gyara",
       "cancelTitle": "A soke wannan gyaran?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "An saka sake gwada gyara a jerin jira",
       "timeline": {
         "queued": "An nemi gyara",
-        "prOpened": "An buɗe PR",
         "failed": "Gyara ya gaza",
-        "blocked": "An hana gyara",
-        "noChangesNeeded": "Babu canji da ake buƙata"
+        "blocked": "An hana gyara"
       },
       "unavailable": "Ba a samun damar yin gyara ga wannan sakamakon bincike."
     },
@@ -1663,9 +1635,6 @@
       "title": "Samfura da nazari",
       "couldNotLoad": "An kasa loda saitunan nazari.",
       "depth": "Zurfin nazari",
-      "modeAuto": "Na atomatik",
-      "modeShallow": "Maras zurfi",
-      "modeDeep": "Mai zurfi",
       "triageModel": "Samfurin tantancewa",
       "analysisModel": "Samfurin nazari",
       "remediationModel": "Samfurin gyara"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Matsalar da aka gano",
       "tabAnalysis": "Nazari",
-      "tabRemediation": "Gyara",
-      "notFound": "Ba a sami sakamakon binciken ba",
-      "notFoundDescription": "Wataƙila an cire wannan matsalar, ko kuma ka rasa damar duba ta.",
-      "couldNotLoad": "An kasa loda wannan sakamakon bincike."
+      "tabRemediation": "Gyara"
     },
     "findingList": {
       "couldNotLoad": "An kasa loda matsalolin da aka gano.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Ana gyara",
       "nextRetryRemediation": "Ana iya sake gwada gyara",
       "nextRemediationAvailable": "Ana iya gyarawa",
-      "retryAnalysis": "Sake gwada nazari",
       "runAnalysis": "Gudanar da nazari",
-      "nextNeedsManualReview": "Yana buƙatar bitar mutum",
       "nextViewDetails": "Duba cikakkun bayanai",
       "viewPr": "Duba PR",
       "analyze": "Yi nazari",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Ana aika sanarwa duk lokacin da aka daidaita sabuwar matsalar da aka gano, har a daidaitawar farko.",
       "slaLeadTimeAccessibility": "Kwanakin gargaɗi kafin cikar wa'adin SLA",
       "slaLeadTimeError": "Shigar da cikakken adadin kwanaki tsakanin 1 da 365.",
-      "slaLeadTimeHint": "Shigar da cikakkiyar lamba tsakanin 1 da 365",
       "slaLeadTimeLabel": "Gargaɗi kafin cikar wa'adin SLA (kwanaki)",
       "slaPersonalTitle": "Aika mini imel game da gargaɗin SLA",
       "slaSection": "Sanarwar gargaɗin SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Nazarin yana layin jira",
-      "queuedTitle": "Nazarin yana layin jira",
       "queuedDescription": "Ana jiran samun damar gudanar da nazari.",
       "analyzing": "Ana nazari",
       "analyzingDescription": "Ana duba ko akwai hanyar da lambar manhajar za ta iya kiran fasalin da abin ya shafa.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Ba a iya mayar da rahoton fasaha zuwa sakamako mai tsari ba.",
       "exploitableDescription": "Akwai hanyar da lambar manhajar za ta iya kiran fasalin da abin ya shafa.",
       "notExploitable": "Ba a iya isa gare shi ba",
-      "notExploitableTitle": "Ba a iya isa gare shi ba",
       "notExploitableDescription": "Ba a sami hanyar kiran fasalin da abin ya shafa a wannan ma'ajiyar ba.",
       "unknown": "Yana buƙatar bita",
       "unknownDescription": "Nazarin bai iya tabbatar da ko akwai hanyar kiran fasalin da ke da raunin tsaro ba.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Wa'adin zai cika nan da kwanaki {{count}}"
     },
     "remediationStatus": {
-      "cancellationRequested": "An nemi sokewa",
       "notStarted": "Ba a fara ba",
       "starting": "Ana farawa",
       "inProgress": "Yana gudana",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "An riga an rufe wannan matsalar.",
       "repoNotInScope": "Ba a zaɓi wannan ma'ajiyar don Wakilin tsaro ba.",
       "analysisRequired": "Yi nazarin lambar shirin kafin fara gyara.",
-      "sandboxAnalysisRequired": "Yi nazarin lambar shirin kafin fara gyara.",
       "staleAnalysis": "Matsalar ta canza bayan nazari. Sake gudanar da nazari kafin fara gyara.",
       "notExploitable": "Nazarin bai gano hanyar kiran wani fasali mai raunin tsaro ba. Ba a iya yin gyara na atomatik.",
       "exploitabilityUnknown": "Nazarin bai iya tabbatar da yiwuwar amfani da matsalar wajen kai hari ba. Ana buƙatar bita da mutum zai yi kafin gyara da dannawa ɗaya.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "An kashe gyara na atomatik. Har yanzu ana iya fara gyara da hannu idan an cika sharuɗɗan tsaro.",
       "includeExistingDisabled": "Ba a haɗa matsalolin da aka riga aka gano cikin gyara na atomatik ba.",
       "belowThreshold": "Tsananin matsalar bai kai matakin da ake buƙata don gyara na atomatik ba. Har yanzu ana iya fara gyara da hannu idan an cika sharuɗɗan tsaro.",
-      "beforeEnablement": "An kammala nazarin kafin a kunna gyara na atomatik. Har yanzu ana iya fara gyara da hannu idan an cika sharuɗɗan tsaro.",
-      "generic": "Ba a samun damar yin gyara ga wannan sakamakon bincike."
+      "beforeEnablement": "An kammala nazarin kafin a kunna gyara na atomatik. Har yanzu ana iya fara gyara da hannu idan an cika sharuɗɗan tsaro."
     },
     "commandFailure": {
       "ownerCapReached": "An kai iyakar nazarin da za a iya gudanarwa a lokaci guda. Jira wani nazarin da ke gudana ya ƙare, sannan ka sake gwadawa.",
-      "githubTokenUnavailable": "Izinin GitHub yana buƙatar kulawa. Sake ba manhajar GitHub izini, sannan ka sake gwadawa.",
       "githubAuthInvalid": "Izinin GitHub yana buƙatar kulawa. Sake ba manhajar GitHub izini, sannan ka sake gwadawa.",
       "findingUnavailable": "An daina samun wannan matsalar. Sabunta matsalolin da aka gano, sannan ka sake gwadawa idan har ba a rufe ta ba.",
       "repositoryUnavailable": "Manhajar GitHub ta rasa damar shiga wannan ma'ajiyar. Sabunta damar shiga ma'ajiyar, sannan ka sake gwadawa.",
@@ -1965,10 +1922,8 @@
       "title": "Zama",
       "copyErrorDetails": "Kwafi cikakkun bayanan kuskure",
       "backToSessions": "Koma zuwa zamanni",
-      "accessDeniedDescription": "Ba ka da izinin ganin wannan.",
       "couldNotLoad": "An kasa loda zaman.",
       "failedToLoadDetails": "An kasa loda cikakkun bayanan zaman.",
-      "notFoundDescription": "Wataƙila an cire wannan abu ko kuma ba a samunsa yanzu.",
       "failedToStopExecution": "An kasa dakatar da aikin.",
       "renameSession": "Canza sunan zaman",
       "renamePlaceholder": "Sunan zaman",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "Fita daga wannan na'urar?",
     "signOutThisSessionTitle": "Fita daga wannan zaman?",
     "signOutThisSessionMessage": "Za a fitar da {{device}}. Za ta iya ci gaba da samun damar amfani da API har na awa ɗaya.",
-    "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "webBrowser": "Burauzar yanar gizo"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Daidaitawar lissafin kuɗi",
         "credits_expired": "Wa'adin kuɗin amfani ya ƙare"
       },
-      "loadMoreFailed": "An kasa loda ƙari.",
       "truncated": "Ana samun ma'amalolin kuɗin amfani na baya."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Ana samun takardun biyan kuɗi na baya."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "suna@company.com",
       "enableA11y": "Kunna faɗakarwar ƙarancin kuɗi",
       "notifyEmailsLabel": "Adiresoshin imel na sanarwa",
       "permissionDenied": "Ba ka da izinin sarrafa faɗakarwar biyan kuɗi.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Gayyaci abokan aiki don fara haɗin gwiwa a wannan ƙungiyar.",
       "emptyDescriptionCannotInvite": "Nemi mai ƙungiyar ko manajan biyan kuɗi ya gayyaci abokan aiki.",
       "emptyTitle": "Babu membobi tukuna",
-      "inviteMember": "Gayyaci memba",
       "invitedDate": "Ranar gayyata: {{date}}",
       "limitPerDay": "{{amount}}/rana",
       "manageA11y": "Sarrafa {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "An kasa loda halin da ake ciki",
       "creditProcessingDelayed": "Sarrafa kuɗin amfani ya jinkirta · ana sake gwadawa kai tsaye",
       "ended": "Ya ƙare",
-      "manageHint": "Yana buɗe shafin sarrafa Kilo Pass a yanar gizo.",
       "notSubscribed": "Ba a yi rajistar biyan kuɗi ba",
       "overallocated": "Adadin waɗanda aka ba Pass ya wuce guraben da aka biya",
       "paidSeat_one": "Gurbi {{displayCount}} da aka biya",

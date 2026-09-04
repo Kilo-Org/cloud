@@ -97,7 +97,7 @@ function manage(subtitle: string, attention = false): OrgKiloPassRowState {
     attention,
     action: 'manage',
     actionLabel: null,
-    accessibilityHint: i18n.t('organization.kiloPass.manageHint'),
+    accessibilityHint: i18n.t('kiloPass.opensManagementOnWeb'),
     loading: false,
   };
 }

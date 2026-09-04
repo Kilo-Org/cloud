@@ -370,7 +370,6 @@
         "closed": "Demann fizyon sa a fèmen"
       },
       "partialSuccessBanner": {
-        "title": "Fizyonnen",
         "body": "Pa t ka efase branch lan: {{reason}}.",
         "accessibility": "Fizyon an fèt. Pa t ka efase branch lan: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Aksepte",
       "replyBadRequest": "Pa ka pibliye repons sa a. Petèt fil diskisyon an chanje.",
       "replyForbidden": "Ou pa gen pèmisyon pou reponn demann fizyon sa a.",
-      "couldNotReply": "Nou pa t kapab voye repons lan.",
       "moderation": {
         "reportContent": {
           "terminal": "Pa ka rapòte kòmantè sa a.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Nou pa t kapab louvri paramèt aplikasyon GitHub la.",
     "installKiloGitHubApp": "Enstale aplikasyon Kilo pou GitHub la",
-    "connectionExpiredTitle": "Koneksyon ak GitHub la ekspire.",
-    "connectionExpiredDescription": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
     "checkConnection": "Tcheke koneksyon an",
     "couldNotLoadPullRequest": "Pa t ka chaje demann fizyon an.",
     "description": "Deskripsyon",
@@ -572,7 +568,6 @@
       "shareA11y": "Pataje demann fizyon an"
     },
     "submit": {
-      "title": "Soumèt revizyon an",
       "loadFailedTitle": "Pa t ka chaje fòm pou soumèt revizyon an.",
       "deletePendingTitle": "Efase kòmantè ki poko voye a?",
       "deletePendingMessage": "Kòmantè sa a ap retire nan lis kòmantè k ap tann pou voye ak revizyon an.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "Koneksyon ak GitHub la ekspire.",
-      "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
-      "checkConnection": "Tcheke koneksyon an"
+      "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
     },
     "eventChips": {
       "comment": "Kòmantè",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Modifye kòmantè ki poko voye e ki pa ajou sou {{location}}",
       "editA11y": "Modifye kòmantè ki poko voye sou {{location}}",
-      "emptyBody": "(vid)",
-      "outdated": "Depase",
       "staleHint": "PR a chanje depi ou te ekri sa a.",
       "deleteA11y": "Efase kòmantè ki poko voye sou {{location}}",
       "deletedAnnouncement": "Kòmantè ki t ap tann pou voye a efase",
@@ -703,7 +695,6 @@
       "security": "Pwoblèm sekirite detekte"
     },
     "category": {
-      "chatMessagesTitle": "Mesaj diskisyon",
       "chatMessagesSubtitle": "repons nan konvèsasyon ou yo",
       "agentAttentionTitle": "Ajan an bezwen ou",
       "agentAttentionSubtitle": "kesyon, pèmisyon ak enfòmasyon ki nesesè",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "mesaj ajan an voye pandan travay la",
       "sessionStatusTitle": "Estati sesyon",
       "sessionStatusSubtitle": "fini / echwe / pare pou kontwole",
-      "kiloclawActivityTitle": "Aktivite KiloClaw",
       "kiloclawActivitySubtitle": "enstans pare/echwe, aksyon pwograme",
-      "balanceAlertsTitle": "Alèt balans",
       "balanceAlertsSubtitle": "avètisman lè balans òganizasyon an ba",
-      "securityFindingsTitle": "Pwoblèm sekirite detekte",
       "securityFindingsSubtitle": "nouvo rezilta ak rapèl SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Seleksyon modèl entèlijans atifisyèl",
       "secretsDescription": "Enfòmasyon otantifikasyon chifre",
-      "versionPinDescription": "Fikse sou yon vèsyon presi",
-      "versionPinLabel": "Vèsyon fiks"
+      "versionPinDescription": "Fikse sou yon vèsyon presi"
     },
     "avatar": {
       "arcade": "Jwèt akad",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Wo",
       "severityMedium": "Mwayen",
       "severityLow": "Ba",
-      "outcomeNotExploitable": "Pa eksplwatab",
       "outcomeTriageComplete": "Triyaj fini",
       "sortSeverityDesc": "Gravite: soti pi wo rive pi ba",
       "sortSeverityAsc": "Gravite: soti pi ba rive pi wo",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Konsta ouvè",
-      "openFindingsDetail": "{{critical}} kritik, {{high}} wo",
-      "confirmedExploitable": "Konfime kòm eksplwatab",
       "confirmedExploitableDetail": "Analiz la konfime risk pwojè a",
-      "needsReview": "Bezwen ou revize l",
       "needsReviewDetail": "Yon moun dwe pran desizyon an",
-      "analysisIncomplete": "Analiz la poko fini",
       "analysisIncompleteDetail": "Risk pwojè a poko detèmine",
       "slaCompliance": "Respè SLA yo",
-      "notMeasured": "Poko mezire",
       "withinDeadlineDetail": "{{within}} sou {{total}} nan delè a",
       "noDeadlineData": "Poko gen konsta ki gen yon dat limit SLA",
       "deadlinePassed": "Dat limit la pase",
@@ -1601,7 +1582,6 @@
       "source": "Sous",
       "sourceId": "ID sous",
       "viewAdvisory": "Gade avi sekirite a sou GitHub",
-      "statusSuperseded": "Ranplase",
       "statusOpen": "Louvri",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Koreksyon an deja kòmanse",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "apre revizyon"
     },
     "settingsOverview": {
-      "title": "Paramèt",
       "couldNotLoadSettings": "Nou pa t ka chaje paramèt Ajan sekirite a.",
       "couldNotLoadPermissions": "Nou pa t ka chaje pèmisyon yo.",
       "on": "Aktive",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} depo ki chwazi",
       "repositoriesCount_other": "{{displayCount}} depo ki chwazi",
       "selectRepositoriesSubtitle": "Chwazi depo Ajan sekirite a ap siveye yo",
-      "modelsAndAnalysis": "Modèl ak analiz",
       "analysisModeSubtitle": "Analiz {{mode}}",
-      "automation": "Otomatizasyon",
       "automationAllOff": "Tout dezaktive",
       "automationCount": "{{displayCount}} sou 3 aktive",
       "notificationsCount": "{{displayCount}} sou 2 aktive",
-      "slaPolicy": "Règleman SLA",
       "disabledNoManage": "Ajan sekirite a dezaktive. Se sèlman pwopriyetè òganizasyon an ak responsab faktirasyon yo ki ka aktive li.",
       "disabledNoRepo": "Chwazi omwen yon depo anvan ou aktive Ajan sekirite a.",
       "disabledPrompt": "Aktive Ajan sekirite a pou senkronize alèt Dependabot yo, chwazi depo yo epi konfigire otomatizasyon an."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Demann anilasyon voye",
       "cancelled": "Koreksyon anile",
       "couldNotLoad": "Nou pa t ka chaje estati koreksyon an.",
-      "noAnalysisTitle": "Poko gen analiz",
-      "noAnalysisDescription": "Lanse yon analiz nan onglet Detay la.",
       "start": "Kòmanse koreksyon an",
       "retry": "Eseye koreksyon an ankò",
       "cancelTitle": "Anile koreksyon sa a?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Nouvo tantativ koreksyon nan lis datant",
       "timeline": {
         "queued": "Koreksyon mande",
-        "prOpened": "PR louvri",
         "failed": "Koreksyon echwe",
-        "blocked": "Koreksyon bloke",
-        "noChangesNeeded": "Pa gen chanjman ki nesesè"
+        "blocked": "Koreksyon bloke"
       },
       "unavailable": "Koreksyon pa disponib pou pwoblèm detekte sa a."
     },
@@ -1663,9 +1635,6 @@
       "title": "Modèl ak analiz",
       "couldNotLoad": "Nou pa t ka chaje paramèt analiz yo.",
       "depth": "Pwofondè analiz",
-      "modeAuto": "Otomatik",
-      "modeShallow": "Supèrfisyèl",
-      "modeDeep": "Apwofondi",
       "triageModel": "Modèl triyaj",
       "analysisModel": "Modèl analiz",
       "remediationModel": "Modèl koreksyon"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Konsta",
       "tabAnalysis": "Analiz",
-      "tabRemediation": "Koreksyon",
-      "notFound": "Nou pa jwenn pwoblèm detekte a",
-      "notFoundDescription": "Yo ka te retire konsta sa a, oswa ou pa gen aksè avè l ankò.",
-      "couldNotLoad": "Nou pa t kapab chaje pwoblèm detekte sa a."
+      "tabRemediation": "Koreksyon"
     },
     "findingList": {
       "couldNotLoad": "Nou pa t ka chaje konsta yo.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Koreksyon an pwosesis",
       "nextRetryRemediation": "Ou ka eseye koreksyon an ankò",
       "nextRemediationAvailable": "Koreksyon disponib",
-      "retryAnalysis": "Eseye analiz la ankò",
       "runAnalysis": "Lanse analiz la",
-      "nextNeedsManualReview": "Bezwen revizyon manyèl",
       "nextViewDetails": "Gade detay yo",
       "viewPr": "Gade PR",
       "analyze": "Analize",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Yo voye li chak fwa yon nouvo konsta senkronize, menm nan premye senkronizasyon an.",
       "slaLeadTimeAccessibility": "Kantite jou davans pou alèt SLA yo",
       "slaLeadTimeError": "Antre kantite jou a kòm yon nonb antye ant 1 ak 365.",
-      "slaLeadTimeHint": "Antre yon nonb antye ant 1 ak 365",
       "slaLeadTimeLabel": "Alèt SLA davans (jou)",
       "slaPersonalTitle": "Voye imèl ban mwen sou alèt SLA yo",
       "slaSection": "Notifikasyon alèt SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Analiz nan ke",
-      "queuedTitle": "Analiz nan ke",
       "queuedDescription": "Analiz la ap tann yon plas lib.",
       "analyzing": "Ap analize",
       "analyzingDescription": "Analiz la ap verifye si kòd aplikasyon an ka rive jwenn fonksyonalite ki afekte a.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Nou pa t ka konvèti rapò teknik la an yon rezilta estriktire.",
       "exploitableDescription": "Kòd aplikasyon an ka rive jwenn fonksyonalite ki afekte a.",
       "notExploitable": "Pa aksesib",
-      "notExploitableTitle": "Pa aksesib",
       "notExploitableDescription": "Analiz la pa jwenn okenn chemen aksesib nan depo sa a.",
       "unknown": "Bezwen revizyon",
       "unknownDescription": "Analiz la pa t ka konfime si fonksyonalite vilnerab la aksesib.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Dat limit nan {{count}} jou"
     },
     "remediationStatus": {
-      "cancellationRequested": "Demann anilasyon voye",
       "notStarted": "Poko kòmanse",
       "starting": "Ap kòmanse",
       "inProgress": "An pwosesis",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Konsta a pa ouvè ankò.",
       "repoNotInScope": "Depo a pa chwazi pou Ajan sekirite a.",
       "analysisRequired": "Lanse yon analiz sou baz kòd la anvan ou kòmanse koreksyon an.",
-      "sandboxAnalysisRequired": "Lanse yon analiz sou baz kòd la anvan ou kòmanse koreksyon an.",
       "staleAnalysis": "Konsta a chanje apre analiz la. Relanse analiz la anvan ou kòmanse koreksyon an.",
       "notExploitable": "Analiz la pa jwenn okenn chemen vilnerab ki aksesib. Koreksyon otomatik la pa disponib.",
       "exploitabilityUnknown": "Analiz la pa t ka konfime si vilnerabilite a ka eksplwate. Yon revizyon manyèl nesesè anvan koreksyon ak yon sèl klik.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Koreksyon otomatik la dezaktive. Ou ka toujou kòmanse koreksyon an manyèlman si tout kondisyon sekirite yo satisfè.",
       "includeExistingDisabled": "Koreksyon otomatik la pa enkli konsta ki deja egziste yo.",
       "belowThreshold": "Gravite konsta a pi ba pase papòt pou koreksyon otomatik la. Ou ka toujou kòmanse koreksyon an manyèlman si tout kondisyon sekirite yo satisfè.",
-      "beforeEnablement": "Analiz la fini anvan koreksyon otomatik la te aktive. Ou ka toujou kòmanse koreksyon an manyèlman si tout kondisyon sekirite yo satisfè.",
-      "generic": "Koreksyon pa disponib pou pwoblèm detekte sa a."
+      "beforeEnablement": "Analiz la fini anvan koreksyon otomatik la te aktive. Ou ka toujou kòmanse koreksyon an manyèlman si tout kondisyon sekirite yo satisfè."
     },
     "commandFailure": {
       "ownerCapReached": "Pa gen plas pou lòt analiz. Tann yon analiz ki an pwosesis fini, epi eseye ankò.",
-      "githubTokenUnavailable": "Gen yon pwoblèm ak otorizasyon GitHub la. Otorize aplikasyon GitHub la ankò, epi eseye ankò.",
       "githubAuthInvalid": "Gen yon pwoblèm ak otorizasyon GitHub la. Otorize aplikasyon GitHub la ankò, epi eseye ankò.",
       "findingUnavailable": "Konsta a pa disponib ankò. Rafrechi konsta yo epi eseye ankò si li toujou ouvè.",
       "repositoryUnavailable": "Aplikasyon GitHub la pa gen aksè nan depo a ankò. Mete aksè depo a ajou, epi eseye ankò.",
@@ -1965,10 +1922,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopye detay erè a",
       "backToSessions": "Tounen nan sesyon yo",
-      "accessDeniedDescription": "Ou pa gen pèmisyon pou wè sa.",
       "couldNotLoad": "Nou pa t ka chaje sesyon an.",
       "failedToLoadDetails": "Nou pa t ka chaje detay sesyon an.",
-      "notFoundDescription": "Yo ka retire eleman sa a, oswa li pa disponib ankò.",
       "failedToStopExecution": "Nou pa t ka sispann egzekisyon an.",
       "renameSession": "Chanje non sesyon an",
       "renamePlaceholder": "Non sesyon",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "Dekonekte aparèy sa a?",
     "signOutThisSessionTitle": "Dekonekte sesyon sa a?",
     "signOutThisSessionMessage": "{{device}} ap dekonekte. Li ka kenbe aksè nan API a pou jiska inèdtan.",
-    "signOutMessage": "W ap bezwen konekte ankò pou jwenn aksè nan espas travay ou.",
     "webBrowser": "Navigatè entènèt"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Ajisteman kontab",
         "credits_expired": "Kredi ekspire"
       },
-      "loadMoreFailed": "Nou pa t kapab chaje plis.",
       "truncated": "Gen aktivite kredi ki pi ansyen ki disponib."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Gen fakti ki pi ansyen ki disponib."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "non@antrepriz.com",
       "enableA11y": "Aktive alèt pou balans ki ba",
       "notifyEmailsLabel": "Adrès imel pou alèt yo",
       "permissionDenied": "Ou pa gen pèmisyon pou jere alèt faktirasyon yo.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Envite kòlèg pou kòmanse kolabore nan òganizasyon sa a.",
       "emptyDescriptionCannotInvite": "Mande yon pwopriyetè oswa yon responsab faktirasyon pou envite kòlèg yo.",
       "emptyTitle": "Pa gen manm ankò",
-      "inviteMember": "Envite yon manm",
       "invitedDate": "Envite {{date}}",
       "limitPerDay": "{{amount}}/jou",
       "manageA11y": "Jere {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Nou pa t ka chaje estati a",
       "creditProcessingDelayed": "Tretman kredi yo anreta · ap eseye ankò otomatikman",
       "ended": "Fini",
-      "manageHint": "Louvri paj jesyon Kilo Pass la sou sit entènèt la.",
       "notSubscribed": "Pa abòne",
       "overallocated": "Kantite Pass ki asiyen yo depase kantite plas ki peye yo",
       "paidSeat_one": "{{displayCount}} plas peye",

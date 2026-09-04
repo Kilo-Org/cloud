@@ -124,8 +124,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         />
         <EmptyState
           icon={ShieldOff}
-          title={t('securityAgent.findingDetail.notFound')}
-          description={t('securityAgent.findingDetail.notFoundDescription')}
+          title={t('securityAgent.dismiss.notFoundTitle')}
+          description={t('securityAgent.dismiss.notFoundDescription')}
         />
       </View>
     );
@@ -140,7 +140,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           onBack={handleBack}
         />
         <QueryError
-          message={t('securityAgent.findingDetail.couldNotLoad')}
+          message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </View>
@@ -197,7 +197,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
       {findingQuery.isError ? (
         <View className="px-6 pb-2">
           <SettingsRecoveryStatus
-            message={t('securityAgent.findingDetail.couldNotLoad')}
+            message={t('securityAgent.dismiss.couldNotLoad')}
             isRetrying={findingQuery.isFetching}
             onRetry={() => void findingQuery.refetch()}
           />

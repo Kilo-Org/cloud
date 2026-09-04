@@ -370,7 +370,6 @@
         "closed": "This pull request is closed"
       },
       "partialSuccessBanner": {
-        "title": "Merged",
         "body": "Couldn't delete the branch: {{reason}}",
         "accessibility": "Merged. Couldn't delete the branch: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Accept",
       "replyBadRequest": "This reply can't be posted. The thread may have changed.",
       "replyForbidden": "You don't have permission to reply to this pull request.",
-      "couldNotReply": "Could not reply.",
       "moderation": {
         "reportContent": {
           "terminal": "This comment can't be reported.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Could not open GitHub App settings",
     "installKiloGitHubApp": "Install the Kilo GitHub App",
-    "connectionExpiredTitle": "GitHub connection expired",
-    "connectionExpiredDescription": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
     "checkConnection": "Check connection",
     "couldNotLoadPullRequest": "Could not load pull request",
     "description": "Description",
@@ -572,7 +568,6 @@
       "shareA11y": "Share pull request"
     },
     "submit": {
-      "title": "Submit review",
       "loadFailedTitle": "Couldn't load review submission",
       "deletePendingTitle": "Delete pending comment?",
       "deletePendingMessage": "This comment will be removed from the review queue.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
-      "checkConnection": "Check connection"
+      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
     },
     "eventChips": {
       "comment": "Comment",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Edit outdated pending comment on {{location}}",
       "editA11y": "Edit pending comment on {{location}}",
-      "emptyBody": "(empty)",
-      "outdated": "Outdated",
       "staleHint": "the PR moved since you wrote this.",
       "deleteA11y": "Delete pending comment on {{location}}",
       "deletedAnnouncement": "Pending comment deleted",
@@ -703,7 +695,6 @@
       "security": "Security findings"
     },
     "category": {
-      "chatMessagesTitle": "Chat messages",
       "chatMessagesSubtitle": "replies in your conversations",
       "agentAttentionTitle": "Agent needs you",
       "agentAttentionSubtitle": "questions, permission, input needed",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "mid-task messages from the agent",
       "sessionStatusTitle": "Session status",
       "sessionStatusSubtitle": "finished / failed / ready to control",
-      "kiloclawActivityTitle": "KiloClaw activity",
       "kiloclawActivitySubtitle": "instance ready/failed, scheduled actions",
-      "balanceAlertsTitle": "Balance alerts",
       "balanceAlertsSubtitle": "low organization balance warnings",
-      "securityFindingsTitle": "Security findings",
       "securityFindingsSubtitle": "new findings and SLA reminders"
     }
   },
@@ -1195,8 +1183,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "AI model selection",
       "secretsDescription": "Encrypted credentials",
-      "versionPinDescription": "Pin to a specific version",
-      "versionPinLabel": "Version pinning"
+      "versionPinDescription": "Pin to a specific version"
     },
     "avatar": {
       "arcade": "Arcade",
@@ -1448,7 +1435,6 @@
       "severityHigh": "High",
       "severityMedium": "Medium",
       "severityLow": "Low",
-      "outcomeNotExploitable": "Not exploitable",
       "outcomeTriageComplete": "Triage complete",
       "sortSeverityDesc": "Severity: high to low",
       "sortSeverityAsc": "Severity: low to high",
@@ -1553,15 +1539,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Open findings",
-      "openFindingsDetail": "{{critical}} critical, {{high}} high",
-      "confirmedExploitable": "Confirmed exploitable",
       "confirmedExploitableDetail": "Project risk confirmed by analysis",
-      "needsReview": "Needs your review",
       "needsReviewDetail": "Human decision required",
-      "analysisIncomplete": "Analysis not complete",
       "analysisIncompleteDetail": "Project risk still unknown",
       "slaCompliance": "SLA compliance",
-      "notMeasured": "Not measured",
       "withinDeadlineDetail": "{{within}} of {{total}} within deadline",
       "noDeadlineData": "No findings have an SLA deadline yet",
       "deadlinePassed": "Deadline passed",
@@ -1609,7 +1590,6 @@
       "source": "Source",
       "sourceId": "Source ID",
       "viewAdvisory": "View advisory on GitHub",
-      "statusSuperseded": "Superseded",
       "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "a fix has already started",
@@ -1620,7 +1600,6 @@
       "reasonAfterReview": "after review"
     },
     "settingsOverview": {
-      "title": "Settings",
       "couldNotLoadSettings": "Could not load Security Agent settings",
       "couldNotLoadPermissions": "Could not load permissions",
       "on": "On",
@@ -1628,13 +1607,10 @@
       "repositoriesCount": "{{displayCount}} repositories selected",
       "repositoriesCount_other": "{{displayCount}} repositories selected",
       "selectRepositoriesSubtitle": "Choose which repositories Security Agent monitors",
-      "modelsAndAnalysis": "Models & analysis",
       "analysisModeSubtitle": "{{mode}} analysis",
-      "automation": "Automation",
       "automationAllOff": "All off",
       "automationCount": "{{displayCount}} of 3 enabled",
       "notificationsCount": "{{displayCount}} of 2 enabled",
-      "slaPolicy": "SLA policy",
       "disabledNoManage": "Security Agent is disabled. Only organization owners and billing managers can turn it on.",
       "disabledNoRepo": "Select at least one repository before enabling Security Agent.",
       "disabledPrompt": "Turn on Security Agent to sync Dependabot alerts, choose repositories, and configure automation."
@@ -1643,8 +1619,6 @@
       "cancellationRequested": "Cancellation requested",
       "cancelled": "Remediation cancelled",
       "couldNotLoad": "Could not load remediation status",
-      "noAnalysisTitle": "No analysis yet",
-      "noAnalysisDescription": "Run one from the Details tab",
       "start": "Start remediation",
       "retry": "Retry remediation",
       "cancelTitle": "Cancel this remediation?",
@@ -1660,10 +1634,8 @@
       "retryQueued": "Remediation retry queued",
       "timeline": {
         "queued": "Remediation requested",
-        "prOpened": "PR opened",
         "failed": "Remediation failed",
-        "blocked": "Remediation blocked",
-        "noChangesNeeded": "No changes needed"
+        "blocked": "Remediation blocked"
       },
       "unavailable": "Remediation is unavailable for this finding."
     },
@@ -1671,9 +1643,6 @@
       "title": "Models & analysis",
       "couldNotLoad": "Could not load analysis settings",
       "depth": "Analysis depth",
-      "modeAuto": "Auto",
-      "modeShallow": "Shallow",
-      "modeDeep": "Deep",
       "triageModel": "Triage model",
       "analysisModel": "Analysis model",
       "remediationModel": "Remediation model"
@@ -1699,10 +1668,7 @@
     "findingDetail": {
       "title": "Finding",
       "tabAnalysis": "Analysis",
-      "tabRemediation": "Remediation",
-      "notFound": "Finding not found",
-      "notFoundDescription": "This finding may have been removed, or you no longer have access to it.",
-      "couldNotLoad": "Could not load this finding"
+      "tabRemediation": "Remediation"
     },
     "findingList": {
       "couldNotLoad": "Could not load findings",
@@ -1717,9 +1683,7 @@
       "nextRemediationInProgress": "Remediation in progress",
       "nextRetryRemediation": "Retry remediation available",
       "nextRemediationAvailable": "Remediation available",
-      "retryAnalysis": "Retry analysis",
       "runAnalysis": "Run analysis",
-      "nextNeedsManualReview": "Needs manual review",
       "nextViewDetails": "View details",
       "viewPr": "View PR",
       "analyze": "Analyze",
@@ -1761,7 +1725,6 @@
       "newFindingSubtitle": "Sent whenever a new finding is synced, including on first sync.",
       "slaLeadTimeAccessibility": "SLA warning lead time in days",
       "slaLeadTimeError": "Enter a whole number of days between 1 and 365.",
-      "slaLeadTimeHint": "Enter a whole number between 1 and 365",
       "slaLeadTimeLabel": "SLA warning lead time (days)",
       "slaPersonalTitle": "Email me about SLA warnings",
       "slaSection": "SLA warning notification",
@@ -1806,7 +1769,6 @@
     },
     "analysisState": {
       "queued": "Analysis queued",
-      "queuedTitle": "Analysis queued",
       "queuedDescription": "Waiting for analysis capacity to become available.",
       "analyzing": "Analyzing",
       "analyzingDescription": "Checking whether application code can reach the affected feature.",
@@ -1815,7 +1777,6 @@
       "extractionFailedDescription": "The technical report could not be turned into a structured result.",
       "exploitableDescription": "Application code can reach the affected feature.",
       "notExploitable": "Unreachable",
-      "notExploitableTitle": "Unreachable",
       "notExploitableDescription": "No reachable path was found in this repository.",
       "unknown": "Needs review",
       "unknownDescription": "Analysis could not confirm whether the vulnerable feature is reachable.",
@@ -1851,7 +1812,6 @@
       "dueInDays": "Due in {{count}} days"
     },
     "remediationStatus": {
-      "cancellationRequested": "Cancellation requested",
       "notStarted": "Not started",
       "starting": "Starting",
       "inProgress": "In progress",
@@ -1870,7 +1830,6 @@
       "findingNotOpen": "Finding is no longer open.",
       "repoNotInScope": "Repository is not selected for Security Agent.",
       "analysisRequired": "Run codebase analysis before starting remediation.",
-      "sandboxAnalysisRequired": "Run codebase analysis before starting remediation.",
       "staleAnalysis": "Finding changed after analysis. Rerun analysis before starting remediation.",
       "notExploitable": "Analysis found no reachable vulnerable path. Auto Remediation is unavailable.",
       "exploitabilityUnknown": "Analysis could not confirm exploitability. Manual review is required before one-click remediation.",
@@ -1886,12 +1845,10 @@
       "autoRemediationDisabled": "Auto Remediation is disabled. Manual remediation can still start when safety gates pass.",
       "includeExistingDisabled": "Existing findings are excluded from automatic remediation.",
       "belowThreshold": "Finding is below automatic severity threshold. Manual remediation can still start when safety gates pass.",
-      "beforeEnablement": "Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass.",
-      "generic": "Remediation is unavailable for this finding."
+      "beforeEnablement": "Analysis completed before Auto Remediation was enabled. Manual remediation can still start when safety gates pass."
     },
     "commandFailure": {
       "ownerCapReached": "Analysis capacity is full. Wait for an active analysis to finish, then retry.",
-      "githubTokenUnavailable": "GitHub authorization needs attention. Re-authorize GitHub App, then retry.",
       "githubAuthInvalid": "GitHub authorization needs attention. Re-authorize GitHub App, then retry.",
       "findingUnavailable": "Finding is no longer available. Refresh findings and retry if it remains open.",
       "repositoryUnavailable": "Repository is no longer available to GitHub App. Refresh repository access, then retry.",
@@ -1973,10 +1930,8 @@
       "title": "Session",
       "copyErrorDetails": "Copy error details",
       "backToSessions": "Back to sessions",
-      "accessDeniedDescription": "You don't have permission to view this.",
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
-      "notFoundDescription": "This item may have been removed or is no longer available.",
       "failedToStopExecution": "Failed to stop execution",
       "renameSession": "Rename session",
       "renamePlaceholder": "Session name",
@@ -2524,7 +2479,6 @@
     "signOutThisDeviceTitle": "Sign out this device?",
     "signOutThisSessionTitle": "Sign out this session?",
     "signOutThisSessionMessage": "{{device}} will be signed out. It can keep API access for up to an hour.",
-    "signOutMessage": "You will need to sign in again to access your workspace.",
     "webBrowser": "Web browser"
   },
   "trustedHosts": {
@@ -2789,7 +2743,6 @@
       "emptyDescription": "Purchases, usage, and credit adjustments for this organization will appear here as they happen.",
       "emptyTitle": "No credit activity",
       "expires": "Expires {{date}}",
-      "loadMoreFailed": "Couldn't load more.",
       "title": "Credit activity",
       "transactionFallback": "Credit transaction",
       "truncated": "Older credit activity is available.",
@@ -2830,7 +2783,6 @@
       }
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "Enable low balance alert",
       "notifyEmailsLabel": "Notify emails",
       "permissionDenied": "You don't have permission to manage billing alerts.",
@@ -2855,7 +2807,6 @@
       "emptyDescriptionCanInvite": "Invite teammates to start collaborating in this organization.",
       "emptyDescriptionCannotInvite": "Ask an owner or billing manager to invite teammates.",
       "emptyTitle": "No members yet",
-      "inviteMember": "Invite member",
       "invitedDate": "Invited {{date}}",
       "limitPerDay": "{{amount}}/day",
       "manageA11y": "Manage {{name}}",
@@ -2898,7 +2849,6 @@
       "couldNotLoadStatus": "Could not load status",
       "creditProcessingDelayed": "Credit processing delayed · retrying automatically",
       "ended": "Ended",
-      "manageHint": "Opens Kilo Pass management on web.",
       "notSubscribed": "Not subscribed",
       "overallocated": "Pass assignments exceed paid seats",
       "paidSeat_one": "{{displayCount}} paid seat",

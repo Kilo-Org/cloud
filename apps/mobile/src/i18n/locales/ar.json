@@ -278,7 +278,6 @@
       "security": "ملاحظات الأمان"
     },
     "category": {
-      "chatMessagesTitle": "رسائل الدردشة",
       "chatMessagesSubtitle": "الردود في محادثاتك",
       "agentAttentionTitle": "الوكيل بحاجة إليك",
       "agentAttentionSubtitle": "أسئلة وطلبات إذن ومعلومات مطلوبة",
@@ -286,11 +285,8 @@
       "agentUpdatesSubtitle": "رسائل من الوكيل أثناء تنفيذ المهمة",
       "sessionStatusTitle": "حالة الجلسة",
       "sessionStatusSubtitle": "مكتملة / تعذّر إكمالها / جاهزة للتحكم",
-      "kiloclawActivityTitle": "نشاط KiloClaw",
       "kiloclawActivitySubtitle": "جاهزية المثيل أو فشله، وإجراءات مجدولة",
-      "balanceAlertsTitle": "تنبيهات الرصيد",
       "balanceAlertsSubtitle": "تحذيرات انخفاض رصيد المؤسسة",
-      "securityFindingsTitle": "ملاحظات الأمان",
       "securityFindingsSubtitle": "نتائج جديدة وتذكيرات SLA"
     }
   },
@@ -770,8 +766,7 @@
       "googleDescription": "Gmail وCalendar وDocs",
       "modelDescription": "اختيار نموذج الذكاء الاصطناعي",
       "secretsDescription": "بيانات اعتماد مشفّرة",
-      "versionPinDescription": "تثبيت النسخة المستخدمة على إصدار محدد",
-      "versionPinLabel": "تثبيت الإصدار"
+      "versionPinDescription": "تثبيت النسخة المستخدمة على إصدار محدد"
     },
     "avatar": {
       "arcade": "آركيد",
@@ -1014,7 +1009,6 @@
       "title": "تصفية النتائج",
       "fixed": "تم الإصلاح",
       "outcome": "النتيجة",
-      "outcomeNotExploitable": "غير قابلة للاستغلال",
       "outcomeTriageComplete": "اكتمل الفرز الأولي",
       "overdueOnly": "النتائج المتأخرة فقط",
       "reset": "إعادة تعيين",
@@ -1060,9 +1054,6 @@
       "analysisModel": "نموذج التحليل",
       "couldNotLoad": "تعذّر تحميل إعدادات التحليل.",
       "depth": "عمق التحليل",
-      "modeAuto": "تلقائي",
-      "modeDeep": "عميق",
-      "modeShallow": "سطحي",
       "remediationModel": "نموذج المعالجة",
       "title": "النماذج والتحليل",
       "triageModel": "نموذج الفرز الأولي"
@@ -1160,15 +1151,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "نتائج مفتوحة",
-      "openFindingsDetail": "مستوى حرج: {{critical}}، مستوى عالٍ: {{high}}",
-      "confirmedExploitable": "مؤكدة القابلية للاستغلال",
       "confirmedExploitableDetail": "تأكدت مخاطر المشروع عبر التحليل",
-      "needsReview": "بحاجة إلى مراجعتك",
       "needsReviewDetail": "مطلوب قرار بشري",
-      "analysisIncomplete": "التحليل غير مكتمل",
       "analysisIncompleteDetail": "مخاطر المشروع ما تزال غير معروفة",
       "slaCompliance": "الالتزام بـ SLA",
-      "notMeasured": "غير مُقاس",
       "withinDeadlineDetail": "{{within}} من أصل {{total}} ضمن المهلة",
       "noDeadlineData": "لم يُحدَّد موعد نهائي حسب SLA لأي نتيجة بعد",
       "deadlinePassed": "انقضى الموعد النهائي",
@@ -1199,9 +1185,6 @@
       "title": "استبعاد الملاحظة"
     },
     "findingDetail": {
-      "couldNotLoad": "تعذّر تحميل هذه الملاحظة.",
-      "notFound": "الملاحظة غير موجودة",
-      "notFoundDescription": "ربما أُزيلت هذه النتيجة، أو لم تعد لديك صلاحية الوصول إليها.",
       "tabAnalysis": "التحليل",
       "tabRemediation": "المعالجة",
       "title": "النتيجة"
@@ -1224,7 +1207,6 @@
       "supersededByDescription": "اضغط لفتح السجل الحالي والاطلاع على الحالة والتحليل والمعالجة.",
       "viewAdvisory": "عرض النشرة الأمنية على GitHub",
       "vulnerableVersions": "الإصدارات المتأثرة بالثغرة",
-      "statusSuperseded": "مستبدلة",
       "statusOpen": "فتح",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "بدأ الإصلاح بالفعل",
@@ -1246,13 +1228,11 @@
       "a11y": "نتيجة بدرجة خطورة {{severity}}: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "نتيجة بدرجة خطورة {{severity}}: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "تحليل",
-      "nextNeedsManualReview": "بحاجة إلى مراجعة يدوية",
       "nextRemediationAvailable": "المعالجة متاحة",
       "nextRemediationInProgress": "المعالجة قيد التنفيذ",
       "nextRemediationPrOpen": "طلب PR للمعالجة مفتوح",
       "nextRetryRemediation": "يمكن إعادة محاولة المعالجة",
       "nextViewDetails": "عرض التفاصيل",
-      "retryAnalysis": "إعادة التحليل",
       "runAnalysis": "إجراء التحليل",
       "viewPr": "عرض PR"
     },
@@ -1265,7 +1245,6 @@
       "newFindingSubtitle": "يُرسل عند مزامنة نتيجة جديدة، بما في ذلك عند أول مزامنة.",
       "slaLeadTimeAccessibility": "عدد الأيام قبل الموعد النهائي لإرسال تحذير SLA",
       "slaLeadTimeError": "أدخل عددًا صحيحًا من الأيام بين 1 و365.",
-      "slaLeadTimeHint": "أدخل عددًا صحيحًا بين 1 و365",
       "slaLeadTimeLabel": "وقت إرسال تحذير SLA قبل الموعد النهائي (بالأيام)",
       "slaPersonalTitle": "إشعاري بتحذيرات SLA عبر البريد الإلكتروني",
       "slaSection": "إشعار تحذير SLA",
@@ -1281,8 +1260,6 @@
       "cancellationRequested": "تم طلب الإلغاء",
       "cancelled": "تم إلغاء المعالجة",
       "couldNotLoad": "تعذّر تحميل حالة المعالجة.",
-      "noAnalysisDescription": "ابدأ التحليل من علامة التبويب التفاصيل.",
-      "noAnalysisTitle": "لا يوجد تحليل بعد",
       "openDraftPullRequest": "فتح مسودة طلب السحب{{number}}",
       "openPullRequest": "فتح طلب السحب{{number}}",
       "progress": "التقدم",
@@ -1292,8 +1269,6 @@
       "timeline": {
         "blocked": "المعالجة متوقفة بسبب عائق",
         "failed": "فشلت المعالجة",
-        "noChangesNeeded": "لا حاجة إلى تغييرات",
-        "prOpened": "تم فتح PR",
         "queued": "تم طلب المعالجة"
       },
       "queued": "أُضيفت المعالجة إلى قائمة الانتظار.",
@@ -1321,7 +1296,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "نوع التحليل: {{mode}}",
-      "automation": "الأتمتة",
       "automationAllOff": "الكل معطّل",
       "automationCount": "تم تفعيل {{displayCount}} من 3",
       "couldNotLoadPermissions": "تعذّر تحميل الصلاحيات.",
@@ -1329,15 +1303,12 @@
       "disabledNoManage": "وكيل الأمان معطّل. يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيله.",
       "disabledNoRepo": "اختر مستودعًا واحدًا على الأقل قبل تفعيل وكيل الأمان.",
       "disabledPrompt": "فعّل وكيل الأمان لمزامنة تنبيهات Dependabot واختيار المستودعات وضبط إعدادات الأتمتة.",
-      "modelsAndAnalysis": "النماذج والتحليل",
       "notificationsCount": "تم تفعيل {{displayCount}} من 2",
       "on": "مفعّل",
       "repositoriesCount": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_other": "المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_one": "مستودع واحد محدد ({{displayCount}})",
       "selectRepositoriesSubtitle": "اختر المستودعات التي يراقبها وكيل الأمان",
-      "slaPolicy": "سياسة SLA",
-      "title": "الإعدادات",
       "repositoriesCount_zero": "عدد المستودعات المحددة: {{displayCount}}",
       "repositoriesCount_two": "مستودعان محددان ({{displayCount}})",
       "repositoriesCount_few": "تم تحديد {{displayCount}} مستودعات",
@@ -1389,7 +1360,6 @@
     },
     "analysisState": {
       "queued": "التحليل في قائمة الانتظار",
-      "queuedTitle": "التحليل في قائمة الانتظار",
       "queuedDescription": "ينتظر التحليل توفر سعة لتنفيذه.",
       "analyzing": "جارٍ التحليل",
       "analyzingDescription": "يجري التحقق مما إذا كانت شفرة التطبيق تصل إلى الوظيفة المتأثرة.",
@@ -1398,7 +1368,6 @@
       "extractionFailedDescription": "تعذّر تحويل التقرير الفني إلى نتيجة منظمة.",
       "exploitableDescription": "يمكن لشفرة التطبيق الوصول إلى الوظيفة المتأثرة.",
       "notExploitable": "لا يمكن الوصول إليها",
-      "notExploitableTitle": "لا يمكن الوصول إليها",
       "notExploitableDescription": "لم يُعثر في هذا المستودع على مسار يصل إلى الوظيفة المتأثرة.",
       "unknown": "بحاجة إلى مراجعة",
       "unknownDescription": "لم يحسم التحليل ما إذا كان بالإمكان الوصول إلى الوظيفة المتأثرة بالثغرة.",
@@ -1442,7 +1411,6 @@
       "dueInDays": "تنتهي المهلة بعد {{count}} يوم"
     },
     "remediationStatus": {
-      "cancellationRequested": "تم طلب الإلغاء",
       "notStarted": "لم تبدأ",
       "starting": "جارٍ البدء",
       "inProgress": "قيد التنفيذ",
@@ -1461,7 +1429,6 @@
       "findingNotOpen": "لم تعد النتيجة مفتوحة.",
       "repoNotInScope": "لم يُحدَّد هذا المستودع للمراقبة بواسطة وكيل الأمان.",
       "analysisRequired": "حلّل شيفرة المشروع قبل بدء المعالجة.",
-      "sandboxAnalysisRequired": "حلّل شيفرة المشروع قبل بدء المعالجة.",
       "staleAnalysis": "تغيّرت النتيجة بعد التحليل. أعد إجراء التحليل قبل بدء المعالجة.",
       "notExploitable": "لم يعثر التحليل على مسار يصل إلى الوظيفة المتأثرة بالثغرة. المعالجة التلقائية غير متاحة.",
       "exploitabilityUnknown": "لم يتمكن التحليل من تأكيد قابلية الاستغلال. المراجعة اليدوية مطلوبة قبل المعالجة بنقرة واحدة.",
@@ -1477,12 +1444,10 @@
       "autoRemediationDisabled": "المعالجة التلقائية معطّلة. يمكن بدء المعالجة يدويًا إذا استوفت شروط الأمان.",
       "includeExistingDisabled": "تُستبعد النتائج الحالية من المعالجة التلقائية.",
       "belowThreshold": "خطورة النتيجة أقل من الحد المطلوب للمعالجة التلقائية. يمكن بدء المعالجة يدويًا إذا استوفت شروط الأمان.",
-      "beforeEnablement": "اكتمل التحليل قبل تفعيل المعالجة التلقائية. يمكن بدء المعالجة يدويًا إذا استوفت شروط الأمان.",
-      "generic": "لا تتوفر معالجة لهذه الملاحظة."
+      "beforeEnablement": "اكتمل التحليل قبل تفعيل المعالجة التلقائية. يمكن بدء المعالجة يدويًا إذا استوفت شروط الأمان."
     },
     "commandFailure": {
       "ownerCapReached": "بلغ عدد التحليلات الجارية الحد الأقصى. انتظر حتى ينتهي أحدها، ثم أعد المحاولة.",
-      "githubTokenUnavailable": "هناك مشكلة في تفويض GitHub. أعد تفويض تطبيق GitHub، ثم أعد المحاولة.",
       "githubAuthInvalid": "هناك مشكلة في تفويض GitHub. أعد تفويض تطبيق GitHub، ثم أعد المحاولة.",
       "findingUnavailable": "لم تعد النتيجة متاحة. حدّث النتائج وأعد المحاولة إذا ظلت مفتوحة.",
       "repositoryUnavailable": "لم يعد المستودع متاحًا لتطبيق GitHub. حدّث صلاحيات الوصول إلى المستودع، ثم أعد المحاولة.",
@@ -1576,10 +1541,8 @@
       "title": "الجلسة",
       "copyErrorDetails": "نسخ تفاصيل الخطأ",
       "backToSessions": "العودة إلى الجلسات",
-      "accessDeniedDescription": "لا تملك صلاحية عرض هذا المحتوى.",
       "couldNotLoad": "تعذّر تحميل الجلسة.",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة.",
-      "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
       "failedToStopExecution": "تعذّر إيقاف التنفيذ.",
       "renameSession": "إعادة تسمية الجلسة",
       "renamePlaceholder": "اسم الجلسة",
@@ -2147,8 +2110,7 @@
     "sessionSignedOut": "تم تسجيل الخروج من الجلسة.",
     "signOutThisDeviceTitle": "تسجيل الخروج من هذا الجهاز؟",
     "signOutThisSessionTitle": "تسجيل الخروج من هذه الجلسة؟",
-    "signOutThisSessionMessage": "سيتم تسجيل الخروج من {{device}}. قد يظل قادرًا على الوصول إلى API لمدة تصل إلى ساعة.",
-    "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك."
+    "signOutThisSessionMessage": "سيتم تسجيل الخروج من {{device}}. قد يظل قادرًا على الوصول إلى API لمدة تصل إلى ساعة."
   },
   "forceUpdate": {
     "couldNotOpenStore": "تعذّر فتح متجر التطبيقات.",
@@ -2428,8 +2390,6 @@
       "reconnectTitle": "إعادة ربط GitHub"
     },
     "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
-    "connectionExpiredDescription": "لم يعد ربط حسابك على GitHub صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
-    "connectionExpiredTitle": "انتهت صلاحية الربط مع GitHub.",
     "couldNotLoadPullRequest": "تعذّر تحميل طلب السحب.",
     "couldNotOpenGitHubAppSettings": "تعذّر فتح إعدادات تطبيق GitHub.",
     "description": "الوصف",
@@ -2445,7 +2405,6 @@
       "comment_other": "التعليقات: {{displayCount}}",
       "couldNotLoad": "تعذّر تحميل المناقشة.",
       "couldNotLoadMore": "تعذّر تحميل المزيد من التعليقات.",
-      "couldNotReply": "تعذّر الرد.",
       "loadMoreComments": "تحميل المزيد من التعليقات",
       "loading": "جارٍ تحميل المناقشة",
       "moderation": {
@@ -2673,8 +2632,7 @@
       "noEnabledMethods": "لا توجد طرق دمج مفعّلة في هذا المستودع. اطلب من مسؤول المستودع تفعيل الدمج العادي أو الدمج المضغوط أو الدمج مع إعادة التأسيس.",
       "partialSuccessBanner": {
         "accessibility": "تم الدمج. تعذّر حذف الفرع: {{reason}}",
-        "body": "تعذّر حذف الفرع: {{reason}}.",
-        "title": "تم الدمج"
+        "body": "تعذّر حذف الفرع: {{reason}}."
       },
       "refreshMergeability": "إعادة التحقق من إمكانية الدمج",
       "terminal": {
@@ -2744,9 +2702,7 @@
       "deletedAnnouncement": "تم حذف التعليق المعلّق",
       "editA11y": "تعديل التعليق المعلّق على {{location}}",
       "editOutdatedA11y": "تعديل التعليق المعلّق القديم على {{location}}",
-      "emptyBody": "(فارغ)",
       "noCommentsQueued": "لا توجد تعليقات في قائمة الانتظار. ستُرسل المراجعة بالنوع المحدد أعلاه فقط.",
-      "outdated": "قديم",
       "staleHint": "تغيّر PR منذ أن كتبت هذا التعليق.",
       "staleQueueHint": "لا تُرسل التعليقات المرتبطة بإيداع أقدم. تبقى في قائمة الانتظار لتتمكن من تعديلها أو حذفها.",
       "summaryA11y": "ملخص المراجعة",
@@ -2755,7 +2711,6 @@
     "pullRequestUnavailable": "طلب السحب غير متاح",
     "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
     "reconnectNotice": {
-      "checkConnection": "التحقق من الاتصال",
       "message": "لم يعد ربط حسابك على GitHub صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
       "title": "انتهت صلاحية الربط مع GitHub."
     },
@@ -2781,7 +2736,6 @@
       "pendingComment_other": "تعليق معلّق",
       "pendingComment_one": "تعليق معلّق",
       "summaryOptional": "الملخص (اختياري)",
-      "title": "إرسال المراجعة",
       "partialPostedMessage": "عدد التعليقات المنشورة: {{displayFreshCount}}. بقيت في قائمة الانتظار تعليقات مرتبطة بإيداع أقدم، وعددها {{displayStaleCount}}.",
       "submitCountOfTotal": "إرسال التعليقات: {{displayFreshCount}} من {{displayTotalCount}}",
       "submitReview": "إرسال المراجعة",
@@ -2861,7 +2815,6 @@
         "accounting_adjustment": "تعديل محاسبي",
         "credits_expired": "انتهاء صلاحية الرصيد"
       },
-      "loadMoreFailed": "تعذّر تحميل المزيد.",
       "truncated": "تتوفر عمليات أقدم في سجل الرصيد."
     },
     "hub": {
@@ -2897,7 +2850,6 @@
       "truncated": "تتوفر فواتير أقدم."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "user@example.com",
       "enableA11y": "تفعيل تنبيه انخفاض الرصيد",
       "notifyEmailsLabel": "عناوين البريد الإلكتروني للتنبيهات",
       "permissionDenied": "ليست لديك صلاحية لإدارة تنبيهات الفوترة.",
@@ -2922,7 +2874,6 @@
       "emptyDescriptionCanInvite": "ادعُ زملاء الفريق لبدء التعاون في هذه المؤسسة.",
       "emptyDescriptionCannotInvite": "اطلب من مالك أو مدير فوترة دعوة زملاء الفريق.",
       "emptyTitle": "لا يوجد أعضاء بعد",
-      "inviteMember": "دعوة عضو",
       "invitedDate": "تمت الدعوة في {{date}}",
       "limitPerDay": "{{amount}}/يوم",
       "manageA11y": "إدارة {{name}}",
@@ -2958,7 +2909,6 @@
       "couldNotLoadStatus": "تعذّر تحميل الحالة",
       "creditProcessingDelayed": "تأخرت معالجة الرصيد · جارٍ إعادة المحاولة تلقائيًا",
       "ended": "انتهى",
-      "manageHint": "يفتح صفحة إدارة Kilo Pass على الموقع.",
       "notSubscribed": "غير مشترك",
       "overallocated": "عدد اشتراكات Kilo Pass المعيّنة يتجاوز عدد المقاعد المدفوعة",
       "paidSeat_one": "مقعد مدفوع واحد ({{displayCount}})",

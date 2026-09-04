@@ -370,7 +370,6 @@
         "closed": "PR นี้ปิดแล้ว"
       },
       "partialSuccessBanner": {
-        "title": "ผสานแล้ว",
         "body": "ไม่สามารถลบบรานช์ได้: {{reason}}",
         "accessibility": "รวมแล้ว แต่ลบบรานช์ไม่ได้: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "ยอมรับ",
       "replyBadRequest": "ไม่สามารถโพสต์การตอบกลับนี้ได้ เธรดอาจมีการเปลี่ยนแปลง",
       "replyForbidden": "คุณไม่มีสิทธิ์ตอบกลับใน PR นี้",
-      "couldNotReply": "ไม่สามารถตอบกลับได้",
       "moderation": {
         "reportContent": {
           "terminal": "ไม่สามารถรายงานความคิดเห็นนี้ได้",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "ไม่สามารถเปิดการตั้งค่าแอป GitHub ได้",
     "installKiloGitHubApp": "ติดตั้ง Kilo GitHub App",
-    "connectionExpiredTitle": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
-    "connectionExpiredDescription": "การเชื่อมต่อ GitHub ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่",
     "checkConnection": "ตรวจสอบการเชื่อมต่อ",
     "couldNotLoadPullRequest": "ไม่สามารถโหลด PR ได้",
     "description": "คำอธิบาย",
@@ -572,7 +568,6 @@
       "shareA11y": "แชร์ PR"
     },
     "submit": {
-      "title": "ส่งผลการตรวจสอบ",
       "loadFailedTitle": "ไม่สามารถโหลดหน้าส่งรีวิวได้",
       "deletePendingTitle": "ลบความคิดเห็นที่รอส่งหรือไม่?",
       "deletePendingMessage": "ความคิดเห็นนี้จะถูกลบออกจากรายการที่รอส่งรีวิว",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
-      "message": "การเชื่อมต่อ GitHub ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่",
-      "checkConnection": "ตรวจสอบการเชื่อมต่อ"
+      "message": "การเชื่อมต่อ GitHub ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่"
     },
     "eventChips": {
       "comment": "แสดงความคิดเห็น",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "แก้ไขความคิดเห็นที่รอส่งและอ้างอิงโค้ดเก่าที่ {{location}}",
       "editA11y": "แก้ไขความคิดเห็นที่รอส่งที่ {{location}}",
-      "emptyBody": "(ว่าง)",
-      "outdated": "ล้าสมัย",
       "staleHint": "PR มีการเปลี่ยนแปลงหลังจากคุณเขียนความคิดเห็นนี้",
       "deleteA11y": "ลบความคิดเห็นที่รอส่งที่ {{location}}",
       "deletedAnnouncement": "ลบความคิดเห็นที่รอส่งแล้ว",
@@ -703,7 +695,6 @@
       "security": "ข้อค้นพบด้านความปลอดภัย"
     },
     "category": {
-      "chatMessagesTitle": "ข้อความแชท",
       "chatMessagesSubtitle": "การตอบกลับในการสนทนาของคุณ",
       "agentAttentionTitle": "เอเจนต์รอการตอบกลับ",
       "agentAttentionSubtitle": "คำถาม คำขออนุญาต และคำขอข้อมูลเพิ่มเติม",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "ข้อความจากเอเจนต์ระหว่างทำงาน",
       "sessionStatusTitle": "สถานะเซสชัน",
       "sessionStatusSubtitle": "เสร็จสิ้น / ล้มเหลว / พร้อมควบคุม",
-      "kiloclawActivityTitle": "กิจกรรม KiloClaw",
       "kiloclawActivitySubtitle": "อินสแตนซ์พร้อมใช้งานหรือทำงานล้มเหลว และการดำเนินการตามกำหนดเวลา",
-      "balanceAlertsTitle": "การแจ้งเตือนยอดเงิน",
       "balanceAlertsSubtitle": "คำเตือนเมื่อยอดคงเหลือขององค์กรต่ำ",
-      "securityFindingsTitle": "ข้อค้นพบด้านความปลอดภัย",
       "securityFindingsSubtitle": "ปัญหาที่ตรวจพบใหม่และการเตือนตาม SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "การเลือกโมเดล AI",
       "secretsDescription": "ข้อมูลยืนยันตัวตนที่เข้ารหัส",
-      "versionPinDescription": "ตรึงไว้ที่เวอร์ชันที่ระบุ",
-      "versionPinLabel": "การล็อกเวอร์ชัน"
+      "versionPinDescription": "ตรึงไว้ที่เวอร์ชันที่ระบุ"
     },
     "avatar": {
       "arcade": "เกมอาร์เคด",
@@ -1440,7 +1427,6 @@
       "severityHigh": "สูง",
       "severityMedium": "ปานกลาง",
       "severityLow": "ต่ำ",
-      "outcomeNotExploitable": "ใช้โจมตีไม่ได้",
       "outcomeTriageComplete": "คัดกรองเสร็จสิ้น",
       "sortSeverityDesc": "ความรุนแรง: สูงไปต่ำ",
       "sortSeverityAsc": "ความรุนแรง: ต่ำไปสูง",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "ข้อค้นพบที่ยังเปิดอยู่",
-      "openFindingsDetail": "ระดับวิกฤต {{critical}} รายการ ระดับสูง {{high}} รายการ",
-      "confirmedExploitable": "ยืนยันแล้วว่าใช้โจมตีได้",
       "confirmedExploitableDetail": "ผลวิเคราะห์ยืนยันความเสี่ยงของโปรเจกต์แล้ว",
-      "needsReview": "รอคุณตรวจสอบ",
       "needsReviewDetail": "ต้องให้ผู้ตรวจสอบตัดสินใจ",
-      "analysisIncomplete": "ยังวิเคราะห์ไม่เสร็จ",
       "analysisIncompleteDetail": "ยังไม่ทราบความเสี่ยงของโปรเจกต์",
       "slaCompliance": "การปฏิบัติตาม SLA",
-      "notMeasured": "ยังไม่ได้วัด",
       "withinDeadlineDetail": "อยู่ภายในกำหนดเวลา {{within}} จาก {{total}} รายการ",
       "noDeadlineData": "ยังไม่มีข้อค้นพบที่มีกำหนดเวลา SLA",
       "deadlinePassed": "เลยกำหนดเวลา",
@@ -1601,7 +1582,6 @@
       "source": "แหล่งที่มา",
       "sourceId": "ID แหล่งที่มา",
       "viewAdvisory": "ดูประกาศด้านความปลอดภัยบน GitHub",
-      "statusSuperseded": "ถูกแทนที่แล้ว",
       "statusOpen": "เปิด",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "เริ่มแก้ไขแล้ว",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "หลังการตรวจสอบ"
     },
     "settingsOverview": {
-      "title": "การตั้งค่า",
       "couldNotLoadSettings": "ไม่สามารถโหลดการตั้งค่า Security Agent ได้",
       "couldNotLoadPermissions": "ไม่สามารถโหลดสิทธิ์ได้",
       "on": "เปิด",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
       "repositoriesCount_other": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
       "selectRepositoriesSubtitle": "เลือกคลังโค้ดที่ต้องการให้ Security Agent ตรวจสอบ",
-      "modelsAndAnalysis": "โมเดลและการวิเคราะห์",
       "analysisModeSubtitle": "การวิเคราะห์แบบ {{mode}}",
-      "automation": "ระบบอัตโนมัติ",
       "automationAllOff": "ปิดทั้งหมด",
       "automationCount": "เปิดอยู่ {{displayCount}} จาก 3 รายการ",
       "notificationsCount": "เปิดอยู่ {{displayCount}} จาก 2 รายการ",
-      "slaPolicy": "นโยบาย SLA",
       "disabledNoManage": "Security Agent ปิดอยู่ เฉพาะเจ้าขององค์กรและผู้จัดการการเรียกเก็บเงินเท่านั้นที่สามารถเปิดได้",
       "disabledNoRepo": "เลือกคลังโค้ดอย่างน้อยหนึ่งแห่งก่อนเปิด Security Agent",
       "disabledPrompt": "เปิด Security Agent เพื่อซิงค์การแจ้งเตือน Dependabot เลือกคลังโค้ด และตั้งค่าระบบอัตโนมัติ"
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "ส่งคำขอยกเลิกแล้ว",
       "cancelled": "ยกเลิกการแก้ไขแล้ว",
       "couldNotLoad": "ไม่สามารถโหลดสถานะการแก้ไขได้",
-      "noAnalysisTitle": "ยังไม่มีการวิเคราะห์",
-      "noAnalysisDescription": "เริ่มการวิเคราะห์จากแท็บรายละเอียด",
       "start": "เริ่มการแก้ไข",
       "retry": "ลองแก้ไขอีกครั้ง",
       "cancelTitle": "ยกเลิกการแก้ไขนี้หรือไม่?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "จัดคิวการแก้ไขอีกครั้งแล้ว",
       "timeline": {
         "queued": "ขอการแก้ไขแล้ว",
-        "prOpened": "เปิด PR แล้ว",
         "failed": "การแก้ไขล้มเหลว",
-        "blocked": "การแก้ไขถูกบล็อก",
-        "noChangesNeeded": "ไม่จำเป็นต้องเปลี่ยนแปลง"
+        "blocked": "การแก้ไขถูกบล็อก"
       },
       "unavailable": "ไม่สามารถใช้การแก้ไขกับข้อค้นพบนี้ได้"
     },
@@ -1663,9 +1635,6 @@
       "title": "โมเดลและการวิเคราะห์",
       "couldNotLoad": "ไม่สามารถโหลดการตั้งค่าการวิเคราะห์ได้",
       "depth": "ระดับความละเอียดในการวิเคราะห์",
-      "modeAuto": "อัตโนมัติ",
-      "modeShallow": "เบื้องต้น",
-      "modeDeep": "เชิงลึก",
       "triageModel": "โมเดลการคัดกรอง",
       "analysisModel": "โมเดลการวิเคราะห์",
       "remediationModel": "โมเดลการแก้ไข"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "ข้อค้นพบ",
       "tabAnalysis": "การวิเคราะห์",
-      "tabRemediation": "การแก้ไข",
-      "notFound": "ไม่พบข้อค้นพบ",
-      "notFoundDescription": "ข้อค้นพบนี้อาจถูกลบไปแล้ว หรือคุณไม่มีสิทธิ์เข้าถึงอีกต่อไป",
-      "couldNotLoad": "ไม่สามารถโหลดข้อค้นพบนี้ได้"
+      "tabRemediation": "การแก้ไข"
     },
     "findingList": {
       "couldNotLoad": "ไม่สามารถโหลดข้อค้นพบได้",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "กำลังดำเนินการแก้ไข",
       "nextRetryRemediation": "ลองแก้ไขอีกครั้งได้",
       "nextRemediationAvailable": "เริ่มแก้ไขได้",
-      "retryAnalysis": "ลองวิเคราะห์อีกครั้ง",
       "runAnalysis": "เริ่มวิเคราะห์",
-      "nextNeedsManualReview": "ต้องตรวจสอบด้วยตนเอง",
       "nextViewDetails": "ดูรายละเอียด",
       "viewPr": "ดู PR",
       "analyze": "วิเคราะห์",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "ส่งทุกครั้งที่มีการซิงค์ข้อค้นพบใหม่ รวมถึงการซิงค์ครั้งแรก",
       "slaLeadTimeAccessibility": "ระยะเวลาแจ้งเตือน SLA ล่วงหน้า หน่วยเป็นวัน",
       "slaLeadTimeError": "ระบุจำนวนวันเป็นจำนวนเต็มตั้งแต่ 1 ถึง 365",
-      "slaLeadTimeHint": "ป้อนจำนวนเต็มตั้งแต่ 1 ถึง 365",
       "slaLeadTimeLabel": "ระยะเวลาแจ้งเตือน SLA ล่วงหน้า (วัน)",
       "slaPersonalTitle": "ส่งอีเมลแจ้งเตือน SLA ให้ฉัน",
       "slaSection": "การแจ้งเตือน SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "รอคิววิเคราะห์",
-      "queuedTitle": "รอคิววิเคราะห์",
       "queuedDescription": "กำลังรอคิววิเคราะห์",
       "analyzing": "กำลังวิเคราะห์",
       "analyzingDescription": "กำลังตรวจสอบว่าโค้ดของแอปเรียกใช้ฟีเจอร์ที่ได้รับผลกระทบได้หรือไม่",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "ไม่สามารถแปลงรายงานทางเทคนิคเป็นผลลัพธ์แบบมีโครงสร้างได้",
       "exploitableDescription": "โค้ดของแอปเรียกใช้ฟีเจอร์ที่ได้รับผลกระทบได้",
       "notExploitable": "เข้าถึงไม่ได้",
-      "notExploitableTitle": "เข้าถึงไม่ได้",
       "notExploitableDescription": "ไม่พบเส้นทางในคลังโค้ดนี้ที่เรียกใช้ฟีเจอร์ที่มีช่องโหว่ได้",
       "unknown": "ต้องตรวจสอบ",
       "unknownDescription": "ผลวิเคราะห์ยังยืนยันไม่ได้ว่าโค้ดเรียกใช้ฟีเจอร์ที่มีช่องโหว่ได้หรือไม่",
@@ -1843,7 +1804,6 @@
       "dueInDays_one": "ครบกำหนดใน {{count}} วัน"
     },
     "remediationStatus": {
-      "cancellationRequested": "ส่งคำขอยกเลิกแล้ว",
       "notStarted": "ยังไม่เริ่ม",
       "starting": "กำลังเริ่ม",
       "inProgress": "กำลังดำเนินการ",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "ข้อค้นพบนี้ไม่ได้อยู่ในสถานะเปิดแล้ว",
       "repoNotInScope": "ไม่ได้เลือกคลังโค้ดนี้ให้ Security Agent ตรวจสอบ",
       "analysisRequired": "วิเคราะห์โค้ดเบสก่อนเริ่มแก้ไข",
-      "sandboxAnalysisRequired": "วิเคราะห์โค้ดเบสก่อนเริ่มแก้ไข",
       "staleAnalysis": "ข้อค้นพบมีการเปลี่ยนแปลงหลังการวิเคราะห์ วิเคราะห์อีกครั้งก่อนเริ่มแก้ไข",
       "notExploitable": "ผลวิเคราะห์ไม่พบเส้นทางที่เรียกใช้โค้ดที่มีช่องโหว่ได้ จึงไม่สามารถใช้การแก้ไขอัตโนมัติได้",
       "exploitabilityUnknown": "ผลวิเคราะห์ยังยืนยันไม่ได้ว่าผู้โจมตีใช้ช่องโหว่นี้ได้หรือไม่ ต้องตรวจสอบด้วยตนเองก่อนใช้การแก้ไขในคลิกเดียว",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "การแก้ไขอัตโนมัติปิดอยู่ แต่ยังเริ่มแก้ไขด้วยตนเองได้เมื่อผ่านเงื่อนไขด้านความปลอดภัย",
       "includeExistingDisabled": "การแก้ไขอัตโนมัติไม่รวมข้อค้นพบที่มีอยู่",
       "belowThreshold": "ความรุนแรงของข้อค้นพบนี้ต่ำกว่าเกณฑ์การแก้ไขอัตโนมัติ แต่ยังเริ่มแก้ไขด้วยตนเองได้เมื่อผ่านเงื่อนไขด้านความปลอดภัย",
-      "beforeEnablement": "วิเคราะห์เสร็จก่อนเปิดการแก้ไขอัตโนมัติ แต่ยังเริ่มแก้ไขด้วยตนเองได้เมื่อผ่านเงื่อนไขด้านความปลอดภัย",
-      "generic": "ไม่สามารถใช้การแก้ไขกับข้อค้นพบนี้ได้"
+      "beforeEnablement": "วิเคราะห์เสร็จก่อนเปิดการแก้ไขอัตโนมัติ แต่ยังเริ่มแก้ไขด้วยตนเองได้เมื่อผ่านเงื่อนไขด้านความปลอดภัย"
     },
     "commandFailure": {
       "ownerCapReached": "จำนวนงานวิเคราะห์ถึงขีดจำกัดแล้ว รอให้งานที่กำลังวิเคราะห์อยู่เสร็จก่อน แล้วลองอีกครั้ง",
-      "githubTokenUnavailable": "การให้สิทธิ์ GitHub มีปัญหา ให้สิทธิ์ GitHub App อีกครั้งแล้วลองใหม่",
       "githubAuthInvalid": "การให้สิทธิ์ GitHub มีปัญหา ให้สิทธิ์ GitHub App อีกครั้งแล้วลองใหม่",
       "findingUnavailable": "ไม่สามารถเข้าถึงข้อค้นพบนี้ได้แล้ว รีเฟรชรายการข้อค้นพบและลองอีกครั้งหากรายการนี้ยังเปิดอยู่",
       "repositoryUnavailable": "GitHub App ไม่สามารถเข้าถึงคลังโค้ดนี้ได้แล้ว รีเฟรชสิทธิ์เข้าถึงคลังโค้ดแล้วลองอีกครั้ง",
@@ -1965,10 +1922,8 @@
       "title": "เซสชัน",
       "copyErrorDetails": "คัดลอกรายละเอียดข้อผิดพลาด",
       "backToSessions": "กลับไปที่เซสชัน",
-      "accessDeniedDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "failedToLoadDetails": "ไม่สามารถโหลดรายละเอียดเซสชันได้",
-      "notFoundDescription": "รายการนี้อาจถูกลบหรือใช้งานไม่ได้แล้ว",
       "failedToStopExecution": "ไม่สามารถหยุดการทำงานได้",
       "renameSession": "เปลี่ยนชื่อเซสชัน",
       "renamePlaceholder": "ชื่อเซสชัน",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "ออกจากระบบบนอุปกรณ์นี้หรือไม่?",
     "signOutThisSessionTitle": "ออกจากระบบสำหรับเซสชันนี้หรือไม่?",
     "signOutThisSessionMessage": "ระบบจะให้ {{device}} ออกจากระบบ แต่อุปกรณ์นี้ยังเข้าถึง API ได้อีกไม่เกินหนึ่งชั่วโมง",
-    "signOutMessage": "คุณต้องเข้าสู่ระบบอีกครั้งเพื่อใช้พื้นที่ทำงาน",
     "webBrowser": "เว็บเบราว์เซอร์"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "การปรับปรุงบัญชี",
         "credits_expired": "เครดิตหมดอายุ"
       },
-      "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
       "truncated": "ยังมีรายการเครดิตก่อนหน้านี้ให้ดู"
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "ยังมีใบแจ้งหนี้ก่อนหน้านี้ให้ดู"
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ชื่อ@บริษัท.com",
       "enableA11y": "เปิดใช้การแจ้งเตือนยอดคงเหลือต่ำ",
       "notifyEmailsLabel": "อีเมลสำหรับการแจ้งเตือน",
       "permissionDenied": "คุณไม่มีสิทธิ์จัดการการแจ้งเตือนการเรียกเก็บเงิน",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "เชิญเพื่อนร่วมทีมเพื่อเริ่มทำงานร่วมกันในองค์กรนี้",
       "emptyDescriptionCannotInvite": "ขอให้เจ้าขององค์กรหรือผู้ดูแลการเรียกเก็บเงินเชิญเพื่อนร่วมทีม",
       "emptyTitle": "ยังไม่มีสมาชิก",
-      "inviteMember": "เชิญสมาชิก",
       "invitedDate": "เชิญเมื่อ {{date}}",
       "limitPerDay": "{{amount}}/วัน",
       "manageA11y": "จัดการ {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "โหลดสถานะไม่สำเร็จ",
       "creditProcessingDelayed": "การประมวลผลเครดิตล่าช้า · กำลังลองใหม่โดยอัตโนมัติ",
       "ended": "สิ้นสุดแล้ว",
-      "manageHint": "เปิดหน้าจัดการ Kilo Pass บนเว็บ",
       "notSubscribed": "ยังไม่ได้สมัครสมาชิก",
       "overallocated": "จำนวนผู้ได้รับ Pass เกินจำนวนสิทธิ์ใช้งานที่ชำระเงินแล้ว",
       "paidSeat_one": "สิทธิ์ใช้งานที่ชำระเงินแล้ว {{displayCount}} สิทธิ์",

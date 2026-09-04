@@ -374,7 +374,6 @@
         "closed": "Táto žiadosť o zlúčenie je uzavretá"
       },
       "partialSuccessBanner": {
-        "title": "Zlúčené",
         "body": "Vetvu sa nepodarilo odstrániť: {{reason}}.",
         "accessibility": "Zlúčené. Vetvu sa nepodarilo odstrániť: {{reason}}"
       },
@@ -445,7 +444,6 @@
       "acceptTerms": "Prijať",
       "replyBadRequest": "Túto odpoveď nemožno odoslať. Vlákno sa mohlo zmeniť.",
       "replyForbidden": "Nemáš oprávnenie odpovedať na túto žiadosť o zlúčenie.",
-      "couldNotReply": "Nepodarilo sa odpovedať.",
       "moderation": {
         "reportContent": {
           "terminal": "Tento komentár sa nedá nahlásiť.",
@@ -502,8 +500,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Nepodarilo sa otvoriť nastavenia aplikácie GitHub.",
     "installKiloGitHubApp": "Nainštalovať aplikáciu Kilo pre GitHub",
-    "connectionExpiredTitle": "Platnosť pripojenia k službe GitHub vypršala.",
-    "connectionExpiredDescription": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
     "checkConnection": "Skontrolovať pripojenie",
     "couldNotLoadPullRequest": "Žiadosť o zlúčenie sa nepodarilo načítať.",
     "description": "Opis",
@@ -580,7 +576,6 @@
       "shareA11y": "Zdieľať žiadosť o zlúčenie"
     },
     "submit": {
-      "title": "Odoslať kontrolu",
       "loadFailedTitle": "Formulár na odoslanie kontroly kódu sa nepodarilo načítať.",
       "deletePendingTitle": "Odstrániť neodoslaný komentár?",
       "deletePendingMessage": "Tento komentár sa odstráni zo zoznamu komentárov čakajúcich na odoslanie v rámci kontroly kódu.",
@@ -598,8 +593,7 @@
     },
     "reconnectNotice": {
       "title": "Platnosť pripojenia k službe GitHub vypršala.",
-      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
-      "checkConnection": "Skontrolovať pripojenie"
+      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
     },
     "eventChips": {
       "comment": "Komentár",
@@ -627,8 +621,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Upraviť neaktuálny neodoslaný komentár k {{location}}",
       "editA11y": "Upraviť neodoslaný komentár k {{location}}",
-      "emptyBody": "(prázdne)",
-      "outdated": "Zastarané",
       "staleHint": "PR sa od napísania tohto komentára zmenil.",
       "deleteA11y": "Odstrániť neodoslaný komentár k {{location}}",
       "deletedAnnouncement": "Neodoslaný komentár bol odstránený",
@@ -717,7 +709,6 @@
       "security": "Bezpečnostné zistenia"
     },
     "category": {
-      "chatMessagesTitle": "Správy v čete",
       "chatMessagesSubtitle": "odpovede v tvojich konverzáciách",
       "agentAttentionTitle": "Agent ťa potrebuje",
       "agentAttentionSubtitle": "otázky, žiadosti o povolenie a potrebné odpovede",
@@ -725,11 +716,8 @@
       "agentUpdatesSubtitle": "správy agenta počas úlohy",
       "sessionStatusTitle": "Stav relácie",
       "sessionStatusSubtitle": "dokončená / zlyhala / pripravená na ovládanie",
-      "kiloclawActivityTitle": "Aktivita KiloClaw",
       "kiloclawActivitySubtitle": "pripravená inštancia, zlyhanie inštancie, naplánované akcie",
-      "balanceAlertsTitle": "Upozornenia na zostatok",
       "balanceAlertsSubtitle": "upozornenia na nízky zostatok organizácie",
-      "securityFindingsTitle": "Bezpečnostné zistenia",
       "securityFindingsSubtitle": "nové zistenia a pripomienky SLA"
     }
   },
@@ -1205,8 +1193,7 @@
       "googleDescription": "Gmail, Kalendár, Dokumenty",
       "modelDescription": "Výber modelu AI",
       "secretsDescription": "Šifrované prihlasovacie údaje",
-      "versionPinDescription": "Pripnúť na konkrétnu verziu",
-      "versionPinLabel": "Pripnutie verzie"
+      "versionPinDescription": "Pripnúť na konkrétnu verziu"
     },
     "avatar": {
       "arcade": "Herný automat",
@@ -1458,7 +1445,6 @@
       "severityHigh": "Vysoká",
       "severityMedium": "Stredná",
       "severityLow": "Nízka",
-      "outcomeNotExploitable": "Nezneužiteľné",
       "outcomeTriageComplete": "Predbežné posúdenie dokončené",
       "sortSeverityDesc": "Závažnosť: od najvyššej",
       "sortSeverityAsc": "Závažnosť: od najnižšej",
@@ -1565,15 +1551,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Otvorené nálezy",
-      "openFindingsDetail": "Kritická závažnosť: {{critical}}, vysoká závažnosť: {{high}}",
-      "confirmedExploitable": "Potvrdené ako zneužiteľné",
       "confirmedExploitableDetail": "Riziko projektu potvrdené analýzou",
-      "needsReview": "Vyžaduje tvoju kontrolu",
       "needsReviewDetail": "Vyžaduje rozhodnutie človeka",
-      "analysisIncomplete": "Nedokončená analýza",
       "analysisIncompleteDetail": "Riziko projektu je stále neznáme",
       "slaCompliance": "Dodržiavanie SLA",
-      "notMeasured": "Nezmerané",
       "withinDeadlineDetail": "V termíne: {{within}} z {{total}}",
       "noDeadlineData": "Žiadny nález zatiaľ nemá termín SLA",
       "deadlinePassed": "Termín uplynul",
@@ -1621,7 +1602,6 @@
       "source": "Zdroj",
       "sourceId": "ID zdroja",
       "viewAdvisory": "Zobraziť bezpečnostné upozornenie na platforme GitHub",
-      "statusSuperseded": "Nahradené",
       "statusOpen": "Otvorené",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Oprava sa už začala",
@@ -1632,7 +1612,6 @@
       "reasonAfterReview": "po preskúmaní"
     },
     "settingsOverview": {
-      "title": "Nastavenia",
       "couldNotLoadSettings": "Nastavenia bezpečnostného agenta sa nepodarilo načítať.",
       "couldNotLoadPermissions": "Oprávnenia sa nepodarilo načítať.",
       "on": "Zapnuté",
@@ -1640,13 +1619,10 @@
       "repositoriesCount": "Vybratých {{displayCount}} repozitárov",
       "repositoriesCount_other": "Vybratých {{displayCount}} repozitárov",
       "selectRepositoriesSubtitle": "Vyberte repozitáre, ktoré má bezpečnostný agent sledovať",
-      "modelsAndAnalysis": "Modely a analýza",
       "analysisModeSubtitle": "Režim analýzy: {{mode}}",
-      "automation": "Automatizácia",
       "automationAllOff": "Všetko vypnuté",
       "automationCount": "Zapnuté: {{displayCount}} z 3",
       "notificationsCount": "Zapnuté: {{displayCount}} z 2",
-      "slaPolicy": "Pravidlá SLA",
       "disabledNoManage": "Bezpečnostný agent je vypnutý. Zapnúť ho môžu iba vlastníci organizácie a správcovia fakturácie.",
       "disabledNoRepo": "Pred zapnutím bezpečnostného agenta vyberte aspoň jeden repozitár.",
       "disabledPrompt": "Zapnite bezpečnostného agenta, aby ste mohli synchronizovať upozornenia zo služby Dependabot, vybrať repozitáre a nastaviť automatizáciu.",
@@ -1657,8 +1633,6 @@
       "cancellationRequested": "Žiadosť o zrušenie bola odoslaná",
       "cancelled": "Náprava zrušená",
       "couldNotLoad": "Stav nápravy sa nepodarilo načítať.",
-      "noAnalysisTitle": "Zatiaľ žiadna analýza",
-      "noAnalysisDescription": "Spusti analýzu na karte Podrobnosti.",
       "start": "Spustiť nápravu",
       "retry": "Zopakovať nápravu",
       "cancelTitle": "Zrušiť túto nápravu?",
@@ -1674,10 +1648,8 @@
       "retryQueued": "Opakovanie nápravy zaradené do frontu",
       "timeline": {
         "queued": "Vyžiadaná náprava",
-        "prOpened": "PR otvorený",
         "failed": "Náprava zlyhala",
-        "blocked": "Náprava zablokovaná",
-        "noChangesNeeded": "Zmeny nie sú potrebné"
+        "blocked": "Náprava zablokovaná"
       },
       "unavailable": "Pre toto zistenie nie je dostupná náprava."
     },
@@ -1685,9 +1657,6 @@
       "title": "Modely a analýza",
       "couldNotLoad": "Nastavenia analýzy sa nepodarilo načítať.",
       "depth": "Hĺbka analýzy",
-      "modeAuto": "Automatická",
-      "modeShallow": "Základná",
-      "modeDeep": "Hĺbková",
       "triageModel": "Model na predbežné posúdenie",
       "analysisModel": "Model na analýzu",
       "remediationModel": "Model na nápravu"
@@ -1713,10 +1682,7 @@
     "findingDetail": {
       "title": "Nález",
       "tabAnalysis": "Analýza",
-      "tabRemediation": "Náprava",
-      "notFound": "Zistenie sa nenašlo",
-      "notFoundDescription": "Tento nález mohol byť odstránený alebo k nemu už nemáte prístup.",
-      "couldNotLoad": "Nepodarilo sa načítať toto zistenie."
+      "tabRemediation": "Náprava"
     },
     "findingList": {
       "couldNotLoad": "Nálezy sa nepodarilo načítať.",
@@ -1731,9 +1697,7 @@
       "nextRemediationInProgress": "Náprava prebieha",
       "nextRetryRemediation": "Nápravu možno zopakovať",
       "nextRemediationAvailable": "Náprava je dostupná",
-      "retryAnalysis": "Zopakovať analýzu",
       "runAnalysis": "Spustiť analýzu",
-      "nextNeedsManualReview": "Vyžaduje ručnú kontrolu",
       "nextViewDetails": "Zobraziť podrobnosti",
       "viewPr": "Zobraziť PR",
       "analyze": "Analyzovať",
@@ -1775,7 +1739,6 @@
       "newFindingSubtitle": "Upozornenie sa odošle pri každej synchronizácii nového nálezu vrátane prvej synchronizácie.",
       "slaLeadTimeAccessibility": "Predstih upozornenia na termín SLA v dňoch",
       "slaLeadTimeError": "Zadajte počet dní od 1 do 365 ako celé číslo.",
-      "slaLeadTimeHint": "Zadaj celé číslo od 1 do 365",
       "slaLeadTimeLabel": "Predstih upozornenia na termín SLA (dni)",
       "slaPersonalTitle": "Posielať mi e-maily s upozorneniami na termíny SLA",
       "slaSection": "Upozornenia na termíny SLA",
@@ -1820,7 +1783,6 @@
     },
     "analysisState": {
       "queued": "Analýza čaká v poradí",
-      "queuedTitle": "Analýza čaká v poradí",
       "queuedDescription": "Čaká sa, kým bude k dispozícii kapacita na analýzu.",
       "analyzing": "Analyzuje sa",
       "analyzingDescription": "Overuje sa, či kód aplikácie môže volať zraniteľnú funkciu.",
@@ -1829,7 +1791,6 @@
       "extractionFailedDescription": "Technickú správu sa nepodarilo previesť na štruktúrovaný výsledok.",
       "exploitableDescription": "Kód aplikácie môže volať zraniteľnú funkciu.",
       "notExploitable": "Nedosiahnuteľné",
-      "notExploitableTitle": "Nedosiahnuteľné",
       "notExploitableDescription": "V tomto repozitári sa nenašla žiadna cesta vykonávania kódu vedúca k zraniteľnej funkcii.",
       "unknown": "Vyžaduje kontrolu",
       "unknownDescription": "Analýza nedokázala potvrdiť, či kód aplikácie môže volať zraniteľnú funkciu.",
@@ -1869,7 +1830,6 @@
       "dueInDays": "Termín o {{count}} dní"
     },
     "remediationStatus": {
-      "cancellationRequested": "Žiadosť o zrušenie bola odoslaná",
       "notStarted": "Nezačaté",
       "starting": "Spúšťa sa",
       "inProgress": "Prebieha",
@@ -1888,7 +1848,6 @@
       "findingNotOpen": "Nález už nie je otvorený.",
       "repoNotInScope": "Repozitár nie je vybraný na sledovanie bezpečnostným agentom.",
       "analysisRequired": "Pred začatím nápravy spusti analýzu zdrojového kódu.",
-      "sandboxAnalysisRequired": "Pred začatím nápravy spusti analýzu zdrojového kódu.",
       "staleAnalysis": "Nález sa po analýze zmenil. Pred spustením nápravy zopakujte analýzu.",
       "notExploitable": "Analýza nenašla žiadnu cestu vykonávania kódu vedúcu k zraniteľnej funkcii. Automatická náprava nie je dostupná.",
       "exploitabilityUnknown": "Analýza nedokázala potvrdiť zneužiteľnosť. Pred nápravou jedným kliknutím je potrebná manuálna kontrola.",
@@ -1904,12 +1863,10 @@
       "autoRemediationDisabled": "Automatická náprava je vypnutá. Manuálnu nápravu možno spustiť, ak prejdú bezpečnostné kontroly.",
       "includeExistingDisabled": "Existujúce nálezy sú vylúčené z automatickej nápravy.",
       "belowThreshold": "Závažnosť nálezu je pod hranicou pre automatickú nápravu. Manuálnu nápravu možno spustiť, ak prejdú bezpečnostné kontroly.",
-      "beforeEnablement": "Analýza sa dokončila pred zapnutím automatickej nápravy. Manuálnu nápravu možno spustiť, ak prejdú bezpečnostné kontroly.",
-      "generic": "Pre toto zistenie nie je dostupná náprava."
+      "beforeEnablement": "Analýza sa dokončila pred zapnutím automatickej nápravy. Manuálnu nápravu možno spustiť, ak prejdú bezpečnostné kontroly."
     },
     "commandFailure": {
       "ownerCapReached": "Kapacita na analýzy je vyčerpaná. Počkajte, kým sa dokončí niektorá z prebiehajúcich analýz, a potom to skúste znova.",
-      "githubTokenUnavailable": "Autorizácia na platforme GitHub vyžaduje zásah. Znova autorizujte aplikáciu GitHub a potom to skúste znova.",
       "githubAuthInvalid": "Autorizácia na platforme GitHub vyžaduje zásah. Znova autorizujte aplikáciu GitHub a potom to skúste znova.",
       "findingUnavailable": "Nález už nie je dostupný. Obnovte zoznam nálezov a ak je nález stále otvorený, skúste to znova.",
       "repositoryUnavailable": "Aplikácia GitHub už nemá prístup k repozitáru. Obnovte prístup k repozitáru a potom to skúste znova.",
@@ -1997,10 +1954,8 @@
       "title": "Relácia",
       "copyErrorDetails": "Kopírovať podrobnosti chyby",
       "backToSessions": "Späť na relácie",
-      "accessDeniedDescription": "Na zobrazenie nemáš oprávnenie.",
       "couldNotLoad": "Reláciu sa nepodarilo načítať.",
       "failedToLoadDetails": "Podrobnosti relácie sa nepodarilo načítať.",
-      "notFoundDescription": "Táto položka mohla byť odstránená alebo už nie je dostupná.",
       "failedToStopExecution": "Vykonávanie sa nepodarilo zastaviť.",
       "renameSession": "Premenovať reláciu",
       "renamePlaceholder": "Názov relácie",
@@ -2558,7 +2513,6 @@
     "signOutThisDeviceTitle": "Odhlásiť toto zariadenie?",
     "signOutThisSessionTitle": "Odhlásiť túto reláciu?",
     "signOutThisSessionMessage": "Zariadenie {{device}} sa odhlási. Prístup k API mu môže zostať ešte hodinu.",
-    "signOutMessage": "Na prístup do svojho pracovného priestoru sa budeš musieť znova prihlásiť.",
     "webBrowser": "Webový prehliadač"
   },
   "forceUpdate": {
@@ -2827,7 +2781,6 @@
         "accounting_adjustment": "Účtovná úprava",
         "credits_expired": "Platnosť kreditov sa skončila"
       },
-      "loadMoreFailed": "Nepodarilo sa načítať ďalšie položky.",
       "truncated": "K dispozícii sú aj staršie pohyby kreditov."
     },
     "inviteMember": {
@@ -2856,7 +2809,6 @@
       "truncated": "Staršie faktúry sú k dispozícii."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "meno@firma.sk",
       "enableA11y": "Zapnúť upozornenie na nízky zostatok",
       "notifyEmailsLabel": "E-mailové adresy na upozornenia",
       "permissionDenied": "Nemáš povolenie spravovať upozornenia na fakturáciu.",
@@ -2881,7 +2833,6 @@
       "emptyDescriptionCanInvite": "Pozvi kolegov a začnite spolupracovať v tejto organizácii.",
       "emptyDescriptionCannotInvite": "Požiadaj vlastníka alebo správcu fakturácie, aby pozval kolegov.",
       "emptyTitle": "Zatiaľ žiadni členovia",
-      "inviteMember": "Pozvať člena",
       "invitedDate": "Pozvánka odoslaná {{date}}",
       "limitPerDay": "{{amount}}/deň",
       "manageA11y": "Spravovať {{name}}",
@@ -2924,7 +2875,6 @@
       "couldNotLoadStatus": "Stav sa nepodarilo načítať",
       "creditProcessingDelayed": "Spracovanie kreditov mešká · pokus sa automaticky opakuje",
       "ended": "Skončené",
-      "manageHint": "Otvorí správu Kilo Pass na webe.",
       "notSubscribed": "Bez predplatného",
       "overallocated": "Počet pridelených predplatných Kilo Pass presahuje počet platených miest",
       "paidSeat_one": "{{displayCount}} platené miesto",

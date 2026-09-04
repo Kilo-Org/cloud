@@ -39,7 +39,7 @@ const SEVERITY_KEYS = {
 } satisfies Record<string, string>;
 
 const FINDING_STATUS_KEYS = {
-  superseded: 'securityAgent.findingDetails.statusSuperseded',
+  superseded: 'securityAgent.deadline.superseded',
   fixed: 'securityAgent.filter.fixed',
   dismissed: 'securityAgent.deadline.dismissed',
   open: 'securityAgent.findingDetails.statusOpen',

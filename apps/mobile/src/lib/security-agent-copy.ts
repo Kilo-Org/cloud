@@ -25,12 +25,12 @@ const LABEL_KEYS = {
 } satisfies Record<SecurityFindingAnalysisState, string>;
 
 const TITLE_KEYS = {
-  queued: 'securityAgent.analysisState.queuedTitle',
+  queued: 'securityAgent.analysisState.queued',
   analyzing: 'securityAgent.analysisState.analyzing',
   failed: 'securityAgent.analysisState.failed',
   'extraction-failed': 'securityAgent.analysisState.unknown',
   exploitable: 'securityAgent.analysis.exploitable',
-  'not-exploitable': 'securityAgent.analysisState.notExploitableTitle',
+  'not-exploitable': 'securityAgent.analysisState.notExploitable',
   unknown: 'securityAgent.analysisState.unknown',
   'safe-to-dismiss': 'securityAgent.analysisState.safeToDismiss',
   'manual-review': 'securityAgent.analysisState.manualReviewTitle',

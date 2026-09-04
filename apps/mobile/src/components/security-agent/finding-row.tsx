@@ -66,11 +66,11 @@ function getNextActionLabel(finding: SecurityFinding): string | null {
     finding.status === 'open' && (!finding.analysis_status || finding.analysis_status === 'failed');
   if (needsAnalysis) {
     return finding.analysis_status === 'failed'
-      ? i18n.t('securityAgent.findingRow.retryAnalysis')
+      ? i18n.t('securityAgent.analysis.retryAnalysis')
       : i18n.t('securityAgent.findingRow.runAnalysis');
   }
   if (finding.analysis?.triage?.suggestedAction === 'manual_review' && finding.status === 'open') {
-    return i18n.t('securityAgent.findingRow.nextNeedsManualReview');
+    return i18n.t('securityAgent.analysisState.manualReviewTitle');
   }
   if (finding.status === 'fixed' || finding.status === 'ignored') {
     return i18n.t('securityAgent.findingRow.nextViewDetails');
@@ -141,7 +141,7 @@ function FindingRowQuickAction({
         ) : null}
         <Text className="text-xs font-medium">
           {analysisFailed
-            ? t('securityAgent.findingRow.retryAnalysis')
+            ? t('securityAgent.analysis.retryAnalysis')
             : t('securityAgent.findingRow.analyze')}
         </Text>
       </Button>

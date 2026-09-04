@@ -372,7 +372,6 @@
         "closed": "Izmaiņu pieprasījums ir slēgts"
       },
       "partialSuccessBanner": {
-        "title": "Apvienots",
         "body": "Neizdevās dzēst zaru: {{reason}}.",
         "accessibility": "Apvienots. Neizdevās dzēst zaru: {{reason}}"
       },
@@ -443,7 +442,6 @@
       "acceptTerms": "Pieņemt",
       "replyBadRequest": "Šo atbildi nevar publicēt. Pavediens, iespējams, ir mainījies.",
       "replyForbidden": "Tev nav atļaujas atbildēt šajā izmaiņu pieprasījumā.",
-      "couldNotReply": "Neizdevās atbildēt.",
       "moderation": {
         "reportContent": {
           "terminal": "Par šo komentāru nevar ziņot.",
@@ -498,8 +496,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Neizdevās atvērt GitHub lietotnes iestatījumus.",
     "installKiloGitHubApp": "Instalēt Kilo GitHub lietotni",
-    "connectionExpiredTitle": "GitHub savienojuma derīguma termiņš ir beidzies.",
-    "connectionExpiredDescription": "Tavs GitHub savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna.",
     "checkConnection": "Pārbaudīt savienojumu",
     "couldNotLoadPullRequest": "Neizdevās ielādēt izmaiņu pieprasījumu.",
     "description": "Apraksts",
@@ -576,7 +572,6 @@
       "shareA11y": "Kopīgot izmaiņu pieprasījumu"
     },
     "submit": {
-      "title": "Iesniegt pārskatīšanas rezultātus",
       "loadFailedTitle": "Neizdevās ielādēt vērtējuma iesniegšanas formu.",
       "deletePendingTitle": "Dzēst nepublicēto komentāru?",
       "deletePendingMessage": "Šis komentārs tiks noņemts no vērtējuma rindas.",
@@ -593,8 +588,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub savienojuma derīguma termiņš ir beidzies.",
-      "message": "Tavs GitHub savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna.",
-      "checkConnection": "Pārbaudīt savienojumu"
+      "message": "Tavs GitHub savienojums vairs nav derīgs. Pārbaudi savienojumu vēlreiz — ja vajadzēs, lietotne aicinās izveidot savienojumu no jauna."
     },
     "eventChips": {
       "comment": "Komentēt",
@@ -620,8 +614,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediģēt novecojušo nepublicēto komentāru: {{location}}",
       "editA11y": "Rediģēt nepublicēto komentāru: {{location}}",
-      "emptyBody": "(tukšs)",
-      "outdated": "Novecojis",
       "staleHint": "kopš šī komentāra uzrakstīšanas PR ir mainījies.",
       "deleteA11y": "Dzēst nepublicēto komentāru: {{location}}",
       "deletedAnnouncement": "Nepublicētais komentārs dzēsts",
@@ -710,7 +702,6 @@
       "security": "Drošības konstatējumi"
     },
     "category": {
-      "chatMessagesTitle": "Tērzēšanas ziņojumi",
       "chatMessagesSubtitle": "atbildes tavās sarunās",
       "agentAttentionTitle": "Aģents gaida tavu rīcību",
       "agentAttentionSubtitle": "jautājumi, atļauju pieprasījumi un nepieciešamās atbildes",
@@ -718,11 +709,8 @@
       "agentUpdatesSubtitle": "aģenta ziņojumi uzdevuma izpildes laikā",
       "sessionStatusTitle": "Sesijas statuss",
       "sessionStatusSubtitle": "sesija pabeigta / kļūda / gatava vadīšanai",
-      "kiloclawActivityTitle": "KiloClaw darbība",
       "kiloclawActivitySubtitle": "instance gatava / kļūda, ieplānotas darbības",
-      "balanceAlertsTitle": "Brīdinājumi par atlikumu",
       "balanceAlertsSubtitle": "brīdinājumi par mazu organizācijas kredītu atlikumu",
-      "securityFindingsTitle": "Drošības konstatējumi",
       "securityFindingsSubtitle": "jaunas konstatētās problēmas un SLA atgādinājumi"
     }
   },
@@ -1196,8 +1184,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Mākslīgā intelekta modeļa izvēle",
       "secretsDescription": "Šifrēti akreditācijas dati",
-      "versionPinDescription": "Fiksēt konkrētu versiju",
-      "versionPinLabel": "Versijas fiksēšana"
+      "versionPinDescription": "Fiksēt konkrētu versiju"
     },
     "avatar": {
       "arcade": "Spēļu automāts",
@@ -1449,7 +1436,6 @@
       "severityHigh": "Augsts",
       "severityMedium": "Vidējs",
       "severityLow": "Zems",
-      "outcomeNotExploitable": "Nav izmantojams uzbrukumam",
       "outcomeTriageComplete": "Sākotnējā izvērtēšana pabeigta",
       "sortSeverityDesc": "Smaguma pakāpe: no augstākās līdz zemākajai",
       "sortSeverityAsc": "Smaguma pakāpe: no zemākās līdz augstākajai",
@@ -1555,15 +1541,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Atvērtie konstatējumi",
-      "openFindingsDetail": "Kritiski: {{critical}}, ar augstu riska līmeni: {{high}}",
-      "confirmedExploitable": "Apstiprināta izmantojamība uzbrukumam",
       "confirmedExploitableDetail": "Projekta risks apstiprināts analīzē",
-      "needsReview": "Tev jāpārskata",
       "needsReviewDetail": "Nepieciešams cilvēka lēmums",
-      "analysisIncomplete": "Analīze nav pabeigta",
       "analysisIncompleteDetail": "Projekta risks joprojām nav zināms",
       "slaCompliance": "SLA ievērošana",
-      "notMeasured": "Nav izmērīts",
       "withinDeadlineDetail": "{{within}} no {{total}} — termiņš nav nokavēts",
       "noDeadlineData": "Konstatējumiem vēl nav SLA termiņa",
       "deadlinePassed": "Termiņš beidzies",
@@ -1611,7 +1592,6 @@
       "source": "Avots",
       "sourceId": "Avota ID",
       "viewAdvisory": "Skatīt drošības paziņojumu vietnē GitHub",
-      "statusSuperseded": "Aizstāts",
       "statusOpen": "Atvērt",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Labošana jau ir sākta",
@@ -1622,7 +1602,6 @@
       "reasonAfterReview": "pēc pārskatīšanas"
     },
     "settingsOverview": {
-      "title": "Iestatījumi",
       "couldNotLoadSettings": "Neizdevās ielādēt drošības aģenta iestatījumus.",
       "couldNotLoadPermissions": "Neizdevās ielādēt atļaujas.",
       "on": "Ieslēgts",
@@ -1630,13 +1609,10 @@
       "repositoriesCount": "Atlasīti {{displayCount}} repozitoriji",
       "repositoriesCount_other": "Atlasīti {{displayCount}} repozitoriji",
       "selectRepositoriesSubtitle": "Izvēlies, kurus repozitorijus uzraudzīs drošības aģents",
-      "modelsAndAnalysis": "Modeļi un analīze",
       "analysisModeSubtitle": "Analīzes režīms: {{mode}}",
-      "automation": "Automatizācija",
       "automationAllOff": "Viss izslēgts",
       "automationCount": "Iespējoti {{displayCount}} no 3",
       "notificationsCount": "Iespējoti {{displayCount}} no 2",
-      "slaPolicy": "SLA politika",
       "disabledNoManage": "Drošības aģents ir atspējots. To var ieslēgt tikai organizācijas īpašnieki un norēķinu pārvaldnieki.",
       "disabledNoRepo": "Pirms drošības aģenta iespējošanas izvēlies vismaz vienu repozitoriju.",
       "disabledPrompt": "Ieslēdz drošības aģentu, lai sinhronizētu Dependabot brīdinājumus, izvēlētos repozitorijus un iestatītu automatizāciju.",
@@ -1646,8 +1622,6 @@
       "cancellationRequested": "Atcelšana pieprasīta",
       "cancelled": "Labošana atcelta",
       "couldNotLoad": "Neizdevās ielādēt labošanas statusu.",
-      "noAnalysisTitle": "Analīzes vēl nav",
-      "noAnalysisDescription": "Sāc analīzi cilnē Informācija.",
       "start": "Sākt labošanu",
       "retry": "Atkārtot labošanu",
       "cancelTitle": "Atcelt šo labošanu?",
@@ -1663,10 +1637,8 @@
       "retryQueued": "Atkārtota labošana pievienota rindai",
       "timeline": {
         "queued": "Labošana pieprasīta",
-        "prOpened": "PR atvērts",
         "failed": "Labošana neizdevās",
-        "blocked": "Labošana bloķēta",
-        "noChangesNeeded": "Izmaiņas nav vajadzīgas"
+        "blocked": "Labošana bloķēta"
       },
       "unavailable": "Šim konstatējumam labošanas funkcija nav pieejama."
     },
@@ -1674,9 +1646,6 @@
       "title": "Modeļi un analīze",
       "couldNotLoad": "Neizdevās ielādēt analīzes iestatījumus.",
       "depth": "Analīzes dziļums",
-      "modeAuto": "Automātiska",
-      "modeShallow": "Virspusēja",
-      "modeDeep": "Padziļināta",
       "triageModel": "Sākotnējās izvērtēšanas modelis",
       "analysisModel": "Analīzes modelis",
       "remediationModel": "Labošanas modelis"
@@ -1702,10 +1671,7 @@
     "findingDetail": {
       "title": "Konstatējums",
       "tabAnalysis": "Analīze",
-      "tabRemediation": "Labošana",
-      "notFound": "Konstatējums nav atrasts",
-      "notFoundDescription": "Šis konstatējums, iespējams, ir noņemts, vai tev vairs nav tam piekļuves.",
-      "couldNotLoad": "Neizdevās ielādēt šo konstatējumu."
+      "tabRemediation": "Labošana"
     },
     "findingList": {
       "couldNotLoad": "Neizdevās ielādēt konstatējumus.",
@@ -1720,9 +1686,7 @@
       "nextRemediationInProgress": "Notiek labošana",
       "nextRetryRemediation": "Labošanu var atkārtot",
       "nextRemediationAvailable": "Pieejama labošana",
-      "retryAnalysis": "Atkārtot analīzi",
       "runAnalysis": "Sākt analīzi",
-      "nextNeedsManualReview": "Jāpārskata manuāli",
       "nextViewDetails": "Skatīt detalizēti",
       "viewPr": "Skatīt PR",
       "analyze": "Analizēt",
@@ -1764,7 +1728,6 @@
       "newFindingSubtitle": "Paziņojums tiek sūtīts ikreiz, kad tiek sinhronizēts jauns konstatējums, arī pirmajā sinhronizācijā.",
       "slaLeadTimeAccessibility": "Dienu skaits pirms SLA termiņa, kad sūtīt brīdinājumu",
       "slaLeadTimeError": "Ievadi dienu skaitu no 1 līdz 365, izmantojot veselu skaitli.",
-      "slaLeadTimeHint": "Ievadi veselu skaitli no 1 līdz 365",
       "slaLeadTimeLabel": "Brīdināt pirms SLA termiņa (dienās)",
       "slaPersonalTitle": "Sūtīt man e-pastus ar SLA brīdinājumiem",
       "slaSection": "SLA brīdinājumu paziņojumi",
@@ -1809,7 +1772,6 @@
     },
     "analysisState": {
       "queued": "Analīze rindā",
-      "queuedTitle": "Analīze rindā",
       "queuedDescription": "Analīze gaida, līdz atbrīvosies vieta tās izpildei.",
       "analyzing": "Notiek analīze",
       "analyzingDescription": "Tiek pārbaudīts, vai no lietotnes koda var sasniegt skarto funkciju.",
@@ -1818,7 +1780,6 @@
       "extractionFailedDescription": "Tehnisko ziņojumu nevarēja pārvērst strukturētā rezultātā.",
       "exploitableDescription": "No lietotnes koda var sasniegt skarto funkciju.",
       "notExploitable": "Nesasniedzams",
-      "notExploitableTitle": "Nesasniedzams",
       "notExploitableDescription": "Šajā repozitorijā netika atrasts izpildes ceļš līdz skartajai funkcijai.",
       "unknown": "Jāpārskata",
       "unknownDescription": "Analīzē neizdevās apstiprināt, vai ievainojamā funkcija ir sasniedzama.",
@@ -1856,7 +1817,6 @@
       "dueInDays": "Termiņš pēc {{count}} dienām"
     },
     "remediationStatus": {
-      "cancellationRequested": "Atcelšana pieprasīta",
       "notStarted": "Nav sākta",
       "starting": "Tiek palaists",
       "inProgress": "Notiek",
@@ -1875,7 +1835,6 @@
       "findingNotOpen": "Konstatējums vairs nav atvērts.",
       "repoNotInScope": "Repozitorijs nav izvēlēts drošības aģenta uzraudzībai.",
       "analysisRequired": "Pirms labošanas sākšanas veic koda bāzes analīzi.",
-      "sandboxAnalysisRequired": "Pirms labošanas sākšanas veic koda bāzes analīzi.",
       "staleAnalysis": "Konstatējums pēc analīzes ir mainījies. Pirms labošanas sākšanas veic analīzi vēlreiz.",
       "notExploitable": "Analīzē netika atrasts izpildes ceļš līdz ievainojamajai funkcijai. Automātiskā labošana nav pieejama.",
       "exploitabilityUnknown": "Analīzē neizdevās apstiprināt izmantojamību uzbrukumā. Pirms labošanas ar vienu pieskārienu nepieciešama manuāla pārskatīšana.",
@@ -1891,12 +1850,10 @@
       "autoRemediationDisabled": "Automātiskā labošana ir atspējota. Ja drošības pārbaudes ir sekmīgas, labošanu joprojām var sākt manuāli.",
       "includeExistingDisabled": "Esošie konstatējumi nav iekļauti automātiskajā labošanā.",
       "belowThreshold": "Konstatējuma smaguma pakāpe ir zem automātiskajai labošanai noteiktā sliekšņa. Ja drošības pārbaudes ir sekmīgas, labošanu joprojām var sākt manuāli.",
-      "beforeEnablement": "Analīze pabeigta pirms automātiskās labošanas iespējošanas. Ja drošības pārbaudes ir sekmīgas, labošanu joprojām var sākt manuāli.",
-      "generic": "Šim konstatējumam labošanas funkcija nav pieejama."
+      "beforeEnablement": "Analīze pabeigta pirms automātiskās labošanas iespējošanas. Ja drošības pārbaudes ir sekmīgas, labošanu joprojām var sākt manuāli."
     },
     "commandFailure": {
       "ownerCapReached": "Sasniegts vienlaicīgu analīžu limits. Pagaidi, līdz kāda no pašreizējām analīzēm beidzas, un mēģini vēlreiz.",
-      "githubTokenUnavailable": "Jāatjauno GitHub autorizācija. Atkārtoti autorizē GitHub lietotni un mēģini vēlreiz.",
       "githubAuthInvalid": "Jāatjauno GitHub autorizācija. Atkārtoti autorizē GitHub lietotni un mēģini vēlreiz.",
       "findingUnavailable": "Konstatējums vairs nav pieejams. Atsvaidzini konstatējumus un mēģini vēlreiz, ja tas joprojām ir atvērts.",
       "repositoryUnavailable": "Repozitorijs vairs nav pieejams GitHub lietotnei. Atjaunini piekļuvi repozitorijam un mēģini vēlreiz.",
@@ -1981,10 +1938,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopēt informāciju par kļūdu",
       "backToSessions": "Atpakaļ uz sesijām",
-      "accessDeniedDescription": "Tev nav atļaujas to skatīt.",
       "couldNotLoad": "Neizdevās ielādēt sesiju.",
       "failedToLoadDetails": "Neizdevās ielādēt sesijas informāciju.",
-      "notFoundDescription": "Iespējams, šis vienums ir noņemts vai vairs nav pieejams.",
       "failedToStopExecution": "Neizdevās apturēt izpildi.",
       "renameSession": "Pārdēvēt sesiju",
       "renamePlaceholder": "Sesijas nosaukums",
@@ -2537,8 +2492,7 @@
     "sessionSignedOut": "Sesija ir beigta.",
     "signOutThisDeviceTitle": "Izrakstīties šajā ierīcē?",
     "signOutThisSessionTitle": "Beigt šo sesiju?",
-    "signOutThisSessionMessage": "Ierīcē „{{device}}” tiks veikta izrakstīšanās. Tai vēl līdz stundai var saglabāties piekļuve API.",
-    "signOutMessage": "Lai piekļūtu savai darbvietai, tev būs jāpierakstās vēlreiz."
+    "signOutThisSessionMessage": "Ierīcē „{{device}}” tiks veikta izrakstīšanās. Tai vēl līdz stundai var saglabāties piekļuve API."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Neizdevās atvērt lietotņu veikalu.",
@@ -2806,7 +2760,6 @@
         "accounting_adjustment": "Grāmatvedības korekcija",
         "credits_expired": "Kredītu derīguma termiņš beidzies"
       },
-      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
       "truncated": "Ir pieejami arī iepriekšējie kredītu darījumi."
     },
     "inviteMember": {
@@ -2835,7 +2788,6 @@
       "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "vards@uznemums.com",
       "enableA11y": "Iespējot brīdinājumu par mazu atlikumu",
       "notifyEmailsLabel": "Paziņojumu saņēmēju e-pasta adreses",
       "permissionDenied": "Tev nav atļaujas pārvaldīt norēķinu brīdinājumus.",
@@ -2860,7 +2812,6 @@
       "emptyDescriptionCanInvite": "Uzaicini komandas biedrus, lai sāktu sadarbību šajā organizācijā.",
       "emptyDescriptionCannotInvite": "Palūdz īpašniekam vai norēķinu pārvaldniekam uzaicināt komandas biedrus.",
       "emptyTitle": "Vēl nav dalībnieku",
-      "inviteMember": "Uzaicināt dalībnieku",
       "invitedDate": "Uzaicināts {{date}}",
       "limitPerDay": "{{amount}}/dienā",
       "manageA11y": "Pārvaldīt {{name}}",
@@ -2903,7 +2854,6 @@
       "couldNotLoadStatus": "Neizdevās ielādēt statusu",
       "creditProcessingDelayed": "Kredītu apstrāde kavējas · automātiski mēģina vēlreiz",
       "ended": "Beidzies",
-      "manageHint": "Atver Kilo Pass pārvaldību tīmeklī.",
       "notSubscribed": "Nav abonēts",
       "overallocated": "Piešķirto Kilo Pass abonementu skaits pārsniedz apmaksāto vietu skaitu",
       "paidSeat_one": "{{displayCount}} apmaksāta vieta",

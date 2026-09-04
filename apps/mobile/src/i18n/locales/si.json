@@ -370,7 +370,6 @@
         "closed": "මෙම පුල් ඉල්ලීම වසා ඇත"
       },
       "partialSuccessBanner": {
-        "title": "ඒකාබද්ධ කර ඇත",
         "body": "ශාඛාව මැකීමට නොහැකි විය: {{reason}}.",
         "accessibility": "ඒකාබද්ධ කරන ලදී. ශාඛාව මැකීමට නොහැකි විය: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "පිළිගන්න",
       "replyBadRequest": "මෙම පිළිතුර පළ කළ නොහැක. සාකච්ඡා පෙළ වෙනස් වී තිබිය හැක.",
       "replyForbidden": "මෙම පුල් ඉල්ලීමට පිළිතුරු දීමට ඔබට අවසර නොමැත.",
-      "couldNotReply": "පිළිතුරු දීමට නොහැකි විය.",
       "moderation": {
         "reportContent": {
           "terminal": "මෙම අදහස වාර්තා කළ නොහැක.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub යෙදුමේ සැකසුම් විවෘත කළ නොහැකි විය.",
     "installKiloGitHubApp": "Kilo GitHub යෙදුම ස්ථාපනය කරන්න",
-    "connectionExpiredTitle": "GitHub සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
-    "connectionExpiredDescription": "ඔබේ GitHub සම්බන්ධතාවය තවදුරටත් වලංගු නොවේ. ඔබේ සම්බන්ධතාවය නැවත පරීක්ෂා කරන්න — අවශ්‍ය නම් නැවත සම්බන්ධ වීමට ඔබෙන් අසනු ඇත.",
     "checkConnection": "සම්බන්ධතාව පරීක්ෂා කරන්න",
     "couldNotLoadPullRequest": "පුල් ඉල්ලීම පූරණය කිරීමට නොහැකි විය.",
     "description": "විස්තරය",
@@ -572,7 +568,6 @@
       "shareA11y": "පුල් ඉල්ලීම බෙදාගන්න"
     },
     "submit": {
-      "title": "සමාලෝචනය ඉදිරිපත් කරන්න",
       "loadFailedTitle": "සමාලෝචනය ඉදිරිපත් කරන තිරය පූරණය කිරීමට නොහැකි විය.",
       "deletePendingTitle": "යැවීමට ඇති අදහස මකන්නද?",
       "deletePendingMessage": "මෙම අදහස සමාලෝචන පෝලිමෙන් ඉවත් කරනු ඇත.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub සම්බන්ධතාව කල් ඉකුත් වී ඇත.",
-      "message": "ඔබේ GitHub සම්බන්ධතාවය තවදුරටත් වලංගු නොවේ. ඔබේ සම්බන්ධතාවය නැවත පරීක්ෂා කරන්න — අවශ්‍ය නම් නැවත සම්බන්ධ වීමට ඔබෙන් අසනු ඇත.",
-      "checkConnection": "සම්බන්ධතාව පරීක්ෂා කරන්න"
+      "message": "ඔබේ GitHub සම්බන්ධතාවය තවදුරටත් වලංගු නොවේ. ඔබේ සම්බන්ධතාවය නැවත පරීක්ෂා කරන්න — අවශ්‍ය නම් නැවත සම්බන්ධ වීමට ඔබෙන් අසනු ඇත."
     },
     "eventChips": {
       "comment": "අදහස් දැක්වීම",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}} හි යල් පැන ගිය, යැවීමට ඇති අදහස සංස්කරණය කරන්න",
       "editA11y": "{{location}} හි යැවීමට ඇති අදහස සංස්කරණය කරන්න",
-      "emptyBody": "(හිස්)",
-      "outdated": "යල් පැන ගිය",
       "staleHint": "ඔබ මෙය ලිවීමෙන් පසු PR යාවත්කාලීන වී ඇත.",
       "deleteA11y": "{{location}} හි යැවීමට ඇති අදහස මකන්න",
       "deletedAnnouncement": "යැවීමට තිබූ අදහස මකා ඇත",
@@ -703,7 +695,6 @@
       "security": "හඳුනාගත් ආරක්ෂක ගැටලු"
     },
     "category": {
-      "chatMessagesTitle": "කතාබස් පණිවිඩ",
       "chatMessagesSubtitle": "ඔබේ සංවාදවල පිළිතුරු",
       "agentAttentionTitle": "නියෝජිතයාට ඔබේ සහාය අවශ්‍යයි",
       "agentAttentionSubtitle": "පිළිතුරු, අවසර හෝ තොරතුරු අවශ්‍ය අවස්ථා",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "කාර්යය කරන අතරතුර නියෝජිතයා එවන පණිවිඩ",
       "sessionStatusTitle": "සැසි තත්ත්වය",
       "sessionStatusSubtitle": "අවසන් / අසාර්ථක / පාලනයට සූදානම්",
-      "kiloclawActivityTitle": "KiloClaw ක්‍රියාකාරකම්",
       "kiloclawActivitySubtitle": "පිටපත සූදානම් හෝ අසාර්ථක වීම, කාලසටහන්ගත ක්‍රියා",
-      "balanceAlertsTitle": "ශේෂය පිළිබඳ ඇඟවීම්",
       "balanceAlertsSubtitle": "සංවිධානයේ ශේෂය අඩු වීමේ දැනුම්දීම්",
-      "securityFindingsTitle": "හඳුනාගත් ආරක්ෂක ගැටලු",
       "securityFindingsSubtitle": "නව සොයාගැනීම් සහ SLA මතක් කිරීම්"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "AI ආකෘති තේරීම",
       "secretsDescription": "ගුප්තකේතනය කළ අක්තපත්‍ර",
-      "versionPinDescription": "නිශ්චිත අනුවාදයකට ස්ථිර කරන්න",
-      "versionPinLabel": "අනුවාදය ස්ථිර කිරීම"
+      "versionPinDescription": "නිශ්චිත අනුවාදයකට ස්ථිර කරන්න"
     },
     "avatar": {
       "arcade": "ආකේඩ් ක්‍රීඩාව",
@@ -1440,7 +1427,6 @@
       "severityHigh": "ඉහළ",
       "severityMedium": "මධ්‍යම",
       "severityLow": "අඩු",
-      "outcomeNotExploitable": "ප්‍රහාරයකට යොදාගත නොහැකි",
       "outcomeTriageComplete": "මූලික ඇගයීම සම්පූර්ණයි",
       "sortSeverityDesc": "බරපතළකම: ඉහළ සිට පහළට",
       "sortSeverityAsc": "බරපතළකම: පහළ සිට ඉහළට",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "විවෘත සොයාගැනීම්",
-      "openFindingsDetail": "බරපතළ {{critical}}, ඉහළ {{high}}",
-      "confirmedExploitable": "ප්‍රහාරයකට යොදාගත හැකි බව තහවුරු කළ",
       "confirmedExploitableDetail": "විශ්ලේෂණයෙන් ව්‍යාපෘතියේ අවදානම තහවුරු වී ඇත",
-      "needsReview": "ඔබේ සමාලෝචනය අවශ්‍යයි",
       "needsReviewDetail": "පුද්ගලයෙකුගේ තීරණයක් අවශ්‍යයි",
-      "analysisIncomplete": "විශ්ලේෂණය සම්පූර්ණ කර නැත",
       "analysisIncompleteDetail": "ව්‍යාපෘතියේ අවදානම තවමත් නොදනී",
       "slaCompliance": "SLA අනුකූලතාව",
-      "notMeasured": "මැන බලා නැත",
       "withinDeadlineDetail": "{{total}} න් {{within}} ක් නියමිත කාලය තුළ",
       "noDeadlineData": "කිසිදු සොයාගැනීමකට තවම SLA අවසන් දිනයක් නියම කර නැත",
       "deadlinePassed": "නියමිත කාලය ඉක්මවා ඇත",
@@ -1601,7 +1582,6 @@
       "source": "මූලාශ්‍රය",
       "sourceId": "මූලාශ්‍ර හැඳුනුම",
       "viewAdvisory": "GitHub හි ආරක්ෂක නිවේදනය බලන්න",
-      "statusSuperseded": "ප්‍රතිස්ථාපනය වී ඇත",
       "statusOpen": "විවෘත",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "නිවැරදි කිරීමක් දැනටමත් ආරම්භ වී ඇත",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "සමාලෝචනයෙන් පසුව"
     },
     "settingsOverview": {
-      "title": "සැකසුම්",
       "couldNotLoadSettings": "ආරක්ෂක නියෝජිතයාගේ සැකසුම් පූරණය කළ නොහැකි විය.",
       "couldNotLoadPermissions": "අවසර පූරණය කළ නොහැකි විය.",
       "on": "ක්‍රියාත්මකයි",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "කේත ගබඩා {{displayCount}}ක් තෝරා ඇත",
       "repositoriesCount_other": "කේත ගබඩා {{displayCount}}ක් තෝරා ඇත",
       "selectRepositoriesSubtitle": "ආරක්ෂක නියෝජිතයා නිරීක්ෂණය කළ යුතු ගබඩා තෝරන්න",
-      "modelsAndAnalysis": "ආකෘති සහ විශ්ලේෂණය",
       "analysisModeSubtitle": "{{mode}} විශ්ලේෂණය",
-      "automation": "ස්වයංක්‍රීයකරණය",
       "automationAllOff": "සියල්ල අක්‍රීයයි",
       "automationCount": "3 න් {{displayCount}} ක් සක්‍රීයයි",
       "notificationsCount": "2 න් {{displayCount}} ක් සක්‍රීයයි",
-      "slaPolicy": "SLA ප්‍රතිපත්තිය",
       "disabledNoManage": "ආරක්ෂක නියෝජිතයා අක්‍රීයයි. එය සක්‍රීය කළ හැක්කේ සංවිධාන හිමිකරුවන්ට සහ බිල්පත් කළමනාකරුවන්ට පමණි.",
       "disabledNoRepo": "ආරක්ෂක නියෝජිතයා සක්‍රීය කිරීමට පෙර අවම වශයෙන් එක් ගබඩාවක් තෝරන්න.",
       "disabledPrompt": "Dependabot ඇඟවීම් සමමුහුර්ත කිරීමට, ගබඩා තේරීමට සහ ස්වයංක්‍රීයකරණය සැකසීමට ආරක්ෂක නියෝජිතයා සක්‍රීය කරන්න."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "අවලංගු කිරීමක් ඉල්ලා ඇත",
       "cancelled": "පිළියම් යෙදීම අවලංගු කළා",
       "couldNotLoad": "පිළියම් යෙදීමේ තත්ත්වය පූරණය කළ නොහැකි විය.",
-      "noAnalysisTitle": "තවම විශ්ලේෂණයක් නැත",
-      "noAnalysisDescription": "විස්තර ටැබයෙන් විශ්ලේෂණයක් ආරම්භ කරන්න.",
       "start": "පිළියම් යෙදීම ආරම්භ කරන්න",
       "retry": "පිළියම් යෙදීමට නැවත උත්සාහ කරන්න",
       "cancelTitle": "මෙම පිළියම් යෙදීම අවලංගු කරන්නද?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "පිළියම් යෙදීමේ නැවත උත්සාහය පෝලිමට එක් කළා",
       "timeline": {
         "queued": "පිළියම් යෙදීමට ඉල්ලා ඇත",
-        "prOpened": "PR විවෘත කර ඇත",
         "failed": "පිළියම් යෙදීම අසාර්ථකයි",
-        "blocked": "පිළියම් යෙදීම අවහිර වී ඇත",
-        "noChangesNeeded": "වෙනස්කම් අවශ්‍ය නැත"
+        "blocked": "පිළියම් යෙදීම අවහිර වී ඇත"
       },
       "unavailable": "හඳුනාගත් මෙම ගැටලුව සඳහා පිළියම් යෙදීමේ පහසුකම නොමැත."
     },
@@ -1663,9 +1635,6 @@
       "title": "ආකෘති සහ විශ්ලේෂණය",
       "couldNotLoad": "විශ්ලේෂණ සැකසුම් පූරණය කළ නොහැකි විය.",
       "depth": "විශ්ලේෂණ ගැඹුර",
-      "modeAuto": "ස්වයංක්‍රීය",
-      "modeShallow": "මතුපිට",
-      "modeDeep": "ගැඹුරු",
       "triageModel": "මූලික ඇගයීමේ ආකෘතිය",
       "analysisModel": "විශ්ලේෂණ ආකෘතිය",
       "remediationModel": "පිළියම් යෙදීමේ ආකෘතිය"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "සොයාගැනීම",
       "tabAnalysis": "විශ්ලේෂණය",
-      "tabRemediation": "පිළියම්",
-      "notFound": "හඳුනාගත් ගැටලුව හමු නොවීය",
-      "notFoundDescription": "මෙම සොයාගැනීම ඉවත් කර තිබිය හැක. නැතහොත් ඔබට තවදුරටත් එයට ප්‍රවේශ වීමට අවසර නැති විය හැක.",
-      "couldNotLoad": "හඳුනාගත් මෙම ගැටලුව පූරණය කළ නොහැකි විය."
+      "tabRemediation": "පිළියම්"
     },
     "findingList": {
       "couldNotLoad": "සොයාගැනීම් පූරණය කළ නොහැකි විය.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "පිළියම් යොදමින් පවතී",
       "nextRetryRemediation": "පිළියම් යෙදීමට නැවත උත්සාහ කළ හැක",
       "nextRemediationAvailable": "පිළියම් යෙදිය හැක",
-      "retryAnalysis": "විශ්ලේෂණයට නැවත උත්සාහ කරන්න",
       "runAnalysis": "විශ්ලේෂණය ආරම්භ කරන්න",
-      "nextNeedsManualReview": "පුද්ගලයකුගේ සමාලෝචනය අවශ්‍යයි",
       "nextViewDetails": "විස්තර බලන්න",
       "viewPr": "PR බලන්න",
       "analyze": "විශ්ලේෂණය කරන්න",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "පළමු සමමුහුර්ත කිරීමේදී ද ඇතුළුව, නව සොයාගැනීමක් සමමුහුර්ත කරන සෑම විටම යවයි.",
       "slaLeadTimeAccessibility": "SLA අවසන් දිනයට පෙර අනතුරු ඇඟවිය යුතු දින ගණන",
       "slaLeadTimeError": "දින ගණන 1 සහ 365 අතර පූර්ණ සංඛ්‍යාවක් ලෙස ඇතුළත් කරන්න.",
-      "slaLeadTimeHint": "1 සහ 365 අතර පූර්ණ සංඛ්‍යාවක් ඇතුළත් කරන්න",
       "slaLeadTimeLabel": "SLA අවසන් දිනයට පෙර අනතුරු ඇඟවීම (දින)",
       "slaPersonalTitle": "SLA අනතුරු ඇඟවීම් ගැන මට විද්‍යුත් තැපැල් යවන්න",
       "slaSection": "SLA අනතුරු ඇඟවීම් දැනුම්දීම",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "විශ්ලේෂණය පෝලිමේ ඇත",
-      "queuedTitle": "විශ්ලේෂණය පෝලිමේ ඇත",
       "queuedDescription": "විශ්ලේෂණයක් ආරම්භ කිරීමට ධාරිතාව ලැබෙන තෙක් රැඳී සිටී.",
       "analyzing": "විශ්ලේෂණය කරමින්",
       "analyzingDescription": "යෙදුමේ කේතයට බලපෑමට ලක් වූ විශේෂාංගය වෙත ළඟා විය හැකිදැයි පරීක්ෂා කරමින් පවතී.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "තාක්ෂණික වාර්තාව ව්‍යුහගත ප්‍රතිඵලයක් බවට පත් කළ නොහැකි විය.",
       "exploitableDescription": "යෙදුම් කේතයට බලපෑමට ලක් වූ විශේෂාංගය වෙත ළඟා විය හැක.",
       "notExploitable": "ළඟා විය නොහැකි",
-      "notExploitableTitle": "ළඟා විය නොහැකි",
       "notExploitableDescription": "මෙම ගබඩාවේ ළඟා විය හැකි මාර්ගයක් හමු නොවීය.",
       "unknown": "සමාලෝචනය අවශ්‍යයි",
       "unknownDescription": "දුර්වලතාව සහිත විශේෂාංගය වෙත ළඟා විය හැකිදැයි විශ්ලේෂණයෙන් තහවුරු කළ නොහැකි විය.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "නියමිත දිනට තව දින {{count}}යි"
     },
     "remediationStatus": {
-      "cancellationRequested": "අවලංගු කිරීමක් ඉල්ලා ඇත",
       "notStarted": "ආරම්භ කර නොමැත",
       "starting": "ආරම්භ වෙමින්",
       "inProgress": "සිදු වෙමින් පවතී",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "සොයාගැනීම තවදුරටත් විවෘත නොවේ.",
       "repoNotInScope": "ආරක්ෂක නියෝජිතයා සඳහා ගබඩාව තෝරා නැත.",
       "analysisRequired": "පිළියම් යෙදීම ආරම්භ කිරීමට පෙර කේත පදනම විශ්ලේෂණය කරන්න.",
-      "sandboxAnalysisRequired": "පිළියම් යෙදීම ආරම්භ කිරීමට පෙර කේත පදනම විශ්ලේෂණය කරන්න.",
       "staleAnalysis": "විශ්ලේෂණයෙන් පසු සොයාගැනීම වෙනස් වී ඇත. පිළියම් යෙදීමට පෙර නැවත විශ්ලේෂණය කරන්න.",
       "notExploitable": "දුර්වලතාව වෙත ළඟා විය හැකි කේත මාර්ගයක් විශ්ලේෂණයෙන් හමු නොවීය. ස්වයංක්‍රීයව පිළියම් යෙදිය නොහැක.",
       "exploitabilityUnknown": "ප්‍රහාරයකට යොදාගත හැකිදැයි විශ්ලේෂණයෙන් තහවුරු කළ නොහැකි විය. එක් ක්ලික් කිරීමකින් පිළියම් යෙදීමට පෙර පුද්ගලයෙකු විසින් සමාලෝචනය කළ යුතුයි.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "ස්වයංක්‍රීයව පිළියම් යෙදීම අක්‍රීයයි. ආරක්ෂක පරීක්ෂණ සමත් වූ පසු ඔබටම පිළියම් යෙදීම ආරම්භ කළ හැක.",
       "includeExistingDisabled": "පවතින සොයාගැනීම් ස්වයංක්‍රීයව පිළියම් යෙදීමෙන් බැහැර කර ඇත.",
       "belowThreshold": "සොයාගැනීමේ බරපතළකම ස්වයංක්‍රීයව පිළියම් යෙදීමට අවශ්‍ය මට්ටමට අඩුයි. ආරක්ෂක පරීක්ෂණ සමත් වූ පසු ඔබටම පිළියම් යෙදීම ආරම්භ කළ හැක.",
-      "beforeEnablement": "ස්වයංක්‍රීයව පිළියම් යෙදීම සක්‍රීය කිරීමට පෙර විශ්ලේෂණය සම්පූර්ණ වී ඇත. ආරක්ෂක පරීක්ෂණ සමත් වූ පසු ඔබටම පිළියම් යෙදීම ආරම්භ කළ හැක.",
-      "generic": "හඳුනාගත් මෙම ගැටලුව සඳහා පිළියම් යෙදීමේ පහසුකම නොමැත."
+      "beforeEnablement": "ස්වයංක්‍රීයව පිළියම් යෙදීම සක්‍රීය කිරීමට පෙර විශ්ලේෂණය සම්පූර්ණ වී ඇත. ආරක්ෂක පරීක්ෂණ සමත් වූ පසු ඔබටම පිළියම් යෙදීම ආරම්භ කළ හැක."
     },
     "commandFailure": {
       "ownerCapReached": "එකවර කළ හැකි උපරිම විශ්ලේෂණ ගණනට ළඟා වී ඇත. දැනට සිදු වන විශ්ලේෂණයක් අවසන් වූ පසු නැවත උත්සාහ කරන්න.",
-      "githubTokenUnavailable": "GitHub අවසරය සම්බන්ධ ගැටලුවක් ඇත. GitHub යෙදුමට නැවත අවසර දී නැවත උත්සාහ කරන්න.",
       "githubAuthInvalid": "GitHub අවසරය සම්බන්ධ ගැටලුවක් ඇත. GitHub යෙදුමට නැවත අවසර දී නැවත උත්සාහ කරන්න.",
       "findingUnavailable": "සොයාගැනීම තවදුරටත් ලබාගත නොහැක. සොයාගැනීම් නැවත පූරණය කරන්න. එය තවමත් විවෘත නම් නැවත උත්සාහ කරන්න.",
       "repositoryUnavailable": "GitHub යෙදුමට තවදුරටත් ගබඩාවට ප්‍රවේශ විය නොහැක. ගබඩා ප්‍රවේශය යාවත්කාලීන කර නැවත උත්සාහ කරන්න.",
@@ -1965,10 +1922,8 @@
       "title": "සැසිය",
       "copyErrorDetails": "දෝෂ විස්තර පිටපත් කරන්න",
       "backToSessions": "සැසි වෙත ආපසු යන්න",
-      "accessDeniedDescription": "මෙය බැලීමට ඔබට අවසර නැත.",
       "couldNotLoad": "සැසිය පූරණය කළ නොහැකි විය.",
       "failedToLoadDetails": "සැසියේ විස්තර පූරණය කළ නොහැකි විය.",
-      "notFoundDescription": "මෙම අයිතමය ඉවත් කර තිබිය හැකිය, නැතිනම් එය තවදුරටත් ලබාගත නොහැක.",
       "failedToStopExecution": "ක්‍රියාත්මක කිරීම නතර කළ නොහැකි විය.",
       "renameSession": "සැසියේ නම වෙනස් කරන්න",
       "renamePlaceholder": "සැසියේ නම",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "මෙම උපාංගයෙන් පිටවන්නද?",
     "signOutThisSessionTitle": "මෙම සැසියෙන් පිටවන්නද?",
     "signOutThisSessionMessage": "{{device}} උපාංගයේ ගිණුමෙන් පිටවනු ඇත. එයට තවත් පැයක් දක්වා API ප්‍රවේශය තිබිය හැක.",
-    "signOutMessage": "ඔබේ වැඩබිමට පිවිසීමට නැවත පුරනය විය යුතුය.",
     "webBrowser": "වෙබ් බ්‍රවුසරය"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "ගිණුම්කරණ ගැළපීම",
         "credits_expired": "ක්‍රෙඩිට් කල් ඉකුත් වී ඇත"
       },
-      "loadMoreFailed": "තවත් පූරණය කළ නොහැකි විය.",
       "truncated": "පෙර ක්‍රෙඩිට් ගනුදෙනු ද බැලිය හැක."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "පෙර ඉන්වොයිසි ද බැලිය හැක."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ඔබේ ඊමේල් ලිපිනය",
       "enableA11y": "ශේෂය අඩු වූ විට දැනුම්දීම සක්‍රීය කරන්න",
       "notifyEmailsLabel": "දැනුම්දීම් ලබන ඊමේල් ලිපින",
       "permissionDenied": "බිල්පත් දැනුම්දීම් කළමනාකරණය කිරීමට ඔබට අවසර නොමැත.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "මෙම සංවිධානයේ සහයෝගයෙන් කටයුතු කිරීමට සගයන්ට ආරාධනා කරන්න.",
       "emptyDescriptionCannotInvite": "සගයන්ට ආරාධනා කිරීමට හිමිකරුවෙකුගෙන් හෝ බිල්පත් කළමනාකරුවෙකුගෙන් ඉල්ලන්න.",
       "emptyTitle": "තවම සාමාජිකයන් නොමැත",
-      "inviteMember": "සාමාජිකයකුට ආරාධනා කරන්න",
       "invitedDate": "ආරාධනා කරන ලද්දේ {{date}}",
       "limitPerDay": "දිනකට {{amount}}",
       "manageA11y": "{{name}} කළමනාකරණය කරන්න",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "තත්ත්වය පූරණය කළ නොහැකි විය",
       "creditProcessingDelayed": "ක්‍රෙඩිට් සැකසීම ප්‍රමාදයි · ස්වයංක්‍රීයව නැවත උත්සාහ කරමින්",
       "ended": "අවසන්",
-      "manageHint": "වෙබ් අඩවියේ Kilo Pass කළමනාකරණ පිටුව විවෘත කරයි.",
       "notSubscribed": "දායක වී නොමැත",
       "overallocated": "Kilo Pass පැවරුම් ගෙවූ සාමාජික ස්ථාන ගණන ඉක්මවයි",
       "paidSeat_one": "ගෙවූ සාමාජික ස්ථාන {{displayCount}} ක්",

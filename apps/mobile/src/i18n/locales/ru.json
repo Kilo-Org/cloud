@@ -278,7 +278,6 @@
       "security": "Замечания по безопасности"
     },
     "category": {
-      "chatMessagesTitle": "Сообщения чата",
       "chatMessagesSubtitle": "ответы в вашей переписке",
       "agentAttentionTitle": "Агенту нужна помощь",
       "agentAttentionSubtitle": "вопросы, запросы разрешений и данных",
@@ -286,11 +285,8 @@
       "agentUpdatesSubtitle": "сообщения агента в ходе выполнения задачи",
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершён / ошибка / готов к управлению",
-      "kiloclawActivityTitle": "Активность KiloClaw",
       "kiloclawActivitySubtitle": "готовность и ошибки экземпляра, запланированные действия",
-      "balanceAlertsTitle": "Оповещения о балансе",
       "balanceAlertsSubtitle": "предупреждения о низком балансе организации",
-      "securityFindingsTitle": "Замечания по безопасности",
       "securityFindingsSubtitle": "новые уязвимости и напоминания о сроках SLA"
     }
   },
@@ -766,8 +762,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Выбор ИИ-модели",
       "secretsDescription": "Зашифрованные учётные данные",
-      "versionPinDescription": "Закрепление конкретной версии",
-      "versionPinLabel": "Закрепление версии"
+      "versionPinDescription": "Закрепление конкретной версии"
     },
     "avatar": {
       "arcade": "Аркада",
@@ -1010,7 +1005,6 @@
       "title": "Фильтры уязвимостей",
       "fixed": "Исправлено",
       "outcome": "Результат",
-      "outcomeNotExploitable": "Эксплуатация невозможна",
       "outcomeTriageComplete": "Первичная оценка завершена",
       "overdueOnly": "Только просроченные",
       "reset": "Сбросить",
@@ -1056,9 +1050,6 @@
       "analysisModel": "Модель для анализа",
       "couldNotLoad": "Не удалось загрузить настройки анализа.",
       "depth": "Глубина анализа",
-      "modeAuto": "Авто",
-      "modeDeep": "Глубокий",
-      "modeShallow": "Поверхностный",
       "remediationModel": "Модель для исправления",
       "title": "Модели и анализ",
       "triageModel": "Модель для первичной оценки"
@@ -1154,15 +1145,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Открытые уязвимости",
-      "openFindingsDetail": "Критический уровень: {{critical}}, высокий: {{high}}",
-      "confirmedExploitable": "Возможность эксплуатации подтверждена",
       "confirmedExploitableDetail": "Анализ подтвердил риск для проекта",
-      "needsReview": "Нужна ваша проверка",
       "needsReviewDetail": "Требуется решение человека",
-      "analysisIncomplete": "Анализ не завершён",
       "analysisIncompleteDetail": "Риск для проекта пока неизвестен",
       "slaCompliance": "Соблюдение SLA",
-      "notMeasured": "Не измерено",
       "withinDeadlineDetail": "Срок не истёк: {{within}} из {{total}}",
       "noDeadlineData": "Ни для одной уязвимости ещё не задан срок исправления по SLA",
       "deadlinePassed": "Срок истек",
@@ -1193,9 +1179,6 @@
       "title": "Отклонить замечание"
     },
     "findingDetail": {
-      "couldNotLoad": "Не удалось загрузить это замечание.",
-      "notFound": "Замечание не найдено",
-      "notFoundDescription": "Возможно, уязвимость удалена или у вас больше нет к ней доступа.",
       "tabAnalysis": "Анализ",
       "tabRemediation": "Исправление",
       "title": "Уязвимость"
@@ -1218,7 +1201,6 @@
       "supersededByDescription": "Нажмите, чтобы открыть актуальную запись со статусом, результатами анализа и данными об исправлении.",
       "viewAdvisory": "Открыть описание уязвимости на GitHub",
       "vulnerableVersions": "Уязвимые версии",
-      "statusSuperseded": "Заменено",
       "statusOpen": "Открыта",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "исправление уже начато",
@@ -1240,13 +1222,11 @@
       "a11y": "Уязвимость: {{title}}. Критичность: {{severity}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Уязвимость: {{title}}. Критичность: {{severity}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Проанализировать",
-      "nextNeedsManualReview": "Требует ручной проверки",
       "nextRemediationAvailable": "Доступно исправление",
       "nextRemediationInProgress": "Идет исправление",
       "nextRemediationPrOpen": "Открыт PR с исправлением",
       "nextRetryRemediation": "Можно повторить исправление",
       "nextViewDetails": "Посмотреть подробности",
-      "retryAnalysis": "Повторить анализ",
       "runAnalysis": "Запустить анализ",
       "viewPr": "Посмотреть PR"
     },
@@ -1259,7 +1239,6 @@
       "newFindingSubtitle": "Уведомление отправляется при синхронизации каждой новой уязвимости, в том числе при первой синхронизации.",
       "slaLeadTimeAccessibility": "За сколько дней предупреждать об истечении срока SLA",
       "slaLeadTimeError": "Введите целое число дней от 1 до 365.",
-      "slaLeadTimeHint": "Введите целое число от 1 до 365",
       "slaLeadTimeLabel": "Предупреждать за (дней до срока SLA)",
       "slaPersonalTitle": "Получать письма о сроках SLA",
       "slaSection": "Уведомления о сроках SLA",
@@ -1275,8 +1254,6 @@
       "cancellationRequested": "Запрошена отмена",
       "cancelled": "Исправление отменено",
       "couldNotLoad": "Не удалось загрузить статус исправления.",
-      "noAnalysisDescription": "Запустите анализ на вкладке «Подробности».",
-      "noAnalysisTitle": "Анализ ещё не проводился",
       "openDraftPullRequest": "Открыть черновик пул-реквеста{{number}}",
       "openPullRequest": "Открыть пул-реквест{{number}}",
       "progress": "Ход выполнения",
@@ -1286,8 +1263,6 @@
       "timeline": {
         "blocked": "Исправление заблокировано",
         "failed": "Не удалось исправить",
-        "noChangesNeeded": "Изменения не требуются",
-        "prOpened": "PR открыт",
         "queued": "Исправление запрошено"
       },
       "queued": "Исправление в очереди",
@@ -1315,7 +1290,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Режим анализа: {{mode}}",
-      "automation": "Автоматизация",
       "automationAllOff": "Всё выключено",
       "automationCount": "Включено {{displayCount}} из 3",
       "couldNotLoadPermissions": "Не удалось загрузить права доступа.",
@@ -1323,15 +1297,12 @@
       "disabledNoManage": "Агент безопасности отключён. Только владельцы организации и администраторы платежей могут его включить.",
       "disabledNoRepo": "Выберите хотя бы один репозиторий, прежде чем включить агента безопасности.",
       "disabledPrompt": "Включите агента безопасности, чтобы синхронизировать оповещения Dependabot, выбрать репозитории и настроить автоматизацию.",
-      "modelsAndAnalysis": "Модели и анализ",
       "notificationsCount": "Включено {{displayCount}} из 2",
       "on": "Вкл.",
       "repositoriesCount": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_other": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_one": "Выбран {{displayCount}} репозиторий",
       "selectRepositoriesSubtitle": "Выберите репозитории для отслеживания агентом безопасности",
-      "slaPolicy": "Политика SLA",
-      "title": "Настройки",
       "repositoriesCount_few": "Выбрано {{displayCount}} репозитория",
       "repositoriesCount_many": "Выбрано {{displayCount}} репозиториев"
     },
@@ -1381,7 +1352,6 @@
     },
     "analysisState": {
       "queued": "Анализ в очереди",
-      "queuedTitle": "Анализ в очереди",
       "queuedDescription": "Анализ начнётся, когда освободятся ресурсы.",
       "analyzing": "Идёт анализ",
       "analyzingDescription": "Проверяется, может ли код приложения вызвать уязвимую функцию.",
@@ -1390,7 +1360,6 @@
       "extractionFailedDescription": "Не удалось извлечь структурированный результат из технического отчёта.",
       "exploitableDescription": "Код приложения может вызвать уязвимую функцию.",
       "notExploitable": "Уязвимый код недостижим",
-      "notExploitableTitle": "Уязвимый код недостижим",
       "notExploitableDescription": "В этом репозитории не найден путь выполнения кода, ведущий к уязвимой функции.",
       "unknown": "Требует проверки",
       "unknownDescription": "Не удалось установить, может ли код приложения вызвать уязвимую функцию.",
@@ -1430,7 +1399,6 @@
       "dueInDays": "Осталось {{count}} дня"
     },
     "remediationStatus": {
-      "cancellationRequested": "Запрошена отмена",
       "notStarted": "Не начато",
       "starting": "Запуск",
       "inProgress": "Выполняется",
@@ -1449,7 +1417,6 @@
       "findingNotOpen": "Уязвимость больше не открыта.",
       "repoNotInScope": "Репозиторий не выбран для отслеживания агентом безопасности.",
       "analysisRequired": "Запустите анализ кодовой базы перед началом исправления.",
-      "sandboxAnalysisRequired": "Запустите анализ кодовой базы перед началом исправления.",
       "staleAnalysis": "Данные об уязвимости изменились после анализа. Повторите анализ перед началом исправления.",
       "notExploitable": "Анализ не выявил пути выполнения кода, ведущего к уязвимой функции. Автоматическое исправление недоступно.",
       "exploitabilityUnknown": "Анализ не подтвердил возможность эксплуатации. Перед исправлением в одно нажатие требуется ручная проверка.",
@@ -1465,12 +1432,10 @@
       "autoRemediationDisabled": "Автоматическое исправление отключено. Исправление можно запустить вручную после успешных проверок безопасности.",
       "includeExistingDisabled": "Ранее обнаруженные уязвимости исключены из автоматического исправления.",
       "belowThreshold": "Критичность уязвимости ниже порога для автоматического исправления. Исправление можно запустить вручную после успешных проверок безопасности.",
-      "beforeEnablement": "Анализ завершился до включения автоматического исправления. Исправление можно запустить вручную после успешных проверок безопасности.",
-      "generic": "Для этого замечания исправление недоступно."
+      "beforeEnablement": "Анализ завершился до включения автоматического исправления. Исправление можно запустить вручную после успешных проверок безопасности."
     },
     "commandFailure": {
       "ownerCapReached": "Достигнут лимит одновременных анализов. Дождитесь завершения одного из них и повторите попытку.",
-      "githubTokenUnavailable": "Возникла проблема с авторизацией GitHub. Повторно авторизуйте приложение GitHub и повторите попытку.",
       "githubAuthInvalid": "Возникла проблема с авторизацией GitHub. Повторно авторизуйте приложение GitHub и повторите попытку.",
       "findingUnavailable": "Уязвимость больше недоступна. Обновите список уязвимостей и повторите попытку, если она всё ещё открыта.",
       "repositoryUnavailable": "Репозиторий больше недоступен для приложения GitHub. Обновите доступ к репозиторию, затем повторите попытку.",
@@ -1558,10 +1523,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Копировать сведения об ошибке",
       "backToSessions": "К сеансам",
-      "accessDeniedDescription": "У вас нет прав на просмотр.",
       "couldNotLoad": "Не удалось загрузить сеанс.",
       "failedToLoadDetails": "Не удалось загрузить сведения о сеансе.",
-      "notFoundDescription": "Возможно, этот элемент удалён или больше недоступен.",
       "failedToStopExecution": "Не удалось остановить выполнение.",
       "renameSession": "Переименовать сеанс",
       "renamePlaceholder": "Название сеанса",
@@ -2119,7 +2082,6 @@
     "signOutThisDeviceTitle": "Выйти на этом устройстве?",
     "signOutThisSessionTitle": "Завершить этот сеанс?",
     "signOutThisSessionMessage": "На устройстве {{device}} будет выполнен выход из аккаунта. Доступ к API на нём может сохраняться ещё до часа.",
-    "signOutMessage": "Чтобы вернуться в рабочее пространство, нужно будет войти снова.",
     "webBrowser": "Веб-браузер"
   },
   "forceUpdate": {
@@ -2400,8 +2362,6 @@
       "reconnectTitle": "Подключить GitHub снова"
     },
     "connectionExpired": "Срок действия подключения к GitHub истёк.",
-    "connectionExpiredDescription": "Подключение к GitHub больше не действует. Проверьте его снова — при необходимости появится предложение подключиться заново.",
-    "connectionExpiredTitle": "Срок действия подключения к GitHub истёк.",
     "couldNotLoadPullRequest": "Не удалось загрузить запрос на слияние.",
     "couldNotOpenGitHubAppSettings": "Не удалось открыть настройки приложения GitHub.",
     "description": "Описание",
@@ -2417,7 +2377,6 @@
       "comment_other": "{{displayCount}} комментария",
       "couldNotLoad": "Не удалось загрузить обсуждение.",
       "couldNotLoadMore": "Не удалось загрузить остальные комментарии.",
-      "couldNotReply": "Не удалось ответить.",
       "loadMoreComments": "Загрузить ещё комментарии",
       "loading": "Загрузка обсуждения",
       "moderation": {
@@ -2637,8 +2596,7 @@
       "noEnabledMethods": "В этом репозитории отключены все способы слияния. Попросите администратора разрешить обычное слияние, объединение коммитов или перебазирование.",
       "partialSuccessBanner": {
         "accessibility": "Слияние выполнено. Не удалось удалить ветку: {{reason}}",
-        "body": "Не удалось удалить ветку. Причина: {{reason}}",
-        "title": "Объединено"
+        "body": "Не удалось удалить ветку. Причина: {{reason}}"
       },
       "refreshMergeability": "Повторно проверить возможность слияния",
       "terminal": {
@@ -2704,9 +2662,7 @@
       "deletedAnnouncement": "Неотправленный комментарий удалён",
       "editA11y": "Изменить неотправленный комментарий: {{location}}",
       "editOutdatedA11y": "Изменить устаревший неотправленный комментарий: {{location}}",
-      "emptyBody": "(пусто)",
       "noCommentsQueued": "В очереди нет комментариев. Ревью будет отправлено только с выбранным выше результатом.",
-      "outdated": "Устарело",
       "staleHint": "PR изменился после создания этого комментария.",
       "staleQueueHint": "Комментарии, написанные для старого коммита, не отправляются. Они остаются в очереди, чтобы вы могли изменить или удалить их.",
       "summaryA11y": "Итоговый комментарий к ревью",
@@ -2715,7 +2671,6 @@
     "pullRequestUnavailable": "Запрос на слияние недоступен",
     "pullRequestUnavailableDescription": "Не удаётся открыть этот PR. Возможно, он удалён, репозиторий закрытый или в нём не установлено приложение Kilo для GitHub.",
     "reconnectNotice": {
-      "checkConnection": "Проверить подключение",
       "message": "Подключение к GitHub больше не действует. Проверьте его снова — при необходимости появится предложение подключиться заново.",
       "title": "Срок действия подключения к GitHub истёк."
     },
@@ -2741,7 +2696,6 @@
       "pendingComment_other": "неотправленного комментария",
       "pendingComment_one": "неотправленный комментарий",
       "summaryOptional": "Итоговый комментарий (необязательно)",
-      "title": "Отправить результаты проверки",
       "partialPostedMessage": "Опубликовано комментариев: {{displayFreshCount}}. Остались в очереди комментарии к старому коммиту: {{displayStaleCount}}.",
       "submitCountOfTotal": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
       "submitReview": "Отправить результаты проверки",
@@ -2819,7 +2773,6 @@
         "accounting_adjustment": "Бухгалтерская корректировка",
         "credits_expired": "Срок действия кредитов истёк"
       },
-      "loadMoreFailed": "Не удалось загрузить следующие записи.",
       "truncated": "Доступны более ранние операции с кредитами."
     },
     "hub": {
@@ -2855,7 +2808,6 @@
       "truncated": "Доступны более ранние счета."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ivan@example.com",
       "enableA11y": "Включить оповещение о низком балансе",
       "notifyEmailsLabel": "Адреса для оповещений",
       "permissionDenied": "У вас нет прав на управление оповещениями об оплате.",
@@ -2880,7 +2832,6 @@
       "emptyDescriptionCanInvite": "Пригласите коллег, чтобы начать совместную работу в этой организации.",
       "emptyDescriptionCannotInvite": "Попросите владельца или ответственного за оплату пригласить коллег.",
       "emptyTitle": "Пока нет участников",
-      "inviteMember": "Пригласить участника",
       "invitedDate": "Приглашение отправлено {{date}}",
       "limitPerDay": "{{amount}}/день",
       "manageA11y": "Управлять участником: {{name}}",
@@ -2916,7 +2867,6 @@
       "couldNotLoadStatus": "Не удалось загрузить статус",
       "creditProcessingDelayed": "Обработка кредитов задерживается · повторяем автоматически",
       "ended": "Подписка завершена",
-      "manageHint": "Открывает управление Kilo Pass в веб-версии.",
       "notSubscribed": "Нет подписки",
       "overallocated": "Kilo Pass назначен большему числу участников, чем оплачено мест",
       "paidSeat_one": "{{displayCount}} оплаченное место",

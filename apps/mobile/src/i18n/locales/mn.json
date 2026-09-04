@@ -370,7 +370,6 @@
         "closed": "Энэ нэгтгэх хүсэлт хаагдсан"
       },
       "partialSuccessBanner": {
-        "title": "Нэгтгэсэн",
         "body": "Салбарыг устгаж чадсангүй: {{reason}}.",
         "accessibility": "Нэгтгэсэн. Салбарыг устгаж чадсангүй: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Зөвшөөрөх",
       "replyBadRequest": "Энэ хариуг нийтлэх боломжгүй. Сэдэв өөрчлөгдсөн байж болзошгүй.",
       "replyForbidden": "Танд энэ нэгтгэх хүсэлтэд хариу бичих эрх байхгүй.",
-      "couldNotReply": "Хариу илгээж чадсангүй.",
       "moderation": {
         "reportContent": {
           "terminal": "Энэ сэтгэгдлийн талаар гомдол гаргах боломжгүй.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub аппын тохиргоог нээж чадсангүй.",
     "installKiloGitHubApp": "Kilo GitHub аппыг суулгах",
-    "connectionExpiredTitle": "GitHub холболтын хугацаа дууссан.",
-    "connectionExpiredDescription": "Таны GitHub холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна.",
     "checkConnection": "Холболтыг шалгах",
     "couldNotLoadPullRequest": "Нэгтгэх хүсэлтийг ачаалж чадсангүй.",
     "description": "Тайлбар",
@@ -572,7 +568,6 @@
       "shareA11y": "Нэгтгэх хүсэлтийг хуваалцах"
     },
     "submit": {
-      "title": "Шалгалтын дүнг илгээх",
       "loadFailedTitle": "Хяналт илгээх хэсгийг ачаалж чадсангүй.",
       "deletePendingTitle": "Илгээгээгүй сэтгэгдлийг устгах уу?",
       "deletePendingMessage": "Энэ сэтгэгдэл хяналтаар илгээх жагсаалтаас хасагдана.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub холболтын хугацаа дууссан.",
-      "message": "Таны GitHub холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна.",
-      "checkConnection": "Холболтыг шалгах"
+      "message": "Таны GitHub холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна."
     },
     "eventChips": {
       "comment": "Сэтгэгдэл бичих",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}} дээрх хуучирсан, илгээгээгүй сэтгэгдлийг засах",
       "editA11y": "{{location}} дээрх илгээгээгүй сэтгэгдлийг засах",
-      "emptyBody": "(хоосон)",
-      "outdated": "Хуучирсан",
       "staleHint": "Таныг үүнийг бичсэнээс хойш PR шинэчлэгдсэн.",
       "deleteA11y": "{{location}} дээрх илгээгээгүй сэтгэгдлийг устгах",
       "deletedAnnouncement": "Илгээгээгүй сэтгэгдлийг устгасан",
@@ -703,7 +695,6 @@
       "security": "Аюулгүй байдлын илэрсэн асуудал"
     },
     "category": {
-      "chatMessagesTitle": "Чатын мессеж",
       "chatMessagesSubtitle": "харилцан яриан дахь хариултууд",
       "agentAttentionTitle": "Агент таны оролцоог хүлээж байна",
       "agentAttentionSubtitle": "асуулт, зөвшөөрөл болон мэдээлэл хүсэх",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "даалгавар гүйцэтгэх явцад агентаас ирэх мессежүүд",
       "sessionStatusTitle": "Сессийн төлөв",
       "sessionStatusSubtitle": "дууссан / амжилтгүй / удирдахад бэлэн",
-      "kiloclawActivityTitle": "KiloClaw-ийн үйл ажиллагаа",
       "kiloclawActivitySubtitle": "инстанц бэлэн/амжилтгүй, төлөвлөсөн үйлдлүүд",
-      "balanceAlertsTitle": "Үлдэгдлийн анхааруулга",
       "balanceAlertsSubtitle": "байгууллагын үлдэгдэл багасах анхааруулга",
-      "securityFindingsTitle": "Аюулгүй байдлын илэрсэн асуудал",
       "securityFindingsSubtitle": "шинээр илэрсэн эмзэг байдал болон SLA сануулга"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Хиймэл оюуны загварын сонголт",
       "secretsDescription": "Шифрлэсэн нэвтрэх мэдээлэл",
-      "versionPinDescription": "Тодорхой хувилбарт түгжих",
-      "versionPinLabel": "Хувилбарыг тогтоох"
+      "versionPinDescription": "Тодорхой хувилбарт түгжих"
     },
     "avatar": {
       "arcade": "Тоглоомын автомат",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Өндөр",
       "severityMedium": "Дунд",
       "severityLow": "Бага",
-      "outcomeNotExploitable": "Халдлагад ашиглах боломжгүй",
       "outcomeTriageComplete": "Анхан шатны үнэлгээ дууссан",
       "sortSeverityDesc": "Ноцтой байдлын зэрэг: ихээс бага руу",
       "sortSeverityAsc": "Ноцтой байдлын зэрэг: багаас их рүү",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Шийдээгүй асуудал",
-      "openFindingsDetail": "{{critical}} ноцтой, {{high}} өндөр",
-      "confirmedExploitable": "Халдлагад ашиглах боломжтой нь батлагдсан",
       "confirmedExploitableDetail": "Төслийн эрсдэлийг шинжилгээгээр баталгаажуулсан",
-      "needsReview": "Та шалгах шаардлагатай",
       "needsReviewDetail": "Хүний шийдвэр шаардлагатай",
-      "analysisIncomplete": "Шинжилгээ дуусаагүй",
       "analysisIncompleteDetail": "Төслийн эрсдэл тодорхойгүй хэвээр байна",
       "slaCompliance": "SLA хэрэгжилт",
-      "notMeasured": "Хэмжигдээгүй",
       "withinDeadlineDetail": "Нийт {{total}} асуудлаас {{within}} нь хугацаандаа байгаа",
       "noDeadlineData": "Илэрсэн асуудалд SLA эцсийн хугацаа хараахан тогтоогоогүй",
       "deadlinePassed": "Хугацаа дууссан",
@@ -1601,7 +1582,6 @@
       "source": "Эх үүсвэр",
       "sourceId": "Эх үүсвэрийн ID",
       "viewAdvisory": "GitHub дээр аюулгүй байдлын зөвлөмжийг үзэх",
-      "statusSuperseded": "Орлогдсон",
       "statusOpen": "Нээлттэй",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Засвар аль хэдийн эхэлсэн",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "шалгалтын дараа"
     },
     "settingsOverview": {
-      "title": "Тохиргоо",
       "couldNotLoadSettings": "Аюулгүй байдлын агентын тохиргоог ачаалж чадсангүй.",
       "couldNotLoadPermissions": "Хандах эрхийн мэдээллийг ачаалж чадсангүй.",
       "on": "Идэвхтэй",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} кодын сан сонгосон",
       "repositoriesCount_other": "{{displayCount}} кодын сан сонгосон",
       "selectRepositoriesSubtitle": "Аюулгүй байдлын агентаар хянуулах репозиториудыг сонгох",
-      "modelsAndAnalysis": "Загвар ба шинжилгээ",
       "analysisModeSubtitle": "{{mode}} шинжилгээ",
-      "automation": "Автоматжуулалт",
       "automationAllOff": "Бүгд идэвхгүй",
       "automationCount": "3-аас {{displayCount}} нь идэвхтэй",
       "notificationsCount": "2-оос {{displayCount}} нь идэвхтэй",
-      "slaPolicy": "SLA-ийн бодлого",
       "disabledNoManage": "Аюулгүй байдлын агент идэвхгүй байна. Зөвхөн байгууллагын эзэмшигч болон төлбөрийн менежер үүнийг идэвхжүүлэх эрхтэй.",
       "disabledNoRepo": "Аюулгүй байдлын агентыг идэвхжүүлэхээс өмнө дор хаяж нэг репозитори сонгоно уу.",
       "disabledPrompt": "Dependabot мэдэгдлийг синхрончлох, репозитори сонгох, автоматжуулалтыг тохируулахын тулд Аюулгүй байдлын агентыг идэвхжүүлнэ үү."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Цуцлах хүсэлт илгээгдсэн",
       "cancelled": "Засвар цуцлагдсан",
       "couldNotLoad": "Засварын төлөвийг ачаалж чадсангүй.",
-      "noAnalysisTitle": "Одоогоор шинжилгээ хийгээгүй",
-      "noAnalysisDescription": "Дэлгэрэнгүй табаас шинжилгээ эхлүүлнэ үү.",
       "start": "Засварыг эхлүүлэх",
       "retry": "Засварыг дахин оролдох",
       "cancelTitle": "Энэ засварыг цуцлах уу?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Засварын дахин оролдлого дараалалд орсон",
       "timeline": {
         "queued": "Засвар хийх хүсэлт илгээсэн",
-        "prOpened": "PR нээгдсэн",
         "failed": "Засвар амжилтгүй болсон",
-        "blocked": "Засвар хийхэд саад гарсан",
-        "noChangesNeeded": "Өөрчлөлт шаардлагагүй"
+        "blocked": "Засвар хийхэд саад гарсан"
       },
       "unavailable": "Энэ асуудлыг засах боломжгүй."
     },
@@ -1663,9 +1635,6 @@
       "title": "Загвар ба шинжилгээ",
       "couldNotLoad": "Шинжилгээний тохиргоог ачаалж чадсангүй.",
       "depth": "Шинжилгээний гүн",
-      "modeAuto": "Авто",
-      "modeShallow": "Өнгөц",
-      "modeDeep": "Гүн",
       "triageModel": "Анхан шатны үнэлгээний загвар",
       "analysisModel": "Шинжилгээний загвар",
       "remediationModel": "Засварын загвар"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Илэрсэн асуудал",
       "tabAnalysis": "Шинжилгээ",
-      "tabRemediation": "Засвар",
-      "notFound": "Илэрсэн асуудал олдсонгүй",
-      "notFoundDescription": "Энэ асуудлыг устгасан эсвэл таны хандах эрхийг цуцалсан байж болзошгүй.",
-      "couldNotLoad": "Энэ асуудлын мэдээллийг ачаалж чадсангүй."
+      "tabRemediation": "Засвар"
     },
     "findingList": {
       "couldNotLoad": "Илэрсэн асуудлыг ачаалж чадсангүй.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Засвар явагдаж байна",
       "nextRetryRemediation": "Засварыг дахин оролдох боломжтой",
       "nextRemediationAvailable": "Засвар хийх боломжтой",
-      "retryAnalysis": "Дахин шинжлэх",
       "runAnalysis": "Шинжилгээ хийх",
-      "nextNeedsManualReview": "Хүн шалгах шаардлагатай",
       "nextViewDetails": "Дэлгэрэнгүй үзэх",
       "viewPr": "PR үзэх",
       "analyze": "Шинжлэх",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Шинээр илэрсэн асуудлыг синхрончлох бүрд, анхны синхрончлолыг оролцуулан мэдэгдэл илгээнэ.",
       "slaLeadTimeAccessibility": "SLA хугацаа дуусахаас хэдэн хоногийн өмнө анхааруулах",
       "slaLeadTimeError": "Хоногийн тоог 1–365 хүртэлх бүхэл тоогоор оруулна уу.",
-      "slaLeadTimeHint": "1-ээс 365 хүртэлх бүхэл тоог оруулна уу",
       "slaLeadTimeLabel": "SLA хугацаанаас өмнө анхааруулах (хоног)",
       "slaPersonalTitle": "SLA анхааруулгыг надад имэйлээр илгээх",
       "slaSection": "SLA анхааруулгын мэдэгдэл",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Шинжилгээ дараалалд",
-      "queuedTitle": "Шинжилгээ дараалалд",
       "queuedDescription": "Шинжилгээ хийх хүчин чадал чөлөөлөгдөхийг хүлээж байна.",
       "analyzing": "Шинжилж байна",
       "analyzingDescription": "Аппын код эмзэг байдалтай функцийг дуудах боломжтой эсэхийг шалгаж байна.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Техникийн тайланг бүтэцтэй үр дүн болгон хөрвүүлж чадсангүй.",
       "exploitableDescription": "Аппын код эмзэг байдалтай функцийг дуудах боломжтой.",
       "notExploitable": "Хүрэх боломжгүй",
-      "notExploitableTitle": "Хүрэх боломжгүй",
       "notExploitableDescription": "Энэ репозиторийн кодоос эмзэг байдалтай функцэд хүрэх зам олдсонгүй.",
       "unknown": "Шалгалт шаардлагатай",
       "unknownDescription": "Эмзэг байдалтай функцийг дуудах боломжтой эсэхийг шинжилгээгээр тогтоож чадсангүй.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Хугацаа дуусахад {{count}} хоног үлдсэн"
     },
     "remediationStatus": {
-      "cancellationRequested": "Цуцлах хүсэлт илгээгдсэн",
       "notStarted": "Эхлээгүй",
       "starting": "Эхэлж байна",
       "inProgress": "Явагдаж байна",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Энэ асуудал нээлттэй төлөвт байхаа больсон.",
       "repoNotInScope": "Энэ репозиторийг Аюулгүй байдлын агентаар хянуулахаар сонгоогүй байна.",
       "analysisRequired": "Засвар эхлүүлэхээс өмнө кодын санг шинжилнэ үү.",
-      "sandboxAnalysisRequired": "Засвар эхлүүлэхээс өмнө кодын санг шинжилнэ үү.",
       "staleAnalysis": "Шинжилгээ хийснээс хойш асуудал өөрчлөгдсөн. Засвар эхлүүлэхээс өмнө дахин шинжилнэ үү.",
       "notExploitable": "Шинжилгээгээр эмзэг байдалтай функцэд хүрэх зам олдоогүй. Автомат засвар хийх боломжгүй.",
       "exploitabilityUnknown": "Халдлагад ашиглах боломжтой эсэхийг шинжилгээгээр тогтоож чадсангүй. Нэг товшилтоор засахаас өмнө хүн шалгах шаардлагатай.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Автомат засвар идэвхгүй байна. Аюулгүй байдлын шалгуурыг хангавал засварыг гараар эхлүүлэх боломжтой.",
       "includeExistingDisabled": "Өмнө илэрсэн асуудлыг автомат засварт хамруулахгүй.",
       "belowThreshold": "Асуудлын ноцтой байдлын зэрэг автомат засварын босгоос доогуур байна. Аюулгүй байдлын шалгуурыг хангавал засварыг гараар эхлүүлэх боломжтой.",
-      "beforeEnablement": "Автомат засварыг идэвхжүүлэхээс өмнө шинжилгээ дууссан байна. Аюулгүй байдлын шалгуурыг хангавал засварыг гараар эхлүүлэх боломжтой.",
-      "generic": "Энэ асуудлыг засах боломжгүй."
+      "beforeEnablement": "Автомат засварыг идэвхжүүлэхээс өмнө шинжилгээ дууссан байна. Аюулгүй байдлын шалгуурыг хангавал засварыг гараар эхлүүлэх боломжтой."
     },
     "commandFailure": {
       "ownerCapReached": "Зэрэг хийх шинжилгээний тоо хязгаартаа хүрсэн байна. Явагдаж буй шинжилгээ дууссаны дараа дахин оролдоно уу.",
-      "githubTokenUnavailable": "GitHub-ын хандах эрхийг шалгах шаардлагатай. GitHub аппад дахин эрх олгоод дахин оролдоно уу.",
       "githubAuthInvalid": "GitHub-ын хандах эрхийг шалгах шаардлагатай. GitHub аппад дахин эрх олгоод дахин оролдоно уу.",
       "findingUnavailable": "Энэ асуудалд хандах боломжгүй болсон. Асуудлын жагсаалтыг шинэчлээд, нээлттэй хэвээр байвал дахин оролдоно уу.",
       "repositoryUnavailable": "GitHub апп энэ репозиторид хандах боломжгүй болсон. Репозиторийн хандах эрхийг шинэчлээд дахин оролдоно уу.",
@@ -1965,10 +1922,8 @@
       "title": "Сесс",
       "copyErrorDetails": "Алдааны мэдээллийг хуулах",
       "backToSessions": "Сессүүд рүү буцах",
-      "accessDeniedDescription": "Танд үүнийг үзэх эрх байхгүй.",
       "couldNotLoad": "Сессийг ачаалж чадсангүй.",
       "failedToLoadDetails": "Сессийн дэлгэрэнгүй мэдээллийг ачаалж чадсангүй.",
-      "notFoundDescription": "Үүнийг устгасан эсвэл хандах боломжгүй болсон байж болзошгүй.",
       "failedToStopExecution": "Гүйцэтгэлийг зогсоож чадсангүй.",
       "renameSession": "Сессийн нэрийг өөрчлөх",
       "renamePlaceholder": "Сессийн нэр",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "Нэвтрэлтийг дуусгалаа.",
     "signOutThisDeviceTitle": "Энэ төхөөрөмжөөс гарах уу?",
     "signOutThisSessionTitle": "Энэ нэвтрэлтийг дуусгах уу?",
-    "signOutThisSessionMessage": "{{device}} төхөөрөмжийг бүртгэлээс гаргана. API-д хандах эрх нь нэг цаг хүртэл хүчинтэй хэвээр байж болно.",
-    "signOutMessage": "Ажлын орчиндоо хандахын тулд дахин нэвтрэх шаардлагатай."
+    "signOutThisSessionMessage": "{{device}} төхөөрөмжийг бүртгэлээс гаргана. API-д хандах эрх нь нэг цаг хүртэл хүчинтэй хэвээр байж болно."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Аппын дэлгүүрийг нээж чадсангүй.",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Нягтлан бодох бүртгэлийн тохируулга",
         "credits_expired": "Кредитийн хугацаа дууссан"
       },
-      "loadMoreFailed": "Цааш ачаалж чадсангүй.",
       "truncated": "Өмнөх кредитийн гүйлгээг үзэх боломжтой."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Өмнөх нэхэмжлэхүүдийг үзэх боломжтой."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "нэр@байгууллага.com",
       "enableA11y": "Үлдэгдэл багасах анхааруулгыг идэвхжүүлэх",
       "notifyEmailsLabel": "Мэдэгдэл хүлээн авах имэйл хаягууд",
       "permissionDenied": "Танд төлбөрийн анхааруулгыг удирдах эрх байхгүй.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Энэ байгууллагад хамтран ажиллахын тулд багийн гишүүдээ урина уу.",
       "emptyDescriptionCannotInvite": "Багийн гишүүдийг урихыг эзэмшигч эсвэл төлбөрийн менежерээс хүснэ үү.",
       "emptyTitle": "Гишүүд хараахан алга",
-      "inviteMember": "Гишүүн урих",
       "invitedDate": "Урьсан огноо: {{date}}",
       "limitPerDay": "{{amount}}/өдөр",
       "manageA11y": "{{name}}-г удирдах",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Төлөвийг ачаалж чадсангүй",
       "creditProcessingDelayed": "Кредит боловсруулах ажил саатсан · автоматаар дахин оролдож байна",
       "ended": "Дууссан",
-      "manageHint": "Kilo Pass-ийн удирдлагын хуудсыг вэб сайтад нээнэ.",
       "notSubscribed": "Захиалгагүй",
       "overallocated": "Kilo Pass олгосон хэрэглэгчийн тоо төлбөртэй эрхийн тооноос хэтэрсэн",
       "paidSeat_one": "{{displayCount}} төлбөртэй эрх",

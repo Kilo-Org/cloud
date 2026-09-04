@@ -214,7 +214,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         const message =
           reply.error instanceof Error
             ? reply.error.message
-            : t('prReview.discussion.couldNotReply');
+            : t('prReview.operation.couldNotReply');
         setInlineError(message);
         setInlineErrorKind('retryable');
       }

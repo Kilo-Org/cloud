@@ -370,7 +370,6 @@
         "closed": "Lesi sicelo sokuhlanganisa sivaliwe"
       },
       "partialSuccessBanner": {
-        "title": "Kuhlanganisiwe",
         "body": "Asikwazanga ukususa igatsha: {{reason}}.",
         "accessibility": "Kuhlanganisiwe. Asikwazanga ukususa igatsha: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Yamukela",
       "replyBadRequest": "Le mpendulo ayikwazi ukuthunyelwa. Kungenzeka uchungechunge lwengxoxo lushintshile.",
       "replyForbidden": "Awunayo imvume yokuphendula kulesi sicelo sokuhlanganisa.",
-      "couldNotReply": "Asikwazanga ukuphendula.",
       "moderation": {
         "reportContent": {
           "terminal": "La mazwana awakwazi ukubikwa.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Asikwazanga ukuvula izilungiselelo zohlelo lokusebenza lwe-GitHub.",
     "installKiloGitHubApp": "Faka i-Kilo GitHub App",
-    "connectionExpiredTitle": "Ukuxhumana ne-GitHub kuphelelwe yisikhathi.",
-    "connectionExpiredDescription": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
     "checkConnection": "Hlola uxhumano",
     "couldNotLoadPullRequest": "Asikwazanga ukulayisha isicelo sokuhlanganisa.",
     "description": "Incazelo",
@@ -572,7 +568,6 @@
       "shareA11y": "Yabelana ngesicelo sokuhlanganisa"
     },
     "submit": {
-      "title": "Thumela umbiko wokuhlola",
       "loadFailedTitle": "Asikwazanga ukulayisha indawo yokuthumela ukubuyekeza.",
       "deletePendingTitle": "Susa amazwana alindile?",
       "deletePendingMessage": "La mazwana azosuswa ohlwini lokubuyekeza okulindile.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "Ukuxhumana ne-GitHub kuphelelwe yisikhathi.",
-      "message": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
-      "checkConnection": "Hlola uxhumano"
+      "message": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka."
     },
     "eventChips": {
       "comment": "Phawula",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Hlela amazwana alindile aphelelwe yisikhathi ku-{{location}}",
       "editA11y": "Hlela amazwana alindile ku-{{location}}",
-      "emptyBody": "(okungenalutho)",
-      "outdated": "Kuphelelwe yisikhathi",
       "staleHint": "i-PR ishintshile selokhu wabhala lokhu.",
       "deleteA11y": "Susa amazwana alindile ku-{{location}}",
       "deletedAnnouncement": "Amazwana alindile asusiwe",
@@ -703,7 +695,6 @@
       "security": "Okutholakele kwezokuphepha"
     },
     "category": {
-      "chatMessagesTitle": "Imilayezo yengxoxo",
       "chatMessagesSubtitle": "izimpendulo ezingxoxweni zakho",
       "agentAttentionTitle": "Umenzeli uyakudinga",
       "agentAttentionSubtitle": "imibuzo, izicelo zemvume nezicelo zempendulo",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "imilayezo evela kumenzeli ngesikhathi esebenza",
       "sessionStatusTitle": "Isimo seseshini",
       "sessionStatusSubtitle": "kuqediwe / kwehlulekile / kulungele ukulawulwa",
-      "kiloclawActivityTitle": "Umsebenzi we-KiloClaw",
       "kiloclawActivitySubtitle": "uhlelo selulungile/lwehlulekile, izenzo ezihleliwe",
-      "balanceAlertsTitle": "Izexwayiso zebhalansi",
       "balanceAlertsSubtitle": "izexwayiso zebhalansi ephansi yenhlangano",
-      "securityFindingsTitle": "Okutholakele kwezokuphepha",
       "securityFindingsSubtitle": "okutholakele okusha nezikhumbuzo ze-SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Ukukhetha imodeli ye-AI",
       "secretsDescription": "Imininingwane yokungena ebethelwe",
-      "versionPinDescription": "Bophela enguqulweni ethile",
-      "versionPinLabel": "Ukukhiya inguqulo"
+      "versionPinDescription": "Bophela enguqulweni ethile"
     },
     "avatar": {
       "arcade": "Umshini wemidlalo",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Okuphezulu",
       "severityMedium": "Okumaphakathi",
       "severityLow": "Okuphansi",
-      "outcomeNotExploitable": "Akunakusetshenziselwa ukuhlasela",
       "outcomeTriageComplete": "Ukuhlola kokuqala kuqediwe",
       "sortSeverityDesc": "Ubucayi: obuphezulu kuye kobuphansi",
       "sortSeverityAsc": "Ubucayi: obuphansi kuye kobuphezulu",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Okutholakele okungakaxazululwa",
-      "openFindingsDetail": "{{critical}} okubucayi, {{high}} okuphezulu",
-      "confirmedExploitable": "Kuqinisekisiwe ukuthi kungasetshenziselwa ukuhlasela",
       "confirmedExploitableDetail": "Ubungozi bephrojekthi buqinisekiswe ngokuhlaziya",
-      "needsReview": "Kudinga ukuthi ukuhlole",
       "needsReviewDetail": "Isinqumo somuntu siyadingeka",
-      "analysisIncomplete": "Ukuhlaziywa akukapheli",
       "analysisIncompleteDetail": "Ubungozi bephrojekthi busengaziwa",
       "slaCompliance": "Ukuthobela i-SLA",
-      "notMeasured": "Akukalwanga",
       "withinDeadlineDetail": "{{within}} kokungu-{{total}} kungakapheli umnqamulajuqu",
       "noDeadlineData": "Akukho okutholakele okunomnqamulajuqu we-SLA okwamanje",
       "deadlinePassed": "Umnqamulajuqu usudlulile",
@@ -1601,7 +1582,6 @@
       "source": "Umthombo",
       "sourceId": "I-ID yomthombo",
       "viewAdvisory": "Buka isaziso sokuphepha ku-GitHub",
-      "statusSuperseded": "Kuthathelwe indawo",
       "statusOpen": "Vula",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Ukulungisa sekuqalile",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "ngemva kokuhlolwa"
     },
     "settingsOverview": {
-      "title": "Izilungiselelo",
       "couldNotLoadSettings": "Asikwazanga ukulayisha izilungiselelo ze-ejenti yezokuphepha.",
       "couldNotLoadPermissions": "Asikwazanga ukulayisha izimvume.",
       "on": "Ivuliwe",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "Kukhethwe izinqolobane zekhodi ezingu-{{displayCount}}",
       "repositoriesCount_other": "Kukhethwe izinqolobane zekhodi ezingu-{{displayCount}}",
       "selectRepositoriesSubtitle": "Khetha izinqolobane zekhodi ezizoqashwa i-ejenti yezokuphepha",
-      "modelsAndAnalysis": "Amamodeli nokuhlaziywa",
       "analysisModeSubtitle": "Ukuhlaziywa: {{mode}}",
-      "automation": "Ukuzenzakalela",
       "automationAllOff": "Konke kuvaliwe",
       "automationCount": "{{displayCount}} kwezingu-3 kuvuliwe",
       "notificationsCount": "{{displayCount}} kwezingu-2 kuvuliwe",
-      "slaPolicy": "Inqubomgomo ye-SLA",
       "disabledNoManage": "I-ejenti yezokuphepha ivaliwe. Abanikazi benhlangano nabaphathi bezinkokhelo kuphela abangayivula.",
       "disabledNoRepo": "Khetha okungenani inqolobane yekhodi eyodwa ngaphambi kokuvula i-ejenti yezokuphepha.",
       "disabledPrompt": "Vula i-ejenti yezokuphepha ukuze uvumelanise izexwayiso ze-Dependabot, ukhethe izinqolobane zekhodi futhi usethe okuzenzakalelayo."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Ukukhansela kuceliwe",
       "cancelled": "Ukulungisa kukhanseliwe",
       "couldNotLoad": "Asikwazanga ukulayisha isimo sokulungisa.",
-      "noAnalysisTitle": "Akukahlaziywa",
-      "noAnalysisDescription": "Qalisa ukuhlaziywa kuthebhu yemininingwane.",
       "start": "Qala ukulungisa",
       "retry": "Zama ukulungisa futhi",
       "cancelTitle": "Ukhansele lokhu kulungisa?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Ukuphinda kuzanywe ukulungisa kufakwe emgqeni",
       "timeline": {
         "queued": "Ukulungisa kuceliwe",
-        "prOpened": "I-PR ivuliwe",
         "failed": "Ukulungisa kwehlulekile",
-        "blocked": "Ukulungisa kuvinjwe",
-        "noChangesNeeded": "Azikho izinguquko ezidingekayo"
+        "blocked": "Ukulungisa kuvinjwe"
       },
       "unavailable": "Awukwazi ukuqalisa ukulungisa lokhu okutholakele."
     },
@@ -1663,9 +1635,6 @@
       "title": "Amamodeli nokuhlaziywa",
       "couldNotLoad": "Asikwazanga ukulayisha izilungiselelo zokuhlaziywa.",
       "depth": "Ukujula kokuhlaziywa",
-      "modeAuto": "Okuzenzakalelayo",
-      "modeShallow": "Okungajulile",
-      "modeDeep": "Okujulile",
       "triageModel": "Imodeli yokuhlola kokuqala",
       "analysisModel": "Imodeli yokuhlaziywa",
       "remediationModel": "Imodeli yokulungisa"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Okutholakele",
       "tabAnalysis": "Ukuhlaziywa",
-      "tabRemediation": "Ukulungisa",
-      "notFound": "Okutholakele akutholakali",
-      "notFoundDescription": "Lokhu okutholakele kungenzeka kususiwe, noma awusenayo imvume yokukufinyelela.",
-      "couldNotLoad": "Asikwazanga ukulayisha lokhu okutholakele."
+      "tabRemediation": "Ukulungisa"
     },
     "findingList": {
       "couldNotLoad": "Asikwazanga ukulayisha okutholakele.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Ukulungisa kusaqhubeka",
       "nextRetryRemediation": "Ungaphinda uzame ukulungisa",
       "nextRemediationAvailable": "Ukulungisa kuyatholakala",
-      "retryAnalysis": "Zama ukuhlaziywa futhi",
       "runAnalysis": "Qalisa ukuhlaziywa",
-      "nextNeedsManualReview": "Kudinga ukuhlolwa ngumuntu",
       "nextViewDetails": "Buka imininingwane",
       "viewPr": "Buka i-PR",
       "analyze": "Hlaziya",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Isaziso sithunyelwa njalo lapho okutholakele okusha kuvumelaniswa, kuhlanganise nokuvumelanisa kokuqala.",
       "slaLeadTimeAccessibility": "Izinsuku zokuxwayisa ngaphambi komnqamulajuqu we-SLA",
       "slaLeadTimeError": "Faka inombolo ephelele yezinsuku phakathi kuka-1 no-365.",
-      "slaLeadTimeHint": "Faka inombolo ephelele phakathi kuka-1 no-365",
       "slaLeadTimeLabel": "Isikhathi sokuxwayisa kusengaphambili nge-SLA (izinsuku)",
       "slaPersonalTitle": "Ngithumele i-imeyili ngezexwayiso ze-SLA",
       "slaSection": "Isaziso sesexwayiso se-SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Ukuhlaziywa kusemgqeni",
-      "queuedTitle": "Ukuhlaziywa kusemgqeni",
       "queuedDescription": "Kulindwe indawo yokunye ukuhlaziywa.",
       "analyzing": "Kuyahlaziywa",
       "analyzingDescription": "Kuyahlolwa ukuthi ikhodi yohlelo lokusebenza ingafinyelela yini esicini esithintekile.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Umbiko wezobuchwepheshe awukwazanga ukuguqulwa ube umphumela ohleliwe.",
       "exploitableDescription": "Ikhodi yohlelo lokusebenza ingafinyelela esicini esithintekile.",
       "notExploitable": "Ayifinyeleleki",
-      "notExploitableTitle": "Ayifinyeleleki",
       "notExploitableDescription": "Ayitholakalanga indlela ikhodi engafinyelela ngayo esicini esinobungozi kule nqolobane yekhodi.",
       "unknown": "Kudinga ukuhlolwa",
       "unknownDescription": "Ukuhlaziywa akukwazanga ukuqinisekisa ukuthi isici esinobungozi siyafinyeleleka yini.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Kusele izinsuku ezingu-{{count}}"
     },
     "remediationStatus": {
-      "cancellationRequested": "Ukukhansela kuceliwe",
       "notStarted": "Akukaqalwa",
       "starting": "Kuyaqala",
       "inProgress": "Kuyaqhubeka",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Okutholakele akusavuliwe.",
       "repoNotInScope": "Inqolobane yekhodi ayikhethelwe i-ejenti yezokuphepha.",
       "analysisRequired": "Qalisa ukuhlaziywa kwayo yonke ikhodi ngaphambi kokuqala ukulungisa.",
-      "sandboxAnalysisRequired": "Qalisa ukuhlaziywa kwayo yonke ikhodi ngaphambi kokuqala ukulungisa.",
       "staleAnalysis": "Okutholakele kushintshile ngemva kokuhlaziywa. Phinda uhlaziye ngaphambi kokuqala ukulungisa.",
       "notExploitable": "Ukuhlaziywa akutholanga ndlela enobungozi efinyelelekayo. Ukulungisa okuzenzakalelayo akutholakali.",
       "exploitabilityUnknown": "Ukuhlaziywa akukwazanga ukuqinisekisa ukuthi okutholakele kungasetshenziswa yini ekuhlaseleni. Kudingeka ukuhlolwa umuntu ngaphambi kokulungisa ngokuthepha okukodwa.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Ukulungisa okuzenzakalelayo kuvaliwe. Usengaqala ukulungisa ngokwakho uma ukuhlolwa kokuphepha kuphumelela.",
       "includeExistingDisabled": "Okutholakele okukhona akufakiwe ekulungiseni okuzenzakalelayo.",
       "belowThreshold": "Ubucayi bokutholakele bungaphansi komkhawulo odingekayo ekulungiseni okuzenzakalelayo. Usengaqala ukulungisa ngokwakho uma ukuhlolwa kokuphepha kuphumelela.",
-      "beforeEnablement": "Ukuhlaziywa kwaqedwa ngaphambi kokuvulwa kokulungisa okuzenzakalelayo. Usengaqala ukulungisa ngokwakho uma ukuhlolwa kokuphepha kuphumelela.",
-      "generic": "Awukwazi ukuqalisa ukulungisa lokhu okutholakele."
+      "beforeEnablement": "Ukuhlaziywa kwaqedwa ngaphambi kokuvulwa kokulungisa okuzenzakalelayo. Usengaqala ukulungisa ngokwakho uma ukuhlolwa kokuphepha kuphumelela."
     },
     "commandFailure": {
       "ownerCapReached": "Isibalo sokuhlaziywa okuqhubekayo sesifinyelele emkhawulweni. Linda kuze kuqedwe okunye ukuhlaziywa bese uzama futhi.",
-      "githubTokenUnavailable": "Izimvume ze-GitHub zidinga ukunakwa. Phinda unike uhlelo lokusebenza lwe-GitHub imvume bese uzama futhi.",
       "githubAuthInvalid": "Izimvume ze-GitHub zidinga ukunakwa. Phinda unike uhlelo lokusebenza lwe-GitHub imvume bese uzama futhi.",
       "findingUnavailable": "Okutholakele akusatholakali. Vuselela uhlu lokutholakele bese uzama futhi uma kusavuliwe.",
       "repositoryUnavailable": "Uhlelo lokusebenza lwe-GitHub alusakwazi ukufinyelela enqolobaneni yekhodi. Vuselela izimvume zenqolobane yekhodi bese uzama futhi.",
@@ -1965,10 +1922,8 @@
       "title": "Iseshini",
       "copyErrorDetails": "Kopisha imininingwane yephutha",
       "backToSessions": "Buyela eziseshini",
-      "accessDeniedDescription": "Awunayo imvume yokubuka lokhu.",
       "couldNotLoad": "Asikwazanga ukulayisha iseshini.",
       "failedToLoadDetails": "Asikwazanga ukulayisha imininingwane yeseshini.",
-      "notFoundDescription": "Le nto kungenzeka isusiwe noma ayisatholakali.",
       "failedToStopExecution": "Asikwazanga ukumisa ukusebenza.",
       "renameSession": "Qamba kabusha iseshini",
       "renamePlaceholder": "Igama leseshini",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "Iseshini ikhishiwe ku-akhawunti.",
     "signOutThisDeviceTitle": "Uyafuna ukuphuma ngemvume kule divayisi?",
     "signOutThisSessionTitle": "Uyafuna ukuphuma ngemvume kule seshini?",
-    "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa.",
-    "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza."
+    "signOutThisSessionMessage": "{{device}} izokhishwa ku-akhawunti. Isengafinyelela ku-API isikhathi esifinyelela ehoreni elilodwa."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Asikwazanga ukuvula isitolo sezinhlelo zokusebenza.",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Ukulungiswa kwezimali",
         "credits_expired": "Amakhredithi aphelelwe yisikhathi"
       },
-      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe.",
       "truncated": "Umnyakazo wamakhredithi wangaphambili uyatholakala."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Ama-invoyisi amadala ayatholakala."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "igama@inkampani.com",
       "enableA11y": "Vula isaziso sebhalansi ephansi",
       "notifyEmailsLabel": "Amakheli okuthumela izaziso",
       "permissionDenied": "Awunayo imvume yokuphatha izaziso zokukhokha.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Mema ozakwenu ukuze niqale ukusebenzisana kule nhlangano.",
       "emptyDescriptionCannotInvite": "Cela umnikazi noma umphathi wokukhokha ukuthi ameme ozakwenu.",
       "emptyTitle": "Awekho amalungu okwamanje",
-      "inviteMember": "Mema ilungu",
       "invitedDate": "Umenyiwe: {{date}}",
       "limitPerDay": "{{amount}}/ngosuku",
       "manageA11y": "Phatha {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Asikwazanga ukulayisha isimo",
       "creditProcessingDelayed": "Ukucutshungulwa kwamakhredithi kubambezelekile · kuphinda kuzanywa ngokuzenzakalelayo",
       "ended": "Iphelile",
-      "manageHint": "Ivula ukuphathwa kwe-Kilo Pass kuwebhu.",
       "notSubscribed": "Akukho okubhaliselwe",
       "overallocated": "Izabelo ze-Pass zidlula izikhala ezikhokhelwe",
       "paidSeat_one": "isikhala esi-{{displayCount}} esikhokhelwe",

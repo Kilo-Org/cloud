@@ -38,7 +38,7 @@ const OUTCOME_OPTIONS = [
   { value: 'analyzing', labelKey: 'securityAgent.analysisState.analyzing' },
   { value: 'failed', labelKey: 'securityAgent.analysisState.failed' },
   { value: 'exploitable', labelKey: 'securityAgent.analysis.exploitable' },
-  { value: 'not_exploitable', labelKey: 'securityAgent.filter.outcomeNotExploitable' },
+  { value: 'not_exploitable', labelKey: 'securityAgent.dashboard.notExploitable' },
   { value: 'safe_to_dismiss', labelKey: 'securityAgent.analysisState.safeToDismiss' },
   { value: 'needs_review', labelKey: 'securityAgent.analysisState.unknown' },
   { value: 'triage_complete', labelKey: 'securityAgent.filter.outcomeTriageComplete' },

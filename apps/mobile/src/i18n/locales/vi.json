@@ -278,7 +278,6 @@
       "security": "Vấn đề bảo mật"
     },
     "category": {
-      "chatMessagesTitle": "Tin nhắn trò chuyện",
       "chatMessagesSubtitle": "câu trả lời trong các cuộc trò chuyện của bạn",
       "agentAttentionTitle": "Tác nhân cần bạn phản hồi",
       "agentAttentionSubtitle": "câu hỏi, yêu cầu cấp quyền hoặc cung cấp thông tin",
@@ -286,11 +285,8 @@
       "agentUpdatesSubtitle": "tin nhắn từ tác nhân trong lúc thực hiện tác vụ",
       "sessionStatusTitle": "Trạng thái phiên",
       "sessionStatusSubtitle": "hoàn tất / thất bại / sẵn sàng điều khiển",
-      "kiloclawActivityTitle": "Hoạt động KiloClaw",
       "kiloclawActivitySubtitle": "máy sẵn sàng hoặc gặp lỗi, thao tác đã lên lịch",
-      "balanceAlertsTitle": "Cảnh báo số dư",
       "balanceAlertsSubtitle": "cảnh báo số dư tổ chức thấp",
-      "securityFindingsTitle": "Vấn đề bảo mật",
       "securityFindingsSubtitle": "vấn đề bảo mật mới và lời nhắc về SLA"
     }
   },
@@ -762,8 +758,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Chọn mô hình AI",
       "secretsDescription": "Thông tin xác thực được mã hóa",
-      "versionPinDescription": "Ghim vào một phiên bản cụ thể",
-      "versionPinLabel": "Ghim phiên bản"
+      "versionPinDescription": "Ghim vào một phiên bản cụ thể"
     },
     "avatar": {
       "arcade": "Máy chơi điện tử",
@@ -1006,7 +1001,6 @@
       "title": "Lọc vấn đề",
       "fixed": "Đã sửa",
       "outcome": "Kết quả",
-      "outcomeNotExploitable": "Không thể khai thác",
       "outcomeTriageComplete": "Đã hoàn tất phân loại",
       "overdueOnly": "Chỉ hiện vấn đề quá hạn",
       "reset": "Đặt lại",
@@ -1052,9 +1046,6 @@
       "analysisModel": "Mô hình phân tích",
       "couldNotLoad": "Không thể tải cài đặt phân tích.",
       "depth": "Độ sâu phân tích",
-      "modeAuto": "Tự động",
-      "modeDeep": "Chuyên sâu",
-      "modeShallow": "Sơ bộ",
       "remediationModel": "Mô hình khắc phục",
       "title": "Mô hình và phân tích",
       "triageModel": "Mô hình phân loại"
@@ -1148,15 +1139,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Vấn đề chưa xử lý",
-      "openFindingsDetail": "{{critical}} nghiêm trọng, {{high}} cao",
-      "confirmedExploitable": "Đã xác nhận có thể khai thác",
       "confirmedExploitableDetail": "Đã xác nhận rủi ro của dự án qua phân tích",
-      "needsReview": "Cần bạn rà soát",
       "needsReviewDetail": "Cần người quyết định",
-      "analysisIncomplete": "Phân tích chưa hoàn tất",
       "analysisIncompleteDetail": "Chưa xác định được rủi ro của dự án",
       "slaCompliance": "Tuân thủ SLA",
-      "notMeasured": "Chưa đo lường",
       "withinDeadlineDetail": "{{within}} trên {{total}} vấn đề còn trong hạn",
       "noDeadlineData": "Chưa có vấn đề nào được đặt hạn chót SLA",
       "deadlinePassed": "Đã quá hạn",
@@ -1187,9 +1173,6 @@
       "title": "Bỏ qua vấn đề"
     },
     "findingDetail": {
-      "couldNotLoad": "Không thể tải thông tin về vấn đề này.",
-      "notFound": "Không tìm thấy vấn đề",
-      "notFoundDescription": "Vấn đề này có thể đã bị xóa hoặc bạn không còn quyền truy cập.",
       "tabAnalysis": "Phân tích",
       "tabRemediation": "Khắc phục",
       "title": "Vấn đề"
@@ -1212,7 +1195,6 @@
       "supersededByDescription": "Chạm để mở bản ghi hiện hành và xem trạng thái, kết quả phân tích cùng thông tin khắc phục.",
       "viewAdvisory": "Xem thông báo bảo mật trên GitHub",
       "vulnerableVersions": "Phiên bản có lỗ hổng",
-      "statusSuperseded": "Đã thay thế",
       "statusOpen": "Mở",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Đã bắt đầu khắc phục",
@@ -1234,13 +1216,11 @@
       "a11y": "Vấn đề mức {{severity}}: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Vấn đề mức {{severity}}: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Phân tích",
-      "nextNeedsManualReview": "Cần rà soát thủ công",
       "nextRemediationAvailable": "Có thể khắc phục",
       "nextRemediationInProgress": "Đang khắc phục",
       "nextRemediationPrOpen": "PR khắc phục đang mở",
       "nextRetryRemediation": "Có thể thử khắc phục lại",
       "nextViewDetails": "Xem chi tiết",
-      "retryAnalysis": "Phân tích lại",
       "runAnalysis": "Chạy phân tích",
       "viewPr": "Xem PR"
     },
@@ -1253,7 +1233,6 @@
       "newFindingSubtitle": "Thông báo được gửi mỗi khi có vấn đề mới được đồng bộ, kể cả trong lần đồng bộ đầu tiên.",
       "slaLeadTimeAccessibility": "Số ngày cảnh báo trước hạn chót SLA",
       "slaLeadTimeError": "Nhập số ngày từ 1 đến 365, chỉ dùng số nguyên.",
-      "slaLeadTimeHint": "Nhập một số nguyên từ 1 đến 365",
       "slaLeadTimeLabel": "Cảnh báo trước hạn chót SLA (ngày)",
       "slaPersonalTitle": "Gửi email cho tôi về các cảnh báo SLA",
       "slaSection": "Cảnh báo SLA",
@@ -1269,8 +1248,6 @@
       "cancellationRequested": "Đã yêu cầu hủy",
       "cancelled": "Đã hủy khắc phục",
       "couldNotLoad": "Không thể tải trạng thái khắc phục.",
-      "noAnalysisDescription": "Chạy phân tích từ thẻ Chi tiết.",
-      "noAnalysisTitle": "Chưa có phân tích",
       "openDraftPullRequest": "Mở bản nháp yêu cầu hợp nhất{{number}}",
       "openPullRequest": "Mở yêu cầu hợp nhất{{number}}",
       "progress": "Tiến độ",
@@ -1280,8 +1257,6 @@
       "timeline": {
         "blocked": "Khắc phục bị chặn",
         "failed": "Khắc phục thất bại",
-        "noChangesNeeded": "Không cần thay đổi",
-        "prOpened": "Đã mở PR",
         "queued": "Đã yêu cầu khắc phục"
       },
       "queued": "Đã đưa yêu cầu khắc phục vào hàng đợi",
@@ -1309,7 +1284,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "Phân tích {{mode}}",
-      "automation": "Tự động hóa",
       "automationAllOff": "Tất cả đều tắt",
       "automationCount": "Đã bật {{displayCount}}/3",
       "couldNotLoadPermissions": "Không thể tải thông tin quyền truy cập.",
@@ -1317,15 +1291,12 @@
       "disabledNoManage": "Trợ lý bảo mật đang tắt. Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bật tính năng này.",
       "disabledNoRepo": "Chọn ít nhất một kho lưu trữ trước khi bật Trợ lý bảo mật.",
       "disabledPrompt": "Bật Trợ lý bảo mật để đồng bộ cảnh báo Dependabot, chọn kho lưu trữ và thiết lập tự động hóa.",
-      "modelsAndAnalysis": "Mô hình và phân tích",
       "notificationsCount": "Đã bật {{displayCount}}/2",
       "on": "Bật",
       "repositoriesCount": "Đã chọn {{displayCount}} kho mã nguồn",
       "repositoriesCount_other": "Đã chọn {{displayCount}} kho mã nguồn",
       "repositoriesCount_one": "Đã chọn {{displayCount}} kho lưu trữ",
-      "selectRepositoriesSubtitle": "Chọn các kho lưu trữ để Trợ lý bảo mật giám sát",
-      "slaPolicy": "Chính sách SLA",
-      "title": "Cài đặt"
+      "selectRepositoriesSubtitle": "Chọn các kho lưu trữ để Trợ lý bảo mật giám sát"
     },
     "settingsSave": {
       "keepEditing": "Tiếp tục chỉnh sửa",
@@ -1373,7 +1344,6 @@
     },
     "analysisState": {
       "queued": "Đang chờ phân tích",
-      "queuedTitle": "Đang chờ phân tích",
       "queuedDescription": "Đang chờ có chỗ trống để chạy phân tích.",
       "analyzing": "Đang phân tích",
       "analyzingDescription": "Đang kiểm tra xem mã ứng dụng có thể gọi đến tính năng bị ảnh hưởng hay không.",
@@ -1382,7 +1352,6 @@
       "extractionFailedDescription": "Không thể chuyển báo cáo kỹ thuật thành kết quả có cấu trúc.",
       "exploitableDescription": "Mã ứng dụng có thể gọi đến tính năng bị ảnh hưởng.",
       "notExploitable": "Không thể tiếp cận",
-      "notExploitableTitle": "Không thể tiếp cận",
       "notExploitableDescription": "Không tìm thấy luồng thực thi nào có thể gọi đến tính năng bị ảnh hưởng trong kho lưu trữ này.",
       "unknown": "Cần rà soát",
       "unknownDescription": "Kết quả phân tích chưa xác định được liệu mã có thể gọi đến tính năng có lỗ hổng hay không.",
@@ -1418,7 +1387,6 @@
       "dueInDays_one": "Còn {{count}} ngày đến hạn"
     },
     "remediationStatus": {
-      "cancellationRequested": "Đã yêu cầu hủy",
       "notStarted": "Chưa bắt đầu",
       "starting": "Đang khởi động",
       "inProgress": "Đang tiến hành",
@@ -1437,7 +1405,6 @@
       "findingNotOpen": "Vấn đề này không còn ở trạng thái chưa xử lý.",
       "repoNotInScope": "Kho lưu trữ này chưa được chọn để Trợ lý bảo mật giám sát.",
       "analysisRequired": "Chạy phân tích mã nguồn trước khi bắt đầu khắc phục.",
-      "sandboxAnalysisRequired": "Chạy phân tích mã nguồn trước khi bắt đầu khắc phục.",
       "staleAnalysis": "Vấn đề đã thay đổi sau khi phân tích. Hãy chạy lại phân tích trước khi bắt đầu khắc phục.",
       "notExploitable": "Kết quả phân tích không tìm thấy luồng thực thi nào có thể gọi đến mã có lỗ hổng. Không thể dùng tính năng khắc phục tự động.",
       "exploitabilityUnknown": "Kết quả phân tích chưa xác nhận được khả năng khai thác. Cần rà soát thủ công trước khi khắc phục bằng một lần chạm.",
@@ -1453,12 +1420,10 @@
       "autoRemediationDisabled": "Tính năng khắc phục tự động đang tắt. Bạn vẫn có thể bắt đầu khắc phục thủ công khi đáp ứng các điều kiện an toàn.",
       "includeExistingDisabled": "Các vấn đề hiện có không được áp dụng tính năng khắc phục tự động.",
       "belowThreshold": "Mức độ nghiêm trọng của vấn đề chưa đạt ngưỡng khắc phục tự động. Bạn vẫn có thể bắt đầu khắc phục thủ công khi đáp ứng các điều kiện an toàn.",
-      "beforeEnablement": "Phân tích đã hoàn tất trước khi bật tính năng khắc phục tự động. Bạn vẫn có thể bắt đầu khắc phục thủ công khi đáp ứng các điều kiện an toàn.",
-      "generic": "Tính năng khắc phục không hỗ trợ vấn đề này."
+      "beforeEnablement": "Phân tích đã hoàn tất trước khi bật tính năng khắc phục tự động. Bạn vẫn có thể bắt đầu khắc phục thủ công khi đáp ứng các điều kiện an toàn."
     },
     "commandFailure": {
       "ownerCapReached": "Đã đạt giới hạn số lượt phân tích đồng thời. Hãy chờ một lượt phân tích đang chạy hoàn tất rồi thử lại.",
-      "githubTokenUnavailable": "Quyền truy cập GitHub có vấn đề. Hãy cấp quyền lại cho ứng dụng GitHub rồi thử lại.",
       "githubAuthInvalid": "Quyền truy cập GitHub có vấn đề. Hãy cấp quyền lại cho ứng dụng GitHub rồi thử lại.",
       "findingUnavailable": "Không còn truy cập được vấn đề này. Hãy làm mới danh sách vấn đề và thử lại nếu vấn đề vẫn chưa được xử lý.",
       "repositoryUnavailable": "Ứng dụng GitHub không còn truy cập được kho lưu trữ này. Hãy làm mới quyền truy cập kho lưu trữ rồi thử lại.",
@@ -1540,10 +1505,8 @@
       "title": "Phiên",
       "copyErrorDetails": "Sao chép chi tiết lỗi",
       "backToSessions": "Quay lại danh sách phiên",
-      "accessDeniedDescription": "Bạn không có quyền xem nội dung này.",
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
-      "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn truy cập được.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
       "renameSession": "Đổi tên phiên",
       "renamePlaceholder": "Tên phiên",
@@ -2091,8 +2054,7 @@
     "sessionSignedOut": "Đã đăng xuất phiên.",
     "signOutThisDeviceTitle": "Đăng xuất khỏi thiết bị này?",
     "signOutThisSessionTitle": "Đăng xuất phiên này?",
-    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ.",
-    "signOutMessage": "Bạn cần đăng nhập lại để truy cập không gian làm việc của mình."
+    "signOutThisSessionMessage": "{{device}} sẽ được đăng xuất. Thiết bị này vẫn có thể truy cập API trong tối đa một giờ."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Không thể mở cửa hàng ứng dụng.",
@@ -2372,8 +2334,6 @@
       "reconnectTitle": "Kết nối lại GitHub"
     },
     "connectionExpired": "Kết nối GitHub đã hết hạn.",
-    "connectionExpiredDescription": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
-    "connectionExpiredTitle": "Kết nối GitHub đã hết hạn.",
     "couldNotLoadPullRequest": "Không thể tải PR.",
     "couldNotOpenGitHubAppSettings": "Không thể mở cài đặt ứng dụng GitHub.",
     "description": "Mô tả",
@@ -2389,7 +2349,6 @@
       "comment_other": "{{displayCount}} bình luận",
       "couldNotLoad": "Không thể tải phần thảo luận.",
       "couldNotLoadMore": "Không thể tải thêm bình luận.",
-      "couldNotReply": "Không thể trả lời.",
       "loadMoreComments": "Tải thêm bình luận",
       "loading": "Đang tải thảo luận",
       "moderation": {
@@ -2601,8 +2560,7 @@
       "noEnabledMethods": "Kho lưu trữ này chưa bật phương thức hợp nhất nào. Hãy nhờ quản trị viên bật phương thức tạo bản ghi hợp nhất, gộp bản ghi hoặc chuyển gốc.",
       "partialSuccessBanner": {
         "accessibility": "Đã hợp nhất. Không thể xóa nhánh: {{reason}}",
-        "body": "Không thể xóa nhánh: {{reason}}.",
-        "title": "Đã hợp nhất"
+        "body": "Không thể xóa nhánh: {{reason}}."
       },
       "refreshMergeability": "Kiểm tra lại khả năng hợp nhất",
       "terminal": {
@@ -2664,9 +2622,7 @@
       "deletedAnnouncement": "Đã xóa bình luận chờ gửi",
       "editA11y": "Chỉnh sửa bình luận chờ gửi tại {{location}}",
       "editOutdatedA11y": "Chỉnh sửa bình luận chờ gửi không còn cập nhật tại {{location}}",
-      "emptyBody": "(trống)",
       "noCommentsQueued": "Không có bình luận nào chờ gửi. Bản đánh giá sẽ được gửi theo hình thức đã chọn ở trên mà không kèm bình luận.",
-      "outdated": "Lỗi thời",
       "staleHint": "PR đã thay đổi kể từ khi bạn viết bình luận này.",
       "staleQueueHint": "Các bình luận gắn với bản ghi cũ hơn sẽ không được gửi. Chúng vẫn nằm trong danh sách chờ gửi để bạn chỉnh sửa hoặc xóa.",
       "summaryA11y": "Tóm tắt đánh giá",
@@ -2675,7 +2631,6 @@
     "pullRequestUnavailable": "Không thể truy cập PR",
     "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
     "reconnectNotice": {
-      "checkConnection": "Kiểm tra kết nối",
       "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
       "title": "Kết nối GitHub đã hết hạn."
     },
@@ -2701,7 +2656,6 @@
       "pendingComment_other": "bình luận chưa gửi",
       "pendingComment_one": "bình luận chờ gửi",
       "summaryOptional": "Tóm tắt (tùy chọn)",
-      "title": "Gửi kết quả rà soát",
       "partialPostedMessage": "Đã đăng {{displayFreshCount}} bình luận. Còn {{displayStaleCount}} bình luận gắn với bản ghi cũ hơn được giữ lại trong danh sách chờ gửi.",
       "submitCountOfTotal": "Gửi {{displayFreshCount}} trong {{displayTotalCount}} bình luận",
       "submitReview": "Gửi kết quả rà soát",
@@ -2777,7 +2731,6 @@
         "accounting_adjustment": "Điều chỉnh kế toán",
         "credits_expired": "Tiền trong số dư đã hết hạn"
       },
-      "loadMoreFailed": "Không thể tải thêm.",
       "truncated": "Còn các biến động số dư trước đó để xem."
     },
     "hub": {
@@ -2813,7 +2766,6 @@
       "truncated": "Còn các hóa đơn trước đó để xem."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ten@congty.com",
       "enableA11y": "Bật cảnh báo số dư thấp",
       "notifyEmailsLabel": "Email nhận thông báo",
       "permissionDenied": "Bạn không có quyền quản lý cảnh báo thanh toán.",
@@ -2838,7 +2790,6 @@
       "emptyDescriptionCanInvite": "Mời các thành viên trong nhóm để bắt đầu cộng tác trong tổ chức này.",
       "emptyDescriptionCannotInvite": "Nhờ chủ sở hữu hoặc người quản lý thanh toán mời các thành viên trong nhóm.",
       "emptyTitle": "Chưa có thành viên",
-      "inviteMember": "Mời thành viên",
       "invitedDate": "Đã mời vào {{date}}",
       "limitPerDay": "{{amount}}/ngày",
       "manageA11y": "Quản lý {{name}}",
@@ -2874,7 +2825,6 @@
       "couldNotLoadStatus": "Không thể tải trạng thái",
       "creditProcessingDelayed": "Việc cộng tiền vào số dư bị chậm · đang tự động thử lại",
       "ended": "Đã kết thúc",
-      "manageHint": "Mở trang quản lý Kilo Pass trên web.",
       "notSubscribed": "Chưa đăng ký",
       "overallocated": "Số lượt cấp Kilo Pass vượt quá số suất đã thanh toán",
       "paidSeat_one": "{{displayCount}} suất đã thanh toán",

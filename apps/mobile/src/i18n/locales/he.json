@@ -278,7 +278,6 @@
       "security": "ממצאי אבטחה"
     },
     "category": {
-      "chatMessagesTitle": "הודעות צ׳אט",
       "chatMessagesSubtitle": "תשובות בשיחות שלך",
       "agentAttentionTitle": "הסוכן צריך אותך",
       "agentAttentionSubtitle": "שאלות, בקשות הרשאה ובקשות למידע",
@@ -286,11 +285,8 @@
       "agentUpdatesSubtitle": "הודעות מהסוכן במהלך המשימה",
       "sessionStatusTitle": "מצב הסשן",
       "sessionStatusSubtitle": "הסתיים / נכשל / מוכן לשליטה",
-      "kiloclawActivityTitle": "פעילות KiloClaw",
       "kiloclawActivitySubtitle": "מופע מוכן או שנכשל, פעולות מתוזמנות",
-      "balanceAlertsTitle": "התראות על היתרה",
       "balanceAlertsSubtitle": "אזהרות על יתרה נמוכה בארגון",
-      "securityFindingsTitle": "ממצאי אבטחה",
       "securityFindingsSubtitle": "ממצאים חדשים ותזכורות SLA"
     }
   },
@@ -764,8 +760,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "בחירת מודל בינה מלאכותית",
       "secretsDescription": "פרטי הזדהות מוצפנים",
-      "versionPinDescription": "הצמדה לגרסה מסוימת",
-      "versionPinLabel": "נעילת גרסה"
+      "versionPinDescription": "הצמדה לגרסה מסוימת"
     },
     "avatar": {
       "arcade": "ארקייד",
@@ -1008,7 +1003,6 @@
       "title": "סינון ממצאים",
       "fixed": "תוקן",
       "outcome": "תוצאה",
-      "outcomeNotExploitable": "לא ניתן לניצול",
       "outcomeTriageComplete": "המיון הראשוני הושלם",
       "overdueOnly": "באיחור בלבד",
       "reset": "איפוס",
@@ -1054,9 +1048,6 @@
       "analysisModel": "מודל לניתוח",
       "couldNotLoad": "לא ניתן לטעון את הגדרות הניתוח.",
       "depth": "עומק הניתוח",
-      "modeAuto": "אוטומטי",
-      "modeDeep": "מעמיק",
-      "modeShallow": "שטחי",
       "remediationModel": "מודל לתיקון",
       "title": "מודלים וניתוח",
       "triageModel": "מודל למיון ראשוני"
@@ -1151,15 +1142,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "ממצאים פתוחים",
-      "openFindingsDetail": "{{critical}} בדרגת חומרה קריטית, {{high}} בדרגת חומרה גבוהה",
-      "confirmedExploitable": "ניתן לניצול בוודאות",
       "confirmedExploitableDetail": "הניתוח אישר שקיים סיכון לפרויקט",
-      "needsReview": "נדרשת בדיקה שלך",
       "needsReviewDetail": "נדרשת החלטה אנושית",
-      "analysisIncomplete": "הניתוח לא הושלם",
       "analysisIncompleteDetail": "הסיכון לפרויקט עדיין אינו ידוע",
       "slaCompliance": "עמידה ב-SLA",
-      "notMeasured": "לא נמדד",
       "withinDeadlineDetail": "{{within}} מתוך {{total}} ללא איחור",
       "noDeadlineData": "עדיין לא נקבעו לממצאים מועדים אחרונים לפי SLA",
       "deadlinePassed": "המועד האחרון חלף",
@@ -1190,9 +1176,6 @@
       "title": "התעלמות מהממצא"
     },
     "findingDetail": {
-      "couldNotLoad": "לא הצלחנו לטעון את הממצא הזה.",
-      "notFound": "הממצא לא נמצא",
-      "notFoundDescription": "ייתכן שממצא זה הוסר, או שאין לך עוד גישה אליו.",
       "tabAnalysis": "ניתוח",
       "tabRemediation": "תיקון",
       "title": "ממצא"
@@ -1215,7 +1198,6 @@
       "supersededByDescription": "הקש לפתיחת הרשומה העדכנית ולצפייה במצב, בניתוח ובתיקון.",
       "viewAdvisory": "צפייה בהודעת האבטחה ב-GitHub",
       "vulnerableVersions": "גרסאות פגיעות",
-      "statusSuperseded": "הוחלף",
       "statusOpen": "פתוח",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "התיקון כבר התחיל",
@@ -1237,13 +1219,11 @@
       "a11y": "ממצא בחומרה {{severity}}: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "ממצא בחומרה {{severity}}: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "ניתוח",
-      "nextNeedsManualReview": "נדרשת בדיקה ידנית",
       "nextRemediationAvailable": "תיקון זמין",
       "nextRemediationInProgress": "התיקון מתבצע",
       "nextRemediationPrOpen": "PR לתיקון פתוח",
       "nextRetryRemediation": "אפשר לנסות לתקן שוב",
       "nextViewDetails": "הצגת פרטים",
-      "retryAnalysis": "הרצת הניתוח מחדש",
       "runAnalysis": "הרצת ניתוח",
       "viewPr": "צפייה ב-PR"
     },
@@ -1256,7 +1236,6 @@
       "newFindingSubtitle": "נשלחת בכל פעם שממצא חדש מסונכרן, כולל בסנכרון הראשון.",
       "slaLeadTimeAccessibility": "מספר הימים להתראה מראש על מועד ה-SLA",
       "slaLeadTimeError": "יש להזין מספר ימים שלם בין 1 ל-365.",
-      "slaLeadTimeHint": "יש להזין מספר שלם בין 1 ל-365",
       "slaLeadTimeLabel": "התראה מראש על מועד ה-SLA (בימים)",
       "slaPersonalTitle": "קבלת דוא״ל על אזהרות SLA",
       "slaSection": "התראת SLA",
@@ -1272,8 +1251,6 @@
       "cancellationRequested": "נשלחה בקשת ביטול",
       "cancelled": "התיקון בוטל",
       "couldNotLoad": "לא ניתן לטעון את מצב התיקון.",
-      "noAnalysisDescription": "אפשר להריץ ניתוח דרך לשונית הפרטים.",
-      "noAnalysisTitle": "עדיין לא בוצע ניתוח",
       "openDraftPullRequest": "פתיחת טיוטת בקשת משיכה{{number}}",
       "openPullRequest": "פתיחת בקשת משיכה{{number}}",
       "progress": "התקדמות",
@@ -1283,8 +1260,6 @@
       "timeline": {
         "blocked": "התיקון נחסם",
         "failed": "התיקון נכשל",
-        "noChangesNeeded": "אין צורך בשינויים",
-        "prOpened": "נפתח PR",
         "queued": "התקבלה בקשה לתיקון"
       },
       "queued": "התיקון נוסף לתור",
@@ -1312,7 +1287,6 @@
     },
     "settingsOverview": {
       "analysisModeSubtitle": "ניתוח {{mode}}",
-      "automation": "אוטומציה",
       "automationAllOff": "הכול כבוי",
       "automationCount": "{{displayCount}} מתוך 3 מופעלים",
       "couldNotLoadPermissions": "לא ניתן לטעון את ההרשאות.",
@@ -1320,15 +1294,12 @@
       "disabledNoManage": "סוכן האבטחה מושבת. רק בעלי הארגון ומנהלי החיוב יכולים להפעיל אותו.",
       "disabledNoRepo": "יש לבחור לפחות מאגר אחד לפני הפעלת סוכן האבטחה.",
       "disabledPrompt": "הפעל את סוכן האבטחה כדי לסנכרן התראות Dependabot, לבחור מאגרים ולהגדיר אוטומציה.",
-      "modelsAndAnalysis": "מודלים וניתוח",
       "notificationsCount": "{{displayCount}} מתוך 2 מופעלים",
       "on": "מופעל",
       "repositoriesCount": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_other": "נבחרו {{displayCount}} מאגרים",
       "repositoriesCount_one": "{{displayCount}} מאגר נבחר",
       "selectRepositoriesSubtitle": "בחירת המאגרים שסוכן האבטחה יעקוב אחריהם",
-      "slaPolicy": "מדיניות SLA",
-      "title": "הגדרות",
       "repositoriesCount_two": "{{displayCount}} מאגרים נבחרו"
     },
     "settingsSave": {
@@ -1377,7 +1348,6 @@
     },
     "analysisState": {
       "queued": "הניתוח ממתין בתור",
-      "queuedTitle": "הניתוח ממתין בתור",
       "queuedDescription": "הניתוח ממתין עד שיתפנה מקום להרצה.",
       "analyzing": "בניתוח",
       "analyzingDescription": "הסוכן בודק אם קוד האפליקציה יכול להגיע לתכונה הפגיעה.",
@@ -1386,7 +1356,6 @@
       "extractionFailedDescription": "לא ניתן להמיר את הדוח הטכני לתוצאה מובנית.",
       "exploitableDescription": "קוד האפליקציה יכול להגיע לתכונה הפגיעה.",
       "notExploitable": "לא נגיש",
-      "notExploitableTitle": "לא נגיש",
       "notExploitableDescription": "לא נמצא במאגר הזה נתיב קוד שמגיע לתכונה הפגיעה.",
       "unknown": "נדרשת בדיקה",
       "unknownDescription": "הניתוח לא הצליח לקבוע אם ניתן להגיע לתכונה הפגיעה.",
@@ -1424,7 +1393,6 @@
       "dueInDays": "נותרו {{count}} ימים למועד האחרון"
     },
     "remediationStatus": {
-      "cancellationRequested": "נשלחה בקשת ביטול",
       "notStarted": "טרם התחיל",
       "starting": "מתחיל",
       "inProgress": "מתבצע",
@@ -1443,7 +1411,6 @@
       "findingNotOpen": "הממצא אינו פתוח עוד.",
       "repoNotInScope": "המאגר לא נבחר למעקב של סוכן האבטחה.",
       "analysisRequired": "לפני הפעלת התיקון, צריך להריץ ניתוח של בסיס הקוד.",
-      "sandboxAnalysisRequired": "לפני הפעלת התיקון, צריך להריץ ניתוח של בסיס הקוד.",
       "staleAnalysis": "הממצא השתנה לאחר הניתוח. הרץ שוב את הניתוח לפני תחילת התיקון.",
       "notExploitable": "הניתוח לא מצא נתיב קוד שמגיע לתכונה פגיעה. התיקון האוטומטי אינו זמין.",
       "exploitabilityUnknown": "הניתוח לא הצליח לקבוע אם ניתן לנצל את הפגיעות. נדרשת בדיקה ידנית לפני תיקון בלחיצה אחת.",
@@ -1459,12 +1426,10 @@
       "autoRemediationDisabled": "התיקון האוטומטי מושבת. עדיין אפשר להתחיל תיקון ידני אם בדיקות הבטיחות עוברות בהצלחה.",
       "includeExistingDisabled": "ממצאים קיימים אינם נכללים בתיקון אוטומטי.",
       "belowThreshold": "חומרת הממצא נמוכה מהסף לתיקון אוטומטי. עדיין אפשר להתחיל תיקון ידני אם בדיקות הבטיחות עוברות בהצלחה.",
-      "beforeEnablement": "הניתוח הושלם לפני הפעלת התיקון האוטומטי. עדיין אפשר להתחיל תיקון ידני אם בדיקות הבטיחות עוברות בהצלחה.",
-      "generic": "לא ניתן להפעיל תיקון לממצא הזה."
+      "beforeEnablement": "הניתוח הושלם לפני הפעלת התיקון האוטומטי. עדיין אפשר להתחיל תיקון ידני אם בדיקות הבטיחות עוברות בהצלחה."
     },
     "commandFailure": {
       "ownerCapReached": "מספר הניתוחים הפעילים הגיע למגבלה. המתן עד שאחד מהם יסתיים ונסה שוב.",
-      "githubTokenUnavailable": "נדרש טיפול בהרשאה ל-GitHub. חדש את ההרשאה לאפליקציית GitHub ונסה שוב.",
       "githubAuthInvalid": "נדרש טיפול בהרשאה ל-GitHub. חדש את ההרשאה לאפליקציית GitHub ונסה שוב.",
       "findingUnavailable": "הממצא אינו זמין עוד. רענן את הממצאים ונסה שוב אם הוא עדיין פתוח.",
       "repositoryUnavailable": "לאפליקציית GitHub אין עוד גישה למאגר. רענן את הרשאות הגישה למאגר ונסה שוב.",
@@ -1549,10 +1514,8 @@
       "title": "סשן",
       "copyErrorDetails": "העתקת פרטי השגיאה",
       "backToSessions": "חזרה לסשנים",
-      "accessDeniedDescription": "אין לך הרשאה לצפות בזה.",
       "couldNotLoad": "לא ניתן היה לטעון את הסשן.",
       "failedToLoadDetails": "לא ניתן היה לטעון את פרטי הסשן.",
-      "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
       "failedToStopExecution": "לא ניתן היה לעצור את ההרצה.",
       "renameSession": "שינוי שם הסשן",
       "renamePlaceholder": "שם הסשן",
@@ -2105,7 +2068,6 @@
     "signOutThisDeviceTitle": "להתנתק מהמכשיר הזה?",
     "signOutThisSessionTitle": "לנתק את החיבור הזה?",
     "signOutThisSessionMessage": "{{device}} ינותק מהחשבון. הגישה שלו ל-API יכולה להישאר פעילה למשך עד שעה.",
-    "signOutMessage": "כדי לגשת לסביבת העבודה שלך, צריך להתחבר שוב.",
     "webBrowser": "דפדפן"
   },
   "forceUpdate": {
@@ -2386,8 +2348,6 @@
       "reconnectTitle": "חיבור מחדש ל-GitHub"
     },
     "connectionExpired": "פג תוקף החיבור ל-GitHub.",
-    "connectionExpiredDescription": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
-    "connectionExpiredTitle": "פג תוקף החיבור ל-GitHub.",
     "couldNotLoadPullRequest": "לא ניתן היה לטעון את בקשת המשיכה.",
     "couldNotOpenGitHubAppSettings": "לא הצלחנו לפתוח את הגדרות האפליקציה ב-GitHub.",
     "description": "תיאור",
@@ -2403,7 +2363,6 @@
       "comment_other": "{{displayCount}} תגובות",
       "couldNotLoad": "לא ניתן היה לטעון את הדיון.",
       "couldNotLoadMore": "לא ניתן היה לטעון עוד תגובות.",
-      "couldNotReply": "לא הצלחנו לשלוח את התשובה.",
       "loadMoreComments": "טעינת תגובות נוספות",
       "loading": "הדיון נטען",
       "moderation": {
@@ -2619,8 +2578,7 @@
       "noEnabledMethods": "אין שיטות מיזוג פעילות במאגר הזה. בקש ממנהל המאגר להפעיל מיזוג רגיל, מיזוג עם איחוד קומיטים או מיזוג עם ריבייס.",
       "partialSuccessBanner": {
         "accessibility": "המיזוג הושלם. לא ניתן היה למחוק את הענף: {{reason}}",
-        "body": "לא ניתן היה למחוק את הענף: {{reason}}.",
-        "title": "מוזג"
+        "body": "לא ניתן היה למחוק את הענף: {{reason}}."
       },
       "refreshMergeability": "בדיקה חוזרת אם אפשר למזג",
       "terminal": {
@@ -2684,9 +2642,7 @@
       "deletedAnnouncement": "התגובה הממתינה נמחקה",
       "editA11y": "עריכת תגובה שממתינה לשליחה ב-{{location}}",
       "editOutdatedA11y": "עריכת תגובה לא עדכנית שממתינה לשליחה ב-{{location}}",
-      "emptyBody": "(ריק)",
       "noCommentsQueued": "אין תגובות שממתינות לשליחה. הסקירה תישלח רק עם סוג הסקירה שנבחר למעלה.",
-      "outdated": "לא עדכני",
       "staleHint": "ה-PR עודכן מאז שכתבת את התגובה הזו.",
       "staleQueueHint": "תגובות שמתייחסות לקומיט ישן יותר לא נשלחות. הן נשארות ברשימת התגובות הממתינות כדי שתוכל לערוך או למחוק אותן.",
       "summaryA11y": "סיכום הסקירה",
@@ -2695,7 +2651,6 @@
     "pullRequestUnavailable": "בקשת המשיכה אינה זמינה",
     "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
     "reconnectNotice": {
-      "checkConnection": "בדיקת החיבור",
       "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
       "title": "פג תוקף החיבור ל-GitHub."
     },
@@ -2721,7 +2676,6 @@
       "pendingComment_other": "תגובות ממתינות",
       "pendingComment_one": "תגובה ממתינה",
       "summaryOptional": "סיכום (לא חובה)",
-      "title": "שליחת סקירה",
       "partialPostedMessage": "פורסמו {{displayFreshCount}} תגובות. {{displayStaleCount}} תגובות מתייחסות לקומיט ישן יותר ועדיין ממתינות לשליחה.",
       "submitCountOfTotal": "שליחת {{displayFreshCount}} מתוך {{displayTotalCount}} תגובות",
       "submitReview": "שליחת סקירה",
@@ -2798,7 +2752,6 @@
         "accounting_adjustment": "התאמה חשבונאית",
         "credits_expired": "פג תוקף הקרדיטים"
       },
-      "loadMoreFailed": "לא הצלחנו לטעון פריטים נוספים.",
       "truncated": "יש תנועות קודמות בקרדיטים."
     },
     "hub": {
@@ -2834,7 +2787,6 @@
       "truncated": "קיימות חשבוניות ישנות יותר."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "israel@company.com",
       "enableA11y": "הפעלת התראה על יתרה נמוכה",
       "notifyEmailsLabel": "כתובות דוא״ל לקבלת התראות",
       "permissionDenied": "אין לך הרשאה לנהל התראות חיוב.",
@@ -2859,7 +2811,6 @@
       "emptyDescriptionCanInvite": "הזמן חברי צוות כדי להתחיל לשתף פעולה בארגון זה.",
       "emptyDescriptionCannotInvite": "בקש מבעלי הארגון או ממנהל החיובים להזמין חברי צוות.",
       "emptyTitle": "אין עדיין חברים",
-      "inviteMember": "הזמנת חבר לארגון",
       "invitedDate": "מועד ההזמנה: {{date}}",
       "limitPerDay": "{{amount}} ליום",
       "manageA11y": "ניהול {{name}}",
@@ -2895,7 +2846,6 @@
       "couldNotLoadStatus": "לא ניתן היה לטעון את המצב",
       "creditProcessingDelayed": "עיבוד הקרדיטים מתעכב · מנסה שוב אוטומטית",
       "ended": "הסתיים",
-      "manageHint": "פתיחת ניהול Kilo Pass באתר.",
       "notSubscribed": "אין מינוי",
       "overallocated": "מספר ההקצאות של Kilo Pass גדול ממספר הרישיונות בתשלום",
       "paidSeat_one": "רישיונות בתשלום: {{displayCount}}",

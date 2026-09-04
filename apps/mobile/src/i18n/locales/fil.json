@@ -370,7 +370,6 @@
         "closed": "Nakasara ang pull request na ito"
       },
       "partialSuccessBanner": {
-        "title": "Pinagsama",
         "body": "Hindi mabura ang branch: {{reason}}.",
         "accessibility": "Na-merge na. Hindi mabura ang branch: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Tanggapin",
       "replyBadRequest": "Hindi ma-post ang sagot na ito. Maaaring nagbago ang talakayan.",
       "replyForbidden": "Wala kang pahintulot na sumagot sa pull request na ito.",
-      "couldNotReply": "Hindi maipadala ang sagot.",
       "moderation": {
         "reportContent": {
           "terminal": "Hindi maiulat ang komentong ito.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Hindi mabuksan ang mga setting ng GitHub App.",
     "installKiloGitHubApp": "I-install ang Kilo GitHub App",
-    "connectionExpiredTitle": "Nag-expire ang koneksyon sa GitHub.",
-    "connectionExpiredDescription": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
     "checkConnection": "Suriin ang koneksyon",
     "couldNotLoadPullRequest": "Hindi ma-load ang pull request.",
     "description": "Paglalarawan",
@@ -572,7 +568,6 @@
       "shareA11y": "Ibahagi ang pull request"
     },
     "submit": {
-      "title": "Isumite ang pagsusuri",
       "loadFailedTitle": "Hindi ma-load ang pagsusumitihan ng pagsusuri.",
       "deletePendingTitle": "Burahin ang nakabinbing komento?",
       "deletePendingMessage": "Aalisin ang komentong ito sa pila ng pagsusuri.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "Nag-expire ang koneksyon sa GitHub.",
-      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
-      "checkConnection": "Suriin ang koneksyon"
+      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan."
     },
     "eventChips": {
       "comment": "Komento",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "I-edit ang nakabinbing komento sa lumang bersyon ng {{location}}",
       "editA11y": "I-edit ang nakabinbing komento sa {{location}}",
-      "emptyBody": "(walang laman)",
-      "outdated": "Luma na",
       "staleHint": "nagbago na ang PR mula nang isinulat mo ito.",
       "deleteA11y": "Burahin ang nakabinbing komento sa {{location}}",
       "deletedAnnouncement": "Nabura ang nakabinbing komento",
@@ -703,7 +695,6 @@
       "security": "Mga natukoy na isyu sa seguridad"
     },
     "category": {
-      "chatMessagesTitle": "Mga mensahe sa usapan",
       "chatMessagesSubtitle": "mga tugon sa iyong mga pag-uusap",
       "agentAttentionTitle": "Kailangan ka ng ahente",
       "agentAttentionSubtitle": "mga tanong, pahintulot, kailangang sagot",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "mga mensahe mula sa ahente habang isinasagawa ang gawain",
       "sessionStatusTitle": "Status ng sesyon",
       "sessionStatusSubtitle": "tapos / nabigo / handa nang kontrolin",
-      "kiloclawActivityTitle": "Aktibidad ng KiloClaw",
       "kiloclawActivitySubtitle": "handa o nabigo ang instance, mga nakaiskedyul na aksyon",
-      "balanceAlertsTitle": "Mga babala sa balanse",
       "balanceAlertsSubtitle": "mga babala sa mababang balanse ng organisasyon",
-      "securityFindingsTitle": "Mga natukoy na isyu sa seguridad",
       "securityFindingsSubtitle": "mga bagong natuklasan at paalala sa SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Pagpili ng modelo ng AI",
       "secretsDescription": "Naka-encrypt na mga credential",
-      "versionPinDescription": "I-pin sa isang partikular na bersyon",
-      "versionPinLabel": "Pag-pin ng bersyon"
+      "versionPinDescription": "I-pin sa isang partikular na bersyon"
     },
     "avatar": {
       "arcade": "Larong arcade",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Mataas",
       "severityMedium": "Katamtaman",
       "severityLow": "Mababa",
-      "outcomeNotExploitable": "Hindi maaaring samantalahin",
       "outcomeTriageComplete": "Tapos na ang paunang pagtatasa",
       "sortSeverityDesc": "Kalubhaan: mula mataas pababa",
       "sortSeverityAsc": "Kalubhaan: mula mababa pataas",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Mga bukas na isyu",
-      "openFindingsDetail": "{{critical}} na kritikal, {{high}} na mataas",
-      "confirmedExploitable": "Kumpirmadong maaaring samantalahin",
       "confirmedExploitableDetail": "Nakumpirma ng pagsusuri ang panganib sa proyekto",
-      "needsReview": "Kailangan mong suriin",
       "needsReviewDetail": "Kinakailangan ang desisyon ng tao",
-      "analysisIncomplete": "Hindi pa kumpleto ang pagsusuri",
       "analysisIncompleteDetail": "Hindi pa alam ang panganib ng proyekto",
       "slaCompliance": "Pagsunod sa SLA",
-      "notMeasured": "Hindi nasukat",
       "withinDeadlineDetail": "{{within}} sa {{total}} ang hindi pa lampas sa takdang petsa",
       "noDeadlineData": "Wala pang natukoy na isyung may takdang petsa ng SLA",
       "deadlinePassed": "Lampas na sa takdang petsa",
@@ -1601,7 +1582,6 @@
       "source": "Pinagmulan",
       "sourceId": "ID ng pinagmulan",
       "viewAdvisory": "Tingnan ang abiso sa GitHub",
-      "statusSuperseded": "Pinalitan",
       "statusOpen": "Bukas",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Sinimulan na ang pag-aayos",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "pagkatapos ng pagsusuri"
     },
     "settingsOverview": {
-      "title": "Mga setting",
       "couldNotLoadSettings": "Hindi ma-load ang mga setting ng Security Agent.",
       "couldNotLoadPermissions": "Hindi ma-load ang mga pahintulot.",
       "on": "Pinagana",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} na repositoryo ang napili",
       "repositoriesCount_other": "{{displayCount}} na repositoryo ang napili",
       "selectRepositoriesSubtitle": "Piliin kung aling mga repository ang susubaybayan ng Security Agent",
-      "modelsAndAnalysis": "Mga modelo at pagsusuri",
       "analysisModeSubtitle": "Pagsusuri: {{mode}}",
-      "automation": "Awtomasyon",
       "automationAllOff": "Lahat ay hindi pinagana",
       "automationCount": "{{displayCount}} sa 3 ang pinagana",
       "notificationsCount": "{{displayCount}} sa 2 ang pinagana",
-      "slaPolicy": "Patakaran sa SLA",
       "disabledNoManage": "Hindi pinagana ang Security Agent. Mga may-ari ng organisasyon at tagapamahala ng pagsingil lang ang maaaring magpagana nito.",
       "disabledNoRepo": "Pumili ng kahit isang repository bago paganahin ang Security Agent.",
       "disabledPrompt": "Paganahin ang Security Agent para i-sync ang mga alerto ng Dependabot, pumili ng mga repository, at itakda ang mga awtomatikong proseso."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Hiniling ang pagkansela",
       "cancelled": "Kinansela ang pag-aayos",
       "couldNotLoad": "Hindi ma-load ang katayuan ng pag-aayos.",
-      "noAnalysisTitle": "Wala pang pagsusuri",
-      "noAnalysisDescription": "Magsimula ng pagsusuri sa tab na Mga detalye.",
       "start": "Simulan ang pag-aayos",
       "retry": "Subukang muli ang pag-aayos",
       "cancelTitle": "Kanselahin ang pag-aayos na ito?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Nakapila ang muling pagtatangkang mag-ayos",
       "timeline": {
         "queued": "Hiniling ang pag-aayos",
-        "prOpened": "Binuksan ang PR",
         "failed": "Nabigo ang pag-aayos",
-        "blocked": "Hindi makausad ang pag-aayos",
-        "noChangesNeeded": "Walang kailangang pagbabago"
+        "blocked": "Hindi makausad ang pag-aayos"
       },
       "unavailable": "Hindi magagamit ang pag-aayos para sa natukoy na isyung ito."
     },
@@ -1663,9 +1635,6 @@
       "title": "Mga modelo at pagsusuri",
       "couldNotLoad": "Hindi ma-load ang mga setting ng pagsusuri.",
       "depth": "Lalim ng pagsusuri",
-      "modeAuto": "Awtomatiko",
-      "modeShallow": "Mababaw",
-      "modeDeep": "Malalim",
       "triageModel": "Modelo para sa paunang pagtatasa",
       "analysisModel": "Modelo para sa pagsusuri",
       "remediationModel": "Modelo para sa pag-aayos"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Natukoy na isyu",
       "tabAnalysis": "Pagsusuri",
-      "tabRemediation": "Pag-aayos",
-      "notFound": "Hindi mahanap ang natukoy na isyu",
-      "notFoundDescription": "Maaaring naalis na ang natukoy na isyung ito, o wala ka nang access dito.",
-      "couldNotLoad": "Hindi ma-load ang natukoy na isyung ito."
+      "tabRemediation": "Pag-aayos"
     },
     "findingList": {
       "couldNotLoad": "Hindi ma-load ang mga natukoy na isyu.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Isinasagawa ang pag-aayos",
       "nextRetryRemediation": "Maaaring subukang muli ang pag-aayos",
       "nextRemediationAvailable": "Maaaring simulan ang pag-aayos",
-      "retryAnalysis": "Subukang suriin muli",
       "runAnalysis": "Isagawa ang pagsusuri",
-      "nextNeedsManualReview": "Kailangan ng manu-manong pagsusuri",
       "nextViewDetails": "Tingnan ang mga detalye",
       "viewPr": "Tingnan ang PR",
       "analyze": "Suriin",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Ipinapadala tuwing may bagong natukoy na isyung na-sync, kasama ang unang pag-sync.",
       "slaLeadTimeAccessibility": "Bilang ng araw bago ang takdang petsa para magbabala tungkol sa SLA",
       "slaLeadTimeError": "Maglagay ng buong bilang ng araw mula 1 hanggang 365.",
-      "slaLeadTimeHint": "Maglagay ng buong bilang mula 1 hanggang 365",
       "slaLeadTimeLabel": "Paunang babala sa SLA (araw bago ang takdang petsa)",
       "slaPersonalTitle": "I-email ako tungkol sa mga babala ng SLA",
       "slaSection": "Abiso ng babala sa SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Nakapila ang pagsusuri",
-      "queuedTitle": "Nakapila ang pagsusuri",
       "queuedDescription": "Naghihintay ng puwang para sa pagsusuri.",
       "analyzing": "Sinisuri",
       "analyzingDescription": "Sinusuri kung may paraan para magamit ng code ng app ang apektadong feature.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Hindi magawang nakabalangkas na resulta ang teknikal na ulat.",
       "exploitableDescription": "May paraan para magamit ng code ng app ang apektadong feature.",
       "notExploitable": "Hindi maabot",
-      "notExploitableTitle": "Hindi maabot",
       "notExploitableDescription": "Walang natukoy na landas sa code ng repository na ito para magamit ang apektadong feature.",
       "unknown": "Kailangang suriin",
       "unknownDescription": "Hindi nakumpirma ng pagsusuri kung may paraan para magamit ang feature na may kahinaan sa seguridad.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "{{count}} araw bago ang takdang petsa"
     },
     "remediationStatus": {
-      "cancellationRequested": "Hiniling ang pagkansela",
       "notStarted": "Hindi pa nasisimulan",
       "starting": "Sinisimulan",
       "inProgress": "Isinasagawa",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Hindi na bukas ang natukoy na isyu.",
       "repoNotInScope": "Hindi napili ang repository para sa Security Agent.",
       "analysisRequired": "Patakbuhin ang pagsusuri ng codebase bago simulan ang pag-aayos.",
-      "sandboxAnalysisRequired": "Patakbuhin ang pagsusuri ng codebase bago simulan ang pag-aayos.",
       "staleAnalysis": "Nagbago ang natukoy na isyu pagkatapos ng pagsusuri. Ulitin ang pagsusuri bago simulan ang pag-aayos.",
       "notExploitable": "Walang natukoy ang pagsusuri na landas sa code para magamit ang feature na may kahinaan sa seguridad. Hindi magagamit ang awtomatikong pag-aayos.",
       "exploitabilityUnknown": "Hindi nakumpirma ng pagsusuri kung maaaring samantalahin ang kahinaan. Kailangan ng manu-manong pagsusuri bago ang pag-aayos sa isang pindot.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Hindi pinagana ang awtomatikong pag-aayos. Maaari pa ring simulan ang pag-aayos nang manu-mano kung pasado sa mga pagsusuri sa kaligtasan.",
       "includeExistingDisabled": "Hindi kasama ang mga dati nang natukoy na isyu sa awtomatikong pag-aayos.",
       "belowThreshold": "Mas mababa ang kalubhaan ng natukoy na isyu sa minimum para sa awtomatikong pag-aayos. Maaari pa ring simulan ang pag-aayos nang manu-mano kung pasado sa mga pagsusuri sa kaligtasan.",
-      "beforeEnablement": "Natapos ang pagsusuri bago pinagana ang awtomatikong pag-aayos. Maaari pa ring simulan ang pag-aayos nang manu-mano kung pasado sa mga pagsusuri sa kaligtasan.",
-      "generic": "Hindi magagamit ang pag-aayos para sa natukoy na isyung ito."
+      "beforeEnablement": "Natapos ang pagsusuri bago pinagana ang awtomatikong pag-aayos. Maaari pa ring simulan ang pag-aayos nang manu-mano kung pasado sa mga pagsusuri sa kaligtasan."
     },
     "commandFailure": {
       "ownerCapReached": "Naabot na ang limitasyon ng sabay-sabay na pagsusuri. Hintaying matapos ang isang kasalukuyang pagsusuri, saka subukang muli.",
-      "githubTokenUnavailable": "Kailangang ayusin ang pahintulot sa GitHub. Pahintulutan muli ang GitHub App, saka subukang muli.",
       "githubAuthInvalid": "Kailangang ayusin ang pahintulot sa GitHub. Pahintulutan muli ang GitHub App, saka subukang muli.",
       "findingUnavailable": "Hindi na makuha ang natukoy na isyu. I-refresh ang mga natukoy na isyu at subukang muli kung bukas pa ito.",
       "repositoryUnavailable": "Hindi na ma-access ng GitHub App ang repository. I-refresh ang access sa repository, saka subukang muli.",
@@ -1965,10 +1922,8 @@
       "title": "Sesyon",
       "copyErrorDetails": "Kopyahin ang mga detalye ng error",
       "backToSessions": "Bumalik sa mga sesyon",
-      "accessDeniedDescription": "Wala kang pahintulot na tingnan ito.",
       "couldNotLoad": "Hindi ma-load ang sesyon.",
       "failedToLoadDetails": "Hindi ma-load ang mga detalye ng sesyon.",
-      "notFoundDescription": "Maaaring inalis na ito o hindi na ito makuha.",
       "failedToStopExecution": "Hindi maihinto ang pagpapatakbo.",
       "renameSession": "Palitan ang pangalan ng sesyon",
       "renamePlaceholder": "Pangalan ng sesyon",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "I-sign out ang device na ito?",
     "signOutThisSessionTitle": "I-sign out ang sesyong ito?",
     "signOutThisSessionMessage": "Masa-sign out ang {{device}}. Maaari pa rin nitong ma-access ang API nang hanggang isang oras.",
-    "signOutMessage": "Kailangan mong mag-sign in muli para mabuksan ang workspace mo.",
     "webBrowser": "Browser sa web"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Pagsasaayos sa talaan ng pananalapi",
         "credits_expired": "Kreditong nawalan ng bisa"
       },
-      "loadMoreFailed": "Hindi ma-load ang iba pa.",
       "truncated": "May mas naunang aktibidad sa kredito na maaaring tingnan."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "pangalan@kumpanya.com",
       "enableA11y": "Paganahin ang babala sa mababang balanse",
       "notifyEmailsLabel": "Mga email na padadalhan ng babala",
       "permissionDenied": "Wala kang pahintulot na pamahalaan ang mga babala sa pagsingil.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Mag-imbita ng mga kasamahan para magsimulang magtulungan sa organisasyong ito.",
       "emptyDescriptionCannotInvite": "Hilingin sa may-ari o tagapamahala ng pagsingil na mag-imbita ng mga kasamahan.",
       "emptyTitle": "Wala pang miyembro",
-      "inviteMember": "Mag-imbita ng miyembro",
       "invitedDate": "Inimbitahan noong {{date}}",
       "limitPerDay": "{{amount}}/araw",
       "manageA11y": "Pamahalaan si {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Hindi ma-load ang status",
       "creditProcessingDelayed": "Naantala ang pagproseso ng kredito · awtomatikong sinusubukang muli",
       "ended": "Natapos",
-      "manageHint": "Bubuksan ang pamamahala ng Kilo Pass sa web.",
       "notSubscribed": "Hindi naka-subscribe",
       "overallocated": "Mas marami ang itinalagang Pass kaysa sa mga bayad na puwesto",
       "paidSeat_one": "{{displayCount}} bayad na puwesto",

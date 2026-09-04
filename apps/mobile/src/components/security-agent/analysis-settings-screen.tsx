@@ -34,9 +34,9 @@ import { cn } from '@/lib/utils';
 type AnalysisMode = SecurityAgentConfig['analysisMode'];
 
 const ANALYSIS_MODES = [
-  { value: 'auto', labelKey: 'securityAgent.analysisSettings.modeAuto' },
-  { value: 'shallow', labelKey: 'securityAgent.analysisSettings.modeShallow' },
-  { value: 'deep', labelKey: 'securityAgent.analysisSettings.modeDeep' },
+  { value: 'auto', labelKey: 'securityAgent.analysisMode.auto' },
+  { value: 'shallow', labelKey: 'securityAgent.analysisMode.shallow' },
+  { value: 'deep', labelKey: 'securityAgent.analysisMode.deep' },
 ] as const satisfies readonly { value: AnalysisMode; labelKey: string }[];
 
 function AnalysisSettingsSkeleton() {

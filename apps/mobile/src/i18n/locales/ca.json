@@ -372,7 +372,6 @@
         "closed": "Sol·licitud d'integració tancada"
       },
       "partialSuccessBanner": {
-        "title": "Fusionada",
         "body": "No s'ha pogut eliminar la branca: {{reason}}.",
         "accessibility": "Fusionada. No s'ha pogut eliminar la branca: {{reason}}"
       },
@@ -443,7 +442,6 @@
       "acceptTerms": "Accepta",
       "replyBadRequest": "Aquesta resposta no es pot publicar. Pot ser que el fil hagi canviat.",
       "replyForbidden": "No tens permís per respondre a aquesta sol·licitud d'integració.",
-      "couldNotReply": "No s'ha pogut respondre.",
       "moderation": {
         "reportContent": {
           "terminal": "Aquest comentari no es pot denunciar.",
@@ -498,8 +496,6 @@
     },
     "couldNotOpenGitHubAppSettings": "No s'ha pogut obrir la configuració de l'aplicació de GitHub.",
     "installKiloGitHubApp": "Instal·la l'aplicació de Kilo per a GitHub",
-    "connectionExpiredTitle": "La connexió amb GitHub ha caducat.",
-    "connectionExpiredDescription": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
     "checkConnection": "Comprova la connexió",
     "couldNotLoadPullRequest": "No s'ha pogut carregar la sol·licitud d'integració.",
     "description": "Descripció",
@@ -576,7 +572,6 @@
       "shareA11y": "Comparteix la sol·licitud d'integració"
     },
     "submit": {
-      "title": "Envia la revisió",
       "loadFailedTitle": "No s'ha pogut carregar el formulari d'enviament de la revisió.",
       "deletePendingTitle": "Vols eliminar el comentari pendent?",
       "deletePendingMessage": "Aquest comentari s'eliminarà de la cua de revisió.",
@@ -593,8 +588,7 @@
     },
     "reconnectNotice": {
       "title": "La connexió amb GitHub ha caducat.",
-      "message": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
-      "checkConnection": "Comprova la connexió"
+      "message": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar."
     },
     "eventChips": {
       "comment": "Comentari",
@@ -620,8 +614,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Edita el comentari pendent desactualitzat a {{location}}",
       "editA11y": "Edita el comentari pendent a {{location}}",
-      "emptyBody": "(buit)",
-      "outdated": "Desactualitzat",
       "staleHint": "la PR ha canviat des que vas escriure aquest comentari.",
       "deleteA11y": "Elimina el comentari pendent a {{location}}",
       "deletedAnnouncement": "Comentari pendent eliminat",
@@ -710,7 +702,6 @@
       "security": "Problemes de seguretat"
     },
     "category": {
-      "chatMessagesTitle": "Missatges de xat",
       "chatMessagesSubtitle": "respostes a les teves converses",
       "agentAttentionTitle": "L'agent et necessita",
       "agentAttentionSubtitle": "preguntes, permisos i sol·licituds d'informació",
@@ -718,11 +709,8 @@
       "agentUpdatesSubtitle": "missatges de l'agent durant la tasca",
       "sessionStatusTitle": "Estat de la sessió",
       "sessionStatusSubtitle": "finalitzada / fallida / a punt per controlar",
-      "kiloclawActivityTitle": "Activitat de KiloClaw",
       "kiloclawActivitySubtitle": "instància a punt/fallida, accions programades",
-      "balanceAlertsTitle": "Alertes de saldo",
       "balanceAlertsSubtitle": "avisos de saldo baix de l'organització",
-      "securityFindingsTitle": "Problemes de seguretat",
       "securityFindingsSubtitle": "noves deteccions i recordatoris d'SLA"
     }
   },
@@ -1196,8 +1184,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Selecció del model d'IA",
       "secretsDescription": "Credencials xifrades",
-      "versionPinDescription": "Fixa una versió específica",
-      "versionPinLabel": "Fixació de la versió"
+      "versionPinDescription": "Fixa una versió específica"
     },
     "avatar": {
       "arcade": "Màquina recreativa",
@@ -1449,7 +1436,6 @@
       "severityHigh": "Alt",
       "severityMedium": "Mitjà",
       "severityLow": "Baix",
-      "outcomeNotExploitable": "No explotable",
       "outcomeTriageComplete": "Triatge completat",
       "sortSeverityDesc": "Gravetat: d'alta a baixa",
       "sortSeverityAsc": "Gravetat: de baixa a alta",
@@ -1555,15 +1541,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Incidències obertes",
-      "openFindingsDetail": "{{critical}} de nivell crític, {{high}} de nivell alt",
-      "confirmedExploitable": "Confirmat com a explotable",
       "confirmedExploitableDetail": "Risc del projecte confirmat per l'anàlisi",
-      "needsReview": "Pendent que ho revisis",
       "needsReviewDetail": "Cal una decisió humana",
-      "analysisIncomplete": "Anàlisi incompleta",
       "analysisIncompleteDetail": "El risc del projecte encara és desconegut",
       "slaCompliance": "Compliment de l'SLA",
-      "notMeasured": "No mesurat",
       "withinDeadlineDetail": "{{within}} de {{total}} dins del termini",
       "noDeadlineData": "Encara no hi ha cap incidència amb un termini de l'SLA",
       "deadlinePassed": "Termini vençut",
@@ -1611,7 +1592,6 @@
       "source": "Origen",
       "sourceId": "ID d'origen",
       "viewAdvisory": "Consulta l'avís a GitHub",
-      "statusSuperseded": "Substituït",
       "statusOpen": "Obertura",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "la correcció ja està en curs",
@@ -1622,7 +1602,6 @@
       "reasonAfterReview": "després de la revisió"
     },
     "settingsOverview": {
-      "title": "Configuració",
       "couldNotLoadSettings": "No s'ha pogut carregar la configuració de l'agent de seguretat.",
       "couldNotLoadPermissions": "No s'han pogut carregar els permisos.",
       "on": "Activat",
@@ -1630,13 +1609,10 @@
       "repositoriesCount": "{{displayCount}} repositoris seleccionats",
       "repositoriesCount_other": "{{displayCount}} repositoris seleccionats",
       "selectRepositoriesSubtitle": "Tria quins repositoris supervisa l'agent de seguretat",
-      "modelsAndAnalysis": "Models i anàlisi",
       "analysisModeSubtitle": "Anàlisi {{mode}}",
-      "automation": "Automatització",
       "automationAllOff": "Tot desactivat",
       "automationCount": "{{displayCount}} de 3 activades",
       "notificationsCount": "{{displayCount}} de 2 activades",
-      "slaPolicy": "Política de SLA",
       "disabledNoManage": "L'agent de seguretat està desactivat. Només els propietaris de l'organització i els gestors de facturació poden activar-lo.",
       "disabledNoRepo": "Selecciona almenys un repositori abans d'activar l'agent de seguretat.",
       "disabledPrompt": "Activa l'agent de seguretat per sincronitzar les alertes de Dependabot, triar repositoris i configurar l'automatització.",
@@ -1646,8 +1622,6 @@
       "cancellationRequested": "Cancel·lació sol·licitada",
       "cancelled": "Correcció cancel·lada",
       "couldNotLoad": "No s'ha pogut carregar l'estat de la correcció.",
-      "noAnalysisTitle": "Encara no hi ha cap anàlisi",
-      "noAnalysisDescription": "Executa'n una des de la pestanya Detalls.",
       "start": "Inicia la correcció",
       "retry": "Torna a provar la correcció",
       "cancelTitle": "Vols cancel·lar aquesta correcció?",
@@ -1663,10 +1637,8 @@
       "retryQueued": "Nou intent de correcció en cua",
       "timeline": {
         "queued": "Correcció sol·licitada",
-        "prOpened": "PR oberta",
         "failed": "Correcció fallida",
-        "blocked": "Correcció bloquejada",
-        "noChangesNeeded": "No calen canvis"
+        "blocked": "Correcció bloquejada"
       },
       "unavailable": "La correcció no està disponible per a aquest problema."
     },
@@ -1674,9 +1646,6 @@
       "title": "Models i anàlisi",
       "couldNotLoad": "No s'ha pogut carregar la configuració de l'anàlisi.",
       "depth": "Profunditat de l'anàlisi",
-      "modeAuto": "Automàtic",
-      "modeShallow": "Superficial",
-      "modeDeep": "Profund",
       "triageModel": "Model de triatge",
       "analysisModel": "Model d'anàlisi",
       "remediationModel": "Model de correcció"
@@ -1702,10 +1671,7 @@
     "findingDetail": {
       "title": "Incidència",
       "tabAnalysis": "Anàlisi",
-      "tabRemediation": "Correcció",
-      "notFound": "No s'ha trobat el problema",
-      "notFoundDescription": "És possible que aquesta incidència s'hagi eliminat o que ja no hi tinguis accés.",
-      "couldNotLoad": "No s'ha pogut carregar aquest problema."
+      "tabRemediation": "Correcció"
     },
     "findingList": {
       "couldNotLoad": "No s'han pogut carregar les incidències.",
@@ -1720,9 +1686,7 @@
       "nextRemediationInProgress": "Correcció en curs",
       "nextRetryRemediation": "Es pot tornar a provar la correcció",
       "nextRemediationAvailable": "Correcció disponible",
-      "retryAnalysis": "Torna a executar l'anàlisi",
       "runAnalysis": "Executa l'anàlisi",
-      "nextNeedsManualReview": "Pendent de revisió manual",
       "nextViewDetails": "Consulta els detalls",
       "viewPr": "Consulta la PR",
       "analyze": "Analitza",
@@ -1764,7 +1728,6 @@
       "newFindingSubtitle": "S'envia cada cop que se sincronitza una incidència nova, també durant la primera sincronització.",
       "slaLeadTimeAccessibility": "Antelació de l'avís de l'SLA en dies",
       "slaLeadTimeError": "Introdueix un nombre enter de dies entre 1 i 365.",
-      "slaLeadTimeHint": "Introdueix un nombre enter entre 1 i 365",
       "slaLeadTimeLabel": "Antelació de l'avís de l'SLA (dies)",
       "slaPersonalTitle": "Envia'm els avisos de l'SLA per correu",
       "slaSection": "Notificació d'avisos de l'SLA",
@@ -1809,7 +1772,6 @@
     },
     "analysisState": {
       "queued": "Anàlisi en cua",
-      "queuedTitle": "Anàlisi en cua",
       "queuedDescription": "L'anàlisi espera que s'alliberi capacitat per executar-se.",
       "analyzing": "En anàlisi",
       "analyzingDescription": "S'està comprovant si el codi de l'aplicació pot accedir a la funcionalitat afectada.",
@@ -1818,7 +1780,6 @@
       "extractionFailedDescription": "L'informe tècnic no s'ha pogut convertir en un resultat estructurat.",
       "exploitableDescription": "El codi de l'aplicació pot accedir a la funcionalitat afectada.",
       "notExploitable": "Inaccessible",
-      "notExploitableTitle": "Inaccessible",
       "notExploitableDescription": "No s'ha trobat cap camí d'execució accessible en aquest repositori.",
       "unknown": "Pendent de revisió",
       "unknownDescription": "L'anàlisi no ha pogut confirmar si es pot accedir a la funcionalitat vulnerable.",
@@ -1856,7 +1817,6 @@
       "dueInDays": "Venç d'aquí a {{count}} dies"
     },
     "remediationStatus": {
-      "cancellationRequested": "Cancel·lació sol·licitada",
       "notStarted": "No iniciada",
       "starting": "S'està iniciant",
       "inProgress": "En curs",
@@ -1875,7 +1835,6 @@
       "findingNotOpen": "La incidència ja no està oberta.",
       "repoNotInScope": "El repositori no està seleccionat per a l'agent de seguretat.",
       "analysisRequired": "Analitza la base de codi abans d'iniciar la correcció.",
-      "sandboxAnalysisRequired": "Analitza la base de codi abans d'iniciar la correcció.",
       "staleAnalysis": "La incidència ha canviat després de l'anàlisi. Torna a executar l'anàlisi abans d'iniciar la correcció.",
       "notExploitable": "L'anàlisi no ha trobat cap camí d'execució accessible que passi per codi vulnerable. La correcció automàtica no està disponible.",
       "exploitabilityUnknown": "L'anàlisi no ha pogut confirmar si la incidència és explotable. Cal una revisió manual abans de la correcció amb un sol toc.",
@@ -1891,12 +1850,10 @@
       "autoRemediationDisabled": "La correcció automàtica està desactivada. Encara es pot iniciar una correcció manual si se superen les comprovacions de seguretat.",
       "includeExistingDisabled": "Les incidències existents queden excloses de la correcció automàtica.",
       "belowThreshold": "La gravetat de la incidència és inferior al llindar de correcció automàtica. Encara es pot iniciar una correcció manual si se superen les comprovacions de seguretat.",
-      "beforeEnablement": "L'anàlisi es va completar abans d'activar la correcció automàtica. Encara es pot iniciar una correcció manual si se superen les comprovacions de seguretat.",
-      "generic": "La correcció no està disponible per a aquest problema."
+      "beforeEnablement": "L'anàlisi es va completar abans d'activar la correcció automàtica. Encara es pot iniciar una correcció manual si se superen les comprovacions de seguretat."
     },
     "commandFailure": {
       "ownerCapReached": "S'ha arribat al límit d'anàlisis simultànies. Espera que acabi una anàlisi en curs i torna-ho a provar.",
-      "githubTokenUnavailable": "L'autorització de GitHub requereix atenció. Torna a autoritzar l'aplicació de GitHub i torna-ho a provar.",
       "githubAuthInvalid": "L'autorització de GitHub requereix atenció. Torna a autoritzar l'aplicació de GitHub i torna-ho a provar.",
       "findingUnavailable": "La incidència ja no està disponible. Actualitza les incidències i torna-ho a provar si continua oberta.",
       "repositoryUnavailable": "El repositori ja no està disponible per a l'aplicació de GitHub. Actualitza l'accés al repositori i torna-ho a provar.",
@@ -1981,10 +1938,8 @@
       "title": "Sessió",
       "copyErrorDetails": "Copia els detalls de l'error",
       "backToSessions": "Torna a les sessions",
-      "accessDeniedDescription": "No tens permís per veure aquest contingut.",
       "couldNotLoad": "No s'ha pogut carregar la sessió.",
       "failedToLoadDetails": "No s'han pogut carregar els detalls de la sessió.",
-      "notFoundDescription": "Pot ser que s'hagi eliminat aquest element o que ja no estigui disponible.",
       "failedToStopExecution": "No s'ha pogut aturar l'execució.",
       "renameSession": "Reanomena la sessió",
       "renamePlaceholder": "Nom de la sessió",
@@ -2537,8 +2492,7 @@
     "sessionSignedOut": "Sessió tancada.",
     "signOutThisDeviceTitle": "Vols tancar la sessió d'aquest dispositiu?",
     "signOutThisSessionTitle": "Vols tancar aquesta sessió?",
-    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Pot mantenir l'accés a l'API fins a una hora.",
-    "signOutMessage": "Hauràs de tornar a iniciar la sessió per accedir al teu espai de treball."
+    "signOutThisSessionMessage": "Es tancarà la sessió de {{device}}. Pot mantenir l'accés a l'API fins a una hora."
   },
   "forceUpdate": {
     "couldNotOpenStore": "No s'ha pogut obrir la botiga d'aplicacions.",
@@ -2806,7 +2760,6 @@
         "accounting_adjustment": "Ajust comptable",
         "credits_expired": "Crèdits caducats"
       },
-      "loadMoreFailed": "No se n'han pogut carregar més.",
       "truncated": "Hi ha moviments de crèdits anteriors disponibles."
     },
     "inviteMember": {
@@ -2835,7 +2788,6 @@
       "truncated": "Hi ha factures més antigues disponibles."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "nom@empresa.com",
       "enableA11y": "Activa l'avís de saldo baix",
       "notifyEmailsLabel": "Adreces de correu per als avisos",
       "permissionDenied": "No tens permís per gestionar els avisos de facturació.",
@@ -2860,7 +2812,6 @@
       "emptyDescriptionCanInvite": "Convida companys per començar a col·laborar en aquesta organització.",
       "emptyDescriptionCannotInvite": "Demana a un propietari o a un gestor de facturació que convidi companys d'equip.",
       "emptyTitle": "Encara no hi ha membres",
-      "inviteMember": "Convida un membre",
       "invitedDate": "Convidat el {{date}}",
       "limitPerDay": "{{amount}}/dia",
       "manageA11y": "Gestiona {{name}}",
@@ -2903,7 +2854,6 @@
       "couldNotLoadStatus": "No s'ha pogut carregar l'estat",
       "creditProcessingDelayed": "Retard en el processament de crèdits · es reintenta automàticament",
       "ended": "Finalitzat",
-      "manageHint": "Obre la gestió de Kilo Pass al web.",
       "notSubscribed": "Sense subscripció",
       "overallocated": "Les assignacions de Kilo Pass superen les llicències de pagament",
       "paidSeat_one": "{{displayCount}} llicència de pagament",

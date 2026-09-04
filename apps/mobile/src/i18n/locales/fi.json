@@ -370,7 +370,6 @@
         "closed": "Muutospyyntö suljettu"
       },
       "partialSuccessBanner": {
-        "title": "Yhdistetty",
         "body": "Haaraa ei voitu poistaa: {{reason}}.",
         "accessibility": "Yhdistetty. Haaraa ei voitu poistaa: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Hyväksy",
       "replyBadRequest": "Tätä vastausta ei voi julkaista. Ketju on voinut muuttua.",
       "replyForbidden": "Sinulla ei ole oikeutta vastata tähän muutospyyntöön.",
-      "couldNotReply": "Vastaaminen epäonnistui.",
       "moderation": {
         "reportContent": {
           "terminal": "Tätä kommenttia ei voi ilmiantaa.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub-sovelluksen asetusten avaaminen epäonnistui.",
     "installKiloGitHubApp": "Asenna Kilo GitHub -sovellus",
-    "connectionExpiredTitle": "GitHub-yhteys on vanhentunut.",
-    "connectionExpiredDescription": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
     "checkConnection": "Tarkista yhteys",
     "couldNotLoadPullRequest": "Muutospyyntöä ei voitu ladata.",
     "description": "Kuvaus",
@@ -572,7 +568,6 @@
       "shareA11y": "Jaa muutospyyntö"
     },
     "submit": {
-      "title": "Lähetä tarkistus",
       "loadFailedTitle": "Katselmoinnin lähetysnäkymää ei voitu ladata.",
       "deletePendingTitle": "Poistetaanko lähettämätön kommentti?",
       "deletePendingMessage": "Tämä kommentti poistetaan katselmoinnin lähetysjonosta.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub-yhteys on vanhentunut.",
-      "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
-      "checkConnection": "Tarkista yhteys"
+      "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
     },
     "eventChips": {
       "comment": "Kommentoi",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Muokkaa vanhentunutta lähettämätöntä kommenttia: {{location}}",
       "editA11y": "Muokkaa lähettämätöntä kommenttia: {{location}}",
-      "emptyBody": "(tyhjä)",
-      "outdated": "Vanhentunut",
       "staleHint": "PR on muuttunut tämän kommentin kirjoittamisen jälkeen.",
       "deleteA11y": "Poista lähettämätön kommentti: {{location}}",
       "deletedAnnouncement": "Lähettämätön kommentti poistettu",
@@ -703,7 +695,6 @@
       "security": "Tietoturvahavainnot"
     },
     "category": {
-      "chatMessagesTitle": "Keskusteluviestit",
       "chatMessagesSubtitle": "vastaukset keskusteluissasi",
       "agentAttentionTitle": "Agentti tarvitsee sinua",
       "agentAttentionSubtitle": "kysymykset, lupapyynnöt ja vastausta vaativat tilanteet",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "agentin viestit tehtävän aikana",
       "sessionStatusTitle": "Istunnon tila",
       "sessionStatusSubtitle": "valmis / epäonnistui / valmis hallittavaksi",
-      "kiloclawActivityTitle": "KiloClaw-tapahtumat",
       "kiloclawActivitySubtitle": "instanssi valmis/epäonnistui, ajoitetut toiminnot",
-      "balanceAlertsTitle": "Saldoilmoitukset",
       "balanceAlertsSubtitle": "varoitukset organisaation alhaisesta saldosta",
-      "securityFindingsTitle": "Tietoturvahavainnot",
       "securityFindingsSubtitle": "uudet löydökset ja SLA-muistutukset"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Tekoälymallin valinta",
       "secretsDescription": "Salatut tunnistetiedot",
-      "versionPinDescription": "Lukitse tiettyyn versioon",
-      "versionPinLabel": "Version lukitseminen"
+      "versionPinDescription": "Lukitse tiettyyn versioon"
     },
     "avatar": {
       "arcade": "Pelihalli",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Korkea",
       "severityMedium": "Keskitaso",
       "severityLow": "Matala",
-      "outcomeNotExploitable": "Ei hyödynnettävissä",
       "outcomeTriageComplete": "Luokittelu valmis",
       "sortSeverityDesc": "Vakavuus: vakavimmasta lievimpään",
       "sortSeverityAsc": "Vakavuus: lievimmästä vakavimpaan",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Avoimet havainnot",
-      "openFindingsDetail": "{{critical}} kriittistä, {{high}} korkean vakavuustason havaintoa",
-      "confirmedExploitable": "Todettu hyödynnettävissä olevaksi",
       "confirmedExploitableDetail": "Projektin riski vahvistettu analyysissä",
-      "needsReview": "Odottaa tarkistustasi",
       "needsReviewDetail": "Vaaditaan ihmisen päätös",
-      "analysisIncomplete": "Analyysi kesken",
       "analysisIncompleteDetail": "Projektin riski edelleen tuntematon",
       "slaCompliance": "SLA:n noudattaminen",
-      "notMeasured": "Ei mitattu",
       "withinDeadlineDetail": "{{within}}/{{total}} määräajassa",
       "noDeadlineData": "Millään havainnolla ei ole vielä SLA-määräaikaa",
       "deadlinePassed": "Määräaika umpeutunut",
@@ -1601,7 +1582,6 @@
       "source": "Lähde",
       "sourceId": "Lähteen tunnus",
       "viewAdvisory": "Näytä tietoturvatiedote GitHubissa",
-      "statusSuperseded": "Korvattu",
       "statusOpen": "Avoin",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "korjaus on jo aloitettu",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "tarkistuksen jälkeen"
     },
     "settingsOverview": {
-      "title": "Asetukset",
       "couldNotLoadSettings": "Tietoturva-agentin asetuksia ei voitu ladata.",
       "couldNotLoadPermissions": "Käyttöoikeuksia ei voitu ladata.",
       "on": "Käytössä",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} koodivarastoa valittu",
       "repositoriesCount_other": "{{displayCount}} koodivarastoa valittu",
       "selectRepositoriesSubtitle": "Valitse tietoturva-agentin valvomat tietovarastot",
-      "modelsAndAnalysis": "Mallit ja analyysi",
       "analysisModeSubtitle": "Analyysitila: {{mode}}",
-      "automation": "Automaatio",
       "automationAllOff": "Kaikki pois käytöstä",
       "automationCount": "{{displayCount}}/3 käytössä",
       "notificationsCount": "{{displayCount}}/2 käytössä",
-      "slaPolicy": "SLA-käytäntö",
       "disabledNoManage": "Tietoturva-agentti on pois käytöstä. Vain organisaation omistajat ja laskutusvastaavat voivat ottaa sen käyttöön.",
       "disabledNoRepo": "Valitse vähintään yksi tietovarasto ennen tietoturva-agentin käyttöönottoa.",
       "disabledPrompt": "Ota tietoturva-agentti käyttöön, niin voit synkronoida Dependabot-hälytykset, valita tietovarastot ja määrittää automaation."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Peruutusta pyydetty",
       "cancelled": "Korjaus peruutettu",
       "couldNotLoad": "Korjauksen tilaa ei voitu ladata.",
-      "noAnalysisTitle": "Ei vielä analyysiä",
-      "noAnalysisDescription": "Käynnistä analyysi Tiedot-välilehdellä.",
       "start": "Aloita korjaus",
       "retry": "Yritä korjausta uudelleen",
       "cancelTitle": "Peruutetaanko tämä korjaus?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Uusi korjausyritys lisättiin jonoon",
       "timeline": {
         "queued": "Korjausta pyydetty",
-        "prOpened": "PR avattu",
         "failed": "Korjaus epäonnistui",
-        "blocked": "Korjaus estetty",
-        "noChangesNeeded": "Muutoksia ei tarvita"
+        "blocked": "Korjaus estetty"
       },
       "unavailable": "Tähän havaintoon ei ole saatavilla korjaustoimintoa."
     },
@@ -1663,9 +1635,6 @@
       "title": "Mallit ja analyysi",
       "couldNotLoad": "Analyysiasetuksia ei voitu ladata.",
       "depth": "Analyysin syvyys",
-      "modeAuto": "Automaattinen",
-      "modeShallow": "Kevyt",
-      "modeDeep": "Perusteellinen",
       "triageModel": "Luokittelumalli",
       "analysisModel": "Analyysimalli",
       "remediationModel": "Korjausmalli"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Havainto",
       "tabAnalysis": "Analyysi",
-      "tabRemediation": "Korjaus",
-      "notFound": "Havaintoa ei löytynyt",
-      "notFoundDescription": "Havainto on ehkä poistettu tai sinulla ei enää ole siihen käyttöoikeutta.",
-      "couldNotLoad": "Havainnon lataaminen epäonnistui."
+      "tabRemediation": "Korjaus"
     },
     "findingList": {
       "couldNotLoad": "Havaintoja ei voitu ladata.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Korjaus käynnissä",
       "nextRetryRemediation": "Korjausta voi yrittää uudelleen",
       "nextRemediationAvailable": "Korjaus saatavilla",
-      "retryAnalysis": "Analysoi uudelleen",
       "runAnalysis": "Suorita analyysi",
-      "nextNeedsManualReview": "Vaatii manuaalisen tarkistuksen",
       "nextViewDetails": "Näytä tiedot",
       "viewPr": "Näytä PR",
       "analyze": "Analysoi",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Lähetetään aina, kun uusi havainto synkronoidaan, myös ensimmäisessä synkronoinnissa.",
       "slaLeadTimeAccessibility": "SLA-varoituksen ennakkoaika päivinä",
       "slaLeadTimeError": "Anna päivien määrä kokonaislukuna väliltä 1–365.",
-      "slaLeadTimeHint": "Anna kokonaisluku välillä 1–365",
       "slaLeadTimeLabel": "SLA-varoituksen ennakkoaika (päivää)",
       "slaPersonalTitle": "Lähetä minulle sähköpostia SLA-varoituksista",
       "slaSection": "SLA-varoitusilmoitus",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Analyysi jonossa",
-      "queuedTitle": "Analyysi jonossa",
       "queuedDescription": "Odotetaan analyysikapasiteetin vapautumista.",
       "analyzing": "Analysoidaan",
       "analyzingDescription": "Tarkistetaan, voiko sovelluksen koodi käyttää haavoittuvaa toimintoa.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Teknistä raporttia ei voitu muuttaa jäsennellyksi tulokseksi.",
       "exploitableDescription": "Sovelluksen koodi voi käyttää haavoittuvaa toimintoa.",
       "notExploitable": "Ei saavutettavissa",
-      "notExploitableTitle": "Ei saavutettavissa",
       "notExploitableDescription": "Tietovarastosta ei löytynyt suorituspolkua haavoittuvaan toimintoon.",
       "unknown": "Vaatii tarkistuksen",
       "unknownDescription": "Analyysi ei vahvistanut, voiko sovelluksen koodi käyttää haavoittuvaa toimintoa.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Määräaika {{count}} päivän kuluttua"
     },
     "remediationStatus": {
-      "cancellationRequested": "Peruutusta pyydetty",
       "notStarted": "Ei aloitettu",
       "starting": "Käynnistetään",
       "inProgress": "Käynnissä",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Havainto ei ole enää avoin.",
       "repoNotInScope": "Tietovarastoa ei ole valittu tietoturva-agentin valvontaan.",
       "analysisRequired": "Suorita koodipohjan analyysi ennen korjauksen aloittamista.",
-      "sandboxAnalysisRequired": "Suorita koodipohjan analyysi ennen korjauksen aloittamista.",
       "staleAnalysis": "Havainto muuttui analyysin jälkeen. Suorita analyysi uudelleen ennen korjauksen aloittamista.",
       "notExploitable": "Analyysi ei löytänyt suorituspolkua haavoittuvaan toimintoon. Automaattinen korjaus ei ole käytettävissä.",
       "exploitabilityUnknown": "Analyysi ei vahvistanut hyväksikäytettävyyttä. Manuaalinen tarkistus tarvitaan ennen yhden napautuksen korjausta.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Automaattinen korjaus on pois käytöstä. Korjauksen voi silti käynnistää manuaalisesti, jos turvallisuusehdot täyttyvät.",
       "includeExistingDisabled": "Aiempia havaintoja ei sisällytetä automaattiseen korjaukseen.",
       "belowThreshold": "Havainnon vakavuus alittaa automaattisen korjauksen kynnyksen. Korjauksen voi silti käynnistää manuaalisesti, jos turvallisuusehdot täyttyvät.",
-      "beforeEnablement": "Analyysi valmistui ennen automaattisen korjauksen käyttöönottoa. Korjauksen voi silti käynnistää manuaalisesti, jos turvallisuusehdot täyttyvät.",
-      "generic": "Tähän havaintoon ei ole saatavilla korjaustoimintoa."
+      "beforeEnablement": "Analyysi valmistui ennen automaattisen korjauksen käyttöönottoa. Korjauksen voi silti käynnistää manuaalisesti, jos turvallisuusehdot täyttyvät."
     },
     "commandFailure": {
       "ownerCapReached": "Kaikki analyysipaikat ovat käytössä. Odota, että jokin käynnissä oleva analyysi valmistuu, ja yritä sitten uudelleen.",
-      "githubTokenUnavailable": "GitHub-valtuutus vaatii huomiota. Valtuuta GitHub-sovellus uudelleen ja yritä sitten uudelleen.",
       "githubAuthInvalid": "GitHub-valtuutus vaatii huomiota. Valtuuta GitHub-sovellus uudelleen ja yritä sitten uudelleen.",
       "findingUnavailable": "Havainto ei ole enää saatavilla. Päivitä havaintolista ja yritä uudelleen, jos havainto on edelleen avoin.",
       "repositoryUnavailable": "GitHub-sovellus ei enää pääse tietovarastoon. Päivitä tietovaraston käyttöoikeudet ja yritä sitten uudelleen.",
@@ -1965,10 +1922,8 @@
       "title": "Istunto",
       "copyErrorDetails": "Kopioi virheen tiedot",
       "backToSessions": "Takaisin istuntoihin",
-      "accessDeniedDescription": "Sinulla ei ole oikeutta tarkastella tätä.",
       "couldNotLoad": "Istuntoa ei voitu ladata.",
       "failedToLoadDetails": "Istunnon tietojen lataus epäonnistui.",
-      "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
       "failedToStopExecution": "Suorituksen pysäyttäminen epäonnistui.",
       "renameSession": "Nimeä istunto uudelleen",
       "renamePlaceholder": "Istunnon nimi",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "Kirjataanko tämä laite ulos?",
     "signOutThisSessionTitle": "Kirjataanko tämä istunto ulos?",
     "signOutThisSessionMessage": "Laite {{device}} kirjataan ulos. Sen API-käyttöoikeus voi säilyä vielä tunnin ajan.",
-    "signOutMessage": "Pääset takaisin työtilaasi kirjautumalla uudelleen sisään.",
     "webBrowser": "Verkkoselain"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Kirjanpidon oikaisu",
         "credits_expired": "Krediitit vanhentuivat"
       },
-      "loadMoreFailed": "Lisätietojen lataaminen epäonnistui.",
       "truncated": "Aiempia krediittitapahtumia on saatavilla."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Vanhempia laskuja on saatavilla."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "nimi@yritys.fi",
       "enableA11y": "Ota saldohälytys käyttöön",
       "notifyEmailsLabel": "Vastaanottajien sähköpostiosoitteet",
       "permissionDenied": "Sinulla ei ole oikeutta hallita laskutushälytyksiä.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Kutsu tiimisi jäseniä yhteistyöhön tässä organisaatiossa.",
       "emptyDescriptionCannotInvite": "Pyydä omistajaa tai laskutusvastaavaa kutsumaan tiimisi jäseniä.",
       "emptyTitle": "Ei vielä jäseniä",
-      "inviteMember": "Kutsu jäsen",
       "invitedDate": "Kutsuttu {{date}}",
       "limitPerDay": "{{amount}}/päivä",
       "manageA11y": "Hallitse jäsentä: {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Tilaa ei voitu ladata",
       "creditProcessingDelayed": "Krediittien käsittely viivästyi · yritetään automaattisesti uudelleen",
       "ended": "Päättynyt",
-      "manageHint": "Avaa Kilo Pass -hallinnan verkossa.",
       "notSubscribed": "Ei tilausta",
       "overallocated": "Kilo Pass on osoitettu useammalle käyttäjälle kuin maksettuja käyttäjäpaikkoja on",
       "paidSeat_one": "{{displayCount}} maksettu käyttäjäpaikka",

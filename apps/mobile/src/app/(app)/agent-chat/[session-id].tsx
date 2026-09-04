@@ -179,11 +179,11 @@ export default function SessionDetailScreen() {
       : 'server';
     if (notFound) {
       title = t('common.notFound');
-      message = t('agentChat.session.notFoundDescription');
+      message = t('queryError.notFoundDescription');
       variant = 'not-found';
     } else if (unauthorized) {
       title = t('common.accessDenied');
-      message = t('agentChat.session.accessDeniedDescription');
+      message = t('queryError.permissionDescription');
       variant = 'permission';
     }
     const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();

@@ -374,7 +374,6 @@
         "closed": "Zahtevek za združitev je zaprt"
       },
       "partialSuccessBanner": {
-        "title": "Združeno",
         "body": "Veje ni bilo mogoče izbrisati: {{reason}}.",
         "accessibility": "Združeno. Veje ni bilo mogoče izbrisati: {{reason}}"
       },
@@ -445,7 +444,6 @@
       "acceptTerms": "Sprejmi",
       "replyBadRequest": "Tega odgovora ni mogoče objaviti. Nit se je morda spremenila.",
       "replyForbidden": "Nimaš dovoljenja za odgovarjanje na ta zahtevek za združitev.",
-      "couldNotReply": "Odgovora ni bilo mogoče poslati.",
       "moderation": {
         "reportContent": {
           "terminal": "Tega komentarja ni mogoče prijaviti.",
@@ -502,8 +500,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Nastavitev aplikacije GitHub ni bilo mogoče odpreti.",
     "installKiloGitHubApp": "Namesti aplikacijo Kilo za GitHub",
-    "connectionExpiredTitle": "Povezava z računom GitHub je potekla.",
-    "connectionExpiredDescription": "Tvoja povezava z GitHubom ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
     "checkConnection": "Preveri povezavo",
     "couldNotLoadPullRequest": "Zahtevka za združitev ni bilo mogoče naložiti.",
     "description": "Opis",
@@ -580,7 +576,6 @@
       "shareA11y": "Deli zahtevek za združitev"
     },
     "submit": {
-      "title": "Oddaj pregled",
       "loadFailedTitle": "Obrazca za oddajo pregleda ni bilo mogoče naložiti.",
       "deletePendingTitle": "Izbrišem čakajoči komentar?",
       "deletePendingMessage": "Ta komentar bo odstranjen iz čakalne vrste za pregled.",
@@ -598,8 +593,7 @@
     },
     "reconnectNotice": {
       "title": "Povezava z računom GitHub je potekla.",
-      "message": "Tvoja povezava z GitHubom ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
-      "checkConnection": "Preveri povezavo"
+      "message": "Tvoja povezava z GitHubom ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -627,8 +621,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",
       "editA11y": "Uredi čakajoči komentar na {{location}}",
-      "emptyBody": "(prazno)",
-      "outdated": "Zastarelo",
       "staleHint": "PR se je od nastanka tega komentarja spremenil.",
       "deleteA11y": "Izbriši čakajoči komentar na {{location}}",
       "deletedAnnouncement": "Čakajoči komentar izbrisan",
@@ -717,7 +709,6 @@
       "security": "Varnostne ugotovitve"
     },
     "category": {
-      "chatMessagesTitle": "Sporočila v klepetu",
       "chatMessagesSubtitle": "odgovori v tvojih pogovorih",
       "agentAttentionTitle": "Agent te potrebuje",
       "agentAttentionSubtitle": "vprašanja, zahteve za dovoljenja in dodatne podatke",
@@ -725,11 +716,8 @@
       "agentUpdatesSubtitle": "sporočila agenta med nalogo",
       "sessionStatusTitle": "Stanje seje",
       "sessionStatusSubtitle": "končano / neuspešno / pripravljeno za upravljanje",
-      "kiloclawActivityTitle": "Dejavnost v KiloClaw",
       "kiloclawActivitySubtitle": "instanca pripravljena ali neuspešna, načrtovana dejanja",
-      "balanceAlertsTitle": "Opozorila o stanju dobroimetja",
       "balanceAlertsSubtitle": "opozorila o nizkem stanju organizacije",
-      "securityFindingsTitle": "Varnostne ugotovitve",
       "securityFindingsSubtitle": "nove ugotovitve in opomniki SLA"
     }
   },
@@ -1205,8 +1193,7 @@
       "googleDescription": "Gmail, Koledar, Dokumenti",
       "modelDescription": "Izbira modela umetne inteligence",
       "secretsDescription": "Šifrirane poverilnice",
-      "versionPinDescription": "Pripni na določeno različico",
-      "versionPinLabel": "Pripenjanje različice"
+      "versionPinDescription": "Pripni na določeno različico"
     },
     "avatar": {
       "arcade": "Igralni avtomat",
@@ -1458,7 +1445,6 @@
       "severityHigh": "Visoko",
       "severityMedium": "Srednje",
       "severityLow": "Nizko",
-      "outcomeNotExploitable": "Ni izkoristljivo",
       "outcomeTriageComplete": "Začetna presoja končana",
       "sortSeverityDesc": "Resnost: od visoke do nizke",
       "sortSeverityAsc": "Resnost: od nizke do visoke",
@@ -1565,15 +1551,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Odprte ugotovitve",
-      "openFindingsDetail": "Kritično: {{critical}}, visoko: {{high}}",
-      "confirmedExploitable": "Potrjeno izkoristljivo",
       "confirmedExploitableDetail": "Tveganje projekta potrjeno z analizo",
-      "needsReview": "Potreben je tvoj pregled",
       "needsReviewDetail": "Potrebna je človeška odločitev",
-      "analysisIncomplete": "Analiza ni dokončana",
       "analysisIncompleteDetail": "Tveganje projekta še ni znano",
       "slaCompliance": "Skladnost s SLA",
-      "notMeasured": "Ni izmerjeno",
       "withinDeadlineDetail": "{{within}} od {{total}} v roku",
       "noDeadlineData": "Nobena ugotovitev še nima roka SLA",
       "deadlinePassed": "Rok je potekel",
@@ -1621,7 +1602,6 @@
       "source": "Vir",
       "sourceId": "ID vira",
       "viewAdvisory": "Prikaži varnostno obvestilo na platformi GitHub",
-      "statusSuperseded": "Nadomeščeno",
       "statusOpen": "Odprto",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Odpravljanje že poteka",
@@ -1632,7 +1612,6 @@
       "reasonAfterReview": "po pregledu"
     },
     "settingsOverview": {
-      "title": "Nastavitve",
       "couldNotLoadSettings": "Nastavitev varnostnega agenta ni bilo mogoče naložiti.",
       "couldNotLoadPermissions": "Dovoljenj ni bilo mogoče naložiti.",
       "on": "Vklopljeno",
@@ -1640,13 +1619,10 @@
       "repositoriesCount": "Izbranih {{displayCount}} repozitorijev",
       "repositoriesCount_other": "Izbranih {{displayCount}} repozitorijev",
       "selectRepositoriesSubtitle": "Izberi, katera skladišča spremlja varnostni agent",
-      "modelsAndAnalysis": "Modeli in analiza",
       "analysisModeSubtitle": "Način analize: {{mode}}",
-      "automation": "Avtomatizacija",
       "automationAllOff": "Vse izklopljeno",
       "automationCount": "Omogočeno: {{displayCount}} od 3",
       "notificationsCount": "Omogočeno: {{displayCount}} od 2",
-      "slaPolicy": "Pravila SLA",
       "disabledNoManage": "Varnostni agent je onemogočen. Omogočijo ga lahko samo lastniki organizacije in upravitelji obračunavanja.",
       "disabledNoRepo": "Pred omogočanjem varnostnega agenta izberi vsaj eno skladišče.",
       "disabledPrompt": "Vklopi varnostnega agenta, da sinhroniziraš opozorila Dependabot, izbereš skladišča in nastaviš avtomatizacijo.",
@@ -1657,8 +1633,6 @@
       "cancellationRequested": "Zahtevan preklic",
       "cancelled": "Odpravljanje preklicano",
       "couldNotLoad": "Stanja odpravljanja ni bilo mogoče naložiti.",
-      "noAnalysisTitle": "Še ni analize",
-      "noAnalysisDescription": "Zaženi analizo na zavihku Podrobnosti.",
       "start": "Začni odpravljanje",
       "retry": "Znova poskusi odpraviti",
       "cancelTitle": "Prekličem to odpravljanje?",
@@ -1674,10 +1648,8 @@
       "retryQueued": "Ponovni poskus odpravljanja v čakalni vrsti",
       "timeline": {
         "queued": "Odpravljanje zahtevano",
-        "prOpened": "Odprt PR",
         "failed": "Odpravljanje ni uspelo",
-        "blocked": "Odpravljanje blokirano",
-        "noChangesNeeded": "Spremembe niso potrebne"
+        "blocked": "Odpravljanje blokirano"
       },
       "unavailable": "Odpravljanje težave za to ugotovitev ni na voljo."
     },
@@ -1685,9 +1657,6 @@
       "title": "Modeli in analiza",
       "couldNotLoad": "Nastavitev analize ni bilo mogoče naložiti.",
       "depth": "Globina analize",
-      "modeAuto": "Samodejno",
-      "modeShallow": "Površinsko",
-      "modeDeep": "Poglobljeno",
       "triageModel": "Model za začetno presojo",
       "analysisModel": "Model za analizo",
       "remediationModel": "Model za odpravljanje"
@@ -1713,10 +1682,7 @@
     "findingDetail": {
       "title": "Ugotovitev",
       "tabAnalysis": "Analiza",
-      "tabRemediation": "Odpravljanje",
-      "notFound": "Ugotovitve ni mogoče najti",
-      "notFoundDescription": "Ta ugotovitev je bila morda odstranjena ali pa do nje nimaš več dostopa.",
-      "couldNotLoad": "Te ugotovitve ni bilo mogoče naložiti."
+      "tabRemediation": "Odpravljanje"
     },
     "findingList": {
       "couldNotLoad": "Ugotovitev ni bilo mogoče naložiti.",
@@ -1731,9 +1697,7 @@
       "nextRemediationInProgress": "Odpravljanje poteka",
       "nextRetryRemediation": "Na voljo je ponovni poskus odpravljanja",
       "nextRemediationAvailable": "Odpravljanje je na voljo",
-      "retryAnalysis": "Ponovi analizo",
       "runAnalysis": "Zaženi analizo",
-      "nextNeedsManualReview": "Potreben je ročni pregled",
       "nextViewDetails": "Prikaži podrobnosti",
       "viewPr": "Prikaži PR",
       "analyze": "Analiziraj",
@@ -1775,7 +1739,6 @@
       "newFindingSubtitle": "Obvestilo se pošlje ob vsaki sinhronizaciji nove ugotovitve, tudi ob prvi sinhronizaciji.",
       "slaLeadTimeAccessibility": "Število dni pred rokom SLA za pošiljanje opozorila",
       "slaLeadTimeError": "Vnesi celo število dni med 1 in 365.",
-      "slaLeadTimeHint": "Vnesi celo število med 1 in 365",
       "slaLeadTimeLabel": "Opozorilo pred rokom SLA (v dneh)",
       "slaPersonalTitle": "Pošlji mi e-pošto o opozorilih SLA",
       "slaSection": "Opozorila o rokih SLA",
@@ -1820,7 +1783,6 @@
     },
     "analysisState": {
       "queued": "Analiza v čakalni vrsti",
-      "queuedTitle": "Analiza v čakalni vrsti",
       "queuedDescription": "Analiza čaka na proste zmogljivosti.",
       "analyzing": "Analiziranje",
       "analyzingDescription": "Preverjamo, ali lahko koda aplikacije doseže prizadeto funkcijo.",
@@ -1829,7 +1791,6 @@
       "extractionFailedDescription": "Tehničnega poročila ni bilo mogoče pretvoriti v strukturiran rezultat.",
       "exploitableDescription": "Koda aplikacije lahko doseže prizadeto funkcijo.",
       "notExploitable": "Nedosegljivo",
-      "notExploitableTitle": "Nedosegljivo",
       "notExploitableDescription": "V tem skladišču ni bila najdena nobena dosegljiva pot.",
       "unknown": "Potreben je pregled",
       "unknownDescription": "Analiza ni mogla potrditi, ali je ranljiva funkcija dosegljiva.",
@@ -1869,7 +1830,6 @@
       "dueInDays": "Rok čez {{count}} dni"
     },
     "remediationStatus": {
-      "cancellationRequested": "Zahtevan preklic",
       "notStarted": "Ni začeto",
       "starting": "Zaganjanje",
       "inProgress": "V teku",
@@ -1888,7 +1848,6 @@
       "findingNotOpen": "Ugotovitev ni več odprta.",
       "repoNotInScope": "Skladišče ni izbrano za varnostnega agenta.",
       "analysisRequired": "Pred odpravljanjem težave zaženi analizo izvorne kode.",
-      "sandboxAnalysisRequired": "Pred odpravljanjem težave zaženi analizo izvorne kode.",
       "staleAnalysis": "Ugotovitev se je po analizi spremenila. Pred začetkom odpravljanja znova zaženi analizo.",
       "notExploitable": "Analiza ni našla dosegljive ranljive poti. Samodejno odpravljanje ni na voljo.",
       "exploitabilityUnknown": "Analiza ni mogla potrditi možnosti zlorabe. Pred odpravljanjem z enim klikom je potreben ročni pregled.",
@@ -1904,12 +1863,10 @@
       "autoRemediationDisabled": "Samodejno odpravljanje je onemogočeno. Če so varnostni pogoji izpolnjeni, lahko še vedno ročno zaženeš odpravljanje.",
       "includeExistingDisabled": "Obstoječe ugotovitve so izključene iz samodejnega odpravljanja.",
       "belowThreshold": "Resnost ugotovitve je pod pragom za samodejno odpravljanje. Če so varnostni pogoji izpolnjeni, lahko še vedno ročno zaženeš odpravljanje.",
-      "beforeEnablement": "Analiza je bila končana, preden je bilo omogočeno samodejno odpravljanje. Če so varnostni pogoji izpolnjeni, lahko še vedno ročno zaženeš odpravljanje.",
-      "generic": "Odpravljanje težave za to ugotovitev ni na voljo."
+      "beforeEnablement": "Analiza je bila končana, preden je bilo omogočeno samodejno odpravljanje. Če so varnostni pogoji izpolnjeni, lahko še vedno ročno zaženeš odpravljanje."
     },
     "commandFailure": {
       "ownerCapReached": "Doseženo je največje število sočasnih analiz. Počakaj, da se ena od njih konča, nato poskusi znova.",
-      "githubTokenUnavailable": "Preveriti je treba pooblastilo za GitHub. Znova pooblasti aplikacijo GitHub in nato poskusi znova.",
       "githubAuthInvalid": "Preveriti je treba pooblastilo za GitHub. Znova pooblasti aplikacijo GitHub in nato poskusi znova.",
       "findingUnavailable": "Ugotovitev ni več na voljo. Osveži ugotovitve in poskusi znova, če je še odprta.",
       "repositoryUnavailable": "Skladišče ni več na voljo aplikaciji GitHub. Osveži dostop do skladišča in nato poskusi znova.",
@@ -1997,10 +1954,8 @@
       "title": "Seja",
       "copyErrorDetails": "Kopiraj podrobnosti napake",
       "backToSessions": "Nazaj na seje",
-      "accessDeniedDescription": "Za ogled te vsebine nimaš dovoljenja.",
       "couldNotLoad": "Seje ni bilo mogoče naložiti.",
       "failedToLoadDetails": "Podrobnosti seje ni bilo mogoče naložiti.",
-      "notFoundDescription": "Ta element je bil morda odstranjen ali ni več na voljo.",
       "failedToStopExecution": "Izvajanja ni bilo mogoče ustaviti.",
       "renameSession": "Preimenuj sejo",
       "renamePlaceholder": "Ime seje",
@@ -2558,7 +2513,6 @@
     "signOutThisDeviceTitle": "Želiš odjaviti to napravo?",
     "signOutThisSessionTitle": "Želiš odjaviti to sejo?",
     "signOutThisSessionMessage": "Naprava {{device}} bo odjavljena. Dostop do API lahko ohrani še največ eno uro.",
-    "signOutMessage": "Za dostop do delovnega prostora se moraš znova prijaviti.",
     "webBrowser": "Spletni brskalnik"
   },
   "forceUpdate": {
@@ -2827,7 +2781,6 @@
         "accounting_adjustment": "Računovodska prilagoditev",
         "credits_expired": "Potek veljavnosti kreditov"
       },
-      "loadMoreFailed": "Dodatnih podatkov ni bilo mogoče naložiti.",
       "truncated": "Na voljo so starejše transakcije s krediti."
     },
     "inviteMember": {
@@ -2856,7 +2809,6 @@
       "truncated": "Starejši računi so na voljo."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ime@podjetje.com",
       "enableA11y": "Omogoči opozorilo o nizkem stanju",
       "notifyEmailsLabel": "E-poštni naslovi za obvestila",
       "permissionDenied": "Nimaš dovoljenja za upravljanje obračunskih opozoril.",
@@ -2881,7 +2833,6 @@
       "emptyDescriptionCanInvite": "Povabi sodelavce, da začnete sodelovati v tej organizaciji.",
       "emptyDescriptionCannotInvite": "Prosi lastnika ali skrbnika obračunavanja, naj povabi sodelavce.",
       "emptyTitle": "Še ni članov",
-      "inviteMember": "Povabi člana",
       "invitedDate": "Povabljen {{date}}",
       "limitPerDay": "{{amount}}/dan",
       "manageA11y": "Upravljaj članstvo: {{name}}",
@@ -2924,7 +2875,6 @@
       "couldNotLoadStatus": "Stanja ni bilo mogoče naložiti",
       "creditProcessingDelayed": "Obdelava kreditov zamuja · samodejni ponovni poskus",
       "ended": "Končano",
-      "manageHint": "Odpre upravljanje naročnine Kilo Pass na spletu.",
       "notSubscribed": "Ni naročnine",
       "overallocated": "Število dodelitev Kilo Pass presega število plačanih uporabniških mest",
       "paidSeat_one": "{{displayCount}} plačano uporabniško mesto",

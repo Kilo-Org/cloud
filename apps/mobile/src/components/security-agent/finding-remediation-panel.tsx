@@ -44,10 +44,10 @@ type FindingRemediationPanelProps = {
 // action values (same labels as the web audit report ACTION_LABELS).
 const REMEDIATION_TIMELINE_LABELS = {
   'security.remediation.queued': 'securityAgent.remediation.timeline.queued',
-  'security.remediation.pr_opened': 'securityAgent.remediation.timeline.prOpened',
+  'security.remediation.pr_opened': 'securityAgent.remediationStatus.prOpened',
   'security.remediation.failed': 'securityAgent.remediation.timeline.failed',
   'security.remediation.blocked': 'securityAgent.remediation.timeline.blocked',
-  'security.remediation.no_changes_needed': 'securityAgent.remediation.timeline.noChangesNeeded',
+  'security.remediation.no_changes_needed': 'securityAgent.remediationStatus.noChangesNeeded',
   'security.remediation.cancelled': 'common.cancelled',
 } as const satisfies Record<string, string>;
 
@@ -61,7 +61,7 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 // plus the PR-draft flag decides the key; icon, tone, and spinning still come
 // from app-shared.
 const REMEDIATION_STATUS_KEYS = {
-  cancellationRequested: 'securityAgent.remediationStatus.cancellationRequested',
+  cancellationRequested: 'securityAgent.remediation.cancellationRequested',
   notStarted: 'securityAgent.remediationStatus.notStarted',
   queued: 'common.queued',
   starting: 'securityAgent.remediationStatus.starting',
@@ -138,7 +138,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   finding_not_open: 'securityAgent.remediationUnavailable.findingNotOpen',
   repo_not_in_scope: 'securityAgent.remediationUnavailable.repoNotInScope',
   analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  sandbox_analysis_required: 'securityAgent.remediationUnavailable.sandboxAnalysisRequired',
+  sandbox_analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
   stale_analysis: 'securityAgent.remediationUnavailable.staleAnalysis',
   not_exploitable: 'securityAgent.remediationUnavailable.notExploitable',
   exploitability_unknown: 'securityAgent.remediationUnavailable.exploitabilityUnknown',
@@ -157,7 +157,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   before_enablement: 'securityAgent.remediationUnavailable.beforeEnablement',
 } as const satisfies Record<string, string>;
 
-const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediationUnavailable.generic';
+const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediation.unavailable';
 
 function getRemediationUnavailableKey(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') {
@@ -243,8 +243,8 @@ export function FindingRemediationPanel({
     return (
       <EmptyState
         icon={Wrench}
-        title={t('securityAgent.remediation.noAnalysisTitle')}
-        description={t('securityAgent.remediation.noAnalysisDescription')}
+        title={t('securityAgent.analysis.noAnalysisYet')}
+        description={t('securityAgent.analysis.noAnalysisYetDescription')}
       />
     );
   }

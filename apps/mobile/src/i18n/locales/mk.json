@@ -370,7 +370,6 @@
         "closed": "Ова барање за спојување е затворено"
       },
       "partialSuccessBanner": {
-        "title": "Споено",
         "body": "Не успеа бришењето на гранката: {{reason}}.",
         "accessibility": "Споено. Не успеа бришењето на гранката: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Прифати",
       "replyBadRequest": "Овој одговор не може да се објави. Можеби нишката е променета.",
       "replyForbidden": "Немаш дозвола да одговориш на ова барање за спојување.",
-      "couldNotReply": "Одговорот не се испрати.",
       "moderation": {
         "reportContent": {
           "terminal": "Овој коментар не може да се пријави.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Поставките за апликацијата на GitHub не се отворија.",
     "installKiloGitHubApp": "Инсталирај ја апликацијата Kilo за GitHub",
-    "connectionExpiredTitle": "Врската со GitHub истече.",
-    "connectionExpiredDescription": "Твојата врска со GitHub веќе не важи. Провери ја повторно — ако е потребно, ќе добиеш барање повторно да се поврзеш.",
     "checkConnection": "Провери ја врската",
     "couldNotLoadPullRequest": "Не успеа вчитувањето на барањето за спојување.",
     "description": "Опис",
@@ -572,7 +568,6 @@
       "shareA11y": "Сподели го барањето за спојување"
     },
     "submit": {
-      "title": "Испрати преглед",
       "loadFailedTitle": "Не успеа вчитувањето на формуларот за испраќање на прегледот.",
       "deletePendingTitle": "Да се избрише коментарот на чекање?",
       "deletePendingMessage": "Овој коментар ќе се отстрани од списокот за испраќање со прегледот.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "Врската со GitHub истече.",
-      "message": "Твојата врска со GitHub веќе не важи. Провери ја повторно — ако е потребно, ќе добиеш барање повторно да се поврзеш.",
-      "checkConnection": "Провери ја врската"
+      "message": "Твојата врска со GitHub веќе не важи. Провери ја повторно — ако е потребно, ќе добиеш барање повторно да се поврзеш."
     },
     "eventChips": {
       "comment": "Коментирај",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Уреди го застарениот коментар на чекање за {{location}}",
       "editA11y": "Уреди го коментарот на чекање за {{location}}",
-      "emptyBody": "(празно)",
-      "outdated": "Застарено",
       "staleHint": "PR е ажуриран откако го напиша ова.",
       "deleteA11y": "Избриши го коментарот на чекање за {{location}}",
       "deletedAnnouncement": "Коментарот на чекање е избришан",
@@ -703,7 +695,6 @@
       "security": "Безбедносни наоди"
     },
     "category": {
-      "chatMessagesTitle": "Пораки во разговорите",
       "chatMessagesSubtitle": "одговори во твоите разговори",
       "agentAttentionTitle": "На агентот му требаш ти",
       "agentAttentionSubtitle": "прашања и барања за дозвола или одговор",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "пораки од агентот додека ја извршува задачата",
       "sessionStatusTitle": "Статус на сесија",
       "sessionStatusSubtitle": "завршено / неуспешно / подготвено за контрола",
-      "kiloclawActivityTitle": "Активност на KiloClaw",
       "kiloclawActivitySubtitle": "инстанца подготвена/неуспешна, закажани дејства",
-      "balanceAlertsTitle": "Предупредувања за салдо",
       "balanceAlertsSubtitle": "предупредувања за ниска состојба на организацијата",
-      "securityFindingsTitle": "Безбедносни наоди",
       "securityFindingsSubtitle": "нови наоди и потсетници за SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Избор на модел со вештачка интелигенција",
       "secretsDescription": "Шифрирани податоци за автентикација",
-      "versionPinDescription": "Фиксирај на одредена верзија",
-      "versionPinLabel": "Заклучување на верзија"
+      "versionPinDescription": "Фиксирај на одредена верзија"
     },
     "avatar": {
       "arcade": "Аркадна игра",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Високо",
       "severityMedium": "Средно",
       "severityLow": "Ниско",
-      "outcomeNotExploitable": "Не може да се искористи",
       "outcomeTriageComplete": "Завршена тријажа",
       "sortSeverityDesc": "Сериозност: од висока кон ниска",
       "sortSeverityAsc": "Сериозност: од ниска кон висока",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Отворени наоди",
-      "openFindingsDetail": "{{critical}} со критична, {{high}} со висока сериозност",
-      "confirmedExploitable": "Потврдена можност за искористување",
       "confirmedExploitableDetail": "Ризикот за проектот е потврден со анализа",
-      "needsReview": "Потребен е твој преглед",
       "needsReviewDetail": "Потребна е одлука од човек",
-      "analysisIncomplete": "Анализата не е завршена",
       "analysisIncompleteDetail": "Ризикот за проектот е сè уште непознат",
       "slaCompliance": "Усогласеност со SLA",
-      "notMeasured": "Не е измерено",
       "withinDeadlineDetail": "{{within}} од {{total}} во рок",
       "noDeadlineData": "Ниту еден наод сè уште нема рок според SLA",
       "deadlinePassed": "Рокот помина",
@@ -1601,7 +1582,6 @@
       "source": "Извор",
       "sourceId": "Идентификатор на изворот",
       "viewAdvisory": "Прегледај го безбедносното известување на GitHub",
-      "statusSuperseded": "Заменето",
       "statusOpen": "Отворено",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "веќе е започната поправка",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "по прегледот"
     },
     "settingsOverview": {
-      "title": "Поставки",
       "couldNotLoadSettings": "Не успеа вчитувањето на поставките на безбедносниот агент.",
       "couldNotLoadPermissions": "Не успеа вчитувањето на дозволите.",
       "on": "Вклучено",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} избрани репозиториуми",
       "repositoriesCount_other": "{{displayCount}} избрани репозиториуми",
       "selectRepositoriesSubtitle": "Избери кои складишта ќе ги следи безбедносниот агент",
-      "modelsAndAnalysis": "Модели и анализа",
       "analysisModeSubtitle": "Анализа: {{mode}}",
-      "automation": "Автоматизација",
       "automationAllOff": "Сè е исклучено",
       "automationCount": "{{displayCount}} од 3 овозможени",
       "notificationsCount": "{{displayCount}} од 2 овозможени",
-      "slaPolicy": "Политика за SLA",
       "disabledNoManage": "Безбедносниот агент е оневозможен. Само сопствениците на организацијата и менаџерите за наплата можат да го вклучат.",
       "disabledNoRepo": "Избери најмалку едно складиште пред да го овозможиш Безбедносниот агент.",
       "disabledPrompt": "Вклучи го безбедносниот агент за да ги синхронизираш предупредувањата од Dependabot, да избереш складишта и да ја поставиш автоматизацијата."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Побарано е откажување",
       "cancelled": "Санирањето е откажано",
       "couldNotLoad": "Не успеа вчитувањето на статусот на санирањето.",
-      "noAnalysisTitle": "Сѐ уште нема анализа",
-      "noAnalysisDescription": "Започни анализа од картичката „Детали“.",
       "start": "Започни санирање",
       "retry": "Повтори го санирањето",
       "cancelTitle": "Да се откаже ова санирање?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Повторниот обид за санирање е додаден во редицата",
       "timeline": {
         "queued": "Побарано санирање",
-        "prOpened": "Отворен PR",
         "failed": "Санирањето не успеа",
-        "blocked": "Санирањето е блокирано",
-        "noChangesNeeded": "Не се потребни промени"
+        "blocked": "Санирањето е блокирано"
       },
       "unavailable": "Не е достапна поправка за овој наод."
     },
@@ -1663,9 +1635,6 @@
       "title": "Модели и анализа",
       "couldNotLoad": "Не успеа вчитувањето на поставките за анализа.",
       "depth": "Длабочина на анализа",
-      "modeAuto": "Автоматски",
-      "modeShallow": "Површински",
-      "modeDeep": "Длабински",
       "triageModel": "Модел за тријажа",
       "analysisModel": "Модел за анализа",
       "remediationModel": "Модел за санирање"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Наод",
       "tabAnalysis": "Анализа",
-      "tabRemediation": "Санирање",
-      "notFound": "Наодот не е пронајден",
-      "notFoundDescription": "Овој наод можеби е отстранет или веќе немаш пристап до него.",
-      "couldNotLoad": "Овој наод не се вчита."
+      "tabRemediation": "Санирање"
     },
     "findingList": {
       "couldNotLoad": "Не успеа вчитувањето на наодите.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Санирањето е во тек",
       "nextRetryRemediation": "Достапен повторен обид за санирање",
       "nextRemediationAvailable": "Достапно санирање",
-      "retryAnalysis": "Повтори ја анализата",
       "runAnalysis": "Изврши анализа",
-      "nextNeedsManualReview": "Потребен е рачен преглед",
       "nextViewDetails": "Прегледај ги деталите",
       "viewPr": "Прегледај го PR",
       "analyze": "Анализирај",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Се испраќа секогаш кога ќе се синхронизира нов наод, вклучително и при првата синхронизација.",
       "slaLeadTimeAccessibility": "Број на денови пред рокот според SLA за испраќање предупредување",
       "slaLeadTimeError": "Внеси цел број денови помеѓу 1 и 365.",
-      "slaLeadTimeHint": "Внеси цел број помеѓу 1 и 365",
       "slaLeadTimeLabel": "Предупредување пред рокот според SLA (денови)",
       "slaPersonalTitle": "Испрати ми е-пошта за предупредувања поврзани со SLA",
       "slaSection": "Известување за рок според SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Анализата е во редица",
-      "queuedTitle": "Анализата е во редица",
       "queuedDescription": "Се чека слободен капацитет за анализа.",
       "analyzing": "Се анализира",
       "analyzingDescription": "Се проверува дали кодот на апликацијата може да ја повика засегнатата функција.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Техничкиот извештај не можеше да се претвори во структуриран резултат.",
       "exploitableDescription": "Кодот на апликацијата може да ја повика засегнатата функција.",
       "notExploitable": "Недостижно",
-      "notExploitableTitle": "Недостижно",
       "notExploitableDescription": "Во ова складиште не е пронајдена патека на извршување до ранливата функција.",
       "unknown": "Потребен е преглед",
       "unknownDescription": "Анализата не можеше да потврди дали кодот може да ја повика ранливата функција.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Рокот истекува за {{count}} дена"
     },
     "remediationStatus": {
-      "cancellationRequested": "Побарано е откажување",
       "notStarted": "Не е започнато",
       "starting": "Се стартува",
       "inProgress": "Во тек",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Наодот веќе не е отворен.",
       "repoNotInScope": "Складиштето не е избрано за Безбедносниот агент.",
       "analysisRequired": "Анализирај го изворниот код пред да започнеш со поправката.",
-      "sandboxAnalysisRequired": "Анализирај го изворниот код пред да започнеш со поправката.",
       "staleAnalysis": "Наодот се промени по анализата. Повторно изврши анализа пред да започнеш со санирање.",
       "notExploitable": "Анализата не најде патека на извршување до ранливата функција. Автоматското санирање не е достапно.",
       "exploitabilityUnknown": "Анализата не можеше да потврди дали ранливоста може да се искористи за напад. Потребен е рачен преглед пред санирање со еден клик.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Автоматското санирање е оневозможено. Рачното санирање сепак може да започне ако се исполнети безбедносните услови.",
       "includeExistingDisabled": "Постојните наоди се исклучени од автоматското санирање.",
       "belowThreshold": "Сериозноста на наодот е под прагот за автоматско санирање. Рачното санирање сепак може да започне ако се исполнети безбедносните услови.",
-      "beforeEnablement": "Анализата заврши пред да се овозможи автоматското санирање. Рачното санирање сепак може да започне ако се исполнети безбедносните услови.",
-      "generic": "Не е достапна поправка за овој наод."
+      "beforeEnablement": "Анализата заврши пред да се овозможи автоматското санирање. Рачното санирање сепак може да започне ако се исполнети безбедносните услови."
     },
     "commandFailure": {
       "ownerCapReached": "Капацитетот за анализа е целосно зафатен. Почекај да заврши некоја од активните анализи, па обиди се повторно.",
-      "githubTokenUnavailable": "Има проблем со овластувањето на GitHub. Повторно овласти ја апликацијата на GitHub, па обиди се повторно.",
       "githubAuthInvalid": "Има проблем со овластувањето на GitHub. Повторно овласти ја апликацијата на GitHub, па обиди се повторно.",
       "findingUnavailable": "Наодот веќе не е достапен. Освежи ги наодите и обиди се повторно ако сè уште е отворен.",
       "repositoryUnavailable": "Складиштето веќе не е достапно за апликацијата на GitHub. Освежи го пристапот до складиштето, па обиди се повторно.",
@@ -1965,10 +1922,8 @@
       "title": "Сесија",
       "copyErrorDetails": "Копирај ги деталите за грешката",
       "backToSessions": "Назад на сесиите",
-      "accessDeniedDescription": "Немаш дозвола да го видиш ова.",
       "couldNotLoad": "Не успеа вчитувањето на сесијата.",
       "failedToLoadDetails": "Не успеа вчитувањето на деталите за сесијата.",
-      "notFoundDescription": "Оваа ставка можеби е отстранета или повеќе не е достапна.",
       "failedToStopExecution": "Не успеа запирањето на извршувањето.",
       "renameSession": "Преименување на сесијата",
       "renamePlaceholder": "Име на сесијата",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "Сесијата е одјавена.",
     "signOutThisDeviceTitle": "Да се одјави овој уред?",
     "signOutThisSessionTitle": "Да се одјави оваа сесија?",
-    "signOutThisSessionMessage": "Уредот {{device}} ќе се одјави. Може да го задржи пристапот до API уште најмногу еден час.",
-    "signOutMessage": "Ќе треба повторно да се најавиш за да пристапиш до твојот работен простор."
+    "signOutThisSessionMessage": "Уредот {{device}} ќе се одјави. Може да го задржи пристапот до API уште најмногу еден час."
   },
   "forceUpdate": {
     "couldNotOpenStore": "Не успеа отворањето на продавницата за апликации.",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Сметководствена корекција",
         "credits_expired": "Истечени кредити"
       },
-      "loadMoreFailed": "Не се вчитаа дополнителни ставки.",
       "truncated": "Достапни се и постари активности со кредити."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Достапни се и постари фактури."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "име@компанија.com",
       "enableA11y": "Овозможи предупредување за ниска состојба",
       "notifyEmailsLabel": "Адреси за известување",
       "permissionDenied": "Немаш дозвола да управуваш со предупредувањата за наплата.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Покани ги колегите од тимот за да соработувате во оваа организација.",
       "emptyDescriptionCannotInvite": "Побарај од сопственик или одговорен за наплата да ги покани колегите од тимот.",
       "emptyTitle": "Сè уште нема членови",
-      "inviteMember": "Покани член",
       "invitedDate": "Покана испратена на {{date}}",
       "limitPerDay": "{{amount}}/ден",
       "manageA11y": "Управувај со {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Не успеа вчитувањето на статусот",
       "creditProcessingDelayed": "Обработката на кредитите доцни · автоматски се обидува повторно",
       "ended": "Завршено",
-      "manageHint": "Го отвора управувањето со Kilo Pass на веб-страницата.",
       "notSubscribed": "Без претплата",
       "overallocated": "Доделени се повеќе претплати на Kilo Pass отколку што има платени места",
       "paidSeat_one": "{{displayCount}} платено место",

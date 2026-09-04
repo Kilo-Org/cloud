@@ -194,7 +194,7 @@ describe('FindingDetailScreen pane containers', () => {
     expect(tree.root.findAllByType(CenteredState)).toHaveLength(0);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);
     const retry = tree.root.findByType(SettingsRecoveryStatus);
-    expect(retry.props.message).toBe('securityAgent.findingDetail.couldNotLoad');
+    expect(retry.props.message).toBe('securityAgent.dismiss.couldNotLoad');
     press(tree, 'common.retry');
     expect(finding.refetch).toHaveBeenCalledOnce();
     expect(analysis.refetch).not.toHaveBeenCalled();
@@ -306,7 +306,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     });
     const tree = renderScreen();
     expect(
-      tree.root.findAllByProps({ children: 'securityAgent.findingDetail.couldNotLoad' })
+      tree.root.findAllByProps({ children: 'securityAgent.dismiss.couldNotLoad' })
     ).toHaveLength(1);
 
     press(tree, 'common.retry');
@@ -325,10 +325,10 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
     const tree = renderScreen();
 
     expect(
-      tree.root.findAllByProps({ children: 'securityAgent.findingDetail.notFound' })
+      tree.root.findAllByProps({ children: 'securityAgent.dismiss.notFoundTitle' })
     ).toHaveLength(1);
     expect(
-      tree.root.findAllByProps({ children: 'securityAgent.findingDetail.notFoundDescription' })
+      tree.root.findAllByProps({ children: 'securityAgent.dismiss.notFoundDescription' })
     ).toHaveLength(1);
     expect(tree.root.findAllByProps({ accessibilityLabel: 'common.retry' })).toHaveLength(0);
     expect(tree.root.findAllByType(QueryError)).toHaveLength(0);

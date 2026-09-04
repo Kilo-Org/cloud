@@ -370,7 +370,6 @@
         "closed": "Den här PR:en är stängd"
       },
       "partialSuccessBanner": {
-        "title": "Sammanfogad",
         "body": "Kunde inte ta bort grenen. Orsak: {{reason}}",
         "accessibility": "Sammanslagen. Kunde inte ta bort grenen. Orsak: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "Godkänn",
       "replyBadRequest": "Det här svaret kan inte publiceras. Tråden kan ha ändrats.",
       "replyForbidden": "Du har inte behörighet att svara på den här PR:en.",
-      "couldNotReply": "Det gick inte att skicka svaret.",
       "moderation": {
         "reportContent": {
           "terminal": "Den här kommentaren kan inte anmälas.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Det gick inte att öppna inställningarna för GitHub-appen.",
     "installKiloGitHubApp": "Installera GitHub-appen för Kilo",
-    "connectionExpiredTitle": "GitHub-anslutningen har upphört att gälla.",
-    "connectionExpiredDescription": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs.",
     "checkConnection": "Kontrollera anslutningen",
     "couldNotLoadPullRequest": "Kunde inte läsa in PR:en.",
     "description": "Beskrivning",
@@ -572,7 +568,6 @@
       "shareA11y": "Dela PR"
     },
     "submit": {
-      "title": "Skicka granskning",
       "loadFailedTitle": "Kunde inte läsa in formuläret för att skicka granskningen.",
       "deletePendingTitle": "Ta bort oskickad kommentar?",
       "deletePendingMessage": "Den här kommentaren tas bort från granskningskön.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub-anslutningen har upphört att gälla.",
-      "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs.",
-      "checkConnection": "Kontrollera anslutningen"
+      "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
     },
     "eventChips": {
       "comment": "Kommentera",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Redigera inaktuell oskickad kommentar vid {{location}}",
       "editA11y": "Redigera oskickad kommentar vid {{location}}",
-      "emptyBody": "(tom)",
-      "outdated": "Föråldrad",
       "staleHint": "PR:en har uppdaterats sedan du skrev kommentaren.",
       "deleteA11y": "Ta bort oskickad kommentar vid {{location}}",
       "deletedAnnouncement": "Oskickad kommentar borttagen",
@@ -703,7 +695,6 @@
       "security": "Säkerhetsanmärkningar"
     },
     "category": {
-      "chatMessagesTitle": "Chattmeddelanden",
       "chatMessagesSubtitle": "svar i dina konversationer",
       "agentAttentionTitle": "Agenten behöver dig",
       "agentAttentionSubtitle": "frågor, behörigheter och annat som kräver ditt svar",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "meddelanden från agenten medan uppgiften pågår",
       "sessionStatusTitle": "Sessionsstatus",
       "sessionStatusSubtitle": "avslutad / misslyckad / redo att styras",
-      "kiloclawActivityTitle": "KiloClaw-aktivitet",
       "kiloclawActivitySubtitle": "instans klar eller misslyckad, schemalagda åtgärder",
-      "balanceAlertsTitle": "Saldovarningar",
       "balanceAlertsSubtitle": "varningar om lågt organisationssaldo",
-      "securityFindingsTitle": "Säkerhetsanmärkningar",
       "securityFindingsSubtitle": "nya säkerhetsfynd och SLA-påminnelser"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "Val av AI-modell",
       "secretsDescription": "Krypterade autentiseringsuppgifter",
-      "versionPinDescription": "Lås till en viss version",
-      "versionPinLabel": "Versionslåsning"
+      "versionPinDescription": "Lås till en viss version"
     },
     "avatar": {
       "arcade": "Arkadspel",
@@ -1440,7 +1427,6 @@
       "severityHigh": "Hög",
       "severityMedium": "Medel",
       "severityLow": "Låg",
-      "outcomeNotExploitable": "Inte utnyttjbar",
       "outcomeTriageComplete": "Inledande bedömning klar",
       "sortSeverityDesc": "Allvarlighetsgrad: hög till låg",
       "sortSeverityAsc": "Allvarlighetsgrad: låg till hög",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Öppna fynd",
-      "openFindingsDetail": "{{critical}} kritiska, {{high}} med hög allvarlighetsgrad",
-      "confirmedExploitable": "Bekräftat utnyttjbara",
       "confirmedExploitableDetail": "Analysen bekräftar en risk i projektet",
-      "needsReview": "Väntar på din granskning",
       "needsReviewDetail": "En person behöver fatta beslut",
-      "analysisIncomplete": "Analysen är inte klar",
       "analysisIncompleteDetail": "Projektrisken är fortfarande okänd",
       "slaCompliance": "SLA-efterlevnad",
-      "notMeasured": "Inte mätt",
       "withinDeadlineDetail": "{{within}} av {{total}} inom tidsfristen",
       "noDeadlineData": "Inga fynd har en SLA-tidsfrist ännu",
       "deadlinePassed": "Tidsfristen har passerat",
@@ -1601,7 +1582,6 @@
       "source": "Källa",
       "sourceId": "Käll-ID",
       "viewAdvisory": "Visa säkerhetsmeddelandet på GitHub",
-      "statusSuperseded": "Ersatt",
       "statusOpen": "Öppna",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "en åtgärd har redan påbörjats",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "efter granskning"
     },
     "settingsOverview": {
-      "title": "Inställningar",
       "couldNotLoadSettings": "Kunde inte läsa in säkerhetsagentens inställningar.",
       "couldNotLoadPermissions": "Kunde inte läsa in behörigheterna.",
       "on": "På",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} kodarkiv valda",
       "repositoriesCount_other": "{{displayCount}} kodarkiv valda",
       "selectRepositoriesSubtitle": "Välj vilka kodarkiv säkerhetsagenten övervakar",
-      "modelsAndAnalysis": "Modeller och analys",
       "analysisModeSubtitle": "Analysläge: {{mode}}",
-      "automation": "Automatisering",
       "automationAllOff": "Allt avstängt",
       "automationCount": "{{displayCount}} av 3 aktiverade",
       "notificationsCount": "{{displayCount}} av 2 aktiverade",
-      "slaPolicy": "SLA-policy",
       "disabledNoManage": "Säkerhetsagenten är inaktiverad. Endast organisationsägare och faktureringsansvariga kan aktivera den.",
       "disabledNoRepo": "Välj minst ett kodarkiv innan du aktiverar säkerhetsagenten.",
       "disabledPrompt": "Aktivera säkerhetsagenten för att synkronisera Dependabot-varningar, välja kodarkiv och ställa in automatisering."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "Avbrott begärt",
       "cancelled": "Åtgärden avbruten",
       "couldNotLoad": "Kunde inte läsa in åtgärdens status.",
-      "noAnalysisTitle": "Ingen analys ännu",
-      "noAnalysisDescription": "Starta en analys på fliken Detaljer.",
       "start": "Starta åtgärd",
       "retry": "Försök igen med åtgärden",
       "cancelTitle": "Avbryt den här åtgärden?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "Ett nytt åtgärdsförsök har köats",
       "timeline": {
         "queued": "Åtgärd begärd",
-        "prOpened": "PR öppnad",
         "failed": "Åtgärden misslyckades",
-        "blocked": "Åtgärden är blockerad",
-        "noChangesNeeded": "Inga ändringar behövs"
+        "blocked": "Åtgärden är blockerad"
       },
       "unavailable": "Det går inte att starta en åtgärd för den här anmärkningen."
     },
@@ -1663,9 +1635,6 @@
       "title": "Modeller och analys",
       "couldNotLoad": "Kunde inte läsa in analysinställningarna.",
       "depth": "Analysdjup",
-      "modeAuto": "Automatisk",
-      "modeShallow": "Översiktlig",
-      "modeDeep": "Fördjupad",
       "triageModel": "Modell för inledande bedömning",
       "analysisModel": "Analysmodell",
       "remediationModel": "Åtgärdsmodell"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "Fynd",
       "tabAnalysis": "Analys",
-      "tabRemediation": "Åtgärd",
-      "notFound": "Anmärkningen hittades inte",
-      "notFoundDescription": "Fyndet kan ha tagits bort, eller så har du inte längre åtkomst till det.",
-      "couldNotLoad": "Det gick inte att läsa in den här anmärkningen."
+      "tabRemediation": "Åtgärd"
     },
     "findingList": {
       "couldNotLoad": "Kunde inte läsa in fynden.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "Åtgärd pågår",
       "nextRetryRemediation": "Åtgärden kan försökas igen",
       "nextRemediationAvailable": "Åtgärd tillgänglig",
-      "retryAnalysis": "Analysera igen",
       "runAnalysis": "Kör analys",
-      "nextNeedsManualReview": "Kräver manuell granskning",
       "nextViewDetails": "Visa detaljer",
       "viewPr": "Visa PR",
       "analyze": "Analysera",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "Skickas varje gång ett nytt fynd synkroniseras, även vid den första synkroniseringen.",
       "slaLeadTimeAccessibility": "Antal dagar i förväg för SLA-varningar",
       "slaLeadTimeError": "Ange antalet dagar som ett heltal mellan 1 och 365.",
-      "slaLeadTimeHint": "Ange ett heltal mellan 1 och 365",
       "slaLeadTimeLabel": "SLA-varning i förväg (dagar)",
       "slaPersonalTitle": "Skicka e-post till mig om SLA-varningar",
       "slaSection": "Avisering om SLA-varningar",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "Analys i kö",
-      "queuedTitle": "Analys i kö",
       "queuedDescription": "Analysen väntar på ledig kapacitet.",
       "analyzing": "Analyseras",
       "analyzingDescription": "Analysen kontrollerar om programkoden kan nå den berörda funktionen.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "Den tekniska rapporten kunde inte omvandlas till ett strukturerat resultat.",
       "exploitableDescription": "Programkoden kan nå den berörda funktionen.",
       "notExploitable": "Oåtkomlig",
-      "notExploitableTitle": "Oåtkomlig",
       "notExploitableDescription": "Ingen kodväg till den sårbara funktionen hittades i kodarkivet.",
       "unknown": "Kräver granskning",
       "unknownDescription": "Analysen kunde inte bekräfta om den sårbara funktionen är nåbar.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "Tidsfrist om {{count}} dagar"
     },
     "remediationStatus": {
-      "cancellationRequested": "Avbrott begärt",
       "notStarted": "Inte startad",
       "starting": "Startar",
       "inProgress": "Pågår",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "Fyndet är inte längre öppet.",
       "repoNotInScope": "Kodarkivet är inte valt för säkerhetsagenten.",
       "analysisRequired": "Analysera kodbasen innan du startar en åtgärd.",
-      "sandboxAnalysisRequired": "Analysera kodbasen innan du startar en åtgärd.",
       "staleAnalysis": "Fyndet ändrades efter analysen. Kör analysen igen innan du startar åtgärden.",
       "notExploitable": "Analysen hittade ingen kodväg till den sårbara funktionen. Automatisk åtgärd är inte tillgänglig.",
       "exploitabilityUnknown": "Analysen kunde inte bekräfta om sårbarheten kan utnyttjas. Manuell granskning krävs innan du kan starta en åtgärd med ett klick.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "Automatisk åtgärd är inaktiverad. En manuell åtgärd kan ändå startas om säkerhetskontrollerna godkänns.",
       "includeExistingDisabled": "Befintliga fynd ingår inte i automatiska åtgärder.",
       "belowThreshold": "Fyndets allvarlighetsgrad är för låg för automatisk åtgärd. En manuell åtgärd kan ändå startas om säkerhetskontrollerna godkänns.",
-      "beforeEnablement": "Analysen slutfördes innan automatisk åtgärd aktiverades. En manuell åtgärd kan ändå startas om säkerhetskontrollerna godkänns.",
-      "generic": "Det går inte att starta en åtgärd för den här anmärkningen."
+      "beforeEnablement": "Analysen slutfördes innan automatisk åtgärd aktiverades. En manuell åtgärd kan ändå startas om säkerhetskontrollerna godkänns."
     },
     "commandFailure": {
       "ownerCapReached": "Ingen analyskapacitet är ledig. Vänta tills en pågående analys är klar och försök sedan igen.",
-      "githubTokenUnavailable": "GitHub-behörigheterna behöver ses över. Godkänn GitHub-appen på nytt och försök sedan igen.",
       "githubAuthInvalid": "GitHub-behörigheterna behöver ses över. Godkänn GitHub-appen på nytt och försök sedan igen.",
       "findingUnavailable": "Fyndet är inte längre tillgängligt. Uppdatera fynden och försök igen om det fortfarande är öppet.",
       "repositoryUnavailable": "GitHub-appen har inte längre åtkomst till kodarkivet. Uppdatera åtkomsten och försök sedan igen.",
@@ -1965,10 +1922,8 @@
       "title": "Sessionen",
       "copyErrorDetails": "Kopiera felinformation",
       "backToSessions": "Tillbaka till sessionerna",
-      "accessDeniedDescription": "Du har inte behörighet att se det här.",
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
-      "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
       "renameSession": "Byt namn på sessionen",
       "renamePlaceholder": "Sessionens namn",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "Logga ut från den här enheten?",
     "signOutThisSessionTitle": "Logga ut den här sessionen?",
     "signOutThisSessionMessage": "{{device}} loggas ut. Den kan behålla API-åtkomst i upp till en timme.",
-    "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "webBrowser": "Webbläsare"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "Redovisningsjustering",
         "credits_expired": "Utgångna krediter"
       },
-      "loadMoreFailed": "Det gick inte att läsa in fler.",
       "truncated": "Det finns äldre kredittransaktioner att visa."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "Äldre fakturor finns tillgängliga."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "namn@foretag.se",
       "enableA11y": "Aktivera varning för lågt saldo",
       "notifyEmailsLabel": "E-postadresser för varningar",
       "permissionDenied": "Du har inte behörighet att hantera faktureringsvarningar.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "Bjud in kollegor för att börja samarbeta i den här organisationen.",
       "emptyDescriptionCannotInvite": "Be en ägare eller faktureringsansvarig att bjuda in kollegor.",
       "emptyTitle": "Inga medlemmar ännu",
-      "inviteMember": "Bjud in medlem",
       "invitedDate": "Inbjuden {{date}}",
       "limitPerDay": "{{amount}}/dag",
       "manageA11y": "Hantera {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "Det gick inte att läsa in status",
       "creditProcessingDelayed": "Kredithanteringen är försenad · nytt försök görs automatiskt",
       "ended": "Avslutad",
-      "manageHint": "Öppnar Kilo Pass-hanteringen på webben.",
       "notSubscribed": "Ingen prenumeration",
       "overallocated": "Antalet tilldelade Kilo Pass överstiger antalet betalda platser",
       "paidSeat_one": "{{displayCount}} betald plats",

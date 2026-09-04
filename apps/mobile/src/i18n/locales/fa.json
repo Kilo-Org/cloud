@@ -370,7 +370,6 @@
         "closed": "این درخواست ادغام بسته شده است"
       },
       "partialSuccessBanner": {
-        "title": "ادغام‌شده",
         "body": "حذف شاخه ممکن نشد: {{reason}}.",
         "accessibility": "ادغام شد. حذف شاخه ممکن نشد: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "پذیرش",
       "replyBadRequest": "این پاسخ قابل ارسال نیست. ممکن است گفت‌وگو تغییر کرده باشد.",
       "replyForbidden": "اجازهٔ پاسخ دادن در این درخواست ادغام را ندارید.",
-      "couldNotReply": "ارسال پاسخ ناموفق بود.",
       "moderation": {
         "reportContent": {
           "terminal": "این نظر قابل گزارش نیست.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "باز کردن تنظیمات برنامه GitHub ناموفق بود.",
     "installKiloGitHubApp": "نصب برنامهٔ Kilo در GitHub",
-    "connectionExpiredTitle": "اعتبار اتصال به GitHub تمام شده است.",
-    "connectionExpiredDescription": "اتصال شما به GitHub دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید.",
     "checkConnection": "بررسی اتصال",
     "couldNotLoadPullRequest": "بارگذاری درخواست ادغام ممکن نشد.",
     "description": "توضیحات",
@@ -572,7 +568,6 @@
       "shareA11y": "اشتراک‌گذاری درخواست ادغام"
     },
     "submit": {
-      "title": "ارسال بازبینی",
       "loadFailedTitle": "بارگذاری بخش ارسال بازبینی ممکن نشد.",
       "deletePendingTitle": "نظر در انتظار ارسال حذف شود؟",
       "deletePendingMessage": "این نظر از صف بازبینی حذف می‌شود.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "اعتبار اتصال به GitHub تمام شده است.",
-      "message": "اتصال شما به GitHub دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید.",
-      "checkConnection": "بررسی اتصال"
+      "message": "اتصال شما به GitHub دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید."
     },
     "eventChips": {
       "comment": "نظر",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "ویرایش نظر در انتظار ارسال دربارهٔ نسخهٔ قبلی {{location}}",
       "editA11y": "ویرایش نظر در انتظار ارسال دربارهٔ {{location}}",
-      "emptyBody": "(خالی)",
-      "outdated": "قدیمی",
       "staleHint": "PR پس از نوشتن این نظر تغییر کرده است.",
       "deleteA11y": "حذف نظر در انتظار ارسال دربارهٔ {{location}}",
       "deletedAnnouncement": "نظر در انتظار ارسال حذف شد",
@@ -703,7 +695,6 @@
       "security": "یافته‌های امنیتی"
     },
     "category": {
-      "chatMessagesTitle": "پیام‌های گفت‌وگو",
       "chatMessagesSubtitle": "پاسخ‌های گفت‌وگوهای شما",
       "agentAttentionTitle": "عامل به شما نیاز دارد",
       "agentAttentionSubtitle": "پرسش‌ها، درخواست مجوز و نیاز به پاسخ شما",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "پیام‌های عامل در حین انجام کار",
       "sessionStatusTitle": "وضعیت نشست",
       "sessionStatusSubtitle": "تمام‌شده / ناموفق / آمادهٔ کنترل",
-      "kiloclawActivityTitle": "فعالیت KiloClaw",
       "kiloclawActivitySubtitle": "نمونه آماده/ناموفق، اقدامات زمان‌بندی‌شده",
-      "balanceAlertsTitle": "هشدارهای موجودی",
       "balanceAlertsSubtitle": "هشدارهای موجودی کم سازمان",
-      "securityFindingsTitle": "یافته‌های امنیتی",
       "securityFindingsSubtitle": "یافته‌های جدید و یادآوری‌های SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail، Calendar، Docs",
       "modelDescription": "انتخاب مدل هوش مصنوعی",
       "secretsDescription": "اطلاعات احراز هویت رمزنگاری‌شده",
-      "versionPinDescription": "تثبیت روی یک نسخه خاص",
-      "versionPinLabel": "تثبیت نسخه"
+      "versionPinDescription": "تثبیت روی یک نسخه خاص"
     },
     "avatar": {
       "arcade": "بازی آرکید",
@@ -1440,7 +1427,6 @@
       "severityHigh": "بالا",
       "severityMedium": "متوسط",
       "severityLow": "کم",
-      "outcomeNotExploitable": "غیرقابل بهره‌برداری",
       "outcomeTriageComplete": "ارزیابی اولیه تکمیل شده",
       "sortSeverityDesc": "شدت: بالا به پایین",
       "sortSeverityAsc": "شدت: پایین به بالا",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "یافته‌های باز",
-      "openFindingsDetail": "{{critical}} بحرانی، {{high}} بالا",
-      "confirmedExploitable": "بهره‌برداری‌پذیری تأییدشده",
       "confirmedExploitableDetail": "ریسک پروژه در تحلیل تأیید شده",
-      "needsReview": "نیازمند بازبینی شما",
       "needsReviewDetail": "نیازمند تصمیم‌گیری انسان",
-      "analysisIncomplete": "تحلیل ناتمام",
       "analysisIncompleteDetail": "ریسک پروژه هنوز ناشناخته است",
       "slaCompliance": "رعایت SLA",
-      "notMeasured": "اندازه‌گیری‌نشده",
       "withinDeadlineDetail": "{{within}} مورد از {{total}} مورد در مهلت مقرر",
       "noDeadlineData": "هنوز هیچ یافته‌ای مهلت SLA ندارد",
       "deadlinePassed": "مهلت گذشته است",
@@ -1601,7 +1582,6 @@
       "source": "منبع",
       "sourceId": "شناسه منبع",
       "viewAdvisory": "مشاهده اطلاعیه امنیتی در GitHub",
-      "statusSuperseded": "جایگزین‌شده",
       "statusOpen": "باز",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "رفع مشکل شروع شده است",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "پس از بررسی"
     },
     "settingsOverview": {
-      "title": "تنظیمات",
       "couldNotLoadSettings": "بارگذاری تنظیمات عامل امنیتی ممکن نشد.",
       "couldNotLoadPermissions": "بارگذاری مجوزها ممکن نشد.",
       "on": "فعال",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}} مخزن انتخاب‌شده",
       "repositoriesCount_other": "{{displayCount}} مخزن انتخاب‌شده",
       "selectRepositoriesSubtitle": "مخازنی را که عامل امنیتی پایش می‌کند انتخاب کنید",
-      "modelsAndAnalysis": "مدل‌ها و تحلیل",
       "analysisModeSubtitle": "تحلیل {{mode}}",
-      "automation": "خودکارسازی",
       "automationAllOff": "همه غیرفعال",
       "automationCount": "{{displayCount}} مورد از ۳ مورد فعال",
       "notificationsCount": "{{displayCount}} مورد از ۲ مورد فعال",
-      "slaPolicy": "خط‌مشی SLA",
       "disabledNoManage": "عامل امنیتی غیرفعال است. فقط مالکان سازمان و مدیران صورتحساب می‌توانند آن را فعال کنند.",
       "disabledNoRepo": "پیش از فعال‌سازی عامل امنیتی، حداقل یک مخزن انتخاب کنید.",
       "disabledPrompt": "عامل امنیتی را فعال کنید تا بتوانید هشدارهای Dependabot را همگام‌سازی کنید، مخازن را انتخاب کنید و خودکارسازی را تنظیم کنید."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "درخواست لغو ثبت شد",
       "cancelled": "اصلاح لغو شد",
       "couldNotLoad": "بارگذاری وضعیت اصلاح ممکن نشد.",
-      "noAnalysisTitle": "هنوز تحلیلی انجام نشده",
-      "noAnalysisDescription": "از زبانه جزئیات، تحلیل را اجرا کنید.",
       "start": "شروع اصلاح",
       "retry": "تلاش دوباره برای اصلاح",
       "cancelTitle": "این اصلاح لغو شود؟",
@@ -1652,10 +1626,8 @@
       "retryQueued": "تلاش دوباره برای اصلاح در صف قرار گرفت",
       "timeline": {
         "queued": "اصلاح درخواست شد",
-        "prOpened": "PR باز شد",
         "failed": "اصلاح ناموفق بود",
-        "blocked": "اصلاح با مانع روبه‌رو شد",
-        "noChangesNeeded": "تغییری لازم نیست"
+        "blocked": "اصلاح با مانع روبه‌رو شد"
       },
       "unavailable": "امکان رفع مشکل این یافته وجود ندارد."
     },
@@ -1663,9 +1635,6 @@
       "title": "مدل‌ها و تحلیل",
       "couldNotLoad": "بارگذاری تنظیمات تحلیل ممکن نشد.",
       "depth": "عمق تحلیل",
-      "modeAuto": "خودکار",
-      "modeShallow": "سطحی",
-      "modeDeep": "عمیق",
       "triageModel": "مدل ارزیابی اولیه",
       "analysisModel": "مدل تحلیل",
       "remediationModel": "مدل اصلاح"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "یافته",
       "tabAnalysis": "تحلیل",
-      "tabRemediation": "اصلاح",
-      "notFound": "یافته پیدا نشد",
-      "notFoundDescription": "این یافته ممکن است حذف شده باشد یا دیگر به آن دسترسی نداشته باشید.",
-      "couldNotLoad": "بارگذاری این یافته ناموفق بود."
+      "tabRemediation": "اصلاح"
     },
     "findingList": {
       "couldNotLoad": "بارگذاری یافته‌ها ممکن نشد.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "اصلاح در حال انجام",
       "nextRetryRemediation": "امکان تلاش دوباره برای اصلاح",
       "nextRemediationAvailable": "امکان اصلاح",
-      "retryAnalysis": "تلاش دوباره برای تحلیل",
       "runAnalysis": "اجرای تحلیل",
-      "nextNeedsManualReview": "نیازمند بازبینی دستی",
       "nextViewDetails": "مشاهده جزئیات",
       "viewPr": "مشاهده PR",
       "analyze": "تحلیل",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "با هر بار همگام‌سازی یک یافته جدید، حتی در اولین همگام‌سازی، اعلان ارسال می‌شود.",
       "slaLeadTimeAccessibility": "تعداد روزهای پیش از مهلت SLA برای ارسال هشدار",
       "slaLeadTimeError": "تعداد روزها را به‌صورت عددی صحیح بین ۱ تا ۳۶۵ وارد کنید.",
-      "slaLeadTimeHint": "یک عدد صحیح از ۱ تا ۳۶۵ وارد کنید",
       "slaLeadTimeLabel": "فاصله هشدار تا مهلت SLA (روز)",
       "slaPersonalTitle": "ارسال ایمیل به من درباره هشدارهای SLA",
       "slaSection": "اعلان هشدار SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "تحلیل در صف",
-      "queuedTitle": "تحلیل در صف",
       "queuedDescription": "تحلیل در انتظار آزاد شدن ظرفیت است.",
       "analyzing": "در حال تحلیل",
       "analyzingDescription": "در حال بررسی است که آیا کد برنامه می‌تواند به قابلیت آسیب‌پذیر دسترسی پیدا کند.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "تبدیل گزارش فنی به نتیجهٔ ساختاریافته ممکن نشد.",
       "exploitableDescription": "کد برنامه می‌تواند به قابلیت آسیب‌پذیر دسترسی پیدا کند.",
       "notExploitable": "دسترس‌ناپذیر",
-      "notExploitableTitle": "دسترس‌ناپذیر",
       "notExploitableDescription": "هیچ مسیر قابل دسترسی در این مخزن پیدا نشد.",
       "unknown": "نیازمند بازبینی",
       "unknownDescription": "تحلیل نتوانست مشخص کند که آیا قابلیت آسیب‌پذیر قابل دسترسی است یا نه.",
@@ -1843,7 +1804,6 @@
       "dueInDays": "{{count}} روز تا پایان مهلت"
     },
     "remediationStatus": {
-      "cancellationRequested": "درخواست لغو ثبت شد",
       "notStarted": "شروع نشده",
       "starting": "در حال شروع",
       "inProgress": "در حال انجام",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "یافته دیگر باز نیست.",
       "repoNotInScope": "این مخزن برای عامل امنیتی انتخاب نشده است.",
       "analysisRequired": "پیش از شروع رفع مشکل، تحلیل مجموعه کد را اجرا کنید.",
-      "sandboxAnalysisRequired": "پیش از شروع رفع مشکل، تحلیل مجموعه کد را اجرا کنید.",
       "staleAnalysis": "یافته پس از تحلیل تغییر کرد. قبل از شروع اصلاح، تحلیل را دوباره اجرا کنید.",
       "notExploitable": "تحلیل هیچ مسیر آسیب‌پذیر قابل دسترسی پیدا نکرد. اصلاح خودکار در دسترس نیست.",
       "exploitabilityUnknown": "تحلیل نتوانست قابلیت بهره‌برداری را تأیید کند. پیش از اصلاح با یک کلیک، بررسی دستی لازم است.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "اصلاح خودکار غیرفعال است. اگر بررسی‌های ایمنی با موفقیت انجام شوند، همچنان می‌توان اصلاح دستی را شروع کرد.",
       "includeExistingDisabled": "یافته‌های موجود از اصلاح خودکار مستثنی شده‌اند.",
       "belowThreshold": "شدت این یافته از حداقل لازم برای اصلاح خودکار کمتر است. اگر بررسی‌های ایمنی با موفقیت انجام شوند، همچنان می‌توان اصلاح دستی را شروع کرد.",
-      "beforeEnablement": "تحلیل پیش از فعال‌سازی اصلاح خودکار کامل شد. اگر بررسی‌های ایمنی با موفقیت انجام شوند، همچنان می‌توان اصلاح دستی را شروع کرد.",
-      "generic": "امکان رفع مشکل این یافته وجود ندارد."
+      "beforeEnablement": "تحلیل پیش از فعال‌سازی اصلاح خودکار کامل شد. اگر بررسی‌های ایمنی با موفقیت انجام شوند، همچنان می‌توان اصلاح دستی را شروع کرد."
     },
     "commandFailure": {
       "ownerCapReached": "ظرفیت تحلیل پر است. صبر کنید تا یکی از تحلیل‌های در حال اجرا تمام شود، سپس دوباره تلاش کنید.",
-      "githubTokenUnavailable": "مجوز دسترسی GitHub به رسیدگی نیاز دارد. دوباره دسترسی برنامه GitHub را تأیید کنید، سپس دوباره تلاش کنید.",
       "githubAuthInvalid": "مجوز دسترسی GitHub به رسیدگی نیاز دارد. دوباره دسترسی برنامه GitHub را تأیید کنید، سپس دوباره تلاش کنید.",
       "findingUnavailable": "یافته دیگر در دسترس نیست. یافته‌ها را تازه‌سازی کنید و اگر همچنان باز است، دوباره تلاش کنید.",
       "repositoryUnavailable": "برنامه GitHub دیگر به این مخزن دسترسی ندارد. دسترسی به مخزن را تازه‌سازی کنید، سپس دوباره تلاش کنید.",
@@ -1965,10 +1922,8 @@
       "title": "نشست",
       "copyErrorDetails": "کپی جزئیات خطا",
       "backToSessions": "بازگشت به نشست‌ها",
-      "accessDeniedDescription": "اجازه مشاهده این مورد را ندارید.",
       "couldNotLoad": "بارگذاری نشست ممکن نشد.",
       "failedToLoadDetails": "بارگذاری جزئیات نشست ممکن نشد.",
-      "notFoundDescription": "این مورد ممکن است حذف شده باشد یا دیگر در دسترس نباشد.",
       "failedToStopExecution": "توقف اجرا ممکن نشد.",
       "renameSession": "تغییر نام نشست",
       "renamePlaceholder": "نام نشست",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "از حساب خود در این دستگاه خارج می‌شوید؟",
     "signOutThisSessionTitle": "از این نشست خارج می‌شوید؟",
     "signOutThisSessionMessage": "دستگاه {{device}} از حساب خارج می‌شود، اما ممکن است تا یک ساعت به API دسترسی داشته باشد.",
-    "signOutMessage": "برای دسترسی به فضای کاری خود باید دوباره وارد شوید.",
     "webBrowser": "مرورگر وب"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "تعدیل حسابداری",
         "credits_expired": "اعتبار منقضی‌شده"
       },
-      "loadMoreFailed": "بارگذاری موارد بیشتر ناموفق بود.",
       "truncated": "سوابق قبلی گردش اعتبار در دسترس است."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "فاکتورهای قدیمی‌تر در دسترس هستند."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ایمیل، مثلاً name@company.com",
       "enableA11y": "فعال‌سازی هشدار موجودی کم",
       "notifyEmailsLabel": "ایمیل‌های دریافت‌کنندهٔ هشدار",
       "permissionDenied": "شما اجازه مدیریت هشدارهای صورتحساب را ندارید.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "برای شروع همکاری در این سازمان، هم‌تیمی‌ها را دعوت کنید.",
       "emptyDescriptionCannotInvite": "از یک مالک یا مدیر صورتحساب بخواهید هم‌تیمی‌ها را دعوت کند.",
       "emptyTitle": "هنوز عضوی نیست",
-      "inviteMember": "دعوت از عضو",
       "invitedDate": "دعوت‌شده در {{date}}",
       "limitPerDay": "{{amount}}/روز",
       "manageA11y": "مدیریت {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "وضعیت بارگذاری نشد",
       "creditProcessingDelayed": "پردازش اعتبار به تأخیر افتاده · تلاش دوباره به‌صورت خودکار",
       "ended": "پایان‌یافته",
-      "manageHint": "مدیریت Kilo Pass را در وب باز می‌کند.",
       "notSubscribed": "بدون اشتراک",
       "overallocated": "تعداد Kilo Passهای تخصیص‌یافته بیشتر از مجوزهای کاربری خریداری‌شده است",
       "paidSeat_one": "{{displayCount}} مجوز کاربری خریداری‌شده",

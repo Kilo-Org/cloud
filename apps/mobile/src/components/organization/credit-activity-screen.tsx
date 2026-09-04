@@ -234,7 +234,7 @@ export function OrganizationCreditActivityScreen() {
         {isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('organization.creditActivity.loadMoreFailed')}
+              {t('organization.invoices.loadMoreFailed')}
             </Text>
             <Button
               variant="outline"

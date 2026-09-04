@@ -374,7 +374,6 @@
         "closed": "Ši pakeitimų užklausa uždaryta"
       },
       "partialSuccessBanner": {
-        "title": "Sujungta",
         "body": "Nepavyko ištrinti šakos: {{reason}}.",
         "accessibility": "Sujungta. Nepavyko ištrinti šakos: {{reason}}"
       },
@@ -445,7 +444,6 @@
       "acceptTerms": "Sutikti",
       "replyBadRequest": "Šio atsakymo negalima paskelbti. Gija galėjo pasikeisti.",
       "replyForbidden": "Neturi teisės atsakyti šios pakeitimų užklausos diskusijoje.",
-      "couldNotReply": "Nepavyko atsakyti.",
       "moderation": {
         "reportContent": {
           "terminal": "Apie šį komentarą negalima pranešti.",
@@ -502,8 +500,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Nepavyko atidaryti GitHub programos nustatymų.",
     "installKiloGitHubApp": "Įdiegti Kilo GitHub programėlę",
-    "connectionExpiredTitle": "Baigėsi GitHub prieigos galiojimas.",
-    "connectionExpiredDescription": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
     "checkConnection": "Patikrinti ryšį",
     "couldNotLoadPullRequest": "Nepavyko įkelti pakeitimų užklausos.",
     "description": "Aprašymas",
@@ -580,7 +576,6 @@
       "shareA11y": "Bendrinti pakeitimų užklausą"
     },
     "submit": {
-      "title": "Pateikti peržiūros išvadas",
       "loadFailedTitle": "Nepavyko įkelti peržiūros pateikimo formos.",
       "deletePendingTitle": "Ištrinti nepateiktą komentarą?",
       "deletePendingMessage": "Šis komentaras bus pašalintas iš peržiūros eilės.",
@@ -598,8 +593,7 @@
     },
     "reconnectNotice": {
       "title": "Baigėsi GitHub prieigos galiojimas.",
-      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
-      "checkConnection": "Patikrinti ryšį"
+      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
     },
     "eventChips": {
       "comment": "Komentuoti",
@@ -627,8 +621,6 @@
     "pendingComment": {
       "editOutdatedA11y": "Redaguoti pasenusį nepateiktą komentarą: {{location}}",
       "editA11y": "Redaguoti nepateiktą komentarą: {{location}}",
-      "emptyBody": "(tuščia)",
-      "outdated": "Pasenę",
       "staleHint": "nuo tada, kai parašei šį komentarą, PR pasikeitė.",
       "deleteA11y": "Ištrinti nepateiktą komentarą: {{location}}",
       "deletedAnnouncement": "Nepateiktas komentaras ištrintas",
@@ -717,7 +709,6 @@
       "security": "Saugos problemos"
     },
     "category": {
-      "chatMessagesTitle": "Pokalbių žinutės",
       "chatMessagesSubtitle": "atsakymai jūsų pokalbiuose",
       "agentAttentionTitle": "Agentui reikia jūsų atsakymo",
       "agentAttentionSubtitle": "klausimai, leidimų ir informacijos prašymai",
@@ -725,11 +716,8 @@
       "agentUpdatesSubtitle": "agento žinutės užduoties metu",
       "sessionStatusTitle": "Sesijos būsena",
       "sessionStatusSubtitle": "baigta / nepavyko / paruošta valdyti",
-      "kiloclawActivityTitle": "KiloClaw veikla",
       "kiloclawActivitySubtitle": "egzemplioriaus parengtis ar klaida, suplanuoti veiksmai",
-      "balanceAlertsTitle": "Įspėjimai apie likutį",
       "balanceAlertsSubtitle": "įspėjimai apie mažą organizacijos likutį",
-      "securityFindingsTitle": "Saugos problemos",
       "securityFindingsSubtitle": "nauji radiniai ir SLA priminimai"
     }
   },
@@ -1205,8 +1193,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "DI modelio pasirinkimas",
       "secretsDescription": "Užšifruoti prisijungimo duomenys",
-      "versionPinDescription": "Užfiksuoti konkrečią versiją",
-      "versionPinLabel": "Versijos fiksavimas"
+      "versionPinDescription": "Užfiksuoti konkrečią versiją"
     },
     "avatar": {
       "arcade": "Žaidimų automatas",
@@ -1458,7 +1445,6 @@
       "severityHigh": "Aukštas",
       "severityMedium": "Vidutinis",
       "severityLow": "Žemas",
-      "outcomeNotExploitable": "Negalima išnaudoti",
       "outcomeTriageComplete": "Pirminis vertinimas baigtas",
       "sortSeverityDesc": "Pavojingumas: nuo didžiausio iki mažiausio",
       "sortSeverityAsc": "Pavojingumas: nuo mažiausio iki didžiausio",
@@ -1565,15 +1551,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Atviri radiniai",
-      "openFindingsDetail": "Kritinio lygio: {{critical}}, aukšto lygio: {{high}}",
-      "confirmedExploitable": "Patvirtinta, kad galima išnaudoti",
       "confirmedExploitableDetail": "Analizė patvirtino projekto riziką",
-      "needsReview": "Laukia tavo peržiūros",
       "needsReviewDetail": "Reikalingas žmogaus sprendimas",
-      "analysisIncomplete": "Analizė neužbaigta",
       "analysisIncompleteDetail": "Projekto rizika dar nežinoma",
       "slaCompliance": "SLA laikymasis",
-      "notMeasured": "Neišmatuota",
       "withinDeadlineDetail": "Terminas nepasibaigęs: {{within}} iš {{total}}",
       "noDeadlineData": "Dar nė vienam radiniui nenustatytas SLA terminas",
       "deadlinePassed": "Terminas pasibaigęs",
@@ -1621,7 +1602,6 @@
       "source": "Šaltinis",
       "sourceId": "Šaltinio ID",
       "viewAdvisory": "Peržiūrėti saugos pranešimą GitHub platformoje",
-      "statusSuperseded": "Pakeista naujesne",
       "statusOpen": "Atidaryta",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "Taisymas jau pradėtas",
@@ -1632,7 +1612,6 @@
       "reasonAfterReview": "po peržiūros"
     },
     "settingsOverview": {
-      "title": "Nustatymai",
       "couldNotLoadSettings": "Nepavyko įkelti saugos agento nustatymų.",
       "couldNotLoadPermissions": "Nepavyko įkelti teisių.",
       "on": "Įjungta",
@@ -1640,13 +1619,10 @@
       "repositoriesCount": "Pasirinkta {{displayCount}} saugyklų",
       "repositoriesCount_other": "Pasirinkta {{displayCount}} saugyklų",
       "selectRepositoriesSubtitle": "Pasirink, kurias saugyklas stebės saugos agentas",
-      "modelsAndAnalysis": "Modeliai ir analizė",
       "analysisModeSubtitle": "Analizės režimas: {{mode}}",
-      "automation": "Automatizavimas",
       "automationAllOff": "Viskas išjungta",
       "automationCount": "Įjungta {{displayCount}} iš 3",
       "notificationsCount": "Įjungta {{displayCount}} iš 2",
-      "slaPolicy": "SLA politika",
       "disabledNoManage": "Saugos agentas išjungtas. Jį įjungti gali tik organizacijos savininkai ir atsiskaitymų administratoriai.",
       "disabledNoRepo": "Prieš įjungdamas saugos agentą, pasirink bent vieną saugyklą.",
       "disabledPrompt": "Įjunk saugos agentą, kad galėtum sinchronizuoti Dependabot įspėjimus, pasirinkti saugyklas ir nustatyti automatizavimą.",
@@ -1657,8 +1633,6 @@
       "cancellationRequested": "Paprašyta atšaukti",
       "cancelled": "Taisymas atšauktas",
       "couldNotLoad": "Nepavyko įkelti taisymo būsenos.",
-      "noAnalysisTitle": "Analizės dar nėra",
-      "noAnalysisDescription": "Pradėk analizę skirtuke „Informacija“.",
       "start": "Pradėti taisymą",
       "retry": "Pakartoti taisymą",
       "cancelTitle": "Atšaukti šį taisymą?",
@@ -1674,10 +1648,8 @@
       "retryQueued": "Pakartotinis taisymas įtrauktas į eilę",
       "timeline": {
         "queued": "Pateikta taisymo užklausa",
-        "prOpened": "PR atidarytas",
         "failed": "Taisymas nepavyko",
-        "blocked": "Taisymas užblokuotas",
-        "noChangesNeeded": "Pakeitimų nereikia"
+        "blocked": "Taisymas užblokuotas"
       },
       "unavailable": "Šiai problemai taisymo funkcija neprieinama."
     },
@@ -1685,9 +1657,6 @@
       "title": "Modeliai ir analizė",
       "couldNotLoad": "Nepavyko įkelti analizės nustatymų.",
       "depth": "Analizės išsamumas",
-      "modeAuto": "Automatinė",
-      "modeShallow": "Paviršinė",
-      "modeDeep": "Išsami",
       "triageModel": "Pirminio vertinimo modelis",
       "analysisModel": "Analizės modelis",
       "remediationModel": "Taisymo modelis"
@@ -1713,10 +1682,7 @@
     "findingDetail": {
       "title": "Radinys",
       "tabAnalysis": "Analizė",
-      "tabRemediation": "Taisymas",
-      "notFound": "Problema nerasta",
-      "notFoundDescription": "Šis radinys galėjo būti pašalintas arba nebeturi prieigos prie jo.",
-      "couldNotLoad": "Nepavyko įkelti šios problemos."
+      "tabRemediation": "Taisymas"
     },
     "findingList": {
       "couldNotLoad": "Nepavyko įkelti radinių.",
@@ -1731,9 +1697,7 @@
       "nextRemediationInProgress": "Taisymas vykdomas",
       "nextRetryRemediation": "Galima pakartoti taisymą",
       "nextRemediationAvailable": "Galima taisyti",
-      "retryAnalysis": "Kartoti analizę",
       "runAnalysis": "Vykdyti analizę",
-      "nextNeedsManualReview": "Reikia žmogaus peržiūros",
       "nextViewDetails": "Peržiūrėti informaciją",
       "viewPr": "Peržiūrėti PR",
       "analyze": "Analizuoti",
@@ -1775,7 +1739,6 @@
       "newFindingSubtitle": "Pranešimai siunčiami kaskart sinchronizavus naują radinį, taip pat ir per pirmąjį sinchronizavimą.",
       "slaLeadTimeAccessibility": "Dienų skaičius iki SLA termino, kai siunčiamas įspėjimas",
       "slaLeadTimeError": "Įvesk sveikąjį dienų skaičių nuo 1 iki 365.",
-      "slaLeadTimeHint": "Įvesk sveikąjį skaičių nuo 1 iki 365",
       "slaLeadTimeLabel": "Įspėti prieš SLA terminą (dienomis)",
       "slaPersonalTitle": "Siųsti man SLA įspėjimus el. paštu",
       "slaSection": "SLA įspėjimai",
@@ -1820,7 +1783,6 @@
     },
     "analysisState": {
       "queued": "Analizė eilėje",
-      "queuedTitle": "Analizė eilėje",
       "queuedDescription": "Laukiama, kol bus galima pradėti dar vieną analizę.",
       "analyzing": "Analizuojama",
       "analyzingDescription": "Tikrinama, ar programos kodas gali pasiekti pažeidžiamą funkciją.",
@@ -1829,7 +1791,6 @@
       "extractionFailedDescription": "Techninės ataskaitos nepavyko paversti struktūrizuotu rezultatu.",
       "exploitableDescription": "Programos kodas gali pasiekti pažeidžiamą funkciją.",
       "notExploitable": "Nepasiekiama",
-      "notExploitableTitle": "Nepasiekiama",
       "notExploitableDescription": "Šioje saugykloje nerasta vykdymo kelio, kuriuo būtų galima pasiekti pažeidžiamą funkciją.",
       "unknown": "Reikia peržiūrėti",
       "unknownDescription": "Analizės metu nepavyko patvirtinti, ar pažeidžiama funkcija pasiekiama.",
@@ -1869,7 +1830,6 @@
       "dueInDays": "Terminas po {{count}} dienų"
     },
     "remediationStatus": {
-      "cancellationRequested": "Paprašyta atšaukti",
       "notStarted": "Nepradėta",
       "starting": "Pradedama",
       "inProgress": "Vykdoma",
@@ -1888,7 +1848,6 @@
       "findingNotOpen": "Radinys nebėra atviras.",
       "repoNotInScope": "Ši saugykla nepasirinkta saugos agento stebėjimui.",
       "analysisRequired": "Prieš taisymą paleisk kodo analizę.",
-      "sandboxAnalysisRequired": "Prieš taisymą paleisk kodo analizę.",
       "staleAnalysis": "Po analizės radinys pasikeitė. Prieš pradėdamas taisymą, pakartok analizę.",
       "notExploitable": "Analizės metu nerasta vykdymo kelio, kuriuo būtų galima pasiekti pažeidžiamą funkciją. Automatinis taisymas negalimas.",
       "exploitabilityUnknown": "Analizės metu nepavyko patvirtinti, ar pažeidžiamumą galima išnaudoti. Prieš taisant vienu paspaudimu, radinį turi peržiūrėti žmogus.",
@@ -1904,12 +1863,10 @@
       "autoRemediationDisabled": "Automatinis taisymas išjungtas. Jei saugos patikros sėkmingos, taisymą vis tiek galima pradėti rankiniu būdu.",
       "includeExistingDisabled": "Esami radiniai neįtraukiami į automatinį taisymą.",
       "belowThreshold": "Radinio pavojingumas nesiekia automatiniam taisymui nustatytos ribos. Jei saugos patikros sėkmingos, taisymą vis tiek galima pradėti rankiniu būdu.",
-      "beforeEnablement": "Analizė baigta prieš įjungiant automatinį taisymą. Jei saugos patikros sėkmingos, taisymą vis tiek galima pradėti rankiniu būdu.",
-      "generic": "Šiai problemai taisymo funkcija neprieinama."
+      "beforeEnablement": "Analizė baigta prieš įjungiant automatinį taisymą. Jei saugos patikros sėkmingos, taisymą vis tiek galima pradėti rankiniu būdu."
     },
     "commandFailure": {
       "ownerCapReached": "Pasiektas vienu metu vykdomų analizių limitas. Palauk, kol baigsis viena iš vykdomų analizių, tada bandyk dar kartą.",
-      "githubTokenUnavailable": "Reikia atnaujinti GitHub prieigos teises. Iš naujo suteik teises GitHub programėlei, tada bandyk dar kartą.",
       "githubAuthInvalid": "Reikia atnaujinti GitHub prieigos teises. Iš naujo suteik teises GitHub programėlei, tada bandyk dar kartą.",
       "findingUnavailable": "Radinys nebepasiekiamas. Atnaujink radinių sąrašą ir, jei radinys vis dar atviras, bandyk dar kartą.",
       "repositoryUnavailable": "GitHub programėlė nebeturi prieigos prie saugyklos. Atnaujink prieigos teises, tada bandyk dar kartą.",
@@ -1997,10 +1954,8 @@
       "title": "Sesija",
       "copyErrorDetails": "Kopijuoti klaidos informaciją",
       "backToSessions": "Grįžti į sesijas",
-      "accessDeniedDescription": "Neturi teisės peržiūrėti šio turinio.",
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
-      "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
       "renameSession": "Pervadinti sesiją",
       "renamePlaceholder": "Sesijos pavadinimas",
@@ -2558,7 +2513,6 @@
     "signOutThisDeviceTitle": "Atsijungti šiame įrenginyje?",
     "signOutThisSessionTitle": "Baigti šią sesiją?",
     "signOutThisSessionMessage": "Įrenginys „{{device}}“ bus atjungtas nuo paskyros. Jo prieiga prie API gali galioti dar iki valandos.",
-    "signOutMessage": "Kad galėtum pasiekti savo darbo sritį, turėsi prisijungti iš naujo.",
     "webBrowser": "Žiniatinklio naršyklė"
   },
   "forceUpdate": {
@@ -2827,7 +2781,6 @@
         "accounting_adjustment": "Apskaitos koregavimas",
         "credits_expired": "Kreditų galiojimas baigėsi"
       },
-      "loadMoreFailed": "Nepavyko įkelti daugiau.",
       "truncated": "Galite peržiūrėti ankstesnes kreditų operacijas."
     },
     "inviteMember": {
@@ -2856,7 +2809,6 @@
       "truncated": "Galite peržiūrėti ankstesnes sąskaitas."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "vardas@company.com",
       "enableA11y": "Įjungti pranešimą apie mažą likutį",
       "notifyEmailsLabel": "Gavėjų el. pašto adresai",
       "permissionDenied": "Neturite leidimo valdyti atsiskaitymo pranešimų.",
@@ -2881,7 +2833,6 @@
       "emptyDescriptionCanInvite": "Pakvieskite kolegas bendradarbiauti šioje organizacijoje.",
       "emptyDescriptionCannotInvite": "Paprašykite savininko arba atsiskaitymų administratoriaus pakviesti kolegas.",
       "emptyTitle": "Dar nėra narių",
-      "inviteMember": "Pakviesti narį",
       "invitedDate": "Kvietimas išsiųstas {{date}}",
       "limitPerDay": "{{amount}}/dieną",
       "manageA11y": "Tvarkyti nario nustatymus: {{name}}",
@@ -2924,7 +2875,6 @@
       "couldNotLoadStatus": "Nepavyko įkelti būsenos",
       "creditProcessingDelayed": "Kreditų apdorojimas vėluoja · automatiškai bandoma dar kartą",
       "ended": "Baigėsi",
-      "manageHint": "Atidaro Kilo Pass valdymo puslapį naršyklėje.",
       "notSubscribed": "Neprenumeruojama",
       "overallocated": "Priskirta daugiau Kilo Pass prenumeratų, nei yra apmokėtų vietų",
       "paidSeat_one": "{{displayCount}} apmokėta vieta",

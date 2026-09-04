@@ -370,7 +370,6 @@
         "closed": "এই পুল রিকোয়েস্ট বন্ধ"
       },
       "partialSuccessBanner": {
-        "title": "মার্জ হয়েছে",
         "body": "ব্রাঞ্চ মুছে ফেলা যায়নি: {{reason}}।",
         "accessibility": "মার্জ হয়েছে। ব্রাঞ্চ মুছে ফেলা যায়নি: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "গ্রহণ করুন",
       "replyBadRequest": "এই উত্তরটি পোস্ট করা যাচ্ছে না। থ্রেডটি বদলে গিয়ে থাকতে পারে।",
       "replyForbidden": "এই পুল রিকোয়েস্টে উত্তর দেওয়ার অনুমতি আপনার নেই।",
-      "couldNotReply": "উত্তর দেওয়া যায়নি।",
       "moderation": {
         "reportContent": {
           "terminal": "এই মন্তব্যটি রিপোর্ট করা যাবে না।",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub অ্যাপের সেটিংস খোলা যায়নি।",
     "installKiloGitHubApp": "Kilo GitHub অ্যাপ ইনস্টল করুন",
-    "connectionExpiredTitle": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
-    "connectionExpiredDescription": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
     "checkConnection": "সংযোগ পরীক্ষা করুন",
     "couldNotLoadPullRequest": "পুল রিকোয়েস্ট লোড করা যায়নি।",
     "description": "বিবরণ",
@@ -572,7 +568,6 @@
       "shareA11y": "পুল রিকোয়েস্ট শেয়ার করুন"
     },
     "submit": {
-      "title": "পর্যালোচনা জমা দিন",
       "loadFailedTitle": "রিভিউ জমা দেওয়ার স্ক্রিন লোড করা যায়নি।",
       "deletePendingTitle": "অপেক্ষমাণ মন্তব্য মুছবেন?",
       "deletePendingMessage": "এই মন্তব্যটি রিভিউয়ের অপেক্ষমাণ তালিকা থেকে সরানো হবে।",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
-      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
-      "checkConnection": "সংযোগ পরীক্ষা করুন"
+      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।"
     },
     "eventChips": {
       "comment": "মন্তব্য",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-এ পুরোনো সংস্করণের অপেক্ষমাণ মন্তব্য সম্পাদনা করুন",
       "editA11y": "{{location}}-এ অপেক্ষমাণ মন্তব্য সম্পাদনা করুন",
-      "emptyBody": "(খালি)",
-      "outdated": "পুরোনো",
       "staleHint": "আপনি এটি লেখার পর PR আপডেট হয়েছে।",
       "deleteA11y": "{{location}}-এ অপেক্ষমাণ মন্তব্য মুছুন",
       "deletedAnnouncement": "অপেক্ষমাণ মন্তব্য মুছে ফেলা হয়েছে",
@@ -703,7 +695,6 @@
       "security": "শনাক্ত নিরাপত্তা সমস্যা"
     },
     "category": {
-      "chatMessagesTitle": "চ্যাটের বার্তা",
       "chatMessagesSubtitle": "আপনার কথোপকথনে উত্তর",
       "agentAttentionTitle": "আপনার সাড়া প্রয়োজন",
       "agentAttentionSubtitle": "প্রশ্নের উত্তর, অনুমতি বা তথ্য চাওয়া হলে",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "কাজ চলাকালীন এজেন্টের বার্তা",
       "sessionStatusTitle": "সেশনের অবস্থা",
       "sessionStatusSubtitle": "সমাপ্ত / ব্যর্থ / নিয়ন্ত্রণের জন্য প্রস্তুত",
-      "kiloclawActivityTitle": "KiloClaw-এর কার্যকলাপ",
       "kiloclawActivitySubtitle": "ইনস্ট্যান্স প্রস্তুত বা ব্যর্থ, নির্ধারিত কাজ",
-      "balanceAlertsTitle": "ব্যালেন্সের সতর্কতা",
       "balanceAlertsSubtitle": "সংস্থার ব্যালেন্স কমে যাওয়ার সতর্কতা",
-      "securityFindingsTitle": "শনাক্ত নিরাপত্তা সমস্যা",
       "securityFindingsSubtitle": "নতুন নিরাপত্তা সমস্যা ও SLA মনে করিয়ে দেওয়ার বিজ্ঞপ্তি"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "AI মডেল নির্বাচন",
       "secretsDescription": "এনক্রিপ্ট করা ক্রেডেনশিয়াল",
-      "versionPinDescription": "একটি নির্দিষ্ট সংস্করণে পিন করুন",
-      "versionPinLabel": "সংস্করণ নির্দিষ্ট রাখা"
+      "versionPinDescription": "একটি নির্দিষ্ট সংস্করণে পিন করুন"
     },
     "avatar": {
       "arcade": "আর্কেড",
@@ -1440,7 +1427,6 @@
       "severityHigh": "উচ্চ",
       "severityMedium": "মাঝারি",
       "severityLow": "নিম্ন",
-      "outcomeNotExploitable": "আক্রমণে ব্যবহারযোগ্য নয়",
       "outcomeTriageComplete": "প্রাথমিক যাচাই সম্পন্ন",
       "sortSeverityDesc": "তীব্রতা: বেশি থেকে কম",
       "sortSeverityAsc": "তীব্রতা: কম থেকে বেশি",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "অমীমাংসিত ত্রুটি",
-      "openFindingsDetail": "{{critical}}টি অতি গুরুতর, {{high}}টি উচ্চ",
-      "confirmedExploitable": "আক্রমণে ব্যবহারযোগ্য বলে নিশ্চিত",
       "confirmedExploitableDetail": "বিশ্লেষণে প্রকল্পের ঝুঁকি নিশ্চিত হয়েছে",
-      "needsReview": "আপনার পর্যালোচনা প্রয়োজন",
       "needsReviewDetail": "মানুষের সিদ্ধান্ত প্রয়োজন",
-      "analysisIncomplete": "বিশ্লেষণ অসম্পূর্ণ",
       "analysisIncompleteDetail": "প্রকল্পের ঝুঁকি এখনো অজানা",
       "slaCompliance": "SLA পালন",
-      "notMeasured": "পরিমাপ করা হয়নি",
       "withinDeadlineDetail": "মোট {{total}}টির মধ্যে {{within}}টি সময়সীমার মধ্যে",
       "noDeadlineData": "এখনো কোনো ত্রুটির SLA সময়সীমা নির্ধারিত নেই",
       "deadlinePassed": "সময়সীমা পেরিয়ে গেছে",
@@ -1601,7 +1582,6 @@
       "source": "উৎস",
       "sourceId": "উৎসের আইডি",
       "viewAdvisory": "GitHub-এ নিরাপত্তা বিজ্ঞপ্তি দেখুন",
-      "statusSuperseded": "প্রতিস্থাপিত",
       "statusOpen": "খোলা",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "সমাধানের কাজ শুরু হয়েছে",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "পর্যালোচনার পরে"
     },
     "settingsOverview": {
-      "title": "সেটিংস",
       "couldNotLoadSettings": "সিকিউরিটি এজেন্টের সেটিংস লোড করা যায়নি।",
       "couldNotLoadPermissions": "অনুমতির তথ্য লোড করা যায়নি।",
       "on": "চালু",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "repositoriesCount_other": "{{displayCount}}টি রিপোজিটরি নির্বাচিত",
       "selectRepositoriesSubtitle": "সিকিউরিটি এজেন্ট কোন রিপোজিটরিগুলো পর্যবেক্ষণ করবে তা বেছে নিন",
-      "modelsAndAnalysis": "মডেল ও বিশ্লেষণ",
       "analysisModeSubtitle": "{{mode}} বিশ্লেষণ",
-      "automation": "অটোমেশন",
       "automationAllOff": "সব বন্ধ",
       "automationCount": "৩টির মধ্যে {{displayCount}}টি চালু",
       "notificationsCount": "২টির মধ্যে {{displayCount}}টি চালু",
-      "slaPolicy": "SLA নীতি",
       "disabledNoManage": "সিকিউরিটি এজেন্ট বন্ধ আছে। শুধুমাত্র সংস্থার মালিক এবং বিলিং ম্যানেজাররা এটি চালু করতে পারেন।",
       "disabledNoRepo": "সিকিউরিটি এজেন্ট চালু করার আগে অন্তত একটি রিপোজিটরি নির্বাচন করুন।",
       "disabledPrompt": "Dependabot-এর সতর্কতা সিঙ্ক করতে, রিপোজিটরি বেছে নিতে এবং অটোমেশন কনফিগার করতে সিকিউরিটি এজেন্ট চালু করুন।"
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "বাতিলের অনুরোধ করা হয়েছে",
       "cancelled": "সমাধানের কাজ বাতিল করা হয়েছে।",
       "couldNotLoad": "সমাধানের অবস্থা লোড করা যায়নি।",
-      "noAnalysisTitle": "এখনো বিশ্লেষণ করা হয়নি",
-      "noAnalysisDescription": "বিস্তারিত ট্যাব থেকে বিশ্লেষণ চালান।",
       "start": "সমাধান শুরু করুন",
       "retry": "আবার সমাধানের চেষ্টা করুন",
       "cancelTitle": "এই সমাধানের কাজ বাতিল করবেন?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "আবার সমাধানের চেষ্টা সারিতে যোগ করা হয়েছে।",
       "timeline": {
         "queued": "সমাধানের অনুরোধ করা হয়েছে",
-        "prOpened": "PR খোলা হয়েছে",
         "failed": "সমাধান ব্যর্থ হয়েছে",
-        "blocked": "সমাধানের কাজ আটকে আছে",
-        "noChangesNeeded": "কোনো পরিবর্তনের প্রয়োজন নেই"
+        "blocked": "সমাধানের কাজ আটকে আছে"
       },
       "unavailable": "শনাক্ত এই সমস্যার সমাধান করা যাচ্ছে না।"
     },
@@ -1663,9 +1635,6 @@
       "title": "মডেল ও বিশ্লেষণ",
       "couldNotLoad": "বিশ্লেষণের সেটিংস লোড করা যায়নি।",
       "depth": "বিশ্লেষণের গভীরতা",
-      "modeAuto": "স্বয়ংক্রিয়",
-      "modeShallow": "অগভীর",
-      "modeDeep": "গভীর",
       "triageModel": "প্রাথমিক যাচাইয়ের মডেল",
       "analysisModel": "বিশ্লেষণের মডেল",
       "remediationModel": "সমাধানের মডেল"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "ত্রুটি",
       "tabAnalysis": "বিশ্লেষণ",
-      "tabRemediation": "সমাধান",
-      "notFound": "শনাক্ত সমস্যাটি পাওয়া যায়নি",
-      "notFoundDescription": "এই ত্রুটিটি সরিয়ে ফেলা হয়েছে, অথবা এটি দেখার অনুমতি আপনার আর নেই।",
-      "couldNotLoad": "শনাক্ত সমস্যাটি লোড করা যায়নি।"
+      "tabRemediation": "সমাধান"
     },
     "findingList": {
       "couldNotLoad": "ত্রুটিগুলো লোড করা যায়নি।",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "সমাধান চলছে",
       "nextRetryRemediation": "আবার সমাধানের চেষ্টা করা যাবে",
       "nextRemediationAvailable": "সমাধান করা যাবে",
-      "retryAnalysis": "আবার বিশ্লেষণ করুন",
       "runAnalysis": "বিশ্লেষণ চালান",
-      "nextNeedsManualReview": "মানুষের পর্যালোচনা প্রয়োজন",
       "nextViewDetails": "বিস্তারিত দেখুন",
       "viewPr": "PR দেখুন",
       "analyze": "বিশ্লেষণ করুন",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "নতুন কোনো ত্রুটি সিঙ্ক হলেই পাঠানো হয়, প্রথমবার সিঙ্ক করার সময়ও।",
       "slaLeadTimeAccessibility": "SLA সময়সীমার কত দিন আগে সতর্কতা পাঠানো হবে",
       "slaLeadTimeError": "দিনের সংখ্যা হিসেবে ১ থেকে ৩৬৫-এর মধ্যে একটি পূর্ণসংখ্যা লিখুন।",
-      "slaLeadTimeHint": "১ থেকে ৩৬৫-এর মধ্যে একটি পূর্ণসংখ্যা লিখুন",
       "slaLeadTimeLabel": "SLA সতর্কতা কত দিন আগে পাঠানো হবে",
       "slaPersonalTitle": "SLA সতর্কতা সম্পর্কে আমাকে ইমেইল করুন",
       "slaSection": "SLA সতর্কতার বিজ্ঞপ্তি",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "বিশ্লেষণ সারিতে আছে",
-      "queuedTitle": "বিশ্লেষণ সারিতে আছে",
       "queuedDescription": "আরও বিশ্লেষণ চালানোর সুযোগের জন্য অপেক্ষা করা হচ্ছে।",
       "analyzing": "বিশ্লেষণ চলছে",
       "analyzingDescription": "অ্যাপ্লিকেশনের কোড থেকে ত্রুটিযুক্ত ফিচারটি ব্যবহার করা যায় কি না, তা পরীক্ষা করা হচ্ছে।",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "প্রযুক্তিগত রিপোর্টটিকে কাঠামোগত ফলাফলে রূপান্তর করা যায়নি।",
       "exploitableDescription": "অ্যাপ্লিকেশনের কোড থেকে ত্রুটিযুক্ত ফিচারটি ব্যবহার করা যায়।",
       "notExploitable": "কোডে পৌঁছানোর পথ নেই",
-      "notExploitableTitle": "কোডে পৌঁছানোর পথ নেই",
       "notExploitableDescription": "এই রিপোজিটরিতে ত্রুটিযুক্ত ফিচারটি ব্যবহারের কোনো কোডপথ পাওয়া যায়নি।",
       "unknown": "পর্যালোচনা প্রয়োজন",
       "unknownDescription": "নিরাপত্তা দুর্বলতাযুক্ত ফিচারটি কোড থেকে ব্যবহার করা যায় কি না, তা বিশ্লেষণে নিশ্চিত হওয়া যায়নি।",
@@ -1843,7 +1804,6 @@
       "dueInDays": "সময়সীমা শেষ হতে {{count}} দিন বাকি"
     },
     "remediationStatus": {
-      "cancellationRequested": "বাতিলের অনুরোধ করা হয়েছে",
       "notStarted": "শুরু হয়নি",
       "starting": "শুরু হচ্ছে",
       "inProgress": "চলমান",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "ত্রুটিটি আর অমীমাংসিত অবস্থায় নেই।",
       "repoNotInScope": "সিকিউরিটি এজেন্টের জন্য রিপোজিটরিটি নির্বাচিত নয়।",
       "analysisRequired": "সমাধান শুরু করার আগে কোডবেস বিশ্লেষণ চালান।",
-      "sandboxAnalysisRequired": "সমাধান শুরু করার আগে কোডবেস বিশ্লেষণ চালান।",
       "staleAnalysis": "বিশ্লেষণের পরে ত্রুটিটি বদলেছে। সমাধান শুরু করার আগে আবার বিশ্লেষণ চালান।",
       "notExploitable": "নিরাপত্তা দুর্বলতাযুক্ত অংশটি ব্যবহারের কোনো কোডপথ বিশ্লেষণে পাওয়া যায়নি। স্বয়ংক্রিয় সমাধান করা যাবে না।",
       "exploitabilityUnknown": "ত্রুটিটি আক্রমণে কাজে লাগানো যায় কি না, তা বিশ্লেষণে নিশ্চিত হওয়া যায়নি। এক ক্লিকে সমাধানের আগে মানুষের পর্যালোচনা প্রয়োজন।",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "স্বয়ংক্রিয় সমাধান বন্ধ আছে। নিরাপত্তার শর্তগুলো পূরণ হলে নিজে সমাধান শুরু করতে পারবেন।",
       "includeExistingDisabled": "আগের ত্রুটিগুলো স্বয়ংক্রিয় সমাধান থেকে বাদ দেওয়া হয়েছে।",
       "belowThreshold": "ত্রুটির তীব্রতা স্বয়ংক্রিয় সমাধানের ন্যূনতম মাত্রার নিচে। নিরাপত্তার শর্তগুলো পূরণ হলে নিজে সমাধান শুরু করতে পারবেন।",
-      "beforeEnablement": "স্বয়ংক্রিয় সমাধান চালু করার আগেই বিশ্লেষণ সম্পন্ন হয়েছে। নিরাপত্তার শর্তগুলো পূরণ হলে নিজে সমাধান শুরু করতে পারবেন।",
-      "generic": "শনাক্ত এই সমস্যার সমাধান করা যাচ্ছে না।"
+      "beforeEnablement": "স্বয়ংক্রিয় সমাধান চালু করার আগেই বিশ্লেষণ সম্পন্ন হয়েছে। নিরাপত্তার শর্তগুলো পূরণ হলে নিজে সমাধান শুরু করতে পারবেন।"
     },
     "commandFailure": {
       "ownerCapReached": "একসঙ্গে যতগুলো বিশ্লেষণ চালানো যায়, সবগুলোই চলছে। একটি শেষ হওয়া পর্যন্ত অপেক্ষা করে আবার চেষ্টা করুন।",
-      "githubTokenUnavailable": "GitHub-এর অনুমোদনে সমস্যা আছে। GitHub অ্যাপটি পুনরায় অনুমোদন দিয়ে আবার চেষ্টা করুন।",
       "githubAuthInvalid": "GitHub-এর অনুমোদনে সমস্যা আছে। GitHub অ্যাপটি পুনরায় অনুমোদন দিয়ে আবার চেষ্টা করুন।",
       "findingUnavailable": "ত্রুটিটি আর পাওয়া যাচ্ছে না। ত্রুটির তালিকা রিফ্রেশ করুন। ত্রুটিটি অমীমাংসিত থাকলে আবার চেষ্টা করুন।",
       "repositoryUnavailable": "GitHub অ্যাপটি এই রিপোজিটরিতে আর অ্যাক্সেস পাচ্ছে না। রিপোজিটরির অ্যাক্সেস রিফ্রেশ করে আবার চেষ্টা করুন।",
@@ -1965,10 +1922,8 @@
       "title": "সেশন",
       "copyErrorDetails": "ত্রুটির বিস্তারিত কপি করুন",
       "backToSessions": "সেশনের তালিকায় ফিরুন",
-      "accessDeniedDescription": "এটি দেখার অনুমতি আপনার নেই।",
       "couldNotLoad": "সেশন লোড করা যায়নি।",
       "failedToLoadDetails": "সেশনের বিস্তারিত লোড করা যায়নি।",
-      "notFoundDescription": "এই আইটেমটি হয়তো সরিয়ে ফেলা হয়েছে বা এখন আর পাওয়া যাচ্ছে না।",
       "failedToStopExecution": "কাজটি থামানো যায়নি।",
       "renameSession": "সেশনের নাম পরিবর্তন করুন",
       "renamePlaceholder": "সেশনের নাম",
@@ -2516,8 +2471,7 @@
     "sessionSignedOut": "সেশন সাইন আউট হয়েছে।",
     "signOutThisDeviceTitle": "এই ডিভাইস থেকে সাইন আউট করবেন?",
     "signOutThisSessionTitle": "এই সেশন থেকে সাইন আউট করবেন?",
-    "signOutThisSessionMessage": "{{device}} থেকে সাইন আউট করা হবে। এরপরও ডিভাইসটি সর্বোচ্চ এক ঘণ্টা API অ্যাক্সেস করতে পারবে।",
-    "signOutMessage": "আপনার ওয়ার্কস্পেসে ঢুকতে আবার সাইন ইন করতে হবে।"
+    "signOutThisSessionMessage": "{{device}} থেকে সাইন আউট করা হবে। এরপরও ডিভাইসটি সর্বোচ্চ এক ঘণ্টা API অ্যাক্সেস করতে পারবে।"
   },
   "forceUpdate": {
     "couldNotOpenStore": "অ্যাপ স্টোর খোলা যায়নি।",
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "হিসাব সমন্বয়",
         "credits_expired": "ক্রেডিটের মেয়াদ শেষ"
       },
-      "loadMoreFailed": "আরও লোড করা যায়নি।",
       "truncated": "ক্রেডিটের আরও পুরোনো লেনদেন দেখা যাবে।"
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "আরও পুরোনো ইনভয়েস দেখা যাবে।"
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ইমেইল ঠিকানা",
       "enableA11y": "ব্যালেন্স কমে গেলে সতর্কতা চালু করুন",
       "notifyEmailsLabel": "যেসব ইমেইলে সতর্কতা পাঠানো হবে",
       "permissionDenied": "বিলিং সতর্কতা পরিচালনার অনুমতি আপনার নেই।",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "এই সংস্থায় একসঙ্গে কাজ শুরু করতে দলের অন্যদের আমন্ত্রণ জানান।",
       "emptyDescriptionCannotInvite": "দলের অন্যদের আমন্ত্রণ জানাতে মালিক বা বিলিং ম্যানেজারকে বলুন।",
       "emptyTitle": "এখনো কোনো সদস্য নেই",
-      "inviteMember": "সদস্যকে আমন্ত্রণ জানান",
       "invitedDate": "আমন্ত্রণ পাঠানো হয়েছে: {{date}}",
       "limitPerDay": "{{amount}}/দিন",
       "manageA11y": "{{name}}-এর সদস্যপদ পরিচালনা করুন",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "অবস্থা লোড করা যায়নি",
       "creditProcessingDelayed": "ক্রেডিট প্রক্রিয়াকরণে দেরি হচ্ছে · স্বয়ংক্রিয়ভাবে আবার চেষ্টা করা হচ্ছে",
       "ended": "শেষ হয়েছে",
-      "manageHint": "ওয়েবে Kilo Pass পরিচালনার পৃষ্ঠা খুলবে।",
       "notSubscribed": "কোনো সাবস্ক্রিপশন নেই",
       "overallocated": "কেনা সিটের চেয়ে বেশি পাস বরাদ্দ করা হয়েছে",
       "paidSeat_one": "{{displayCount}}টি কেনা সিট",

@@ -370,7 +370,6 @@
         "closed": "ປິດຄຳຂໍລວມໂຄດນີ້ແລ້ວ"
       },
       "partialSuccessBanner": {
-        "title": "ລວມໂຄ້ດແລ້ວ",
         "body": "ບໍ່ສາມາດລຶບສາຂາໄດ້: {{reason}}.",
         "accessibility": "ລວມແລ້ວ. ບໍ່ສາມາດລຶບສາຂາໄດ້: {{reason}}"
       },
@@ -441,7 +440,6 @@
       "acceptTerms": "ຍອມຮັບ",
       "replyBadRequest": "ບໍ່ສາມາດໂພດຄຳຕອບນີ້ໄດ້. ກະທູ້ອາດມີການປ່ຽນແປງແລ້ວ.",
       "replyForbidden": "ທ່ານບໍ່ມີສິດຕອບໃນຄຳຂໍລວມໂຄດນີ້.",
-      "couldNotReply": "ບໍ່ສາມາດຕອບໄດ້.",
       "moderation": {
         "reportContent": {
           "terminal": "ບໍ່ສາມາດລາຍງານຄຳເຫັນນີ້ໄດ້.",
@@ -494,8 +492,6 @@
     },
     "couldNotOpenGitHubAppSettings": "ບໍ່ສາມາດເປີດການຕັ້ງຄ່າແອັບ GitHub ໄດ້.",
     "installKiloGitHubApp": "ຕິດຕັ້ງແອັບ Kilo ສຳລັບ GitHub",
-    "connectionExpiredTitle": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
-    "connectionExpiredDescription": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
     "checkConnection": "ກວດສອບການເຊື່ອມຕໍ່",
     "couldNotLoadPullRequest": "ບໍ່ສາມາດໂຫຼດຄຳຂໍລວມໂຄດໄດ້.",
     "description": "ຄຳອະທິບາຍ",
@@ -572,7 +568,6 @@
       "shareA11y": "ແບ່ງປັນຄຳຂໍລວມໂຄດ"
     },
     "submit": {
-      "title": "ສົ່ງຜົນການກວດສອບ",
       "loadFailedTitle": "ບໍ່ສາມາດໂຫຼດໜ້າສົ່ງຜົນການກວດທານໄດ້.",
       "deletePendingTitle": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງບໍ?",
       "deletePendingMessage": "ຄຳເຫັນນີ້ຈະຖືກລຶບອອກຈາກຄິວການກວດທານ.",
@@ -588,8 +583,7 @@
     },
     "reconnectNotice": {
       "title": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
-      "message": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
-      "checkConnection": "ກວດສອບການເຊື່ອມຕໍ່"
+      "message": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ."
     },
     "eventChips": {
       "comment": "ສະແດງຄຳເຫັນ",
@@ -613,8 +607,6 @@
     "pendingComment": {
       "editOutdatedA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍສົ່ງແລະອ້າງອີງໂຄດເກົ່າຢູ່ {{location}}",
       "editA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍສົ່ງຢູ່ {{location}}",
-      "emptyBody": "(ວ່າງເປົ່າ)",
-      "outdated": "ລ້າສະໄໝ",
       "staleHint": "PR ມີການອັບເດດຫຼັງຈາກທ່ານຂຽນຄຳເຫັນນີ້.",
       "deleteA11y": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງຢູ່ {{location}}",
       "deletedAnnouncement": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງແລ້ວ",
@@ -703,7 +695,6 @@
       "security": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ"
     },
     "category": {
-      "chatMessagesTitle": "ຂໍ້ຄວາມສົນທະນາ",
       "chatMessagesSubtitle": "ຄຳຕອບໃນການສົນທະນາຂອງທ່ານ",
       "agentAttentionTitle": "ຕົວແທນຕ້ອງການຄຳຕອບຈາກທ່ານ",
       "agentAttentionSubtitle": "ຄຳຖາມ, ຄຳຂໍອະນຸຍາດ ແລະ ຂໍ້ມູນທີ່ຕ້ອງການ",
@@ -711,11 +702,8 @@
       "agentUpdatesSubtitle": "ຂໍ້ຄວາມຈາກຕົວແທນໃນຂະນະເຮັດວຽກ",
       "sessionStatusTitle": "ສະຖານະເຊສຊັນ",
       "sessionStatusSubtitle": "ສຳເລັດ / ບໍ່ສຳເລັດ / ພ້ອມໃຫ້ຄວບຄຸມ",
-      "kiloclawActivityTitle": "ກິດຈະກຳ KiloClaw",
       "kiloclawActivitySubtitle": "ອິນສະແຕນພ້ອມໃຊ້ງານ/ຂັດຂ້ອງ, ວຽກທີ່ຕັ້ງເວລາໄວ້",
-      "balanceAlertsTitle": "ການແຈ້ງເຕືອນຍອດເງິນ",
       "balanceAlertsSubtitle": "ຄຳເຕືອນເມື່ອຍອດເງິນຂອງອົງກອນຕໍ່າ",
-      "securityFindingsTitle": "ບັນຫາດ້ານຄວາມປອດໄພທີ່ກວດພົບ",
       "securityFindingsSubtitle": "ບັນຫາທີ່ພົບໃໝ່ ແລະ ການແຈ້ງເຕືອນກ່ຽວກັບ SLA"
     }
   },
@@ -1187,8 +1175,7 @@
       "googleDescription": "Gmail, Calendar, Docs",
       "modelDescription": "ການເລືອກໂມເດວ AI",
       "secretsDescription": "ຂໍ້ມູນຢືນຢັນຕົວຕົນທີ່ເຂົ້າລະຫັດໄວ້",
-      "versionPinDescription": "ລັອກໃຫ້ໃຊ້ເວີຊັນທີ່ກຳນົດ",
-      "versionPinLabel": "ການລັອກເວີຊັນ"
+      "versionPinDescription": "ລັອກໃຫ້ໃຊ້ເວີຊັນທີ່ກຳນົດ"
     },
     "avatar": {
       "arcade": "ຕູ້ເກມ",
@@ -1440,7 +1427,6 @@
       "severityHigh": "ສູງ",
       "severityMedium": "ປານກາງ",
       "severityLow": "ຕ່ຳ",
-      "outcomeNotExploitable": "ໃຊ້ໂຈມຕີບໍ່ໄດ້",
       "outcomeTriageComplete": "ຄັດແຍກເບື້ອງຕົ້ນແລ້ວ",
       "sortSeverityDesc": "ຄວາມຮ້າຍແຮງ: ສູງຫາຕ່ຳ",
       "sortSeverityAsc": "ຄວາມຮ້າຍແຮງ: ຕ່ຳຫາສູງ",
@@ -1545,15 +1531,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "ບັນຫາທີ່ຍັງເປີດຢູ່",
-      "openFindingsDetail": "ຮ້າຍແຮງ {{critical}}, ສູງ {{high}}",
-      "confirmedExploitable": "ຢືນຢັນແລ້ວວ່າໃຊ້ໂຈມຕີໄດ້",
       "confirmedExploitableDetail": "ການວິເຄາະຢືນຢັນຄວາມສ່ຽງຂອງໂຄງການແລ້ວ",
-      "needsReview": "ທ່ານຕ້ອງກວດສອບ",
       "needsReviewDetail": "ຕ້ອງໃຫ້ຄົນຕັດສິນໃຈ",
-      "analysisIncomplete": "ການວິເຄາະຍັງບໍ່ສຳເລັດ",
       "analysisIncompleteDetail": "ຍັງບໍ່ຮູ້ຄວາມສ່ຽງຂອງໂຄງການ",
       "slaCompliance": "ການປະຕິບັດຕາມ SLA",
-      "notMeasured": "ຍັງບໍ່ໄດ້ວັດແທກ",
       "withinDeadlineDetail": "{{within}} ຈາກ {{total}} ລາຍການຍັງບໍ່ເກີນກຳນົດ",
       "noDeadlineData": "ຍັງບໍ່ມີບັນຫາໃດທີ່ຕັ້ງວັນຄົບກຳນົດ SLA ໄວ້",
       "deadlinePassed": "ເກີນກຳນົດແລ້ວ",
@@ -1601,7 +1582,6 @@
       "source": "ແຫຼ່ງຂໍ້ມູນ",
       "sourceId": "ລະຫັດຈາກແຫຼ່ງຂໍ້ມູນ",
       "viewAdvisory": "ເບິ່ງປະກາດຄວາມປອດໄພໃນ GitHub",
-      "statusSuperseded": "ແທນທີ່ແລ້ວ",
       "statusOpen": "ເປີດ",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "ເລີ່ມແກ້ໄຂແລ້ວ",
@@ -1612,7 +1592,6 @@
       "reasonAfterReview": "ຫຼັງຈາກກວດທານ"
     },
     "settingsOverview": {
-      "title": "ການຕັ້ງຄ່າ",
       "couldNotLoadSettings": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າຕົວຊ່ວຍດ້ານຄວາມປອດໄພໄດ້.",
       "couldNotLoadPermissions": "ບໍ່ສາມາດໂຫຼດຂໍ້ມູນສິດໄດ້.",
       "on": "ເປີດ",
@@ -1620,13 +1599,10 @@
       "repositoriesCount": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
       "repositoriesCount_other": "ເລືອກຄັງໂຄ້ດແລ້ວ {{displayCount}} ຄັງ",
       "selectRepositoriesSubtitle": "ເລືອກຄັງໂຄ້ດທີ່ຈະໃຫ້ຕົວຊ່ວຍດ້ານຄວາມປອດໄພຕິດຕາມ",
-      "modelsAndAnalysis": "ໂມເດວ ແລະ ການວິເຄາະ",
       "analysisModeSubtitle": "ການວິເຄາະແບບ {{mode}}",
-      "automation": "ການເຮັດວຽກອັດຕະໂນມັດ",
       "automationAllOff": "ປິດທັງໝົດ",
       "automationCount": "ເປີດແລ້ວ {{displayCount}} ຈາກ 3 ລາຍການ",
       "notificationsCount": "ເປີດແລ້ວ {{displayCount}} ຈາກ 2 ລາຍການ",
-      "slaPolicy": "ນະໂຍບາຍ SLA",
       "disabledNoManage": "ຕົວຊ່ວຍດ້ານຄວາມປອດໄພປິດຢູ່. ມີພຽງເຈົ້າຂອງອົງກອນ ແລະ ຜູ້ຈັດການການເກັບເງິນເທົ່ານັ້ນທີ່ເປີດໃຊ້ໄດ້.",
       "disabledNoRepo": "ເລືອກຄັງໂຄ້ດຢ່າງໜ້ອຍໜຶ່ງແຫ່ງກ່ອນເປີດຕົວຊ່ວຍດ້ານຄວາມປອດໄພ.",
       "disabledPrompt": "ເປີດຕົວຊ່ວຍດ້ານຄວາມປອດໄພເພື່ອຊິງຂໍ້ມູນການແຈ້ງເຕືອນ Dependabot, ເລືອກຄັງໂຄ້ດ ແລະ ຕັ້ງຄ່າການເຮັດວຽກອັດຕະໂນມັດ."
@@ -1635,8 +1611,6 @@
       "cancellationRequested": "ສົ່ງຄຳຂໍຍົກເລີກແລ້ວ",
       "cancelled": "ຍົກເລີກການແກ້ໄຂແລ້ວ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດສະຖານະການແກ້ໄຂໄດ້.",
-      "noAnalysisTitle": "ຍັງບໍ່ມີການວິເຄາະ",
-      "noAnalysisDescription": "ເລີ່ມການວິເຄາະຈາກແຖບລາຍລະອຽດ.",
       "start": "ເລີ່ມການແກ້ໄຂ",
       "retry": "ລອງແກ້ໄຂໃໝ່",
       "cancelTitle": "ຍົກເລີກການແກ້ໄຂນີ້ບໍ?",
@@ -1652,10 +1626,8 @@
       "retryQueued": "ເພີ່ມການລອງແກ້ໄຂໃໝ່ໃສ່ຄິວແລ້ວ",
       "timeline": {
         "queued": "ຂໍການແກ້ໄຂແລ້ວ",
-        "prOpened": "ເປີດ PR ແລ້ວ",
         "failed": "ການແກ້ໄຂລົ້ມເຫຼວ",
-        "blocked": "ການແກ້ໄຂຕິດຂັດ",
-        "noChangesNeeded": "ບໍ່ຈຳເປັນຕ້ອງປ່ຽນແປງ"
+        "blocked": "ການແກ້ໄຂຕິດຂັດ"
       },
       "unavailable": "ບໍ່ມີການແກ້ໄຂໃຫ້ໃຊ້ສຳລັບບັນຫາທີ່ກວດພົບນີ້."
     },
@@ -1663,9 +1635,6 @@
       "title": "ໂມເດວ ແລະ ການວິເຄາະ",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດການຕັ້ງຄ່າການວິເຄາະໄດ້.",
       "depth": "ລະດັບຄວາມເລິກຂອງການວິເຄາະ",
-      "modeAuto": "ອັດຕະໂນມັດ",
-      "modeShallow": "ເບື້ອງຕົ້ນ",
-      "modeDeep": "ເຊິງເລິກ",
       "triageModel": "ໂມເດວຄັດແຍກເບື້ອງຕົ້ນ",
       "analysisModel": "ໂມເດວວິເຄາະ",
       "remediationModel": "ໂມເດວແກ້ໄຂ"
@@ -1691,10 +1660,7 @@
     "findingDetail": {
       "title": "ບັນຫາທີ່ກວດພົບ",
       "tabAnalysis": "ການວິເຄາະ",
-      "tabRemediation": "ການແກ້ໄຂ",
-      "notFound": "ບໍ່ພົບລາຍການບັນຫານີ້",
-      "notFoundDescription": "ບັນຫາທີ່ກວດພົບນີ້ອາດຖືກລຶບແລ້ວ ຫຼື ເຈົ້າບໍ່ມີສິດເຂົ້າເບິ່ງອີກແລ້ວ.",
-      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດບັນຫາທີ່ກວດພົບນີ້ໄດ້."
+      "tabRemediation": "ການແກ້ໄຂ"
     },
     "findingList": {
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດບັນຫາທີ່ກວດພົບໄດ້.",
@@ -1709,9 +1675,7 @@
       "nextRemediationInProgress": "ກຳລັງແກ້ໄຂ",
       "nextRetryRemediation": "ລອງແກ້ໄຂໃໝ່ໄດ້",
       "nextRemediationAvailable": "ເລີ່ມແກ້ໄຂໄດ້",
-      "retryAnalysis": "ລອງວິເຄາະໃໝ່",
       "runAnalysis": "ດຳເນີນການວິເຄາະ",
-      "nextNeedsManualReview": "ຕ້ອງໃຫ້ຄົນກວດສອບ",
       "nextViewDetails": "ເບິ່ງລາຍລະອຽດ",
       "viewPr": "ເບິ່ງ PR",
       "analyze": "ວິເຄາະ",
@@ -1753,7 +1717,6 @@
       "newFindingSubtitle": "ສົ່ງທຸກຄັ້ງທີ່ຊິງຂໍ້ມູນບັນຫາໃໝ່ ລວມທັງການຊິງຂໍ້ມູນຄັ້ງທຳອິດ.",
       "slaLeadTimeAccessibility": "ຈຳນວນມື້ທີ່ແຈ້ງເຕືອນ SLA ລ່ວງໜ້າ",
       "slaLeadTimeError": "ໃສ່ຈຳນວນມື້ເປັນຈຳນວນເຕັມຕັ້ງແຕ່ 1 ຫາ 365.",
-      "slaLeadTimeHint": "ໃສ່ຈຳນວນເຕັມແຕ່ 1 ຫາ 365",
       "slaLeadTimeLabel": "ແຈ້ງເຕືອນ SLA ລ່ວງໜ້າ (ມື້)",
       "slaPersonalTitle": "ສົ່ງອີເມວແຈ້ງຂ້ອຍເມື່ອມີຄຳເຕືອນ SLA",
       "slaSection": "ການແຈ້ງເຕືອນ SLA",
@@ -1798,7 +1761,6 @@
     },
     "analysisState": {
       "queued": "ລໍຄິວວິເຄາະ",
-      "queuedTitle": "ລໍຄິວວິເຄາະ",
       "queuedDescription": "ກຳລັງລໍຖ້າໃຫ້ລະບົບມີບ່ອນວ່າງສຳລັບການວິເຄາະ.",
       "analyzing": "ກຳລັງວິເຄາະ",
       "analyzingDescription": "ກຳລັງກວດສອບວ່າໂຄ້ດຂອງແອັບສາມາດເອີ້ນໃຊ້ຄຸນສົມບັດທີ່ມີບັນຫາໄດ້ຫຼືບໍ່.",
@@ -1807,7 +1769,6 @@
       "extractionFailedDescription": "ບໍ່ສາມາດແປງລາຍງານທາງເຕັກນິກເປັນຜົນລັບທີ່ມີໂຄງສ້າງໄດ້.",
       "exploitableDescription": "ໂຄ້ດຂອງແອັບສາມາດເອີ້ນໃຊ້ຄຸນສົມບັດທີ່ມີບັນຫາໄດ້.",
       "notExploitable": "ເຂົ້າເຖິງບໍ່ໄດ້",
-      "notExploitableTitle": "ເຂົ້າເຖິງບໍ່ໄດ້",
       "notExploitableDescription": "ບໍ່ພົບເສັ້ນທາງໃນຄັງໂຄ້ດນີ້ທີ່ເຂົ້າເຖິງສ່ວນທີ່ມີບັນຫາໄດ້.",
       "unknown": "ຕ້ອງກວດສອບ",
       "unknownDescription": "ການວິເຄາະບໍ່ສາມາດຢືນຢັນໄດ້ວ່າໂຄ້ດສາມາດເອີ້ນໃຊ້ຄຸນສົມບັດທີ່ມີຊ່ອງໂຫວ່ໄດ້ຫຼືບໍ່.",
@@ -1843,7 +1804,6 @@
       "dueInDays_one": "ອີກ {{count}} ມື້ຄົບກຳນົດ"
     },
     "remediationStatus": {
-      "cancellationRequested": "ສົ່ງຄຳຂໍຍົກເລີກແລ້ວ",
       "notStarted": "ຍັງບໍ່ໄດ້ເລີ່ມ",
       "starting": "ກຳລັງເລີ່ມ",
       "inProgress": "ກຳລັງດຳເນີນການ",
@@ -1862,7 +1822,6 @@
       "findingNotOpen": "ບັນຫານີ້ບໍ່ຢູ່ໃນສະຖານະເປີດອີກແລ້ວ.",
       "repoNotInScope": "ບໍ່ໄດ້ເລືອກຄັງໂຄ້ດນີ້ໃຫ້ຕົວຊ່ວຍດ້ານຄວາມປອດໄພຕິດຕາມ.",
       "analysisRequired": "ວິເຄາະໂຄ້ດທັງໝົດກ່ອນເລີ່ມການແກ້ໄຂ.",
-      "sandboxAnalysisRequired": "ວິເຄາະໂຄ້ດທັງໝົດກ່ອນເລີ່ມການແກ້ໄຂ.",
       "staleAnalysis": "ບັນຫານີ້ມີການປ່ຽນແປງຫຼັງຈາກວິເຄາະ. ວິເຄາະໃໝ່ກ່ອນເລີ່ມການແກ້ໄຂ.",
       "notExploitable": "ການວິເຄາະບໍ່ພົບເສັ້ນທາງທີ່ເຂົ້າເຖິງຊ່ອງໂຫວ່ໄດ້. ຈຶ່ງບໍ່ສາມາດໃຊ້ການແກ້ໄຂອັດຕະໂນມັດໄດ້.",
       "exploitabilityUnknown": "ການວິເຄາະບໍ່ສາມາດຢືນຢັນໄດ້ວ່າຊ່ອງໂຫວ່ນີ້ນຳໄປໃຊ້ໂຈມຕີໄດ້ຫຼືບໍ່. ຕ້ອງໃຫ້ຄົນກວດທານກ່ອນໃຊ້ການແກ້ໄຂດ້ວຍການແຕະຄັ້ງດຽວ.",
@@ -1878,12 +1837,10 @@
       "autoRemediationDisabled": "ການແກ້ໄຂອັດຕະໂນມັດປິດຢູ່. ຍັງສາມາດເລີ່ມການແກ້ໄຂດ້ວຍຕົນເອງໄດ້ເມື່ອຜ່ານເກນຄວາມປອດໄພ.",
       "includeExistingDisabled": "ການແກ້ໄຂອັດຕະໂນມັດບໍ່ລວມບັນຫາທີ່ກວດພົບໄວ້ແລ້ວ.",
       "belowThreshold": "ຄວາມຮ້າຍແຮງຂອງບັນຫານີ້ຕ່ຳກວ່າເກນສຳລັບການແກ້ໄຂອັດຕະໂນມັດ. ຍັງສາມາດເລີ່ມການແກ້ໄຂດ້ວຍຕົນເອງໄດ້ເມື່ອຜ່ານເກນຄວາມປອດໄພ.",
-      "beforeEnablement": "ການວິເຄາະສຳເລັດກ່ອນເປີດການແກ້ໄຂອັດຕະໂນມັດ. ຍັງສາມາດເລີ່ມການແກ້ໄຂດ້ວຍຕົນເອງໄດ້ເມື່ອຜ່ານເກນຄວາມປອດໄພ.",
-      "generic": "ບໍ່ມີການແກ້ໄຂໃຫ້ໃຊ້ສຳລັບບັນຫາທີ່ກວດພົບນີ້."
+      "beforeEnablement": "ການວິເຄາະສຳເລັດກ່ອນເປີດການແກ້ໄຂອັດຕະໂນມັດ. ຍັງສາມາດເລີ່ມການແກ້ໄຂດ້ວຍຕົນເອງໄດ້ເມື່ອຜ່ານເກນຄວາມປອດໄພ."
     },
     "commandFailure": {
       "ownerCapReached": "ຈຳນວນການວິເຄາະທີ່ເຮັດພ້ອມກັນຮອດຂີດຈຳກັດແລ້ວ. ລໍຖ້າໃຫ້ການວິເຄາະທີ່ກຳລັງເຮັດຢູ່ສຳເລັດ ແລ້ວລອງໃໝ່.",
-      "githubTokenUnavailable": "ສິດເຂົ້າເຖິງ GitHub ມີບັນຫາ. ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງ ແລ້ວລອງໃໝ່.",
       "githubAuthInvalid": "ສິດເຂົ້າເຖິງ GitHub ມີບັນຫາ. ໃຫ້ສິດແອັບ GitHub ອີກຄັ້ງ ແລ້ວລອງໃໝ່.",
       "findingUnavailable": "ບໍ່ສາມາດເຂົ້າເບິ່ງບັນຫານີ້ໄດ້ອີກແລ້ວ. ໂຫຼດລາຍການບັນຫາໃໝ່ ແລະ ລອງອີກຄັ້ງຖ້າບັນຫານັ້ນຍັງເປີດຢູ່.",
       "repositoryUnavailable": "ແອັບ GitHub ບໍ່ສາມາດເຂົ້າເຖິງຄັງໂຄ້ດນີ້ໄດ້ອີກແລ້ວ. ໂຫຼດຂໍ້ມູນສິດເຂົ້າເຖິງຄັງໂຄ້ດໃໝ່ ແລ້ວລອງອີກຄັ້ງ.",
@@ -1965,10 +1922,8 @@
       "title": "ເຊດຊັນ",
       "copyErrorDetails": "ຄັດລອກລາຍລະອຽດຂໍ້ຜິດພາດ",
       "backToSessions": "ກັບໄປລາຍການເຊດຊັນ",
-      "accessDeniedDescription": "ທ່ານບໍ່ມີສິດເບິ່ງລາຍການນີ້.",
       "couldNotLoad": "ບໍ່ສາມາດໂຫຼດເຊດຊັນໄດ້.",
       "failedToLoadDetails": "ບໍ່ສາມາດໂຫຼດລາຍລະອຽດເຊດຊັນໄດ້.",
-      "notFoundDescription": "ລາຍການນີ້ອາດຖືກລຶບ ຫຼື ບໍ່ມີອີກແລ້ວ.",
       "failedToStopExecution": "ບໍ່ສາມາດຢຸດການເຮັດວຽກໄດ້.",
       "renameSession": "ປ່ຽນຊື່ເຊດຊັນ",
       "renamePlaceholder": "ຊື່ເຊດຊັນ",
@@ -2516,7 +2471,6 @@
     "signOutThisDeviceTitle": "ອອກຈາກລະບົບໃນອຸປະກອນນີ້ບໍ?",
     "signOutThisSessionTitle": "ອອກຈາກລະບົບໃນເຊສຊັນນີ້ບໍ?",
     "signOutThisSessionMessage": "ລະບົບຈະອອກຈາກບັນຊີໃນ {{device}}. ອຸປະກອນນີ້ອາດຍັງເຂົ້າເຖິງ API ໄດ້ອີກສູງສຸດໜຶ່ງຊົ່ວໂມງ.",
-    "signOutMessage": "ທ່ານຈະຕ້ອງເຂົ້າສູ່ລະບົບໃໝ່ ເພື່ອໃຊ້ພື້ນທີ່ເຮັດວຽກຂອງທ່ານ.",
     "webBrowser": "ຕົວທ່ອງເວັບ"
   },
   "forceUpdate": {
@@ -2785,7 +2739,6 @@
         "accounting_adjustment": "ການປັບຍອດບັນຊີ",
         "credits_expired": "ເຄຣດິດໝົດອາຍຸ"
       },
-      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້.",
       "truncated": "ຍັງມີປະຫວັດເຄຣດິດກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
     "inviteMember": {
@@ -2814,7 +2767,6 @@
       "truncated": "ຍັງມີໃບແຈ້ງໜີ້ກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "ຕົວຢ່າງ: name@company.com",
       "enableA11y": "ເປີດການແຈ້ງເຕືອນຍອດເງິນຕໍ່າ",
       "notifyEmailsLabel": "ອີເມວທີ່ຮັບການແຈ້ງເຕືອນ",
       "permissionDenied": "ທ່ານບໍ່ມີສິດຈັດການການແຈ້ງເຕືອນກ່ຽວກັບການຮຽກເກັບເງິນ.",
@@ -2839,7 +2791,6 @@
       "emptyDescriptionCanInvite": "ເຊີນເພື່ອນຮ່ວມທີມເພື່ອເລີ່ມເຮັດວຽກຮ່ວມກັນໃນອົງກອນນີ້.",
       "emptyDescriptionCannotInvite": "ຂໍໃຫ້ເຈົ້າຂອງ ຫຼື ຜູ້ຈັດການການຮຽກເກັບເງິນເຊີນເພື່ອນຮ່ວມທີມ.",
       "emptyTitle": "ຍັງບໍ່ມີສະມາຊິກ",
-      "inviteMember": "ເຊີນສະມາຊິກ",
       "invitedDate": "ເຊີນເມື່ອ {{date}}",
       "limitPerDay": "{{amount}}/ວັນ",
       "manageA11y": "ຈັດການ {{name}}",
@@ -2882,7 +2833,6 @@
       "couldNotLoadStatus": "ບໍ່ສາມາດໂຫຼດສະຖານະໄດ້",
       "creditProcessingDelayed": "ການປະມວນຜົນເຄຣດິດລ່າຊ້າ · ກຳລັງລອງອີກຄັ້ງອັດຕະໂນມັດ",
       "ended": "ສິ້ນສຸດແລ້ວ",
-      "manageHint": "ເປີດໜ້າຈັດການ Kilo Pass ໃນເວັບ.",
       "notSubscribed": "ຍັງບໍ່ໄດ້ສະໝັກ",
       "overallocated": "ຈຳນວນຜູ້ທີ່ໄດ້ຮັບສິດ Kilo Pass ເກີນຈຳນວນສິດຜູ້ໃຊ້ທີ່ຊຳລະແລ້ວ",
       "paidSeat_one": "ສິດຜູ້ໃຊ້ທີ່ຊຳລະແລ້ວ {{displayCount}} ສິດ",

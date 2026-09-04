@@ -1049,11 +1049,16 @@ Inside `src/plugins/gateway/`:
 entropy source, the catalog, and the gateway with its token and retry policy
 under it. A model it knows nothing about is assumed to speak all three shapes,
 which is true of everything the gateway relays, so the smallest call names four
-things: the URL, the org, a `fetch`, and a token. It exists because that wiring has an order and a trap — the catalog
-must be one instance shared by the session and the gateway, not two that agree
-— and because the package's own live runs were copying twenty-five lines of it
-each. Every plugin is still a plugin: a caller who needs a token that refreshes
-composes the layers themselves.
+things: the URL, the org, a `fetch`, and a token. It exists because that wiring
+has an order and a trap — the catalog must be one instance shared by the session
+and the gateway, not two that agree — and because the package's own live runs
+were copying twenty-five lines of it each.
+
+`token` takes a `TokenSourceService` as well as a string. That is the one plugin
+a long-lived caller has to replace, because the kilo token expires, and
+replacing it by hand means rebuilding the shared catalog — the trap this
+function closes. One line here against twelve a caller would have copied. Every
+other plugin is still replaced by composing the layers instead.
 
 There are six entry points: `@kilocode/harness-sdk`, `/core`,
 `/plugins/gateway`, `/plugins/prompt`, `/plugins/store/node` and

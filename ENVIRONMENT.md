@@ -258,6 +258,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
+- `ENKRYPT_API_KEY` - API key for the Enkrypt scores endpoint; sent only in the server-side `apikey` header. Required when Enkrypt ingestion is enabled, but optional at application startup. See [Enkrypt operations](docs/enkrypt-sync-operations.md) for release gates, monitoring, and independent shutdown controls. `[SECRET]`
 - `FAKE_LLM_URL` - Local-only URL for the fake-llm service. Next.js uses it in development to list and route `fake-deterministic` through the real gateway (`apps/web/.env.development.local.example`, `apps/web/src/lib/ai-gateway/local-fake-llm.ts`). The cloud-agent-next E2E driver uses the same var for `/test/*` side channels (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`). Defaults to `http://localhost:8811`. Ignored on Vercel. [SERVER]
 
 ### Vector DBs
@@ -290,6 +291,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 ### Feature Flags
 
+- `ENKRYPT_SYNC_ENABLED` - Enables daily Enkrypt ingestion and mapped-model catalog enrollment only when exactly `true`; defaults to disabled. Does not enable publication. Configure the API key and an external monitor for the read-only health endpoint before enabling. [SERVER]
+- `ENKRYPT_PUBLICATION_ENABLED` - Exposes stored Enkrypt scores through public model catalogs and model-statistics endpoints only when exactly `true`; defaults to disabled. Does not enable ingestion. Keep disabled until redistribution approval and the release gates in [Enkrypt operations](docs/enkrypt-sync-operations.md) are satisfied. Disabling suppresses existing and cached scores after the updated deployment is serving traffic; previously delivered client responses cannot be recalled. [SERVER]
 - `KILOCLAW_BILLING_ENFORCEMENT` - Feature flag controlling KiloClaw billing enforcement. [SERVER]
 - `BRIEFING_DEBUG` - Enables verbose debug logging for the KiloClaw morning briefing plugin; checked in `services/kiloclaw/plugins/kiloclaw-morning-briefing/src/index.ts`. [SERVER]
 - `KILOCLAW_DISABLE_AI_COAUTHOR` - Disables AI co-author features in Gastown; checked in `services/gastown/container/src/control-server.ts`. [SERVER]

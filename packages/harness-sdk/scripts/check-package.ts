@@ -38,7 +38,7 @@ const entries: readonly Entry[] = [
   { subpath: './plugins/fetch', promises: ['webFetch'] },
   { subpath: './plugins/gateway', promises: ['layerKiloGateway'] },
   { subpath: './plugins/prompt', promises: ['assemble', 'layerAssembler'] },
-  { subpath: './plugins/tools', promises: ['questionTool'] },
+  { subpath: './plugins/tools', promises: ['questionTool', 'subagentTool'] },
   { subpath: './plugins/store/node', promises: ['layerNodeStore'] },
   { subpath: './plugins/store/expo', promises: ['layerExpoStore'] },
   { subpath: './testing', promises: ['checkStore', 'checkAssembler'] },
@@ -54,6 +54,27 @@ const map = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as {
 };
 
 const broken: string[] = [];
+
+/* The table above is written by hand, and a subpath added to `package.json`
+   and not to it is a subpath nothing here loads. Two lines beat remembering. */
+const listed = new Set(entries.map(entry => entry.subpath));
+const unchecked = Object.keys(map.exports).filter(subpath => !listed.has(subpath));
+if (unchecked.length > 0) {
+  broken.push(`${unchecked.join(', ')} is in the exports map and not in this check`);
+}
+
+/* And an entry point nobody is told about is an entry point nobody imports.
+   The README's own table is what is read, not the whole page: a subpath named
+   once in a code example is still a subpath missing from the list a consumer
+   reads to find out what there is. */
+const readme = readFileSync(join(root, 'README.md'), 'utf8');
+const table = readme.slice(readme.indexOf('## Entry points'));
+const undocumented = Object.keys(map.exports).filter(
+  subpath => !table.includes(`\`@kilocode/harness-sdk${subpath.slice(1)}\` |`)
+);
+if (undocumented.length > 0) {
+  broken.push(`${undocumented.join(', ')} is an entry point the README does not name`);
+}
 
 const fileOf = (subpath: string): string | undefined => {
   const target = map.exports[subpath];

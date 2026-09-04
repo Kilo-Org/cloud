@@ -553,7 +553,7 @@ Each of these is a `Context.Tag`, and each ships a default the package owns.
 | Point | What it decides | This package ships |
 |---|---|---|
 | `ModelClient` | How a request leaves and a reply comes back | `layerKiloGateway` |
-| `ToolRegistry` | Every tool the harness has. A session names the ones it may use | `questionTool` |
+| `ToolRegistry` | Every tool the harness has. A session names the ones it may use | `questionTool`, `subagentTool` |
 | `PromptAssembler` | What the prompt looks like, and where the breakpoints go | `layerAssembler` |
 | `ModelCatalog` | Which shapes a model speaks, its output limit, its window | `layerTableCatalog` |
 | `SessionStore` | Where the conversation is kept | `layerNodeStore`, `layerExpoStore` |
@@ -598,8 +598,10 @@ safe against a real database.
 |---|---|
 | `@kilocode/harness-sdk` | What a caller uses: the layers, the tags, the errors, and the types they carry |
 | `@kilocode/harness-sdk/core` | The contracts and the pure domain, no plugin. Wider than the root: it also holds the machinery a session runs on, which a plugin author sometimes needs |
+| `@kilocode/harness-sdk/plugins/fetch` | `webFetch`, for a runtime with a WHATWG `fetch` |
 | `@kilocode/harness-sdk/plugins/gateway` | The gateway plugin on its own |
 | `@kilocode/harness-sdk/plugins/prompt` | The assembler on its own |
 | `@kilocode/harness-sdk/plugins/tools` | The tools the package ships |
 | `@kilocode/harness-sdk/plugins/store/node` | The store on `node:sqlite` |
 | `@kilocode/harness-sdk/plugins/store/expo` | The store on `expo-sqlite` |
+| `@kilocode/harness-sdk/testing` | `checkStore` and `checkAssembler`, for a plugin author's own test suite |

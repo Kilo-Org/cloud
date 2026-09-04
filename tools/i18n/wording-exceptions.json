@@ -81,12 +81,16 @@
   "ckb": ["added", "commit", "deleted", "open"],
   "cs": [
     "comment",
+    "commit",
     "edit",
+    "files",
     "none",
     "open",
     "open pull request",
     "privacy policy",
+    "reactions",
     "recommended",
+    "tokens",
     "unknown"
   ],
   "cy": ["commit", "open", "open pull request", "review"],

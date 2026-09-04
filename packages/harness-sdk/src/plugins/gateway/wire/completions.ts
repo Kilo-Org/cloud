@@ -7,14 +7,20 @@ import type {
   StopReason,
 } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
-import { dataUri, isLast } from './parts.js';
+import { dataUri } from './parts.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
 import { readCached, type TokenCount } from './usage.js';
 
 /**
- * The OpenAI chat shape, with one extension. `cache_control` on a content block
- * is not part of the OpenAI type; the gateway forwards it to a provider that
- * reads it and ignores it everywhere else, so marking a breakpoint is free.
+ * The OpenAI chat shape, with one extension for the effort.
+ *
+ * It marks no cache breakpoint. It used to send Anthropic's `cache_control` on
+ * the last block, on the theory that the gateway would forward it to a provider
+ * that reads it. Measured on 2026-09-04 against a prefix nobody had sent
+ * before, twice for `openai/gpt-5.6-luna` and twice for
+ * `anthropic/claude-haiku-4.5`: the second call read 12229 and 13630 cached
+ * tokens, the same to the token with the breakpoint and without it. This shape
+ * caches on whatever the gateway does, which is what `api-kind.ts` ranks it on.
  */
 type CompletionsBody = Omit<OpenAI.Chat.ChatCompletionCreateParams, 'messages'> & {
   /** The OpenRouter reasoning field. It is not part of the OpenAI type. */
@@ -25,39 +31,22 @@ type CompletionsBody = Omit<OpenAI.Chat.ChatCompletionCreateParams, 'messages'> 
   }[];
 };
 
-/** The OpenAI content block, plus the breakpoint the gateway forwards. */
 type ContentBlock =
-  | { readonly type: 'text'; readonly text: string; readonly cache_control?: Ephemeral }
-  | {
-      readonly type: 'image_url';
-      readonly image_url: { readonly url: string };
-      readonly cache_control?: Ephemeral;
-    };
-
-interface Ephemeral {
-  readonly type: 'ephemeral';
-}
-
-const ephemeral: Ephemeral = { type: 'ephemeral' };
-
-const block = (text: string, cache: boolean): ContentBlock =>
-  cache ? { type: 'text', text, cache_control: ephemeral } : { type: 'text', text };
+  | { readonly type: 'text'; readonly text: string }
+  | { readonly type: 'image_url'; readonly image_url: { readonly url: string } };
 
 /**
  * Reasoning is left out. Providers relayed through this shape report their
  * thinking under two different field names and neither takes it back, so there
  * is no block this shape could replay.
  */
-const renderPart = (part: PromptPart, cache: boolean): ContentBlock | undefined => {
+const renderPart = (part: PromptPart): ContentBlock | undefined => {
   switch (part.kind) {
     case 'text': {
-      return block(part.text, cache);
+      return { type: 'text', text: part.text };
     }
     case 'image': {
-      const image_url = { url: dataUri(part) };
-      return cache
-        ? { type: 'image_url', image_url, cache_control: ephemeral }
-        : { type: 'image_url', image_url };
+      return { type: 'image_url', image_url: { url: dataUri(part) } };
     }
     case 'reasoning':
     case 'redacted': {
@@ -70,9 +59,7 @@ const renderMessage = (
   message: PromptMessage
 ): { role: 'user' | 'assistant'; content: readonly ContentBlock[] } => ({
   role: message.role,
-  content: message.parts
-    .map((part, index) => renderPart(part, isLast(message, index)))
-    .filter(part => part !== undefined),
+  content: message.parts.map(renderPart).filter(part => part !== undefined),
 });
 
 const toBody = ({ prompt, model, maxTokens, effort }: ModelRequest): CompletionsBody => ({
@@ -84,7 +71,7 @@ const toBody = ({ prompt, model, maxTokens, effort }: ModelRequest): Completions
   messages: [
     ...prompt.system.map(part => ({
       role: 'system' as const,
-      content: [block(part.text, part.cache)],
+      content: [{ type: 'text' as const, text: part.text }],
     })),
     ...prompt.messages.map(renderMessage),
   ],

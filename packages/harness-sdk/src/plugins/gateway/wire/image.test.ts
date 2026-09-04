@@ -72,3 +72,20 @@ it('sends the image as a data URI on both OpenAI shapes', () => {
     ],
   });
 });
+
+it('marks no breakpoint on the completions shape, which caches without one', () => {
+  /* Measured live on 2026-09-04 against a prefix nobody had sent before, twice
+     for `openai/gpt-5.6-luna` and twice for `anthropic/claude-haiku-4.5`: the
+     second call read 12229 and 13630 cached tokens, the same to the token with
+     an Anthropic `cache_control` on the last block and without one. The field
+     bought nothing on this shape, so the shape stopped sending it. Re-run the
+     measurement before putting it back. */
+  const body = assert<{ messages: { content: { cache_control?: unknown }[] }[] }>(
+    completionsWire.toBody(request('image/png'))
+  );
+
+  const marked = body.messages.flatMap(message =>
+    message.content.filter(block => block.cache_control !== undefined)
+  );
+  expect(marked).toEqual([]);
+});

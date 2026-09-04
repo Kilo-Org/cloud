@@ -876,6 +876,22 @@ export const autocommitStartedDataSchema = z.object({
 });
 export type AutocommitStartedData = z.infer<typeof autocommitStartedDataSchema>;
 
+const commitPushStatusSchema = z.enum(['pushed', 'failed', 'not_attempted', 'unknown']);
+const maxCommitMessageBytes = 16 * 1024;
+
+export const sessionCommitDataSchema = z.object({
+  commitHash: z.string().regex(/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/),
+  commitMessage: z
+    .string()
+    .max(maxCommitMessageBytes)
+    .refine(value => new TextEncoder().encode(value).byteLength <= maxCommitMessageBytes),
+  messageId: z.string().min(1).max(256),
+  userMessageId: z.string().min(1).max(256),
+  committedAt: z.iso.datetime({ offset: true }),
+  pushStatus: commitPushStatusSchema,
+  commitMessageTruncated: z.literal(true).optional(),
+});
+
 export const autocommitCompletedDataSchema = z.object({
   messageId: z.string(),
   success: z.boolean().catch(false),
@@ -883,6 +899,10 @@ export const autocommitCompletedDataSchema = z.object({
   skipped: z.boolean().optional(),
   commitHash: z.string().optional(),
   commitMessage: z.string().optional(),
+  userMessageId: z.string().optional().catch(undefined),
+  committedAt: sessionCommitDataSchema.shape.committedAt.optional().catch(undefined),
+  pushStatus: commitPushStatusSchema.optional().catch(undefined),
+  commitMessageTruncated: z.boolean().optional().catch(undefined),
 });
 export type AutocommitCompletedData = z.infer<typeof autocommitCompletedDataSchema>;
 

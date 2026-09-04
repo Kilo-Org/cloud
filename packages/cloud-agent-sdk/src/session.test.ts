@@ -208,6 +208,88 @@ describe('session pipeline integration', () => {
     });
   });
 
+  describe('immutable commit facts', () => {
+    const completion = {
+      messageId: 'assistant-1',
+      userMessageId: 'user-1',
+      success: true,
+      commitHash: 'a'.repeat(40),
+      commitMessage: 'fix: actual message\n\nFull body',
+      committedAt: '2026-09-01T10:00:00.000Z',
+      pushStatus: 'failed',
+      commitMessageTruncated: true,
+    };
+
+    it.each([true, false])(
+      'retains the local commit on failed push with operation success %s',
+      success => {
+        const { storage, serviceState, feedEvent } = createTestSession();
+        const event = createEvent('autocommit_completed', { ...completion, success });
+        feedEvent(event);
+        expect(serviceState.getCommits()).toEqual([
+          {
+            commitHash: completion.commitHash,
+            commitMessage: completion.commitMessage,
+            messageId: completion.messageId,
+            userMessageId: completion.userMessageId,
+            committedAt: completion.committedAt,
+            pushStatus: 'failed',
+            commitMessageTruncated: true,
+            timestamp: event.timestamp,
+          },
+        ]);
+        expect(storage.getMessageIds()).toEqual([]);
+      }
+    );
+
+    it('deduplicates live and materialized replay by full SHA and preserves the first metadata', () => {
+      const { serviceState, feedEvent } = createTestSession();
+      feedEvent(createEvent('autocommit_completed', completion));
+      const original = serviceState.getCommits()[0];
+      const replay = kilocode('autocommit_completed', {
+        ...completion,
+        commitMessage: 'duplicate',
+      });
+      feedEvent({ ...replay, eventId: 0 });
+      feedEvent(createEvent('connected', {}));
+      feedEvent({ ...replay, eventId: 0 });
+      feedEvent({
+        ...kilocode('autocommit_completed', {
+          ...completion,
+          commitHash: 'b'.repeat(40),
+          committedAt: '2026-09-01T09:00:00.000Z',
+        }),
+        eventId: 0,
+      });
+      expect(serviceState.getCommits()).toHaveLength(2);
+      expect(serviceState.getCommits()[0]).toBe(original);
+    });
+
+    it.each([
+      { success: false, commitHash: undefined },
+      { skipped: true },
+      { commitHash: 'abc1234' },
+      { commitHash: 'not-a-sha' },
+    ])('does not promote skipped or unproven completions: %j', override => {
+      const { serviceState, feedEvent } = createTestSession();
+      feedEvent(createEvent('autocommit_completed', { ...completion, ...override }));
+      expect(serviceState.getCommits()).toEqual([]);
+    });
+
+    it('clears the local collection without resurrecting it on replay; reset permits a fresh load', () => {
+      const { serviceState, feedEvent } = createTestSession();
+      const event = createEvent('autocommit_completed', completion);
+      feedEvent(event);
+      serviceState.clearCommits();
+      feedEvent({ ...event, eventId: 0 });
+      expect(serviceState.getCommits()).toEqual([]);
+      serviceState.reset();
+      expect(serviceState.snapshot().commits).toEqual([]);
+      feedEvent(event);
+      expect(serviceState.getCommits()).toHaveLength(1);
+    });
+  });
+
   describe('autocommit lifecycle', () => {
     it('tracks autocommit started and completed', () => {
       const { serviceState, feedEvent } = createTestSession();

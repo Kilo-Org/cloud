@@ -2594,7 +2594,11 @@ describe('control finalization and compact', () => {
           expect(committed).toMatchObject({
             success: true,
             messageId: 'assistant_1',
-            commitMessage: 'Apply normal control turn',
+            userMessageId: 'msg_1',
+            commitHash: (await git(['rev-parse', 'HEAD'], workspace)).trim(),
+            pushStatus: 'unknown',
+            message: 'Changes committed; push command completed',
+            commitMessage: 'Apply normal control turn\n',
           });
         } else {
           expect(committed).toMatchObject({ success: true, skipped: true });
@@ -2625,6 +2629,8 @@ describe('control finalization and compact', () => {
     const handlerDeps = deps({
       runAutoCommit: async options => {
         expect(options.workspacePath).toBe(session.directory);
+        expect(options.messageId).toBe('assistant_1');
+        expect(options.userMessageId).toBe('msg_1');
         expect(options.signal?.aborted).toBe(false);
         options.onEvent({
           streamEventType: 'autocommit_started',
@@ -2866,6 +2872,46 @@ describe('control finalization and compact', () => {
     finished.resolve(true);
     await waitForTasks(handlerDeps);
     expect(commands).toBe(0);
+    expect(events.at(-1)?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
+  });
+
+  it('anchors compact auto-commit metadata to its originating user when no assistant is known', async () => {
+    const events: SessionEventPayload[] = [];
+    const handlerDeps = deps({
+      runAutoCommit: async options => {
+        options.onEvent({
+          streamEventType: 'autocommit_completed',
+          timestamp: '2026-09-01T00:00:00.000Z',
+          data: {
+            success: true,
+            message: 'Changes committed (push not attempted)',
+            commitHash: 'a'.repeat(40),
+            commitMessage: 'Apply changes\n',
+            committedAt: '2026-09-01T00:00:00.000Z',
+            pushStatus: 'not_attempted',
+            messageId: options.messageId,
+            userMessageId: options.userMessageId,
+          },
+        });
+        return { success: true };
+      },
+      emitSessionEvent: (_session, event) => events.push(event),
+    });
+    expect(
+      await handleControlRequest(
+        'session.prompt',
+        session,
+        {
+          ...promptPayload,
+          turn: { type: 'command', command: 'compact', arguments: '' },
+          finalization: { autoCommit: true },
+        },
+        handlerDeps
+      )
+    ).toMatchObject({ ok: true, result: { status: 'accepted' } });
+    await waitForTasks(handlerDeps);
+    const committed = events.find(event => event.type === 'autocommit_completed')?.properties;
+    expect(committed).toMatchObject({ messageId: 'msg_1', userMessageId: 'msg_1' });
     expect(events.at(-1)?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
   });
 

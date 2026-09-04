@@ -1085,6 +1085,7 @@ async function executePrompt(
           kiloClient,
           env,
           messageId: completion?.info.id ?? messageId,
+          userMessageId: messageId,
           signal,
           onEvent: event => emitFinalizationEvent(session, event, deps),
         });

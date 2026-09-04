@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { autoCommitRecordSchema } from '@kilocode/worker-utils/cloud-agent-commits';
 import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
@@ -67,6 +68,14 @@ export function applyPendingInteractionEvent(
 }
 
 export type SandboxControlEventQueries = {
+  insertUnique(params: {
+    executionId: string;
+    sessionId: string;
+    streamEventType: string;
+    payload: string;
+    timestamp: number;
+    entityId: string;
+  }): EventId | null;
   upsert(params: {
     executionId: string;
     sessionId: string;
@@ -96,6 +105,36 @@ export function persistSandboxControlSessionEvent(params: {
   eventQueries: SandboxControlEventQueries;
   broadcast: (event: StoredEvent) => void;
 }): { applied: true } {
+  const commit =
+    params.payload.type === 'autocommit_completed' && params.payload.properties.skipped !== true
+      ? autoCommitRecordSchema.safeParse(params.payload.properties)
+      : undefined;
+  if (commit?.success) {
+    const timestamp = Date.parse(commit.data.committedAt);
+    const payload = JSON.stringify({
+      type: params.payload.type,
+      event: params.payload.type,
+      properties: { ...params.payload.properties, ...commit.data },
+    });
+    const eventId = params.eventQueries.insertUnique({
+      executionId: '',
+      sessionId: params.sessionId,
+      streamEventType: 'kilocode',
+      payload,
+      timestamp,
+      entityId: `commit/${commit.data.commitHash}`,
+    });
+    if (eventId === null) return { applied: true };
+    params.broadcast({
+      id: eventId,
+      execution_id: '',
+      session_id: params.sessionId,
+      stream_event_type: 'kilocode',
+      payload,
+      timestamp,
+    });
+    return { applied: true };
+  }
   const timestamp = params.payload.timestamp ? Date.parse(params.payload.timestamp) : Date.now();
   const payload = JSON.stringify({
     type: params.payload.type,

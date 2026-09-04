@@ -6821,6 +6821,7 @@ async function worktreeFixture(sessionIdOverride?: `workspace_${string}`) {
   const prompts: RequestFrame[] = [];
   const promptSeen = Promise.withResolvers<void>();
   const aborts: RequestFrame[] = [];
+  const terminalCloses: RequestFrame[] = [];
   let nextAttach: ((request: RequestFrame) => void) | undefined;
 
   function receive(client: WebSocket): void {
@@ -6856,6 +6857,9 @@ async function worktreeFixture(sessionIdOverride?: `workspace_${string}`) {
         result = { status: 'aborted' };
       } else if (request.operation === 'session.detach') {
         result = { detached: true };
+      } else if (request.operation === 'session.terminal.close') {
+        terminalCloses.push(request);
+        result = { success: true };
       } else return;
       client.send(
         JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result })
@@ -6905,6 +6909,7 @@ async function worktreeFixture(sessionIdOverride?: `workspace_${string}`) {
     readyNotifications,
     prompts,
     aborts,
+    terminalCloses,
     noWake,
     promptSeen: promptSeen.promise,
     holdNextAttach(): Promise<RequestFrame> {
@@ -6995,6 +7000,314 @@ async function worktreeFixture(sessionIdOverride?: `workspace_${string}`) {
 function captureRevision(request: RequestFrame): number {
   return (request.payload as { revision: number }).revision;
 }
+
+describe('SandboxSession commit metadata', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  const hash = 'd'.repeat(40);
+  const nextHash = 'e'.repeat(40);
+  const commit = {
+    commitHash: hash,
+    commitMessage: 'Actual commit message',
+    userMessageId: 'user_turn',
+    messageId: 'assistant_turn',
+    committedAt: '2026-09-01T10:00:00Z',
+    pushStatus: 'failed',
+    success: false,
+    message: 'Push failed',
+  };
+
+  it('preserves the first metadata record and replays each full SHA once after reconstruction', async () => {
+    const f = await worktreeFixture();
+    try {
+      await f.event('autocommit_completed', f.kiloSessionId, commit);
+      const first = await runInDurableObject(f.session, (_instance, state) =>
+        createEventQueries(drizzle(state.storage), state.storage.sql).findByEntityId(
+          `commit/${hash}`
+        )
+      );
+      expect(first).not.toBeNull();
+      expect(first?.timestamp).toBe(Date.parse(commit.committedAt));
+      expect(JSON.parse(first?.payload ?? '{}').properties).toMatchObject(commit);
+      await f.event('autocommit_completed', f.kiloSessionId, {
+        ...commit,
+        commitMessage: 'Changed duplicate',
+        committedAt: '2026-09-02T00:00:00Z',
+      });
+      await f.event('autocommit_completed', f.kiloSessionId, { ...commit, commitHash: nextHash });
+      await f.settled();
+      const replay = await runInDurableObject(f.session, (_instance, state) => {
+        const events = createEventQueries(drizzle(state.storage), state.storage.sql);
+        expect(events.findByEntityId(`commit/${hash}`)).toEqual(first);
+        return events.findByFilters({ materialized: 'updates' });
+      });
+      expect(replay.map(event => JSON.parse(event.payload).properties.commitHash)).toEqual([
+        hash,
+        nextHash,
+      ]);
+      expect(replay[0]?.id).toBeLessThan(replay[1]?.id ?? 0);
+      expect(f.captures).toHaveLength(0);
+      expect(f.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(f.noWake.claimCreate).not.toHaveBeenCalled();
+      await abortAllDurableObjects();
+      const fresh = env.SANDBOX_SESSION.getByName(`${f.userId}:${f.sessionId}`);
+      await runInDurableObject(fresh, (_instance, state) => {
+        const events = createEventQueries(drizzle(state.storage), state.storage.sql);
+        expect(events.findByEntityId(`commit/${hash}`)).toEqual(first);
+        expect(events.findByFilters({ materialized: 'updates' })).toEqual(replay);
+      });
+    } finally {
+      f.close();
+    }
+  });
+});
+
+describe('SandboxSession worktree cleanup fencing', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each(['session', 'worktree'] as const)(
+    'keeps %s fenced and connections closed after worktree erasure failure, late capture and reconstruction',
+    async action => {
+      const f = await worktreeFixture();
+      const clients: WebSocket[] = [];
+      const servers: WebSocket[] = [];
+      const closed: Promise<CloseEvent>[] = [];
+      let restore: (() => void) | undefined;
+      let held: RequestFrame | undefined;
+      let lateCapture: Promise<unknown> | undefined;
+      let closedBeforePurge = false;
+      try {
+        await runInDurableObject(f.session, (_instance, state) => {
+          state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+          state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+          const attachment = {
+            sessionId: f.sessionId,
+            ownerId: f.userId,
+            kiloSessionId: f.kiloSessionId,
+            sandboxId: f.sandboxId,
+            directory: f.directory,
+            wrapperInstanceId: f.wrapperInstanceId,
+          };
+          state.storage.kv.put('terminal_attached_session', attachment);
+          state.storage.kv.put('terminal:pty_worktree', {
+            ...attachment,
+            ptyId: 'pty_worktree',
+            state: 'running',
+          });
+          for (const tag of ['stream', 'terminal', 'terminal']) {
+            const pair = new WebSocketPair();
+            state.acceptWebSocket(pair[1], [tag]);
+            pair[0].accept();
+            clients.push(pair[0]);
+            servers.push(pair[1]);
+            closed.push(
+              new Promise(resolve => pair[0].addEventListener('close', resolve, { once: true }))
+            );
+          }
+        });
+        lateCapture = f.session.refreshWorktreeChanges();
+        held = await f.nextCapture();
+        await runInDurableObject(f.session, (_instance, state) => {
+          const remove = state.storage.kv.delete.bind(state.storage.kv);
+          const spy = vi.spyOn(state.storage.kv, 'delete').mockImplementation(key => {
+            if (key.startsWith(WORKTREE_FILE_PREFIX)) {
+              closedBeforePurge = servers.every(socket => socket.readyState !== WebSocket.OPEN);
+              throw new Error('Injected worktree erasure failure');
+            }
+            return remove(key);
+          });
+          restore = () => spy.mockRestore();
+        });
+        const worktreeInput = {
+          worktreeId: f.worktreeId,
+          kiloSessionId: f.kiloSessionId,
+          ownerId: f.userId,
+        };
+        await runInDurableObject(f.session, async instance => {
+          const failed =
+            action === 'session'
+              ? instance.deleteSession()
+              : instance.beginWorktreeDeletion(worktreeInput);
+          await expect(failed).rejects.toThrow('Injected worktree erasure failure');
+        });
+        expect(closedBeforePurge).toBe(true);
+        expect((await Promise.all(closed)).map(event => event.code)).toEqual(
+          action === 'worktree' ? [1001, 1000, 1000] : [1000, 1000, 1000]
+        );
+        if (action === 'session') {
+          expect(f.terminalCloses).toHaveLength(1);
+          expect(await f.control.listRoutes()).toEqual([]);
+        }
+        await expect(f.session.getCredentialMetadata()).resolves.toBeNull();
+        await expect(f.session.createTerminal()).resolves.toMatchObject({ success: false });
+        expect(
+          (
+            await f.session.fetch(
+              new Request('https://session.test/stream', { headers: { Upgrade: 'websocket' } })
+            )
+          ).status
+        ).toBe(action === 'worktree' ? 410 : 404);
+        await expect(f.session.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+        f.reply(held, worktreeSnapshotCapture(captureRevision(held)));
+        held = undefined;
+        await expect(lateCapture).resolves.toMatchObject({ status: 'failed' });
+        await f.settled();
+        restore();
+        await runInDurableObject(f.session, () => {
+          for (const client of clients) client.close();
+          clients.length = 0;
+        });
+        await abortAllDurableObjects();
+        const fresh = env.SANDBOX_SESSION.getByName(`${f.userId}:${f.sessionId}`);
+        await expect(fresh.getCredentialMetadata()).resolves.toBeNull();
+        await expect(fresh.createTerminal()).resolves.toMatchObject({ success: false });
+        expect(
+          (
+            await fresh.fetch(
+              new Request('https://session.test/stream', { headers: { Upgrade: 'websocket' } })
+            )
+          ).status
+        ).toBe(action === 'worktree' ? 410 : 404);
+        await expect(fresh.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+        await expect(
+          fresh.getWorktreeFile({ path: 'changed.ts', expectedRevision: 4 })
+        ).resolves.toEqual({ status: 'not_captured' });
+        await runInDurableObject(fresh, (_instance, state) => {
+          expect(state.storage.kv.get('session_lifecycle_fence')).toMatchObject({
+            state: 'deleted',
+          });
+          expect(state.storage.kv.get(WORKTREE_CHANGES_KEY)).toEqual(savedWorktreeSnapshot);
+          expect(state.storage.kv.get(`${WORKTREE_FILE_PREFIX}changed.ts`)).toEqual(
+            worktreeFileRecord(4)
+          );
+          expect(state.storage.kv.get('terminal:pty_worktree')).toMatchObject({ state: 'ended' });
+          expect(state.storage.kv.get('terminal_attached_session')).toBeUndefined();
+        });
+        if (action === 'session') await fresh.deleteSession();
+        else await fresh.beginWorktreeDeletion(worktreeInput);
+        await runInDurableObject(fresh, (_instance, state) => {
+          expect(state.storage.kv.get(WORKTREE_CHANGES_KEY)).toBeUndefined();
+          expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
+        });
+      } finally {
+        restore?.();
+        if (held) f.reply(held, worktreeSnapshotCapture(captureRevision(held)));
+        await lateCapture;
+        if (clients.length > 0)
+          await runInDurableObject(f.session, () => {
+            for (const client of clients) client.close();
+            clients.length = 0;
+          });
+        f.close();
+      }
+    }
+  );
+
+  it('reports both worktree erasure and detach failures while keeping deletion retriable', async () => {
+    const f = await worktreeFixture();
+    let restore: (() => void) | undefined;
+    const detach = vi
+      .spyOn(SandboxControl.prototype, 'detachSession')
+      .mockRejectedValue(new Error('Injected detach failure'));
+    try {
+      await runInDurableObject(f.session, async (instance, state) => {
+        state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+        state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+        const remove = state.storage.kv.delete.bind(state.storage.kv);
+        const spy = vi.spyOn(state.storage.kv, 'delete').mockImplementation(key => {
+          if (key.startsWith(WORKTREE_FILE_PREFIX))
+            throw new Error('Injected worktree erasure failure');
+          return remove(key);
+        });
+        restore = () => spy.mockRestore();
+        await expect(instance.deleteSession()).rejects.toMatchObject({
+          message: 'Session cleanup failed',
+          errors: [
+            expect.objectContaining({ message: 'Injected worktree erasure failure' }),
+            expect.objectContaining({ message: 'Injected detach failure' }),
+          ],
+        });
+        expect(state.storage.kv.get('session_lifecycle_fence')).toMatchObject({ state: 'deleted' });
+      });
+      expect(detach).toHaveBeenCalled();
+      restore?.();
+      detach.mockRestore();
+      await f.session.deleteSession();
+      await runInDurableObject(f.session, (_instance, state) => {
+        expect(state.storage.kv.get(WORKTREE_CHANGES_KEY)).toBeUndefined();
+        expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
+      });
+    } finally {
+      restore?.();
+      detach.mockRestore();
+      f.close();
+    }
+  });
+
+  it('fences late worktree capture and access after revocation even if detach fails', async () => {
+    const f = await worktreeFixture();
+    const detach = vi
+      .spyOn(SandboxControl.prototype, 'detachSession')
+      .mockRejectedValue(new Error('Injected detach failure'));
+    let held: RequestFrame | undefined;
+    let lateCapture: Promise<unknown> | undefined;
+    try {
+      await runInDurableObject(f.session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        if (!metadata) throw new Error('Missing fixture metadata');
+        state.storage.kv.put(
+          'session_metadata',
+          serializeSessionMetadata({
+            ...metadata,
+            identity: { ...metadata.identity, orgId: 'revoked-org' },
+          })
+        );
+        state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+        state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+      });
+      lateCapture = f.session.refreshWorktreeChanges();
+      held = await f.nextCapture();
+      await runInDurableObject(f.session, async instance => {
+        await expect(instance.closeOrgStreams('revoked-org')).rejects.toThrow(
+          'Injected detach failure'
+        );
+      });
+      f.reply(held, worktreeSnapshotCapture(captureRevision(held)));
+      held = undefined;
+      await expect(lateCapture).resolves.toMatchObject({ status: 'failed' });
+      await f.settled();
+      await abortAllDurableObjects();
+      const fresh = env.SANDBOX_SESSION.getByName(`${f.userId}:${f.sessionId}`);
+      await expect(fresh.getCredentialMetadata()).resolves.toBeNull();
+      await expect(fresh.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+      await expect(
+        fresh.getWorktreeFile({ path: 'changed.ts', expectedRevision: 4 })
+      ).resolves.toEqual({ status: 'not_captured' });
+      await runInDurableObject(fresh, (_instance, state) => {
+        expect(state.storage.kv.get('session_lifecycle_fence')).toMatchObject({ state: 'revoked' });
+        expect(state.storage.kv.get(WORKTREE_CHANGES_KEY)).toEqual(savedWorktreeSnapshot);
+        expect(state.storage.kv.get(`${WORKTREE_FILE_PREFIX}changed.ts`)).toEqual(
+          worktreeFileRecord(4)
+        );
+      });
+      detach.mockRestore();
+      await fresh.closeOrgStreams('revoked-org');
+      const freshControl = env.SANDBOX_CONTROL.getByName(f.sandboxId);
+      expect(await freshControl.listRoutes()).toEqual([]);
+    } finally {
+      detach.mockRestore();
+      if (held) f.reply(held, worktreeSnapshotCapture(captureRevision(held)));
+      await lateCapture;
+      f.close();
+    }
+  });
+});
 
 describe('SandboxSession worktree changes persistence', () => {
   beforeEach(() => {
@@ -8083,7 +8396,7 @@ describe('SandboxSession worktree changes persistence', () => {
     }
   });
 
-  it('rolls back the deletion fence if synchronous worktree erasure fails, allowing a complete retry', async () => {
+  it('preserves the deletion fence if worktree erasure fails, allowing a complete retry', async () => {
     const fixture = await worktreeFixture();
     let restore: (() => void) | undefined;
     try {
@@ -8101,9 +8414,10 @@ describe('SandboxSession worktree changes persistence', () => {
       await runInDurableObject(fixture.session, async instance => {
         await expect(instance.deleteSession()).rejects.toThrow('Injected worktree erasure failure');
       });
-      await expect(fixture.session.getMetadata()).resolves.not.toBeNull();
+      await expect(fixture.session.getMetadata()).resolves.toBeNull();
+      expect(await fixture.control.listRoutes()).toEqual([]);
       await runInDurableObject(fixture.session, (_instance, state) => {
-        expect(state.storage.kv.get('session_lifecycle_fence')).toBeUndefined();
+        expect(state.storage.kv.get('session_lifecycle_fence')).toMatchObject({ state: 'deleted' });
         expect(state.storage.kv.get(WORKTREE_CHANGES_KEY) !== undefined).toBe(true);
         expect(state.storage.kv.get(`${WORKTREE_FILE_PREFIX}changed.ts`) !== undefined).toBe(true);
       });

@@ -245,3 +245,10 @@ export type {
 } from './security-finding-audit.js';
 
 export { hasOrganizationAccess } from './organization-membership.js';
+
+export {
+  MAX_AUTO_COMMIT_MESSAGE_BYTES,
+  commitHashSchema,
+  autoCommitRecordSchema,
+} from './cloud-agent-commits.js';
+export type { AutoCommitRecord } from './cloud-agent-commits.js';

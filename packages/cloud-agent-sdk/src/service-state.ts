@@ -7,6 +7,7 @@
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
+import { sessionCommitDataSchema } from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
@@ -19,6 +20,7 @@ import type {
   CloudStatus,
   MessageDeliveryState,
   PreparationAttempt,
+  SessionCommit,
   PreparationStepSnapshot,
 } from './types';
 
@@ -72,6 +74,8 @@ type ServiceState = {
   /** @deprecated Legacy transient setup output. */
   getSetupLog(): readonly string[];
   getPreparationAttempts(): readonly PreparationAttempt[];
+  getCommits(): readonly SessionCommit[];
+  clearCommits(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
   getSuggestion(): SuggestionState | null;
@@ -117,6 +121,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let cloudStatus: CloudStatus | null = null;
   let setupLog: string[] = [];
   let preparationAttempts: PreparationAttempt[] = [];
+  let commits: readonly SessionCommit[] = [];
+  const seenCommits = new Set<string>();
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
@@ -546,12 +552,30 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processAutocommitCompleted(
     event: Extract<ServiceEvent, { type: 'autocommit_completed' }>
   ): void {
-    if (event.skipped) return;
+    if (event.skipped) {
+      if (status.type === 'autocommit' && status.step === 'started') {
+        status = IDLE_STATUS;
+        notify();
+      }
+      return;
+    }
 
-    if (event.success) {
+    const parsedCommit = sessionCommitDataSchema.safeParse(event);
+    const commitHash = parsedCommit.success ? parsedCommit.data.commitHash : undefined;
+    if (parsedCommit.success) {
+      if (seenCommits.has(parsedCommit.data.commitHash)) return;
+      seenCommits.add(parsedCommit.data.commitHash);
+      commits = [...commits, { ...parsedCommit.data, timestamp: event.timestamp }];
+    }
+    if (event.success || commitHash) {
       const parts = [event.commitHash, event.commitMessage].filter(Boolean);
       const message = parts.length > 0 ? parts.join(' ') : 'Committed';
-      status = { type: 'autocommit', step: 'completed', message };
+      status = {
+        type: 'autocommit',
+        step: 'completed',
+        message,
+        ...(commitHash ? { commitHash } : {}),
+      };
     } else {
       status = { type: 'autocommit', step: 'failed', message: event.message ?? 'Commit failed' };
     }
@@ -873,6 +897,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     getCloudStatus: () => cloudStatus,
     getSetupLog: () => setupLog,
     getPreparationAttempts: () => preparationAttempts,
+    getCommits: () => commits,
+    clearCommits(): void {
+      commits = [];
+      notify();
+    },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
     getSuggestion: () => suggestion,
@@ -890,6 +919,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       cloudStatus,
       setupLog,
       preparationAttempts,
+      commits,
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
@@ -925,6 +955,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       cloudStatus = null;
       setupLog = [];
       preparationAttempts = [];
+      commits = [];
+      seenCommits.clear();
       sessionInfo = null;
       questions = [];
       permissions = [];

@@ -5,7 +5,9 @@ import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
 import type { WorktreeChangesDrawer } from './WorktreeChanges';
-import type { StoredSession } from './types';
+import type { ConversationMessages } from './ConversationMessages';
+import type { StoredMessage, StoredSession } from './types';
+import type { SessionCommit } from '@kilocode/cloud-agent-sdk';
 import {
   CHAT_TAB_ID,
   addTerminalTab,
@@ -23,6 +25,7 @@ Object.assign(globalThis, { React });
 let mockSessionId: string | null = 'ses_recent';
 let mockWorktreeId: string | null = 'worktree_shared';
 let mockTabs: ComponentProps<typeof CloudAgentWorkspaceTabs>;
+let mockConversation: ComponentProps<typeof ConversationMessages>;
 let mockAtomValues: Record<string, unknown>;
 const mockClosedPtys: string[] = [];
 const mockChats = [
@@ -165,7 +168,10 @@ jest.mock('./ChatInput', () => ({
   ChatInput: () => createElement('input', { 'data-composer': true }),
 }));
 jest.mock('./ConversationMessages', () => ({
-  ConversationMessages: () => createElement('section', { 'data-conversation': true }),
+  ConversationMessages: (props: ComponentProps<typeof ConversationMessages>) => {
+    mockConversation = props;
+    return createElement('section', { 'data-conversation': true });
+  },
 }));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
 jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
@@ -371,6 +377,7 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       dynamicMessages: [],
       pendingMessages: new Map(),
       preparationAttempts: [],
+      commits: [],
       chatUI: { shouldAutoScroll: false },
     };
     dom = installTerminalTestDom();
@@ -479,6 +486,94 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     render({ organizationId: 'organization-a' });
     expect(dom.container.querySelector('[data-file-owner]')).toBeNull();
     expect(mockTabs.files).toEqual([]);
+  });
+
+  function receiveCommit() {
+    const commitHash = 'a'.repeat(40);
+    const commits: SessionCommit[] = [
+      {
+        commitHash,
+        commitMessage: 'Actual commit',
+        messageId: 'assistant',
+        userMessageId: 'user',
+        committedAt: '2026-09-01T10:00:00.000Z',
+        pushStatus: 'pushed',
+      },
+    ];
+    mockAtomValues.commits = commits;
+    mockAtomValues.dynamicMessages = [
+      {
+        info: {
+          id: 'assistant',
+          sessionID: 'ses_recent',
+          role: 'assistant',
+          time: { created: 1, completed: 2 },
+          parentID: 'user',
+          modelID: 'test',
+          providerID: 'test',
+          mode: 'code',
+          agent: 'code',
+          path: { cwd: '/', root: '/' },
+          cost: 0,
+          tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+        },
+        parts: [],
+      },
+    ] satisfies StoredMessage[];
+    render();
+    const anchors = mockConversation.commitsAfterMessage;
+    expect(anchors?.get('assistant')).toEqual(commits);
+    render();
+    expect(mockConversation.commitsAfterMessage).toBe(anchors);
+    return anchors;
+  }
+
+  it('adds commit metadata without changing workspace tabs, chats, the draft, or the mounted PTY', () => {
+    render();
+    const composer = dom.container.querySelector<HTMLInputElement>('[data-composer]');
+    if (!composer) throw new Error('Missing composer');
+    composer.value = 'Unsent draft';
+    const conversation = dom.container.querySelector('[data-conversation]');
+    const terminal = openTerminal();
+    const tabId = mockTabs.activeTabId;
+    const terminals = mockTabs.terminals;
+    const files = mockTabs.files;
+    const switches = mockManager.switchSession.mock.calls.length;
+    receiveCommit();
+    expect(mockTabs.activeTabId).toBe(tabId);
+    expect(mockTabs.terminals).toBe(terminals);
+    expect(mockTabs.files).toBe(files);
+    expect(mockTabs).not.toHaveProperty('commits');
+    expect(dom.container.querySelector('[data-composer]')).toBe(composer);
+    expect(composer.value).toBe('Unsent draft');
+    expect(dom.container.querySelector('[data-conversation]')).toBe(conversation);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockSessionId).toBe('ses_recent');
+    expect(mockManager.switchSession.mock.calls.length).toBe(switches);
+    expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('withholds old commit metadata before sibling atoms resolve while preserving the worktree PTY', () => {
+    render();
+    const terminal = openTerminal();
+    receiveCommit();
+    mockSessionId = 'ses_historical';
+    render();
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+  });
+
+  it('withholds commit metadata when the organization does not match the loaded session', () => {
+    receiveCommit();
+    render({ organizationId: 'another-organization' });
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
+  });
+
+  it('withholds commit metadata when access becomes read-only', () => {
+    receiveCommit();
+    mockAtomValues.isReadOnly = true;
+    render();
+    expect(mockConversation.commitsAfterMessage?.size).toBe(0);
   });
 
   it('scopes changes to each sibling control session without replacing its worktree terminal', () => {

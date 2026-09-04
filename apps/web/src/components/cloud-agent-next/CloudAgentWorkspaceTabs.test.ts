@@ -152,6 +152,17 @@ describe('CloudAgentWorkspaceTabs', () => {
       expect(html).toContain('Selected workspace panel');
     }
   });
+
+  it('keeps workspace navigation limited to chats, terminals, and saved files', () => {
+    const html = renderWorkspaceTabs({
+      terminals: [{ id: 'pty', title: 'Terminal 1', cloudAgentSessionId: 'workspace-one' }],
+      files: [{ path: 'src/file.ts' }],
+    });
+    expect((html.match(/<button\b[^>]*role="tab"/g) ?? []).length).toBe(3);
+    expect(html).not.toContain('View diff');
+    expect(html).not.toContain('Commit');
+  });
+
   it('renders complete grouped chat titles and selects only the current session tab', () => {
     const firstTitle = 'Investigate the complete authentication regression across every provider';
     const secondTitle = 'Fix the separate billing synchronization flow';

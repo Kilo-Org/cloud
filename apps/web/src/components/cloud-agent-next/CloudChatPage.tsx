@@ -55,6 +55,7 @@ import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import { WorktreeChangesDrawer } from './WorktreeChanges';
 import { WorktreeFilePane } from './WorktreeFilePane';
+import { commitsByMessageAnchor, isCommitSummaryRepresented } from './message-presentation';
 import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { canOpenWorktreeChanges } from './worktree-changes';
 import {
@@ -206,6 +207,7 @@ export default function CloudChatPage({
   const activity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
+  const commits = useAtomValue(manager.atoms.commits);
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const activePermission = useAtomValue(manager.atoms.activePermission);
   const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
@@ -276,6 +278,11 @@ export default function CloudChatPage({
   const fileScope = JSON.stringify([currentUserId, organizationId, sessionIdFromParams, sessionId]);
   const [resolvedFileScope, setResolvedFileScope] = useState(fileScope);
   const filesVisible = canOpenChanges && resolvedFileScope === fileScope;
+  const commitsAfterMessage = useMemo(
+    () =>
+      commitsByMessageAnchor([...staticMessages, ...dynamicMessages], filesVisible ? commits : []),
+    [commits, dynamicMessages, filesVisible, staticMessages]
+  );
   const activeWorkspaceTabId =
     !filesVisible && workspaceTabs.activeTabId.startsWith('file:')
       ? CHAT_TAB_ID
@@ -1008,8 +1015,9 @@ export default function CloudChatPage({
   // A running preparation row already shows live progress inline, so the
   // trailing progress row would repeat the same message beneath it.
   const visibleStatusIndicator =
-    statusIndicator?.type === 'progress' &&
-    preparationAttempts.some(attempt => attempt.status === 'running')
+    (statusIndicator?.type === 'progress' &&
+      preparationAttempts.some(attempt => attempt.status === 'running')) ||
+    isCommitSummaryRepresented(statusIndicator, commitsAfterMessage)
       ? null
       : statusIndicator;
 
@@ -1223,6 +1231,7 @@ export default function CloudChatPage({
                                 dynamicMessages={dynamicMessages}
                                 pendingMessages={pendingMessages}
                                 preparationByMessageId={preparationByMessageId}
+                                commitsAfterMessage={commitsAfterMessage}
                                 getChildMessages={getChildMessages}
                                 onOpenChildSession={handleOpenTopLevelChildSession}
                                 onOpenPreparationDetails={handleOpenPreparationDetails}

@@ -81,6 +81,25 @@ git diff --check
 - Set `freezeOnBlur: true` on tabs. Use haptics for commits and outcomes only, never passive interaction.
 - Set `transition={0}` on small or header `expo-image` images to avoid flicker.
 
+## Translations
+
+Copy lives in `src/i18n/locales/en.json`. The other 86 catalogs are reviewed
+against the screens their keys render on, so a key's name and its context are
+what a translator has to work from.
+
+- Add and edit copy in `en.json` only. Never hand-edit another catalog.
+- Search `en.json` for the string before you add a key. If the copy already
+  exists, reuse that key. `pnpm check:i18n` fails when two keys hold the same copy.
+- Put copy used by more than one section under `common.`.
+- Name a label with `$t(other.key)`; never spell an English label inside another
+  message, or every catalog quotes a button the reader never sees.
+- Keep the `{{placeholder}}` set identical to English. Word order around a
+  placeholder is the translator's to change, so never assume English order.
+- Name a key for what the string is, not for the one screen that shows it first.
+- If one English word truly needs two senses, add it to `TWO_SENSE_COPY` in
+  `tools/i18n/check-catalogs.mjs` and record both senses there.
+- Run `pnpm check:i18n` after you touch copy.
+
 ## Design
 
 The app follows https://github.com/Kilo-Org/kilo-design/ in general, except where this file states otherwise.

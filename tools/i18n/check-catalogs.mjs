@@ -42,6 +42,35 @@ const WORDING_EXCEPTIONS = JSON.parse(
 );
 
 /**
+ * English strings this product uses in two senses, so each sense needs a key.
+ *
+ * Every other piece of copy belongs to exactly one key. Two keys holding the
+ * same English string drift apart the moment someone translates one of them,
+ * and nothing downstream can tell which of the two the reader was meant to see.
+ *
+ * The value records why the split is real. Adding an entry claims the call sites
+ * mean different things; removing one promises the copy means the same thing
+ * everywhere it appears.
+ */
+const TWO_SENSE_COPY = new Map([
+  [
+    'open',
+    'the verb on a button and an alert action, versus the state of a pull request, a finding and an invoice',
+  ],
+  ['comment', 'the verb on a button, versus the noun on a row label and a badge'],
+  ['block', 'the verb, block a discussion participant, versus the reviewer decision to block'],
+  ['merge', 'the verb in the merge section header, versus the name of the merge method on a badge'],
+  ['review', 'the noun, a review, versus the verb in the onboarding step'],
+  ['high', 'the severity of a finding, versus the thinking effort of a model'],
+  ['medium', 'the severity of a finding, versus the thinking effort of a model'],
+  ['low', 'the severity of a finding, versus the thinking effort of a model'],
+  ['none', 'no review gate, versus the thinking effort of a model'],
+  ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
+  ['plan', 'a billing plan, versus the agent plan mode'],
+  ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+]);
+
+/**
  * Proper nouns, format-only strings, and pre-existing English-identical copy
  * outside this section's five keys. Remove a key from the set when that copy
  * is translated or the key is deleted.
@@ -383,6 +412,32 @@ for (const catalog of CATALOGS) {
     wordingGroups.get(folded).push(key);
   }
   const sharedWordings = [...wordingGroups].filter(([, keys]) => keys.length > 1);
+
+  // One key per piece of copy. Two keys holding the same English string cannot
+  // be translated apart without the catalogs drifting, so the copy belongs to
+  // one key and every call site points at it. A plural family shares copy by
+  // design, so its members are exempt.
+  if (catalog.name === 'mobile') {
+    const byCopy = new Map();
+    for (const [key, value] of english) {
+      if (pluralParts(key)) {
+        continue;
+      }
+      if (!byCopy.has(value)) {
+        byCopy.set(value, []);
+      }
+      byCopy.get(value).push(key);
+    }
+    for (const [value, keys] of byCopy) {
+      if (keys.length < 2 || TWO_SENSE_COPY.has(wording(value))) {
+        continue;
+      }
+      fail(
+        `${catalog.name}/en: ${keys.length} keys hold the copy "${value}" (${keys.join(', ')}). Point every call site at one key, or add the string to TWO_SENSE_COPY in tools/i18n/check-catalogs.mjs with the two senses it carries.`
+      );
+    }
+  }
+
   for (const [key, value] of english) {
     if (value.trim() === '') {
       fail(`${catalog.name}/en: "${key}" is empty`);

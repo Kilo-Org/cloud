@@ -5,6 +5,7 @@ import { compactSession } from './compact.js';
 import type { ModelError, ModelEvent, ModelUsage } from './model.js';
 import { cancelQueued, type Continued, enqueueMessage, type Waiting } from './queue.js';
 import type { StoreError } from './storage.js';
+import { backgroundNow, type RunningCall, runningIn } from './tools.js';
 import type { PartDraft, Turn } from './turn.js';
 import type { Wiring } from './wiring.js';
 
@@ -40,6 +41,25 @@ interface SessionHandle {
   readonly cancel: (id: string) => Effect.Effect<boolean>;
   /** What is waiting to be said, in the order it will be. Empty when nothing is. */
   readonly queued: Effect.Effect<readonly Waiting[]>;
+  /**
+   * The calls the model is waiting on right now, oldest first. Show it, or read
+   * it to decide what has waited long enough.
+   */
+  readonly running: Effect.Effect<readonly RunningCall[]>;
+  /**
+   * Stops the model waiting for one call, now, and answers whether it was still
+   * waiting.
+   *
+   * The work is untouched: it keeps running, and what it says arrives in a
+   * round of its own, exactly as it would have on the deadline. This is the
+   * deadline brought forward by somebody who knows better than a fixed number —
+   * a person watching a call take too long, or an agent deciding it has waited
+   * enough. The session does not need to know which of them it was.
+   *
+   * False means the call has already been answered, has already gone to the
+   * background, or was never here. None of those is an error.
+   */
+  readonly background: (callId: string) => Effect.Effect<boolean>;
   /** Every turn so far, oldest first. Appending a turn never changes this one. */
   readonly history: Effect.Effect<readonly Turn[]>;
   /** The counts of every call so far. Pass to `hitRatio` for the cache share. */
@@ -89,6 +109,8 @@ const handleOf = (wiring: Wiring): Effect.Effect<SessionHandle> =>
       enqueueMessage(wiring.pending, input, options),
     cancel: (id: string) => cancelQueued(wiring.pending, id),
     queued: Ref.get(wiring.pending.waiting),
+    running: runningIn(wiring),
+    background: (callId: string) => backgroundNow(wiring, callId),
     history: Effect.map(Ref.get(wiring.state), session => session.turns),
     usage: Ref.get(wiring.totals),
     compact: whileFree(wiring, compactSession(wiring)),

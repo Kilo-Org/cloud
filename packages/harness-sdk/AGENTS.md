@@ -411,6 +411,7 @@ PASS  image       12s  every shape carried the picture and replayed it
 PASS  cancel      10s  the call stopped when the caller did
 PASS  queue        8s  two handed over while busy, one taken back, order kept
 PASS  together    24s  a late answer and a typed message shared one line
+PASS  subagent    ??s  a task went down, one answer came up, a call was sent away
 PASS  session     24s  the prefix held across 10 calls, a busy session refused
 PASS  resume      11s  the stored count is the provider's own
 PASS  clone       10s  the clone read 11848 tokens of prefix and wrote 0
@@ -556,6 +557,31 @@ prompt rather than for the line.
 
 Breaking `cancelQueued` so it removes nothing fails five of the run's claims,
 including `the cancelled message was said to the model anyway`.
+
+### A subagent, and a call sent away
+
+`pnpm test:e2e:subagent` proves the two things a fake cannot. That a real model
+reads the subagent tool as something to hand a whole task to, and that what
+comes back is usable as an answer.
+
+The subagent is told a codename the parent never sees, so an answer carrying it
+came up through the tool. Its identifier is not the parent's and its counts are
+its own. Then the same tool is run again with a five-minute deadline and sent
+away by the caller the moment `session.running` shows the model waiting on it:
+nothing here is the clock. The model answers without it and is told the result
+in a round of its own.
+
+Measured 2026-09-04, `anthropic/claude-haiku-4.5`:
+
+```
+the parent answered: "This quarter's codename is \"nightjar.\""
+the subagent said:   "nightjar"
+parent spent 1621 tokens, subagent 64
+
+sent away: "subagent"
+answered without it: "I've asked the subagent to find this quarter's codename and am waiting for its response."
+told later:          "This quarter's codename is Nightjar."
+```
 
 ### One line, contended
 
@@ -956,6 +982,50 @@ A result that lands while a question is still streaming waits for it, because
 one session still does one thing at a time. The driver retries while the session
 is busy, for up to five minutes, and a session busy longer than that surfaces on
 `session.continued` rather than spinning forever.
+
+### The deadline can be brought forward
+
+`Tool.inlineFor` and the session's own limit are guesses made before a call
+starts. `session.background(callId)` is the same decision made by somebody who
+can see how long it has taken, and `session.running` is what they read to
+decide. Nothing is cancelled: the call keeps running in the session's scope and
+answers in a round of its own, down the path the deadline already took.
+
+One call serves a person and an agent. A key press and a policy in the harness's
+own code say the same thing to the session, and there is no second surface for
+the second one: which of them decided is the caller's business.
+
+It is one `Deferred` per waiting call, raced against the deadline. The call is
+in `wiring.running` from the moment it starts until the model stops waiting for
+it — answered, timed out, or sent away — so `background` on anything else
+answers false rather than failing. Pressing twice answers false the second time,
+which is a person racing their own hand and not an error.
+
+### A subagent is a session, not a new mechanism
+
+`subagentTool` calls `openSession` from inside a tool. That is the whole
+implementation, and it is the answer to what the architecture makes cheap: a
+subagent needs no new seam, no nesting in the session, and no change to the
+loop.
+
+It takes the layers it runs under, because `Tool.run` is handed no context. What
+crosses between parent and subagent was the only real decision:
+
+- **One string goes up**, and not what the subagent said on the way to its own
+  tools. A model narrates before it calls something, and handing that up would
+  put back the noise a subagent exists to absorb. The answer is what it said
+  after its last call.
+- **The counts do not go up.** They belong to the session that spent them.
+  `onFinished` hands them to a caller that is adding up a conversation, which is
+  the one thing that cannot be recovered afterwards.
+- **The store does cross**, and on purpose. A session reads `SessionStore` from
+  the context it runs in, through `Effect.serviceOption`, which puts no
+  requirement in the type. A tool runs inside the parent's context, so the
+  subagent writes to the same database under a session of its own: one database,
+  two transcripts. Pass layers with a store of their own to separate even that.
+- **Depth is the harness's decision.** A subagent offered the tool that started
+  it can start one of its own. Nothing here stops that, because nothing here
+  knows what the harness is for.
 
 ### The one tool the package ships
 
@@ -1451,6 +1521,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/entropy/seeded.ts` | A repeatable source, for a test or a replay |
 | `src/plugins/token/static.ts` | One token for the life of the process |
 | `src/plugins/tools/question.ts` | The question tool, and the asker a caller writes |
+| `src/plugins/tools/subagent.ts` | The subagent tool: `openSession` from inside a tool |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/store/sqlite.ts` | Every query, written once for every platform |
 | `src/plugins/store/driver.ts` | The one-function seam an adapter fills, and `transact` |

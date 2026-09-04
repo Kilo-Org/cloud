@@ -8,6 +8,7 @@ import { continueSession, cloneSession } from '../src/core/resume.js';
 import { TokenError, type TokenSourceService } from '../src/core/token.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
+import { subagentTool } from '../src/plugins/tools/subagent.js';
 import { hitRatio } from '../src/core/usage.js';
 import type { Continued } from '../src/core/queue.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
@@ -176,3 +177,19 @@ const ask: Asker = questions =>
   );
 
 export const tools = [questionTool(ask)];
+
+/* The README's on-demand backgrounding. */
+export const sending = Effect.gen(function* () {
+  const session = yield* openSession({ system: 'sys', model: 'm' });
+  const waiting = yield* session.running;
+  const sent = yield* session.background(waiting[0]?.id ?? '');
+  return sent;
+});
+
+/* The README's subagent, over the layers the caller already built. */
+export const withSubagent = [
+  subagentTool(
+    { system: 'You look things up.', model: 'anthropic/claude-haiku-4.5', inlineFor: '5 seconds' },
+    layers
+  ),
+];

@@ -1,8 +1,8 @@
-import { Cause, Duration, Effect, type Exit, Fiber, Option } from 'effect';
+import { Cause, Clock, Deferred, Duration, Effect, type Exit, Fiber, Option, Ref } from 'effect';
 import { enqueue } from './queue.js';
 import { type Tool, type ToolCall, type ToolFailure, type ToolResult, toolNamed } from './tool.js';
 import { makeTurn, type PartDraft, type Turn } from './turn.js';
-import type { Wiring } from './wiring.js';
+import type { Running, Wiring } from './wiring.js';
 
 /**
  * Runs the tools one turn asked for, and turns what they say into a turn.
@@ -85,6 +85,90 @@ const working = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<Tool
   return permit === undefined ? work : permit.withPermits(1)(work);
 };
 
+/** One call the model is waiting on, as a caller reads it. */
+interface RunningCall {
+  readonly id: string;
+  readonly name: string;
+  readonly since: number;
+}
+
+const shown = (one: Running): RunningCall => ({
+  id: one.call.id,
+  name: one.call.name,
+  since: one.since,
+});
+
+/** What the model is waiting on now, in the order the calls started. */
+const runningIn = (wiring: Wiring): Effect.Effect<readonly RunningCall[]> =>
+  Effect.map(Ref.get(wiring.running), held =>
+    [...held.values()].map(shown).sort((one, other) => one.since - other.since)
+  );
+
+/**
+ * Stops the model waiting for one call, now. True when it was still waiting.
+ *
+ * False means the call has already been answered, has already gone to the
+ * background, or was never here. None of those is an error: a person pressing
+ * the key as the answer lands is ordinary.
+ *
+ * The same call serves a person and an agent. Which of them decided is the
+ * caller's business, and the session does not need to know.
+ */
+const backgroundNow = (wiring: Wiring, callId: string): Effect.Effect<boolean> =>
+  Effect.flatMap(Ref.get(wiring.running), held => {
+    const one = held.get(callId);
+    /* `Deferred.succeed` answers false when it was already completed, which is
+       a call somebody sent away twice. Both facts read the same to a caller:
+       it is no longer waiting on this one. */
+    return one === undefined ? Effect.succeed(false) : Deferred.succeed(one.release, true);
+  });
+
+/** Holds the call in `running` for as long as the model is waiting on it. */
+const whileWaiting = <A>(
+  wiring: Wiring,
+  one: Omit<Running, 'since'>,
+  wait: Effect.Effect<A>
+): Effect.Effect<A> =>
+  Effect.acquireUseRelease(
+    Effect.flatMap(Clock.currentTimeMillis, since =>
+      Ref.update(wiring.running, held => new Map(held).set(one.call.id, { ...one, since }))
+    ),
+    () => wait,
+    () =>
+      Ref.update(wiring.running, held => {
+        const left = new Map(held);
+        left.delete(one.call.id);
+        return left;
+      })
+  );
+
+/**
+ * Waits for the call, unless the deadline passes or somebody sends it away.
+ *
+ * `None` means the model stops waiting: the answer is not here, and the call
+ * carries on without it.
+ */
+const waited = (
+  fiber: Fiber.RuntimeFiber<ToolResult>,
+  release: Deferred.Deferred<boolean>,
+  wait: Duration.Duration
+): Effect.Effect<Option.Option<Exit.Exit<ToolResult>>> =>
+  Duration.isZero(wait)
+    ? Effect.succeed(Option.none())
+    : Effect.map(
+        Effect.timeoutOption(
+          Effect.raceFirst(
+            Effect.map(
+              Fiber.await(fiber),
+              (exit): Option.Option<Exit.Exit<ToolResult>> => Option.some(exit)
+            ),
+            Effect.as(Deferred.await(release), Option.none<Exit.Exit<ToolResult>>())
+          ),
+          wait
+        ),
+        Option.flatten
+      );
+
 /**
  * One call, run under a deadline it can outlive.
  *
@@ -101,10 +185,9 @@ const working = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<Tool
 const under = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<ToolResult> =>
   Effect.gen(function* () {
     const fiber = yield* Effect.forkIn(working(wiring, tool, call), wiring.scope);
+    const release = yield* Deferred.make<boolean>();
     const wait = Duration.decode(waitFor(wiring, tool));
-    const ended = Duration.isZero(wait)
-      ? Option.none<Exit.Exit<ToolResult>>()
-      : yield* Effect.timeoutOption(Fiber.await(fiber), wait);
+    const ended = yield* whileWaiting(wiring, { call, release }, waited(fiber, release, wait));
     return yield* Option.match(ended, {
       onSome: (exit: Exit.Exit<ToolResult>) => exit,
       onNone: () => later(wiring, call, fiber),
@@ -182,4 +265,5 @@ const callsIn = (turn: Turn): readonly ToolCall[] =>
     .filter(part => part.kind === 'toolCall')
     .map(part => ({ id: part.callId, name: part.name, arguments: part.body }));
 
-export { callsIn, defaultInlineFor, lateText, resultsTurn, runCalls };
+export type { RunningCall };
+export { backgroundNow, callsIn, defaultInlineFor, lateText, resultsTurn, runCalls, runningIn };

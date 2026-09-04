@@ -37,6 +37,7 @@
     "test:e2e:resume": "ttsx e2e/resume.ts",
     "test:e2e:replay": "ttsx e2e/replay.ts",
     "test:e2e:reasoning": "ttsx e2e/reasoning.ts",
+    "test:e2e:subagent": "ttsx e2e/subagent.ts",
     "test:e2e:session": "ttsx e2e/session.ts",
     "test:e2e:shapes": "ttsx e2e/shapes.ts",
     "test:e2e:stop": "ttsx e2e/stop.ts",

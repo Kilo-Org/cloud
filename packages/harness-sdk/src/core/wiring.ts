@@ -1,4 +1,4 @@
-import { type Duration, Effect, type Option, PubSub, Ref, type Scope } from 'effect';
+import { type Deferred, type Duration, Effect, type Option, PubSub, Ref, type Scope } from 'effect';
 import type { SessionBusyError } from './ask.js';
 import { ModelCatalog, type ModelCatalogService } from './catalog.js';
 import { EntropySource, type EntropySourceService } from './entropy.js';
@@ -14,7 +14,7 @@ import { PromptAssembler, type PromptAssemblerService } from './prompt.js';
 import { type Continued, makePending, type Pending } from './queue.js';
 import type { Session } from './session.js';
 import { onStore, SessionStore, type SessionStoreService, type StoreError } from './storage.js';
-import { locksFor, resolveTools, type Tool, type ToolMissingError } from './tool.js';
+import { locksFor, resolveTools, type Tool, type ToolCall, type ToolMissingError } from './tool.js';
 
 /**
  * What a session is opened with. Every value is frozen for the life of the
@@ -98,6 +98,13 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
    */
   readonly locks: ReadonlyMap<string, Effect.Semaphore>;
   /**
+   * The calls the model is waiting on right now, by identifier. A call is here
+   * from the moment it starts until the model stops waiting for it, whether
+   * that is because it answered, because the deadline passed, or because
+   * somebody sent it to the background.
+   */
+  readonly running: Ref.Ref<ReadonlyMap<string, Running>>;
+  /**
    * The session's own scope. Work that has to outlive the question that started
    * it is forked here: a backgrounded tool, and the thing that drives what it
    * eventually says. Closing the session stops all of it.
@@ -115,6 +122,22 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
    * for display, and the transcript is the record.
    */
   readonly continued: PubSub.PubSub<Continued>;
+}
+
+/**
+ * A call the model is still waiting on, and the way to stop it waiting.
+ *
+ * The deadline is not the only thing that can end the waiting. A person
+ * watching a call take too long, or an agent that decides it has waited enough,
+ * completes `release`, and the model is moved on at once. The work itself is
+ * untouched either way: it keeps running, and what it says arrives in a round
+ * of its own.
+ */
+interface Running {
+  readonly call: ToolCall;
+  /** When the call started, from the session's clock. */
+  readonly since: number;
+  readonly release: Deferred.Deferred<boolean>;
 }
 
 /**
@@ -172,6 +195,7 @@ const wiringFor = (
       busy: yield* Ref.make(false),
       tools,
       locks: yield* locksFor(tools),
+      running: yield* Ref.make<ReadonlyMap<string, Running>>(new Map()),
       scope: yield* Effect.scope,
       pending: yield* makePending(yield* EntropySource),
       continued: yield* PubSub.sliding<Continued>({
@@ -185,5 +209,5 @@ const wiringFor = (
     return wiring;
   });
 
-export type { ContinuedError, SessionContext, SessionOptions, Wiring };
+export type { ContinuedError, Running, SessionContext, SessionOptions, Wiring };
 export { wiringFor };

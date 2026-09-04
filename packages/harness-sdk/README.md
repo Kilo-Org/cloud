@@ -266,6 +266,49 @@ The answer goes back as a turn the conversation says, never as a second tool
 result: the call it belongs to was already answered, and every shape refuses a
 second result for one call.
 
+### Sending a running call away
+
+The deadline is a guess made before the call started. Whoever is watching knows
+better, so any call the model is waiting on can be sent to the background now:
+
+```ts
+const waiting = yield* session.running;
+const sent = yield* session.background(waiting[0]?.id ?? '');
+```
+
+Nothing is cancelled. The work carries on and answers in a round of its own,
+exactly as it would have on the deadline — this is the deadline brought forward.
+`background` answers false when the call has already been answered, has already
+gone to the background, or was never here.
+
+The same call serves a person pressing a key and an agent deciding it has waited
+long enough. The session does not need to know which of them it was.
+
+### The subagent tool
+
+A tool that is a session of its own: its own system prompt, its own model, its
+own tools, and a transcript the parent never sees. The parent pays for one
+answer rather than for every step that produced it.
+
+```ts
+const tools = [
+  subagentTool(
+    { system: 'You look things up.', model: 'anthropic/claude-haiku-4.5', inlineFor: '5 seconds' },
+    layers
+  ),
+];
+```
+
+It takes the layers to run under because a tool is handed no context. They may
+be the ones the parent uses or another set entirely, which is how a subagent
+runs on a cheaper model than the one that called it.
+
+What crosses back is one string, and never what the subagent said on its way to
+its own tools. The counts do not: they belong to the session that spent them, so
+`onFinished` hands them over for a caller that is adding up what a conversation
+cost. A store does cross, because a session reads it from the context it runs
+in — the subagent writes to the same database under a session of its own.
+
 ### The question tool
 
 The package ships one tool, because no harness can do without it and none can

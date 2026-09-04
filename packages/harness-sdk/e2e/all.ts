@@ -22,6 +22,7 @@ const runs = [
   'cancel',
   'queue',
   'together',
+  'subagent',
   'session',
   'resume',
   'clone',

@@ -379,6 +379,26 @@ choose. UTC and the weekday always come back; `zone` adds the local time as
 well, and is the harness's to set rather than the model's, because a model
 naming its own zone is guessing.
 
+### The todo tool
+
+A model given a task of several steps forgets one, does two at once, or says it
+is finished with a step still open. Writing the steps down and reading them back
+is the fix, and every harness writes the same one.
+
+```ts
+import { todoTool } from '@kilocode/harness-sdk/plugins/tools';
+
+const tools = [todoTool({ onChanged: todos => draw(todos) })];
+```
+
+The model sends the whole list every time rather than a change to it. Patching
+needs stable identifiers, models invent them, and a patch against one that does
+not exist either fails the call or edits the wrong line. What comes back is the
+list as it now stands.
+
+The list belongs to the tool, not to a session, so a registry shared by a parent
+and its subagents shares one list. Build a tool per session where that is wrong.
+
 ### The question tool
 
 No harness can do without this one and none can write it for itself. Everything about the question is the model's — how many,
@@ -569,7 +589,7 @@ Each of these is a `Context.Tag`, and each ships a default the package owns.
 | Point | What it decides | This package ships |
 |---|---|---|
 | `ModelClient` | How a request leaves and a reply comes back | `layerKiloGateway` |
-| `ToolRegistry` | Every tool the harness has. A session names the ones it may use | `questionTool`, `subagentTool`, `timeTool` |
+| `ToolRegistry` | Every tool the harness has. A session names the ones it may use | `questionTool`, `subagentTool`, `timeTool`, `todoTool` |
 | `PromptAssembler` | What the prompt looks like, and where the breakpoints go | `layerAssembler` |
 | `ModelCatalog` | Which shapes a model speaks, its output limit, its window | `layerTableCatalog` |
 | `SessionStore` | Where the conversation is kept | `layerNodeStore`, `layerExpoStore` |

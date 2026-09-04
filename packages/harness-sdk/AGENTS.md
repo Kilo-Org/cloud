@@ -1125,12 +1125,12 @@ which is the one lab that list leaves out.
 
 Measured on 2026-09-04, eleven models, every shipped tool:
 
-| | question | subagent | time |
-|---|---:|---:|---:|
-| Called the tool | 11 of 11 | 11 of 11 | 11 of 11 |
-| Sent a payload the schema accepted | 11 of 11 | 11 of 11 | — |
-| Asked everything in one call | 11 of 11 | — | — |
-| Waited | 11 of 11 | 6 of 11 | — |
+| | question | subagent | time | todo |
+|---|---:|---:|---:|---:|
+| Called the tool | 11 of 11 | 11 of 11 | 11 of 11 | 11 of 11 |
+| Sent a payload the schema accepted | 11 of 11 | 11 of 11 | — | 11 of 11 |
+| Put every part in one call | 11 of 11 | — | — | 11 of 11 |
+| Waited | 11 of 11 | 8 of 11 | — | — |
 
 `time` takes no arguments and reads nothing off the call, so there is no payload
 to be wrong and nothing to wait on. What its column asks is whether a model
@@ -1145,8 +1145,16 @@ reads the field: `question` defaults to waiting and every model kept it,
 `subagent` defaults to not and seven of eleven overrode it. A model that never
 overrode would be a model ignoring the field.
 
-The question and time tools were clean on their first run and were not
-touched. The subagent
+The question, time and todo tools were clean on their first run and were not
+touched. `todo` was asked to start a job of three named parts, without the words
+"list" or "steps": every model wrote down three or more.
+
+One row of that run scored a provider hiccup rather than a model. `glm-5.3-flash`
+answered nothing at all — no tool call and no text — which is not a judgement and
+not something a description can fix, and it answered normally on every run
+since. `tried` now retries an empty answer on the other shape and keeps a second
+one, because twice is a finding. That is the second time this run measured the
+wrong thing, and both are recorded here so the third is caught in review. The subagent
 description was not, and what it cost is the point of keeping this run:
 
 | Description | Delegated |

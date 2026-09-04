@@ -45,6 +45,7 @@ const functions = [
   'questionTool',
   'subagentTool',
   'timeTool',
+  'todoTool',
 ] as const;
 
 /** What has an entry point of its own, and must not be reachable from the root. */

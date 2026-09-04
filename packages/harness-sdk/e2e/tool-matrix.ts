@@ -39,6 +39,7 @@ import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
 import { subagentTool } from '../src/plugins/tools/subagent.js';
 import { timeTool } from '../src/plugins/tools/time.js';
+import { type Todo, todoTool } from '../src/plugins/tools/todo.js';
 import { kilo } from './setup.js';
 import { failures, passed } from './report.js';
 
@@ -97,17 +98,35 @@ const watched = (events: readonly ModelEvent[]) => ({
 const preferred: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
 
 /**
+ * A model that neither called anything nor said anything has decided nothing.
+ *
+ * This is not a model reading a description badly, so it is not something a
+ * description can fix. `glm-5.3-flash` did it once on the todo scenario and
+ * answered normally on every run since — an empty answer is the provider, and
+ * scoring it would have sent somebody off to tune a description that was
+ * already right. It is the second time this run measured the wrong thing; the
+ * first is under "One tool version" in AGENTS.md.
+ */
+const decided = (one: Scored): boolean => one.called || one.said !== '';
+
+/**
  * Tries the best shape first, then the one every provider serves.
  *
- * Same fallback as `e2e/models.ts`. A provider that refuses a shape is not a
- * model using a tool badly, and scoring it as one would put a row in the table
- * that no description can fix.
+ * Same fallback as `e2e/models.ts`, plus the empty answer above. A provider that
+ * refuses a shape is not a model using a tool badly, and scoring it as one would
+ * put a row in the table that no description can fix. A second empty answer is
+ * kept rather than retried again: twice is a finding.
  */
 const tried = async (
   build: (kinds: readonly ApiKind[]) => Effect.Effect<Scored, unknown, never>
 ): Promise<Scored> => {
   const got = await Effect.runPromise(
-    Effect.either(build(preferred).pipe(Effect.catchAll(() => build(['chat_completions']))))
+    Effect.either(
+      build(preferred).pipe(
+        Effect.filterOrFail(decided, () => 'answered nothing at all' as const),
+        Effect.catchAll(() => build(['chat_completions']))
+      )
+    )
   );
   return got._tag === 'Left' ? nothing : got.right;
 };
@@ -248,6 +267,42 @@ const oneTime = (model: string, kinds: readonly ApiKind[]) =>
     }));
   });
 
+/* -------------------------------------------------------------------- todo */
+
+/**
+ * A task of several steps, without the word "list" or "steps" in it.
+ *
+ * Naming the tool's job in the question would measure obedience. What is being
+ * measured is whether a model reads a job of several parts as one to write
+ * down, which is the judgement the description has to produce.
+ */
+const planning =
+  'Migrate my project from npm to pnpm: check the lockfile, update the CI ' +
+  'workflow, and fix the install script. Start on it.';
+
+const oneTodo = (model: string, kinds: readonly ApiKind[]) =>
+  Effect.suspend(() => {
+    const drawn: (readonly Todo[])[] = [];
+    const tool = todoTool({ onChanged: todos => Effect.sync(() => void drawn.push(todos)) });
+    const layers = Layer.merge(
+      kilo({ apiKinds: kinds }),
+      Layer.succeed(ToolRegistry, { tools: [tool] })
+    );
+    const program = Effect.gen(function* () {
+      const session = yield* openSession({ system, model, maxTokens, tools: ['todo'] });
+      return [...(yield* Stream.runCollect(session.ask(planning)))];
+    });
+    return Effect.map(Effect.scoped(Effect.provide(program, layers)), events => ({
+      ...watched(events),
+      /* The harness is told only on a list the schema accepted, so being told at
+         all is the payload being right. */
+      valid: drawn.length > 0,
+      /* How many steps went down in the first list. One is a model that did not
+         read the task as having parts. */
+      together: drawn[0]?.length ?? 0,
+    }));
+  });
+
 /* ------------------------------------------------------------------- table */
 
 const scored = async (model: string) => ({
@@ -255,6 +310,7 @@ const scored = async (model: string) => ({
   question: await tried(kinds => oneQuestion(model, kinds)),
   subagent: await tried(kinds => oneSubagent(model, kinds)),
   time: await tried(kinds => oneTime(model, kinds)),
+  todo: await tried(kinds => oneTodo(model, kinds)),
 });
 
 const rows = await Promise.all(chosen.map(scored));
@@ -263,12 +319,12 @@ const pad = (text: string, width: number) => text.padEnd(width);
 const mark = (right: boolean) => (right ? 'yes' : 'NO');
 
 console.log(
-  `\n${pad('model', 32)}${pad('question', 32)}${pad('subagent', 20)}time\n` +
+  `\n${pad('model', 32)}${pad('question', 32)}${pad('subagent', 20)}${pad('time', 8)}todo\n` +
     `${pad('', 32)}${pad('called valid batch  waited', 32)}` +
-    `${pad('called valid waited', 20)}called`
+    `${pad('called valid waited', 20)}${pad('called', 8)}called valid steps`
 );
 
-for (const { model, question, subagent, time } of rows) {
+for (const { model, question, subagent, time, todo } of rows) {
   console.log(
     pad(model, 32) +
       pad(mark(question.called), 7) +
@@ -278,7 +334,10 @@ for (const { model, question, subagent, time } of rows) {
       pad(mark(subagent.called), 7) +
       pad(mark(subagent.valid), 6) +
       pad(mark(subagent.waited), 7) +
-      mark(time.called)
+      pad(mark(time.called), 8) +
+      pad(mark(todo.called), 7) +
+      pad(mark(todo.valid), 6) +
+      String(todo.together)
   );
 
   /* The floor. Everything else is a number to tune a description against. */
@@ -286,6 +345,7 @@ for (const { model, question, subagent, time } of rows) {
     ['question', question],
     ['subagent', subagent],
     ['time', time],
+    ['todo', todo],
   ] as const) {
     if (!one.called) {
       failures.push(`${model} never called ${name}, and said: ${JSON.stringify(one.said)}`);
@@ -301,7 +361,8 @@ const share = (of: (row: (typeof rows)[number]) => boolean) =>
 console.log(
   `\nasked everything in one call:      ${share(row => row.question.together > 1)}` +
     `\nkept question's waiting default:   ${share(row => row.question.waited)}` +
-    `\noverrode subagent's, as it had to: ${share(row => row.subagent.called && row.subagent.waited)}`
+    `\noverrode subagent's, as it had to: ${share(row => row.subagent.called && row.subagent.waited)}` +
+    `\nwrote down every step of three:     ${share(row => row.todo.together >= 3)}`
 );
 
 passed('every model called every tool and sent each one a payload it could read.');

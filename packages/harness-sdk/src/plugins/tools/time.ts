@@ -107,9 +107,7 @@ const wordsFor = (at: Date, zone: string | undefined): string => {
 const timeTool = (options?: TimeOptions): Tool => ({
   definition: { name: options?.name ?? 'time', description, parameters },
   run: (_call: ToolCall) =>
-    Effect.map(Clock.currentTimeMillis, (at: number) =>
-      wordsFor(new Date(at), options?.zone)
-    ),
+    Effect.map(Clock.currentTimeMillis, (at: number) => wordsFor(new Date(at), options?.zone)),
 });
 
 export type { TimeOptions };

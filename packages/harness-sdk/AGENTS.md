@@ -144,6 +144,12 @@ Marginal cost through `openSession`, `ask`, the gateway and a fake transport,
 | SSE parse and wire read (the validator table above) | 0.25 |
 | typia validation alone | 0.005 |
 
+What one exchange holds while the reply streams is one record behind one ref,
+not a ref per field. Copying the other three fields on every token costs
+0.054 us against 0.402 for the update itself, measured 2026-09-04 over 200000
+rounds — a third of a percent of what a token costs through the whole session,
+for one concept instead of five and a single read at the end.
+
 Identifiers, measured the same day:
 
 | | us |

@@ -741,6 +741,12 @@ with nothing between them: a signature does not close a block here, so both
 land in one part with the second signature. A model produces those between tool
 calls, which this package does not have. Split on the signature when it does.
 
+Measured with `pnpm test:e2e:probe responses anthropic/claude-sonnet-4.5` on
+2026-09-04: one reasoning item and one message in a turn, 43
+`response.reasoning.delta` frames and a single `response.output_item.done`
+carrying the reasoning. So the merge loses nothing today, and the probe is how
+to check that again.
+
 ### A provider may fail after the answer has started
 
 All three shapes may report a failure in the middle of a stream that they would

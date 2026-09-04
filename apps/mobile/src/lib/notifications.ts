@@ -258,7 +258,7 @@ async function getActiveUserId(): Promise<string | null> {
 
 const shown = {
   shouldPlaySound: true,
-  shouldSetBadge: false,
+  shouldSetBadge: true,
   shouldShowBanner: true,
   shouldShowList: true,
 } satisfies Notifications.NotificationBehavior;

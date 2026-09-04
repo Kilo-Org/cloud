@@ -606,7 +606,7 @@ describe('glanceable app badge sink', () => {
     });
   });
 
-  it('applies foreground glanceable counts and disables ordinary push badges', async () => {
+  it('applies foreground glanceable counts and allows visible push badges', async () => {
     const { loaded } = await loadBadgeSink();
     loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
     mockSecureStoreKeys();
@@ -629,7 +629,7 @@ describe('glanceable app badge sink', () => {
         },
       },
     });
-    expect(ordinary.shouldSetBadge).toBe(false);
+    expect(ordinary.shouldSetBadge).toBe(true);
     expect(mocks.setBadgeCountAsync).not.toHaveBeenCalled();
 
     const stale = await registration.handleNotification({

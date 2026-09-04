@@ -236,7 +236,7 @@ export function SettingsOverviewScreen({
             <View className="flex-1 pr-3">
               <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
               <Text variant="muted" className="text-xs">
-                {data.isEnabled ? repoCountLabel : t('securityAgent.settingsOverview.disabled')}
+                {data.isEnabled ? repoCountLabel : t('common.disabled')}
               </Text>
             </View>
             {capability.canManage ? (
@@ -248,9 +248,7 @@ export function SettingsOverviewScreen({
               />
             ) : (
               <Text variant="muted" className="text-xs">
-                {data.isEnabled
-                  ? t('common.enabled')
-                  : t('securityAgent.settingsOverview.disabled')}
+                {data.isEnabled ? t('common.enabled') : t('common.disabled')}
               </Text>
             )}
           </View>

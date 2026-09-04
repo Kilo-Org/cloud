@@ -69,14 +69,64 @@
     "repository": "저장소",
     "signOut": "로그아웃",
     "agents": "에이전트",
-    "all": "전체"
+    "all": "전체",
+    "allModels": "모든 모델",
+    "balanced": "균형형",
+    "bitbucketConnected": "Bitbucket 연결됨",
+    "branch": "브랜치",
+    "cameraAccessDisabled": "카메라 접근 권한 없음",
+    "chat": "채팅",
+    "clearFilters": "필터 초기화",
+    "clearSearch": "검색어 지우기",
+    "closed": "닫힘",
+    "closeReactions": "반응 닫기",
+    "connect": "연결",
+    "connectBitbucket": "Bitbucket 연결",
+    "connectGitlab": "GitLab 연결",
+    "contentTruncated": "내용 일부 생략됨",
+    "copyLink": "링크 복사",
+    "couldNotLoadOrganizations": "조직을 불러오지 못했습니다.",
+    "couldNotLoadSessions": "세션을 불러오지 못했습니다.",
+    "couldnTLoadMore": "추가 항목을 불러오지 못했습니다.",
+    "deviceSessions": "기기 세션",
+    "disabled": "비활성화됨",
+    "email": "이메일",
+    "ends": "{{date}}에 종료",
+    "failed": "실패",
+    "file": "파일",
+    "gitlab": "GitLab",
+    "goBack": "뒤로 가기",
+    "idle": "대기 중",
+    "keepEditing": "계속 편집",
+    "keepRunning": "계속 실행",
+    "kiloclaw": "KiloClaw",
+    "newSession": "새 세션",
+    "noKiloclawInstances": "KiloClaw 인스턴스 없음",
+    "noModelsAvailable": "사용 가능한 모델 없음",
+    "notFound": "항목을 찾을 수 없습니다.",
+    "online": "온라인",
+    "open": "{{name}} 열기",
+    "openPullRequest": "풀 리퀘스트 오픈",
+    "pending": "대기 중",
+    "performance": "성능",
+    "preferences": "환경설정",
+    "privacyPolicy": "개인정보 처리방침",
+    "profile": "프로필",
+    "reactions": "반응",
+    "recent": "최근",
+    "recommended": "추천",
+    "remaining": "잔여",
+    "rename": "이름 변경",
+    "reply": "답글",
+    "reportSubmittedReceipt": "신고가 접수되었습니다. 접수 번호: {{receiptId}}",
+    "retryLoadingMore": "추가 항목 불러오기 재시도",
+    "reviewPr": "PR 리뷰"
   },
   "language": {
     "title": "언어",
     "restarting": "언어 적용을 위해 다시 시작 중",
     "couldNotRestart": "다시 시작 실패",
     "languageSaved": "언어 설정이 저장되었습니다.",
-    "retry": "다시 시도",
     "catalogLoadFailed": "언어 데이터를 불러올 수 없습니다. 다시 시도하세요.",
     "search": "언어 검색",
     "noMatches": "일치하는 언어가 없습니다",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "로그인 코드: {{code}}",
     "openSignInPageInBrowser": "브라우저에서 로그인 페이지 열기",
     "copySignInLink": "로그인 링크 복사",
-    "copyLink": "링크 복사",
     "cancelSignIn": "로그인 취소",
     "startingSignIn": "로그인 시작 중...",
     "organizationUsesSso": "조직에서 통합 로그인(SSO)을 사용합니다.",
@@ -112,7 +161,6 @@
     "terms": "약관",
     "termsConnector": " 및 ",
     "termsSuffix": "에 동의합니다.",
-    "privacyPolicy": "개인정보 처리방침",
     "moreSignInOptions": "다른 방법으로 로그인",
     "couldNotCompleteSignIn": "로그인을 완료할 수 없습니다. 다시 시도하세요.",
     "sessionEnded": "세션이 종료되었습니다. 다시 로그인하세요.",
@@ -126,7 +174,6 @@
     "or": "또는"
   },
   "profile": {
-    "title": "프로필",
     "codeReviewerSubtitle": "자동 PR 리뷰",
     "securityAgentSubtitle": "취약점 탐지 및 해결",
     "reviews": "리뷰",
@@ -136,9 +183,7 @@
     "linkedAccounts": "연결된 계정",
     "couldNotLoadAccounts": "계정을 불러올 수 없습니다.",
     "app": "앱",
-    "preferences": "환경설정",
     "preferencesSubtitle": "화면 스타일, 알림, 추론 및 화면 동작",
-    "deviceSessions": "기기 세션",
     "deviceSessionsSubtitle": "다른 기기의 로그인 확인 및 로그아웃",
     "feedback": "피드백",
     "privacyChoices": "개인정보 설정",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "이메일",
     "providerTestAccount": "테스트 계정",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "엔터프라이즈 SSO"
   },
   "preferences": {
-    "title": "환경설정",
     "autoExpandThinking": "추론 내용 자동 펼치기",
     "autoExpandThinkingSubtitle": "에이전트의 추론이 끝나면 추론 내용을 펼쳐서 표시합니다.",
     "keepScreenOn": "세션 화면에서 화면 켜짐 유지",
@@ -245,17 +287,13 @@
   },
   "tabs": {
     "home": "홈",
-    "profile": "프로필",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, 탭, {{total}}개 중 {{position}}번째",
-    "chat": "채팅"
+    "position": "{{name}}, 탭, {{total}}개 중 {{position}}번째"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "인스턴스 전환",
       "couldNotLoadInstances": "인스턴스를 불러올 수 없습니다.",
-      "noInstances": "KiloClaw 인스턴스 없음",
       "noInstancesDescription": "채팅을 시작하려면 인스턴스를 설정하세요.",
       "setUpKiloclaw": "KiloClaw 설정",
       "currentInstance": "{{title}}, 현재 선택된 인스턴스"
@@ -277,16 +315,12 @@
       "couldNotSignIn": "채팅에 로그인할 수 없습니다.",
       "couldNotRefreshMessages": "메시지를 새로고침할 수 없습니다.",
       "couldNotLoadHistory": "대화 기록을 불러올 수 없습니다.",
-      "rename": "이름 변경",
       "leave": "나가기",
       "untitledConversation": "제목 없는 대화",
       "createFailed": "대화를 만들지 못했습니다.",
       "leaveFailed": "대화에서 나가지 못했습니다."
     },
     "reactions": {
-      "title": "반응",
-      "close": "반응 닫기",
-      "recent": "최근",
       "common": "자주 쓰는 반응",
       "reactWith": "{{reaction}} 반응 추가",
       "accessibility": "{{emoji}} 반응, {{displayCount}}개"
@@ -359,7 +393,6 @@
       "addReactionFailed": "반응을 추가하지 못했습니다.",
       "retrySend": "다시 보내기",
       "moreReactions": "다른 반응 보기",
-      "reply": "답글",
       "edit": "편집",
       "sendFailed": "메시지를 보내지 못했습니다.",
       "retrySendFailed": "메시지를 다시 보내지 못했습니다.",
@@ -370,7 +403,6 @@
       "takePhoto": "사진 찍기",
       "photoLibrary": "사진 보관함",
       "files": "파일",
-      "cameraAccessDisabled": "카메라 접근 권한 없음",
       "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 접근을 허용하세요."
     },
     "typingIndicator": {
@@ -380,8 +412,6 @@
       "typing_other": "{{names}}님이 입력 중..."
     },
     "botStatus": {
-      "online": "온라인",
-      "idle": "대기 중",
       "offline": "오프라인",
       "loadingUser": "사용자 정보 불러오는 중...",
       "waitingForStatus": "봇 상태 확인 대기 중...",
@@ -395,7 +425,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw 인스턴스를 불러오지 못했습니다.",
     "billing": {
       "title": "결제",
@@ -403,7 +432,6 @@
       "plan": "플랜",
       "finalTermEnds": "마지막 약정 종료일",
       "afterFinalTerm": "마지막 약정 종료 후",
-      "remaining": "잔여",
       "lessThanOneDay": "1일 미만",
       "ends": "종료일",
       "expires": "만료일",
@@ -504,20 +532,15 @@
       "disconnect": "Google 계정 연결 해제",
       "copied": "복사 완료",
       "copyCommand": "명령 복사",
-      "disabled": "비활성화됨",
       "disconnectConfirm": "연결 해제",
       "disconnectMessage": "이 인스턴스에서 Google 계정을 제거할까요? Gmail 알림이 꺼집니다. 변경 사항을 적용하려면 연결 해제 후 다시 배포하세요.",
       "disconnectTitle": "Google 연결 해제"
     },
     "modelList": {
-      "title": "모든 모델",
       "searchPlaceholder": "모델 검색...",
-      "clearSearch": "검색어 지우기",
       "noMatches": "검색 결과에 해당하는 모델 없음",
-      "noModels": "사용 가능한 모델 없음",
       "noModelsDescription": "사용 가능한 모델이 여기에 표시됩니다.",
-      "noResultsFor": "\"{{query}}\" 검색 결과가 없습니다.",
-      "recommended": "추천"
+      "noResultsFor": "\"{{query}}\" 검색 결과가 없습니다."
     },
     "secrets": {
       "title": "시크릿",
@@ -528,7 +551,6 @@
       "removeTitle": "시크릿 제거",
       "saved": "{{label}} 저장됨",
       "allFieldsRequired": "{{label}} 연결에 필요한 모든 항목을 입력하세요.",
-      "connect": "연결",
       "hide": "{{label}} 숨기기",
       "removing": "제거 중…",
       "saving": "저장 중…",
@@ -606,7 +628,6 @@
       "finishingSetup": "설정 마무리 중",
       "finishingSetupDescription": "계정 설정을 마무리하고 있습니다. 보통 금방 끝나니 잠시만 기다려 주세요.",
       "getStarted": "시작하기",
-      "noInstances": "KiloClaw 인스턴스 없음",
       "noInstancesDescription": "코딩 에이전트를 실행하려면 첫 인스턴스를 만드세요."
     },
     "instance": {
@@ -618,7 +639,6 @@
     "instanceCard": {
       "fixOnKiloAi": "kilo.ai에서 문제 해결: {{label}}",
       "needsAttention": "{{name}} 확인 필요: {{label}}",
-      "open": "{{name}} 열기",
       "openSettings": "{{name}} 설정 열기",
       "openUnread": "{{name}} 열기, 읽지 않은 메시지 {{displayCount}}개",
       "openUnread_other": "{{name}} 열기, 읽지 않은 메시지 {{displayCount}}개",
@@ -639,19 +659,16 @@
     "modelPicker": {
       "autoModelA11y": "{{label}} 자동 모델",
       "balancedDescription": "합리적인 비용으로 속도와 성능을 균형 있게 제공합니다.",
-      "balancedLabel": "균형형",
       "browseAllModels": "또는 500개 이상의 모델 중에서 선택",
       "browseAllModelsA11y": "500개 이상의 모든 모델 둘러보기",
       "currentModel": "현재 모델",
       "frontierDescription": "추론 기능을 갖춘 최상위 모델을 선택해 최고의 성능을 제공합니다.",
       "frontierLabel": "프런티어",
-      "kiloAuto": "Kilo Auto",
-      "performance": "성능"
+      "kiloAuto": "Kilo Auto"
     },
     "onboarding": {
       "complete": {
         "chatWith": "{{name}}과(와) 채팅하기",
-        "online": "온라인",
         "ready": "{{name}} 준비 완료",
         "warmedUp": "준비가 모두 끝났습니다. 언제든 인사를 건네세요."
       },
@@ -829,11 +846,8 @@
       "setup": "Bitbucket 설정"
     },
     "bitbucketConnect": {
-      "connect": "연결",
-      "connected": "Bitbucket 연결됨",
       "description": "필요한 권한이 포함된 작업 영역 액세스 토큰을 생성하여 아래에 붙여넣으세요.",
       "scopes": "계정: 읽기 · 저장소: 읽기/쓰기 · 풀 리퀘스트: 읽기 · 웹훅: 읽기/쓰기",
-      "title": "Bitbucket 연결",
       "tokenPlaceholder": "작업 영역 액세스 토큰"
     },
     "followReviewMd": "REVIEW.md 따르기",
@@ -859,7 +873,6 @@
       "statusUnavailable": "상태 확인 불가"
     },
     "providerConnect": {
-      "connectGitLab": "GitLab 연결",
       "description": "풀 리퀘스트를 자동으로 리뷰하려면 Kilo {{label}} 연결을 설정하세요.",
       "githubApp": "GitHub 앱",
       "githubError": "GitHub 설정을 열 수 없습니다. 다시 시도하세요.",
@@ -868,7 +881,6 @@
       "bitbucketError": "Bitbucket 설정을 열 수 없습니다. 다시 시도하세요."
     },
     "reviewDetail": {
-      "branch": "브랜치",
       "byline": "{{repo}} #{{number}} · {{author}}",
       "cancelMessage": "진행 중인 코드 리뷰가 중지됩니다.",
       "cancelReview": "리뷰 취소",
@@ -883,9 +895,7 @@
       "gate": "통과 기준",
       "gateHidden": "숨김",
       "gateNone": "없음",
-      "keepRunning": "계속 실행",
       "noFindings": "발견된 문제가 없습니다.",
-      "openPullRequest": "풀 리퀘스트 오픈",
       "retryMessage": "코드 리뷰가 다시 실행됩니다.",
       "retryReview": "리뷰 다시 시도",
       "retryTitle": "리뷰를 다시 시도할까요?",
@@ -923,7 +933,6 @@
     },
     "reviewMemory": {
       "couldNotLoad": "리뷰 메모리를 불러올 수 없습니다.",
-      "couldNotLoadMore": "추가 항목을 불러오지 못했습니다.",
       "couldNotLoadProposals": "제안을 불러올 수 없습니다.",
       "enable": "리뷰 메모리 활성화",
       "loading": "리뷰 메모리 불러오는 중",
@@ -933,11 +942,9 @@
       "off": "리뷰 메모리가 꺼져 있습니다.",
       "offDescription": "리뷰 메모리를 활성화하면 Kilo가 유지보수 담당자의 답변을 학습하여 REVIEW.md 지침을 제안합니다.",
       "readOnlyDescription": "조직 소유자와 결제 관리자만 리뷰 메모리를 활성화할 수 있습니다.",
-      "retryLoadingMore": "추가 항목 불러오기 재시도",
       "title": "리뷰 메모리"
     },
     "scopeList": {
-      "couldNotLoad": "조직을 불러오지 못했습니다.",
       "personalStillAvailable": "개인 저장소는 아래에서 계속 사용할 수 있습니다.",
       "personalSubtitle": "내 저장소",
       "viewOnly": "보기 전용"
@@ -966,21 +973,17 @@
     "updateFailed": "리뷰어를 업데이트하지 못했습니다.",
     "configSaveFailed": "리뷰 설정을 저장하지 못했습니다.",
     "status": {
-      "pending": "대기 중",
       "running": "실행 중",
       "completed": "완료",
-      "failed": "실패",
       "interrupted": "중단됨"
     },
     "reviewStyle": {
       "strict": "엄격",
-      "balanced": "균형형",
       "lenient": "관대",
       "roast": "독설"
     },
     "focusArea": {
       "security": "보안",
-      "performance": "성능",
       "bugs": "버그",
       "style": "스타일",
       "testing": "테스트",
@@ -1043,7 +1046,6 @@
       "sortSeverityDesc": "심각도: 높은 순",
       "sortSlaDue": "SLA 마감일",
       "status": "상태",
-      "statusClosed": "닫힘",
       "statusIgnored": "무시됨",
       "statusOpen": "오픈"
     },
@@ -1252,7 +1254,6 @@
       "reasonAfterReview": "검토 결과에 따른 판단"
     },
     "findingList": {
-      "clearFilters": "필터 초기화",
       "couldNotLoad": "발견된 문제를 불러올 수 없습니다.",
       "couldNotLoadMore": "발견된 문제를 추가로 불러올 수 없습니다.",
       "emptyDescription": "현재 조치가 필요한 미해결 문제가 없습니다.",
@@ -1293,14 +1294,12 @@
     "remediation": {
       "attemptHistory": "시도 기록({{displayCount}})",
       "attemptNumber": "{{number}}번째 시도",
-      "branch": "브랜치",
       "cancelMessage": "보안 에이전트가 진행 중인 수정 시도를 중지합니다.",
       "cancelRemediation": "수정 취소",
       "cancelTitle": "이 수정 작업을 취소할까요?",
       "cancellationRequested": "취소 요청됨",
       "cancelled": "수정이 취소되었습니다.",
       "couldNotLoad": "수정 상태를 불러올 수 없습니다.",
-      "keepRunning": "계속 실행",
       "noAnalysisDescription": "세부 정보 탭에서 분석을 실행하세요.",
       "noAnalysisTitle": "아직 분석 내역 없음",
       "openDraftPullRequest": "초안 풀 리퀘스트{{number}} 열기",
@@ -1342,7 +1341,6 @@
       "setupFailed": "GitHub 설정을 시작할 수 없습니다. 다시 시도하세요."
     },
     "scopeList": {
-      "couldNotLoad": "조직을 불러오지 못했습니다.",
       "personalSubtitle": "내 저장소"
     },
     "settingsOverview": {
@@ -1352,7 +1350,6 @@
       "automationCount": "3개 중 {{displayCount}}개 활성화됨",
       "couldNotLoadPermissions": "권한을 불러올 수 없습니다.",
       "couldNotLoadSettings": "보안 에이전트 설정을 불러올 수 없습니다.",
-      "disabled": "비활성화됨",
       "disabledNoManage": "보안 에이전트가 비활성화되어 있습니다. 조직 소유자와 결제 관리자만 활성화할 수 있습니다.",
       "disabledNoRepo": "보안 에이전트를 활성화하기 전에 저장소를 하나 이상 선택하세요.",
       "disabledPrompt": "보안 에이전트를 활성화하여 Dependabot 알림을 동기화하고, 저장소를 선택하고, 자동화를 설정하세요.",
@@ -1471,7 +1468,6 @@
       "draftPrOpened": "초안 PR 열림",
       "prOpened": "PR 생성됨",
       "blocked": "차단됨",
-      "failed": "실패",
       "noChangesNeeded": "변경 필요 없음",
       "originAutomaticPolicy": "자동화 정책",
       "originIncludeExistingPolicy": "기존 문제 포함 정책",
@@ -1525,12 +1521,9 @@
     "search": {
       "searching": "검색 중",
       "searchSessions": "세션 검색",
-      "searchSessionsPlaceholder": "세션 검색",
-      "clearSearch": "검색어 지우기",
-      "clearFilters": "필터 초기화"
+      "searchSessionsPlaceholder": "세션 검색"
     },
     "sessionList": {
-      "couldNotLoad": "세션을 불러오지 못했습니다.",
       "couldNotLoadActive": "활성 세션을 불러오지 못했습니다.",
       "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
       "noMatches": "일치하는 세션 없음",
@@ -1546,7 +1539,6 @@
       "deleteTitle": "세션을 삭제할까요?",
       "deleteMessage": "이 작업은 되돌릴 수 없습니다.",
       "deleteSession": "세션 삭제",
-      "rename": "이름 변경",
       "renameMessage": "이 세션의 새 이름을 입력하세요.",
       "copyId": "세션 ID 복사",
       "idCopied": "세션 ID 복사됨",
@@ -1595,7 +1587,6 @@
       "accessDeniedDescription": "이 항목을 볼 권한이 없습니다.",
       "couldNotLoad": "세션을 불러올 수 없습니다.",
       "failedToLoadDetails": "세션 세부 정보를 불러오지 못했습니다.",
-      "notFound": "항목을 찾을 수 없습니다.",
       "notFoundDescription": "이 항목이 삭제되었거나 더 이상 제공되지 않을 수 있습니다.",
       "failedToStopExecution": "실행을 중지하지 못했습니다.",
       "renameSession": "세션 이름 변경",
@@ -1639,7 +1630,6 @@
       "retryConnection": "연결 다시 시도"
     },
     "newSession": {
-      "title": "새 세션",
       "connectGithubDescription": "브라우저에서 GitHub를 연결한 후 여기로 돌아와 저장소를 선택하세요.",
       "openGithub": "GitHub 열기",
       "refreshRepositories": "저장소 새로고침",
@@ -1667,12 +1657,8 @@
       "discardDraftMessage": "프롬프트가 사라집니다.",
       "discardDraftTitle": "초안을 삭제할까요?",
       "discardFailed": "초안을 삭제할 수 없습니다. 다시 시도하세요.",
-      "keepEditing": "계속 편집",
       "remoteHint": "컴퓨터에서 `kilo remote`를 실행하거나 실행 중인 CLI 세션에서 `/remote`를 사용하여 로컬 kilo 프로세스를 제어하세요.",
-      "bitbucketConnected": "Bitbucket 연결됨",
-      "connectBitbucket": "Bitbucket 연결",
       "connectBitbucketDescription": "브라우저에서 Bitbucket을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
-      "connectGitlab": "GitLab 연결",
       "connectGitlabDescription": "브라우저에서 GitLab을 연결한 후 여기로 돌아와 저장소를 선택하세요.",
       "couldNotLoadBitbucketRepositories": "Bitbucket 저장소를 불러올 수 없습니다.",
       "couldNotLoadGithubRepositories": "GitHub 저장소를 불러올 수 없습니다.",
@@ -1702,7 +1688,6 @@
       "accessibilityLabel": "{{name}} 도구, {{status}}",
       "fileEmpty": "이 파일은 비어 있습니다.",
       "noTasks": "작업이 없습니다.",
-      "contentTruncated": "내용 일부 생략됨",
       "truncated": "일부 생략됨",
       "toolRead": "읽기",
       "toolEdit": "편집",
@@ -1775,8 +1760,7 @@
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
       "loading": "불러오는 중…",
       "accessibility": "저장소: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "메시지 세부 정보",
@@ -1798,8 +1782,7 @@
       "cacheWrite": "캐시 쓰기",
       "total": "합계",
       "reportAiResponseFailedRetryable": "이 응답을 신고하지 못했습니다.",
-      "reportAiResponseFailedTerminal": "이 응답은 신고할 수 없습니다.",
-      "reportAiResponseSubmitted": "신고가 접수되었습니다. 접수 번호: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "이 응답은 신고할 수 없습니다."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -1838,10 +1821,8 @@
       "viewImageWithAlt": "{{alt}} 이미지 보기",
       "imageOutput": "이미지 출력",
       "imageOutputWithFilename": "이미지 출력, {{filename}}",
-      "defaultName": "파일",
       "openFullScreen": "{{name}} 전체 화면으로 열기",
       "preview": "{{name}} 미리보기",
-      "openFile": "{{name}} 열기",
       "couldNotLoadFile": "이 파일을 불러올 수 없습니다.",
       "couldNotLoadFileRetry": "이 파일을 불러올 수 없습니다. 다시 시도하세요.",
       "retryLoadingFile": "파일 불러오기 다시 시도",
@@ -1977,11 +1958,8 @@
     "modelPicker": {
       "title": "모델 선택",
       "searchPlaceholder": "모델 검색...",
-      "noModels": "사용 가능한 모델 없음",
       "noModelsDescription": "선택할 수 있는 모델이 없습니다.",
-      "favorites": "즐겨찾기",
-      "recommended": "추천",
-      "allModels": "모든 모델"
+      "favorites": "즐겨찾기"
     },
     "modelSelector": {
       "provider": "제공업체 {{id}}",
@@ -2019,7 +1997,6 @@
       "camera": "카메라",
       "photoLibrary": "사진 보관함",
       "files": "파일",
-      "cameraAccessDisabled": "카메라 접근 권한 없음",
       "cameraAccessMessage": "사진을 찍으려면 설정에서 카메라 접근을 허용하세요.",
       "couldNotOpenPhotoPicker": "사진 선택 화면을 열지 못했습니다. Kilo를 다시 시작한 후 다시 시도하세요.",
       "maxFilesAllowed": "최대 {{displayCount}}개의 파일을 첨부할 수 있습니다.",
@@ -2047,9 +2024,7 @@
     },
     "chatLink": {
       "linkCopied": "링크를 복사했습니다.",
-      "reviewPr": "PR 리뷰",
       "openLink": "링크 열기",
-      "copyLink": "링크 복사",
       "shareLink": "링크 공유",
       "share": "공유",
       "prLinkActions": "PR 링크 작업",
@@ -2095,7 +2070,6 @@
       "tokensUsage": "컨텍스트 토큰 {{window}}개 중 {{used}}개 사용, {{percentage}} 사용",
       "title": "컨텍스트 사용량",
       "used": "사용량",
-      "remaining": "잔여",
       "provider": "제공업체",
       "totalCost": "총 비용",
       "usageReflectsLatest": "사용량은 가장 최근에 생성이 완료된 어시스턴트 응답을 기준으로 합니다.",
@@ -2161,7 +2135,6 @@
     "billingPage": "결제 페이지"
   },
   "deviceSessions": {
-    "couldNotLoad": "세션을 불러오지 못했습니다.",
     "couldNotLoadDescription": "정보를 불러올 때까지 로그인 중인 세션을 확인할 수 없습니다.",
     "currentDeviceUnidentified": "현재 기기를 식별할 수 없습니다.",
     "noSessions": "로그인 중인 세션 없음",
@@ -2169,7 +2142,6 @@
     "onlyKiloAppSignIns": "Kilo 앱의 로그인 내역만 여기에 표시됩니다. 에디터 및 CLI의 로그인 내역은 표시되지 않습니다.",
     "signedIn": "{{signedIn}}에 로그인함 · 마지막 활동 {{lastSeen}}",
     "thisDevice": "이 기기",
-    "title": "기기 세션",
     "viewProfile": "프로필 보기",
     "signOutThisDevice": "이 기기 로그아웃",
     "signOutThisSession": "이 세션 로그아웃",
@@ -2202,11 +2174,9 @@
   },
   "invalidRoute": {
     "description": "이 링크는 더 이상 유효하지 않습니다.",
-    "goBack": "뒤로 가기",
     "title": "페이지를 찾을 수 없습니다"
   },
   "monoScrollBlock": {
-    "contentTruncated": "내용 일부 생략됨",
     "truncated": "일부 생략됨",
     "wrap": "줄 바꿈",
     "scroll": "스크롤"
@@ -2219,15 +2189,13 @@
     "neutralDescription": "다시 시도하세요.",
     "offlineTitle": "불러오지 못했습니다.",
     "permissionDescription": "이 항목을 볼 권한이 없습니다.",
-    "notFoundTitle": "항목을 찾을 수 없습니다.",
     "notFoundDescription": "이 항목이 삭제되었거나 더 이상 제공되지 않을 수 있습니다.",
     "serverTitle": "불러올 수 없습니다.",
     "serverDescription": "서비스에 문제가 발생했습니다. 다시 시도하세요."
   },
   "screenHeader": {
     "openMenu": "메뉴 열기",
-    "openMenuFor": "{{title}} 메뉴 열기",
-    "goBack": "뒤로 가기"
+    "openMenuFor": "{{title}} 메뉴 열기"
   },
   "picker": {
     "optionsExpired": "선택 항목 만료",
@@ -2258,9 +2226,7 @@
   },
   "share": {
     "title": "Kilo로 공유",
-    "reviewPr": "PR 리뷰",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "새 세션",
     "searchPlaceholder": "최근 세션 검색",
     "connectedCli": "연결된 CLI",
     "newSessionOn": "{{name}}의 새 세션",
@@ -2318,7 +2284,6 @@
     "statusCanceling": "Kilo Pass 해지 예정",
     "statusPastDue": "Kilo Pass 결제 연체",
     "monthlyCredits": "월 {{credits}} 크레딧",
-    "ends": "{{date}}에 종료",
     "periodEnd": "기간 종료",
     "managedOnGooglePlay": "Google Play에서 관리",
     "managedInAppStore": "App Store에서 관리",
@@ -2330,7 +2295,6 @@
     "unavailableDescription": "Kilo Pass는 Android에서 인앱 구매로 이용할 수 없습니다. 웹에서 관리하세요.",
     "webManagementDescription": "이 Kilo Pass는 웹에서 관리됩니다.",
     "legalDisclosure": "Kilo Pass는 자동 갱신되는 월간 구독입니다. 결제는 구매 확인 시 Apple ID로 청구됩니다. 구독은 현재 기간 종료 24시간 전까지 취소하지 않으면 표시된 가격으로 매월 자동 갱신됩니다. App Store 계정 설정에서 언제든지 관리하거나 취소할 수 있습니다.",
-    "legalPrivacyPolicy": "개인정보 처리방침",
     "legalTermsOfUse": "이용 약관(EULA)",
     "purchaseDifferentAccount": "이 App Store 구매 내역은 Kilo 계정에 연결되어 있지 않습니다. 구매에 사용한 Apple Account로 로그인한 후 다시 시도하세요.",
     "restoreFailed": "구매를 복원하지 못했습니다. 다시 시도하세요.",
@@ -2452,7 +2416,6 @@
       "editTitle": "댓글 수정",
       "insertSuggestion": "제안 삽입",
       "insertSuggestionA11y": "코드 제안 삽입",
-      "keepEditing": "계속 편집",
       "loadFailedTitle": "댓글 작성 화면을 불러오지 못했습니다.",
       "ok": "확인",
       "unavailableMessage": "이 제출 대기 중인 댓글은 이미 삭제되었거나 제출되었습니다.",
@@ -2480,7 +2443,6 @@
       "addReaction": "반응 추가",
       "block": "차단",
       "blockedUser": "{{login}} 님을 차단했습니다.",
-      "closeReactions": "반응 닫기",
       "collapseThread": "스레드 접기",
       "commentActions": "댓글 작업",
       "comment": "댓글 {{displayCount}}개",
@@ -2488,7 +2450,6 @@
       "couldNotLoad": "토론을 불러오지 못했습니다.",
       "couldNotLoadMore": "댓글을 더 불러오지 못했습니다.",
       "couldNotReply": "답글을 달 수 없습니다.",
-      "file": "파일",
       "loadMoreComments": "댓글 더 불러오기",
       "loading": "토론 불러오는 중",
       "moderation": {
@@ -2521,14 +2482,11 @@
       "reaction": "반응",
       "reaction_other": "반응",
       "reaction_one": "반응",
-      "reactionsTitle": "반응",
-      "reply": "답글",
       "replyBadRequest": "이 답글을 게시할 수 없습니다. 스레드가 변경되었을 수 있습니다.",
       "replyBody": "답글 내용",
       "replyForbidden": "이 풀 리퀘스트에 답글을 달 권한이 없습니다.",
       "replyPlaceholder": "답글…",
       "reportContent": "콘텐츠 신고",
-      "reportSubmitted": "신고가 접수되었습니다. 접수 번호: {{receiptId}}",
       "reportUser": "사용자 신고",
       "resolveThread": "스레드 해결",
       "resolved": "해결됨",
@@ -2573,7 +2531,6 @@
       "noRecentPrs": "최근 PR 없음",
       "noRecentPrsDescription": "위에 PR 링크를 붙여넣어 리뷰를 시작하세요. 다음부터는 여기에 표시됩니다.",
       "open": "오픈",
-      "openPullRequest": "풀 리퀘스트 오픈",
       "pasteLink": "풀 리퀘스트 링크 붙여넣기",
       "pastePrLink": "PR 링크 붙여넣기",
       "removeFromRecentsMessage": "이 풀 리퀘스트가 최근 항목에서 제거됩니다.",
@@ -2666,12 +2623,9 @@
     },
     "inbox": {
       "couldNotLoad": "받은 편지함을 불러오지 못했습니다.",
-      "couldNotLoadMore": "추가 항목을 불러오지 못했습니다.",
       "loading": "받은 편지함 불러오는 중",
       "noReviewRequests": "리뷰 요청 없음",
       "noReviewRequestsDescription": "리뷰를 요청받은 풀 리퀘스트가 여기에 표시됩니다. 위에 다른 PR 링크를 붙여넣을 수도 있습니다.",
-      "recent": "최근",
-      "retryLoadingMore": "추가 항목 불러오기 재시도",
       "title": "받은 편지함"
     },
     "installKiloGitHubApp": "Kilo GitHub 앱 설치",
@@ -2758,7 +2712,6 @@
       "file": "파일",
       "file_other": "파일",
       "file_one": "파일",
-      "stateClosed": "닫힘",
       "stateMerged": "병합됨",
       "stateOpen": "오픈",
       "stateOpenApproved": "열림 · 승인됨",
@@ -2897,7 +2850,6 @@
     },
     "inviteMember": {
       "emailError": "올바른 이메일 주소를 입력하세요.",
-      "emailLabel": "이메일",
       "emailPlaceholder": "이름@회사.com",
       "permissionDenied": "멤버를 초대할 권한이 없습니다.",
       "roleLabel": "역할",
@@ -2967,7 +2919,6 @@
         "billingManager": "결제 관리자"
       },
       "emailStatusFailed": "이메일 발송 실패",
-      "emailStatusPending": "대기 중",
       "inviteCreated": "초대를 만들었습니다.",
       "pendingInvitations": "수락 대기 중인 초대",
       "resendInvite": "초대 다시 보내기",
@@ -2985,7 +2936,6 @@
       "couldNotLoadStatus": "상태를 불러올 수 없습니다",
       "creditProcessingDelayed": "크레딧 처리 지연됨 · 자동으로 다시 시도 중",
       "ended": "종료됨",
-      "endsOn": "{{date}}에 종료",
       "manageHint": "웹에서 Kilo Pass 관리 페이지를 엽니다.",
       "notSubscribed": "구독하지 않음",
       "overallocated": "Kilo Pass 배정 수가 유료 라이선스 수를 초과함",
@@ -2996,7 +2946,6 @@
       "paymentPending": "결제 대기 중",
       "processingBlocked": "처리 차단됨",
       "processingNeedsReview": "처리 검토 필요",
-      "retry": "다시 시도",
       "retryHint": "Kilo Pass 상태를 다시 불러옵니다.",
       "setupHint": "웹에서 Kilo Pass 설정을 엽니다."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "환경설정으로 돌아가기"
   },
   "quickChat": {
-    "title": "채팅",
     "empty": {
       "title": "채팅 시작하기",
       "description": "모델과 대화하려면 메시지를 보내세요."
@@ -3076,7 +3024,6 @@
     "openAgents": "에이전트 열기",
     "running": "작업 중",
     "needsInput": "입력 필요",
-    "idle": "대기 중",
     "channelName": "활성 에이전트",
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
   }

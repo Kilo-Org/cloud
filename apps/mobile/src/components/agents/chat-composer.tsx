@@ -349,7 +349,7 @@ export function ChatComposer({
       i18n.t('agentChat.composer.discardAttachmentsTitle'),
       i18n.t('agentChat.composer.discardAttachmentsMessage'),
       [
-        { text: i18n.t('agentChat.newSession.keepEditing'), style: 'cancel' },
+        { text: i18n.t('common.keepEditing'), style: 'cancel' },
         {
           text: i18n.t('common.discard'),
           style: 'destructive',

@@ -298,7 +298,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           }}
           accessibilityLabel={t('prReview.discussion.submitReply')}
         >
-          <Text>{t('prReview.discussion.reply')}</Text>
+          <Text>{t('common.reply')}</Text>
         </Button>
       </View>
     </View>

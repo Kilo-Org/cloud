@@ -48,7 +48,7 @@ export type RepoPlatform = 'github' | 'gitlab' | 'bitbucket';
 /** i18n key for each repository provider's display name (rows, closed selector, and group headers). */
 export const REPO_PLATFORM_LABEL_KEYS = {
   github: 'common.github',
-  gitlab: 'agentChat.repoPicker.platformGitlab',
+  gitlab: 'common.gitlab',
   bitbucket: 'agentChat.repoPicker.platformBitbucket',
 } satisfies Record<RepoPlatform, string>;
 

@@ -67,7 +67,7 @@ export function TodoTaskRows({ tasks, truncated = false }: Readonly<TodoTaskRows
       })}
       {truncated ? (
         <Text
-          accessibilityLabel={t('agentChat.toolCard.contentTruncated')}
+          accessibilityLabel={t('common.contentTruncated')}
           className="mt-1 text-xs text-muted-foreground"
         >
           {t('agentChat.toolCard.truncated')}

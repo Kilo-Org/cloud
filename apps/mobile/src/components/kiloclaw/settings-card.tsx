@@ -296,9 +296,7 @@ export function SettingsCard({
       <View className="flex-row gap-2 px-4 pb-3">
         <ExpandButton
           expanded={expanded}
-          label={
-            item.configured ? t('kiloclaw.secrets.updateToken') : t('kiloclaw.secrets.connect')
-          }
+          label={item.configured ? t('kiloclaw.secrets.updateToken') : t('common.connect')}
           onPress={toggleExpanded}
         />
         {item.configured && (

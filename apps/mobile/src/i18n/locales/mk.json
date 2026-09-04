@@ -69,7 +69,58 @@
     "repository": "Репозиториум",
     "signOut": "Одјави се",
     "agents": "Агенти",
-    "all": "Сите"
+    "all": "Сите",
+    "allModels": "Сите модели",
+    "balanced": "Балансирано",
+    "bitbucketConnected": "Bitbucket е поврзан",
+    "branch": "Гранка",
+    "cameraAccessDisabled": "Пристапот до камерата е оневозможен",
+    "chat": "Разговор",
+    "clearFilters": "Исчисти ги филтрите",
+    "clearSearch": "Исчисти го пребарувањето",
+    "closed": "Затворено",
+    "closeReactions": "Затвори ги реакциите",
+    "connect": "Поврзи",
+    "connectBitbucket": "Поврзи Bitbucket",
+    "connectGitlab": "Поврзи GitLab",
+    "contentTruncated": "Содржината е скратена",
+    "copyLink": "Копирај врска",
+    "couldNotLoadOrganizations": "Организациите не се вчитаа.",
+    "couldNotLoadSessions": "Сесиите не се вчитаа.",
+    "couldnTLoadMore": "Не се вчитаа дополнителни ставки.",
+    "deviceSessions": "Сесии на уреди",
+    "disabled": "Оневозможено",
+    "email": "Е-пошта",
+    "ends": "Завршува на {{date}}",
+    "failed": "Неуспешно",
+    "file": "датотека",
+    "gitlab": "GitLab",
+    "goBack": "Врати се назад",
+    "idle": "Во мирување",
+    "keepEditing": "Продолжи со уредување",
+    "keepRunning": "Остави да работи",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Нова сесија",
+    "noKiloclawInstances": "Нема инстанци на KiloClaw",
+    "noModelsAvailable": "Нема достапни модели",
+    "notFound": "Не е пронајдено.",
+    "online": "Онлајн",
+    "open": "Отвори {{name}}",
+    "openPullRequest": "Отворен PR",
+    "pending": "На чекање",
+    "performance": "Перформанси",
+    "preferences": "Лични поставки",
+    "privacyPolicy": "Политика за приватност",
+    "profile": "Профил",
+    "reactions": "реакции",
+    "recent": "Неодамнешни",
+    "recommended": "Препорачани",
+    "remaining": "Преостанато",
+    "rename": "Преименувај",
+    "reply": "Одговори",
+    "reportSubmittedReceipt": "Пријавата е испратена. Потврда: {{receiptId}}.",
+    "retryLoadingMore": "Обиди се повторно да вчиташ повеќе",
+    "reviewPr": "Прегледај PR"
   },
   "language": {
     "title": "Јазик",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Не можеше да се рестартира",
     "languageSaved": "Твојот избор на јазик е зачуван.",
     "catalogLoadFailed": "Не успеа вчитувањето на јазикот. Обиди се повторно.",
-    "retry": "Обиди се повторно",
     "search": "Пребарување јазици",
     "noMatches": "Нема соодветни јазици",
     "deviceLanguage": "Јазик на уредот",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Код за најавување: {{code}}",
     "openSignInPageInBrowser": "Отвори ја страницата за најавување во прелистувачот",
     "copySignInLink": "Копирај ја врската за најавување",
-    "copyLink": "Копирај врска",
     "cancelSignIn": "Откажи го најавувањето",
     "startingSignIn": "Започнува најавувањето...",
     "organizationUsesSso": "Твојата организација користи единствено најавување.",
@@ -112,7 +161,6 @@
     "terms": "Услови",
     "termsConnector": " и ",
     "termsSuffix": ".",
-    "privacyPolicy": "Политика за приватност",
     "moreSignInOptions": "Повеќе опции за најавување",
     "couldNotCompleteSignIn": "Не можеше да се заврши најавувањето. Обиди се повторно.",
     "sessionEnded": "Твојата сесија заврши. Најави се повторно.",
@@ -126,7 +174,6 @@
     "or": "или"
   },
   "profile": {
-    "title": "Профил",
     "codeReviewerSubtitle": "Автоматски прегледи на PR",
     "securityAgentSubtitle": "Пронаоѓај и отстранувај ранливости",
     "reviews": "Прегледи",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Поврзани сметки",
     "couldNotLoadAccounts": "Не успеа вчитувањето на сметките.",
     "app": "Апликација",
-    "preferences": "Лични поставки",
     "preferencesSubtitle": "Изглед, известувања, размислување и однесување на екранот",
-    "deviceSessions": "Сесии на уреди",
     "deviceSessionsSubtitle": "Прегледај ги и одјави ги другите уреди",
     "feedback": "Испрати повратни информации",
     "privacyChoices": "Поставки за приватност",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Е-пошта",
     "providerTestAccount": "Тестна сметка",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Деловно SSO"
   },
   "preferences": {
-    "title": "Лични поставки",
     "autoExpandThinking": "Автоматски прикажувај го размислувањето",
     "autoExpandThinkingSubtitle": "Прикажи го целото размислување на агентот кога ќе заврши.",
     "keepScreenOn": "Задржи го екранот вклучен додека ја гледаш сесијата",
@@ -360,7 +402,6 @@
       "unresolveThread": "Означи ја нишката како нерешена",
       "resolved": "Решено",
       "outdated": "Застарено",
-      "file": "датотека",
       "comment_one": "1 коментар",
       "comment": "{{displayCount}} коментари",
       "comment_other": "{{displayCount}} коментари",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Не успеа вчитувањето на дополнителни коментари.",
       "retryLoadingMore": "Повтори го вчитувањето на дополнителни коментари",
       "loadMoreComments": "Вчитај повеќе коментари",
-      "closeReactions": "Затвори ги реакциите",
-      "reactionsTitle": "реакции",
       "addReaction": "Додај реакција",
       "reactionPill": "реакција {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакција",
@@ -380,13 +419,11 @@
       "reportUser": "Пријави корисник",
       "mute": "Пригуши",
       "block": "Блокирај",
-      "reportSubmitted": "Пријавата е испратена. Потврда: {{receiptId}}.",
       "blockedUser": "Блокиран {{login}}",
       "mutedUser": "Пригушен {{login}}",
       "replyPlaceholder": "Одговор…",
       "replyBody": "Содржина на одговорот",
       "submitReply": "Испрати одговор",
-      "reply": "Одговори",
       "termsTitle": "Услови за користење",
       "termsCopy": "Мора да имаш најмалку 13 години за да објавуваш.",
       "termsAcceptRetry": "Не успеа прифаќањето на условите. Провери ја врската и обиди се повторно.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "URL на барањето за спојување на GitHub",
       "clearLink": "Исчисти го линкот до барањето за спојување",
       "pasteLink": "Залепи линк до барањето за спојување",
-      "open": "Отворено",
-      "openPullRequest": "Отворен PR"
+      "open": "Отворено"
     },
     "checks": {
       "title": "Проверки",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Примени барања",
-      "recent": "Неодамнешни",
       "loading": "Се вчитуваат примените барања",
       "noReviewRequests": "Нема барања за преглед",
       "noReviewRequestsDescription": "Тука се прикажуваат барањата за спојување што чекаат на твојот преглед. Можеш и да залепиш линк до кој било PR погоре.",
-      "couldNotLoad": "Не успеа вчитувањето на примените барања.",
-      "couldNotLoadMore": "Не се вчитаа дополнителни ставки.",
-      "retryLoadingMore": "Обиди се повторно да вчиташ повеќе"
+      "couldNotLoad": "Не успеа вчитувањето на примените барања."
     },
     "composer": {
       "commentBodyPlaceholder": "Твојот коментар",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Не успеа вчитувањето на полето за пишување коментар.",
       "discardTitle": "Да се отфрли коментарот?",
       "discardMessage": "Твојот нацрт ќе се изгуби.",
-      "keepEditing": "Продолжи со уредување",
       "comment": "Коментирај",
       "insertSuggestionA11y": "Вметни предлог за код",
       "insertSuggestion": "Вметни предлог",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Споено",
-      "stateClosed": "Затворено",
       "stateOpenApproved": "Отворено · Одобрено",
       "stateOpenChangesRequested": "Отворено · Побарани промени",
       "stateOpenReviewRequired": "Отворено · Потребен преглед",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Почетна",
-    "profile": "Профил",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, јазиче, {{position}} од {{total}}",
-    "chat": "Разговор"
+    "position": "{{name}}, јазиче, {{position}} од {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Промена на инстанца",
       "couldNotLoadInstances": "Не успеа вчитувањето на инстанците.",
-      "noInstances": "Нема инстанци на KiloClaw",
       "noInstancesDescription": "Постави инстанца за да започнеш разговор.",
       "setUpKiloclaw": "Постави KiloClaw",
       "currentInstance": "{{title}}, тековна"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Не успеа најавувањето во разговорот.",
       "couldNotRefreshMessages": "Не успеа освежувањето на пораките.",
       "couldNotLoadHistory": "Не успеа вчитувањето на историјата на разговорот.",
-      "rename": "Преименувај",
       "leave": "Напушти",
       "untitledConversation": "Разговор без наслов",
       "createFailed": "Не успеа создавањето на разговорот.",
       "leaveFailed": "Не успеа напуштањето на разговорот."
     },
     "reactions": {
-      "title": "реакции",
-      "close": "Затвори ги реакциите",
-      "recent": "Неодамнешни",
       "common": "Вообичаени",
       "reactWith": "Реагирај со {{reaction}}",
       "accessibility": "Реакција {{emoji}}, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Не успеа додавањето на реакцијата.",
       "retrySend": "Испрати повторно",
       "moreReactions": "Повеќе реакции",
-      "reply": "Одговори",
       "edit": "Уреди",
       "sendFailed": "Не успеа испраќањето на пораката.",
       "retrySendFailed": "Не успеа повторното испраќање.",
@@ -807,7 +829,6 @@
       "takePhoto": "Фотографирај",
       "photoLibrary": "Фототека",
       "files": "датотеки",
-      "cameraAccessDisabled": "Пристапот до камерата е оневозможен",
       "cameraAccessMessage": "Дозволи пристап до камерата во поставките за да фотографираш."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} пишуваат..."
     },
     "botStatus": {
-      "online": "Онлајн",
-      "idle": "Во мирување",
       "offline": "Офлајн",
       "loadingUser": "Се вчитува корисникот...",
       "waitingForStatus": "Се чека статусот на ботот...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Не успеа вчитувањето на инстанците на KiloClaw.",
     "billing": {
       "title": "Наплата",
@@ -840,7 +858,6 @@
       "plan": "План",
       "finalTermEnds": "Последниот период завршува",
       "afterFinalTerm": "По последниот период",
-      "remaining": "Преостанато",
       "lessThanOneDay": "Помалку од 1 ден",
       "ends": "Завршува",
       "expires": "Истекува",
@@ -941,20 +958,15 @@
       "disconnect": "Исклучи ја сметката на Google",
       "copied": "Копирано",
       "copyCommand": "Копирај ја командата",
-      "disabled": "Оневозможено",
       "disconnectConfirm": "Исклучи",
       "disconnectMessage": "Да се отстрани твојата сметка на Google од оваа инстанца? Ова ќе ги исклучи известувањата од Gmail. По исклучувањето, повторно постави ја инстанцата за да се применат промените.",
       "disconnectTitle": "Исклучување на Google"
     },
     "modelList": {
-      "title": "Сите модели",
       "searchPlaceholder": "Пребарување модели…",
-      "clearSearch": "Исчисти го пребарувањето",
       "noMatches": "Ниту еден модел не одговара на твоето пребарување",
-      "noModels": "Нема достапни модели",
       "noModelsDescription": "Моделите ќе се појават тука штом станат достапни.",
-      "noResultsFor": "Нема резултати за „{{query}}“.",
-      "recommended": "Препорачани"
+      "noResultsFor": "Нема резултати за „{{query}}“."
     },
     "secrets": {
       "title": "Тајни податоци",
@@ -972,8 +984,7 @@
       "setupGuide": "водич за поставување",
       "saving": "Се зачувува…",
       "removing": "Се отстранува…",
-      "updateToken": "Ажурирај токен",
-      "connect": "Поврзи"
+      "updateToken": "Ажурирај токен"
     },
     "versionPin": {
       "title": "Заклучување на верзија",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Се завршува поставувањето",
       "finishingSetupDescription": "Почекај малку, го довршуваме поставувањето на твојата сметка. Ова обично трае кратко.",
       "getStarted": "Започни",
-      "noInstances": "Нема инстанци на KiloClaw",
       "noInstancesDescription": "Создај ја првата инстанца за да стартуваш агенти за програмирање."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Разговарај со {{name}}",
-        "online": "Онлајн",
         "ready": "{{name}} е подготвен",
         "warmedUp": "Сè е подготвено. Поздрави кога ќе сакаш."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Најнапредни",
       "frontierDescription": "Највисоки перформанси. Ги насочува барањата кон најнапредните модели со расудување.",
-      "balancedLabel": "Балансирано",
       "balancedDescription": "Добар баланс меѓу брзината и можностите по пониска цена.",
-      "performance": "Перформанси",
       "autoModelA11y": "автоматски модел {{label}}",
       "currentModel": "Тековен модел",
       "browseAllModels": "или избери од над 500 модели",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "Отвори {{name}}, {{displayCount}} непрочитана порака",
       "openUnread": "Отвори {{name}}, {{displayCount}} непрочитани пораки",
       "openUnread_other": "Отвори {{name}}, {{displayCount}} непрочитани пораки",
-      "open": "Отвори {{name}}",
       "openSettings": "Отвори поставки за {{name}}",
       "fixOnKiloAi": "Поправи на kilo.ai: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Преглед",
       "cancelTitle": "Да се откаже прегледот?",
       "cancelMessage": "Ова ќе го запре тековниот преглед на кодот.",
-      "keepRunning": "Остави да работи",
       "cancelReview": "Откажи го прегледот",
       "retryTitle": "Да се повтори прегледот?",
       "retryMessage": "Ова повторно ќе го изврши прегледот на кодот.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} од {{author}}",
       "noFindings": "Нема наоди.",
       "showMore": "Прикажи повеќе",
-      "branch": "Гранка",
       "created": "Создадено",
       "started": "Започнато",
       "completed": "Завршено",
       "tokens": "токени",
       "tokensInOut": "{{input}} влез / {{output}} излез",
-      "openPullRequest": "Отворен PR",
       "council": "Совет",
       "decision": "Одлука",
       "gate": "Услов за проверка",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Меморија од прегледи",
-      "couldNotLoadMore": "Не се вчитаа дополнителни ставки.",
-      "retryLoadingMore": "Обиди се повторно да вчиташ повеќе",
       "loading": "Се вчитува меморијата за прегледи",
       "couldNotLoad": "Не успеа вчитувањето на меморијата за прегледи.",
       "off": "Меморијата за прегледи е исклучена.",
@@ -1347,15 +1348,11 @@
       "setup": "Поставување на Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket е поврзан",
-      "title": "Поврзи Bitbucket",
       "description": "Создај токен за пристап до работниот простор со потребните дозволи и залепи го подолу.",
       "scopes": "Сметка: читање · Складишта: читање/запишување · Барања за спојување: читање · Веб-куки: читање/запишување",
-      "tokenPlaceholder": "Токен за пристап до работниот простор",
-      "connect": "Поврзи"
+      "tokenPlaceholder": "Токен за пристап до работниот простор"
     },
     "scopeList": {
-      "couldNotLoad": "Организациите не се вчитаа.",
       "personalStillAvailable": "Личните складишта сè уште се достапни подолу.",
       "personalSubtitle": "Твоите репозиториуми",
       "viewOnly": "Само преглед"
@@ -1378,7 +1375,6 @@
       "githubApp": "апликација на GitHub",
       "githubError": "Не можеше да се отвори поставувањето на GitHub. Обиди се повторно.",
       "gitlabAccount": "сметка на GitLab",
-      "connectGitLab": "Поврзи GitLab",
       "gitlabError": "Не можеше да се отвори поставувањето на GitLab. Обиди се повторно.",
       "description": "Поврзи ја {{label}} со Kilo за автоматски преглед на барањата за спојување.",
       "bitbucketError": "Не можеше да се отвори поставувањето на Bitbucket. Обиди се повторно."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Не успеа ажурирањето на прегледувачот на код.",
     "configSaveFailed": "Не успеа зачувувањето на поставките за преглед.",
     "status": {
-      "pending": "На чекање",
       "running": "Во тек",
       "completed": "Завршено",
-      "failed": "Неуспешно",
       "interrupted": "Прекинато"
     },
     "reviewStyle": {
       "strict": "Строг",
-      "balanced": "Балансирано",
       "lenient": "Попустлив",
       "roast": "Остра шега"
     },
     "focusArea": {
       "security": "Безбедност",
-      "performance": "Перформанси",
       "bugs": "Грешки",
       "style": "Стил",
       "testing": "Тестирање",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Отворено",
       "fixed": "Поправено",
       "statusIgnored": "Игнорирано",
-      "statusClosed": "Затворено",
       "severityHigh": "Високо",
       "severityMedium": "Средно",
       "severityLow": "Ниско",
@@ -1655,7 +1646,6 @@
       "title": "Поставки",
       "couldNotLoadSettings": "Не успеа вчитувањето на поставките на безбедносниот агент.",
       "couldNotLoadPermissions": "Не успеа вчитувањето на дозволите.",
-      "disabled": "Оневозможено",
       "on": "Вклучено",
       "repositoriesCount_one": "{{displayCount}} избрано складиште",
       "repositoriesCount": "{{displayCount}} избрани репозиториуми",
@@ -1683,7 +1673,6 @@
       "retry": "Повтори го санирањето",
       "cancelTitle": "Да се откаже ова санирање?",
       "cancelMessage": "Безбедносниот агент ќе го запре тековниот обид за санирање.",
-      "keepRunning": "Остави да работи",
       "cancelRemediation": "Откажи го санирањето",
       "openPullRequest": "Отвори барање за спојување{{number}}",
       "openDraftPullRequest": "Отвори нацрт на барање за спојување{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "Историја на обиди ({{displayCount}})",
       "attemptNumber": "Обид #{{number}}",
       "startedBy": "Започнато од",
-      "branch": "Гранка",
       "queued": "Санирањето е додадено во редицата",
       "retryQueued": "Повторниот обид за санирање е додаден во редицата",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Ниту еден наод не одговара на филтрите",
       "noMatchesDescription": "Обиди се да ги приспособиш или да ги отстраниш избраните филтри.",
       "emptyTitle": "Нема отворени наоди",
-      "emptyDescription": "Во моментов нема отворени наоди што бараат внимание.",
-      "clearFilters": "Исчисти ги филтрите"
+      "emptyDescription": "Во моментов нема отворени наоди што бараат внимание."
     },
     "scopeList": {
-      "couldNotLoad": "Организациите не се вчитаа.",
       "personalSubtitle": "Твоите репозиториуми"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "Отворен PR во нацрт",
       "prOpened": "Отворен PR",
       "blocked": "Блокирано",
-      "failed": "Неуспешно",
       "noChangesNeeded": "Не се потребни промени",
       "originAutomaticPolicy": "Правило за автоматско санирање",
       "originIncludeExistingPolicy": "Правило за вклучување постојни наоди",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Се пребарува",
       "searchSessions": "Пребарување сесии",
-      "searchSessionsPlaceholder": "Пребарување сесии",
-      "clearSearch": "Исчисти го пребарувањето",
-      "clearFilters": "Исчисти ги филтрите"
+      "searchSessionsPlaceholder": "Пребарување сесии"
     },
     "sessionList": {
-      "couldNotLoad": "Сесиите не се вчитаа.",
       "couldNotLoadActive": "Не успеа вчитувањето на активните сесии.",
       "noSessionsYetDescription": "Започни задача за програмирање од телефонот. Твоите сесии ќе се појават тука.",
       "noMatches": "Нема сесии што одговараат на пребарувањето",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Да се избрише сесијата?",
       "deleteMessage": "Ова дејство не може да се поништи.",
       "deleteSession": "Избриши сесија",
-      "rename": "Преименувај",
       "renameMessage": "Внеси ново име за оваа сесија.",
       "copyId": "Копирај го идентификаторот на сесијата",
       "idCopied": "Идентификаторот на сесијата е копиран",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Немаш дозвола да го видиш ова.",
       "couldNotLoad": "Не успеа вчитувањето на сесијата.",
       "failedToLoadDetails": "Не успеа вчитувањето на деталите за сесијата.",
-      "notFound": "Не е пронајдено.",
       "notFoundDescription": "Оваа ставка можеби е отстранета или повеќе не е достапна.",
       "failedToStopExecution": "Не успеа запирањето на извршувањето.",
       "renameSession": "Преименување на сесијата",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Поврзи се повторно"
     },
     "newSession": {
-      "title": "Нова сесија",
       "connectGithubDescription": "Поврзи го GitHub преку прелистувачот, па врати се тука за да избереш репозиториум.",
       "openGithub": "Отвори GitHub",
       "refreshRepositories": "Освежи ги репозиториумите",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Не успеа освежувањето на репозиториумите. Обиди се повторно.",
       "discardDraftTitle": "Да се отфрли нацртот?",
       "discardDraftMessage": "Твоето упатство ќе се изгуби.",
-      "keepEditing": "Продолжи со уредување",
       "discardFailed": "Не успеа отфрлањето на нацртот. Обиди се повторно.",
       "remoteHint": "За да управуваш со локален процес на kilo, изврши `kilo remote` на компјутерот или `/remote` во активна сесија на CLI.",
-      "bitbucketConnected": "Bitbucket е поврзан",
-      "connectBitbucket": "Поврзи Bitbucket",
       "connectBitbucketDescription": "Поврзи го Bitbucket преку прелистувачот, па врати се тука за да избереш репозиториум.",
-      "connectGitlab": "Поврзи GitLab",
       "connectGitlabDescription": "Поврзи го GitLab преку прелистувачот, па врати се тука за да избереш репозиториум.",
       "couldNotLoadBitbucketRepositories": "Не успеа вчитувањето на репозиториумите од Bitbucket.",
       "couldNotLoadGithubRepositories": "Не успеа вчитувањето на репозиториумите од GitHub.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "Алатка {{name}}, {{status}}",
       "fileEmpty": "Оваа датотека е празна.",
       "noTasks": "Нема задачи.",
-      "contentTruncated": "Содржината е скратена",
       "truncated": "Скратено",
       "toolRead": "читање",
       "toolEdit": "Уреди",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Пробај со друг поим за пребарување.",
       "loading": "Вчитување...",
       "accessibility": "Репозиториум: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Детали за пораката",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Запишување во кеш",
       "total": "Вкупно",
       "reportAiResponseFailedRetryable": "Не успеа пријавувањето на овој одговор.",
-      "reportAiResponseFailedTerminal": "Овој одговор не може да се пријави.",
-      "reportAiResponseSubmitted": "Пријавата е испратена. Потврда: {{receiptId}}."
+      "reportAiResponseFailedTerminal": "Овој одговор не може да се пријави."
     },
     "modelCost": {
       "lessThan": "помалку од {{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "Погледни ја сликата {{alt}}",
       "imageOutput": "Излезна слика",
       "imageOutputWithFilename": "Излезна слика, {{filename}}",
-      "defaultName": "датотека",
       "openFullScreen": "Отвори {{name}} на цел екран",
       "preview": "Прегледај {{name}}",
-      "openFile": "Отвори {{name}}",
       "couldNotLoadFile": "Не успеа вчитувањето на оваа датотека.",
       "couldNotLoadFileRetry": "Не успеа вчитувањето на оваа датотека. Обиди се повторно.",
       "retryLoadingFile": "Повторно вчитај ја датотеката",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "Избор на модел",
       "searchPlaceholder": "Пребарување модели…",
-      "noModels": "Нема достапни модели",
       "noModelsDescription": "Нема достапни модели за избор.",
-      "favorites": "Омилени",
-      "recommended": "Препорачани",
-      "allModels": "Сите модели"
+      "favorites": "Омилени"
     },
     "modelSelector": {
       "provider": "Давател {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "Камера",
       "photoLibrary": "Фототека",
       "files": "датотеки",
-      "cameraAccessDisabled": "Пристапот до камерата е оневозможен",
       "cameraAccessMessage": "Дозволи пристап до камерата во поставките за да фотографираш.",
       "couldNotOpenPhotoPicker": "Не успеа отворањето на избирачот на фотографии. Рестартирај го Kilo и обиди се повторно.",
       "maxFilesAllowed": "Дозволени се најмногу {{displayCount}} датотеки.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Линкот е копиран",
-      "reviewPr": "Прегледај PR",
       "openLink": "Отвори линк",
-      "copyLink": "Копирај врска",
       "shareLink": "Сподели линк",
       "share": "Сподели",
       "prLinkActions": "Дејства за PR линк",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Контекст: {{used}} од {{window}} токени, искористени {{percentage}}",
       "title": "Искористеност на контекстот",
       "used": "Искористено",
-      "remaining": "Преостанато",
       "provider": "Давател",
       "totalCost": "Вкупен трошок",
       "usageReflectsLatest": "Искористеноста се однесува на последниот завршен одговор на асистентот.",
@@ -2598,7 +2561,6 @@
     "billingPage": "страница за наплата"
   },
   "deviceSessions": {
-    "couldNotLoad": "Сесиите не се вчитаа.",
     "couldNotLoadDescription": "Твоите активни сесии не се достапни додека не заврши вчитувањето.",
     "currentDeviceUnidentified": "Не успеа препознавањето на тековниот уред.",
     "noSessions": "Нема активни сесии",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Тука се прикажуваат само најавувањата во апликацијата Kilo. Најавувањата преку уредувачот и CLI не се наведени.",
     "signedIn": "Најава: {{signedIn}} · Последна активност: {{lastSeen}}",
     "thisDevice": "Овој уред",
-    "title": "Сесии на уреди",
     "viewProfile": "Прикажи профил",
     "webBrowser": "Веб прелистувач",
     "signOutThisDevice": "Одјави го овој уред",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "Овој линк веќе не е важечки.",
-    "goBack": "Врати се назад",
     "title": "Страницата не е пронајдена"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Содржината е скратена",
     "truncated": "Скратено",
     "wrap": "Прелом",
     "scroll": "Лизгање"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Обиди се повторно.",
     "offlineTitle": "Вчитувањето не успеа.",
     "permissionDescription": "Немаш дозвола да го видиш ова.",
-    "notFoundTitle": "Не е пронајдено.",
     "notFoundDescription": "Оваа ставка можеби е отстранета или повеќе не е достапна.",
     "serverTitle": "Вчитувањето не е можно.",
     "serverDescription": "Се појави проблем од наша страна. Обиди се повторно."
   },
   "screenHeader": {
     "openMenu": "Отвори мени",
-    "openMenuFor": "Отвори мени за {{title}}",
-    "goBack": "Врати се назад"
+    "openMenuFor": "Отвори мени за {{title}}"
   },
   "picker": {
     "optionsExpired": "Опциите веќе не важат",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Споделување во Kilo",
-    "reviewPr": "Прегледај PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Нова сесија",
     "searchPlaceholder": "Пребарување во неодамнешните сесии",
     "connectedCli": "На поврзаниот CLI",
     "newSessionOn": "Нова сесија на {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass се откажува",
     "statusPastDue": "Задоцнето плаќање за Kilo Pass",
     "monthlyCredits": "{{credits}} месечни кредити",
-    "ends": "Завршува на {{date}}",
     "periodEnd": "крај на периодот",
     "managedOnGooglePlay": "Управување преку Google Play",
     "managedInAppStore": "Управување преку App Store",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Kilo Pass не е достапен за купување во апликацијата на Android. Управувај со претплатата преку веб-страницата.",
     "webManagementDescription": "Со оваа претплата на Kilo Pass се управува преку веб-страницата.",
     "legalDisclosure": "Kilo Pass е месечна претплата што автоматски се обновува. Наплатата се врши преку твојот Apple ID кога ќе го потврдиш купувањето. Претплатата автоматски се обновува секој месец по прикажаната цена, освен ако ја откажеш најмалку 24 часа пред крајот на тековниот период. Можеш да управуваш со неа или да ја откажеш во секое време преку поставките на твојата сметка во App Store.",
-    "legalPrivacyPolicy": "Политика за приватност",
     "legalTermsOfUse": "Услови за користење (EULA)",
     "purchaseDifferentAccount": "Ова купување од App Store не е поврзано со твојата сметка на Kilo. Најави се на Apple Account што ја користеше за купувањето, па обиди се повторно.",
     "restoreFailed": "Не успеа враќањето на купувањата. Обиди се повторно.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "Внеси важечка адреса за е-пошта.",
-      "emailLabel": "Е-пошта",
       "emailPlaceholder": "име@компанија.com",
       "permissionDenied": "Немаш дозвола да покануваш членови.",
       "roleLabel": "Улога",
@@ -2968,7 +2920,6 @@
         "billingManager": "Одговорен за наплата"
       },
       "emailStatusFailed": "Неуспешно испраќање е-пошта",
-      "emailStatusPending": "На чекање",
       "inviteCreated": "Поканата е создадена",
       "pendingInvitations": "Покани на чекање",
       "resendInvite": "Испрати ја повторно поканата",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Не успеа вчитувањето на статусот",
       "creditProcessingDelayed": "Обработката на кредитите доцни · автоматски се обидува повторно",
       "ended": "Завршено",
-      "endsOn": "Завршува на {{date}}",
       "manageHint": "Го отвора управувањето со Kilo Pass на веб-страницата.",
       "notSubscribed": "Без претплата",
       "overallocated": "Доделени се повеќе претплати на Kilo Pass отколку што има платени места",
@@ -3004,7 +2954,6 @@
       "paymentPending": "Плаќањето е на чекање",
       "processingBlocked": "Обработката е блокирана",
       "processingNeedsReview": "Потребна е проверка на обработката",
-      "retry": "Обиди се повторно",
       "retryHint": "Повторно се обидува да го вчита статусот на Kilo Pass.",
       "setupHint": "Го отвора поставувањето на Kilo Pass во прелистувачот."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Назад на поставките"
   },
   "quickChat": {
-    "title": "Разговор",
     "empty": {
       "title": "Започни разговор",
       "description": "Испрати порака за да разговараш со модел."
@@ -3076,7 +3024,6 @@
     "openAgents": "Отвори ги агентите",
     "running": "Во тек",
     "needsInput": "чека внес",
-    "idle": "Во мирување",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Вклучи ги активностите во живо во поставките за да ги видиш активните агенти на заклучениот екран."
   }

@@ -16,14 +16,14 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 
 const reviewStyleLabels = {
   strict: 'codeReviewer.reviewStyle.strict',
-  balanced: 'codeReviewer.reviewStyle.balanced',
+  balanced: 'common.balanced',
   lenient: 'codeReviewer.reviewStyle.lenient',
   roast: 'codeReviewer.reviewStyle.roast',
 } as const;
 
 const focusAreaLabels = {
   security: 'codeReviewer.focusArea.security',
-  performance: 'codeReviewer.focusArea.performance',
+  performance: 'common.performance',
   bugs: 'codeReviewer.focusArea.bugs',
   style: 'codeReviewer.focusArea.style',
   testing: 'codeReviewer.focusArea.testing',

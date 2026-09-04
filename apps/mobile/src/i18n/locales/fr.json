@@ -69,14 +69,64 @@
     "repository": "Dépôt",
     "signOut": "Se déconnecter",
     "agents": "Agents IA",
-    "all": "Tout"
+    "all": "Tout",
+    "allModels": "Tous les modèles",
+    "balanced": "Équilibré",
+    "bitbucketConnected": "Bitbucket connecté",
+    "branch": "Branche",
+    "cameraAccessDisabled": "Accès à l'appareil photo désactivé",
+    "chat": "Discussion",
+    "clearFilters": "Réinitialiser les filtres",
+    "clearSearch": "Effacer la recherche",
+    "closed": "Clôture",
+    "closeReactions": "Fermer les réactions",
+    "connect": "Connecter",
+    "connectBitbucket": "Connecter Bitbucket",
+    "connectGitlab": "Connecter GitLab",
+    "contentTruncated": "Contenu tronqué",
+    "copyLink": "Copier le lien",
+    "couldNotLoadOrganizations": "Impossible de charger les organisations.",
+    "couldNotLoadSessions": "Impossible de charger les sessions.",
+    "couldnTLoadMore": "Impossible de charger la suite.",
+    "deviceSessions": "Sessions sur les appareils",
+    "disabled": "Désactivé",
+    "email": "E-mail",
+    "ends": "Se termine le {{date}}",
+    "failed": "Échec",
+    "file": "fichier",
+    "gitlab": "GitLab",
+    "goBack": "Retour",
+    "idle": "En veille",
+    "keepEditing": "Continuer à modifier",
+    "keepRunning": "Laisser continuer",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Nouvelle session",
+    "noKiloclawInstances": "Aucune instance KiloClaw",
+    "noModelsAvailable": "Aucun modèle disponible",
+    "notFound": "Cet élément est introuvable.",
+    "online": "En ligne",
+    "open": "Ouvrir {{name}}",
+    "openPullRequest": "Ouverture de la PR",
+    "pending": "En attente",
+    "performance": "Performances",
+    "preferences": "Préférences",
+    "privacyPolicy": "politique de confidentialité",
+    "profile": "Profil",
+    "reactions": "réactions",
+    "recent": "Récentes",
+    "recommended": "Recommandés",
+    "remaining": "Restant",
+    "rename": "Renommer",
+    "reply": "Répondre",
+    "reportSubmittedReceipt": "Signalement envoyé. Référence : {{receiptId}}",
+    "retryLoadingMore": "Réessayer de charger la suite",
+    "reviewPr": "Examiner la PR"
   },
   "language": {
     "title": "Langue",
     "restarting": "Redémarrage pour changer de langue",
     "couldNotRestart": "Impossible de redémarrer",
     "languageSaved": "Votre choix de langue est enregistré.",
-    "retry": "Réessayer",
     "catalogLoadFailed": "Impossible de charger la langue. Réessayez.",
     "search": "Rechercher une langue",
     "noMatches": "Aucune langue correspondante",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Code de connexion : {{code}}",
     "openSignInPageInBrowser": "Ouvrir la page de connexion dans le navigateur",
     "copySignInLink": "Copier le lien de connexion",
-    "copyLink": "Copier le lien",
     "cancelSignIn": "Annuler la connexion",
     "startingSignIn": "Connexion en cours…",
     "organizationUsesSso": "Votre organisation utilise l'authentification unique.",
@@ -112,7 +161,6 @@
     "terms": "conditions d'utilisation",
     "termsConnector": " et ",
     "termsSuffix": ".",
-    "privacyPolicy": "politique de confidentialité",
     "moreSignInOptions": "Autres options de connexion",
     "couldNotCompleteSignIn": "Impossible de terminer la connexion. Réessayez.",
     "sessionEnded": "Votre session a pris fin. Reconnectez-vous.",
@@ -126,7 +174,6 @@
     "or": "ou"
   },
   "profile": {
-    "title": "Profil",
     "codeReviewerSubtitle": "Revues automatiques de PR",
     "securityAgentSubtitle": "Trouver et corriger les vulnérabilités",
     "reviews": "Revues",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Comptes liés",
     "couldNotLoadAccounts": "Impossible de charger les comptes.",
     "app": "Application",
-    "preferences": "Préférences",
     "preferencesSubtitle": "Apparence, notifications, réflexion et comportement de l'écran",
-    "deviceSessions": "Sessions sur les appareils",
     "deviceSessionsSubtitle": "Consulter et déconnecter les autres appareils",
     "feedback": "Donner un avis",
     "privacyChoices": "Préférences de confidentialité",
@@ -163,9 +208,7 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-mail",
     "providerTestAccount": "Compte de test",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO d'entreprise"
@@ -226,17 +269,13 @@
   },
   "tabs": {
     "home": "Accueil",
-    "profile": "Profil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, onglet, {{position}} sur {{total}}",
-    "chat": "Discussion"
+    "position": "{{name}}, onglet, {{position}} sur {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Changer d'instance",
       "couldNotLoadInstances": "Impossible de charger les instances.",
-      "noInstances": "Aucune instance KiloClaw",
       "noInstancesDescription": "Configurez une instance pour commencer à discuter.",
       "setUpKiloclaw": "Configurer KiloClaw",
       "currentInstance": "{{title}}, instance actuelle"
@@ -258,16 +297,12 @@
       "couldNotSignIn": "Impossible de se connecter à la messagerie.",
       "couldNotRefreshMessages": "Impossible d'actualiser les messages.",
       "couldNotLoadHistory": "Impossible de charger l'historique de la conversation.",
-      "rename": "Renommer",
       "leave": "Quitter",
       "untitledConversation": "Conversation sans titre",
       "createFailed": "Impossible de créer la conversation.",
       "leaveFailed": "Impossible de quitter la conversation."
     },
     "reactions": {
-      "title": "réactions",
-      "close": "Fermer les réactions",
-      "recent": "Récentes",
       "common": "Courantes",
       "reactWith": "Réagir avec {{reaction}}",
       "accessibility": "Réaction {{emoji}}, {{displayCount}}"
@@ -340,7 +375,6 @@
       "addReactionFailed": "Impossible d'ajouter la réaction.",
       "retrySend": "Renvoyer",
       "moreReactions": "Plus de réactions",
-      "reply": "Répondre",
       "edit": "Modifier",
       "sendFailed": "Impossible d'envoyer le message.",
       "retrySendFailed": "Impossible de renvoyer le message.",
@@ -351,7 +385,6 @@
       "takePhoto": "Prendre une photo",
       "photoLibrary": "Photothèque",
       "files": "fichiers",
-      "cameraAccessDisabled": "Accès à l'appareil photo désactivé",
       "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans les paramètres pour prendre une photo."
     },
     "typingIndicator": {
@@ -362,8 +395,6 @@
       "typing_many": "{{names}} écrivent…"
     },
     "botStatus": {
-      "online": "En ligne",
-      "idle": "En veille",
       "offline": "Hors ligne",
       "loadingUser": "Chargement de l'utilisateur…",
       "waitingForStatus": "En attente de l'état du bot…",
@@ -377,7 +408,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Impossible de charger les instances KiloClaw.",
     "billing": {
       "title": "Facturation",
@@ -385,7 +415,6 @@
       "plan": "Programme",
       "finalTermEnds": "Fin de la dernière période",
       "afterFinalTerm": "Après la dernière période",
-      "remaining": "Restant",
       "lessThanOneDay": "Moins d'un jour",
       "ends": "Date de fin",
       "expires": "Date d'expiration",
@@ -486,20 +515,15 @@
       "disconnect": "Déconnecter le compte Google",
       "copied": "Copié",
       "copyCommand": "Copier la commande",
-      "disabled": "Désactivé",
       "disconnectConfirm": "Déconnecter",
       "disconnectMessage": "Retirer votre compte Google de cette instance ? Les notifications Gmail seront désactivées. Redéployez l'instance après la déconnexion pour appliquer les modifications.",
       "disconnectTitle": "Déconnecter Google"
     },
     "modelList": {
-      "title": "Tous les modèles",
       "searchPlaceholder": "Rechercher des modèles…",
-      "clearSearch": "Effacer la recherche",
       "noMatches": "Aucun modèle ne correspond à votre recherche",
-      "noModels": "Aucun modèle disponible",
       "noModelsDescription": "Les modèles apparaîtront ici dès qu'ils seront disponibles.",
-      "noResultsFor": "Aucun résultat ne correspond à « {{query}} ».",
-      "recommended": "Recommandés"
+      "noResultsFor": "Aucun résultat ne correspond à « {{query}} »."
     },
     "secrets": {
       "title": "Données secrètes",
@@ -510,7 +534,6 @@
       "removeTitle": "Supprimer le secret",
       "saved": "{{label}} enregistré",
       "allFieldsRequired": "Remplissez tous les champs pour connecter {{label}}.",
-      "connect": "Connecter",
       "hide": "Masquer {{label}}",
       "removing": "Suppression…",
       "saving": "Enregistrement…",
@@ -588,7 +611,6 @@
       "finishingSetup": "Finalisation de la configuration",
       "finishingSetupDescription": "Patientez, nous terminons la configuration de votre compte. Cela ne prend généralement qu'un instant.",
       "getStarted": "Commencer",
-      "noInstances": "Aucune instance KiloClaw",
       "noInstancesDescription": "Créez votre première instance pour lancer des agents de programmation."
     },
     "instance": {
@@ -600,7 +622,6 @@
     "instanceCard": {
       "fixOnKiloAi": "Corriger sur kilo.ai : {{label}}",
       "needsAttention": "{{name}} nécessite votre attention : {{label}}",
-      "open": "Ouvrir {{name}}",
       "openSettings": "Ouvrir les paramètres de {{name}}",
       "openUnread": "Ouvrir {{name}}, {{displayCount}} messages non lus",
       "openUnread_other": "Ouvrir {{name}}, {{displayCount}} messages non lus",
@@ -622,19 +643,16 @@
     "modelPicker": {
       "autoModelA11y": "modèle automatique {{label}}",
       "balancedDescription": "Un bon équilibre entre rapidité et performances, à moindre coût.",
-      "balancedLabel": "Équilibré",
       "browseAllModels": "ou choisissez parmi plus de 500 modèles",
       "browseAllModelsA11y": "Parcourir le catalogue de plus de 500 modèles",
       "currentModel": "Modèle actuel",
       "frontierDescription": "Performances maximales. Utilise des modèles de pointe dotés de capacités de raisonnement.",
       "frontierLabel": "De pointe",
-      "kiloAuto": "Kilo Auto",
-      "performance": "Performances"
+      "kiloAuto": "Kilo Auto"
     },
     "onboarding": {
       "complete": {
         "chatWith": "Discuter avec {{name}}",
-        "online": "En ligne",
         "ready": "{{name}} est prêt",
         "warmedUp": "Tout est prêt. Dites bonjour quand vous voulez."
       },
@@ -812,11 +830,8 @@
       "setup": "Configuration de Bitbucket"
     },
     "bitbucketConnect": {
-      "connect": "Connecter",
-      "connected": "Bitbucket connecté",
       "description": "Créez un jeton d'accès à l'espace de travail avec les autorisations requises, puis collez-le ci-dessous.",
       "scopes": "Compte : lecture · Dépôts : lecture/écriture · Demandes de fusion : lecture · Webhooks : lecture/écriture.",
-      "title": "Connecter Bitbucket",
       "tokenPlaceholder": "Jeton d'accès à l'espace de travail"
     },
     "followReviewMd": "Suivre les consignes de REVIEW.md",
@@ -842,7 +857,6 @@
       "statusUnavailable": "État indisponible"
     },
     "providerConnect": {
-      "connectGitLab": "Connecter GitLab",
       "description": "Établissez la connexion entre Kilo et votre {{label}} pour examiner automatiquement les demandes de fusion.",
       "githubApp": "application GitHub",
       "githubError": "Impossible d'ouvrir la configuration de GitHub. Réessayez.",
@@ -851,7 +865,6 @@
       "bitbucketError": "Impossible d'ouvrir la configuration de Bitbucket. Réessayez."
     },
     "reviewDetail": {
-      "branch": "Branche",
       "byline": "{{repo}} #{{number}} par {{author}}",
       "cancelMessage": "Cela arrêtera la revue de code en cours.",
       "cancelReview": "Annuler la revue",
@@ -866,9 +879,7 @@
       "gate": "Contrôle de validation",
       "gateHidden": "Masqué",
       "gateNone": "Aucun",
-      "keepRunning": "Laisser continuer",
       "noFindings": "Aucun signalement.",
-      "openPullRequest": "Ouverture de la PR",
       "retryMessage": "Cela relancera la revue de code.",
       "retryReview": "Relancer la revue",
       "retryTitle": "Relancer la revue ?",
@@ -906,7 +917,6 @@
     },
     "reviewMemory": {
       "couldNotLoad": "Impossible de charger la mémoire de revue.",
-      "couldNotLoadMore": "Impossible de charger la suite.",
       "couldNotLoadProposals": "Impossible de charger les propositions.",
       "enable": "Activer la mémoire de revue",
       "loading": "Chargement de la mémoire de revue",
@@ -916,11 +926,9 @@
       "off": "La mémoire de revue est désactivée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
       "readOnlyDescription": "Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent activer la mémoire de revue.",
-      "retryLoadingMore": "Réessayer de charger la suite",
       "title": "Mémoire des revues"
     },
     "scopeList": {
-      "couldNotLoad": "Impossible de charger les organisations.",
       "personalStillAvailable": "Les dépôts personnels restent disponibles ci-dessous.",
       "personalSubtitle": "Vos propres dépôts",
       "viewOnly": "Lecture seule"
@@ -949,21 +957,17 @@
     "updateFailed": "Impossible de mettre à jour l'agent de revue de code.",
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",
     "status": {
-      "pending": "En attente",
       "running": "En cours",
       "completed": "Terminé",
-      "failed": "Échec",
       "interrupted": "Interrompue"
     },
     "reviewStyle": {
       "strict": "Exigeant",
-      "balanced": "Équilibré",
       "lenient": "Indulgent",
       "roast": "Sarcastique"
     },
     "focusArea": {
       "security": "Sécurité",
-      "performance": "Performances",
       "bugs": "Bogues",
       "style": "Style du code",
       "testing": "Tests",
@@ -1026,7 +1030,6 @@
       "sortSeverityDesc": "Gravité : de la plus élevée à la plus faible",
       "sortSlaDue": "Échéance du SLA",
       "status": "Statut",
-      "statusClosed": "Clôture",
       "statusIgnored": "Ignoré",
       "statusOpen": "Ouverture"
     },
@@ -1236,7 +1239,6 @@
       "reasonAfterReview": "après examen"
     },
     "findingList": {
-      "clearFilters": "Réinitialiser les filtres",
       "couldNotLoad": "Impossible de charger les signalements.",
       "couldNotLoadMore": "Impossible de charger davantage de signalements.",
       "emptyDescription": "Aucun signalement ouvert ne nécessite d'intervention pour le moment.",
@@ -1277,14 +1279,12 @@
     "remediation": {
       "attemptHistory": "Historique des tentatives ({{displayCount}})",
       "attemptNumber": "Tentative n° {{number}}",
-      "branch": "Branche",
       "cancelMessage": "L'agent de sécurité arrêtera la tentative de correction en cours.",
       "cancelRemediation": "Annuler la correction",
       "cancelTitle": "Annuler cette correction ?",
       "cancellationRequested": "Annulation demandée",
       "cancelled": "Correction annulée",
       "couldNotLoad": "Impossible de charger l'état de la correction.",
-      "keepRunning": "Laisser continuer",
       "noAnalysisDescription": "Lancez une analyse depuis l'onglet Détails.",
       "noAnalysisTitle": "Aucune analyse pour le moment",
       "openDraftPullRequest": "Ouvrir le brouillon de demande de fusion{{number}}",
@@ -1326,7 +1326,6 @@
       "setupFailed": "Impossible de lancer la configuration de GitHub. Réessayez."
     },
     "scopeList": {
-      "couldNotLoad": "Impossible de charger les organisations.",
       "personalSubtitle": "Vos propres dépôts"
     },
     "settingsOverview": {
@@ -1336,7 +1335,6 @@
       "automationCount": "{{displayCount}} sur 3 activées",
       "couldNotLoadPermissions": "Impossible de charger les autorisations.",
       "couldNotLoadSettings": "Impossible de charger les paramètres de l'agent de sécurité.",
-      "disabled": "Désactivé",
       "disabledNoManage": "L'agent de sécurité est désactivé. Seuls les propriétaires de l'organisation et les responsables de la facturation peuvent l'activer.",
       "disabledNoRepo": "Sélectionnez au moins un dépôt avant d'activer l'agent de sécurité.",
       "disabledPrompt": "Activez l'agent de sécurité pour synchroniser les alertes Dependabot, choisir des dépôts et configurer l'automatisation.",
@@ -1458,7 +1456,6 @@
       "draftPrOpened": "Brouillon de PR ouvert",
       "prOpened": "PR ouverte",
       "blocked": "Bloquée",
-      "failed": "Échec",
       "noChangesNeeded": "Aucune modification nécessaire",
       "originAutomaticPolicy": "Règle automatique",
       "originIncludeExistingPolicy": "Règle d'inclusion des signalements existants",
@@ -1516,7 +1513,6 @@
       "accessDeniedDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
       "couldNotLoad": "Impossible de charger la session.",
       "failedToLoadDetails": "Impossible de charger les détails de la session.",
-      "notFound": "Cet élément est introuvable.",
       "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible.",
       "failedToStopExecution": "Impossible d'arrêter l'exécution.",
       "renameSession": "Renommer la session",
@@ -1560,7 +1556,6 @@
       "retryConnection": "Réessayer de se connecter"
     },
     "newSession": {
-      "title": "Nouvelle session",
       "connectGithubDescription": "Connectez votre compte GitHub dans votre navigateur, puis revenez ici pour choisir un dépôt.",
       "openGithub": "Ouvrir GitHub",
       "refreshRepositories": "Actualiser les dépôts",
@@ -1588,12 +1583,8 @@
       "discardDraftMessage": "Votre consigne sera perdue.",
       "discardDraftTitle": "Supprimer le brouillon ?",
       "discardFailed": "Impossible de supprimer le brouillon. Réessayez.",
-      "keepEditing": "Continuer à modifier",
       "remoteHint": "Exécutez `kilo remote` sur votre ordinateur, ou `/remote` dans une session CLI en cours, pour contrôler un processus kilo local.",
-      "bitbucketConnected": "Bitbucket connecté",
-      "connectBitbucket": "Connecter Bitbucket",
       "connectBitbucketDescription": "Connectez votre compte Bitbucket dans votre navigateur, puis revenez ici pour choisir un dépôt.",
-      "connectGitlab": "Connecter GitLab",
       "connectGitlabDescription": "Connectez votre compte GitLab dans votre navigateur, puis revenez ici pour choisir un dépôt.",
       "couldNotLoadBitbucketRepositories": "Impossible de charger les dépôts Bitbucket.",
       "couldNotLoadGithubRepositories": "Impossible de charger les dépôts GitHub.",
@@ -1624,7 +1615,6 @@
       "accessibilityLabel": "Outil {{name}}, {{status}}",
       "fileEmpty": "Ce fichier est vide.",
       "noTasks": "Aucune tâche.",
-      "contentTruncated": "Contenu tronqué",
       "truncated": "Tronqué",
       "toolRead": "lire",
       "toolEdit": "Modifier",
@@ -1682,8 +1672,7 @@
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
       "loading": "Chargement…",
       "accessibility": "Dépôt : {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "modeSelector": {
       "accessibility": "Mode : {{label}}"
@@ -1720,8 +1709,7 @@
       "cacheWrite": "Écriture dans le cache",
       "total": "Total général",
       "reportAiResponseFailedRetryable": "Impossible de signaler cette réponse.",
-      "reportAiResponseFailedTerminal": "Cette réponse ne peut pas être signalée.",
-      "reportAiResponseSubmitted": "Signalement envoyé. Référence : {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Cette réponse ne peut pas être signalée."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -1760,10 +1748,8 @@
       "viewImageWithAlt": "Voir l'image {{alt}}",
       "imageOutput": "Image produite",
       "imageOutputWithFilename": "Image produite, {{filename}}",
-      "defaultName": "fichier",
       "openFullScreen": "Ouvrir {{name}} en plein écran",
       "preview": "Afficher un aperçu de {{name}}",
-      "openFile": "Ouvrir {{name}}",
       "couldNotLoadFile": "Impossible de charger ce fichier.",
       "couldNotLoadFileRetry": "Impossible de charger ce fichier. Réessayez.",
       "retryLoadingFile": "Réessayer de charger le fichier",
@@ -1902,11 +1888,8 @@
     "modelPicker": {
       "title": "Choix du modèle",
       "searchPlaceholder": "Rechercher des modèles…",
-      "noModels": "Aucun modèle disponible",
       "noModelsDescription": "Aucun modèle n'est disponible.",
-      "favorites": "Favoris",
-      "recommended": "Recommandés",
-      "allModels": "Tous les modèles"
+      "favorites": "Favoris"
     },
     "modelSelector": {
       "provider": "Fournisseur {{id}}",
@@ -1944,7 +1927,6 @@
       "camera": "Appareil photo",
       "photoLibrary": "Photothèque",
       "files": "fichiers",
-      "cameraAccessDisabled": "Accès à l'appareil photo désactivé",
       "cameraAccessMessage": "Autorisez l'accès à l'appareil photo dans les paramètres pour prendre une photo.",
       "couldNotOpenPhotoPicker": "Impossible d'ouvrir le sélecteur de photos. Redémarrez Kilo et réessayez.",
       "maxFilesAllowed": "Vous pouvez joindre jusqu'à {{displayCount}} fichiers.",
@@ -1972,9 +1954,7 @@
     },
     "chatLink": {
       "linkCopied": "Lien copié",
-      "reviewPr": "Examiner la PR",
       "openLink": "Ouvrir le lien",
-      "copyLink": "Copier le lien",
       "shareLink": "Partager le lien",
       "share": "Partager",
       "prLinkActions": "Actions sur le lien de la PR",
@@ -2020,7 +2000,6 @@
       "tokensUsage": "Contexte : {{used}} jetons sur {{window}}, {{percentage}} utilisés",
       "title": "Utilisation du contexte",
       "used": "Utilisé",
-      "remaining": "Restant",
       "provider": "Fournisseur",
       "totalCost": "Coût total",
       "usageReflectsLatest": "L'utilisation correspond à la dernière réponse complète de l'assistant.",
@@ -2082,7 +2061,6 @@
     "retryLoadingPrivacy": "Réessayer de charger les préférences de confidentialité"
   },
   "preferences": {
-    "title": "Préférences",
     "autoExpandThinking": "Développer automatiquement la réflexion",
     "autoExpandThinkingSubtitle": "Afficher le détail de la réflexion de l'agent une fois celle-ci terminée.",
     "keepScreenOn": "Garder l'écran allumé sur la page de la session",
@@ -2106,7 +2084,6 @@
     "billingPage": "page de facturation"
   },
   "deviceSessions": {
-    "couldNotLoad": "Impossible de charger les sessions.",
     "couldNotLoadDescription": "Vos sessions actives restent indisponibles tant que leur chargement n'a pas abouti.",
     "currentDeviceUnidentified": "Impossible d'identifier l'appareil actuel.",
     "noSessions": "Aucune session active",
@@ -2114,7 +2091,6 @@
     "onlyKiloAppSignIns": "Seules les connexions à l'application Kilo apparaissent ici. Les connexions depuis l'éditeur ou la CLI ne sont pas affichées.",
     "signedIn": "Connexion : {{signedIn}} · Dernière activité : {{lastSeen}}",
     "thisDevice": "Cet appareil",
-    "title": "Sessions sur les appareils",
     "viewProfile": "Voir le profil",
     "signOutThisDevice": "Déconnecter cet appareil",
     "signOutThisSession": "Déconnecter cette session",
@@ -2147,7 +2123,6 @@
   },
   "invalidRoute": {
     "description": "Ce lien n'est plus valide.",
-    "goBack": "Retour",
     "title": "Page introuvable"
   },
   "offline": {
@@ -2158,15 +2133,13 @@
     "neutralDescription": "Réessayez.",
     "offlineTitle": "Le chargement a échoué.",
     "permissionDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
-    "notFoundTitle": "Cet élément est introuvable.",
     "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible.",
     "serverTitle": "Impossible de charger les données.",
     "serverDescription": "Une erreur s'est produite de notre côté. Réessayez."
   },
   "screenHeader": {
     "openMenu": "Ouvrir le menu",
-    "openMenuFor": "Ouvrir le menu pour {{title}}",
-    "goBack": "Retour"
+    "openMenuFor": "Ouvrir le menu pour {{title}}"
   },
   "picker": {
     "optionsExpired": "Options indisponibles",
@@ -2197,9 +2170,7 @@
   },
   "share": {
     "title": "Partager avec Kilo",
-    "reviewPr": "Examiner la PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Nouvelle session",
     "searchPlaceholder": "Rechercher parmi les sessions récentes",
     "connectedCli": "Sur une CLI connectée",
     "newSessionOn": "Nouvelle session sur {{name}}",
@@ -2257,7 +2228,6 @@
     "statusCanceling": "Résiliation de Kilo Pass en cours",
     "statusPastDue": "Paiement de Kilo Pass en retard",
     "monthlyCredits": "{{credits}} crédits par mois",
-    "ends": "Se termine le {{date}}",
     "periodEnd": "fin de période",
     "managedOnGooglePlay": "Géré sur Google Play",
     "managedInAppStore": "Géré dans l'App Store",
@@ -2269,7 +2239,6 @@
     "unavailableDescription": "Kilo Pass n'est pas disponible comme achat intégré sur Android. Gérez-le sur le web.",
     "webManagementDescription": "Ce Kilo Pass est géré sur le web.",
     "legalDisclosure": "Kilo Pass est un abonnement mensuel à renouvellement automatique. Le paiement est facturé à votre Apple ID à la confirmation de l'achat. L'abonnement se renouvelle automatiquement chaque mois au prix indiqué, sauf résiliation au moins 24 heures avant la fin de la période en cours. Vous pouvez le gérer ou le résilier à tout moment dans les réglages de votre compte App Store.",
-    "legalPrivacyPolicy": "politique de confidentialité",
     "legalTermsOfUse": "conditions d'utilisation (EULA)",
     "purchaseDifferentAccount": "Cet achat sur l'App Store n'est pas lié à votre compte Kilo. Connectez-vous au compte Apple Account utilisé pour l'achat, puis réessayez.",
     "restoreFailed": "Échec de la restauration des achats. Réessayez.",
@@ -2364,12 +2333,9 @@
     "search": {
       "searching": "Recherche en cours",
       "searchSessions": "Rechercher des sessions",
-      "searchSessionsPlaceholder": "Rechercher des sessions",
-      "clearSearch": "Effacer la recherche",
-      "clearFilters": "Réinitialiser les filtres"
+      "searchSessionsPlaceholder": "Rechercher des sessions"
     },
     "sessionList": {
-      "couldNotLoad": "Impossible de charger les sessions.",
       "couldNotLoadActive": "Impossible de charger les sessions actives.",
       "noSessionsYetDescription": "Lancez une tâche de programmation depuis votre téléphone. Vos sessions apparaîtront ici.",
       "noMatches": "Aucune session ne correspond aux critères",
@@ -2385,7 +2351,6 @@
       "deleteTitle": "Supprimer la session ?",
       "deleteMessage": "Cette action est irréversible.",
       "deleteSession": "Supprimer la session",
-      "rename": "Renommer",
       "renameMessage": "Saisissez un nouveau nom pour cette session.",
       "copyId": "Copier l'identifiant de la session",
       "idCopied": "Identifiant de la session copié",
@@ -2430,7 +2395,6 @@
     "liveCount_many": "{{count}} EN COURS"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Contenu tronqué",
     "truncated": "Tronqué",
     "wrap": "Retour à la ligne",
     "scroll": "Défilement"
@@ -2466,7 +2430,6 @@
       "editTitle": "Modification du commentaire",
       "insertSuggestion": "Insérer une suggestion",
       "insertSuggestionA11y": "Insérer une suggestion de code",
-      "keepEditing": "Continuer à modifier",
       "loadFailedTitle": "Impossible de charger l'éditeur de commentaires.",
       "ok": "OK",
       "unavailableMessage": "Ce commentaire en attente a déjà été supprimé ou envoyé.",
@@ -2494,7 +2457,6 @@
       "addReaction": "Ajouter une réaction",
       "block": "Bloquer",
       "blockedUser": "{{login}} bloqué",
-      "closeReactions": "Fermer les réactions",
       "collapseThread": "Réduire le fil",
       "commentActions": "Actions du commentaire",
       "comment": "{{displayCount}} commentaires",
@@ -2502,7 +2464,6 @@
       "couldNotLoad": "Impossible de charger les échanges.",
       "couldNotLoadMore": "Impossible de charger d'autres commentaires.",
       "couldNotReply": "Impossible de répondre.",
-      "file": "fichier",
       "loadMoreComments": "Charger d'autres commentaires",
       "loading": "Chargement des échanges",
       "moderation": {
@@ -2535,14 +2496,11 @@
       "reaction": "réactions",
       "reaction_other": "réactions",
       "reaction_one": "réaction",
-      "reactionsTitle": "réactions",
-      "reply": "Répondre",
       "replyBadRequest": "Cette réponse ne peut pas être publiée. Le fil a peut-être changé.",
       "replyBody": "Texte de la réponse",
       "replyForbidden": "Vous n'avez pas l'autorisation de répondre à cette demande de fusion.",
       "replyPlaceholder": "Votre réponse…",
       "reportContent": "Signaler le contenu",
-      "reportSubmitted": "Signalement envoyé. Référence : {{receiptId}}",
       "reportUser": "Signaler l'utilisateur",
       "resolveThread": "Marquer le fil comme résolu",
       "resolved": "Résolu",
@@ -2589,7 +2547,6 @@
       "noRecentPrs": "Aucune PR récente",
       "noRecentPrsDescription": "Collez un lien de PR ci-dessus pour commencer une revue. La PR apparaîtra ici la prochaine fois.",
       "open": "Ouverture",
-      "openPullRequest": "Ouverture de la PR",
       "pasteLink": "Coller le lien de la demande de fusion",
       "pastePrLink": "Coller un lien de PR",
       "removeFromRecentsMessage": "Cette demande de fusion sera retirée de vos éléments récents.",
@@ -2684,12 +2641,9 @@
     },
     "inbox": {
       "couldNotLoad": "Impossible de charger la boîte de réception.",
-      "couldNotLoadMore": "Impossible de charger la suite.",
       "loading": "Chargement de la boîte de réception",
       "noReviewRequests": "Aucune demande de revue",
       "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",
-      "recent": "Récentes",
-      "retryLoadingMore": "Réessayer de charger la suite",
       "title": "Boîte de réception"
     },
     "installKiloGitHubApp": "Installer l'application GitHub de Kilo",
@@ -2776,7 +2730,6 @@
       "file": "fichiers",
       "file_other": "fichiers",
       "file_one": "fichier",
-      "stateClosed": "Clôture",
       "stateMerged": "Fusionnée",
       "stateOpen": "Ouverture",
       "stateOpenApproved": "Ouverte · Approuvée",
@@ -2918,7 +2871,6 @@
     },
     "inviteMember": {
       "emailError": "Saisissez une adresse e-mail valide.",
-      "emailLabel": "E-mail",
       "emailPlaceholder": "nom@entreprise.com",
       "permissionDenied": "Vous n'avez pas l'autorisation d'inviter des membres.",
       "roleLabel": "Rôle",
@@ -2988,7 +2940,6 @@
         "billingManager": "Responsable de la facturation"
       },
       "emailStatusFailed": "Échec de l'envoi de l'e-mail",
-      "emailStatusPending": "En attente",
       "inviteCreated": "Invitation créée",
       "pendingInvitations": "Invitations en attente",
       "resendInvite": "Renvoyer l'invitation",
@@ -3006,7 +2957,6 @@
       "couldNotLoadStatus": "Impossible de charger le statut",
       "creditProcessingDelayed": "Traitement des crédits retardé · nouvelle tentative automatique",
       "ended": "Terminé",
-      "endsOn": "Se termine le {{date}}",
       "manageHint": "Ouvre la gestion de Kilo Pass sur le site web.",
       "notSubscribed": "Aucun abonnement",
       "overallocated": "Le nombre de pass attribués dépasse le nombre de licences payées",
@@ -3017,7 +2967,6 @@
       "paymentPending": "Paiement en attente",
       "processingBlocked": "Traitement bloqué",
       "processingNeedsReview": "Traitement à examiner",
-      "retry": "Réessayer",
       "retryHint": "Relance le chargement du statut de Kilo Pass.",
       "setupHint": "Ouvre la configuration de Kilo Pass dans le navigateur.",
       "paidSeat_many": "{{displayCount}} licences payées"
@@ -3079,7 +3028,6 @@
     "backToPreferences": "Retour aux préférences"
   },
   "quickChat": {
-    "title": "Discussion",
     "empty": {
       "title": "Démarrer une discussion",
       "description": "Envoyez un message pour discuter avec un modèle."
@@ -3098,7 +3046,6 @@
     "openAgents": "Ouvrir les agents",
     "running": "En cours",
     "needsInput": "intervention requise",
-    "idle": "En veille",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
   }

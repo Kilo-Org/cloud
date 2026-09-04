@@ -69,7 +69,58 @@
     "repository": "Хранилище",
     "signOut": "Излез",
     "agents": "Агенти",
-    "all": "Всички"
+    "all": "Всички",
+    "allModels": "Всички модели",
+    "balanced": "Балансиран",
+    "bitbucketConnected": "Bitbucket е свързан",
+    "branch": "Клон",
+    "cameraAccessDisabled": "Няма достъп до камерата",
+    "chat": "Чат",
+    "clearFilters": "Изчисти филтрите",
+    "clearSearch": "Изчисти търсенето",
+    "closed": "Затворено",
+    "closeReactions": "Затвори реакциите",
+    "connect": "Свържи",
+    "connectBitbucket": "Свържи Bitbucket",
+    "connectGitlab": "Свържи GitLab",
+    "contentTruncated": "Съдържанието е съкратено",
+    "copyLink": "Копирай връзката",
+    "couldNotLoadOrganizations": "Организациите не се заредиха.",
+    "couldNotLoadSessions": "Сесиите не се заредиха.",
+    "couldnTLoadMore": "Не успяхме да заредим още резултати.",
+    "deviceSessions": "Сесии на устройства",
+    "disabled": "Изключено",
+    "email": "Имейл",
+    "ends": "Приключва на {{date}}",
+    "failed": "Неуспешно",
+    "file": "Файл",
+    "gitlab": "GitLab",
+    "goBack": "Върни се назад",
+    "idle": "Без активност",
+    "keepEditing": "Продължи редактирането",
+    "keepRunning": "Продължи изпълнението",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Нова сесия",
+    "noKiloclawInstances": "Няма инстанции на KiloClaw",
+    "noModelsAvailable": "Няма налични модели",
+    "notFound": "Не е намерено.",
+    "online": "Онлайн",
+    "open": "Отвори {{name}}",
+    "openPullRequest": "Отваряне на заявка за сливане",
+    "pending": "В изчакване",
+    "performance": "Производителност",
+    "preferences": "Предпочитания",
+    "privacyPolicy": "Политика за поверителност",
+    "profile": "Профил",
+    "reactions": "Реакции",
+    "recent": "Последни",
+    "recommended": "Препоръчани",
+    "remaining": "Оставащи",
+    "rename": "Преименувай",
+    "reply": "Отговори",
+    "reportSubmittedReceipt": "Сигналът е изпратен. Номер: {{receiptId}}",
+    "retryLoadingMore": "Опитай отново да заредиш още резултати",
+    "reviewPr": "Прегледай PR"
   },
   "language": {
     "title": "Език",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Неуспешно рестартиране",
     "languageSaved": "Избраният език е запазен.",
     "catalogLoadFailed": "Не можахме да заредим езика. Моля, опитай отново.",
-    "retry": "Опитай отново",
     "search": "Търсене на езици",
     "noMatches": "Няма езици, които отговарят на търсенето",
     "deviceLanguage": "Език на устройството",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Код за влизане: {{code}}",
     "openSignInPageInBrowser": "Отвори страницата за влизане в браузъра",
     "copySignInLink": "Копирай връзката за влизане",
-    "copyLink": "Копирай връзката",
     "cancelSignIn": "Отмени влизането",
     "startingSignIn": "Започва влизане…",
     "organizationUsesSso": "Организацията ти използва единен вход.",
@@ -112,7 +161,6 @@
     "terms": "условия",
     "termsConnector": " и ",
     "termsSuffix": ".",
-    "privacyPolicy": "Политика за поверителност",
     "moreSignInOptions": "Още опции за влизане",
     "couldNotCompleteSignIn": "Не можахме да завършим влизането. Моля, опитай отново.",
     "sessionEnded": "Сесията ти приключи. Влез отново.",
@@ -126,7 +174,6 @@
     "or": "или"
   },
   "profile": {
-    "title": "Профил",
     "codeReviewerSubtitle": "Автоматични прегледи на PR",
     "securityAgentSubtitle": "Откривай и отстранявай уязвимости",
     "reviews": "Прегледи",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Свързани акаунти",
     "couldNotLoadAccounts": "Не успяхме да заредим акаунтите.",
     "app": "Приложение",
-    "preferences": "Предпочитания",
     "preferencesSubtitle": "Изглед, известия, разсъждения и поведение на екрана",
-    "deviceSessions": "Сесии на устройства",
     "deviceSessionsSubtitle": "Преглеждай другите устройства и прекратявай сесиите им",
     "feedback": "Обратна връзка",
     "privacyChoices": "Настройки за поверителност",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Имейл",
     "providerTestAccount": "Тестов акаунт",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Корпоративно SSO"
   },
   "preferences": {
-    "title": "Предпочитания",
     "autoExpandThinking": "Автоматично разгъване на разсъжденията",
     "autoExpandThinkingSubtitle": "Показвай разсъжденията на агента разгънати, след като приключат.",
     "keepScreenOn": "Дръж екрана включен при отворена сесия",
@@ -360,7 +402,6 @@
       "unresolveThread": "Отвори отново нишката",
       "resolved": "Приключена",
       "outdated": "Остаряло",
-      "file": "Файл",
       "comment_one": "1 коментар",
       "comment": "{{displayCount}} коментара",
       "comment_other": "{{displayCount}} коментара",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Не можахме да заредим още коментари.",
       "retryLoadingMore": "Опитай отново да заредиш още коментари",
       "loadMoreComments": "Зареди още коментари",
-      "closeReactions": "Затвори реакциите",
-      "reactionsTitle": "Реакции",
       "addReaction": "Добави реакция",
       "reactionPill": "реакция {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "реакция",
@@ -380,13 +419,11 @@
       "reportUser": "Сигнализирай за потребител",
       "mute": "Заглуши",
       "block": "Блокиране",
-      "reportSubmitted": "Сигналът е изпратен. Номер: {{receiptId}}",
       "blockedUser": "{{login}} е блокиран",
       "mutedUser": "{{login}} е заглушен",
       "replyPlaceholder": "Отговор…",
       "replyBody": "Текст на отговора",
       "submitReply": "Изпрати отговора",
-      "reply": "Отговори",
       "termsTitle": "Условия за ползване",
       "termsCopy": "Трябва да имаш навършени 13 години, за да публикуваш.",
       "termsAcceptRetry": "Не можахме да запазим приемането на условията за ползване. Провери връзката си и опитай отново.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "URL на заявка за обединяване в GitHub",
       "clearLink": "Изчисти връзката към заявката за обединяване",
       "pasteLink": "Постави връзка към заявка за обединяване",
-      "open": "Отваряне",
-      "openPullRequest": "Отваряне на заявка за сливане"
+      "open": "Отваряне"
     },
     "checks": {
       "title": "Проверки",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Входящи",
-      "recent": "Последни",
       "loading": "Зареждане на входящите заявки",
       "noReviewRequests": "Няма заявки за преглед",
       "noReviewRequestsDescription": "Тук се показват заявките за обединяване, които очакват твоя преглед. Можеш също да поставиш връзка към който и да е PR по-горе.",
-      "couldNotLoad": "Не можахме да заредим входящите заявки.",
-      "couldNotLoadMore": "Не успяхме да заредим още резултати.",
-      "retryLoadingMore": "Опитай отново да заредиш още резултати"
+      "couldNotLoad": "Не можахме да заредим входящите заявки."
     },
     "composer": {
       "commentBodyPlaceholder": "Текст на коментара",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Не можахме да заредим редактора за коментари.",
       "discardTitle": "Да се изхвърли ли коментарът?",
       "discardMessage": "Черновата ти ще бъде загубена.",
-      "keepEditing": "Продължи редактирането",
       "comment": "Коментар",
       "insertSuggestionA11y": "Вмъкни предложение за код",
       "insertSuggestion": "Вмъкни предложение",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Слято",
-      "stateClosed": "Затворено",
       "stateOpenApproved": "Отворена · Одобрена",
       "stateOpenChangesRequested": "Отворена · Поискани промени",
       "stateOpenReviewRequired": "Отворена · Нужен преглед",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Начало",
-    "profile": "Профил",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, раздел, {{position}} от {{total}}",
-    "chat": "Чат"
+    "position": "{{name}}, раздел, {{position}} от {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Смяна на инстанция",
       "couldNotLoadInstances": "Не успяхме да заредим инстанциите.",
-      "noInstances": "Няма инстанции на KiloClaw",
       "noInstancesDescription": "Настрой инстанция, за да започнеш разговор.",
       "setUpKiloclaw": "Настрой KiloClaw",
       "currentInstance": "{{title}}, текуща"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Не успяхме да влезем в чата.",
       "couldNotRefreshMessages": "Не успяхме да обновим съобщенията.",
       "couldNotLoadHistory": "Не успяхме да заредим историята на разговора.",
-      "rename": "Преименувай",
       "leave": "Напусни",
       "untitledConversation": "Разговор без заглавие",
       "createFailed": "Не успяхме да създадем разговора.",
       "leaveFailed": "Не успяхме да напуснем разговора."
     },
     "reactions": {
-      "title": "Реакции",
-      "close": "Затвори реакциите",
-      "recent": "Последни",
       "common": "Често използвани",
       "reactWith": "Реагирай с {{reaction}}",
       "accessibility": "Реакция {{emoji}}, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Не успяхме да добавим реакцията.",
       "retrySend": "Изпрати отново",
       "moreReactions": "Още реакции",
-      "reply": "Отговори",
       "edit": "Редактиране",
       "sendFailed": "Не успяхме да изпратим съобщението.",
       "retrySendFailed": "Не успяхме да изпратим съобщението отново.",
@@ -807,7 +829,6 @@
       "takePhoto": "Снимай",
       "photoLibrary": "Фотогалерия",
       "files": "Файлове",
-      "cameraAccessDisabled": "Няма достъп до камерата",
       "cameraAccessMessage": "Разреши достъпа до камерата в настройките, за да направиш снимка."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} пишат…"
     },
     "botStatus": {
-      "online": "Онлайн",
-      "idle": "Без активност",
       "offline": "Офлайн",
       "loadingUser": "Зареждане на потребителя…",
       "waitingForStatus": "Изчакване на състоянието на бота…",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Не можахме да заредим инстанциите на KiloClaw.",
     "billing": {
       "title": "Плащания",
@@ -840,7 +858,6 @@
       "plan": "План",
       "finalTermEnds": "Край на последния период",
       "afterFinalTerm": "След последния период",
-      "remaining": "Оставащи",
       "ends": "Изтича",
       "expires": "Изтича",
       "noActivePlan": "Няма активен план",
@@ -941,20 +958,15 @@
       "disconnect": "Прекъсни връзката с акаунта в Google",
       "copied": "Копирано",
       "copyCommand": "Копирай командата",
-      "disabled": "Изключено",
       "disconnectConfirm": "Прекъсни връзката",
       "disconnectMessage": "Да се премахне ли акаунтът ти в Google от тази инстанция? Това ще изключи известията от Gmail. След като прекъснеш връзката, разгърни инстанцията отново, за да приложиш промените.",
       "disconnectTitle": "Прекъсване на връзката с Google"
     },
     "modelList": {
-      "title": "Всички модели",
       "searchPlaceholder": "Търсене на модели…",
-      "clearSearch": "Изчисти търсенето",
       "noMatches": "Няма модели за това търсене",
-      "noModels": "Няма налични модели",
       "noModelsDescription": "Моделите ще се появят тук, когато са налични.",
-      "noResultsFor": "Няма резултати за „{{query}}“.",
-      "recommended": "Препоръчани"
+      "noResultsFor": "Няма резултати за „{{query}}“."
     },
     "secrets": {
       "title": "Поверителни данни",
@@ -972,8 +984,7 @@
       "setupGuide": "ръководство за настройка",
       "saving": "Запазване…",
       "removing": "Премахване…",
-      "updateToken": "Актуализирай токена",
-      "connect": "Свържи"
+      "updateToken": "Актуализирай токена"
     },
     "versionPin": {
       "title": "Фиксиране на версията",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Приключване на настройката",
       "finishingSetupDescription": "Изчакай малко, довършваме настройката на акаунта ти. Обикновено това отнема само миг.",
       "getStarted": "Започни",
-      "noInstances": "Няма инстанции на KiloClaw",
       "noInstancesDescription": "Създай първата си инстанция, за да започнеш да използваш агенти за програмиране."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Разговаряй с {{name}}",
-        "online": "Онлайн",
         "ready": "{{name}} е готов",
         "warmedUp": "Всичко е готово. Поздрави го, когато пожелаеш."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Водещи модели",
       "frontierDescription": "Най-висока производителност. Насочва заявките към водещи модели със способност за разсъждение.",
-      "balancedLabel": "Балансиран",
       "balancedDescription": "Добър баланс между бързина и възможности на по-ниска цена.",
-      "performance": "Производителност",
       "autoModelA11y": "Автоматичен модел: {{label}}",
       "currentModel": "Текущ модел",
       "browseAllModels": "или избери от над 500 модела",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "Отвори {{name}}, {{displayCount}} непрочетено съобщение",
       "openUnread": "Отвори {{name}}, {{displayCount}} непрочетени съобщения",
       "openUnread_other": "Отвори {{name}}, {{displayCount}} непрочетени съобщения",
-      "open": "Отвори {{name}}",
       "openSettings": "Отвори настройките за {{name}}",
       "fixOnKiloAi": "Отстрани проблема в kilo.ai: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Преглед",
       "cancelTitle": "Да се отмени ли прегледът?",
       "cancelMessage": "Това ще спре текущия преглед на кода.",
-      "keepRunning": "Продължи изпълнението",
       "cancelReview": "Отмени прегледа",
       "retryTitle": "Да се повтори ли прегледът?",
       "retryMessage": "Това ще стартира прегледа на кода отново.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} от {{author}}",
       "noFindings": "Няма открити проблеми.",
       "showMore": "Покажи още",
-      "branch": "Клон",
       "created": "Създаден",
       "started": "Започнат",
       "completed": "Завършено",
       "tokens": "Токени",
       "tokensInOut": "{{input}} входящи / {{output}} изходящи",
-      "openPullRequest": "Отваряне на заявка за сливане",
       "council": "Съвет",
       "decision": "Решение",
       "gate": "Проверка за качество",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Памет от прегледите",
-      "couldNotLoadMore": "Не успяхме да заредим още резултати.",
-      "retryLoadingMore": "Опитай отново да заредиш още резултати",
       "loading": "Зареждане на паметта за прегледи",
       "couldNotLoad": "Не успяхме да заредим паметта за прегледи.",
       "off": "Паметта за прегледи е изключена.",
@@ -1347,15 +1348,11 @@
       "setup": "Настройка на Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket е свързан",
-      "title": "Свържи Bitbucket",
       "description": "Създай токен за достъп до работното пространство с необходимите права и го постави по-долу.",
       "scopes": "Права за достъп: акаунт — четене; хранилища — четене/запис; заявки за сливане — четене; уебкукове — четене/запис.",
-      "tokenPlaceholder": "Токен за достъп до работното пространство",
-      "connect": "Свържи"
+      "tokenPlaceholder": "Токен за достъп до работното пространство"
     },
     "scopeList": {
-      "couldNotLoad": "Организациите не се заредиха.",
       "personalStillAvailable": "Личните хранилища все още са налични по-долу.",
       "personalSubtitle": "Личните ти хранилища",
       "viewOnly": "Само за преглед"
@@ -1378,7 +1375,6 @@
       "githubApp": "приложението за GitHub",
       "githubError": "Не успяхме да отворим настройката на GitHub. Опитай отново.",
       "gitlabAccount": "акаунта в GitLab",
-      "connectGitLab": "Свържи GitLab",
       "gitlabError": "Не успяхме да отворим настройката на GitLab. Опитай отново.",
       "description": "Свържи {{label}} на Kilo, за да се преглеждат автоматично заявките за сливане.",
       "bitbucketError": "Не успяхме да отворим настройката на Bitbucket. Опитай отново."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Не успяхме да актуализираме агента за преглед на код.",
     "configSaveFailed": "Не успяхме да запазим настройките за преглед.",
     "status": {
-      "pending": "В изчакване",
       "running": "Изпълнява се",
       "completed": "Завършено",
-      "failed": "Неуспешно",
       "interrupted": "Прекъснато"
     },
     "reviewStyle": {
       "strict": "Строг",
-      "balanced": "Балансиран",
       "lenient": "Снизходителен",
       "roast": "Хаплив"
     },
     "focusArea": {
       "security": "Сигурност",
-      "performance": "Производителност",
       "bugs": "Грешки",
       "style": "Стил",
       "testing": "Тестване",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Отваряне",
       "fixed": "Отстранено",
       "statusIgnored": "Игнорирани",
-      "statusClosed": "Затворено",
       "severityHigh": "Високо",
       "severityMedium": "Средно",
       "severityLow": "Ниско",
@@ -1655,7 +1646,6 @@
       "title": "Настройки",
       "couldNotLoadSettings": "Не успяхме да заредим настройките на агента за сигурност.",
       "couldNotLoadPermissions": "Не успяхме да заредим правата.",
-      "disabled": "Изключено",
       "on": "Включено",
       "repositoriesCount_one": "{{displayCount}} избрано хранилище",
       "repositoriesCount": "{{displayCount}} избрани хранилища",
@@ -1683,7 +1673,6 @@
       "retry": "Повтори отстраняването",
       "cancelTitle": "Да се отмени ли това отстраняване?",
       "cancelMessage": "Агентът за сигурност ще спре текущия опит за отстраняване.",
-      "keepRunning": "Продължи изпълнението",
       "cancelRemediation": "Отмени отстраняването",
       "openPullRequest": "Отвори заявката за сливане{{number}}",
       "openDraftPullRequest": "Отвори черновата на заявката за сливане{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "История на опитите ({{displayCount}})",
       "attemptNumber": "Опит № {{number}}",
       "startedBy": "Започнато от",
-      "branch": "Клон",
       "queued": "Отстраняването е добавено в опашката",
       "retryQueued": "Повторният опит за отстраняване е добавен в опашката",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Няма проблеми, които отговарят на филтрите",
       "noMatchesDescription": "Опитай да промениш или изчистиш избраните филтри.",
       "emptyTitle": "Няма отворени проблеми",
-      "emptyDescription": "В момента няма отворени проблеми, които изискват внимание.",
-      "clearFilters": "Изчисти филтрите"
+      "emptyDescription": "В момента няма отворени проблеми, които изискват внимание."
     },
     "scopeList": {
-      "couldNotLoad": "Организациите не се заредиха.",
       "personalSubtitle": "Личните ти хранилища"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "Отворена чернова на PR",
       "prOpened": "Създаден PR",
       "blocked": "Блокирано",
-      "failed": "Неуспешно",
       "noChangesNeeded": "Не са нужни промени",
       "originAutomaticPolicy": "Правило за автоматично отстраняване",
       "originIncludeExistingPolicy": "Правило за включване на съществуващи проблеми",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Търсене",
       "searchSessions": "Търсене на сесии",
-      "searchSessionsPlaceholder": "Търсене на сесии",
-      "clearSearch": "Изчисти търсенето",
-      "clearFilters": "Изчисти филтрите"
+      "searchSessionsPlaceholder": "Търсене на сесии"
     },
     "sessionList": {
-      "couldNotLoad": "Сесиите не се заредиха.",
       "couldNotLoadActive": "Не можахме да заредим активните сесии.",
       "noSessionsYetDescription": "Започни задача за програмиране от телефона си. Сесиите ти ще се появят тук.",
       "noMatches": "Няма сесии за това търсене",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Да се изтрие ли сесията?",
       "deleteMessage": "Това не може да бъде отменено.",
       "deleteSession": "Изтрий сесията",
-      "rename": "Преименувай",
       "renameMessage": "Въведи ново име за тази сесия.",
       "copyId": "Копирай идентификатора на сесията",
       "idCopied": "Идентификаторът на сесията е копиран",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Нямаш разрешение да видиш това.",
       "couldNotLoad": "Не успяхме да заредим сесията.",
       "failedToLoadDetails": "Не успяхме да заредим подробностите за сесията.",
-      "notFound": "Не е намерено.",
       "notFoundDescription": "Този елемент може да е премахнат или вече да не е наличен.",
       "failedToStopExecution": "Не успяхме да спрем изпълнението.",
       "renameSession": "Преименуване на сесията",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Опитай да се свържеш отново"
     },
     "newSession": {
-      "title": "Нова сесия",
       "connectGithubDescription": "Свържи GitHub в браузъра си, след което се върни тук, за да избереш хранилище.",
       "openGithub": "Отвори GitHub",
       "refreshRepositories": "Опресни хранилищата",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Не успяхме да опресним хранилищата. Опитай отново.",
       "discardDraftTitle": "Да се изтрие ли черновата?",
       "discardDraftMessage": "Подканата ти ще се загуби.",
-      "keepEditing": "Продължи редактирането",
       "discardFailed": "Не успяхме да изтрием черновата. Опитай отново.",
       "remoteHint": "Изпълни `kilo remote` на компютъра си или `/remote` в работеща CLI сесия, за да управляваш локален процес на kilo.",
-      "bitbucketConnected": "Bitbucket е свързан",
-      "connectBitbucket": "Свържи Bitbucket",
       "connectBitbucketDescription": "Свържи Bitbucket в браузъра си, след което се върни тук, за да избереш хранилище.",
-      "connectGitlab": "Свържи GitLab",
       "connectGitlabDescription": "Свържи GitLab в браузъра си, след което се върни тук, за да избереш хранилище.",
       "couldNotLoadBitbucketRepositories": "Не успяхме да заредим хранилищата в Bitbucket.",
       "couldNotLoadGithubRepositories": "Не успяхме да заредим хранилищата в GitHub.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "Инструмент {{name}}, {{status}}",
       "fileEmpty": "Този файл е празен.",
       "noTasks": "Няма задачи.",
-      "contentTruncated": "Съдържанието е съкратено",
       "truncated": "Съкратено",
       "toolRead": "четене",
       "toolEdit": "Редактиране",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Опитай с друга дума за търсене.",
       "loading": "Зареждане...",
       "accessibility": "Хранилище: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Подробности за съобщението",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Запис в кеш",
       "total": "Общо",
       "reportAiResponseFailedRetryable": "Не можа да се докладва този отговор.",
-      "reportAiResponseFailedTerminal": "Този отговор не може да бъде докладван.",
-      "reportAiResponseSubmitted": "Сигналът е изпратен. Номер: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Този отговор не може да бъде докладван."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "Прегледай изображението {{alt}}",
       "imageOutput": "Резултат като изображение",
       "imageOutputWithFilename": "Резултат като изображение, {{filename}}",
-      "defaultName": "Файл",
       "openFullScreen": "Отвори {{name}} на цял екран",
       "preview": "Прегледай {{name}}",
-      "openFile": "Отвори {{name}}",
       "couldNotLoadFile": "Не може да се зареди този файл.",
       "couldNotLoadFileRetry": "Не може да се зареди този файл. Опитай отново.",
       "retryLoadingFile": "Опитай отново да заредиш файла",
@@ -2414,10 +2384,7 @@
     "modelPicker": {
       "title": "Избор на модел",
       "searchPlaceholder": "Търсене на модели…",
-      "allModels": "Всички модели",
       "favorites": "Любими",
-      "noModels": "Няма налични модели",
-      "recommended": "Препоръчани",
       "noModelsDescription": "Няма налични модели за избор."
     },
     "modelSelector": {
@@ -2456,7 +2423,6 @@
       "camera": "Камера",
       "photoLibrary": "Фотогалерия",
       "files": "Файлове",
-      "cameraAccessDisabled": "Няма достъп до камерата",
       "cameraAccessMessage": "Разреши достъпа до камерата в настройките, за да направиш снимка.",
       "couldNotOpenPhotoPicker": "Не успяхме да отворим прозореца за избор на снимки. Рестартирай Kilo и опитай отново.",
       "maxFilesAllowed": "Можеш да прикачиш най-много {{displayCount}} файла.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Връзката е копирана",
-      "reviewPr": "Прегледай PR",
       "openLink": "Отвори връзката",
-      "copyLink": "Копирай връзката",
       "shareLink": "Сподели връзката",
       "share": "Сподели",
       "prLinkActions": "Действия с връзката към PR",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Контекст: {{used}} от {{window}} токена, използвани {{percentage}}",
       "title": "Използване на контекста",
       "used": "Използвани",
-      "remaining": "Оставащи",
       "provider": "Доставчик",
       "totalCost": "Общ разход",
       "usageReflectsLatest": "Данните за използването са от последния завършен отговор на асистента.",
@@ -2598,7 +2561,6 @@
     "billingPage": "страницата за плащания"
   },
   "deviceSessions": {
-    "couldNotLoad": "Сесиите не се заредиха.",
     "couldNotLoadDescription": "Активните ти сесии ще са достъпни след зареждането на данните.",
     "currentDeviceUnidentified": "Не успяхме да разпознаем текущото устройство.",
     "noSessions": "Няма активни сесии",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Тук се показват само влизанията в приложението Kilo. Влизанията през редактора и CLI не са включени.",
     "signedIn": "Влизане: {{signedIn}} · Последна активност: {{lastSeen}}",
     "thisDevice": "Това устройство",
-    "title": "Сесии на устройства",
     "webBrowser": "Уеб браузър",
     "viewProfile": "Прегледай профила",
     "signOutThisDevice": "Излез от акаунта на това устройство",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "Тази връзка вече не е валидна.",
-    "goBack": "Върни се назад",
     "title": "Страницата не е намерена"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Съдържанието е съкратено",
     "truncated": "Съкратено",
     "wrap": "Пренасяне",
     "scroll": "Превъртане"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Моля, опитай отново.",
     "offlineTitle": "Зареждането завърши неуспешно.",
     "permissionDescription": "Нямаш разрешение да видиш това.",
-    "notFoundTitle": "Не е намерено.",
     "notFoundDescription": "Този елемент може да е премахнат или вече да не е наличен.",
     "serverTitle": "Не успяхме да заредим данните.",
     "serverDescription": "Възникна проблем от наша страна. Опитай отново."
   },
   "screenHeader": {
     "openMenu": "Отвори менюто",
-    "openMenuFor": "Отвори менюто за {{title}}",
-    "goBack": "Върни се назад"
+    "openMenuFor": "Отвори менюто за {{title}}"
   },
   "picker": {
     "optionsExpired": "Опциите вече не са достъпни",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Споделяне в Kilo",
-    "reviewPr": "Прегледай PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Нова сесия",
     "searchPlaceholder": "Търсене в последните сесии",
     "connectedCli": "Чрез свързан CLI",
     "newSessionOn": "Нова сесия на {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Предстоящо прекратяване на Kilo Pass",
     "statusPastDue": "Просрочено плащане за Kilo Pass",
     "monthlyCredits": "{{credits}} месечни кредити",
-    "ends": "Приключва на {{date}}",
     "periodEnd": "край на периода",
     "managedOnGooglePlay": "Управлява се в Google Play",
     "managedInAppStore": "Управлява се в App Store",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Kilo Pass не може да се закупи в приложението за Android. Управлявай го през сайта.",
     "webManagementDescription": "Този Kilo Pass се управлява през сайта.",
     "legalDisclosure": "Kilo Pass е месечен абонамент с автоматично подновяване. Сумата се начислява към твоя Apple ID при потвърждаване на покупката. Абонаментът се подновява автоматично всеки месец на показаната цена, освен ако не го прекратиш поне 24 часа преди края на текущия период. Можеш да го управляваш или прекратиш по всяко време от настройките на акаунта си в App Store.",
-    "legalPrivacyPolicy": "Политика за поверителност",
     "legalTermsOfUse": "условията за ползване (EULA)",
     "purchaseDifferentAccount": "Тази покупка от App Store не е свързана с акаунта ти в Kilo. Влез в Apple Account, използван за покупката, и опитай отново.",
     "restoreFailed": "Не успяхме да възстановим покупките. Опитай отново.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "Въведи валиден имейл адрес.",
-      "emailLabel": "Имейл",
       "emailPlaceholder": "име@фирма.bg",
       "permissionDenied": "Нямаш разрешение да каниш членове.",
       "roleLabel": "Роля",
@@ -2968,7 +2920,6 @@
         "billingManager": "Отговорник за плащанията"
       },
       "emailStatusFailed": "Имейлът не беше изпратен",
-      "emailStatusPending": "В изчакване",
       "inviteCreated": "Поканата е създадена",
       "pendingInvitations": "Покани в изчакване",
       "resendInvite": "Изпрати поканата отново",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Не можа да се зареди статусът",
       "creditProcessingDelayed": "Обработката на кредитите се бави · автоматичен повторен опит",
       "ended": "Приключил",
-      "endsOn": "Приключва на {{date}}",
       "manageHint": "Отваря управлението на Kilo Pass в сайта.",
       "notSubscribed": "Без абонамент",
       "overallocated": "Разпределените абонаменти надхвърлят платените места",
@@ -3004,7 +2954,6 @@
       "paymentPending": "Плащането е в изчакване",
       "processingBlocked": "Обработката е блокирана",
       "processingNeedsReview": "Нужна е проверка на обработката",
-      "retry": "Опитай отново",
       "retryHint": "Повтаря зареждането на статуса на Kilo Pass.",
       "setupHint": "Отваря настройките на Kilo Pass в браузъра."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Обратно към предпочитанията"
   },
   "quickChat": {
-    "title": "Чат",
     "empty": {
       "title": "Започни чат",
       "description": "Изпрати съобщение, за да разговаряш с модел."
@@ -3076,7 +3024,6 @@
     "openAgents": "Отвори агентите",
     "running": "В процес",
     "needsInput": "Нужен е отговор",
-    "idle": "Без активност",
     "channelName": "Активни агенти",
     "activityKitDisabledBody": "Включи дейностите на живо в настройките, за да виждаш активните агенти на заключения екран."
   }

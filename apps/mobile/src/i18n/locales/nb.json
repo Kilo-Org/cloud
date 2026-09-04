@@ -69,7 +69,58 @@
     "repository": "Kodelager",
     "signOut": "Logg ut",
     "agents": "Agenter",
-    "all": "Alle"
+    "all": "Alle",
+    "allModels": "Alle modeller",
+    "balanced": "Balansert",
+    "bitbucketConnected": "Bitbucket tilkoblet",
+    "branch": "Gren",
+    "cameraAccessDisabled": "Ingen tilgang til kameraet",
+    "chat": "Samtale",
+    "clearFilters": "Fjern filtre",
+    "clearSearch": "Tøm søk",
+    "closed": "Lukket",
+    "closeReactions": "Lukk reaksjoner",
+    "connect": "Koble til",
+    "connectBitbucket": "Koble til Bitbucket",
+    "connectGitlab": "Koble til GitLab",
+    "contentTruncated": "Innholdet er forkortet",
+    "copyLink": "Kopier lenke",
+    "couldNotLoadOrganizations": "Kunne ikke laste inn organisasjonene.",
+    "couldNotLoadSessions": "Kunne ikke laste inn øktene.",
+    "couldnTLoadMore": "Kunne ikke laste inn flere.",
+    "deviceSessions": "Enhetsøkter",
+    "disabled": "Deaktivert",
+    "email": "E-post",
+    "ends": "Utløper {{date}}",
+    "failed": "Mislykket",
+    "file": "fil",
+    "gitlab": "GitLab",
+    "goBack": "Gå tilbake",
+    "idle": "Ledig",
+    "keepEditing": "Fortsett å redigere",
+    "keepRunning": "La kjøringen fortsette",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Ny økt",
+    "noKiloclawInstances": "Ingen KiloClaw-instanser",
+    "noModelsAvailable": "Ingen modeller tilgjengelige",
+    "notFound": "Fant ikke elementet.",
+    "online": "På nett",
+    "open": "Åpne {{name}}",
+    "openPullRequest": "Åpne PR",
+    "pending": "Venter",
+    "performance": "Ytelse",
+    "preferences": "Innstillinger",
+    "privacyPolicy": "personvernerklæring",
+    "profile": "Profil",
+    "reactions": "reaksjoner",
+    "recent": "Siste",
+    "recommended": "Anbefalte",
+    "remaining": "Gjenstår",
+    "rename": "Gi nytt navn",
+    "reply": "Svar",
+    "reportSubmittedReceipt": "Rapporten er sendt. Kvittering: {{receiptId}}",
+    "retryLoadingMore": "Prøv igjen å laste inn flere",
+    "reviewPr": "Gjennomgå PR"
   },
   "language": {
     "title": "Språk",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Kunne ikke starte på nytt",
     "languageSaved": "Språkvalget ditt er lagret.",
     "catalogLoadFailed": "Kunne ikke laste inn språket. Prøv igjen.",
-    "retry": "Prøv igjen",
     "search": "Søk etter språk…",
     "noMatches": "Ingen språk funnet",
     "deviceLanguage": "Enhetens språk",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Innloggingskode: {{code}}",
     "openSignInPageInBrowser": "Åpne innloggingssiden i nettleseren",
     "copySignInLink": "Kopier innloggingslenke",
-    "copyLink": "Kopier lenke",
     "cancelSignIn": "Avbryt innlogging",
     "startingSignIn": "Starter innlogging…",
     "organizationUsesSso": "Organisasjonen din bruker felles innlogging.",
@@ -112,7 +161,6 @@
     "terms": "vilkår",
     "termsConnector": " og ",
     "termsSuffix": ".",
-    "privacyPolicy": "personvernerklæring",
     "moreSignInOptions": "Flere innloggingsalternativer",
     "couldNotCompleteSignIn": "Kunne ikke fullføre innloggingen. Prøv igjen.",
     "sessionEnded": "Økten din er avsluttet. Logg inn igjen.",
@@ -126,7 +174,6 @@
     "or": "eller"
   },
   "profile": {
-    "title": "Profil",
     "codeReviewerSubtitle": "Automatiske PR-gjennomganger",
     "securityAgentSubtitle": "Finn og utbedre sårbarheter",
     "reviews": "Kodegjennomganger",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Tilkoblede kontoer",
     "couldNotLoadAccounts": "Kunne ikke laste inn kontoene.",
     "app": "Appen",
-    "preferences": "Innstillinger",
     "preferencesSubtitle": "Utseende, varsler, resonnering og skjerminnstillinger",
-    "deviceSessions": "Enhetsøkter",
     "deviceSessionsSubtitle": "Se gjennom og logg ut andre enheter",
     "feedback": "Tilbakemelding",
     "privacyChoices": "Personvernvalg",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-post",
     "providerTestAccount": "Testkonto",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO for bedrifter"
   },
   "preferences": {
-    "title": "Innstillinger",
     "autoExpandThinking": "Vis resonnering automatisk",
     "autoExpandThinkingSubtitle": "Vis hele agentens resonnement når det er ferdig.",
     "keepScreenOn": "Hold skjermen på i øktvisningen",
@@ -360,7 +402,6 @@
       "unresolveThread": "Merk tråden som uløst",
       "resolved": "Løst",
       "outdated": "Utdatert",
-      "file": "fil",
       "comment_one": "1 kommentar",
       "comment": "{{displayCount}} kommentarer",
       "comment_other": "{{displayCount}} kommentarer",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Kunne ikke laste inn flere kommentarer.",
       "retryLoadingMore": "Prøv å laste inn flere kommentarer på nytt",
       "loadMoreComments": "Last inn flere kommentarer",
-      "closeReactions": "Lukk reaksjoner",
-      "reactionsTitle": "reaksjoner",
       "addReaction": "Legg til reaksjon",
       "reactionPill": "{{emoji}}-reaksjon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksjon",
@@ -380,13 +419,11 @@
       "reportUser": "Rapporter bruker",
       "mute": "Demp",
       "block": "Blokker",
-      "reportSubmitted": "Rapporten er sendt. Kvittering: {{receiptId}}",
       "blockedUser": "{{login}} er blokkert",
       "mutedUser": "{{login}} er dempet",
       "replyPlaceholder": "Svar…",
       "replyBody": "Svartekst",
       "submitReply": "Send svar",
-      "reply": "Svar",
       "termsTitle": "Bruksvilkår",
       "termsCopy": "Du må være minst 13 år for å publisere.",
       "termsAcceptRetry": "Kunne ikke godta vilkårene. Sjekk tilkoblingen og prøv igjen.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "URL til en PR på GitHub",
       "clearLink": "Fjern PR-lenken",
       "pasteLink": "Lim inn PR-lenke",
-      "open": "Åpne",
-      "openPullRequest": "Åpne PR"
+      "open": "Åpne"
     },
     "checks": {
       "title": "Sjekker",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Innboks",
-      "recent": "Siste",
       "loading": "Laster inn innboksen",
       "noReviewRequests": "Ingen forespørsler om kodegjennomgang",
       "noReviewRequestsDescription": "PR-er som venter på at du går gjennom dem, vises her. Du kan fortsatt lime inn en hvilken som helst PR-lenke ovenfor.",
-      "couldNotLoad": "Kunne ikke laste inn innboksen.",
-      "couldNotLoadMore": "Kunne ikke laste inn flere.",
-      "retryLoadingMore": "Prøv igjen å laste inn flere"
+      "couldNotLoad": "Kunne ikke laste inn innboksen."
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentar…",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Kunne ikke laste inn kommentarfeltet.",
       "discardTitle": "Forkaste kommentaren?",
       "discardMessage": "Utkastet ditt går tapt.",
-      "keepEditing": "Fortsett å redigere",
       "comment": "Kommenter",
       "insertSuggestionA11y": "Sett inn et kodeforslag",
       "insertSuggestion": "Sett inn forslag",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Flettet",
-      "stateClosed": "Lukket",
       "stateOpenApproved": "Åpen · Godkjent",
       "stateOpenChangesRequested": "Åpen · Endringer kreves",
       "stateOpenReviewRequired": "Åpen · Kodegjennomgang kreves",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Hjem",
-    "profile": "Profil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fane, {{position}} av {{total}}",
-    "chat": "Samtale"
+    "position": "{{name}}, fane, {{position}} av {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Bytt instans",
       "couldNotLoadInstances": "Kunne ikke laste inn instansene.",
-      "noInstances": "Ingen KiloClaw-instanser",
       "noInstancesDescription": "Sett opp en instans for å begynne å chatte.",
       "setUpKiloclaw": "Sett opp KiloClaw",
       "currentInstance": "{{title}}, valgt instans"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Kunne ikke logge inn i chatten.",
       "couldNotRefreshMessages": "Kunne ikke oppdatere meldingene.",
       "couldNotLoadHistory": "Kunne ikke laste inn samtalehistorikken.",
-      "rename": "Gi nytt navn",
       "leave": "Forlat",
       "untitledConversation": "Samtale uten tittel",
       "createFailed": "Kunne ikke opprette samtalen.",
       "leaveFailed": "Kunne ikke forlate samtalen."
     },
     "reactions": {
-      "title": "reaksjoner",
-      "close": "Lukk reaksjoner",
-      "recent": "Siste",
       "common": "Vanlige reaksjoner",
       "reactWith": "Reager med {{reaction}}",
       "accessibility": "{{emoji}}-reaksjon, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Kunne ikke legge til reaksjonen.",
       "retrySend": "Prøv å sende på nytt",
       "moreReactions": "Flere reaksjoner",
-      "reply": "Svar",
       "edit": "Rediger",
       "sendFailed": "Kunne ikke sende meldingen.",
       "retrySendFailed": "Kunne ikke sende meldingen på nytt.",
@@ -807,7 +829,6 @@
       "takePhoto": "Ta bilde",
       "photoLibrary": "Fotobibliotek",
       "files": "filer",
-      "cameraAccessDisabled": "Ingen tilgang til kameraet",
       "cameraAccessMessage": "Gi appen tilgang til kameraet i Innstillinger for å ta et bilde."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} skriver..."
     },
     "botStatus": {
-      "online": "På nett",
-      "idle": "Ledig",
       "offline": "Frakoblet",
       "loadingUser": "Laster inn bruker…",
       "waitingForStatus": "Venter på botstatus...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Kunne ikke laste inn KiloClaw-instansene.",
     "billing": {
       "title": "Fakturering",
@@ -840,7 +858,6 @@
       "plan": "Planvalg",
       "finalTermEnds": "Siste periode slutter",
       "afterFinalTerm": "Etter siste periode",
-      "remaining": "Gjenstår",
       "lessThanOneDay": "Mindre enn 1 dag",
       "ends": "Slutter",
       "expires": "Utløper",
@@ -941,20 +958,15 @@
       "disconnect": "Koble fra Google-konto",
       "copied": "Kopiert",
       "copyCommand": "Kopier kommando",
-      "disabled": "Deaktivert",
       "disconnectConfirm": "Koble fra",
       "disconnectMessage": "Vil du fjerne Google-kontoen din fra denne instansen? Dette deaktiverer Gmail-varsler. Distribuer instansen på nytt etterpå for at endringene skal tre i kraft.",
       "disconnectTitle": "Koble fra Google"
     },
     "modelList": {
-      "title": "Alle modeller",
       "searchPlaceholder": "Søk etter modeller...",
-      "clearSearch": "Tøm søk",
       "noMatches": "Ingen modeller passer til søket ditt",
-      "noModels": "Ingen modeller tilgjengelige",
       "noModelsDescription": "Modeller vises her når de blir tilgjengelige.",
-      "noResultsFor": "Ingen treff for «{{query}}».",
-      "recommended": "Anbefalte"
+      "noResultsFor": "Ingen treff for «{{query}}»."
     },
     "secrets": {
       "title": "Hemmeligheter",
@@ -972,8 +984,7 @@
       "setupGuide": "oppsettsveiledning",
       "saving": "Lagrer…",
       "removing": "Fjerner…",
-      "updateToken": "Oppdater tilgangstoken",
-      "connect": "Koble til"
+      "updateToken": "Oppdater tilgangstoken"
     },
     "versionPin": {
       "title": "Versjonslåsing",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Fullfører oppsettet",
       "finishingSetupDescription": "Vent litt mens vi gjør kontoen din klar. Dette tar vanligvis bare et øyeblikk.",
       "getStarted": "Kom i gang",
-      "noInstances": "Ingen KiloClaw-instanser",
       "noInstancesDescription": "Opprett din første instans for å begynne å kjøre kodeagenter."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Chatt med {{name}}",
-        "online": "På nett",
         "ready": "{{name}} er klar",
         "warmedUp": "Alt er klart. Si hei når du er klar."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Toppytelse",
       "frontierDescription": "Høyest ytelse. Bruker de mest avanserte modellene med resonnering.",
-      "balancedLabel": "Balansert",
       "balancedDescription": "God balanse mellom hastighet og ytelse til en lavere pris.",
-      "performance": "Ytelse",
       "autoModelA11y": "automatisk modellvalg: {{label}}",
       "currentModel": "Valgt modell",
       "browseAllModels": "eller velg blant 500+ modeller",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "Åpne {{name}}, {{displayCount}} ulest melding",
       "openUnread": "Åpne {{name}}, {{displayCount}} uleste meldinger",
       "openUnread_other": "Åpne {{name}}, {{displayCount}} uleste meldinger",
-      "open": "Åpne {{name}}",
       "openSettings": "Åpne innstillinger for {{name}}",
       "fixOnKiloAi": "Løs problemet på kilo.ai: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Gjennomgang",
       "cancelTitle": "Avbryte gjennomgangen?",
       "cancelMessage": "Dette stopper den pågående kodegjennomgangen.",
-      "keepRunning": "La kjøringen fortsette",
       "cancelReview": "Avbryt gjennomgang",
       "retryTitle": "Prøve gjennomgangen på nytt?",
       "retryMessage": "Dette kjører kodegjennomgangen på nytt.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} av {{author}}",
       "noFindings": "Ingen funn ble gjort.",
       "showMore": "Vis mer",
-      "branch": "Gren",
       "created": "Opprettet",
       "started": "Startet",
       "completed": "Fullført",
       "tokens": "tokener",
       "tokensInOut": "{{input}} inn / {{output}} ut",
-      "openPullRequest": "Åpne PR",
       "council": "Vurderingspanel",
       "decision": "Avgjørelse",
       "gate": "Kvalitetskontroll",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Gjennomgangsminne",
-      "couldNotLoadMore": "Kunne ikke laste inn flere.",
-      "retryLoadingMore": "Prøv igjen å laste inn flere",
       "loading": "Laster inn minnet for kodegjennomganger",
       "couldNotLoad": "Kunne ikke laste inn minnet for kodegjennomganger.",
       "off": "Minnet for kodegjennomganger er deaktivert.",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucket-oppsett"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket tilkoblet",
-      "title": "Koble til Bitbucket",
       "description": "Opprett et tilgangstoken for arbeidsområdet med de nødvendige tillatelsene, og lim det inn nedenfor.",
       "scopes": "Konto: lesing · Kodelagre: lesing/skriving · PR-er: lesing · Webhooks: lesing/skriving",
-      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet",
-      "connect": "Koble til"
+      "tokenPlaceholder": "Tilgangstoken for arbeidsområdet"
     },
     "scopeList": {
-      "couldNotLoad": "Kunne ikke laste inn organisasjonene.",
       "personalStillAvailable": "Personlige kodelagre er fortsatt tilgjengelige nedenfor.",
       "personalSubtitle": "Dine egne kodelagre",
       "viewOnly": "Kun visning"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub-app",
       "githubError": "Kunne ikke åpne GitHub-oppsettet. Prøv igjen.",
       "gitlabAccount": "GitLab-konto",
-      "connectGitLab": "Koble til GitLab",
       "gitlabError": "Kunne ikke åpne GitLab-oppsettet. Prøv igjen.",
       "description": "Koble til Kilo via {{label}} for å gjennomgå PR-er automatisk.",
       "bitbucketError": "Kunne ikke åpne Bitbucket-oppsettet. Prøv igjen."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Kunne ikke oppdatere kodegranskeren.",
     "configSaveFailed": "Kunne ikke lagre innstillingene for kodegjennomgang.",
     "status": {
-      "pending": "Venter",
       "running": "Kjører",
       "completed": "Fullført",
-      "failed": "Mislykket",
       "interrupted": "Avbrutt"
     },
     "reviewStyle": {
       "strict": "Streng",
-      "balanced": "Balansert",
       "lenient": "Ettergivende",
       "roast": "Nådeløs kritikk"
     },
     "focusArea": {
       "security": "Sikkerhet",
-      "performance": "Ytelse",
       "bugs": "Feil",
       "style": "Stil",
       "testing": "Tester",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Åpne",
       "fixed": "Rettet",
       "statusIgnored": "Ignorert",
-      "statusClosed": "Lukket",
       "severityHigh": "Høy",
       "severityMedium": "Middels",
       "severityLow": "Lav",
@@ -1655,7 +1646,6 @@
       "title": "Innstillinger",
       "couldNotLoadSettings": "Kunne ikke laste inn innstillingene for sikkerhetsagenten.",
       "couldNotLoadPermissions": "Kunne ikke laste inn tillatelsene.",
-      "disabled": "Deaktivert",
       "on": "På",
       "repositoriesCount_one": "{{displayCount}} kodelager valgt",
       "repositoriesCount": "{{displayCount}} kodelagre valgt",
@@ -1683,7 +1673,6 @@
       "retry": "Prøv utbedring på nytt",
       "cancelTitle": "Avbryte denne utbedringen?",
       "cancelMessage": "Sikkerhetsagenten stopper det pågående utbedringsforsøket.",
-      "keepRunning": "La kjøringen fortsette",
       "cancelRemediation": "Avbryt utbedring",
       "openPullRequest": "Åpne PR{{number}}",
       "openDraftPullRequest": "Åpne PR-utkast{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "Forsøkshistorikk ({{displayCount}})",
       "attemptNumber": "Forsøk nr. {{number}}",
       "startedBy": "Startet av",
-      "branch": "Gren",
       "queued": "Utbedring i kø",
       "retryQueued": "Nytt utbedringsforsøk satt i kø",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Ingen funn passer med filtrene",
       "noMatchesDescription": "Prøv å justere eller fjerne de valgte filtrene.",
       "emptyTitle": "Ingen åpne funn",
-      "emptyDescription": "Ingen åpne funn krever oppfølging akkurat nå.",
-      "clearFilters": "Fjern filtre"
+      "emptyDescription": "Ingen åpne funn krever oppfølging akkurat nå."
     },
     "scopeList": {
-      "couldNotLoad": "Kunne ikke laste inn organisasjonene.",
       "personalSubtitle": "Dine egne kodelagre"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "PR-utkast opprettet",
       "prOpened": "PR åpnet",
       "blocked": "Blokkert",
-      "failed": "Mislykket",
       "noChangesNeeded": "Ingen endringer trengs",
       "originAutomaticPolicy": "Regel for automatisk utbedring",
       "originIncludeExistingPolicy": "Regel for å inkludere eksisterende funn",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Søker",
       "searchSessions": "Søk i økter",
-      "searchSessionsPlaceholder": "Søk i økter",
-      "clearSearch": "Tøm søk",
-      "clearFilters": "Fjern filtre"
+      "searchSessionsPlaceholder": "Søk i økter"
     },
     "sessionList": {
-      "couldNotLoad": "Kunne ikke laste inn øktene.",
       "couldNotLoadActive": "Kunne ikke laste inn aktive økter.",
       "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din. Øktene dine vises her.",
       "noMatches": "Ingen økter passer til søket",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Slette økt?",
       "deleteMessage": "Dette kan ikke angres.",
       "deleteSession": "Slett økt",
-      "rename": "Gi nytt navn",
       "renameMessage": "Skriv inn et nytt navn på denne økten.",
       "copyId": "Kopier økt-ID",
       "idCopied": "Økt-ID kopiert",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Du har ikke tillatelse til å se dette.",
       "couldNotLoad": "Kunne ikke laste inn økten.",
       "failedToLoadDetails": "Kunne ikke laste inn øktdetaljene.",
-      "notFound": "Fant ikke elementet.",
       "notFoundDescription": "Dette elementet kan ha blitt fjernet eller er ikke lenger tilgjengelig.",
       "failedToStopExecution": "Kunne ikke stoppe kjøringen.",
       "renameSession": "Gi økten nytt navn",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Prøv å koble til på nytt"
     },
     "newSession": {
-      "title": "Ny økt",
       "connectGithubDescription": "Koble til GitHub i nettleseren. Gå deretter tilbake hit for å velge et kodelager.",
       "openGithub": "Åpne GitHub",
       "refreshRepositories": "Oppdater kodelagre",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Kunne ikke oppdatere kodelagrene. Prøv igjen.",
       "discardDraftTitle": "Forkaste utkast?",
       "discardDraftMessage": "Instruksjonen din går tapt.",
-      "keepEditing": "Fortsett å redigere",
       "discardFailed": "Kunne ikke forkaste utkastet. Prøv igjen.",
       "remoteHint": "Kjør `kilo remote` på datamaskinen din, eller `/remote` i en aktiv CLI-økt, for å styre en lokal kilo-prosess.",
-      "bitbucketConnected": "Bitbucket tilkoblet",
-      "connectBitbucket": "Koble til Bitbucket",
       "connectBitbucketDescription": "Koble til Bitbucket i nettleseren. Gå deretter tilbake hit for å velge et kodelager.",
-      "connectGitlab": "Koble til GitLab",
       "connectGitlabDescription": "Koble til GitLab i nettleseren. Gå deretter tilbake hit for å velge et kodelager.",
       "couldNotLoadBitbucketRepositories": "Kunne ikke laste inn kodelagre fra Bitbucket.",
       "couldNotLoadGithubRepositories": "Kunne ikke laste inn kodelagre fra GitHub.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "Verktøyet {{name}}, {{status}}",
       "fileEmpty": "Denne filen er tom.",
       "noTasks": "Det er ingen oppgaver.",
-      "contentTruncated": "Innholdet er forkortet",
       "truncated": "Forkortet",
       "toolRead": "les",
       "toolEdit": "Rediger",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Prøv et annet søkeord.",
       "loading": "Laster inn…",
       "accessibility": "Kodelager: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Meldingsdetaljer",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Skriving til hurtigbuffer",
       "total": "Totalt",
       "reportAiResponseFailedRetryable": "Kunne ikke rapportere dette svaret.",
-      "reportAiResponseFailedTerminal": "Dette svaret kan ikke rapporteres.",
-      "reportAiResponseSubmitted": "Rapporten er sendt. Kvittering: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Dette svaret kan ikke rapporteres."
     },
     "modelCost": {
       "lessThan": "mindre enn {{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "Vis bilde: {{alt}}",
       "imageOutput": "Bilderesultat",
       "imageOutputWithFilename": "Bilderesultat, {{filename}}",
-      "defaultName": "fil",
       "openFullScreen": "Åpne {{name}} i fullskjerm",
       "preview": "Forhåndsvis {{name}}",
-      "openFile": "Åpne {{name}}",
       "couldNotLoadFile": "Kunne ikke laste inn denne filen.",
       "couldNotLoadFileRetry": "Kunne ikke laste inn denne filen. Prøv igjen.",
       "retryLoadingFile": "Prøv å laste inn filen på nytt",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "Velg modell",
       "searchPlaceholder": "Søk etter modeller...",
-      "noModels": "Ingen modeller tilgjengelige",
       "noModelsDescription": "Det er ingen modeller å velge mellom.",
-      "favorites": "Favoritter",
-      "recommended": "Anbefalte",
-      "allModels": "Alle modeller"
+      "favorites": "Favoritter"
     },
     "modelSelector": {
       "provider": "Leverandør {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
       "files": "filer",
-      "cameraAccessDisabled": "Ingen tilgang til kameraet",
       "cameraAccessMessage": "Gi appen tilgang til kameraet i Innstillinger for å ta et bilde.",
       "couldNotOpenPhotoPicker": "Kunne ikke åpne bildevelgeren. Start Kilo på nytt og prøv igjen.",
       "maxFilesAllowed": "Du kan legge til maksimalt {{displayCount}} filer.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Lenke kopiert",
-      "reviewPr": "Gjennomgå PR",
       "openLink": "Åpne lenke",
-      "copyLink": "Kopier lenke",
       "shareLink": "Del lenke",
       "share": "Del",
       "prLinkActions": "Handlinger for PR-lenke",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Kontekst: {{used}} av {{window}} tokener, {{percentage}} brukt",
       "title": "Kontekstbruk",
       "used": "Brukt",
-      "remaining": "Gjenstår",
       "provider": "Leverandør",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Forbruket gjelder til og med det siste fullførte svaret fra assistenten.",
@@ -2598,7 +2561,6 @@
     "billingPage": "faktureringsside"
   },
   "deviceSessions": {
-    "couldNotLoad": "Kunne ikke laste inn øktene.",
     "couldNotLoadDescription": "De aktive øktene dine kan ikke vises før innlastingen er fullført.",
     "currentDeviceUnidentified": "Kunne ikke identifisere denne enheten.",
     "noSessions": "Ingen aktive økter",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Her vises bare innlogginger i Kilo-appen. Innlogginger i kodeeditoren og CLI-en vises ikke.",
     "signedIn": "Logget inn {{signedIn}} · Sist sett {{lastSeen}}",
     "thisDevice": "Denne enheten",
-    "title": "Enhetsøkter",
     "viewProfile": "Vis profil",
     "signOutThisDevice": "Logg ut denne enheten",
     "signOutThisSession": "Logg ut denne økten",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "Denne lenken er ikke lenger gyldig.",
-    "goBack": "Gå tilbake",
     "title": "Siden ble ikke funnet"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Innholdet er forkortet",
     "truncated": "Forkortet",
     "wrap": "Linjebryting",
     "scroll": "Rull"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Prøv igjen.",
     "offlineTitle": "Kunne ikke laste inn innholdet.",
     "permissionDescription": "Du har ikke tillatelse til å se dette.",
-    "notFoundTitle": "Fant ikke elementet.",
     "notFoundDescription": "Dette elementet kan ha blitt fjernet eller er ikke lenger tilgjengelig.",
     "serverTitle": "Kunne ikke laste inn innholdet.",
     "serverDescription": "Noe gikk galt hos oss. Prøv igjen."
   },
   "screenHeader": {
     "openMenu": "Åpne meny",
-    "openMenuFor": "Åpne meny for {{title}}",
-    "goBack": "Gå tilbake"
+    "openMenuFor": "Åpne meny for {{title}}"
   },
   "picker": {
     "optionsExpired": "Valgene er utløpt",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Del med Kilo",
-    "reviewPr": "Gjennomgå PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Ny økt",
     "searchPlaceholder": "Søk i de siste øktene",
     "connectedCli": "På en tilkoblet CLI",
     "newSessionOn": "Ny økt på {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass avsluttes",
     "statusPastDue": "Kilo Pass-betalingen er forfalt",
     "monthlyCredits": "{{credits}} månedlige kreditter",
-    "ends": "Utløper {{date}}",
     "periodEnd": "slutten av perioden",
     "managedOnGooglePlay": "Administreres på Google Play",
     "managedInAppStore": "Administreres i App Store",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Kilo Pass er ikke tilgjengelig som et kjøp i appen på Android. Administrer det på nettet.",
     "webManagementDescription": "Dette Kilo Pass-abonnementet administreres på nettet.",
     "legalDisclosure": "Kilo Pass er et månedsabonnement som fornyes automatisk. Betalingen belastes Apple ID-en din når kjøpet bekreftes. Abonnementet fornyes automatisk hver måned til den viste prisen, med mindre du sier det opp minst 24 timer før den gjeldende perioden utløper. Du kan administrere eller si opp abonnementet når som helst i kontoinnstillingene i App Store.",
-    "legalPrivacyPolicy": "personvernerklæring",
     "legalTermsOfUse": "bruksvilkårene (EULA)",
     "purchaseDifferentAccount": "Dette App Store-kjøpet er ikke koblet til Kilo-kontoen din. Logg inn på Apple-kontoen som ble brukt til kjøpet, og prøv igjen.",
     "restoreFailed": "Kunne ikke gjenopprette kjøp. Prøv igjen.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "Angi en gyldig e-postadresse.",
-      "emailLabel": "E-post",
       "emailPlaceholder": "navn@firma.no",
       "permissionDenied": "Du har ikke tillatelse til å invitere medlemmer.",
       "roleLabel": "Rolle",
@@ -2968,7 +2920,6 @@
         "billingManager": "Faktureringsansvarlig"
       },
       "emailStatusFailed": "E-posten ble ikke sendt",
-      "emailStatusPending": "Venter",
       "inviteCreated": "Invitasjon opprettet",
       "pendingInvitations": "Ventende invitasjoner",
       "resendInvite": "Send invitasjon på nytt",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Kunne ikke laste inn status",
       "creditProcessingDelayed": "Behandlingen av kreditter er forsinket · prøver automatisk igjen",
       "ended": "Avsluttet",
-      "endsOn": "Utløper {{date}}",
       "manageHint": "Åpner administrasjonen av Kilo Pass i nettleseren.",
       "notSubscribed": "Intet abonnement",
       "overallocated": "Flere Pass er tildelt enn det er betalte plasser",
@@ -3004,7 +2954,6 @@
       "paymentPending": "Venter på betaling",
       "processingBlocked": "Behandling blokkert",
       "processingNeedsReview": "Behandlingen må kontrolleres",
-      "retry": "Prøv igjen",
       "retryHint": "Prøver å laste inn status for Kilo Pass på nytt.",
       "setupHint": "Åpner oppsettet for Kilo Pass i nettleseren."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Tilbake til innstillinger"
   },
   "quickChat": {
-    "title": "Samtale",
     "empty": {
       "title": "Start en chat",
       "description": "Send en melding for å snakke med en modell."
@@ -3076,7 +3024,6 @@
     "openAgents": "Åpne agenter",
     "running": "Jobber",
     "needsInput": "venter på svar",
-    "idle": "Ledig",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   }

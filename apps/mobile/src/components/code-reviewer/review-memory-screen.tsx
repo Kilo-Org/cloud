@@ -71,13 +71,13 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     footer = (
       <View className="items-center gap-2 px-6 py-4">
         <Text variant="muted" className="text-center text-xs">
-          {t('codeReviewer.reviewMemory.couldNotLoadMore')}
+          {t('common.couldnTLoadMore')}
         </Text>
         <Button
           size="sm"
           variant="outline"
           onPress={() => void proposalsQuery.fetchNextPage()}
-          accessibilityLabel={t('codeReviewer.reviewMemory.retryLoadingMore')}
+          accessibilityLabel={t('common.retryLoadingMore')}
         >
           <Text>{t('common.retry')}</Text>
         </Button>

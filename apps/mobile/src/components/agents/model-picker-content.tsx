@@ -187,9 +187,7 @@ export function ModelPickerContent() {
         <EmptyState
           icon={search.trim() ? SearchX : Info}
           title={
-            search.trim()
-              ? t('agentChat.repoPicker.noMatches')
-              : t('agentChat.modelPicker.noModels')
+            search.trim() ? t('agentChat.repoPicker.noMatches') : t('common.noModelsAvailable')
           }
           description={
             search.trim()

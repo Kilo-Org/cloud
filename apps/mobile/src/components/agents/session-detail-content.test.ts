@@ -553,7 +553,7 @@ describe('SessionDetailContent display scope', () => {
     expect(
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
-    expect(header.findByProps({ accessibilityLabel: i18n.t('screenHeader.goBack') })).toBeDefined();
+    expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
     const { onPress } = header.findByProps({
       accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
         title: `Root ${ROOT_ID}`,

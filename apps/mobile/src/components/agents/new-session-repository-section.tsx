@@ -37,7 +37,7 @@ const PROVIDER_COPY = {
     emptyDescription: 'agentChat.newSession.noRepositoriesVisible',
   },
   gitlab: {
-    connectTitle: 'agentChat.newSession.connectGitlab',
+    connectTitle: 'common.connectGitlab',
     connectDescription: 'agentChat.newSession.connectGitlabDescription',
     openLabel: 'agentChat.newSession.openGitlab',
     connectedTitle: 'agentChat.newSession.gitlabConnected',
@@ -45,10 +45,10 @@ const PROVIDER_COPY = {
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleGitlab',
   },
   bitbucket: {
-    connectTitle: 'agentChat.newSession.connectBitbucket',
+    connectTitle: 'common.connectBitbucket',
     connectDescription: 'agentChat.newSession.connectBitbucketDescription',
     openLabel: 'agentChat.newSession.openBitbucket',
-    connectedTitle: 'agentChat.newSession.bitbucketConnected',
+    connectedTitle: 'common.bitbucketConnected',
     errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',
   },

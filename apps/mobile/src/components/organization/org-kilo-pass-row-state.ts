@@ -87,7 +87,7 @@ function formatPeriodEnd(iso: string | null): string | null {
 function cancelingSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
   const ends = formatPeriodEnd(agreement.paidThrough);
   return ends
-    ? `${i18n.t('organization.kiloPass.endsOn', { date: ends })} · ${activeSubtitle(agreement)}`
+    ? `${i18n.t('common.ends', { date: ends })} · ${activeSubtitle(agreement)}`
     : `${i18n.t('organization.kiloPass.canceling')} · ${activeSubtitle(agreement)}`;
 }
 
@@ -135,7 +135,7 @@ export function getOrgKiloPassRowState(params: {
         subtitle: i18n.t('organization.kiloPass.couldNotLoadStatus'),
         attention: true,
         action: 'retry',
-        actionLabel: i18n.t('organization.kiloPass.retry'),
+        actionLabel: i18n.t('common.retry'),
         accessibilityHint: i18n.t('organization.kiloPass.retryHint'),
         loading: false,
       };

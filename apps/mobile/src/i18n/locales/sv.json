@@ -69,7 +69,58 @@
     "repository": "Kodarkiv",
     "signOut": "Logga ut",
     "agents": "Agenter",
-    "all": "Alla"
+    "all": "Alla",
+    "allModels": "Alla modeller",
+    "balanced": "Balanserad",
+    "bitbucketConnected": "Bitbucket är anslutet",
+    "branch": "Gren",
+    "cameraAccessDisabled": "Ingen åtkomst till kameran",
+    "chat": "Chatt",
+    "clearFilters": "Rensa filter",
+    "clearSearch": "Rensa sökningen",
+    "closed": "Stängd",
+    "closeReactions": "Stäng reaktionsvyn",
+    "connect": "Anslut",
+    "connectBitbucket": "Anslut Bitbucket",
+    "connectGitlab": "Anslut GitLab",
+    "contentTruncated": "Innehållet har kortats av",
+    "copyLink": "Kopiera länk",
+    "couldNotLoadOrganizations": "Det gick inte att läsa in organisationerna.",
+    "couldNotLoadSessions": "Det gick inte att läsa in sessionerna.",
+    "couldnTLoadMore": "Det gick inte att läsa in fler.",
+    "deviceSessions": "Enhetssessioner",
+    "disabled": "Inaktiverad",
+    "email": "E-post",
+    "ends": "Upphör {{date}}",
+    "failed": "Misslyckades",
+    "file": "fil",
+    "gitlab": "GitLab",
+    "goBack": "Gå tillbaka",
+    "idle": "Väntar",
+    "keepEditing": "Fortsätt redigera",
+    "keepRunning": "Fortsätt köra",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Ny session",
+    "noKiloclawInstances": "Inga KiloClaw-instanser",
+    "noModelsAvailable": "Inga modeller tillgängliga",
+    "notFound": "Innehållet hittades inte.",
+    "online": "Uppkopplad",
+    "open": "Öppna {{name}}",
+    "openPullRequest": "Öppna PR",
+    "pending": "Väntar",
+    "performance": "Prestanda",
+    "preferences": "Inställningar",
+    "privacyPolicy": "integritetspolicy",
+    "profile": "Profil",
+    "reactions": "reaktioner",
+    "recent": "Senaste",
+    "recommended": "Rekommenderade",
+    "remaining": "Kvar",
+    "rename": "Byt namn",
+    "reply": "Svara",
+    "reportSubmittedReceipt": "Anmälan skickad. Kvitto: {{receiptId}}",
+    "retryLoadingMore": "Försök läsa in fler igen",
+    "reviewPr": "Granska PR"
   },
   "language": {
     "title": "Språk",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Kunde inte starta om",
     "languageSaved": "Ditt språkval har sparats.",
     "catalogLoadFailed": "Kunde inte läsa in språket. Försök igen.",
-    "retry": "Försök igen",
     "search": "Sök språk",
     "noMatches": "Inga språk matchar sökningen",
     "deviceLanguage": "Enhetens språk",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Inloggningskod: {{code}}",
     "openSignInPageInBrowser": "Öppna inloggningssidan i webbläsaren",
     "copySignInLink": "Kopiera inloggningslänken",
-    "copyLink": "Kopiera länk",
     "cancelSignIn": "Avbryt inloggning",
     "startingSignIn": "Startar inloggning…",
     "organizationUsesSso": "Din organisation använder enkel inloggning (SSO).",
@@ -112,7 +161,6 @@
     "terms": "villkor",
     "termsConnector": " och ",
     "termsSuffix": ".",
-    "privacyPolicy": "integritetspolicy",
     "moreSignInOptions": "Fler inloggningsalternativ",
     "couldNotCompleteSignIn": "Kunde inte slutföra inloggningen. Försök igen.",
     "sessionEnded": "Din session avslutades. Logga in igen.",
@@ -126,7 +174,6 @@
     "or": "eller"
   },
   "profile": {
-    "title": "Profil",
     "codeReviewerSubtitle": "Automatiska PR-granskningar",
     "securityAgentSubtitle": "Hitta och åtgärda sårbarheter",
     "reviews": "Granskningar",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Länkade konton",
     "couldNotLoadAccounts": "Det gick inte att läsa in kontona.",
     "app": "Appen",
-    "preferences": "Inställningar",
     "preferencesSubtitle": "Utseende, aviseringar, resonemang och skärminställningar",
-    "deviceSessions": "Enhetssessioner",
     "deviceSessionsSubtitle": "Visa andra enheter och logga ut från dem",
     "feedback": "Skicka synpunkter",
     "privacyChoices": "Integritetsinställningar",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-post",
     "providerTestAccount": "Testkonto",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO för företag"
   },
   "preferences": {
-    "title": "Inställningar",
     "autoExpandThinking": "Visa resonemang automatiskt",
     "autoExpandThinkingSubtitle": "Visa agentens resonemang i sin helhet när det är klart.",
     "keepScreenOn": "Håll skärmen tänd på sessionssidan",
@@ -360,7 +402,6 @@
       "unresolveThread": "Markera tråden som olöst",
       "resolved": "Löst",
       "outdated": "Föråldrad",
-      "file": "fil",
       "comment_one": "1 kommentar",
       "comment": "{{displayCount}} kommentarer",
       "comment_other": "{{displayCount}} kommentarer",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Kunde inte läsa in fler kommentarer.",
       "retryLoadingMore": "Försök läsa in fler kommentarer igen",
       "loadMoreComments": "Läs in fler kommentarer",
-      "closeReactions": "Stäng reaktionsvyn",
-      "reactionsTitle": "reaktioner",
       "addReaction": "Lägg till en reaktion",
       "reactionPill": "{{emoji}}-reaktion, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktion",
@@ -380,13 +419,11 @@
       "reportUser": "Anmäl användare",
       "mute": "Tysta",
       "block": "Blockera",
-      "reportSubmitted": "Anmälan skickad. Kvitto: {{receiptId}}",
       "blockedUser": "{{login}} har blockerats",
       "mutedUser": "{{login}} har tystats",
       "replyPlaceholder": "Ditt svar…",
       "replyBody": "Svarstext",
       "submitReply": "Skicka svar",
-      "reply": "Svara",
       "termsTitle": "Användarvillkor",
       "termsCopy": "Du måste vara minst 13 år för att publicera inlägg.",
       "termsAcceptRetry": "Kunde inte godkänna villkoren. Kontrollera anslutningen och försök igen.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "URL till en PR på GitHub",
       "clearLink": "Rensa PR-länken",
       "pasteLink": "Klistra in PR-länk",
-      "open": "Öppna",
-      "openPullRequest": "Öppna PR"
+      "open": "Öppna"
     },
     "checks": {
       "title": "Kontroller",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Inkorg",
-      "recent": "Senaste",
       "loading": "Läser in inkorgen",
       "noReviewRequests": "Inga granskningsförfrågningar",
       "noReviewRequestsDescription": "PR:er som väntar på din granskning visas här. Du kan också klistra in valfri PR-länk ovan.",
-      "couldNotLoad": "Kunde inte läsa in inkorgen.",
-      "couldNotLoadMore": "Det gick inte att läsa in fler.",
-      "retryLoadingMore": "Försök läsa in fler igen"
+      "couldNotLoad": "Kunde inte läsa in inkorgen."
     },
     "composer": {
       "commentBodyPlaceholder": "Din kommentar",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Kunde inte läsa in kommentarredigeraren.",
       "discardTitle": "Kasta kommentaren?",
       "discardMessage": "Ditt utkast går förlorat.",
-      "keepEditing": "Fortsätt redigera",
       "comment": "Kommentera",
       "insertSuggestionA11y": "Infoga ett kodförslag",
       "insertSuggestion": "Infoga förslag",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Sammanfogad",
-      "stateClosed": "Stängd",
       "stateOpenApproved": "Öppen · godkänd",
       "stateOpenChangesRequested": "Öppen · ändringar begärda",
       "stateOpenReviewRequired": "Öppen · granskning krävs",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Hem",
-    "profile": "Profil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, flik, {{position}} av {{total}}",
-    "chat": "Chatt"
+    "position": "{{name}}, flik, {{position}} av {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Byt instans",
       "couldNotLoadInstances": "Kunde inte läsa in instanserna.",
-      "noInstances": "Inga KiloClaw-instanser",
       "noInstancesDescription": "Skapa en instans för att börja chatta.",
       "setUpKiloclaw": "Konfigurera KiloClaw",
       "currentInstance": "{{title}}, vald instans"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Kunde inte logga in i chatten.",
       "couldNotRefreshMessages": "Kunde inte uppdatera meddelandena.",
       "couldNotLoadHistory": "Kunde inte läsa in konversationshistoriken.",
-      "rename": "Byt namn",
       "leave": "Lämna",
       "untitledConversation": "Konversation utan titel",
       "createFailed": "Kunde inte skapa konversationen.",
       "leaveFailed": "Kunde inte lämna konversationen."
     },
     "reactions": {
-      "title": "reaktioner",
-      "close": "Stäng reaktionsvyn",
-      "recent": "Senaste",
       "common": "Vanliga",
       "reactWith": "Reagera med {{reaction}}",
       "accessibility": "Reaktion {{emoji}}, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Kunde inte lägga till reaktionen.",
       "retrySend": "Skicka om",
       "moreReactions": "Fler reaktioner",
-      "reply": "Svara",
       "edit": "Redigera",
       "sendFailed": "Kunde inte skicka meddelandet.",
       "retrySendFailed": "Kunde inte skicka meddelandet igen.",
@@ -807,7 +829,6 @@
       "takePhoto": "Ta en bild",
       "photoLibrary": "Fotobibliotek",
       "files": "filer",
-      "cameraAccessDisabled": "Ingen åtkomst till kameran",
       "cameraAccessMessage": "Tillåt åtkomst till kameran i Inställningar för att ta en bild."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} skriver…"
     },
     "botStatus": {
-      "online": "Uppkopplad",
-      "idle": "Väntar",
       "offline": "Frånkopplad",
       "loadingUser": "Läser in användare…",
       "waitingForStatus": "Väntar på bottens status…",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Kunde inte läsa in KiloClaw-instanserna.",
     "billing": {
       "title": "Fakturering",
@@ -840,7 +858,6 @@
       "plan": "Planering",
       "finalTermEnds": "Sista perioden upphör",
       "afterFinalTerm": "Efter sista perioden",
-      "remaining": "Kvar",
       "lessThanOneDay": "Mindre än 1 dag",
       "ends": "Upphör",
       "expires": "Upphör",
@@ -941,20 +958,15 @@
       "disconnect": "Koppla från Google-kontot",
       "copied": "Kopierat",
       "copyCommand": "Kopiera kommando",
-      "disabled": "Inaktiverad",
       "disconnectConfirm": "Koppla från",
       "disconnectMessage": "Vill du ta bort ditt Google-konto från den här instansen? Då stängs Gmail-aviseringar av. Driftsätt instansen på nytt efter frånkopplingen för att ändringarna ska börja gälla.",
       "disconnectTitle": "Koppla från Google"
     },
     "modelList": {
-      "title": "Alla modeller",
       "searchPlaceholder": "Sök efter modeller…",
-      "clearSearch": "Rensa sökningen",
       "noMatches": "Inga modeller matchar din sökning",
-      "noModels": "Inga modeller tillgängliga",
       "noModelsDescription": "Modeller visas här när de blir tillgängliga.",
-      "noResultsFor": "Sökningen efter ”{{query}}” gav inga resultat.",
-      "recommended": "Rekommenderade"
+      "noResultsFor": "Sökningen efter ”{{query}}” gav inga resultat."
     },
     "secrets": {
       "title": "Hemligheter",
@@ -972,8 +984,7 @@
       "setupGuide": "konfigurationsguide",
       "saving": "Sparar…",
       "removing": "Tar bort…",
-      "updateToken": "Uppdatera token",
-      "connect": "Anslut"
+      "updateToken": "Uppdatera token"
     },
     "versionPin": {
       "title": "Versionslåsning",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Konfigurationen slutförs",
       "finishingSetupDescription": "Vi gör klart ditt konto. Det brukar bara ta en liten stund.",
       "getStarted": "Kom igång",
-      "noInstances": "Inga KiloClaw-instanser",
       "noInstancesDescription": "Skapa din första instans för att börja köra kodagenter."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Chatta med {{name}}",
-        "online": "Uppkopplad",
         "ready": "{{name}} är redo",
         "warmedUp": "Allt är klart. Säg hej när du är redo."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Spetsmodell",
       "frontierDescription": "Högsta prestanda. Använder de mest avancerade modellerna med resonemangsförmåga.",
-      "balancedLabel": "Balanserad",
       "balancedDescription": "Bra balans mellan snabbhet och förmåga till lägre kostnad.",
-      "performance": "Prestanda",
       "autoModelA11y": "automatiskt modellval: {{label}}",
       "currentModel": "Aktuell modell",
       "browseAllModels": "eller välj bland över 500 modeller",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "Öppna {{name}}, {{displayCount}} oläst meddelande",
       "openUnread": "Öppna {{name}}, {{displayCount}} olästa meddelanden",
       "openUnread_other": "Öppna {{name}}, {{displayCount}} olästa meddelanden",
-      "open": "Öppna {{name}}",
       "openSettings": "Öppna inställningar för {{name}}",
       "fixOnKiloAi": "Åtgärda på kilo.ai: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Granskning",
       "cancelTitle": "Avbryt granskningen?",
       "cancelMessage": "Detta stoppar den pågående kodgranskningen.",
-      "keepRunning": "Fortsätt köra",
       "cancelReview": "Avbryt granskningen",
       "retryTitle": "Gör om granskningen?",
       "retryMessage": "Detta kör kodgranskningen igen.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} av {{author}}",
       "noFindings": "Inga fynd upptäcktes.",
       "showMore": "Visa mer",
-      "branch": "Gren",
       "created": "Skapad",
       "started": "Startad",
       "completed": "Slutförd",
       "tokens": "token",
       "tokensInOut": "{{input}} in / {{output}} ut",
-      "openPullRequest": "Öppna PR",
       "council": "Granskningsråd",
       "decision": "Beslut",
       "gate": "Godkännandekontroll",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Granskningsminne",
-      "couldNotLoadMore": "Det gick inte att läsa in fler.",
-      "retryLoadingMore": "Försök läsa in fler igen",
       "loading": "Läser in granskningsminne",
       "couldNotLoad": "Kunde inte läsa in granskningsminnet.",
       "off": "Granskningsminnet är avstängt.",
@@ -1347,15 +1348,11 @@
       "setup": "Konfiguration av Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket är anslutet",
-      "title": "Anslut Bitbucket",
       "description": "Skapa en åtkomsttoken för arbetsytan med de behörigheter som krävs och klistra in den nedan.",
       "scopes": "Behörigheter som krävs: läsa kontouppgifter, läsa och skriva i kodarkiv, läsa pull-begäranden samt läsa och skriva webbhookar.",
-      "tokenPlaceholder": "Åtkomsttoken för arbetsytan",
-      "connect": "Anslut"
+      "tokenPlaceholder": "Åtkomsttoken för arbetsytan"
     },
     "scopeList": {
-      "couldNotLoad": "Det gick inte att läsa in organisationerna.",
       "personalStillAvailable": "Personliga kodarkiv är fortfarande tillgängliga nedan.",
       "personalSubtitle": "Dina egna kodarkiv",
       "viewOnly": "Endast visning"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub-app",
       "githubError": "Kunde inte öppna konfigurationen för GitHub. Försök igen.",
       "gitlabAccount": "GitLab-konto",
-      "connectGitLab": "Anslut GitLab",
       "gitlabError": "Kunde inte öppna konfigurationen för GitLab. Försök igen.",
       "description": "Anslut Kilos {{label}} för att granska pull-begäranden automatiskt.",
       "bitbucketError": "Kunde inte öppna konfigurationen för Bitbucket. Försök igen."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Kunde inte uppdatera granskaren.",
     "configSaveFailed": "Kunde inte spara granskningsinställningarna.",
     "status": {
-      "pending": "Väntar",
       "running": "Körs",
       "completed": "Slutförd",
-      "failed": "Misslyckades",
       "interrupted": "Avbruten"
     },
     "reviewStyle": {
       "strict": "Strikt",
-      "balanced": "Balanserad",
       "lenient": "Mild",
       "roast": "Svidande kritik"
     },
     "focusArea": {
       "security": "Säkerhet",
-      "performance": "Prestanda",
       "bugs": "Buggar",
       "style": "Stil",
       "testing": "Testning",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Öppna",
       "fixed": "Åtgärdad",
       "statusIgnored": "Ignorerat",
-      "statusClosed": "Stängd",
       "severityHigh": "Hög",
       "severityMedium": "Medel",
       "severityLow": "Låg",
@@ -1655,7 +1646,6 @@
       "title": "Inställningar",
       "couldNotLoadSettings": "Kunde inte läsa in säkerhetsagentens inställningar.",
       "couldNotLoadPermissions": "Kunde inte läsa in behörigheterna.",
-      "disabled": "Inaktiverad",
       "on": "På",
       "repositoriesCount_one": "{{displayCount}} kodarkiv valt",
       "repositoriesCount": "{{displayCount}} kodarkiv valda",
@@ -1683,7 +1673,6 @@
       "retry": "Försök igen med åtgärden",
       "cancelTitle": "Avbryt den här åtgärden?",
       "cancelMessage": "Säkerhetsagenten stoppar det pågående åtgärdsförsöket.",
-      "keepRunning": "Fortsätt köra",
       "cancelRemediation": "Avbryt åtgärden",
       "openPullRequest": "Öppna pull-begäran{{number}}",
       "openDraftPullRequest": "Öppna utkast till pull-begäran{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "Försökshistorik ({{displayCount}})",
       "attemptNumber": "Försök {{number}}",
       "startedBy": "Startad av",
-      "branch": "Gren",
       "queued": "Åtgärden är köad",
       "retryQueued": "Ett nytt åtgärdsförsök har köats",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Inga fynd matchar filtren",
       "noMatchesDescription": "Försök att justera eller rensa de valda filtren.",
       "emptyTitle": "Inga öppna fynd",
-      "emptyDescription": "Inga öppna fynd behöver hanteras just nu.",
-      "clearFilters": "Rensa filter"
+      "emptyDescription": "Inga öppna fynd behöver hanteras just nu."
     },
     "scopeList": {
-      "couldNotLoad": "Det gick inte att läsa in organisationerna.",
       "personalSubtitle": "Dina egna kodarkiv"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "PR-utkast öppnat",
       "prOpened": "PR öppnad",
       "blocked": "Blockerad",
-      "failed": "Misslyckades",
       "noChangesNeeded": "Inga ändringar behövs",
       "originAutomaticPolicy": "Automatisk policy",
       "originIncludeExistingPolicy": "Policy för att inkludera befintliga fynd",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Söker",
       "searchSessions": "Sök efter sessioner",
-      "searchSessionsPlaceholder": "Sök efter sessioner",
-      "clearSearch": "Rensa sökningen",
-      "clearFilters": "Rensa filter"
+      "searchSessionsPlaceholder": "Sök efter sessioner"
     },
     "sessionList": {
-      "couldNotLoad": "Det gick inte att läsa in sessionerna.",
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner.",
       "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen. Dina sessioner visas här.",
       "noMatches": "Inga matchande sessioner",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Ta bort session?",
       "deleteMessage": "Det går inte att ångra.",
       "deleteSession": "Ta bort session",
-      "rename": "Byt namn",
       "renameMessage": "Ange ett nytt namn för den här sessionen.",
       "copyId": "Kopiera sessions-ID",
       "idCopied": "Sessions-ID kopierat",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Du har inte behörighet att se det här.",
       "couldNotLoad": "Det gick inte att läsa in sessionen.",
       "failedToLoadDetails": "Det gick inte att läsa in sessionsinformationen.",
-      "notFound": "Innehållet hittades inte.",
       "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
       "failedToStopExecution": "Det gick inte att stoppa körningen.",
       "renameSession": "Byt namn på sessionen",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Försök ansluta igen"
     },
     "newSession": {
-      "title": "Ny session",
       "connectGithubDescription": "Anslut GitHub i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
       "openGithub": "Öppna GitHub",
       "refreshRepositories": "Uppdatera kodarkiven",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Det gick inte att uppdatera kodarkiven. Försök igen.",
       "discardDraftTitle": "Ta bort utkastet?",
       "discardDraftMessage": "Din prompt går förlorad.",
-      "keepEditing": "Fortsätt redigera",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
       "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process.",
-      "bitbucketConnected": "Bitbucket är anslutet",
-      "connectBitbucket": "Anslut Bitbucket",
       "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
-      "connectGitlab": "Anslut GitLab",
       "connectGitlabDescription": "Anslut GitLab i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
       "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in kodarkiven från Bitbucket.",
       "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "Verktyget {{name}}, {{status}}",
       "fileEmpty": "Den här filen är tom.",
       "noTasks": "Det finns inga uppgifter.",
-      "contentTruncated": "Innehållet har kortats av",
       "truncated": "Avkortat",
       "toolRead": "läs",
       "toolEdit": "Redigera",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Prova en annan sökterm.",
       "loading": "Läser in…",
       "accessibility": "Kodarkiv: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Meddelandeinformation",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Skrivning till cache",
       "total": "Totalt",
       "reportAiResponseFailedRetryable": "Kunde inte rapportera det här svaret.",
-      "reportAiResponseFailedTerminal": "Det här svaret kan inte rapporteras.",
-      "reportAiResponseSubmitted": "Anmälan skickad. Kvitto: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Det här svaret kan inte rapporteras."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "Visa bild {{alt}}",
       "imageOutput": "Genererad bild",
       "imageOutputWithFilename": "Genererad bild, {{filename}}",
-      "defaultName": "fil",
       "openFullScreen": "Öppna {{name}} i helskärm",
       "preview": "Förhandsvisa {{name}}",
-      "openFile": "Öppna {{name}}",
       "couldNotLoadFile": "Kunde inte läsa in den här filen.",
       "couldNotLoadFileRetry": "Kunde inte läsa in den här filen. Försök igen.",
       "retryLoadingFile": "Försök läsa in filen igen",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "Välj modell",
       "searchPlaceholder": "Sök efter modeller…",
-      "noModels": "Inga modeller tillgängliga",
       "noModelsDescription": "Det finns inga modeller att välja mellan.",
-      "favorites": "Favoriter",
-      "recommended": "Rekommenderade",
-      "allModels": "Alla modeller"
+      "favorites": "Favoriter"
     },
     "modelSelector": {
       "provider": "Leverantör {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "Kamera",
       "photoLibrary": "Fotobibliotek",
       "files": "filer",
-      "cameraAccessDisabled": "Ingen åtkomst till kameran",
       "cameraAccessMessage": "Tillåt åtkomst till kameran i Inställningar för att ta en bild.",
       "couldNotOpenPhotoPicker": "Det gick inte att öppna bildväljaren. Starta om Kilo och försök igen.",
       "maxFilesAllowed": "Du kan lägga till högst {{displayCount}} filer.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Länk kopierad",
-      "reviewPr": "Granska PR",
       "openLink": "Öppna länk",
-      "copyLink": "Kopiera länk",
       "shareLink": "Dela länk",
       "share": "Dela",
       "prLinkActions": "Åtgärder för PR-länken",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Kontext: {{used}} av {{window}} token, {{percentage}} använt",
       "title": "Kontextanvändning",
       "used": "Använt",
-      "remaining": "Kvar",
       "provider": "Leverantör",
       "totalCost": "Total kostnad",
       "usageReflectsLatest": "Användningen avser det senaste färdiga svaret från assistenten.",
@@ -2598,7 +2561,6 @@
     "billingPage": "faktureringssidan"
   },
   "deviceSessions": {
-    "couldNotLoad": "Det gick inte att läsa in sessionerna.",
     "couldNotLoadDescription": "Dina aktiva sessioner kan inte visas förrän inläsningen är klar.",
     "currentDeviceUnidentified": "Det gick inte att identifiera den här enheten.",
     "noSessions": "Inga aktiva sessioner",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Här visas bara inloggningar i Kilo-appen. Inloggningar i kodredigeraren och CLI visas inte.",
     "signedIn": "Inloggad {{signedIn}} · Senast aktiv {{lastSeen}}",
     "thisDevice": "Den här enheten",
-    "title": "Enhetssessioner",
     "viewProfile": "Visa profil",
     "signOutThisDevice": "Logga ut från den här enheten",
     "signOutThisSession": "Logga ut den här sessionen",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "Den här länken är inte längre giltig.",
-    "goBack": "Gå tillbaka",
     "title": "Sidan hittades inte"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Innehållet har kortats av",
     "truncated": "Avkortat",
     "wrap": "Radbrytning",
     "scroll": "Rullning"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Försök igen.",
     "offlineTitle": "Kunde inte läsa in innehållet.",
     "permissionDescription": "Du har inte behörighet att se det här.",
-    "notFoundTitle": "Innehållet hittades inte.",
     "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
     "serverTitle": "Kunde inte läsa in innehållet.",
     "serverDescription": "Något gick fel hos oss. Försök igen."
   },
   "screenHeader": {
     "openMenu": "Öppna menyn",
-    "openMenuFor": "Öppna menyn för {{title}}",
-    "goBack": "Gå tillbaka"
+    "openMenuFor": "Öppna menyn för {{title}}"
   },
   "picker": {
     "optionsExpired": "Alternativen har upphört att gälla",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Dela till Kilo",
-    "reviewPr": "Granska PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Ny session",
     "searchPlaceholder": "Sök bland de senaste sessionerna",
     "connectedCli": "Via ett anslutet CLI-verktyg",
     "newSessionOn": "Ny session på {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass avslutas",
     "statusPastDue": "Kilo Pass: försenad betalning",
     "monthlyCredits": "{{credits}} krediter per månad",
-    "ends": "Upphör {{date}}",
     "periodEnd": "periodens slut",
     "managedOnGooglePlay": "Hanteras på Google Play",
     "managedInAppStore": "Hanteras i App Store",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Kilo Pass är inte tillgängligt som köp i appen på Android. Hantera det på webben.",
     "webManagementDescription": "Detta Kilo Pass hanteras på webben.",
     "legalDisclosure": "Kilo Pass är en månadsprenumeration som förnyas automatiskt. Ditt Apple-ID debiteras när köpet bekräftas. Prenumerationen förnyas automatiskt varje månad till det pris som visas, om du inte säger upp den minst 24 timmar innan den aktuella perioden löper ut. Du kan hantera eller säga upp prenumerationen när som helst i kontoinställningarna för App Store.",
-    "legalPrivacyPolicy": "integritetspolicy",
     "legalTermsOfUse": "användarvillkor (EULA)",
     "purchaseDifferentAccount": "Det här App Store-köpet är inte kopplat till ditt Kilo-konto. Logga in på det Apple-konto som användes för köpet och försök sedan igen.",
     "restoreFailed": "Det gick inte att återställa köpen. Försök igen.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "Ange en giltig e-postadress.",
-      "emailLabel": "E-post",
       "emailPlaceholder": "namn@foretag.se",
       "permissionDenied": "Du har inte behörighet att bjuda in medlemmar.",
       "roleLabel": "Roll",
@@ -2968,7 +2920,6 @@
         "billingManager": "Faktureringsansvarig"
       },
       "emailStatusFailed": "E-postmeddelandet kunde inte skickas",
-      "emailStatusPending": "Väntar",
       "inviteCreated": "Inbjudan skapad",
       "pendingInvitations": "Väntande inbjudningar",
       "resendInvite": "Skicka inbjudan igen",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Det gick inte att läsa in status",
       "creditProcessingDelayed": "Kredithanteringen är försenad · nytt försök görs automatiskt",
       "ended": "Avslutad",
-      "endsOn": "Upphör {{date}}",
       "manageHint": "Öppnar Kilo Pass-hanteringen på webben.",
       "notSubscribed": "Ingen prenumeration",
       "overallocated": "Antalet tilldelade Kilo Pass överstiger antalet betalda platser",
@@ -3004,7 +2954,6 @@
       "paymentPending": "Väntar på betalning",
       "processingBlocked": "Bearbetningen blockerad",
       "processingNeedsReview": "Bearbetningen kräver granskning",
-      "retry": "Försök igen",
       "retryHint": "Försöker läsa in Kilo Pass-status igen.",
       "setupHint": "Öppnar inställningarna för Kilo Pass i webbläsaren."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Tillbaka till inställningarna"
   },
   "quickChat": {
-    "title": "Chatt",
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."
@@ -3076,7 +3024,6 @@
     "openAgents": "Öppna agenter",
     "running": "Arbetar",
     "needsInput": "Väntar på svar",
-    "idle": "Väntar",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
   }

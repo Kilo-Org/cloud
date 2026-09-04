@@ -113,7 +113,7 @@ function RecentEyebrow() {
     <View className="flex-row items-center gap-2">
       <Clock size={16} color={colors.mutedForeground} />
       <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-        {t('prReview.inbox.recent')}
+        {t('common.recent')}
       </Text>
     </View>
   );
@@ -221,13 +221,13 @@ function LoadMoreRetry({ onRetry }: Readonly<{ onRetry: () => void }>) {
   return (
     <View className="items-center gap-2">
       <Text variant="muted" className="text-center text-xs">
-        {t('prReview.inbox.couldNotLoadMore')}
+        {t('common.couldnTLoadMore')}
       </Text>
       <Button
         size="sm"
         variant="outline"
         onPress={onRetry}
-        accessibilityLabel={t('prReview.inbox.retryLoadingMore')}
+        accessibilityLabel={t('common.retryLoadingMore')}
       >
         <Text>{t('common.retry')}</Text>
       </Button>

@@ -219,7 +219,7 @@ export default function GoogleScreen() {
                 onPress={handleToggleGmail}
                 disabled={mutations.setGmailNotifications.isPending}
               >
-                <Text>{gmailEnabled ? t('common.enabled') : t('kiloclaw.google.disabled')}</Text>
+                <Text>{gmailEnabled ? t('common.enabled') : t('common.disabled')}</Text>
               </Button>
             </View>
           </View>

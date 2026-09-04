@@ -180,7 +180,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
                   setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
                 }}
               >
-                <Text>{t('securityAgent.findingList.clearFilters')}</Text>
+                <Text>{t('common.clearFilters')}</Text>
               </Button>
             ) : undefined
           }

@@ -20,7 +20,7 @@ const STATUS_OPTIONS = [
   { value: 'open', labelKey: 'securityAgent.filter.statusOpen' },
   { value: 'fixed', labelKey: 'securityAgent.filter.fixed' },
   { value: 'ignored', labelKey: 'securityAgent.filter.statusIgnored' },
-  { value: 'closed', labelKey: 'securityAgent.filter.statusClosed' },
+  { value: 'closed', labelKey: 'common.closed' },
   { value: 'all', labelKey: 'common.all' },
 ] as const satisfies readonly { value: SecurityFindingStatusFilter; labelKey: string }[];
 

@@ -145,27 +145,25 @@ export default function ModelListScreen() {
   const sections = [
     ...(preferred.length > 0
       ? [
-          { type: 'header' as const, title: t('kiloclaw.modelList.recommended') },
+          { type: 'header' as const, title: t('common.recommended') },
           ...preferred.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
     ...(rest.length > 0
       ? [
-          { type: 'header' as const, title: t('kiloclaw.modelList.title') },
+          { type: 'header' as const, title: t('common.allModels') },
           ...rest.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
   ];
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return (
-      <InstanceContextBoundary title={t('kiloclaw.modelList.title')} context={instanceContext} />
-    );
+    return <InstanceContextBoundary title={t('common.allModels')} context={instanceContext} />;
   }
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('kiloclaw.modelList.title')} />
+      <ScreenHeader title={t('common.allModels')} />
       <View className="px-4 pb-2 pt-2">
         <TextInput
           ref={searchInputRef}
@@ -199,9 +197,7 @@ export default function ModelListScreen() {
         (sections.length === 0 ? (
           <EmptyState
             icon={Search}
-            title={
-              searchFilter ? t('kiloclaw.modelList.noMatches') : t('kiloclaw.modelList.noModels')
-            }
+            title={searchFilter ? t('kiloclaw.modelList.noMatches') : t('common.noModelsAvailable')}
             description={
               searchFilter
                 ? t('kiloclaw.modelList.noResultsFor', { query: searchFilter })
@@ -210,7 +206,7 @@ export default function ModelListScreen() {
             action={
               searchFilter ? (
                 <Button variant="outline" size="sm" onPress={handleClearSearch}>
-                  <Text>{t('kiloclaw.modelList.clearSearch')}</Text>
+                  <Text>{t('common.clearSearch')}</Text>
                 </Button>
               ) : undefined
             }

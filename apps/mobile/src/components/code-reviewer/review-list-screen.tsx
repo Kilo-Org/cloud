@@ -32,11 +32,11 @@ const STATUS_CLASSNAME = {
 } satisfies Record<CodeReviewStatus, string>;
 
 const STATUS_KEY = {
-  pending: 'codeReviewer.status.pending',
+  pending: 'common.pending',
   queued: 'common.queued',
   running: 'codeReviewer.status.running',
   completed: 'codeReviewer.status.completed',
-  failed: 'codeReviewer.status.failed',
+  failed: 'common.failed',
   cancelled: 'common.cancelled',
   interrupted: 'codeReviewer.status.interrupted',
 } satisfies Record<CodeReviewStatus, string>;

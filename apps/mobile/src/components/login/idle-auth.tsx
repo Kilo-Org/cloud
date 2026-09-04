@@ -300,7 +300,7 @@ export function IdleAuth({
           className="text-xs text-primary underline"
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
         >
-          {t('login.privacyPolicy')}
+          {t('common.privacyPolicy')}
         </Text>
         {t('login.termsSuffix')}
       </Text>

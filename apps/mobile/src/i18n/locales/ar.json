@@ -69,14 +69,64 @@
     "repository": "المستودع",
     "signOut": "تسجيل الخروج",
     "agents": "الوكلاء",
-    "all": "الكل"
+    "all": "الكل",
+    "allModels": "جميع النماذج",
+    "balanced": "متوازن",
+    "bitbucketConnected": "تم ربط Bitbucket",
+    "branch": "الفرع",
+    "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
+    "chat": "الدردشة",
+    "clearFilters": "مسح عوامل التصفية",
+    "clearSearch": "مسح البحث",
+    "closed": "مغلق",
+    "closeReactions": "إغلاق التفاعلات",
+    "connect": "ربط",
+    "connectBitbucket": "ربط Bitbucket",
+    "connectGitlab": "ربط GitLab",
+    "contentTruncated": "تم اقتطاع المحتوى",
+    "copyLink": "نسخ الرابط",
+    "couldNotLoadOrganizations": "تعذّر تحميل المؤسسات.",
+    "couldNotLoadSessions": "تعذّر تحميل الجلسات.",
+    "couldnTLoadMore": "تعذّر تحميل المزيد.",
+    "deviceSessions": "جلسات الأجهزة",
+    "disabled": "معطّل",
+    "email": "البريد الإلكتروني",
+    "ends": "ينتهي في {{date}}",
+    "failed": "فشل",
+    "file": "ملف",
+    "gitlab": "GitLab",
+    "goBack": "رجوع",
+    "idle": "خامل",
+    "keepEditing": "متابعة التعديل",
+    "keepRunning": "متابعة التشغيل",
+    "kiloclaw": "KiloClaw",
+    "newSession": "جلسة جديدة",
+    "noKiloclawInstances": "لا توجد مثيلات KiloClaw",
+    "noModelsAvailable": "لا توجد نماذج متاحة",
+    "notFound": "لم نعثر على العنصر المطلوب.",
+    "online": "متصل",
+    "open": "فتح {{name}}",
+    "openPullRequest": "فتح طلب السحب",
+    "pending": "قيد الانتظار",
+    "performance": "الأداء",
+    "preferences": "التفضيلات",
+    "privacyPolicy": "سياسة الخصوصية",
+    "profile": "الملف الشخصي",
+    "reactions": "تفاعل",
+    "recent": "الأحدث",
+    "recommended": "النماذج الموصى بها",
+    "remaining": "المتبقي",
+    "rename": "تغيير الاسم",
+    "reply": "رد",
+    "reportSubmittedReceipt": "تم إرسال البلاغ. رقم الإيصال: {{receiptId}}",
+    "retryLoadingMore": "إعادة محاولة تحميل المزيد",
+    "reviewPr": "مراجعة PR"
   },
   "language": {
     "title": "اللغة",
     "restarting": "جارٍ إعادة التشغيل لتطبيق اللغة",
     "couldNotRestart": "تعذّرت إعادة التشغيل",
     "languageSaved": "تم حفظ اللغة التي اخترتها.",
-    "retry": "إعادة المحاولة",
     "catalogLoadFailed": "تعذّر تحميل اللغة. حاول مرة أخرى.",
     "search": "البحث في اللغات",
     "noMatches": "لا توجد لغات مطابقة",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "رمز تسجيل الدخول: {{code}}",
     "openSignInPageInBrowser": "فتح صفحة تسجيل الدخول في المتصفح",
     "copySignInLink": "نسخ رابط تسجيل الدخول",
-    "copyLink": "نسخ الرابط",
     "cancelSignIn": "إلغاء تسجيل الدخول",
     "startingSignIn": "جارٍ بدء تسجيل الدخول...",
     "organizationUsesSso": "تستخدم مؤسستك تسجيل الدخول الموحّد.",
@@ -112,7 +161,6 @@
     "terms": "الشروط",
     "termsConnector": " و ",
     "termsSuffix": ".",
-    "privacyPolicy": "سياسة الخصوصية",
     "moreSignInOptions": "المزيد من خيارات تسجيل الدخول",
     "couldNotCompleteSignIn": "تعذّر إكمال تسجيل الدخول. حاول مرة أخرى.",
     "sessionEnded": "انتهت جلستك. سجّل الدخول مرة أخرى.",
@@ -126,7 +174,6 @@
     "or": "أو"
   },
   "profile": {
-    "title": "الملف الشخصي",
     "codeReviewerSubtitle": "مراجعات PR تلقائية",
     "securityAgentSubtitle": "اكتشاف الثغرات ومعالجتها",
     "reviews": "المراجعات",
@@ -136,9 +183,7 @@
     "linkedAccounts": "الحسابات المرتبطة",
     "couldNotLoadAccounts": "تعذّر تحميل الحسابات.",
     "app": "التطبيق",
-    "preferences": "التفضيلات",
     "preferencesSubtitle": "المظهر والإشعارات والتفكير وسلوك الشاشة",
-    "deviceSessions": "جلسات الأجهزة",
     "deviceSessionsSubtitle": "مراجعة الأجهزة الأخرى وتسجيل الخروج منها",
     "feedback": "إرسال ملاحظات",
     "privacyChoices": "خيارات الخصوصية",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "البريد الإلكتروني",
     "providerTestAccount": "حساب تجريبي",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "تسجيل الدخول الموحّد للمؤسسات"
   },
   "preferences": {
-    "title": "التفضيلات",
     "autoExpandThinking": "عرض تفاصيل التفكير تلقائيًا",
     "autoExpandThinkingSubtitle": "عرض تفاصيل تفكير الوكيل عند انتهائه.",
     "keepScreenOn": "إبقاء الشاشة مضاءة في صفحة الجلسة",
@@ -245,17 +287,13 @@
   },
   "tabs": {
     "home": "الرئيسية",
-    "profile": "الملف الشخصي",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تبويب، {{position}} من {{total}}",
-    "chat": "الدردشة"
+    "position": "{{name}}، تبويب، {{position}} من {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "تبديل المثيل",
       "couldNotLoadInstances": "تعذّر تحميل المثيلات.",
-      "noInstances": "لا توجد مثيلات KiloClaw",
       "noInstancesDescription": "أعِدّ مثيلًا لبدء الدردشة.",
       "setUpKiloclaw": "إعداد KiloClaw",
       "currentInstance": "{{title}}، المثيل الحالي"
@@ -277,16 +315,12 @@
       "couldNotSignIn": "تعذّر تسجيل الدخول إلى الدردشة.",
       "couldNotRefreshMessages": "تعذّر تحديث الرسائل.",
       "couldNotLoadHistory": "تعذّر تحميل سجل المحادثة.",
-      "rename": "تغيير الاسم",
       "leave": "مغادرة",
       "untitledConversation": "محادثة بدون عنوان",
       "createFailed": "تعذّر إنشاء المحادثة.",
       "leaveFailed": "تعذّرت مغادرة المحادثة."
     },
     "reactions": {
-      "title": "تفاعل",
-      "close": "إغلاق التفاعلات",
-      "recent": "الأحدث",
       "common": "التفاعلات الشائعة",
       "reactWith": "التفاعل بـ {{reaction}}",
       "accessibility": "تفاعل {{emoji}}، {{displayCount}}"
@@ -359,7 +393,6 @@
       "addReactionFailed": "تعذّرت إضافة التفاعل.",
       "retrySend": "إعادة الإرسال",
       "moreReactions": "مزيد من التفاعلات",
-      "reply": "رد",
       "edit": "تعديل",
       "sendFailed": "تعذّر إرسال الرسالة.",
       "retrySendFailed": "تعذّرت إعادة الإرسال.",
@@ -370,7 +403,6 @@
       "takePhoto": "التقاط صورة",
       "photoLibrary": "مكتبة الصور",
       "files": "ملف",
-      "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة."
     },
     "typingIndicator": {
@@ -384,8 +416,6 @@
       "typing_many": "{{names}} يكتبون…"
     },
     "botStatus": {
-      "online": "متصل",
-      "idle": "خامل",
       "offline": "غير متصل",
       "loadingUser": "جارٍ تحميل بيانات المستخدم...",
       "waitingForStatus": "في انتظار حالة الروبوت...",
@@ -399,7 +429,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "تعذّر تحميل مثيلات KiloClaw.",
     "billing": {
       "title": "الفوترة",
@@ -407,7 +436,6 @@
       "plan": "خطة",
       "finalTermEnds": "نهاية الفترة الأخيرة",
       "afterFinalTerm": "بعد الفترة الأخيرة",
-      "remaining": "المتبقي",
       "ends": "تاريخ الانتهاء",
       "expires": "انتهاء الصلاحية",
       "noActivePlan": "لا توجد خطة نشطة",
@@ -508,20 +536,15 @@
       "disconnect": "إلغاء ربط حساب Google",
       "copied": "تم النسخ",
       "copyCommand": "نسخ الأمر",
-      "disabled": "معطّل",
       "disconnectConfirm": "إلغاء الربط",
       "disconnectMessage": "إزالة حسابك على Google من هذا المثيل؟ سيؤدي ذلك إلى تعطيل إشعارات Gmail. أعد النشر بعد إلغاء الربط لتطبيق التغييرات.",
       "disconnectTitle": "إلغاء ربط Google"
     },
     "modelList": {
-      "title": "جميع النماذج",
       "searchPlaceholder": "البحث عن النماذج...",
-      "clearSearch": "مسح البحث",
       "noMatches": "لا توجد نماذج تطابق بحثك",
-      "noModels": "لا توجد نماذج متاحة",
       "noModelsDescription": "ستظهر النماذج هنا عندما تصبح متاحة.",
-      "noResultsFor": "لا توجد نتائج تطابق «{{query}}».",
-      "recommended": "النماذج الموصى بها"
+      "noResultsFor": "لا توجد نتائج تطابق «{{query}}»."
     },
     "secrets": {
       "title": "البيانات السرية",
@@ -532,7 +555,6 @@
       "removeTitle": "إزالة البيانات السرية",
       "saved": "تم حفظ {{label}}",
       "allFieldsRequired": "يجب ملء جميع الحقول لربط {{label}}.",
-      "connect": "ربط",
       "hide": "إخفاء {{label}}",
       "removing": "جارٍ الإزالة…",
       "saving": "جارٍ الحفظ…",
@@ -610,7 +632,6 @@
       "finishingSetup": "جارٍ إكمال الإعداد",
       "finishingSetupDescription": "انتظر قليلًا ريثما نكمل إعداد حسابك. لا يستغرق ذلك عادةً وقتًا طويلًا.",
       "getStarted": "البدء",
-      "noInstances": "لا توجد مثيلات KiloClaw",
       "noInstancesDescription": "أنشئ مثيلك الأول لبدء تشغيل وكلاء البرمجة."
     },
     "instance": {
@@ -622,7 +643,6 @@
     "instanceCard": {
       "fixOnKiloAi": "الإصلاح على kilo.ai: {{label}}",
       "needsAttention": "{{name}} يحتاج إلى تدخل: {{label}}",
-      "open": "فتح {{name}}",
       "openSettings": "فتح إعدادات {{name}}",
       "openUnread": "فتح {{name}}، الرسائل غير المقروءة: {{displayCount}}",
       "openUnread_other": "فتح {{name}}، الرسائل غير المقروءة: {{displayCount}}",
@@ -647,19 +667,16 @@
     "modelPicker": {
       "autoModelA11y": "النموذج التلقائي: {{label}}",
       "balancedDescription": "توازن ذكي بين السرعة والقدرة بتكلفة أقل.",
-      "balancedLabel": "متوازن",
       "browseAllModels": "أو اختر من بين أكثر من 500 نموذج",
       "browseAllModelsA11y": "استعراض جميع النماذج التي يزيد عددها عن 500",
       "currentModel": "النموذج الحالي",
       "frontierDescription": "أعلى أداء. يوجّه الطلبات إلى أحدث النماذج المتقدمة التي تدعم الاستدلال.",
       "frontierLabel": "متقدم",
-      "kiloAuto": "Kilo Auto",
-      "performance": "الأداء"
+      "kiloAuto": "Kilo Auto"
     },
     "onboarding": {
       "complete": {
         "chatWith": "الدردشة مع {{name}}",
-        "online": "متصل",
         "ready": "{{name}} جاهز",
         "warmedUp": "كل شيء جاهز. ألقِ التحية متى شئت."
       },
@@ -837,11 +854,8 @@
       "setup": "إعداد Bitbucket"
     },
     "bitbucketConnect": {
-      "connect": "ربط",
-      "connected": "تم ربط Bitbucket",
       "description": "أنشئ رمز وصول لمساحة العمل بالصلاحيات المطلوبة والصقه أدناه.",
       "scopes": "الصلاحيات المطلوبة: الحساب: قراءة · المستودعات: قراءة/كتابة · طلبات السحب: قراءة · خطافات الويب: قراءة/كتابة.",
-      "title": "ربط Bitbucket",
       "tokenPlaceholder": "رمز وصول مساحة العمل"
     },
     "followReviewMd": "اتباع تعليمات REVIEW.md",
@@ -867,7 +881,6 @@
       "statusUnavailable": "الحالة غير متاحة"
     },
     "providerConnect": {
-      "connectGitLab": "ربط GitLab",
       "description": "اربط {{label}} الخاص بـ Kilo لمراجعة طلبات السحب تلقائيًا.",
       "githubApp": "تطبيق GitHub",
       "githubError": "تعذّر فتح صفحة إعداد GitHub. حاول مرة أخرى.",
@@ -876,7 +889,6 @@
       "bitbucketError": "تعذّر فتح صفحة إعداد Bitbucket. حاول مرة أخرى."
     },
     "reviewDetail": {
-      "branch": "الفرع",
       "byline": "{{repo}} #{{number}} بواسطة {{author}}",
       "cancelMessage": "سيؤدي هذا إلى إيقاف مراجعة الشفرة الجارية.",
       "cancelReview": "إلغاء المراجعة",
@@ -891,9 +903,7 @@
       "gate": "معيار اجتياز الفحص",
       "gateHidden": "مخفي",
       "gateNone": "لا شيء",
-      "keepRunning": "متابعة التشغيل",
       "noFindings": "لا توجد نتائج.",
-      "openPullRequest": "فتح طلب السحب",
       "retryMessage": "سيؤدي هذا إلى إعادة مراجعة الشفرة.",
       "retryReview": "إعادة المراجعة",
       "retryTitle": "إعادة المراجعة؟",
@@ -931,7 +941,6 @@
     },
     "reviewMemory": {
       "couldNotLoad": "تعذّر تحميل ذاكرة المراجعة.",
-      "couldNotLoadMore": "تعذّر تحميل المزيد.",
       "couldNotLoadProposals": "تعذّر تحميل المقترحات.",
       "enable": "تفعيل ذاكرة المراجعة",
       "loading": "جارٍ تحميل ذاكرة المراجعة",
@@ -941,11 +950,9 @@
       "off": "ذاكرة المراجعة معطّلة.",
       "offDescription": "فعّلها ليتعلم Kilo من ردود المشرفين ويقترح إرشادات لملف REVIEW.md.",
       "readOnlyDescription": "يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيل ذاكرة المراجعة.",
-      "retryLoadingMore": "إعادة محاولة تحميل المزيد",
       "title": "ذاكرة المراجعة"
     },
     "scopeList": {
-      "couldNotLoad": "تعذّر تحميل المؤسسات.",
       "personalStillAvailable": "لا تزال المستودعات الشخصية متاحة أدناه.",
       "personalSubtitle": "مستودعاتك الخاصة",
       "viewOnly": "للعرض فقط"
@@ -974,21 +981,17 @@
     "updateFailed": "تعذّر تحديث المراجع.",
     "configSaveFailed": "تعذّر حفظ إعدادات المراجعة.",
     "status": {
-      "pending": "قيد الانتظار",
       "running": "قيد التشغيل",
       "completed": "تم الاكتمال",
-      "failed": "فشل",
       "interrupted": "متوقفة"
     },
     "reviewStyle": {
       "strict": "صارم",
-      "balanced": "متوازن",
       "lenient": "متساهل",
       "roast": "ساخر"
     },
     "focusArea": {
       "security": "الأمان",
-      "performance": "الأداء",
       "bugs": "الأخطاء",
       "style": "الأسلوب",
       "testing": "الاختبار",
@@ -1051,7 +1054,6 @@
       "sortSeverityDesc": "الخطورة: من الأعلى إلى الأدنى",
       "sortSlaDue": "الموعد النهائي حسب SLA",
       "status": "الحالة",
-      "statusClosed": "مغلق",
       "statusIgnored": "تم تجاهلها",
       "statusOpen": "فتح"
     },
@@ -1264,7 +1266,6 @@
       "reasonAfterReview": "بعد المراجعة"
     },
     "findingList": {
-      "clearFilters": "مسح عوامل التصفية",
       "couldNotLoad": "تعذّر تحميل النتائج.",
       "couldNotLoadMore": "تعذّر تحميل المزيد من النتائج.",
       "emptyDescription": "لا توجد نتائج مفتوحة تستدعي الاهتمام حاليًا.",
@@ -1305,14 +1306,12 @@
     "remediation": {
       "attemptHistory": "سجل المحاولات ({{displayCount}})",
       "attemptNumber": "المحاولة رقم {{number}}",
-      "branch": "الفرع",
       "cancelMessage": "سيوقف وكيل الأمان محاولة المعالجة الجارية.",
       "cancelRemediation": "إلغاء المعالجة",
       "cancelTitle": "إلغاء هذه المعالجة؟",
       "cancellationRequested": "تم طلب الإلغاء",
       "cancelled": "تم إلغاء المعالجة",
       "couldNotLoad": "تعذّر تحميل حالة المعالجة.",
-      "keepRunning": "متابعة التشغيل",
       "noAnalysisDescription": "ابدأ التحليل من علامة التبويب التفاصيل.",
       "noAnalysisTitle": "لا يوجد تحليل بعد",
       "openDraftPullRequest": "فتح مسودة طلب السحب{{number}}",
@@ -1354,7 +1353,6 @@
       "setupFailed": "تعذّر بدء إعداد GitHub. حاول مرة أخرى."
     },
     "scopeList": {
-      "couldNotLoad": "تعذّر تحميل المؤسسات.",
       "personalSubtitle": "مستودعاتك الخاصة"
     },
     "settingsOverview": {
@@ -1364,7 +1362,6 @@
       "automationCount": "تم تفعيل {{displayCount}} من 3",
       "couldNotLoadPermissions": "تعذّر تحميل الصلاحيات.",
       "couldNotLoadSettings": "تعذّر تحميل إعدادات وكيل الأمان.",
-      "disabled": "معطّل",
       "disabledNoManage": "وكيل الأمان معطّل. يمكن لمالكي المؤسسة ومديري الفوترة فقط تفعيله.",
       "disabledNoRepo": "اختر مستودعًا واحدًا على الأقل قبل تفعيل وكيل الأمان.",
       "disabledPrompt": "فعّل وكيل الأمان لمزامنة تنبيهات Dependabot واختيار المستودعات وضبط إعدادات الأتمتة.",
@@ -1495,7 +1492,6 @@
       "draftPrOpened": "تم فتح مسودة PR",
       "prOpened": "تم فتح PR",
       "blocked": "متوقفة بسبب عائق",
-      "failed": "فشل",
       "noChangesNeeded": "لا حاجة إلى تغييرات",
       "originAutomaticPolicy": "سياسة تلقائية",
       "originIncludeExistingPolicy": "سياسة تضمين النتائج الحالية",
@@ -1549,12 +1545,9 @@
     "search": {
       "searching": "جارٍ البحث",
       "searchSessions": "البحث في الجلسات",
-      "searchSessionsPlaceholder": "البحث في الجلسات",
-      "clearSearch": "مسح البحث",
-      "clearFilters": "مسح عوامل التصفية"
+      "searchSessionsPlaceholder": "البحث في الجلسات"
     },
     "sessionList": {
-      "couldNotLoad": "تعذّر تحميل الجلسات.",
       "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة.",
       "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
       "noMatches": "لا توجد جلسات مطابقة",
@@ -1570,7 +1563,6 @@
       "deleteTitle": "حذف الجلسة؟",
       "deleteMessage": "لا يمكن التراجع عن هذا الإجراء.",
       "deleteSession": "حذف الجلسة",
-      "rename": "تغيير الاسم",
       "renameMessage": "أدخل اسمًا جديدًا لهذه الجلسة.",
       "copyId": "نسخ معرّف الجلسة",
       "idCopied": "تم نسخ معرّف الجلسة",
@@ -1631,7 +1623,6 @@
       "accessDeniedDescription": "لا تملك صلاحية عرض هذا المحتوى.",
       "couldNotLoad": "تعذّر تحميل الجلسة.",
       "failedToLoadDetails": "تعذّر تحميل تفاصيل الجلسة.",
-      "notFound": "لم نعثر على العنصر المطلوب.",
       "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
       "failedToStopExecution": "تعذّر إيقاف التنفيذ.",
       "renameSession": "إعادة تسمية الجلسة",
@@ -1675,7 +1666,6 @@
       "retryConnection": "إعادة محاولة الاتصال"
     },
     "newSession": {
-      "title": "جلسة جديدة",
       "connectGithubDescription": "اربط حسابك على GitHub من المتصفح، ثم عد إلى هنا لاختيار مستودع.",
       "openGithub": "فتح GitHub",
       "refreshRepositories": "تحديث المستودعات",
@@ -1703,12 +1693,8 @@
       "discardDraftMessage": "ستفقد التعليمات التي كتبتها.",
       "discardDraftTitle": "حذف المسودة؟",
       "discardFailed": "تعذّر حذف المسودة. حاول مرة أخرى.",
-      "keepEditing": "متابعة التعديل",
       "remoteHint": "شغّل `kilo remote` على جهاز الكمبيوتر، أو `/remote` في جلسة CLI قيد التشغيل، للتحكم في عملية kilo محلية.",
-      "bitbucketConnected": "تم ربط Bitbucket",
-      "connectBitbucket": "ربط Bitbucket",
       "connectBitbucketDescription": "اربط حسابك على Bitbucket من المتصفح، ثم عد إلى هنا لاختيار مستودع.",
-      "connectGitlab": "ربط GitLab",
       "connectGitlabDescription": "اربط حسابك على GitLab من المتصفح، ثم عد إلى هنا لاختيار مستودع.",
       "couldNotLoadBitbucketRepositories": "تعذّر تحميل مستودعات Bitbucket.",
       "couldNotLoadGithubRepositories": "تعذّر تحميل مستودعات GitHub.",
@@ -1742,7 +1728,6 @@
       "accessibilityLabel": "أداة {{name}}، {{status}}",
       "fileEmpty": "هذا الملف فارغ.",
       "noTasks": "لا توجد مهام.",
-      "contentTruncated": "تم اقتطاع المحتوى",
       "truncated": "مقتطع",
       "toolRead": "قراءة",
       "toolEdit": "تعديل",
@@ -1815,8 +1800,7 @@
       "tryDifferentSearch": "جرّب كلمة بحث أخرى.",
       "loading": "جارٍ التحميل…",
       "accessibility": "المستودع: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "تفاصيل الرسالة",
@@ -1838,8 +1822,7 @@
       "cacheWrite": "كتابة في ذاكرة التخزين المؤقت",
       "total": "الإجمالي",
       "reportAiResponseFailedRetryable": "تعذّر الإبلاغ عن هذا الرد.",
-      "reportAiResponseFailedTerminal": "لا يمكن الإبلاغ عن هذا الرد.",
-      "reportAiResponseSubmitted": "تم إرسال البلاغ. رقم الإيصال: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "لا يمكن الإبلاغ عن هذا الرد."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -1878,10 +1861,8 @@
       "viewImageWithAlt": "عرض الصورة: {{alt}}",
       "imageOutput": "الصورة الناتجة",
       "imageOutputWithFilename": "الصورة الناتجة، {{filename}}",
-      "defaultName": "ملف",
       "openFullScreen": "فتح {{name}} بملء الشاشة",
       "preview": "معاينة {{name}}",
-      "openFile": "فتح {{name}}",
       "couldNotLoadFile": "تعذّر تحميل هذا الملف.",
       "couldNotLoadFileRetry": "تعذّر تحميل هذا الملف. حاول مرة أخرى.",
       "retryLoadingFile": "إعادة محاولة تحميل الملف",
@@ -2029,10 +2010,7 @@
     "modelPicker": {
       "title": "اختيار النموذج",
       "searchPlaceholder": "البحث عن النماذج...",
-      "allModels": "جميع النماذج",
       "favorites": "المفضلة",
-      "noModels": "لا توجد نماذج متاحة",
-      "recommended": "النماذج الموصى بها",
       "noModelsDescription": "لا توجد نماذج متاحة للاختيار."
     },
     "modelSelector": {
@@ -2071,7 +2049,6 @@
       "camera": "الكاميرا",
       "photoLibrary": "مكتبة الصور",
       "files": "ملف",
-      "cameraAccessDisabled": "الوصول إلى الكاميرا معطّل",
       "cameraAccessMessage": "اسمح بالوصول إلى الكاميرا في الإعدادات لالتقاط صورة.",
       "couldNotOpenPhotoPicker": "تعذّر فتح نافذة اختيار الصور. أعد تشغيل Kilo وحاول مرة أخرى.",
       "maxFilesAllowed": "الحد الأقصى لعدد الملفات هو {{displayCount}}.",
@@ -2099,9 +2076,7 @@
     },
     "chatLink": {
       "linkCopied": "تم نسخ الرابط",
-      "reviewPr": "مراجعة PR",
       "openLink": "فتح الرابط",
-      "copyLink": "نسخ الرابط",
       "shareLink": "مشاركة الرابط",
       "share": "مشاركة",
       "prLinkActions": "إجراءات رابط PR",
@@ -2147,7 +2122,6 @@
       "tokensUsage": "السياق: {{used}} من أصل {{window}} من الرموز، نسبة الاستخدام {{percentage}}",
       "title": "استخدام السياق",
       "used": "المُستخدَم",
-      "remaining": "المتبقي",
       "provider": "المزود",
       "totalCost": "التكلفة الإجمالية",
       "usageReflectsLatest": "تعكس بيانات الاستخدام آخر رد مكتمل من المساعد.",
@@ -2217,7 +2191,6 @@
     "billingPage": "صفحة الفوترة"
   },
   "deviceSessions": {
-    "couldNotLoad": "تعذّر تحميل الجلسات.",
     "couldNotLoadDescription": "لا يمكن عرض جلساتك النشطة حتى يكتمل تحميل البيانات.",
     "currentDeviceUnidentified": "تعذّر التعرّف على الجهاز الحالي.",
     "noSessions": "لا توجد جلسات نشطة",
@@ -2225,7 +2198,6 @@
     "onlyKiloAppSignIns": "تظهر هنا فقط عمليات تسجيل الدخول عبر تطبيق Kilo. لا تُدرج عمليات تسجيل الدخول عبر المحرر أو CLI.",
     "signedIn": "تسجيل الدخول: {{signedIn}} · آخر ظهور: {{lastSeen}}",
     "thisDevice": "هذا الجهاز",
-    "title": "جلسات الأجهزة",
     "webBrowser": "متصفح الويب",
     "viewProfile": "عرض الملف الشخصي",
     "signOutThisDevice": "تسجيل الخروج من هذا الجهاز",
@@ -2258,11 +2230,9 @@
   },
   "invalidRoute": {
     "description": "هذا الرابط لم يعد صالحًا.",
-    "goBack": "رجوع",
     "title": "الصفحة غير موجودة"
   },
   "monoScrollBlock": {
-    "contentTruncated": "تم اقتطاع المحتوى",
     "truncated": "مقتطع",
     "wrap": "التفاف",
     "scroll": "تمرير"
@@ -2275,15 +2245,13 @@
     "neutralDescription": "حاول مرة أخرى.",
     "offlineTitle": "تعذّر التحميل.",
     "permissionDescription": "لا تملك صلاحية عرض هذا المحتوى.",
-    "notFoundTitle": "لم نعثر على العنصر المطلوب.",
     "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
     "serverTitle": "تعذّر التحميل.",
     "serverDescription": "حدث خطأ من جانبنا. حاول مرة أخرى."
   },
   "screenHeader": {
     "openMenu": "فتح القائمة",
-    "openMenuFor": "فتح قائمة {{title}}",
-    "goBack": "رجوع"
+    "openMenuFor": "فتح قائمة {{title}}"
   },
   "picker": {
     "optionsExpired": "انتهت صلاحية الخيارات",
@@ -2314,9 +2282,7 @@
   },
   "share": {
     "title": "المشاركة مع Kilo",
-    "reviewPr": "مراجعة PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "جلسة جديدة",
     "searchPlaceholder": "البحث في الجلسات الأخيرة",
     "connectedCli": "على CLI متصل",
     "newSessionOn": "جلسة جديدة على {{name}}",
@@ -2374,7 +2340,6 @@
     "statusCanceling": "Kilo Pass قيد الإلغاء",
     "statusPastDue": "Kilo Pass متأخر السداد",
     "monthlyCredits": "رصيد شهري بقيمة {{credits}}",
-    "ends": "ينتهي في {{date}}",
     "periodEnd": "نهاية الفترة",
     "managedOnGooglePlay": "تتم الإدارة عبر Google Play",
     "managedInAppStore": "تتم الإدارة عبر App Store",
@@ -2386,7 +2351,6 @@
     "unavailableDescription": "Kilo Pass غير متاح كعملية شراء داخل التطبيق على Android. يمكنك إدارته على الويب.",
     "webManagementDescription": "تتم إدارة اشتراك Kilo Pass هذا عبر الويب.",
     "legalDisclosure": "Kilo Pass اشتراك شهري يتجدد تلقائيًا. تُخصم قيمة الاشتراك من حساب Apple ID عند تأكيد الشراء. يتجدد الاشتراك تلقائيًا كل شهر بالسعر المعروض، ما لم تلغه قبل نهاية الفترة الحالية بـ24 ساعة على الأقل. يمكنك إدارة الاشتراك أو إلغاؤه في أي وقت من إعدادات حسابك في App Store.",
-    "legalPrivacyPolicy": "سياسة الخصوصية",
     "legalTermsOfUse": "شروط الاستخدام (EULA)",
     "purchaseDifferentAccount": "عملية الشراء هذه من App Store غير مرتبطة بحسابك في Kilo. سجّل الدخول إلى حساب Apple Account المستخدم للشراء، ثم حاول مرة أخرى.",
     "restoreFailed": "تعذّرت استعادة المشتريات. حاول مرة أخرى.",
@@ -2508,7 +2472,6 @@
       "editTitle": "تعديل التعليق",
       "insertSuggestion": "إدراج اقتراح",
       "insertSuggestionA11y": "إدراج اقتراح شيفرة",
-      "keepEditing": "متابعة التعديل",
       "loadFailedTitle": "تعذّر تحميل محرر التعليقات.",
       "ok": "حسنًا",
       "unavailableMessage": "تم حذف هذا التعليق المعلّق أو إرساله بالفعل.",
@@ -2536,7 +2499,6 @@
       "addReaction": "إضافة تفاعل",
       "block": "حظر",
       "blockedUser": "تم حظر {{login}}",
-      "closeReactions": "إغلاق التفاعلات",
       "collapseThread": "طي سلسلة المناقشة",
       "commentActions": "إجراءات التعليق",
       "comment": "التعليقات: {{displayCount}}",
@@ -2544,7 +2506,6 @@
       "couldNotLoad": "تعذّر تحميل المناقشة.",
       "couldNotLoadMore": "تعذّر تحميل المزيد من التعليقات.",
       "couldNotReply": "تعذّر الرد.",
-      "file": "ملف",
       "loadMoreComments": "تحميل المزيد من التعليقات",
       "loading": "جارٍ تحميل المناقشة",
       "moderation": {
@@ -2577,14 +2538,11 @@
       "reaction": "تفاعل",
       "reaction_other": "تفاعل",
       "reaction_one": "تفاعل",
-      "reactionsTitle": "تفاعل",
-      "reply": "رد",
       "replyBadRequest": "لا يمكن نشر هذا الرد. ربما تغيّرت سلسلة المناقشة.",
       "replyBody": "نص الرد",
       "replyForbidden": "ليست لديك صلاحية للرد على طلب السحب هذا.",
       "replyPlaceholder": "الرد…",
       "reportContent": "الإبلاغ عن المحتوى",
-      "reportSubmitted": "تم إرسال البلاغ. رقم الإيصال: {{receiptId}}",
       "reportUser": "الإبلاغ عن المستخدم",
       "resolveThread": "تحديد سلسلة المناقشة كمحلولة",
       "resolved": "تم الحل",
@@ -2637,7 +2595,6 @@
       "noRecentPrs": "لا توجد طلبات PR حديثة",
       "noRecentPrsDescription": "الصق رابط PR أعلاه لبدء المراجعة. سيظهر هنا في المرة القادمة.",
       "open": "فتح",
-      "openPullRequest": "فتح طلب السحب",
       "pasteLink": "لصق رابط طلب السحب",
       "pastePrLink": "لصق رابط PR",
       "removeFromRecentsMessage": "سيُزال طلب السحب هذا من قائمة الطلبات الأخيرة.",
@@ -2738,12 +2695,9 @@
     },
     "inbox": {
       "couldNotLoad": "تعذّر تحميل صندوق الوارد.",
-      "couldNotLoadMore": "تعذّر تحميل المزيد.",
       "loading": "جارٍ تحميل صندوق الوارد",
       "noReviewRequests": "لا توجد طلبات مراجعة",
       "noReviewRequestsDescription": "تظهر هنا طلبات السحب التي تنتظر مراجعتك. ويمكنك أيضًا لصق أي رابط PR أعلاه.",
-      "recent": "الأحدث",
-      "retryLoadingMore": "إعادة محاولة تحميل المزيد",
       "title": "صندوق الوارد"
     },
     "installKiloGitHubApp": "تثبيت تطبيق Kilo على GitHub",
@@ -2830,7 +2784,6 @@
       "file": "ملف",
       "file_other": "ملف",
       "file_one": "ملف",
-      "stateClosed": "مغلق",
       "stateMerged": "تم الدمج",
       "stateOpen": "فتح",
       "stateOpenApproved": "مفتوح · تمت الموافقة",
@@ -2981,7 +2934,6 @@
     },
     "inviteMember": {
       "emailError": "أدخل عنوان بريد إلكتروني صالحًا.",
-      "emailLabel": "البريد الإلكتروني",
       "emailPlaceholder": "user@example.com",
       "permissionDenied": "ليست لديك صلاحية لدعوة الأعضاء.",
       "roleLabel": "الدور",
@@ -3051,7 +3003,6 @@
         "billingManager": "مدير الفوترة"
       },
       "emailStatusFailed": "تعذّر إرسال البريد الإلكتروني",
-      "emailStatusPending": "قيد الانتظار",
       "inviteCreated": "تم إنشاء الدعوة",
       "pendingInvitations": "الدعوات المعلّقة",
       "resendInvite": "إعادة إرسال الدعوة",
@@ -3069,7 +3020,6 @@
       "couldNotLoadStatus": "تعذّر تحميل الحالة",
       "creditProcessingDelayed": "تأخرت معالجة الرصيد · جارٍ إعادة المحاولة تلقائيًا",
       "ended": "انتهى",
-      "endsOn": "ينتهي في {{date}}",
       "manageHint": "يفتح صفحة إدارة Kilo Pass على الموقع.",
       "notSubscribed": "غير مشترك",
       "overallocated": "عدد اشتراكات Kilo Pass المعيّنة يتجاوز عدد المقاعد المدفوعة",
@@ -3080,7 +3030,6 @@
       "paymentPending": "الدفع قيد الانتظار",
       "processingBlocked": "المعالجة متوقفة",
       "processingNeedsReview": "المعالجة تحتاج إلى مراجعة",
-      "retry": "إعادة المحاولة",
       "retryHint": "يعيد محاولة تحميل حالة Kilo Pass.",
       "setupHint": "يفتح إعداد Kilo Pass على الويب.",
       "paidSeat_zero": "عدد المقاعد المدفوعة: {{displayCount}}",
@@ -3145,7 +3094,6 @@
     "backToPreferences": "العودة إلى التفضيلات"
   },
   "quickChat": {
-    "title": "الدردشة",
     "empty": {
       "title": "ابدأ محادثة",
       "description": "أرسل رسالة للتحدث مع نموذج."
@@ -3164,7 +3112,6 @@
     "openAgents": "فتح الوكلاء",
     "running": "جارٍ العمل",
     "needsInput": "بانتظار تدخلك",
-    "idle": "خامل",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لعرض الوكلاء النشطين على شاشة القفل."
   }

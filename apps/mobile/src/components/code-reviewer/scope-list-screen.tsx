@@ -35,7 +35,7 @@ export function ScopeListScreen() {
         {isError && (
           <QueryError
             variant="server"
-            title={t('codeReviewer.scopeList.couldNotLoad')}
+            title={t('common.couldNotLoadOrganizations')}
             message={t('codeReviewer.scopeList.personalStillAvailable')}
             placement="top"
             className="pb-6 pt-0"

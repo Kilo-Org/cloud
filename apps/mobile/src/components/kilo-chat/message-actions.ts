@@ -45,7 +45,7 @@ export function buildMessageActionSheetOptions({
     actions.push({ kind: 'more-reactions', label: i18n.t('chat.messageActions.moreReactions') });
   }
   if (canUseApiBackedActions && canReply) {
-    actions.push({ kind: 'reply', label: i18n.t('chat.messageActions.reply') });
+    actions.push({ kind: 'reply', label: i18n.t('common.reply') });
   }
   if (canCopy) {
     actions.push({ kind: 'copy', label: i18n.t('common.copy') });

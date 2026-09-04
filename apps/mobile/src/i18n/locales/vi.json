@@ -69,14 +69,64 @@
     "repository": "Kho mã nguồn",
     "signOut": "Đăng xuất",
     "agents": "Trợ lý",
-    "all": "Tất cả"
+    "all": "Tất cả",
+    "allModels": "Tất cả các mô hình",
+    "balanced": "Cân bằng",
+    "bitbucketConnected": "Đã kết nối Bitbucket",
+    "branch": "Nhánh",
+    "cameraAccessDisabled": "Quyền truy cập máy ảnh đã tắt",
+    "chat": "Trò chuyện",
+    "clearFilters": "Xóa bộ lọc",
+    "clearSearch": "Xóa nội dung tìm kiếm",
+    "closed": "Đã đóng",
+    "closeReactions": "Đóng bảng biểu cảm",
+    "connect": "Kết nối",
+    "connectBitbucket": "Kết nối Bitbucket",
+    "connectGitlab": "Kết nối GitLab",
+    "contentTruncated": "Nội dung bị cắt bớt",
+    "copyLink": "Sao chép liên kết",
+    "couldNotLoadOrganizations": "Không thể tải danh sách tổ chức.",
+    "couldNotLoadSessions": "Không thể tải danh sách phiên.",
+    "couldnTLoadMore": "Không thể tải thêm.",
+    "deviceSessions": "Phiên đăng nhập trên thiết bị",
+    "disabled": "Đã tắt",
+    "email": "Thư điện tử",
+    "ends": "Kết thúc vào {{date}}",
+    "failed": "Thất bại",
+    "file": "Tệp",
+    "gitlab": "GitLab",
+    "goBack": "Quay lại",
+    "idle": "Đang rảnh",
+    "keepEditing": "Tiếp tục chỉnh sửa",
+    "keepRunning": "Tiếp tục chạy",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Phiên mới",
+    "noKiloclawInstances": "Chưa có máy chủ KiloClaw",
+    "noModelsAvailable": "Không có mô hình khả dụng",
+    "notFound": "Không tìm thấy.",
+    "online": "Trực tuyến",
+    "open": "Mở {{name}}",
+    "openPullRequest": "Mở yêu cầu hợp nhất",
+    "pending": "Đang chờ",
+    "performance": "Hiệu năng",
+    "preferences": "Tùy chọn",
+    "privacyPolicy": "Chính sách quyền riêng tư",
+    "profile": "Hồ sơ",
+    "reactions": "Biểu cảm",
+    "recent": "Gần đây",
+    "recommended": "Đề xuất",
+    "remaining": "Còn lại",
+    "rename": "Đổi tên",
+    "reply": "Trả lời",
+    "reportSubmittedReceipt": "Đã gửi báo cáo. Mã tiếp nhận: {{receiptId}}",
+    "retryLoadingMore": "Thử tải thêm lần nữa",
+    "reviewPr": "Rà soát PR"
   },
   "language": {
     "title": "Ngôn ngữ",
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
     "couldNotRestart": "Không thể khởi động lại",
     "languageSaved": "Đã lưu ngôn ngữ bạn chọn.",
-    "retry": "Thử lại",
     "catalogLoadFailed": "Không thể tải dữ liệu ngôn ngữ. Vui lòng thử lại.",
     "search": "Tìm ngôn ngữ",
     "noMatches": "Không có ngôn ngữ phù hợp",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Mã đăng nhập: {{code}}",
     "openSignInPageInBrowser": "Mở trang đăng nhập trong trình duyệt",
     "copySignInLink": "Sao chép liên kết đăng nhập",
-    "copyLink": "Sao chép liên kết",
     "cancelSignIn": "Hủy đăng nhập",
     "startingSignIn": "Đang bắt đầu đăng nhập...",
     "organizationUsesSso": "Tổ chức của bạn sử dụng đăng nhập một lần.",
@@ -112,7 +161,6 @@
     "terms": "Điều khoản",
     "termsConnector": " và ",
     "termsSuffix": ".",
-    "privacyPolicy": "Chính sách quyền riêng tư",
     "moreSignInOptions": "Thêm tùy chọn đăng nhập",
     "couldNotCompleteSignIn": "Không thể hoàn tất đăng nhập. Vui lòng thử lại.",
     "sessionEnded": "Phiên của bạn đã kết thúc. Vui lòng đăng nhập lại.",
@@ -126,7 +174,6 @@
     "or": "hoặc"
   },
   "profile": {
-    "title": "Hồ sơ",
     "codeReviewerSubtitle": "Rà soát PR tự động",
     "securityAgentSubtitle": "Tìm và khắc phục lỗ hổng",
     "reviews": "Rà soát mã",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Tài khoản đã liên kết",
     "couldNotLoadAccounts": "Không thể tải danh sách tài khoản.",
     "app": "Ứng dụng",
-    "preferences": "Tùy chọn",
     "preferencesSubtitle": "Giao diện, thông báo, suy luận và cách hoạt động của màn hình",
-    "deviceSessions": "Phiên đăng nhập trên thiết bị",
     "deviceSessionsSubtitle": "Xem và đăng xuất khỏi các thiết bị khác",
     "feedback": "Gửi góp ý",
     "privacyChoices": "Tùy chọn quyền riêng tư",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Thư điện tử",
     "providerTestAccount": "Tài khoản thử nghiệm",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO doanh nghiệp"
   },
   "preferences": {
-    "title": "Tùy chọn",
     "autoExpandThinking": "Tự động mở phần suy luận",
     "autoExpandThinkingSubtitle": "Hiển thị toàn bộ nội dung suy luận của tác nhân sau khi suy luận xong.",
     "keepScreenOn": "Giữ màn hình sáng khi xem phiên",
@@ -245,17 +287,13 @@
   },
   "tabs": {
     "home": "Trang chủ",
-    "profile": "Hồ sơ",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, thẻ {{position}} trên {{total}}",
-    "chat": "Trò chuyện"
+    "position": "{{name}}, thẻ {{position}} trên {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Chuyển máy chủ",
       "couldNotLoadInstances": "Không thể tải danh sách máy chủ.",
-      "noInstances": "Chưa có máy chủ KiloClaw",
       "noInstancesDescription": "Thiết lập một máy chủ để bắt đầu trò chuyện.",
       "setUpKiloclaw": "Thiết lập KiloClaw",
       "currentInstance": "{{title}}, đang dùng"
@@ -277,16 +315,12 @@
       "couldNotSignIn": "Không thể đăng nhập để trò chuyện.",
       "couldNotRefreshMessages": "Không thể làm mới tin nhắn.",
       "couldNotLoadHistory": "Không thể tải lịch sử cuộc trò chuyện.",
-      "rename": "Đổi tên",
       "leave": "Rời khỏi",
       "untitledConversation": "Cuộc trò chuyện không có tiêu đề",
       "createFailed": "Không thể tạo cuộc trò chuyện.",
       "leaveFailed": "Không thể rời khỏi cuộc trò chuyện."
     },
     "reactions": {
-      "title": "Biểu cảm",
-      "close": "Đóng bảng biểu cảm",
-      "recent": "Gần đây",
       "common": "Phổ biến",
       "reactWith": "Bày tỏ cảm xúc bằng {{reaction}}",
       "accessibility": "Biểu cảm {{emoji}}, {{displayCount}} lượt"
@@ -359,7 +393,6 @@
       "addReactionFailed": "Không thể thêm biểu cảm.",
       "retrySend": "Gửi lại",
       "moreReactions": "Biểu cảm khác",
-      "reply": "Trả lời",
       "edit": "Chỉnh sửa",
       "sendFailed": "Không thể gửi tin nhắn.",
       "retrySendFailed": "Không thể gửi lại tin nhắn.",
@@ -370,7 +403,6 @@
       "takePhoto": "Chụp ảnh",
       "photoLibrary": "Thư viện ảnh",
       "files": "Tệp",
-      "cameraAccessDisabled": "Quyền truy cập máy ảnh đã tắt",
       "cameraAccessMessage": "Cho phép truy cập máy ảnh trong phần cài đặt để chụp ảnh."
     },
     "typingIndicator": {
@@ -380,8 +412,6 @@
       "typing_other": "{{names}} đang nhập..."
     },
     "botStatus": {
-      "online": "Trực tuyến",
-      "idle": "Đang rảnh",
       "offline": "Ngoại tuyến",
       "loadingUser": "Đang tải thông tin người dùng...",
       "waitingForStatus": "Đang chờ trạng thái bot...",
@@ -395,7 +425,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Không thể tải các phiên chạy KiloClaw.",
     "billing": {
       "title": "Thanh toán",
@@ -403,7 +432,6 @@
       "plan": "Kế hoạch",
       "finalTermEnds": "Ngày kết thúc kỳ cuối",
       "afterFinalTerm": "Sau kỳ cuối",
-      "remaining": "Còn lại",
       "lessThanOneDay": "Dưới 1 ngày",
       "ends": "Kết thúc",
       "expires": "Hết hạn",
@@ -504,20 +532,15 @@
       "disconnect": "Ngắt kết nối tài khoản Google",
       "copied": "Đã sao chép",
       "copyCommand": "Sao chép lệnh",
-      "disabled": "Đã tắt",
       "disconnectConfirm": "Ngắt kết nối",
       "disconnectMessage": "Xóa tài khoản Google của bạn khỏi phiên chạy này? Thao tác này sẽ tắt thông báo Gmail. Triển khai lại sau khi ngắt kết nối để áp dụng thay đổi.",
       "disconnectTitle": "Ngắt kết nối Google"
     },
     "modelList": {
-      "title": "Tất cả các mô hình",
       "searchPlaceholder": "Tìm kiếm mô hình...",
-      "clearSearch": "Xóa nội dung tìm kiếm",
       "noMatches": "Không có mô hình phù hợp với nội dung tìm kiếm",
-      "noModels": "Không có mô hình khả dụng",
       "noModelsDescription": "Các mô hình sẽ xuất hiện ở đây khi có thể sử dụng.",
-      "noResultsFor": "Không tìm thấy kết quả cho \"{{query}}\".",
-      "recommended": "Đề xuất"
+      "noResultsFor": "Không tìm thấy kết quả cho \"{{query}}\"."
     },
     "secrets": {
       "title": "Thông tin bí mật",
@@ -528,7 +551,6 @@
       "removeTitle": "Xóa thông tin bảo mật",
       "saved": "Đã lưu {{label}}",
       "allFieldsRequired": "Điền tất cả các trường để kết nối {{label}}.",
-      "connect": "Kết nối",
       "hide": "Ẩn {{label}}",
       "removing": "Đang xóa…",
       "saving": "Đang lưu…",
@@ -606,7 +628,6 @@
       "finishingSetup": "Đang hoàn tất thiết lập",
       "finishingSetupDescription": "Vui lòng đợi trong khi chúng tôi hoàn tất thiết lập tài khoản của bạn. Quá trình này thường chỉ mất một lát.",
       "getStarted": "Bắt đầu",
-      "noInstances": "Chưa có máy chủ KiloClaw",
       "noInstancesDescription": "Tạo phiên chạy đầu tiên để bắt đầu dùng các tác nhân lập trình."
     },
     "instance": {
@@ -618,7 +639,6 @@
     "instanceCard": {
       "fixOnKiloAi": "Khắc phục trên kilo.ai: {{label}}",
       "needsAttention": "{{name}} cần được kiểm tra: {{label}}",
-      "open": "Mở {{name}}",
       "openSettings": "Mở cài đặt cho {{name}}",
       "openUnread": "Mở {{name}}, {{displayCount}} tin nhắn chưa đọc",
       "openUnread_other": "Mở {{name}}, {{displayCount}} tin nhắn chưa đọc",
@@ -639,19 +659,16 @@
     "modelPicker": {
       "autoModelA11y": "Mô hình tự động {{label}}",
       "balancedDescription": "Cân bằng giữa tốc độ và khả năng xử lý với chi phí thấp hơn.",
-      "balancedLabel": "Cân bằng",
       "browseAllModels": "hoặc chọn từ hơn 500 mô hình",
       "browseAllModelsA11y": "Xem toàn bộ danh sách hơn 500 mô hình",
       "currentModel": "Mô hình hiện tại",
       "frontierDescription": "Hiệu năng cao nhất. Chuyển yêu cầu đến các mô hình tiên tiến có khả năng suy luận.",
       "frontierLabel": "Tiên tiến",
-      "kiloAuto": "Kilo Auto",
-      "performance": "Hiệu năng"
+      "kiloAuto": "Kilo Auto"
     },
     "onboarding": {
       "complete": {
         "chatWith": "Trò chuyện với {{name}}",
-        "online": "Trực tuyến",
         "ready": "{{name}} đã sẵn sàng",
         "warmedUp": "Mọi thứ đã sẵn sàng. Hãy gửi lời chào khi bạn muốn bắt đầu."
       },
@@ -829,11 +846,8 @@
       "setup": "Thiết lập Bitbucket"
     },
     "bitbucketConnect": {
-      "connect": "Kết nối",
-      "connected": "Đã kết nối Bitbucket",
       "description": "Tạo mã truy cập không gian làm việc với các quyền cần thiết rồi dán vào bên dưới.",
       "scopes": "Tài khoản: đọc · Kho lưu trữ: đọc/ghi · Yêu cầu hợp nhất: đọc · Webhook: đọc/ghi",
-      "title": "Kết nối Bitbucket",
       "tokenPlaceholder": "Mã truy cập không gian làm việc"
     },
     "followReviewMd": "Tuân theo REVIEW.md",
@@ -859,7 +873,6 @@
       "statusUnavailable": "Không lấy được trạng thái"
     },
     "providerConnect": {
-      "connectGitLab": "Kết nối GitLab",
       "description": "Kết nối {{label}} của Kilo để tự động rà soát các yêu cầu hợp nhất.",
       "githubApp": "ứng dụng GitHub",
       "githubError": "Không thể mở trang thiết lập GitHub. Vui lòng thử lại.",
@@ -868,7 +881,6 @@
       "bitbucketError": "Không thể mở trang thiết lập Bitbucket. Vui lòng thử lại."
     },
     "reviewDetail": {
-      "branch": "Nhánh",
       "byline": "{{repo}} #{{number}} do {{author}} tạo",
       "cancelMessage": "Thao tác này sẽ dừng lượt rà soát mã đang chạy.",
       "cancelReview": "Hủy rà soát",
@@ -883,9 +895,7 @@
       "gate": "Điều kiện đạt",
       "gateHidden": "Ẩn",
       "gateNone": "Không có",
-      "keepRunning": "Tiếp tục chạy",
       "noFindings": "Không phát hiện vấn đề nào.",
-      "openPullRequest": "Mở yêu cầu hợp nhất",
       "retryMessage": "Thao tác này sẽ chạy lại lượt rà soát mã.",
       "retryReview": "Rà soát lại",
       "retryTitle": "Rà soát lại?",
@@ -923,7 +933,6 @@
     },
     "reviewMemory": {
       "couldNotLoad": "Không thể tải bộ nhớ rà soát.",
-      "couldNotLoadMore": "Không thể tải thêm.",
       "couldNotLoadProposals": "Không thể tải các đề xuất.",
       "enable": "Bật bộ nhớ rà soát",
       "loading": "Đang tải bộ nhớ rà soát",
@@ -933,11 +942,9 @@
       "off": "Bộ nhớ rà soát đang tắt.",
       "offDescription": "Bật tính năng này để Kilo học từ phản hồi của người bảo trì và đề xuất hướng dẫn cho tệp REVIEW.md.",
       "readOnlyDescription": "Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bật bộ nhớ rà soát.",
-      "retryLoadingMore": "Thử tải thêm lần nữa",
       "title": "Bộ nhớ rà soát"
     },
     "scopeList": {
-      "couldNotLoad": "Không thể tải danh sách tổ chức.",
       "personalStillAvailable": "Bạn vẫn có thể truy cập các kho lưu trữ cá nhân bên dưới.",
       "personalSubtitle": "Kho mã nguồn của riêng bạn",
       "viewOnly": "Chỉ xem"
@@ -966,21 +973,17 @@
     "updateFailed": "Không thể cập nhật Trình rà soát mã.",
     "configSaveFailed": "Không thể lưu cấu hình rà soát.",
     "status": {
-      "pending": "Đang chờ",
       "running": "Đang chạy",
       "completed": "Đã hoàn tất",
-      "failed": "Thất bại",
       "interrupted": "Bị gián đoạn"
     },
     "reviewStyle": {
       "strict": "Nghiêm ngặt",
-      "balanced": "Cân bằng",
       "lenient": "Nới lỏng",
       "roast": "Châm biếm"
     },
     "focusArea": {
       "security": "Bảo mật",
-      "performance": "Hiệu năng",
       "bugs": "Lỗi",
       "style": "Phong cách viết mã",
       "testing": "Kiểm thử",
@@ -1043,7 +1046,6 @@
       "sortSeverityDesc": "Mức độ nghiêm trọng: từ cao đến thấp",
       "sortSlaDue": "Ngày đến hạn SLA",
       "status": "Trạng thái",
-      "statusClosed": "Đã đóng",
       "statusIgnored": "Đã bỏ qua",
       "statusOpen": "Mở"
     },
@@ -1252,7 +1254,6 @@
       "reasonAfterReview": "sau khi rà soát"
     },
     "findingList": {
-      "clearFilters": "Xóa bộ lọc",
       "couldNotLoad": "Không thể tải danh sách vấn đề.",
       "couldNotLoadMore": "Không thể tải thêm vấn đề.",
       "emptyDescription": "Hiện không có vấn đề chưa xử lý nào cần chú ý.",
@@ -1293,14 +1294,12 @@
     "remediation": {
       "attemptHistory": "Lịch sử các lần thử ({{displayCount}})",
       "attemptNumber": "Lần thử #{{number}}",
-      "branch": "Nhánh",
       "cancelMessage": "Trợ lý bảo mật sẽ dừng lượt khắc phục đang chạy.",
       "cancelRemediation": "Hủy khắc phục",
       "cancelTitle": "Hủy lượt khắc phục này?",
       "cancellationRequested": "Đã yêu cầu hủy",
       "cancelled": "Đã hủy khắc phục",
       "couldNotLoad": "Không thể tải trạng thái khắc phục.",
-      "keepRunning": "Tiếp tục chạy",
       "noAnalysisDescription": "Chạy phân tích từ thẻ Chi tiết.",
       "noAnalysisTitle": "Chưa có phân tích",
       "openDraftPullRequest": "Mở bản nháp yêu cầu hợp nhất{{number}}",
@@ -1342,7 +1341,6 @@
       "setupFailed": "Không thể bắt đầu thiết lập GitHub. Vui lòng thử lại."
     },
     "scopeList": {
-      "couldNotLoad": "Không thể tải danh sách tổ chức.",
       "personalSubtitle": "Kho mã nguồn của riêng bạn"
     },
     "settingsOverview": {
@@ -1352,7 +1350,6 @@
       "automationCount": "Đã bật {{displayCount}}/3",
       "couldNotLoadPermissions": "Không thể tải thông tin quyền truy cập.",
       "couldNotLoadSettings": "Không thể tải cài đặt Trợ lý bảo mật.",
-      "disabled": "Đã tắt",
       "disabledNoManage": "Trợ lý bảo mật đang tắt. Chỉ chủ sở hữu tổ chức và người quản lý thanh toán mới có thể bật tính năng này.",
       "disabledNoRepo": "Chọn ít nhất một kho lưu trữ trước khi bật Trợ lý bảo mật.",
       "disabledPrompt": "Bật Trợ lý bảo mật để đồng bộ cảnh báo Dependabot, chọn kho lưu trữ và thiết lập tự động hóa.",
@@ -1471,7 +1468,6 @@
       "draftPrOpened": "Đã mở PR nháp",
       "prOpened": "Đã mở PR",
       "blocked": "Bị chặn",
-      "failed": "Thất bại",
       "noChangesNeeded": "Không cần thay đổi",
       "originAutomaticPolicy": "Chính sách tự động khắc phục",
       "originIncludeExistingPolicy": "Chính sách áp dụng cho vấn đề hiện có",
@@ -1525,12 +1521,9 @@
     "search": {
       "searching": "Đang tìm kiếm",
       "searchSessions": "Tìm phiên làm việc",
-      "searchSessionsPlaceholder": "Tìm phiên làm việc",
-      "clearSearch": "Xóa nội dung tìm kiếm",
-      "clearFilters": "Xóa bộ lọc"
+      "searchSessionsPlaceholder": "Tìm phiên làm việc"
     },
     "sessionList": {
-      "couldNotLoad": "Không thể tải danh sách phiên.",
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động.",
       "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
       "noMatches": "Không có phiên phù hợp",
@@ -1546,7 +1539,6 @@
       "deleteTitle": "Xóa phiên?",
       "deleteMessage": "Không thể hoàn tác thao tác này.",
       "deleteSession": "Xóa phiên",
-      "rename": "Đổi tên",
       "renameMessage": "Nhập tên mới cho phiên này.",
       "copyId": "Sao chép ID phiên",
       "idCopied": "Đã sao chép ID phiên",
@@ -1595,7 +1587,6 @@
       "accessDeniedDescription": "Bạn không có quyền xem nội dung này.",
       "couldNotLoad": "Không thể tải phiên.",
       "failedToLoadDetails": "Không thể tải thông tin phiên.",
-      "notFound": "Không tìm thấy.",
       "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn truy cập được.",
       "failedToStopExecution": "Không thể dừng tác vụ đang chạy.",
       "renameSession": "Đổi tên phiên",
@@ -1639,7 +1630,6 @@
       "retryConnection": "Thử kết nối lại"
     },
     "newSession": {
-      "title": "Phiên mới",
       "connectGithubDescription": "Kết nối GitHub trong trình duyệt, rồi quay lại đây để chọn kho mã.",
       "openGithub": "Mở GitHub",
       "refreshRepositories": "Làm mới danh sách kho mã",
@@ -1667,12 +1657,8 @@
       "discardDraftMessage": "Nội dung yêu cầu của bạn sẽ bị mất.",
       "discardDraftTitle": "Hủy bản nháp?",
       "discardFailed": "Không thể hủy bản nháp. Vui lòng thử lại.",
-      "keepEditing": "Tiếp tục chỉnh sửa",
       "remoteHint": "Chạy `kilo remote` trên máy tính hoặc `/remote` trong phiên CLI đang chạy để điều khiển tiến trình kilo trên máy.",
-      "bitbucketConnected": "Đã kết nối Bitbucket",
-      "connectBitbucket": "Kết nối Bitbucket",
       "connectBitbucketDescription": "Kết nối Bitbucket trong trình duyệt, rồi quay lại đây để chọn kho mã.",
-      "connectGitlab": "Kết nối GitLab",
       "connectGitlabDescription": "Kết nối GitLab trong trình duyệt, rồi quay lại đây để chọn kho mã.",
       "couldNotLoadBitbucketRepositories": "Không thể tải danh sách kho mã Bitbucket.",
       "couldNotLoadGithubRepositories": "Không thể tải danh sách kho mã GitHub.",
@@ -1702,7 +1688,6 @@
       "accessibilityLabel": "công cụ {{name}}, {{status}}",
       "fileEmpty": "Tệp này trống.",
       "noTasks": "Không có tác vụ nào.",
-      "contentTruncated": "Nội dung bị cắt bớt",
       "truncated": "Đã cắt bớt",
       "toolRead": "đọc",
       "toolEdit": "Chỉnh sửa",
@@ -1775,8 +1760,7 @@
       "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",
       "loading": "Đang tải...",
       "accessibility": "Kho mã: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Chi tiết tin nhắn",
@@ -1798,8 +1782,7 @@
       "cacheWrite": "Ghi vào bộ nhớ đệm",
       "total": "Tổng",
       "reportAiResponseFailedRetryable": "Không thể báo cáo phản hồi này.",
-      "reportAiResponseFailedTerminal": "Không thể báo cáo phản hồi này.",
-      "reportAiResponseSubmitted": "Đã gửi báo cáo. Mã tiếp nhận: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Không thể báo cáo phản hồi này."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -1838,10 +1821,8 @@
       "viewImageWithAlt": "Xem hình ảnh {{alt}}",
       "imageOutput": "Hình ảnh đầu ra",
       "imageOutputWithFilename": "Hình ảnh đầu ra, {{filename}}",
-      "defaultName": "Tệp",
       "openFullScreen": "Mở {{name}} ở chế độ toàn màn hình",
       "preview": "Xem trước {{name}}",
-      "openFile": "Mở {{name}}",
       "couldNotLoadFile": "Không thể tải tệp này.",
       "couldNotLoadFileRetry": "Không thể tải tệp này. Vui lòng thử lại.",
       "retryLoadingFile": "Thử tải lại tệp",
@@ -1977,11 +1958,8 @@
     "modelPicker": {
       "title": "Chọn mô hình",
       "searchPlaceholder": "Tìm kiếm mô hình...",
-      "noModels": "Không có mô hình khả dụng",
       "noModelsDescription": "Không có mô hình nào để chọn.",
-      "allModels": "Tất cả các mô hình",
-      "favorites": "Mục yêu thích",
-      "recommended": "Đề xuất"
+      "favorites": "Mục yêu thích"
     },
     "modelSelector": {
       "provider": "Nhà cung cấp {{id}}",
@@ -2019,7 +1997,6 @@
       "camera": "Máy ảnh",
       "photoLibrary": "Thư viện ảnh",
       "files": "Tệp",
-      "cameraAccessDisabled": "Quyền truy cập máy ảnh đã tắt",
       "cameraAccessMessage": "Cho phép truy cập máy ảnh trong phần cài đặt để chụp ảnh.",
       "couldNotOpenPhotoPicker": "Không thể mở trình chọn ảnh. Khởi động lại Kilo và thử lại.",
       "maxFilesAllowed": "Chỉ được thêm tối đa {{displayCount}} tệp.",
@@ -2047,9 +2024,7 @@
     },
     "chatLink": {
       "linkCopied": "Đã sao chép liên kết",
-      "reviewPr": "Rà soát PR",
       "openLink": "Mở liên kết",
-      "copyLink": "Sao chép liên kết",
       "shareLink": "Chia sẻ liên kết",
       "share": "Chia sẻ",
       "prLinkActions": "Thao tác với liên kết PR",
@@ -2095,7 +2070,6 @@
       "tokensUsage": "Ngữ cảnh đã dùng {{used}} trong tổng số {{window}} token, chiếm {{percentage}}",
       "title": "Mức sử dụng ngữ cảnh",
       "used": "Đã dùng",
-      "remaining": "Còn lại",
       "provider": "Nhà cung cấp",
       "totalCost": "Tổng chi phí",
       "usageReflectsLatest": "Mức sử dụng được tính theo phản hồi gần nhất mà trợ lý đã hoàn tất.",
@@ -2161,7 +2135,6 @@
     "billingPage": "trang thanh toán"
   },
   "deviceSessions": {
-    "couldNotLoad": "Không thể tải danh sách phiên.",
     "couldNotLoadDescription": "Bạn chưa thể xem các phiên đang hoạt động cho đến khi tải xong dữ liệu.",
     "currentDeviceUnidentified": "Không thể xác định thiết bị hiện tại.",
     "noSessions": "Không có phiên đang hoạt động",
@@ -2170,7 +2143,6 @@
     "signedIn": "Đăng nhập lúc {{signedIn}} · Hoạt động gần nhất {{lastSeen}}",
     "thisDevice": "Thiết bị này",
     "webBrowser": "Trình duyệt web",
-    "title": "Phiên đăng nhập trên thiết bị",
     "viewProfile": "Xem hồ sơ",
     "signOutThisDevice": "Đăng xuất khỏi thiết bị này",
     "signOutThisSession": "Đăng xuất phiên này",
@@ -2202,11 +2174,9 @@
   },
   "invalidRoute": {
     "description": "Liên kết này không còn hợp lệ.",
-    "goBack": "Quay lại",
     "title": "Không tìm thấy trang"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Nội dung bị cắt bớt",
     "truncated": "Đã cắt bớt",
     "wrap": "Xuống dòng",
     "scroll": "Cuộn"
@@ -2219,15 +2189,13 @@
     "neutralDescription": "Vui lòng thử lại.",
     "offlineTitle": "Không thể tải dữ liệu.",
     "permissionDescription": "Bạn không có quyền xem nội dung này.",
-    "notFoundTitle": "Không tìm thấy.",
     "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn truy cập được.",
     "serverTitle": "Không thể tải dữ liệu.",
     "serverDescription": "Hệ thống của chúng tôi gặp lỗi. Vui lòng thử lại."
   },
   "screenHeader": {
     "openMenu": "Mở trình đơn",
-    "openMenuFor": "Mở trình đơn cho {{title}}",
-    "goBack": "Quay lại"
+    "openMenuFor": "Mở trình đơn cho {{title}}"
   },
   "picker": {
     "optionsExpired": "Tùy chọn đã hết hạn",
@@ -2258,9 +2226,7 @@
   },
   "share": {
     "title": "Chia sẻ đến Kilo",
-    "reviewPr": "Rà soát PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Phiên mới",
     "searchPlaceholder": "Tìm kiếm các phiên gần đây",
     "connectedCli": "Trên CLI đã kết nối",
     "newSessionOn": "Phiên mới trên {{name}}",
@@ -2318,7 +2284,6 @@
     "statusCanceling": "Kilo Pass đang hủy",
     "statusPastDue": "Kilo Pass quá hạn thanh toán",
     "monthlyCredits": "Điểm sử dụng hằng tháng: {{credits}}",
-    "ends": "Kết thúc vào {{date}}",
     "periodEnd": "cuối kỳ",
     "managedOnGooglePlay": "Được quản lý trên Google Play",
     "managedInAppStore": "Được quản lý trên App Store",
@@ -2330,7 +2295,6 @@
     "unavailableDescription": "Bạn không thể mua Kilo Pass trong ứng dụng trên Android. Hãy quản lý gói đăng ký trên trang web.",
     "webManagementDescription": "Kilo Pass này được quản lý trên trang web.",
     "legalDisclosure": "Kilo Pass là gói đăng ký hằng tháng tự động gia hạn. Khoản phí sẽ được tính vào tài khoản Apple ID của bạn khi bạn xác nhận mua. Gói đăng ký tự động gia hạn mỗi tháng theo giá hiển thị, trừ khi bạn hủy ít nhất 24 giờ trước khi kỳ hiện tại kết thúc. Bạn có thể quản lý hoặc hủy bất cứ lúc nào trong cài đặt tài khoản App Store.",
-    "legalPrivacyPolicy": "Chính sách quyền riêng tư",
     "legalTermsOfUse": "Điều khoản sử dụng (EULA)",
     "purchaseDifferentAccount": "Giao dịch mua trên App Store này không liên kết với tài khoản Kilo của bạn. Hãy đăng nhập vào Apple Account đã dùng để mua rồi thử lại.",
     "restoreFailed": "Không thể khôi phục giao dịch mua. Hãy thử lại.",
@@ -2452,7 +2416,6 @@
       "editTitle": "Chỉnh sửa bình luận",
       "insertSuggestion": "Chèn đề xuất",
       "insertSuggestionA11y": "Chèn đề xuất sửa mã",
-      "keepEditing": "Tiếp tục chỉnh sửa",
       "loadFailedTitle": "Không thể tải trình soạn bình luận.",
       "ok": "OK",
       "unavailableMessage": "Bình luận chờ gửi này đã bị xóa hoặc đã được gửi.",
@@ -2480,7 +2443,6 @@
       "addReaction": "Thêm cảm xúc",
       "block": "Chặn",
       "blockedUser": "Đã chặn {{login}}",
-      "closeReactions": "Đóng bảng biểu cảm",
       "collapseThread": "Thu gọn chuỗi thảo luận",
       "commentActions": "Thao tác với bình luận",
       "comment": "{{displayCount}} bình luận",
@@ -2488,7 +2450,6 @@
       "couldNotLoad": "Không thể tải phần thảo luận.",
       "couldNotLoadMore": "Không thể tải thêm bình luận.",
       "couldNotReply": "Không thể trả lời.",
-      "file": "Tệp",
       "loadMoreComments": "Tải thêm bình luận",
       "loading": "Đang tải thảo luận",
       "moderation": {
@@ -2521,14 +2482,11 @@
       "reaction": "Biểu cảm",
       "reaction_other": "Biểu cảm",
       "reaction_one": "cảm xúc",
-      "reactionsTitle": "Biểu cảm",
-      "reply": "Trả lời",
       "replyBadRequest": "Không thể đăng câu trả lời này. Chuỗi thảo luận có thể đã thay đổi.",
       "replyBody": "Nội dung trả lời",
       "replyForbidden": "Bạn không có quyền trả lời trong PR này.",
       "replyPlaceholder": "Trả lời…",
       "reportContent": "Báo cáo nội dung",
-      "reportSubmitted": "Đã gửi báo cáo. Mã tiếp nhận: {{receiptId}}",
       "reportUser": "Báo cáo người dùng",
       "resolveThread": "Đánh dấu chuỗi thảo luận là đã giải quyết",
       "resolved": "Đã giải quyết",
@@ -2573,7 +2531,6 @@
       "noRecentPrs": "Chưa có PR gần đây",
       "noRecentPrsDescription": "Dán liên kết PR ở trên để bắt đầu đánh giá. PR sẽ xuất hiện ở đây vào lần sau.",
       "open": "Mở",
-      "openPullRequest": "Mở yêu cầu hợp nhất",
       "pasteLink": "Dán liên kết PR",
       "pastePrLink": "Dán liên kết PR",
       "removeFromRecentsMessage": "PR này sẽ được xóa khỏi danh sách gần đây của bạn.",
@@ -2666,12 +2623,9 @@
     },
     "inbox": {
       "couldNotLoad": "Không thể tải hộp thư đến.",
-      "couldNotLoadMore": "Không thể tải thêm.",
       "loading": "Đang tải hộp thư đến",
       "noReviewRequests": "Chưa có yêu cầu đánh giá",
       "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây. Bạn vẫn có thể dán liên kết của bất kỳ PR nào ở trên.",
-      "recent": "Gần đây",
-      "retryLoadingMore": "Thử tải thêm lần nữa",
       "title": "Hộp thư đến"
     },
     "installKiloGitHubApp": "Cài đặt ứng dụng Kilo trên GitHub",
@@ -2758,7 +2712,6 @@
       "file": "Tệp",
       "file_other": "Tệp",
       "file_one": "Tệp",
-      "stateClosed": "Đã đóng",
       "stateMerged": "Đã hợp nhất",
       "stateOpen": "Mở",
       "stateOpenApproved": "Đang mở · Đã phê duyệt",
@@ -2897,7 +2850,6 @@
     },
     "inviteMember": {
       "emailError": "Hãy nhập địa chỉ email hợp lệ.",
-      "emailLabel": "Thư điện tử",
       "emailPlaceholder": "ten@congty.com",
       "permissionDenied": "Bạn không có quyền mời thành viên.",
       "roleLabel": "Vai trò",
@@ -2967,7 +2919,6 @@
         "billingManager": "Người quản lý thanh toán"
       },
       "emailStatusFailed": "Không gửi được email",
-      "emailStatusPending": "Đang chờ",
       "inviteCreated": "Đã tạo lời mời",
       "pendingInvitations": "Lời mời chờ phản hồi",
       "resendInvite": "Gửi lại lời mời",
@@ -2985,7 +2936,6 @@
       "couldNotLoadStatus": "Không thể tải trạng thái",
       "creditProcessingDelayed": "Việc cộng tiền vào số dư bị chậm · đang tự động thử lại",
       "ended": "Đã kết thúc",
-      "endsOn": "Kết thúc vào {{date}}",
       "manageHint": "Mở trang quản lý Kilo Pass trên web.",
       "notSubscribed": "Chưa đăng ký",
       "overallocated": "Số lượt cấp Kilo Pass vượt quá số suất đã thanh toán",
@@ -2996,7 +2946,6 @@
       "paymentPending": "Đang chờ xử lý thanh toán",
       "processingBlocked": "Không thể tiếp tục xử lý",
       "processingNeedsReview": "Cần kiểm tra quá trình xử lý",
-      "retry": "Thử lại",
       "retryHint": "Thử tải lại trạng thái Kilo Pass.",
       "setupHint": "Mở trang thiết lập Kilo Pass trên web."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Quay lại cài đặt"
   },
   "quickChat": {
-    "title": "Trò chuyện",
     "empty": {
       "title": "Bắt đầu trò chuyện",
       "description": "Gửi tin nhắn để trò chuyện với mô hình AI."
@@ -3076,7 +3024,6 @@
     "openAgents": "Mở danh sách tác nhân",
     "running": "Đang xử lý",
     "needsInput": "Cần phản hồi",
-    "idle": "Đang rảnh",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
   }

@@ -120,7 +120,7 @@ export function PreferencesScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.title')} />
+      <ScreenHeader title={t('common.preferences')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-3 pt-4"
@@ -221,7 +221,7 @@ export function PreferencesScreen() {
           />
           <ConfigureRow
             icon={Smartphone}
-            title={t('profile.deviceSessions')}
+            title={t('common.deviceSessions')}
             subtitle={t('profile.deviceSessionsSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last

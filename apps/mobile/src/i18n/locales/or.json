@@ -69,7 +69,58 @@
     "repository": "ରିପୋଜିଟୋରୀ",
     "signOut": "ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "agents": "ଏଜେଣ୍ଟ",
-    "all": "ସମସ୍ତ"
+    "all": "ସମସ୍ତ",
+    "allModels": "ସମସ୍ତ ମଡେଲ୍",
+    "balanced": "ସନ୍ତୁଳିତ",
+    "bitbucketConnected": "Bitbucket ସହ ସଂଯୋଗ ହୋଇଛି",
+    "branch": "ବ୍ରାଞ୍ଚ୍",
+    "cameraAccessDisabled": "କ୍ୟାମେରା ବ୍ୟବହାର ଅନୁମତି ବନ୍ଦ",
+    "chat": "ଚାଟ୍",
+    "clearFilters": "ଫିଲ୍ଟର୍ ହଟାନ୍ତୁ",
+    "clearSearch": "ସନ୍ଧାନ ସଫା କରନ୍ତୁ",
+    "closed": "ବନ୍ଦ",
+    "closeReactions": "ପ୍ରତିକ୍ରିୟା ବନ୍ଦ କରନ୍ତୁ",
+    "connect": "ସଂଯୋଗ କରନ୍ତୁ",
+    "connectBitbucket": "Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ",
+    "connectGitlab": "GitLab ସହ ସଂଯୋଗ କରନ୍ତୁ",
+    "contentTruncated": "ବିଷୟବସ୍ତୁର କିଛି ଅଂଶ ଦେଖାଯାଉଛି",
+    "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
+    "couldNotLoadOrganizations": "ସଂଗଠନର ତାଲିକା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "couldNotLoadSessions": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "couldnTLoadMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+    "deviceSessions": "ଉପକରଣର ସେସନ୍",
+    "disabled": "ବନ୍ଦ",
+    "email": "ଇମେଲ୍",
+    "ends": "{{date}}ରେ ସମାପ୍ତ",
+    "failed": "ବିଫଳ",
+    "file": "ଫାଇଲ୍",
+    "gitlab": "GitLab",
+    "goBack": "ଫେରିଯାନ୍ତୁ",
+    "idle": "ଅପେକ୍ଷାରେ",
+    "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
+    "keepRunning": "ଚାଲୁ ରଖନ୍ତୁ",
+    "kiloclaw": "KiloClaw",
+    "newSession": "ନୂଆ ସେସନ୍",
+    "noKiloclawInstances": "କୌଣସି KiloClaw ଇନ୍‌ଷ୍ଟାନ୍ସ ନାହିଁ",
+    "noModelsAvailable": "କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ",
+    "notFound": "ମିଳିଲା ନାହିଁ।",
+    "online": "ଅନଲାଇନ୍",
+    "open": "{{name}} ଖୋଲନ୍ତୁ",
+    "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+    "pending": "ଅପେକ୍ଷାରତ",
+    "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
+    "preferences": "ପସନ୍ଦ",
+    "privacyPolicy": "ଗୋପନୀୟତା ନୀତି",
+    "profile": "ପ୍ରୋଫାଇଲ୍",
+    "reactions": "ପ୍ରତିକ୍ରିୟା",
+    "recent": "ସାମ୍ପ୍ରତିକ",
+    "recommended": "ସୁପାରିଶକୃତ",
+    "remaining": "ଅବଶିଷ୍ଟ",
+    "rename": "ନାମ ବଦଳାନ୍ତୁ",
+    "reply": "ଉତ୍ତର ଦିଅନ୍ତୁ",
+    "reportSubmittedReceipt": "ରିପୋର୍ଟ ଦାଖଲ ହେଲା। ରସିଦ {{receiptId}}",
+    "retryLoadingMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
+    "reviewPr": "PR ସମୀକ୍ଷା କରନ୍ତୁ"
   },
   "language": {
     "title": "ଭାଷା",
@@ -77,7 +128,6 @@
     "couldNotRestart": "ପୁଣି ଆରମ୍ଭ ହୋଇପାରିଲା ନାହିଁ",
     "languageSaved": "ଆପଣ ବାଛିଥିବା ଭାଷା ସଂରକ୍ଷିତ ହୋଇଛି।",
     "catalogLoadFailed": "ଭାଷା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
-    "retry": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
     "search": "ଭାଷା ଖୋଜନ୍ତୁ",
     "noMatches": "ମେଳ ଖାଉଥିବା କୌଣସି ଭାଷା ନାହିଁ",
     "deviceLanguage": "ଡିଭାଇସ୍‌ର ଭାଷା",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "ସାଇନ୍ ଇନ୍ କୋଡ୍: {{code}}",
     "openSignInPageInBrowser": "ବ୍ରାଉଜରରେ ସାଇନ୍ ଇନ୍ ପୃଷ୍ଠା ଖୋଲନ୍ତୁ",
     "copySignInLink": "ସାଇନ୍ ଇନ୍ ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
-    "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
     "cancelSignIn": "ସାଇନ୍ ଇନ୍ ବାତିଲ କରନ୍ତୁ",
     "startingSignIn": "ସାଇନ୍ ଇନ୍ ଆରମ୍ଭ ହେଉଛି...",
     "organizationUsesSso": "ଆପଣଙ୍କ ସଂଗଠନ ସିଙ୍ଗଲ୍ ସାଇନ୍ ଅନ୍ ବ୍ୟବହାର କରେ।",
@@ -112,7 +161,6 @@
     "terms": "ସର୍ତ୍ତାବଳୀ",
     "termsConnector": " ଏବଂ ",
     "termsSuffix": "ରେ ସହମତ ହେଉଛନ୍ତି।",
-    "privacyPolicy": "ଗୋପନୀୟତା ନୀତି",
     "moreSignInOptions": "ସାଇନ୍ ଇନ୍ ପାଇଁ ଅଧିକ ବିକଳ୍ପ",
     "couldNotCompleteSignIn": "ସାଇନ୍ ଇନ୍ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "sessionEnded": "ଆପଣଙ୍କ ସେସନ୍ ସମାପ୍ତ ହୋଇଛି। ପୁଣି ସାଇନ୍ ଇନ୍ କରନ୍ତୁ।",
@@ -126,7 +174,6 @@
     "or": "କିମ୍ବା"
   },
   "profile": {
-    "title": "ପ୍ରୋଫାଇଲ୍",
     "codeReviewerSubtitle": "ସ୍ୱୟଂଚାଳିତ PR ସମୀକ୍ଷା",
     "securityAgentSubtitle": "ସୁରକ୍ଷା ଦୁର୍ବଳତା ଖୋଜି ସୁଧାରନ୍ତୁ",
     "reviews": "ସମୀକ୍ଷା",
@@ -136,9 +183,7 @@
     "linkedAccounts": "ସଂଯୋଜିତ ଆକାଉଣ୍ଟ",
     "couldNotLoadAccounts": "ଆକାଉଣ୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "app": "ଆପ୍",
-    "preferences": "ପସନ୍ଦ",
     "preferencesSubtitle": "ଦେଖାଶୁଣା, ବିଜ୍ଞପ୍ତି, ଚିନ୍ତନ ଓ ସ୍କ୍ରିନ୍‌ର ବ୍ୟବହାର",
-    "deviceSessions": "ଉପକରଣର ସେସନ୍",
     "deviceSessionsSubtitle": "ଅନ୍ୟ ଡିଭାଇସ୍ ଯାଞ୍ଚ କରି ସେଗୁଡ଼ିକରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "feedback": "ମତାମତ",
     "privacyChoices": "ଗୋପନୀୟତା ପସନ୍ଦ",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "ଇମେଲ୍",
     "providerTestAccount": "ପରୀକ୍ଷଣ ଆକାଉଣ୍ଟ",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "ଏଣ୍ଟରପ୍ରାଇଜ୍ SSO"
   },
   "preferences": {
-    "title": "ପସନ୍ଦ",
     "autoExpandThinking": "ଚିନ୍ତନର ବିବରଣୀ ଆପେ ଖୋଲନ୍ତୁ",
     "autoExpandThinkingSubtitle": "ଏଜେଣ୍ଟର ଚିନ୍ତନ ଶେଷ ହେଲେ ଏହାର ବିବରଣୀ ଖୋଲି ଦେଖାନ୍ତୁ।",
     "keepScreenOn": "ସେସନ୍ ପୃଷ୍ଠାରେ ଥିବା ସମୟରେ ସ୍କ୍ରିନ୍ ଚାଲୁ ରଖନ୍ତୁ",
@@ -360,7 +402,6 @@
       "unresolveThread": "ଥ୍ରେଡ୍‌ରୁ ସମାଧାନ ହୋଇଥିବା ଚିହ୍ନ ହଟାନ୍ତୁ",
       "resolved": "ସମାଧାନ ହୋଇଛି",
       "outdated": "ପୁରୁଣା",
-      "file": "ଫାଇଲ୍",
       "comment_one": "1ଟି ମନ୍ତବ୍ୟ",
       "comment": "{{displayCount}} ମନ୍ତବ୍ୟ",
       "comment_other": "{{displayCount}} ମନ୍ତବ୍ୟ",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingMore": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "loadMoreComments": "ଅଧିକ ମନ୍ତବ୍ୟ ଲୋଡ୍ କରନ୍ତୁ",
-      "closeReactions": "ପ୍ରତିକ୍ରିୟା ବନ୍ଦ କରନ୍ତୁ",
-      "reactionsTitle": "ପ୍ରତିକ୍ରିୟା",
       "addReaction": "ପ୍ରତିକ୍ରିୟା ଯୋଡ଼ନ୍ତୁ",
       "reactionPill": "{{emoji}} ପ୍ରତିକ୍ରିୟା, {{displayCount}} {{countLabel}}",
       "reaction_one": "ପ୍ରତିକ୍ରିୟା",
@@ -380,13 +419,11 @@
       "reportUser": "ବ୍ୟବହାରକାରୀଙ୍କ ବିଷୟରେ ରିପୋର୍ଟ କରନ୍ତୁ",
       "mute": "ମ୍ୟୁଟ୍ କରନ୍ତୁ",
       "block": "ବ୍ଲକ୍",
-      "reportSubmitted": "ରିପୋର୍ଟ ଦାଖଲ ହେଲା। ରସିଦ {{receiptId}}",
       "blockedUser": "{{login}}ଙ୍କୁ ବ୍ଲକ୍ କରାଗଲା",
       "mutedUser": "{{login}}ଙ୍କୁ ମ୍ୟୁଟ୍ କରାଗଲା",
       "replyPlaceholder": "ଆପଣଙ୍କ ଉତ୍ତର…",
       "replyBody": "ଉତ୍ତରର ବିଷୟବସ୍ତୁ",
       "submitReply": "ଉତ୍ତର ଦାଖଲ କରନ୍ତୁ",
-      "reply": "ଉତ୍ତର ଦିଅନ୍ତୁ",
       "termsTitle": "ସେବା ସର୍ତ୍ତାବଳୀ",
       "termsCopy": "ପୋଷ୍ଟ କରିବାକୁ ଆପଣଙ୍କ ବୟସ ଅତି କମରେ 13 ବର୍ଷ ହେବା ଆବଶ୍ୟକ।",
       "termsAcceptRetry": "ସର୍ତ୍ତାବଳୀ ଗ୍ରହଣ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ URL",
       "clearLink": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ହଟାନ୍ତୁ",
       "pasteLink": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ",
-      "open": "ଖୋଲା",
-      "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ"
+      "open": "ଖୋଲା"
     },
     "checks": {
       "title": "ଯାଞ୍ଚ",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "ଇନବକ୍ସ",
-      "recent": "ସାମ୍ପ୍ରତିକ",
       "loading": "ଇନବକ୍ସ ଲୋଡ୍ ହେଉଛି",
       "noReviewRequests": "କୌଣସି ସମୀକ୍ଷା ଅନୁରୋଧ ନାହିଁ",
       "noReviewRequestsDescription": "ଆପଣଙ୍କ ସମୀକ୍ଷା ଅପେକ୍ଷାରେ ଥିବା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକ ଏଠାରେ ଦେଖାଯିବ। ଆପଣ ଉପରେ ଯେକୌଣସି PR ଲିଙ୍କ୍ ମଧ୍ୟ ପେଷ୍ଟ କରିପାରିବେ।",
-      "couldNotLoad": "ଇନବକ୍ସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "couldNotLoadMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "retryLoadingMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ"
+      "couldNotLoad": "ଇନବକ୍ସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।"
     },
     "composer": {
       "commentBodyPlaceholder": "ଆପଣଙ୍କ ମନ୍ତବ୍ୟ",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "ମନ୍ତବ୍ୟ ଲେଖିବା ସ୍କ୍ରିନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "discardTitle": "ମନ୍ତବ୍ୟ ବାତିଲ କରିବେ?",
       "discardMessage": "ଆପଣଙ୍କ ଡ୍ରାଫ୍ଟ ହଟିଯିବ।",
-      "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "comment": "ମନ୍ତବ୍ୟ",
       "insertSuggestionA11y": "କୋଡ୍ ପରାମର୍ଶ ଯୋଡ଼ନ୍ତୁ",
       "insertSuggestion": "ପରାମର୍ଶ ଯୋଡ଼ନ୍ତୁ",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "ମର୍ଜ୍ ହେଲା",
-      "stateClosed": "ବନ୍ଦ",
       "stateOpenApproved": "ଖୋଲା · ଅନୁମୋଦିତ",
       "stateOpenChangesRequested": "ଖୋଲା · ପରିବର୍ତ୍ତନ ଅନୁରୋଧ",
       "stateOpenReviewRequired": "ଖୋଲା · ସମୀକ୍ଷା ଆବଶ୍ୟକ",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "ହୋମ୍",
-    "profile": "ପ୍ରୋଫାଇଲ୍",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ମଧ୍ୟରୁ {{position}}",
-    "chat": "ଚାଟ୍"
+    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ମଧ୍ୟରୁ {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "ଇନ୍‌ଷ୍ଟାନ୍ସ ବଦଳ",
       "couldNotLoadInstances": "ଇନ୍‌ଷ୍ଟାନ୍ସଗୁଡ଼ିକ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "noInstances": "କୌଣସି KiloClaw ଇନ୍‌ଷ୍ଟାନ୍ସ ନାହିଁ",
       "noInstancesDescription": "ଚାଟ୍ ଆରମ୍ଭ କରିବାକୁ ଏକ ଇନ୍‌ଷ୍ଟାନ୍ସର ସେଟଅପ୍ କରନ୍ତୁ।",
       "setUpKiloclaw": "KiloClaw ସେଟଅପ୍ କରନ୍ତୁ",
       "currentInstance": "{{title}}, ବର୍ତ୍ତମାନର ଇନ୍‌ଷ୍ଟାନ୍ସ"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "ଚାଟ୍‌ରେ ସାଇନ୍ ଇନ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotRefreshMessages": "ସନ୍ଦେଶଗୁଡ଼ିକ ରିଫ୍ରେସ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadHistory": "କଥାବାର୍ତ୍ତାର ଇତିହାସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "rename": "ନାମ ବଦଳାନ୍ତୁ",
       "leave": "ଛାଡ଼ନ୍ତୁ",
       "untitledConversation": "ଶୀର୍ଷକହୀନ କଥାବାର୍ତ୍ତା",
       "createFailed": "କଥାବାର୍ତ୍ତା ତିଆରି ହୋଇପାରିଲା ନାହିଁ।",
       "leaveFailed": "କଥାବାର୍ତ୍ତା ଛାଡ଼ିହେଲା ନାହିଁ।"
     },
     "reactions": {
-      "title": "ପ୍ରତିକ୍ରିୟା",
-      "close": "ପ୍ରତିକ୍ରିୟା ବନ୍ଦ କରନ୍ତୁ",
-      "recent": "ସାମ୍ପ୍ରତିକ",
       "common": "ସାଧାରଣ",
       "reactWith": "{{reaction}} ପ୍ରତିକ୍ରିୟା ଦିଅନ୍ତୁ",
       "accessibility": "{{emoji}} ପ୍ରତିକ୍ରିୟା, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "ପ୍ରତିକ୍ରିୟା ଯୋଡ଼ାଯାଇପାରିଲା ନାହିଁ।",
       "retrySend": "ପୁଣି ପଠାନ୍ତୁ",
       "moreReactions": "ଅଧିକ ପ୍ରତିକ୍ରିୟା",
-      "reply": "ଉତ୍ତର ଦିଅନ୍ତୁ",
       "edit": "ସମ୍ପାଦନ କରନ୍ତୁ",
       "sendFailed": "ସନ୍ଦେଶ ପଠାଯାଇପାରିଲା ନାହିଁ।",
       "retrySendFailed": "ପୁଣି ପଠାଇବାର ପ୍ରୟାସ ବିଫଳ ହେଲା।",
@@ -807,7 +829,6 @@
       "takePhoto": "ଫଟୋ ନିଅନ୍ତୁ",
       "photoLibrary": "ଫଟୋ ସଂଗ୍ରହ",
       "files": "ଫାଇଲ୍",
-      "cameraAccessDisabled": "କ୍ୟାମେରା ବ୍ୟବହାର ଅନୁମତି ବନ୍ଦ",
       "cameraAccessMessage": "ଫଟୋ ଉଠାଇବାକୁ ସେଟିଂସ୍‌ରେ କ୍ୟାମେରା ବ୍ୟବହାର ପାଇଁ ଅନୁମତି ଦିଅନ୍ତୁ।"
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} ଟାଇପ୍ କରୁଛନ୍ତି..."
     },
     "botStatus": {
-      "online": "ଅନଲାଇନ୍",
-      "idle": "ଅପେକ୍ଷାରେ",
       "offline": "ଅଫଲାଇନ୍",
       "loadingUser": "ବ୍ୟବହାରକାରୀଙ୍କ ତଥ୍ୟ ଲୋଡ୍ ହେଉଛି...",
       "waitingForStatus": "ବଟ୍‌ର ସ୍ଥିତି ଜାଣିବାକୁ ଅପେକ୍ଷା କରୁଛି...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw ଇନ୍ସଟାନ୍ସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "billing": {
       "title": "ବିଲିଂ",
@@ -840,7 +858,6 @@
       "plan": "ଯୋଜନା",
       "finalTermEnds": "ଶେଷ ଅବଧିର ସମାପ୍ତି",
       "afterFinalTerm": "ଶେଷ ଅବଧି ପରେ",
-      "remaining": "ଅବଶିଷ୍ଟ",
       "lessThanOneDay": "୧ ଦିନରୁ କମ୍",
       "ends": "ସମାପ୍ତି ତାରିଖ",
       "expires": "ମିଆଦ ଶେଷ ତାରିଖ",
@@ -941,20 +958,15 @@
       "disconnect": "Google ଆକାଉଣ୍ଟର ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରନ୍ତୁ",
       "copied": "କପି ହେଲା",
       "copyCommand": "କମାଣ୍ଡ କପି କରନ୍ତୁ",
-      "disabled": "ବନ୍ଦ",
       "disconnectConfirm": "ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରନ୍ତୁ",
       "disconnectMessage": "ଏହି ଇନ୍ସଟାନ୍ସରୁ ଆପଣଙ୍କ Google ଆକାଉଣ୍ଟ ହଟାଇବେ? ଏହା Gmail ବିଜ୍ଞପ୍ତି ବନ୍ଦ କରିବ। ପରିବର୍ତ୍ତନ ଲାଗୁ କରିବାକୁ ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରିବା ପରେ ଇନ୍ସଟାନ୍ସ ପୁନଃ ନିୟୋଜନ କରନ୍ତୁ।",
       "disconnectTitle": "Google ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ କରିବେ?"
     },
     "modelList": {
-      "title": "ସମସ୍ତ ମଡେଲ୍",
       "searchPlaceholder": "ମଡେଲ୍ ସନ୍ଧାନ…",
-      "clearSearch": "ସନ୍ଧାନ ସଫା କରନ୍ତୁ",
       "noMatches": "ଆପଣଙ୍କ ସନ୍ଧାନ ସହିତ ମେଳ ଖାଉଥିବା କୌଣସି ମଡେଲ ନାହିଁ",
-      "noModels": "କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ",
       "noModelsDescription": "ଉପଲବ୍ଧ ହେଲେ ମଡେଲ ଏଠାରେ ଦେଖାଯିବ।",
-      "noResultsFor": "\"{{query}}\" ପାଇଁ କୌଣସି ଫଳାଫଳ ନାହିଁ।",
-      "recommended": "ସୁପାରିଶକୃତ"
+      "noResultsFor": "\"{{query}}\" ପାଇଁ କୌଣସି ଫଳାଫଳ ନାହିଁ।"
     },
     "secrets": {
       "title": "ଗୋପନୀୟ ତଥ୍ୟ",
@@ -972,8 +984,7 @@
       "setupGuide": "ସେଟଅପ୍ ନିର୍ଦ୍ଦେଶିକା",
       "saving": "ସଂରକ୍ଷଣ ହେଉଛି…",
       "removing": "ହଟାଯାଉଛି…",
-      "updateToken": "ଟୋକେନ୍ ଅପଡେଟ୍ କରନ୍ତୁ",
-      "connect": "ସଂଯୋଗ କରନ୍ତୁ"
+      "updateToken": "ଟୋକେନ୍ ଅପଡେଟ୍ କରନ୍ତୁ"
     },
     "versionPin": {
       "title": "ସଂସ୍କରଣ ସ୍ଥିର ରଖିବା",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "ସେଟଅପ୍ ଶେଷ ହେଉଛି",
       "finishingSetupDescription": "ଟିକିଏ ଅପେକ୍ଷା କରନ୍ତୁ, ଆମେ ଆପଣଙ୍କ ଆକାଉଣ୍ଟ ପ୍ରସ୍ତୁତ କରୁଛୁ। ସାଧାରଣତଃ ଏଥିପାଇଁ ଅଳ୍ପ ସମୟ ଲାଗେ।",
       "getStarted": "ଆରମ୍ଭ କରନ୍ତୁ",
-      "noInstances": "କୌଣସି KiloClaw ଇନ୍‌ଷ୍ଟାନ୍ସ ନାହିଁ",
       "noInstancesDescription": "କୋଡିଂ ଏଜେଣ୍ଟ ଚଲାଇବାକୁ ଆପଣଙ୍କ ପ୍ରଥମ ଇନ୍ସଟାନ୍ସ ତିଆରି କରନ୍ତୁ।"
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}} ସହିତ ଚାଟ୍ କରନ୍ତୁ",
-        "online": "ଅନଲାଇନ୍",
         "ready": "{{name}} ପ୍ରସ୍ତୁତ",
         "warmedUp": "ସବୁ ପ୍ରସ୍ତୁତ। ଆପଣ ଚାହିଁଲେ କଥା ଆରମ୍ଭ କରନ୍ତୁ।"
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "ଅତ୍ୟାଧୁନିକ",
       "frontierDescription": "ସର୍ବୋତ୍ତମ କାର୍ଯ୍ୟକ୍ଷମତା। ଯୁକ୍ତିଭିତ୍ତିକ ବିଚାର କରିପାରୁଥିବା ଅତ୍ୟାଧୁନିକ ମଡେଲକୁ ଅନୁରୋଧ ପଠାଏ।",
-      "balancedLabel": "ସନ୍ତୁଳିତ",
       "balancedDescription": "କମ୍ ଖର୍ଚ୍ଚରେ ଗତି ଓ କ୍ଷମତାର ଭଲ ସନ୍ତୁଳନ।",
-      "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
       "autoModelA11y": "{{label}} ସ୍ୱୟଂଚାଳିତ ମଡେଲ",
       "currentModel": "ବର୍ତ୍ତମାନର ମଡେଲ",
       "browseAllModels": "କିମ୍ବା ୫୦୦+ ମଡେଲରୁ ଚୟନ କରନ୍ତୁ",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}} ଅପଢ଼ା ବାର୍ତ୍ତା",
       "openUnread": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}}ଟି ଅପଢ଼ା ସନ୍ଦେଶ",
       "openUnread_other": "{{name}} ଖୋଲନ୍ତୁ, {{displayCount}}ଟି ଅପଢ଼ା ସନ୍ଦେଶ",
-      "open": "{{name}} ଖୋଲନ୍ତୁ",
       "openSettings": "{{name}} ପାଇଁ ସେଟିଂ ଖୋଲନ୍ତୁ",
       "fixOnKiloAi": "kilo.ai ରେ ସମାଧାନ କରନ୍ତୁ: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "ସମୀକ୍ଷା",
       "cancelTitle": "ସମୀକ୍ଷା ବାତିଲ କରିବେ?",
       "cancelMessage": "ଏହା ଚାଲୁଥିବା କୋଡ୍ ସମୀକ୍ଷା ବନ୍ଦ କରିବ।",
-      "keepRunning": "ଚାଲୁ ରଖନ୍ତୁ",
       "cancelReview": "ସମୀକ୍ଷା ବାତିଲ କରନ୍ତୁ",
       "retryTitle": "ସମୀକ୍ଷା ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରିବେ?",
       "retryMessage": "ଏହା କୋଡ୍ ସମୀକ୍ଷା ପୁଣି ଆରମ୍ଭ କରିବ।",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} · ଲେଖକ: {{author}}",
       "noFindings": "କୌଣସି ସମସ୍ୟା ଚିହ୍ନଟ ହୋଇନାହିଁ।",
       "showMore": "ଅଧିକ ଦେଖାନ୍ତୁ",
-      "branch": "ବ୍ରାଞ୍ଚ୍",
       "created": "ତିଆରି ହୋଇଛି",
       "started": "ଆରମ୍ଭ ହୋଇଛି",
       "completed": "ସମାପ୍ତ",
       "tokens": "ଟୋକେନ୍",
       "tokensInOut": "{{input}} ଇନ୍‌ପୁଟ୍ / {{output}} ଆଉଟ୍‌ପୁଟ୍",
-      "openPullRequest": "ଖୋଲା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
       "council": "ସମୀକ୍ଷକ ମଣ୍ଡଳୀ",
       "decision": "ନିଷ୍ପତ୍ତି",
       "gate": "ଉତ୍ତୀର୍ଣ୍ଣ ହେବାର ସର୍ତ୍ତ",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "ସମୀକ୍ଷା ସ୍ମୃତି",
-      "couldNotLoadMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "retryLoadingMore": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ କରିବାକୁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "loading": "ସମୀକ୍ଷା ସ୍ମୃତି ଲୋଡ୍ ହେଉଛି",
       "couldNotLoad": "ସମୀକ୍ଷା ସ୍ମୃତି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "off": "ସମୀକ୍ଷା ସ୍ମୃତି ବନ୍ଦ ଅଛି।",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucket ସେଟଅପ୍"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket ସହ ସଂଯୋଗ ହୋଇଛି",
-      "title": "Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ",
       "description": "ଆବଶ୍ୟକ ଅନୁମତି ସହିତ କାର୍ଯ୍ୟକ୍ଷେତ୍ର ପାଇଁ ଏକ ଆକ୍ସେସ୍ ଟୋକେନ୍ ତିଆରି କରନ୍ତୁ ଏବଂ ତଳେ ପେଷ୍ଟ କରନ୍ତୁ।",
       "scopes": "ଆକାଉଣ୍ଟ: ପଢ଼ିବା · ରିପୋଜିଟୋରୀ: ପଢ଼ିବା/ଲେଖିବା · ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ: ପଢ଼ିବା · ୱେବ୍‌ହୁକ୍: ପଢ଼ିବା/ଲେଖିବା",
-      "tokenPlaceholder": "କାର୍ଯ୍ୟକ୍ଷେତ୍ରର ଆକ୍ସେସ୍ ଟୋକେନ୍",
-      "connect": "ସଂଯୋଗ କରନ୍ତୁ"
+      "tokenPlaceholder": "କାର୍ଯ୍ୟକ୍ଷେତ୍ରର ଆକ୍ସେସ୍ ଟୋକେନ୍"
     },
     "scopeList": {
-      "couldNotLoad": "ସଂଗଠନର ତାଲିକା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "personalStillAvailable": "ବ୍ୟକ୍ତିଗତ ରିପୋଜିଟୋରୀଗୁଡ଼ିକ ଏବେ ବି ତଳେ ଉପଲବ୍ଧ ଅଛି।",
       "personalSubtitle": "ଆପଣଙ୍କ ନିଜ ରିପୋଜିଟୋରୀ",
       "viewOnly": "କେବଳ ଦେଖିବାର ଅନୁମତି"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub ଆପ୍",
       "githubError": "GitHub ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "gitlabAccount": "GitLab ଆକାଉଣ୍ଟ",
-      "connectGitLab": "GitLab ସହ ସଂଯୋଗ କରନ୍ତୁ",
       "gitlabError": "GitLab ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "description": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକର ସ୍ୱୟଂଚାଳିତ ସମୀକ୍ଷା ପାଇଁ Kilo {{label}} ସଂଯୋଗ କରନ୍ତୁ।",
       "bitbucketError": "Bitbucket ସେଟଅପ୍ ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
@@ -1403,21 +1399,17 @@
     "updateFailed": "କୋଡ୍ ସମୀକ୍ଷକ ଅପଡେଟ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "configSaveFailed": "ସମୀକ୍ଷା ସେଟିଂସ୍ ସଂରକ୍ଷଣ ହୋଇପାରିଲା ନାହିଁ।",
     "status": {
-      "pending": "ଅପେକ୍ଷାରତ",
       "running": "ଚାଲୁଛି",
       "completed": "ସମାପ୍ତ",
-      "failed": "ବିଫଳ",
       "interrupted": "ବ୍ୟାହତ"
     },
     "reviewStyle": {
       "strict": "କଠୋର",
-      "balanced": "ସନ୍ତୁଳିତ",
       "lenient": "ଶିଥିଳ",
       "roast": "କଟାକ୍ଷ"
     },
     "focusArea": {
       "security": "ସୁରକ୍ଷା",
-      "performance": "କାର୍ଯ୍ୟଦକ୍ଷତା",
       "bugs": "ବଗ୍",
       "style": "ଶୈଳୀ",
       "testing": "ପରୀକ୍ଷା",
@@ -1468,7 +1460,6 @@
       "statusOpen": "ଖୋଲା",
       "fixed": "ସମାଧାନ ହୋଇଛି",
       "statusIgnored": "ଅଣଦେଖା",
-      "statusClosed": "ବନ୍ଦ",
       "severityHigh": "ଉଚ୍ଚ",
       "severityMedium": "ମଧ୍ୟମ",
       "severityLow": "ନିମ୍ନ",
@@ -1655,7 +1646,6 @@
       "title": "ସେଟିଂସ୍",
       "couldNotLoadSettings": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ସେଟିଂସ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadPermissions": "ଅନୁମତି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "disabled": "ବନ୍ଦ",
       "on": "ଚାଲୁ",
       "repositoriesCount_one": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ କରାଯାଇଛି",
       "repositoriesCount": "{{displayCount}}ଟି ରିପୋଜିଟୋରୀ ଚୟନ ହୋଇଛି",
@@ -1683,7 +1673,6 @@
       "retry": "ସମାଧାନ ପାଇଁ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "cancelTitle": "ଏହି ସମାଧାନ ବାତିଲ କରିବେ?",
       "cancelMessage": "ସୁରକ୍ଷା ଏଜେଣ୍ଟ ଚାଲୁଥିବା ସମାଧାନ ପ୍ରୟାସକୁ ବନ୍ଦ କରିବ।",
-      "keepRunning": "ଚାଲୁ ରଖନ୍ତୁ",
       "cancelRemediation": "ସମାଧାନ ବାତିଲ କରନ୍ତୁ",
       "openPullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ{{number}} ଖୋଲନ୍ତୁ",
       "openDraftPullRequest": "ଖସଡ଼ା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ{{number}} ଖୋଲନ୍ତୁ",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "ପ୍ରୟାସର ଇତିହାସ ({{displayCount}})",
       "attemptNumber": "ପ୍ରୟାସ #{{number}}",
       "startedBy": "ଆରମ୍ଭ କରିଛନ୍ତି",
-      "branch": "ବ୍ରାଞ୍ଚ୍",
       "queued": "ସମାଧାନ ଅପେକ୍ଷା ତାଲିକାରେ ରଖାଗଲା",
       "retryQueued": "ସମାଧାନର ପରବର୍ତ୍ତୀ ପ୍ରୟାସ ଅପେକ୍ଷା ତାଲିକାରେ ରଖାଗଲା",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "ଫିଲ୍ଟର ସହ ମେଳ ଖାଉଥିବା କୌଣସି ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
       "noMatchesDescription": "ବଛାଯାଇଥିବା ଫିଲ୍ଟରଗୁଡ଼ିକୁ ବଦଳାନ୍ତୁ କିମ୍ବା ହଟାନ୍ତୁ।",
       "emptyTitle": "କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ",
-      "emptyDescription": "ଏବେ ଧ୍ୟାନ ଦେବାକୁ ଥିବା କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ।",
-      "clearFilters": "ଫିଲ୍ଟର୍ ହଟାନ୍ତୁ"
+      "emptyDescription": "ଏବେ ଧ୍ୟାନ ଦେବାକୁ ଥିବା କୌଣସି ଅସମାପ୍ତ ଚିହ୍ନଟ ସମସ୍ୟା ନାହିଁ।"
     },
     "scopeList": {
-      "couldNotLoad": "ସଂଗଠନର ତାଲିକା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "personalSubtitle": "ଆପଣଙ୍କ ନିଜ ରିପୋଜିଟୋରୀ"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "ଖସଡ଼ା PR ଖୋଲାଯାଇଛି",
       "prOpened": "PR ଖୋଲାଯାଇଛି",
       "blocked": "ଅବରୁଦ୍ଧ",
-      "failed": "ବିଫଳ",
       "noChangesNeeded": "କୌଣସି ପରିବର୍ତ୍ତନ ଆବଶ୍ୟକ ନାହିଁ",
       "originAutomaticPolicy": "ସ୍ୱୟଂଚାଳିତ ନୀତି",
       "originIncludeExistingPolicy": "ପୂର୍ବରୁ ଥିବା ସମସ୍ୟା ଅନ୍ତର୍ଭୁକ୍ତ କରିବାର ନୀତି",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "ଖୋଜାଯାଉଛି",
       "searchSessions": "ସେସନ୍ ସନ୍ଧାନ",
-      "searchSessionsPlaceholder": "ସେସନ୍ ସନ୍ଧାନ",
-      "clearSearch": "ସନ୍ଧାନ ସଫା କରନ୍ତୁ",
-      "clearFilters": "ଫିଲ୍ଟର୍ ହଟାନ୍ତୁ"
+      "searchSessionsPlaceholder": "ସେସନ୍ ସନ୍ଧାନ"
     },
     "sessionList": {
-      "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadActive": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ। ଆପଣଙ୍କ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noMatches": "କୌଣସି ସେସନ୍ ମେଳ ଖାଉନାହିଁ",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "ସେସନ୍ ବିଲୋପ କରିବେ?",
       "deleteMessage": "ଏହା ପୂର୍ବବତ୍ କରାଯାଇପାରିବ ନାହିଁ।",
       "deleteSession": "ସେସନ୍ ବିଲୋପ କରନ୍ତୁ",
-      "rename": "ନାମ ବଦଳାନ୍ତୁ",
       "renameMessage": "ଏହି ସେସନ୍ ପାଇଁ ଏକ ନୂଆ ନାମ ଲେଖନ୍ତୁ।",
       "copyId": "ସେସନ୍ ID କପି କରନ୍ତୁ",
       "idCopied": "ସେସନ୍ ID କପି ହୋଇଛି",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "ଏହା ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "failedToLoadDetails": "ସେସନ୍ ବିବରଣୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "notFound": "ମିଳିଲା ନାହିଁ।",
       "notFoundDescription": "ଏହି ଆଇଟମ୍‌ଟି ହଟାଯାଇଥାଇପାରେ କିମ୍ବା ଆଉ ଉପଲବ୍ଧ ନାହିଁ।",
       "failedToStopExecution": "ଚାଲୁଥିବା କାମ ବନ୍ଦ ହୋଇପାରିଲା ନାହିଁ।",
       "renameSession": "ସେସନ୍ ନାମ ବଦଳାନ୍ତୁ",
@@ -2076,7 +2056,6 @@
       "retryConnection": "ପୁଣି ସଂଯୋଗ କରନ୍ତୁ"
     },
     "newSession": {
-      "title": "ନୂଆ ସେସନ୍",
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
       "refreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ କରନ୍ତୁ",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "discardDraftTitle": "ଡ୍ରାଫ୍ଟ ହଟାଇବେ?",
       "discardDraftMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ହଟିଯିବ।",
-      "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "discardFailed": "ଡ୍ରାଫ୍ଟ ହଟାଇ ହେଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "remoteHint": "ସ୍ଥାନୀୟ kilo ପ୍ରକ୍ରିୟାକୁ ନିୟନ୍ତ୍ରଣ କରିବାକୁ ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ `kilo remote` କିମ୍ବା ଚାଲୁଥିବା CLI ସେସନରେ `/remote` ଚଲାନ୍ତୁ।",
-      "bitbucketConnected": "Bitbucket ସହ ସଂଯୋଗ ହୋଇଛି",
-      "connectBitbucket": "Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ",
       "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ Bitbucket ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
-      "connectGitlab": "GitLab ସହ ସଂଯୋଗ କରନ୍ତୁ",
       "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitLab ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "couldNotLoadBitbucketRepositories": "Bitbucket ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadGithubRepositories": "GitHub ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "{{name}} ଟୁଲ୍, {{status}}",
       "fileEmpty": "ଏହି ଫାଇଲ୍ ଖାଲି।",
       "noTasks": "କୌଣସି କାର୍ଯ୍ୟ ନାହିଁ।",
-      "contentTruncated": "ବିଷୟବସ୍ତୁର କିଛି ଅଂଶ ଦେଖାଯାଉଛି",
       "truncated": "ଆଂଶିକ",
       "toolRead": "ପଢ଼ା",
       "toolEdit": "ସମ୍ପାଦନ କରନ୍ତୁ",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "ଅନ୍ୟ ଏକ ଶବ୍ଦ ଦେଇ ଖୋଜନ୍ତୁ।",
       "loading": "ଲୋଡ୍ ହେଉଛି...",
       "accessibility": "ରିପୋଜିଟୋରୀ: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "ବାର୍ତ୍ତା ବିବରଣୀ",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "କ୍ୟାଶ୍‌ରେ ଲେଖା",
       "total": "ସର୍ବମୋଟ",
       "reportAiResponseFailedRetryable": "ଏହି ଉତ୍ତର ରିପୋର୍ଟ କରି ହେଲା ନାହିଁ।",
-      "reportAiResponseFailedTerminal": "ଏହି ଉତ୍ତର ରିପୋର୍ଟ କରିହେବ ନାହିଁ।",
-      "reportAiResponseSubmitted": "ରିପୋର୍ଟ ଦାଖଲ ହେଲା। ରସିଦ {{receiptId}}"
+      "reportAiResponseFailedTerminal": "ଏହି ଉତ୍ତର ରିପୋର୍ଟ କରିହେବ ନାହିଁ।"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "{{alt}} ଛବି ଦେଖନ୍ତୁ",
       "imageOutput": "ଛବି ଆଉଟପୁଟ୍",
       "imageOutputWithFilename": "ଛବି ଆଉଟପୁଟ୍, {{filename}}",
-      "defaultName": "ଫାଇଲ୍",
       "openFullScreen": "{{name}} ପୂରା ସ୍କ୍ରିନରେ ଖୋଲନ୍ତୁ",
       "preview": "{{name}} ର ପୂର୍ବଦର୍ଶନ ଦେଖନ୍ତୁ",
-      "openFile": "{{name}} ଖୋଲନ୍ତୁ",
       "couldNotLoadFile": "ଏହି ଫାଇଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotLoadFileRetry": "ଏହି ଫାଇଲ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "retryLoadingFile": "ଫାଇଲ୍ ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "ମଡେଲ୍ ବାଛନ୍ତୁ",
       "searchPlaceholder": "ମଡେଲ୍ ସନ୍ଧାନ…",
-      "allModels": "ସମସ୍ତ ମଡେଲ୍",
       "favorites": "ପସନ୍ଦର ମଡେଲ୍",
-      "noModels": "କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ",
-      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।",
-      "recommended": "ସୁପାରିଶକୃତ"
+      "noModelsDescription": "ବାଛିବାକୁ କୌଣସି ମଡେଲ୍ ଉପଲବ୍ଧ ନାହିଁ।"
     },
     "modelSelector": {
       "provider": "ସେବା ପ୍ରଦାନକାରୀ {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "କ୍ୟାମେରା",
       "photoLibrary": "ଫଟୋ ସଂଗ୍ରହ",
       "files": "ଫାଇଲ୍",
-      "cameraAccessDisabled": "କ୍ୟାମେରା ବ୍ୟବହାର ଅନୁମତି ବନ୍ଦ",
       "cameraAccessMessage": "ଫଟୋ ଉଠାଇବାକୁ ସେଟିଂସ୍‌ରେ କ୍ୟାମେରା ବ୍ୟବହାର ପାଇଁ ଅନୁମତି ଦିଅନ୍ତୁ।",
       "couldNotOpenPhotoPicker": "ଫଟୋ ବାଛିବା ସୁବିଧା ଖୋଲି ହେଲା ନାହିଁ। Kilo ପୁଣି ଆରମ୍ଭ କରି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "maxFilesAllowed": "ସର୍ବାଧିକ {{displayCount}}ଟି ଫାଇଲ୍ ଯୋଡ଼ିପାରିବେ।",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "ଲିଙ୍କ କପି ହେଲା",
-      "reviewPr": "PR ସମୀକ୍ଷା କରନ୍ତୁ",
       "openLink": "ଲିଙ୍କ ଖୋଲନ୍ତୁ",
-      "copyLink": "ଲିଙ୍କ୍ କପି କରନ୍ତୁ",
       "shareLink": "ଲିଙ୍କ ସେୟାର କରନ୍ତୁ",
       "share": "ସେୟାର କରନ୍ତୁ",
       "prLinkActions": "PR ଲିଙ୍କ ପାଇଁ ବିକଳ୍ପ",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "ପ୍ରସଙ୍ଗରେ {{window}} ଟୋକନ୍ ମଧ୍ୟରୁ {{used}} ବ୍ୟବହୃତ, {{percentage}} ବ୍ୟବହାର ହୋଇଛି",
       "title": "ପ୍ରସଙ୍ଗ ବ୍ୟବହାର",
       "used": "ବ୍ୟବହୃତ",
-      "remaining": "ଅବଶିଷ୍ଟ",
       "provider": "ସେବା ପ୍ରଦାନକାରୀ",
       "totalCost": "ମୋଟ ଖର୍ଚ୍ଚ",
       "usageReflectsLatest": "ଏହି ବ୍ୟବହାର ତଥ୍ୟ ସହାୟକର ସଦ୍ୟ ସମାପ୍ତ ଉତ୍ତର ଉପରେ ଆଧାରିତ।",
@@ -2598,7 +2561,6 @@
     "billingPage": "ବିଲିଂ ପୃଷ୍ଠା"
   },
   "deviceSessions": {
-    "couldNotLoad": "ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "couldNotLoadDescription": "ଏହା ଲୋଡ୍ ନହେବା ପର୍ଯ୍ୟନ୍ତ ଆପଣଙ୍କ ସକ୍ରିୟ ସେସନ୍ ଦେଖିହେବ ନାହିଁ।",
     "currentDeviceUnidentified": "ବର୍ତ୍ତମାନର ଡିଭାଇସ୍ ଚିହ୍ନଟ ହୋଇପାରିଲା ନାହିଁ।",
     "noSessions": "କୌଣସି ସକ୍ରିୟ ସେସନ୍ ନାହିଁ",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "ଏଠାରେ କେବଳ Kilo ଆପ୍ ସାଇନ୍-ଇନ୍ ଦେଖାଯାଏ। ଏଡିଟର ଏବଂ CLI ସାଇନ୍-ଇନ୍ ତାଲିକାଭୁକ୍ତ ନୁହେଁ।",
     "signedIn": "ସାଇନ୍ ଇନ୍: {{signedIn}} · ଶେଷ ଥର ସକ୍ରିୟ: {{lastSeen}}",
     "thisDevice": "ଏହି ଡିଭାଇସ୍",
-    "title": "ଉପକରଣର ସେସନ୍",
     "viewProfile": "ପ୍ରୋଫାଇଲ୍ ଦେଖନ୍ତୁ",
     "signOutThisDevice": "ଏହି ଡିଭାଇସରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "signOutThisSession": "ଏହି ସେସନରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "ଏହି ଲିଙ୍କ ଆଉ ବୈଧ ନୁହେଁ।",
-    "goBack": "ଫେରିଯାନ୍ତୁ",
     "title": "ପୃଷ୍ଠା ମିଳିଲା ନାହିଁ"
   },
   "monoScrollBlock": {
-    "contentTruncated": "ବିଷୟବସ୍ତୁର କିଛି ଅଂଶ ଦେଖାଯାଉଛି",
     "truncated": "ଆଂଶିକ",
     "wrap": "ଧାଡ଼ି ଭାଙ୍ଗ",
     "scroll": "ସ୍କ୍ରୋଲ୍"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "offlineTitle": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "permissionDescription": "ଏହା ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
-    "notFoundTitle": "ମିଳିଲା ନାହିଁ।",
     "notFoundDescription": "ଏହି ଆଇଟମ୍‌ଟି ହଟାଯାଇଥାଇପାରେ କିମ୍ବା ଆଉ ଉପଲବ୍ଧ ନାହିଁ।",
     "serverTitle": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
     "serverDescription": "ଆମ ପଟେ କିଛି ସମସ୍ୟା ହୋଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   },
   "screenHeader": {
     "openMenu": "ମେନୁ ଖୋଲନ୍ତୁ",
-    "openMenuFor": "{{title}} ପାଇଁ ମେନୁ ଖୋଲନ୍ତୁ",
-    "goBack": "ଫେରିଯାନ୍ତୁ"
+    "openMenuFor": "{{title}} ପାଇଁ ମେନୁ ଖୋଲନ୍ତୁ"
   },
   "picker": {
     "optionsExpired": "ବିକଳ୍ପଗୁଡ଼ିକର ମିଆଦ ଶେଷ",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kilo କୁ ସେୟାର",
-    "reviewPr": "PR ସମୀକ୍ଷା କରନ୍ତୁ",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "ନୂଆ ସେସନ୍",
     "searchPlaceholder": "ନିକଟର ସେସନ୍ ଖୋଜନ୍ତୁ",
     "connectedCli": "ସଂଯୁକ୍ତ CLI ରେ",
     "newSessionOn": "{{name}} ରେ ନୂତନ ସେସନ୍",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass ବାତିଲ ହେଉଛି",
     "statusPastDue": "Kilo Pass ଦେୟ ବିଳମ୍ବିତ",
     "monthlyCredits": "ପ୍ରତି ମାସରେ {{credits}} କ୍ରେଡିଟ୍",
-    "ends": "{{date}}ରେ ସମାପ୍ତ",
     "periodEnd": "ଅବଧିର ଶେଷ",
     "managedOnGooglePlay": "Google Play ରେ ପରିଚାଳିତ",
     "managedInAppStore": "App Store ରେ ପରିଚାଳିତ",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Android ଆପ୍ ଭିତରୁ Kilo Pass କିଣିହେବ ନାହିଁ। ଏହାକୁ ୱେବ୍‌ରେ ପରିଚାଳନା କରନ୍ତୁ।",
     "webManagementDescription": "ଏହି Kilo Pass ୱେବ୍‌ରେ ପରିଚାଳିତ ହୁଏ।",
     "legalDisclosure": "Kilo Pass ଏକ ମାସିକ ସବସ୍କ୍ରିପସନ୍, ଯାହା ସ୍ୱୟଂଚାଳିତ ଭାବରେ ନବୀକରଣ ହୁଏ। କ୍ରୟ ନିଶ୍ଚିତ କଲେ ଆପଣଙ୍କ Apple ID ରୁ ଦେୟ ଆଦାୟ ହୁଏ। ଚଳିତ ଅବଧି ଶେଷ ହେବାର ଅତି କମରେ 24 ଘଣ୍ଟା ପୂର୍ବରୁ ବାତିଲ ନକଲେ ସବସ୍କ୍ରିପସନ୍ ପ୍ରତି ମାସରେ ଦେଖାଯାଇଥିବା ମୂଲ୍ୟରେ ସ୍ୱୟଂଚାଳିତ ଭାବରେ ନବୀକରଣ ହୁଏ। ଆପଣଙ୍କ App Store ଆକାଉଣ୍ଟ ସେଟିଂସ୍‌ରେ ଯେକୌଣସି ସମୟରେ ଏହାକୁ ପରିଚାଳନା କିମ୍ବା ବାତିଲ କରନ୍ତୁ।",
-    "legalPrivacyPolicy": "ଗୋପନୀୟତା ନୀତି",
     "legalTermsOfUse": "ବ୍ୟବହାର ନିୟମାବଳୀ (EULA)",
     "purchaseDifferentAccount": "ଏହି App Store କ୍ରୟ ଆପଣଙ୍କ Kilo ଆକାଉଣ୍ଟ ସହ ଯୋଡ଼ାଯାଇନାହିଁ। କ୍ରୟ ପାଇଁ ବ୍ୟବହାର କରିଥିବା Apple Account ରେ ସାଇନ୍ ଇନ୍ କରନ୍ତୁ, ତାପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "restoreFailed": "କ୍ରୟ ପୁନଃସ୍ଥାପନ ହୋଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "ଏକ ବୈଧ ଇମେଲ୍ ଠିକଣା ଲେଖନ୍ତୁ।",
-      "emailLabel": "ଇମେଲ୍",
       "emailPlaceholder": "ନାମ@କମ୍ପାନୀ.com",
       "permissionDenied": "ସଦସ୍ୟଙ୍କୁ ନିମନ୍ତ୍ରଣ କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "roleLabel": "ଭୂମିକା",
@@ -2968,7 +2920,6 @@
         "billingManager": "ବିଲିଂ ପରିଚାଳକ"
       },
       "emailStatusFailed": "ଇମେଲ୍ ପଠାଇବା ବିଫଳ",
-      "emailStatusPending": "ଅପେକ୍ଷାରତ",
       "inviteCreated": "ନିମନ୍ତ୍ରଣ ସୃଷ୍ଟି ହେଲା",
       "pendingInvitations": "ଅପେକ୍ଷାରେ ଥିବା ନିମନ୍ତ୍ରଣ",
       "resendInvite": "ନିମନ୍ତ୍ରଣ ପୁନଃପଠାନ୍ତୁ",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "ସ୍ଥିତି ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
       "creditProcessingDelayed": "କ୍ରେଡିଟ୍ ପ୍ରକ୍ରିୟାକରଣରେ ବିଳମ୍ବ · ଆପେ ପୁଣି ଚେଷ୍ଟା ହେଉଛି",
       "ended": "ସମାପ୍ତ",
-      "endsOn": "{{date}}ରେ ସମାପ୍ତ",
       "manageHint": "ୱେବ୍‌ରେ Kilo Pass ପରିଚାଳନା ପୃଷ୍ଠା ଖୋଲେ।",
       "notSubscribed": "ସବସ୍କ୍ରିପସନ୍ ନାହିଁ",
       "overallocated": "ପୈଠ ହୋଇଥିବା ସିଟ୍ ସଂଖ୍ୟାଠାରୁ ଅଧିକ ପାସ୍ ବଣ୍ଟାଯାଇଛି",
@@ -3004,7 +2954,6 @@
       "paymentPending": "ପେମେଣ୍ଟ ଅପେକ୍ଷାରେ",
       "processingBlocked": "ପ୍ରକ୍ରିୟାକରଣ ଅଟକିଛି",
       "processingNeedsReview": "ପ୍ରକ୍ରିୟାକରଣର ସମୀକ୍ଷା ଆବଶ୍ୟକ",
-      "retry": "ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ",
       "retryHint": "Kilo Pass ସ୍ଥିତି ପୁଣି ଲୋଡ୍ କରିବାକୁ ଚେଷ୍ଟା କରେ।",
       "setupHint": "ୱେବ୍‌ରେ Kilo Pass ସେଟଅପ୍ ଖୋଲେ।"
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
   },
   "quickChat": {
-    "title": "ଚାଟ୍",
     "empty": {
       "title": "ଏକ ଚାଟ୍ ଆରମ୍ଭ କରନ୍ତୁ",
       "description": "ଏକ ମଡେଲ୍ ସହିତ କଥା ହେବାକୁ ଏକ ସନ୍ଦେଶ ପଠାନ୍ତୁ।"
@@ -3076,7 +3024,6 @@
     "openAgents": "ଏଜେଣ୍ଟ ତାଲିକା ଖୋଲନ୍ତୁ",
     "running": "କାମ କରୁଛି",
     "needsInput": "ଆପଣଙ୍କ ଉତ୍ତର ଆବଶ୍ୟକ",
-    "idle": "ଅପେକ୍ଷାରେ",
     "channelName": "ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ",
     "activityKitDisabledBody": "ଲକ୍ ସ୍କ୍ରିନ୍‌ରେ ସକ୍ରିୟ ଏଜେଣ୍ଟଗୁଡ଼ିକ ଦେଖିବାକୁ ସେଟିଂସ୍‌ରେ ଲାଇଭ୍ କାର୍ଯ୍ୟକଳାପ ଚାଲୁ କରନ୍ତୁ।"
   }

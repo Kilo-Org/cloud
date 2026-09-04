@@ -69,7 +69,58 @@
     "repository": "Repozitoriy",
     "signOut": "Tizimdan chiqish",
     "agents": "Agentlar",
-    "all": "Barchasi"
+    "all": "Barchasi",
+    "allModels": "Barcha modellar",
+    "balanced": "Muvozanatli",
+    "bitbucketConnected": "Bitbucket ulandi",
+    "branch": "Tarmoq",
+    "cameraAccessDisabled": "Kameradan foydalanishga ruxsat berilmagan",
+    "chat": "Suhbat",
+    "clearFilters": "Filtrlarni tozalash",
+    "clearSearch": "Qidiruvni tozalash",
+    "closed": "Yopilgan",
+    "closeReactions": "Reaksiyalarni yopish",
+    "connect": "Ulash",
+    "connectBitbucket": "Bitbucketni ulash",
+    "connectGitlab": "GitLabni ulash",
+    "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
+    "copyLink": "Havolani nusxalash",
+    "couldNotLoadOrganizations": "Tashkilotlarni yuklab bo‘lmadi.",
+    "couldNotLoadSessions": "Seanslarni yuklab bo‘lmadi.",
+    "couldnTLoadMore": "Qolganlarini yuklab bo‘lmadi.",
+    "deviceSessions": "Qurilma seanslari",
+    "disabled": "O‘chirilgan",
+    "email": "Elektron pochta",
+    "ends": "Tugash sanasi: {{date}}",
+    "failed": "Amalga oshmadi",
+    "file": "Fayl",
+    "gitlab": "GitLab",
+    "goBack": "Orqaga qaytish",
+    "idle": "Kutmoqda",
+    "keepEditing": "Tahrirlashni davom ettirish",
+    "keepRunning": "To‘xtatmaslik",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Yangi seans",
+    "noKiloclawInstances": "KiloClaw nusxalari yo‘q",
+    "noModelsAvailable": "Modellar mavjud emas",
+    "notFound": "Topilmadi.",
+    "online": "Onlayn",
+    "open": "{{name}}ni ochish",
+    "openPullRequest": "Ochiq PR",
+    "pending": "Kutilmoqda",
+    "performance": "Unumdorlik",
+    "preferences": "Shaxsiy sozlamalar",
+    "privacyPolicy": "Maxfiylik siyosati",
+    "profile": "Profil",
+    "reactions": "Reaksiya",
+    "recent": "Oxirgilar",
+    "recommended": "Tavsiya etilgan",
+    "remaining": "Qolgani",
+    "rename": "Nomini o‘zgartirish",
+    "reply": "Javob berish",
+    "reportSubmittedReceipt": "Shikoyat yuborildi. Qayd raqami: {{receiptId}}",
+    "retryLoadingMore": "Qolganlarini yuklashga qayta urinish",
+    "reviewPr": "PRni ko‘rib chiqish"
   },
   "language": {
     "title": "Til",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Qayta ishga tushirib bo'lmadi",
     "languageSaved": "Tanlagan tilingiz saqlandi.",
     "catalogLoadFailed": "Til ma'lumotlarini yuklab bo'lmadi. Iltimos, qayta urinib ko'ring.",
-    "retry": "Qayta urinish",
     "search": "Tilni qidirish",
     "noMatches": "Mos til topilmadi",
     "deviceLanguage": "Qurilma tili",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Kirish kodi: {{code}}",
     "openSignInPageInBrowser": "Brauzerda kirish sahifasini ochish",
     "copySignInLink": "Kirish havolasini nusxalash",
-    "copyLink": "Havolani nusxalash",
     "cancelSignIn": "Kirishni bekor qilish",
     "startingSignIn": "Kirish boshlanmoqda...",
     "organizationUsesSso": "Tashkilotingiz yagona kirish tizimidan foydalanadi.",
@@ -112,7 +161,6 @@
     "terms": "Shartlar",
     "termsConnector": " va ",
     "termsSuffix": ".",
-    "privacyPolicy": "Maxfiylik siyosati",
     "moreSignInOptions": "Boshqa kirish usullari",
     "couldNotCompleteSignIn": "Kirishni yakunlab bo'lmadi. Iltimos, qayta urinib ko'ring.",
     "sessionEnded": "Seansingiz tugadi. Iltimos, qayta kiring.",
@@ -126,7 +174,6 @@
     "or": "yoki"
   },
   "profile": {
-    "title": "Profil",
     "codeReviewerSubtitle": "PR tekshiruvlarini avtomatik bajarish",
     "securityAgentSubtitle": "Zaifliklarni topish va bartaraf etish",
     "reviews": "Tekshiruvlar",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Bog'langan hisoblar",
     "couldNotLoadAccounts": "Hisoblarni yuklab bo'lmadi.",
     "app": "Ilova",
-    "preferences": "Shaxsiy sozlamalar",
     "preferencesSubtitle": "Ko'rinish, bildirishnomalar, fikrlash va ekran sozlamalari",
-    "deviceSessions": "Qurilma seanslari",
     "deviceSessionsSubtitle": "Boshqa qurilmalarni ko'rish va ulardagi sessiyalarni tugatish",
     "feedback": "Fikr-mulohaza",
     "privacyChoices": "Maxfiylik sozlamalari",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Elektron pochta",
     "providerTestAccount": "Sinov hisobi",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Korporativ SSO"
   },
   "preferences": {
-    "title": "Shaxsiy sozlamalar",
     "autoExpandThinking": "Fikrlash matnini avtomatik ochish",
     "autoExpandThinkingSubtitle": "Agent fikrlashni tugatgach, fikrlash matnini to'liq ko'rsatish.",
     "keepScreenOn": "Sessiya sahifasida ekranni o'chirmaslik",
@@ -360,7 +402,6 @@
       "unresolveThread": "Izohlar zanjiridan hal qilingan belgisini olib tashlash",
       "resolved": "Hal qilingan",
       "outdated": "Eskirgan",
-      "file": "Fayl",
       "comment_one": "1 izoh",
       "comment": "{{displayCount}} ta izoh",
       "comment_other": "{{displayCount}} ta izoh",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Qolgan izohlarni yuklab bo'lmadi.",
       "retryLoadingMore": "Qolgan izohlarni qayta yuklash",
       "loadMoreComments": "Yana izoh yuklash",
-      "closeReactions": "Reaksiyalarni yopish",
-      "reactionsTitle": "Reaksiya",
       "addReaction": "Reaksiya qo'shish",
       "reactionPill": "{{emoji}} reaksiyasi, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
@@ -380,13 +419,11 @@
       "reportUser": "Foydalanuvchi ustidan shikoyat qilish",
       "mute": "Bildirishnomalarni o'chirish",
       "block": "Bloklash",
-      "reportSubmitted": "Shikoyat yuborildi. Qayd raqami: {{receiptId}}",
       "blockedUser": "{{login}} bloklandi",
       "mutedUser": "{{login}}dan bildirishnomalar o'chirildi",
       "replyPlaceholder": "Javob…",
       "replyBody": "Javob matni",
       "submitReply": "Javobni yuborish",
-      "reply": "Javob berish",
       "termsTitle": "Xizmat shartlari",
       "termsCopy": "Xabar joylash uchun kamida 13 yoshda bo'lishingiz kerak.",
       "termsAcceptRetry": "Shartlarni qabul qilib bo'lmadi. Internetga ulanishni tekshiring va qayta urinib ko'ring.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHubdagi PRning URL manzili",
       "clearLink": "PR havolasini tozalash",
       "pasteLink": "PR havolasini joylashtirish",
-      "open": "Ochiq",
-      "openPullRequest": "Ochiq PR"
+      "open": "Ochiq"
     },
     "checks": {
       "title": "Tekshiruvlar",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Kiruvchi so'rovlar",
-      "recent": "Oxirgilar",
       "loading": "Kiruvchi so'rovlar yuklanmoqda",
       "noReviewRequests": "Ko'rib chiqish so'rovlari yo'q",
       "noReviewRequestsDescription": "Ko'rib chiqishingizni kutayotgan PRlar shu yerda ko'rinadi. Yuqoriga istalgan PR havolasini ham joylashtirishingiz mumkin.",
-      "couldNotLoad": "Kiruvchi so'rovlarni yuklab bo'lmadi.",
-      "couldNotLoadMore": "Qolganlarini yuklab bo‘lmadi.",
-      "retryLoadingMore": "Qolganlarini yuklashga qayta urinish"
+      "couldNotLoad": "Kiruvchi so'rovlarni yuklab bo'lmadi."
     },
     "composer": {
       "commentBodyPlaceholder": "Izoh matni",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Izoh yozish oynasini yuklab bo'lmadi.",
       "discardTitle": "Izoh bekor qilinsinmi?",
       "discardMessage": "Qoralamangiz yo'qoladi.",
-      "keepEditing": "Tahrirlashni davom ettirish",
       "comment": "Izoh",
       "insertSuggestionA11y": "Kod taklifini kiritish",
       "insertSuggestion": "Taklifni kiritish",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Birlashtirilgan",
-      "stateClosed": "Yopilgan",
       "stateOpenApproved": "Ochiq · Tasdiqlandi",
       "stateOpenChangesRequested": "Ochiq · O'zgarishlar so'raldi",
       "stateOpenReviewRequired": "Ochiq · Ko'rib chiqish kerak",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Bosh sahifa",
-    "profile": "Profil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, varaq, {{total}} tadan {{position}}-si",
-    "chat": "Suhbat"
+    "position": "{{name}}, varaq, {{total}} tadan {{position}}-si"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Nusxani almashtirish",
       "couldNotLoadInstances": "Nusxalarni yuklab bo'lmadi.",
-      "noInstances": "KiloClaw nusxalari yo‘q",
       "noInstancesDescription": "Suhbatlashishni boshlash uchun nusxani sozlang.",
       "setUpKiloclaw": "KiloClawni sozlash",
       "currentInstance": "{{title}}, joriy"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Suhbatga kirib bo'lmadi.",
       "couldNotRefreshMessages": "Xabarlarni yangilab bo'lmadi.",
       "couldNotLoadHistory": "Suhbat tarixini yuklab bo'lmadi.",
-      "rename": "Nomini o‘zgartirish",
       "leave": "Chiqish",
       "untitledConversation": "Nomsiz suhbat",
       "createFailed": "Suhbatni yaratib bo'lmadi.",
       "leaveFailed": "Suhbatdan chiqib bo'lmadi."
     },
     "reactions": {
-      "title": "Reaksiya",
-      "close": "Reaksiyalarni yopish",
-      "recent": "Oxirgilar",
       "common": "Ko'p ishlatiladigan",
       "reactWith": "{{reaction}} bilan reaksiya qilish",
       "accessibility": "{{emoji}} reaksiyasi, {{displayCount}} ta"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Reaksiya qo'shib bo'lmadi.",
       "retrySend": "Qayta yuborish",
       "moreReactions": "Boshqa reaksiyalar",
-      "reply": "Javob berish",
       "edit": "Tahrirlash",
       "sendFailed": "Xabarni yuborib bo'lmadi.",
       "retrySendFailed": "Xabarni qayta yuborib bo'lmadi.",
@@ -807,7 +829,6 @@
       "takePhoto": "Rasmga olish",
       "photoLibrary": "Rasmlar kutubxonasi",
       "files": "Fayl",
-      "cameraAccessDisabled": "Kameradan foydalanishga ruxsat berilmagan",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} yozmoqda..."
     },
     "botStatus": {
-      "online": "Onlayn",
-      "idle": "Kutmoqda",
       "offline": "Oflayn",
       "loadingUser": "Foydalanuvchi ma'lumotlari yuklanmoqda...",
       "waitingForStatus": "Bot holati kutilmoqda...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw nusxalarini yuklab bo'lmadi.",
     "billing": {
       "title": "To'lovlar",
@@ -840,7 +858,6 @@
       "plan": "Reja",
       "finalTermEnds": "Oxirgi davr tugashi",
       "afterFinalTerm": "Oxirgi davrdan keyin",
-      "remaining": "Qolgani",
       "lessThanOneDay": "1 kundan kam",
       "ends": "Tugaydi",
       "expires": "Amal qilish muddati tugaydi",
@@ -941,20 +958,15 @@
       "disconnect": "Google hisobi bilan ulanishni uzish",
       "copied": "Nusxalandi",
       "copyCommand": "Buyruqni nusxalash",
-      "disabled": "O‘chirilgan",
       "disconnectConfirm": "Uzish",
       "disconnectMessage": "Google hisobingiz bu nusxadan olib tashlansinmi? Gmail bildirishnomalari o'chiriladi. O'zgarishlarni qo'llash uchun ulanishni uzgach, nusxani qayta joylashtiring.",
       "disconnectTitle": "Google bilan ulanishni uzish"
     },
     "modelList": {
-      "title": "Barcha modellar",
       "searchPlaceholder": "Modellarni qidirish...",
-      "clearSearch": "Qidiruvni tozalash",
       "noMatches": "Qidiruvingizga mos model topilmadi",
-      "noModels": "Modellar mavjud emas",
       "noModelsDescription": "Modellar mavjud bo'lgach, shu yerda ko'rinadi.",
-      "noResultsFor": "\"{{query}}\" so'rovi bo'yicha natija topilmadi.",
-      "recommended": "Tavsiya etilgan"
+      "noResultsFor": "\"{{query}}\" so'rovi bo'yicha natija topilmadi."
     },
     "secrets": {
       "title": "Maxfiy ma’lumotlar",
@@ -972,8 +984,7 @@
       "setupGuide": "Sozlash qo‘llanmasi",
       "saving": "Saqlanmoqda…",
       "removing": "O'chirilmoqda…",
-      "updateToken": "Tokenni yangilash",
-      "connect": "Ulash"
+      "updateToken": "Tokenni yangilash"
     },
     "versionPin": {
       "title": "Versiyani belgilab qo‘yish",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Sozlash yakunlanmoqda",
       "finishingSetupDescription": "Biroz kuting, hisobingizni sozlashni yakunlayapmiz. Bu odatda ko'p vaqt olmaydi.",
       "getStarted": "Boshlash",
-      "noInstances": "KiloClaw nusxalari yo‘q",
       "noInstancesDescription": "Kod yozuvchi agentlarni ishga tushirish uchun birinchi nusxangizni yarating."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}} bilan suhbatlashish",
-        "online": "Onlayn",
         "ready": "{{name}} tayyor",
         "warmedUp": "Hammasi tayyor. Xohlaganingizda salom ayting."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Ilg'or",
       "frontierDescription": "Eng yuqori imkoniyatlar. So'rovlarni mulohaza yurita oladigan ilg'or modellarga yo'naltiradi.",
-      "balancedLabel": "Muvozanatli",
       "balancedDescription": "Tezlik va imkoniyatlarning arzonroq narxdagi qulay muvozanati.",
-      "performance": "Unumdorlik",
       "autoModelA11y": "{{label}} avtomatik modeli",
       "currentModel": "Joriy model",
       "browseAllModels": "yoki 500 dan ortiq model orasidan tanlang",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "{{name}}ni ochish, {{displayCount}} ta o'qilmagan xabar",
       "openUnread": "{{name}}ni ochish, {{displayCount}} ta o‘qilmagan xabar",
       "openUnread_other": "{{name}}ni ochish, {{displayCount}} ta o‘qilmagan xabar",
-      "open": "{{name}}ni ochish",
       "openSettings": "{{name}} uchun sozlamalarni ochish",
       "fixOnKiloAi": "kilo.ai saytida tuzatish: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Ko‘rib chiqish",
       "cancelTitle": "Ko'rib chiqish bekor qilinsinmi?",
       "cancelMessage": "Bu davom etayotgan kodni ko'rib chiqish jarayonini to'xtatadi.",
-      "keepRunning": "To‘xtatmaslik",
       "cancelReview": "Ko'rib chiqishni bekor qilish",
       "retryTitle": "Qayta ko'rib chiqilsinmi?",
       "retryMessage": "Bu kodni ko'rib chiqishni qayta ishga tushiradi.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}}, muallif: {{author}}",
       "noFindings": "Muammolar topilmadi.",
       "showMore": "Ko'proq ko'rsatish",
-      "branch": "Tarmoq",
       "created": "Yaratilgan",
       "started": "Boshlangan",
       "completed": "Yakunlangan",
       "tokens": "Token",
       "tokensInOut": "{{input}} kirish / {{output}} chiqish",
-      "openPullRequest": "Ochiq PR",
       "council": "Kengash",
       "decision": "Qaror",
       "gate": "O'tish shartlari",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Ko‘rib chiqish xotirasi",
-      "couldNotLoadMore": "Qolganlarini yuklab bo‘lmadi.",
-      "retryLoadingMore": "Qolganlarini yuklashga qayta urinish",
       "loading": "Ko'rib chiqish xotirasi yuklanmoqda",
       "couldNotLoad": "Ko'rib chiqish xotirasini yuklab bo'lmadi.",
       "off": "Ko'rib chiqish xotirasi o'chiq.",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucketni sozlash"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket ulandi",
-      "title": "Bitbucketni ulash",
       "description": "Kerakli ruxsatlarga ega ish maydoniga kirish tokenini yarating va uni quyiga joylashtiring.",
       "scopes": "Hisob: o'qish · Repozitoriyalar: o'qish/yozish · PRlar: o'qish · Vebhuklar: o'qish/yozish",
-      "tokenPlaceholder": "Ish maydoniga kirish tokeni",
-      "connect": "Ulash"
+      "tokenPlaceholder": "Ish maydoniga kirish tokeni"
     },
     "scopeList": {
-      "couldNotLoad": "Tashkilotlarni yuklab bo‘lmadi.",
       "personalStillAvailable": "Quyida shaxsiy repozitoriyalaringizdan foydalanishingiz mumkin.",
       "personalSubtitle": "O‘zingizga tegishli repozitoriylar",
       "viewOnly": "Faqat ko'rish"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub ilovasi",
       "githubError": "GitHubni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "gitlabAccount": "GitLab hisobi",
-      "connectGitLab": "GitLabni ulash",
       "gitlabError": "GitLabni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "description": "PRlarni avtomatik ko'rib chiqish uchun Kilo {{label}}ni ulang.",
       "bitbucketError": "Bitbucketni sozlash sahifasini ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Kodni ko'rib chiquvchini yangilab bo'lmadi.",
     "configSaveFailed": "Ko'rib chiqish sozlamalarini saqlab bo'lmadi.",
     "status": {
-      "pending": "Kutilmoqda",
       "running": "Ishlamoqda",
       "completed": "Yakunlangan",
-      "failed": "Amalga oshmadi",
       "interrupted": "Uzildi"
     },
     "reviewStyle": {
       "strict": "Talabchan",
-      "balanced": "Muvozanatli",
       "lenient": "Yumshoq",
       "roast": "Hajviy tanqid"
     },
     "focusArea": {
       "security": "Xavfsizlik",
-      "performance": "Unumdorlik",
       "bugs": "Xatolar",
       "style": "Uslub",
       "testing": "Testlash",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Ochiq",
       "fixed": "Tuzatilgan",
       "statusIgnored": "E'tiborsiz qoldirilgan",
-      "statusClosed": "Yopilgan",
       "severityHigh": "Yuqori",
       "severityMedium": "O‘rta",
       "severityLow": "Past",
@@ -1655,7 +1646,6 @@
       "title": "Sozlamalar",
       "couldNotLoadSettings": "Xavfsizlik agenti sozlamalarini yuklab bo'lmadi.",
       "couldNotLoadPermissions": "Ruxsatlarni yuklab bo'lmadi.",
-      "disabled": "O‘chirilgan",
       "on": "Yoniq",
       "repositoriesCount_one": "{{displayCount}} ta repozitoriya tanlangan",
       "repositoriesCount": "{{displayCount}} ta repozitoriy tanlangan",
@@ -1683,7 +1673,6 @@
       "retry": "Qayta tuzatishga urinish",
       "cancelTitle": "Bu tuzatish bekor qilinsinmi?",
       "cancelMessage": "Xavfsizlik agenti davom etayotgan tuzatish urinishini to'xtatadi.",
-      "keepRunning": "To‘xtatmaslik",
       "cancelRemediation": "Tuzatishni bekor qilish",
       "openPullRequest": "PR{{number}}ni ochish",
       "openDraftPullRequest": "Qoralama PR{{number}}ni ochish",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "Urinishlar tarixi ({{displayCount}})",
       "attemptNumber": "{{number}}-urinish",
       "startedBy": "Boshlagan foydalanuvchi",
-      "branch": "Tarmoq",
       "queued": "Tuzatish navbatga qo'yildi",
       "retryQueued": "Qayta tuzatish urinishi navbatga qo'yildi",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Filtrlarga mos muammolar yo'q",
       "noMatchesDescription": "Tanlangan filtrlarni sozlab yoki tozalab ko'ring.",
       "emptyTitle": "Ochiq muammolar yo'q",
-      "emptyDescription": "Hozir e'tibor talab qiladigan ochiq muammolar yo'q.",
-      "clearFilters": "Filtrlarni tozalash"
+      "emptyDescription": "Hozir e'tibor talab qiladigan ochiq muammolar yo'q."
     },
     "scopeList": {
-      "couldNotLoad": "Tashkilotlarni yuklab bo‘lmadi.",
       "personalSubtitle": "O‘zingizga tegishli repozitoriylar"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "Qoralama PR ochildi",
       "prOpened": "PR ochildi",
       "blocked": "To'siq bor",
-      "failed": "Amalga oshmadi",
       "noChangesNeeded": "O‘zgartirish kerak emas",
       "originAutomaticPolicy": "Avtomatik qoida",
       "originIncludeExistingPolicy": "Mavjud muammolarni ham qo'shish qoidasi",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Qidirilmoqda",
       "searchSessions": "Seanslarni qidirish",
-      "searchSessionsPlaceholder": "Seanslarni qidirish",
-      "clearSearch": "Qidiruvni tozalash",
-      "clearFilters": "Filtrlarni tozalash"
+      "searchSessionsPlaceholder": "Seanslarni qidirish"
     },
     "sessionList": {
-      "couldNotLoad": "Seanslarni yuklab bo‘lmadi.",
       "couldNotLoadActive": "Faol sessiyalarni yuklab bo'lmadi.",
       "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang. Sessiyalaringiz shu yerda ko'rinadi.",
       "noMatches": "Mos sessiya topilmadi",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Sessiya o'chirilsinmi?",
       "deleteMessage": "Bu amalni ortga qaytarib bo'lmaydi.",
       "deleteSession": "Sessiyani o'chirish",
-      "rename": "Nomini o‘zgartirish",
       "renameMessage": "Bu sessiya uchun yangi nom kiriting.",
       "copyId": "Sessiya identifikatorini nusxalash",
       "idCopied": "Sessiya identifikatori nusxalandi",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
       "couldNotLoad": "Sessiyani yuklab bo'lmadi.",
       "failedToLoadDetails": "Sessiya tafsilotlarini yuklab bo'lmadi.",
-      "notFound": "Topilmadi.",
       "notFoundDescription": "Bu element olib tashlangan yoki undan endi foydalanib bo‘lmaydigan bo‘lishi mumkin.",
       "failedToStopExecution": "Bajarishni to'xtatib bo'lmadi.",
       "renameSession": "Sessiya nomini o'zgartirish",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Qayta ulanish"
     },
     "newSession": {
-      "title": "Yangi seans",
       "connectGithubDescription": "Brauzerda GitHub hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
       "openGithub": "GitHub saytini ochish",
       "refreshRepositories": "Repozitoriyalarni yangilash",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Repozitoriyalarni yangilab bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "discardDraftTitle": "Qoralama bekor qilinsinmi?",
       "discardDraftMessage": "Yozgan so'rovingiz yo'qoladi.",
-      "keepEditing": "Tahrirlashni davom ettirish",
       "discardFailed": "Qoralamani bekor qilib bo'lmadi. Iltimos, qayta urinib ko'ring.",
       "remoteHint": "Kompyuteringizdagi kilo jarayonini boshqarish uchun `kilo remote` buyrug'ini yoki ishlayotgan CLI sessiyasida `/remote` buyrug'ini bajaring.",
-      "bitbucketConnected": "Bitbucket ulandi",
-      "connectBitbucket": "Bitbucketni ulash",
       "connectBitbucketDescription": "Brauzerda Bitbucket hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
-      "connectGitlab": "GitLabni ulash",
       "connectGitlabDescription": "Brauzerda GitLab hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi.",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "{{name}} vositasi, {{status}}",
       "fileEmpty": "Bu fayl bo‘sh.",
       "noTasks": "Vazifalar yo'q.",
-      "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
       "truncated": "Qisqartirilgan",
       "toolRead": "o'qish",
       "toolEdit": "Tahrirlash",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Boshqa so‘z bilan qidirib ko‘ring.",
       "loading": "Yuklanmoqda...",
       "accessibility": "Repozitoriya: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Xabar tafsilotlari",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Keshga yozish",
       "total": "Jami",
       "reportAiResponseFailedRetryable": "Bu javob haqida shikoyat yuborib bo'lmadi.",
-      "reportAiResponseFailedTerminal": "Bu javob haqida shikoyat yuborish imkoni yo'q.",
-      "reportAiResponseSubmitted": "Shikoyat yuborildi. Qayd raqami: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Bu javob haqida shikoyat yuborish imkoni yo'q."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "{{alt}} rasmini ko'rish",
       "imageOutput": "Natijadagi rasm",
       "imageOutputWithFilename": "Natijadagi rasm: {{filename}}",
-      "defaultName": "Fayl",
       "openFullScreen": "{{name}} faylini to'liq ekranda ochish",
       "preview": "{{name}} faylini oldindan ko'rish",
-      "openFile": "{{name}}ni ochish",
       "couldNotLoadFile": "Ushbu faylni yuklab bo'lmadi.",
       "couldNotLoadFileRetry": "Ushbu faylni yuklab bo'lmadi. Qayta urinib ko'ring.",
       "retryLoadingFile": "Faylni qayta yuklash",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "Modelni tanlash",
       "searchPlaceholder": "Modellarni qidirish...",
-      "noModels": "Modellar mavjud emas",
       "noModelsDescription": "Tanlash uchun modellar mavjud emas.",
-      "allModels": "Barcha modellar",
-      "favorites": "Sevimlilar",
-      "recommended": "Tavsiya etilgan"
+      "favorites": "Sevimlilar"
     },
     "modelSelector": {
       "provider": "Provayder: {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "Kamera",
       "photoLibrary": "Rasmlar kutubxonasi",
       "files": "Fayl",
-      "cameraAccessDisabled": "Kameradan foydalanishga ruxsat berilmagan",
       "cameraAccessMessage": "Suratga olish uchun sozlamalarda kameradan foydalanishga ruxsat bering.",
       "couldNotOpenPhotoPicker": "Rasm tanlash oynasini ochib bo'lmadi. Kilo ilovasini qayta ishga tushiring va yana urinib ko'ring.",
       "maxFilesAllowed": "Ko'pi bilan {{displayCount}} ta fayl qo'shish mumkin.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Havola nusxalandi",
-      "reviewPr": "PRni ko‘rib chiqish",
       "openLink": "Havolani ochish",
-      "copyLink": "Havolani nusxalash",
       "shareLink": "Havolani ulashish",
       "share": "Ulashish",
       "prLinkActions": "PR havolasi bilan amallar",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Kontekst: {{window}} ta tokendan {{used}} tasi ishlatilgan, {{percentage}}",
       "title": "Kontekstdan foydalanish",
       "used": "Ishlatilgan",
-      "remaining": "Qolgani",
       "provider": "Provayder",
       "totalCost": "Umumiy xarajat",
       "usageReflectsLatest": "Foydalanish ko'rsatkichlari yordamchining oxirgi tugallangan javobiga tegishli.",
@@ -2598,7 +2561,6 @@
     "billingPage": "to'lov sahifasi"
   },
   "deviceSessions": {
-    "couldNotLoad": "Seanslarni yuklab bo‘lmadi.",
     "couldNotLoadDescription": "Ma'lumotlar yuklanmaguncha faol sessiyalaringizni ko'rsatib bo'lmaydi.",
     "currentDeviceUnidentified": "Joriy qurilmani aniqlab bo'lmadi.",
     "noSessions": "Faol sessiyalar yo'q",
@@ -2607,7 +2569,6 @@
     "signedIn": "Kirilgan vaqt: {{signedIn}} · Oxirgi faollik: {{lastSeen}}",
     "thisDevice": "Bu qurilma",
     "webBrowser": "Veb-brauzer",
-    "title": "Qurilma seanslari",
     "viewProfile": "Profilni ko'rish",
     "signOutThisDevice": "Bu qurilmada tizimdan chiqish",
     "signOutThisSession": "Bu sessiyani tugatish",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "Bu havola endi amal qilmaydi.",
-    "goBack": "Orqaga qaytish",
     "title": "Sahifa topilmadi"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Matnning bir qismi ko‘rsatilmagan",
     "truncated": "Qisqartirilgan",
     "wrap": "Satrga bo'lish",
     "scroll": "Siljitish"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Iltimos, qayta urinib ko'ring.",
     "offlineTitle": "Yuklab bo'lmadi.",
     "permissionDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
-    "notFoundTitle": "Topilmadi.",
     "notFoundDescription": "Bu element olib tashlangan yoki undan endi foydalanib bo‘lmaydigan bo‘lishi mumkin.",
     "serverTitle": "Yuklab bo'lmadi.",
     "serverDescription": "Tizimimizda xato yuz berdi. Iltimos, qayta urinib ko'ring."
   },
   "screenHeader": {
     "openMenu": "Menyuni ochish",
-    "openMenuFor": "{{title}} uchun menyuni ochish",
-    "goBack": "Orqaga qaytish"
+    "openMenuFor": "{{title}} uchun menyuni ochish"
   },
   "picker": {
     "optionsExpired": "Variantlar eskirgan",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kiloga yuborish",
-    "reviewPr": "PRni ko‘rib chiqish",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Yangi seans",
     "searchPlaceholder": "Oxirgi sessiyalarni qidirish",
     "connectedCli": "Ulangan CLIda",
     "newSessionOn": "{{name}}da yangi sessiya",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass bekor qilinmoqda",
     "statusPastDue": "Kilo Pass to'lovi kechikkan",
     "monthlyCredits": "Oyiga {{credits}} kredit",
-    "ends": "Tugash sanasi: {{date}}",
     "periodEnd": "davr oxiri",
     "managedOnGooglePlay": "Google Play orqali boshqariladi",
     "managedInAppStore": "App Store orqali boshqariladi",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Androidda Kilo Passni ilova ichidan xarid qilib bo'lmaydi. Uni veb-saytda boshqaring.",
     "webManagementDescription": "Bu Kilo Pass veb-saytda boshqariladi.",
     "legalDisclosure": "Kilo Pass avtomatik yangilanadigan oylik obunadir. Xarid tasdiqlanganda to'lov Apple ID hisobingizdan yechiladi. Agar obunani joriy davr tugashidan kamida 24 soat oldin bekor qilmasangiz, u har oy ko'rsatilgan narxda avtomatik yangilanadi. Obunani istalgan payt App Store hisobingiz sozlamalarida boshqaring yoki bekor qiling.",
-    "legalPrivacyPolicy": "Maxfiylik siyosati",
     "legalTermsOfUse": "Foydalanish shartlari (EULA)",
     "purchaseDifferentAccount": "Bu App Store xaridi Kilo hisobingizga bog'lanmagan. Xarid uchun ishlatilgan Apple Account hisobiga kiring va qayta urinib ko'ring.",
     "restoreFailed": "Xaridlarni tiklab bo'lmadi. Qayta urinib ko'ring.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "To'g'ri elektron pochta manzilini kiriting.",
-      "emailLabel": "Elektron pochta",
       "emailPlaceholder": "ism@kompaniya.com",
       "permissionDenied": "A'zolarni taklif qilishga ruxsatingiz yo'q.",
       "roleLabel": "Rol",
@@ -2968,7 +2920,6 @@
         "billingManager": "To'lov menejeri"
       },
       "emailStatusFailed": "Xat yuborilmadi",
-      "emailStatusPending": "Kutilmoqda",
       "inviteCreated": "Taklifnoma yaratildi",
       "pendingInvitations": "Qabul qilinmagan taklifnomalar",
       "resendInvite": "Taklifnomani qayta yuborish",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Holatni yuklab bo'lmadi",
       "creditProcessingDelayed": "Kreditlarni hisobga o'tkazish kechikmoqda · avtomatik qayta urinilmoqda",
       "ended": "Yakunlandi",
-      "endsOn": "Tugash sanasi: {{date}}",
       "manageHint": "Kilo Pass boshqaruv sahifasini saytda ochadi.",
       "notSubscribed": "Obuna yo'q",
       "overallocated": "Tayinlangan Kilo Pass obunalari soni to'langan o'rinlar sonidan ko'p",
@@ -3004,7 +2954,6 @@
       "paymentPending": "To'lov kutilmoqda",
       "processingBlocked": "Qayta ishlash bloklandi",
       "processingNeedsReview": "Qayta ishlash jarayonini tekshirish kerak",
-      "retry": "Qayta urinish",
       "retryHint": "Kilo Pass holatini qayta yuklaydi.",
       "setupHint": "Kilo Pass sozlash sahifasini brauzerda ochadi."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Sozlamalarga qaytish"
   },
   "quickChat": {
-    "title": "Suhbat",
     "empty": {
       "title": "Suhbatni boshlang",
       "description": "Model bilan gaplashish uchun xabar yuboring."
@@ -3076,7 +3024,6 @@
     "openAgents": "Agentlarni ochish",
     "running": "Ishlamoqda",
     "needsInput": "Javob kutilmoqda",
-    "idle": "Kutmoqda",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
   }

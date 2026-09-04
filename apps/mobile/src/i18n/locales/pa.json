@@ -69,7 +69,58 @@
     "repository": "ਰਿਪੋਜ਼ਿਟਰੀ",
     "signOut": "ਸਾਈਨ ਆਊਟ ਕਰੋ",
     "agents": "ਏਜੰਟ",
-    "all": "ਸਾਰੇ"
+    "all": "ਸਾਰੇ",
+    "allModels": "ਸਾਰੇ ਮਾਡਲ",
+    "balanced": "ਸੰਤੁਲਿਤ",
+    "bitbucketConnected": "Bitbucket ਜੁੜ ਗਿਆ",
+    "branch": "ਬ੍ਰਾਂਚ",
+    "cameraAccessDisabled": "ਕੈਮਰੇ ਦੀ ਵਰਤੋਂ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ",
+    "chat": "ਚੈਟ",
+    "clearFilters": "ਫਿਲਟਰ ਹਟਾਓ",
+    "clearSearch": "ਖੋਜ ਸਾਫ਼ ਕਰੋ",
+    "closed": "ਬੰਦ",
+    "closeReactions": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ ਬੰਦ ਕਰੋ",
+    "connect": "ਜੋੜੋ",
+    "connectBitbucket": "Bitbucket ਨਾਲ ਜੋੜੋ",
+    "connectGitlab": "GitLab ਨਾਲ ਜੋੜੋ",
+    "contentTruncated": "ਸਮੱਗਰੀ ਦਾ ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
+    "copyLink": "ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
+    "couldNotLoadOrganizations": "ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
+    "couldNotLoadSessions": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
+    "couldnTLoadMore": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
+    "deviceSessions": "ਡਿਵਾਈਸਾਂ ਦੇ ਸੈਸ਼ਨ",
+    "disabled": "ਬੰਦ",
+    "email": "ਈਮੇਲ",
+    "ends": "{{date}} ਨੂੰ ਖ਼ਤਮ ਹੋਵੇਗਾ",
+    "failed": "ਅਸਫਲ",
+    "file": "ਫਾਈਲ",
+    "gitlab": "GitLab",
+    "goBack": "ਵਾਪਸ ਜਾਓ",
+    "idle": "ਵਿਹਲਾ",
+    "keepEditing": "ਸੋਧਣਾ ਜਾਰੀ ਰੱਖੋ",
+    "keepRunning": "ਚੱਲਣ ਦਿਓ",
+    "kiloclaw": "KiloClaw",
+    "newSession": "ਨਵਾਂ ਸੈਸ਼ਨ",
+    "noKiloclawInstances": "ਕੋਈ KiloClaw ਇੰਸਟੈਂਸ ਨਹੀਂ",
+    "noModelsAvailable": "ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ",
+    "notFound": "ਨਹੀਂ ਮਿਲਿਆ।",
+    "online": "ਔਨਲਾਈਨ",
+    "open": "{{name}} ਖੋਲ੍ਹੋ",
+    "openPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
+    "pending": "ਉਡੀਕ ਵਿੱਚ",
+    "performance": "ਕਾਰਗੁਜ਼ਾਰੀ",
+    "preferences": "ਤਰਜੀਹਾਂ",
+    "privacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
+    "profile": "ਪ੍ਰੋਫਾਈਲ",
+    "reactions": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ",
+    "recent": "ਹਾਲੀਆ",
+    "recommended": "ਸਿਫ਼ਾਰਸ਼ ਕੀਤੇ ਮਾਡਲ",
+    "remaining": "ਬਾਕੀ",
+    "rename": "ਨਾਮ ਬਦਲੋ",
+    "reply": "ਜਵਾਬ ਦਿਓ",
+    "reportSubmittedReceipt": "ਰਿਪੋਰਟ ਜਮ੍ਹਾਂ ਕੀਤੀ ਗਈ। ਰਸੀਦ {{receiptId}}",
+    "retryLoadingMore": "ਹੋਰ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
+    "reviewPr": "PR ਦੀ ਸਮੀਖਿਆ ਕਰੋ"
   },
   "language": {
     "title": "ਭਾਸ਼ਾ",
@@ -77,7 +128,6 @@
     "couldNotRestart": "ਮੁੜ ਚਾਲੂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "languageSaved": "ਤੁਹਾਡੀ ਭਾਸ਼ਾ ਦੀ ਚੋਣ ਸੇਵ ਹੋ ਗਈ ਹੈ।",
     "catalogLoadFailed": "ਭਾਸ਼ਾ ਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
-    "retry": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
     "search": "ਭਾਸ਼ਾ ਦੀ ਖੋਜ",
     "noMatches": "ਕੋਈ ਭਾਸ਼ਾ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ",
     "deviceLanguage": "ਡਿਵਾਈਸ ਦੀ ਭਾਸ਼ਾ",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "ਸਾਈਨ ਇਨ ਕੋਡ: {{code}}",
     "openSignInPageInBrowser": "ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਸਾਈਨ-ਇਨ ਪੰਨਾ ਖੋਲ੍ਹੋ",
     "copySignInLink": "ਸਾਈਨ-ਇਨ ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
-    "copyLink": "ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
     "cancelSignIn": "ਸਾਈਨ ਇਨ ਰੱਦ ਕਰੋ",
     "startingSignIn": "ਸਾਈਨ ਇਨ ਸ਼ੁਰੂ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
     "organizationUsesSso": "ਤੁਹਾਡੀ ਸੰਸਥਾ ਸਿੰਗਲ ਸਾਈਨ-ਆਨ ਵਰਤਦੀ ਹੈ।",
@@ -112,7 +161,6 @@
     "terms": "ਸ਼ਰਤਾਂ",
     "termsConnector": " ਅਤੇ ",
     "termsSuffix": "।",
-    "privacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
     "moreSignInOptions": "ਹੋਰ ਸਾਈਨ-ਇਨ ਵਿਕਲਪ",
     "couldNotCompleteSignIn": "ਸਾਈਨ ਇਨ ਪੂਰਾ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "sessionEnded": "ਤੁਹਾਡਾ ਸੈਸ਼ਨ ਖਤਮ ਹੋ ਗਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਸਾਈਨ ਇਨ ਕਰੋ।",
@@ -126,7 +174,6 @@
     "or": "ਜਾਂ"
   },
   "profile": {
-    "title": "ਪ੍ਰੋਫਾਈਲ",
     "codeReviewerSubtitle": "ਆਪਣੇ ਆਪ ਹੋਣ ਵਾਲੀਆਂ PR ਸਮੀਖਿਆਵਾਂ",
     "securityAgentSubtitle": "ਸੁਰੱਖਿਆ ਕਮਜ਼ੋਰੀਆਂ ਲੱਭੋ ਅਤੇ ਠੀਕ ਕਰੋ",
     "reviews": "ਸਮੀਖਿਆਵਾਂ",
@@ -136,9 +183,7 @@
     "linkedAccounts": "ਲਿੰਕ ਕੀਤੇ ਖਾਤੇ",
     "couldNotLoadAccounts": "ਖਾਤੇ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
     "app": "ਐਪ",
-    "preferences": "ਤਰਜੀਹਾਂ",
     "preferencesSubtitle": "ਦਿੱਖ, ਸੂਚਨਾਵਾਂ, ਸੋਚ ਅਤੇ ਸਕ੍ਰੀਨ ਦਾ ਵਿਹਾਰ",
-    "deviceSessions": "ਡਿਵਾਈਸਾਂ ਦੇ ਸੈਸ਼ਨ",
     "deviceSessionsSubtitle": "ਹੋਰ ਡਿਵਾਈਸਾਂ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਉਨ੍ਹਾਂ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
     "feedback": "ਫੀਡਬੈਕ ਦਿਓ",
     "privacyChoices": "ਗੋਪਨੀਯਤਾ ਦੀਆਂ ਚੋਣਾਂ",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "ਈਮੇਲ",
     "providerTestAccount": "ਟੈਸਟ ਖਾਤਾ",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "ਐਂਟਰਪ੍ਰਾਈਜ਼ SSO"
   },
   "preferences": {
-    "title": "ਤਰਜੀਹਾਂ",
     "autoExpandThinking": "ਸੋਚ ਦਾ ਵੇਰਵਾ ਆਪਣੇ ਆਪ ਖੋਲ੍ਹੋ",
     "autoExpandThinkingSubtitle": "ਏਜੰਟ ਦੇ ਸੋਚਣ ਤੋਂ ਬਾਅਦ ਉਸ ਦੀ ਸੋਚ ਦਾ ਪੂਰਾ ਵੇਰਵਾ ਦਿਖਾਓ।",
     "keepScreenOn": "ਸੈਸ਼ਨ ਪੰਨੇ 'ਤੇ ਸਕ੍ਰੀਨ ਚਾਲੂ ਰੱਖੋ",
@@ -360,7 +402,6 @@
       "unresolveThread": "ਥ੍ਰੈਡ ਨੂੰ ਮੁੜ ਅਣਸੁਲਝਿਆ ਕਰੋ",
       "resolved": "ਹੱਲ ਹੋਇਆ",
       "outdated": "ਪੁਰਾਣੀ",
-      "file": "ਫਾਈਲ",
       "comment_one": "1 ਟਿੱਪਣੀ",
       "comment": "{{displayCount}} ਟਿੱਪਣੀਆਂ",
       "comment_other": "{{displayCount}} ਟਿੱਪਣੀਆਂ",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "retryLoadingMore": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "loadMoreComments": "ਹੋਰ ਟਿੱਪਣੀਆਂ ਲੋਡ ਕਰੋ",
-      "closeReactions": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ ਬੰਦ ਕਰੋ",
-      "reactionsTitle": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ",
       "addReaction": "ਪ੍ਰਤੀਕਿਰਿਆ ਜੋੜੋ",
       "reactionPill": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{displayCount}} {{countLabel}}",
       "reaction_one": "ਪ੍ਰਤੀਕਿਰਿਆ",
@@ -380,13 +419,11 @@
       "reportUser": "ਵਰਤੋਂਕਾਰ ਦੀ ਰਿਪੋਰਟ ਕਰੋ",
       "mute": "ਮਿਊਟ ਕਰੋ",
       "block": "ਬਲੌਕ ਕਰੋ",
-      "reportSubmitted": "ਰਿਪੋਰਟ ਜਮ੍ਹਾਂ ਕੀਤੀ ਗਈ। ਰਸੀਦ {{receiptId}}",
       "blockedUser": "{{login}} ਨੂੰ ਬਲੌਕ ਕੀਤਾ ਗਿਆ",
       "mutedUser": "{{login}} ਨੂੰ ਮਿਊਟ ਕੀਤਾ ਗਿਆ",
       "replyPlaceholder": "ਜਵਾਬ…",
       "replyBody": "ਜਵਾਬ ਦੀ ਸਮੱਗਰੀ",
       "submitReply": "ਜਵਾਬ ਭੇਜੋ",
-      "reply": "ਜਵਾਬ ਦਿਓ",
       "termsTitle": "ਸੇਵਾ ਦੀਆਂ ਸ਼ਰਤਾਂ",
       "termsCopy": "ਪੋਸਟ ਕਰਨ ਲਈ ਤੁਹਾਡੀ ਉਮਰ ਘੱਟੋ-ਘੱਟ 13 ਸਾਲ ਹੋਣੀ ਲਾਜ਼ਮੀ ਹੈ।",
       "termsAcceptRetry": "ਸ਼ਰਤਾਂ ਸਵੀਕਾਰ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHub ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ URL",
       "clearLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਹਟਾਓ",
       "pasteLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
-      "open": "ਖੋਲ੍ਹੋ",
-      "openPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ"
+      "open": "ਖੋਲ੍ਹੋ"
     },
     "checks": {
       "title": "ਜਾਂਚਾਂ",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "ਇਨਬਾਕਸ",
-      "recent": "ਹਾਲੀਆ",
       "loading": "ਇਨਬਾਕਸ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ",
       "noReviewRequests": "ਸਮੀਖਿਆ ਲਈ ਕੋਈ ਬੇਨਤੀ ਨਹੀਂ",
       "noReviewRequestsDescription": "ਤੁਹਾਡੀ ਸਮੀਖਿਆ ਦੀ ਉਡੀਕ ਕਰ ਰਹੀਆਂ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਇੱਥੇ ਦਿਖਾਈ ਦਿੰਦੀਆਂ ਹਨ। ਤੁਸੀਂ ਉੱਪਰ ਕਿਸੇ ਵੀ PR ਦਾ ਲਿੰਕ ਵੀ ਪੇਸਟ ਕਰ ਸਕਦੇ ਹੋ।",
-      "couldNotLoad": "ਇਨਬਾਕਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-      "couldNotLoadMore": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-      "retryLoadingMore": "ਹੋਰ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
+      "couldNotLoad": "ਇਨਬਾਕਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।"
     },
     "composer": {
       "commentBodyPlaceholder": "ਤੁਹਾਡੀ ਟਿੱਪਣੀ",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "ਟਿੱਪਣੀ ਲਿਖਣ ਵਾਲੀ ਸਕ੍ਰੀਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "discardTitle": "ਟਿੱਪਣੀ ਖਾਰਜ ਕਰੀਏ?",
       "discardMessage": "ਤੁਹਾਡਾ ਖਰੜਾ ਮਿਟ ਜਾਵੇਗਾ।",
-      "keepEditing": "ਸੋਧਣਾ ਜਾਰੀ ਰੱਖੋ",
       "comment": "ਟਿੱਪਣੀ",
       "insertSuggestionA11y": "ਕੋਡ ਲਈ ਸੁਝਾਅ ਸ਼ਾਮਲ ਕਰੋ",
       "insertSuggestion": "ਸੁਝਾਅ ਸ਼ਾਮਲ ਕਰੋ",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "ਮਰਜ ਹੋਈ",
-      "stateClosed": "ਬੰਦ",
       "stateOpenApproved": "ਖੁੱਲ੍ਹੀ · ਮਨਜ਼ੂਰ",
       "stateOpenChangesRequested": "ਖੁੱਲ੍ਹੀ · ਬਦਲਾਅ ਮੰਗੇ ਗਏ",
       "stateOpenReviewRequired": "ਖੁੱਲ੍ਹੀ · ਸਮੀਖਿਆ ਲੋੜੀਂਦੀ",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "ਹੋਮ",
-    "profile": "ਪ੍ਰੋਫਾਈਲ",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ਟੈਬ, {{total}} ਵਿੱਚੋਂ {{position}}",
-    "chat": "ਚੈਟ"
+    "position": "{{name}}, ਟੈਬ, {{total}} ਵਿੱਚੋਂ {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "ਇੰਸਟੈਂਸ ਦੀ ਚੋਣ",
       "couldNotLoadInstances": "ਇੰਸਟੈਂਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
-      "noInstances": "ਕੋਈ KiloClaw ਇੰਸਟੈਂਸ ਨਹੀਂ",
       "noInstancesDescription": "ਚੈਟ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਇੱਕ ਇੰਸਟੈਂਸ ਦਾ ਸੈੱਟਅੱਪ ਕਰੋ।",
       "setUpKiloclaw": "KiloClaw ਦਾ ਸੈੱਟਅੱਪ ਕਰੋ",
       "currentInstance": "{{title}}, ਮੌਜੂਦਾ"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "ਚੈਟ ਵਿੱਚ ਸਾਈਨ ਇਨ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "couldNotRefreshMessages": "ਸੁਨੇਹੇ ਰਿਫਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "couldNotLoadHistory": "ਗੱਲਬਾਤ ਦਾ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-      "rename": "ਨਾਮ ਬਦਲੋ",
       "leave": "ਛੱਡੋ",
       "untitledConversation": "ਬਿਨਾਂ ਸਿਰਲੇਖ ਵਾਲੀ ਗੱਲਬਾਤ",
       "createFailed": "ਗੱਲਬਾਤ ਨਹੀਂ ਬਣ ਸਕੀ।",
       "leaveFailed": "ਗੱਲਬਾਤ ਛੱਡੀ ਨਹੀਂ ਜਾ ਸਕੀ।"
     },
     "reactions": {
-      "title": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ",
-      "close": "ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ ਬੰਦ ਕਰੋ",
-      "recent": "ਹਾਲੀਆ",
       "common": "ਆਮ",
       "reactWith": "{{reaction}} ਨਾਲ ਪ੍ਰਤੀਕਿਰਿਆ ਕਰੋ",
       "accessibility": "{{emoji}} ਪ੍ਰਤੀਕਿਰਿਆ, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "ਪ੍ਰਤੀਕਿਰਿਆ ਜੋੜੀ ਨਹੀਂ ਜਾ ਸਕੀ।",
       "retrySend": "ਦੁਬਾਰਾ ਭੇਜੋ",
       "moreReactions": "ਹੋਰ ਪ੍ਰਤੀਕਿਰਿਆਵਾਂ",
-      "reply": "ਜਵਾਬ ਦਿਓ",
       "edit": "ਸੋਧੋ",
       "sendFailed": "ਸੁਨੇਹਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "retrySendFailed": "ਸੁਨੇਹਾ ਦੁਬਾਰਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
@@ -807,7 +829,6 @@
       "takePhoto": "ਫੋਟੋ ਲਓ",
       "photoLibrary": "ਫੋਟੋ ਲਾਇਬ੍ਰੇਰੀ",
       "files": "ਫਾਈਲਾਂ",
-      "cameraAccessDisabled": "ਕੈਮਰੇ ਦੀ ਵਰਤੋਂ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ",
       "cameraAccessMessage": "ਫੋਟੋ ਲੈਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਕੈਮਰਾ ਵਰਤਣ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।"
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} ਟਾਈਪ ਕਰ ਰਹੇ ਹਨ..."
     },
     "botStatus": {
-      "online": "ਔਨਲਾਈਨ",
-      "idle": "ਵਿਹਲਾ",
       "offline": "ਔਫਲਾਈਨ",
       "loadingUser": "ਵਰਤੋਂਕਾਰ ਦੀ ਜਾਣਕਾਰੀ ਲੋਡ ਹੋ ਰਹੀ ਹੈ…",
       "waitingForStatus": "ਬੋਟ ਦੀ ਸਥਿਤੀ ਦੀ ਉਡੀਕ...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw ਇੰਸਟੈਂਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "billing": {
       "title": "ਬਿਲਿੰਗ",
@@ -840,7 +858,6 @@
       "plan": "ਯੋਜਨਾ",
       "finalTermEnds": "ਅੰਤਿਮ ਮਿਆਦ ਦੀ ਸਮਾਪਤੀ",
       "afterFinalTerm": "ਅੰਤਿਮ ਮਿਆਦ ਤੋਂ ਬਾਅਦ",
-      "remaining": "ਬਾਕੀ",
       "lessThanOneDay": "1 ਦਿਨ ਤੋਂ ਘੱਟ",
       "ends": "ਸਮਾਪਤੀ",
       "expires": "ਮਿਆਦ ਦੀ ਸਮਾਪਤੀ",
@@ -941,20 +958,15 @@
       "disconnect": "Google ਖਾਤਾ ਡਿਸਕਨੈਕਟ ਕਰੋ",
       "copied": "ਕਾਪੀ ਕੀਤੀ ਗਈ",
       "copyCommand": "ਕਮਾਂਡ ਕਾਪੀ ਕਰੋ",
-      "disabled": "ਬੰਦ",
       "disconnectConfirm": "ਡਿਸਕਨੈਕਟ ਕਰੋ",
       "disconnectMessage": "ਇਸ ਇੰਸਟੈਂਸ ਤੋਂ ਆਪਣਾ Google ਖਾਤਾ ਹਟਾਈਏ? ਇਸ ਨਾਲ Gmail ਦੀਆਂ ਸੂਚਨਾਵਾਂ ਬੰਦ ਹੋ ਜਾਣਗੀਆਂ। ਬਦਲਾਅ ਲਾਗੂ ਕਰਨ ਲਈ ਡਿਸਕਨੈਕਟ ਕਰਨ ਤੋਂ ਬਾਅਦ ਇੰਸਟੈਂਸ ਦੁਬਾਰਾ ਤੈਨਾਤ ਕਰੋ।",
       "disconnectTitle": "Google ਡਿਸਕਨੈਕਟ ਕਰੋ"
     },
     "modelList": {
-      "title": "ਸਾਰੇ ਮਾਡਲ",
       "searchPlaceholder": "ਮਾਡਲ ਖੋਜੋ...",
-      "clearSearch": "ਖੋਜ ਸਾਫ਼ ਕਰੋ",
       "noMatches": "ਕੋਈ ਮਾਡਲ ਤੁਹਾਡੀ ਖੋਜ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
-      "noModels": "ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ",
       "noModelsDescription": "ਉਪਲਬਧ ਹੋਣ 'ਤੇ ਮਾਡਲ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
-      "noResultsFor": "\"{{query}}\" ਲਈ ਕੋਈ ਨਤੀਜਾ ਨਹੀਂ ਮਿਲਿਆ।",
-      "recommended": "ਸਿਫ਼ਾਰਸ਼ ਕੀਤੇ ਮਾਡਲ"
+      "noResultsFor": "\"{{query}}\" ਲਈ ਕੋਈ ਨਤੀਜਾ ਨਹੀਂ ਮਿਲਿਆ।"
     },
     "secrets": {
       "title": "ਗੁਪਤ ਜਾਣਕਾਰੀ",
@@ -972,8 +984,7 @@
       "setupGuide": "ਸੈੱਟਅੱਪ ਲਈ ਹਦਾਇਤਾਂ",
       "saving": "ਸੰਭਾਲਿਆ ਜਾ ਰਿਹਾ ਹੈ…",
       "removing": "ਹਟਾਇਆ ਜਾ ਰਿਹਾ ਹੈ…",
-      "updateToken": "ਟੋਕਨ ਅੱਪਡੇਟ ਕਰੋ",
-      "connect": "ਜੋੜੋ"
+      "updateToken": "ਟੋਕਨ ਅੱਪਡੇਟ ਕਰੋ"
     },
     "versionPin": {
       "title": "ਵਰਜਨ ਨੂੰ ਸਥਿਰ ਰੱਖਣਾ",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "ਸੈੱਟਅੱਪ ਪੂਰਾ ਹੋ ਰਿਹਾ ਹੈ",
       "finishingSetupDescription": "ਥੋੜ੍ਹੀ ਦੇਰ ਉਡੀਕ ਕਰੋ, ਅਸੀਂ ਤੁਹਾਡਾ ਖਾਤਾ ਤਿਆਰ ਕਰ ਰਹੇ ਹਾਂ। ਇਸ ਵਿੱਚ ਆਮ ਤੌਰ 'ਤੇ ਥੋੜ੍ਹਾ ਜਿਹਾ ਸਮਾਂ ਲੱਗਦਾ ਹੈ।",
       "getStarted": "ਸ਼ੁਰੂ ਕਰੋ",
-      "noInstances": "ਕੋਈ KiloClaw ਇੰਸਟੈਂਸ ਨਹੀਂ",
       "noInstancesDescription": "ਕੋਡਿੰਗ ਏਜੰਟ ਚਲਾਉਣ ਲਈ ਆਪਣਾ ਪਹਿਲਾ ਇੰਸਟੈਂਸ ਬਣਾਓ।"
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}} ਨਾਲ ਗੱਲ ਕਰੋ",
-        "online": "ਔਨਲਾਈਨ",
         "ready": "{{name}} ਤਿਆਰ ਹੈ",
         "warmedUp": "ਸਭ ਤਿਆਰ ਹੈ। ਜਦੋਂ ਤੁਸੀਂ ਤਿਆਰ ਹੋਵੋ ਤਾਂ ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ ਕਹੋ।"
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "ਫਰੰਟੀਅਰ",
       "frontierDescription": "ਸਭ ਤੋਂ ਵਧੀਆ ਕਾਰਗੁਜ਼ਾਰੀ। ਤਰਕ ਕਰਨ ਦੀ ਸਮਰੱਥਾ ਵਾਲੇ ਉੱਨਤ ਮਾਡਲਾਂ ਨੂੰ ਬੇਨਤੀਆਂ ਭੇਜਦਾ ਹੈ।",
-      "balancedLabel": "ਸੰਤੁਲਿਤ",
       "balancedDescription": "ਘੱਟ ਲਾਗਤ 'ਤੇ ਤੇਜ਼ੀ ਅਤੇ ਸਮਰੱਥਾ ਦਾ ਵਧੀਆ ਸੰਤੁਲਨ।",
-      "performance": "ਕਾਰਗੁਜ਼ਾਰੀ",
       "autoModelA11y": "{{label}} ਆਟੋ ਮਾਡਲ",
       "currentModel": "ਮੌਜੂਦਾ ਮਾਡਲ",
       "browseAllModels": "ਜਾਂ 500+ ਮਾਡਲਾਂ ਵਿੱਚੋਂ ਚੁਣੋ",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "{{name}} ਖੋਲ੍ਹੋ, {{displayCount}} ਨਾ ਪੜ੍ਹਿਆ ਸੁਨੇਹਾ",
       "openUnread": "{{name}} ਖੋਲ੍ਹੋ, {{displayCount}} ਨਾ ਪੜ੍ਹੇ ਸੁਨੇਹੇ",
       "openUnread_other": "{{name}} ਖੋਲ੍ਹੋ, {{displayCount}} ਨਾ ਪੜ੍ਹੇ ਸੁਨੇਹੇ",
-      "open": "{{name}} ਖੋਲ੍ਹੋ",
       "openSettings": "{{name}} ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਖੋਲ੍ਹੋ",
       "fixOnKiloAi": "kilo.ai 'ਤੇ ਠੀਕ ਕਰੋ: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "ਸਮੀਖਿਆ",
       "cancelTitle": "ਸਮੀਖਿਆ ਰੱਦ ਕਰਨੀ ਹੈ?",
       "cancelMessage": "ਇਹ ਚੱਲ ਰਹੀ ਕੋਡ ਸਮੀਖਿਆ ਨੂੰ ਰੋਕ ਦੇਵੇਗਾ।",
-      "keepRunning": "ਚੱਲਣ ਦਿਓ",
       "cancelReview": "ਸਮੀਖਿਆ ਰੱਦ ਕਰੋ",
       "retryTitle": "ਸਮੀਖਿਆ ਦੁਬਾਰਾ ਕਰਨੀ ਹੈ?",
       "retryMessage": "ਇਹ ਕੋਡ ਸਮੀਖਿਆ ਨੂੰ ਦੁਬਾਰਾ ਚਲਾਏਗਾ।",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} — {{author}} ਦੁਆਰਾ",
       "noFindings": "ਕੋਈ ਸਮੱਸਿਆ ਨਹੀਂ ਮਿਲੀ।",
       "showMore": "ਹੋਰ ਦਿਖਾਓ",
-      "branch": "ਬ੍ਰਾਂਚ",
       "created": "ਬਣਾਇਆ ਗਿਆ",
       "started": "ਸ਼ੁਰੂ ਕੀਤਾ ਗਿਆ",
       "completed": "ਮੁਕੰਮਲ",
       "tokens": "ਟੋਕਨ",
       "tokensInOut": "{{input}} ਇਨਪੁਟ / {{output}} ਆਉਟਪੁਟ",
-      "openPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
       "council": "ਕੌਂਸਲ",
       "decision": "ਫੈਸਲਾ",
       "gate": "ਮਨਜ਼ੂਰੀ ਦੀ ਜਾਂਚ",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "ਸਮੀਖਿਆ ਦੀ ਯਾਦਦਾਸ਼ਤ",
-      "couldNotLoadMore": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
-      "retryLoadingMore": "ਹੋਰ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "loading": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਲੋਡ ਹੋ ਰਹੀ ਹੈ",
       "couldNotLoad": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "off": "ਸਮੀਖਿਆ ਦੀ ਮੈਮੋਰੀ ਬੰਦ ਹੈ।",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucket ਦਾ ਸੈੱਟਅੱਪ"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket ਜੁੜ ਗਿਆ",
-      "title": "Bitbucket ਨਾਲ ਜੋੜੋ",
       "description": "ਲੋੜੀਂਦੀਆਂ ਇਜਾਜ਼ਤਾਂ ਵਾਲਾ ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ ਬਣਾਓ ਅਤੇ ਇਸ ਨੂੰ ਹੇਠਾਂ ਪੇਸਟ ਕਰੋ।",
       "scopes": "ਖਾਤਾ: ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ · ਰਿਪੋਜ਼ਟਰੀਆਂ: ਪੜ੍ਹਨ/ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ · ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ: ਪੜ੍ਹਨ ਦੀ ਇਜਾਜ਼ਤ · ਵੈਬਹੁੱਕ: ਪੜ੍ਹਨ/ਲਿਖਣ ਦੀ ਇਜਾਜ਼ਤ",
-      "tokenPlaceholder": "ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ",
-      "connect": "ਜੋੜੋ"
+      "tokenPlaceholder": "ਵਰਕਸਪੇਸ ਪਹੁੰਚ ਟੋਕਨ"
     },
     "scopeList": {
-      "couldNotLoad": "ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
       "personalStillAvailable": "ਨਿੱਜੀ ਰਿਪੋਜ਼ਟਰੀਆਂ ਹੇਠਾਂ ਅਜੇ ਵੀ ਉਪਲਬਧ ਹਨ।",
       "personalSubtitle": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ",
       "viewOnly": "ਸਿਰਫ਼ ਦੇਖਣ ਦੀ ਪਹੁੰਚ"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub ਐਪ",
       "githubError": "GitHub ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "gitlabAccount": "GitLab ਖਾਤਾ",
-      "connectGitLab": "GitLab ਨਾਲ ਜੋੜੋ",
       "gitlabError": "GitLab ਸੈੱਟਅੱਪ ਨਹੀਂ ਖੋਲ੍ਹਿਆ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "description": "ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਵੈਚਾਲਿਤ ਸਮੀਖਿਆ ਲਈ Kilo {{label}} ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketError": "Bitbucket ਸੈੱਟਅੱਪ ਖੋਲ੍ਹ ਨਹੀਂ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
@@ -1403,21 +1399,17 @@
     "updateFailed": "ਸਮੀਖਿਅਕ ਅੱਪਡੇਟ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "configSaveFailed": "ਸਮੀਖਿਆ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਸੇਵ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
     "status": {
-      "pending": "ਉਡੀਕ ਵਿੱਚ",
       "running": "ਚੱਲ ਰਿਹਾ ਹੈ",
       "completed": "ਮੁਕੰਮਲ",
-      "failed": "ਅਸਫਲ",
       "interrupted": "ਵਿਚਕਾਰ ਰੁਕਿਆ"
     },
     "reviewStyle": {
       "strict": "ਸਖ਼ਤ",
-      "balanced": "ਸੰਤੁਲਿਤ",
       "lenient": "ਨਰਮ",
       "roast": "ਤਿੱਖੀ ਆਲੋਚਨਾ"
     },
     "focusArea": {
       "security": "ਸੁਰੱਖਿਆ",
-      "performance": "ਕਾਰਗੁਜ਼ਾਰੀ",
       "bugs": "ਬੱਗ",
       "style": "ਸ਼ੈਲੀ",
       "testing": "ਟੈਸਟਿੰਗ",
@@ -1468,7 +1460,6 @@
       "statusOpen": "ਖੋਲ੍ਹੋ",
       "fixed": "ਠੀਕ ਕੀਤਾ ਗਿਆ",
       "statusIgnored": "ਅਣਡਿੱਠੀ",
-      "statusClosed": "ਬੰਦ",
       "severityHigh": "ਉੱਚ",
       "severityMedium": "ਮੱਧਮ",
       "severityLow": "ਘੱਟ",
@@ -1655,7 +1646,6 @@
       "title": "ਸੈਟਿੰਗਾਂ",
       "couldNotLoadSettings": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
       "couldNotLoadPermissions": "ਇਜਾਜ਼ਤਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
-      "disabled": "ਬੰਦ",
       "on": "ਚਾਲੂ",
       "repositoriesCount_one": "{{displayCount}} ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੀ ਗਈ",
       "repositoriesCount": "{{displayCount}} ਰਿਪੋਜ਼ਿਟਰੀਆਂ ਚੁਣੀਆਂ ਗਈਆਂ",
@@ -1683,7 +1673,6 @@
       "retry": "ਸੁਧਾਰ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "cancelTitle": "ਇਹ ਸੁਧਾਰ ਰੱਦ ਕਰਨਾ ਹੈ?",
       "cancelMessage": "ਸੁਰੱਖਿਆ ਏਜੰਟ ਸੁਧਾਰ ਦੀ ਚੱਲ ਰਹੀ ਕੋਸ਼ਿਸ਼ ਰੋਕ ਦੇਵੇਗਾ।",
-      "keepRunning": "ਚੱਲਣ ਦਿਓ",
       "cancelRemediation": "ਸੁਧਾਰ ਰੱਦ ਕਰੋ",
       "openPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ{{number}} ਖੋਲ੍ਹੋ",
       "openDraftPullRequest": "ਡਰਾਫਟ ਪੁੱਲ ਰਿਕਵੈਸਟ{{number}} ਖੋਲ੍ਹੋ",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "ਕੋਸ਼ਿਸ਼ਾਂ ਦਾ ਇਤਿਹਾਸ ({{displayCount}})",
       "attemptNumber": "ਕੋਸ਼ਿਸ਼ #{{number}}",
       "startedBy": "ਸ਼ੁਰੂ ਕਰਨ ਵਾਲਾ",
-      "branch": "ਬ੍ਰਾਂਚ",
       "queued": "ਸੁਧਾਰ ਕਤਾਰ ਵਿੱਚ ਪਾਇਆ ਗਿਆ",
       "retryQueued": "ਸੁਧਾਰ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਤਾਰ ਵਿੱਚ ਪਾਈ ਗਈ",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "ਕੋਈ ਸਮੱਸਿਆ ਫਿਲਟਰਾਂ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦੀ",
       "noMatchesDescription": "ਚੁਣੇ ਹੋਏ ਫਿਲਟਰ ਬਦਲ ਕੇ ਜਾਂ ਹਟਾ ਕੇ ਦੇਖੋ।",
       "emptyTitle": "ਕੋਈ ਖੁੱਲ੍ਹੀ ਸਮੱਸਿਆ ਨਹੀਂ",
-      "emptyDescription": "ਇਸ ਵੇਲੇ ਕਿਸੇ ਵੀ ਖੁੱਲ੍ਹੀ ਸਮੱਸਿਆ ਵੱਲ ਧਿਆਨ ਦੇਣ ਦੀ ਲੋੜ ਨਹੀਂ ਹੈ।",
-      "clearFilters": "ਫਿਲਟਰ ਹਟਾਓ"
+      "emptyDescription": "ਇਸ ਵੇਲੇ ਕਿਸੇ ਵੀ ਖੁੱਲ੍ਹੀ ਸਮੱਸਿਆ ਵੱਲ ਧਿਆਨ ਦੇਣ ਦੀ ਲੋੜ ਨਹੀਂ ਹੈ।"
     },
     "scopeList": {
-      "couldNotLoad": "ਸੰਸਥਾਵਾਂ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀਆਂ।",
       "personalSubtitle": "ਤੁਹਾਡੀਆਂ ਆਪਣੀਆਂ ਰਿਪੋਜ਼ਿਟਰੀਆਂ"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "ਡਰਾਫਟ PR ਖੋਲ੍ਹੀ ਗਈ",
       "prOpened": "PR ਖੋਲ੍ਹੀ ਗਈ",
       "blocked": "ਰੁਕਿਆ ਹੋਇਆ",
-      "failed": "ਅਸਫਲ",
       "noChangesNeeded": "ਕਿਸੇ ਤਬਦੀਲੀ ਦੀ ਲੋੜ ਨਹੀਂ",
       "originAutomaticPolicy": "ਸਵੈਚਾਲਿਤ ਨੀਤੀ",
       "originIncludeExistingPolicy": "ਮੌਜੂਦਾ ਸਮੱਸਿਆਵਾਂ ਸ਼ਾਮਲ ਕਰਨ ਦੀ ਨੀਤੀ",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "ਖੋਜ ਜਾਰੀ ਹੈ",
       "searchSessions": "ਸੈਸ਼ਨ ਖੋਜੋ",
-      "searchSessionsPlaceholder": "ਸੈਸ਼ਨ ਖੋਜੋ",
-      "clearSearch": "ਖੋਜ ਸਾਫ਼ ਕਰੋ",
-      "clearFilters": "ਫਿਲਟਰ ਹਟਾਓ"
+      "searchSessionsPlaceholder": "ਸੈਸ਼ਨ ਖੋਜੋ"
     },
     "sessionList": {
-      "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "couldNotLoadActive": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
       "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਦਾ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "ਕੀ ਸੈਸ਼ਨ ਮਿਟਾਉਣਾ ਹੈ?",
       "deleteMessage": "ਇਸਨੂੰ ਵਾਪਸ ਨਹੀਂ ਲਿਆ ਜਾ ਸਕਦਾ।",
       "deleteSession": "ਸੈਸ਼ਨ ਮਿਟਾਓ",
-      "rename": "ਨਾਮ ਬਦਲੋ",
       "renameMessage": "ਇਸ ਸੈਸ਼ਨ ਲਈ ਨਵਾਂ ਨਾਮ ਦਰਜ ਕਰੋ।",
       "copyId": "ਸੈਸ਼ਨ ਦਾ ID ਕਾਪੀ ਕਰੋ",
       "idCopied": "ਸੈਸ਼ਨ ਦਾ ID ਕਾਪੀ ਹੋ ਗਿਆ",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "ਤੁਹਾਨੂੰ ਇਹ ਦੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "failedToLoadDetails": "ਸੈਸ਼ਨ ਦੇ ਵੇਰਵੇ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ।",
-      "notFound": "ਨਹੀਂ ਮਿਲਿਆ।",
       "notFoundDescription": "ਇਹ ਆਈਟਮ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋ ਸਕਦੀ ਹੈ ਜਾਂ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "failedToStopExecution": "ਚੱਲ ਰਿਹਾ ਕੰਮ ਰੋਕਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ।",
       "renameSession": "ਸੈਸ਼ਨ ਦਾ ਨਾਮ ਬਦਲੋ",
@@ -2076,7 +2056,6 @@
       "retryConnection": "ਮੁੜ ਕਨੈਕਟ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
     },
     "newSession": {
-      "title": "ਨਵਾਂ ਸੈਸ਼ਨ",
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਨੂੰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
       "refreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਕਰੋ",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "discardDraftTitle": "ਕੀ ਡਰਾਫਟ ਰੱਦ ਕਰਨਾ ਹੈ?",
       "discardDraftMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਮਿਟ ਜਾਵੇਗਾ।",
-      "keepEditing": "ਸੋਧਣਾ ਜਾਰੀ ਰੱਖੋ",
       "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "remoteHint": "ਆਪਣੇ ਕੰਪਿਊਟਰ 'ਤੇ ਚੱਲ ਰਹੀ kilo ਪ੍ਰਕਿਰਿਆ ਨੂੰ ਕੰਟਰੋਲ ਕਰਨ ਲਈ `kilo remote` ਚਲਾਓ ਜਾਂ ਚੱਲ ਰਹੇ CLI ਸੈਸ਼ਨ ਵਿੱਚ `/remote` ਚਲਾਓ।",
-      "bitbucketConnected": "Bitbucket ਜੁੜ ਗਿਆ",
-      "connectBitbucket": "Bitbucket ਨਾਲ ਜੋੜੋ",
       "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "connectGitlab": "GitLab ਨਾਲ ਜੋੜੋ",
       "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "{{name}} ਟੂਲ, {{status}}",
       "fileEmpty": "ਇਹ ਫਾਈਲ ਖਾਲੀ ਹੈ।",
       "noTasks": "ਕੋਈ ਕੰਮ ਨਹੀਂ ਹੈ।",
-      "contentTruncated": "ਸਮੱਗਰੀ ਦਾ ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
       "truncated": "ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
       "toolRead": "ਪੜ੍ਹੋ",
       "toolEdit": "ਸੋਧੋ",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "ਕਿਸੇ ਹੋਰ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",
       "loading": "ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ...",
       "accessibility": "ਰਿਪੋਜ਼ਟਰੀ: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "ਸੁਨੇਹੇ ਦੇ ਵੇਰਵੇ",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "ਕੈਸ਼ ਵਿੱਚ ਲਿਖੇ",
       "total": "ਕੁੱਲ",
       "reportAiResponseFailedRetryable": "ਇਸ ਜਵਾਬ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
-      "reportAiResponseFailedTerminal": "ਇਸ ਜਵਾਬ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
-      "reportAiResponseSubmitted": "ਰਿਪੋਰਟ ਜਮ੍ਹਾਂ ਕੀਤੀ ਗਈ। ਰਸੀਦ {{receiptId}}"
+      "reportAiResponseFailedTerminal": "ਇਸ ਜਵਾਬ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "{{alt}} ਚਿੱਤਰ ਵੇਖੋ",
       "imageOutput": "ਆਉਟਪੁੱਟ ਚਿੱਤਰ",
       "imageOutputWithFilename": "ਆਉਟਪੁੱਟ ਚਿੱਤਰ, {{filename}}",
-      "defaultName": "ਫਾਈਲ",
       "openFullScreen": "{{name}} ਨੂੰ ਪੂਰੀ ਸਕ੍ਰੀਨ 'ਤੇ ਖੋਲ੍ਹੋ",
       "preview": "{{name}} ਦੀ ਝਲਕ ਵੇਖੋ",
-      "openFile": "{{name}} ਖੋਲ੍ਹੋ",
       "couldNotLoadFile": "ਇਹ ਫਾਈਲ ਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
       "couldNotLoadFileRetry": "ਇਹ ਫਾਈਲ ਲੋਡ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "retryLoadingFile": "ਫਾਈਲ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "ਮਾਡਲ ਚੁਣੋ",
       "searchPlaceholder": "ਮਾਡਲ ਖੋਜੋ...",
-      "allModels": "ਸਾਰੇ ਮਾਡਲ",
       "favorites": "ਪਸੰਦੀਦਾ",
-      "noModels": "ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ",
-      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
-      "recommended": "ਸਿਫ਼ਾਰਸ਼ ਕੀਤੇ ਮਾਡਲ"
+      "noModelsDescription": "ਚੁਣਨ ਲਈ ਕੋਈ ਮਾਡਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।"
     },
     "modelSelector": {
       "provider": "ਪ੍ਰਦਾਤਾ {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "ਕੈਮਰਾ",
       "photoLibrary": "ਫੋਟੋ ਲਾਇਬ੍ਰੇਰੀ",
       "files": "ਫਾਈਲਾਂ",
-      "cameraAccessDisabled": "ਕੈਮਰੇ ਦੀ ਵਰਤੋਂ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ",
       "cameraAccessMessage": "ਫੋਟੋ ਲੈਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਕੈਮਰਾ ਵਰਤਣ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ।",
       "couldNotOpenPhotoPicker": "ਫੋਟੋ ਚੁਣਨ ਵਾਲੀ ਸਕ੍ਰੀਨ ਨਹੀਂ ਖੋਲ੍ਹੀ ਜਾ ਸਕੀ। Kilo ਮੁੜ ਚਾਲੂ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "maxFilesAllowed": "ਵੱਧ ਤੋਂ ਵੱਧ {{displayCount}} ਫਾਈਲਾਂ ਜੋੜੀਆਂ ਜਾ ਸਕਦੀਆਂ ਹਨ।",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "ਲਿੰਕ ਕਾਪੀ ਹੋ ਗਿਆ",
-      "reviewPr": "PR ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
       "openLink": "ਲਿੰਕ ਖੋਲ੍ਹੋ",
-      "copyLink": "ਲਿੰਕ ਕਾਪੀ ਕਰੋ",
       "shareLink": "ਲਿੰਕ ਸਾਂਝਾ ਕਰੋ",
       "share": "ਸਾਂਝਾ ਕਰੋ",
       "prLinkActions": "PR ਲਿੰਕ ਲਈ ਕਾਰਵਾਈਆਂ",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "ਸੰਦਰਭ ਵਿੱਚ {{window}} ਵਿੱਚੋਂ {{used}} ਟੋਕਨ, {{percentage}} ਵਰਤੋਂ",
       "title": "ਸੰਦਰਭ ਦੀ ਵਰਤੋਂ",
       "used": "ਵਰਤੇ ਗਏ",
-      "remaining": "ਬਾਕੀ",
       "provider": "ਪ੍ਰਦਾਤਾ",
       "totalCost": "ਕੁੱਲ ਲਾਗਤ",
       "usageReflectsLatest": "ਇਹ ਵਰਤੋਂ ਸਹਾਇਕ ਦੇ ਸਭ ਤੋਂ ਹਾਲੀਆ ਪੂਰੇ ਹੋਏ ਜਵਾਬ 'ਤੇ ਆਧਾਰਿਤ ਹੈ।",
@@ -2598,7 +2561,6 @@
     "billingPage": "ਬਿਲਿੰਗ ਪੰਨਾ"
   },
   "deviceSessions": {
-    "couldNotLoad": "ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
     "couldNotLoadDescription": "ਜਦੋਂ ਤੱਕ ਇਹ ਲੋਡ ਨਹੀਂ ਹੁੰਦਾ, ਤੁਹਾਡੇ ਸਰਗਰਮ ਸੈਸ਼ਨ ਉਪਲਬਧ ਨਹੀਂ ਹੋਣਗੇ।",
     "currentDeviceUnidentified": "ਮੌਜੂਦਾ ਡਿਵਾਈਸ ਦੀ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
     "noSessions": "ਕੋਈ ਸਰਗਰਮ ਸੈਸ਼ਨ ਨਹੀਂ",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "ਇੱਥੇ ਸਿਰਫ਼ Kilo ਐਪ ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਦਿਖਾਈ ਦਿੰਦੇ ਹਨ। ਐਡੀਟਰ ਅਤੇ CLI ਰਾਹੀਂ ਕੀਤੇ ਸਾਈਨ ਇਨ ਇਸ ਸੂਚੀ ਵਿੱਚ ਨਹੀਂ ਹਨ।",
     "signedIn": "ਸਾਈਨ ਇਨ ਕੀਤਾ: {{signedIn}} · ਆਖ਼ਰੀ ਵਾਰ ਵੇਖਿਆ: {{lastSeen}}",
     "thisDevice": "ਇਹ ਡਿਵਾਈਸ",
-    "title": "ਡਿਵਾਈਸਾਂ ਦੇ ਸੈਸ਼ਨ",
     "viewProfile": "ਪ੍ਰੋਫਾਈਲ ਵੇਖੋ",
     "signOutThisDevice": "ਇਸ ਡਿਵਾਈਸ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
     "signOutThisSession": "ਇਸ ਸੈਸ਼ਨ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "ਇਹ ਲਿੰਕ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ।",
-    "goBack": "ਵਾਪਸ ਜਾਓ",
     "title": "ਪੰਨਾ ਨਹੀਂ ਮਿਲਿਆ"
   },
   "monoScrollBlock": {
-    "contentTruncated": "ਸਮੱਗਰੀ ਦਾ ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
     "truncated": "ਕੁਝ ਹਿੱਸਾ ਕੱਟਿਆ ਗਿਆ",
     "wrap": "ਲਾਈਨ ਤੋੜੋ",
     "scroll": "ਸਕ੍ਰੋਲ"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "offlineTitle": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "permissionDescription": "ਤੁਹਾਨੂੰ ਇਹ ਦੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
-    "notFoundTitle": "ਨਹੀਂ ਮਿਲਿਆ।",
     "notFoundDescription": "ਇਹ ਆਈਟਮ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋ ਸਕਦੀ ਹੈ ਜਾਂ ਹੁਣ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "serverTitle": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
     "serverDescription": "ਸਾਡੇ ਪਾਸੇ ਕੋਈ ਸਮੱਸਿਆ ਆਈ ਹੈ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "screenHeader": {
     "openMenu": "ਮੀਨੂ ਖੋਲ੍ਹੋ",
-    "openMenuFor": "{{title}} ਲਈ ਮੀਨੂ ਖੋਲ੍ਹੋ",
-    "goBack": "ਵਾਪਸ ਜਾਓ"
+    "openMenuFor": "{{title}} ਲਈ ਮੀਨੂ ਖੋਲ੍ਹੋ"
   },
   "picker": {
     "optionsExpired": "ਵਿਕਲਪਾਂ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kilo ਵਿੱਚ ਸਾਂਝਾ ਕਰਨਾ",
-    "reviewPr": "PR ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "ਨਵਾਂ ਸੈਸ਼ਨ",
     "searchPlaceholder": "ਹਾਲੀਆ ਸੈਸ਼ਨਾਂ ਦੀ ਖੋਜ",
     "connectedCli": "ਕਨੈਕਟ ਕੀਤੇ CLI 'ਤੇ",
     "newSessionOn": "{{name}} 'ਤੇ ਨਵਾਂ ਸੈਸ਼ਨ",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass ਰੱਦ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
     "statusPastDue": "Kilo Pass ਦਾ ਭੁਗਤਾਨ ਲੇਟ",
     "monthlyCredits": "{{credits}} ਮਾਸਿਕ ਕ੍ਰੈਡਿਟ",
-    "ends": "{{date}} ਨੂੰ ਖ਼ਤਮ ਹੋਵੇਗਾ",
     "periodEnd": "ਮਿਆਦ ਦਾ ਅੰਤ",
     "managedOnGooglePlay": "Google Play 'ਤੇ ਪ੍ਰਬੰਧਿਤ",
     "managedInAppStore": "App Store ਵਿੱਚ ਪ੍ਰਬੰਧਿਤ",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Android 'ਤੇ ਐਪ ਦੇ ਅੰਦਰੋਂ Kilo Pass ਨਹੀਂ ਖਰੀਦਿਆ ਜਾ ਸਕਦਾ। ਇਸ ਦਾ ਪ੍ਰਬੰਧ ਵੈੱਬ 'ਤੇ ਕਰੋ।",
     "webManagementDescription": "ਇਹ Kilo Pass ਵੈੱਬ 'ਤੇ ਪ੍ਰਬੰਧਿਤ ਹੈ।",
     "legalDisclosure": "Kilo Pass ਆਪਣੇ ਆਪ ਨਵਿਆਈ ਜਾਣ ਵਾਲੀ ਮਹੀਨਾਵਾਰ ਗਾਹਕੀ ਹੈ। ਖਰੀਦ ਦੀ ਪੁਸ਼ਟੀ ਹੋਣ 'ਤੇ ਤੁਹਾਡੀ Apple ID ਤੋਂ ਭੁਗਤਾਨ ਲਿਆ ਜਾਂਦਾ ਹੈ। ਜੇ ਮੌਜੂਦਾ ਮਿਆਦ ਮੁੱਕਣ ਤੋਂ ਘੱਟੋ-ਘੱਟ 24 ਘੰਟੇ ਪਹਿਲਾਂ ਗਾਹਕੀ ਰੱਦ ਨਾ ਕੀਤੀ ਜਾਵੇ, ਤਾਂ ਇਹ ਹਰ ਮਹੀਨੇ ਦਿਖਾਈ ਗਈ ਕੀਮਤ 'ਤੇ ਆਪਣੇ ਆਪ ਨਵਿਆਈ ਜਾਂਦੀ ਹੈ। ਆਪਣੇ App Store ਖਾਤੇ ਦੀਆਂ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਕਿਸੇ ਵੀ ਵੇਲੇ ਗਾਹਕੀ ਦਾ ਪ੍ਰਬੰਧ ਕਰੋ ਜਾਂ ਇਸ ਨੂੰ ਰੱਦ ਕਰੋ।",
-    "legalPrivacyPolicy": "ਗੋਪਨੀਯਤਾ ਨੀਤੀ",
     "legalTermsOfUse": "ਵਰਤੋਂ ਦੀਆਂ ਸ਼ਰਤਾਂ (EULA)",
     "purchaseDifferentAccount": "App Store ਦੀ ਇਹ ਖਰੀਦ ਤੁਹਾਡੇ Kilo ਖਾਤੇ ਨਾਲ ਜੁੜੀ ਨਹੀਂ ਹੈ। ਖਰੀਦ ਲਈ ਵਰਤੇ Apple Account ਵਿੱਚ ਸਾਈਨ ਇਨ ਕਰੋ, ਫਿਰ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
     "restoreFailed": "ਖਰੀਦਾਂ ਬਹਾਲ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "ਸਹੀ ਈਮੇਲ ਪਤਾ ਦਰਜ ਕਰੋ।",
-      "emailLabel": "ਈਮੇਲ",
       "emailPlaceholder": "ਨਾਮ@ਕੰਪਨੀ.com",
       "permissionDenied": "ਤੁਹਾਡੇ ਕੋਲ ਮੈਂਬਰਾਂ ਨੂੰ ਸੱਦਾ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "roleLabel": "ਭੂਮਿਕਾ",
@@ -2968,7 +2920,6 @@
         "billingManager": "ਬਿਲਿੰਗ ਮੈਨੇਜਰ"
       },
       "emailStatusFailed": "ਈਮੇਲ ਨਹੀਂ ਭੇਜੀ ਜਾ ਸਕੀ",
-      "emailStatusPending": "ਉਡੀਕ ਵਿੱਚ",
       "inviteCreated": "ਸੱਦਾ ਬਣਾਇਆ ਗਿਆ",
       "pendingInvitations": "ਜਵਾਬ ਦੀ ਉਡੀਕ ਵਾਲੇ ਸੱਦੇ",
       "resendInvite": "ਸੱਦਾ ਦੁਬਾਰਾ ਭੇਜੋ",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "ਸਥਿਤੀ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ",
       "creditProcessingDelayed": "ਕ੍ਰੈਡਿਟ ਦੀ ਪ੍ਰਕਿਰਿਆ ਵਿੱਚ ਦੇਰੀ · ਆਪਣੇ ਆਪ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਜਾਰੀ ਹੈ",
       "ended": "ਖਤਮ ਹੋ ਗਿਆ",
-      "endsOn": "{{date}} ਨੂੰ ਖ਼ਤਮ ਹੋਵੇਗਾ",
       "manageHint": "ਵੈੱਬ 'ਤੇ Kilo Pass ਦੇ ਪ੍ਰਬੰਧਨ ਦਾ ਪੰਨਾ ਖੋਲ੍ਹਦਾ ਹੈ।",
       "notSubscribed": "ਗਾਹਕੀ ਨਹੀਂ ਹੈ",
       "overallocated": "ਵੰਡੇ ਗਏ ਪਾਸਾਂ ਦੀ ਗਿਣਤੀ ਭੁਗਤਾਨ ਕੀਤੀਆਂ ਸੀਟਾਂ ਤੋਂ ਵੱਧ ਹੈ",
@@ -3004,7 +2954,6 @@
       "paymentPending": "ਭੁਗਤਾਨ ਬਕਾਇਆ",
       "processingBlocked": "ਪ੍ਰਕਿਰਿਆ ਰੁਕੀ ਹੋਈ ਹੈ",
       "processingNeedsReview": "ਪ੍ਰਕਿਰਿਆ ਦੀ ਸਮੀਖਿਆ ਦੀ ਲੋੜ ਹੈ",
-      "retry": "ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "retryHint": "Kilo Pass ਦੀ ਸਥਿਤੀ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਦਾ ਹੈ।",
       "setupHint": "Kilo Pass ਸੈੱਟਅੱਪ ਵੈੱਬ 'ਤੇ ਖੋਲ੍ਹਦਾ ਹੈ।"
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
   },
   "quickChat": {
-    "title": "ਚੈਟ",
     "empty": {
       "title": "ਚੈਟ ਸ਼ੁਰੂ ਕਰੋ",
       "description": "ਕਿਸੇ ਮਾਡਲ ਨਾਲ ਗੱਲ ਕਰਨ ਲਈ ਸੁਨੇਹਾ ਭੇਜੋ।"
@@ -3076,7 +3024,6 @@
     "openAgents": "ਏਜੰਟ ਖੋਲ੍ਹੋ",
     "running": "ਕੰਮ ਜਾਰੀ",
     "needsInput": "ਜਵਾਬ ਦੀ ਉਡੀਕ",
-    "idle": "ਵਿਹਲਾ",
     "channelName": "ਸਰਗਰਮ ਏਜੰਟ",
     "activityKitDisabledBody": "ਲਾਕ ਸਕ੍ਰੀਨ 'ਤੇ ਸਰਗਰਮ ਏਜੰਟ ਵੇਖਣ ਲਈ ਸੈਟਿੰਗਾਂ ਵਿੱਚ ਲਾਈਵ ਗਤੀਵਿਧੀਆਂ ਚਾਲੂ ਕਰੋ।"
   }

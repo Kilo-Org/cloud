@@ -268,7 +268,7 @@ describe.each([true, false])('finding load states with local history=%s', hasLoc
   });
 
   function expectSafeBack(tree: R) {
-    press(tree, 'screenHeader.goBack');
+    press(tree, 'common.goBack');
     expect(navigation.history).toEqual(
       hasLocalHistory ? [scopeRoot] : ['/(app)/(tabs)/(3_profile)']
     );

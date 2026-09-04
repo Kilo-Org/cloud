@@ -69,7 +69,58 @@
     "repository": "Рэпазіторый",
     "signOut": "Выйсці",
     "agents": "Агенты",
-    "all": "Усё"
+    "all": "Усё",
+    "allModels": "Усе мадэлі",
+    "balanced": "Збалансаваны",
+    "bitbucketConnected": "Bitbucket падключаны",
+    "branch": "Галіна",
+    "cameraAccessDisabled": "Доступ да камеры адключаны",
+    "chat": "Чат",
+    "clearFilters": "Скінуць фільтры",
+    "clearSearch": "Ачысціць пошук",
+    "closed": "Закрыта",
+    "closeReactions": "Закрыць спіс рэакцый",
+    "connect": "Падключыць",
+    "connectBitbucket": "Падключыць Bitbucket",
+    "connectGitlab": "Падключыць GitLab",
+    "contentTruncated": "Змест абрэзаны",
+    "copyLink": "Скапіяваць спасылку",
+    "couldNotLoadOrganizations": "Не атрымалася загрузіць арганізацыі.",
+    "couldNotLoadSessions": "Не атрымалася загрузіць сеансы.",
+    "couldnTLoadMore": "Не атрымалася загрузіць наступныя запісы.",
+    "deviceSessions": "Сеансы на прыладах",
+    "disabled": "Адключана",
+    "email": "Электронная пошта",
+    "ends": "Сканчваецца {{date}}",
+    "failed": "Не атрымалася",
+    "file": "Файл",
+    "gitlab": "GitLab",
+    "goBack": "Назад",
+    "idle": "Чакае",
+    "keepEditing": "Працягнуць рэдагаванне",
+    "keepRunning": "Працягнуць працу",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Новы сеанс",
+    "noKiloclawInstances": "Няма асобнікаў KiloClaw",
+    "noModelsAvailable": "Няма даступных мадэляў",
+    "notFound": "Нічога не знойдзена.",
+    "online": "У сетцы",
+    "open": "Адкрыць {{name}}",
+    "openPullRequest": "Адкрыць запыт на зліццё",
+    "pending": "Чакае",
+    "performance": "Прадукцыйнасць",
+    "preferences": "Налады",
+    "privacyPolicy": "Палітыка прыватнасці",
+    "profile": "Профіль",
+    "reactions": "Рэакцыі",
+    "recent": "Нядаўнія",
+    "recommended": "Рэкамендаваныя",
+    "remaining": "Засталося",
+    "rename": "Перайменаваць",
+    "reply": "Адказаць",
+    "reportSubmittedReceipt": "Скарга адпраўлена. Нумар пацвярджэння: {{receiptId}}",
+    "retryLoadingMore": "Паўтарыць загрузку наступных запісаў",
+    "reviewPr": "Праверыць PR"
   },
   "language": {
     "title": "Мова",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Не атрымалася перазапусціць",
     "languageSaved": "Выбар мовы захаваны.",
     "catalogLoadFailed": "Не атрымалася загрузіць пераклад. Паспрабуйце яшчэ раз.",
-    "retry": "Паўтарыць",
     "search": "Пошук моў",
     "noMatches": "Моў не знойдзена",
     "deviceLanguage": "Мова прылады",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Код уваходу: {{code}}",
     "openSignInPageInBrowser": "Адкрыць старонку ўваходу ў браўзеры",
     "copySignInLink": "Скапіраваць спасылку для ўваходу",
-    "copyLink": "Скапіяваць спасылку",
     "cancelSignIn": "Адмяніць уваход",
     "startingSignIn": "Пачынаем уваход…",
     "organizationUsesSso": "Ваша арганізацыя выкарыстоўвае адзіны ўваход.",
@@ -112,7 +161,6 @@
     "terms": "умовамі",
     "termsConnector": " і ",
     "termsSuffix": ".",
-    "privacyPolicy": "Палітыка прыватнасці",
     "moreSignInOptions": "Іншыя спосабы ўваходу",
     "couldNotCompleteSignIn": "Не атрымалася завяршыць уваход. Паспрабуйце яшчэ раз.",
     "sessionEnded": "Ваш сеанс скончыўся. Увайдзіце яшчэ раз.",
@@ -126,7 +174,6 @@
     "or": "або"
   },
   "profile": {
-    "title": "Профіль",
     "codeReviewerSubtitle": "Аўтаматычныя праверкі PR",
     "securityAgentSubtitle": "Знаходзіць і ліквідаваць уразлівасці",
     "reviews": "Праверкі кода",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Звязаныя ўліковыя запісы",
     "couldNotLoadAccounts": "Не ўдалося загрузіць уліковыя запісы.",
     "app": "Праграма",
-    "preferences": "Налады",
     "preferencesSubtitle": "Знешні выгляд, апавяшчэнні, развагі і паводзіны экрана",
-    "deviceSessions": "Сеансы на прыладах",
     "deviceSessionsSubtitle": "Праглядаць сеансы і завяршаць іх на іншых прыладах",
     "feedback": "Водгук",
     "privacyChoices": "Налады прыватнасці",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Электронная пошта",
     "providerTestAccount": "Тэставы ўліковы запіс",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Карпаратыўны SSO"
   },
   "preferences": {
-    "title": "Налады",
     "autoExpandThinking": "Аўтаматычна разгортваць развагі",
     "autoExpandThinkingSubtitle": "Паказваць развагі агента разгорнутымі пасля іх завяршэння.",
     "keepScreenOn": "Не выключаць экран на старонцы сеанса",
@@ -364,7 +406,6 @@
       "unresolveThread": "Пазначыць абмеркаванне як нявырашанае",
       "resolved": "Вырашана",
       "outdated": "Састарэла",
-      "file": "Файл",
       "comment_one": "1 каментар",
       "comment": "{{displayCount}} каментара",
       "comment_other": "{{displayCount}} каментара",
@@ -372,8 +413,6 @@
       "couldNotLoadMore": "Не атрымалася загрузіць астатнія каментары.",
       "retryLoadingMore": "Паўтарыць загрузку астатніх каментароў",
       "loadMoreComments": "Загрузіць яшчэ каментары",
-      "closeReactions": "Закрыць спіс рэакцый",
-      "reactionsTitle": "Рэакцыі",
       "addReaction": "Дадаць рэакцыю",
       "reactionPill": "рэакцыя {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "рэакцыя",
@@ -384,13 +423,11 @@
       "reportUser": "Паскардзіцца на карыстальніка",
       "mute": "Ігнараваць",
       "block": "Заблакаваць",
-      "reportSubmitted": "Скарга адпраўлена. Нумар пацвярджэння: {{receiptId}}",
       "blockedUser": "Карыстальнік {{login}} заблакаваны",
       "mutedUser": "Паведамленні ад {{login}} ігнаруюцца",
       "replyPlaceholder": "Адказ…",
       "replyBody": "Тэкст адказу",
       "submitReply": "Адправіць адказ",
-      "reply": "Адказаць",
       "termsTitle": "Умовы выкарыстання",
       "termsCopy": "Каб пакідаць паведамленні, табе мусіць быць не менш за 13 гадоў.",
       "termsAcceptRetry": "Не атрымалася прыняць умовы. Правер падключэнне да інтэрнэту і паспрабуй яшчэ раз.",
@@ -476,8 +513,7 @@
       "urlAccessibility": "URL запыту на зліццё на GitHub",
       "clearLink": "Ачысціць спасылку на запыт на зліццё",
       "pasteLink": "Уставіць спасылку на запыт на зліццё",
-      "open": "Адкрыць",
-      "openPullRequest": "Адкрыць запыт на зліццё"
+      "open": "Адкрыць"
     },
     "checks": {
       "title": "Праверкі",
@@ -497,13 +533,10 @@
     },
     "inbox": {
       "title": "Уваходныя",
-      "recent": "Нядаўнія",
       "loading": "Загрузка ўваходных",
       "noReviewRequests": "Няма запытаў на праверку кода",
       "noReviewRequestsDescription": "Тут з'яўляюцца запыты на зліццё, якія чакаюць тваёй праверкі кода. Таксама можна ўставіць вышэй спасылку на любы PR.",
-      "couldNotLoad": "Не атрымалася загрузіць уваходныя.",
-      "couldNotLoadMore": "Не атрымалася загрузіць наступныя запісы.",
-      "retryLoadingMore": "Паўтарыць загрузку наступных запісаў"
+      "couldNotLoad": "Не атрымалася загрузіць уваходныя."
     },
     "composer": {
       "commentBodyPlaceholder": "Тэкст каментара",
@@ -518,7 +551,6 @@
       "loadFailedTitle": "Не атрымалася загрузіць рэдактар каментарыяў.",
       "discardTitle": "Адкінуць каментар?",
       "discardMessage": "Твой чарнавік будзе страчаны.",
-      "keepEditing": "Працягнуць рэдагаванне",
       "comment": "Каментар",
       "insertSuggestionA11y": "Уставіць прапанову змены кода",
       "insertSuggestion": "Уставіць прапанову",
@@ -567,7 +599,6 @@
     },
     "overview": {
       "stateMerged": "Зліта",
-      "stateClosed": "Закрыта",
       "stateOpenApproved": "Адкрыты · ухвалены",
       "stateOpenChangesRequested": "Адкрыты · запытаны змены",
       "stateOpenReviewRequired": "Адкрыты · патрэбна праверка кода",
@@ -696,17 +727,13 @@
   },
   "tabs": {
     "home": "Галоўная",
-    "profile": "Профіль",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, укладка, {{position}} з {{total}}",
-    "chat": "Чат"
+    "position": "{{name}}, укладка, {{position}} з {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Выбар асобніка",
       "couldNotLoadInstances": "Не атрымалася загрузіць асобнікі.",
-      "noInstances": "Няма асобнікаў KiloClaw",
       "noInstancesDescription": "Наладзьце асобнік, каб пачаць размову.",
       "setUpKiloclaw": "Наладзіць KiloClaw",
       "currentInstance": "{{title}}, бягучы"
@@ -728,16 +755,12 @@
       "couldNotSignIn": "Не атрымалася ўвайсці ў чат.",
       "couldNotRefreshMessages": "Не атрымалася абнавіць паведамленні.",
       "couldNotLoadHistory": "Не атрымалася загрузіць гісторыю размовы.",
-      "rename": "Перайменаваць",
       "leave": "Пакінуць",
       "untitledConversation": "Размова без назвы",
       "createFailed": "Не атрымалася стварыць размову.",
       "leaveFailed": "Не атрымалася пакінуць размову."
     },
     "reactions": {
-      "title": "Рэакцыі",
-      "close": "Закрыць спіс рэакцый",
-      "recent": "Нядаўнія",
       "common": "Частыя",
       "reactWith": "Дадаць рэакцыю {{reaction}}",
       "accessibility": "Рэакцыя {{emoji}}, колькасць: {{displayCount}}"
@@ -810,7 +833,6 @@
       "addReactionFailed": "Не атрымалася дадаць рэакцыю.",
       "retrySend": "Адправіць яшчэ раз",
       "moreReactions": "Іншыя рэакцыі",
-      "reply": "Адказаць",
       "edit": "Рэдагаваць",
       "sendFailed": "Не атрымалася адправіць паведамленне.",
       "retrySendFailed": "Не атрымалася паўторна адправіць паведамленне.",
@@ -821,7 +843,6 @@
       "takePhoto": "Зрабіць фота",
       "photoLibrary": "Галерэя фота",
       "files": "Файлы",
-      "cameraAccessDisabled": "Доступ да камеры адключаны",
       "cameraAccessMessage": "Каб зрабіць фота, дазволь доступ да камеры ў наладах."
     },
     "typingIndicator": {
@@ -833,8 +854,6 @@
       "typing_many": "{{names}} пішуць…"
     },
     "botStatus": {
-      "online": "У сетцы",
-      "idle": "Чакае",
       "offline": "Не ў сетцы",
       "loadingUser": "Загрузка даных карыстальніка…",
       "waitingForStatus": "Чаканне стану бота…",
@@ -848,7 +867,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Не атрымалася загрузіць экзэмпляры KiloClaw.",
     "billing": {
       "title": "Аплата",
@@ -856,7 +874,6 @@
       "plan": "План",
       "finalTermEnds": "Канец апошняга перыяду",
       "afterFinalTerm": "Пасля апошняга перыяду",
-      "remaining": "Засталося",
       "ends": "Сканчаецца",
       "expires": "Тэрмін дзеяння сканчаецца",
       "noActivePlan": "Няма актыўнага тарыфу",
@@ -957,20 +974,15 @@
       "disconnect": "Адключыць уліковы запіс Google",
       "copied": "Скапіявана",
       "copyCommand": "Скапіраваць каманду",
-      "disabled": "Адключана",
       "disconnectConfirm": "Адключыць",
       "disconnectMessage": "Выдаліць твой уліковы запіс Google з гэтага экзэмпляра? Гэта адключыць апавяшчэнні Gmail. Пасля адключэння паўторна разгарні экзэмпляр, каб ужыць змены.",
       "disconnectTitle": "Адключыць Google"
     },
     "modelList": {
-      "title": "Усе мадэлі",
       "searchPlaceholder": "Пошук мадэляў...",
-      "clearSearch": "Ачысціць пошук",
       "noMatches": "Мадэляў паводле запыту не знойдзена",
-      "noModels": "Няма даступных мадэляў",
       "noModelsDescription": "Мадэлі з'явяцца тут, калі стануць даступнымі.",
-      "noResultsFor": "Паводле запыту «{{query}}» нічога не знойдзена.",
-      "recommended": "Рэкамендаваныя"
+      "noResultsFor": "Паводле запыту «{{query}}» нічога не знойдзена."
     },
     "secrets": {
       "title": "Сакрэты",
@@ -988,8 +1000,7 @@
       "setupGuide": "Інструкцыя па наладжванні",
       "saving": "Захаванне…",
       "removing": "Выдаленне…",
-      "updateToken": "Абнавіць токен",
-      "connect": "Падключыць"
+      "updateToken": "Абнавіць токен"
     },
     "versionPin": {
       "title": "Замацаванне версіі",
@@ -1036,7 +1047,6 @@
       "finishingSetup": "Завяршэнне наладжвання",
       "finishingSetupDescription": "Пачакай, мы завяршаем наладку твайго ўліковага запісу. Звычайна гэта займае зусім няшмат часу.",
       "getStarted": "Пачаць",
-      "noInstances": "Няма асобнікаў KiloClaw",
       "noInstancesDescription": "Ствары свой першы экзэмпляр, каб запускаць агентаў для напісання кода."
     },
     "instance": {
@@ -1060,7 +1070,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Пачаць чат з {{name}}",
-        "online": "У сетцы",
         "ready": "{{name}} гатовы да працы",
         "warmedUp": "Усё гатова. Можаш павітацца, калі захочаш."
       },
@@ -1157,9 +1166,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Перадавыя",
       "frontierDescription": "Найлепшыя вынікі. Выкарыстоўвае перадавыя мадэлі з разважаннем.",
-      "balancedLabel": "Збалансаваны",
       "balancedDescription": "Удалае спалучэнне хуткасці і магчымасцей за меншыя грошы.",
-      "performance": "Прадукцыйнасць",
       "autoModelA11y": "Аўтаматычны выбар мадэлі: {{label}}",
       "currentModel": "Бягучая мадэль",
       "browseAllModels": "або выбраць з больш чым 500 мадэляў",
@@ -1193,7 +1200,6 @@
       "openUnread_one": "Адкрыць {{name}}, {{displayCount}} непрачытанае паведамленне",
       "openUnread": "Адкрыць {{name}}, {{displayCount}} непрачытанага паведамлення",
       "openUnread_other": "Адкрыць {{name}}, {{displayCount}} непрачытанага паведамлення",
-      "open": "Адкрыць {{name}}",
       "openSettings": "Адкрыць налады для {{name}}",
       "fixOnKiloAi": "Выправіць на kilo.ai: {{label}}",
       "openUnread_few": "Адкрыць {{name}}, {{displayCount}} непрачытаныя паведамленні",
@@ -1281,7 +1287,6 @@
       "title": "Праверка",
       "cancelTitle": "Адмяніць праверку?",
       "cancelMessage": "Гэта спыніць бягучую праверку кода.",
-      "keepRunning": "Працягнуць працу",
       "cancelReview": "Адмяніць праверку",
       "retryTitle": "Паўтарыць праверку?",
       "retryMessage": "Гэта запусціць праверку кода нанова.",
@@ -1291,13 +1296,11 @@
       "byline": "{{repo}} #{{number}} · Аўтар: {{author}}",
       "noFindings": "Праблем не выяўлена.",
       "showMore": "Паказаць больш",
-      "branch": "Галіна",
       "created": "Створана",
       "started": "Пачата",
       "completed": "Завершана",
       "tokens": "Токены",
       "tokensInOut": "Уваход: {{input}} / Выхад: {{output}}",
-      "openPullRequest": "Адкрыць запыт на зліццё",
       "council": "Рада",
       "decision": "Рашэнне",
       "gate": "Крытэрыі праходжання",
@@ -1325,8 +1328,6 @@
     },
     "reviewMemory": {
       "title": "Памяць праверак",
-      "couldNotLoadMore": "Не атрымалася загрузіць наступныя запісы.",
-      "retryLoadingMore": "Паўтарыць загрузку наступных запісаў",
       "loading": "Загрузка памяці праверак",
       "couldNotLoad": "Не атрымалася загрузіць памяць праверак.",
       "off": "Памяць праверак выключана.",
@@ -1365,15 +1366,11 @@
       "setup": "Наладжванне Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket падключаны",
-      "title": "Падключыць Bitbucket",
       "description": "Стварыце токен доступу да працоўнай прасторы з патрэбнымі правамі і ўстаўце яго ніжэй.",
       "scopes": "Уліковы запіс: чытанне · Рэпазіторыі: чытанне і запіс · Запыты на зліццё: чытанне · Вэбхукі: чытанне і запіс.",
-      "tokenPlaceholder": "Токен доступу да працоўнай прасторы",
-      "connect": "Падключыць"
+      "tokenPlaceholder": "Токен доступу да працоўнай прасторы"
     },
     "scopeList": {
-      "couldNotLoad": "Не атрымалася загрузіць арганізацыі.",
       "personalStillAvailable": "Асабістыя рэпазіторыі па-ранейшаму даступныя ніжэй.",
       "personalSubtitle": "Твае рэпазіторыі",
       "viewOnly": "Толькі прагляд"
@@ -1396,7 +1393,6 @@
       "githubApp": "праграма GitHub",
       "githubError": "Не атрымалася адкрыць наладжванне GitHub. Паспрабуйце яшчэ раз.",
       "gitlabAccount": "уліковы запіс GitLab",
-      "connectGitLab": "Падключыць GitLab",
       "gitlabError": "Не атрымалася адкрыць наладжванне GitLab. Паспрабуйце яшчэ раз.",
       "description": "Наладзьце падключэнне Kilo ({{label}}), каб аўтаматычна правяраць запыты на зліццё.",
       "bitbucketError": "Не атрымалася адкрыць наладжванне Bitbucket. Паспрабуйце яшчэ раз."
@@ -1421,21 +1417,17 @@
     "updateFailed": "Не атрымалася абнавіць агента праверкі кода.",
     "configSaveFailed": "Не атрымалася захаваць налады праверкі кода.",
     "status": {
-      "pending": "Чакае",
       "running": "Працуе",
       "completed": "Завершана",
-      "failed": "Не атрымалася",
       "interrupted": "Перапынена"
     },
     "reviewStyle": {
       "strict": "Строгі",
-      "balanced": "Збалансаваны",
       "lenient": "Паблажлівы",
       "roast": "З'едлівая крытыка"
     },
     "focusArea": {
       "security": "Бяспека",
-      "performance": "Прадукцыйнасць",
       "bugs": "Памылкі",
       "style": "Стыль",
       "testing": "Тэставанне",
@@ -1486,7 +1478,6 @@
       "statusOpen": "Адкрыта",
       "fixed": "Выпраўлена",
       "statusIgnored": "Праігнаравана",
-      "statusClosed": "Закрыта",
       "severityHigh": "Высокі",
       "severityMedium": "Сярэдні",
       "severityLow": "Нізкі",
@@ -1675,7 +1666,6 @@
       "title": "Налады",
       "couldNotLoadSettings": "Не атрымалася загрузіць налады агента бяспекі.",
       "couldNotLoadPermissions": "Не атрымалася загрузіць правы доступу.",
-      "disabled": "Адключана",
       "on": "Уключана",
       "repositoriesCount_one": "Выбраны {{displayCount}} рэпазіторый",
       "repositoriesCount": "Выбрана {{displayCount}} рэпазіторыя",
@@ -1705,7 +1695,6 @@
       "retry": "Паўтарыць выпраўленне",
       "cancelTitle": "Адмяніць гэтае выпраўленне?",
       "cancelMessage": "Агент бяспекі спыніць бягучую спробу выпраўлення.",
-      "keepRunning": "Працягнуць працу",
       "cancelRemediation": "Адмяніць выпраўленне",
       "openPullRequest": "Адкрыць запыт на зліццё{{number}}",
       "openDraftPullRequest": "Адкрыць чарнавік запыту на зліццё{{number}}",
@@ -1713,7 +1702,6 @@
       "attemptHistory": "Гісторыя спроб ({{displayCount}})",
       "attemptNumber": "Спроба № {{number}}",
       "startedBy": "Хто запусціў",
-      "branch": "Галіна",
       "queued": "Выпраўленне ў чарзе",
       "retryQueued": "Паўторнае выпраўленне ў чарзе",
       "timeline": {
@@ -1769,11 +1757,9 @@
       "noMatchesTitle": "Няма праблем, якія адпавядаюць фільтрам",
       "noMatchesDescription": "Паспрабуйце змяніць або скінуць выбраныя фільтры.",
       "emptyTitle": "Няма адкрытых праблем",
-      "emptyDescription": "Зараз няма адкрытых праблем, якія патрабуюць увагі.",
-      "clearFilters": "Скінуць фільтры"
+      "emptyDescription": "Зараз няма адкрытых праблем, якія патрабуюць увагі."
     },
     "scopeList": {
-      "couldNotLoad": "Не атрымалася загрузіць арганізацыі.",
       "personalSubtitle": "Твае рэпазіторыі"
     },
     "findingRow": {
@@ -1934,7 +1920,6 @@
       "draftPrOpened": "Адкрыты чарнавік PR",
       "prOpened": "PR адкрыты",
       "blocked": "Заблакіравана",
-      "failed": "Не атрымалася",
       "noChangesNeeded": "Змены не патрэбныя",
       "originAutomaticPolicy": "Правіла аўтаматычнага выпраўлення",
       "originIncludeExistingPolicy": "Правіла ўключэння наяўных праблем",
@@ -1988,12 +1973,9 @@
     "search": {
       "searching": "Пошук",
       "searchSessions": "Пошук сеансаў",
-      "searchSessionsPlaceholder": "Пошук сеансаў",
-      "clearSearch": "Ачысціць пошук",
-      "clearFilters": "Скінуць фільтры"
+      "searchSessionsPlaceholder": "Пошук сеансаў"
     },
     "sessionList": {
-      "couldNotLoad": "Не атрымалася загрузіць сеансы.",
       "couldNotLoadActive": "Не атрымалася загрузіць актыўныя сеансы.",
       "noSessionsYetDescription": "Запусці задачу па напісанні кода з тэлефона. Твае сеансы з'явяцца тут.",
       "noMatches": "Няма сеансаў паводле ўмоў пошуку",
@@ -2009,7 +1991,6 @@
       "deleteTitle": "Выдаліць сеанс?",
       "deleteMessage": "Гэта нельга адмяніць.",
       "deleteSession": "Выдаліць сеанс",
-      "rename": "Перайменаваць",
       "renameMessage": "Увядзі новую назву гэтага сеанса.",
       "copyId": "Скапіраваць ідэнтыфікатар сеанса",
       "idCopied": "Ідэнтыфікатар сеанса скапіраваны",
@@ -2064,7 +2045,6 @@
       "accessDeniedDescription": "У цябе няма дазволу на прагляд.",
       "couldNotLoad": "Не ўдалося загрузіць сеанс.",
       "failedToLoadDetails": "Не ўдалося загрузіць падрабязнасці сеанса.",
-      "notFound": "Нічога не знойдзена.",
       "notFoundDescription": "Магчыма, гэты элемент быў выдалены або больш недаступны.",
       "failedToStopExecution": "Не ўдалося спыніць выкананне.",
       "renameSession": "Перайменаваць сеанс",
@@ -2108,7 +2088,6 @@
       "retryConnection": "Паўтарыць падключэнне"
     },
     "newSession": {
-      "title": "Новы сеанс",
       "connectGithubDescription": "Падключыце GitHub у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
       "openGithub": "Адкрыць GitHub",
       "refreshRepositories": "Абнавіць рэпазіторыі",
@@ -2135,13 +2114,9 @@
       "couldNotRefreshRepositories": "Не ўдалося абнавіць рэпазіторыі. Паспрабуйце яшчэ раз.",
       "discardDraftTitle": "Выдаліць чарнавік?",
       "discardDraftMessage": "Ваш запыт будзе страчаны.",
-      "keepEditing": "Працягнуць рэдагаванне",
       "discardFailed": "Не ўдалося выдаліць чарнавік. Паспрабуйце яшчэ раз.",
       "remoteHint": "Выканайце `kilo remote` на сваім камп'ютары або `/remote` у актыўным сеансе CLI, каб кіраваць лакальным працэсам kilo.",
-      "bitbucketConnected": "Bitbucket падключаны",
-      "connectBitbucket": "Падключыць Bitbucket",
       "connectBitbucketDescription": "Падключыце Bitbucket у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
-      "connectGitlab": "Падключыць GitLab",
       "connectGitlabDescription": "Падключыце GitLab у браўзеры, потым вярніцеся сюды, каб выбраць рэпазіторый.",
       "couldNotLoadBitbucketRepositories": "Не ўдалося загрузіць рэпазіторыі Bitbucket.",
       "couldNotLoadGithubRepositories": "Не ўдалося загрузіць рэпазіторыі GitHub.",
@@ -2173,7 +2148,6 @@
       "accessibilityLabel": "Інструмент {{name}}, {{status}}",
       "fileEmpty": "Гэты файл пусты.",
       "noTasks": "Няма задач.",
-      "contentTruncated": "Змест абрэзаны",
       "truncated": "Абрэзана",
       "toolRead": "чытанне",
       "toolEdit": "Рэдагаваць",
@@ -2246,8 +2220,7 @@
       "tryDifferentSearch": "Паспрабуй іншы пошукавы запыт.",
       "loading": "Загрузка…",
       "accessibility": "Рэпазіторый: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Падрабязнасці паведамлення",
@@ -2269,8 +2242,7 @@
       "cacheWrite": "Запіс у кэш",
       "total": "Усяго",
       "reportAiResponseFailedRetryable": "Не ўдалося адправіць скаргу на гэты адказ.",
-      "reportAiResponseFailedTerminal": "На гэты адказ нельга паскардзіцца.",
-      "reportAiResponseSubmitted": "Скарга адпраўлена. Нумар пацвярджэння: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "На гэты адказ нельга паскардзіцца."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2309,10 +2281,8 @@
       "viewImageWithAlt": "Праглядзець выяву «{{alt}}»",
       "imageOutput": "Выніковая выява",
       "imageOutputWithFilename": "Выніковая выява, {{filename}}",
-      "defaultName": "Файл",
       "openFullScreen": "Адкрыць {{name}} на ўвесь экран",
       "preview": "Праглядзець {{name}}",
-      "openFile": "Адкрыць {{name}}",
       "couldNotLoadFile": "Не ўдалося загрузіць гэты файл.",
       "couldNotLoadFileRetry": "Не ўдалося загрузіць гэты файл. Паспрабуйце яшчэ раз.",
       "retryLoadingFile": "Паўтарыць загрузку файла",
@@ -2454,10 +2424,7 @@
     "modelPicker": {
       "title": "Выбар мадэлі",
       "searchPlaceholder": "Пошук мадэляў...",
-      "allModels": "Усе мадэлі",
       "favorites": "Абранае",
-      "noModels": "Няма даступных мадэляў",
-      "recommended": "Рэкамендаваныя",
       "noModelsDescription": "Няма мадэляў для выбару."
     },
     "modelSelector": {
@@ -2496,7 +2463,6 @@
       "camera": "Камера",
       "photoLibrary": "Галерэя фота",
       "files": "Файлы",
-      "cameraAccessDisabled": "Доступ да камеры адключаны",
       "cameraAccessMessage": "Каб зрабіць фота, дазволь доступ да камеры ў наладах.",
       "couldNotOpenPhotoPicker": "Не ўдалося адкрыць акно выбару фота. Перазапусціце Kilo і паспрабуйце яшчэ раз.",
       "maxFilesAllowed": "Максімальная колькасць файлаў: {{displayCount}}.",
@@ -2524,9 +2490,7 @@
     },
     "chatLink": {
       "linkCopied": "Спасылка скапіяваная",
-      "reviewPr": "Праверыць PR",
       "openLink": "Адкрыць спасылку",
-      "copyLink": "Скапіяваць спасылку",
       "shareLink": "Падзяліцца спасылкай",
       "share": "Падзяліцца",
       "prLinkActions": "Дзеянні са спасылкай на PR",
@@ -2572,7 +2536,6 @@
       "tokensUsage": "Токенаў у кантэксце: {{used}} з {{window}}, выкарыстана {{percentage}}",
       "title": "Выкарыстанне кантэксту",
       "used": "Выкарыстана",
-      "remaining": "Засталося",
       "provider": "Пастаўшчык",
       "totalCost": "Агульны кошт",
       "usageReflectsLatest": "Паказчыкі выкарыстання адпавядаюць апошняму завершанаму адказу памочніка.",
@@ -2640,7 +2603,6 @@
     "billingPage": "старонка аплаты"
   },
   "deviceSessions": {
-    "couldNotLoad": "Не атрымалася загрузіць сеансы.",
     "couldNotLoadDescription": "Актыўныя сеансы будуць недаступныя да завяршэння загрузкі даных.",
     "currentDeviceUnidentified": "Не ўдалося вызначыць бягучую прыладу.",
     "noSessions": "Няма актыўных сеансаў",
@@ -2648,7 +2610,6 @@
     "onlyKiloAppSignIns": "Тут паказваюцца толькі ўваходы праз праграму Kilo. Уваходы праз рэдактар і CLI не паказваюцца.",
     "signedIn": "Уваход: {{signedIn}} · Апошняя актыўнасць: {{lastSeen}}",
     "thisDevice": "Гэтая прылада",
-    "title": "Сеансы на прыладах",
     "webBrowser": "Вэб-браўзер",
     "viewProfile": "Праглядзець профіль",
     "signOutThisDevice": "Выйсці з уліковага запісу на гэтай прыладзе",
@@ -2681,11 +2642,9 @@
   },
   "invalidRoute": {
     "description": "Гэтая спасылка больш не дзейнічае.",
-    "goBack": "Назад",
     "title": "Старонка не знойдзеная"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Змест абрэзаны",
     "truncated": "Абрэзана",
     "wrap": "Перанос",
     "scroll": "Пракрутка"
@@ -2698,15 +2657,13 @@
     "neutralDescription": "Паспрабуйце яшчэ раз.",
     "offlineTitle": "Не атрымалася загрузіць даныя.",
     "permissionDescription": "У цябе няма дазволу на прагляд.",
-    "notFoundTitle": "Нічога не знойдзена.",
     "notFoundDescription": "Магчыма, гэты элемент быў выдалены або больш недаступны.",
     "serverTitle": "Не атрымалася загрузіць даныя.",
     "serverDescription": "На нашым баку ўзнікла памылка. Паспрабуйце яшчэ раз."
   },
   "screenHeader": {
     "openMenu": "Адкрыць меню",
-    "openMenuFor": "Адкрыць меню для {{title}}",
-    "goBack": "Назад"
+    "openMenuFor": "Адкрыць меню для {{title}}"
   },
   "picker": {
     "optionsExpired": "Тэрмін дзеяння варыянтаў скончыўся",
@@ -2737,9 +2694,7 @@
   },
   "share": {
     "title": "Адпраўка ў Kilo",
-    "reviewPr": "Праверыць PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Новы сеанс",
     "searchPlaceholder": "Пошук нядаўніх сеансаў",
     "connectedCli": "У падключаным CLI",
     "newSessionOn": "Новы сеанс на {{name}}",
@@ -2797,7 +2752,6 @@
     "statusCanceling": "Kilo Pass адмяняецца",
     "statusPastDue": "Аплата Kilo Pass пратэрмінавана",
     "monthlyCredits": "Крэдытаў штомесяц: {{credits}}",
-    "ends": "Сканчваецца {{date}}",
     "periodEnd": "канец перыяду",
     "managedOnGooglePlay": "Кіраванне праз Google Play",
     "managedInAppStore": "Кіраванне праз App Store",
@@ -2809,7 +2763,6 @@
     "unavailableDescription": "На Android нельга набыць Kilo Pass у праграме. Кіруйце падпіскай на сайце.",
     "webManagementDescription": "Кіраванне гэтай падпіскай Kilo Pass даступна на сайце.",
     "legalDisclosure": "Kilo Pass — штомесячная падпіска з аўтаматычным падаўжэннем. Аплата спаганяецца з вашага Apple ID пры пацвярджэнні пакупкі. Падпіска аўтаматычна падаўжаецца кожны месяц па паказанай цане, калі не адмяніць яе не пазней чым за 24 гадзіны да заканчэння бягучага перыяду. Вы можаце кіраваць падпіскай або адмяніць яе ў любы час у наладах уліковага запісу App Store.",
-    "legalPrivacyPolicy": "Палітыка прыватнасці",
     "legalTermsOfUse": "умовы выкарыстання (EULA)",
     "purchaseDifferentAccount": "Гэтая пакупка ў App Store не звязана з вашым уліковым запісам Kilo. Увайдзіце ў Apple Account, які выкарыстоўваўся для пакупкі, і паспрабуйце яшчэ раз.",
     "restoreFailed": "Не атрымалася аднавіць пакупкі. Паспрабуйце яшчэ раз.",
@@ -2940,7 +2893,6 @@
     },
     "inviteMember": {
       "emailError": "Увядзіце карэктны адрас электроннай пошты.",
-      "emailLabel": "Электронная пошта",
       "emailPlaceholder": "імя@company.com",
       "permissionDenied": "У вас няма дазволу запрашаць удзельнікаў.",
       "roleLabel": "Роля",
@@ -3010,7 +2962,6 @@
         "billingManager": "Кіраўнік плацяжоў"
       },
       "emailStatusFailed": "Ліст не дастаўлены",
-      "emailStatusPending": "Чакае",
       "inviteCreated": "Запрашэнне створанае",
       "pendingInvitations": "Запрашэнні без адказу",
       "resendInvite": "Адправіць запрашэнне зноў",
@@ -3035,7 +2986,6 @@
       "couldNotLoadStatus": "Не ўдалося загрузіць статус",
       "creditProcessingDelayed": "Залічэнне крэдытаў затрымліваецца · аўтаматычная паўторная спроба",
       "ended": "Завершана",
-      "endsOn": "Сканчваецца {{date}}",
       "manageHint": "Адкрывае кіраванне падпіскай Kilo Pass на сайце.",
       "notSubscribed": "Няма падпіскі",
       "overallocated": "Прызначана больш Kilo Pass, чым аплачана месцаў",
@@ -3046,7 +2996,6 @@
       "paymentPending": "Чаканне плацяжу",
       "processingBlocked": "Апрацоўка заблакаваная",
       "processingNeedsReview": "Апрацоўка патрабуе праверкі",
-      "retry": "Паўтарыць",
       "retryHint": "Паўтарае загрузку статусу Kilo Pass.",
       "setupHint": "Адкрывае налады Kilo Pass у браўзеры.",
       "paidSeat_few": "{{displayCount}} аплачаныя месцы",
@@ -3101,7 +3050,6 @@
     "backToPreferences": "Назад да налад"
   },
   "quickChat": {
-    "title": "Чат",
     "empty": {
       "title": "Пачніце размову",
       "description": "Адпраўце паведамленне, каб пачаць размову з мадэллю."
@@ -3120,7 +3068,6 @@
     "openAgents": "Адкрыць агентаў",
     "running": "Працуе",
     "needsInput": "Чакае адказу",
-    "idle": "Чакае",
     "channelName": "Актыўныя агенты",
     "activityKitDisabledBody": "Уключы дзеянні ў рэальным часе ў наладах, каб бачыць актыўных агентаў на экране блакіроўкі."
   }

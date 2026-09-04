@@ -929,7 +929,7 @@ describe('buildGlanceableViewProps', () => {
     expect(props.countLines.map(line => line.label)).toEqual([
       'glanceable.needsInput',
       'glanceable.running',
-      'glanceable.idle',
+      'common.idle',
     ]);
   });
 

@@ -69,7 +69,58 @@
     "repository": "คลังโค้ด",
     "signOut": "ออกจากระบบ",
     "agents": "เอเจนต์",
-    "all": "ทั้งหมด"
+    "all": "ทั้งหมด",
+    "allModels": "โมเดลทั้งหมด",
+    "balanced": "สมดุล",
+    "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
+    "branch": "บรานช์",
+    "cameraAccessDisabled": "ไม่ได้อนุญาตให้ใช้กล้อง",
+    "chat": "แชท",
+    "clearFilters": "ล้างตัวกรอง",
+    "clearSearch": "ล้างคำค้นหา",
+    "closed": "ปิดแล้ว",
+    "closeReactions": "ปิดการแสดงความรู้สึก",
+    "connect": "เชื่อมต่อ",
+    "connectBitbucket": "เชื่อมต่อ Bitbucket",
+    "connectGitlab": "เชื่อมต่อ GitLab",
+    "contentTruncated": "เนื้อหาถูกตัดทอน",
+    "copyLink": "คัดลอกลิงก์",
+    "couldNotLoadOrganizations": "ไม่สามารถโหลดรายชื่อองค์กรได้",
+    "couldNotLoadSessions": "ไม่สามารถโหลดเซสชันได้",
+    "couldnTLoadMore": "ไม่สามารถโหลดเพิ่มได้",
+    "deviceSessions": "เซสชันบนอุปกรณ์",
+    "disabled": "ปิดใช้งานแล้ว",
+    "email": "อีเมล",
+    "ends": "สิ้นสุดวันที่ {{date}}",
+    "failed": "ล้มเหลว",
+    "file": "ไฟล์",
+    "gitlab": "GitLab",
+    "goBack": "ย้อนกลับ",
+    "idle": "รอทำงาน",
+    "keepEditing": "แก้ไขต่อ",
+    "keepRunning": "ให้ทำงานต่อ",
+    "kiloclaw": "KiloClaw",
+    "newSession": "เซสชันใหม่",
+    "noKiloclawInstances": "ยังไม่มีอินสแตนซ์ KiloClaw",
+    "noModelsAvailable": "ไม่มีโมเดลที่ใช้งานได้",
+    "notFound": "ไม่พบข้อมูล",
+    "online": "ออนไลน์",
+    "open": "เปิด {{name}}",
+    "openPullRequest": "เปิดพูลรีเควสต์",
+    "pending": "รอดำเนินการ",
+    "performance": "ประสิทธิภาพ",
+    "preferences": "การตั้งค่า",
+    "privacyPolicy": "นโยบายความเป็นส่วนตัว",
+    "profile": "โปรไฟล์",
+    "reactions": "การแสดงความรู้สึก",
+    "recent": "ล่าสุด",
+    "recommended": "แนะนำ",
+    "remaining": "คงเหลือ",
+    "rename": "เปลี่ยนชื่อ",
+    "reply": "ตอบกลับ",
+    "reportSubmittedReceipt": "ส่งรายงานแล้ว หมายเลขรับเรื่อง {{receiptId}}",
+    "retryLoadingMore": "ลองโหลดเพิ่มอีกครั้ง",
+    "reviewPr": "ตรวจสอบ PR"
   },
   "language": {
     "title": "ภาษา",
@@ -77,7 +128,6 @@
     "couldNotRestart": "ไม่สามารถเริ่มแอปใหม่ได้",
     "languageSaved": "บันทึกภาษาที่เลือกแล้ว",
     "catalogLoadFailed": "ไม่สามารถโหลดภาษาได้ กรุณาลองอีกครั้ง",
-    "retry": "ลองอีกครั้ง",
     "search": "ค้นหาภาษา",
     "noMatches": "ไม่มีภาษาที่ตรงกัน",
     "deviceLanguage": "ภาษาของอุปกรณ์",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "รหัสลงชื่อเข้าใช้: {{code}}",
     "openSignInPageInBrowser": "เปิดหน้าลงชื่อเข้าใช้ในเบราว์เซอร์",
     "copySignInLink": "คัดลอกลิงก์ลงชื่อเข้าใช้",
-    "copyLink": "คัดลอกลิงก์",
     "cancelSignIn": "ยกเลิกการลงชื่อเข้าใช้",
     "startingSignIn": "กำลังเริ่มลงชื่อเข้าใช้...",
     "organizationUsesSso": "องค์กรของคุณใช้การลงชื่อเข้าใช้ครั้งเดียว",
@@ -112,7 +161,6 @@
     "terms": "ข้อกำหนด",
     "termsConnector": " และ ",
     "termsSuffix": ".",
-    "privacyPolicy": "นโยบายความเป็นส่วนตัว",
     "moreSignInOptions": "ตัวเลือกการลงชื่อเข้าใช้เพิ่มเติม",
     "couldNotCompleteSignIn": "ลงชื่อเข้าใช้ไม่สำเร็จ กรุณาลองอีกครั้ง",
     "sessionEnded": "เซสชันของคุณสิ้นสุดแล้ว กรุณาลงชื่อเข้าใช้อีกครั้ง",
@@ -126,7 +174,6 @@
     "or": "หรือ"
   },
   "profile": {
-    "title": "โปรไฟล์",
     "codeReviewerSubtitle": "การตรวจสอบ PR อัตโนมัติ",
     "securityAgentSubtitle": "ค้นหาและแก้ไขช่องโหว่",
     "reviews": "การตรวจสอบโค้ด",
@@ -136,9 +183,7 @@
     "linkedAccounts": "บัญชีที่เชื่อมโยง",
     "couldNotLoadAccounts": "ไม่สามารถโหลดบัญชีได้",
     "app": "แอป",
-    "preferences": "การตั้งค่า",
     "preferencesSubtitle": "รูปแบบการแสดงผล การแจ้งเตือน กระบวนการคิด และการทำงานของหน้าจอ",
-    "deviceSessions": "เซสชันบนอุปกรณ์",
     "deviceSessionsSubtitle": "ตรวจสอบและออกจากระบบบนอุปกรณ์อื่น",
     "feedback": "ส่งข้อเสนอแนะ",
     "privacyChoices": "ตัวเลือกความเป็นส่วนตัว",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "อีเมล",
     "providerTestAccount": "บัญชีทดสอบ",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO สำหรับองค์กร"
   },
   "preferences": {
-    "title": "การตั้งค่า",
     "autoExpandThinking": "ขยายกระบวนการคิดอัตโนมัติ",
     "autoExpandThinkingSubtitle": "ขยายรายละเอียดกระบวนการคิดของเอเจนต์เมื่อคิดเสร็จ",
     "keepScreenOn": "เปิดหน้าจอค้างไว้ขณะอยู่ในหน้าเซสชัน",
@@ -360,7 +402,6 @@
       "unresolveThread": "ทำเครื่องหมายเธรดว่ายังไม่แก้ไข",
       "resolved": "แก้ไขแล้ว",
       "outdated": "ล้าสมัย",
-      "file": "ไฟล์",
       "comment_one": "ความคิดเห็น 1 รายการ",
       "comment": "ความคิดเห็น {{displayCount}} รายการ",
       "comment_other": "ความคิดเห็น {{displayCount}} รายการ",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "ไม่สามารถโหลดความคิดเห็นเพิ่มได้",
       "retryLoadingMore": "ลองโหลดความคิดเห็นเพิ่มอีกครั้ง",
       "loadMoreComments": "โหลดความคิดเห็นเพิ่ม",
-      "closeReactions": "ปิดการแสดงความรู้สึก",
-      "reactionsTitle": "การแสดงความรู้สึก",
       "addReaction": "แสดงความรู้สึก",
       "reactionPill": "การแสดงความรู้สึก {{emoji}}: {{displayCount}} {{countLabel}}",
       "reaction_one": "ครั้ง",
@@ -380,13 +419,11 @@
       "reportUser": "รายงานผู้ใช้",
       "mute": "ปิดเสียง",
       "block": "บล็อก",
-      "reportSubmitted": "ส่งรายงานแล้ว หมายเลขรับเรื่อง {{receiptId}}",
       "blockedUser": "บล็อก {{login}} แล้ว",
       "mutedUser": "ปิดเสียง {{login}} แล้ว",
       "replyPlaceholder": "ตอบกลับ…",
       "replyBody": "เนื้อหาการตอบกลับ",
       "submitReply": "ส่งการตอบกลับ",
-      "reply": "ตอบกลับ",
       "termsTitle": "ข้อกำหนดในการให้บริการ",
       "termsCopy": "คุณต้องมีอายุอย่างน้อย 13 ปีจึงจะโพสต์ได้",
       "termsAcceptRetry": "บันทึกการยอมรับข้อกำหนดไม่สำเร็จ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
@@ -468,8 +505,7 @@
       "urlAccessibility": "URL ของ PR บน GitHub",
       "clearLink": "ล้างลิงก์ PR",
       "pasteLink": "วางลิงก์ PR",
-      "open": "เปิด",
-      "openPullRequest": "เปิดพูลรีเควสต์"
+      "open": "เปิด"
     },
     "checks": {
       "title": "การตรวจสอบ",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "กล่องขาเข้า",
-      "recent": "ล่าสุด",
       "loading": "กำลังโหลดกล่องขาเข้า",
       "noReviewRequests": "ไม่มีคำขอรีวิว",
       "noReviewRequestsDescription": "PR ที่รอคุณรีวิวจะแสดงที่นี่ คุณยังวางลิงก์ PR ใดก็ได้ด้านบน",
-      "couldNotLoad": "ไม่สามารถโหลดกล่องขาเข้าได้",
-      "couldNotLoadMore": "ไม่สามารถโหลดเพิ่มได้",
-      "retryLoadingMore": "ลองโหลดเพิ่มอีกครั้ง"
+      "couldNotLoad": "ไม่สามารถโหลดกล่องขาเข้าได้"
     },
     "composer": {
       "commentBodyPlaceholder": "เขียนความคิดเห็น…",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "ไม่สามารถโหลดหน้าเขียนความคิดเห็นได้",
       "discardTitle": "ทิ้งความคิดเห็นนี้หรือไม่?",
       "discardMessage": "ฉบับร่างของคุณจะหายไป",
-      "keepEditing": "แก้ไขต่อ",
       "comment": "แสดงความคิดเห็น",
       "insertSuggestionA11y": "แทรกข้อเสนอแก้ไขโค้ด",
       "insertSuggestion": "แทรกข้อเสนอแก้ไข",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "ผสานแล้ว",
-      "stateClosed": "ปิดแล้ว",
       "stateOpenApproved": "เปิด · อนุมัติแล้ว",
       "stateOpenChangesRequested": "เปิด · ขอให้แก้ไขแล้ว",
       "stateOpenReviewRequired": "เปิด · รอรีวิว",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "หน้าหลัก",
-    "profile": "โปรไฟล์",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}} แท็บที่ {{position}} จาก {{total}}",
-    "chat": "แชท"
+    "position": "{{name}} แท็บที่ {{position}} จาก {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "สลับอินสแตนซ์",
       "couldNotLoadInstances": "ไม่สามารถโหลดอินสแตนซ์ได้",
-      "noInstances": "ยังไม่มีอินสแตนซ์ KiloClaw",
       "noInstancesDescription": "ตั้งค่าอินสแตนซ์เพื่อเริ่มแชท",
       "setUpKiloclaw": "ตั้งค่า KiloClaw",
       "currentInstance": "{{title}} อินสแตนซ์ปัจจุบัน"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "ไม่สามารถลงชื่อเข้าใช้แชทได้",
       "couldNotRefreshMessages": "ไม่สามารถรีเฟรชข้อความได้",
       "couldNotLoadHistory": "ไม่สามารถโหลดประวัติการสนทนาได้",
-      "rename": "เปลี่ยนชื่อ",
       "leave": "ออก",
       "untitledConversation": "การสนทนาที่ไม่มีชื่อ",
       "createFailed": "สร้างการสนทนาไม่สำเร็จ",
       "leaveFailed": "ออกจากการสนทนาไม่สำเร็จ"
     },
     "reactions": {
-      "title": "การแสดงความรู้สึก",
-      "close": "ปิดการแสดงความรู้สึก",
-      "recent": "ล่าสุด",
       "common": "ทั่วไป",
       "reactWith": "แสดงปฏิกิริยา {{reaction}}",
       "accessibility": "ปฏิกิริยา {{emoji}} จำนวน {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "เพิ่มปฏิกิริยาไม่สำเร็จ",
       "retrySend": "ลองส่งอีกครั้ง",
       "moreReactions": "ปฏิกิริยาเพิ่มเติม",
-      "reply": "ตอบกลับ",
       "edit": "แก้ไข",
       "sendFailed": "ส่งข้อความไม่สำเร็จ",
       "retrySendFailed": "ลองส่งอีกครั้งไม่สำเร็จ",
@@ -807,7 +829,6 @@
       "takePhoto": "ถ่ายภาพ",
       "photoLibrary": "คลังรูปภาพ",
       "files": "ไฟล์",
-      "cameraAccessDisabled": "ไม่ได้อนุญาตให้ใช้กล้อง",
       "cameraAccessMessage": "อนุญาตให้ใช้กล้องในการตั้งค่าเพื่อถ่ายรูป"
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} กำลังพิมพ์..."
     },
     "botStatus": {
-      "online": "ออนไลน์",
-      "idle": "รอทำงาน",
       "offline": "ออฟไลน์",
       "loadingUser": "กำลังโหลดข้อมูลผู้ใช้...",
       "waitingForStatus": "กำลังรอสถานะบอท...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "โหลดอินสแตนซ์ KiloClaw ไม่สำเร็จ",
     "billing": {
       "title": "การเรียกเก็บเงิน",
@@ -840,7 +858,6 @@
       "plan": "แผน",
       "finalTermEnds": "วันสิ้นสุดรอบสุดท้าย",
       "afterFinalTerm": "หลังสิ้นสุดรอบสุดท้าย",
-      "remaining": "คงเหลือ",
       "lessThanOneDay": "น้อยกว่า 1 วัน",
       "ends": "สิ้นสุด",
       "expires": "หมดอายุ",
@@ -941,20 +958,15 @@
       "disconnect": "ตัดการเชื่อมต่อบัญชี Google",
       "copied": "คัดลอกแล้ว",
       "copyCommand": "คัดลอกคำสั่ง",
-      "disabled": "ปิดใช้งานแล้ว",
       "disconnectConfirm": "ตัดการเชื่อมต่อ",
       "disconnectMessage": "นำบัญชี Google ออกจากอินสแตนซ์นี้หรือไม่? การแจ้งเตือน Gmail จะถูกปิด หลังตัดการเชื่อมต่อ ให้ดีพลอยอินสแตนซ์ใหม่เพื่อให้การเปลี่ยนแปลงมีผล",
       "disconnectTitle": "ตัดการเชื่อมต่อ Google"
     },
     "modelList": {
-      "title": "โมเดลทั้งหมด",
       "searchPlaceholder": "ค้นหาโมเดล...",
-      "clearSearch": "ล้างคำค้นหา",
       "noMatches": "ไม่มีโมเดลตรงกับการค้นหาของคุณ",
-      "noModels": "ไม่มีโมเดลที่ใช้งานได้",
       "noModelsDescription": "โมเดลจะปรากฏที่นี่เมื่อพร้อมใช้งาน",
-      "noResultsFor": "ไม่มีผลลัพธ์สำหรับ \"{{query}}\"",
-      "recommended": "แนะนำ"
+      "noResultsFor": "ไม่มีผลลัพธ์สำหรับ \"{{query}}\""
     },
     "secrets": {
       "title": "ข้อมูลลับ",
@@ -972,8 +984,7 @@
       "setupGuide": "คู่มือการตั้งค่า",
       "saving": "กำลังบันทึก…",
       "removing": "กำลังนำออก…",
-      "updateToken": "อัปเดตโทเค็น",
-      "connect": "เชื่อมต่อ"
+      "updateToken": "อัปเดตโทเค็น"
     },
     "versionPin": {
       "title": "การล็อกเวอร์ชัน",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "กำลังตั้งค่าขั้นสุดท้าย",
       "finishingSetupDescription": "รอสักครู่ ระบบกำลังเตรียมบัญชีของคุณให้พร้อมใช้งาน โดยปกติใช้เวลาไม่นาน",
       "getStarted": "เริ่มต้นใช้งาน",
-      "noInstances": "ยังไม่มีอินสแตนซ์ KiloClaw",
       "noInstancesDescription": "สร้างอินสแตนซ์แรกเพื่อเริ่มใช้งานเอเจนต์เขียนโค้ด"
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "แชทกับ {{name}}",
-        "online": "ออนไลน์",
         "ready": "{{name}} พร้อมแล้ว",
         "warmedUp": "พร้อมแล้ว ทักทายได้เมื่อคุณพร้อม"
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "ล้ำหน้า",
       "frontierDescription": "ประสิทธิภาพสูงสุด เลือกใช้โมเดลล้ำหน้าที่มีความสามารถด้านการให้เหตุผล",
-      "balancedLabel": "สมดุล",
       "balancedDescription": "สมดุลทั้งความเร็วและความสามารถ ในราคาที่ถูกลง",
-      "performance": "ประสิทธิภาพ",
       "autoModelA11y": "เลือกโมเดลอัตโนมัติแบบ {{label}}",
       "currentModel": "โมเดลปัจจุบัน",
       "browseAllModels": "หรือเลือกจากโมเดลมากกว่า 500 รายการ",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "เปิด {{name}} มีข้อความที่ยังไม่ได้อ่าน {{displayCount}} ข้อความ",
       "openUnread": "เปิด {{name}} มีข้อความที่ยังไม่ได้อ่าน {{displayCount}} ข้อความ",
       "openUnread_other": "เปิด {{name}} มีข้อความที่ยังไม่ได้อ่าน {{displayCount}} ข้อความ",
-      "open": "เปิด {{name}}",
       "openSettings": "เปิดการตั้งค่าสำหรับ {{name}}",
       "fixOnKiloAi": "แก้ไขบน kilo.ai: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "การตรวจสอบ",
       "cancelTitle": "ยกเลิกการตรวจสอบหรือไม่?",
       "cancelMessage": "การดำเนินการนี้จะหยุดการตรวจสอบโค้ดที่กำลังดำเนินการอยู่",
-      "keepRunning": "ให้ทำงานต่อ",
       "cancelReview": "ยกเลิกการตรวจสอบ",
       "retryTitle": "ลองตรวจสอบอีกครั้งหรือไม่?",
       "retryMessage": "ระบบจะตรวจสอบโค้ดอีกครั้ง",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} โดย {{author}}",
       "noFindings": "ไม่มีข้อค้นพบ",
       "showMore": "แสดงเพิ่มเติม",
-      "branch": "บรานช์",
       "created": "สร้างเมื่อ",
       "started": "เริ่มเมื่อ",
       "completed": "เสร็จสิ้น",
       "tokens": "โทเค็น",
       "tokensInOut": "ขาเข้า {{input}} / ขาออก {{output}}",
-      "openPullRequest": "เปิดพูลรีเควสต์",
       "council": "คณะผู้ตรวจสอบ",
       "decision": "การตัดสินใจ",
       "gate": "เกณฑ์ผ่านการตรวจสอบ",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "ความจำในการตรวจสอบ",
-      "couldNotLoadMore": "ไม่สามารถโหลดเพิ่มได้",
-      "retryLoadingMore": "ลองโหลดเพิ่มอีกครั้ง",
       "loading": "กำลังโหลดความจำในการตรวจสอบ",
       "couldNotLoad": "โหลดความจำในการตรวจสอบไม่สำเร็จ",
       "off": "ความจำในการตรวจสอบปิดอยู่",
@@ -1347,15 +1348,11 @@
       "setup": "การตั้งค่า Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "เชื่อมต่อ Bitbucket แล้ว",
-      "title": "เชื่อมต่อ Bitbucket",
       "description": "สร้างโทเค็นการเข้าถึงพื้นที่ทำงานที่มีขอบเขตสิทธิ์ตามที่กำหนด แล้ววางโทเค็นด้านล่าง",
       "scopes": "บัญชี: อ่าน · คลังโค้ด: อ่าน/เขียน · PR: อ่าน · เว็บฮุก: อ่าน/เขียน",
-      "tokenPlaceholder": "โทเค็นการเข้าถึงพื้นที่ทำงาน",
-      "connect": "เชื่อมต่อ"
+      "tokenPlaceholder": "โทเค็นการเข้าถึงพื้นที่ทำงาน"
     },
     "scopeList": {
-      "couldNotLoad": "ไม่สามารถโหลดรายชื่อองค์กรได้",
       "personalStillAvailable": "ยังเข้าถึงคลังโค้ดส่วนตัวได้ด้านล่าง",
       "personalSubtitle": "คลังโค้ดของคุณเอง",
       "viewOnly": "ดูอย่างเดียว"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub App",
       "githubError": "ไม่สามารถเปิดหน้าตั้งค่า GitHub ได้ กรุณาลองอีกครั้ง",
       "gitlabAccount": "บัญชี GitLab",
-      "connectGitLab": "เชื่อมต่อ GitLab",
       "gitlabError": "ไม่สามารถเปิดหน้าตั้งค่า GitLab ได้ กรุณาลองอีกครั้ง",
       "description": "เชื่อมต่อ{{label}}กับ Kilo เพื่อตรวจสอบ PR โดยอัตโนมัติ",
       "bitbucketError": "ไม่สามารถเปิดหน้าตั้งค่า Bitbucket ได้ กรุณาลองอีกครั้ง"
@@ -1403,21 +1399,17 @@
     "updateFailed": "อัปเดตตัวตรวจสอบโค้ดไม่สำเร็จ",
     "configSaveFailed": "บันทึกการตั้งค่าการตรวจสอบไม่สำเร็จ",
     "status": {
-      "pending": "รอดำเนินการ",
       "running": "กำลังทำงาน",
       "completed": "เสร็จสิ้น",
-      "failed": "ล้มเหลว",
       "interrupted": "ถูกขัดจังหวะ"
     },
     "reviewStyle": {
       "strict": "เข้มงวด",
-      "balanced": "สมดุล",
       "lenient": "ผ่อนปรน",
       "roast": "วิจารณ์แบบแซวแรง"
     },
     "focusArea": {
       "security": "ความปลอดภัย",
-      "performance": "ประสิทธิภาพ",
       "bugs": "บั๊ก",
       "style": "รูปแบบโค้ด",
       "testing": "การทดสอบ",
@@ -1468,7 +1460,6 @@
       "statusOpen": "เปิด",
       "fixed": "แก้ไขแล้ว",
       "statusIgnored": "เพิกเฉยแล้ว",
-      "statusClosed": "ปิดแล้ว",
       "severityHigh": "สูง",
       "severityMedium": "ปานกลาง",
       "severityLow": "ต่ำ",
@@ -1655,7 +1646,6 @@
       "title": "การตั้งค่า",
       "couldNotLoadSettings": "ไม่สามารถโหลดการตั้งค่า Security Agent ได้",
       "couldNotLoadPermissions": "ไม่สามารถโหลดสิทธิ์ได้",
-      "disabled": "ปิดใช้งานแล้ว",
       "on": "เปิด",
       "repositoriesCount_one": "เลือกคลังโค้ดแล้ว {{displayCount}} แห่ง",
       "repositoriesCount": "เลือกคลังโค้ดแล้ว {{displayCount}} รายการ",
@@ -1683,7 +1673,6 @@
       "retry": "ลองแก้ไขอีกครั้ง",
       "cancelTitle": "ยกเลิกการแก้ไขนี้หรือไม่?",
       "cancelMessage": "Security Agent จะหยุดการแก้ไขที่กำลังดำเนินการอยู่",
-      "keepRunning": "ให้ทำงานต่อ",
       "cancelRemediation": "ยกเลิกการแก้ไข",
       "openPullRequest": "เปิด PR{{number}}",
       "openDraftPullRequest": "เปิด PR ฉบับร่าง{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "ประวัติการแก้ไข ({{displayCount}})",
       "attemptNumber": "การแก้ไขครั้งที่ {{number}}",
       "startedBy": "เริ่มโดย",
-      "branch": "บรานช์",
       "queued": "จัดคิวการแก้ไขแล้ว",
       "retryQueued": "จัดคิวการแก้ไขอีกครั้งแล้ว",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "ไม่มีข้อค้นพบที่ตรงกับตัวกรอง",
       "noMatchesDescription": "ลองปรับหรือล้างตัวกรองที่เลือก",
       "emptyTitle": "ไม่มีข้อค้นพบที่ยังเปิดอยู่",
-      "emptyDescription": "ขณะนี้ไม่มีข้อค้นพบที่ยังเปิดอยู่ซึ่งต้องจัดการ",
-      "clearFilters": "ล้างตัวกรอง"
+      "emptyDescription": "ขณะนี้ไม่มีข้อค้นพบที่ยังเปิดอยู่ซึ่งต้องจัดการ"
     },
     "scopeList": {
-      "couldNotLoad": "ไม่สามารถโหลดรายชื่อองค์กรได้",
       "personalSubtitle": "คลังโค้ดของคุณเอง"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "เปิด PR ฉบับร่างแล้ว",
       "prOpened": "เปิด PR แล้ว",
       "blocked": "ถูกบล็อก",
-      "failed": "ล้มเหลว",
       "noChangesNeeded": "ไม่จำเป็นต้องเปลี่ยนแปลง",
       "originAutomaticPolicy": "นโยบายอัตโนมัติ",
       "originIncludeExistingPolicy": "นโยบายรวมข้อค้นพบที่มีอยู่",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "กำลังค้นหา",
       "searchSessions": "ค้นหาเซสชัน",
-      "searchSessionsPlaceholder": "ค้นหาเซสชัน",
-      "clearSearch": "ล้างคำค้นหา",
-      "clearFilters": "ล้างตัวกรอง"
+      "searchSessionsPlaceholder": "ค้นหาเซสชัน"
     },
     "sessionList": {
-      "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "couldNotLoadActive": "ไม่สามารถโหลดเซสชันที่กำลังทำงานได้",
       "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ เซสชันของคุณจะแสดงที่นี่",
       "noMatches": "ไม่มีเซสชันที่ตรงกัน",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "ลบเซสชันนี้หรือไม่?",
       "deleteMessage": "การดำเนินการนี้ไม่สามารถย้อนกลับได้",
       "deleteSession": "ลบเซสชัน",
-      "rename": "เปลี่ยนชื่อ",
       "renameMessage": "ระบุชื่อใหม่สำหรับเซสชันนี้",
       "copyId": "คัดลอก ID เซสชัน",
       "idCopied": "คัดลอก ID เซสชันแล้ว",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
       "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
       "failedToLoadDetails": "ไม่สามารถโหลดรายละเอียดเซสชันได้",
-      "notFound": "ไม่พบข้อมูล",
       "notFoundDescription": "รายการนี้อาจถูกลบหรือใช้งานไม่ได้แล้ว",
       "failedToStopExecution": "ไม่สามารถหยุดการทำงานได้",
       "renameSession": "เปลี่ยนชื่อเซสชัน",
@@ -2076,7 +2056,6 @@
       "retryConnection": "ลองเชื่อมต่อใหม่"
     },
     "newSession": {
-      "title": "เซสชันใหม่",
       "connectGithubDescription": "เชื่อมต่อ GitHub ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
       "openGithub": "เปิด GitHub",
       "refreshRepositories": "รีเฟรชรายการคลังโค้ด",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "ไม่สามารถรีเฟรชรายการคลังโค้ดได้ กรุณาลองอีกครั้ง",
       "discardDraftTitle": "ทิ้งฉบับร่างหรือไม่?",
       "discardDraftMessage": "พรอมต์ที่คุณเขียนไว้จะหายไป",
-      "keepEditing": "แก้ไขต่อ",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
       "remoteHint": "รัน `kilo remote` บนคอมพิวเตอร์ หรือ `/remote` ในเซสชัน CLI ที่กำลังทำงาน เพื่อควบคุมโปรเซส kilo บนเครื่องนั้น",
-      "bitbucketConnected": "เชื่อมต่อ Bitbucket แล้ว",
-      "connectBitbucket": "เชื่อมต่อ Bitbucket",
       "connectBitbucketDescription": "เชื่อมต่อ Bitbucket ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
-      "connectGitlab": "เชื่อมต่อ GitLab",
       "connectGitlabDescription": "เชื่อมต่อ GitLab ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
       "couldNotLoadBitbucketRepositories": "ไม่สามารถโหลดคลังโค้ดจาก Bitbucket ได้",
       "couldNotLoadGithubRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitHub ได้",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "เครื่องมือ {{name}}, {{status}}",
       "fileEmpty": "ไฟล์นี้ไม่มีเนื้อหา",
       "noTasks": "ไม่มีงาน",
-      "contentTruncated": "เนื้อหาถูกตัดทอน",
       "truncated": "ถูกตัดทอน",
       "toolRead": "อ่าน",
       "toolEdit": "แก้ไข",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
       "loading": "กำลังโหลด...",
       "accessibility": "คลังโค้ด: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "รายละเอียดข้อความ",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "การเขียนแคช",
       "total": "รวม",
       "reportAiResponseFailedRetryable": "ไม่สามารถรายงานคำตอบนี้ได้",
-      "reportAiResponseFailedTerminal": "คำตอบนี้ไม่สามารถรายงานได้",
-      "reportAiResponseSubmitted": "ส่งรายงานแล้ว หมายเลขรับเรื่อง {{receiptId}}"
+      "reportAiResponseFailedTerminal": "คำตอบนี้ไม่สามารถรายงานได้"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "ดูรูปภาพ {{alt}}",
       "imageOutput": "รูปภาพผลลัพธ์",
       "imageOutputWithFilename": "รูปภาพผลลัพธ์ {{filename}}",
-      "defaultName": "ไฟล์",
       "openFullScreen": "เปิด {{name}} แบบเต็มหน้าจอ",
       "preview": "ดูตัวอย่าง {{name}}",
-      "openFile": "เปิด {{name}}",
       "couldNotLoadFile": "ไม่สามารถโหลดไฟล์นี้ได้",
       "couldNotLoadFileRetry": "ไม่สามารถโหลดไฟล์นี้ได้ ลองอีกครั้ง",
       "retryLoadingFile": "ลองโหลดไฟล์ใหม่",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "เลือกโมเดล",
       "searchPlaceholder": "ค้นหาโมเดล...",
-      "noModels": "ไม่มีโมเดลที่ใช้งานได้",
       "noModelsDescription": "ไม่มีโมเดลให้เลือก",
-      "favorites": "รายการโปรด",
-      "recommended": "แนะนำ",
-      "allModels": "โมเดลทั้งหมด"
+      "favorites": "รายการโปรด"
     },
     "modelSelector": {
       "provider": "ผู้ให้บริการ {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "กล้อง",
       "photoLibrary": "คลังรูปภาพ",
       "files": "ไฟล์",
-      "cameraAccessDisabled": "ไม่ได้อนุญาตให้ใช้กล้อง",
       "cameraAccessMessage": "อนุญาตให้ใช้กล้องในการตั้งค่าเพื่อถ่ายรูป",
       "couldNotOpenPhotoPicker": "เปิดหน้าต่างเลือกรูปภาพไม่สำเร็จ ปิดแล้วเปิด Kilo ใหม่ จากนั้นลองอีกครั้ง",
       "maxFilesAllowed": "แนบไฟล์ได้สูงสุด {{displayCount}} ไฟล์",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "คัดลอกลิงก์แล้ว",
-      "reviewPr": "ตรวจสอบ PR",
       "openLink": "เปิดลิงก์",
-      "copyLink": "คัดลอกลิงก์",
       "shareLink": "แชร์ลิงก์",
       "share": "แชร์",
       "prLinkActions": "ตัวเลือกสำหรับลิงก์ PR",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "ใช้บริบท {{used}} จาก {{window}} โทเคน คิดเป็น {{percentage}}",
       "title": "การใช้บริบท",
       "used": "ใช้แล้ว",
-      "remaining": "คงเหลือ",
       "provider": "ผู้ให้บริการ",
       "totalCost": "ค่าใช้จ่ายรวม",
       "usageReflectsLatest": "ข้อมูลการใช้งานอ้างอิงจากคำตอบล่าสุดที่ผู้ช่วยสร้างเสร็จแล้ว",
@@ -2598,7 +2561,6 @@
     "billingPage": "หน้าการเรียกเก็บเงิน"
   },
   "deviceSessions": {
-    "couldNotLoad": "ไม่สามารถโหลดเซสชันได้",
     "couldNotLoadDescription": "ยังไม่สามารถแสดงเซสชันที่ใช้งานอยู่ได้จนกว่าจะโหลดข้อมูลเสร็จ",
     "currentDeviceUnidentified": "ระบุอุปกรณ์ปัจจุบันไม่ได้",
     "noSessions": "ไม่มีเซสชันที่ใช้งานอยู่",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "หน้านี้แสดงเฉพาะการเข้าสู่ระบบผ่านแอป Kilo ไม่รวมการเข้าสู่ระบบผ่านโปรแกรมแก้ไขโค้ดหรือ CLI",
     "signedIn": "เข้าสู่ระบบเมื่อ {{signedIn}} · ใช้งานล่าสุด {{lastSeen}}",
     "thisDevice": "อุปกรณ์นี้",
-    "title": "เซสชันบนอุปกรณ์",
     "viewProfile": "ดูโปรไฟล์",
     "signOutThisDevice": "ออกจากระบบบนอุปกรณ์นี้",
     "signOutThisSession": "ออกจากระบบสำหรับเซสชันนี้",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "ลิงก์นี้ใช้ไม่ได้แล้ว",
-    "goBack": "ย้อนกลับ",
     "title": "ไม่พบหน้า"
   },
   "monoScrollBlock": {
-    "contentTruncated": "เนื้อหาถูกตัดทอน",
     "truncated": "ถูกตัดทอน",
     "wrap": "ตัดบรรทัด",
     "scroll": "เลื่อน"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "กรุณาลองอีกครั้ง",
     "offlineTitle": "โหลดไม่สำเร็จ",
     "permissionDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
-    "notFoundTitle": "ไม่พบข้อมูล",
     "notFoundDescription": "รายการนี้อาจถูกลบหรือใช้งานไม่ได้แล้ว",
     "serverTitle": "โหลดไม่สำเร็จ",
     "serverDescription": "ระบบของเราเกิดข้อผิดพลาด กรุณาลองอีกครั้ง"
   },
   "screenHeader": {
     "openMenu": "เปิดเมนู",
-    "openMenuFor": "เปิดเมนูสำหรับ {{title}}",
-    "goBack": "ย้อนกลับ"
+    "openMenuFor": "เปิดเมนูสำหรับ {{title}}"
   },
   "picker": {
     "optionsExpired": "ตัวเลือกหมดอายุแล้ว",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "แชร์ไปยัง Kilo",
-    "reviewPr": "ตรวจสอบ PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} · PR #{{number}}",
-    "newSession": "เซสชันใหม่",
     "searchPlaceholder": "ค้นหาเซสชันล่าสุด",
     "connectedCli": "บน CLI ที่เชื่อมต่ออยู่",
     "newSessionOn": "เซสชันใหม่บน {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass กำลังยกเลิก",
     "statusPastDue": "Kilo Pass ค้างชำระ",
     "monthlyCredits": "เครดิต {{credits}} ต่อเดือน",
-    "ends": "สิ้นสุดวันที่ {{date}}",
     "periodEnd": "วันสิ้นสุดรอบ",
     "managedOnGooglePlay": "จัดการบน Google Play",
     "managedInAppStore": "จัดการใน App Store",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "ไม่สามารถซื้อ Kilo Pass ภายในแอปบน Android ได้ จัดการได้บนเว็บ",
     "webManagementDescription": "จัดการ Kilo Pass นี้ได้บนเว็บ",
     "legalDisclosure": "Kilo Pass เป็นการสมัครสมาชิกรายเดือนที่ต่ออายุอัตโนมัติ ค่าธรรมเนียมจะถูกเรียกเก็บจาก Apple ID ของคุณเมื่อยืนยันการซื้อ การสมัครสมาชิกจะต่ออายุอัตโนมัติทุกเดือนในราคาที่แสดง เว้นแต่จะยกเลิกอย่างน้อย 24 ชั่วโมงก่อนสิ้นสุดรอบปัจจุบัน จัดการหรือยกเลิกได้ทุกเมื่อในการตั้งค่าบัญชี App Store",
-    "legalPrivacyPolicy": "นโยบายความเป็นส่วนตัว",
     "legalTermsOfUse": "ข้อกำหนดการใช้งาน (EULA)",
     "purchaseDifferentAccount": "การซื้อใน App Store นี้ไม่ได้เชื่อมโยงกับบัญชี Kilo ของคุณ ลงชื่อเข้าใช้ Apple Account ที่ใช้ซื้อ แล้วลองอีกครั้ง",
     "restoreFailed": "กู้คืนการซื้อไม่สำเร็จ ลองอีกครั้ง",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "ป้อนที่อยู่อีเมลที่ถูกต้อง",
-      "emailLabel": "อีเมล",
       "emailPlaceholder": "ชื่อ@บริษัท.com",
       "permissionDenied": "คุณไม่มีสิทธิ์เชิญสมาชิก",
       "roleLabel": "บทบาท",
@@ -2968,7 +2920,6 @@
         "billingManager": "ผู้ดูแลการเรียกเก็บเงิน"
       },
       "emailStatusFailed": "ส่งอีเมลไม่สำเร็จ",
-      "emailStatusPending": "รอดำเนินการ",
       "inviteCreated": "สร้างคำเชิญแล้ว",
       "pendingInvitations": "คำเชิญที่รอตอบรับ",
       "resendInvite": "ส่งคำเชิญอีกครั้ง",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "โหลดสถานะไม่สำเร็จ",
       "creditProcessingDelayed": "การประมวลผลเครดิตล่าช้า · กำลังลองใหม่โดยอัตโนมัติ",
       "ended": "สิ้นสุดแล้ว",
-      "endsOn": "สิ้นสุดวันที่ {{date}}",
       "manageHint": "เปิดหน้าจัดการ Kilo Pass บนเว็บ",
       "notSubscribed": "ยังไม่ได้สมัครสมาชิก",
       "overallocated": "จำนวนผู้ได้รับ Pass เกินจำนวนสิทธิ์ใช้งานที่ชำระเงินแล้ว",
@@ -3004,7 +2954,6 @@
       "paymentPending": "รอการชำระเงิน",
       "processingBlocked": "การประมวลผลถูกบล็อก",
       "processingNeedsReview": "ต้องตรวจสอบการประมวลผล",
-      "retry": "ลองอีกครั้ง",
       "retryHint": "ลองโหลดสถานะ Kilo Pass อีกครั้ง",
       "setupHint": "เปิดการตั้งค่า Kilo Pass บนเว็บ"
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "กลับไปที่การตั้งค่า"
   },
   "quickChat": {
-    "title": "แชท",
     "empty": {
       "title": "เริ่มแชท",
       "description": "ส่งข้อความเพื่อพูดคุยกับโมเดล"
@@ -3076,7 +3024,6 @@
     "openAgents": "เปิดเอเจนต์",
     "running": "กำลังทำงาน",
     "needsInput": "รอข้อมูลจากคุณ",
-    "idle": "รอทำงาน",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อก"
   }

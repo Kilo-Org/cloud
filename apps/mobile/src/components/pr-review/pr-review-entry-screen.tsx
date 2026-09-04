@@ -305,7 +305,7 @@ export function PrReviewEntryScreen() {
         <Button
           disabled={!hasInput}
           onPress={handleSubmit}
-          accessibilityLabel={t('prReview.entry.openPullRequest')}
+          accessibilityLabel={t('common.openPullRequest')}
         >
           <Text>{t('prReview.entry.open')}</Text>
         </Button>

@@ -164,7 +164,7 @@ function PlanDetails({
       <View>
         <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.freeTrial')} />
         <View className="h-px bg-border" />
-        <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
+        <DetailRow label={t('common.remaining')} value={daysText} />
         <View className="h-px bg-border" />
         <DetailRow
           label={t('kiloclaw.billing.ends')}
@@ -179,7 +179,7 @@ function PlanDetails({
       <View>
         <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.earlybird')} />
         <View className="h-px bg-border" />
-        <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
+        <DetailRow label={t('common.remaining')} value={daysText} />
         <View className="h-px bg-border" />
         <DetailRow
           label={t('kiloclaw.billing.expires')}

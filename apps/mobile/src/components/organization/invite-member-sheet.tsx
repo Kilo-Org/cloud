@@ -77,7 +77,7 @@ export function InviteMemberSheet() {
       </Text>
 
       <FormField
-        label={t('organization.inviteMember.emailLabel')}
+        label={t('common.email')}
         required
         placeholder={t('organization.inviteMember.emailPlaceholder')}
         keyboardType="email-address"

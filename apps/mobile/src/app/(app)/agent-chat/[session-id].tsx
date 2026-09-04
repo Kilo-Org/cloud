@@ -178,7 +178,7 @@ export default function SessionDetailScreen() {
       ? 'neutral'
       : 'server';
     if (notFound) {
-      title = t('agentChat.session.notFound');
+      title = t('common.notFound');
       message = t('agentChat.session.notFoundDescription');
       variant = 'not-found';
     } else if (unauthorized) {

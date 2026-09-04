@@ -18,7 +18,7 @@ export const GLANCEABLE_STATUS_COPY_KEY = {
   privacy: 'glanceable.privacy',
 } as const satisfies Record<Exclude<GlanceableStatus, 'happy'>, string>;
 
-export type GlanceableCountKey = 'glanceable.running' | 'glanceable.needsInput' | 'glanceable.idle';
+export type GlanceableCountKey = 'glanceable.running' | 'glanceable.needsInput' | 'common.idle';
 
 /** The state a count line stands for. Surfaces map it to a glyph and a color. */
 export type GlanceableCountKind = 'needsInput' | 'running' | 'idle';
@@ -37,7 +37,7 @@ export type GlanceableCountLine = {
 const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind }[] = [
   { key: 'glanceable.needsInput', kind: 'needsInput' },
   { key: 'glanceable.running', kind: 'running' },
-  { key: 'glanceable.idle', kind: 'idle' },
+  { key: 'common.idle', kind: 'idle' },
 ];
 
 /**

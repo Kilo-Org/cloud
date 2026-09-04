@@ -100,7 +100,7 @@ export default function InstancePickerScreen() {
       {showList && loadedInstances.length === 0 ? (
         <EmptyState
           icon={Server}
-          title={t('chat.instancePicker.noInstances')}
+          title={t('common.noKiloclawInstances')}
           description={t('chat.instancePicker.noInstancesDescription')}
           action={
             <Button

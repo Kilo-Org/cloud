@@ -147,7 +147,7 @@ export function DeviceSessionsScreen() {
     body = (
       <QueryError
         variant="server"
-        title={t('deviceSessions.couldNotLoad')}
+        title={t('common.couldNotLoadSessions')}
         message={t('deviceSessions.couldNotLoadDescription')}
         onRetry={() => void refetch()}
         isRetrying={isFetching}
@@ -217,7 +217,7 @@ export function DeviceSessionsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('deviceSessions.title')} />
+      <ScreenHeader title={t('common.deviceSessions')} />
       {body}
     </View>
   );

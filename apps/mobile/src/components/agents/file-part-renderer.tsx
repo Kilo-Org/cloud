@@ -304,7 +304,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
             <ImageViewerModal
               visible={viewerVisible}
               uri={url}
-              filename={part.filename ?? t('agentChat.filePart.defaultName')}
+              filename={part.filename ?? t('common.file')}
               onShare={() => {
                 void handleShare();
               }}
@@ -370,7 +370,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
           <FileIcon size={14} color={colors.mutedForeground} />
         )}
         <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-          {part.filename ?? t('agentChat.filePart.defaultName')}
+          {part.filename ?? t('common.file')}
         </Text>
       </Pressable>
       {preview && url ? (
@@ -501,7 +501,7 @@ function FilePreviewModal({
   return (
     <SessionPageSheet visible onClose={onClose}>
       <SheetHeader
-        title={part.filename ?? t('agentChat.filePart.defaultName')}
+        title={part.filename ?? t('common.file')}
         titleEllipsis="middle"
         onDone={onClose}
         doneLabel={t('common.done')}

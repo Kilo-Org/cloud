@@ -26,7 +26,7 @@ const PLATFORM_CONFIG = {
   gitlab: {
     icon: GitMerge,
     label: 'codeReviewer.providerConnect.gitlabAccount',
-    buttonLabel: 'codeReviewer.providerConnect.connectGitLab',
+    buttonLabel: 'common.connectGitlab',
     getUrl: getGitLabIntegrationUrl,
     errorMessage: 'codeReviewer.providerConnect.gitlabError',
   },

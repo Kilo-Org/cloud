@@ -46,7 +46,7 @@ export function ToolResultRows({
       ))}
       {truncated ? (
         <Text
-          accessibilityLabel={t('monoScrollBlock.contentTruncated')}
+          accessibilityLabel={t('common.contentTruncated')}
           className="mt-1 text-xs text-muted-foreground"
         >
           {t('monoScrollBlock.truncated')}

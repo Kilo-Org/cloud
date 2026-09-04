@@ -69,7 +69,58 @@
     "repository": "ರೆಪೊಸಿಟರಿ",
     "signOut": "ಸೈನ್ ಔಟ್ ಮಾಡಿ",
     "agents": "ಏಜೆಂಟ್‌ಗಳು",
-    "all": "ಎಲ್ಲವೂ"
+    "all": "ಎಲ್ಲವೂ",
+    "allModels": "ಎಲ್ಲಾ ಮಾದರಿಗಳು",
+    "balanced": "ಸಮತೋಲಿತ",
+    "bitbucketConnected": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿದೆ",
+    "branch": "ಬ್ರಾಂಚ್",
+    "cameraAccessDisabled": "ಕ್ಯಾಮೆರಾ ಬಳಸಲು ಅನುಮತಿ ಇಲ್ಲ",
+    "chat": "ಚಾಟ್",
+    "clearFilters": "ಫಿಲ್ಟರ್‌ಗಳನ್ನು ತೆರವುಗೊಳಿಸಿ",
+    "clearSearch": "ಹುಡುಕಾಟವನ್ನು ತೆರವುಗೊಳಿಸಿ",
+    "closed": "ಮುಚ್ಚಲಾಗಿದೆ",
+    "closeReactions": "ಪ್ರತಿಕ್ರಿಯೆಗಳನ್ನು ಮುಚ್ಚಿ",
+    "connect": "ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
+    "connectBitbucket": "Bitbucket ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
+    "connectGitlab": "GitLab ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
+    "contentTruncated": "ವಿಷಯವನ್ನು ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
+    "copyLink": "ಲಿಂಕ್ ನಕಲಿಸಿ",
+    "couldNotLoadOrganizations": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "couldNotLoadSessions": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "couldnTLoadMore": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+    "deviceSessions": "ಸಾಧನ ಸೆಷನ್‌ಗಳು",
+    "disabled": "ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
+    "email": "ಇಮೇಲ್",
+    "ends": "{{date}} ರಂದು ಕೊನೆಗೊಳ್ಳುತ್ತದೆ",
+    "failed": "ವಿಫಲವಾಗಿದೆ",
+    "file": "ಫೈಲ್",
+    "gitlab": "GitLab",
+    "goBack": "ಹಿಂದೆ ಹೋಗಿ",
+    "idle": "ಕೆಲಸವಿಲ್ಲ",
+    "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
+    "keepRunning": "ಚಾಲನೆಯಲ್ಲಿರಲಿ",
+    "kiloclaw": "KiloClaw",
+    "newSession": "ಹೊಸ ಸೆಷನ್",
+    "noKiloclawInstances": "KiloClaw ಇನ್‌ಸ್ಟನ್ಸ್‌ಗಳಿಲ್ಲ",
+    "noModelsAvailable": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
+    "notFound": "ಕಂಡುಬಂದಿಲ್ಲ.",
+    "online": "ಆನ್‌ಲೈನ್",
+    "open": "{{name}} ತೆರೆಯಿರಿ",
+    "openPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
+    "pending": "ಬಾಕಿ ಇದೆ",
+    "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
+    "preferences": "ಆದ್ಯತೆಗಳು",
+    "privacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
+    "profile": "ಪ್ರೊಫೈಲ್",
+    "reactions": "ಪ್ರತಿಕ್ರಿಯೆಗಳು",
+    "recent": "ಇತ್ತೀಚಿನ",
+    "recommended": "ಶಿಫಾರಸು ಮಾಡಿದವು",
+    "remaining": "ಬಾಕಿ",
+    "rename": "ಹೆಸರು ಬದಲಿಸಿ",
+    "reply": "ಉತ್ತರಿಸಿ",
+    "reportSubmittedReceipt": "ವರದಿ ಸಲ್ಲಿಸಲಾಗಿದೆ. ಸ್ವೀಕೃತಿ ಸಂಖ್ಯೆ: {{receiptId}}",
+    "retryLoadingMore": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
+    "reviewPr": "PR ಪರಿಶೀಲಿಸಿ"
   },
   "language": {
     "title": "ಭಾಷೆ",
@@ -77,7 +128,6 @@
     "couldNotRestart": "ಮರುಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "languageSaved": "ನಿಮ್ಮ ಭಾಷೆಯ ಆಯ್ಕೆಯನ್ನು ಉಳಿಸಲಾಗಿದೆ.",
     "catalogLoadFailed": "ಭಾಷೆಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
     "search": "ಭಾಷೆಯ ಹೆಸರು",
     "noMatches": "ಹೊಂದುವ ಭಾಷೆಗಳು ಕಂಡುಬಂದಿಲ್ಲ",
     "deviceLanguage": "ಸಾಧನದ ಭಾಷೆ",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "ಸೈನ್ ಇನ್ ಕೋಡ್: {{code}}",
     "openSignInPageInBrowser": "ಬ್ರೌಸರ್‌ನಲ್ಲಿ ಸೈನ್ ಇನ್ ಪುಟವನ್ನು ತೆರೆಯಿರಿ",
     "copySignInLink": "ಸೈನ್ ಇನ್ ಲಿಂಕ್ ನಕಲಿಸಿ",
-    "copyLink": "ಲಿಂಕ್ ನಕಲಿಸಿ",
     "cancelSignIn": "ಸೈನ್ ಇನ್ ಪ್ರಕ್ರಿಯೆಯನ್ನು ರದ್ದುಗೊಳಿಸಿ",
     "startingSignIn": "ಸೈನ್ ಇನ್ ಪ್ರಾರಂಭವಾಗುತ್ತಿದೆ...",
     "organizationUsesSso": "ನಿಮ್ಮ ಸಂಸ್ಥೆಯು ಸಿಂಗಲ್ ಸೈನ್-ಆನ್ ಬಳಸುತ್ತದೆ.",
@@ -112,7 +161,6 @@
     "terms": "ನಿಯಮಗಳು",
     "termsConnector": " ಮತ್ತು ",
     "termsSuffix": "ಗೆ ಒಪ್ಪುತ್ತೀರಿ.",
-    "privacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
     "moreSignInOptions": "ಇನ್ನಷ್ಟು ಸೈನ್ ಇನ್ ಆಯ್ಕೆಗಳು",
     "couldNotCompleteSignIn": "ಸೈನ್ ಇನ್ ಪೂರ್ಣಗೊಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "sessionEnded": "ನಿಮ್ಮ ಸೆಷನ್ ಅಂತ್ಯಗೊಂಡಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಸೈನ್ ಇನ್ ಮಾಡಿ.",
@@ -126,7 +174,6 @@
     "or": "ಅಥವಾ"
   },
   "profile": {
-    "title": "ಪ್ರೊಫೈಲ್",
     "codeReviewerSubtitle": "ಸ್ವಯಂಚಾಲಿತ PR ಪರಿಶೀಲನೆಗಳು",
     "securityAgentSubtitle": "ಭದ್ರತಾ ದೋಷಗಳನ್ನು ಹುಡುಕಿ ಸರಿಪಡಿಸಿ",
     "reviews": "ಪರಿಶೀಲನೆಗಳು",
@@ -136,9 +183,7 @@
     "linkedAccounts": "ಸಂಪರ್ಕಿತ ಖಾತೆಗಳು",
     "couldNotLoadAccounts": "ಖಾತೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "app": "ಅಪ್ಲಿಕೇಶನ್",
-    "preferences": "ಆದ್ಯತೆಗಳು",
     "preferencesSubtitle": "ನೋಟ, ಅಧಿಸೂಚನೆಗಳು, ಯೋಚನೆ ಮತ್ತು ಪರದೆಯ ವರ್ತನೆ",
-    "deviceSessions": "ಸಾಧನ ಸೆಷನ್‌ಗಳು",
     "deviceSessionsSubtitle": "ಇತರ ಸಾಧನಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಅವುಗಳಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಿ",
     "feedback": "ಅಭಿಪ್ರಾಯ ತಿಳಿಸಿ",
     "privacyChoices": "ಗೌಪ್ಯತೆ ಆಯ್ಕೆಗಳು",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "ಇಮೇಲ್",
     "providerTestAccount": "ಪರೀಕ್ಷಾ ಖಾತೆ",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "ಸಾಂಸ್ಥಿಕ SSO"
   },
   "preferences": {
-    "title": "ಆದ್ಯತೆಗಳು",
     "autoExpandThinking": "ಯೋಚನೆಯನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ವಿಸ್ತರಿಸಿ",
     "autoExpandThinkingSubtitle": "ಏಜೆಂಟ್ ಯೋಚಿಸುವುದನ್ನು ಮುಗಿಸಿದಾಗ ಅದರ ಯೋಚನೆಯನ್ನು ವಿಸ್ತರಿಸಿ ತೋರಿಸಿ.",
     "keepScreenOn": "ಸೆಶನ್ ಪುಟದಲ್ಲಿರುವಾಗ ಪರದೆಯನ್ನು ಆನ್ ಆಗಿರಿಸಿ",
@@ -360,7 +402,6 @@
       "unresolveThread": "ಚರ್ಚಾ ಸರಣಿಯನ್ನು ಪರಿಹರಿಸಲಾಗಿಲ್ಲ ಎಂದು ಗುರುತಿಸಿ",
       "resolved": "ಪರಿಹರಿಸಲಾಗಿದೆ",
       "outdated": "ಹಳೆಯದು",
-      "file": "ಫೈಲ್",
       "comment_one": "1 ಕಾಮೆಂಟ್",
       "comment": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
       "comment_other": "{{displayCount}} ಟಿಪ್ಪಣಿಗಳು",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "ಇನ್ನಷ್ಟು ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryLoadingMore": "ಇನ್ನಷ್ಟು ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "loadMoreComments": "ಇನ್ನಷ್ಟು ಕಾಮೆಂಟ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಿ",
-      "closeReactions": "ಪ್ರತಿಕ್ರಿಯೆಗಳನ್ನು ಮುಚ್ಚಿ",
-      "reactionsTitle": "ಪ್ರತಿಕ್ರಿಯೆಗಳು",
       "addReaction": "ಪ್ರತಿಕ್ರಿಯೆ ಸೇರಿಸಿ",
       "reactionPill": "{{emoji}} ಪ್ರತಿಕ್ರಿಯೆ, {{displayCount}} {{countLabel}}",
       "reaction_one": "ಪ್ರತಿಕ್ರಿಯೆ",
@@ -380,13 +419,11 @@
       "reportUser": "ಬಳಕೆದಾರರ ಬಗ್ಗೆ ವರದಿ ಮಾಡಿ",
       "mute": "ಮ್ಯೂಟ್ ಮಾಡಿ",
       "block": "ನಿರ್ಬಂಧ",
-      "reportSubmitted": "ವರದಿ ಸಲ್ಲಿಸಲಾಗಿದೆ. ಸ್ವೀಕೃತಿ ಸಂಖ್ಯೆ: {{receiptId}}",
       "blockedUser": "{{login}} ಅವರನ್ನು ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
       "mutedUser": "{{login}} ಅವರನ್ನು ಮ್ಯೂಟ್ ಮಾಡಲಾಗಿದೆ",
       "replyPlaceholder": "ಉತ್ತರ…",
       "replyBody": "ಉತ್ತರದ ಪಠ್ಯ",
       "submitReply": "ಉತ್ತರ ಸಲ್ಲಿಸಿ",
-      "reply": "ಉತ್ತರಿಸಿ",
       "termsTitle": "ಸೇವಾ ನಿಯಮಗಳು",
       "termsCopy": "ಪೋಸ್ಟ್ ಮಾಡಲು ನಿಮಗೆ ಕನಿಷ್ಠ 13 ವರ್ಷ ವಯಸ್ಸಾಗಿರಬೇಕು.",
       "termsAcceptRetry": "ಸೇವಾ ನಿಯಮಗಳಿಗೆ ಸಮ್ಮತಿ ದಾಖಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ನಿಮ್ಮ ಸಂಪರ್ಕವನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHub ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ URL",
       "clearLink": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ತೆರವುಗೊಳಿಸಿ",
       "pasteLink": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅಂಟಿಸಿ",
-      "open": "ಓಪನ್",
-      "openPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ"
+      "open": "ಓಪನ್"
     },
     "checks": {
       "title": "ತಪಾಸಣೆಗಳು",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "ಇನ್‌ಬಾಕ್ಸ್",
-      "recent": "ಇತ್ತೀಚಿನ",
       "loading": "ಇನ್‌ಬಾಕ್ಸ್ ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
       "noReviewRequests": "ಪರಿಶೀಲನೆಗೆ ಯಾವುದೇ ವಿನಂತಿಗಳಿಲ್ಲ",
       "noReviewRequestsDescription": "ನಿಮ್ಮ ಪರಿಶೀಲನೆಗೆ ಕಾಯುತ್ತಿರುವ ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ. ಮೇಲೆ ಯಾವುದೇ PR ಲಿಂಕ್ ಅಂಟಿಸಿಯೂ ಪರಿಶೀಲಿಸಬಹುದು.",
-      "couldNotLoad": "ಇನ್‌ಬಾಕ್ಸ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "couldNotLoadMore": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "retryLoadingMore": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ"
+      "couldNotLoad": "ಇನ್‌ಬಾಕ್ಸ್ ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "composer": {
       "commentBodyPlaceholder": "ನಿಮ್ಮ ಕಾಮೆಂಟ್",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "ಕಾಮೆಂಟ್ ಬರೆಯುವ ಪರದೆಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "discardTitle": "ಕಾಮೆಂಟ್ ತ್ಯಜಿಸುವುದೇ?",
       "discardMessage": "ನಿಮ್ಮ ಕರಡು ಕಳೆದುಹೋಗುತ್ತದೆ.",
-      "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
       "comment": "ಟಿಪ್ಪಣಿ",
       "insertSuggestionA11y": "ಕೋಡ್ ಸಲಹೆಯನ್ನು ಸೇರಿಸಿ",
       "insertSuggestion": "ಸಲಹೆ ಸೇರಿಸಿ",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "ವಿಲೀನಗೊಳಿಸಲಾಗಿದೆ",
-      "stateClosed": "ಮುಚ್ಚಲಾಗಿದೆ",
       "stateOpenApproved": "ತೆರೆದಿದೆ · ಅನುಮೋದಿತ",
       "stateOpenChangesRequested": "ತೆರೆದಿದೆ · ಬದಲಾವಣೆಗಳನ್ನು ಕೋರಲಾಗಿದೆ",
       "stateOpenReviewRequired": "ತೆರೆದಿದೆ · ಪರಿಶೀಲನೆ ಅಗತ್ಯ",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "ಮುಖಪುಟ",
-    "profile": "ಪ್ರೊಫೈಲ್",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}}ರಲ್ಲಿ {{position}}",
-    "chat": "ಚಾಟ್"
+    "position": "{{name}}, ಟ್ಯಾಬ್, {{total}}ರಲ್ಲಿ {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "ಇನ್‌ಸ್ಟನ್ಸ್ ಆಯ್ಕೆ",
       "couldNotLoadInstances": "ಇನ್‌ಸ್ಟನ್ಸ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "noInstances": "KiloClaw ಇನ್‌ಸ್ಟನ್ಸ್‌ಗಳಿಲ್ಲ",
       "noInstancesDescription": "ಚಾಟ್ ಪ್ರಾರಂಭಿಸಲು ಒಂದು ಇನ್‌ಸ್ಟನ್ಸ್ ಅನ್ನು ಹೊಂದಿಸಿ.",
       "setUpKiloclaw": "KiloClaw ಹೊಂದಿಸಿ",
       "currentInstance": "{{title}}, ಪ್ರಸ್ತುತ"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "ಚಾಟ್‌ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotRefreshMessages": "ಸಂದೇಶಗಳನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoadHistory": "ಸಂಭಾಷಣೆಯ ಇತಿಹಾಸವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "rename": "ಹೆಸರು ಬದಲಿಸಿ",
       "leave": "ಹೊರಹೋಗಿ",
       "untitledConversation": "ಶೀರ್ಷಿಕೆಯಿಲ್ಲದ ಸಂಭಾಷಣೆ",
       "createFailed": "ಸಂಭಾಷಣೆಯನ್ನು ರಚಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "leaveFailed": "ಸಂಭಾಷಣೆಯಿಂದ ಹೊರಹೋಗಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ."
     },
     "reactions": {
-      "title": "ಪ್ರತಿಕ್ರಿಯೆಗಳು",
-      "close": "ಪ್ರತಿಕ್ರಿಯೆಗಳನ್ನು ಮುಚ್ಚಿ",
-      "recent": "ಇತ್ತೀಚಿನ",
       "common": "ಸಾಮಾನ್ಯ",
       "reactWith": "{{reaction}} ಬಳಸಿ ಪ್ರತಿಕ್ರಿಯಿಸಿ",
       "accessibility": "{{emoji}} ಪ್ರತಿಕ್ರಿಯೆ, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ಸೇರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retrySend": "ಮತ್ತೆ ಕಳುಹಿಸಿ",
       "moreReactions": "ಹೆಚ್ಚಿನ ಪ್ರತಿಕ್ರಿಯೆಗಳು",
-      "reply": "ಉತ್ತರಿಸಿ",
       "edit": "ಸಂಪಾದಿಸಿ",
       "sendFailed": "ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retrySendFailed": "ಮತ್ತೆ ಕಳುಹಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -807,7 +829,6 @@
       "takePhoto": "ಫೋಟೋ ತೆಗೆಯಿರಿ",
       "photoLibrary": "ಫೋಟೋ ಸಂಗ್ರಹ",
       "files": "ಫೈಲ್‌ಗಳು",
-      "cameraAccessDisabled": "ಕ್ಯಾಮೆರಾ ಬಳಸಲು ಅನುಮತಿ ಇಲ್ಲ",
       "cameraAccessMessage": "ಫೋಟೋ ತೆಗೆಯಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಕ್ಯಾಮೆರಾ ಬಳಸಲು ಅನುಮತಿ ನೀಡಿ."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} ಟೈಪ್ ಮಾಡುತ್ತಿದ್ದಾರೆ..."
     },
     "botStatus": {
-      "online": "ಆನ್‌ಲೈನ್",
-      "idle": "ಕೆಲಸವಿಲ್ಲ",
       "offline": "ಆಫ್‌ಲೈನ್",
       "loadingUser": "ಬಳಕೆದಾರರ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...",
       "waitingForStatus": "ಬಾಟ್‌ನ ಸ್ಥಿತಿಗಾಗಿ ಕಾಯಲಾಗುತ್ತಿದೆ...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw ಇನ್‌ಸ್ಟನ್ಸ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "billing": {
       "title": "ಬಿಲ್ಲಿಂಗ್",
@@ -840,7 +858,6 @@
       "plan": "ಯೋಜನೆ",
       "finalTermEnds": "ಅಂತಿಮ ಅವಧಿ ಮುಗಿಯುವ ದಿನಾಂಕ",
       "afterFinalTerm": "ಅಂತಿಮ ಅವಧಿಯ ನಂತರ",
-      "remaining": "ಬಾಕಿ",
       "lessThanOneDay": "1 ದಿನಕ್ಕಿಂತ ಕಡಿಮೆ",
       "ends": "ಮುಗಿಯುವ ದಿನಾಂಕ",
       "expires": "ಅವಧಿ ಮುಗಿಯುವ ದಿನಾಂಕ",
@@ -941,20 +958,15 @@
       "disconnect": "Google ಖಾತೆ ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ",
       "copied": "ನಕಲಿಸಲಾಗಿದೆ",
       "copyCommand": "ಆಜ್ಞೆ ನಕಲಿಸಿ",
-      "disabled": "ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
       "disconnectConfirm": "ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ",
       "disconnectMessage": "ಈ ಇನ್‌ಸ್ಟನ್ಸ್‌ನಿಂದ ನಿಮ್ಮ Google ಖಾತೆಯನ್ನು ತೆಗೆದುಹಾಕುವುದೇ? ಇದರಿಂದ Gmail ಅಧಿಸೂಚನೆಗಳು ನಿಷ್ಕ್ರಿಯಗೊಳ್ಳುತ್ತವೆ. ಬದಲಾವಣೆಗಳನ್ನು ಅನ್ವಯಿಸಲು ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿದ ನಂತರ ಇನ್‌ಸ್ಟನ್ಸ್ ಅನ್ನು ಮರುನಿಯೋಜಿಸಿ.",
       "disconnectTitle": "Google ಸಂಪರ್ಕ ಕಡಿತಗೊಳಿಸಿ"
     },
     "modelList": {
-      "title": "ಎಲ್ಲಾ ಮಾದರಿಗಳು",
       "searchPlaceholder": "ಮಾದರಿಗಳ ಹುಡುಕಾಟ",
-      "clearSearch": "ಹುಡುಕಾಟವನ್ನು ತೆರವುಗೊಳಿಸಿ",
       "noMatches": "ನಿಮ್ಮ ಹುಡುಕಾಟಕ್ಕೆ ಹೊಂದುವ ಮಾದರಿಗಳಿಲ್ಲ",
-      "noModels": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
       "noModelsDescription": "ಮಾದರಿಗಳು ಲಭ್ಯವಾದಾಗ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
-      "noResultsFor": "\"{{query}}\"ಗೆ ಯಾವುದೇ ಫಲಿತಾಂಶಗಳಿಲ್ಲ.",
-      "recommended": "ಶಿಫಾರಸು ಮಾಡಿದವು"
+      "noResultsFor": "\"{{query}}\"ಗೆ ಯಾವುದೇ ಫಲಿತಾಂಶಗಳಿಲ್ಲ."
     },
     "secrets": {
       "title": "ಗೌಪ್ಯ ಮಾಹಿತಿ",
@@ -972,8 +984,7 @@
       "setupGuide": "ಸಿದ್ಧತಾ ಮಾರ್ಗದರ್ಶಿ",
       "saving": "ಉಳಿಸಲಾಗುತ್ತಿದೆ…",
       "removing": "ತೆಗೆದುಹಾಕಲಾಗುತ್ತಿದೆ…",
-      "updateToken": "ಟೋಕನ್ ನವೀಕರಿಸಿ",
-      "connect": "ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ"
+      "updateToken": "ಟೋಕನ್ ನವೀಕರಿಸಿ"
     },
     "versionPin": {
       "title": "ಆವೃತ್ತಿ ಸ್ಥಿರಗೊಳಿಸುವಿಕೆ",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "ಸಿದ್ಧತೆ ಪೂರ್ಣಗೊಳ್ಳುತ್ತಿದೆ",
       "finishingSetupDescription": "ಸ್ವಲ್ಪ ಕಾಯಿರಿ. ನಿಮ್ಮ ಖಾತೆಯನ್ನು ಸಿದ್ಧಪಡಿಸುತ್ತಿದ್ದೇವೆ. ಇದಕ್ಕೆ ಸಾಮಾನ್ಯವಾಗಿ ಸ್ವಲ್ಪ ಸಮಯ ಸಾಕು.",
       "getStarted": "ಪ್ರಾರಂಭಿಸಿ",
-      "noInstances": "KiloClaw ಇನ್‌ಸ್ಟನ್ಸ್‌ಗಳಿಲ್ಲ",
       "noInstancesDescription": "ಕೋಡಿಂಗ್ ಏಜೆಂಟ್‌ಗಳನ್ನು ಚಲಾಯಿಸಲು ನಿಮ್ಮ ಮೊದಲ ಇನ್‌ಸ್ಟನ್ಸ್ ರಚಿಸಿ."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}} ಜೊತೆ ಚಾಟ್ ಮಾಡಿ",
-        "online": "ಆನ್‌ಲೈನ್",
         "ready": "{{name}} ಸಿದ್ಧವಾಗಿದೆ",
         "warmedUp": "ಎಲ್ಲವೂ ಸಿದ್ಧವಾಗಿದೆ. ನೀವು ಸಿದ್ಧವಾದಾಗ ನಮಸ್ಕಾರ ಹೇಳಿ."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "ಅತ್ಯಾಧುನಿಕ",
       "frontierDescription": "ಅತ್ಯುತ್ತಮ ಕಾರ್ಯಕ್ಷಮತೆ. ತರ್ಕಿಸುವ ಸಾಮರ್ಥ್ಯವಿರುವ ಅತ್ಯಾಧುನಿಕ ಮಾದರಿಗಳಿಗೆ ವಿನಂತಿಗಳನ್ನು ಕಳುಹಿಸುತ್ತದೆ.",
-      "balancedLabel": "ಸಮತೋಲಿತ",
       "balancedDescription": "ಕಡಿಮೆ ವೆಚ್ಚದಲ್ಲಿ ವೇಗ ಮತ್ತು ಸಾಮರ್ಥ್ಯದ ಉತ್ತಮ ಸಮತೋಲನ.",
-      "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
       "autoModelA11y": "{{label}} ಸ್ವಯಂಚಾಲಿತ ಮಾದರಿ",
       "currentModel": "ಪ್ರಸ್ತುತ ಮಾದರಿ",
       "browseAllModels": "ಅಥವಾ 500+ ಮಾದರಿಗಳಿಂದ ಆಯ್ಕೆ ಮಾಡಿ",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶ",
       "openUnread": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶಗಳು",
       "openUnread_other": "{{name}} ತೆರೆಯಿರಿ, {{displayCount}} ಓದದ ಸಂದೇಶಗಳು",
-      "open": "{{name}} ತೆರೆಯಿರಿ",
       "openSettings": "{{name}} ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ತೆರೆಯಿರಿ",
       "fixOnKiloAi": "kilo.ai ನಲ್ಲಿ ಸರಿಪಡಿಸಿ: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "ಪರಿಶೀಲನೆ",
       "cancelTitle": "ಪರಿಶೀಲನೆಯನ್ನು ರದ್ದುಗೊಳಿಸಬೇಕೇ?",
       "cancelMessage": "ಇದು ಪ್ರಗತಿಯಲ್ಲಿರುವ ಕೋಡ್ ಪರಿಶೀಲನೆಯನ್ನು ನಿಲ್ಲಿಸುತ್ತದೆ.",
-      "keepRunning": "ಚಾಲನೆಯಲ್ಲಿರಲಿ",
       "cancelReview": "ಪರಿಶೀಲನೆಯನ್ನು ರದ್ದುಗೊಳಿಸಿ",
       "retryTitle": "ಪರಿಶೀಲನೆಗಾಗಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಬೇಕೇ?",
       "retryMessage": "ಇದು ಕೋಡ್ ಪರಿಶೀಲನೆಯನ್ನು ಮತ್ತೆ ನಡೆಸುತ್ತದೆ.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} · ರಚಿಸಿದವರು: {{author}}",
       "noFindings": "ಯಾವುದೇ ಸಮಸ್ಯೆಗಳು ಪತ್ತೆಯಾಗಿಲ್ಲ.",
       "showMore": "ಇನ್ನಷ್ಟು ತೋರಿಸಿ",
-      "branch": "ಬ್ರಾಂಚ್",
       "created": "ರಚಿಸಲಾಗಿದೆ",
       "started": "ಪ್ರಾರಂಭಿಸಲಾಗಿದೆ",
       "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
       "tokens": "ಟೋಕನ್‌ಗಳು",
       "tokensInOut": "{{input}} ಇನ್‌ಪುಟ್ / {{output}} ಔಟ್‌ಪುಟ್",
-      "openPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
       "council": "ಪರಿಶೀಲನಾ ಮಂಡಳಿ",
       "decision": "ನಿರ್ಧಾರ",
       "gate": "ಗುಣಮಟ್ಟದ ತಡೆ",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "ಪರಿಶೀಲನೆಯ ಸ್ಮರಣೆ",
-      "couldNotLoadMore": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "retryLoadingMore": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "loading": "ಪರಿಶೀಲನಾ ಸ್ಮರಣೆಯನ್ನು ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ",
       "couldNotLoad": "ಪರಿಶೀಲನಾ ಸ್ಮರಣೆಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "off": "ಪರಿಶೀಲನಾ ಸ್ಮರಣೆ ನಿಷ್ಕ್ರಿಯವಾಗಿದೆ.",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucket ಸಿದ್ಧತೆ"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿದೆ",
-      "title": "Bitbucket ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
       "description": "ಅಗತ್ಯ ಅನುಮತಿಗಳೊಂದಿಗೆ ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್ ರಚಿಸಿ, ಅದನ್ನು ಕೆಳಗೆ ಅಂಟಿಸಿ.",
       "scopes": "ಖಾತೆ: ಓದಲು · ರೆಪೊಸಿಟರಿಗಳು: ಓದಲು/ಬರೆಯಲು · ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳು: ಓದಲು · ವೆಬ್‌ಹುಕ್‌ಗಳು: ಓದಲು/ಬರೆಯಲು",
-      "tokenPlaceholder": "ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್",
-      "connect": "ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ"
+      "tokenPlaceholder": "ಕಾರ್ಯಸ್ಥಳದ ಪ್ರವೇಶ ಟೋಕನ್"
     },
     "scopeList": {
-      "couldNotLoad": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "personalStillAvailable": "ವೈಯಕ್ತಿಕ ರೆಪೊಸಿಟರಿಗಳು ಕೆಳಗೆ ಇನ್ನೂ ಲಭ್ಯವಿವೆ.",
       "personalSubtitle": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು",
       "viewOnly": "ನೋಡಲು ಮಾತ್ರ"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub ಅಪ್ಲಿಕೇಶನ್",
       "githubError": "GitHub ಸೆಟಪ್ ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "gitlabAccount": "GitLab ಖಾತೆ",
-      "connectGitLab": "GitLab ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
       "gitlabError": "GitLab ಸೆಟಪ್ ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "description": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್‌ಗಳನ್ನು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಪರಿಶೀಲಿಸಲು Kilo {{label}} ಅನ್ನು ಸಂಪರ್ಕಿಸಿ.",
       "bitbucketError": "Bitbucket ಸೆಟಪ್ ತೆರೆಯಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
@@ -1403,21 +1399,17 @@
     "updateFailed": "ಕೋಡ್ ಪರಿಶೀಲಕವನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "configSaveFailed": "ಪರಿಶೀಲನೆಯ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "status": {
-      "pending": "ಬಾಕಿ ಇದೆ",
       "running": "ಚಾಲನೆಯಲ್ಲಿದೆ",
       "completed": "ಪೂರ್ಣಗೊಂಡಿದೆ",
-      "failed": "ವಿಫಲವಾಗಿದೆ",
       "interrupted": "ಮಧ್ಯದಲ್ಲಿ ನಿಂತಿದೆ"
     },
     "reviewStyle": {
       "strict": "ಕಟ್ಟುನಿಟ್ಟಾದ",
-      "balanced": "ಸಮತೋಲಿತ",
       "lenient": "ಸೌಮ್ಯ",
       "roast": "ಕಟು ಹಾಸ್ಯ"
     },
     "focusArea": {
       "security": "ಭದ್ರತೆ",
-      "performance": "ಕಾರ್ಯಕ್ಷಮತೆ",
       "bugs": "ದೋಷಗಳು",
       "style": "ಶೈಲಿ",
       "testing": "ಪರೀಕ್ಷೆ",
@@ -1468,7 +1460,6 @@
       "statusOpen": "ಓಪನ್",
       "fixed": "ಸರಿಪಡಿಸಲಾಗಿದೆ",
       "statusIgnored": "ನಿರ್ಲಕ್ಷಿಸಲಾಗಿದೆ",
-      "statusClosed": "ಮುಚ್ಚಲಾಗಿದೆ",
       "severityHigh": "ಹೆಚ್ಚು",
       "severityMedium": "ಮಧ್ಯಮ",
       "severityLow": "ಕಡಿಮೆ",
@@ -1655,7 +1646,6 @@
       "title": "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
       "couldNotLoadSettings": "ಭದ್ರತಾ ಏಜೆಂಟ್‌ನ ಸೆಟ್ಟಿಂಗ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoadPermissions": "ಅನುಮತಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "disabled": "ನಿಷ್ಕ್ರಿಯಗೊಳಿಸಲಾಗಿದೆ",
       "on": "ಸಕ್ರಿಯ",
       "repositoriesCount_one": "{{displayCount}} ರೆಪೊಸಿಟರಿ ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
       "repositoriesCount": "{{displayCount}} ರೆಪೊಸಿಟರಿಗಳನ್ನು ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ",
@@ -1683,7 +1673,6 @@
       "retry": "ಪರಿಹಾರಕ್ಕಾಗಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "cancelTitle": "ಈ ಪರಿಹಾರವನ್ನು ರದ್ದುಗೊಳಿಸಬೇಕೇ?",
       "cancelMessage": "ಭದ್ರತಾ ಏಜೆಂಟ್ ನಡೆಯುತ್ತಿರುವ ಪರಿಹಾರದ ಪ್ರಯತ್ನವನ್ನು ನಿಲ್ಲಿಸುತ್ತದೆ.",
-      "keepRunning": "ಚಾಲನೆಯಲ್ಲಿರಲಿ",
       "cancelRemediation": "ಪರಿಹಾರವನ್ನು ರದ್ದುಗೊಳಿಸಿ",
       "openPullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್{{number}} ತೆರೆಯಿರಿ",
       "openDraftPullRequest": "ಕರಡು ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್{{number}} ತೆರೆಯಿರಿ",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "ಪ್ರಯತ್ನಗಳ ಇತಿಹಾಸ ({{displayCount}})",
       "attemptNumber": "ಪ್ರಯತ್ನ #{{number}}",
       "startedBy": "ಪ್ರಾರಂಭಿಸಿದವರು",
-      "branch": "ಬ್ರಾಂಚ್",
       "queued": "ಪರಿಹಾರವನ್ನು ಸರದಿಗೆ ಸೇರಿಸಲಾಗಿದೆ",
       "retryQueued": "ಪರಿಹಾರದ ಮರುಪ್ರಯತ್ನವನ್ನು ಸರದಿಗೆ ಸೇರಿಸಲಾಗಿದೆ",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "ಫಿಲ್ಟರ್‌ಗಳಿಗೆ ಹೊಂದುವ ಸಮಸ್ಯೆಗಳಿಲ್ಲ",
       "noMatchesDescription": "ಆಯ್ಕೆ ಮಾಡಿದ ಫಿಲ್ಟರ್‌ಗಳನ್ನು ಬದಲಾಯಿಸಿ ಅಥವಾ ತೆರವುಗೊಳಿಸಿ, ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "emptyTitle": "ಪತ್ತೆಯಾದ ಬಾಕಿ ಸಮಸ್ಯೆಗಳಿಲ್ಲ",
-      "emptyDescription": "ಸದ್ಯ ಗಮನಹರಿಸಬೇಕಾದ ಬಾಕಿ ಸಮಸ್ಯೆಗಳಿಲ್ಲ.",
-      "clearFilters": "ಫಿಲ್ಟರ್‌ಗಳನ್ನು ತೆರವುಗೊಳಿಸಿ"
+      "emptyDescription": "ಸದ್ಯ ಗಮನಹರಿಸಬೇಕಾದ ಬಾಕಿ ಸಮಸ್ಯೆಗಳಿಲ್ಲ."
     },
     "scopeList": {
-      "couldNotLoad": "ಸಂಸ್ಥೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "personalSubtitle": "ನಿಮ್ಮ ಸ್ವಂತ ರೆಪೊಸಿಟರಿಗಳು"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "ಕರಡು PR ತೆರೆಯಲಾಗಿದೆ",
       "prOpened": "PR ತೆರೆಯಲಾಗಿದೆ",
       "blocked": "ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
-      "failed": "ವಿಫಲವಾಗಿದೆ",
       "noChangesNeeded": "ಯಾವುದೇ ಬದಲಾವಣೆಗಳ ಅಗತ್ಯವಿಲ್ಲ",
       "originAutomaticPolicy": "ಸ್ವಯಂಚಾಲಿತ ನೀತಿ",
       "originIncludeExistingPolicy": "ಈಗಾಗಲೇ ಪತ್ತೆಯಾದ ಸಮಸ್ಯೆಗಳನ್ನು ಸೇರಿಸುವ ನೀತಿ",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "ಹುಡುಕಲಾಗುತ್ತಿದೆ",
       "searchSessions": "ಸೆಷನ್‌ಗಳ ಹುಡುಕಾಟ",
-      "searchSessionsPlaceholder": "ಸೆಷನ್‌ಗಳ ಹುಡುಕಾಟ",
-      "clearSearch": "ಹುಡುಕಾಟವನ್ನು ತೆರವುಗೊಳಿಸಿ",
-      "clearFilters": "ಫಿಲ್ಟರ್‌ಗಳನ್ನು ತೆರವುಗೊಳಿಸಿ"
+      "searchSessionsPlaceholder": "ಸೆಷನ್‌ಗಳ ಹುಡುಕಾಟ"
     },
     "sessionList": {
-      "couldNotLoad": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoadActive": "ಸಕ್ರಿಯ ಸೆಶನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "noSessionsYetDescription": "ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ಕೋಡಿಂಗ್ ಕೆಲಸವನ್ನು ಪ್ರಾರಂಭಿಸಿ. ನಿಮ್ಮ ಸೆಶನ್‌ಗಳು ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ.",
       "noMatches": "ಹೊಂದುವ ಸೆಶನ್‌ಗಳಿಲ್ಲ",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "ಸೆಶನ್ ಅಳಿಸುವುದೇ?",
       "deleteMessage": "ಇದನ್ನು ಹಿಂತಿರುಗಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "deleteSession": "ಸೆಶನ್ ಅಳಿಸಿ",
-      "rename": "ಹೆಸರು ಬದಲಿಸಿ",
       "renameMessage": "ಈ ಸೆಶನ್‌ಗೆ ಹೊಸ ಹೆಸರನ್ನು ನಮೂದಿಸಿ.",
       "copyId": "ಸೆಶನ್ ID ನಕಲಿಸಿ",
       "idCopied": "ಸೆಶನ್ ID ನಕಲಿಸಲಾಗಿದೆ",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "ಇದನ್ನು ನೋಡಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "couldNotLoad": "ಸೆಶನ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "failedToLoadDetails": "ಸೆಶನ್ ವಿವರಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "notFound": "ಕಂಡುಬಂದಿಲ್ಲ.",
       "notFoundDescription": "ಇದನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು ಅಥವಾ ಇದು ಈಗ ಲಭ್ಯವಿಲ್ಲ.",
       "failedToStopExecution": "ಕಾರ್ಯನಿರ್ವಹಣೆಯನ್ನು ನಿಲ್ಲಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "renameSession": "ಸೆಶನ್ ಹೆಸರು ಬದಲಾಯಿಸಿ",
@@ -2076,7 +2056,6 @@
       "retryConnection": "ಮತ್ತೆ ಸಂಪರ್ಕಿಸಲು ಪ್ರಯತ್ನಿಸಿ"
     },
     "newSession": {
-      "title": "ಹೊಸ ಸೆಷನ್",
       "connectGithubDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitHub ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
       "openGithub": "GitHub ತೆರೆಯಿರಿ",
       "refreshRepositories": "ರೆಪೊಸಿಟರಿಗಳ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಿ",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "ರೆಪೊಸಿಟರಿಗಳ ಪಟ್ಟಿಯನ್ನು ನವೀಕರಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "discardDraftTitle": "ಕರಡನ್ನು ಅಳಿಸಬೇಕೆ?",
       "discardDraftMessage": "ನಿಮ್ಮ ಪ್ರಾಂಪ್ಟ್ ಕಳೆದುಹೋಗುತ್ತದೆ.",
-      "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
       "discardFailed": "ಕರಡನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "remoteHint": "ಸ್ಥಳೀಯ kilo ಪ್ರಕ್ರಿಯೆಯನ್ನು ನಿಯಂತ್ರಿಸಲು ನಿಮ್ಮ ಕಂಪ್ಯೂಟರ್‌ನಲ್ಲಿ `kilo remote` ಚಲಾಯಿಸಿ ಅಥವಾ ಚಾಲನೆಯಲ್ಲಿರುವ CLI ಸೆಶನ್‌ನಲ್ಲಿ `/remote` ಬಳಸಿ.",
-      "bitbucketConnected": "Bitbucket ಸಂಪರ್ಕಗೊಂಡಿದೆ",
-      "connectBitbucket": "Bitbucket ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
       "connectBitbucketDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ Bitbucket ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
-      "connectGitlab": "GitLab ಸಂಪರ್ಕ ಕಲ್ಪಿಸಿ",
       "connectGitlabDescription": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ GitLab ಸಂಪರ್ಕಿಸಿ. ನಂತರ ರೆಪೊಸಿಟರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಲು ಇಲ್ಲಿಗೆ ಹಿಂತಿರುಗಿ.",
       "couldNotLoadBitbucketRepositories": "Bitbucket ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoadGithubRepositories": "GitHub ರೆಪೊಸಿಟರಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "{{name}} ಸಾಧನ, {{status}}",
       "fileEmpty": "ಈ ಫೈಲ್ ಖಾಲಿಯಾಗಿದೆ.",
       "noTasks": "ಯಾವುದೇ ಕಾರ್ಯಗಳಿಲ್ಲ.",
-      "contentTruncated": "ವಿಷಯವನ್ನು ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
       "truncated": "ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
       "toolRead": "ಓದಿ",
       "toolEdit": "ಸಂಪಾದಿಸಿ",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "ಬೇರೆ ಪದ ಬಳಸಿ ಹುಡುಕಿ.",
       "loading": "ಲೋಡ್ ಆಗುತ್ತಿದೆ...",
       "accessibility": "ರೆಪೊಸಿಟರಿ: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "ಸಂದೇಶ ವಿವರಗಳು",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "ಕ್ಯಾಶ್‌ಗೆ ಬರೆದವು",
       "total": "ಒಟ್ಟು",
       "reportAiResponseFailedRetryable": "ಈ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ವರದಿ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-      "reportAiResponseFailedTerminal": "ಈ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ವರದಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ.",
-      "reportAiResponseSubmitted": "ವರದಿ ಸಲ್ಲಿಸಲಾಗಿದೆ. ಸ್ವೀಕೃತಿ ಸಂಖ್ಯೆ: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "ಈ ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ವರದಿ ಮಾಡಲು ಸಾಧ್ಯವಿಲ್ಲ."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "{{alt}} ಚಿತ್ರ ನೋಡಿ",
       "imageOutput": "ಔಟ್‌ಪುಟ್ ಚಿತ್ರ",
       "imageOutputWithFilename": "ಔಟ್‌ಪುಟ್ ಚಿತ್ರ, {{filename}}",
-      "defaultName": "ಫೈಲ್",
       "openFullScreen": "{{name}} ಅನ್ನು ಪೂರ್ಣ ಪರದೆಯಲ್ಲಿ ತೆರೆಯಿರಿ",
       "preview": "{{name}} ನ ಮುನ್ನೋಟ ನೋಡಿ",
-      "openFile": "{{name}} ತೆರೆಯಿರಿ",
       "couldNotLoadFile": "ಈ ಫೈಲ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "couldNotLoadFileRetry": "ಈ ಫೈಲ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "retryLoadingFile": "ಫೈಲ್ ಅನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "ಮಾದರಿ ಆಯ್ಕೆಮಾಡಿ",
       "searchPlaceholder": "ಮಾದರಿಗಳ ಹುಡುಕಾಟ",
-      "noModels": "ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ",
       "noModelsDescription": "ಆಯ್ಕೆ ಮಾಡಲು ಯಾವುದೇ ಮಾದರಿಗಳು ಲಭ್ಯವಿಲ್ಲ.",
-      "favorites": "ಮೆಚ್ಚಿನವುಗಳು",
-      "recommended": "ಶಿಫಾರಸು ಮಾಡಿದವು",
-      "allModels": "ಎಲ್ಲಾ ಮಾದರಿಗಳು"
+      "favorites": "ಮೆಚ್ಚಿನವುಗಳು"
     },
     "modelSelector": {
       "provider": "ಪೂರೈಕೆದಾರ {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "ಕ್ಯಾಮೆರಾ",
       "photoLibrary": "ಫೋಟೋ ಸಂಗ್ರಹ",
       "files": "ಫೈಲ್‌ಗಳು",
-      "cameraAccessDisabled": "ಕ್ಯಾಮೆರಾ ಬಳಸಲು ಅನುಮತಿ ಇಲ್ಲ",
       "cameraAccessMessage": "ಫೋಟೋ ತೆಗೆಯಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಕ್ಯಾಮೆರಾ ಬಳಸಲು ಅನುಮತಿ ನೀಡಿ.",
       "couldNotOpenPhotoPicker": "ಫೋಟೋ ಆಯ್ಕೆ ಪರದೆಯನ್ನು ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. Kilo ಅನ್ನು ಮರುಪ್ರಾರಂಭಿಸಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
       "maxFilesAllowed": "ಗರಿಷ್ಠ {{displayCount}} ಫೈಲ್‌ಗಳನ್ನು ಸೇರಿಸಬಹುದು.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "ಲಿಂಕ್ ನಕಲಿಸಲಾಗಿದೆ",
-      "reviewPr": "PR ಪರಿಶೀಲಿಸಿ",
       "openLink": "ಲಿಂಕ್ ತೆರೆಯಿರಿ",
-      "copyLink": "ಲಿಂಕ್ ನಕಲಿಸಿ",
       "shareLink": "ಲಿಂಕ್ ಹಂಚಿಕೊಳ್ಳಿ",
       "share": "ಹಂಚಿಕೊಳ್ಳಿ",
       "prLinkActions": "PR ಲಿಂಕ್ ಕ್ರಿಯೆಗಳು",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "ಸಂದರ್ಭಕ್ಕೆ ಲಭ್ಯವಿರುವ {{window}} ಟೋಕನ್‌ಗಳಲ್ಲಿ {{used}} ಬಳಸಲಾಗಿದೆ, ಬಳಕೆ {{percentage}}",
       "title": "ಸಂದರ್ಭ ಬಳಕೆ",
       "used": "ಬಳಸಿದ ಪ್ರಮಾಣ",
-      "remaining": "ಬಾಕಿ",
       "provider": "ಪೂರೈಕೆದಾರ",
       "totalCost": "ಒಟ್ಟು ವೆಚ್ಚ",
       "usageReflectsLatest": "ಇಲ್ಲಿ ತೋರಿಸಿರುವ ಬಳಕೆಯು ಸಹಾಯಕನ ಕೊನೆಯ ಪೂರ್ಣಗೊಂಡ ಪ್ರತಿಕ್ರಿಯೆಗೆ ಸಂಬಂಧಿಸಿದೆ.",
@@ -2598,7 +2561,6 @@
     "billingPage": "ಬಿಲ್ಲಿಂಗ್ ಪುಟ"
   },
   "deviceSessions": {
-    "couldNotLoad": "ಸೆಷನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "couldNotLoadDescription": "ಇದು ಲೋಡ್ ಆಗುವವರೆಗೆ ನಿಮ್ಮ ಸಕ್ರಿಯ ಸೆಶನ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
     "currentDeviceUnidentified": "ಪ್ರಸ್ತುತ ಸಾಧನವನ್ನು ಗುರುತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "noSessions": "ಯಾವುದೇ ಸಕ್ರಿಯ ಸೆಶನ್‌ಗಳಿಲ್ಲ",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Kilo ಅಪ್ಲಿಕೇಶನ್‌ನಲ್ಲಿ ಮಾಡಿದ ಸೈನ್ ಇನ್‌ಗಳು ಮಾತ್ರ ಇಲ್ಲಿ ಕಾಣಿಸುತ್ತವೆ. ಎಡಿಟರ್ ಮತ್ತು CLI ಸೈನ್ ಇನ್‌ಗಳನ್ನು ಇಲ್ಲಿ ಪಟ್ಟಿ ಮಾಡುವುದಿಲ್ಲ.",
     "signedIn": "ಸೈನ್ ಇನ್ ಮಾಡಿದ ಸಮಯ: {{signedIn}} · ಕೊನೆಯ ಚಟುವಟಿಕೆ: {{lastSeen}}",
     "thisDevice": "ಈ ಸಾಧನ",
-    "title": "ಸಾಧನ ಸೆಷನ್‌ಗಳು",
     "viewProfile": "ಪ್ರೊಫೈಲ್ ವೀಕ್ಷಿಸಿ",
     "signOutThisDevice": "ಈ ಸಾಧನದಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಿ",
     "signOutThisSession": "ಈ ಸೆಶನ್‌ನಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಿ",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "ಈ ಲಿಂಕ್ ಇನ್ನು ಮುಂದೆ ಮಾನ್ಯವಾಗಿಲ್ಲ.",
-    "goBack": "ಹಿಂದೆ ಹೋಗಿ",
     "title": "ಪುಟ ಕಂಡುಬಂದಿಲ್ಲ"
   },
   "monoScrollBlock": {
-    "contentTruncated": "ವಿಷಯವನ್ನು ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
     "truncated": "ಮೊಟಕುಗೊಳಿಸಲಾಗಿದೆ",
     "wrap": "ಸಾಲು ಮಡಿಕೆ",
     "scroll": "ಸ್ಕ್ರಾಲ್"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "offlineTitle": "ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "permissionDescription": "ಇದನ್ನು ನೋಡಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
-    "notFoundTitle": "ಕಂಡುಬಂದಿಲ್ಲ.",
     "notFoundDescription": "ಇದನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು ಅಥವಾ ಇದು ಈಗ ಲಭ್ಯವಿಲ್ಲ.",
     "serverTitle": "ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
     "serverDescription": "ನಮ್ಮ ಕಡೆಯಿಂದ ದೋಷ ಉಂಟಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "screenHeader": {
     "openMenu": "ಮೆನು ತೆರೆಯಿರಿ",
-    "openMenuFor": "{{title}} ಗಾಗಿ ಮೆನು ತೆರೆಯಿರಿ",
-    "goBack": "ಹಿಂದೆ ಹೋಗಿ"
+    "openMenuFor": "{{title}} ಗಾಗಿ ಮೆನು ತೆರೆಯಿರಿ"
   },
   "picker": {
     "optionsExpired": "ಆಯ್ಕೆಗಳ ಅವಧಿ ಮುಗಿದಿದೆ",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kiloಗೆ ಹಂಚಿಕೆ",
-    "reviewPr": "PR ಪರಿಶೀಲಿಸಿ",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "ಹೊಸ ಸೆಷನ್",
     "searchPlaceholder": "ಇತ್ತೀಚಿನ ಸೆಶನ್‌ಗಳ ಹುಡುಕಾಟ",
     "connectedCli": "ಸಂಪರ್ಕಿತ CLIಯಲ್ಲಿ",
     "newSessionOn": "{{name}}ನಲ್ಲಿ ಹೊಸ ಸೆಶನ್",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass ರದ್ದಾಗುತ್ತಿದೆ",
     "statusPastDue": "Kilo Pass ಪಾವತಿಯ ಗಡುವು ಮೀರಿದೆ",
     "monthlyCredits": "{{credits}} ಮಾಸಿಕ ಕ್ರೆಡಿಟ್‌ಗಳು",
-    "ends": "{{date}} ರಂದು ಕೊನೆಗೊಳ್ಳುತ್ತದೆ",
     "periodEnd": "ಅವಧಿ ಅಂತ್ಯ",
     "managedOnGooglePlay": "Google Play ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ",
     "managedInAppStore": "App Store ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Android ಅಪ್ಲಿಕೇಶನ್‌ನೊಳಗೆ Kilo Pass ಖರೀದಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ಅದನ್ನು ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಿ.",
     "webManagementDescription": "ಈ Kilo Pass ಅನ್ನು ವೆಬ್‌ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
     "legalDisclosure": "Kilo Pass ಪ್ರತಿ ತಿಂಗಳು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಣಗೊಳ್ಳುವ ಚಂದಾದಾರಿಕೆಯಾಗಿದೆ. ಖರೀದಿಯನ್ನು ದೃಢೀಕರಿಸಿದಾಗ ನಿಮ್ಮ Apple ID ಗೆ ಶುಲ್ಕ ವಿಧಿಸಲಾಗುತ್ತದೆ. ಪ್ರಸ್ತುತ ಅವಧಿ ಮುಗಿಯುವ ಕನಿಷ್ಠ 24 ಗಂಟೆಗಳ ಮೊದಲು ರದ್ದುಗೊಳಿಸದಿದ್ದರೆ, ತೋರಿಸಿದ ಬೆಲೆಯಲ್ಲಿ ಚಂದಾದಾರಿಕೆ ಪ್ರತಿ ತಿಂಗಳು ಸ್ವಯಂಚಾಲಿತವಾಗಿ ನವೀಕರಣಗೊಳ್ಳುತ್ತದೆ. ನಿಮ್ಮ App Store ಖಾತೆಯ ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಯಾವಾಗ ಬೇಕಾದರೂ ಅದನ್ನು ನಿರ್ವಹಿಸಿ ಅಥವಾ ರದ್ದುಗೊಳಿಸಿ.",
-    "legalPrivacyPolicy": "ಗೌಪ್ಯತಾ ನೀತಿ",
     "legalTermsOfUse": "ಬಳಕೆಯ ನಿಯಮಗಳು (EULA)",
     "purchaseDifferentAccount": "ಈ App Store ಖರೀದಿಯು ನಿಮ್ಮ Kilo ಖಾತೆಗೆ ಲಿಂಕ್ ಆಗಿಲ್ಲ. ಖರೀದಿಗೆ ಬಳಸಿದ Apple Account ಗೆ ಸೈನ್ ಇನ್ ಮಾಡಿ, ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "restoreFailed": "ಖರೀದಿಗಳನ್ನು ಮರುಸ್ಥಾಪಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "ಮಾನ್ಯ ಇಮೇಲ್ ವಿಳಾಸವನ್ನು ನಮೂದಿಸಿ.",
-      "emailLabel": "ಇಮೇಲ್",
       "emailPlaceholder": "ಇಮೇಲ್ ವಿಳಾಸ",
       "permissionDenied": "ಸದಸ್ಯರನ್ನು ಆಹ್ವಾನಿಸಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
       "roleLabel": "ಪಾತ್ರ",
@@ -2968,7 +2920,6 @@
         "billingManager": "ಬಿಲ್ಲಿಂಗ್ ವ್ಯವಸ್ಥಾಪಕರು"
       },
       "emailStatusFailed": "ಇಮೇಲ್ ಕಳುಹಿಸುವುದು ವಿಫಲವಾಗಿದೆ",
-      "emailStatusPending": "ಬಾಕಿ ಇದೆ",
       "inviteCreated": "ಆಹ್ವಾನ ರಚಿಸಲಾಗಿದೆ",
       "pendingInvitations": "ಬಾಕಿ ಇರುವ ಆಹ್ವಾನಗಳು",
       "resendInvite": "ಆಹ್ವಾನವನ್ನು ಮತ್ತೆ ಕಳುಹಿಸಿ",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "ಸ್ಥಿತಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "creditProcessingDelayed": "ಕ್ರೆಡಿಟ್ ಸಂಸ್ಕರಣೆ ವಿಳಂಬವಾಗಿದೆ · ಸ್ವಯಂಚಾಲಿತವಾಗಿ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತಿದೆ",
       "ended": "ಮುಕ್ತಾಯಗೊಂಡಿದೆ",
-      "endsOn": "{{date}} ರಂದು ಕೊನೆಗೊಳ್ಳುತ್ತದೆ",
       "manageHint": "ವೆಬ್‌ನಲ್ಲಿ Kilo Pass ನಿರ್ವಹಣೆಯನ್ನು ತೆರೆಯುತ್ತದೆ.",
       "notSubscribed": "ಚಂದಾದಾರರಾಗಿಲ್ಲ",
       "overallocated": "ನಿಯೋಜಿಸಿದ ಪಾಸ್‌ಗಳ ಸಂಖ್ಯೆ ಪಾವತಿಸಿದ ಸೀಟ್‌ಗಳ ಸಂಖ್ಯೆಯನ್ನು ಮೀರಿದೆ",
@@ -3004,7 +2954,6 @@
       "paymentPending": "ಪಾವತಿ ಬಾಕಿ ಇದೆ",
       "processingBlocked": "ಸಂಸ್ಕರಣೆ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ",
       "processingNeedsReview": "ಸಂಸ್ಕರಣೆಯನ್ನು ಪರಿಶೀಲಿಸಬೇಕು",
-      "retry": "ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "retryHint": "Kilo Pass ಸ್ಥಿತಿಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸುತ್ತದೆ.",
       "setupHint": "ವೆಬ್‌ನಲ್ಲಿ Kilo Pass ಸೆಟಪ್ ಪುಟವನ್ನು ತೆರೆಯುತ್ತದೆ."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "ಆದ್ಯತೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ"
   },
   "quickChat": {
-    "title": "ಚಾಟ್",
     "empty": {
       "title": "ಚಾಟ್ ಪ್ರಾರಂಭಿಸಿ",
       "description": "ಮಾದರಿಯೊಂದಿಗೆ ಮಾತನಾಡಲು ಸಂದೇಶ ಕಳುಹಿಸಿ."
@@ -3076,7 +3024,6 @@
     "openAgents": "ಏಜೆಂಟ್‌ಗಳ ಪಟ್ಟಿಯನ್ನು ತೆರೆಯಿರಿ",
     "running": "ಕೆಲಸ ಮಾಡುತ್ತಿದೆ",
     "needsInput": "ನಿಮ್ಮ ಪ್ರತಿಕ್ರಿಯೆ ಅಗತ್ಯ",
-    "idle": "ಕೆಲಸವಿಲ್ಲ",
     "channelName": "ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳು",
     "activityKitDisabledBody": "ಲಾಕ್ ಪರದೆಯಲ್ಲಿ ಸಕ್ರಿಯ ಏಜೆಂಟ್‌ಗಳನ್ನು ನೋಡಲು ಸೆಟ್ಟಿಂಗ್‌ಗಳಲ್ಲಿ ಲೈವ್ ಚಟುವಟಿಕೆಗಳನ್ನು ಸಕ್ರಿಯಗೊಳಿಸಿ."
   }

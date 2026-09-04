@@ -69,7 +69,58 @@
     "repository": "Repository",
     "signOut": "Sign out",
     "agents": "Agents",
-    "all": "All"
+    "all": "All",
+    "allModels": "All models",
+    "balanced": "Balanced",
+    "bitbucketConnected": "Bitbucket connected",
+    "branch": "Branch",
+    "cameraAccessDisabled": "Camera Access Disabled",
+    "chat": "Chat",
+    "clearFilters": "Clear filters",
+    "clearSearch": "Clear search",
+    "closed": "Closed",
+    "closeReactions": "Close reactions",
+    "connect": "Connect",
+    "connectBitbucket": "Connect Bitbucket",
+    "connectGitlab": "Connect GitLab",
+    "contentTruncated": "Content truncated",
+    "copyLink": "Copy link",
+    "couldNotLoadOrganizations": "Could not load organizations",
+    "couldNotLoadSessions": "Could not load sessions",
+    "couldnTLoadMore": "Couldn't load more",
+    "deviceSessions": "Device sessions",
+    "disabled": "Disabled",
+    "email": "Email",
+    "ends": "Ends {{date}}",
+    "failed": "Failed",
+    "file": "File",
+    "gitlab": "GitLab",
+    "goBack": "Go back",
+    "idle": "Idle",
+    "keepEditing": "Keep editing",
+    "keepRunning": "Keep running",
+    "kiloclaw": "KiloClaw",
+    "newSession": "New session",
+    "noKiloclawInstances": "No KiloClaw instances",
+    "noModelsAvailable": "No models available",
+    "notFound": "Not found",
+    "online": "Online",
+    "open": "Open {{name}}",
+    "openPullRequest": "Open pull request",
+    "pending": "Pending",
+    "performance": "Performance",
+    "preferences": "Preferences",
+    "privacyPolicy": "Privacy Policy",
+    "profile": "Profile",
+    "reactions": "Reactions",
+    "recent": "Recent",
+    "recommended": "Recommended",
+    "remaining": "Remaining",
+    "rename": "Rename",
+    "reply": "Reply",
+    "reportSubmittedReceipt": "Report submitted. Receipt {{receiptId}}",
+    "retryLoadingMore": "Retry loading more",
+    "reviewPr": "Review PR"
   },
   "language": {
     "title": "Language",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Could not restart",
     "languageSaved": "Your language is saved.",
     "catalogLoadFailed": "Could not load the language. Please try again.",
-    "retry": "Retry",
     "search": "Search languages",
     "noMatches": "No languages match",
     "deviceLanguage": "Device language",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Sign in code: {{code}}",
     "openSignInPageInBrowser": "Open sign-in page in browser",
     "copySignInLink": "Copy sign-in link",
-    "copyLink": "Copy link",
     "cancelSignIn": "Cancel sign in",
     "startingSignIn": "Starting sign in...",
     "organizationUsesSso": "Your organization uses single sign-on.",
@@ -112,7 +161,6 @@
     "terms": "Terms",
     "termsConnector": " and ",
     "termsSuffix": ".",
-    "privacyPolicy": "Privacy Policy",
     "moreSignInOptions": "More sign-in options",
     "couldNotCompleteSignIn": "Could not complete sign in. Please try again.",
     "sessionEnded": "Your session ended. Please sign in again.",
@@ -126,7 +174,6 @@
     "or": "or"
   },
   "profile": {
-    "title": "Profile",
     "codeReviewerSubtitle": "Automatic PR reviews",
     "securityAgentSubtitle": "Find and remediate vulnerabilities",
     "reviews": "Reviews",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Linked accounts",
     "couldNotLoadAccounts": "Could not load accounts",
     "app": "App",
-    "preferences": "Preferences",
     "preferencesSubtitle": "Appearance, notifications, thinking, and screen behavior",
-    "deviceSessions": "Device sessions",
     "deviceSessionsSubtitle": "Review and sign out other devices",
     "feedback": "Feedback",
     "privacyChoices": "Privacy choices",
@@ -163,9 +208,7 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Email",
     "providerTestAccount": "Test Account",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Enterprise SSO"
@@ -173,7 +216,6 @@
   "preferences": {
     "biometricUnlock": "Unlock with biometrics",
     "biometricUnlockSubtitle": "Unlock at launch and after five minutes in the background.",
-    "title": "Preferences",
     "autoExpandThinking": "Auto expand thinking",
     "autoExpandThinkingSubtitle": "Show the agent's thinking expanded when it finishes.",
     "keepScreenOn": "Keep screen on while on session page",
@@ -360,7 +402,6 @@
       "unresolveThread": "Unresolve thread",
       "resolved": "Resolved",
       "outdated": "Outdated",
-      "file": "File",
       "comment_one": "1 comment",
       "comment": "{{displayCount}} comments",
       "comment_other": "{{displayCount}} comments",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Could not load more comments.",
       "retryLoadingMore": "Retry loading more comments",
       "loadMoreComments": "Load more comments",
-      "closeReactions": "Close reactions",
-      "reactionsTitle": "Reactions",
       "addReaction": "Add reaction",
       "reactionPill": "{{emoji}} reaction, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaction",
@@ -380,13 +419,11 @@
       "reportUser": "Report user",
       "mute": "Mute",
       "block": "Block",
-      "reportSubmitted": "Report submitted. Receipt {{receiptId}}",
       "blockedUser": "Blocked {{login}}",
       "mutedUser": "Muted {{login}}",
       "replyPlaceholder": "Reply…",
       "replyBody": "Reply body",
       "submitReply": "Submit reply",
-      "reply": "Reply",
       "termsTitle": "Terms of Service",
       "termsCopy": "You must be 13 or older to post.",
       "termsAcceptRetry": "Couldn't accept the Terms. Check your connection and try again.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHub pull request URL",
       "clearLink": "Clear pull request link",
       "pasteLink": "Paste pull request link",
-      "open": "Open",
-      "openPullRequest": "Open pull request"
+      "open": "Open"
     },
     "checks": {
       "title": "Checks",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Inbox",
-      "recent": "Recent",
       "loading": "Loading inbox",
       "noReviewRequests": "No review requests",
       "noReviewRequestsDescription": "Pull requests waiting on your review show up here. You can still paste any PR link above.",
-      "couldNotLoad": "Could not load inbox",
-      "couldNotLoadMore": "Couldn't load more",
-      "retryLoadingMore": "Retry loading more"
+      "couldNotLoad": "Could not load inbox"
     },
     "composer": {
       "commentBodyPlaceholder": "Leave a comment",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Couldn't load the comment composer",
       "discardTitle": "Discard comment?",
       "discardMessage": "Your draft will be lost.",
-      "keepEditing": "Keep editing",
       "comment": "Comment",
       "insertSuggestionA11y": "Insert a code suggestion",
       "insertSuggestion": "Insert suggestion",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Merged",
-      "stateClosed": "Closed",
       "stateOpenApproved": "Open · Approved",
       "stateOpenChangesRequested": "Open · Changes requested",
       "stateOpenReviewRequired": "Open · Review required",
@@ -682,14 +713,10 @@
   },
   "tabs": {
     "home": "Home",
-    "chat": "Chat",
-    "profile": "Profile",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
     "position": "{{name}}, tab, {{position}} of {{total}}"
   },
   "quickChat": {
-    "title": "Chat",
     "empty": {
       "title": "Start a chat",
       "description": "Send a message to talk to a model."
@@ -702,7 +729,6 @@
     "instancePicker": {
       "switchInstance": "Switch instance",
       "couldNotLoadInstances": "Could not load instances",
-      "noInstances": "No KiloClaw instances",
       "noInstancesDescription": "Set up an instance to start chatting.",
       "setUpKiloclaw": "Set up KiloClaw",
       "currentInstance": "{{title}}, current"
@@ -724,16 +750,12 @@
       "couldNotSignIn": "Couldn't sign in to chat",
       "couldNotRefreshMessages": "Couldn't refresh messages",
       "couldNotLoadHistory": "Could not load conversation history",
-      "rename": "Rename",
       "leave": "Leave",
       "untitledConversation": "Untitled conversation",
       "createFailed": "Failed to create conversation",
       "leaveFailed": "Failed to leave conversation"
     },
     "reactions": {
-      "title": "Reactions",
-      "close": "Close reactions",
-      "recent": "Recent",
       "common": "Common",
       "reactWith": "React with {{reaction}}",
       "accessibility": "{{emoji}} reaction, {{displayCount}}"
@@ -806,7 +828,6 @@
       "addReactionFailed": "Failed to add reaction",
       "retrySend": "Retry send",
       "moreReactions": "More reactions",
-      "reply": "Reply",
       "edit": "Edit",
       "sendFailed": "Failed to send message",
       "retrySendFailed": "Failed to retry send",
@@ -817,7 +838,6 @@
       "takePhoto": "Take photo",
       "photoLibrary": "Photo library",
       "files": "Files",
-      "cameraAccessDisabled": "Camera Access Disabled",
       "cameraAccessMessage": "Allow camera access in Settings to take a photo."
     },
     "typingIndicator": {
@@ -827,8 +847,6 @@
       "typing_other": "{{names}} are typing..."
     },
     "botStatus": {
-      "online": "Online",
-      "idle": "Idle",
       "offline": "Offline",
       "loadingUser": "Loading user...",
       "waitingForStatus": "Waiting for bot status...",
@@ -842,7 +860,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Could not load KiloClaw instances",
     "billing": {
       "title": "Billing",
@@ -850,7 +867,6 @@
       "plan": "Plan",
       "finalTermEnds": "Final term ends",
       "afterFinalTerm": "After final term",
-      "remaining": "Remaining",
       "lessThanOneDay": "Less than 1 day",
       "ends": "Ends",
       "expires": "Expires",
@@ -951,20 +967,15 @@
       "disconnect": "Disconnect Google Account",
       "copied": "Copied!",
       "copyCommand": "Copy command",
-      "disabled": "Disabled",
       "disconnectConfirm": "Disconnect",
       "disconnectMessage": "Remove your Google account from this instance? This will disable Gmail notifications. Redeploy after disconnecting to apply changes.",
       "disconnectTitle": "Disconnect Google"
     },
     "modelList": {
-      "title": "All models",
       "searchPlaceholder": "Search models...",
-      "clearSearch": "Clear search",
       "noMatches": "No models match your search",
-      "noModels": "No models available",
       "noModelsDescription": "Models will appear here once available.",
-      "noResultsFor": "No results for \"{{query}}\"",
-      "recommended": "Recommended"
+      "noResultsFor": "No results for \"{{query}}\""
     },
     "secrets": {
       "title": "Secrets",
@@ -982,8 +993,7 @@
       "setupGuide": "Setup guide",
       "saving": "Saving…",
       "removing": "Removing…",
-      "updateToken": "Update Token",
-      "connect": "Connect"
+      "updateToken": "Update Token"
     },
     "versionPin": {
       "title": "Version pinning",
@@ -1030,7 +1040,6 @@
       "finishingSetup": "Finishing setup",
       "finishingSetupDescription": "Hang tight, we're finalizing your account. This usually takes a moment.",
       "getStarted": "Get started",
-      "noInstances": "No KiloClaw instances",
       "noInstancesDescription": "Create your first instance to start running coding agents."
     },
     "instance": {
@@ -1054,7 +1063,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Chat with {{name}}",
-        "online": "Online",
         "ready": "{{name}} is ready",
         "warmedUp": "All warmed up. Say hi whenever you're ready."
       },
@@ -1151,9 +1159,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Frontier",
       "frontierDescription": "Highest performance. Routes to frontier models with reasoning.",
-      "balancedLabel": "Balanced",
       "balancedDescription": "Smart balance of speed and capability at lower cost.",
-      "performance": "Performance",
       "autoModelA11y": "{{label}} auto model",
       "currentModel": "Current model",
       "browseAllModels": "or select from 500+ models",
@@ -1187,7 +1193,6 @@
       "openUnread_one": "Open {{name}}, {{displayCount}} unread message",
       "openUnread": "Open {{name}}, {{displayCount}} unread messages",
       "openUnread_other": "Open {{name}}, {{displayCount}} unread messages",
-      "open": "Open {{name}}",
       "openSettings": "Open settings for {{name}}",
       "fixOnKiloAi": "Fix on kilo.ai: {{label}}"
     },
@@ -1273,7 +1278,6 @@
       "title": "Review",
       "cancelTitle": "Cancel review?",
       "cancelMessage": "This will stop the in-progress code review.",
-      "keepRunning": "Keep running",
       "cancelReview": "Cancel review",
       "retryTitle": "Retry review?",
       "retryMessage": "This will re-run the code review.",
@@ -1283,13 +1287,11 @@
       "byline": "{{repo}} #{{number}} by {{author}}",
       "noFindings": "No findings",
       "showMore": "Show more",
-      "branch": "Branch",
       "created": "Created",
       "started": "Started",
       "completed": "Completed",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} out",
-      "openPullRequest": "Open pull request",
       "transcriptWaiting": "Waiting for the review transcript.",
       "transcriptEmpty": "No transcript for this review.",
       "transcriptRetry": "Could not load the review transcript.",
@@ -1317,8 +1319,6 @@
     },
     "reviewMemory": {
       "title": "Review memory",
-      "couldNotLoadMore": "Couldn't load more",
-      "retryLoadingMore": "Retry loading more",
       "loading": "Loading review memory",
       "couldNotLoad": "Could not load review memory",
       "off": "Review memory is off",
@@ -1357,15 +1357,11 @@
       "setup": "Bitbucket setup"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket connected",
-      "title": "Connect Bitbucket",
       "description": "Create a Workspace Access Token with the required scopes and paste it below.",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
-      "tokenPlaceholder": "Workspace access token",
-      "connect": "Connect"
+      "tokenPlaceholder": "Workspace access token"
     },
     "scopeList": {
-      "couldNotLoad": "Could not load organizations",
       "personalStillAvailable": "Personal repositories are still available below.",
       "personalSubtitle": "Your own repositories",
       "viewOnly": "View only"
@@ -1388,7 +1384,6 @@
       "githubApp": "GitHub App",
       "githubError": "Could not open GitHub setup. Please try again.",
       "gitlabAccount": "GitLab account",
-      "connectGitLab": "Connect GitLab",
       "gitlabError": "Could not open GitLab setup. Please try again.",
       "bitbucketError": "Could not open Bitbucket setup. Please try again.",
       "description": "Connect the Kilo {{label}} to review pull requests automatically."
@@ -1413,21 +1408,17 @@
     "updateFailed": "Failed to update reviewer",
     "configSaveFailed": "Failed to save review config",
     "status": {
-      "pending": "Pending",
       "running": "Running",
       "completed": "Completed",
-      "failed": "Failed",
       "interrupted": "Interrupted"
     },
     "reviewStyle": {
       "strict": "Strict",
-      "balanced": "Balanced",
       "lenient": "Lenient",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "Security",
-      "performance": "Performance",
       "bugs": "Bugs",
       "style": "Style",
       "testing": "Testing",
@@ -1478,7 +1469,6 @@
       "statusOpen": "Open",
       "fixed": "Fixed",
       "statusIgnored": "Ignored",
-      "statusClosed": "Closed",
       "severityHigh": "High",
       "severityMedium": "Medium",
       "severityLow": "Low",
@@ -1665,7 +1655,6 @@
       "title": "Settings",
       "couldNotLoadSettings": "Could not load Security Agent settings",
       "couldNotLoadPermissions": "Could not load permissions",
-      "disabled": "Disabled",
       "on": "On",
       "repositoriesCount_one": "{{displayCount}} repository selected",
       "repositoriesCount": "{{displayCount}} repositories selected",
@@ -1693,7 +1682,6 @@
       "retry": "Retry remediation",
       "cancelTitle": "Cancel this remediation?",
       "cancelMessage": "Security Agent will stop the in-progress remediation attempt.",
-      "keepRunning": "Keep running",
       "cancelRemediation": "Cancel remediation",
       "openPullRequest": "Open pull request{{number}}",
       "openDraftPullRequest": "Open draft pull request{{number}}",
@@ -1701,7 +1689,6 @@
       "attemptHistory": "Attempt history ({{displayCount}})",
       "attemptNumber": "Attempt #{{number}}",
       "startedBy": "Started by",
-      "branch": "Branch",
       "queued": "Remediation queued",
       "retryQueued": "Remediation retry queued",
       "timeline": {
@@ -1757,11 +1744,9 @@
       "noMatchesTitle": "No findings match filters",
       "noMatchesDescription": "Try adjusting or clearing the selected filters.",
       "emptyTitle": "No open findings",
-      "emptyDescription": "No open findings need attention right now.",
-      "clearFilters": "Clear filters"
+      "emptyDescription": "No open findings need attention right now."
     },
     "scopeList": {
-      "couldNotLoad": "Could not load organizations",
       "personalSubtitle": "Your own repositories"
     },
     "findingRow": {
@@ -1918,7 +1903,6 @@
       "draftPrOpened": "Draft PR opened",
       "prOpened": "PR opened",
       "blocked": "Blocked",
-      "failed": "Failed",
       "noChangesNeeded": "No changes needed",
       "originAutomaticPolicy": "Automatic policy",
       "originIncludeExistingPolicy": "Include existing policy",
@@ -1974,12 +1958,9 @@
     "search": {
       "searching": "Searching",
       "searchSessions": "Search sessions",
-      "searchSessionsPlaceholder": "Search sessions...",
-      "clearSearch": "Clear search",
-      "clearFilters": "Clear filters"
+      "searchSessionsPlaceholder": "Search sessions..."
     },
     "sessionList": {
-      "couldNotLoad": "Could not load sessions",
       "couldNotLoadActive": "Could not load active sessions",
       "updating": "Updating",
       "noSessionsYetDescription": "Start a coding task from your phone. Your sessions will appear here.",
@@ -1995,7 +1976,6 @@
       "deleteTitle": "Delete session?",
       "deleteMessage": "This cannot be undone.",
       "deleteSession": "Delete session",
-      "rename": "Rename",
       "renameMessage": "Enter a new name for this session",
       "copyId": "Copy session ID",
       "idCopied": "Session ID copied",
@@ -2042,7 +2022,6 @@
       "accessDeniedDescription": "You don't have permission to view this.",
       "couldNotLoad": "Could not load session",
       "failedToLoadDetails": "Failed to load session details",
-      "notFound": "Not found",
       "notFoundDescription": "This item may have been removed or is no longer available.",
       "failedToStopExecution": "Failed to stop execution",
       "renameSession": "Rename session",
@@ -2086,15 +2065,12 @@
       "retryConnection": "Retry connection"
     },
     "newSession": {
-      "title": "New session",
       "recentlyUsed": "Recently used",
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",
       "couldNotLoadGitlabRepositories": "Couldn't load GitLab repositories",
       "couldNotLoadBitbucketRepositories": "Couldn't load Bitbucket repositories",
       "connectGithubDescription": "Connect GitHub in your browser, then return here to pick a repository.",
-      "connectGitlab": "Connect GitLab",
       "connectGitlabDescription": "Connect GitLab in your browser, then return here to pick a repository.",
-      "connectBitbucket": "Connect Bitbucket",
       "connectBitbucketDescription": "Connect Bitbucket in your browser, then return here to pick a repository.",
       "openGithub": "Open GitHub",
       "openGitlab": "Open GitLab",
@@ -2102,7 +2078,6 @@
       "refreshRepositories": "Refresh repositories",
       "githubConnected": "GitHub connected",
       "gitlabConnected": "GitLab connected",
-      "bitbucketConnected": "Bitbucket connected",
       "noRepositoriesVisible": "No repositories visible. Check repository access for the Kilo GitHub App, then refresh.",
       "noRepositoriesVisibleGitlab": "No repositories visible. Check repository access for GitLab, then refresh.",
       "noRepositoriesVisibleBitbucket": "No repositories visible. Check repository access for Bitbucket, then refresh.",
@@ -2128,7 +2103,6 @@
       "discardDraftTitle": "Discard draft?",
       "discardDraftMessage": "Your prompt will be lost.",
       "discardWithUploadsMessage": "Your prompt and any unclaimed uploads will be deleted.",
-      "keepEditing": "Keep editing",
       "discardFailed": "Could not discard the draft. Please try again.",
       "remoteHint": "Run `kilo remote` on your computer, or `/remote` in a running CLI session, to control a local kilo process.",
       "continueFrom": "Continuing {{title}}",
@@ -2149,7 +2123,6 @@
       "accessibilityLabel": "{{name}} tool, {{status}}",
       "fileEmpty": "This file is empty.",
       "noTasks": "No tasks.",
-      "contentTruncated": "Content truncated",
       "truncated": "Truncated",
       "toolRead": "read",
       "toolEdit": "edit",
@@ -2225,7 +2198,6 @@
     },
     "repoPicker": {
       "title": "Select repository",
-      "platformGitlab": "GitLab",
       "platformBitbucket": "Bitbucket",
       "searchLabel": "Search repositories",
       "searchPlaceholder": "Search repositories...",
@@ -2256,8 +2228,7 @@
       "cacheWrite": "Cache write",
       "total": "Total",
       "reportAiResponseFailedRetryable": "Couldn't report this response.",
-      "reportAiResponseFailedTerminal": "This response can't be reported.",
-      "reportAiResponseSubmitted": "Report submitted. Receipt {{receiptId}}"
+      "reportAiResponseFailedTerminal": "This response can't be reported."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2296,10 +2267,8 @@
       "viewImageWithAlt": "View image {{alt}}",
       "imageOutput": "Image output",
       "imageOutputWithFilename": "Image output, {{filename}}",
-      "defaultName": "File",
       "openFullScreen": "Open {{name}} full screen",
       "preview": "Preview {{name}}",
-      "openFile": "Open {{name}}",
       "couldNotLoadFile": "Could not load this file.",
       "couldNotLoadFileRetry": "Could not load this file. Try again.",
       "retryLoadingFile": "Retry loading file",
@@ -2440,11 +2409,8 @@
     "modelPicker": {
       "title": "Select model",
       "searchPlaceholder": "Search models...",
-      "noModels": "No models available",
       "noModelsDescription": "No models are available to select.",
-      "favorites": "Favorites",
-      "recommended": "Recommended",
-      "allModels": "All models"
+      "favorites": "Favorites"
     },
     "modelSelector": {
       "provider": "Provider {{id}}",
@@ -2482,7 +2448,6 @@
       "camera": "Camera",
       "photoLibrary": "Photo Library",
       "files": "Files",
-      "cameraAccessDisabled": "Camera Access Disabled",
       "cameraAccessMessage": "Allow camera access in Settings to take a photo.",
       "couldNotOpenPhotoPicker": "Could not open the photo picker. Restart Kilo and try again.",
       "maxFilesAllowed": "Maximum {{displayCount}} files allowed",
@@ -2510,9 +2475,7 @@
     },
     "chatLink": {
       "linkCopied": "Link copied",
-      "reviewPr": "Review PR",
       "openLink": "Open link",
-      "copyLink": "Copy link",
       "shareLink": "Share link",
       "share": "Share",
       "prLinkActions": "PR link actions",
@@ -2565,7 +2528,6 @@
       "tokensUsage": "Context {{used}} of {{window}} tokens, {{percentage}} used",
       "title": "Context usage",
       "used": "Used",
-      "remaining": "Remaining",
       "provider": "Provider",
       "totalCost": "Total cost",
       "usageReflectsLatest": "Usage reflects the latest completed assistant response.",
@@ -2608,7 +2570,6 @@
     "billingPage": "billing page"
   },
   "deviceSessions": {
-    "couldNotLoad": "Could not load sessions",
     "couldNotLoadDescription": "Your active sessions are unavailable until this loads.",
     "currentDeviceUnidentified": "Current device could not be identified",
     "noSessions": "No active sessions",
@@ -2616,7 +2577,6 @@
     "onlyKiloAppSignIns": "Only Kilo app sign-ins appear here. Editor and CLI sign-ins are not listed.",
     "signedIn": "Signed in {{signedIn}} · Last seen {{lastSeen}}",
     "thisDevice": "This device",
-    "title": "Device sessions",
     "viewProfile": "View profile",
     "signOutThisDevice": "Sign out this device",
     "signOutThisSession": "Sign out this session",
@@ -2657,11 +2617,9 @@
   },
   "invalidRoute": {
     "description": "This link is no longer valid.",
-    "goBack": "Go back",
     "title": "Page not found"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Content truncated",
     "truncated": "Truncated",
     "wrap": "Wrap",
     "scroll": "Scroll"
@@ -2674,15 +2632,13 @@
     "neutralDescription": "Please try again.",
     "offlineTitle": "Failed to load",
     "permissionDescription": "You don't have permission to view this.",
-    "notFoundTitle": "Not found",
     "notFoundDescription": "This item may have been removed or is no longer available.",
     "serverTitle": "Could not load",
     "serverDescription": "Something went wrong on our end. Please try again."
   },
   "screenHeader": {
     "openMenu": "Open menu",
-    "openMenuFor": "Open menu for {{title}}",
-    "goBack": "Go back"
+    "openMenuFor": "Open menu for {{title}}"
   },
   "picker": {
     "optionsExpired": "Options expired",
@@ -2713,9 +2669,7 @@
   },
   "share": {
     "title": "Share to Kilo",
-    "reviewPr": "Review PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "New session",
     "searchPlaceholder": "Search recent sessions",
     "connectedCli": "On a connected CLI",
     "newSessionOn": "New session on {{name}}",
@@ -2773,7 +2727,6 @@
     "statusCanceling": "Kilo Pass canceling",
     "statusPastDue": "Kilo Pass past due",
     "monthlyCredits": "{{credits}} monthly credits",
-    "ends": "Ends {{date}}",
     "periodEnd": "period end",
     "managedOnGooglePlay": "Managed on Google Play",
     "managedInAppStore": "Managed in App Store",
@@ -2785,7 +2738,6 @@
     "unavailableDescription": "Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.",
     "webManagementDescription": "This Kilo Pass is managed on the web.",
     "legalDisclosure": "Kilo Pass is an auto-renewable monthly subscription. Payment is charged to your Apple ID at confirmation of purchase. Subscriptions renew automatically each month at the price shown unless canceled at least 24 hours before the end of the current period. Manage or cancel anytime in your App Store account settings.",
-    "legalPrivacyPolicy": "Privacy Policy",
     "legalTermsOfUse": "Terms of Use (EULA)",
     "purchaseDifferentAccount": "This App Store purchase isn't linked to your Kilo account. Sign in to the Apple Account used for the purchase, then try again.",
     "restoreFailed": "Failed to restore purchases. Try again.",
@@ -2916,7 +2868,6 @@
     },
     "inviteMember": {
       "emailError": "Enter a valid email address",
-      "emailLabel": "Email",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "You don't have permission to invite members.",
       "roleLabel": "Role",
@@ -2986,7 +2937,6 @@
         "billingManager": "Billing manager"
       },
       "emailStatusFailed": "Email failed",
-      "emailStatusPending": "Pending",
       "inviteCreated": "Invite created",
       "pendingInvitations": "Pending invitations",
       "resendInvite": "Resend invite",
@@ -3011,7 +2961,6 @@
       "couldNotLoadStatus": "Could not load status",
       "creditProcessingDelayed": "Credit processing delayed · retrying automatically",
       "ended": "Ended",
-      "endsOn": "Ends {{date}}",
       "manageHint": "Opens Kilo Pass management on web.",
       "notSubscribed": "Not subscribed",
       "overallocated": "Pass assignments exceed paid seats",
@@ -3022,7 +2971,6 @@
       "paymentPending": "Payment pending",
       "processingBlocked": "Processing blocked",
       "processingNeedsReview": "Processing needs review",
-      "retry": "Retry",
       "retryHint": "Retries loading Kilo Pass status.",
       "setupHint": "Opens Kilo Pass setup on web."
     }
@@ -3076,7 +3024,6 @@
     "openAgents": "Open agents",
     "running": "Working",
     "needsInput": "Needs input",
-    "idle": "Idle",
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   }

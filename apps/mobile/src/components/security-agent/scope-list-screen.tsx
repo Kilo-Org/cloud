@@ -41,7 +41,7 @@ export function ScopeListScreen() {
         <QueryError
           placement="top"
           variant="server"
-          title={t('securityAgent.scopeList.couldNotLoad')}
+          title={t('common.couldNotLoadOrganizations')}
           onRetry={() => void refetch()}
           isRetrying={isFetching}
           className="mt-3"

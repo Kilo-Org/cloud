@@ -137,7 +137,7 @@ export function resolveMessageAuthorLabel({
 }): string {
   const member = members.find(candidate => candidate.id === senderId);
   if (senderId.startsWith('bot:')) {
-    return firstDisplayValue([botName, member?.displayName]) ?? i18n.t('kiloclaw.title');
+    return firstDisplayValue([botName, member?.displayName]) ?? i18n.t('common.kiloclaw');
   }
   return firstDisplayValue([member?.displayName]) ?? senderId;
 }

@@ -242,7 +242,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       : bodyRef.current.trim().length > 0;
     if (dirty) {
       Alert.alert(t('prReview.composer.discardTitle'), t('prReview.composer.discardMessage'), [
-        { text: t('prReview.composer.keepEditing'), style: 'cancel' },
+        { text: t('common.keepEditing'), style: 'cancel' },
         {
           text: t('common.discard'),
           style: 'destructive',

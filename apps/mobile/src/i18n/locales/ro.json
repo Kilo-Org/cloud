@@ -69,7 +69,58 @@
     "repository": "Depozit de cod",
     "signOut": "Deconectează-te",
     "agents": "Agenți",
-    "all": "Toate"
+    "all": "Toate",
+    "allModels": "Toate modelele",
+    "balanced": "Echilibrat",
+    "bitbucketConnected": "Bitbucket conectat",
+    "branch": "Ramură",
+    "cameraAccessDisabled": "Acces la cameră dezactivat",
+    "chat": "Conversații",
+    "clearFilters": "Resetează filtrele",
+    "clearSearch": "Șterge căutarea",
+    "closed": "Închis",
+    "closeReactions": "Închide reacțiile",
+    "connect": "Conectează",
+    "connectBitbucket": "Conectează Bitbucket",
+    "connectGitlab": "Conectează GitLab",
+    "contentTruncated": "Conținut trunchiat",
+    "copyLink": "Copiază linkul",
+    "couldNotLoadOrganizations": "Nu s-au putut încărca organizațiile.",
+    "couldNotLoadSessions": "Nu s-au putut încărca sesiunile.",
+    "couldnTLoadMore": "Nu s-au putut încărca mai multe elemente.",
+    "deviceSessions": "Sesiuni pe dispozitive",
+    "disabled": "Dezactivat",
+    "email": "E-mail",
+    "ends": "Se încheie la {{date}}",
+    "failed": "Eșec",
+    "file": "Fișier",
+    "gitlab": "GitLab",
+    "goBack": "Înapoi",
+    "idle": "Inactiv",
+    "keepEditing": "Continuă editarea",
+    "keepRunning": "Continuă rularea",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Sesiune nouă",
+    "noKiloclawInstances": "Nicio instanță KiloClaw",
+    "noModelsAvailable": "Niciun model disponibil",
+    "notFound": "Elementul nu a fost găsit.",
+    "online": "Conectat",
+    "open": "Deschide {{name}}",
+    "openPullRequest": "Deschidere PR",
+    "pending": "În așteptare",
+    "performance": "Performanță",
+    "preferences": "Preferințe",
+    "privacyPolicy": "Politica de confidențialitate",
+    "profile": "Profil",
+    "reactions": "Reacții",
+    "recent": "Recente",
+    "recommended": "Recomandate",
+    "remaining": "Rămas",
+    "rename": "Redenumește",
+    "reply": "Răspunde",
+    "reportSubmittedReceipt": "Sesizare trimisă. Număr de înregistrare: {{receiptId}}",
+    "retryLoadingMore": "Încearcă din nou să încarci mai multe elemente",
+    "reviewPr": "Revizuiește PR-ul"
   },
   "language": {
     "title": "Limbă",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Repornirea a eșuat",
     "languageSaved": "Limba selectată a fost salvată.",
     "catalogLoadFailed": "Nu s-a putut încărca limba. Încearcă din nou.",
-    "retry": "Reîncearcă",
     "search": "Căutare limbă",
     "noMatches": "Nicio limbă nu corespunde căutării",
     "deviceLanguage": "Limba dispozitivului",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Cod de autentificare: {{code}}",
     "openSignInPageInBrowser": "Deschide pagina de autentificare în browser",
     "copySignInLink": "Copiază linkul de autentificare",
-    "copyLink": "Copiază linkul",
     "cancelSignIn": "Anulează autentificarea",
     "startingSignIn": "Se începe autentificarea…",
     "organizationUsesSso": "Organizația ta folosește autentificare unică.",
@@ -112,7 +161,6 @@
     "terms": "termenii de utilizare",
     "termsConnector": " și ",
     "termsSuffix": ".",
-    "privacyPolicy": "Politica de confidențialitate",
     "moreSignInOptions": "Mai multe opțiuni de autentificare",
     "couldNotCompleteSignIn": "Nu s-a putut finaliza autentificarea. Încearcă din nou.",
     "sessionEnded": "Sesiunea ta s-a încheiat. Autentifică-te din nou.",
@@ -126,7 +174,6 @@
     "or": "sau"
   },
   "profile": {
-    "title": "Profil",
     "codeReviewerSubtitle": "Revizuiri automate de PR",
     "securityAgentSubtitle": "Găsește și remediază vulnerabilitățile",
     "reviews": "Revizuiri",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Conturi asociate",
     "couldNotLoadAccounts": "Nu s-au putut încărca conturile.",
     "app": "Aplicație",
-    "preferences": "Preferințe",
     "preferencesSubtitle": "Aspect, notificări, raționament și comportamentul ecranului",
-    "deviceSessions": "Sesiuni pe dispozitive",
     "deviceSessionsSubtitle": "Verifică și deconectează alte dispozitive",
     "feedback": "Trimite păreri",
     "privacyChoices": "Opțiuni de confidențialitate",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-mail",
     "providerTestAccount": "Cont de test",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO pentru companii"
   },
   "preferences": {
-    "title": "Preferințe",
     "autoExpandThinking": "Extindere automată a raționamentului",
     "autoExpandThinkingSubtitle": "Afișează raționamentul agentului în formă extinsă după finalizarea lui.",
     "keepScreenOn": "Menține ecranul aprins pe pagina sesiunii",
@@ -362,7 +404,6 @@
       "unresolveThread": "Marchează firul de discuție ca nerezolvat",
       "resolved": "Rezolvat",
       "outdated": "Depășit",
-      "file": "Fișier",
       "comment_one": "1 comentariu",
       "comment": "{{displayCount}} de comentarii",
       "comment_other": "{{displayCount}} de comentarii",
@@ -370,8 +411,6 @@
       "couldNotLoadMore": "Nu s-au putut încărca mai multe comentarii.",
       "retryLoadingMore": "Încearcă din nou să încarci mai multe comentarii",
       "loadMoreComments": "Încarcă mai multe comentarii",
-      "closeReactions": "Închide reacțiile",
-      "reactionsTitle": "Reacții",
       "addReaction": "Adaugă o reacție",
       "reactionPill": "reacție {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "reacție",
@@ -382,13 +421,11 @@
       "reportUser": "Raportează utilizatorul",
       "mute": "Ignoră utilizatorul",
       "block": "Blocare",
-      "reportSubmitted": "Sesizare trimisă. Număr de înregistrare: {{receiptId}}",
       "blockedUser": "Ai blocat utilizatorul {{login}}",
       "mutedUser": "Ai ignorat utilizatorul {{login}}",
       "replyPlaceholder": "Răspuns…",
       "replyBody": "Textul răspunsului",
       "submitReply": "Trimite răspunsul",
-      "reply": "Răspunde",
       "termsTitle": "Termeni de utilizare",
       "termsCopy": "Trebuie să ai cel puțin 13 ani pentru a publica mesaje.",
       "termsAcceptRetry": "Nu s-au putut accepta termenii de utilizare. Verifică conexiunea și încearcă din nou.",
@@ -472,8 +509,7 @@
       "urlAccessibility": "Adresa URL a PR-ului de pe GitHub",
       "clearLink": "Șterge legătura către PR",
       "pasteLink": "Lipește legătura către PR",
-      "open": "Deschidere",
-      "openPullRequest": "Deschidere PR"
+      "open": "Deschidere"
     },
     "checks": {
       "title": "Verificări",
@@ -493,13 +529,10 @@
     },
     "inbox": {
       "title": "Primite",
-      "recent": "Recente",
       "loading": "Se încarcă cererile primite",
       "noReviewRequests": "Nicio cerere de revizuire",
       "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta. Poți lipi mai sus și o legătură către orice alt PR.",
-      "couldNotLoad": "Nu s-au putut încărca cererile primite.",
-      "couldNotLoadMore": "Nu s-au putut încărca mai multe elemente.",
-      "retryLoadingMore": "Încearcă din nou să încarci mai multe elemente"
+      "couldNotLoad": "Nu s-au putut încărca cererile primite."
     },
     "composer": {
       "commentBodyPlaceholder": "Comentariul tău",
@@ -514,7 +547,6 @@
       "loadFailedTitle": "Nu s-a putut încărca editorul de comentarii.",
       "discardTitle": "Renunți la comentariu?",
       "discardMessage": "Ciorna ta se va pierde.",
-      "keepEditing": "Continuă editarea",
       "comment": "Comentariu",
       "insertSuggestionA11y": "Inserează o sugestie de cod",
       "insertSuggestion": "Inserează o sugestie",
@@ -562,7 +594,6 @@
     },
     "overview": {
       "stateMerged": "Îmbinat",
-      "stateClosed": "Închis",
       "stateOpenApproved": "Deschis · aprobat",
       "stateOpenChangesRequested": "Deschis · modificări cerute",
       "stateOpenReviewRequired": "Deschis · revizuire necesară",
@@ -689,17 +720,13 @@
   },
   "tabs": {
     "home": "Acasă",
-    "profile": "Profil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, filă, {{position}} din {{total}}",
-    "chat": "Conversații"
+    "position": "{{name}}, filă, {{position}} din {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Schimbarea instanței",
       "couldNotLoadInstances": "Nu s-au putut încărca instanțele.",
-      "noInstances": "Nicio instanță KiloClaw",
       "noInstancesDescription": "Configurează o instanță pentru a începe conversația.",
       "setUpKiloclaw": "Configurează KiloClaw",
       "currentInstance": "{{title}}, instanța curentă"
@@ -721,16 +748,12 @@
       "couldNotSignIn": "Nu s-a putut efectua autentificarea în chat.",
       "couldNotRefreshMessages": "Nu s-au putut actualiza mesajele.",
       "couldNotLoadHistory": "Nu s-a putut încărca istoricul conversației.",
-      "rename": "Redenumește",
       "leave": "Părăsește",
       "untitledConversation": "Conversație fără titlu",
       "createFailed": "Nu s-a putut crea conversația.",
       "leaveFailed": "Nu s-a putut părăsi conversația."
     },
     "reactions": {
-      "title": "Reacții",
-      "close": "Închide reacțiile",
-      "recent": "Recente",
       "common": "Frecvente",
       "reactWith": "Reacționează cu {{reaction}}",
       "accessibility": "Reacție {{emoji}}, {{displayCount}}"
@@ -803,7 +826,6 @@
       "addReactionFailed": "Nu s-a putut adăuga reacția.",
       "retrySend": "Reîncearcă trimiterea",
       "moreReactions": "Mai multe reacții",
-      "reply": "Răspunde",
       "edit": "Editează",
       "sendFailed": "Nu s-a putut trimite mesajul.",
       "retrySendFailed": "Nu s-a putut retrimite mesajul.",
@@ -814,7 +836,6 @@
       "takePhoto": "Fă o fotografie",
       "photoLibrary": "Galerie foto",
       "files": "Fișiere",
-      "cameraAccessDisabled": "Acces la cameră dezactivat",
       "cameraAccessMessage": "Permite accesul la cameră în Setări pentru a face o fotografie."
     },
     "typingIndicator": {
@@ -825,8 +846,6 @@
       "typing_few": "{{names}} scriu..."
     },
     "botStatus": {
-      "online": "Conectat",
-      "idle": "Inactiv",
       "offline": "Deconectat",
       "loadingUser": "Se încarcă utilizatorul…",
       "waitingForStatus": "Se așteaptă starea botului…",
@@ -840,7 +859,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Nu s-au putut încărca instanțele KiloClaw.",
     "billing": {
       "title": "Facturare",
@@ -848,7 +866,6 @@
       "plan": "Planul",
       "finalTermEnds": "Ultima perioadă contractuală se încheie",
       "afterFinalTerm": "După ultima perioadă contractuală",
-      "remaining": "Rămas",
       "lessThanOneDay": "Mai puțin de 1 zi",
       "ends": "Se încheie",
       "expires": "Expiră",
@@ -949,20 +966,15 @@
       "disconnect": "Deconectează contul Google",
       "copied": "Copiat",
       "copyCommand": "Copiază comanda",
-      "disabled": "Dezactivat",
       "disconnectConfirm": "Deconectează",
       "disconnectMessage": "Elimini contul Google din această instanță? Notificările Gmail vor fi dezactivate. După deconectare, reimplementează instanța pentru a aplica modificările.",
       "disconnectTitle": "Deconectare de la Google"
     },
     "modelList": {
-      "title": "Toate modelele",
       "searchPlaceholder": "Căutare modele",
-      "clearSearch": "Șterge căutarea",
       "noMatches": "Niciun model nu corespunde căutării tale",
-      "noModels": "Niciun model disponibil",
       "noModelsDescription": "Modelele vor apărea aici când vor fi disponibile.",
-      "noResultsFor": "Nu există rezultate pentru „{{query}}”.",
-      "recommended": "Recomandate"
+      "noResultsFor": "Nu există rezultate pentru „{{query}}”."
     },
     "secrets": {
       "title": "Secrete",
@@ -980,8 +992,7 @@
       "setupGuide": "ghid de configurare",
       "saving": "Se salvează…",
       "removing": "Se elimină…",
-      "updateToken": "Actualizează tokenul",
-      "connect": "Conectează"
+      "updateToken": "Actualizează tokenul"
     },
     "versionPin": {
       "title": "Fixarea versiunii",
@@ -1028,7 +1039,6 @@
       "finishingSetup": "Se finalizează configurarea",
       "finishingSetupDescription": "Așteaptă puțin, finalizăm configurarea contului tău. De obicei durează doar câteva clipe.",
       "getStarted": "Începe",
-      "noInstances": "Nicio instanță KiloClaw",
       "noInstancesDescription": "Creează prima ta instanță pentru a rula agenți de programare."
     },
     "instance": {
@@ -1052,7 +1062,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Discută cu {{name}}",
-        "online": "Conectat",
         "ready": "{{name}} este gata",
         "warmedUp": "Totul este pregătit. Trimite un salut când ești gata."
       },
@@ -1149,9 +1158,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "De vârf",
       "frontierDescription": "Performanță maximă. Direcționează cererile către modele de vârf cu capacități de raționament.",
-      "balancedLabel": "Echilibrat",
       "balancedDescription": "Oferă un echilibru între viteză și performanță, la un cost mai mic.",
-      "performance": "Performanță",
       "autoModelA11y": "model automat {{label}}",
       "currentModel": "Modelul curent",
       "browseAllModels": "sau alege dintre peste 500 de modele",
@@ -1185,7 +1192,6 @@
       "openUnread_one": "Deschide {{name}}, {{displayCount}} mesaj necitit",
       "openUnread": "Deschide {{name}}, {{displayCount}} de mesaje necitite",
       "openUnread_other": "Deschide {{name}}, {{displayCount}} de mesaje necitite",
-      "open": "Deschide {{name}}",
       "openSettings": "Deschide setările pentru {{name}}",
       "fixOnKiloAi": "Rezolvă pe kilo.ai: {{label}}",
       "openUnread_few": "Deschide {{name}}, {{displayCount}} mesaje necitite"
@@ -1272,7 +1278,6 @@
       "title": "Revizuire",
       "cancelTitle": "Anulezi revizuirea?",
       "cancelMessage": "Revizuirea codului aflată în curs se va opri.",
-      "keepRunning": "Continuă rularea",
       "cancelReview": "Anulează revizuirea",
       "retryTitle": "Reîncerci revizuirea?",
       "retryMessage": "Revizuirea codului va fi efectuată din nou.",
@@ -1282,13 +1287,11 @@
       "byline": "{{repo}} #{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
       "showMore": "Afișează mai mult",
-      "branch": "Ramură",
       "created": "Creată",
       "started": "Începută",
       "completed": "Finalizat",
       "tokens": "Tokenuri",
       "tokensInOut": "{{input}} intrare / {{output}} ieșire",
-      "openPullRequest": "Deschidere PR",
       "council": "Consiliu",
       "decision": "Decizie",
       "gate": "Control de calitate",
@@ -1316,8 +1319,6 @@
     },
     "reviewMemory": {
       "title": "Memoria revizuirilor",
-      "couldNotLoadMore": "Nu s-au putut încărca mai multe elemente.",
-      "retryLoadingMore": "Încearcă din nou să încarci mai multe elemente",
       "loading": "Se încarcă memoria de revizuire",
       "couldNotLoad": "Nu s-a putut încărca memoria de revizuire.",
       "off": "Memoria de revizuire este dezactivată.",
@@ -1356,15 +1357,11 @@
       "setup": "Configurare Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket conectat",
-      "title": "Conectează Bitbucket",
       "description": "Creează un token de acces pentru spațiul de lucru, cu permisiunile necesare, și lipește-l mai jos.",
       "scopes": "Cont: citire · Depozite: citire/scriere · PR-uri: citire · Webhook-uri: citire/scriere",
-      "tokenPlaceholder": "Token de acces la spațiul de lucru",
-      "connect": "Conectează"
+      "tokenPlaceholder": "Token de acces la spațiul de lucru"
     },
     "scopeList": {
-      "couldNotLoad": "Nu s-au putut încărca organizațiile.",
       "personalStillAvailable": "Depozitele personale sunt în continuare disponibile mai jos.",
       "personalSubtitle": "Depozitele tale de cod",
       "viewOnly": "Doar vizualizare"
@@ -1387,7 +1384,6 @@
       "githubApp": "aplicația GitHub",
       "githubError": "Nu s-a putut deschide configurarea GitHub. Încearcă din nou.",
       "gitlabAccount": "contul GitLab",
-      "connectGitLab": "Conectează GitLab",
       "gitlabError": "Nu s-a putut deschide configurarea GitLab. Încearcă din nou.",
       "description": "Conectează {{label}} la Kilo pentru a revizui automat PR-urile.",
       "bitbucketError": "Nu s-a putut deschide configurarea Bitbucket. Încearcă din nou."
@@ -1412,21 +1408,17 @@
     "updateFailed": "Nu s-a putut actualiza agentul de revizuire a codului.",
     "configSaveFailed": "Nu s-a putut salva configurația revizuirii.",
     "status": {
-      "pending": "În așteptare",
       "running": "Rulează",
       "completed": "Finalizat",
-      "failed": "Eșec",
       "interrupted": "Întreruptă"
     },
     "reviewStyle": {
       "strict": "Exigent",
-      "balanced": "Echilibrat",
       "lenient": "Îngăduitor",
       "roast": "Critică acidă"
     },
     "focusArea": {
       "security": "Securitate",
-      "performance": "Performanță",
       "bugs": "Erori",
       "style": "Stil",
       "testing": "Testare",
@@ -1477,7 +1469,6 @@
       "statusOpen": "Deschidere",
       "fixed": "Remediată",
       "statusIgnored": "Ignorată",
-      "statusClosed": "Închis",
       "severityHigh": "Ridicat",
       "severityMedium": "Mediu",
       "severityLow": "Scăzut",
@@ -1665,7 +1656,6 @@
       "title": "Setări",
       "couldNotLoadSettings": "Nu s-au putut încărca setările agentului de securitate.",
       "couldNotLoadPermissions": "Nu s-au putut încărca permisiunile.",
-      "disabled": "Dezactivat",
       "on": "Activat",
       "repositoriesCount_one": "{{displayCount}} depozit selectat",
       "repositoriesCount": "{{displayCount}} de depozite de cod selectate",
@@ -1694,7 +1684,6 @@
       "retry": "Reîncearcă remedierea",
       "cancelTitle": "Anulezi această remediere?",
       "cancelMessage": "Agentul de securitate va opri încercarea de remediere în curs.",
-      "keepRunning": "Continuă rularea",
       "cancelRemediation": "Anulează remedierea",
       "openPullRequest": "Deschide PR-ul{{number}}",
       "openDraftPullRequest": "Deschide PR-ul în stadiu de schiță{{number}}",
@@ -1702,7 +1691,6 @@
       "attemptHistory": "Istoricul încercărilor ({{displayCount}})",
       "attemptNumber": "Încercarea nr. {{number}}",
       "startedBy": "Inițiată de",
-      "branch": "Ramură",
       "queued": "Remediere în așteptare",
       "retryQueued": "O nouă încercare de remediere este în așteptare",
       "timeline": {
@@ -1758,11 +1746,9 @@
       "noMatchesTitle": "Nicio constatare nu corespunde filtrelor",
       "noMatchesDescription": "Încearcă să modifici sau să elimini filtrele selectate.",
       "emptyTitle": "Nicio constatare deschisă",
-      "emptyDescription": "Nicio constatare deschisă nu necesită atenție în acest moment.",
-      "clearFilters": "Resetează filtrele"
+      "emptyDescription": "Nicio constatare deschisă nu necesită atenție în acest moment."
     },
     "scopeList": {
-      "couldNotLoad": "Nu s-au putut încărca organizațiile.",
       "personalSubtitle": "Depozitele tale de cod"
     },
     "findingRow": {
@@ -1921,7 +1907,6 @@
       "draftPrOpened": "PR deschis în stadiu de schiță",
       "prOpened": "PR deschis",
       "blocked": "Blocată",
-      "failed": "Eșec",
       "noChangesNeeded": "Nu sunt necesare modificări",
       "originAutomaticPolicy": "Regulă de automatizare",
       "originIncludeExistingPolicy": "Regulă de includere a constatărilor existente",
@@ -1975,12 +1960,9 @@
     "search": {
       "searching": "Se caută",
       "searchSessions": "Căutare sesiuni",
-      "searchSessionsPlaceholder": "Căutare sesiuni",
-      "clearSearch": "Șterge căutarea",
-      "clearFilters": "Resetează filtrele"
+      "searchSessionsPlaceholder": "Căutare sesiuni"
     },
     "sessionList": {
-      "couldNotLoad": "Nu s-au putut încărca sesiunile.",
       "couldNotLoadActive": "Nu s-au putut încărca sesiunile active.",
       "noSessionsYetDescription": "Începe o sarcină de programare de pe telefon. Sesiunile tale vor apărea aici.",
       "noMatches": "Nicio sesiune nu corespunde filtrelor",
@@ -1996,7 +1978,6 @@
       "deleteTitle": "Ștergi sesiunea?",
       "deleteMessage": "Această acțiune nu poate fi anulată.",
       "deleteSession": "Șterge sesiunea",
-      "rename": "Redenumește",
       "renameMessage": "Introdu un nume nou pentru această sesiune.",
       "copyId": "Copiază ID-ul sesiunii",
       "idCopied": "ID-ul sesiunii a fost copiat",
@@ -2048,7 +2029,6 @@
       "accessDeniedDescription": "Nu ai permisiunea să vizualizezi acest conținut.",
       "couldNotLoad": "Nu s-a putut încărca sesiunea.",
       "failedToLoadDetails": "Nu s-au putut încărca detaliile sesiunii.",
-      "notFound": "Elementul nu a fost găsit.",
       "notFoundDescription": "Este posibil ca acest element să fi fost eliminat sau să nu mai fie disponibil.",
       "failedToStopExecution": "Nu s-a putut opri execuția.",
       "renameSession": "Redenumește sesiunea",
@@ -2092,7 +2072,6 @@
       "retryConnection": "Încearcă din nou conectarea"
     },
     "newSession": {
-      "title": "Sesiune nouă",
       "connectGithubDescription": "Conectează contul GitHub în browser, apoi revino aici pentru a alege un depozit.",
       "openGithub": "Deschide GitHub",
       "refreshRepositories": "Reîmprospătează depozitele",
@@ -2119,13 +2098,9 @@
       "couldNotRefreshRepositories": "Nu s-au putut reîmprospăta depozitele. Încearcă din nou.",
       "discardDraftTitle": "Renunți la ciornă?",
       "discardDraftMessage": "Instrucțiunile tale se vor pierde.",
-      "keepEditing": "Continuă editarea",
       "discardFailed": "Nu s-a putut șterge ciorna. Încearcă din nou.",
       "remoteHint": "Rulează `kilo remote` pe computerul tău sau `/remote` într-o sesiune CLI activă pentru a controla un proces kilo local.",
-      "bitbucketConnected": "Bitbucket conectat",
-      "connectBitbucket": "Conectează Bitbucket",
       "connectBitbucketDescription": "Conectează contul Bitbucket în browser, apoi revino aici pentru a alege un depozit.",
-      "connectGitlab": "Conectează GitLab",
       "connectGitlabDescription": "Conectează contul GitLab în browser, apoi revino aici pentru a alege un depozit.",
       "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket.",
       "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
@@ -2156,7 +2131,6 @@
       "accessibilityLabel": "Instrumentul {{name}}, {{status}}",
       "fileEmpty": "Acest fișier este gol.",
       "noTasks": "Nu există sarcini.",
-      "contentTruncated": "Conținut trunchiat",
       "truncated": "Trunchiat",
       "toolRead": "citire",
       "toolEdit": "Editează",
@@ -2229,8 +2203,7 @@
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",
       "loading": "Se încarcă...",
       "accessibility": "Depozit: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Detaliile mesajului",
@@ -2252,8 +2225,7 @@
       "cacheWrite": "Scriere în cache",
       "total": "În total",
       "reportAiResponseFailedRetryable": "Nu s-a putut raporta acest răspuns.",
-      "reportAiResponseFailedTerminal": "Acest răspuns nu poate fi raportat.",
-      "reportAiResponseSubmitted": "Sesizare trimisă. Număr de înregistrare: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Acest răspuns nu poate fi raportat."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2292,10 +2264,8 @@
       "viewImageWithAlt": "Vezi imaginea {{alt}}",
       "imageOutput": "Imagine rezultată",
       "imageOutputWithFilename": "Imagine rezultată, {{filename}}",
-      "defaultName": "Fișier",
       "openFullScreen": "Deschide {{name}} pe ecran complet",
       "preview": "Previzualizează {{name}}",
-      "openFile": "Deschide {{name}}",
       "couldNotLoadFile": "Nu s-a putut încărca acest fișier.",
       "couldNotLoadFileRetry": "Nu s-a putut încărca acest fișier. Încearcă din nou.",
       "retryLoadingFile": "Reîncearcă încărcarea fișierului",
@@ -2434,11 +2404,8 @@
     "modelPicker": {
       "title": "Model",
       "searchPlaceholder": "Căutare modele",
-      "allModels": "Toate modelele",
       "favorites": "Favorite",
-      "noModels": "Niciun model disponibil",
-      "noModelsDescription": "Nu este disponibil niciun model.",
-      "recommended": "Recomandate"
+      "noModelsDescription": "Nu este disponibil niciun model."
     },
     "modelSelector": {
       "provider": "Furnizor {{id}}",
@@ -2476,7 +2443,6 @@
       "camera": "Cameră",
       "photoLibrary": "Galerie foto",
       "files": "Fișiere",
-      "cameraAccessDisabled": "Acces la cameră dezactivat",
       "cameraAccessMessage": "Permite accesul la cameră în Setări pentru a face o fotografie.",
       "couldNotOpenPhotoPicker": "Selectorul de fotografii nu a putut fi deschis. Repornește Kilo și încearcă din nou.",
       "maxFilesAllowed": "Poți adăuga cel mult {{displayCount}} fișiere.",
@@ -2504,9 +2470,7 @@
     },
     "chatLink": {
       "linkCopied": "Link copiat",
-      "reviewPr": "Revizuiește PR-ul",
       "openLink": "Deschide linkul",
-      "copyLink": "Copiază linkul",
       "shareLink": "Partajează linkul",
       "share": "Partajează",
       "prLinkActions": "Acțiuni pentru linkul PR",
@@ -2552,7 +2516,6 @@
       "tokensUsage": "Context: {{used}} din {{window}} tokenuri, {{percentage}} utilizat",
       "title": "Utilizarea contextului",
       "used": "Folosit",
-      "remaining": "Rămas",
       "provider": "Furnizor",
       "totalCost": "Cost total",
       "usageReflectsLatest": "Datele de utilizare corespund celui mai recent răspuns finalizat al asistentului.",
@@ -2619,7 +2582,6 @@
     "billingPage": "pagina de facturare"
   },
   "deviceSessions": {
-    "couldNotLoad": "Nu s-au putut încărca sesiunile.",
     "couldNotLoadDescription": "Sesiunile tale active nu pot fi afișate până la încărcarea datelor.",
     "currentDeviceUnidentified": "Nu s-a putut identifica dispozitivul curent.",
     "noSessions": "Nicio sesiune activă",
@@ -2627,7 +2589,6 @@
     "onlyKiloAppSignIns": "Doar autentificările din aplicația Kilo apar aici. Autentificările din editor și CLI nu sunt listate.",
     "signedIn": "Autentificare: {{signedIn}} · Ultima activitate: {{lastSeen}}",
     "thisDevice": "Acest dispozitiv",
-    "title": "Sesiuni pe dispozitive",
     "viewProfile": "Vezi profilul",
     "signOutThisDevice": "Deconectează acest dispozitiv",
     "signOutThisSession": "Deconectează această sesiune",
@@ -2660,11 +2621,9 @@
   },
   "invalidRoute": {
     "description": "Acest link nu mai este valabil.",
-    "goBack": "Înapoi",
     "title": "Pagina nu a fost găsită"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Conținut trunchiat",
     "truncated": "Trunchiat",
     "wrap": "Încadrare",
     "scroll": "Derulare"
@@ -2677,15 +2636,13 @@
     "neutralDescription": "Încearcă din nou.",
     "offlineTitle": "Încărcarea a eșuat.",
     "permissionDescription": "Nu ai permisiunea să vizualizezi acest conținut.",
-    "notFoundTitle": "Elementul nu a fost găsit.",
     "notFoundDescription": "Este posibil ca acest element să fi fost eliminat sau să nu mai fie disponibil.",
     "serverTitle": "Nu s-au putut încărca datele.",
     "serverDescription": "A apărut o problemă pe server. Încearcă din nou."
   },
   "screenHeader": {
     "openMenu": "Deschide meniul",
-    "openMenuFor": "Deschide meniul pentru {{title}}",
-    "goBack": "Înapoi"
+    "openMenuFor": "Deschide meniul pentru {{title}}"
   },
   "picker": {
     "optionsExpired": "Opțiunile au expirat",
@@ -2716,9 +2673,7 @@
   },
   "share": {
     "title": "Distribuire către Kilo",
-    "reviewPr": "Revizuiește PR-ul",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Sesiune nouă",
     "searchPlaceholder": "Căutare în sesiunile recente",
     "connectedCli": "Pe un CLI conectat",
     "newSessionOn": "Sesiune nouă pe {{name}}",
@@ -2776,7 +2731,6 @@
     "statusCanceling": "Kilo Pass în curs de anulare",
     "statusPastDue": "Kilo Pass cu plată restantă",
     "monthlyCredits": "{{credits}} credite lunare",
-    "ends": "Se încheie la {{date}}",
     "periodEnd": "sfârșitul perioadei",
     "managedOnGooglePlay": "Gestionat prin Google Play",
     "managedInAppStore": "Gestionat în App Store",
@@ -2788,7 +2742,6 @@
     "unavailableDescription": "Kilo Pass nu este disponibil ca achiziție în aplicație pe Android. Gestionează-l pe site.",
     "webManagementDescription": "Acest Kilo Pass este gestionat pe site.",
     "legalDisclosure": "Kilo Pass este un abonament lunar cu reînnoire automată. Plata se debitează din contul tău Apple ID la confirmarea achiziției. Abonamentul se reînnoiește automat în fiecare lună la prețul afișat, dacă nu îl anulezi cu cel puțin 24 de ore înainte de sfârșitul perioadei curente. Poți gestiona sau anula abonamentul oricând din setările contului tău App Store.",
-    "legalPrivacyPolicy": "Politica de confidențialitate",
     "legalTermsOfUse": "Condiții de utilizare (EULA)",
     "purchaseDifferentAccount": "Această achiziție din App Store nu este asociată contului tău Kilo. Autentifică-te în Apple Account folosit la achiziție, apoi încearcă din nou.",
     "restoreFailed": "Nu s-au putut restabili achizițiile. Încearcă din nou.",
@@ -2919,7 +2872,6 @@
     },
     "inviteMember": {
       "emailError": "Introdu o adresă de e-mail validă.",
-      "emailLabel": "E-mail",
       "emailPlaceholder": "nume@companie.com",
       "permissionDenied": "Nu ai permisiunea de a invita membri.",
       "roleLabel": "Rol",
@@ -2989,7 +2941,6 @@
         "billingManager": "Manager de facturare"
       },
       "emailStatusFailed": "Trimiterea e-mailului a eșuat",
-      "emailStatusPending": "În așteptare",
       "inviteCreated": "Invitație creată",
       "pendingInvitations": "Invitații în așteptare",
       "resendInvite": "Retrimite invitația",
@@ -3014,7 +2965,6 @@
       "couldNotLoadStatus": "Starea nu a putut fi încărcată",
       "creditProcessingDelayed": "Procesarea creditelor întârzie · se reîncearcă automat",
       "ended": "Încheiat",
-      "endsOn": "Se încheie la {{date}}",
       "manageHint": "Deschide pagina de gestionare Kilo Pass pe site.",
       "notSubscribed": "Fără abonament",
       "overallocated": "Numărul de atribuiri Kilo Pass depășește numărul de locuri plătite",
@@ -3025,7 +2975,6 @@
       "paymentPending": "Plată în așteptare",
       "processingBlocked": "Procesare blocată",
       "processingNeedsReview": "Procesarea necesită verificare",
-      "retry": "Reîncearcă",
       "retryHint": "Reîncearcă încărcarea stării Kilo Pass.",
       "setupHint": "Deschide configurarea Kilo Pass pe web.",
       "paidSeat_few": "{{displayCount}} locuri plătite"
@@ -3079,7 +3028,6 @@
     "backToPreferences": "Înapoi la preferințe"
   },
   "quickChat": {
-    "title": "Conversații",
     "empty": {
       "title": "Începe o conversație",
       "description": "Trimite un mesaj pentru a vorbi cu un model."
@@ -3098,7 +3046,6 @@
     "openAgents": "Deschide agenții",
     "running": "În lucru",
     "needsInput": "așteaptă un răspuns",
-    "idle": "Inactiv",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
   }

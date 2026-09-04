@@ -69,7 +69,7 @@ const REMEDIATION_STATUS_KEYS = {
   draftPrOpened: 'securityAgent.remediationStatus.draftPrOpened',
   prOpened: 'securityAgent.remediationStatus.prOpened',
   blocked: 'securityAgent.remediationStatus.blocked',
-  failed: 'securityAgent.remediationStatus.failed',
+  failed: 'common.failed',
   noChangesNeeded: 'securityAgent.remediationStatus.noChangesNeeded',
   cancelled: 'common.cancelled',
 } as const satisfies Record<string, string>;
@@ -350,7 +350,7 @@ export function FindingRemediationPanel({
               t('securityAgent.remediation.cancelTitle'),
               t('securityAgent.remediation.cancelMessage'),
               [
-                { text: t('securityAgent.remediation.keepRunning'), style: 'cancel' },
+                { text: t('common.keepRunning'), style: 'cancel' },
                 {
                   text: t('securityAgent.remediation.cancelRemediation'),
                   style: 'destructive',
@@ -474,12 +474,7 @@ export function FindingRemediationPanel({
                     value={attempt.remediationModelSlug}
                     selectable
                   />
-                  <KvRow
-                    label={t('securityAgent.remediation.branch')}
-                    value={attempt.branchName}
-                    last
-                    selectable
-                  />
+                  <KvRow label={t('common.branch')} value={attempt.branchName} last selectable />
                   {outcome ? (
                     <Text variant="muted" className="text-xs" selectable>
                       {outcome}

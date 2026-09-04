@@ -70,7 +70,7 @@ function titleForClass(cls: TerminalErrorClass): string {
     return i18n.t('common.accessDenied');
   }
   if (cls === 'gone') {
-    return i18n.t('agentChat.session.notFound');
+    return i18n.t('common.notFound');
   }
   return i18n.t('agentChat.session.couldNotLoadThisSession');
 }

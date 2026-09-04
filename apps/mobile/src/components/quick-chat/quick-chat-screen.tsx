@@ -258,11 +258,7 @@ function ScopedQuickChatScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('quickChat.title')}
-        showBackButton={false}
-        context={<ContextControl />}
-      />
+      <ScreenHeader title={t('common.chat')} showBackButton={false} context={<ContextControl />} />
       {keyboardContainerKind === 'app-aware-padding' ? (
         <AppAwareKeyboardPaddingView className="flex-1">
           {renderKeyboardBody()}

@@ -20,7 +20,7 @@ type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
 
 type PrStateChipLabelKey =
   | 'prReview.overview.stateMerged'
-  | 'prReview.overview.stateClosed'
+  | 'common.closed'
   | 'common.draft'
   | 'prReview.overview.stateOpenApproved'
   | 'prReview.overview.stateOpenChangesRequested'
@@ -42,7 +42,7 @@ export function describePrState(args: {
     return { labelKey: 'prReview.overview.stateMerged', tone: 'muted', icon: GitMerge };
   }
   if (args.state === 'closed') {
-    return { labelKey: 'prReview.overview.stateClosed', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'common.closed', tone: 'muted', icon: GitPullRequest };
   }
   if (args.draft) {
     return { labelKey: 'common.draft', tone: 'muted', icon: GitPullRequest };

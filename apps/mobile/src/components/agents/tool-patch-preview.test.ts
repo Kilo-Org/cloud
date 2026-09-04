@@ -170,7 +170,7 @@ describe('ToolPatchPreview', () => {
     const truncatedLabel = texts.find(
       el =>
         (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
-        'monoScrollBlock.contentTruncated'
+        'common.contentTruncated'
     );
     expect(truncatedLabel).toBeDefined();
     if (!truncatedLabel) {
@@ -187,7 +187,7 @@ describe('ToolPatchPreview', () => {
     const truncatedLabel = texts.find(
       el =>
         (el.props as { accessibilityLabel?: string }).accessibilityLabel ===
-        'monoScrollBlock.contentTruncated'
+        'common.contentTruncated'
     );
     expect(truncatedLabel).toBeUndefined();
   });

@@ -33,7 +33,7 @@ const VARIANT_META_KEYS = {
     description: 'queryError.permissionDescription',
   },
   'not-found': {
-    title: 'queryError.notFoundTitle',
+    title: 'common.notFound',
     description: 'queryError.notFoundDescription',
   },
   server: { title: 'queryError.serverTitle', description: 'queryError.serverDescription' },

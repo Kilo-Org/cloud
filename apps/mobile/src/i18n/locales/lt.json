@@ -69,7 +69,58 @@
     "repository": "Saugykla",
     "signOut": "Atsijungti",
     "agents": "Agentai",
-    "all": "Visi"
+    "all": "Visi",
+    "allModels": "Visi modeliai",
+    "balanced": "Subalansuotas",
+    "bitbucketConnected": "Bitbucket prijungtas",
+    "branch": "Šaka",
+    "cameraAccessDisabled": "Neleidžiama naudoti kameros",
+    "chat": "Pokalbis",
+    "clearFilters": "Išvalyti filtrus",
+    "clearSearch": "Išvalyti paiešką",
+    "closed": "Uždaryta",
+    "closeReactions": "Uždaryti reakcijas",
+    "connect": "Prijungti",
+    "connectBitbucket": "Prijungti Bitbucket",
+    "connectGitlab": "Prijungti GitLab",
+    "contentTruncated": "Turinys sutrumpintas",
+    "copyLink": "Kopijuoti nuorodą",
+    "couldNotLoadOrganizations": "Nepavyko įkelti organizacijų.",
+    "couldNotLoadSessions": "Nepavyko įkelti sesijų.",
+    "couldnTLoadMore": "Nepavyko įkelti daugiau.",
+    "deviceSessions": "Įrenginių sesijos",
+    "disabled": "Išjungta",
+    "email": "El. paštas",
+    "ends": "Baigiasi {{date}}",
+    "failed": "Nepavyko",
+    "file": "Failas",
+    "gitlab": "GitLab",
+    "goBack": "Grįžti",
+    "idle": "Laukia",
+    "keepEditing": "Tęsti redagavimą",
+    "keepRunning": "Tęsti vykdymą",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Nauja sesija",
+    "noKiloclawInstances": "Nėra KiloClaw egzempliorių",
+    "noModelsAvailable": "Nėra modelių",
+    "notFound": "Nerasta.",
+    "online": "Prisijungęs",
+    "open": "Atidaryti {{name}}",
+    "openPullRequest": "Atidaryti pakeitimų užklausą",
+    "pending": "Laukiama",
+    "performance": "Našumas",
+    "preferences": "Nuostatos",
+    "privacyPolicy": "Privatumo politika",
+    "profile": "Profilis",
+    "reactions": "Reakcijos",
+    "recent": "Naujausi",
+    "recommended": "Rekomenduojami",
+    "remaining": "Liko",
+    "rename": "Pervadinti",
+    "reply": "Atsakyti",
+    "reportSubmittedReceipt": "Pranešimas pateiktas. Patvirtinimo numeris: {{receiptId}}.",
+    "retryLoadingMore": "Dar kartą bandyti įkelti daugiau",
+    "reviewPr": "Peržiūrėti PR"
   },
   "language": {
     "title": "Kalba",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Nepavyko paleisti iš naujo",
     "languageSaved": "Pasirinkta kalba išsaugota.",
     "catalogLoadFailed": "Nepavyko įkelti kalbos. Bandyk dar kartą.",
-    "retry": "Bandyti dar kartą",
     "search": "Kalbų paieška",
     "noMatches": "Atitinkančių kalbų nerasta",
     "deviceLanguage": "Įrenginio kalba",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Prisijungimo kodas: {{code}}",
     "openSignInPageInBrowser": "Atidaryti prisijungimo puslapį naršyklėje",
     "copySignInLink": "Kopijuoti prisijungimo nuorodą",
-    "copyLink": "Kopijuoti nuorodą",
     "cancelSignIn": "Atšaukti prisijungimą",
     "startingSignIn": "Pradedamas prisijungimas...",
     "organizationUsesSso": "Tavo organizacija naudoja bendrąjį prisijungimą.",
@@ -112,7 +161,6 @@
     "terms": "sąlygomis",
     "termsConnector": " ir ",
     "termsSuffix": ".",
-    "privacyPolicy": "Privatumo politika",
     "moreSignInOptions": "Daugiau prisijungimo parinkčių",
     "couldNotCompleteSignIn": "Nepavyko užbaigti prisijungimo. Bandyk dar kartą.",
     "sessionEnded": "Tavo sesija baigėsi. Prisijunk dar kartą.",
@@ -126,7 +174,6 @@
     "or": "arba"
   },
   "profile": {
-    "title": "Profilis",
     "codeReviewerSubtitle": "Automatinės PR peržiūros",
     "securityAgentSubtitle": "Rasti ir pašalinti pažeidžiamumus",
     "reviews": "Peržiūros",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Susietos paskyros",
     "couldNotLoadAccounts": "Nepavyko įkelti paskyrų.",
     "app": "Programėlė",
-    "preferences": "Nuostatos",
     "preferencesSubtitle": "Išvaizda, pranešimai, mąstymas ir ekrano elgsena",
-    "deviceSessions": "Įrenginių sesijos",
     "deviceSessionsSubtitle": "Peržiūrėti kitus įrenginius ir juose atsijungti",
     "feedback": "Atsiliepimai",
     "privacyChoices": "Privatumo nuostatos",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "El. paštas",
     "providerTestAccount": "Bandomoji paskyra",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Įmonės SSO"
   },
   "preferences": {
-    "title": "Nuostatos",
     "autoExpandThinking": "Automatiškai išskleisti mąstymą",
     "autoExpandThinkingSubtitle": "Baigus mąstyti, automatiškai išskleisti agento mąstymo tekstą.",
     "keepScreenOn": "Neišjungti ekrano sesijos puslapyje",
@@ -364,7 +406,6 @@
       "unresolveThread": "Pažymėti giją kaip neišspręstą",
       "resolved": "Išspręsta",
       "outdated": "Pasenę",
-      "file": "Failas",
       "comment_one": "1 komentaras",
       "comment": "{{displayCount}} komentarų",
       "comment_other": "{{displayCount}} komentarų",
@@ -372,8 +413,6 @@
       "couldNotLoadMore": "Nepavyko įkelti daugiau komentarų.",
       "retryLoadingMore": "Bandyti įkelti daugiau komentarų dar kartą",
       "loadMoreComments": "Įkelti daugiau komentarų",
-      "closeReactions": "Uždaryti reakcijas",
-      "reactionsTitle": "Reakcijos",
       "addReaction": "Pridėti reakciją",
       "reactionPill": "{{emoji}} reakcija, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakcija",
@@ -384,13 +423,11 @@
       "reportUser": "Pranešti apie naudotoją",
       "mute": "Nutildyti",
       "block": "Blokuoti",
-      "reportSubmitted": "Pranešimas pateiktas. Patvirtinimo numeris: {{receiptId}}.",
       "blockedUser": "Užblokuotas naudotojas {{login}}",
       "mutedUser": "Nutildytas naudotojas {{login}}",
       "replyPlaceholder": "Atsakymas…",
       "replyBody": "Atsakymo tekstas",
       "submitReply": "Pateikti atsakymą",
-      "reply": "Atsakyti",
       "termsTitle": "Paslaugų teikimo sąlygos",
       "termsCopy": "Kad galėtum skelbti, tau turi būti bent 13 metų.",
       "termsAcceptRetry": "Nepavyko patvirtinti sutikimo su sąlygomis. Patikrink ryšį ir bandyk dar kartą.",
@@ -476,8 +513,7 @@
       "urlAccessibility": "GitHub pakeitimų užklausos URL",
       "clearLink": "Išvalyti pakeitimų užklausos nuorodą",
       "pasteLink": "Įklijuoti pakeitimų užklausos nuorodą",
-      "open": "Atidaryti",
-      "openPullRequest": "Atidaryti pakeitimų užklausą"
+      "open": "Atidaryti"
     },
     "checks": {
       "title": "Patikrinimai",
@@ -497,13 +533,10 @@
     },
     "inbox": {
       "title": "Gautos užklausos",
-      "recent": "Naujausi",
       "loading": "Įkeliamos gautos užklausos",
       "noReviewRequests": "Nėra prašymų peržiūrėti",
       "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos. Viršuje taip pat gali įklijuoti bet kurio PR nuorodą.",
-      "couldNotLoad": "Nepavyko įkelti gautų užklausų.",
-      "couldNotLoadMore": "Nepavyko įkelti daugiau.",
-      "retryLoadingMore": "Dar kartą bandyti įkelti daugiau"
+      "couldNotLoad": "Nepavyko įkelti gautų užklausų."
     },
     "composer": {
       "commentBodyPlaceholder": "Komentaras",
@@ -518,7 +551,6 @@
       "loadFailedTitle": "Nepavyko įkelti komentaro rengyklės.",
       "discardTitle": "Atmesti komentarą?",
       "discardMessage": "Tavo juodraštis bus prarastas.",
-      "keepEditing": "Tęsti redagavimą",
       "comment": "Komentuoti",
       "insertSuggestionA11y": "Įterpti kodo pakeitimo pasiūlymą",
       "insertSuggestion": "Įterpti pasiūlymą",
@@ -567,7 +599,6 @@
     },
     "overview": {
       "stateMerged": "Sujungta",
-      "stateClosed": "Uždaryta",
       "stateOpenApproved": "Atvira · Patvirtinta",
       "stateOpenChangesRequested": "Atvira · Prašoma pakeitimų",
       "stateOpenReviewRequired": "Atvira · Reikia peržiūros",
@@ -696,17 +727,13 @@
   },
   "tabs": {
     "home": "Pradžia",
-    "profile": "Profilis",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, skirtukas, {{position}} iš {{total}}",
-    "chat": "Pokalbis"
+    "position": "{{name}}, skirtukas, {{position}} iš {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Egzemplioriaus pasirinkimas",
       "couldNotLoadInstances": "Nepavyko įkelti egzempliorių.",
-      "noInstances": "Nėra KiloClaw egzempliorių",
       "noInstancesDescription": "Paruošk egzempliorių, kad galėtum pradėti pokalbį.",
       "setUpKiloclaw": "Paruošti KiloClaw",
       "currentInstance": "{{title}}, dabartinis"
@@ -728,16 +755,12 @@
       "couldNotSignIn": "Nepavyko prisijungti prie pokalbio.",
       "couldNotRefreshMessages": "Nepavyko atnaujinti žinučių.",
       "couldNotLoadHistory": "Nepavyko įkelti pokalbio istorijos.",
-      "rename": "Pervadinti",
       "leave": "Išeiti",
       "untitledConversation": "Pokalbis be pavadinimo",
       "createFailed": "Nepavyko sukurti pokalbio.",
       "leaveFailed": "Nepavyko išeiti iš pokalbio."
     },
     "reactions": {
-      "title": "Reakcijos",
-      "close": "Uždaryti reakcijas",
-      "recent": "Naujausi",
       "common": "Dažnos",
       "reactWith": "Pridėti reakciją {{reaction}}",
       "accessibility": "{{emoji}} reakcija, {{displayCount}}"
@@ -810,7 +833,6 @@
       "addReactionFailed": "Nepavyko pridėti reakcijos.",
       "retrySend": "Siųsti dar kartą",
       "moreReactions": "Daugiau reakcijų",
-      "reply": "Atsakyti",
       "edit": "Redaguoti",
       "sendFailed": "Nepavyko išsiųsti žinutės.",
       "retrySendFailed": "Nepavyko išsiųsti dar kartą.",
@@ -821,7 +843,6 @@
       "takePhoto": "Fotografuoti",
       "photoLibrary": "Nuotraukų biblioteka",
       "files": "Failai",
-      "cameraAccessDisabled": "Neleidžiama naudoti kameros",
       "cameraAccessMessage": "Jei nori fotografuoti, nustatymuose leisk naudoti kamerą."
     },
     "typingIndicator": {
@@ -833,8 +854,6 @@
       "typing_many": "{{names}} rašo..."
     },
     "botStatus": {
-      "online": "Prisijungęs",
-      "idle": "Laukia",
       "offline": "Atsijungęs",
       "loadingUser": "Įkeliami naudotojo duomenys...",
       "waitingForStatus": "Laukiama roboto būsenos...",
@@ -848,7 +867,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Nepavyko įkelti KiloClaw egzempliorių.",
     "billing": {
       "title": "Atsiskaitymai",
@@ -856,7 +874,6 @@
       "plan": "Planas",
       "finalTermEnds": "Paskutinio laikotarpio pabaiga",
       "afterFinalTerm": "Po paskutinio laikotarpio",
-      "remaining": "Liko",
       "lessThanOneDay": "Mažiau nei 1 diena",
       "ends": "Baigiasi",
       "expires": "Nustoja galioti",
@@ -957,20 +974,15 @@
       "disconnect": "Atjungti Google paskyrą",
       "copied": "Nukopijuota",
       "copyCommand": "Kopijuoti komandą",
-      "disabled": "Išjungta",
       "disconnectConfirm": "Atjungti",
       "disconnectMessage": "Pašalinti tavo Google paskyrą iš šio egzemplioriaus? Gmail pranešimai bus išjungti. Atjungęs paskyrą iš naujo įdiek egzempliorių, kad pakeitimai įsigaliotų.",
       "disconnectTitle": "Atjungti Google"
     },
     "modelList": {
-      "title": "Visi modeliai",
       "searchPlaceholder": "Modelių paieška",
-      "clearSearch": "Išvalyti paiešką",
       "noMatches": "Nėra paiešką atitinkančių modelių",
-      "noModels": "Nėra modelių",
       "noModelsDescription": "Modeliai bus rodomi čia, kai bus prieinami.",
-      "noResultsFor": "Pagal „{{query}}“ rezultatų nerasta.",
-      "recommended": "Rekomenduojami"
+      "noResultsFor": "Pagal „{{query}}“ rezultatų nerasta."
     },
     "secrets": {
       "title": "Slapti duomenys",
@@ -988,8 +1000,7 @@
       "setupGuide": "Sąrankos vadovas",
       "saving": "Išsaugoma…",
       "removing": "Šalinama…",
-      "updateToken": "Atnaujinti prieigos raktą",
-      "connect": "Prijungti"
+      "updateToken": "Atnaujinti prieigos raktą"
     },
     "versionPin": {
       "title": "Versijos fiksavimas",
@@ -1036,7 +1047,6 @@
       "finishingSetup": "Baigiama sąranka",
       "finishingSetupDescription": "Palauk, baigiame kurti tavo paskyrą. Paprastai tai užtrunka tik akimirką.",
       "getStarted": "Pradėti",
-      "noInstances": "Nėra KiloClaw egzempliorių",
       "noInstancesDescription": "Sukurk pirmąjį egzempliorių ir pradėk naudoti programavimo agentus."
     },
     "instance": {
@@ -1060,7 +1070,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Kalbėtis su {{name}}",
-        "online": "Prisijungęs",
         "ready": "{{name}} jau gali veikti",
         "warmedUp": "Viskas paruošta. Gali pasisveikinti, kai tik norėsi."
       },
@@ -1157,9 +1166,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Pažangiausi",
       "frontierDescription": "Didžiausios galimybės. Užklausos nukreipiamos į pažangiausius samprotaujančius modelius.",
-      "balancedLabel": "Subalansuotas",
       "balancedDescription": "Geras greičio ir galimybių derinys už mažesnę kainą.",
-      "performance": "Našumas",
       "autoModelA11y": "{{label}} automatinis modelis",
       "currentModel": "Dabartinis modelis",
       "browseAllModels": "arba rinkis iš daugiau nei 500 modelių",
@@ -1193,7 +1200,6 @@
       "openUnread_one": "Atidaryti {{name}}, {{displayCount}} neskaityta žinutė",
       "openUnread": "Atidaryti {{name}}, {{displayCount}} neskaitytų žinučių",
       "openUnread_other": "Atidaryti {{name}}, {{displayCount}} neskaitytų žinučių",
-      "open": "Atidaryti {{name}}",
       "openSettings": "Atidaryti {{name}} nustatymus",
       "fixOnKiloAi": "Ištaisyti kilo.ai: {{label}}",
       "openUnread_few": "Atidaryti {{name}}, {{displayCount}} neskaitytos žinutės",
@@ -1281,7 +1287,6 @@
       "title": "Peržiūra",
       "cancelTitle": "Atšaukti peržiūrą?",
       "cancelMessage": "Vykdoma kodo peržiūra bus sustabdyta.",
-      "keepRunning": "Tęsti vykdymą",
       "cancelReview": "Atšaukti peržiūrą",
       "retryTitle": "Pakartoti peržiūrą?",
       "retryMessage": "Kodo peržiūra bus atlikta dar kartą.",
@@ -1291,13 +1296,11 @@
       "byline": "{{repo}} #{{number}} · Autorius: {{author}}",
       "noFindings": "Radinių nerasta.",
       "showMore": "Rodyti daugiau",
-      "branch": "Šaka",
       "created": "Sukurta",
       "started": "Pradėta",
       "completed": "Baigta",
       "tokens": "Žetonai",
       "tokensInOut": "Įvestis: {{input}} / išvestis: {{output}}",
-      "openPullRequest": "Atidaryti pakeitimų užklausą",
       "council": "Taryba",
       "decision": "Sprendimas",
       "gate": "Kokybės patikra",
@@ -1325,8 +1328,6 @@
     },
     "reviewMemory": {
       "title": "Peržiūrų atmintis",
-      "couldNotLoadMore": "Nepavyko įkelti daugiau.",
-      "retryLoadingMore": "Dar kartą bandyti įkelti daugiau",
       "loading": "Įkeliama peržiūros atmintis",
       "couldNotLoad": "Nepavyko įkelti peržiūros atminties.",
       "off": "Peržiūros atmintis išjungta.",
@@ -1365,15 +1366,11 @@
       "setup": "Bitbucket sąranka"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket prijungtas",
-      "title": "Prijungti Bitbucket",
       "description": "Sukurk darbo srities prieigos raktą su reikiamomis teisėmis ir įklijuok jį žemiau.",
       "scopes": "Paskyra: skaityti · Saugyklos: skaityti / rašyti · PR: skaityti · Įvykių pranešimai: skaityti / rašyti",
-      "tokenPlaceholder": "Darbo srities prieigos raktas",
-      "connect": "Prijungti"
+      "tokenPlaceholder": "Darbo srities prieigos raktas"
     },
     "scopeList": {
-      "couldNotLoad": "Nepavyko įkelti organizacijų.",
       "personalStillAvailable": "Asmenines saugyklas vis dar gali pasiekti žemiau.",
       "personalSubtitle": "Tavo saugyklos",
       "viewOnly": "Tik peržiūra"
@@ -1396,7 +1393,6 @@
       "githubApp": "GitHub programėlė",
       "githubError": "Nepavyko atidaryti GitHub sąrankos. Bandyk dar kartą.",
       "gitlabAccount": "GitLab paskyra",
-      "connectGitLab": "Prijungti GitLab",
       "gitlabError": "Nepavyko atidaryti GitLab sąrankos. Bandyk dar kartą.",
       "description": "Prijunk prie Kilo: {{label}}. Tada PR bus peržiūrimi automatiškai.",
       "bitbucketError": "Nepavyko atidaryti Bitbucket sąrankos. Bandyk dar kartą."
@@ -1421,21 +1417,17 @@
     "updateFailed": "Nepavyko atnaujinti kodo peržiūros agento.",
     "configSaveFailed": "Nepavyko išsaugoti peržiūros nustatymų.",
     "status": {
-      "pending": "Laukiama",
       "running": "Vykdoma",
       "completed": "Baigta",
-      "failed": "Nepavyko",
       "interrupted": "Nutraukta"
     },
     "reviewStyle": {
       "strict": "Griežtas",
-      "balanced": "Subalansuotas",
       "lenient": "Atlaidus",
       "roast": "Pašaipus"
     },
     "focusArea": {
       "security": "Sauga",
-      "performance": "Našumas",
       "bugs": "Klaidos",
       "style": "Stilius",
       "testing": "Testavimas",
@@ -1486,7 +1478,6 @@
       "statusOpen": "Atidaryta",
       "fixed": "Ištaisyta",
       "statusIgnored": "Ignoruota",
-      "statusClosed": "Uždaryta",
       "severityHigh": "Aukštas",
       "severityMedium": "Vidutinis",
       "severityLow": "Žemas",
@@ -1675,7 +1666,6 @@
       "title": "Nustatymai",
       "couldNotLoadSettings": "Nepavyko įkelti saugos agento nustatymų.",
       "couldNotLoadPermissions": "Nepavyko įkelti teisių.",
-      "disabled": "Išjungta",
       "on": "Įjungta",
       "repositoriesCount_one": "Pasirinkta {{displayCount}} saugykla",
       "repositoriesCount": "Pasirinkta {{displayCount}} saugyklų",
@@ -1705,7 +1695,6 @@
       "retry": "Pakartoti taisymą",
       "cancelTitle": "Atšaukti šį taisymą?",
       "cancelMessage": "Saugos agentas sustabdys vykdomą taisymo bandymą.",
-      "keepRunning": "Tęsti vykdymą",
       "cancelRemediation": "Atšaukti taisymą",
       "openPullRequest": "Atidaryti PR{{number}}",
       "openDraftPullRequest": "Atidaryti PR juodraštį{{number}}",
@@ -1713,7 +1702,6 @@
       "attemptHistory": "Bandymų istorija ({{displayCount}})",
       "attemptNumber": "Bandymas Nr. {{number}}",
       "startedBy": "Pradėjo",
-      "branch": "Šaka",
       "queued": "Taisymas įtrauktas į eilę",
       "retryQueued": "Pakartotinis taisymas įtrauktas į eilę",
       "timeline": {
@@ -1769,11 +1757,9 @@
       "noMatchesTitle": "Filtrus atitinkančių radinių nėra",
       "noMatchesDescription": "Pabandyk pakeisti arba išvalyti pasirinktus filtrus.",
       "emptyTitle": "Nėra atvirų radinių",
-      "emptyDescription": "Šiuo metu nėra atvirų radinių, kuriems reikia dėmesio.",
-      "clearFilters": "Išvalyti filtrus"
+      "emptyDescription": "Šiuo metu nėra atvirų radinių, kuriems reikia dėmesio."
     },
     "scopeList": {
-      "couldNotLoad": "Nepavyko įkelti organizacijų.",
       "personalSubtitle": "Tavo saugyklos"
     },
     "findingRow": {
@@ -1934,7 +1920,6 @@
       "draftPrOpened": "Atidarytas PR juodraštis",
       "prOpened": "PR atidarytas",
       "blocked": "Užblokuota",
-      "failed": "Nepavyko",
       "noChangesNeeded": "Pakeitimų nereikia",
       "originAutomaticPolicy": "Automatizavimo taisyklė",
       "originIncludeExistingPolicy": "Esamų radinių įtraukimo taisyklė",
@@ -1988,12 +1973,9 @@
     "search": {
       "searching": "Ieškoma",
       "searchSessions": "Ieškoti sesijų",
-      "searchSessionsPlaceholder": "Ieškoti sesijų",
-      "clearSearch": "Išvalyti paiešką",
-      "clearFilters": "Išvalyti filtrus"
+      "searchSessionsPlaceholder": "Ieškoti sesijų"
     },
     "sessionList": {
-      "couldNotLoad": "Nepavyko įkelti sesijų.",
       "couldNotLoadActive": "Nepavyko įkelti aktyvių sesijų.",
       "noSessionsYetDescription": "Pradėk programavimo užduotį telefone. Tavo sesijos bus rodomos čia.",
       "noMatches": "Nėra paiešką atitinkančių sesijų",
@@ -2009,7 +1991,6 @@
       "deleteTitle": "Ištrinti sesiją?",
       "deleteMessage": "To negalima atšaukti.",
       "deleteSession": "Ištrinti sesiją",
-      "rename": "Pervadinti",
       "renameMessage": "Įvesk naują šios sesijos pavadinimą.",
       "copyId": "Kopijuoti sesijos ID",
       "idCopied": "Sesijos ID nukopijuotas",
@@ -2064,7 +2045,6 @@
       "accessDeniedDescription": "Neturi teisės peržiūrėti šio turinio.",
       "couldNotLoad": "Nepavyko įkelti sesijos.",
       "failedToLoadDetails": "Nepavyko įkelti sesijos informacijos.",
-      "notFound": "Nerasta.",
       "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
       "failedToStopExecution": "Nepavyko sustabdyti vykdymo.",
       "renameSession": "Pervadinti sesiją",
@@ -2108,7 +2088,6 @@
       "retryConnection": "Bandyti prisijungti iš naujo"
     },
     "newSession": {
-      "title": "Nauja sesija",
       "connectGithubDescription": "Naršyklėje susiekite GitHub paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
       "openGithub": "Atidaryti GitHub",
       "refreshRepositories": "Atnaujinti saugyklas",
@@ -2135,13 +2114,9 @@
       "couldNotRefreshRepositories": "Nepavyko atnaujinti saugyklų. Bandykite dar kartą.",
       "discardDraftTitle": "Atmesti juodraštį?",
       "discardDraftMessage": "Jūsų užklausa bus prarasta.",
-      "keepEditing": "Tęsti redagavimą",
       "discardFailed": "Nepavyko atmesti juodraščio. Bandykite dar kartą.",
       "remoteHint": "Norėdami valdyti vietinį kilo procesą, kompiuteryje vykdykite `kilo remote` arba veikiančioje CLI sesijoje vykdykite `/remote`.",
-      "bitbucketConnected": "Bitbucket prijungtas",
-      "connectBitbucket": "Prijungti Bitbucket",
       "connectBitbucketDescription": "Naršyklėje susiekite Bitbucket paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "connectGitlab": "Prijungti GitLab",
       "connectGitlabDescription": "Naršyklėje susiekite GitLab paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
       "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
       "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
@@ -2173,7 +2148,6 @@
       "accessibilityLabel": "Įrankis „{{name}}“, {{status}}",
       "fileEmpty": "Šis failas tuščias.",
       "noTasks": "Užduočių nėra.",
-      "contentTruncated": "Turinys sutrumpintas",
       "truncated": "Sutrumpinta",
       "toolRead": "skaityti",
       "toolEdit": "Redaguoti",
@@ -2246,8 +2220,7 @@
       "tryDifferentSearch": "Bandyk ieškoti pagal kitą žodį.",
       "loading": "Įkeliama…",
       "accessibility": "Saugykla: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Žinutės informacija",
@@ -2269,8 +2242,7 @@
       "cacheWrite": "Rašymas į talpyklą",
       "total": "Iš viso",
       "reportAiResponseFailedRetryable": "Nepavyko pranešti apie šį atsakymą.",
-      "reportAiResponseFailedTerminal": "Apie šį atsakymą negalima pranešti.",
-      "reportAiResponseSubmitted": "Pranešimas pateiktas. Patvirtinimo numeris: {{receiptId}}."
+      "reportAiResponseFailedTerminal": "Apie šį atsakymą negalima pranešti."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2309,10 +2281,8 @@
       "viewImageWithAlt": "Peržiūrėti paveikslėlį „{{alt}}“",
       "imageOutput": "Gautas paveikslėlis",
       "imageOutputWithFilename": "Gautas paveikslėlis: {{filename}}",
-      "defaultName": "Failas",
       "openFullScreen": "Atidaryti {{name}} per visą ekraną",
       "preview": "Peržiūrėti {{name}}",
-      "openFile": "Atidaryti {{name}}",
       "couldNotLoadFile": "Nepavyko įkelti šio failo.",
       "couldNotLoadFileRetry": "Nepavyko įkelti šio failo. Bandykite dar kartą.",
       "retryLoadingFile": "Bandyti įkelti failą iš naujo",
@@ -2454,11 +2424,8 @@
     "modelPicker": {
       "title": "Modelio pasirinkimas",
       "searchPlaceholder": "Modelių paieška",
-      "noModels": "Nėra modelių",
       "noModelsDescription": "Nėra modelių, kuriuos galėtumėte pasirinkti.",
-      "favorites": "Mėgstamiausi",
-      "recommended": "Rekomenduojami",
-      "allModels": "Visi modeliai"
+      "favorites": "Mėgstamiausi"
     },
     "modelSelector": {
       "provider": "Teikėjas {{id}}",
@@ -2496,7 +2463,6 @@
       "camera": "Fotoaparatas",
       "photoLibrary": "Nuotraukų biblioteka",
       "files": "Failai",
-      "cameraAccessDisabled": "Neleidžiama naudoti kameros",
       "cameraAccessMessage": "Jei nori fotografuoti, nustatymuose leisk naudoti kamerą.",
       "couldNotOpenPhotoPicker": "Nepavyko atidaryti nuotraukų parinkiklio. Iš naujo paleiskite Kilo ir bandykite dar kartą.",
       "maxFilesAllowed": "Didžiausias leidžiamas failų skaičius: {{displayCount}}.",
@@ -2524,9 +2490,7 @@
     },
     "chatLink": {
       "linkCopied": "Nuoroda nukopijuota",
-      "reviewPr": "Peržiūrėti PR",
       "openLink": "Atidaryti nuorodą",
-      "copyLink": "Kopijuoti nuorodą",
       "shareLink": "Bendrinti nuorodą",
       "share": "Bendrinti",
       "prLinkActions": "PR nuorodos veiksmai",
@@ -2572,7 +2536,6 @@
       "tokensUsage": "Konteksto žetonų: {{used}} iš {{window}}, panaudota {{percentage}}",
       "title": "Konteksto naudojimas",
       "used": "Panaudota",
-      "remaining": "Liko",
       "provider": "Teikėjas",
       "totalCost": "Bendra kaina",
       "usageReflectsLatest": "Naudojimo duomenys atitinka paskutinį baigtą asistento atsakymą.",
@@ -2640,7 +2603,6 @@
     "billingPage": "atsiskaitymų puslapis"
   },
   "deviceSessions": {
-    "couldNotLoad": "Nepavyko įkelti sesijų.",
     "couldNotLoadDescription": "Kol duomenys neįkelti, aktyvių sesijų peržiūrėti negalima.",
     "currentDeviceUnidentified": "Nepavyko atpažinti šio įrenginio.",
     "noSessions": "Nėra aktyvių sesijų",
@@ -2648,7 +2610,6 @@
     "onlyKiloAppSignIns": "Čia rodomi tik prisijungimai prie Kilo programėlės. Prisijungimai per redaktorių ir CLI nerodomi.",
     "signedIn": "Prisijungta {{signedIn}} · Paskutinė veikla {{lastSeen}}",
     "thisDevice": "Šis įrenginys",
-    "title": "Įrenginių sesijos",
     "viewProfile": "Peržiūrėti profilį",
     "signOutThisDevice": "Atsijungti šiame įrenginyje",
     "signOutThisSession": "Baigti šią sesiją",
@@ -2681,11 +2642,9 @@
   },
   "invalidRoute": {
     "description": "Ši nuoroda nebegalioja.",
-    "goBack": "Grįžti",
     "title": "Puslapis nerastas"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Turinys sutrumpintas",
     "truncated": "Sutrumpinta",
     "wrap": "Laužyti eilutes",
     "scroll": "Slinkti"
@@ -2698,15 +2657,13 @@
     "neutralDescription": "Bandyk dar kartą.",
     "offlineTitle": "Nepavyko įkelti.",
     "permissionDescription": "Neturi teisės peržiūrėti šio turinio.",
-    "notFoundTitle": "Nerasta.",
     "notFoundDescription": "Galbūt šis turinys pašalintas arba nebepasiekiamas.",
     "serverTitle": "Nepavyko įkelti.",
     "serverDescription": "Mūsų sistemoje įvyko klaida. Bandyk dar kartą."
   },
   "screenHeader": {
     "openMenu": "Atidaryti meniu",
-    "openMenuFor": "Atidaryti {{title}} meniu",
-    "goBack": "Grįžti"
+    "openMenuFor": "Atidaryti {{title}} meniu"
   },
   "picker": {
     "optionsExpired": "Parinktys nebegalioja",
@@ -2737,9 +2694,7 @@
   },
   "share": {
     "title": "Bendrinimas su Kilo",
-    "reviewPr": "Peržiūrėti PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Nauja sesija",
     "searchPlaceholder": "Neseniai naudotų sesijų paieška",
     "connectedCli": "Prijungtoje CLI",
     "newSessionOn": "Nauja sesija {{name}}",
@@ -2797,7 +2752,6 @@
     "statusCanceling": "Kilo Pass atšaukiamas",
     "statusPastDue": "Kilo Pass mokėjimas pradelstas",
     "monthlyCredits": "Kreditai per mėnesį: {{credits}}",
-    "ends": "Baigiasi {{date}}",
     "periodEnd": "laikotarpio pabaiga",
     "managedOnGooglePlay": "Valdoma per Google Play",
     "managedInAppStore": "Valdoma per App Store",
@@ -2809,7 +2763,6 @@
     "unavailableDescription": "Android programėlėje Kilo Pass įsigyti negalima. Valdyk prenumeratą svetainėje.",
     "webManagementDescription": "Ši Kilo Pass prenumerata valdoma svetainėje.",
     "legalDisclosure": "Kilo Pass yra automatiškai pratęsiama mėnesinė prenumerata. Patvirtinus pirkimą, mokestis nuskaitomas per tavo Apple ID paskyrą. Prenumerata automatiškai pratęsiama kas mėnesį nurodyta kaina, nebent ją atšauksi likus bent 24 valandoms iki einamojo laikotarpio pabaigos. Prenumeratą gali bet kada valdyti arba atšaukti App Store paskyros nustatymuose.",
-    "legalPrivacyPolicy": "Privatumo politika",
     "legalTermsOfUse": "naudojimo sąlygomis (EULA)",
     "purchaseDifferentAccount": "Šis App Store pirkinys nesusietas su tavo Kilo paskyra. Prisijunk prie perkant naudotos Apple Account paskyros, tada bandyk dar kartą.",
     "restoreFailed": "Nepavyko atkurti pirkinių. Bandyk dar kartą.",
@@ -2940,7 +2893,6 @@
     },
     "inviteMember": {
       "emailError": "Įveskite tinkamą el. pašto adresą.",
-      "emailLabel": "El. paštas",
       "emailPlaceholder": "vardas@company.com",
       "permissionDenied": "Neturite leidimo kviesti narių.",
       "roleLabel": "Vaidmuo",
@@ -3010,7 +2962,6 @@
         "billingManager": "Atsiskaitymų administratorius"
       },
       "emailStatusFailed": "Laiško išsiųsti nepavyko",
-      "emailStatusPending": "Laukiama",
       "inviteCreated": "Kvietimas sukurtas",
       "pendingInvitations": "Nepriimti kvietimai",
       "resendInvite": "Išsiųsti kvietimą dar kartą",
@@ -3035,7 +2986,6 @@
       "couldNotLoadStatus": "Nepavyko įkelti būsenos",
       "creditProcessingDelayed": "Kreditų apdorojimas vėluoja · automatiškai bandoma dar kartą",
       "ended": "Baigėsi",
-      "endsOn": "Baigiasi {{date}}",
       "manageHint": "Atidaro Kilo Pass valdymo puslapį naršyklėje.",
       "notSubscribed": "Neprenumeruojama",
       "overallocated": "Priskirta daugiau Kilo Pass prenumeratų, nei yra apmokėtų vietų",
@@ -3046,7 +2996,6 @@
       "paymentPending": "Laukiama mokėjimo",
       "processingBlocked": "Apdorojimas užblokuotas",
       "processingNeedsReview": "Reikia patikrinti apdorojimą",
-      "retry": "Bandyti dar kartą",
       "retryHint": "Bando iš naujo įkelti Kilo Pass būseną.",
       "setupHint": "Atidaro Kilo Pass sąranką naršyklėje.",
       "paidSeat_few": "{{displayCount}} apmokėtos vietos",
@@ -3101,7 +3050,6 @@
     "backToPreferences": "Grįžti į nuostatas"
   },
   "quickChat": {
-    "title": "Pokalbis",
     "empty": {
       "title": "Pradėk pokalbį",
       "description": "Parašyk žinutę ir pradėk pokalbį su modeliu."
@@ -3120,7 +3068,6 @@
     "openAgents": "Atidaryti agentus",
     "running": "Vykdoma",
     "needsInput": "Laukia atsakymo",
-    "idle": "Laukia",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
   }

@@ -44,7 +44,7 @@ function confirmCancel(onConfirm: () => void) {
     i18n.t('codeReviewer.reviewDetail.cancelTitle'),
     i18n.t('codeReviewer.reviewDetail.cancelMessage'),
     [
-      { text: i18n.t('codeReviewer.reviewDetail.keepRunning'), style: 'cancel' },
+      { text: i18n.t('common.keepRunning'), style: 'cancel' },
       {
         text: i18n.t('codeReviewer.reviewDetail.cancelReview'),
         style: 'destructive',
@@ -214,10 +214,7 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className="text-sm font-medium">{t('common.details')}</Text>
           <View className="gap-1 rounded-lg bg-secondary p-4">
-            <MetaRow
-              label={t('codeReviewer.reviewDetail.branch')}
-              value={`${review.head_ref} → ${review.base_ref}`}
-            />
+            <MetaRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
             <MetaRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} />
             {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
             <MetaRow
@@ -274,7 +271,7 @@ export function ReviewDetailScreen({
               });
             }}
           >
-            <Text>{t('codeReviewer.reviewDetail.openPullRequest')}</Text>
+            <Text>{t('common.openPullRequest')}</Text>
           </Button>
 
           {canCancel ? (

@@ -12,7 +12,7 @@ export default function ReviewStyleRoute() {
   const { t } = useTranslation();
   const labels = {
     strict: t('codeReviewer.reviewStyle.strict'),
-    balanced: t('codeReviewer.reviewStyle.balanced'),
+    balanced: t('common.balanced'),
     lenient: t('codeReviewer.reviewStyle.lenient'),
     roast: t('codeReviewer.reviewStyle.roast'),
   } as const;

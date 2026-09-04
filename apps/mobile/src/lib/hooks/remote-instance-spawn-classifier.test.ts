@@ -9,9 +9,7 @@ import { resolveCloneImportFailureKey } from './remote-instance-spawn-classifier
 // drift.
 describe('resolveCloneImportFailureKey', () => {
   it('maps cloud session not found to the not-found key', () => {
-    expect(resolveCloneImportFailureKey('cloud session not found')).toBe(
-      'agentChat.session.notFound'
-    );
+    expect(resolveCloneImportFailureKey('cloud session not found')).toBe('common.notFound');
   });
 
   it('maps cloud session import unauthorized to the access-denied key', () => {

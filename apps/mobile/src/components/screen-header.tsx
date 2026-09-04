@@ -158,7 +158,7 @@ export function ScreenHeader({
               }}
               accessibilityRole="button"
               accessibilityLabel={
-                resolvedBackIcon === 'close' ? t('common.close') : t('screenHeader.goBack')
+                resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')
               }
               className={`${I18nManager.isRTL ? '-mr-4' : '-ml-4'} h-11 w-11 shrink-0 items-center justify-center active:opacity-70`}
             >

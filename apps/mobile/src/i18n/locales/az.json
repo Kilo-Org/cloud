@@ -69,7 +69,58 @@
     "repository": "Repozitoriya",
     "signOut": "Çıxış et",
     "agents": "Agentlər",
-    "all": "Hamısı"
+    "all": "Hamısı",
+    "allModels": "Bütün modellər",
+    "balanced": "Balanslı",
+    "bitbucketConnected": "Bitbucket qoşulub",
+    "branch": "Budaq",
+    "cameraAccessDisabled": "Kameraya giriş bağlıdır",
+    "chat": "Söhbət",
+    "clearFilters": "Filtrləri təmizlə",
+    "clearSearch": "Axtarışı təmizlə",
+    "closed": "Bağlı",
+    "closeReactions": "Reaksiyaları bağla",
+    "connect": "Qoşul",
+    "connectBitbucket": "Bitbucket hesabını qoş",
+    "connectGitlab": "GitLab-ı qoş",
+    "contentTruncated": "Məzmun qısaldılıb",
+    "copyLink": "Keçidi kopyala",
+    "couldNotLoadOrganizations": "Təşkilatları yükləmək mümkün olmadı.",
+    "couldNotLoadSessions": "Sessiyaları yükləmək mümkün olmadı.",
+    "couldnTLoadMore": "Daha çox məlumat yükləmək mümkün olmadı.",
+    "deviceSessions": "Cihaz sessiyaları",
+    "disabled": "Deaktiv",
+    "email": "E-poçt",
+    "ends": "{{date}} tarixində bitir",
+    "failed": "Uğursuz",
+    "file": "Fayl",
+    "gitlab": "GitLab",
+    "goBack": "Geri qayıt",
+    "idle": "Gözləmədə",
+    "keepEditing": "Redaktəyə davam et",
+    "keepRunning": "İcranı davam etdir",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Yeni sessiya",
+    "noKiloclawInstances": "KiloClaw nüsxəsi yoxdur",
+    "noModelsAvailable": "Mövcud model yoxdur",
+    "notFound": "Tapılmadı.",
+    "online": "Onlayn",
+    "open": "{{name}} aç",
+    "openPullRequest": "Açıq birləşdirmə sorğusu",
+    "pending": "Gözləyir",
+    "performance": "Məhsuldarlıq",
+    "preferences": "Seçimlər",
+    "privacyPolicy": "Məxfilik siyasəti",
+    "profile": "Profil",
+    "reactions": "Reaksiya",
+    "recent": "Sonuncular",
+    "recommended": "Tövsiyə olunanlar",
+    "remaining": "Qalan",
+    "rename": "Adını dəyiş",
+    "reply": "Cavab ver",
+    "reportSubmittedReceipt": "Şikayət göndərildi. Qəbz nömrəsi: {{receiptId}}.",
+    "retryLoadingMore": "Daha çox məlumat yükləməyə yenidən cəhd et",
+    "reviewPr": "PR-ı yoxla"
   },
   "language": {
     "title": "Dil",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Yenidən başlatmaq mümkün olmadı",
     "languageSaved": "Dil seçimin yadda saxlanıldı.",
     "catalogLoadFailed": "Dili yükləmək mümkün olmadı. Yenidən cəhd et.",
-    "retry": "Yenidən cəhd et",
     "search": "Dil axtarışı",
     "noMatches": "Uyğun dil tapılmadı",
     "deviceLanguage": "Cihazın dili",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Giriş kodu: {{code}}",
     "openSignInPageInBrowser": "Giriş səhifəsini brauzerdə aç",
     "copySignInLink": "Giriş keçidini kopyala",
-    "copyLink": "Keçidi kopyala",
     "cancelSignIn": "Girişi ləğv et",
     "startingSignIn": "Giriş başladılır...",
     "organizationUsesSso": "Təşkilatın vahid giriş sistemindən istifadə edir.",
@@ -112,7 +161,6 @@
     "terms": "Şərtlər",
     "termsConnector": " və ",
     "termsSuffix": ".",
-    "privacyPolicy": "Məxfilik siyasəti",
     "moreSignInOptions": "Digər giriş üsulları",
     "couldNotCompleteSignIn": "Girişi tamamlamaq mümkün olmadı. Yenidən cəhd et.",
     "sessionEnded": "Sessiyan başa çatıb. Yenidən daxil ol.",
@@ -126,7 +174,6 @@
     "or": "və ya"
   },
   "profile": {
-    "title": "Profil",
     "codeReviewerSubtitle": "Avtomatik PR yoxlamaları",
     "securityAgentSubtitle": "Təhlükəsizlik boşluqlarını tap və aradan qaldır",
     "reviews": "Yoxlamalar",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Əlaqələndirilmiş hesablar",
     "couldNotLoadAccounts": "Hesabları yükləmək mümkün olmadı.",
     "app": "Tətbiq",
-    "preferences": "Seçimlər",
     "preferencesSubtitle": "Görünüş, bildirişlər, düşünmə və ekranın davranışı",
-    "deviceSessions": "Cihaz sessiyaları",
     "deviceSessionsSubtitle": "Digər cihazlara bax və onlardakı hesabından çıx",
     "feedback": "Rəy",
     "privacyChoices": "Məxfilik seçimləri",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-poçt",
     "providerTestAccount": "Sınaq hesabı",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Korporativ SSO"
   },
   "preferences": {
-    "title": "Seçimlər",
     "autoExpandThinking": "Düşüncə bölməsini avtomatik aç",
     "autoExpandThinkingSubtitle": "Agent düşünməni bitirdikdə düşüncə bölməsini açıq göstər.",
     "keepScreenOn": "Sessiya səhifəsində ikən ekranı açıq saxla",
@@ -360,7 +402,6 @@
       "unresolveThread": "Müzakirənin həll olunmuş işarəsini götür",
       "resolved": "Həll olunub",
       "outdated": "Köhnəlmiş",
-      "file": "Fayl",
       "comment_one": "1 şərh",
       "comment": "{{displayCount}} şərh",
       "comment_other": "{{displayCount}} şərh",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Daha çox şərh yüklənə bilmədi.",
       "retryLoadingMore": "Əlavə şərhləri yükləməyə yenidən cəhd et",
       "loadMoreComments": "Daha çox şərh yüklə",
-      "closeReactions": "Reaksiyaları bağla",
-      "reactionsTitle": "Reaksiya",
       "addReaction": "Reaksiya əlavə et",
       "reactionPill": "{{emoji}} reaksiyası, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaksiya",
@@ -380,13 +419,11 @@
       "reportUser": "İstifadəçidən şikayət et",
       "mute": "Səssizə al",
       "block": "Blokla",
-      "reportSubmitted": "Şikayət göndərildi. Qəbz nömrəsi: {{receiptId}}.",
       "blockedUser": "{{login}} bloklandı",
       "mutedUser": "{{login}} səssizə alındı",
       "replyPlaceholder": "Cavab…",
       "replyBody": "Cavab mətni",
       "submitReply": "Cavabı göndər",
-      "reply": "Cavab ver",
       "termsTitle": "Xidmət şərtləri",
       "termsCopy": "Paylaşım etmək üçün ən azı 13 yaşın olmalıdır.",
       "termsAcceptRetry": "Şərtləri qəbul etmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHub birləşdirmə sorğusunun URL-i",
       "clearLink": "Birləşdirmə sorğusunun keçidini təmizlə",
       "pasteLink": "Birləşdirmə sorğusunun keçidini yapışdır",
-      "open": "Açıq",
-      "openPullRequest": "Açıq birləşdirmə sorğusu"
+      "open": "Açıq"
     },
     "checks": {
       "title": "Yoxlamalar",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Gələnlər",
-      "recent": "Sonuncular",
       "loading": "Gələnlər yüklənir",
       "noReviewRequests": "Kod baxışı sorğusu yoxdur",
       "noReviewRequestsDescription": "Nəzərdən keçirməyini gözləyən birləşdirmə sorğuları burada görünür. Yuxarıdakı sahəyə istənilən PR keçidini də yapışdıra bilərsən.",
-      "couldNotLoad": "Gələnləri yükləmək mümkün olmadı.",
-      "couldNotLoadMore": "Daha çox məlumat yükləmək mümkün olmadı.",
-      "retryLoadingMore": "Daha çox məlumat yükləməyə yenidən cəhd et"
+      "couldNotLoad": "Gələnləri yükləmək mümkün olmadı."
     },
     "composer": {
       "commentBodyPlaceholder": "Şərh mətni",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Şərh redaktorunu yükləmək mümkün olmadı.",
       "discardTitle": "Şərhdən imtina edilsin?",
       "discardMessage": "Qaralaman silinəcək.",
-      "keepEditing": "Redaktəyə davam et",
       "comment": "Şərh",
       "insertSuggestionA11y": "Kod təklifi daxil et",
       "insertSuggestion": "Təklif daxil et",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Birləşdirilib",
-      "stateClosed": "Bağlı",
       "stateOpenApproved": "Açıq · Təsdiqlənib",
       "stateOpenChangesRequested": "Açıq · Dəyişiklik tələb edilib",
       "stateOpenReviewRequired": "Açıq · Kod baxışı tələb olunur",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Əsas",
-    "profile": "Profil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, vərəq, {{position}} / {{total}}",
-    "chat": "Söhbət"
+    "position": "{{name}}, vərəq, {{position}} / {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Nüsxə seçimi",
       "couldNotLoadInstances": "Nüsxələri yükləmək mümkün olmadı.",
-      "noInstances": "KiloClaw nüsxəsi yoxdur",
       "noInstancesDescription": "Söhbətə başlamaq üçün bir nüsxə qur.",
       "setUpKiloclaw": "KiloClaw-u qur",
       "currentInstance": "{{title}}, cari"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Söhbətə daxil olmaq mümkün olmadı.",
       "couldNotRefreshMessages": "Mesajları yeniləmək mümkün olmadı.",
       "couldNotLoadHistory": "Söhbət tarixçəsini yükləmək mümkün olmadı.",
-      "rename": "Adını dəyiş",
       "leave": "Çıx",
       "untitledConversation": "Adsız söhbət",
       "createFailed": "Söhbət yaratmaq mümkün olmadı.",
       "leaveFailed": "Söhbətdən çıxmaq mümkün olmadı."
     },
     "reactions": {
-      "title": "Reaksiya",
-      "close": "Reaksiyaları bağla",
-      "recent": "Sonuncular",
       "common": "Tez-tez istifadə olunanlar",
       "reactWith": "{{reaction}} ilə reaksiya ver",
       "accessibility": "{{emoji}} reaksiyası, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Reaksiya əlavə etmək mümkün olmadı.",
       "retrySend": "Yenidən göndər",
       "moreReactions": "Daha çox reaksiya",
-      "reply": "Cavab ver",
       "edit": "Redaktə et",
       "sendFailed": "Mesajı göndərmək mümkün olmadı.",
       "retrySendFailed": "Mesajı yenidən göndərmək mümkün olmadı.",
@@ -807,7 +829,6 @@
       "takePhoto": "Şəkil çək",
       "photoLibrary": "Qalereya",
       "files": "Fayl",
-      "cameraAccessDisabled": "Kameraya giriş bağlıdır",
       "cameraAccessMessage": "Şəkil çəkmək üçün parametrlərdə kameraya girişə icazə ver."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} yazırlar..."
     },
     "botStatus": {
-      "online": "Onlayn",
-      "idle": "Gözləmədə",
       "offline": "Oflayn",
       "loadingUser": "İstifadəçi məlumatları yüklənir...",
       "waitingForStatus": "Botun statusu gözlənilir...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw instanslarını yükləmək mümkün olmadı.",
     "billing": {
       "title": "Ödənişlər",
@@ -840,7 +858,6 @@
       "plan": "Planlaşdırma",
       "finalTermEnds": "Son dövrün bitmə tarixi",
       "afterFinalTerm": "Son dövrdən sonra",
-      "remaining": "Qalan",
       "ends": "Bitmə tarixi",
       "expires": "Etibarlılıq müddəti",
       "noActivePlan": "Aktiv plan yoxdur",
@@ -941,20 +958,15 @@
       "disconnect": "Google hesabının bağlantısını kəs",
       "copied": "Kopyalandı",
       "copyCommand": "Əmrin surətini çıxar",
-      "disabled": "Deaktiv",
       "disconnectConfirm": "Bağlantını kəs",
       "disconnectMessage": "Google hesabın bu instansdan silinsin? Gmail bildirişləri söndürüləcək. Dəyişiklikləri tətbiq etmək üçün bağlantını kəsdikdən sonra instansı yenidən yerləşdir.",
       "disconnectTitle": "Google bağlantısının kəsilməsi"
     },
     "modelList": {
-      "title": "Bütün modellər",
       "searchPlaceholder": "Model axtarışı...",
-      "clearSearch": "Axtarışı təmizlə",
       "noMatches": "Axtarışına uyğun model yoxdur",
-      "noModels": "Mövcud model yoxdur",
       "noModelsDescription": "Modellər mövcud olduqda burada görünəcək.",
-      "noResultsFor": "“{{query}}” sorğusu üçün nəticə yoxdur.",
-      "recommended": "Tövsiyə olunanlar"
+      "noResultsFor": "“{{query}}” sorğusu üçün nəticə yoxdur."
     },
     "secrets": {
       "title": "Məxfi məlumatlar",
@@ -972,8 +984,7 @@
       "setupGuide": "Quraşdırma təlimatı",
       "saving": "Yadda saxlanılır…",
       "removing": "Silinir…",
-      "updateToken": "Tokeni yenilə",
-      "connect": "Qoşul"
+      "updateToken": "Tokeni yenilə"
     },
     "versionPin": {
       "title": "Versiyanın sabitlənməsi",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Quraşdırma tamamlanır",
       "finishingSetupDescription": "Bir az gözlə, hesabını hazırlayırıq. Bu, adətən çox vaxt çəkmir.",
       "getStarted": "Başla",
-      "noInstances": "KiloClaw nüsxəsi yoxdur",
       "noInstancesDescription": "Kodlaşdırma agentlərini işə salmaq üçün ilk instansını yarat."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}} ilə söhbət et",
-        "online": "Onlayn",
         "ready": "{{name}} hazırdır",
         "warmedUp": "Hər şey hazırdır. Hazır olanda salam yaz."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Ən qabaqcıl",
       "frontierDescription": "Ən yüksək məhsuldarlıq. Sorğuları məntiqi düşünmə qabiliyyətli ən qabaqcıl modellərə yönləndirir.",
-      "balancedLabel": "Balanslı",
       "balancedDescription": "Daha aşağı qiymətə sürət və imkanlar arasında optimal tarazlıq yaradır.",
-      "performance": "Məhsuldarlıq",
       "autoModelA11y": "{{label}} avtomatik modeli",
       "currentModel": "Cari model",
       "browseAllModels": "və ya 500-dən çox model arasından seç",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "{{name}} aç, {{displayCount}} oxunmamış mesaj var",
       "openUnread": "{{name}} aç, {{displayCount}} oxunmamış mesaj",
       "openUnread_other": "{{name}} aç, {{displayCount}} oxunmamış mesaj",
-      "open": "{{name}} aç",
       "openSettings": "{{name}} üçün parametrləri aç",
       "fixOnKiloAi": "kilo.ai saytında düzəlt: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Yoxlama",
       "cancelTitle": "Kod yoxlaması ləğv edilsin?",
       "cancelMessage": "Bu, davam edən kod yoxlamasını dayandıracaq.",
-      "keepRunning": "İcranı davam etdir",
       "cancelReview": "Yoxlamanı ləğv et",
       "retryTitle": "Kod yoxlaması təkrarlansın?",
       "retryMessage": "Bu, kod yoxlamasını yenidən başladacaq.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} · Müəllif: {{author}}",
       "noFindings": "Tapıntı yoxdur.",
       "showMore": "Daha çox göstər",
-      "branch": "Budaq",
       "created": "Yaradılıb",
       "started": "Başlanıb",
       "completed": "Tamamlanıb",
       "tokens": "Token",
       "tokensInOut": "{{input}} giriş / {{output}} çıxış",
-      "openPullRequest": "Açıq birləşdirmə sorğusu",
       "council": "Şura",
       "decision": "Qərar",
       "gate": "Keçid şərti",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Yoxlama yaddaşı",
-      "couldNotLoadMore": "Daha çox məlumat yükləmək mümkün olmadı.",
-      "retryLoadingMore": "Daha çox məlumat yükləməyə yenidən cəhd et",
       "loading": "Kod yoxlaması yaddaşı yüklənir",
       "couldNotLoad": "Kod yoxlaması yaddaşını yükləmək mümkün olmadı.",
       "off": "Kod yoxlaması yaddaşı deaktivdir.",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucket quraşdırması"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket qoşulub",
-      "title": "Bitbucket hesabını qoş",
       "description": "Tələb olunan icazələri olan iş sahəsi giriş tokeni yarat və aşağıya yapışdır.",
       "scopes": "Hesab: oxuma · Repozitoriyalar: oxuma/yazma · PR-lər: oxuma · Vebhuklar: oxuma/yazma",
-      "tokenPlaceholder": "İş sahəsinin giriş tokeni",
-      "connect": "Qoşul"
+      "tokenPlaceholder": "İş sahəsinin giriş tokeni"
     },
     "scopeList": {
-      "couldNotLoad": "Təşkilatları yükləmək mümkün olmadı.",
       "personalStillAvailable": "Şəxsi repozitoriyalar aşağıda hələ də əlçatandır.",
       "personalSubtitle": "Öz repozitoriyaların",
       "viewOnly": "Yalnız baxış"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub tətbiqi",
       "githubError": "GitHub quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
       "gitlabAccount": "GitLab hesabı",
-      "connectGitLab": "GitLab-ı qoş",
       "gitlabError": "GitLab quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et.",
       "description": "PR-ləri avtomatik yoxlamaq üçün Kilo ilə {{label}} arasında bağlantı qur.",
       "bitbucketError": "Bitbucket quraşdırmasını açmaq mümkün olmadı. Yenidən cəhd et."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Kod yoxlayıcısını yeniləmək mümkün olmadı.",
     "configSaveFailed": "Kod yoxlamasının parametrlərini yadda saxlamaq mümkün olmadı.",
     "status": {
-      "pending": "Gözləyir",
       "running": "İşləyir",
       "completed": "Tamamlanıb",
-      "failed": "Uğursuz",
       "interrupted": "Yarımçıq qalıb"
     },
     "reviewStyle": {
       "strict": "Sərt",
-      "balanced": "Balanslı",
       "lenient": "Yumşaq",
       "roast": "İstehza"
     },
     "focusArea": {
       "security": "Təhlükəsizlik",
-      "performance": "Məhsuldarlıq",
       "bugs": "Səhvlər",
       "style": "Stil",
       "testing": "Testlər",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Açıq",
       "fixed": "Düzəldilib",
       "statusIgnored": "Nəzərə alınmayıb",
-      "statusClosed": "Bağlı",
       "severityHigh": "Yüksək",
       "severityMedium": "Orta",
       "severityLow": "Aşağı",
@@ -1655,7 +1646,6 @@
       "title": "Parametrlər",
       "couldNotLoadSettings": "Təhlükəsizlik agentinin parametrlərini yükləmək mümkün olmadı.",
       "couldNotLoadPermissions": "İcazələri yükləmək mümkün olmadı.",
-      "disabled": "Deaktiv",
       "on": "Aktiv",
       "repositoriesCount_one": "{{displayCount}} repozitoriya seçilib",
       "repositoriesCount": "{{displayCount}} repozitoriya seçilib",
@@ -1683,7 +1673,6 @@
       "retry": "Düzəlişə yenidən cəhd et",
       "cancelTitle": "Bu düzəliş ləğv edilsin?",
       "cancelMessage": "Təhlükəsizlik agenti davam edən düzəliş cəhdini dayandıracaq.",
-      "keepRunning": "İcranı davam etdir",
       "cancelRemediation": "Düzəlişi ləğv et",
       "openPullRequest": "PR{{number}} aç",
       "openDraftPullRequest": "Qaralama PR{{number}} aç",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "Cəhd tarixçəsi ({{displayCount}})",
       "attemptNumber": "Cəhd #{{number}}",
       "startedBy": "Başladan",
-      "branch": "Budaq",
       "queued": "Düzəliş növbəyə alındı",
       "retryQueued": "Təkrar düzəliş cəhdi növbəyə əlavə edildi",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Heç bir tapıntı filtrlərə uyğun gəlmir",
       "noMatchesDescription": "Seçilmiş filtrləri dəyiş və ya təmizlə.",
       "emptyTitle": "Açıq tapıntı yoxdur",
-      "emptyDescription": "Hazırda diqqət tələb edən açıq tapıntı yoxdur.",
-      "clearFilters": "Filtrləri təmizlə"
+      "emptyDescription": "Hazırda diqqət tələb edən açıq tapıntı yoxdur."
     },
     "scopeList": {
-      "couldNotLoad": "Təşkilatları yükləmək mümkün olmadı.",
       "personalSubtitle": "Öz repozitoriyaların"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "Qaralama PR açıldı",
       "prOpened": "PR açıldı",
       "blocked": "Bloklanıb",
-      "failed": "Uğursuz",
       "noChangesNeeded": "Dəyişiklik lazım deyil",
       "originAutomaticPolicy": "Avtomatik düzəliş qaydası",
       "originIncludeExistingPolicy": "Mövcud tapıntıları daxil etmə qaydası",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Axtarılır",
       "searchSessions": "Sessiya axtarışı",
-      "searchSessionsPlaceholder": "Sessiya axtarışı",
-      "clearSearch": "Axtarışı təmizlə",
-      "clearFilters": "Filtrləri təmizlə"
+      "searchSessionsPlaceholder": "Sessiya axtarışı"
     },
     "sessionList": {
-      "couldNotLoad": "Sessiyaları yükləmək mümkün olmadı.",
       "couldNotLoadActive": "Aktiv sessiyaları yükləmək mümkün olmadı.",
       "noSessionsYetDescription": "Telefonundan kodlaşdırma tapşırığı başlat. Sessiyaların burada görünəcək.",
       "noMatches": "Uyğun sessiya yoxdur",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Sessiya silinsin?",
       "deleteMessage": "Bu əməliyyatı geri qaytarmaq mümkün deyil.",
       "deleteSession": "Sessiyanı sil",
-      "rename": "Adını dəyiş",
       "renameMessage": "Bu sessiya üçün yeni ad daxil et.",
       "copyId": "Sessiya ID-sinin surətini çıxar",
       "idCopied": "Sessiya ID-sinin surəti çıxarıldı",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Buna baxmağa icazən yoxdur.",
       "couldNotLoad": "Sessiyanı yükləmək mümkün olmadı.",
       "failedToLoadDetails": "Sessiyanın təfərrüatlarını yükləmək mümkün olmadı.",
-      "notFound": "Tapılmadı.",
       "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq əlçatan deyil.",
       "failedToStopExecution": "İcranı dayandırmaq mümkün olmadı.",
       "renameSession": "Sessiyanın adını dəyiş",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Yenidən qoşul"
     },
     "newSession": {
-      "title": "Yeni sessiya",
       "connectGithubDescription": "GitHub hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
       "openGithub": "GitHub-u aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",
-      "keepEditing": "Redaktəyə davam et",
       "discardFailed": "Qaralamanı silmək mümkün olmadı. Yenidən cəhd et.",
       "remoteHint": "Kompüterindəki kilo prosesini idarə etmək üçün kompüterdə `kilo remote` əmrini və ya işləyən CLI sessiyasında `/remote` əmrini işə sal.",
-      "bitbucketConnected": "Bitbucket qoşulub",
-      "connectBitbucket": "Bitbucket hesabını qoş",
       "connectBitbucketDescription": "Bitbucket hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
-      "connectGitlab": "GitLab-ı qoş",
       "connectGitlabDescription": "GitLab hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "{{name}} aləti, {{status}}",
       "fileEmpty": "Bu fayl boşdur.",
       "noTasks": "Tapşırıq yoxdur.",
-      "contentTruncated": "Məzmun qısaldılıb",
       "truncated": "Qısaldılıb",
       "toolRead": "oxu",
       "toolEdit": "Redaktə et",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Başqa sözlə axtar.",
       "loading": "Yüklənir...",
       "accessibility": "Repozitoriya: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Mesajın təfərrüatları",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Keşə yazma",
       "total": "Cəmi",
       "reportAiResponseFailedRetryable": "Bu cavabdan şikayət göndərmək mümkün olmadı.",
-      "reportAiResponseFailedTerminal": "Bu cavabdan şikayət göndərmək mümkün deyil.",
-      "reportAiResponseSubmitted": "Şikayət göndərildi. Qəbz nömrəsi: {{receiptId}}."
+      "reportAiResponseFailedTerminal": "Bu cavabdan şikayət göndərmək mümkün deyil."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "Şəkilə bax: {{alt}}",
       "imageOutput": "Nəticə şəkli",
       "imageOutputWithFilename": "Nəticə şəkli: {{filename}}",
-      "defaultName": "Fayl",
       "openFullScreen": "{{name}} faylını tam ekranda aç",
       "preview": "{{name}} faylına önbaxış et",
-      "openFile": "{{name}} aç",
       "couldNotLoadFile": "Bu fayl yüklənə bilmədi.",
       "couldNotLoadFileRetry": "Bu faylı yükləmək mümkün olmadı. Yenidən cəhd et.",
       "retryLoadingFile": "Faylı yenidən yüklə",
@@ -2414,10 +2384,7 @@
     "modelPicker": {
       "title": "Model seç",
       "searchPlaceholder": "Model axtarışı...",
-      "allModels": "Bütün modellər",
       "favorites": "Sevimlilər",
-      "noModels": "Mövcud model yoxdur",
-      "recommended": "Tövsiyə olunanlar",
       "noModelsDescription": "Seçim üçün heç bir model əlçatan deyil."
     },
     "modelSelector": {
@@ -2456,7 +2423,6 @@
       "camera": "Kamera",
       "photoLibrary": "Qalereya",
       "files": "Fayl",
-      "cameraAccessDisabled": "Kameraya giriş bağlıdır",
       "cameraAccessMessage": "Şəkil çəkmək üçün parametrlərdə kameraya girişə icazə ver.",
       "couldNotOpenPhotoPicker": "Şəkil seçicisini açmaq mümkün olmadı. Kilo-nu yenidən başlat və yenidən cəhd et.",
       "maxFilesAllowed": "Ən çox {{displayCount}} fayl əlavə etmək olar.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Keçid kopyalandı",
-      "reviewPr": "PR-ı yoxla",
       "openLink": "Keçidi aç",
-      "copyLink": "Keçidi kopyala",
       "shareLink": "Keçidi paylaş",
       "share": "Paylaş",
       "prLinkActions": "PR keçidi ilə əməliyyatlar",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Kontekstdə {{window}} tokendən {{used}} token istifadə olunub, {{percentage}} doludur",
       "title": "Kontekst istifadəsi",
       "used": "İstifadə olunub",
-      "remaining": "Qalan",
       "provider": "Təminatçı",
       "totalCost": "Ümumi xərc",
       "usageReflectsLatest": "İstifadə göstəriciləri köməkçinin son tamamlanmış cavabına aiddir.",
@@ -2598,7 +2561,6 @@
     "billingPage": "ödəniş səhifəsi"
   },
   "deviceSessions": {
-    "couldNotLoad": "Sessiyaları yükləmək mümkün olmadı.",
     "couldNotLoadDescription": "Məlumatlar yüklənənədək aktiv sessiyaların əlçatan deyil.",
     "currentDeviceUnidentified": "Cari cihazı müəyyən etmək mümkün olmadı.",
     "noSessions": "Aktiv sessiya yoxdur",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Burada yalnız Kilo tətbiqində açılan sessiyalar görünür. Redaktor və CLI sessiyaları siyahıda göstərilmir.",
     "signedIn": "Giriş: {{signedIn}} · Son fəaliyyət: {{lastSeen}}",
     "thisDevice": "Bu cihaz",
-    "title": "Cihaz sessiyaları",
     "webBrowser": "Veb brauzer",
     "viewProfile": "Profilə bax",
     "signOutThisDevice": "Bu cihazdan çıxış et",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "Bu keçid artıq etibarlı deyil.",
-    "goBack": "Geri qayıt",
     "title": "Səhifə tapılmadı"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Məzmun qısaldılıb",
     "truncated": "Qısaldılıb",
     "wrap": "Sətrə keçir",
     "scroll": "Sürüşdür"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Yenidən cəhd et.",
     "offlineTitle": "Yükləmək mümkün olmadı.",
     "permissionDescription": "Buna baxmağa icazən yoxdur.",
-    "notFoundTitle": "Tapılmadı.",
     "notFoundDescription": "Bu element silinmiş ola bilər və ya artıq əlçatan deyil.",
     "serverTitle": "Yükləmək mümkün olmadı.",
     "serverDescription": "Bizim tərəfdə xəta baş verdi. Yenidən cəhd et."
   },
   "screenHeader": {
     "openMenu": "Menyunu aç",
-    "openMenuFor": "{{title}} üçün menyunu aç",
-    "goBack": "Geri qayıt"
+    "openMenuFor": "{{title}} üçün menyunu aç"
   },
   "picker": {
     "optionsExpired": "Seçimlərin müddəti bitib",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kilo-ya göndər",
-    "reviewPr": "PR-ı yoxla",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Yeni sessiya",
     "searchPlaceholder": "Son sessiyalarda axtarış",
     "connectedCli": "Qoşulmuş CLI-də",
     "newSessionOn": "{{name}} üçün yeni sessiya",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass ləğv edilir",
     "statusPastDue": "Kilo Pass ödənişi gecikib",
     "monthlyCredits": "Aylıq {{credits}} kredit",
-    "ends": "{{date}} tarixində bitir",
     "periodEnd": "dövrün sonu",
     "managedOnGooglePlay": "Google Play-də idarə olunur",
     "managedInAppStore": "App Store-da idarə olunur",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Kilo Pass-ı Android-də tətbiq daxilində almaq mümkün deyil. Onu vebdə idarə et.",
     "webManagementDescription": "Bu Kilo Pass vebdə idarə olunur.",
     "legalDisclosure": "Kilo Pass avtomatik yenilənən aylıq abunəlikdir. Alış təsdiqləndikdə ödəniş Apple ID hesabından tutulur. Cari dövrün bitməsinə ən azı 24 saat qalmış ləğv edilməsə, abunəlik hər ay göstərilən qiymətə avtomatik yenilənir. Abunəliyi istənilən vaxt App Store hesabının parametrlərindən idarə et və ya ləğv et.",
-    "legalPrivacyPolicy": "Məxfilik siyasəti",
     "legalTermsOfUse": "İstifadə şərtləri (EULA)",
     "purchaseDifferentAccount": "Bu App Store alışı Kilo hesabına bağlı deyil. Alış üçün istifadə etdiyin Apple Account hesabına daxil ol, sonra yenidən cəhd et.",
     "restoreFailed": "Alışları bərpa etmək mümkün olmadı. Yenidən cəhd et.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "Düzgün e-poçt ünvanı daxil et.",
-      "emailLabel": "E-poçt",
       "emailPlaceholder": "ad@sirket.com",
       "permissionDenied": "Üzv dəvət etmək icazən yoxdur.",
       "roleLabel": "Rol",
@@ -2968,7 +2920,6 @@
         "billingManager": "Ödəniş meneceri"
       },
       "emailStatusFailed": "E-poçt göndərilmədi",
-      "emailStatusPending": "Gözləyir",
       "inviteCreated": "Dəvət yaradıldı",
       "pendingInvitations": "Gözləyən dəvətlər",
       "resendInvite": "Dəvəti yenidən göndər",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Status yüklənə bilmədi",
       "creditProcessingDelayed": "Kreditlərin emalı gecikir · avtomatik yenidən cəhd edilir",
       "ended": "Bitdi",
-      "endsOn": "{{date}} tarixində bitir",
       "manageHint": "Kilo Pass idarəetmə səhifəsini saytda açır.",
       "notSubscribed": "Abunə deyil",
       "overallocated": "Təyin edilmiş Kilo Pass abunəliklərinin sayı ödənişli yerlərin sayından çoxdur",
@@ -3004,7 +2954,6 @@
       "paymentPending": "Ödəniş gözlənilir",
       "processingBlocked": "Emal bloklanıb",
       "processingNeedsReview": "Emalı yoxlamaq lazımdır",
-      "retry": "Yenidən cəhd et",
       "retryHint": "Kilo Pass statusunun yüklənməsinə yenidən cəhd edir.",
       "setupHint": "Kilo Pass quraşdırma səhifəsini brauzerdə açır."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Parametrlərə qayıt"
   },
   "quickChat": {
-    "title": "Söhbət",
     "empty": {
       "title": "Söhbətə başla",
       "description": "Modellə danışmaq üçün mesaj göndər."
@@ -3076,7 +3024,6 @@
     "openAgents": "Agentləri aç",
     "running": "İşləyir",
     "needsInput": "Cavab gözləyir",
-    "idle": "Gözləmədə",
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
   }

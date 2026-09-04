@@ -69,7 +69,58 @@
     "repository": "ឃ្លាំងកូដ",
     "signOut": "ចាកចេញ",
     "agents": "ភ្នាក់ងារ",
-    "all": "ទាំងអស់"
+    "all": "ទាំងអស់",
+    "allModels": "ម៉ូដែលទាំងអស់",
+    "balanced": "មានតុល្យភាព",
+    "bitbucketConnected": "បានភ្ជាប់ Bitbucket",
+    "branch": "សាខា",
+    "cameraAccessDisabled": "ការចូលប្រើកាមេរ៉ាត្រូវបានបិទ",
+    "chat": "ជជែក",
+    "clearFilters": "ដកតម្រងចេញ",
+    "clearSearch": "លុបពាក្យស្វែងរក",
+    "closed": "បានបិទ",
+    "closeReactions": "បិទប្រតិកម្ម",
+    "connect": "ភ្ជាប់",
+    "connectBitbucket": "ភ្ជាប់ Bitbucket",
+    "connectGitlab": "ភ្ជាប់ GitLab",
+    "contentTruncated": "មាតិកាត្រូវបានកាត់ឱ្យខ្លី",
+    "copyLink": "ចម្លងតំណ",
+    "couldNotLoadOrganizations": "មិនអាចផ្ទុកស្ថាប័នបានទេ។",
+    "couldNotLoadSessions": "មិនអាចផ្ទុកវគ្គបានទេ។",
+    "couldnTLoadMore": "មិនអាចផ្ទុកបន្ថែមបានទេ។",
+    "deviceSessions": "វគ្គប្រើប្រាស់លើឧបករណ៍",
+    "disabled": "បានបិទ",
+    "email": "អ៊ីមែល",
+    "ends": "បញ្ចប់នៅ {{date}}",
+    "failed": "បរាជ័យ",
+    "file": "ឯកសារ",
+    "gitlab": "GitLab",
+    "goBack": "ត្រឡប់ក្រោយ",
+    "idle": "ទំនេរ",
+    "keepEditing": "បន្តកែសម្រួល",
+    "keepRunning": "បន្តដំណើរការ",
+    "kiloclaw": "KiloClaw",
+    "newSession": "វគ្គថ្មី",
+    "noKiloclawInstances": "គ្មានម៉ាស៊ីន KiloClaw",
+    "noModelsAvailable": "គ្មានម៉ូដែលសម្រាប់ប្រើ",
+    "notFound": "រកមិនឃើញទេ។",
+    "online": "អនឡាញ",
+    "open": "បើក {{name}}",
+    "openPullRequest": "បើកសំណើបញ្ចូលកូដ",
+    "pending": "កំពុងរង់ចាំ",
+    "performance": "ប្រសិទ្ធភាព",
+    "preferences": "ចំណូលចិត្ត",
+    "privacyPolicy": "គោលការណ៍ឯកជនភាព",
+    "profile": "ប្រវត្តិរូប",
+    "reactions": "ប្រតិកម្ម",
+    "recent": "ថ្មីៗ",
+    "recommended": "ណែនាំសម្រាប់អ្នក",
+    "remaining": "នៅសល់",
+    "rename": "ប្តូរឈ្មោះ",
+    "reply": "ឆ្លើយតប",
+    "reportSubmittedReceipt": "បានផ្ញើរបាយការណ៍។ លេខបង្កាន់ដៃ {{receiptId}}",
+    "retryLoadingMore": "ព្យាយាមផ្ទុកបន្ថែមម្តងទៀត",
+    "reviewPr": "ពិនិត្យ PR"
   },
   "language": {
     "title": "ភាសា",
@@ -77,7 +128,6 @@
     "couldNotRestart": "មិនអាចចាប់ផ្តើមឡើងវិញបានទេ",
     "languageSaved": "បានរក្សាទុកភាសាដែលអ្នកបានជ្រើសរើសហើយ។",
     "catalogLoadFailed": "មិនអាចផ្ទុកភាសាបានទេ។ សូមព្យាយាមម្តងទៀត។",
-    "retry": "ព្យាយាមម្តងទៀត",
     "search": "ស្វែងរកភាសា",
     "noMatches": "គ្មានភាសាដែលត្រូវគ្នា",
     "deviceLanguage": "ភាសារបស់ឧបករណ៍",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "លេខកូដចូល៖ {{code}}",
     "openSignInPageInBrowser": "បើកទំព័រចូលនៅក្នុងកម្មវិធីរុករក",
     "copySignInLink": "ចម្លងតំណចូល",
-    "copyLink": "ចម្លងតំណ",
     "cancelSignIn": "បោះបង់ការចូល",
     "startingSignIn": "កំពុងចាប់ផ្តើមចូល...",
     "organizationUsesSso": "អង្គការរបស់អ្នកប្រើប្រព័ន្ធចូលតែម្តង។",
@@ -112,7 +161,6 @@
     "terms": "លក្ខខណ្ឌ",
     "termsConnector": " និង ",
     "termsSuffix": "។",
-    "privacyPolicy": "គោលការណ៍ឯកជនភាព",
     "moreSignInOptions": "ជម្រើសចូលបន្ថែម",
     "couldNotCompleteSignIn": "មិនអាចបញ្ចប់ការចូលបានទេ។ សូមព្យាយាមម្តងទៀត។",
     "sessionEnded": "វគ្គរបស់អ្នកបានបញ្ចប់។ សូមចូលម្តងទៀត។",
@@ -126,7 +174,6 @@
     "or": "ឬ"
   },
   "profile": {
-    "title": "ប្រវត្តិរូប",
     "codeReviewerSubtitle": "ការពិនិត្យ PR ដោយស្វ័យប្រវត្តិ",
     "securityAgentSubtitle": "ស្វែងរក និងដោះស្រាយចំណុចខ្សោយផ្នែកសុវត្ថិភាព",
     "reviews": "ការពិនិត្យ",
@@ -136,9 +183,7 @@
     "linkedAccounts": "គណនីដែលបានភ្ជាប់",
     "couldNotLoadAccounts": "មិនអាចផ្ទុកគណនីបានទេ។",
     "app": "កម្មវិធី",
-    "preferences": "ចំណូលចិត្ត",
     "preferencesSubtitle": "រូបរាង ការជូនដំណឹង ការគិត និងរបៀបដំណើរការអេក្រង់",
-    "deviceSessions": "វគ្គប្រើប្រាស់លើឧបករណ៍",
     "deviceSessionsSubtitle": "ពិនិត្យ និងចេញពីគណនីលើឧបករណ៍ផ្សេងទៀត",
     "feedback": "មតិកែលម្អ",
     "privacyChoices": "ជម្រើសឯកជនភាព",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "អ៊ីមែល",
     "providerTestAccount": "គណនីសាកល្បង",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO សម្រាប់សហគ្រាស"
   },
   "preferences": {
-    "title": "ចំណូលចិត្ត",
     "autoExpandThinking": "ពង្រីកការគិតដោយស្វ័យប្រវត្តិ",
     "autoExpandThinkingSubtitle": "បង្ហាញខ្លឹមសារនៃការគិតរបស់ភ្នាក់ងារទាំងមូល នៅពេលវាគិតរួច។",
     "keepScreenOn": "ទុកអេក្រង់ឱ្យបើកពេលនៅលើទំព័រវគ្គ",
@@ -360,7 +402,6 @@
       "unresolveThread": "សម្គាល់ការពិភាក្សាថាមិនទាន់ដោះស្រាយ",
       "resolved": "បានដោះស្រាយ",
       "outdated": "ហួសសម័យ",
-      "file": "ឯកសារ",
       "comment_one": "មតិយោបល់ 1",
       "comment": "មតិយោបល់ {{displayCount}}",
       "comment_other": "មតិយោបល់ {{displayCount}}",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "មិនអាចផ្ទុកមតិយោបល់បន្ថែមបានទេ។",
       "retryLoadingMore": "ព្យាយាមផ្ទុកមតិយោបល់បន្ថែមម្តងទៀត",
       "loadMoreComments": "ផ្ទុកមតិយោបល់បន្ថែម",
-      "closeReactions": "បិទប្រតិកម្ម",
-      "reactionsTitle": "ប្រតិកម្ម",
       "addReaction": "បន្ថែមប្រតិកម្ម",
       "reactionPill": "ប្រតិកម្ម {{emoji}} ចំនួន {{displayCount}} {{countLabel}}",
       "reaction_one": "ប្រតិកម្ម",
@@ -380,13 +419,11 @@
       "reportUser": "រាយការណ៍អ្នកប្រើប្រាស់",
       "mute": "បិទសំឡេង",
       "block": "រារាំង",
-      "reportSubmitted": "បានផ្ញើរបាយការណ៍។ លេខបង្កាន់ដៃ {{receiptId}}",
       "blockedUser": "បានរារាំង {{login}}",
       "mutedUser": "បានបិទសំឡេង {{login}}",
       "replyPlaceholder": "ឆ្លើយតប…",
       "replyBody": "ខ្លឹមសារឆ្លើយតប",
       "submitReply": "ផ្ញើការឆ្លើយតប",
-      "reply": "ឆ្លើយតប",
       "termsTitle": "លក្ខខណ្ឌនៃសេវាកម្ម",
       "termsCopy": "អ្នកត្រូវមានអាយុ 13 ឆ្នាំឡើងទៅ ទើបអាចបង្ហោះបាន។",
       "termsAcceptRetry": "មិនអាចទទួលយកលក្ខខណ្ឌបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។",
@@ -468,8 +505,7 @@
       "urlAccessibility": "URL សំណើបញ្ចូលកូដនៅលើ GitHub",
       "clearLink": "លុបតំណសំណើបញ្ចូលកូដ",
       "pasteLink": "បិទភ្ជាប់តំណសំណើបញ្ចូលកូដ",
-      "open": "បើក",
-      "openPullRequest": "បើកសំណើបញ្ចូលកូដ"
+      "open": "បើក"
     },
     "checks": {
       "title": "ការត្រួតពិនិត្យ",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "ប្រអប់ចូល",
-      "recent": "ថ្មីៗ",
       "loading": "កំពុងផ្ទុកប្រអប់ចូល",
       "noReviewRequests": "គ្មានសំណើពិនិត្យទេ",
       "noReviewRequestsDescription": "សំណើបញ្ចូលកូដដែលរង់ចាំអ្នកពិនិត្យនឹងបង្ហាញនៅទីនេះ។ អ្នកនៅតែអាចបិទភ្ជាប់តំណ PR ណាមួយខាងលើបាន។",
-      "couldNotLoad": "មិនអាចផ្ទុកប្រអប់ចូលបានទេ។",
-      "couldNotLoadMore": "មិនអាចផ្ទុកបន្ថែមបានទេ។",
-      "retryLoadingMore": "ព្យាយាមផ្ទុកបន្ថែមម្តងទៀត"
+      "couldNotLoad": "មិនអាចផ្ទុកប្រអប់ចូលបានទេ។"
     },
     "composer": {
       "commentBodyPlaceholder": "មតិយោបល់របស់អ្នក",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "មិនអាចផ្ទុកប្រអប់សរសេរមតិយោបល់បានទេ។",
       "discardTitle": "បោះបង់មតិយោបល់?",
       "discardMessage": "សេចក្តីព្រាងរបស់អ្នកនឹងបាត់បង់។",
-      "keepEditing": "បន្តកែសម្រួល",
       "comment": "អត្ថាធិប្បាយ",
       "insertSuggestionA11y": "បញ្ចូលសំណើកែប្រែកូដ",
       "insertSuggestion": "បញ្ចូលសំណើកែប្រែ",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "បានបញ្ចូលគ្នា",
-      "stateClosed": "បានបិទ",
       "stateOpenApproved": "បើក · បានអនុម័ត",
       "stateOpenChangesRequested": "បើក · បានស្នើសុំការកែប្រែ",
       "stateOpenReviewRequired": "បើក · ត្រូវការពិនិត្យ",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "ទំព័រដើម",
-    "profile": "ប្រវត្តិរូប",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ផ្ទាំងទី {{position}} ក្នុងចំណោម {{total}}",
-    "chat": "ជជែក"
+    "position": "{{name}}, ផ្ទាំងទី {{position}} ក្នុងចំណោម {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "ប្តូរអ៊ីនស្តង់",
       "couldNotLoadInstances": "មិនអាចផ្ទុកអ៊ីនស្តង់បានទេ។",
-      "noInstances": "គ្មានម៉ាស៊ីន KiloClaw",
       "noInstancesDescription": "រៀបចំអ៊ីនស្តង់មួយដើម្បីចាប់ផ្តើមជជែក។",
       "setUpKiloclaw": "រៀបចំ KiloClaw",
       "currentInstance": "{{title}} កំពុងប្រើ"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "មិនអាចចូលប្រើការជជែកបានទេ។",
       "couldNotRefreshMessages": "មិនអាចផ្ទុកសារឡើងវិញបានទេ។",
       "couldNotLoadHistory": "មិនអាចផ្ទុកប្រវត្តិការសន្ទនាបានទេ។",
-      "rename": "ប្តូរឈ្មោះ",
       "leave": "ចាកចេញ",
       "untitledConversation": "ការសន្ទនាគ្មានចំណងជើង",
       "createFailed": "មិនអាចបង្កើតការសន្ទនាបានទេ។",
       "leaveFailed": "មិនអាចចាកចេញពីការសន្ទនាបានទេ។"
     },
     "reactions": {
-      "title": "ប្រតិកម្ម",
-      "close": "បិទប្រតិកម្ម",
-      "recent": "ថ្មីៗ",
       "common": "ទូទៅ",
       "reactWith": "បន្ថែមប្រតិកម្ម {{reaction}}",
       "accessibility": "ប្រតិកម្ម {{emoji}} ចំនួន {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "មិនអាចបន្ថែមប្រតិកម្មបានទេ។",
       "retrySend": "ព្យាយាមផ្ញើម្តងទៀត",
       "moreReactions": "ប្រតិកម្មច្រើនទៀត",
-      "reply": "ឆ្លើយតប",
       "edit": "កែសម្រួល",
       "sendFailed": "មិនអាចផ្ញើសារបានទេ។",
       "retrySendFailed": "មិនអាចព្យាយាមផ្ញើម្តងទៀតបានទេ។",
@@ -807,7 +829,6 @@
       "takePhoto": "ថតរូប",
       "photoLibrary": "បណ្ណាល័យរូបថត",
       "files": "ឯកសារ",
-      "cameraAccessDisabled": "ការចូលប្រើកាមេរ៉ាត្រូវបានបិទ",
       "cameraAccessMessage": "សូមអនុញ្ញាតឱ្យចូលប្រើកាមេរ៉ានៅក្នុងការកំណត់ ដើម្បីថតរូប។"
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} កំពុងវាយសារ…"
     },
     "botStatus": {
-      "online": "អនឡាញ",
-      "idle": "ទំនេរ",
       "offline": "ក្រៅបណ្តាញ",
       "loadingUser": "កំពុងផ្ទុកព័ត៌មានអ្នកប្រើ...",
       "waitingForStatus": "កំពុងរង់ចាំស្ថានភាពបូត...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "មិនអាចផ្ទុកអ៊ីនស្តង់ KiloClaw បានទេ។",
     "billing": {
       "title": "ការគិតថ្លៃ",
@@ -840,7 +858,6 @@
       "plan": "ផែនការ",
       "finalTermEnds": "កាលបរិច្ឆេទបញ្ចប់អាណត្តិចុងក្រោយ",
       "afterFinalTerm": "ក្រោយអាណត្តិចុងក្រោយ",
-      "remaining": "នៅសល់",
       "lessThanOneDay": "តិចជាង 1 ថ្ងៃ",
       "ends": "កាលបរិច្ឆេទបញ្ចប់",
       "expires": "កាលបរិច្ឆេទផុតកំណត់",
@@ -941,20 +958,15 @@
       "disconnect": "ផ្តាច់ការភ្ជាប់គណនី Google",
       "copied": "បានចម្លង",
       "copyCommand": "ចម្លងពាក្យបញ្ជា",
-      "disabled": "បានបិទ",
       "disconnectConfirm": "ផ្តាច់ការភ្ជាប់",
       "disconnectMessage": "ដកគណនី Google របស់អ្នកចេញពីអ៊ីនស្តង់នេះ? សកម្មភាពនេះនឹងបិទការជូនដំណឹង Gmail។ ដាក់ពង្រាយឡើងវិញបន្ទាប់ពីផ្តាច់ការភ្ជាប់ ដើម្បីអនុវត្តការផ្លាស់ប្តូរ។",
       "disconnectTitle": "ផ្តាច់ការភ្ជាប់ Google"
     },
     "modelList": {
-      "title": "ម៉ូដែលទាំងអស់",
       "searchPlaceholder": "ស្វែងរកម៉ូដែល…",
-      "clearSearch": "លុបពាក្យស្វែងរក",
       "noMatches": "គ្មានម៉ូដែលដែលត្រូវនឹងការស្វែងរករបស់អ្នក",
-      "noModels": "គ្មានម៉ូដែលសម្រាប់ប្រើ",
       "noModelsDescription": "ម៉ូដែលនឹងបង្ហាញនៅទីនេះ នៅពេលអាចប្រើបាន។",
-      "noResultsFor": "គ្មានលទ្ធផលសម្រាប់ «{{query}}» ទេ។",
-      "recommended": "ណែនាំសម្រាប់អ្នក"
+      "noResultsFor": "គ្មានលទ្ធផលសម្រាប់ «{{query}}» ទេ។"
     },
     "secrets": {
       "title": "ព័ត៌មានសម្ងាត់",
@@ -972,8 +984,7 @@
       "setupGuide": "ការណែនាំអំពីការរៀបចំ",
       "saving": "កំពុងរក្សាទុក…",
       "removing": "កំពុងដកចេញ…",
-      "updateToken": "ធ្វើបច្ចុប្បន្នភាពថូខិន",
-      "connect": "ភ្ជាប់"
+      "updateToken": "ធ្វើបច្ចុប្បន្នភាពថូខិន"
     },
     "versionPin": {
       "title": "ការកំណត់កំណែថេរ",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "កំពុងបញ្ចប់ការរៀបចំ",
       "finishingSetupDescription": "សូមរង់ចាំបន្តិច យើងកំពុងបញ្ចប់ការរៀបចំគណនីរបស់អ្នក។ ជាធម្មតា វាចំណាយពេលតែបន្តិចប៉ុណ្ណោះ។",
       "getStarted": "ចាប់ផ្តើម",
-      "noInstances": "គ្មានម៉ាស៊ីន KiloClaw",
       "noInstancesDescription": "បង្កើតអ៊ីនស្តង់ដំបូងរបស់អ្នក ដើម្បីចាប់ផ្តើមដំណើរការភ្នាក់ងារសរសេរកូដ។"
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "ជជែកជាមួយ {{name}}",
-        "online": "អនឡាញ",
         "ready": "{{name}} បានត្រៀមរួចរាល់",
         "warmedUp": "អ្វីៗរួចរាល់ហើយ។ ចាប់ផ្តើមសួរសុខទុក្ខនៅពេលអ្នករួចរាល់។"
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "កម្រិតខ្ពស់បំផុត",
       "frontierDescription": "ប្រសិទ្ធភាពខ្ពស់បំផុត។ បញ្ជូនសំណើទៅម៉ូដែលកម្រិតខ្ពស់បំផុតដែលមានសមត្ថភាពវែកញែក។",
-      "balancedLabel": "មានតុល្យភាព",
       "balancedDescription": "មានតុល្យភាពល្អរវាងល្បឿន និងសមត្ថភាព ក្នុងតម្លៃទាបជាង។",
-      "performance": "ប្រសិទ្ធភាព",
       "autoModelA11y": "ម៉ូដែលស្វ័យប្រវត្តិ {{label}}",
       "currentModel": "ម៉ូដែលបច្ចុប្បន្ន",
       "browseAllModels": "ឬជ្រើសរើសពីម៉ូដែលជាង 500",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "បើក {{name}} មានសារមិនទាន់អាន {{displayCount}}",
       "openUnread": "បើក {{name}} មានសារមិនទាន់អាន {{displayCount}}",
       "openUnread_other": "បើក {{name}} មានសារមិនទាន់អាន {{displayCount}}",
-      "open": "បើក {{name}}",
       "openSettings": "បើកការកំណត់សម្រាប់ {{name}}",
       "fixOnKiloAi": "ដោះស្រាយនៅលើ kilo.ai៖ {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "ការពិនិត្យ",
       "cancelTitle": "បោះបង់ការត្រួតពិនិត្យ?",
       "cancelMessage": "នេះនឹងបញ្ឈប់ការត្រួតពិនិត្យកូដដែលកំពុងដំណើរការ។",
-      "keepRunning": "បន្តដំណើរការ",
       "cancelReview": "បោះបង់ការត្រួតពិនិត្យ",
       "retryTitle": "ព្យាយាមត្រួតពិនិត្យម្តងទៀត?",
       "retryMessage": "នេះនឹងដំណើរការការត្រួតពិនិត្យកូដឡើងវិញ។",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} ដោយ {{author}}",
       "noFindings": "រកមិនឃើញបញ្ហាទេ។",
       "showMore": "បង្ហាញបន្ថែម",
-      "branch": "សាខា",
       "created": "បានបង្កើត",
       "started": "បានចាប់ផ្តើម",
       "completed": "បានបញ្ចប់",
       "tokens": "ថូខិន",
       "tokensInOut": "{{input}} ចូល / {{output}} ចេញ",
-      "openPullRequest": "បើកសំណើបញ្ចូលកូដ",
       "council": "ក្រុមប្រឹក្សា",
       "decision": "ការសម្រេចចិត្ត",
       "gate": "លក្ខខណ្ឌឆ្លងកាត់",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "ការចងចាំពីការពិនិត្យ",
-      "couldNotLoadMore": "មិនអាចផ្ទុកបន្ថែមបានទេ។",
-      "retryLoadingMore": "ព្យាយាមផ្ទុកបន្ថែមម្តងទៀត",
       "loading": "កំពុងផ្ទុកអង្គចងចាំសម្រាប់ការត្រួតពិនិត្យ",
       "couldNotLoad": "មិនអាចផ្ទុកអង្គចងចាំសម្រាប់ការត្រួតពិនិត្យបានទេ។",
       "off": "អង្គចងចាំសម្រាប់ការត្រួតពិនិត្យត្រូវបានបិទ។",
@@ -1347,15 +1348,11 @@
       "setup": "ការរៀបចំ Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "បានភ្ជាប់ Bitbucket",
-      "title": "ភ្ជាប់ Bitbucket",
       "description": "បង្កើតថូខឹនចូលប្រើកន្លែងធ្វើការដែលមានសិទ្ធិចាំបាច់ រួចបិទភ្ជាប់វាខាងក្រោម។",
       "scopes": "គណនី៖ អាន · ឃ្លាំងកូដ៖ អាន/សរសេរ · សំណើបញ្ចូលកូដ៖ អាន · វេបហ៊ុក៖ អាន/សរសេរ",
-      "tokenPlaceholder": "ថូខឹនចូលប្រើកន្លែងធ្វើការ",
-      "connect": "ភ្ជាប់"
+      "tokenPlaceholder": "ថូខឹនចូលប្រើកន្លែងធ្វើការ"
     },
     "scopeList": {
-      "couldNotLoad": "មិនអាចផ្ទុកស្ថាប័នបានទេ។",
       "personalStillAvailable": "ឃ្លាំងកូដផ្ទាល់ខ្លួននៅតែអាចប្រើបាននៅខាងក្រោម។",
       "personalSubtitle": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក",
       "viewOnly": "មើលតែប៉ុណ្ណោះ"
@@ -1378,7 +1375,6 @@
       "githubApp": "កម្មវិធី GitHub",
       "githubError": "មិនអាចបើកការរៀបចំ GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។",
       "gitlabAccount": "គណនី GitLab",
-      "connectGitLab": "ភ្ជាប់ GitLab",
       "gitlabError": "មិនអាចបើកការរៀបចំ GitLab បានទេ។ សូមព្យាយាមម្តងទៀត។",
       "description": "ភ្ជាប់ {{label}} របស់ Kilo ដើម្បីត្រួតពិនិត្យសំណើបញ្ចូលកូដដោយស្វ័យប្រវត្តិ។",
       "bitbucketError": "មិនអាចបើកការរៀបចំ Bitbucket បានទេ។ សូមព្យាយាមម្តងទៀត។"
@@ -1403,21 +1399,17 @@
     "updateFailed": "មិនអាចធ្វើបច្ចុប្បន្នភាពឧបករណ៍ត្រួតពិនិត្យកូដបានទេ។",
     "configSaveFailed": "មិនអាចរក្សាទុកការកំណត់ការត្រួតពិនិត្យបានទេ។",
     "status": {
-      "pending": "កំពុងរង់ចាំ",
       "running": "កំពុងដំណើរការ",
       "completed": "បានបញ្ចប់",
-      "failed": "បរាជ័យ",
       "interrupted": "បានផ្អាកកណ្តាលទី"
     },
     "reviewStyle": {
       "strict": "តឹងរ៉ឹង",
-      "balanced": "មានតុល្យភាព",
       "lenient": "ធូររលុង",
       "roast": "រិះគន់បែបកំប្លែង"
     },
     "focusArea": {
       "security": "សុវត្ថិភាព",
-      "performance": "ប្រសិទ្ធភាព",
       "bugs": "កំហុស",
       "style": "រចនាប័ទ្មកូដ",
       "testing": "ការធ្វើតេស្ត",
@@ -1468,7 +1460,6 @@
       "statusOpen": "បើក",
       "fixed": "បានកែតម្រូវ",
       "statusIgnored": "មិនអើពើ",
-      "statusClosed": "បានបិទ",
       "severityHigh": "ខ្ពស់",
       "severityMedium": "មធ្យម",
       "severityLow": "ទាប",
@@ -1655,7 +1646,6 @@
       "title": "ការកំណត់",
       "couldNotLoadSettings": "មិនអាចផ្ទុកការកំណត់ភ្នាក់ងារសុវត្ថិភាពបានទេ។",
       "couldNotLoadPermissions": "មិនអាចផ្ទុកសិទ្ធិបានទេ។",
-      "disabled": "បានបិទ",
       "on": "បើក",
       "repositoriesCount_one": "បានជ្រើសរើសឃ្លាំងកូដចំនួន {{displayCount}}",
       "repositoriesCount": "បានជ្រើសរើសឃ្លាំងកូដ {{displayCount}}",
@@ -1683,7 +1673,6 @@
       "retry": "ព្យាយាមជួសជុលម្តងទៀត",
       "cancelTitle": "បោះបង់ការជួសជុលនេះ?",
       "cancelMessage": "ភ្នាក់ងារសុវត្ថិភាពនឹងបញ្ឈប់ការព្យាយាមជួសជុលដែលកំពុងដំណើរការ។",
-      "keepRunning": "បន្តដំណើរការ",
       "cancelRemediation": "បោះបង់ការជួសជុល",
       "openPullRequest": "បើកសំណើបញ្ចូលកូដ{{number}}",
       "openDraftPullRequest": "បើកសេចក្តីព្រាងសំណើបញ្ចូលកូដ{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "ប្រវត្តិនៃការព្យាយាម ({{displayCount}})",
       "attemptNumber": "ការព្យាយាមលើកទី {{number}}",
       "startedBy": "ចាប់ផ្តើមដោយ",
-      "branch": "សាខា",
       "queued": "បានដាក់ការជួសជុលក្នុងជួររង់ចាំ",
       "retryQueued": "បានដាក់ការព្យាយាមជួសជុលម្តងទៀតក្នុងជួររង់ចាំ",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "គ្មានបញ្ហាដែលរកឃើញត្រូវនឹងតម្រង",
       "noMatchesDescription": "សាកល្បងកែប្រែ ឬដកតម្រងដែលបានជ្រើសរើសចេញ។",
       "emptyTitle": "គ្មានបញ្ហាដែលរកឃើញនៅបើក",
-      "emptyDescription": "ឥឡូវនេះគ្មានបញ្ហាដែលរកឃើញនៅបើក ដែលត្រូវការយកចិត្តទុកដាក់ទេ។",
-      "clearFilters": "ដកតម្រងចេញ"
+      "emptyDescription": "ឥឡូវនេះគ្មានបញ្ហាដែលរកឃើញនៅបើក ដែលត្រូវការយកចិត្តទុកដាក់ទេ។"
     },
     "scopeList": {
-      "couldNotLoad": "មិនអាចផ្ទុកស្ថាប័នបានទេ។",
       "personalSubtitle": "ឃ្លាំងកូដផ្ទាល់ខ្លួនរបស់អ្នក"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "បានបើកសេចក្តីព្រាង PR",
       "prOpened": "បានបើក PR",
       "blocked": "ត្រូវបានរារាំង",
-      "failed": "បរាជ័យ",
       "noChangesNeeded": "មិនចាំបាច់ផ្លាស់ប្តូរ",
       "originAutomaticPolicy": "គោលការណ៍ស្វ័យប្រវត្តិ",
       "originIncludeExistingPolicy": "គោលការណ៍រួមបញ្ចូលបញ្ហាដែលរកឃើញស្រាប់",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "កំពុងស្វែងរក",
       "searchSessions": "ស្វែងរកវគ្គ",
-      "searchSessionsPlaceholder": "ស្វែងរកវគ្គ",
-      "clearSearch": "លុបពាក្យស្វែងរក",
-      "clearFilters": "ដកតម្រងចេញ"
+      "searchSessionsPlaceholder": "ស្វែងរកវគ្គ"
     },
     "sessionList": {
-      "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
       "couldNotLoadActive": "មិនអាចផ្ទុកវគ្គសកម្មបានទេ។",
       "noSessionsYetDescription": "ចាប់ផ្តើមកិច្ចការសរសេរកូដពីទូរស័ព្ទរបស់អ្នក។ វគ្គរបស់អ្នកនឹងបង្ហាញនៅទីនេះ។",
       "noMatches": "គ្មានវគ្គដែលត្រូវគ្នា",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "លុបវគ្គ?",
       "deleteMessage": "សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។",
       "deleteSession": "លុបវគ្គ",
-      "rename": "ប្តូរឈ្មោះ",
       "renameMessage": "បញ្ចូលឈ្មោះថ្មីសម្រាប់វគ្គនេះ។",
       "copyId": "ចម្លងលេខសម្គាល់វគ្គ",
       "idCopied": "បានចម្លងលេខសម្គាល់វគ្គ",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "អ្នកមិនមានសិទ្ធិមើលធាតុនេះទេ។",
       "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
       "failedToLoadDetails": "មិនអាចផ្ទុកព័ត៌មានលម្អិតនៃវគ្គបានទេ។",
-      "notFound": "រកមិនឃើញទេ។",
       "notFoundDescription": "ធាតុនេះអាចត្រូវបានដកចេញ ឬលែងមានទៀតហើយ។",
       "failedToStopExecution": "មិនអាចបញ្ឈប់ការដំណើរការបានទេ។",
       "renameSession": "ប្តូរឈ្មោះវគ្គ",
@@ -2076,7 +2056,6 @@
       "retryConnection": "ព្យាយាមភ្ជាប់ម្តងទៀត"
     },
     "newSession": {
-      "title": "វគ្គថ្មី",
       "connectGithubDescription": "ភ្ជាប់ GitHub ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
       "openGithub": "បើក GitHub",
       "refreshRepositories": "ផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញ",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "មិនអាចផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "discardDraftTitle": "បោះបង់សេចក្តីព្រាង?",
       "discardDraftMessage": "សេចក្តីណែនាំដែលអ្នកបានសរសេរនឹងបាត់បង់។",
-      "keepEditing": "បន្តកែសម្រួល",
       "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "remoteHint": "ដំណើរការ `kilo remote` នៅលើកុំព្យូទ័ររបស់អ្នក ឬ `/remote` នៅក្នុងវគ្គ CLI ដែលកំពុងដំណើរការ ដើម្បីគ្រប់គ្រងដំណើរការ kilo ក្នុងមូលដ្ឋាន។",
-      "bitbucketConnected": "បានភ្ជាប់ Bitbucket",
-      "connectBitbucket": "ភ្ជាប់ Bitbucket",
       "connectBitbucketDescription": "ភ្ជាប់ Bitbucket ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
-      "connectGitlab": "ភ្ជាប់ GitLab",
       "connectGitlabDescription": "ភ្ជាប់ GitLab ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
       "couldNotLoadBitbucketRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី Bitbucket បានទេ។",
       "couldNotLoadGithubRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី GitHub បានទេ។",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "ឧបករណ៍ {{name}}, {{status}}",
       "fileEmpty": "ឯកសារនេះទទេ។",
       "noTasks": "គ្មានកិច្ចការ។",
-      "contentTruncated": "មាតិកាត្រូវបានកាត់ឱ្យខ្លី",
       "truncated": "បានកាត់ឱ្យខ្លី",
       "toolRead": "អាន",
       "toolEdit": "កែសម្រួល",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "សូមសាកល្បងពាក្យស្វែងរកផ្សេង។",
       "loading": "កំពុងផ្ទុក...",
       "accessibility": "ឃ្លាំងកូដ: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "ព័ត៌មានលម្អិតនៃសារ",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "ការសរសេរទៅឃ្លាំងបណ្ដោះអាសន្ន",
       "total": "សរុប",
       "reportAiResponseFailedRetryable": "មិនអាចរាយការណ៍ចម្លើយនេះបានទេ។",
-      "reportAiResponseFailedTerminal": "មិនអាចរាយការណ៍ចម្លើយនេះបានទេ។",
-      "reportAiResponseSubmitted": "បានផ្ញើរបាយការណ៍។ លេខបង្កាន់ដៃ {{receiptId}}"
+      "reportAiResponseFailedTerminal": "មិនអាចរាយការណ៍ចម្លើយនេះបានទេ។"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "មើលរូបភាព {{alt}}",
       "imageOutput": "លទ្ធផលរូបភាព",
       "imageOutputWithFilename": "លទ្ធផលរូបភាព, {{filename}}",
-      "defaultName": "ឯកសារ",
       "openFullScreen": "បើក {{name}} ពេញអេក្រង់",
       "preview": "មើល {{name}} ជាមុន",
-      "openFile": "បើក {{name}}",
       "couldNotLoadFile": "មិនអាចផ្ទុកឯកសារនេះបានទេ។",
       "couldNotLoadFileRetry": "មិនអាចផ្ទុកឯកសារនេះបានទេ។ ព្យាយាមម្តងទៀត។",
       "retryLoadingFile": "ព្យាយាមផ្ទុកឯកសារម្តងទៀត",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "ជ្រើសរើសម៉ូដែល",
       "searchPlaceholder": "ស្វែងរកម៉ូដែល…",
-      "noModels": "គ្មានម៉ូដែលសម្រាប់ប្រើ",
       "noModelsDescription": "គ្មានម៉ូដែលណាអាចជ្រើសរើសបានទេ។",
-      "favorites": "ចំណូលចិត្ត",
-      "recommended": "ណែនាំសម្រាប់អ្នក",
-      "allModels": "ម៉ូដែលទាំងអស់"
+      "favorites": "ចំណូលចិត្ត"
     },
     "modelSelector": {
       "provider": "អ្នកផ្តល់សេវា {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "កាមេរ៉ា",
       "photoLibrary": "បណ្ណាល័យរូបថត",
       "files": "ឯកសារ",
-      "cameraAccessDisabled": "ការចូលប្រើកាមេរ៉ាត្រូវបានបិទ",
       "cameraAccessMessage": "សូមអនុញ្ញាតឱ្យចូលប្រើកាមេរ៉ានៅក្នុងការកំណត់ ដើម្បីថតរូប។",
       "couldNotOpenPhotoPicker": "មិនអាចបើកផ្ទាំងជ្រើសរើសរូបថតបានទេ។ ចាប់ផ្តើម Kilo ឡើងវិញ ហើយព្យាយាមម្តងទៀត។",
       "maxFilesAllowed": "អាចភ្ជាប់ឯកសារបានច្រើនបំផុតចំនួន {{displayCount}}។",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "បានចម្លងតំណ",
-      "reviewPr": "ពិនិត្យ PR",
       "openLink": "បើកតំណ",
-      "copyLink": "ចម្លងតំណ",
       "shareLink": "ចែករំលែកតំណ",
       "share": "ចែករំលែក",
       "prLinkActions": "សកម្មភាពតំណ PR",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "បរិបទប្រើតូខេន {{used}} ក្នុងចំណោម {{window}} បានប្រើ {{percentage}}",
       "title": "ការប្រើប្រាស់បរិបទ",
       "used": "បានប្រើ",
-      "remaining": "នៅសល់",
       "provider": "អ្នកផ្តល់សេវា",
       "totalCost": "ថ្លៃចំណាយសរុប",
       "usageReflectsLatest": "ទិន្នន័យការប្រើប្រាស់នេះផ្អែកលើចម្លើយចុងក្រោយដែលជំនួយការបានបង្កើតរួច។",
@@ -2598,7 +2561,6 @@
     "billingPage": "ទំព័រគិតប្រាក់"
   },
   "deviceSessions": {
-    "couldNotLoad": "មិនអាចផ្ទុកវគ្គបានទេ។",
     "couldNotLoadDescription": "អ្នកមិនអាចមើលវគ្គសកម្មបានទេ រហូតដល់ទិន្នន័យនេះផ្ទុករួច។",
     "currentDeviceUnidentified": "មិនអាចកំណត់អត្តសញ្ញាណឧបករណ៍បច្ចុប្បន្នបានទេ។",
     "noSessions": "គ្មានវគ្គសកម្មទេ",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "មានតែការចូលគណនីតាមកម្មវិធី Kilo ប៉ុណ្ណោះដែលបង្ហាញនៅទីនេះ។ ការចូលគណនីតាមកម្មវិធីកែកូដ និង CLI មិនមានក្នុងបញ្ជីនេះទេ។",
     "signedIn": "ចូលគណនីនៅ {{signedIn}} · សកម្មចុងក្រោយនៅ {{lastSeen}}",
     "thisDevice": "ឧបករណ៍នេះ",
-    "title": "វគ្គប្រើប្រាស់លើឧបករណ៍",
     "viewProfile": "មើលប្រវត្តិរូប",
     "signOutThisDevice": "ចេញពីគណនីលើឧបករណ៍នេះ",
     "signOutThisSession": "ចេញពីគណនីក្នុងវគ្គនេះ",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "តំណនេះលែងមានសុពលភាពទៀតហើយ។",
-    "goBack": "ត្រឡប់ក្រោយ",
     "title": "រកមិនឃើញទំព័រ"
   },
   "monoScrollBlock": {
-    "contentTruncated": "មាតិកាត្រូវបានកាត់ឱ្យខ្លី",
     "truncated": "បានកាត់ឱ្យខ្លី",
     "wrap": "បំបែកបន្ទាត់",
     "scroll": "រមូរ"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "សូមព្យាយាមម្តងទៀត។",
     "offlineTitle": "មិនអាចផ្ទុកបានទេ។",
     "permissionDescription": "អ្នកមិនមានសិទ្ធិមើលធាតុនេះទេ។",
-    "notFoundTitle": "រកមិនឃើញទេ។",
     "notFoundDescription": "ធាតុនេះអាចត្រូវបានដកចេញ ឬលែងមានទៀតហើយ។",
     "serverTitle": "មិនអាចផ្ទុកបានទេ។",
     "serverDescription": "មានអ្វីមួយខុសប្រក្រតីនៅខាងយើង។ សូមព្យាយាមម្តងទៀត។"
   },
   "screenHeader": {
     "openMenu": "បើកម៉ឺនុយ",
-    "openMenuFor": "បើកម៉ឺនុយសម្រាប់ {{title}}",
-    "goBack": "ត្រឡប់ក្រោយ"
+    "openMenuFor": "បើកម៉ឺនុយសម្រាប់ {{title}}"
   },
   "picker": {
     "optionsExpired": "ជម្រើសបានផុតកំណត់",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "ចែករំលែកទៅ Kilo",
-    "reviewPr": "ពិនិត្យ PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "វគ្គថ្មី",
     "searchPlaceholder": "ស្វែងរកវគ្គថ្មីៗ",
     "connectedCli": "នៅលើ CLI ដែលបានភ្ជាប់",
     "newSessionOn": "វគ្គថ្មីនៅលើ {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass កំពុងបោះបង់",
     "statusPastDue": "Kilo Pass ហួសកំណត់ទូទាត់",
     "monthlyCredits": "ក្រេឌីតប្រចាំខែ {{credits}}",
-    "ends": "បញ្ចប់នៅ {{date}}",
     "periodEnd": "ចុងរយៈពេល",
     "managedOnGooglePlay": "គ្រប់គ្រងនៅលើ Google Play",
     "managedInAppStore": "គ្រប់គ្រងក្នុង App Store",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "មិនអាចទិញ Kilo Pass ក្នុងកម្មវិធីលើ Android បានទេ។ សូមគ្រប់គ្រងវានៅលើគេហទំព័រ។",
     "webManagementDescription": "Kilo Pass នេះត្រូវបានគ្រប់គ្រងនៅលើគេហទំព័រ។",
     "legalDisclosure": "Kilo Pass គឺជាការជាវប្រចាំខែដែលបន្តដោយស្វ័យប្រវត្តិ។ ប្រាក់នឹងត្រូវគិតតាម Apple ID របស់អ្នក នៅពេលអ្នកបញ្ជាក់ការទិញ។ ការជាវបន្តដោយស្វ័យប្រវត្តិរៀងរាល់ខែតាមតម្លៃដែលបានបង្ហាញ លុះត្រាតែអ្នកបោះបង់យ៉ាងហោចណាស់ 24 ម៉ោងមុនរយៈពេលបច្ចុប្បន្នបញ្ចប់។ អ្នកអាចគ្រប់គ្រង ឬបោះបង់នៅពេលណាក៏បាន ក្នុងការកំណត់គណនី App Store របស់អ្នក។",
-    "legalPrivacyPolicy": "គោលការណ៍ឯកជនភាព",
     "legalTermsOfUse": "លក្ខខណ្ឌនៃការប្រើប្រាស់ (EULA)",
     "purchaseDifferentAccount": "ការទិញ App Store នេះមិនត្រូវបានភ្ជាប់ទៅគណនី Kilo របស់អ្នកទេ។ ចូលជាមួយ Apple Account ដែលបានប្រើសម្រាប់ការទិញ បន្ទាប់មកព្យាយាមម្តងទៀត។",
     "restoreFailed": "មិនអាចស្តារការទិញឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "សូមបញ្ចូលអាសយដ្ឋានអ៊ីមែលត្រឹមត្រូវ។",
-      "emailLabel": "អ៊ីមែល",
       "emailPlaceholder": "ឈ្មោះ@company.com",
       "permissionDenied": "អ្នកមិនមានសិទ្ធិអញ្ជើញសមាជិកទេ។",
       "roleLabel": "តួនាទី",
@@ -2968,7 +2920,6 @@
         "billingManager": "អ្នកគ្រប់គ្រងការគិតប្រាក់"
       },
       "emailStatusFailed": "ផ្ញើអ៊ីមែលមិនបានសម្រេច",
-      "emailStatusPending": "កំពុងរង់ចាំ",
       "inviteCreated": "បានបង្កើតការអញ្ជើញ",
       "pendingInvitations": "ការអញ្ជើញដែលរង់ចាំការឆ្លើយតប",
       "resendInvite": "ផ្ញើការអញ្ជើញម្តងទៀត",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "មិនអាចផ្ទុកស្ថានភាពបានទេ",
       "creditProcessingDelayed": "ការដំណើរការឥណទានយឺតយ៉ាវ · កំពុងព្យាយាមម្តងទៀតដោយស្វ័យប្រវត្តិ",
       "ended": "បានបញ្ចប់",
-      "endsOn": "បញ្ចប់នៅ {{date}}",
       "manageHint": "បើកការគ្រប់គ្រង Kilo Pass នៅលើគេហទំព័រ។",
       "notSubscribed": "មិនបានជាវ",
       "overallocated": "ចំនួន Kilo Pass ដែលបានចាត់ចែងលើសចំនួនកន្លែងសមាជិកដែលបានបង់ប្រាក់",
@@ -3004,7 +2954,6 @@
       "paymentPending": "កំពុងរង់ចាំការទូទាត់",
       "processingBlocked": "ការដំណើរការត្រូវបានរារាំង",
       "processingNeedsReview": "ការដំណើរការត្រូវការការពិនិត្យ",
-      "retry": "ព្យាយាមម្តងទៀត",
       "retryHint": "ព្យាយាមផ្ទុកស្ថានភាព Kilo Pass ម្តងទៀត។",
       "setupHint": "បើកការរៀបចំ Kilo Pass នៅលើគេហទំព័រ។"
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "ត្រឡប់ទៅការកំណត់"
   },
   "quickChat": {
-    "title": "ជជែក",
     "empty": {
       "title": "ចាប់ផ្តើមជជែក",
       "description": "ផ្ញើសារដើម្បីជជែកជាមួយម៉ូដែល។"
@@ -3076,7 +3024,6 @@
     "openAgents": "បើកភ្នាក់ងារ",
     "running": "កំពុងដំណើរការ",
     "needsInput": "ត្រូវការការឆ្លើយតប",
-    "idle": "ទំនេរ",
     "channelName": "ភ្នាក់ងារសកម្ម",
     "activityKitDisabledBody": "បើកសកម្មភាពបន្តផ្ទាល់នៅក្នុងការកំណត់ ដើម្បីមើលភ្នាក់ងារសកម្មនៅលើអេក្រង់ចាក់សោ។"
   }

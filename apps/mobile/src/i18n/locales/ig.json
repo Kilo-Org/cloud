@@ -69,7 +69,58 @@
     "repository": "Ebe nchekwa koodu",
     "signOut": "Pụọ",
     "agents": "Ndị enyemaka",
-    "all": "Niile"
+    "all": "Niile",
+    "allModels": "Ihe nlereanya niile",
+    "balanced": "Nhatanha",
+    "bitbucketConnected": "Ejikọọla Bitbucket",
+    "branch": "Alaka",
+    "cameraAccessDisabled": "Enweghị ikike iji igwefoto",
+    "chat": "Nkata",
+    "clearFilters": "Kpochapụ nzacha",
+    "clearSearch": "Kpochapụ ọchụchọ",
+    "closed": "Emechiri",
+    "closeReactions": "Mechie mmeghachi omume",
+    "connect": "Jikọọ",
+    "connectBitbucket": "Jikọọ Bitbucket",
+    "connectGitlab": "Jikọọ GitLab",
+    "contentTruncated": "Ebipụrụ akụkụ ọdịnaya",
+    "copyLink": "Detuo njikọ",
+    "couldNotLoadOrganizations": "Enweghị ike ibudata òtù.",
+    "couldNotLoadSessions": "Enweghị ike ibudata nnọkọ.",
+    "couldnTLoadMore": "Enweghị ike ibudata ọzọ.",
+    "deviceSessions": "Nnọkọ ngwaọrụ",
+    "disabled": "Agbanyụrụ",
+    "email": "Ozi ịntanetị",
+    "ends": "Ga-agwụ na {{date}}",
+    "failed": "Emezughị",
+    "file": "Faịlụ",
+    "gitlab": "GitLab",
+    "goBack": "Laghachi azụ",
+    "idle": "Anaghị arụ ọrụ",
+    "keepEditing": "Nọgide na-edezi",
+    "keepRunning": "Hapụ ka ọ na-arụ ọrụ",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Nnọkọ ọhụrụ",
+    "noKiloclawInstances": "Enweghị sistemụ KiloClaw",
+    "noModelsAvailable": "Enweghị ihe nlereanya dị",
+    "notFound": "Ahụghị ya.",
+    "online": "Dị n'ịntanetị",
+    "open": "Mepee {{name}}",
+    "openPullRequest": "Meghe arịrịọ ijikọ koodu",
+    "pending": "Na-echere",
+    "performance": "Arụmọrụ",
+    "preferences": "Mmasị",
+    "privacyPolicy": "Amụma nzuzo",
+    "profile": "Profaịlụ",
+    "reactions": "Mmeghachi omume",
+    "recent": "Ndị na-adịbeghị anya",
+    "recommended": "Atụrụ aro",
+    "remaining": "Fọdụrụ",
+    "rename": "Gbanwee aha",
+    "reply": "Zaghachi",
+    "reportSubmittedReceipt": "Ezigaala mkpesa. Nnata: {{receiptId}}.",
+    "retryLoadingMore": "Nwaaghachi ibudata ihe ndị ọzọ",
+    "reviewPr": "Nyochaa PR"
   },
   "language": {
     "title": "Asụsụ",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Enweghị ike ịmalitegharị",
     "languageSaved": "Echekwaala asụsụ gị.",
     "catalogLoadFailed": "Enweghị ike ibudata asụsụ ahụ. Biko nwaa ọzọ.",
-    "retry": "Nwaa ọzọ",
     "search": "Asụsụ ị na-achọ",
     "noMatches": "Enweghị asụsụ dabara n'ihe ị na-achọ",
     "deviceLanguage": "Asụsụ ngwaọrụ",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Koodu nbanye: {{code}}",
     "openSignInPageInBrowser": "Mepee ibe nbanye na ihe nchọgharị",
     "copySignInLink": "Detuo njikọ nbanye",
-    "copyLink": "Detuo njikọ",
     "cancelSignIn": "Kagbuo nbanye",
     "startingSignIn": "Na-amalite nbanye...",
     "organizationUsesSso": "Nzukọ gị na-eji nbanye otu ugboro.",
@@ -112,7 +161,6 @@
     "terms": "Ụkpụrụ anyị",
     "termsConnector": " na ",
     "termsSuffix": ".",
-    "privacyPolicy": "Amụma nzuzo",
     "moreSignInOptions": "Nhọrọ nbanye ndị ọzọ",
     "couldNotCompleteSignIn": "Enweghị ike imecha nbanye. Biko nwaa ọzọ.",
     "sessionEnded": "Nnọkọ gị agwụla. Biko banye ọzọ.",
@@ -126,7 +174,6 @@
     "or": "ma ọ bụ"
   },
   "profile": {
-    "title": "Profaịlụ",
     "codeReviewerSubtitle": "Nyocha PR akpaghị aka",
     "securityAgentSubtitle": "Chọta ma dozie adịghị ike nchebe",
     "reviews": "Nyocha",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Akaụntụ ejikọrọ",
     "couldNotLoadAccounts": "Enweghị ike ibudata akaụntụ.",
     "app": "Ngwa",
-    "preferences": "Mmasị",
     "preferencesSubtitle": "Ọdịdị, ọkwa, iche echiche, na omume ihuenyo",
-    "deviceSessions": "Nnọkọ ngwaọrụ",
     "deviceSessionsSubtitle": "Nyochaa ma pụọ na ngwaọrụ ndị ọzọ",
     "feedback": "Nzaghachi",
     "privacyChoices": "Nhọrọ nzuzo",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Ozi ịntanetị",
     "providerTestAccount": "Akaụntụ nnwale",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSO ụlọ ọrụ"
   },
   "preferences": {
-    "title": "Mmasị",
     "autoExpandThinking": "Gbasaa echiche na-akpaghị aka",
     "autoExpandThinkingSubtitle": "Gosi echiche onye nnọchi anya n'ụzọ zuru ezu mgbe ọ mechara iche echiche.",
     "keepScreenOn": "Hapụ ihuenyo ka ọ na-enwu n'ibe nnọkọ",
@@ -360,7 +402,6 @@
       "unresolveThread": "Wepụ akara ndozi n'usoro mkparịta ụka",
       "resolved": "Edoziela",
       "outdated": "Ochie",
-      "file": "Faịlụ",
       "comment_one": "okwu 1",
       "comment": "nkwupụta {{displayCount}}",
       "comment_other": "nkwupụta {{displayCount}}",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Enweghị ike ibudata okwu ndị ọzọ.",
       "retryLoadingMore": "Nwaa ọzọ ibudata okwu ndị ọzọ",
       "loadMoreComments": "Budata okwu ndị ọzọ",
-      "closeReactions": "Mechie mmeghachi omume",
-      "reactionsTitle": "Mmeghachi omume",
       "addReaction": "Tinye mmeghachi omume",
       "reactionPill": "mmeghachi omume {{emoji}}, {{displayCount}} {{countLabel}}",
       "reaction_one": "mmeghachi omume",
@@ -380,13 +419,11 @@
       "reportUser": "Kpesa onye ọrụ",
       "mute": "Mechie ọnụ",
       "block": "Gbochie",
-      "reportSubmitted": "Ezigaala mkpesa. Nnata: {{receiptId}}.",
       "blockedUser": "Egbochiela {{login}}",
       "mutedUser": "Emechiela {{login}} ọnụ",
       "replyPlaceholder": "Azịza gị…",
       "replyBody": "Ederede azịza",
       "submitReply": "Ziga azịza",
-      "reply": "Zaghachi",
       "termsTitle": "Usoro ojiji",
       "termsCopy": "Ị ga-erurịrị afọ 13 ma ọ bụ karịa tupu ị bipụta ozi.",
       "termsAcceptRetry": "Enweghị ike ịnakwere usoro ojiji. Lelee njikọ gị ma nwaa ọzọ.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "URL arịrịọ njikọta GitHub",
       "clearLink": "Hichapụ njikọ arịrịọ njikọta",
       "pasteLink": "Mado njikọ arịrịọ njikọta",
-      "open": "Meghe",
-      "openPullRequest": "Meghe arịrịọ ijikọ koodu"
+      "open": "Meghe"
     },
     "checks": {
       "title": "Nnwale",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Igbe nnabata",
-      "recent": "Ndị na-adịbeghị anya",
       "loading": "Na-ebudata igbe nnabata",
       "noReviewRequests": "Enweghị arịrịọ nyocha",
       "noReviewRequestsDescription": "Arịrịọ njikọta na-echere nyocha gị na-apụta ebe a. Ị ka nwere ike ịmado njikọ PR ọ bụla n'elu.",
-      "couldNotLoad": "Enweghị ike ibudata igbe nnabata.",
-      "couldNotLoadMore": "Enweghị ike ibudata ọzọ.",
-      "retryLoadingMore": "Nwaaghachi ibudata ihe ndị ọzọ"
+      "couldNotLoad": "Enweghị ike ibudata igbe nnabata."
     },
     "composer": {
       "commentBodyPlaceholder": "Okwu gị",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Enweghị ike ibudata ebe a na-ede okwu.",
       "discardTitle": "Tụfuo okwu?",
       "discardMessage": "Ihe ị dere ga-efu.",
-      "keepEditing": "Nọgide na-edezi",
       "comment": "Nkwupụta",
       "insertSuggestionA11y": "Tinye aro koodu",
       "insertSuggestion": "Tinye aro",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Ejikọtara",
-      "stateClosed": "Emechiri",
       "stateOpenApproved": "Emeghe · akwadoro",
       "stateOpenChangesRequested": "Emeghe · arịọrọ mgbanwe",
       "stateOpenReviewRequired": "Emeghe · achọrọ nyocha",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Mbido",
-    "profile": "Profaịlụ",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, taabụ, {{position}} n'ime {{total}}",
-    "chat": "Nkata"
+    "position": "{{name}}, taabụ, {{position}} n'ime {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Nhọrọ sava",
       "couldNotLoadInstances": "Enweghị ike ibudata ndepụta sava.",
-      "noInstances": "Enweghị sistemụ KiloClaw",
       "noInstancesDescription": "Hazie sava ka ị malite ịkparịta ụka.",
       "setUpKiloclaw": "Hazie KiloClaw",
       "currentInstance": "{{title}}, nke a na-eji ugbu a"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Enweghị ike ịbanye na mkparịta ụka.",
       "couldNotRefreshMessages": "Enweghị ike imelite ozi.",
       "couldNotLoadHistory": "Enweghị ike ibudata ndekọ mkparịta ụka.",
-      "rename": "Gbanwee aha",
       "leave": "Hapụ",
       "untitledConversation": "Mkparịta ụka enweghị aha",
       "createFailed": "Enweghị ike imepụta mkparịta ụka.",
       "leaveFailed": "Enweghị ike ịhapụ mkparịta ụka."
     },
     "reactions": {
-      "title": "Mmeghachi omume",
-      "close": "Mechie mmeghachi omume",
-      "recent": "Ndị na-adịbeghị anya",
       "common": "Nke a na-ejikarị",
       "reactWith": "Jiri {{reaction}} gosi mmeghachi omume",
       "accessibility": "{{emoji}} mmeghachi omume, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Enweghị ike ịgbakwunye mmeghachi omume.",
       "retrySend": "Nwaa iziga ọzọ",
       "moreReactions": "Mmeghachi omume ndị ọzọ",
-      "reply": "Zaghachi",
       "edit": "Dezie",
       "sendFailed": "Enweghị ike iziga ozi.",
       "retrySendFailed": "Enweghị ike ịnwale iziga ozi ọzọ.",
@@ -807,7 +829,6 @@
       "takePhoto": "Sere foto",
       "photoLibrary": "Nchịkọta foto",
       "files": "Faịlụ",
-      "cameraAccessDisabled": "Enweghị ikike iji igwefoto",
       "cameraAccessMessage": "Nye ikike iji igwefoto na ntọala ka ị see foto."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} na-ede ozi..."
     },
     "botStatus": {
-      "online": "Dị n'ịntanetị",
-      "idle": "Anaghị arụ ọrụ",
       "offline": "Anọghị n'ịntanetị",
       "loadingUser": "Na-ebudata ozi onye ọrụ…",
       "waitingForStatus": "Na-eche ọnọdụ bọt…",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Enweghị ike ibudata igwe KiloClaw.",
     "billing": {
       "title": "Ịkwụ ụgwọ",
@@ -840,7 +858,6 @@
       "plan": "Atụmatụ",
       "finalTermEnds": "Oge ikpeazụ na-akwụsị",
       "afterFinalTerm": "Mgbe oge ikpeazụ gasịrị",
-      "remaining": "Fọdụrụ",
       "lessThanOneDay": "Ihe na-erughị ụbọchị 1",
       "ends": "Na-akwụsị",
       "expires": "Oge ya ga-agwụ",
@@ -941,20 +958,15 @@
       "disconnect": "Kwụsị njikọ akaụntụ Google",
       "copied": "Edetuola",
       "copyCommand": "Detuo iwu",
-      "disabled": "Agbanyụrụ",
       "disconnectConfirm": "Kwụsị njikọ",
       "disconnectMessage": "Wepụ akaụntụ Google gị na igwe a? Nke a ga-agbanyụ ozi ọkwa Gmail. Mgbe ị kwụsịrị njikọ ahụ, tinye igwe ahụ n'ọrụ ọzọ ka mgbanwe ahụ malite ịrụ ọrụ.",
       "disconnectTitle": "Kwụsị njikọ Google"
     },
     "modelList": {
-      "title": "Ihe nlereanya niile",
       "searchPlaceholder": "Chọọ ihe nlereanya...",
-      "clearSearch": "Kpochapụ ọchụchọ",
       "noMatches": "Enweghị mọdẹl dabara na ọchụchọ gị",
-      "noModels": "Enweghị ihe nlereanya dị",
       "noModelsDescription": "Mọdẹl ga-apụta ebe a ozugbo ha dịnụ.",
-      "noResultsFor": "Enweghị nsonaazụ maka \"{{query}}\".",
-      "recommended": "Atụrụ aro"
+      "noResultsFor": "Enweghị nsonaazụ maka \"{{query}}\"."
     },
     "secrets": {
       "title": "Ihe nzuzo",
@@ -972,8 +984,7 @@
       "setupGuide": "Ntuziaka nhazi",
       "saving": "Na-echekwa…",
       "removing": "Na-ewepụ…",
-      "updateToken": "Melite akara nnweta",
-      "connect": "Jikọọ"
+      "updateToken": "Melite akara nnweta"
     },
     "versionPin": {
       "title": "Idobe otu ụdị",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Na-emecha nhazi",
       "finishingSetupDescription": "Biko chere, anyị na-emecha nhazi akaụntụ gị. Nke a na-ewekarị obere oge.",
       "getStarted": "Malite",
-      "noInstances": "Enweghị sistemụ KiloClaw",
       "noInstancesDescription": "Mepụta igwe mbụ gị ka ị malite iji ndị nnọchi anya na-ede koodu."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Kparịta ụka na {{name}}",
-        "online": "Dị n'ịntanetị",
         "ready": "{{name}} dị njikere",
         "warmedUp": "Ihe niile dị njikere. Kelee ya mgbe ị dị njikere."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Kachasị elu",
       "frontierDescription": "Arụmọrụ kacha elu. Na-ahọrọ mọdẹl kacha elu nwere ikike iche echiche.",
-      "balancedLabel": "Nhatanha",
       "balancedDescription": "Ntụle kwesịrị ekwesị n'etiti ọsọ na ikike n'ọnụ ahịa dị ala.",
-      "performance": "Arụmọrụ",
       "autoModelA11y": "Nhọrọ mọdẹl akpaghị aka {{label}}",
       "currentModel": "Mọdẹl dị ugbu a",
       "browseAllModels": "ma ọ bụ họrọ n'ime mọdẹl 500+",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "Mepee {{name}}, ozi {{displayCount}} a na-agụbeghị",
       "openUnread": "Mepee {{name}}, ozi {{displayCount}} a na-agụbeghị",
       "openUnread_other": "Mepee {{name}}, ozi {{displayCount}} a na-agụbeghị",
-      "open": "Mepee {{name}}",
       "openSettings": "Mepee ntọala maka {{name}}",
       "fixOnKiloAi": "Dozie na kilo.ai: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Nyocha",
       "cancelTitle": "Kagbuo nyocha?",
       "cancelMessage": "Nke a ga-akwụsị nyocha koodu na-aga n'ihu.",
-      "keepRunning": "Hapụ ka ọ na-arụ ọrụ",
       "cancelReview": "Kagbuo nyocha",
       "retryTitle": "Nwaa nyocha ọzọ?",
       "retryMessage": "Nke a ga-eme nyocha koodu ahụ ọzọ.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}} nke {{author}}",
       "noFindings": "Enweghị ihe achọpụtara.",
       "showMore": "Gosi ọzọ",
-      "branch": "Alaka",
       "created": "Emebere",
       "started": "Malitere",
       "completed": "Emechara",
       "tokens": "Iberibe ederede",
       "tokensInOut": "{{input}} batara / {{output}} pụtara",
-      "openPullRequest": "Meghe arịrịọ ijikọ koodu",
       "council": "Otu ndị nyocha",
       "decision": "Mkpebi",
       "gate": "Ụkpụrụ nnabata",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Ncheta nyocha",
-      "couldNotLoadMore": "Enweghị ike ibudata ọzọ.",
-      "retryLoadingMore": "Nwaaghachi ibudata ihe ndị ọzọ",
       "loading": "Na-ebudata ebe nchekwa nyocha",
       "couldNotLoad": "Enweghị ike ibudata ebe nchekwa nyocha.",
       "off": "A gbanyụrụ ebe nchekwa nyocha.",
@@ -1347,15 +1348,11 @@
       "setup": "Nhazi Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "Ejikọọla Bitbucket",
-      "title": "Jikọọ Bitbucket",
       "description": "Mepụta akara ikike ịnweta oghere ọrụ nwere ikike ndị achọrọ, wee mado ya n'okpuru.",
       "scopes": "Akaụntụ: ịgụ · Ebe nchekwa: ịgụ/ide · Arịrịọ njikọ: ịgụ · Njikọ ngosi: ịgụ/ide",
-      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ",
-      "connect": "Jikọọ"
+      "tokenPlaceholder": "Akara ikike ịnweta oghere ọrụ"
     },
     "scopeList": {
-      "couldNotLoad": "Enweghị ike ibudata òtù.",
       "personalStillAvailable": "Ebe nchekwa nke gị ka dị n'okpuru.",
       "personalSubtitle": "Ebe nchekwa koodu nke gị",
       "viewOnly": "Maka ile naanị"
@@ -1378,7 +1375,6 @@
       "githubApp": "ngwa GitHub",
       "githubError": "Enweghị ike imepe nhazi GitHub. Biko nwaa ọzọ.",
       "gitlabAccount": "akaụntụ GitLab",
-      "connectGitLab": "Jikọọ GitLab",
       "gitlabError": "Enweghị ike imepe nhazi GitLab. Biko nwaa ọzọ.",
       "description": "Jikọọ {{label}} na Kilo iji nyochaa arịrịọ njikọ na-akpaghị aka.",
       "bitbucketError": "Enweghị ike imeghe nhazi Bitbucket. Biko nwaa ọzọ."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Enweghị ike imelite onye nyocha.",
     "configSaveFailed": "Enweghị ike ichekwa nhazi nyocha.",
     "status": {
-      "pending": "Na-echere",
       "running": "Na-arụ ọrụ",
       "completed": "Emechara",
-      "failed": "Emezughị",
       "interrupted": "A kwụsịrị tupu ọ gwụchaa"
     },
     "reviewStyle": {
       "strict": "Siri ike",
-      "balanced": "Nhatanha",
       "lenient": "Dị nwayọọ",
       "roast": "Nkatọ na-atọ ọchị"
     },
     "focusArea": {
       "security": "Nchebe",
-      "performance": "Arụmọrụ",
       "bugs": "Njehie",
       "style": "Ụdị ide koodu",
       "testing": "Nnwale",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Meghe",
       "fixed": "Edoziri",
       "statusIgnored": "E leghaara anya",
-      "statusClosed": "Emechiri",
       "severityHigh": "Elu",
       "severityMedium": "Ọkara",
       "severityLow": "Ala",
@@ -1655,7 +1646,6 @@
       "title": "Ntọala",
       "couldNotLoadSettings": "Enweghị ike ibudata ntọala onye nnọchi anya nchebe.",
       "couldNotLoadPermissions": "Enweghị ike ibudata ikike.",
-      "disabled": "Agbanyụrụ",
       "on": "Gbanyere",
       "repositoriesCount_one": "Ebe nchekwa {{displayCount}} ahọpụtara",
       "repositoriesCount": "Ahọpụtara ebe nchekwa koodu {{displayCount}}",
@@ -1683,7 +1673,6 @@
       "retry": "Nwaa ndozi ọzọ",
       "cancelTitle": "Kagbuo ndozi a?",
       "cancelMessage": "Onye nnọchi anya nchebe ga-akwụsị mbọ ndozi na-aga n'ihu.",
-      "keepRunning": "Hapụ ka ọ na-arụ ọrụ",
       "cancelRemediation": "Kagbuo ndozi",
       "openPullRequest": "Mepee arịrịọ njikọ{{number}}",
       "openDraftPullRequest": "Mepee arịrịọ njikọ a ka na-ede{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "Ndekọ mbọ ({{displayCount}})",
       "attemptNumber": "Mbọ #{{number}}",
       "startedBy": "Onye malitere",
-      "branch": "Alaka",
       "queued": "E tinyela ndozi n'ahịrị nchere",
       "retryQueued": "E tinyela ịnwale ndozi ọzọ n'ahịrị nchere",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Enweghị ihe achọpụtara dabara na ihe nzacha",
       "noMatchesDescription": "Nwaa ịgbanwe ma ọ bụ ihichapụ ihe nzacha ahọpụtara.",
       "emptyTitle": "Enweghị ihe achọpụtara a ka na-arụ na ya",
-      "emptyDescription": "Enweghị ihe achọpụtara a ka na-arụ na ya nke chọrọ nlebara anya ugbu a.",
-      "clearFilters": "Kpochapụ nzacha"
+      "emptyDescription": "Enweghị ihe achọpụtara a ka na-arụ na ya nke chọrọ nlebara anya ugbu a."
     },
     "scopeList": {
-      "couldNotLoad": "Enweghị ike ibudata òtù.",
       "personalSubtitle": "Ebe nchekwa koodu nke gị"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "E mepeela PR a ka na-ede",
       "prOpened": "Emepeela PR",
       "blocked": "E gbochiri",
-      "failed": "Emezughị",
       "noChangesNeeded": "Achọghị mgbanwe",
       "originAutomaticPolicy": "Iwu akpaaka",
       "originIncludeExistingPolicy": "Iwu ịgụnye ihe dịbu",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Na-achọ",
       "searchSessions": "Chọọ nnọkọ",
-      "searchSessionsPlaceholder": "Chọọ nnọkọ",
-      "clearSearch": "Kpochapụ ọchụchọ",
-      "clearFilters": "Kpochapụ nzacha"
+      "searchSessionsPlaceholder": "Chọọ nnọkọ"
     },
     "sessionList": {
-      "couldNotLoad": "Enweghị ike ibudata nnọkọ.",
       "couldNotLoadActive": "Enweghị ike ibudata nnọkọ na-arụ ọrụ.",
       "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị. Nnọkọ gị ga-apụta ebe a.",
       "noMatches": "Enweghị nnọkọ dabara",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Hichapụ nnọkọ?",
       "deleteMessage": "Enweghị ike ịkagbu nke a.",
       "deleteSession": "Hichapụ nnọkọ",
-      "rename": "Gbanwee aha",
       "renameMessage": "Tinye aha ọhụrụ maka nnọkọ a.",
       "copyId": "Detuo ID nnọkọ",
       "idCopied": "Edetuola ID nnọkọ",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Ị nweghị ikike ile nke a.",
       "couldNotLoad": "Enweghị ike ibudata nnọkọ ahụ.",
       "failedToLoadDetails": "Enweghị ike ibudata nkọwa nnọkọ ahụ.",
-      "notFound": "Ahụghị ya.",
       "notFoundDescription": "O nwere ike ịbụ na ewepụla ihe a ma ọ bụ na ọ dịkwaghị.",
       "failedToStopExecution": "Enweghị ike ịkwụsị ọrụ ahụ.",
       "renameSession": "Gbanwee aha nnọkọ",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Nwaa njikọ ọzọ"
     },
     "newSession": {
-      "title": "Nnọkọ ọhụrụ",
       "connectGithubDescription": "Jikọọ GitHub n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
       "openGithub": "Mepee GitHub",
       "refreshRepositories": "Budata ebe nchekwa koodu ọzọ",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Enweghị ike ibudata ebe nchekwa koodu ọzọ. Biko nwaa ọzọ.",
       "discardDraftTitle": "Tụfuo ozi a na-ede?",
       "discardDraftMessage": "Ihe ị dere ga-efu.",
-      "keepEditing": "Nọgide na-edezi",
       "discardFailed": "Enweghị ike ịtụfu ozi a na-ede. Biko nwaa ọzọ.",
       "remoteHint": "Gbaa `kilo remote` na kọmputa gị, ma ọ bụ `/remote` n'ime nnọkọ CLI na-arụ ọrụ, iji chịkwaa usoro kilo dị na kọmputa gị.",
-      "bitbucketConnected": "Ejikọọla Bitbucket",
-      "connectBitbucket": "Jikọọ Bitbucket",
       "connectBitbucketDescription": "Jikọọ Bitbucket n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
-      "connectGitlab": "Jikọọ GitLab",
       "connectGitlabDescription": "Jikọọ GitLab n'ihe nchọgharị gị, wee laghachi ebe a ịhọrọ ebe nchekwa koodu.",
       "couldNotLoadBitbucketRepositories": "Enweghị ike ibudata ebe nchekwa koodu Bitbucket.",
       "couldNotLoadGithubRepositories": "Enweghị ike ibudata ebe nchekwa koodu GitHub.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "Ngwá ọrụ {{name}}, {{status}}",
       "fileEmpty": "Faịlụ a tọgbọrọ chakoo.",
       "noTasks": "Enweghị ọrụ.",
-      "contentTruncated": "Ebipụrụ akụkụ ọdịnaya",
       "truncated": "Ebipụrụ akụkụ",
       "toolRead": "gụọ",
       "toolEdit": "Dezie",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",
       "loading": "Na-ebudata...",
       "accessibility": "Ebe nchekwa koodu: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Nkọwa ozi",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Ide na nchekwa nwa oge",
       "total": "Ngụkọta",
       "reportAiResponseFailedRetryable": "Enweghị ike ịkọ nzaghachi a.",
-      "reportAiResponseFailedTerminal": "Enweghị ike ịkọ nzaghachi a.",
-      "reportAiResponseSubmitted": "Ezigaala mkpesa. Nnata: {{receiptId}}."
+      "reportAiResponseFailedTerminal": "Enweghị ike ịkọ nzaghachi a."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "Lee onyonyo {{alt}}",
       "imageOutput": "Mmepụta onyonyo",
       "imageOutputWithFilename": "Mmepụta onyonyo, {{filename}}",
-      "defaultName": "Faịlụ",
       "openFullScreen": "Mepee {{name}} n'ihuenyo zuru ezu",
       "preview": "Lee nlele {{name}}",
-      "openFile": "Mepee {{name}}",
       "couldNotLoadFile": "Enweghị ike ibudata faịlụ a.",
       "couldNotLoadFileRetry": "Enweghị ike ibudata faịlụ a. Nwaa ọzọ.",
       "retryLoadingFile": "Nwaa ibudata faịlụ ọzọ",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "Họrọ ihe nlereanya",
       "searchPlaceholder": "Chọọ ihe nlereanya...",
-      "noModels": "Enweghị ihe nlereanya dị",
       "noModelsDescription": "Enweghị ihe nlereanya dị ịhọrọ.",
-      "favorites": "Ihe kacha amasị gị",
-      "recommended": "Atụrụ aro",
-      "allModels": "Ihe nlereanya niile"
+      "favorites": "Ihe kacha amasị gị"
     },
     "modelSelector": {
       "provider": "Onye na-enye ọrụ {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "Kamera",
       "photoLibrary": "Nchịkọta foto",
       "files": "Faịlụ",
-      "cameraAccessDisabled": "Enweghị ikike iji igwefoto",
       "cameraAccessMessage": "Nye ikike iji igwefoto na ntọala ka ị see foto.",
       "couldNotOpenPhotoPicker": "Enweghị ike imepe ihe ịhọrọ foto. Malitegharịa Kilo ma nwaa ọzọ.",
       "maxFilesAllowed": "A naghị anabata karịa faịlụ {{displayCount}}.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Edetuola njikọ",
-      "reviewPr": "Nyochaa PR",
       "openLink": "Mepee njikọ",
-      "copyLink": "Detuo njikọ",
       "shareLink": "Kekọrịta njikọ",
       "share": "Kekọrịta",
       "prLinkActions": "Ihe a ga-eme na njikọ PR",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Tokin {{used}} n'ime {{window}} nke ozi ntụaka, ejirila {{percentage}}",
       "title": "Ojiji ozi ntụaka",
       "used": "Ejiri",
-      "remaining": "Fọdụrụ",
       "provider": "Onye na-enye ọrụ",
       "totalCost": "Ngụkọta ọnụ ahịa",
       "usageReflectsLatest": "Ojiji a sitere na nzaghachi ikpeazụ onye inyeaka mechara.",
@@ -2598,7 +2561,6 @@
     "billingPage": "ibe ịkwụ ụgwọ"
   },
   "deviceSessions": {
-    "couldNotLoad": "Enweghị ike ibudata nnọkọ.",
     "couldNotLoadDescription": "Nnọkọ gị ndị na-arụ ọrụ agaghị adị ruo mgbe nke a budatara.",
     "currentDeviceUnidentified": "Enweghị ike ịmata ngwaọrụ a.",
     "noSessions": "Enweghị nnọkọ na-arụ ọrụ",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Naanị nbanye ngwa Kilo na-apụta ebe a. A naghị edepụta nbanye ihe ndezi koodu na CLI.",
     "signedIn": "A banyere na {{signedIn}} · A hụrụ ikpeazụ na {{lastSeen}}",
     "thisDevice": "Ngwaọrụ a",
-    "title": "Nnọkọ ngwaọrụ",
     "viewProfile": "Lelee profaịlụ",
     "signOutThisDevice": "Pụọ na ngwaọrụ a",
     "signOutThisSession": "Pụọ na nnọkọ a",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "Njikọ a adịkwaghị irè.",
-    "goBack": "Laghachi azụ",
     "title": "Ahụghị ibe ahụ"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Ebipụrụ akụkụ ọdịnaya",
     "truncated": "Ebipụrụ akụkụ",
     "wrap": "Kewaa ahịrị",
     "scroll": "Pịgharịa"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Biko nwaa ọzọ.",
     "offlineTitle": "Enweghị ike ibudata ya.",
     "permissionDescription": "Ị nweghị ikike ile nke a.",
-    "notFoundTitle": "Ahụghị ya.",
     "notFoundDescription": "O nwere ike ịbụ na ewepụla ihe a ma ọ bụ na ọ dịkwaghị.",
     "serverTitle": "Enweghị ike ibudata ya.",
     "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ."
   },
   "screenHeader": {
     "openMenu": "Mepee ndepụta nhọrọ",
-    "openMenuFor": "Mepee ndepụta nhọrọ maka {{title}}",
-    "goBack": "Laghachi azụ"
+    "openMenuFor": "Mepee ndepụta nhọrọ maka {{title}}"
   },
   "picker": {
     "optionsExpired": "Oge nhọrọ agwụla",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kekọrịta na Kilo",
-    "reviewPr": "Nyochaa PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Nnọkọ ọhụrụ",
     "searchPlaceholder": "Nchọgharị nnọkọ ndị na-adịbeghị anya",
     "connectedCli": "Na CLI ejikọrọ",
     "newSessionOn": "Nnọkọ ọhụrụ na {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "A na-akagbu Kilo Pass",
     "statusPastDue": "Ụgwọ Kilo Pass agafeela oge",
     "monthlyCredits": "Ego ojiji {{credits}} kwa ọnwa",
-    "ends": "Ga-agwụ na {{date}}",
     "periodEnd": "njedebe oge",
     "managedOnGooglePlay": "A na-ejikwa ya na Google Play",
     "managedInAppStore": "A na-ejikwa ya na App Store",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Enweghị ike ịzụta Kilo Pass n'ime ngwa na Android. Jikwaa ya na webụ.",
     "webManagementDescription": "A na-ejikwa Kilo Pass a na webụ.",
     "legalDisclosure": "Kilo Pass bụ ndenye aha kwa ọnwa nke na-emeghachi na-akpaghị aka. A na-ana Apple ID gị ụgwọ mgbe e kwenyere ịzụrụ ihe. Ndenye aha na-emeghachi na-akpaghị aka kwa ọnwa n'ọnụahịa egosiri, ọ gwụla ma ị kagburu ya opekata mpe awa 24 tupu oge nke ugbu a agwụ. Jikwaa ma ọ bụ kagbuo ya mgbe ọ bụla na ntọala akaụntụ App Store gị.",
-    "legalPrivacyPolicy": "Amụma nzuzo",
     "legalTermsOfUse": "Ụkpụrụ ojiji (EULA)",
     "purchaseDifferentAccount": "Ihe azụrụ na App Store a ejikọghị na akaụntụ Kilo gị. Banye na Apple Account e ji zụta ya, wee nwaa ọzọ.",
     "restoreFailed": "Enweghị ike iweghachite ihe azụrụ. Nwaa ọzọ.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "Tinye adreesị ozi ịntanetị ziri ezi.",
-      "emailLabel": "Ozi ịntanetị",
       "emailPlaceholder": "aha@company.com",
       "permissionDenied": "Ị nweghị ikike ịkpọ ndị otu òkù.",
       "roleLabel": "Ọrụ",
@@ -2968,7 +2920,6 @@
         "billingManager": "Onye njikwa ịgba ụgwọ"
       },
       "emailStatusFailed": "Ozi ịntanetị ezigaghị",
-      "emailStatusPending": "Na-echere",
       "inviteCreated": "Emepụtala òkù",
       "pendingInvitations": "Òkù ndị na-echere",
       "resendInvite": "Ziga òkù ọzọ",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Enweghị ike ibudata ọnọdụ",
       "creditProcessingDelayed": "Nhazi ego ojiji egbuola oge · na-anwa ọzọ na-akpaghị aka",
       "ended": "Agwụla",
-      "endsOn": "Ga-agwụ na {{date}}",
       "manageHint": "Na-emeghe njikwa Kilo Pass na webụ.",
       "notSubscribed": "Enweghị ndenye aha",
       "overallocated": "Ọnụ ọgụgụ ndị e kenyere Pass karịrị oghere ndị otu akwụgoro ụgwọ",
@@ -3004,7 +2954,6 @@
       "paymentPending": "Ịkwụ ụgwọ na-echere",
       "processingBlocked": "Egbochiri nhazi",
       "processingNeedsReview": "Nhazi chọrọ nyocha",
-      "retry": "Nwaa ọzọ",
       "retryHint": "Ọ na-anwa ibudata ọnọdụ Kilo Pass ọzọ.",
       "setupHint": "Ọ na-emepe nhazi Kilo Pass na weebụ."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Laghachi na nhọrọ"
   },
   "quickChat": {
-    "title": "Nkata",
     "empty": {
       "title": "Malite mkparịta ụka",
       "description": "Ziga ozi ka ị kparịta ụka na ụdị AI."
@@ -3076,7 +3024,6 @@
     "openAgents": "Mepee ndị nnọchi anya",
     "running": "Na-arụ ọrụ",
     "needsInput": "Chọrọ nzaghachi",
-    "idle": "Anaghị arụ ọrụ",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
   }

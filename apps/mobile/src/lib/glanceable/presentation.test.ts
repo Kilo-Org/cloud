@@ -77,7 +77,7 @@ describe('primary rank and locked copy keys', () => {
 
     const onlyIdle = snapshot({ sessions: [{ status: 'idle' }] });
     expect(primaryGlanceableCount(onlyIdle)).toEqual({
-      key: 'glanceable.idle',
+      key: 'common.idle',
       kind: 'idle',
       count: 1,
     });
@@ -163,7 +163,7 @@ describe('numeric spoken label', () => {
 describe('numeric spoken label', () => {
   const copy: Record<string, string> = {
     'glanceable.needsInput': 'Needs input',
-    'glanceable.idle': 'Idle',
+    'common.idle': 'Idle',
     'glanceable.running': 'Working',
     'glanceable.waiting': 'Waiting for agents',
     'glanceable.empty': 'No work in progress',

@@ -49,10 +49,10 @@ const PROVIDER_LABEL_KEYS = {
   anaconda: 'profile.providerAnaconda',
   apple: 'profile.providerApple',
   discord: 'profile.providerDiscord',
-  email: 'profile.providerEmail',
+  email: 'common.email',
   'fake-login': 'profile.providerTestAccount',
   github: 'common.github',
-  gitlab: 'profile.providerGitlab',
+  gitlab: 'common.gitlab',
   google: 'profile.providerGoogle',
   linkedin: 'profile.providerLinkedin',
   workos: 'profile.providerEnterpriseSso',
@@ -146,7 +146,7 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.title')} size="large" showBackButton={false} />
+      <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 pt-4"
@@ -292,7 +292,7 @@ export function ProfileScreen() {
           </Text>
           <ConfigureRow
             icon={SlidersHorizontal}
-            title={t('profile.preferences')}
+            title={t('common.preferences')}
             subtitle={t('profile.preferencesSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last

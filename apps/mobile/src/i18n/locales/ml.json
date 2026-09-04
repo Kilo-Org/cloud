@@ -69,7 +69,58 @@
     "repository": "റിപ്പോസിറ്ററി",
     "signOut": "സൈൻ ഔട്ട് ചെയ്യുക",
     "agents": "ഏജന്റുകൾ",
-    "all": "എല്ലാം"
+    "all": "എല്ലാം",
+    "allModels": "എല്ലാ മോഡലുകളും",
+    "balanced": "സമതുലിതം",
+    "bitbucketConnected": "Bitbucket ബന്ധിപ്പിച്ചു",
+    "branch": "ബ്രാഞ്ച്",
+    "cameraAccessDisabled": "ക്യാമറ ഉപയോഗിക്കാൻ അനുമതിയില്ല",
+    "chat": "ചാറ്റ്",
+    "clearFilters": "ഫിൽട്ടറുകൾ മായ്ക്കുക",
+    "clearSearch": "തിരയൽ മായ്ക്കുക",
+    "closed": "അടച്ചു",
+    "closeReactions": "പ്രതികരണങ്ങൾ അടയ്ക്കുക",
+    "connect": "ബന്ധിപ്പിക്കുക",
+    "connectBitbucket": "Bitbucket ബന്ധിപ്പിക്കുക",
+    "connectGitlab": "GitLab ബന്ധിപ്പിക്കുക",
+    "contentTruncated": "ഉള്ളടക്കത്തിന്റെ ഒരു ഭാഗം മാത്രം കാണിക്കുന്നു",
+    "copyLink": "ലിങ്ക് പകർത്തുക",
+    "couldNotLoadOrganizations": "സ്ഥാപനങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
+    "couldNotLoadSessions": "സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
+    "couldnTLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
+    "deviceSessions": "ഉപകരണ സെഷനുകൾ",
+    "disabled": "പ്രവർത്തനരഹിതം",
+    "email": "ഇമെയിൽ",
+    "ends": "{{date}}-ന് അവസാനിക്കുന്നു",
+    "failed": "പരാജയപ്പെട്ടു",
+    "file": "ഫയൽ",
+    "gitlab": "GitLab",
+    "goBack": "തിരികെ പോകുക",
+    "idle": "നിഷ്ക്രിയം",
+    "keepEditing": "തിരുത്തുന്നത് തുടരുക",
+    "keepRunning": "പ്രവർത്തനം തുടരുക",
+    "kiloclaw": "KiloClaw",
+    "newSession": "പുതിയ സെഷൻ",
+    "noKiloclawInstances": "KiloClaw ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
+    "noModelsAvailable": "മോഡലുകൾ ലഭ്യമല്ല",
+    "notFound": "കണ്ടെത്താനായില്ല.",
+    "online": "ഓൺലൈൻ",
+    "open": "{{name}} തുറക്കുക",
+    "openPullRequest": "തുറന്ന പുൾ റിക്വസ്റ്റ്",
+    "pending": "കാത്തിരിക്കുന്നു",
+    "performance": "പ്രവർത്തനക്ഷമത",
+    "preferences": "മുൻഗണനകൾ",
+    "privacyPolicy": "സ്വകാര്യതാ നയം",
+    "profile": "പ്രൊഫൈൽ",
+    "reactions": "പ്രതികരണങ്ങൾ",
+    "recent": "അടുത്തിടെയുള്ളവ",
+    "recommended": "ശുപാർശ ചെയ്യുന്നവ",
+    "remaining": "ശേഷിക്കുന്നത്",
+    "rename": "പേര് മാറ്റുക",
+    "reply": "മറുപടി നൽകുക",
+    "reportSubmittedReceipt": "റിപ്പോർട്ട് സമർപ്പിച്ചു. രസീത് നമ്പർ: {{receiptId}}",
+    "retryLoadingMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
+    "reviewPr": "PR പരിശോധിക്കുക"
   },
   "language": {
     "title": "ഭാഷ",
@@ -77,7 +128,6 @@
     "couldNotRestart": "പുനരാരംഭിക്കാനായില്ല",
     "languageSaved": "നിങ്ങൾ തിരഞ്ഞെടുത്ത ഭാഷ സംരക്ഷിച്ചു.",
     "catalogLoadFailed": "ഭാഷ ലോഡ് ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
-    "retry": "വീണ്ടും ശ്രമിക്കുക",
     "search": "ഭാഷ തിരയൽ",
     "noMatches": "പൊരുത്തപ്പെടുന്ന ഭാഷകളില്ല",
     "deviceLanguage": "ഉപകരണത്തിന്റെ ഭാഷ",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "സൈൻ ഇൻ കോഡ്: {{code}}",
     "openSignInPageInBrowser": "സൈൻ ഇൻ പേജ് ബ്രൗസറിൽ തുറക്കുക",
     "copySignInLink": "സൈൻ ഇൻ ലിങ്ക് പകർത്തുക",
-    "copyLink": "ലിങ്ക് പകർത്തുക",
     "cancelSignIn": "സൈൻ ഇൻ റദ്ദാക്കുക",
     "startingSignIn": "സൈൻ ഇൻ ആരംഭിക്കുന്നു...",
     "organizationUsesSso": "നിങ്ങളുടെ ഓർഗനൈസേഷൻ സിംഗിൾ സൈൻ-ഓൺ ഉപയോഗിക്കുന്നു.",
@@ -112,7 +161,6 @@
     "terms": "നിബന്ധനകൾ",
     "termsConnector": " കൂടാതെ ",
     "termsSuffix": ".",
-    "privacyPolicy": "സ്വകാര്യതാ നയം",
     "moreSignInOptions": "സൈൻ ഇൻ ചെയ്യാനുള്ള കൂടുതൽ മാർഗങ്ങൾ",
     "couldNotCompleteSignIn": "സൈൻ ഇൻ പൂർത്തിയാക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "sessionEnded": "നിങ്ങളുടെ സെഷൻ അവസാനിച്ചു. വീണ്ടും സൈൻ ഇൻ ചെയ്യുക.",
@@ -126,7 +174,6 @@
     "or": "അല്ലെങ്കിൽ"
   },
   "profile": {
-    "title": "പ്രൊഫൈൽ",
     "codeReviewerSubtitle": "സ്വയമേവയുള്ള PR അവലോകനങ്ങൾ",
     "securityAgentSubtitle": "സുരക്ഷാ ദൗർബല്യങ്ങൾ കണ്ടെത്തി പരിഹരിക്കുക",
     "reviews": "അവലോകനങ്ങൾ",
@@ -136,9 +183,7 @@
     "linkedAccounts": "ലിങ്ക് ചെയ്ത അക്കൗണ്ടുകൾ",
     "couldNotLoadAccounts": "അക്കൗണ്ടുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
     "app": "ആപ്പ്",
-    "preferences": "മുൻഗണനകൾ",
     "preferencesSubtitle": "ദൃശ്യരൂപം, അറിയിപ്പുകൾ, ചിന്ത, സ്ക്രീനിന്റെ പ്രവർത്തനം",
-    "deviceSessions": "ഉപകരണ സെഷനുകൾ",
     "deviceSessionsSubtitle": "മറ്റ് ഉപകരണങ്ങൾ പരിശോധിച്ച് അവയിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
     "feedback": "ഫീഡ്ബാക്ക്",
     "privacyChoices": "സ്വകാര്യതാ തിരഞ്ഞെടുപ്പുകൾ",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "ഇമെയിൽ",
     "providerTestAccount": "ടെസ്റ്റ് അക്കൗണ്ട്",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "എന്റർപ്രൈസ് SSO"
   },
   "preferences": {
-    "title": "മുൻഗണനകൾ",
     "autoExpandThinking": "ചിന്തയുടെ വിശദാംശങ്ങൾ സ്വയമേവ കാണിക്കുക",
     "autoExpandThinkingSubtitle": "ഏജന്റ് ചിന്തിച്ച് കഴിയുമ്പോൾ അതിന്റെ വിശദാംശങ്ങൾ പൂർണ്ണമായി കാണിക്കുക.",
     "keepScreenOn": "സെഷൻ പേജിലായിരിക്കുമ്പോൾ സ്ക്രീൻ ഓണാക്കി നിർത്തുക",
@@ -360,7 +402,6 @@
       "unresolveThread": "ത്രെഡ് പരിഹരിച്ചതായുള്ള അടയാളം നീക്കുക",
       "resolved": "പരിഹരിച്ചു",
       "outdated": "പഴയത്",
-      "file": "ഫയൽ",
       "comment_one": "1 അഭിപ്രായം",
       "comment": "{{displayCount}} അഭിപ്രായങ്ങൾ",
       "comment_other": "{{displayCount}} അഭിപ്രായങ്ങൾ",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
       "retryLoadingMore": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "loadMoreComments": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യുക",
-      "closeReactions": "പ്രതികരണങ്ങൾ അടയ്ക്കുക",
-      "reactionsTitle": "പ്രതികരണങ്ങൾ",
       "addReaction": "പ്രതികരണം ചേർക്കുക",
       "reactionPill": "{{emoji}} പ്രതികരണം, {{displayCount}} {{countLabel}}",
       "reaction_one": "പ്രതികരണം",
@@ -380,13 +419,11 @@
       "reportUser": "ഉപയോക്താവിനെ റിപ്പോർട്ട് ചെയ്യുക",
       "mute": "മ്യൂട്ട് ചെയ്യുക",
       "block": "ബ്ലോക്ക് ചെയ്യുക",
-      "reportSubmitted": "റിപ്പോർട്ട് സമർപ്പിച്ചു. രസീത് നമ്പർ: {{receiptId}}",
       "blockedUser": "{{login}} എന്ന ഉപയോക്താവിനെ ബ്ലോക്ക് ചെയ്തു",
       "mutedUser": "{{login}} എന്ന ഉപയോക്താവിനെ മ്യൂട്ട് ചെയ്തു",
       "replyPlaceholder": "മറുപടി…",
       "replyBody": "മറുപടിയുടെ ഉള്ളടക്കം",
       "submitReply": "മറുപടി സമർപ്പിക്കുക",
-      "reply": "മറുപടി നൽകുക",
       "termsTitle": "സേവന നിബന്ധനകൾ",
       "termsCopy": "പോസ്റ്റ് ചെയ്യാൻ കുറഞ്ഞത് 13 വയസ്സ് ഉണ്ടായിരിക്കണം.",
       "termsAcceptRetry": "നിബന്ധനകൾ അംഗീകരിക്കാനായില്ല. ഇന്റർനെറ്റ് കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHub പുൾ റിക്വസ്റ്റ് URL",
       "clearLink": "പുൾ റിക്വസ്റ്റ് ലിങ്ക് മായ്ക്കുക",
       "pasteLink": "പുൾ റിക്വസ്റ്റ് ലിങ്ക് ഒട്ടിക്കുക",
-      "open": "ഓപ്പൺ",
-      "openPullRequest": "തുറന്ന പുൾ റിക്വസ്റ്റ്"
+      "open": "ഓപ്പൺ"
     },
     "checks": {
       "title": "പരിശോധനകൾ",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "ഇൻബോക്സ്",
-      "recent": "അടുത്തിടെയുള്ളവ",
       "loading": "ഇൻബോക്സ് ലോഡ് ചെയ്യുന്നു",
       "noReviewRequests": "അവലോകന അഭ്യർത്ഥനകളില്ല",
       "noReviewRequestsDescription": "നിങ്ങളുടെ അവലോകനത്തിനായി കാത്തിരിക്കുന്ന പുൾ റിക്വസ്റ്റുകൾ ഇവിടെ ദൃശ്യമാകും. മുകളിൽ ഏത് PR ലിങ്കും ഒട്ടിക്കാം.",
-      "couldNotLoad": "ഇൻബോക്സ് ലോഡ് ചെയ്യാനായില്ല.",
-      "couldNotLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
-      "retryLoadingMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക"
+      "couldNotLoad": "ഇൻബോക്സ് ലോഡ് ചെയ്യാനായില്ല."
     },
     "composer": {
       "commentBodyPlaceholder": "നിങ്ങളുടെ അഭിപ്രായം",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "അഭിപ്രായം എഴുതാനുള്ള ഭാഗം ലോഡ് ചെയ്യാനായില്ല.",
       "discardTitle": "അഭിപ്രായം ഉപേക്ഷിക്കണോ?",
       "discardMessage": "നിങ്ങളുടെ ഡ്രാഫ്റ്റ് നഷ്ടപ്പെടും.",
-      "keepEditing": "തിരുത്തുന്നത് തുടരുക",
       "comment": "അഭിപ്രായം",
       "insertSuggestionA11y": "ഒരു കോഡ് നിർദ്ദേശം ചേർക്കുക",
       "insertSuggestion": "നിർദ്ദേശം ചേർക്കുക",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "മെർജ് ചെയ്തു",
-      "stateClosed": "അടച്ചു",
       "stateOpenApproved": "തുറന്നത് · അംഗീകരിച്ചു",
       "stateOpenChangesRequested": "തുറന്നത് · മാറ്റങ്ങൾ അഭ്യർത്ഥിച്ചു",
       "stateOpenReviewRequired": "തുറന്നത് · അവലോകനം ആവശ്യമാണ്",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "ഹോം",
-    "profile": "പ്രൊഫൈൽ",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ടാബ്, {{total}}-ൽ {{position}}",
-    "chat": "ചാറ്റ്"
+    "position": "{{name}}, ടാബ്, {{total}}-ൽ {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കൽ",
       "couldNotLoadInstances": "ഇൻസ്റ്റൻസുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "noInstances": "KiloClaw ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
       "noInstancesDescription": "ചാറ്റ് ചെയ്യാൻ ഒരു ഇൻസ്റ്റൻസ് സജ്ജീകരിക്കുക.",
       "setUpKiloclaw": "KiloClaw സജ്ജീകരിക്കുക",
       "currentInstance": "{{title}}, ഇപ്പോൾ ഉപയോഗിക്കുന്നത്"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "ചാറ്റിൽ സൈൻ ഇൻ ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "couldNotRefreshMessages": "സന്ദേശങ്ങൾ പുതുക്കാൻ കഴിഞ്ഞില്ല.",
       "couldNotLoadHistory": "സംഭാഷണ ചരിത്രം ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "rename": "പേര് മാറ്റുക",
       "leave": "പുറത്തുപോകുക",
       "untitledConversation": "പേരില്ലാത്ത സംഭാഷണം",
       "createFailed": "സംഭാഷണം സൃഷ്ടിക്കാൻ കഴിഞ്ഞില്ല.",
       "leaveFailed": "സംഭാഷണത്തിൽ നിന്ന് പുറത്തുപോകാൻ കഴിഞ്ഞില്ല."
     },
     "reactions": {
-      "title": "പ്രതികരണങ്ങൾ",
-      "close": "പ്രതികരണങ്ങൾ അടയ്ക്കുക",
-      "recent": "അടുത്തിടെയുള്ളവ",
       "common": "പതിവായി ഉപയോഗിക്കുന്നവ",
       "reactWith": "{{reaction}} ഉപയോഗിച്ച് പ്രതികരിക്കുക",
       "accessibility": "{{emoji}} പ്രതികരണം, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "പ്രതികരണം ചേർക്കാൻ കഴിഞ്ഞില്ല.",
       "retrySend": "വീണ്ടും അയയ്ക്കുക",
       "moreReactions": "കൂടുതൽ പ്രതികരണങ്ങൾ",
-      "reply": "മറുപടി നൽകുക",
       "edit": "തിരുത്തുക",
       "sendFailed": "സന്ദേശം അയയ്ക്കാൻ കഴിഞ്ഞില്ല.",
       "retrySendFailed": "വീണ്ടും അയയ്ക്കാൻ കഴിഞ്ഞില്ല.",
@@ -807,7 +829,6 @@
       "takePhoto": "ഫോട്ടോ എടുക്കുക",
       "photoLibrary": "ഫോട്ടോ ലൈബ്രറി",
       "files": "ഫയലുകൾ",
-      "cameraAccessDisabled": "ക്യാമറ ഉപയോഗിക്കാൻ അനുമതിയില്ല",
       "cameraAccessMessage": "ഫോട്ടോ എടുക്കാൻ ക്രമീകരണങ്ങളിൽ ക്യാമറ ഉപയോഗിക്കാനുള്ള അനുമതി നൽകുക."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} ടൈപ്പ് ചെയ്യുന്നു..."
     },
     "botStatus": {
-      "online": "ഓൺലൈൻ",
-      "idle": "നിഷ്ക്രിയം",
       "offline": "ഓഫ്ലൈൻ",
       "loadingUser": "ഉപയോക്താവിന്റെ വിവരങ്ങൾ ലോഡ് ചെയ്യുന്നു...",
       "waitingForStatus": "ബോട്ടിന്റെ നില അറിയാൻ കാത്തിരിക്കുന്നു...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw ഇൻസ്റ്റൻസുകൾ ലോഡ് ചെയ്യാനായില്ല.",
     "billing": {
       "title": "ബില്ലിംഗ്",
@@ -840,7 +858,6 @@
       "plan": "പ്ലാൻ",
       "finalTermEnds": "അവസാന കാലയളവ് തീരുന്നത്",
       "afterFinalTerm": "അവസാന കാലയളവിന് ശേഷം",
-      "remaining": "ശേഷിക്കുന്നത്",
       "lessThanOneDay": "1 ദിവസത്തിൽ കുറവ്",
       "ends": "അവസാനിക്കുന്നത്",
       "expires": "കാലാവധി തീരുന്നത്",
@@ -941,20 +958,15 @@
       "disconnect": "Google അക്കൗണ്ട് വിച്ഛേദിക്കുക",
       "copied": "പകർത്തി",
       "copyCommand": "കമാൻഡ് പകർത്തുക",
-      "disabled": "പ്രവർത്തനരഹിതം",
       "disconnectConfirm": "വിച്ഛേദിക്കുക",
       "disconnectMessage": "ഈ ഇൻസ്റ്റൻസിൽ നിന്ന് നിങ്ങളുടെ Google അക്കൗണ്ട് നീക്കം ചെയ്യണോ? ഇതോടെ Gmail അറിയിപ്പുകൾ നിലയ്ക്കും. മാറ്റങ്ങൾ പ്രയോഗിക്കാൻ ബന്ധം വിച്ഛേദിച്ച ശേഷം ഇൻസ്റ്റൻസ് വീണ്ടും വിന്യസിക്കുക.",
       "disconnectTitle": "Google വിച്ഛേദിക്കുക"
     },
     "modelList": {
-      "title": "എല്ലാ മോഡലുകളും",
       "searchPlaceholder": "മോഡൽ തിരയൽ",
-      "clearSearch": "തിരയൽ മായ്ക്കുക",
       "noMatches": "നിങ്ങളുടെ തിരയലുമായി ഒത്തുപോകുന്ന മോഡലുകളില്ല",
-      "noModels": "മോഡലുകൾ ലഭ്യമല്ല",
       "noModelsDescription": "ലഭ്യമായിക്കഴിഞ്ഞാൽ മോഡലുകൾ ഇവിടെ ദൃശ്യമാകും.",
-      "noResultsFor": "\"{{query}}\" എന്നതിന് ഫലങ്ങളൊന്നുമില്ല.",
-      "recommended": "ശുപാർശ ചെയ്യുന്നവ"
+      "noResultsFor": "\"{{query}}\" എന്നതിന് ഫലങ്ങളൊന്നുമില്ല."
     },
     "secrets": {
       "title": "രഹസ്യ വിവരങ്ങൾ",
@@ -972,8 +984,7 @@
       "setupGuide": "സജ്ജീകരണത്തിനുള്ള മാർഗനിർദേശം",
       "saving": "സംരക്ഷിക്കുന്നു…",
       "removing": "നീക്കം ചെയ്യുന്നു…",
-      "updateToken": "ടോക്കൺ അപ്ഡേറ്റ് ചെയ്യുക",
-      "connect": "ബന്ധിപ്പിക്കുക"
+      "updateToken": "ടോക്കൺ അപ്ഡേറ്റ് ചെയ്യുക"
     },
     "versionPin": {
       "title": "പതിപ്പ് സ്ഥിരപ്പെടുത്തൽ",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "സജ്ജീകരണം പൂർത്തിയാക്കുന്നു",
       "finishingSetupDescription": "അൽപ്പം കാത്തിരിക്കുക. നിങ്ങളുടെ അക്കൗണ്ടിന്റെ സജ്ജീകരണം പൂർത്തിയാക്കുന്നു. സാധാരണയായി ഇതിന് അധികം സമയമെടുക്കില്ല.",
       "getStarted": "ആരംഭിക്കുക",
-      "noInstances": "KiloClaw ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
       "noInstancesDescription": "കോഡിംഗ് ഏജന്റുകൾ പ്രവർത്തിപ്പിക്കാൻ നിങ്ങളുടെ ആദ്യ ഇൻസ്റ്റൻസ് സൃഷ്ടിക്കുക."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}}-നോട് ചാറ്റ് ചെയ്യുക",
-        "online": "ഓൺലൈൻ",
         "ready": "{{name}} തയ്യാറാണ്",
         "warmedUp": "എല്ലാം തയ്യാറായി. നിങ്ങൾ തയ്യാറാകുമ്പോൾ ഹായ് പറയുക."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "ഫ്രന്റിയർ",
       "frontierDescription": "ഏറ്റവും മികച്ച പ്രകടനം. യുക്തിചിന്താശേഷിയുള്ള അത്യാധുനിക മോഡലുകളിലേക്ക് അഭ്യർത്ഥനകൾ അയയ്ക്കുന്നു.",
-      "balancedLabel": "സമതുലിതം",
       "balancedDescription": "കുറഞ്ഞ ചെലവിൽ വേഗവും കഴിവും ഒരുപോലെ ലഭിക്കുന്നു.",
-      "performance": "പ്രവർത്തനക്ഷമത",
       "autoModelA11y": "{{label}} ഓട്ടോ മോഡൽ",
       "currentModel": "നിലവിലെ മോഡൽ",
       "browseAllModels": "അല്ലെങ്കിൽ 500+ മോഡലുകളിൽ നിന്ന് തിരഞ്ഞെടുക്കുക",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശം",
       "openUnread": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
       "openUnread_other": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
-      "open": "{{name}} തുറക്കുക",
       "openSettings": "{{name}}-ന്റെ ക്രമീകരണങ്ങൾ തുറക്കുക",
       "fixOnKiloAi": "kilo.ai-യിൽ പരിഹരിക്കുക: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "പരിശോധന",
       "cancelTitle": "അവലോകനം റദ്ദാക്കണോ?",
       "cancelMessage": "ഇത് പുരോഗമിക്കുന്ന കോഡ് അവലോകനം നിർത്തും.",
-      "keepRunning": "പ്രവർത്തനം തുടരുക",
       "cancelReview": "അവലോകനം റദ്ദാക്കുക",
       "retryTitle": "അവലോകനത്തിന് വീണ്ടും ശ്രമിക്കണോ?",
       "retryMessage": "ഇത് കോഡ് അവലോകനം വീണ്ടും നടത്തും.",
@@ -1273,13 +1278,11 @@
       "byline": "{{author}} എഴുതിയ {{repo}} #{{number}}",
       "noFindings": "കണ്ടെത്തലുകളൊന്നുമില്ല.",
       "showMore": "കൂടുതൽ കാണിക്കുക",
-      "branch": "ബ്രാഞ്ച്",
       "created": "സൃഷ്ടിച്ചത്",
       "started": "ആരംഭിച്ചത്",
       "completed": "പൂർത്തിയായി",
       "tokens": "ടോക്കണുകൾ",
       "tokensInOut": "{{input}} ഇൻപുട്ട് / {{output}} ഔട്ട്പുട്ട്",
-      "openPullRequest": "തുറന്ന പുൾ റിക്വസ്റ്റ്",
       "council": "അവലോകന സമിതി",
       "decision": "തീരുമാനം",
       "gate": "ഗുണനിലവാര പരിശോധന",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "പരിശോധനാ മെമ്മറി",
-      "couldNotLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
-      "retryLoadingMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "loading": "അവലോകന മെമ്മറി ലോഡ് ചെയ്യുന്നു",
       "couldNotLoad": "അവലോകന മെമ്മറി ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "off": "അവലോകന മെമ്മറി പ്രവർത്തനരഹിതമാണ്.",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucket സജ്ജീകരണം"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket ബന്ധിപ്പിച്ചു",
-      "title": "Bitbucket ബന്ധിപ്പിക്കുക",
       "description": "ആവശ്യമായ അനുമതികളോടെ ഒരു വർക്ക്സ്പെയ്സ് ആക്സസ് ടോക്കൺ സൃഷ്ടിച്ച് താഴെ ഒട്ടിക്കുക.",
       "scopes": "അക്കൗണ്ട്: വായിക്കുക · റിപ്പോസിറ്ററികൾ: വായിക്കുക/എഴുതുക · പുൾ റിക്വസ്റ്റുകൾ: വായിക്കുക · വെബ്ഹുക്കുകൾ: വായിക്കുക/എഴുതുക",
-      "tokenPlaceholder": "വർക്ക്സ്പെയ്സ് ആക്സസ് ടോക്കൺ",
-      "connect": "ബന്ധിപ്പിക്കുക"
+      "tokenPlaceholder": "വർക്ക്സ്പെയ്സ് ആക്സസ് ടോക്കൺ"
     },
     "scopeList": {
-      "couldNotLoad": "സ്ഥാപനങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
       "personalStillAvailable": "വ്യക്തിഗത റിപ്പോസിറ്ററികൾ ഇപ്പോഴും ചുവടെ ലഭ്യമാണ്.",
       "personalSubtitle": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ",
       "viewOnly": "കാണാൻ മാത്രം"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHub ആപ്പ്",
       "githubError": "GitHub സജ്ജീകരണം തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "gitlabAccount": "GitLab അക്കൗണ്ട്",
-      "connectGitLab": "GitLab ബന്ധിപ്പിക്കുക",
       "gitlabError": "GitLab സജ്ജീകരണം തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "description": "പുൾ റിക്വസ്റ്റുകൾ സ്വയമേവ അവലോകനം ചെയ്യാൻ Kilo {{label}} കണക്റ്റ് ചെയ്യുക.",
       "bitbucketError": "Bitbucket സജ്ജീകരണം തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
@@ -1403,21 +1399,17 @@
     "updateFailed": "കോഡ് അവലോകന ഏജന്റ് പുതുക്കാൻ കഴിഞ്ഞില്ല.",
     "configSaveFailed": "അവലോകന ക്രമീകരണങ്ങൾ സംരക്ഷിക്കാൻ കഴിഞ്ഞില്ല.",
     "status": {
-      "pending": "കാത്തിരിക്കുന്നു",
       "running": "പ്രവർത്തിക്കുന്നു",
       "completed": "പൂർത്തിയായി",
-      "failed": "പരാജയപ്പെട്ടു",
       "interrupted": "തടസ്സപ്പെട്ടു"
     },
     "reviewStyle": {
       "strict": "കർശനം",
-      "balanced": "സമതുലിതം",
       "lenient": "വിട്ടുവീഴ്ചയുള്ളത്",
       "roast": "പരിഹാസ വിമർശനം"
     },
     "focusArea": {
       "security": "സുരക്ഷ",
-      "performance": "പ്രവർത്തനക്ഷമത",
       "bugs": "ബഗുകൾ",
       "style": "ശൈലി",
       "testing": "ടെസ്റ്റിംഗ്",
@@ -1468,7 +1460,6 @@
       "statusOpen": "ഓപ്പൺ",
       "fixed": "പരിഹരിച്ചു",
       "statusIgnored": "അവഗണിച്ചവ",
-      "statusClosed": "അടച്ചു",
       "severityHigh": "ഉയർന്നത്",
       "severityMedium": "ഇടത്തരം",
       "severityLow": "കുറഞ്ഞത്",
@@ -1655,7 +1646,6 @@
       "title": "ക്രമീകരണങ്ങൾ",
       "couldNotLoadSettings": "സുരക്ഷാ ഏജന്റിന്റെ ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "couldNotLoadPermissions": "അനുമതികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "disabled": "പ്രവർത്തനരഹിതം",
       "on": "പ്രവർത്തനക്ഷമം",
       "repositoriesCount_one": "{{displayCount}} റിപ്പോസിറ്ററി തിരഞ്ഞെടുത്തു",
       "repositoriesCount": "{{displayCount}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
@@ -1683,7 +1673,6 @@
       "retry": "പരിഹരിക്കാൻ വീണ്ടും ശ്രമിക്കുക",
       "cancelTitle": "ഈ പരിഹാരം റദ്ദാക്കണോ?",
       "cancelMessage": "നടന്നുകൊണ്ടിരിക്കുന്ന പരിഹാരശ്രമം സുരക്ഷാ ഏജന്റ് നിർത്തും.",
-      "keepRunning": "പ്രവർത്തനം തുടരുക",
       "cancelRemediation": "പരിഹാരം റദ്ദാക്കുക",
       "openPullRequest": "പുൾ റിക്വസ്റ്റ്{{number}} തുറക്കുക",
       "openDraftPullRequest": "കരട് പുൾ റിക്വസ്റ്റ്{{number}} തുറക്കുക",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "മുൻ ശ്രമങ്ങൾ ({{displayCount}})",
       "attemptNumber": "ശ്രമം #{{number}}",
       "startedBy": "ആരംഭിച്ചത്",
-      "branch": "ബ്രാഞ്ച്",
       "queued": "പരിഹാരം ക്യൂവിൽ ചേർത്തു",
       "retryQueued": "വീണ്ടും പരിഹരിക്കാനുള്ള ശ്രമം ക്യൂവിൽ ചേർത്തു",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "ഫിൽട്ടറുകളുമായി പൊരുത്തപ്പെടുന്ന കണ്ടെത്തലുകളൊന്നുമില്ല",
       "noMatchesDescription": "തിരഞ്ഞെടുത്ത ഫിൽട്ടറുകൾ ക്രമീകരിക്കുകയോ മായ്ക്കുകയോ ചെയ്യുക.",
       "emptyTitle": "തീർപ്പാകാത്ത കണ്ടെത്തലുകളില്ല",
-      "emptyDescription": "ഇപ്പോൾ ശ്രദ്ധ ആവശ്യമായ തീർപ്പാകാത്ത കണ്ടെത്തലുകളില്ല.",
-      "clearFilters": "ഫിൽട്ടറുകൾ മായ്ക്കുക"
+      "emptyDescription": "ഇപ്പോൾ ശ്രദ്ധ ആവശ്യമായ തീർപ്പാകാത്ത കണ്ടെത്തലുകളില്ല."
     },
     "scopeList": {
-      "couldNotLoad": "സ്ഥാപനങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
       "personalSubtitle": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "കരട് PR തുറന്നു",
       "prOpened": "PR തുറന്നു",
       "blocked": "തടസ്സപ്പെട്ടിരിക്കുന്നു",
-      "failed": "പരാജയപ്പെട്ടു",
       "noChangesNeeded": "മാറ്റങ്ങൾ ആവശ്യമില്ല",
       "originAutomaticPolicy": "സ്വയമേവ പ്രവർത്തിക്കുന്ന നയം",
       "originIncludeExistingPolicy": "നിലവിലുള്ളവ ഉൾപ്പെടുത്തുന്ന നയം",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "തിരയുന്നു",
       "searchSessions": "സെഷൻ തിരയൽ",
-      "searchSessionsPlaceholder": "സെഷൻ തിരയൽ",
-      "clearSearch": "തിരയൽ മായ്ക്കുക",
-      "clearFilters": "ഫിൽട്ടറുകൾ മായ്ക്കുക"
+      "searchSessionsPlaceholder": "സെഷൻ തിരയൽ"
     },
     "sessionList": {
-      "couldNotLoad": "സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
       "couldNotLoadActive": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
       "noSessionsYetDescription": "നിങ്ങളുടെ ഫോണിൽ നിന്ന് ഒരു കോഡിംഗ് ജോലി ആരംഭിക്കുക. നിങ്ങളുടെ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noMatches": "പൊരുത്തപ്പെടുന്ന സെഷനുകളൊന്നുമില്ല",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "സെഷൻ ഇല്ലാതാക്കണോ?",
       "deleteMessage": "ഇത് പഴയപടിയാക്കാനാവില്ല.",
       "deleteSession": "സെഷൻ ഇല്ലാതാക്കുക",
-      "rename": "പേര് മാറ്റുക",
       "renameMessage": "ഈ സെഷന് പുതിയ പേര് നൽകുക.",
       "copyId": "സെഷൻ ID പകർത്തുക",
       "idCopied": "സെഷൻ ID പകർത്തി",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "ഇത് കാണാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "couldNotLoad": "സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "failedToLoadDetails": "സെഷന്റെ വിശദാംശങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "notFound": "കണ്ടെത്താനായില്ല.",
       "notFoundDescription": "ഈ ഇനം നീക്കം ചെയ്തതോ ഇനി ലഭ്യമല്ലാത്തതോ ആകാം.",
       "failedToStopExecution": "പ്രവർത്തനം നിർത്താൻ കഴിഞ്ഞില്ല.",
       "renameSession": "സെഷന്റെ പേര് മാറ്റുക",
@@ -2076,7 +2056,6 @@
       "retryConnection": "വീണ്ടും കണക്റ്റ് ചെയ്യാൻ ശ്രമിക്കുക"
     },
     "newSession": {
-      "title": "പുതിയ സെഷൻ",
       "connectGithubDescription": "ബ്രൗസറിൽ GitHub കണക്റ്റ് ചെയ്യുക. തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ മടങ്ങിയെത്തുക.",
       "openGithub": "GitHub തുറക്കുക",
       "refreshRepositories": "റിപ്പോസിറ്ററികൾ പുതുക്കുക",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "റിപ്പോസിറ്ററികൾ പുതുക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "discardDraftTitle": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കണോ?",
       "discardDraftMessage": "നിങ്ങളുടെ പ്രോംപ്റ്റ് നഷ്ടപ്പെടും.",
-      "keepEditing": "തിരുത്തുന്നത് തുടരുക",
       "discardFailed": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "remoteHint": "കമ്പ്യൂട്ടറിലെ kilo പ്രോസസ്സ് നിയന്ത്രിക്കാൻ അതിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക. അല്ലെങ്കിൽ പ്രവർത്തിക്കുന്ന CLI സെഷനിൽ `/remote` പ്രവർത്തിപ്പിക്കുക.",
-      "bitbucketConnected": "Bitbucket ബന്ധിപ്പിച്ചു",
-      "connectBitbucket": "Bitbucket ബന്ധിപ്പിക്കുക",
       "connectBitbucketDescription": "ബ്രൗസറിൽ Bitbucket കണക്റ്റ് ചെയ്യുക. തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ മടങ്ങിയെത്തുക.",
-      "connectGitlab": "GitLab ബന്ധിപ്പിക്കുക",
       "connectGitlabDescription": "ബ്രൗസറിൽ GitLab കണക്റ്റ് ചെയ്യുക. തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ മടങ്ങിയെത്തുക.",
       "couldNotLoadBitbucketRepositories": "Bitbucket റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "couldNotLoadGithubRepositories": "GitHub റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "{{name}} ടൂൾ, {{status}}",
       "fileEmpty": "ഈ ഫയൽ ശൂന്യമാണ്.",
       "noTasks": "ജോലികളൊന്നുമില്ല.",
-      "contentTruncated": "ഉള്ളടക്കത്തിന്റെ ഒരു ഭാഗം മാത്രം കാണിക്കുന്നു",
       "truncated": "ഭാഗികം",
       "toolRead": "വായിക്കുക",
       "toolEdit": "തിരുത്തുക",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "മറ്റൊരു പദം ഉപയോഗിച്ച് തിരയുക.",
       "loading": "ലോഡ് ചെയ്യുന്നു...",
       "accessibility": "റിപ്പോസിറ്ററി: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "സന്ദേശ വിശദാംശങ്ങൾ",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "കാഷെയിൽ എഴുതിയത്",
       "total": "ആകെ",
       "reportAiResponseFailedRetryable": "ഈ മറുപടി റിപ്പോർട്ട് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
-      "reportAiResponseFailedTerminal": "ഈ മറുപടി റിപ്പോർട്ട് ചെയ്യാൻ കഴിയില്ല.",
-      "reportAiResponseSubmitted": "റിപ്പോർട്ട് സമർപ്പിച്ചു. രസീത് നമ്പർ: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "ഈ മറുപടി റിപ്പോർട്ട് ചെയ്യാൻ കഴിയില്ല."
     },
     "modelCost": {
       "lessThan": "{{amount}}-ൽ കുറവ്",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "{{alt}} എന്ന ചിത്രം കാണുക",
       "imageOutput": "ഔട്ട്പുട്ട് ചിത്രം",
       "imageOutputWithFilename": "ഔട്ട്പുട്ട് ചിത്രം: {{filename}}",
-      "defaultName": "ഫയൽ",
       "openFullScreen": "{{name}} പൂർണ്ണ സ്ക്രീനിൽ തുറക്കുക",
       "preview": "{{name}} പ്രിവ്യൂ കാണുക",
-      "openFile": "{{name}} തുറക്കുക",
       "couldNotLoadFile": "ഈ ഫയൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "couldNotLoadFileRetry": "ഈ ഫയൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "retryLoadingFile": "ഫയൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "മോഡൽ തിരഞ്ഞെടുക്കുക",
       "searchPlaceholder": "മോഡൽ തിരയൽ",
-      "noModels": "മോഡലുകൾ ലഭ്യമല്ല",
       "noModelsDescription": "തിരഞ്ഞെടുക്കാൻ മോഡലുകൾ ലഭ്യമല്ല.",
-      "favorites": "പ്രിയപ്പെട്ടവ",
-      "recommended": "ശുപാർശ ചെയ്യുന്നവ",
-      "allModels": "എല്ലാ മോഡലുകളും"
+      "favorites": "പ്രിയപ്പെട്ടവ"
     },
     "modelSelector": {
       "provider": "ദാതാവ് {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "ക്യാമറ",
       "photoLibrary": "ഫോട്ടോ ലൈബ്രറി",
       "files": "ഫയലുകൾ",
-      "cameraAccessDisabled": "ക്യാമറ ഉപയോഗിക്കാൻ അനുമതിയില്ല",
       "cameraAccessMessage": "ഫോട്ടോ എടുക്കാൻ ക്രമീകരണങ്ങളിൽ ക്യാമറ ഉപയോഗിക്കാനുള്ള അനുമതി നൽകുക.",
       "couldNotOpenPhotoPicker": "ഫോട്ടോ തിരഞ്ഞെടുക്കാനുള്ള ജാലകം തുറക്കാൻ കഴിഞ്ഞില്ല. Kilo വീണ്ടും ആരംഭിച്ച് ശ്രമിക്കുക.",
       "maxFilesAllowed": "പരമാവധി {{displayCount}} ഫയലുകൾ അനുവദിക്കും.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "ലിങ്ക് പകർത്തി",
-      "reviewPr": "PR പരിശോധിക്കുക",
       "openLink": "ലിങ്ക് തുറക്കുക",
-      "copyLink": "ലിങ്ക് പകർത്തുക",
       "shareLink": "ലിങ്ക് പങ്കിടുക",
       "share": "പങ്കിടുക",
       "prLinkActions": "PR ലിങ്ക് പ്രവർത്തനങ്ങൾ",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "സന്ദർഭത്തിലെ {{window}} ടോക്കണുകളിൽ {{used}} ഉപയോഗിച്ചു, {{percentage}} ഉപയോഗം",
       "title": "സന്ദർഭ ഉപയോഗം",
       "used": "ഉപയോഗിച്ചത്",
-      "remaining": "ശേഷിക്കുന്നത്",
       "provider": "ദാതാവ്",
       "totalCost": "ആകെ ചെലവ്",
       "usageReflectsLatest": "അവസാനം പൂർത്തിയായ അസിസ്റ്റന്റിന്റെ മറുപടിയെ അടിസ്ഥാനമാക്കിയുള്ള ഉപയോഗമാണ് കാണിക്കുന്നത്.",
@@ -2598,7 +2561,6 @@
     "billingPage": "ബില്ലിംഗ് പേജ്"
   },
   "deviceSessions": {
-    "couldNotLoad": "സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
     "couldNotLoadDescription": "ഇത് ലോഡ് ആകുന്നതുവരെ നിങ്ങളുടെ സജീവ സെഷനുകൾ ലഭ്യമല്ല.",
     "currentDeviceUnidentified": "നിലവിലെ ഉപകരണം തിരിച്ചറിയാൻ കഴിഞ്ഞില്ല.",
     "noSessions": "സജീവ സെഷനുകളൊന്നുമില്ല",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Kilo ആപ്പിൽ സൈൻ ഇൻ ചെയ്ത സെഷനുകൾ മാത്രമേ ഇവിടെ കാണൂ. എഡിറ്ററിലെയും CLI-യിലെയും സെഷനുകൾ ഇവിടെ കാണിക്കില്ല.",
     "signedIn": "സൈൻ ഇൻ ചെയ്തത് {{signedIn}} · അവസാനം സജീവമായത് {{lastSeen}}",
     "thisDevice": "ഈ ഉപകരണം",
-    "title": "ഉപകരണ സെഷനുകൾ",
     "viewProfile": "പ്രൊഫൈൽ കാണുക",
     "webBrowser": "വെബ് ബ്രൗസർ",
     "signOutThisDevice": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "ഈ ലിങ്ക് ഇനി സാധുവല്ല.",
-    "goBack": "തിരികെ പോകുക",
     "title": "പേജ് കണ്ടെത്താനായില്ല"
   },
   "monoScrollBlock": {
-    "contentTruncated": "ഉള്ളടക്കത്തിന്റെ ഒരു ഭാഗം മാത്രം കാണിക്കുന്നു",
     "truncated": "ഭാഗികം",
     "wrap": "വരി മടക്കുക",
     "scroll": "സ്ക്രോൾ"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "വീണ്ടും ശ്രമിക്കുക.",
     "offlineTitle": "ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
     "permissionDescription": "ഇത് കാണാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
-    "notFoundTitle": "കണ്ടെത്താനായില്ല.",
     "notFoundDescription": "ഈ ഇനം നീക്കം ചെയ്തതോ ഇനി ലഭ്യമല്ലാത്തതോ ആകാം.",
     "serverTitle": "ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
     "serverDescription": "ഞങ്ങളുടെ ഭാഗത്ത് എന്തോ കുഴപ്പം സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക."
   },
   "screenHeader": {
     "openMenu": "മെനു തുറക്കുക",
-    "openMenuFor": "{{title}}-നുള്ള മെനു തുറക്കുക",
-    "goBack": "തിരികെ പോകുക"
+    "openMenuFor": "{{title}}-നുള്ള മെനു തുറക്കുക"
   },
   "picker": {
     "optionsExpired": "ഓപ്ഷനുകൾ കാലഹരണപ്പെട്ടു",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",
-    "reviewPr": "PR പരിശോധിക്കുക",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "പുതിയ സെഷൻ",
     "searchPlaceholder": "അടുത്തിടെ ഉപയോഗിച്ച സെഷനുകളിൽ തിരയൽ",
     "connectedCli": "കണക്റ്റ് ചെയ്ത CLI-യിൽ",
     "newSessionOn": "{{name}}-ൽ പുതിയ സെഷൻ",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Pass റദ്ദാക്കുന്നു",
     "statusPastDue": "Kilo Pass പണമടയ്ക്കാനുള്ള സമയം കഴിഞ്ഞു",
     "monthlyCredits": "പ്രതിമാസം {{credits}} ക്രെഡിറ്റുകൾ",
-    "ends": "{{date}}-ന് അവസാനിക്കുന്നു",
     "periodEnd": "കാലയളവിന്റെ അവസാനം",
     "managedOnGooglePlay": "നിയന്ത്രിക്കുന്നത് Google Play വഴി",
     "managedInAppStore": "നിയന്ത്രിക്കുന്നത് App Store വഴി",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Android ആപ്പിനുള്ളിൽ Kilo Pass വാങ്ങാൻ കഴിയില്ല. വെബ്സൈറ്റ് വഴി ഇത് നിയന്ത്രിക്കുക.",
     "webManagementDescription": "ഈ Kilo Pass വെബ്സൈറ്റ് വഴിയാണ് നിയന്ത്രിക്കുന്നത്.",
     "legalDisclosure": "സ്വയമേവ പുതുക്കുന്ന പ്രതിമാസ സബ്സ്ക്രിപ്ഷനാണ് Kilo Pass. വാങ്ങൽ സ്ഥിരീകരിക്കുമ്പോൾ നിങ്ങളുടെ Apple ID-യിൽ നിന്ന് പണം ഈടാക്കും. നിലവിലെ കാലയളവ് അവസാനിക്കുന്നതിന് കുറഞ്ഞത് 24 മണിക്കൂർ മുമ്പെങ്കിലും റദ്ദാക്കിയില്ലെങ്കിൽ, കാണിച്ചിരിക്കുന്ന വിലയിൽ ഓരോ മാസവും സബ്സ്ക്രിപ്ഷൻ സ്വയമേവ പുതുക്കും. നിങ്ങളുടെ App Store അക്കൗണ്ട് ക്രമീകരണങ്ങളിൽ എപ്പോൾ വേണമെങ്കിലും ഇത് നിയന്ത്രിക്കുകയോ റദ്ദാക്കുകയോ ചെയ്യാം.",
-    "legalPrivacyPolicy": "സ്വകാര്യതാ നയം",
     "legalTermsOfUse": "ഉപയോഗ നിബന്ധനകൾ (EULA)",
     "purchaseDifferentAccount": "ഈ App Store വാങ്ങൽ നിങ്ങളുടെ Kilo അക്കൗണ്ടുമായി ബന്ധിപ്പിച്ചിട്ടില്ല. വാങ്ങാൻ ഉപയോഗിച്ച Apple Account-ൽ സൈൻ ഇൻ ചെയ്ത ശേഷം വീണ്ടും ശ്രമിക്കുക.",
     "restoreFailed": "വാങ്ങലുകൾ പുനഃസ്ഥാപിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "സാധുവായ ഒരു ഇമെയിൽ വിലാസം നൽകുക.",
-      "emailLabel": "ഇമെയിൽ",
       "emailPlaceholder": "ഇമെയിൽ വിലാസം",
       "permissionDenied": "അംഗങ്ങളെ ക്ഷണിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "roleLabel": "റോൾ",
@@ -2968,7 +2920,6 @@
         "billingManager": "ബില്ലിംഗ് മാനേജർ"
       },
       "emailStatusFailed": "ഇമെയിൽ അയയ്ക്കാനായില്ല",
-      "emailStatusPending": "കാത്തിരിക്കുന്നു",
       "inviteCreated": "ക്ഷണം സൃഷ്ടിച്ചു",
       "pendingInvitations": "സ്വീകരിക്കാത്ത ക്ഷണങ്ങൾ",
       "resendInvite": "ക്ഷണം വീണ്ടും അയയ്ക്കുക",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "നില ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "creditProcessingDelayed": "ക്രെഡിറ്റ് പ്രോസസ്സിംഗ് വൈകി · സ്വയമേവ വീണ്ടും ശ്രമിക്കുന്നു",
       "ended": "അവസാനിച്ചു",
-      "endsOn": "{{date}}-ന് അവസാനിക്കുന്നു",
       "manageHint": "Kilo Pass നിയന്ത്രിക്കാനുള്ള പേജ് വെബ്സൈറ്റിൽ തുറക്കുന്നു.",
       "notSubscribed": "സബ്സ്ക്രൈബ് ചെയ്തിട്ടില്ല",
       "overallocated": "അനുവദിച്ച പാസുകളുടെ എണ്ണം പണമടച്ച സീറ്റുകളേക്കാൾ കൂടുതലാണ്",
@@ -3004,7 +2954,6 @@
       "paymentPending": "പണമടയ്ക്കൽ പൂർത്തിയായിട്ടില്ല",
       "processingBlocked": "പ്രോസസ്സിംഗ് തടഞ്ഞു",
       "processingNeedsReview": "പ്രോസസ്സിംഗ് പരിശോധിക്കണം",
-      "retry": "വീണ്ടും ശ്രമിക്കുക",
       "retryHint": "Kilo Pass നില ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുന്നു.",
       "setupHint": "വെബിൽ Kilo Pass സജ്ജീകരണം തുറക്കുന്നു."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "മുൻഗണനകളിലേക്ക് മടങ്ങുക"
   },
   "quickChat": {
-    "title": "ചാറ്റ്",
     "empty": {
       "title": "ഒരു ചാറ്റ് ആരംഭിക്കുക",
       "description": "ഒരു മോഡലുമായി സംസാരിക്കാൻ സന്ദേശം അയയ്ക്കുക."
@@ -3076,7 +3024,6 @@
     "openAgents": "ഏജന്റുകൾ തുറക്കുക",
     "running": "പ്രവർത്തിക്കുന്നു",
     "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം",
-    "idle": "നിഷ്ക്രിയം",
     "channelName": "സജീവ ഏജന്റുകൾ",
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക."
   }

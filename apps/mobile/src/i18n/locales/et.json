@@ -69,7 +69,58 @@
     "repository": "Hoidla",
     "signOut": "Logi välja",
     "agents": "Agendid",
-    "all": "Kõik"
+    "all": "Kõik",
+    "allModels": "Kõik mudelid",
+    "balanced": "Tasakaalustatud",
+    "bitbucketConnected": "Bitbucket on ühendatud",
+    "branch": "Haru",
+    "cameraAccessDisabled": "Juurdepääs kaamerale on keelatud",
+    "chat": "Vestlus",
+    "clearFilters": "Eemalda filtrid",
+    "clearSearch": "Tühjenda otsing",
+    "closed": "Suletud",
+    "closeReactions": "Sulge reaktsioonid",
+    "connect": "Ühenda",
+    "connectBitbucket": "Ühenda Bitbucket",
+    "connectGitlab": "Ühenda GitLab",
+    "contentTruncated": "Sisu kärbitud",
+    "copyLink": "Kopeeri link",
+    "couldNotLoadOrganizations": "Organisatsioone ei õnnestunud laadida.",
+    "couldNotLoadSessions": "Seansse ei õnnestunud laadida.",
+    "couldnTLoadMore": "Rohkem andmeid ei õnnestunud laadida.",
+    "deviceSessions": "Seadmete seansid",
+    "disabled": "Välja lülitatud",
+    "email": "E-post",
+    "ends": "Lõpeb {{date}}",
+    "failed": "Ebaõnnestus",
+    "file": "Fail",
+    "gitlab": "GitLab",
+    "goBack": "Mine tagasi",
+    "idle": "Ooterežiimis",
+    "keepEditing": "Jätka muutmist",
+    "keepRunning": "Jätka tööd",
+    "kiloclaw": "KiloClaw",
+    "newSession": "Uus seanss",
+    "noKiloclawInstances": "KiloClaw'i eksemplare pole",
+    "noModelsAvailable": "Mudeleid pole saadaval",
+    "notFound": "Ei leitud.",
+    "online": "Võrgus",
+    "open": "Ava {{name}}",
+    "openPullRequest": "Ava tõmbetaotlus",
+    "pending": "Ootel",
+    "performance": "Jõudlus",
+    "preferences": "Eelistused",
+    "privacyPolicy": "Privaatsuspoliitika",
+    "profile": "Profiil",
+    "reactions": "Reaktsioonid",
+    "recent": "Hiljutised",
+    "recommended": "Soovitatud",
+    "remaining": "Alles",
+    "rename": "Nimeta ümber",
+    "reply": "Vasta",
+    "reportSubmittedReceipt": "Teade saadetud. Kinnituse number: {{receiptId}}",
+    "retryLoadingMore": "Proovi lisaandmeid uuesti laadida",
+    "reviewPr": "Vaata PR-i üle"
   },
   "language": {
     "title": "Keel",
@@ -77,7 +128,6 @@
     "couldNotRestart": "Taaskäivitamine ebaõnnestus",
     "languageSaved": "Sinu keelevalik on salvestatud.",
     "catalogLoadFailed": "Keele laadimine ebaõnnestus. Proovi uuesti.",
-    "retry": "Proovi uuesti",
     "search": "Keele otsing",
     "noMatches": "Sobivaid keeli ei leitud",
     "deviceLanguage": "Seadme keel",
@@ -93,7 +143,6 @@
     "signInCodeAccessibility": "Sisselogimiskood: {{code}}",
     "openSignInPageInBrowser": "Ava sisselogimisleht brauseris",
     "copySignInLink": "Kopeeri sisselogimislink",
-    "copyLink": "Kopeeri link",
     "cancelSignIn": "Tühista sisselogimine",
     "startingSignIn": "Sisselogimise alustamine...",
     "organizationUsesSso": "Sinu organisatsioon kasutab ühtset sisselogimist.",
@@ -112,7 +161,6 @@
     "terms": "kasutustingimustega",
     "termsConnector": " ja ",
     "termsSuffix": ".",
-    "privacyPolicy": "Privaatsuspoliitika",
     "moreSignInOptions": "Rohkem sisselogimisvalikuid",
     "couldNotCompleteSignIn": "Sisselogimist ei õnnestunud lõpule viia. Proovi uuesti.",
     "sessionEnded": "Sinu seanss lõppes. Logi uuesti sisse.",
@@ -126,7 +174,6 @@
     "or": "või"
   },
   "profile": {
-    "title": "Profiil",
     "codeReviewerSubtitle": "Automaatsed PR-ülevaatused",
     "securityAgentSubtitle": "Leia ja kõrvalda turvanõrkused",
     "reviews": "Ülevaatused",
@@ -136,9 +183,7 @@
     "linkedAccounts": "Seotud kontod",
     "couldNotLoadAccounts": "Kontosid ei õnnestunud laadida.",
     "app": "Rakendus",
-    "preferences": "Eelistused",
     "preferencesSubtitle": "Välimus, teavitused, mõttekäigud ja ekraani käitumine",
-    "deviceSessions": "Seadmete seansid",
     "deviceSessionsSubtitle": "Vaata teised seadmed üle ja logi neist välja",
     "feedback": "Anna tagasisidet",
     "privacyChoices": "Privaatsusvalikud",
@@ -163,15 +208,12 @@
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-post",
     "providerTestAccount": "Testikonto",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Ettevõtte SSO"
   },
   "preferences": {
-    "title": "Eelistused",
     "autoExpandThinking": "Ava mõttekäik automaatselt",
     "autoExpandThinkingSubtitle": "Näita agendi mõttekäiku avatuna, kui mõtlemine lõpeb.",
     "keepScreenOn": "Hoia ekraan seansi lehel sisselülitatuna",
@@ -360,7 +402,6 @@
       "unresolveThread": "Märgi lõim lahendamata",
       "resolved": "Lahendatud",
       "outdated": "Aegunud",
-      "file": "Fail",
       "comment_one": "1 kommentaar",
       "comment": "{{displayCount}} kommentaari",
       "comment_other": "{{displayCount}} kommentaari",
@@ -368,8 +409,6 @@
       "couldNotLoadMore": "Lisakommentaare ei õnnestunud laadida.",
       "retryLoadingMore": "Proovi lisakommentaare uuesti laadida",
       "loadMoreComments": "Laadi rohkem kommentaare",
-      "closeReactions": "Sulge reaktsioonid",
-      "reactionsTitle": "Reaktsioonid",
       "addReaction": "Lisa reaktsioon",
       "reactionPill": "{{emoji}} reaktsioon, {{displayCount}} {{countLabel}}",
       "reaction_one": "reaktsioon",
@@ -380,13 +419,11 @@
       "reportUser": "Teata kasutajast",
       "mute": "Vaigista",
       "block": "Blokeeri",
-      "reportSubmitted": "Teade saadetud. Kinnituse number: {{receiptId}}",
       "blockedUser": "{{login}} on blokeeritud",
       "mutedUser": "{{login}} on vaigistatud",
       "replyPlaceholder": "Vastus…",
       "replyBody": "Vastuse sisu",
       "submitReply": "Saada vastus",
-      "reply": "Vasta",
       "termsTitle": "Teenusetingimused",
       "termsCopy": "Postitamiseks pead olema vähemalt 13-aastane.",
       "termsAcceptRetry": "Tingimustega nõustumine ebaõnnestus. Kontrolli ühendust ja proovi uuesti.",
@@ -468,8 +505,7 @@
       "urlAccessibility": "GitHubi tõmbetaotluse URL",
       "clearLink": "Eemalda tõmbetaotluse link",
       "pasteLink": "Kleebi tõmbetaotluse link",
-      "open": "Ava",
-      "openPullRequest": "Ava tõmbetaotlus"
+      "open": "Ava"
     },
     "checks": {
       "title": "Kontrollid",
@@ -489,13 +525,10 @@
     },
     "inbox": {
       "title": "Postkast",
-      "recent": "Hiljutised",
       "loading": "Postkasti laadimine",
       "noReviewRequests": "Ülevaatustaotlusi pole",
       "noReviewRequestsDescription": "Siin kuvatakse sinu ülevaatust ootavad tõmbetaotlused. Ülalolevale väljale saad endiselt kleepida mis tahes PR-i lingi.",
-      "couldNotLoad": "Postkasti ei õnnestunud laadida.",
-      "couldNotLoadMore": "Rohkem andmeid ei õnnestunud laadida.",
-      "retryLoadingMore": "Proovi lisaandmeid uuesti laadida"
+      "couldNotLoad": "Postkasti ei õnnestunud laadida."
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentaar",
@@ -510,7 +543,6 @@
       "loadFailedTitle": "Kommentaari sisestusvormi ei õnnestunud laadida.",
       "discardTitle": "Kas loobuda kommentaarist?",
       "discardMessage": "Sinu mustand kaob.",
-      "keepEditing": "Jätka muutmist",
       "comment": "Kommenteeri",
       "insertSuggestionA11y": "Lisa koodisoovitus",
       "insertSuggestion": "Lisa soovitus",
@@ -557,7 +589,6 @@
     },
     "overview": {
       "stateMerged": "Mestitud",
-      "stateClosed": "Suletud",
       "stateOpenApproved": "Avatud · Kinnitatud",
       "stateOpenChangesRequested": "Avatud · Muudatusi nõutud",
       "stateOpenReviewRequired": "Avatud · Ülevaatus nõutud",
@@ -682,17 +713,13 @@
   },
   "tabs": {
     "home": "Avaleht",
-    "profile": "Profiil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, vahekaart, {{position}}/{{total}}",
-    "chat": "Vestlus"
+    "position": "{{name}}, vahekaart, {{position}}/{{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Eksemplari vahetamine",
       "couldNotLoadInstances": "Eksemplare ei õnnestunud laadida.",
-      "noInstances": "KiloClaw'i eksemplare pole",
       "noInstancesDescription": "Vestluse alustamiseks seadista eksemplar.",
       "setUpKiloclaw": "Seadista KiloClaw",
       "currentInstance": "{{title}}, praegune"
@@ -714,16 +741,12 @@
       "couldNotSignIn": "Vestlusse sisselogimine ebaõnnestus.",
       "couldNotRefreshMessages": "Sõnumeid ei õnnestunud värskendada.",
       "couldNotLoadHistory": "Vestluse ajalugu ei õnnestunud laadida.",
-      "rename": "Nimeta ümber",
       "leave": "Lahku",
       "untitledConversation": "Pealkirjata vestlus",
       "createFailed": "Vestluse loomine ebaõnnestus.",
       "leaveFailed": "Vestlusest lahkumine ebaõnnestus."
     },
     "reactions": {
-      "title": "Reaktsioonid",
-      "close": "Sulge reaktsioonid",
-      "recent": "Hiljutised",
       "common": "Levinud",
       "reactWith": "Reageeri emotikoniga {{reaction}}",
       "accessibility": "{{emoji}} reaktsioon, {{displayCount}}"
@@ -796,7 +819,6 @@
       "addReactionFailed": "Reaktsiooni lisamine ebaõnnestus.",
       "retrySend": "Saada uuesti",
       "moreReactions": "Veel reaktsioone",
-      "reply": "Vasta",
       "edit": "Muuda",
       "sendFailed": "Sõnumi saatmine ebaõnnestus.",
       "retrySendFailed": "Sõnumi uuesti saatmine ebaõnnestus.",
@@ -807,7 +829,6 @@
       "takePhoto": "Tee foto",
       "photoLibrary": "Fototeek",
       "files": "Failid",
-      "cameraAccessDisabled": "Juurdepääs kaamerale on keelatud",
       "cameraAccessMessage": "Pildistamiseks luba seadetes juurdepääs kaamerale."
     },
     "typingIndicator": {
@@ -817,8 +838,6 @@
       "typing_other": "{{names}} kirjutavad..."
     },
     "botStatus": {
-      "online": "Võrgus",
-      "idle": "Ooterežiimis",
       "offline": "Võrguühenduseta",
       "loadingUser": "Kasutaja laadimine...",
       "waitingForStatus": "Oodatakse boti olekut...",
@@ -832,7 +851,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw’ eksemplare ei õnnestunud laadida.",
     "billing": {
       "title": "Arveldus",
@@ -840,7 +858,6 @@
       "plan": "Plaan",
       "finalTermEnds": "Viimane periood lõpeb",
       "afterFinalTerm": "Pärast viimast perioodi",
-      "remaining": "Alles",
       "lessThanOneDay": "Vähem kui 1 päev",
       "ends": "Lõpeb",
       "expires": "Aegub",
@@ -941,20 +958,15 @@
       "disconnect": "Ühenda Google'i konto lahti",
       "copied": "Kopeeritud",
       "copyCommand": "Kopeeri käsk",
-      "disabled": "Välja lülitatud",
       "disconnectConfirm": "Ühenda lahti",
       "disconnectMessage": "Kas eemaldada oma Google'i konto sellest eksemplarist? See lülitab Gmaili teatised välja. Muudatuste rakendamiseks juuruta eksemplar pärast konto lahtiühendamist uuesti.",
       "disconnectTitle": "Google'i lahtiühendamine"
     },
     "modelList": {
-      "title": "Kõik mudelid",
       "searchPlaceholder": "Mudeli otsing",
-      "clearSearch": "Tühjenda otsing",
       "noMatches": "Otsingule vastavaid mudeleid ei leitud",
-      "noModels": "Mudeleid pole saadaval",
       "noModelsDescription": "Siin kuvatakse mudelid, kui need on saadaval.",
-      "noResultsFor": "Otsingule „{{query}}“ ei leitud tulemusi.",
-      "recommended": "Soovitatud"
+      "noResultsFor": "Otsingule „{{query}}“ ei leitud tulemusi."
     },
     "secrets": {
       "title": "Salajased väärtused",
@@ -972,8 +984,7 @@
       "setupGuide": "seadistusjuhend",
       "saving": "Salvestamine…",
       "removing": "Eemaldamine…",
-      "updateToken": "Uuenda pääsutõendit",
-      "connect": "Ühenda"
+      "updateToken": "Uuenda pääsutõendit"
     },
     "versionPin": {
       "title": "Versiooni lukustamine",
@@ -1020,7 +1031,6 @@
       "finishingSetup": "Seadistamine lõpeb",
       "finishingSetupDescription": "Oota hetk, viime sinu konto seadistamise lõpule. Tavaliselt kulub selleks vaid hetk.",
       "getStarted": "Alusta",
-      "noInstances": "KiloClaw'i eksemplare pole",
       "noInstancesDescription": "Loo oma esimene eksemplar, et käitada programmeerimisagente."
     },
     "instance": {
@@ -1044,7 +1054,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Ava vestlus: {{name}}",
-        "online": "Võrgus",
         "ready": "{{name}} on valmis",
         "warmedUp": "Kõik on valmis. Ütle tere, kui oled valmis."
       },
@@ -1141,9 +1150,7 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Tipptase",
       "frontierDescription": "Parim jõudlus. Suunab päringud arutlusvõimega tippmudelitele.",
-      "balancedLabel": "Tasakaalustatud",
       "balancedDescription": "Nutikas tasakaal kiiruse ja võimekuse vahel madalama hinnaga.",
-      "performance": "Jõudlus",
       "autoModelA11y": "{{label}} automaatne mudel",
       "currentModel": "Praegune mudel",
       "browseAllModels": "või vali enam kui 500 mudeli hulgast",
@@ -1177,7 +1184,6 @@
       "openUnread_one": "Ava {{name}}, {{displayCount}} lugemata sõnum",
       "openUnread": "Ava {{name}}, {{displayCount}} lugemata sõnumit",
       "openUnread_other": "Ava {{name}}, {{displayCount}} lugemata sõnumit",
-      "open": "Ava {{name}}",
       "openSettings": "Ava {{name}} seaded",
       "fixOnKiloAi": "Paranda saidil kilo.ai: {{label}}"
     },
@@ -1263,7 +1269,6 @@
       "title": "Ülevaatus",
       "cancelTitle": "Kas tühistada ülevaatus?",
       "cancelMessage": "See peatab poolelioleva koodi ülevaatuse.",
-      "keepRunning": "Jätka tööd",
       "cancelReview": "Tühista ülevaatus",
       "retryTitle": "Kas proovida ülevaatust uuesti?",
       "retryMessage": "See käivitab koodi ülevaatuse uuesti.",
@@ -1273,13 +1278,11 @@
       "byline": "{{repo}} #{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
       "showMore": "Kuva rohkem",
-      "branch": "Haru",
       "created": "Loodud",
       "started": "Alustatud",
       "completed": "Lõpetatud",
       "tokens": "Tokenid",
       "tokensInOut": "{{input}} sisendis / {{output}} väljundis",
-      "openPullRequest": "Ava tõmbetaotlus",
       "council": "Nõukogu",
       "decision": "Otsus",
       "gate": "Kvaliteedikontroll",
@@ -1307,8 +1310,6 @@
     },
     "reviewMemory": {
       "title": "Ülevaatuste mälu",
-      "couldNotLoadMore": "Rohkem andmeid ei õnnestunud laadida.",
-      "retryLoadingMore": "Proovi lisaandmeid uuesti laadida",
       "loading": "Ülevaatuste mälu laadimine",
       "couldNotLoad": "Ülevaatuste mälu ei õnnestunud laadida.",
       "off": "Ülevaatuste mälu on välja lülitatud.",
@@ -1347,15 +1348,11 @@
       "setup": "Bitbucketi seadistamine"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket on ühendatud",
-      "title": "Ühenda Bitbucket",
       "description": "Loo nõutavate õigustega tööruumi juurdepääsutunnus ja kleebi see allolevale väljale.",
       "scopes": "Konto: lugemine · Hoidlad: lugemine/kirjutamine · Tõmbetaotlused: lugemine · Veebihaagid: lugemine/kirjutamine",
-      "tokenPlaceholder": "Tööruumi juurdepääsutunnus",
-      "connect": "Ühenda"
+      "tokenPlaceholder": "Tööruumi juurdepääsutunnus"
     },
     "scopeList": {
-      "couldNotLoad": "Organisatsioone ei õnnestunud laadida.",
       "personalStillAvailable": "Isiklikud hoidlad on allpool siiski saadaval.",
       "personalSubtitle": "Sinu enda hoidlad",
       "viewOnly": "Ainult vaatamiseks"
@@ -1378,7 +1375,6 @@
       "githubApp": "GitHubi rakendus",
       "githubError": "GitHubi seadistamist ei õnnestunud avada. Proovi uuesti.",
       "gitlabAccount": "GitLabi konto",
-      "connectGitLab": "Ühenda GitLab",
       "gitlabError": "GitLabi seadistamist ei õnnestunud avada. Proovi uuesti.",
       "description": "Ühenda Kilo {{label}}, et tõmbetaotlusi automaatselt üle vaadata.",
       "bitbucketError": "Bitbucketi seadistamist ei õnnestunud avada. Proovi uuesti."
@@ -1403,21 +1399,17 @@
     "updateFailed": "Koodiülevaataja uuendamine ebaõnnestus.",
     "configSaveFailed": "Ülevaatuse seadete salvestamine ebaõnnestus.",
     "status": {
-      "pending": "Ootel",
       "running": "Töötab",
       "completed": "Lõpetatud",
-      "failed": "Ebaõnnestus",
       "interrupted": "Katkestatud"
     },
     "reviewStyle": {
       "strict": "Range",
-      "balanced": "Tasakaalustatud",
       "lenient": "Leebe",
       "roast": "Pilkav"
     },
     "focusArea": {
       "security": "Turvalisus",
-      "performance": "Jõudlus",
       "bugs": "Vead",
       "style": "Stiil",
       "testing": "Testimine",
@@ -1468,7 +1460,6 @@
       "statusOpen": "Avatud",
       "fixed": "Parandatud",
       "statusIgnored": "Ignoreeritud",
-      "statusClosed": "Suletud",
       "severityHigh": "Kõrge",
       "severityMedium": "Keskmine",
       "severityLow": "Madal",
@@ -1655,7 +1646,6 @@
       "title": "Seaded",
       "couldNotLoadSettings": "Turvaagendi seadeid ei õnnestunud laadida.",
       "couldNotLoadPermissions": "Õigusi ei õnnestunud laadida.",
-      "disabled": "Välja lülitatud",
       "on": "Sees",
       "repositoriesCount_one": "Valitud on {{displayCount}} hoidla",
       "repositoriesCount": "Valitud on {{displayCount}} hoidlat",
@@ -1683,7 +1673,6 @@
       "retry": "Proovi parandamist uuesti",
       "cancelTitle": "Kas tühistada see parandamine?",
       "cancelMessage": "Turvaagent peatab käimasoleva parandamiskatse.",
-      "keepRunning": "Jätka tööd",
       "cancelRemediation": "Tühista parandamine",
       "openPullRequest": "Ava tõmbetaotlus{{number}}",
       "openDraftPullRequest": "Ava tõmbetaotluse mustand{{number}}",
@@ -1691,7 +1680,6 @@
       "attemptHistory": "Katsete ajalugu ({{displayCount}})",
       "attemptNumber": "Katse nr {{number}}",
       "startedBy": "Alustaja",
-      "branch": "Haru",
       "queued": "Parandamine on järjekorras",
       "retryQueued": "Uus parandamiskatse lisati järjekorda",
       "timeline": {
@@ -1747,11 +1735,9 @@
       "noMatchesTitle": "Ükski leid ei vasta filtritele",
       "noMatchesDescription": "Proovi valitud filtreid muuta või eemaldada.",
       "emptyTitle": "Avatud leide pole",
-      "emptyDescription": "Praegu ei vaja ükski avatud leid tähelepanu.",
-      "clearFilters": "Eemalda filtrid"
+      "emptyDescription": "Praegu ei vaja ükski avatud leid tähelepanu."
     },
     "scopeList": {
-      "couldNotLoad": "Organisatsioone ei õnnestunud laadida.",
       "personalSubtitle": "Sinu enda hoidlad"
     },
     "findingRow": {
@@ -1908,7 +1894,6 @@
       "draftPrOpened": "PR-i mustand avatud",
       "prOpened": "PR avatud",
       "blocked": "Blokeeritud",
-      "failed": "Ebaõnnestus",
       "noChangesNeeded": "Muudatusi pole vaja",
       "originAutomaticPolicy": "Automaatreegel",
       "originIncludeExistingPolicy": "Varasemate leidude kaasamise reegel",
@@ -1962,12 +1947,9 @@
     "search": {
       "searching": "Otsimine",
       "searchSessions": "Otsi seansse",
-      "searchSessionsPlaceholder": "Otsi seansse",
-      "clearSearch": "Tühjenda otsing",
-      "clearFilters": "Eemalda filtrid"
+      "searchSessionsPlaceholder": "Otsi seansse"
     },
     "sessionList": {
-      "couldNotLoad": "Seansse ei õnnestunud laadida.",
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
       "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
       "noMatches": "Sobivaid seansse ei leitud",
@@ -1983,7 +1965,6 @@
       "deleteTitle": "Kas kustutada seanss?",
       "deleteMessage": "Seda ei saa tagasi võtta.",
       "deleteSession": "Kustuta seanss",
-      "rename": "Nimeta ümber",
       "renameMessage": "Sisesta seansile uus nimi.",
       "copyId": "Kopeeri seansi ID",
       "idCopied": "Seansi ID on kopeeritud",
@@ -2032,7 +2013,6 @@
       "accessDeniedDescription": "Sul pole õigust seda vaadata.",
       "couldNotLoad": "Seansi laadimine ebaõnnestus.",
       "failedToLoadDetails": "Seansi üksikasjade laadimine ebaõnnestus.",
-      "notFound": "Ei leitud.",
       "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
       "failedToStopExecution": "Täitmise peatamine ebaõnnestus.",
       "renameSession": "Nimeta seanss ümber",
@@ -2076,7 +2056,6 @@
       "retryConnection": "Proovi uuesti ühenduda"
     },
     "newSession": {
-      "title": "Uus seanss",
       "connectGithubDescription": "Ühenda GitHub brauseris ja naase siia, et valida hoidla.",
       "openGithub": "Ava GitHub",
       "refreshRepositories": "Värskenda hoidlaid",
@@ -2103,13 +2082,9 @@
       "couldNotRefreshRepositories": "Hoidlate värskendamine ebaõnnestus. Proovi uuesti.",
       "discardDraftTitle": "Kas loobuda mustandist?",
       "discardDraftMessage": "Sinu viip läheb kaotsi.",
-      "keepEditing": "Jätka muutmist",
       "discardFailed": "Mustandist loobumine ebaõnnestus. Proovi uuesti.",
       "remoteHint": "Kohaliku kilo protsessi juhtimiseks käivita arvutis `kilo remote` või töötavas CLI-seansis `/remote`.",
-      "bitbucketConnected": "Bitbucket on ühendatud",
-      "connectBitbucket": "Ühenda Bitbucket",
       "connectBitbucketDescription": "Ühenda Bitbucket brauseris ja naase siia, et valida hoidla.",
-      "connectGitlab": "Ühenda GitLab",
       "connectGitlabDescription": "Ühenda GitLab brauseris ja naase siia, et valida hoidla.",
       "couldNotLoadBitbucketRepositories": "Bitbucketi hoidlate laadimine ebaõnnestus.",
       "couldNotLoadGithubRepositories": "GitHubi hoidlate laadimine ebaõnnestus.",
@@ -2139,7 +2114,6 @@
       "accessibilityLabel": "Tööriist {{name}}, {{status}}",
       "fileEmpty": "See fail on tühi.",
       "noTasks": "Ülesandeid pole.",
-      "contentTruncated": "Sisu kärbitud",
       "truncated": "Kärbitud",
       "toolRead": "loe",
       "toolEdit": "Muuda",
@@ -2212,8 +2186,7 @@
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
       "loading": "Laadimine...",
       "accessibility": "Hoidla: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Sõnumi üksikasjad",
@@ -2235,8 +2208,7 @@
       "cacheWrite": "Vahemällu kirjutamine",
       "total": "Kokku",
       "reportAiResponseFailedRetryable": "Sellest vastusest ei õnnestunud teatada.",
-      "reportAiResponseFailedTerminal": "Sellest vastusest ei saa teatada.",
-      "reportAiResponseSubmitted": "Teade saadetud. Kinnituse number: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Sellest vastusest ei saa teatada."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2275,10 +2247,8 @@
       "viewImageWithAlt": "Vaata pilti {{alt}}",
       "imageOutput": "Väljundpilt",
       "imageOutputWithFilename": "Väljundpilt, {{filename}}",
-      "defaultName": "Fail",
       "openFullScreen": "Ava {{name}} täisekraanil",
       "preview": "Vaata faili {{name}} eelvaadet",
-      "openFile": "Ava {{name}}",
       "couldNotLoadFile": "Seda faili ei õnnestunud laadida.",
       "couldNotLoadFileRetry": "Seda faili ei õnnestunud laadida. Proovi uuesti.",
       "retryLoadingFile": "Proovi faili laadimist uuesti",
@@ -2414,11 +2384,8 @@
     "modelPicker": {
       "title": "Vali mudel",
       "searchPlaceholder": "Mudeli otsing",
-      "noModels": "Mudeleid pole saadaval",
       "noModelsDescription": "Valimiseks pole ühtegi mudelit saadaval.",
-      "favorites": "Lemmikud",
-      "recommended": "Soovitatud",
-      "allModels": "Kõik mudelid"
+      "favorites": "Lemmikud"
     },
     "modelSelector": {
       "provider": "Pakkuja {{id}}",
@@ -2456,7 +2423,6 @@
       "camera": "Kaamera",
       "photoLibrary": "Fototeek",
       "files": "Failid",
-      "cameraAccessDisabled": "Juurdepääs kaamerale on keelatud",
       "cameraAccessMessage": "Pildistamiseks luba seadetes juurdepääs kaamerale.",
       "couldNotOpenPhotoPicker": "Fotovalijat ei õnnestunud avada. Taaskäivita Kilo ja proovi uuesti.",
       "maxFilesAllowed": "Lisada saab kuni {{displayCount}} faili.",
@@ -2484,9 +2450,7 @@
     },
     "chatLink": {
       "linkCopied": "Link kopeeritud",
-      "reviewPr": "Vaata PR-i üle",
       "openLink": "Ava link",
-      "copyLink": "Kopeeri link",
       "shareLink": "Jaga linki",
       "share": "Jaga",
       "prLinkActions": "PR-i lingi toimingud",
@@ -2532,7 +2496,6 @@
       "tokensUsage": "Kontekstis {{used}} tokenit {{window}} tokenist, {{percentage}} kasutatud",
       "title": "Konteksti kasutus",
       "used": "Kasutatud",
-      "remaining": "Alles",
       "provider": "Pakkuja",
       "totalCost": "Kogukulu",
       "usageReflectsLatest": "Kasutusandmed kajastavad assistendi viimast valmis vastust.",
@@ -2598,7 +2561,6 @@
     "billingPage": "arveldusleht"
   },
   "deviceSessions": {
-    "couldNotLoad": "Seansse ei õnnestunud laadida.",
     "couldNotLoadDescription": "Sinu aktiivsed seansid on saadaval alles pärast andmete laadimist.",
     "currentDeviceUnidentified": "Praegust seadet ei õnnestunud tuvastada.",
     "noSessions": "Aktiivseid seansse pole",
@@ -2606,7 +2568,6 @@
     "onlyKiloAppSignIns": "Siin kuvatakse ainult Kilo rakendusse sisselogimised. Redaktori ja CLI kaudu sisselogimisi ei kuvata.",
     "signedIn": "Sisse logitud {{signedIn}} · Viimati nähtud {{lastSeen}}",
     "thisDevice": "See seade",
-    "title": "Seadmete seansid",
     "viewProfile": "Vaata profiili",
     "signOutThisDevice": "Logi sellest seadmest välja",
     "signOutThisSession": "Logi sellest seansist välja",
@@ -2639,11 +2600,9 @@
   },
   "invalidRoute": {
     "description": "See link pole enam kehtiv.",
-    "goBack": "Mine tagasi",
     "title": "Lehte ei leitud"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Sisu kärbitud",
     "truncated": "Kärbitud",
     "wrap": "Reamurdmine",
     "scroll": "Kerimine"
@@ -2656,15 +2615,13 @@
     "neutralDescription": "Proovi uuesti.",
     "offlineTitle": "Laadimine ebaõnnestus.",
     "permissionDescription": "Sul pole õigust seda vaadata.",
-    "notFoundTitle": "Ei leitud.",
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
     "serverTitle": "Laadimine ei õnnestunud.",
     "serverDescription": "Meie poolel tekkis viga. Proovi uuesti."
   },
   "screenHeader": {
     "openMenu": "Ava menüü",
-    "openMenuFor": "Ava {{title}} menüü",
-    "goBack": "Mine tagasi"
+    "openMenuFor": "Ava {{title}} menüü"
   },
   "picker": {
     "optionsExpired": "Valikud aegunud",
@@ -2695,9 +2652,7 @@
   },
   "share": {
     "title": "Kilosse jagamine",
-    "reviewPr": "Vaata PR-i üle",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Uus seanss",
     "searchPlaceholder": "Hiljutiste seansside otsing",
     "connectedCli": "Ühendatud CLI-s",
     "newSessionOn": "Uus seanss eksemplaris {{name}}",
@@ -2755,7 +2710,6 @@
     "statusCanceling": "Kilo Passi tühistamine on pooleli",
     "statusPastDue": "Kilo Passi maksetähtaeg on möödunud",
     "monthlyCredits": "{{credits}} krediiti kuus",
-    "ends": "Lõpeb {{date}}",
     "periodEnd": "perioodi lõpp",
     "managedOnGooglePlay": "Hallatakse Google Plays",
     "managedInAppStore": "Hallatakse App Store'is",
@@ -2767,7 +2721,6 @@
     "unavailableDescription": "Kilo Pass pole Androidis rakendusesiseselt ostetav. Halda seda veebis.",
     "webManagementDescription": "Seda Kilo Passi hallatakse veebis.",
     "legalDisclosure": "Kilo Pass on automaatselt uuenev kuutellimus. Ostu kinnitamisel võetakse tasu sinu Apple ID-ga seotud makseviisilt. Tellimus uueneb iga kuu automaatselt näidatud hinnaga, kui sa seda ei tühista vähemalt 24 tundi enne käimasoleva perioodi lõppu. Saad tellimust igal ajal hallata või tühistada oma App Store'i konto seadetes.",
-    "legalPrivacyPolicy": "Privaatsuspoliitika",
     "legalTermsOfUse": "kasutustingimustega (EULA)",
     "purchaseDifferentAccount": "See App Store'i ost pole sinu Kilo kontoga seotud. Logi sisse ostuks kasutatud Apple Accountiga ja proovi uuesti.",
     "restoreFailed": "Ostude taastamine ebaõnnestus. Proovi uuesti.",
@@ -2898,7 +2851,6 @@
     },
     "inviteMember": {
       "emailError": "Sisesta kehtiv e-posti aadress.",
-      "emailLabel": "E-post",
       "emailPlaceholder": "nimi@ettevote.ee",
       "permissionDenied": "Sul puudub õigus liikmeid kutsuda.",
       "roleLabel": "Roll",
@@ -2968,7 +2920,6 @@
         "billingManager": "Arveldushaldur"
       },
       "emailStatusFailed": "E-kirja saatmine ebaõnnestus",
-      "emailStatusPending": "Ootel",
       "inviteCreated": "Kutse loodud",
       "pendingInvitations": "Ootel kutsed",
       "resendInvite": "Saada kutse uuesti",
@@ -2993,7 +2944,6 @@
       "couldNotLoadStatus": "Olekut ei õnnestunud laadida",
       "creditProcessingDelayed": "Krediidi töötlemine viibib · proovitakse automaatselt uuesti",
       "ended": "Lõppenud",
-      "endsOn": "Lõpeb {{date}}",
       "manageHint": "Avab veebis Kilo Passi halduse.",
       "notSubscribed": "Pole tellitud",
       "overallocated": "Määratud passe on rohkem kui tasulisi kasutajakohti",
@@ -3004,7 +2954,6 @@
       "paymentPending": "Makse ootel",
       "processingBlocked": "Töötlemine blokeeritud",
       "processingNeedsReview": "Töötlemine vajab ülevaatamist",
-      "retry": "Proovi uuesti",
       "retryHint": "Proovib Kilo Passi oleku laadimist uuesti.",
       "setupHint": "Avab veebis Kilo Passi seadistuse."
     }
@@ -3057,7 +3006,6 @@
     "backToPreferences": "Tagasi eelistuste juurde"
   },
   "quickChat": {
-    "title": "Vestlus",
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."
@@ -3076,7 +3024,6 @@
     "openAgents": "Ava agendid",
     "running": "Töös",
     "needsInput": "vajab sisendit",
-    "idle": "Ooterežiimis",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
   }

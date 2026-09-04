@@ -98,6 +98,13 @@ interface WireUsage {
  * Why this shape says the model stopped. `tool_use` and `pause_turn` are not
  * mapped: this package has no tools, so neither can arrive, and naming them
  * here would claim a meaning nothing has tested.
+ *
+ * The keys are strings and not `Anthropic.StopReason`, because the SDK's union
+ * is behind its own documentation: at 0.104.1 it does not carry
+ * `model_context_window_exceeded`, which the provider documents and sends.
+ * Binding to the union would reject a name the provider actually uses. The two
+ * OpenAI shapes have no such gap; keeping all three the same way is worth more
+ * than one of them typechecking against a vendor list.
  */
 const stopReasons: Readonly<Record<string, StopReason>> = {
   end_turn: 'end',

@@ -21,6 +21,8 @@
     "migrations": "drizzle-kit generate && ttsx --project scripts/tsconfig.json scripts/inline-migrations.ts",
     "test": "vitest run --passWithNoTests",
     "test:e2e": "ttsx e2e/live.ts",
+    "test:e2e:cancel": "ttsx e2e/cancel.ts",
+    "test:e2e:image": "ttsx e2e/image.ts",
     "test:e2e:models": "ttsx e2e/models.ts",
     "test:e2e:session": "ttsx e2e/session.ts",
     "test:e2e:shapes": "ttsx e2e/shapes.ts",

@@ -177,6 +177,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
+| One live run | `pnpm test:e2e:image`, `…:cancel`, `…:shapes`, `…:session`, `…:models` |
 
 `pnpm test:perf` is a separate config because its files must not run beside the
 unit tests: parallel workers compete for the CPU being measured. Its ceilings
@@ -308,6 +309,34 @@ Cache read grows by exactly one exchange per call and cache write stays at
 exactly that exchange. A prefix that moved would show as a large write on a
 late call, which is what the run asserts. It also asks a second question while
 the first is still streaming, and requires `SessionBusyError`.
+
+### A picture, and a caller who walks away
+
+`pnpm test:e2e:image` sends a coloured circle through each of the three shapes
+and asks what colour it is. Each shape gets a **different** colour, so a model
+that never saw the picture would have to guess three specific words to pass.
+
+The second question is the one that matters. It asks whether the background is
+white or black, which the first answer never said, so it can only be answered
+from the picture. An assembler that dropped the image from the second request
+would leave the model with its own earlier word and nothing else. Checked by
+returning `[]` for an image part in `assemble`: five of the six assertions fire
+and the model answers `i don't see any image attached to your message`.
+
+`pnpm test:e2e:cancel` asks for a long answer twice, reads one to the end, and
+walks away from the other after ten pieces. It waits for pieces and not for a
+clock, because the time to the first piece is longer than a short wait: a fixed
+700 ms only ever cancelled a request that had not started answering.
+
+It asserts four things a fake `fetch` cannot show: the run stops mid-stream
+(11 pieces of 76, 1.9 s of 3.3 s), every signal ends aborted, the abort leaves
+no unhandled rejection in undici, and the session can still be asked a question
+afterwards. Checked by replacing the release with `Effect.void`: the timing does
+**not** change, because interrupting the fiber stops the reader either way and
+only the socket leaks. The signal assertion is what catches it.
+
+**What neither run proves:** that the provider stops generating and stops
+charging. Nothing this package can read reports that.
 
 ### Many models, a longer conversation
 

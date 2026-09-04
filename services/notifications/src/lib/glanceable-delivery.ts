@@ -79,6 +79,7 @@ export function buildGlanceableExpoMessages(
       ({
         to: token,
         data: snapshot,
+        badge: snapshot.needsInput,
         // Data-only wake: `_contentAvailable` makes the OS deliver the message to
         // the background task while the app is backgrounded/killed, and omitting
         // title/body keeps it from becoming a visible FCM notification that skips

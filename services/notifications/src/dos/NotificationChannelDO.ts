@@ -159,22 +159,15 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     // 4. Badge math. On a retry the badge was already incremented during
     //    the prior attempt; re-applying the delta would double-count.
-    //    The total is recomputed in either case (other writers may have
-    //    advanced it).
-    let badgeTotal: number | undefined;
-    if (input.badge) {
-      if (!isRetry) {
-        // Mark `pending` BEFORE the increment so any later failure path
-        // is gated on the marker and a retry skips the increment.
-        const ts = Date.now();
-        await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
-        // Also schedule cleanup at this point — if Expo keeps failing and
-        // no future push ever lands, `pending` would otherwise leak.
-        await this.ensureCleanupAlarm(ts);
-        badgeTotal = await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
-      } else {
-        badgeTotal = await this.getTotal();
-      }
+    if (input.badge && !isRetry) {
+      // Mark `pending` BEFORE the increment so any later failure path
+      // is gated on the marker and a retry skips the increment.
+      const ts = Date.now();
+      await this.ctx.storage.put<IdemRecord>(idemKey, { stage: 'pending', ts });
+      // Also schedule cleanup at this point — if Expo keeps failing and
+      // no future push ever lands, `pending` would otherwise leak.
+      await this.ensureCleanupAlarm(ts);
+      await this.incrementBucket(input.badge.badgeBucket, input.badge.delta);
     }
 
     // 5. Tokens. Missing Expo tokens only means no OS push can be sent; the
@@ -288,7 +281,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
         // version at registration) get a channelId; older clients fall back
         // to the default channel. iOS ignores channelId either way.
         ...(app_version != null && { channelId }),
-        ...(badgeTotal !== undefined && { badge: badgeTotal }),
         sound: input.push.sound ?? undefined,
         priority: input.push.priority ?? 'default',
       } satisfies ExpoPushMessage;
@@ -550,7 +542,7 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
   // Read-modify-write of a bucket counter. The DO is single-threaded, so
   // this is race-free without explicit locking.
-  private async incrementBucket(bucket: string, delta: number): Promise<number> {
+  private async incrementBucket(bucket: string, delta: number): Promise<void> {
     const key = `${BUCKET_PREFIX}${bucket}`;
     const total = await this.getTotal();
     const current = (await this.ctx.storage.get<number>(key)) ?? 0;
@@ -563,7 +555,6 @@ export class NotificationChannelDO extends DurableObject<Env> {
 
     const nextTotal = Math.max(0, total + delta);
     await this.ctx.storage.put<number>(TOTAL_KEY, nextTotal);
-    return nextTotal;
   }
 
   // Aggregate badge count. Existing DOs without the aggregate fall back to one

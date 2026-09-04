@@ -1661,28 +1661,32 @@ describe('toGlanceableContentState', () => {
 });
 
 describe('buildGlanceableExpoMessages', () => {
-  it('emits one data-only, tag-collapsed message per Expo token', () => {
-    const messages = buildGlanceableExpoMessages(
-      [
-        { token: 'ExponentPushToken[aaa]', locale: null },
-        { token: 'ExponentPushToken[bbb]', locale: 'es' },
-      ],
-      snapshot
-    );
+  it.each([0, 1, 3])(
+    'emits badge %i in one data-only, tag-collapsed message per Expo token',
+    needsInput => {
+      const messages = buildGlanceableExpoMessages(
+        [
+          { token: 'ExponentPushToken[aaa]', locale: null },
+          { token: 'ExponentPushToken[bbb]', locale: 'es' },
+        ],
+        { ...snapshot, needsInput }
+      );
 
-    expect(messages).toHaveLength(2);
-    for (const message of messages) {
-      expect(message.data).toEqual(snapshot);
-      expect(message._contentAvailable).toBe(true);
-      expect(message.title).toBeUndefined();
-      expect(message.body).toBeUndefined();
-      expect(message.sound).toBeNull();
-      expect(message.priority).toBe('default');
-      expect(message.channelId).toBe('active-agents');
-      expect(message.tag).toBe('deadbeef');
+      expect(messages).toHaveLength(2);
+      for (const message of messages) {
+        expect(message.data).toEqual({ ...snapshot, needsInput });
+        expect(message.badge).toBe(needsInput);
+        expect(message._contentAvailable).toBe(true);
+        expect(message.title).toBeUndefined();
+        expect(message.body).toBeUndefined();
+        expect(message.sound).toBeNull();
+        expect(message.priority).toBe('default');
+        expect(message.channelId).toBe('active-agents');
+        expect(message.tag).toBe('deadbeef');
+      }
+      expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
     }
-    expect(messages.map(m => m.to)).toEqual(['ExponentPushToken[aaa]', 'ExponentPushToken[bbb]']);
-  });
+  );
 });
 
 describe('deliverGlanceableSnapshot', () => {
@@ -1696,6 +1700,30 @@ describe('deliverGlanceableSnapshot', () => {
     expect(deps.hasAndroidOngoingToken).not.toHaveBeenCalled();
     expect(calls.iosSends).toHaveLength(0);
     expect(calls.expoSends).toHaveLength(0);
+  });
+
+  it('keeps the badge unchanged after transport failure and sends the latest count on retry', async () => {
+    const latestSnapshot = { ...snapshot, needsInput: 4 };
+    const delivered: ExpoPushMessage[] = [];
+    const { deps } = fakeDeps({
+      buildSnapshot: vi.fn().mockResolvedValueOnce(snapshot).mockResolvedValueOnce(latestSnapshot),
+      listIosExpoTokens: vi.fn(async () => [{ token: 'ExponentPushToken[aaa]', locale: null }]),
+      sendExpoPush: vi
+        .fn()
+        .mockRejectedValueOnce(new Error('transport down'))
+        .mockImplementationOnce(async messages => {
+          delivered.push(...messages);
+        }),
+    });
+
+    await expect(
+      deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps)
+    ).rejects.toThrow('transport down');
+    expect(delivered).toHaveLength(0);
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+    expect(delivered.map(message => message.badge)).toEqual([4]);
+    expect(vi.mocked(deps.sendExpoPush).mock.calls[1][0][0].badge).toBe(4);
   });
 
   it('sends update only to the activity tokens when both kinds are registered', async () => {

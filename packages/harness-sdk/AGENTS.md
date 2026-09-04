@@ -558,6 +558,11 @@ Measured at 64 tokens: low effort raised answers on two of four models and
 rescued none of the models that answered nothing. Raise `maxTokens` first;
 reach for `effort` to cut cost once answers arrive.
 
+The five levels are exactly Anthropic's `output_config.effort` set, checked
+against the SDK on 2026-09-04, and a subset of OpenAI's `ReasoningEffort`,
+which also has `none` and `minimal`. So every value this package accepts
+reaches every shape it can send. Do not add one that only one of them takes.
+
 ## Decisions
 
 ### The session bridges; the plugin decides

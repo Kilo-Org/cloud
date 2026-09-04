@@ -24,6 +24,7 @@ import {
 } from '../services/git-token-service-client.js';
 import { readProfileBundle } from '../session-profile.js';
 import { hasModernRuntimeAuthorization } from '../session/runtime-authorization-persistence.js';
+import { worktreeRuntimeProxyGrantSchema } from '../runtime-credential-proxy.js';
 import type { SessionAttachPayload } from '../shared/sandbox-control-protocol.js';
 import { parseCanonicalBitbucketCloneUrl, sessionIdSchema, type Env } from '../types.js';
 import { createControlPlaneCredential, parseControlPlaneCredential } from './managed-credential.js';
@@ -75,7 +76,18 @@ const targetsSchema = z
 const runtimeProxySchema = z
   .object({
     targets: targetsSchema,
-    handle: tokenSchema.max(4096).optional(),
+    /** Static capability installed in the shared Kilo process. */
+    worktreeHandle: tokenSchema.max(4096).optional(),
+    /** Control-scoped, fenced authority; it never contains a backing token. */
+    grant: worktreeRuntimeProxyGrantSchema.optional(),
+    /** Exact root capabilities substituted only by the Vercel policy. */
+    members: z
+      .array(
+        memberSchema.extend({
+          handle: tokenSchema.max(4096),
+        })
+      )
+      .default([]),
   })
   .strict();
 const capabilitySchema = z
@@ -274,7 +286,28 @@ export const sessionCredentialGrantSchema = z
       }
       if (grant.kilo.runtimeProxy) {
         const targets = deriveRuntimeProxyTargets(grant.kilo.runtimeProxy.targets);
-        if (!targets) reject();
+        const members = grant.kilo.runtimeProxy.members;
+        if (
+          !targets ||
+          (grant.kilo.runtimeProxy.grant !== undefined &&
+            (grant.kilo.runtimeProxy.grant.sandboxId !== grant.sandboxId ||
+              grant.kilo.runtimeProxy.grant.scopeId !== grant.scopeId ||
+              grant.kilo.runtimeProxy.grant.directory !== grant.directory ||
+              grant.kilo.runtimeProxy.grant.userId !== grant.userId ||
+              grant.kilo.runtimeProxy.grant.orgId !== grant.orgId)) ||
+          new Set(members.map(member => member.sessionId)).size !== members.length ||
+          new Set(members.map(member => member.kiloSessionId)).size !== members.length ||
+          members.some(
+            member =>
+              !grant.members.some(
+                expected =>
+                  expected.sessionId === member.sessionId &&
+                  expected.kiloSessionId === member.kiloSessionId
+              )
+          )
+        ) {
+          reject();
+        }
       }
     } else {
       const prefixes = { github: 'kgh2.', gitlab: 'kgl2.', bitbucket: 'kbb1.' };
@@ -928,9 +961,6 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
-  const kiloToken = containmentEnabled
-    ? token.data
-    : await selectDirectKiloToken(env, token.data, existing, now);
   const modernRuntimeProxy =
     provider === 'vercel' && containmentEnabled && hasModernRuntimeAuthorization(metadata)
       ? runtimeProxyTargets(env)
@@ -943,6 +973,14 @@ export async function prepareSessionCredentials(input: {
   ) {
     invalidCredentials();
   }
+  // The proxy resolves generic traffic through an active member. Keep the
+  // control grant stable when a sibling joins; its session-local authority is
+  // deliberately never promoted into the worktree process configuration.
+  const kiloToken = containmentEnabled
+    ? modernRuntimeProxy && existing?.kilo.runtimeProxy
+      ? existing.kilo.token
+      : token.data
+    : await selectDirectKiloToken(env, token.data, existing, now);
   let grant: SessionCredentialGrant = {
     version: 1,
     ...(!containmentEnabled ? { containmentEnabled: false as const } : {}),
@@ -975,9 +1013,9 @@ export async function prepareSessionCredentials(input: {
         ? {
             runtimeProxy: {
               targets: modernRuntimeProxy,
-              ...(existing?.kilo.runtimeProxy?.handle
-                ? { handle: existing.kilo.runtimeProxy.handle }
-                : {}),
+              worktreeHandle: existing?.kilo.runtimeProxy?.worktreeHandle,
+              grant: existing?.kilo.runtimeProxy?.grant,
+              members: existing?.kilo.runtimeProxy?.members ?? [],
             },
           }
         : {}),
@@ -1056,6 +1094,16 @@ export function removeSessionCredentialMembership(
           capabilities: Object.fromEntries(
             Object.entries(grant.kilo.capabilities).filter(([id]) => id !== sessionId)
           ),
+          ...(grant.kilo.runtimeProxy
+            ? {
+                runtimeProxy: {
+                  ...grant.kilo.runtimeProxy,
+                  members: grant.kilo.runtimeProxy.members.filter(
+                    member => member.sessionId !== sessionId
+                  ),
+                },
+              }
+            : {}),
         },
       },
     ];

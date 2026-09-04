@@ -9,7 +9,7 @@ import {
 import type { Env } from './types.js';
 
 const AUDIENCE = 'cloud-agent-next:runtime-credential-proxy';
-const claimsSchema = z
+const sessionClaimsSchema = z
   .object({
     aud: z.literal(AUDIENCE),
     grantId: z.string().uuid(),
@@ -25,6 +25,25 @@ const claimsSchema = z
   })
   .strict()
   .refine(claims => claims.exp > claims.iat);
+
+const worktreeClaimsSchema = z
+  .object({
+    aud: z.literal(AUDIENCE),
+    kind: z.literal('worktree'),
+    grantId: z.string().uuid(),
+    sandboxId: z.string().min(1),
+    scopeId: z.string().min(1),
+    directory: z.string().min(1),
+    userId: z.string().min(1),
+    nonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    iat: z.number().int().positive(),
+    exp: z.number().int().positive(),
+  })
+  .strict()
+  .refine(claims => claims.exp > claims.iat);
+export type RuntimeProxyHandleClaims =
+  | z.infer<typeof sessionClaimsSchema>
+  | z.infer<typeof worktreeClaimsSchema>;
 
 export const RUNTIME_PROXY_GRANT_KEY = 'runtime_proxy_grant';
 const runtimeProxyGrantBaseSchema = z
@@ -102,6 +121,39 @@ export function createRuntimeProxyGrant(input: RuntimeProxyGrantInput): RuntimeP
   });
 }
 
+export const worktreeRuntimeProxyGrantSchema = z
+  .object({
+    version: z.literal(1),
+    kind: z.literal('worktree'),
+    grantId: z.string().uuid(),
+    sandboxId: z.string().min(1),
+    scopeId: z.string().min(1),
+    directory: z.string().min(1),
+    userId: z.string().min(1),
+    orgId: z.string().min(1).optional(),
+    nonce: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
+    leaseExpiresAt: z.number().int().positive(),
+    state: z.literal('active'),
+    allocationId: z.string().min(1),
+    providerInstanceId: z.string().min(1),
+    connectionId: z.string().min(1),
+    wrapperInstanceId: z.string().min(1),
+  })
+  .strict();
+export type WorktreeRuntimeProxyGrant = z.infer<typeof worktreeRuntimeProxyGrantSchema>;
+
+export function createWorktreeRuntimeProxyGrant(
+  input: Omit<WorktreeRuntimeProxyGrant, 'version' | 'kind' | 'grantId' | 'nonce'>
+): WorktreeRuntimeProxyGrant {
+  return worktreeRuntimeProxyGrantSchema.parse({
+    version: 1,
+    kind: 'worktree',
+    grantId: crypto.randomUUID(),
+    nonce: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url'),
+    ...input,
+  });
+}
+
 export async function issueRuntimeCredentialProxyHandle(
   env: Pick<Env, 'NEXTAUTH_SECRET'>,
   input: RuntimeProxyGrant,
@@ -130,15 +182,44 @@ export async function issueRuntimeCredentialProxyHandle(
   );
 }
 
+export async function issueWorktreeRuntimeCredentialProxyHandle(
+  env: Pick<Env, 'NEXTAUTH_SECRET'>,
+  input: WorktreeRuntimeProxyGrant,
+  issuedAt = Date.now()
+): Promise<string> {
+  const grant = worktreeRuntimeProxyGrantSchema.parse(input);
+  const secret = await resolveSecret(env.NEXTAUTH_SECRET);
+  if (!secret) throw new Error('Authentication unavailable');
+  const iat = Math.floor(issuedAt / 1000);
+  const exp = Math.floor(grant.leaseExpiresAt / 1000);
+  if (exp <= iat) throw new Error('Runtime proxy grant has expired');
+  return jwt.sign(
+    {
+      aud: AUDIENCE,
+      kind: 'worktree',
+      grantId: grant.grantId,
+      sandboxId: grant.sandboxId,
+      scopeId: grant.scopeId,
+      directory: grant.directory,
+      userId: grant.userId,
+      nonce: grant.nonce,
+      iat,
+      exp,
+    },
+    secret,
+    { algorithm: 'HS256' }
+  );
+}
+
 export async function verifyRuntimeCredentialProxyHandle(
   env: Pick<Env, 'NEXTAUTH_SECRET'>,
   value: string
-): Promise<z.infer<typeof claimsSchema> | null> {
+): Promise<RuntimeProxyHandleClaims | null> {
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
   if (!secret || value.length > 4096) return null;
   try {
     const verified = jwt.verify(value, secret, { algorithms: ['HS256'] });
-    const claims = claimsSchema.safeParse(verified);
+    const claims = z.union([sessionClaimsSchema, worktreeClaimsSchema]).safeParse(verified);
     return claims.success ? claims.data : null;
   } catch {
     return null;
@@ -147,7 +228,7 @@ export async function verifyRuntimeCredentialProxyHandle(
 
 export function matchesRuntimeProxyGrant(
   value: unknown,
-  handle: z.infer<typeof claimsSchema>,
+  handle: RuntimeProxyHandleClaims,
   context: {
     authorizationId: string;
     sessionId: string;
@@ -158,6 +239,7 @@ export function matchesRuntimeProxyGrant(
     now: number;
   }
 ): value is RuntimeProxyGrant {
+  if (!('sessionId' in handle)) return false;
   const grant = runtimeProxyGrantSchema.safeParse(value);
   if (!grant.success) return false;
   const current = grant.data;
@@ -210,6 +292,7 @@ export async function resolveRuntimeProxyCredential(input: {
   const now = input.now ?? Date.now();
   if (
     !claims ||
+    !('sessionId' in claims) ||
     !input.authorization ||
     input.authorization.state !== 'active' ||
     !matchesRuntimeProxyGrant(input.grant, claims, {

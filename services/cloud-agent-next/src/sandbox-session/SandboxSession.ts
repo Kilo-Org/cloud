@@ -1857,7 +1857,7 @@ export class SandboxSession extends DurableObject<Env> {
             },
           };
           if (getSandboxProvider(metadata) === 'vercel') {
-            await wait(() =>
+            const worktreeHandle = await wait(() =>
               control.bindRuntimeCredentialProxyHandle({
                 ownerId: metadata.identity.userId,
                 sessionId,
@@ -1866,6 +1866,8 @@ export class SandboxSession extends DurableObject<Env> {
                 handle,
               })
             );
+            if (!worktreeHandle) throw new Error('Runtime credential proxy grant is unavailable');
+            proxyKilo = { ...proxyKilo, token: worktreeHandle };
           }
         }
         phase = 'attach';

@@ -13,7 +13,9 @@ export type VercelCredentialPolicyInput = {
     rootSessionIds: string[];
     organizationId?: string;
     runtimeProxy?: {
-      handle?: string;
+      worktreeHandle?: string;
+      grant?: unknown;
+      members?: Array<{ sessionId: string; kiloSessionId: string; handle: string }>;
       targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string };
     };
   };
@@ -209,7 +211,8 @@ function runtimeProxyInjectionRules(
   organizationId: string | undefined
 ): VercelSandboxInjectionRule[] {
   const input = kilo.runtimeProxy;
-  if (!input?.handle) return [];
+  const worktreeHandle = input?.worktreeHandle;
+  if (!input || !worktreeHandle) return [];
   const targets = [
     new URL(input.targets.backendBaseUrl),
     new URL(input.targets.providerBaseUrl),
@@ -229,16 +232,16 @@ function runtimeProxyInjectionRules(
     invalidPolicy();
   }
   const [backend, provider, ingest] = targets;
-  const authorization = `Bearer ${input.handle}`;
+  const authorization = `Bearer ${worktreeHandle}`;
   const rules: VercelSandboxInjectionRule[] = [];
-  const add = (target: URL, path: string, methods: string[]) =>
+  const add = (target: URL, path: string, methods: string[], injected = authorization) =>
     rules.push(
       createCredentialRule({
         target,
         path: { exact: path },
         methods,
         expectedAuthorization: authorization,
-        injectedAuthorization: authorization,
+        injectedAuthorization: injected,
       })
     );
   for (const path of [
@@ -268,14 +271,21 @@ function runtimeProxyInjectionRules(
   ] as const) {
     add(provider, `${basePath(provider)}/api/openrouter${path}`, [...methods]);
   }
-  add(ingest, `${basePath(ingest)}/api/session`, ['POST']);
-  for (const sessionId of kilo.rootSessionIds) {
+  // Session creation has no trustworthy root path to select a member. It is
+  // intentionally not exposed through a shared worktree capability.
+  for (const member of input.members ?? []) {
+    const sessionId = member.kiloSessionId;
     for (const [suffix, methods] of [
       ['export', ['GET']],
       ['ingest', ['POST']],
       ['title', ['POST']],
     ] as const) {
-      add(ingest, `${basePath(ingest)}/api/session/${sessionId}/${suffix}`, [...methods]);
+      add(
+        ingest,
+        `${basePath(ingest)}/api/session/${sessionId}/${suffix}`,
+        [...methods],
+        `Bearer ${member.handle}`
+      );
     }
   }
   return rules;

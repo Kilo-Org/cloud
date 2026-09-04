@@ -121,7 +121,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
   token: () => Promise<string | null>;
 }): Promise<{ token: string; organizationId?: string } | null> {
   const claims = await verifyRuntimeCredentialProxyHandle(input.env as never, input.handle);
-  if (!claims) return null;
+  if (!claims || !('sessionId' in claims)) return null;
   const [metadata, authorization, fence, grant] = await Promise.all([
     input.metadata(),
     input.authorization(),

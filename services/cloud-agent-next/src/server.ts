@@ -396,18 +396,46 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
   const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
   if (route !== 'backend' && route !== 'provider' && route !== 'ingest')
     return c.text('Not found', 404);
+  const isWorktreeHandle = 'kind' in claims && claims.kind === 'worktree';
+  // Root-addressed ingest is authorized by a member handle after the native
+  // Vercel policy rewrites the static process capability.
+  if (isWorktreeHandle && route === 'ingest') return c.text('Not found', 404);
   let bodyText: string | undefined;
   if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
     if (bodyText === undefined) return c.text('Not found', 404);
   }
   let credential: { token: string; organizationId?: string } | null;
+  let selectedWorktreeMember: { sessionId: string; kiloSessionId: string; handle: string } | null =
+    null;
   try {
-    credential = await withDORetry(
-      () => resolveSessionStub(c.env, claims.userId, claims.sessionId),
-      session => session.resolveRuntimeCredentialProxyGrant(handle),
-      'resolveRuntimeCredentialProxyGrant'
-    );
+    if (isWorktreeHandle) {
+      const candidates = await withDORetry(
+        () => getSandboxControlStub(c.env, claims.sandboxId),
+        control => control.resolveWorktreeRuntimeCredentialProxyGrant({ handle }),
+        'resolveWorktreeRuntimeCredentialProxyGrant'
+      );
+      credential = null;
+      for (const member of candidates) {
+        const resolved = await withDORetry(
+          () => resolveSessionStub(c.env, claims.userId, member.sessionId),
+          session => session.resolveRuntimeCredentialProxyGrant(member.handle),
+          'resolveRuntimeCredentialProxyMember'
+        );
+        if (resolved) {
+          selectedWorktreeMember = member;
+          credential = resolved;
+          break;
+        }
+      }
+    } else {
+      if (!('sessionId' in claims)) return c.text('Unauthorized', 401);
+      credential = await withDORetry(
+        () => resolveSessionStub(c.env, claims.userId, claims.sessionId),
+        session => session.resolveRuntimeCredentialProxyGrant(handle),
+        'resolveRuntimeCredentialProxyGrant'
+      );
+    }
   } catch {
     return c.text('Credential unavailable', 503);
   }
@@ -420,7 +448,9 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
     c.req.method,
     path,
     new URL(c.req.url).search,
-    claims.kiloSessionId,
+    'kiloSessionId' in claims
+      ? claims.kiloSessionId
+      : (selectedWorktreeMember?.kiloSessionId ?? ''),
     credential.organizationId,
     c.req.header('content-type'),
     bodyText

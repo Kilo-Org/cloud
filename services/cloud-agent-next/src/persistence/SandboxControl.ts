@@ -132,6 +132,12 @@ import {
 } from '../sandbox-control/session-credentials.js';
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import {
+  createWorktreeRuntimeProxyGrant,
+  issueWorktreeRuntimeCredentialProxyHandle,
+  verifyRuntimeCredentialProxyHandle,
+  worktreeRuntimeProxyGrantSchema,
+} from '../runtime-credential-proxy.js';
+import {
   diagnosticCause,
   diagnosticConnection,
   diagnosticEventType,
@@ -1374,8 +1380,8 @@ export class SandboxControl extends DurableObject<Env> {
     kiloSessionId: string;
     directory: string;
     handle: string;
-  }): Promise<void> {
-    await this.withCredentialUpdate(async () => {
+  }): Promise<string> {
+    return this.withCredentialUpdate(async () => {
       if (
         typeof input.handle !== 'string' ||
         input.handle.length === 0 ||
@@ -1386,10 +1392,16 @@ export class SandboxControl extends DurableObject<Env> {
       const ownerId = await this.requireOwner();
       if (ownerId !== input.ownerId) throw new Error('Sandbox owner mismatch');
       const physical = await loadPhysicalRecord(this.ctx.storage);
+      const runtime = this.readyWrapperRuntime();
       if (
         this.providerKind !== 'vercel' ||
         physical.state !== 'running' ||
-        !this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT)
+        !this.matchesContainment(physical, WORKTREE_CREDENTIAL_CONTAINMENT) ||
+        !physical.createIntent ||
+        !physical.providerRef ||
+        !runtime ||
+        !runtime.wrapperInstanceId ||
+        runtime.providerInstanceId !== physical.providerRef
       ) {
         throw new Error('Sandbox credential containment mismatch');
       }
@@ -1409,6 +1421,46 @@ export class SandboxControl extends DurableObject<Env> {
       if (index < 0) throw new Error('Session has no matching runtime proxy credential grant');
       const grant = grants[index];
       if (!grant) throw new Error('Session has no matching runtime proxy credential grant');
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle);
+      if (
+        !claims ||
+        !('sessionId' in claims) ||
+        claims.userId !== ownerId ||
+        claims.sessionId !== input.sessionId ||
+        claims.kiloSessionId !== input.kiloSessionId
+      ) {
+        throw new Error('Invalid runtime credential proxy member handle');
+      }
+      const existingProxy = grant.kilo.runtimeProxy;
+      if (!existingProxy) throw new Error('Session has no matching runtime proxy credential grant');
+      const currentWorktreeGrant = worktreeRuntimeProxyGrantSchema.safeParse(existingProxy.grant);
+      const worktreeGrant =
+        currentWorktreeGrant.success &&
+        currentWorktreeGrant.data.leaseExpiresAt > now &&
+        currentWorktreeGrant.data.allocationId === physical.createIntent.intentId &&
+        currentWorktreeGrant.data.providerInstanceId === runtime.providerInstanceId &&
+        currentWorktreeGrant.data.connectionId === runtime.connectionId &&
+        currentWorktreeGrant.data.wrapperInstanceId === runtime.wrapperInstanceId
+          ? currentWorktreeGrant.data
+          : createWorktreeRuntimeProxyGrant({
+              sandboxId: this.sandboxId,
+              scopeId: grant.scopeId,
+              directory: grant.directory,
+              userId: ownerId,
+              ...(grant.orgId ? { orgId: grant.orgId } : {}),
+              leaseExpiresAt: grant.expiresAt,
+              state: 'active',
+              allocationId: physical.createIntent.intentId,
+              providerInstanceId: runtime.providerInstanceId,
+              connectionId: runtime.connectionId,
+              wrapperInstanceId: runtime.wrapperInstanceId,
+            });
+      const worktreeHandle =
+        currentWorktreeGrant.success &&
+        currentWorktreeGrant.data.grantId === worktreeGrant.grantId &&
+        existingProxy.worktreeHandle
+          ? existingProxy.worktreeHandle
+          : await issueWorktreeRuntimeCredentialProxyHandle(this.env, worktreeGrant);
       const updated = grants.map((value, current) =>
         current === index
           ? {
@@ -1416,7 +1468,21 @@ export class SandboxControl extends DurableObject<Env> {
               kilo: {
                 ...value.kilo,
                 runtimeProxy: value.kilo.runtimeProxy
-                  ? { ...value.kilo.runtimeProxy, handle: input.handle }
+                  ? {
+                      ...value.kilo.runtimeProxy,
+                      grant: worktreeGrant,
+                      worktreeHandle,
+                      members: [
+                        ...value.kilo.runtimeProxy.members.filter(
+                          member => member.sessionId !== input.sessionId
+                        ),
+                        {
+                          sessionId: input.sessionId,
+                          kiloSessionId: input.kiloSessionId,
+                          handle: input.handle,
+                        },
+                      ],
+                    }
                   : undefined,
               },
             }
@@ -1429,7 +1495,61 @@ export class SandboxControl extends DurableObject<Env> {
         requiredContainment: WORKTREE_CREDENTIAL_CONTAINMENT,
       });
       await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+      return worktreeHandle;
     });
+  }
+
+  async resolveWorktreeRuntimeCredentialProxyGrant(input: {
+    handle: string;
+  }): Promise<Array<{ sessionId: string; kiloSessionId: string; handle: string }>> {
+    await this.ensureOperationalInitialized();
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle);
+    if (!claims || !('kind' in claims) || claims.kind !== 'worktree') return [];
+    const [physical, grants, routes] = await Promise.all([
+      loadPhysicalRecord(this.ctx.storage),
+      loadSessionCredentialGrants(this.ctx.storage),
+      loadRouteTable(this.ctx.storage),
+    ]);
+    const runtime = this.readyWrapperRuntime();
+    if (
+      this.runtimeDeleted ||
+      !runtime ||
+      !runtime.wrapperInstanceId ||
+      physical.state !== 'running' ||
+      physical.stopTombstone ||
+      !physical.createIntent ||
+      !physical.providerRef ||
+      runtime.providerInstanceId !== physical.providerRef
+    )
+      return [];
+    const grant = grants.find(value => value.kilo.runtimeProxy?.worktreeHandle === input.handle);
+    const proxyGrant =
+      grant && worktreeRuntimeProxyGrantSchema.safeParse(grant.kilo.runtimeProxy?.grant);
+    if (
+      !grant ||
+      !proxyGrant?.success ||
+      proxyGrant.data.leaseExpiresAt <= Date.now() ||
+      Math.floor(proxyGrant.data.leaseExpiresAt / 1000) !== claims.exp ||
+      proxyGrant.data.grantId !== claims.grantId ||
+      proxyGrant.data.nonce !== claims.nonce ||
+      proxyGrant.data.sandboxId !== claims.sandboxId ||
+      proxyGrant.data.scopeId !== claims.scopeId ||
+      proxyGrant.data.directory !== claims.directory ||
+      proxyGrant.data.userId !== claims.userId ||
+      proxyGrant.data.allocationId !== physical.createIntent.intentId ||
+      proxyGrant.data.providerInstanceId !== runtime.providerInstanceId ||
+      proxyGrant.data.connectionId !== runtime.connectionId ||
+      proxyGrant.data.wrapperInstanceId !== runtime.wrapperInstanceId
+    )
+      return [];
+    const runtimeProxy = grant.kilo.runtimeProxy;
+    if (!runtimeProxy) return [];
+    return [...runtimeProxy.members]
+      .sort((left, right) => left.sessionId.localeCompare(right.sessionId))
+      .filter(value => {
+        const route = routes.get(value.sessionId);
+        return route?.kiloSessionId === value.kiloSessionId && route.directory === grant.directory;
+      });
   }
 
   async detachSession(sessionId: string): Promise<{ existed: boolean }> {

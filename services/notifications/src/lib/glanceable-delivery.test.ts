@@ -588,13 +588,20 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
 
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    // Idle work keeps a card alive but never raises one, so the push-to-start
+    // token stays unused until an agent works or asks for input.
     current = freshSnapshot({ running: 0, idle: 1 });
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['old-activity', 'end']]);
+
+    current = freshSnapshot({ running: 1, idle: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
       ['scope-token', 'start'],
     ]);
     expect(JSON.parse(apns[1].aps['content-state'].props)).toMatchObject({
+      running: 1,
       idle: 1,
       needsInputSince: '2026-08-27T10:00:01.000Z',
     });
@@ -1590,15 +1597,16 @@ describe('apnsSendsForTokens', () => {
           { token: 'ptt-token', kind: 'ios_push_to_start' },
           { token: 'activity-token', kind: 'ios_activity' },
         ],
+        true,
         true
       )
     ).toEqual([{ token: 'activity-token', event: 'update' }]);
   });
 
   it('sends start to the push-to-start token when no activity token exists', () => {
-    expect(apnsSendsForTokens([{ token: 'ptt-token', kind: 'ios_push_to_start' }], true)).toEqual([
-      { token: 'ptt-token', event: 'start' },
-    ]);
+    expect(
+      apnsSendsForTokens([{ token: 'ptt-token', kind: 'ios_push_to_start' }], true, true)
+    ).toEqual([{ token: 'ptt-token', event: 'start' }]);
   });
 
   it.each([
@@ -1614,6 +1622,7 @@ describe('apnsSendsForTokens', () => {
             { token: 'activity-token-1', kind: 'ios_activity' },
             { token: 'activity-token-2', kind: 'ios_activity' },
           ],
+          eligible,
           eligible
         )
       ).toEqual([
@@ -1624,10 +1633,22 @@ describe('apnsSendsForTokens', () => {
   );
 
   it('does not start an activity for empty work', () => {
-    expect(apnsSendsForTokens([{ token: 'ptt-token', kind: 'ios_push_to_start' }], false)).toEqual(
-      []
-    );
-    expect(apnsSendsForTokens([], true)).toEqual([]);
+    expect(
+      apnsSendsForTokens([{ token: 'ptt-token', kind: 'ios_push_to_start' }], false, false)
+    ).toEqual([]);
+    expect(apnsSendsForTokens([], true, true)).toEqual([]);
+  });
+
+  it('does not start an activity for idle-only work', () => {
+    expect(
+      apnsSendsForTokens([{ token: 'ptt-token', kind: 'ios_push_to_start' }], true, false)
+    ).toEqual([]);
+  });
+
+  it('still updates an existing activity for idle-only work', () => {
+    expect(
+      apnsSendsForTokens([{ token: 'activity-token', kind: 'ios_activity' }], true, false)
+    ).toEqual([{ token: 'activity-token', event: 'update' }]);
   });
 });
 

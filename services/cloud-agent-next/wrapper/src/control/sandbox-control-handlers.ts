@@ -887,17 +887,36 @@ async function handleAbort(
 ): Promise<ControlHandlerResult> {
   const parsed = sessionAbortPayloadSchema.safeParse(payload ?? {});
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
-  const task = deps.operations.active(session.kiloSessionId);
-  if (parsed.data.messageId && task?.messageId !== parsed.data.messageId) {
-    return ok({ status: 'already_idle' });
-  }
+  const task = deps.operations.abortTarget(session, parsed.data.messageId);
   if (task) {
-    task.cancel('Session aborted', 'cancelled');
+    if (
+      parsed.data.cleanupDeadlineAt !== undefined &&
+      parsed.data.cleanupDeadlineAt <= Date.now()
+    ) {
+      return ok(
+        parsed.data.operationId
+          ? { status: 'unconfirmed', quiescent: false }
+          : { status: 'already_idle' }
+      );
+    }
+    task.cancel('Session aborted', 'cancelled', parsed.data.cleanupDeadlineAt);
     const result = await task.done;
+    if (parsed.data.operationId) {
+      const delivery = task.deliveryResult();
+      return ok({
+        status: 'unconfirmed',
+        quiescent: false,
+        ...(delivery ? { delivery } : {}),
+      });
+    }
     if (!result.ok && task.kind !== 'preparation') return result;
     return ok({ status: 'aborted' });
   }
-  return ok({ status: 'already_idle' });
+  return ok(
+    parsed.data.operationId
+      ? { status: 'unconfirmed', quiescent: false }
+      : { status: 'already_idle' }
+  );
 }
 
 async function readRootRequests<Request extends { id: string; sessionID: string }>(

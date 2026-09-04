@@ -391,7 +391,7 @@ async function completeHello(
       result: {
         protocolVersion: 1,
         handshakeComplete: true,
-        capabilities: { kiloVersionHeartbeat: true, sessionOperationResults: true },
+        capabilities: { kiloVersionHeartbeat: true, sessionOperationResults: true, scopedStopAbort: true },
       },
     })
   );

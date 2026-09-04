@@ -123,6 +123,25 @@ describe('operation admission and lookup', () => {
     expect(record.snapshot().native.completion).toEqual(completion().info);
     expect(record.snapshot().local?.result.ok).toBe(true);
     expect(record.snapshot().delivery?.state).toBe('acknowledged');
+    expect(
+      await handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: authorization.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      )
+    ).toMatchObject({
+      ok: true,
+      result: {
+        status: 'unconfirmed',
+        quiescent: false,
+        delivery: { authorization },
+      },
+    });
     expect(handlerDeps.operations.counts().active).toBe(0);
     expect(
       await handleControlRequest('session.operation.get', session, authorization, handlerDeps)

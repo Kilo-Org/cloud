@@ -109,6 +109,7 @@ export type SandboxControlSocketHandler = {
   sendRequest(input: SandboxControlOutboundRequest): Promise<ResponseFrame>;
   hasHandshakenSocket(): boolean;
   supportsOperationResults(): boolean;
+  supportsScopedStopAbort(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
   closeProvisionalSockets(): void;
@@ -334,6 +335,13 @@ export function createSandboxControlSocketHandler(
       return (
         current !== null &&
         readAttachment(current.socket)?.capabilities?.sessionOperationResults === true
+      );
+    },
+
+    supportsScopedStopAbort(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null && readAttachment(current.socket)?.capabilities?.scopedStopAbort === true
       );
     },
 
@@ -815,10 +823,14 @@ export function createSandboxControlSocketHandler(
       const authorizationTimeout = authorization?.success
         ? authorization.data.dispatchDeadlineAt - Date.now()
         : undefined;
-      const timeoutMs =
-        authorizationTimeout === undefined
-          ? input.timeoutMs
-          : Math.max(1, Math.min(input.timeoutMs ?? authorizationTimeout, authorizationTimeout));
+      const deadlineTimeout =
+        input.deadlineAt === undefined ? undefined : Math.max(1, input.deadlineAt - Date.now());
+      const timeoutMs = [input.timeoutMs, authorizationTimeout, deadlineTimeout]
+        .filter((timeout): timeout is number => timeout !== undefined)
+        .reduce<number | undefined>(
+          (shortest, timeout) => (shortest === undefined ? timeout : Math.min(shortest, timeout)),
+          undefined
+        );
       const pending = waiters.wait(requestId, timeoutMs);
       log('socket_request_sent', {
         ...diagnosticConnection(current.identity),

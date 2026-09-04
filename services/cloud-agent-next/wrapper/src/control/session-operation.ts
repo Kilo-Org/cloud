@@ -131,6 +131,7 @@ export class SessionOperation {
   private outcome?: SessionMessageOutcome;
   private local?: { result: ControlHandlerResult; completedAt: number };
   private delivery?: OperationResultDelivery;
+  private cleanupDeadlineAt?: number;
 
   constructor(
     session: SessionRequestIdentity,
@@ -239,7 +240,10 @@ export class SessionOperation {
     return this.delivery?.acknowledge(ack, isCurrent) ?? Promise.resolve(false);
   }
 
-  cancel(reason: string, status: 'failed' | 'cancelled'): void {
+  cancel(reason: string, status: 'failed' | 'cancelled', cleanupDeadlineAt?: number): void {
+    if (cleanupDeadlineAt !== undefined) {
+      this.cleanupDeadlineAt = Math.min(this.cleanupDeadlineAt ?? Infinity, cleanupDeadlineAt);
+    }
     if (!this.local) this.controller.abort(new ControlTaskCancellation(status, reason));
   }
 
@@ -597,7 +601,10 @@ export class SessionOperation {
       };
       try {
         diagnostic('abort_started');
-        const cleanupDeadlineAt = Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS;
+        const cleanupDeadlineAt = Math.min(
+          this.cleanupDeadlineAt ?? Infinity,
+          Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS
+        );
         const abortController = new AbortController();
         const abortTimer = setTimeout(
           () => abortController.abort(new Error('Kilo cancellation timed out')),

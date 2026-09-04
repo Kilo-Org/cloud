@@ -181,6 +181,10 @@ export function helloResult(): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
     handshakeComplete: true,
-    capabilities: { kiloVersionHeartbeat: true, sessionOperationResults: true },
+    capabilities: {
+      kiloVersionHeartbeat: true,
+      sessionOperationResults: true,
+      scopedStopAbort: true,
+    },
   };
 }

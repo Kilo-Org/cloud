@@ -372,7 +372,7 @@ export function createSandboxControlClient(
           payload: {
             protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
             providerInstanceId: options.providerInstanceId,
-            capabilities: { sessionOperationResults: true },
+            capabilities: { sessionOperationResults: true, scopedStopAbort: true },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),
           },

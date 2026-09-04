@@ -2231,6 +2231,18 @@ describe('owned control execution', () => {
       expect(
         await handleControlRequest('session.abort', session, { messageId: 'older' }, handlerDeps)
       ).toEqual({ ok: true, result: { status: 'already_idle' } });
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          {
+            messageId: 'older',
+            operationId: '11111111-1111-4111-8111-111111111111',
+            cleanupDeadlineAt: Date.now() + 1_000,
+          },
+          handlerDeps
+        )
+      ).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
       expect(taskSignal?.aborted).toBe(false);
       expect(aborts).toBe(0);
       const aborting = handleControlRequest(
@@ -2306,6 +2318,73 @@ describe('owned control execution', () => {
       replacement.resolve(completion());
       await waitForTasks(handlerDeps);
     }
+  });
+
+  it('keeps a scoped Stop unconfirmed when native completion misses a successful abort acknowledgement', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => true,
+      })
+    );
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+
+      const aborted = await handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 20,
+        },
+        handlerDeps
+      );
+      expect(aborted).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
+
+      expect(retired).toEqual(['Native cancellation did not settle']);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('keeps a scoped Stop unconfirmed when preparation fails after cancellation', async () => {
+    const started = Promise.withResolvers<void>();
+    const handlerDeps = deps({
+      applyAttach: async (_identity, _payload, hooks) => {
+        started.resolve();
+        const signal = hooks.signal;
+        if (!signal) throw new Error('Missing preparation cancellation signal');
+        await new Promise<void>(resolve =>
+          signal.addEventListener('abort', () => resolve(), { once: true })
+        );
+        return {
+          ok: false,
+          error: { code: 'not_ready', message: 'Preparation failed', retryable: true },
+        };
+      },
+    });
+    const attaching = handleControlRequest('session.attach', session, {}, handlerDeps);
+    await started.promise;
+
+    const aborted = await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() + 1_000,
+      },
+      handlerDeps
+    );
+    expect(aborted).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
+    expect(await attaching).toMatchObject({ ok: false });
   });
 
   it.each(['false', 'malformed', 'HTTP failure'] as const)(

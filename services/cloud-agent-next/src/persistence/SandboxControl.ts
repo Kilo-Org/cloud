@@ -36,6 +36,11 @@ import {
 } from '../sandbox-control/socket.js';
 import { SandboxControlConnectionError } from '../sandbox-control/waiters.js';
 import {
+  hasScopedStopMaintenanceFields,
+  parseScopedStopMaintenance,
+  stopAbortWirePayload,
+} from '../sandbox-control/scoped-stop-maintenance.js';
+import {
   createSessionForwarding,
   SessionForwardingError,
 } from '../sandbox-control/session-forwarding.js';
@@ -52,6 +57,7 @@ import {
   sessionOperationAckSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationExpiresAt,
+  sessionAbortPayloadSchema,
   sessionRequestIdentitySchema,
   wrapperInstanceIdSchema,
   type ResponseFrame,
@@ -529,9 +535,17 @@ export class SandboxControl extends DurableObject<Env> {
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
     await this.ensureOperationalInitialized();
     if (input.operation === 'session.git.summary') return this.requestWorktreeChanges(input);
+    const scopedStop =
+      input.operation === 'session.abort' ? parseScopedStopMaintenance(input.payload) : undefined;
+    if (
+      input.operation === 'session.abort' &&
+      hasScopedStopMaintenanceFields(input.payload) &&
+      scopedStop === undefined
+    )
+      throw new Error('Invalid scoped Stop maintenance request');
     const maintenance =
       input.operation === 'session.operation.get' || input.operation === 'session.operation.ack';
-    if (!maintenance) await this.assertRequestWorktreeAdmission(input);
+    if (!maintenance && !scopedStop) await this.assertRequestWorktreeAdmission(input);
     if (input.operation === 'worktree.delete' || input.operation === 'worktree.prepareDeletion') {
       throw new Error('Worktree cleanup requires the deletion coordinator');
     }
@@ -578,7 +592,8 @@ export class SandboxControl extends DurableObject<Env> {
         Date.now() >= sessionOperationExpiresAt(maintenanceAuthorization.data))
     )
       throw new Error('Invalid session operation maintenance authorization');
-    const runtime = maintenance
+    const usesMaintenanceChannel = maintenance || scopedStop !== undefined;
+    const runtime = usesMaintenanceChannel
       ? this.socketHandler.getConnectionIdentity()
       : this.readyWrapperRuntime();
     if (!runtime) throw new Error('Sandbox runtime is not ready');
@@ -594,19 +609,33 @@ export class SandboxControl extends DurableObject<Env> {
     )
       throw new Error('Sandbox wrapper runtime changed');
     const isCurrent = () => {
-      const current = maintenance
+      const current = usesMaintenanceChannel
         ? this.socketHandler.getConnectionIdentity()
         : this.readyWrapperRuntime();
       return current !== null && this.sameConnection(current, runtime);
     };
     const physical = await loadPhysicalRecord(this.ctx.storage);
     if (
-      (!maintenance && physical.state !== 'running') ||
-      (!maintenance && physical.stopTombstone) ||
+      ((!maintenance || scopedStop !== undefined) && physical.state !== 'running') ||
+      ((!maintenance || scopedStop !== undefined) && physical.stopTombstone) ||
       physical.providerRef !== runtime.providerInstanceId ||
       !isCurrent()
     ) {
       throw new Error('Sandbox runtime is not ready');
+    }
+    if (scopedStop) {
+      const session = sessionRequestIdentitySchema.safeParse(input.session);
+      if (!session.success || expectedWrapperInstanceId === undefined)
+        throw new Error('Scoped Stop identity is required');
+      const route = (await loadRouteTable(this.ctx.storage)).get(session.data.sessionId);
+      if (
+        !route ||
+        route.kiloSessionId !== session.data.kiloSessionId ||
+        route.directory !== session.data.directory ||
+        runtime.wrapperInstanceId !== expectedWrapperInstanceId
+      )
+        throw new Error('Scoped Stop target is stale');
+      this.assertWorktreeAdmission(route.worktreeId);
     }
     if (input.operation === 'session.attach' || input.operation === 'session.prompt') {
       const payload = parseOperationPayload(input.operation, input.payload);
@@ -664,8 +693,16 @@ export class SandboxControl extends DurableObject<Env> {
         if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
       });
     }
-    if (!maintenance) await this.assertRequestWorktreeAdmission(input);
+    if (!usesMaintenanceChannel) await this.assertRequestWorktreeAdmission(input);
     if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
+    if (scopedStop) {
+      const payload = sessionAbortPayloadSchema.parse(input.payload);
+      return this.socketHandler.sendRequest({
+        ...input,
+        payload: stopAbortWirePayload(payload, this.socketHandler.supportsScopedStopAbort()),
+        deadlineAt: scopedStop.cleanupDeadlineAt,
+      });
+    }
     return this.socketHandler.sendRequest(input);
   }
 

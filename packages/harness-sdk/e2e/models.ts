@@ -2,7 +2,7 @@ import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
 import { cachedSystem as system, kilo } from './setup.js';
 

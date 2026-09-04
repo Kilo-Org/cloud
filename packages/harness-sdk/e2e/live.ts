@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
 import { cachedSystem as system, kilo } from './setup.js';

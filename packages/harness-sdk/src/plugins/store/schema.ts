@@ -29,6 +29,15 @@ const sessions = sqliteTable('sessions', {
   effort: text('effort', { enum: ['low', 'medium', 'high', 'xhigh', 'max'] }),
   maxTokens: integer('max_tokens'),
   prompted: integer('prompted'),
+  /**
+   * The tools the session offers, as a JSON array of names in the order the
+   * model sees them. It is one column and not a table because nothing ever
+   * queries it: it is read whole with the session and written once, at open.
+   *
+   * The names and not the definitions, because a definition lives in code. See
+   * AGENTS.md, "A session names its tools; the registry defines them".
+   */
+  tools: text('tools'),
 });
 
 /**
@@ -60,11 +69,16 @@ const turns = sqliteTable(
  * join at all, rather than a join whose cost grows with the conversation.
  *
  * `body` is the only payload column, because every kind has exactly one payload
- * — the text, the reasoning, or the base64 of the image. `media` names the
- * media type and is empty for everything but an image. `signature` is what the
- * provider issued with a thinking block and reads back to know the thinking is
- * its own; it is empty for everything but reasoning, and for reasoning from a
- * shape that issues none.
+ * — the text, the reasoning, the base64 of the image, the arguments of a call,
+ * or what a tool gave back. `media` names the media type and is empty for
+ * everything but an image. `signature` is what the provider issued with a
+ * thinking block and reads back to know the thinking is its own; it is empty for
+ * everything but reasoning, and for reasoning from a shape that issues none.
+ *
+ * The last three belong to tools. `call_id` is what the provider called the
+ * call, and it is on both halves: a result names the call it answers, and every
+ * shape refuses a call whose result is missing. `name` is the tool, on the call
+ * only. `failed` says the tool did not do what it was asked, on the result only.
  */
 const parts = sqliteTable(
   'parts',
@@ -76,10 +90,15 @@ const parts = sqliteTable(
     sessionId: text('session_id')
       .notNull()
       .references(() => sessions.id),
-    kind: text('kind', { enum: ['text', 'summary', 'reasoning', 'redacted', 'image'] }).notNull(),
+    kind: text('kind', {
+      enum: ['text', 'summary', 'reasoning', 'redacted', 'image', 'toolCall', 'toolResult'],
+    }).notNull(),
     body: text('body').notNull(),
     media: text('media'),
     signature: text('signature'),
+    callId: text('call_id'),
+    name: text('name'),
+    failed: integer('failed', { mode: 'boolean' }),
   },
   table => [index('parts_session_id_id').on(table.sessionId, table.id)]
 );

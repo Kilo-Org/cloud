@@ -19,4 +19,16 @@ const isLast = (message: PromptMessage, index: number): boolean =>
 const dataUri = (part: Extract<PromptPart, { kind: 'image' }>): string =>
   `data:${part.media};base64,${part.data}`;
 
-export { dataUri, isLast };
+/**
+ * How a failed result reads to a model on a shape that has no flag for one.
+ *
+ * The Anthropic shape marks a failed result on the block itself. Neither OpenAI
+ * shape has anywhere to put it, and a failure the model cannot tell from an
+ * answer is a failure it will build on, so it is said in the text instead.
+ */
+const failedText = (body: string): string => `The tool call failed. ${body}`;
+
+/** What a result reads as on a shape with no flag: the text says which it is. */
+const resultText = (body: string, failed: boolean): string => (failed ? failedText(body) : body);
+
+export { dataUri, isLast, resultText };

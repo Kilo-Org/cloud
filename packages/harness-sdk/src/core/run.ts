@@ -2,13 +2,9 @@ import { Effect } from 'effect';
 import { EntropySource } from './entropy.js';
 import { makeSession } from './session.js';
 import { onStore, type StoreError } from './storage.js';
-import {
-  handleOf,
-  type SessionContext,
-  type SessionHandle,
-  type SessionOptions,
-  wiringFor,
-} from './wiring.js';
+import type { ToolMissingError } from './tool.js';
+import { handleOf, type SessionHandle } from './handle.js';
+import { type SessionContext, type SessionOptions, wiringFor } from './wiring.js';
 
 /**
  * Opens a new session and, when a store is in the context, records it.
@@ -19,7 +15,7 @@ import {
  */
 const openSession = (
   options: SessionOptions
-): Effect.Effect<SessionHandle, StoreError, SessionContext> =>
+): Effect.Effect<SessionHandle, StoreError | ToolMissingError, SessionContext> =>
   Effect.gen(function* () {
     const entropy = yield* EntropySource;
     const opened = yield* makeSession(entropy);

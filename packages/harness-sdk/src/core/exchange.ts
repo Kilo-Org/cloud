@@ -3,6 +3,7 @@ import { promptedOf } from './compact.js';
 import type { ModelEvent, ModelUsage } from './model.js';
 import { appendTurn, type Session } from './session.js';
 import { onStore, type StoreError } from './storage.js';
+import type { ToolCall } from './tool.js';
 import { makeTurn, partsOf, type PartDraft, type Turn } from './turn.js';
 import { add } from './usage.js';
 import type { Wiring } from './wiring.js';
@@ -44,9 +45,14 @@ interface Spoken {
    * the encrypted blocks in another loses which came first.
    */
   readonly thought: readonly PartDraft[];
+  /**
+   * The tools the model asked for, in the order it asked. A turn may hold
+   * several, and each is answered before the next request goes out.
+   */
+  readonly calls: readonly PartDraft[];
 }
 
-const nothingSaid: Spoken = { text: '', thought: [] };
+const nothingSaid: Spoken = { text: '', thought: [], calls: [] };
 
 interface Exchange {
   readonly question: Turn;
@@ -58,18 +64,24 @@ interface Exchange {
 }
 
 /**
- * The thinking comes first, in the order the model produced it, and the answer
- * last. A reasoning block is kept even with no words: a provider that returns
- * the thinking as a summary defaults to no summary at all, so the block is
- * empty and still has to go back exactly as it came.
+ * The thinking comes first, in the order the model produced it, then the words,
+ * then the tools it asked for. Every shape wants that order and refuses another.
+ * A reasoning block is kept even with no words: a provider that returns the
+ * thinking as a summary defaults to no summary at all, so the block is empty and
+ * still has to go back exactly as it came.
  *
- * The text part is always there: an answer of no words is still an answer, and
- * a turn with no text would shorten the prompt that follows.
+ * The text part is always there when nothing else is: an answer of no words is
+ * still an answer, and a turn with no parts would shorten the prompt that
+ * follows. It is left out of a turn that asked for a tool and said nothing,
+ * because a provider refuses an empty text block beside a call.
  */
-const partsSaid = (spoken: Spoken): readonly PartDraft[] => [
-  ...spoken.thought,
-  { kind: 'text', body: spoken.text },
-];
+const partsSaid = (spoken: Spoken): readonly PartDraft[] => {
+  const said: readonly PartDraft[] =
+    spoken.text.length === 0 && spoken.calls.length > 0
+      ? []
+      : [{ kind: 'text', body: spoken.text }];
+  return [...spoken.thought, ...said, ...spoken.calls];
+};
 
 /**
  * Writes the whole exchange and adds this call's counts to the session's. The
@@ -169,10 +181,21 @@ const exchangeFor = (
 const said = (spoken: Ref.Ref<Spoken>, text: string): Effect.Effect<void> =>
   Ref.update(spoken, held => ({ ...held, text: held.text + text }));
 
+/** One tool the model asked for, kept in the order it asked. */
+const called = (spoken: Ref.Ref<Spoken>, call: ToolCall): Effect.Effect<void> => {
+  const part: PartDraft = {
+    kind: 'toolCall',
+    body: call.arguments,
+    callId: call.id,
+    name: call.name,
+  };
+  return Ref.update(spoken, held => ({ ...held, calls: [...held.calls, part] }));
+};
+
 /** One block of thinking the provider encrypted, kept where it arrived. */
 const hidden = (spoken: Ref.Ref<Spoken>, data: string): Effect.Effect<void> => {
   const block: PartDraft = { kind: 'redacted', body: data };
   return Ref.update(spoken, held => ({ ...held, thought: [...held.thought, block] }));
 };
 
-export { exchangeFor, finish, hidden, remember, rollback, said, thinking };
+export { called, exchangeFor, finish, hidden, remember, rollback, said, thinking };

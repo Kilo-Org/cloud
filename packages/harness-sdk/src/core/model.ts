@@ -1,5 +1,6 @@
 import { Context, Data, type Stream } from 'effect';
 import type { Prompt } from './prompt.js';
+import type { ToolCall, ToolDefinition } from './tool.js';
 
 /**
  * How hard the model should think. Both model SDKs spell the levels this way.
@@ -23,6 +24,13 @@ interface ModelRequest {
   readonly effort?: Effort;
   /** Groups the requests of one session onto one cache entry. Use the session id. */
   readonly cacheKey?: string;
+  /**
+   * The tools the model may ask for. Every shape puts these in front of the
+   * messages, so they are part of the cached prefix and must not change within
+   * a session. A request that offers none omits the field rather than sending
+   * an empty list, which some shapes refuse.
+   */
+  readonly tools?: readonly ToolDefinition[];
 }
 
 /**
@@ -42,9 +50,11 @@ interface ModelUsage {
  * `end` is a finished answer. `maxTokens` is a wall: the answer stops
  * mid-sentence, and a caller that treats it as finished stores half a thought
  * and builds every later request on it. `refusal` is the model declining.
+ * `tools` is the model waiting on a tool it asked for, which is the one reason
+ * that is not the end of anything: the loop answers the calls and asks again.
  * `unknown` is a shape that reported nothing, which is not an error.
  */
-type StopReason = 'end' | 'maxTokens' | 'refusal' | 'unknown';
+type StopReason = 'end' | 'maxTokens' | 'refusal' | 'tools' | 'unknown';
 
 /**
  * A model call failed. `status` is the HTTP status when the transport has one.
@@ -76,6 +86,16 @@ type ModelEvent =
   | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
   /** Thinking the provider encrypted. There is nothing here to show a reader. */
   | { readonly kind: 'redacted'; readonly data: string }
+  /**
+   * A tool the model asked for, whole. It arrives as its block closes and not
+   * at the end of the stream, so the tool starts while the model is still
+   * writing the next call.
+   *
+   * The arguments stream in pieces on every shape. The transport collects them,
+   * because collecting them is reading the wire; nothing above it ever sees
+   * half a call.
+   */
+  | { readonly kind: 'toolCall'; readonly call: ToolCall }
   | { readonly kind: 'done'; readonly usage: ModelUsage; readonly stop: StopReason };
 
 const zeroUsage: ModelUsage = {

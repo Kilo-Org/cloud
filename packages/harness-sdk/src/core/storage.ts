@@ -28,6 +28,11 @@ interface StoredSession {
   readonly effort?: Effort;
   readonly maxTokens?: number;
   readonly prompted?: number;
+  /**
+   * The tools the session offers, by name, in the order the model sees them.
+   * Absent means none: a session that named none is reopened offering none.
+   */
+  readonly tools?: readonly string[];
 }
 
 /**

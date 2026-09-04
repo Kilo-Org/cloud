@@ -23,6 +23,13 @@ const migrations: readonly (readonly string[])[] = [
   ['ALTER TABLE `parts` ADD `signature` text;'],
   /* 0003_flaky_gideon */
   ['ALTER TABLE `sessions` ADD `prompted` integer;'],
+  /* 0004_keen_boomer */
+  [
+    'ALTER TABLE `parts` ADD `call_id` text;',
+    'ALTER TABLE `parts` ADD `name` text;',
+    'ALTER TABLE `parts` ADD `failed` integer;',
+    'ALTER TABLE `sessions` ADD `tools` text;',
+  ],
 ];
 
 export { migrations };

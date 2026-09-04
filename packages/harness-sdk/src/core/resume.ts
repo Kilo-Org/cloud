@@ -7,14 +7,10 @@ import {
   type StoredSession,
   type StoreError,
 } from './storage.js';
+import type { ToolMissingError } from './tool.js';
 import { draftOf, makeTurn, type Turn } from './turn.js';
-import {
-  handleOf,
-  type SessionContext,
-  type SessionHandle,
-  type SessionOptions,
-  wiringFor,
-} from './wiring.js';
+import { handleOf, type SessionHandle } from './handle.js';
+import { type SessionContext, type SessionOptions, wiringFor } from './wiring.js';
 
 /** The store holds no session under that identifier. */
 class SessionNotFoundError extends Data.TaggedError('harness/SessionNotFoundError')<{
@@ -24,7 +20,7 @@ class SessionNotFoundError extends Data.TaggedError('harness/SessionNotFoundErro
 /** Everything a resumed session needs. A store is required, not optional. */
 type ResumeContext = SessionContext | SessionStore;
 
-type ResumeError = StoreError | SessionNotFoundError;
+type ResumeError = StoreError | SessionNotFoundError | ToolMissingError;
 
 /** What the session was opened with, as `wiringFor` wants it. */
 const optionsOf = (stored: StoredSession): SessionOptions => ({
@@ -32,6 +28,7 @@ const optionsOf = (stored: StoredSession): SessionOptions => ({
   model: stored.model,
   ...(stored.effort === undefined ? {} : { effort: stored.effort }),
   ...(stored.maxTokens === undefined ? {} : { maxTokens: stored.maxTokens }),
+  ...(stored.tools === undefined ? {} : { tools: stored.tools }),
 });
 
 const storedOf = (

@@ -18,7 +18,7 @@ import { continueSession, type ResumeContext } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
 import { SessionStore } from '../src/core/storage.js';
 import type { Turn } from '../src/core/turn.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { everyShape, kilo } from './setup.js';
 

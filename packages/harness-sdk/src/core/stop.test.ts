@@ -41,8 +41,9 @@ it('reads the stop reason of the messages shape', () => {
   expect(messagesWire.toStop({ delta: { stop_reason: 'model_context_window_exceeded' } })).toBe(
     'maxTokens'
   );
+  expect(messagesWire.toStop({ delta: { stop_reason: 'tool_use' } })).toBe('tools');
   /* A name this package has never seen is `unknown`, never a guess. */
-  expect(messagesWire.toStop({ delta: { stop_reason: 'tool_use' } })).toBe('unknown');
+  expect(messagesWire.toStop({ delta: { stop_reason: 'pause_turn' } })).toBe('unknown');
   /* Every other frame says nothing, so it must not overwrite what was said. */
   expect(messagesWire.toStop({ delta: { text: 'he' } })).toBeUndefined();
   expect(messagesWire.toStop({ usage: { output_tokens: 4 } })).toBeUndefined();

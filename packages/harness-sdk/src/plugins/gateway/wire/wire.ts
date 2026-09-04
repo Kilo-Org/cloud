@@ -11,14 +11,36 @@ import type { ModelRequest, ModelUsage, StopReason } from '../../../core/model.j
  * text at all, and it is a kind of its own so that nothing can render its bytes
  * as words by mistake.
  *
- * Every member is a `ModelEvent` as it stands, so a part reaches the caller
- * unchanged and no conversion sits on the per-token path. A member added here
- * that `ModelEvent` does not hold fails the gateway's own return type.
+ * The first three are a `ModelEvent` as they stand, so a part reaches the caller
+ * unchanged and no conversion sits on the per-token path.
+ *
+ * The last three are not, and cannot be. A tool call arrives in pieces on every
+ * shape — the name first, then the arguments a fragment at a time — and no
+ * shape sends the same pieces as another. So each shape reports the pieces it
+ * has and the gateway collects them into one `toolCall`, which is the only form
+ * anything above the transport ever sees. See `openCall` in the gateway.
+ *
+ * `callEnd` closes whatever call is open. Two shapes send an event that means
+ * exactly that; the third closes a call by starting the next one or by ending
+ * the stream, so it sends none and the gateway closes it either way.
  */
 type WirePart =
   | { readonly kind: 'delta'; readonly text: string }
   | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
-  | { readonly kind: 'redacted'; readonly data: string };
+  | { readonly kind: 'redacted'; readonly data: string }
+  | {
+      readonly kind: 'callStart';
+      readonly id: string;
+      readonly name: string;
+      /**
+       * Arguments the opening frame already carried. One shape puts the name
+       * and the first fragment on the same frame, and a reader that returns one
+       * part per frame has nowhere else to put it.
+       */
+      readonly text?: string;
+    }
+  | { readonly kind: 'callArguments'; readonly text: string }
+  | { readonly kind: 'callEnd' };
 
 /**
  * One gateway shape. A wire maps a request onto a body and maps the reply back.

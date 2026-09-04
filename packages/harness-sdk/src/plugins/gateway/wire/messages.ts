@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { createAssert, createIs } from 'typia';
 import type { ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
+import type { ToolDefinition } from '../../../core/tool.js';
 import { isLast } from './parts.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
 import { type Counts, set, type TokenCount } from './usage.js';
@@ -11,7 +12,9 @@ type ContentBlock =
   | Anthropic.TextBlockParam
   | Anthropic.ImageBlockParam
   | Anthropic.ThinkingBlockParam
-  | Anthropic.RedactedThinkingBlockParam;
+  | Anthropic.RedactedThinkingBlockParam
+  | Anthropic.ToolUseBlockParam
+  | Anthropic.ToolResultBlockParam;
 type MessagesBody = Anthropic.MessageCreateParams;
 type MediaType = Anthropic.Base64ImageSource['media_type'];
 
@@ -43,8 +46,41 @@ const thinkingBlock = (text: string, signature: string): Anthropic.ThinkingBlock
   signature,
 });
 
+/**
+ * The arguments as this shape wants them: an object, not the text the model
+ * wrote. Text this cannot parse produced a call nothing could run, and its
+ * result already says so; an empty object keeps that exchange replayable, where
+ * throwing would make the session unusable forever over one bad call.
+ */
+const argumentsIn = (text: string): Record<string, unknown> => {
+  try {
+    const parsed: unknown = JSON.parse(text);
+    return isArguments(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const isArguments = createIs<Record<string, unknown>>();
+
 const renderPart = (part: PromptPart, cache: boolean): ContentBlock | undefined => {
   switch (part.kind) {
+    case 'toolCall': {
+      return {
+        type: 'tool_use',
+        id: part.callId,
+        name: part.name,
+        input: argumentsIn(part.arguments),
+      };
+    }
+    case 'toolResult': {
+      return {
+        type: 'tool_result',
+        tool_use_id: part.callId,
+        content: part.body,
+        ...(part.failed ? { is_error: true } : {}),
+      };
+    }
     case 'text': {
       return textBlock(part.text, cache);
     }
@@ -73,11 +109,31 @@ const renderMessage = (
     .filter(block => block !== undefined),
 });
 
-const toBody = ({ prompt, model, maxTokens, effort }: ModelRequest): MessagesBody => ({
+/**
+ * A tool, as this shape takes one. The schema goes across untouched: nothing
+ * here looks inside it, and a shape that rewrote it would change the prefix.
+ */
+const toolBlock = (tool: ToolDefinition): Anthropic.Tool => ({
+  name: tool.name,
+  description: tool.description,
+  /* Rebuilt only because this SDK types the list as mutable. Every field goes
+     across as it was given, which is what the prefix depends on. */
+  input_schema: {
+    ...tool.parameters,
+    type: 'object',
+    required: tool.parameters.required === undefined ? [] : [...tool.parameters.required],
+  },
+});
+
+const toBody = ({ prompt, model, maxTokens, effort, tools }: ModelRequest): MessagesBody => ({
   model,
   max_tokens: maxTokens,
   stream: true,
   ...(effort === undefined ? {} : { output_config: { effort } }),
+  /* Left out rather than sent empty: a shape that is offered no tool must not
+     be told there is an empty list of them, and an empty list would sit in the
+     prefix of a session that has none. */
+  ...(tools === undefined || tools.length === 0 ? {} : { tools: tools.map(toolBlock) }),
   system: prompt.system.map(part => textBlock(part.text, part.cache)),
   messages: prompt.messages.map(renderMessage),
 });
@@ -95,9 +151,9 @@ interface WireUsage {
 }
 
 /**
- * Why this shape says the model stopped. `tool_use` and `pause_turn` are not
- * mapped: this package has no tools, so neither can arrive, and naming them
- * here would claim a meaning nothing has tested.
+ * Why this shape says the model stopped. `pause_turn` is not mapped: nothing
+ * here has produced one, and naming it would claim a meaning nothing has
+ * tested.
  *
  * The keys are strings and not `Anthropic.StopReason`, because the SDK's union
  * is behind its own documentation: at 0.104.1 it does not carry
@@ -116,6 +172,7 @@ const stopReasons: Readonly<Record<string, StopReason>> = {
      `maxTokens` names here. */
   model_context_window_exceeded: 'maxTokens',
   refusal: 'refusal',
+  tool_use: 'tools',
 };
 
 const asStop = stopFrom(stopReasons);
@@ -145,6 +202,21 @@ interface RedactedEvent {
   content_block: { type: 'redacted_thinking'; data: string };
 }
 
+/** The block that opens a call. The arguments follow it, a fragment at a time. */
+interface CallStartEvent {
+  content_block: { type: 'tool_use'; id: string; name: string };
+}
+
+/** One fragment of the arguments, as text. This shape streams them as JSON. */
+interface CallArgumentsEvent {
+  delta: { partial_json: string };
+}
+
+/** The end of any block. It closes a call when one is open, and nothing when not. */
+interface BlockEndEvent {
+  type: 'content_block_stop';
+}
+
 interface UsageEvent {
   usage: WireUsage;
 }
@@ -164,6 +236,9 @@ const isDelta = createIs<DeltaEvent>();
 const isThinking = createIs<ThinkingEvent>();
 const isSignature = createIs<SignatureEvent>();
 const isRedacted = createIs<RedactedEvent>();
+const isCallStart = createIs<CallStartEvent>();
+const isCallArguments = createIs<CallArgumentsEvent>();
+const isBlockEnd = createIs<BlockEndEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
 const isStart = createIs<StartEvent>();
@@ -187,7 +262,21 @@ const toDelta = (event: unknown): WirePart | undefined => {
   if (isSignature(event)) {
     return { kind: 'reasoning', text: '', signature: event.delta.signature };
   }
-  return isRedacted(event) ? { kind: 'redacted', data: event.content_block.data } : undefined;
+  if (isRedacted(event)) {
+    return { kind: 'redacted', data: event.content_block.data };
+  }
+  return toCall(event);
+};
+
+/** The three frames of a tool call, kept apart from the per-token path above. */
+const toCall = (event: unknown): WirePart | undefined => {
+  if (isCallStart(event)) {
+    return { kind: 'callStart', id: event.content_block.id, name: event.content_block.name };
+  }
+  if (isCallArguments(event)) {
+    return { kind: 'callArguments', text: event.delta.partial_json };
+  }
+  return isBlockEnd(event) ? { kind: 'callEnd' } : undefined;
 };
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {

@@ -38,6 +38,12 @@ const renderPart = (part: TurnPart): readonly PromptPart[] => {
         },
       ];
     }
+    case 'toolCall': {
+      return [{ kind: 'toolCall', callId: part.callId, name: part.name, arguments: part.body }];
+    }
+    case 'toolResult': {
+      return [{ kind: 'toolResult', callId: part.callId, body: part.body, failed: part.failed }];
+    }
   }
 };
 

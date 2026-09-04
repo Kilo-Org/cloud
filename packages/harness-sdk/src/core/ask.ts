@@ -1,6 +1,15 @@
 import { Data, Effect, Ref, Stream } from 'effect';
 import { compactIfFull } from './compact.js';
-import { exchangeFor, finish, hidden, remember, rollback, said, thinking } from './exchange.js';
+import {
+  called,
+  exchangeFor,
+  finish,
+  hidden,
+  remember,
+  rollback,
+  said,
+  thinking,
+} from './exchange.js';
 import type { ModelError, ModelEvent } from './model.js';
 import { sinceSummary } from './session.js';
 import type { StoreError } from './storage.js';
@@ -94,6 +103,9 @@ const answerOf = (
             }
             case 'redacted': {
               return hidden(exchange.spoken, event.data);
+            }
+            case 'toolCall': {
+              return called(exchange.spoken, event.call);
             }
             case 'done': {
               return finish(wiring, exchange, event.usage);

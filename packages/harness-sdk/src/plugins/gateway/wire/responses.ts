@@ -2,7 +2,8 @@ import type OpenAI from 'openai';
 import { createAssert, createIs } from 'typia';
 import type { ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
-import { dataUri } from './parts.js';
+import type { ToolDefinition } from '../../../core/tool.js';
+import { dataUri, resultText } from './parts.js';
 import { stopFrom, type Wire, type WirePart } from './wire.js';
 import { readCached, type TokenCount } from './usage.js';
 
@@ -28,14 +29,41 @@ const renderPart = (part: PromptPart): OpenAI.Responses.ResponseInputContent | u
     case 'image': {
       return { type: 'input_image', image_url: dataUri(part), detail: 'auto' };
     }
-    /* A block the provider encrypted belongs to the Anthropic shape. This one
+    /* A block the provider encrypted belongs to the Anthropic shape: this one
        encrypts the whole reasoning item instead, and the two are not the same
-       bytes, so there is nothing here to hand back. */
+       bytes. A call and its result are items beside the message, not content in
+       it. All four are rendered by `itemsOf`, or by nothing at all. */
     case 'redacted':
-    case 'reasoning': {
+    case 'reasoning':
+    case 'toolCall':
+    case 'toolResult': {
       return undefined;
     }
   }
+};
+
+/**
+ * A call, or its result, as the item this shape takes. The arguments go across
+ * as the text the model wrote, which is what this shape asks for, so a call
+ * that could not be run replays exactly as it was made. There is no flag for a
+ * failed result here, so the text says so instead.
+ */
+const toolItem = (part: PromptPart): OpenAI.Responses.ResponseInputItem | undefined => {
+  if (part.kind === 'toolCall') {
+    return {
+      type: 'function_call',
+      call_id: part.callId,
+      name: part.name,
+      arguments: part.arguments,
+    };
+  }
+  return part.kind === 'toolResult'
+    ? {
+        type: 'function_call_output',
+        call_id: part.callId,
+        output: resultText(part.body, part.failed),
+      }
+    : undefined;
 };
 
 /**
@@ -85,10 +113,32 @@ const reasoningItem = (part: PromptPart): OpenAI.Responses.ResponseReasoningItem
 const itemsOf = (message: PromptMessage): OpenAI.Responses.ResponseInputItem[] => {
   const thinking = message.parts.map(reasoningItem).filter(item => item !== undefined);
   const content = message.parts.map(renderPart).filter(part => part !== undefined);
-  return content.length === 0 ? thinking : [...thinking, { role: message.role, content }];
+  const tools = message.parts.map(toolItem).filter(item => item !== undefined);
+  const said = content.length === 0 ? [] : [{ role: message.role, content }];
+  return [...thinking, ...said, ...tools];
 };
 
-const toBody = ({ prompt, model, maxTokens, cacheKey, effort }: ModelRequest): ResponsesBody => ({
+/**
+ * A tool, as this shape takes one. `strict` is false because the schema comes
+ * from the caller unchanged: strict mode adds rules a hand-written schema will
+ * not always meet, and a rejected schema is a session that cannot start.
+ */
+const toolItemFor = (tool: ToolDefinition): OpenAI.Responses.FunctionTool => ({
+  type: 'function',
+  name: tool.name,
+  description: tool.description,
+  parameters: { ...tool.parameters },
+  strict: false,
+});
+
+const toBody = ({
+  prompt,
+  model,
+  maxTokens,
+  cacheKey,
+  effort,
+  tools,
+}: ModelRequest): ResponsesBody => ({
   model,
   max_output_tokens: maxTokens,
   stream: true,
@@ -99,6 +149,7 @@ const toBody = ({ prompt, model, maxTokens, cacheKey, effort }: ModelRequest): R
   store: false,
   instructions: prompt.system.map(part => part.text).join('\n'),
   ...(cacheKey === undefined ? {} : { prompt_cache_key: cacheKey }),
+  ...(tools === undefined || tools.length === 0 ? {} : { tools: tools.map(toolItemFor) }),
   input: prompt.messages.flatMap(itemsOf),
 });
 
@@ -164,7 +215,28 @@ interface ReasoningDoneEvent {
   item: { type: 'reasoning'; id: string; encrypted_content: string };
 }
 
+/** The item that opens a call. `call_id` names the call; `id` names the item. */
+interface CallStartEvent {
+  type: 'response.output_item.added';
+  item: { type: 'function_call'; call_id: string; name: string };
+}
+
+/** One fragment of the arguments, as text. */
+interface CallArgumentsEvent {
+  type: 'response.function_call_arguments.delta';
+  delta: string;
+}
+
+/** The finished call item. The arguments already streamed, so this only closes. */
+interface CallEndEvent {
+  type: 'response.output_item.done';
+  item: { type: 'function_call' };
+}
+
 const isDelta = createIs<DeltaEvent>();
+const isCallStart = createIs<CallStartEvent>();
+const isCallArguments = createIs<CallArgumentsEvent>();
+const isCallEnd = createIs<CallEndEvent>();
 const isCompleted = createIs<CompletedEvent>();
 const isEnd = createIs<EndEvent>();
 const isReasoning = createIs<ReasoningEvent>();
@@ -185,13 +257,24 @@ const toDelta = (event: unknown): WirePart | undefined => {
     return { kind: 'reasoning', text: event.delta };
   }
   if (!isReasoningDone(event)) {
-    return undefined;
+    return toCall(event);
   }
   const seal: ReasoningSeal = {
     id: event.item.id,
     encrypted_content: event.item.encrypted_content,
   };
   return { kind: 'reasoning', text: '', signature: JSON.stringify(seal) };
+};
+
+/** The three frames of a tool call, kept apart from the per-token path above. */
+const toCall = (event: unknown): WirePart | undefined => {
+  if (isCallStart(event)) {
+    return { kind: 'callStart', id: event.item.call_id, name: event.item.name };
+  }
+  if (isCallArguments(event)) {
+    return { kind: 'callArguments', text: event.delta };
+  }
+  return isCallEnd(event) ? { kind: 'callEnd' } : undefined;
 };
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined =>

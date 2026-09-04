@@ -15,7 +15,7 @@ import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { StopReason } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { kilo } from './setup.js';
 
 const model = process.env['KILO_MODEL'] ?? 'openai/gpt-5.6-luna';

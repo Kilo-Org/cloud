@@ -230,14 +230,12 @@ it('refuses a row the schema cannot explain rather than handing it back', async 
       })
     )
   );
-  db.prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+  db.prepare('INSERT INTO parts (id, turn_id, session_id, kind, body) VALUES (?, ?, ?, ?, ?)').run(
     'prt_1',
     'trn_1',
     session.id,
     'banana',
-    'hello',
-    null,
-    null
+    'hello'
   );
 
   const failed = await use(db, store => Effect.flip(store.load(session.id)));

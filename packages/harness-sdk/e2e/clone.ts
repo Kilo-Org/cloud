@@ -17,7 +17,7 @@ import type { ModelUsage } from '../src/core/model.js';
 import { cloneSession } from '../src/core/resume.js';
 import type { ResumeContext } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { cachedSystem as system, kilo } from './setup.js';
 

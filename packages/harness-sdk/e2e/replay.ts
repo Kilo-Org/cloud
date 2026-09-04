@@ -23,7 +23,7 @@ import type { ApiKind } from '../src/core/catalog.js';
 import { continueSession, type ResumeContext } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
 import type { Turn, TurnPart } from '../src/core/turn.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { kilo } from './setup.js';
 

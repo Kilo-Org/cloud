@@ -77,8 +77,10 @@ it('refuses to load an image row that names no media type', async () => {
             prompted: 0,
           });
           database
-            .prepare('INSERT INTO parts VALUES (?, ?, ?, ?, ?, ?, ?)')
-            .run('prt_1', 'trn_1', session.id, 'image', pixel, null, null);
+            .prepare(
+              'INSERT INTO parts (id, turn_id, session_id, kind, body) VALUES (?, ?, ?, ?, ?)'
+            )
+            .run('prt_1', 'trn_1', session.id, 'image', pixel);
           return yield* Effect.flip(store.load(session.id));
         })
       ),

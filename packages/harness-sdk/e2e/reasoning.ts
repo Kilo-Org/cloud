@@ -22,7 +22,7 @@ import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { kilo } from './setup.js';
 
 const system = 'You answer briefly. Think first, then give the answer in one short sentence.';
@@ -69,7 +69,8 @@ const ask = (session: SessionHandle, text: string) =>
       case 'done': {
         return { ...held, input: event.usage.inputTokens + event.usage.cacheReadTokens };
       }
-      case 'redacted': {
+      case 'redacted':
+      case 'toolCall': {
         return held;
       }
     }

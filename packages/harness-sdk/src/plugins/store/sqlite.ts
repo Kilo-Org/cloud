@@ -10,7 +10,14 @@ import {
 import type { Turn, TurnPart } from '../../core/turn.js';
 import { transact, type SqlDriver } from './driver.js';
 import { migrate } from './migrate.js';
-import { assertParts, assertSessions, assertTurns, asStoredSession, byTurn } from './rows.js';
+import {
+  assertParts,
+  assertSessions,
+  assertTurns,
+  asStoredSession,
+  byTurn,
+  toolsIn,
+} from './rows.js';
 import { parts, sessions, turns } from './schema.js';
 
 /**
@@ -31,6 +38,29 @@ const attempt = <A>(
 
 type Db = ReturnType<typeof drizzle>;
 
+/** What only one kind of part carries. Everything else leaves the column empty. */
+const columnsOf = (part: TurnPart) => {
+  switch (part.kind) {
+    case 'image': {
+      return { media: part.media };
+    }
+    case 'reasoning': {
+      return part.signature === undefined ? {} : { signature: part.signature };
+    }
+    case 'toolCall': {
+      return { callId: part.callId, name: part.name };
+    }
+    case 'toolResult': {
+      return { callId: part.callId, failed: part.failed };
+    }
+    case 'text':
+    case 'summary':
+    case 'redacted': {
+      return {};
+    }
+  }
+};
+
 /** One part, as its row. Only the kind that has a column fills it. */
 const partRow = (turn: Turn, part: TurnPart) => ({
   id: part.id,
@@ -38,10 +68,7 @@ const partRow = (turn: Turn, part: TurnPart) => ({
   sessionId: turn.sessionId,
   kind: part.kind,
   body: part.body,
-  ...(part.kind === 'image' ? { media: part.media } : {}),
-  ...(part.kind === 'reasoning' && part.signature !== undefined
-    ? { signature: part.signature }
-    : {}),
+  ...columnsOf(part),
 });
 
 /**
@@ -100,7 +127,7 @@ const storeOn = (driver: SqlDriver): SessionStoreService => {
   return {
     create: session =>
       attempt('create', async () => {
-        await db.insert(sessions).values(session);
+        await db.insert(sessions).values({ ...session, tools: toolsIn(session.tools) });
       }),
 
     read: sessionId =>

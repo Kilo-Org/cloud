@@ -7,7 +7,7 @@ import { layerAssembler } from '../plugins/prompt/default.js';
 import { layerNodeStore } from '../plugins/store/node.js';
 import type { ModelRequest } from './model.js';
 import type { ResumeContext } from './resume.js';
-import type { SessionHandle } from './wiring.js';
+import type { SessionHandle } from './handle.js';
 
 /**
  * What the continue and clone tests share.

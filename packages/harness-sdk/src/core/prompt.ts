@@ -23,7 +23,21 @@ type PromptPart =
   | { readonly kind: 'text'; readonly text: string }
   | { readonly kind: 'reasoning'; readonly text: string; readonly signature?: string }
   | { readonly kind: 'redacted'; readonly data: string }
-  | { readonly kind: 'image'; readonly media: string; readonly data: string };
+  | { readonly kind: 'image'; readonly media: string; readonly data: string }
+  /** A tool the model asked for, on its way back into the transcript. */
+  | {
+      readonly kind: 'toolCall';
+      readonly callId: string;
+      readonly name: string;
+      readonly arguments: string;
+    }
+  /** What the tool gave back. It answers the call of the same identifier. */
+  | {
+      readonly kind: 'toolResult';
+      readonly callId: string;
+      readonly body: string;
+      readonly failed: boolean;
+    };
 
 /** `cache` marks the breakpoint, which belongs to the message, not to a part. */
 interface PromptMessage {

@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { Effect, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { everyShape, kilo } from './setup.js';
 
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';

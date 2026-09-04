@@ -7,7 +7,8 @@ import { layerAssembler } from '../plugins/prompt/default.js';
 import type { SessionBusyError } from './ask.js';
 import type { ModelError, ModelRequest } from './model.js';
 import { openSession } from './run.js';
-import type { SessionHandle, SessionOptions } from './wiring.js';
+import type { SessionHandle } from './handle.js';
+import type { SessionOptions } from './wiring.js';
 import { SessionStore, StoreError, type StoredExchange } from './storage.js';
 import { textOf, type Turn } from './turn.js';
 

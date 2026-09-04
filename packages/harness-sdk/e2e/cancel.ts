@@ -15,7 +15,7 @@ import assert from 'node:assert/strict';
 import { Duration, Effect, Fiber, Layer, Ref, Stream } from 'effect';
 import type { AbortLike, FetchLike } from '../src/core/fetch.js';
 import { openSession } from '../src/core/run.js';
-import type { SessionHandle } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
 import { kilo } from './setup.js';
 import { nodeFetch } from './node-fetch.js';
 

@@ -38,6 +38,32 @@ type TurnPart =
       readonly body: string;
       /** The media type, such as `image/png`. */
       readonly media: string;
+    }
+  /**
+   * A tool the model asked for. `body` is the arguments, as the JSON text the
+   * model wrote: nothing here parses it, because only the tool knows what shape
+   * it should be.
+   */
+  | {
+      readonly id: string;
+      readonly kind: 'toolCall';
+      readonly body: string;
+      /** What the provider called the call. The result names the same one. */
+      readonly callId: string;
+      readonly name: string;
+    }
+  /**
+   * What a tool gave back. Every shape refuses a call with no result, so a
+   * stored call without one is a session that can never be continued: the two
+   * are written together or neither is.
+   */
+  | {
+      readonly id: string;
+      readonly kind: 'toolResult';
+      readonly body: string;
+      readonly callId: string;
+      /** True when the tool did not do what it was asked. */
+      readonly failed: boolean;
     };
 
 /** A part before it has an identifier. */
@@ -46,7 +72,19 @@ type PartDraft =
   | { readonly kind: 'summary'; readonly body: string }
   | { readonly kind: 'reasoning'; readonly body: string; readonly signature?: string }
   | { readonly kind: 'redacted'; readonly body: string }
-  | { readonly kind: 'image'; readonly body: string; readonly media: string };
+  | { readonly kind: 'image'; readonly body: string; readonly media: string }
+  | {
+      readonly kind: 'toolCall';
+      readonly body: string;
+      readonly callId: string;
+      readonly name: string;
+    }
+  | {
+      readonly kind: 'toolResult';
+      readonly body: string;
+      readonly callId: string;
+      readonly failed: boolean;
+    };
 
 /**
  * One turn of a conversation. Both identifiers are monotonic ULIDs, so each is

@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { ModelEvent } from '../src/core/model.js';
-import type { SessionHandle, SessionOptions } from '../src/core/wiring.js';
+import type { SessionHandle } from '../src/core/handle.js';
+import type { SessionOptions } from '../src/core/wiring.js';
 import type { KiloSetup } from '../src/plugins/kilo.js';
 
 /**

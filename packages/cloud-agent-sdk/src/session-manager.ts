@@ -100,6 +100,11 @@ type SessionConfig = {
       }>
     | undefined;
 };
+type WorktreeChangesRefresh = {
+  cloudSessionId: string;
+  revision?: number;
+  connectionVersion: number;
+};
 type ActiveSessionType = ResolvedSession['type'];
 type ObservedModelSource = 'session' | 'message' | 'catalog';
 type StandaloneQuestion = { requestId: string; questions: QuestionInfo[] };
@@ -369,6 +374,7 @@ type SessionManagerAtoms = {
   fetchedSessionData: W<FetchedSessionData | null>;
   /** Slash command catalog reported by the wrapper for the current session. */
   availableCommands: W<SlashCommandInfo[]>;
+  worktreeChangesRefresh: W<WorktreeChangesRefresh | null>;
   messagesList: Atom<StoredMessage[]>;
   staticMessages: Atom<StoredMessage[]>;
   dynamicMessages: Atom<StoredMessage[]>;
@@ -752,6 +758,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
    * DO) and on every wrapper push. Empty list = wrapper hasn't reported yet.
    */
   const availableCommandsAtom = atom<SlashCommandInfo[]>([]);
+  const worktreeChangesRefreshAtom = atom<WorktreeChangesRefresh | null>(null);
   const childSessionHydrationStatesAtom = atom<Map<string, ChildSessionHydrationState>>(new Map());
   const childSessionErrorsAtom = atom<Map<string, string>>(new Map());
   const hasOlderMessagesAtom = atom<boolean>(false);
@@ -973,6 +980,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
     store.set(childSessionErrorsAtom, new Map());
     store.set(chatUIAtom, { shouldAutoScroll: true });
     store.set(availableCommandsAtom, []);
+    store.set(worktreeChangesRefreshAtom, null);
     store.set(hasOlderMessagesAtom, false);
     store.set(isLoadingOlderMessagesAtom, false);
     store.set(olderMessagesErrorAtom, null);
@@ -1831,6 +1839,26 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       },
       onEvent: event => {
         if (expectedGeneration !== switchGeneration) return;
+        if (event.type === 'worktree.changes.ready' || event.type === 'connected') {
+          const cloudSessionId = store.get(sessionIdAtom);
+          if (!cloudSessionId || event.cloudSessionId !== cloudSessionId) return;
+          const previous = store.get(worktreeChangesRefreshAtom);
+          if (event.type === 'worktree.changes.ready') {
+            if (event.revision <= (previous?.revision ?? 0)) return;
+            store.set(worktreeChangesRefreshAtom, {
+              cloudSessionId,
+              revision: event.revision,
+              connectionVersion: previous?.connectionVersion ?? 0,
+            });
+          } else {
+            store.set(worktreeChangesRefreshAtom, {
+              ...previous,
+              cloudSessionId,
+              connectionVersion: (previous?.connectionVersion ?? 0) + 1,
+            });
+          }
+          return;
+        }
         if (event.type === 'commands.available') {
           // Replace the catalog wholesale. The DO sends the full list on
           // every connect, so we never need to merge incrementally.
@@ -2396,6 +2424,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       billingFailure: billingFailureAtom,
       fetchedSessionData: fetchedSessionDataAtom,
       availableCommands: availableCommandsAtom,
+      worktreeChangesRefresh: worktreeChangesRefreshAtom,
       messagesList: messagesListAtom,
       staticMessages: staticMessagesAtom,
       dynamicMessages: dynamicMessagesAtom,
@@ -2420,6 +2449,7 @@ export type {
   SessionManager,
   SessionManagerConfig,
   SessionManagerAtoms,
+  WorktreeChangesRefresh,
   SessionStatusIndicator,
   SessionConfig,
   StandalonePermission,

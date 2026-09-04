@@ -135,6 +135,14 @@ vi.mock('expo-router', () => ({
   useIsFocused: () => true,
   useRouter: () => ({ replace: vi.fn() }),
 }));
+
+// `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
+// Android Fabric alive (KILO-APP-25); its own mechanics are covered in
+// src/lib/navigation/stack-safe-replace.mounted.test.tsx. Here it stands in for
+// the navigation call so these assertions stay about the destination href.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
+}));
 vi.mock('expo-keep-awake', () => ({
   useKeepAwake: vi.fn(),
 }));

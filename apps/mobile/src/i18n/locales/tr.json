@@ -2890,7 +2890,22 @@
       "stateOpenApproved": "Açık · Onaylandı",
       "stateOpenChangesRequested": "Açık · Değişiklik istendi",
       "stateOpenReviewRequired": "Açık · İnceleme gerekli",
-      "unknownAuthor": "Bilinmeyen yazar"
+      "unknownAuthor": "Bilinmeyen yazar",
+      "openedAgo": "Açıldı {{time}}",
+      "updatedAgo": "Güncellendi {{time}}",
+      "mergedAgo": "Birleştirildi {{time}}",
+      "mergedByAgo": "{{login}} birleştirdi {{time}}",
+      "closedAgo": "Kapalı {{time}}",
+      "labels": "Etiketler",
+      "reviewers": "İnceleyenler",
+      "assignees": "Atananlar",
+      "linkedIssues": "Bağlantılı sorunlar",
+      "reviewApproved": "Onaylandı",
+      "reviewChangesRequested": "Değişiklik istendi",
+      "reviewCommented": "Yorum yapıldı",
+      "reviewPending": "İnceleme bekliyor",
+      "openIssueA11y": "GitHub'da #{{number}} sorununu aç",
+      "reviewDismissed": "Yok sayıldı"
     },
     "pendingComment": {
       "allQueuedHint": "Tüm yorumlar tek bir toplu istekte gönderilecek.",

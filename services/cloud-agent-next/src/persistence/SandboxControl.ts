@@ -34,7 +34,7 @@ import {
   type SandboxControlOutboundRequest,
   type SandboxControlSocketHandler,
 } from '../sandbox-control/socket.js';
-import { parseOperationPayload } from '../sandbox-control/frames.js';
+import { errorResponse, parseOperationPayload } from '../sandbox-control/frames.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -593,6 +593,7 @@ export class SandboxControl extends DurableObject<Env> {
 
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
     await this.ensureOperationalInitialized();
+    if (input.operation === 'session.git.summary') return this.requestWorktreeChanges(input);
     await this.assertRequestWorktreeAdmission(input);
     if (input.operation === 'worktree.delete' || input.operation === 'worktree.prepareDeletion') {
       throw new Error('Worktree cleanup requires the deletion coordinator');
@@ -689,6 +690,75 @@ export class SandboxControl extends DurableObject<Env> {
     await this.assertRequestWorktreeAdmission(input);
     if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
     return this.socketHandler.sendRequest(input);
+  }
+
+  private async requestWorktreeChanges(
+    input: SandboxControlOutboundRequest
+  ): Promise<ResponseFrame> {
+    await this.assertRequestWorktreeAdmission(input);
+    const session = input.session;
+    const matchesRoute = (route: SessionRoute | undefined) =>
+      session !== undefined &&
+      route?.kiloSessionId === session.kiloSessionId &&
+      route.directory === session.directory;
+    const physical = await loadPhysicalRecord(this.ctx.storage);
+    const routes = await loadRouteTable(this.ctx.storage);
+    const route = session ? routes.get(session.sessionId) : undefined;
+    const runtime = this.readyWrapperRuntime();
+    const socket = this.socketHandler.getReadySocket();
+    this.assertWorktreeAdmission(route?.worktreeId);
+    if (
+      physical.state !== 'running' ||
+      physical.stopTombstone ||
+      !runtime ||
+      physical.providerRef !== runtime.providerInstanceId ||
+      !matchesRoute(route) ||
+      !socket
+    ) {
+      return errorResponse(crypto.randomUUID(), 'not_ready', 'Worktree is not attached and ready');
+    }
+    if (
+      input.expectedWrapperInstanceId !== undefined &&
+      wrapperInstanceIdSchema.parse(input.expectedWrapperInstanceId) !== runtime.wrapperInstanceId
+    ) {
+      return errorResponse(
+        crypto.randomUUID(),
+        'protocol_error',
+        'Worktree capture context changed'
+      );
+    }
+
+    let response: ResponseFrame;
+    try {
+      response = await this.socketHandler.sendRequest(input);
+    } catch {
+      return errorResponse(crypto.randomUUID(), 'protocol_error', 'Worktree capture failed');
+    }
+    const currentPhysical = await loadPhysicalRecord(this.ctx.storage);
+    const currentRoutes = await loadRouteTable(this.ctx.storage);
+    const currentRoute = session ? currentRoutes.get(session.sessionId) : undefined;
+    await this.assertRequestWorktreeAdmission(input);
+    this.assertWorktreeAdmission(currentRoute?.worktreeId);
+    const currentRuntime = this.readyWrapperRuntime();
+    if (
+      currentPhysical.state !== 'running' ||
+      currentPhysical.stopTombstone ||
+      currentPhysical.providerRef !== physical.providerRef ||
+      !sameAllocation(physical, currentPhysical) ||
+      !currentRuntime ||
+      !this.sameConnection(runtime, currentRuntime) ||
+      !matchesRoute(currentRoute) ||
+      currentRoute?.ownerId !== route?.ownerId ||
+      currentRoute?.worktreeId !== route?.worktreeId ||
+      this.socketHandler.getReadySocket() !== socket
+    ) {
+      return errorResponse(
+        response.requestId,
+        'protocol_error',
+        'Worktree capture context changed'
+      );
+    }
+    return response;
   }
 
   async quarantineRuntime(input: {

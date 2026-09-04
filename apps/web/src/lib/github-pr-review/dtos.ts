@@ -9,6 +9,29 @@ export const GitHubPrReviewAuthorSchema = z
   })
   .strict();
 
+/** A reviewer's latest state on the PR, or PENDING when only a request exists. */
+export const GitHubPrReviewReviewerSchema = GitHubPrReviewAuthorSchema.extend({
+  state: z.enum(['APPROVED', 'CHANGES_REQUESTED', 'COMMENTED', 'DISMISSED', 'PENDING']),
+});
+
+/** A repository label. `color` is GitHub's 6-digit hex WITHOUT the leading `#`. */
+export const GitHubPrReviewLabelSchema = z
+  .object({
+    name: z.string().min(1),
+    color: z.string(),
+  })
+  .strict();
+
+/** An issue this PR closes when it merges — GitHub's "Development" sidebar box. */
+export const GitHubPrReviewLinkedIssueSchema = z
+  .object({
+    number: z.number().int().positive(),
+    title: z.string(),
+    url: z.string().url(),
+    closed: z.boolean(),
+  })
+  .strict();
+
 export const GitHubPrReviewOverviewSchema = z
   .object({
     number: z.number().int().positive(),
@@ -39,6 +62,19 @@ export const GitHubPrReviewOverviewSchema = z
       })
       .nullable(),
     reviewDecision: z.enum(['REVIEW_REQUIRED', 'APPROVED', 'CHANGES_REQUESTED']).nullable(),
+    labels: z.array(GitHubPrReviewLabelSchema),
+    assignees: z.array(GitHubPrReviewAuthorSchema),
+    // Empty when the GraphQL enrichment leg degraded — the overview still
+    // renders, it just omits the reviewer and linked-issue rows.
+    reviewers: z.array(GitHubPrReviewReviewerSchema),
+    linkedIssues: z.array(GitHubPrReviewLinkedIssueSchema),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+    closedAt: z.string().nullable(),
+    mergedAt: z.string().nullable(),
+    mergedBy: GitHubPrReviewAuthorSchema.nullable(),
+    /** Conversation comments plus review comments — the Discussion tab badge. */
+    commentCount: z.number().int().nonnegative(),
     repo: z
       .object({
         allowMergeCommit: z.boolean(),

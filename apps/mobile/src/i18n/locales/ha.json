@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "fayil",
       "file": "fayiloli",
-      "file_other": "fayiloli"
+      "file_other": "fayiloli",
+      "openedAgo": "An buɗe {{time}}",
+      "updatedAgo": "An sabunta {{time}}",
+      "mergedAgo": "An haɗa {{time}}",
+      "mergedByAgo": "{{login}} ya haɗa {{time}}",
+      "closedAgo": "An rufe {{time}}",
+      "labels": "Alamomi",
+      "reviewers": "Masu duba",
+      "assignees": "Waɗanda aka ba wa aiki",
+      "linkedIssues": "Batutuwa masu alaƙa",
+      "reviewApproved": "An amince",
+      "reviewChangesRequested": "An nemi canje-canje",
+      "reviewCommented": "An yi sharhi",
+      "reviewPending": "Ana jiran dubawa",
+      "openIssueA11y": "Buɗe batu #{{number}} a GitHub",
+      "reviewDismissed": "An watsar"
     },
     "pendingComment": {
       "editOutdatedA11y": "Gyara tsokacin da ke jira na tsoho a {{location}}",

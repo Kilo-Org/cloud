@@ -1,4 +1,3 @@
-import * as z from 'zod';
 import type { DirectByokProviderMetaId } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import type {
   GatewayChatApiKind,
@@ -6,24 +5,15 @@ import type {
   TransformRequestContext,
 } from '@/lib/ai-gateway/providers/types';
 import type { CustomLlmProvider } from '@kilocode/db';
-import { OpenCodeVariantSchema } from '@kilocode/db/schema-types';
+import type { DirectByokModel } from '@kilocode/db/schema-types';
 
-export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
-
-export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
-
-export const DirectByokModelSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  flags: z.array(DirectByokModelFlagSchema).readonly().optional(),
-  context_length: z.number(),
-  max_completion_tokens: z.number(),
-  variants: z.record(z.string(), OpenCodeVariantSchema).optional(),
-});
-
-export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);
-
-export type DirectByokModel = z.infer<typeof DirectByokModelSchema>;
+export {
+  DirectByokModelFlagSchema,
+  DirectByokModelSchema,
+  DirectByokModelArraySchema,
+  type DirectByokModelFlag,
+  type DirectByokModel,
+} from '@kilocode/db/schema-types';
 
 export type DirectByokProvider = {
   id: DirectByokProviderMetaId;

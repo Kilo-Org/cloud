@@ -1,12 +1,12 @@
 // Performs one `prepareSession` clone for the Cloud Agent Continue entry: a
 // hoisted operation key, a safe-retry outbox row, and post-success navigation.
 import { useCallback } from 'react';
-import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { type KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import * as Haptics from 'expo-haptics';
 
 import { type AgentMode, normalizeAgentMode } from '@/components/agents/mode-normalize';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import {
   type NewSessionRepository,
   type RepositoryPlatform,
@@ -29,7 +29,7 @@ export function useContinueCloudCreate(
   dest: { repository: NewSessionRepository | null; model: string; variant: string },
   mode: string
 ) => Promise<void> {
-  const router = useRouter();
+  const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   // P1-A-08b: cloud prepares and remote spawns are different intents, so each

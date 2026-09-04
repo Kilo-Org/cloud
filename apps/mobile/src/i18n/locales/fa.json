@@ -550,7 +550,22 @@
       "commit_other": "commit",
       "file_one": "فایل",
       "file": "فایل",
-      "file_other": "فایل"
+      "file_other": "فایل",
+      "openedAgo": "باز شده {{time}}",
+      "updatedAgo": "به‌روزرسانی شده {{time}}",
+      "mergedAgo": "ادغام شد {{time}}",
+      "mergedByAgo": "ادغام‌شده توسط {{login}} {{time}}",
+      "closedAgo": "بسته {{time}}",
+      "labels": "برچسب‌ها",
+      "reviewers": "بازبین‌ها",
+      "assignees": "واگذارشدگان",
+      "linkedIssues": "مسائل مرتبط",
+      "reviewApproved": "تأیید شد",
+      "reviewChangesRequested": "تغییرات درخواست شد",
+      "reviewCommented": "نظر داده شد",
+      "reviewPending": "در انتظار بازبینی",
+      "openIssueA11y": "باز کردن مسئله #{{number}} در GitHub",
+      "reviewDismissed": "رد شده"
     },
     "pendingComment": {
       "editOutdatedA11y": "ویرایش نظر قدیمی در انتظار روی {{location}}",

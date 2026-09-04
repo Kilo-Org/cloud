@@ -550,7 +550,22 @@
       "commit_other": "కమిట్లు",
       "file_one": "ఫైల్",
       "file": "ఫైల్లు",
-      "file_other": "ఫైల్లు"
+      "file_other": "ఫైల్లు",
+      "openedAgo": "తెరవబడింది {{time}}",
+      "updatedAgo": "నవీకరించబడింది {{time}}",
+      "mergedAgo": "మెర్జ్ అయింది {{time}}",
+      "mergedByAgo": "{{login}} విలీనం చేశారు {{time}}",
+      "closedAgo": "మూసివేయబడింది {{time}}",
+      "labels": "లేబుళ్లు",
+      "reviewers": "సమీక్షకులు",
+      "assignees": "కేటాయించినవారు",
+      "linkedIssues": "అనుసంధానిత సమస్యలు",
+      "reviewApproved": "ఆమోదించబడింది",
+      "reviewChangesRequested": "మార్పులు కోరబడ్డాయి",
+      "reviewCommented": "వ్యాఖ్యానించబడింది",
+      "reviewPending": "సమీక్ష కోసం వేచి ఉంది",
+      "openIssueA11y": "GitHub లో సమస్య #{{number}} తెరవండి",
+      "reviewDismissed": "తోసివేయబడింది"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}పై పాత పెండింగ్ వ్యాఖ్యను సవరించండి",

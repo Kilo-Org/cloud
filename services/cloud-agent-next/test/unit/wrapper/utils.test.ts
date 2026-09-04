@@ -27,6 +27,50 @@ describe('runProcess', () => {
     expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
   });
 
+  it('preserves UTF-8 characters split across stdout and stderr chunks', async () => {
+    const outputs = { stdout: '', stderr: '' };
+    const text = 'é漢字𐐀\tpath\n';
+    const result = await runProcess(
+      process.execPath,
+      [
+        '-e',
+        `const bytes = Buffer.from(${JSON.stringify(text)}); let i = 0;
+        const timer = setInterval(() => {
+          const byte = bytes.subarray(i, ++i);
+          process.stdout.write(byte);
+          process.stderr.write(byte);
+          if (i === bytes.length) clearInterval(timer);
+        }, 20);`,
+      ],
+      {
+        timeoutMs: 5_000,
+        onOutput: (stream, output) => {
+          outputs[stream] += output;
+        },
+      }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe(text);
+    expect(result.stderr).toBe(text);
+    expect(outputs).toEqual({ stdout: text, stderr: text });
+    expect(result.stdoutTruncated).toBeUndefined();
+    expect(result.stderrTruncated).toBeUndefined();
+  });
+
+  it('keeps a valid UTF-8 tail within the byte cap', async () => {
+    const result = await runProcess(
+      process.execPath,
+      ['-e', 'process.stdout.write("𐐀".repeat(40) + "end")'],
+      { timeoutMs: 5_000, maxOutputBytes: 10 }
+    );
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('𐐀end');
+    expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(10);
+    expect(result.stdoutTruncated).toBe(true);
+  });
+
   it('bounds output while retaining the most recent tail', async () => {
     const result = await runProcess(
       process.execPath,

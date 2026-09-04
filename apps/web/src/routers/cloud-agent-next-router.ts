@@ -32,6 +32,7 @@ import {
   baseGetSessionNextOutputSchema,
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
+  baseWorktreeChangesNextSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
@@ -65,6 +66,10 @@ import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForUser } from '@/lib/user/balance';
 import { isMobileClient } from '@/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
+import {
+  getWorktreeChangesOutputSchema,
+  refreshWorktreeChangesOutputSchema,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -326,6 +331,26 @@ export const cloudAgentNextRouter = createTRPCRouter({
         rethrowAsPaymentRequired(error);
         throw error;
       }
+    }),
+
+  getWorktreeChanges: baseProcedure
+    .input(baseWorktreeChangesNextSchema)
+    .output(getWorktreeChangesOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getWorktreeChanges(input.cloudAgentSessionId);
+    }),
+
+  refreshWorktreeChanges: baseProcedure
+    .input(baseWorktreeChangesNextSchema)
+    .output(refreshWorktreeChangesOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
     }),
 
   createTerminal: baseProcedure

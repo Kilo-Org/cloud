@@ -550,7 +550,22 @@
       "commit_other": "কমিট",
       "file_one": "ফাইল",
       "file": "ফাইল",
-      "file_other": "ফাইল"
+      "file_other": "ফাইল",
+      "openedAgo": "খোলা হয়েছে {{time}}",
+      "updatedAgo": "হালনাগাদ হয়েছে {{time}}",
+      "mergedAgo": "মার্জ হয়েছে {{time}}",
+      "mergedByAgo": "{{login}} মার্জ করেছেন {{time}}",
+      "closedAgo": "বন্ধ {{time}}",
+      "labels": "লেবেল",
+      "reviewers": "পর্যালোচক",
+      "assignees": "নিযুক্ত ব্যক্তি",
+      "linkedIssues": "সংযুক্ত ইস্যু",
+      "reviewApproved": "অনুমোদিত",
+      "reviewChangesRequested": "পরিবর্তন চাওয়া হয়েছে",
+      "reviewCommented": "মন্তব্য করা হয়েছে",
+      "reviewPending": "পর্যালোচনার অপেক্ষায়",
+      "openIssueA11y": "GitHub-এ ইস্যু #{{number}} খুলুন",
+      "reviewDismissed": "খারিজ করা হয়েছে"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-এ পুরাতন মুলতুবি মন্তব্য সম্পাদনা করুন",

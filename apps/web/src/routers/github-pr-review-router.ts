@@ -27,6 +27,7 @@ import {
   buildReviewThreadsResult,
   sliceFileLines,
   type GraphQlInboxNode,
+  type OverviewGraphQlData,
 } from '@/lib/github-pr-review/mappers';
 import {
   CONVERSATION_COMMENTS_MAX_PAGES,
@@ -220,11 +221,44 @@ const AutoMergeInput = ownerRepoSchema
   })
   .strict();
 
+// Overview enrichment: the aggregate review decision plus the three sidebar
+// boxes REST cannot answer — per-reviewer state, pending review requests, and
+// the issues this PR closes. `latestReviews` returns ONE node per reviewer
+// (their newest review), which is exactly what GitHub's own sidebar lists.
+// Only the `User` inline fragment is selected on `requestedReviewer`: a
+// requested team has no login or avatar and is dropped by the mapper.
 const PULL_REQUEST_FRAGMENT_QUERY = /* GraphQL */ `
   query PrReviewDecision($owner: String!, $name: String!, $number: Int!) {
     repository(owner: $owner, name: $name) {
       pullRequest(number: $number) {
         reviewDecision
+        latestReviews(first: 25) {
+          nodes {
+            state
+            author {
+              login
+              avatarUrl
+            }
+          }
+        }
+        reviewRequests(first: 25) {
+          nodes {
+            requestedReviewer {
+              ... on User {
+                login
+                avatarUrl
+              }
+            }
+          }
+        }
+        closingIssuesReferences(first: 10) {
+          nodes {
+            number
+            title
+            url
+            closed
+          }
+        }
       }
     }
     viewer {
@@ -1425,12 +1459,10 @@ async function runMergeWrite(
   }
 }
 
-type OverviewGraphQl = {
-  repository: {
-    pullRequest: { reviewDecision: string | null } | null;
-  } | null;
-  viewer: { login: string } | null;
-};
+// Mirrors PULL_REQUEST_FRAGMENT_QUERY. `OverviewGraphQlData` (mappers.ts) owns
+// the field-by-field shape; this alias keeps the fetch helper's return type in
+// step with it without restating the selection twice.
+type OverviewGraphQl = NonNullable<OverviewGraphQlData>;
 
 // GraphQL enrichment for the overview (reviewDecision + viewer.login). It keeps
 // its own try/catch: a TRPCError and any raw 401 are rethrown so

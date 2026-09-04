@@ -2930,7 +2930,22 @@
       "commit_few": "коммита",
       "commit_many": "коммитов",
       "file_few": "файла",
-      "file_many": "файлов"
+      "file_many": "файлов",
+      "openedAgo": "Открыт {{time}}",
+      "updatedAgo": "Обновлён {{time}}",
+      "mergedAgo": "Объединен {{time}}",
+      "mergedByAgo": "Объединил {{login}} {{time}}",
+      "closedAgo": "Закрыт {{time}}",
+      "labels": "Метки",
+      "reviewers": "Рецензенты",
+      "assignees": "Ответственные",
+      "linkedIssues": "Связанные задачи",
+      "reviewApproved": "Одобрено",
+      "reviewChangesRequested": "Запрошены изменения",
+      "reviewCommented": "Прокомментировано",
+      "reviewPending": "Ожидает рецензии",
+      "openIssueA11y": "Открыть задачу #{{number}} на GitHub",
+      "reviewDismissed": "Отклонено"
     },
     "pendingComment": {
       "allQueuedHint": "Все комментарии будут отправлены одним пакетным запросом.",

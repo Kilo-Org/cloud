@@ -2890,7 +2890,22 @@
       "stateOpenApproved": "Terbuka · Disetujui",
       "stateOpenChangesRequested": "Terbuka · Perubahan diminta",
       "stateOpenReviewRequired": "Terbuka · Tinjauan diperlukan",
-      "unknownAuthor": "Penulis tidak diketahui"
+      "unknownAuthor": "Penulis tidak diketahui",
+      "openedAgo": "Dibuka {{time}}",
+      "updatedAgo": "Diperbarui {{time}}",
+      "mergedAgo": "Digabungkan {{time}}",
+      "mergedByAgo": "Digabungkan oleh {{login}} {{time}}",
+      "closedAgo": "Ditutup {{time}}",
+      "labels": "Label",
+      "reviewers": "Peninjau",
+      "assignees": "Penerima tugas",
+      "linkedIssues": "Isu tertaut",
+      "reviewApproved": "Disetujui",
+      "reviewChangesRequested": "Perubahan diminta",
+      "reviewCommented": "Dikomentari",
+      "reviewPending": "Menunggu tinjauan",
+      "openIssueA11y": "Buka isu #{{number}} di GitHub",
+      "reviewDismissed": "Diabaikan"
     },
     "pendingComment": {
       "allQueuedHint": "Semua komentar akan dikirim dalam satu permintaan sekaligus.",

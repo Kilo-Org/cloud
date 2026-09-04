@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "ဖိုင်",
       "file": "ဖိုင်များ",
-      "file_other": "ဖိုင်များ"
+      "file_other": "ဖိုင်များ",
+      "openedAgo": "ဖွင့်ခဲ့သည် {{time}}",
+      "updatedAgo": "မွမ်းမံခဲ့သည် {{time}}",
+      "mergedAgo": "ပေါင်းစည်းပြီးပါပြီ {{time}}",
+      "mergedByAgo": "{{login}} က ပေါင်းစည်းခဲ့သည် {{time}}",
+      "closedAgo": "ပိတ်ထား {{time}}",
+      "labels": "အညွှန်းများ",
+      "reviewers": "စိစစ်သူများ",
+      "assignees": "တာဝန်ခံများ",
+      "linkedIssues": "ချိတ်ဆက်ထားသော ကိစ္စများ",
+      "reviewApproved": "အတည်ပြုပြီး",
+      "reviewChangesRequested": "ပြောင်းလဲမှုများ တောင်းဆိုထားသည်",
+      "reviewCommented": "မှတ်ချက်ပေးထားသည်",
+      "reviewPending": "စိစစ်မှု စောင့်ဆိုင်းနေသည်",
+      "openIssueA11y": "GitHub တွင် ကိစ္စ #{{number}} ကို ဖွင့်ပါ",
+      "reviewDismissed": "ဖျက်သိမ်းပြီး"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} တွင် ခေတ်နောက်ကျသော ဆိုင်းငံ့မှတ်ချက် တည်းဖြတ်ပါ",

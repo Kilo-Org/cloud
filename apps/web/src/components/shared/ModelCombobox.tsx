@@ -66,6 +66,8 @@ export type ModelComboboxProps = {
   modal?: boolean;
   /** Optional aria-label for the trigger button, overriding the default accessible name */
   triggerAriaLabel?: string;
+  /** Optional id for the trigger button/label pair. Set this when rendering more than one full-variant combobox on a page to avoid duplicate DOM ids. */
+  id?: string;
 };
 
 export function ModelCombobox({
@@ -88,6 +90,7 @@ export function ModelCombobox({
   pinnedModel,
   modal = false,
   triggerAriaLabel,
+  id = 'model-combobox',
 }: ModelComboboxProps) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -247,7 +250,7 @@ export function ModelCombobox({
   return (
     <div className="space-y-2">
       {showLabel && (
-        <Label htmlFor="model-combobox">
+        <Label htmlFor={id}>
           {label} {required && <span className="text-red-400">*</span>}
         </Label>
       )}
@@ -258,7 +261,7 @@ export function ModelCombobox({
       >
         <PopoverTrigger asChild>
           <Button
-            id="model-combobox"
+            id={id}
             type="button"
             variant="outline"
             role="combobox"

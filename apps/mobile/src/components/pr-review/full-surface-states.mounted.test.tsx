@@ -79,7 +79,14 @@ vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/icons', () => ({
   CheckCheck: 'CheckCheck',
+  CircleCheck: 'CircleCheck',
+  CircleDot: 'CircleDot',
+  CircleX: 'CircleX',
+  Clock: 'Clock',
   GitPullRequest: 'GitPullRequest',
+  MessageSquare: 'MessageSquare',
+  UserRound: 'UserRound',
+  Users: 'Users',
 }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
@@ -136,7 +143,22 @@ describe('PR Overview full-body states', () => {
   );
 
   it('keeps cached overview content and its refresh control after a transient failure', async () => {
-    query.data = { title: 'Saved title', headSha: '1234567', counts: {}, bodyMarkdown: '' };
+    query.data = {
+      title: 'Saved title',
+      headSha: '1234567',
+      counts: {},
+      bodyMarkdown: '',
+      state: 'open',
+      createdAt: '2026-03-01T12:00:00Z',
+      updatedAt: '2026-03-02T09:30:00Z',
+      closedAt: null,
+      mergedAt: null,
+      mergedBy: null,
+      labels: [],
+      assignees: [],
+      reviewers: [],
+      linkedIssues: [],
+    };
     const { renderer, unmount } = await renderWithProviders(
       createElement(PrReviewOverview, overviewProps)
     );

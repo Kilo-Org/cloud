@@ -1,5 +1,4 @@
 import { type RefObject, useCallback, useRef } from 'react';
-import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import * as Haptics from 'expo-haptics';
@@ -14,6 +13,7 @@ import {
 import { resolveNewSessionPromptForCreate } from '@/components/agents/new-session-prompt-state';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import { replaceWithAgentSession } from '@/components/agents/session-detail-routes';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { invalidateAgentSessionQueries } from '@/lib/agent-session-cache';
 import { captureEvent, SESSION_CREATED_EVENT } from '@/lib/analytics/posthog';
 import { useHoistedOperationKey } from '@/lib/operation-key';
@@ -81,7 +81,7 @@ export function useNewSessionCreator({
   autoCommit,
   profileId,
 }: UseNewSessionCreatorInput): UseNewSessionCreatorResult {
-  const router = useRouter();
+  const router = useStackSafeReplace();
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const promptRef = useRef('');

@@ -550,7 +550,22 @@
       "commit_other": "commitтер",
       "file_one": "файл",
       "file": "файлдар",
-      "file_other": "файлдар"
+      "file_other": "файлдар",
+      "openedAgo": "Ашылды {{time}}",
+      "updatedAgo": "Жаңартылды {{time}}",
+      "mergedAgo": "Біріктірілді {{time}}",
+      "mergedByAgo": "{{login}} біріктірді {{time}}",
+      "closedAgo": "Жабық {{time}}",
+      "labels": "Белгілер",
+      "reviewers": "Қараушылар",
+      "assignees": "Тағайындалғандар",
+      "linkedIssues": "Байланысты мәселелер",
+      "reviewApproved": "Мақұлданды",
+      "reviewChangesRequested": "Өзгертулер сұралды",
+      "reviewCommented": "Пікір қалдырылды",
+      "reviewPending": "Қарауды күтуде",
+      "openIssueA11y": "GitHub-та #{{number}} мәселесін ашу",
+      "reviewDismissed": "Болдырылды"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} бойынша ескірген күтілудегі пікірді өңдеу",

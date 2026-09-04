@@ -14,6 +14,7 @@ import type {
 } from './types';
 import {
   cloudAgentEventSchema,
+  cloudWorktreeChangesReadyDataSchema,
   kilocodePayloadSchema,
   messageUpdatedDataSchema,
   messagePartUpdatedDataSchema,
@@ -160,11 +161,13 @@ export type ServiceEvent =
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
   | {
       type: 'connected';
+      cloudSessionId?: string;
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
       activeMessageId?: string | null | undefined;
     }
   | { type: 'commands.available'; commands: SlashCommandInfo[] }
+  | { type: 'worktree.changes.ready'; cloudSessionId: string; revision: number }
   | {
       type: 'cloud.message.queued';
       messageId: string;
@@ -605,6 +608,16 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   if (!cloudAgentEventSchema.safeParse(raw).success) return null;
 
+  if (raw.streamEventType === 'cloud.worktree.changes.ready') {
+    const r = cloudWorktreeChangesReadyDataSchema.safeParse(raw.data);
+    if (!r.success) return null;
+    return {
+      type: 'worktree.changes.ready',
+      cloudSessionId: raw.sessionId,
+      revision: r.data.revision,
+    };
+  }
+
   let eventType = raw.streamEventType;
   let data: unknown = raw.data;
 
@@ -614,7 +627,11 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
     data = kilo.data.properties;
   }
 
-  return normalizeInnerEvent(eventType, data);
+  const event = normalizeInnerEvent(eventType, data);
+  if (raw.streamEventType === 'connected' && event?.type === 'connected') {
+    return { ...event, cloudSessionId: raw.sessionId };
+  }
+  return event;
 }
 
 /**

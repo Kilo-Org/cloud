@@ -53,6 +53,7 @@ function SheetContent({
   showOverlay = true,
   overlayClassName,
   dismissibleOverlay = false,
+  showCloseButton = true,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: 'top' | 'right' | 'bottom' | 'left';
@@ -60,6 +61,7 @@ function SheetContent({
   showOverlay?: boolean;
   overlayClassName?: string;
   dismissibleOverlay?: boolean;
+  showCloseButton?: boolean;
 }) {
   return (
     <SheetPortal container={portalContainer}>
@@ -93,10 +95,12 @@ function SheetContent({
         {...props}
       >
         {children}
-        <SheetPrimitive.Close className={sheetCloseClassName}>
-          <XIcon className="size-4" aria-hidden="true" />
-          <span className="sr-only">Close</span>
-        </SheetPrimitive.Close>
+        {showCloseButton && (
+          <SheetPrimitive.Close className={sheetCloseClassName}>
+            <XIcon className="size-4" aria-hidden="true" />
+            <span className="sr-only">Close</span>
+          </SheetPrimitive.Close>
+        )}
       </SheetPrimitive.Content>
     </SheetPortal>
   );

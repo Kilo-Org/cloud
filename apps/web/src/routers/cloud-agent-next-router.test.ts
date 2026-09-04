@@ -1,7 +1,14 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
-import type { User } from '@kilocode/db/schema';
+import { cli_sessions_v2, organizations, type User } from '@kilocode/db/schema';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import type * as MinimumVersionModule from '@/lib/trpc/min-version';
+import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
+import type {
+  GetWorktreeChangesOutput,
+  RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { z } from 'zod';
 import type {
   personalPrepareSessionNextSchema,
@@ -65,6 +72,10 @@ const mockCancelQueuedMessage =
   jest.fn<(input: { sessionId: string; messageId: string }) => Promise<{ dropped: boolean }>>();
 const mockGetSandboxStatus =
   jest.fn<(cloudAgentSessionId: string) => Promise<SandboxStatusSnapshot>>();
+const mockGetWorktreeChanges =
+  jest.fn<(cloudAgentSessionId: string) => Promise<GetWorktreeChangesOutput>>();
+const mockRefreshWorktreeChanges =
+  jest.fn<(cloudAgentSessionId: string) => Promise<RefreshWorktreeChangesOutput>>();
 
 const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   prepareSession: mockPrepareSession,
@@ -72,6 +83,8 @@ const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   getSession: mockGetSession,
   cancelQueuedMessage: mockCancelQueuedMessage,
   getSandboxStatus: mockGetSandboxStatus,
+  getWorktreeChanges: mockGetWorktreeChanges,
+  refreshWorktreeChanges: mockRefreshWorktreeChanges,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -209,6 +222,10 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
   getAttachmentDownloadUrl: (input: { messageUuid: string; filename: string }) => Promise<unknown>;
   cancelQueuedMessage: (input: { sessionId: string; messageId: string }) => Promise<unknown>;
   getSandboxStatus: (input: { cloudAgentSessionId: string }) => Promise<SandboxStatusSnapshot>;
+  getWorktreeChanges: (input: { cloudAgentSessionId: string }) => Promise<GetWorktreeChangesOutput>;
+  refreshWorktreeChanges: (input: {
+    cloudAgentSessionId: string;
+  }) => Promise<RefreshWorktreeChangesOutput>;
   checkEligibility: () => Promise<{
     balance: number;
     minBalance: number;
@@ -223,6 +240,92 @@ beforeAll(async () => {
   const { createCallerFactory } = await import('@/lib/trpc/init');
   const mod = await import('./cloud-agent-next-router');
   createCaller = createCallerFactory(mod.cloudAgentNextRouter);
+});
+
+describe('cloudAgentNextRouter worktree changes access', () => {
+  const personalSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const orgSessionId = 'workspace_12345678-1234-4234-9234-123456789abd';
+  let owner: User;
+  let otherUser: User;
+
+  beforeAll(async () => {
+    owner = await insertTestUser({ id: 'oauth/worktree-personal-owner' });
+    otherUser = await insertTestUser();
+    const [organization] = await db
+      .insert(organizations)
+      .values({
+        name: 'Personal changes scope test',
+        created_by_kilo_user_id: owner.id,
+      })
+      .returning();
+    await db.insert(cli_sessions_v2).values([
+      {
+        session_id: 'ses_changes_personal',
+        cloud_agent_session_id: personalSessionId,
+        kilo_user_id: owner.id,
+        created_on_platform: 'cloud-agent-web',
+      },
+      {
+        session_id: 'ses_changes_personal_org',
+        cloud_agent_session_id: orgSessionId,
+        organization_id: organization.id,
+        kilo_user_id: owner.id,
+        created_on_platform: 'cloud-agent-web',
+      },
+    ]);
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyUserOwnsSessionV2ByCloudAgentId.mockImplementation(
+      jest.requireActual<typeof SessionOwnership>('@/lib/cloud-agent/session-ownership')
+        .verifyUserOwnsSessionV2ByCloudAgentId
+    );
+    mockGetWorktreeChanges.mockResolvedValue({ snapshot: null });
+    mockRefreshWorktreeChanges.mockResolvedValue({ status: 'offline', snapshot: null });
+  });
+
+  describe.each(['getWorktreeChanges', 'refreshWorktreeChanges'] as const)('%s', procedure => {
+    it('allows the creator in personal scope without model or rollout gates', async () => {
+      const result = await createCaller({ user: owner })[procedure]({
+        cloudAgentSessionId: personalSessionId,
+      });
+      expect(result.snapshot).toBeNull();
+      expect(
+        procedure === 'getWorktreeChanges' ? mockGetWorktreeChanges : mockRefreshWorktreeChanges
+      ).toHaveBeenCalledWith(personalSessionId);
+      expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+      expect(mockGetBalanceForUser).not.toHaveBeenCalled();
+      expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+    });
+
+    it('denies another creator before constructing a Worker client', async () => {
+      await expect(
+        createCaller({ user: otherUser })[procedure]({ cloudAgentSessionId: personalSessionId })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      expect(mockGetWorktreeChanges).not.toHaveBeenCalled();
+      expect(mockRefreshWorktreeChanges).not.toHaveBeenCalled();
+    });
+
+    it('denies the same creator accessing an organization session through personal scope', async () => {
+      await expect(
+        createCaller({ user: owner })[procedure]({ cloudAgentSessionId: orgSessionId })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    });
+
+    it.each(['agent_12345678-1234-4234-9234-123456789abc', 'ses_12345678901234567890123456'])(
+      'rejects legacy ID %s before ownership or Worker calls',
+      async cloudAgentSessionId => {
+        await expect(
+          createCaller({ user: owner })[procedure]({ cloudAgentSessionId })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(mockVerifyUserOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+        expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      }
+    );
+  });
 });
 
 describe('cloudAgentNextRouter attachment forwarding', () => {

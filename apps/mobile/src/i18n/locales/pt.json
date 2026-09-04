@@ -557,7 +557,22 @@
       "file": "ficheiros",
       "file_other": "ficheiros",
       "commit_many": "commits",
-      "file_many": "ficheiros"
+      "file_many": "ficheiros",
+      "openedAgo": "Aberto {{time}}",
+      "updatedAgo": "Atualizado {{time}}",
+      "mergedAgo": "Fundido {{time}}",
+      "mergedByAgo": "Integrado por {{login}} {{time}}",
+      "closedAgo": "Fechado {{time}}",
+      "labels": "Etiquetas",
+      "reviewers": "Revisores",
+      "assignees": "Responsáveis",
+      "linkedIssues": "Problemas associados",
+      "reviewApproved": "Aprovado",
+      "reviewChangesRequested": "Alterações solicitadas",
+      "reviewCommented": "Comentado",
+      "reviewPending": "A aguardar revisão",
+      "openIssueA11y": "Abrir problema #{{number}} no GitHub",
+      "reviewDismissed": "Dispensada"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editar comentário pendente desatualizado em {{location}}",

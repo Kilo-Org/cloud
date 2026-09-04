@@ -550,7 +550,22 @@
       "commit_other": "commit",
       "file_one": "fitxategi",
       "file": "fitxategi",
-      "file_other": "fitxategi"
+      "file_other": "fitxategi",
+      "openedAgo": "Irekita {{time}}",
+      "updatedAgo": "Eguneratua {{time}}",
+      "mergedAgo": "Batuta {{time}}",
+      "mergedByAgo": "{{login}} erabiltzaileak bateratua {{time}}",
+      "closedAgo": "Itxita {{time}}",
+      "labels": "Etiketak",
+      "reviewers": "Berrikusleak",
+      "assignees": "Esleituak",
+      "linkedIssues": "Lotutako arazoak",
+      "reviewApproved": "Onartua",
+      "reviewChangesRequested": "Aldaketak eskatuta",
+      "reviewCommented": "Iruzkindua",
+      "reviewPending": "Berrikuspenaren zain",
+      "openIssueA11y": "Ireki #{{number}} arazoa GitHuben",
+      "reviewDismissed": "Baztertuta"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editatu {{location}}-ko iruzkin zaharkitua",

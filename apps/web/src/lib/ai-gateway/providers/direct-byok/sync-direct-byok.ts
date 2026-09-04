@@ -4,6 +4,8 @@ import {
   type DirectByokModelFlag,
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { db } from '@/lib/drizzle';
+import { direct_byok_model_lists } from '@kilocode/db/schema';
 import { redisClient } from '@/lib/redis';
 import { directByokModelsRedisKey } from '@/lib/redis-keys';
 import {
@@ -324,6 +326,15 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       variants: raw.variants,
     });
   }
+
+  const synced_at = new Date().toISOString();
+  await db
+    .insert(direct_byok_model_lists)
+    .values({ provider_id: fetcher.providerId, models, synced_at })
+    .onConflictDoUpdate({
+      target: direct_byok_model_lists.provider_id,
+      set: { models, synced_at },
+    });
 
   await redisClient.set(directByokModelsRedisKey(fetcher.providerId), JSON.stringify(models));
   return models.length;

@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "ගොනුව",
       "file": "ගොනු",
-      "file_other": "ගොනු"
+      "file_other": "ගොනු",
+      "openedAgo": "විවෘත කළේ {{time}}",
+      "updatedAgo": "යාවත්කාලීන කළේ {{time}}",
+      "mergedAgo": "ඒකාබද්ධ කරන ලදී {{time}}",
+      "mergedByAgo": "{{login}} ඒකාබද්ධ කළේ {{time}}",
+      "closedAgo": "වසා ඇත {{time}}",
+      "labels": "ලේබල",
+      "reviewers": "සමාලෝචකයෝ",
+      "assignees": "පවරන ලද අය",
+      "linkedIssues": "සම්බන්ධිත ගැටලු",
+      "reviewApproved": "අනුමත කළා",
+      "reviewChangesRequested": "වෙනස්කම් ඉල්ලා ඇත",
+      "reviewCommented": "අදහස් දක්වා ඇත",
+      "reviewPending": "සමාලෝචනය බලාපොරොත්තුවෙන්",
+      "openIssueA11y": "GitHub හි #{{number}} ගැටලුව විවෘත කරන්න",
+      "reviewDismissed": "ඉවතලා ඇත"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} මත යල් පැන ගිය අත්හිටුවන ලද අදහස සංස්කරණය කරන්න",

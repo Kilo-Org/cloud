@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ExternalLink, Github, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -19,6 +19,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useConfirm } from '@/components/ui/confirm';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
+import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
+import { useModelSelectorList } from '@/app/api/openrouter/hooks';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
@@ -45,6 +47,19 @@ export function OrganizationGitHubInstallations({
       ? process.env.NEXT_PUBLIC_GITHUB_LITE_APP_NAME || 'KiloConnect-Lite'
       : process.env.NEXT_PUBLIC_GITHUB_APP_NAME || 'KiloConnect';
   const query = useQuery(trpc.githubApps.listOrganizationInstallations.queryOptions(input));
+  const { data: openRouterModels, isLoading: isLoadingModels } =
+    useModelSelectorList(organizationId);
+  const modelOptions = useMemo<ModelOption[]>(
+    () =>
+      openRouterModels?.data.map(model => ({
+        id: model.id,
+        name: model.name,
+        isFree: model.isFree,
+        mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
+        hasUserByokAvailable: model.hasUserByokAvailable,
+      })) ?? [],
+    [openRouterModels]
+  );
   const invalidate = async () => {
     await queryClient.invalidateQueries({
       queryKey: trpc.githubApps.listOrganizationInstallations.queryKey(input),
@@ -60,6 +75,20 @@ export function OrganizationGitHubInstallations({
         toast.error('Could not refresh GitHub access', { description: error.message }),
     })
   );
+  const updateModel = useMutation(
+    trpc.githubApps.updateModel.mutationOptions({
+      onSuccess: async result => {
+        if (result.success) {
+          toast.success('Model updated successfully');
+          await invalidate();
+        } else {
+          toast.error('Failed to update model', { description: result.error });
+        }
+      },
+      onError: error => toast.error('Failed to update model', { description: error.message }),
+    })
+  );
+
   const uninstall = useMutation(
     trpc.githubApps.uninstallApp.mutationOptions({
       onSuccess: async () => {
@@ -156,103 +185,132 @@ export function OrganizationGitHubInstallations({
               const accountName = installation.accountLogin ?? 'GitHub organization';
               return (
                 <Collapsible key={installation.id}>
-                  <div className="flex min-w-0 items-center gap-3 px-4 py-4 sm:px-5">
-                    <Github className="size-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <span className="max-w-full truncate font-medium">{accountName}</span>
-                        <Badge variant={installation.status === 'connected' ? 'new' : 'secondary'}>
-                          {statusLabel[installation.status]}
-                        </Badge>
-                        {installation.isPrimary && installations.length > 1 && (
-                          <Badge variant="outline">Primary</Badge>
-                        )}
+                  <div className="space-y-4 px-4 py-4 sm:px-5">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Github
+                        className="size-5 shrink-0 text-muted-foreground"
+                        aria-hidden="true"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-2">
+                          <span className="max-w-full truncate font-medium">{accountName}</span>
+                          <Badge
+                            variant={installation.status === 'connected' ? 'new' : 'secondary'}
+                          >
+                            {statusLabel[installation.status]}
+                          </Badge>
+                          {installation.isPrimary && installations.length > 1 && (
+                            <Badge variant="outline">Primary</Badge>
+                          )}
+                        </div>
+                        <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">{repositoryScope}</p>
-                    </div>
-                    {installation.repositorySelection === 'selected' && selectedCount > 0 && (
-                      <CollapsibleTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="group min-h-11 min-w-11 shrink-0 px-0 sm:min-h-0 sm:min-w-0 sm:px-3"
-                          aria-label={`Show repositories for ${accountName}`}
-                        >
-                          <span className="hidden sm:inline">Repositories</span>
-                          <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
-                        </Button>
-                      </CollapsibleTrigger>
-                    )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
-                          aria-label={`Manage ${accountName}`}
-                        >
-                          <MoreHorizontal className="size-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {installation.installationId && (
-                          <DropdownMenuItem asChild>
-                            <a
-                              href={`https://github.com/apps/${githubAppName}/installations/${installation.installationId}`}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Manage on GitHub <ExternalLink className="ml-auto size-3.5" />
-                            </a>
-                          </DropdownMenuItem>
-                        )}
-                        {installation.canRefresh && (
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              refresh.mutate({ organizationId, integrationId: installation.id })
-                            }
+                      {installation.repositorySelection === 'selected' && selectedCount > 0 && (
+                        <CollapsibleTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="group min-h-11 min-w-11 shrink-0 px-0 sm:min-h-0 sm:min-w-0 sm:px-3"
+                            aria-label={`Show repositories for ${accountName}`}
                           >
-                            Refresh access <RefreshCw className="ml-auto size-3.5" />
-                          </DropdownMenuItem>
-                        )}
-                        {(installation.canCancel || installation.canUninstall) && (
-                          <DropdownMenuSeparator />
-                        )}
-                        {installation.canCancel && (
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              cancel.mutate({ organizationId, integrationId: installation.id })
-                            }
+                            <span className="hidden sm:inline">Repositories</span>
+                            <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+                          </Button>
+                        </CollapsibleTrigger>
+                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="min-h-11 min-w-11 sm:min-h-0 sm:min-w-0"
+                            aria-label={`Manage ${accountName}`}
                           >
-                            Remove pending request
-                          </DropdownMenuItem>
-                        )}
-                        {installation.canUninstall && installation.installationId && (
-                          <DropdownMenuItem
-                            variant="destructive"
-                            onSelect={async () => {
-                              const account =
-                                installation.accountLogin ?? 'this GitHub organization';
-                              if (
-                                await confirm({
-                                  title: `Disconnect ${account}?`,
-                                  description: `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`,
-                                  confirmLabel: `Disconnect ${account}`,
-                                  destructive: true,
-                                })
-                              ) {
-                                uninstall.mutate({
-                                  organizationId,
-                                  integrationId: installation.id,
-                                });
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {installation.installationId && (
+                            <DropdownMenuItem asChild>
+                              <a
+                                href={`https://github.com/apps/${githubAppName}/installations/${installation.installationId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Manage on GitHub <ExternalLink className="ml-auto size-3.5" />
+                              </a>
+                            </DropdownMenuItem>
+                          )}
+                          {installation.canRefresh && (
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                refresh.mutate({ organizationId, integrationId: installation.id })
                               }
-                            }}
-                          >
-                            Disconnect organization
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                            >
+                              Refresh access <RefreshCw className="ml-auto size-3.5" />
+                            </DropdownMenuItem>
+                          )}
+                          {(installation.canCancel || installation.canUninstall) && (
+                            <DropdownMenuSeparator />
+                          )}
+                          {installation.canCancel && (
+                            <DropdownMenuItem
+                              onSelect={() =>
+                                cancel.mutate({ organizationId, integrationId: installation.id })
+                              }
+                            >
+                              Remove pending request
+                            </DropdownMenuItem>
+                          )}
+                          {installation.canUninstall && installation.installationId && (
+                            <DropdownMenuItem
+                              variant="destructive"
+                              onSelect={async () => {
+                                const account =
+                                  installation.accountLogin ?? 'this GitHub organization';
+                                if (
+                                  await confirm({
+                                    title: `Disconnect ${account}?`,
+                                    description: `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`,
+                                    confirmLabel: `Disconnect ${account}`,
+                                    destructive: true,
+                                  })
+                                ) {
+                                  uninstall.mutate({
+                                    organizationId,
+                                    integrationId: installation.id,
+                                  });
+                                }
+                              }}
+                            >
+                              Disconnect organization
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    {installation.status === 'connected' && (
+                      <div className="space-y-3 rounded-lg border p-4">
+                        <ModelCombobox
+                          id={`model-combobox-${installation.id}`}
+                          label="AI Model"
+                          helperText="Select the AI model to use when responding to GitHub bot mentions"
+                          models={modelOptions}
+                          value={installation.modelSlug ?? undefined}
+                          onValueChange={modelSlug =>
+                            updateModel.mutate({
+                              organizationId,
+                              integrationId: installation.id,
+                              modelSlug,
+                            })
+                          }
+                          isLoading={isLoadingModels}
+                          disabled={!installation.canManageModel}
+                          placeholder="Select a model"
+                          triggerAriaLabel={`AI model for ${accountName}`}
+                        />
+                      </div>
+                    )}
                   </div>
                   {installation.repositorySelection === 'selected' && (
                     <CollapsibleContent>

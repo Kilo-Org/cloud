@@ -2910,7 +2910,22 @@
       "stateOpenReviewRequired": "Abierta · Revisión necesaria",
       "unknownAuthor": "Autor desconocido",
       "commit_many": "commits",
-      "file_many": "archivos"
+      "file_many": "archivos",
+      "openedAgo": "Abierto {{time}}",
+      "updatedAgo": "Actualizado {{time}}",
+      "mergedAgo": "Fusionada {{time}}",
+      "mergedByAgo": "Fusionado por {{login}} {{time}}",
+      "closedAgo": "Cerrada {{time}}",
+      "labels": "Etiquetas",
+      "reviewers": "Revisores",
+      "assignees": "Asignados",
+      "linkedIssues": "Incidencias vinculadas",
+      "reviewApproved": "Aprobado",
+      "reviewChangesRequested": "Cambios solicitados",
+      "reviewCommented": "Comentado",
+      "reviewPending": "Pendiente de revisión",
+      "openIssueA11y": "Abrir incidencia #{{number}} en GitHub",
+      "reviewDismissed": "Descartado"
     },
     "pendingComment": {
       "allQueuedHint": "Todos los comentarios se enviarán en una única solicitud por lotes.",

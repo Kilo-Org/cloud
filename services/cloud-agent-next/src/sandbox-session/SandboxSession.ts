@@ -1,4 +1,8 @@
 import { DurableObject } from 'cloudflare:workers';
+import type {
+  GetWorktreeChangesOutput,
+  RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
 import {
@@ -97,6 +101,15 @@ import {
   RUNTIME_AUTHORIZATION_KEY,
 } from '../session/runtime-authorization-persistence.js';
 import { validateControlSessionOptions } from './attach-payload.js';
+import {
+  createWorktreeChanges,
+  worktreeChangesContext,
+  type WorktreeChangesContext,
+} from './worktree-changes.js';
+import {
+  WORKTREE_CHANGED_EVENT,
+  WORKTREE_CHANGES_READY_EVENT,
+} from '../shared/worktree-changes-wire.js';
 import { createPreparationProgressRecorder } from '../session/preparation-progress.js';
 import {
   finalizeOtherRunningAttemptsForMessage,
@@ -216,6 +229,7 @@ export class SandboxSession extends DurableObject<Env> {
   private deletedWorktreeId: CloudAgentWorktreeId | undefined;
   private readonly activeOperations = new Set<Promise<unknown>>();
   private deletionCompletion: Promise<void> | undefined;
+  private readonly worktreeChanges: ReturnType<typeof createWorktreeChanges>;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -248,6 +262,58 @@ export class SandboxSession extends DurableObject<Env> {
     });
     const db = drizzle(ctx.storage, { logger: false });
     this.eventQueries = createEventQueries(db, ctx.storage.sql);
+    this.worktreeChanges = createWorktreeChanges({
+      storage: {
+        get: key => ctx.storage.get(key),
+        put: async (key, snapshot) => {
+          if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) {
+            throw new Error('Worktree changes persistence is blocked');
+          }
+          const sessionId = this.requireSessionId();
+          const payload = JSON.stringify({ revision: snapshot.revision });
+          const timestamp = Date.now();
+          const id = ctx.storage.transactionSync(() => {
+            ctx.storage.kv.put(key, snapshot);
+            return this.eventQueries.insertUnique({
+              executionId: '',
+              sessionId,
+              streamEventType: WORKTREE_CHANGES_READY_EVENT,
+              payload,
+              timestamp,
+              entityId: `worktree-changes/${snapshot.revision}`,
+            });
+          });
+          if (id === null) return;
+          try {
+            this.broadcastStoredEvent({
+              id,
+              execution_id: '',
+              session_id: sessionId,
+              stream_event_type: WORKTREE_CHANGES_READY_EVENT,
+              payload,
+              timestamp,
+            });
+          } catch {
+            logger
+              .withFields({ sessionId, eventId: id, revision: snapshot.revision })
+              .error('Failed to broadcast saved worktree changes');
+          }
+        },
+      },
+      readContext: async () => this.worktreeContext(await this.getMetadata()),
+      requestCapture: (context, payload) =>
+        withDORetry(
+          () => getSandboxControlStub(this.env, context.sandboxId),
+          control =>
+            control.request({
+              operation: 'session.git.summary',
+              session: context.session,
+              payload,
+            }),
+          'captureWorktreeChanges'
+        ),
+      waitUntil: promise => this.ctx.waitUntil(promise),
+    });
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(db, migrations);
       this.deletedWorktreeId = cloudAgentWorktreeIdSchema
@@ -408,6 +474,14 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (!this.saveMessages(settled, epoch, 'wrapper_outcome'))
         return result(false, 'epoch_changed', diagnostic);
+      if (this.isCurrentEventRuntime(input.wrapperInstanceId)) {
+        this.worktreeChanges.onEvent(
+          this.worktreeContext(metadata),
+          root,
+          input.payload.type,
+          outcome.data
+        );
+      }
       await this.armQueueRetry();
       const nextId = nextQueuedMessageId(this.loadMessages());
       if (nextId && this.terminalLifecycle.isCurrent(epoch)) {
@@ -423,6 +497,17 @@ export class SandboxSession extends DurableObject<Env> {
       (root === undefined || input.identity.rootKiloSessionId !== root)
     )
       return result(false, 'root_mismatch');
+    if (input.payload.type === WORKTREE_CHANGED_EVENT) {
+      if (!root || eventKiloSessionId !== root) return result(false, 'root_mismatch');
+      if (!input.wrapperInstanceId) return result(false, 'missing_wrapper_identity');
+      this.worktreeChanges.onEvent(
+        this.worktreeContext(metadata),
+        eventKiloSessionId,
+        input.payload.type,
+        input.payload.properties
+      );
+      return result(true, 'applied');
+    }
     if (
       (input.payload.type === 'question.asked' || input.payload.type === 'permission.asked') &&
       !this.loadMessages().some(
@@ -439,6 +524,12 @@ export class SandboxSession extends DurableObject<Env> {
     });
     const activeMessages = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
     if (activeMessages) this.saveMessages(activeMessages, epoch);
+    this.worktreeChanges.onEvent(
+      this.worktreeContext(metadata),
+      eventKiloSessionId,
+      input.payload.type,
+      input.payload.properties
+    );
     const ingestItems = controlEventToIngestItems(input.payload.type, input.payload.properties);
     const rootKiloSessionId = metadata.auth.kiloSessionId;
     const token = metadata.auth.kilocodeToken;
@@ -552,6 +643,7 @@ export class SandboxSession extends DurableObject<Env> {
   async closeOrgStreams(organizationId: string): Promise<number> {
     const metadata = this.terminalLifecycle.getStoredMetadata();
     if (!metadata?.identity.orgId || metadata.identity.orgId !== organizationId) return 0;
+    this.worktreeChanges.suppress();
     const records = this.terminalLifecycle.beginRevocation(metadata);
     const sockets = this.ctx.getWebSockets('stream');
     for (const ws of sockets) ws.close(1000, 'session access revoked');
@@ -749,6 +841,18 @@ export class SandboxSession extends DurableObject<Env> {
     }
   }
 
+  async getWorktreeChanges(): Promise<GetWorktreeChangesOutput> {
+    if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) return { snapshot: null };
+    return this.worktreeChanges.get();
+  }
+
+  async refreshWorktreeChanges(): Promise<RefreshWorktreeChangesOutput> {
+    if (this.deletedWorktreeId || this.terminalLifecycle.isBlocked()) {
+      return { status: 'offline', snapshot: null };
+    }
+    return this.worktreeChanges.refresh();
+  }
+
   async validateKiloGlobalFeedProducer(_params: {
     kiloSessionId: string;
     wrapperRunId: string;
@@ -827,6 +931,7 @@ export class SandboxSession extends DurableObject<Env> {
     const sandboxId = metadata?.workspace?.sandboxId;
     const kiloSessionId = metadata?.auth.kiloSessionId;
     if (!accepted) return { success: true };
+    this.worktreeChanges.markInterrupted(this.worktreeContext(metadata));
     try {
       if (!metadata || !sandboxId || !kiloSessionId)
         throw new Error('Accepted runtime is unavailable');
@@ -981,6 +1086,7 @@ export class SandboxSession extends DurableObject<Env> {
       (await this.ctx.storage.get(DELETION_COMPLETED_KEY))
     )
       return null;
+    this.worktreeChanges.suppress();
     this.ctx.storage.transactionSync(() => {
       this.ctx.storage.kv.put(DELETED_WORKTREE_KEY, worktreeId);
       this.terminalLifecycle.beginDeletion(metadata);
@@ -1081,6 +1187,7 @@ export class SandboxSession extends DurableObject<Env> {
 
   async deleteSession(): Promise<void> {
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
+    this.worktreeChanges.suppress();
     await this.interruptExecution();
     if (this.deletedWorktreeId) throw new Error('worktree_deleting');
     const metadata = this.terminalLifecycle.getStoredMetadata();
@@ -1712,6 +1819,7 @@ export class SandboxSession extends DurableObject<Env> {
     }
     let phase: DispatchPhase = 'preparing';
     let credentialsPrepared = false;
+    const preparationGeneration = this.worktreeChanges.beginPreparation();
     try {
       validateControlSessionOptions(metadata);
       const session = { sessionId, kiloSessionId, directory: this.directory(metadata) };
@@ -1927,6 +2035,7 @@ export class SandboxSession extends DurableObject<Env> {
         throw new Error('Wrapper changed during session attachment');
       this.terminalLifecycle.recordAttachment({ metadata, sandboxId, wrapperInstanceId, epoch });
       recorder.finalize({ status: 'completed' });
+      this.worktreeChanges.attached(preparationGeneration, this.worktreeContext(metadata));
       phase = 'prompt';
       await dispatch('prompt', async () => {
         const prompt = await wait(async () =>
@@ -1989,6 +2098,8 @@ export class SandboxSession extends DurableObject<Env> {
         deadlineAt,
         error,
       });
+    } finally {
+      this.worktreeChanges.finishPreparation(preparationGeneration);
     }
   }
 
@@ -2529,6 +2640,23 @@ export class SandboxSession extends DurableObject<Env> {
       sessionPermissionResolveResultSchema.parse(response.result);
     else sessionQuestionResolveResultSchema.parse(response.result);
     return { success: true };
+  }
+
+  private worktreeContext(metadata: SessionMetadata | null): WorktreeChangesContext | null {
+    if (
+      this.deletedWorktreeId ||
+      this.terminalLifecycle.isBlocked() ||
+      this.pendingRuntimeCleanup() ||
+      !metadata ||
+      metadata.identity.sessionId !== this.sessionId
+    ) {
+      return null;
+    }
+    try {
+      return worktreeChangesContext(metadata, this.directory(metadata));
+    } catch {
+      return null;
+    }
   }
 
   private directory(metadata: SessionMetadata): string {

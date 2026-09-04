@@ -417,6 +417,141 @@ describe('createSandboxControlClient', () => {
     client.close();
   });
 
+  it.each([
+    { ok: true, result: '漢'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES / 2) },
+    {
+      ok: false,
+      error: { code: 'failure', message: 'private-data'.repeat(100_000), retryable: false },
+    },
+  ])(
+    'replaces oversized response envelopes with a small error and preserves the socket',
+    async outcome => {
+      const fake = new FakeWebSocket();
+      const client = createSandboxControlClient({
+        url: 'wss://example.test/sandbox-control/sbx_1',
+        credential: 'secret',
+        providerInstanceId: 'inst_1',
+        openWebSocket: () => fake as unknown as WebSocket,
+        onRequest: async operation =>
+          operation === 'sandbox.status' ? { ok: true, result: { healthy: true } } : outcome,
+      });
+      const connecting = client.connect();
+      await handshake(fake);
+      await connecting;
+      fake.respond(
+        JSON.stringify({
+          type: 'request',
+          requestId: 'large',
+          operation: 'session.git.summary',
+          payload: { revision: 1 },
+        })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(JSON.parse(fake.sent[2] ?? '{}')).toEqual({
+        type: 'response',
+        requestId: 'large',
+        ok: false,
+        error: {
+          code: 'payload_too_large',
+          message: 'Response exceeds size limit',
+          retryable: false,
+        },
+      });
+      expect(Buffer.byteLength(fake.sent[2] ?? '')).toBeLessThan(1024);
+      expect(fake.readyState).toBe(1);
+      fake.respond(
+        JSON.stringify({
+          type: 'request',
+          requestId: 'next',
+          operation: 'sandbox.status',
+          payload: {},
+        })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(JSON.parse(fake.sent[3] ?? '{}')).toEqual({
+        type: 'response',
+        requestId: 'next',
+        ok: true,
+        result: { healthy: true },
+      });
+      client.close();
+    }
+  );
+
+  it.each([0, 1])(
+    'keeps the full response strictly below the frame limit with %s bytes of headroom',
+    async headroom => {
+      const fake = new FakeWebSocket();
+      const requestId = 'quote"漢';
+      const envelopeBytes = Buffer.byteLength(
+        JSON.stringify({ type: 'response', requestId, ok: true, result: '' })
+      );
+      const client = createSandboxControlClient({
+        url: 'wss://example.test/sandbox-control/sbx_1',
+        credential: 'secret',
+        providerInstanceId: 'inst_1',
+        openWebSocket: () => fake as unknown as WebSocket,
+        onRequest: async () => ({
+          ok: true,
+          result: 'x'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES - envelopeBytes - headroom),
+        }),
+      });
+      const connecting = client.connect();
+      await handshake(fake);
+      await connecting;
+      fake.respond(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'session.git.summary',
+          payload: { revision: 1 },
+        })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(JSON.parse(fake.sent[2] ?? '{}').ok).toBe(headroom === 1);
+      expect(Buffer.byteLength(fake.sent[2] ?? '')).toBeLessThan(MAX_SANDBOX_CONTROL_FRAME_BYTES);
+      client.close();
+    }
+  );
+
+  it('safely handles unserializable results without closing the shared socket', async () => {
+    const fake = new FakeWebSocket();
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'secret',
+      providerInstanceId: 'inst_1',
+      openWebSocket: () => fake as unknown as WebSocket,
+      onRequest: async () => ({ ok: true, result: 1n }),
+    });
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'invalid-result',
+        operation: 'session.git.summary',
+        payload: { revision: 1 },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(JSON.parse(fake.sent[2] ?? '{}')).toEqual({
+      type: 'response',
+      requestId: 'invalid-result',
+      ok: false,
+      error: { code: 'capture_failed', message: 'Response serialization failed', retryable: false },
+    });
+    expect(fake.readyState).toBe(1);
+    client.close();
+  });
+
   it('includes session on sendEvent when provided', async () => {
     const fake = new FakeWebSocket();
     const client = createSandboxControlClient({
@@ -992,69 +1127,86 @@ describe('createSandboxControlClient', () => {
     }
   );
 
-  it.each(['event', 'outcome-budget', 'response', 'ping', 'closed-socket'] as const)(
-    'retires once on established %s delivery failure',
-    async failure => {
-      const timers = spyOn(globalThis, 'setInterval');
-      const { client, sockets, openWebSocket, onDisconnected } = createClientFixture({
-        onRequest: async () => ({ ok: true }),
-      });
-      try {
-        const connecting = client.connect();
-        await Promise.resolve();
-        await handshake(sockets[0]);
-        await connecting;
-        const socket = sockets[0];
-        if (!socket) throw new Error('missing socket');
-        if (failure === 'closed-socket') socket.readyState = 3;
-        else if (failure !== 'outcome-budget')
-          socket.send = () => {
-            throw new Error('send failed');
-          };
-        if (failure === 'response') {
-          socket.respond(
-            JSON.stringify({
-              type: 'request',
-              requestId: 'normal-status',
-              operation: 'sandbox.status',
-              payload: {},
-            })
-          );
-        } else if (failure === 'ping') {
-          const ping = timers.mock.calls[0]?.[0];
-          if (typeof ping !== 'function') throw new Error('missing keepalive');
-          ping();
-          ping();
-        } else {
-          expect(
-            client.sendEvent?.(
-              'session.event',
-              {
-                type: 'session.message.outcome',
-                properties: { messageId: 'msg_1', status: 'completed' },
-              },
-              {
-                directory:
-                  failure === 'outcome-budget'
-                    ? 'd'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES)
-                    : '/workspace',
-              }
-            )
-          ).toBe(false);
-        }
-        await waitForReconnect();
-        socket.error();
-        socket.close();
-        expect(onDisconnected).toHaveBeenCalledTimes(1);
-        expect(openWebSocket).toHaveBeenCalledTimes(1);
-        expect(client.sendEvent?.('sandbox.ready', { kiloReady: true })).toBe(false);
-        expect(client.connect()).rejects.toThrow('sandbox control client closed');
-      } finally {
-        client.close();
-        timers.mockRestore();
+  it.each([
+    'event',
+    'outcome-budget',
+    'response',
+    'oversized-response',
+    'invalid-response',
+    'ping',
+    'closed-socket',
+  ] as const)('retires once on established %s delivery failure', async failure => {
+    const timers = spyOn(globalThis, 'setInterval');
+    const { client, sockets, openWebSocket, onDisconnected } = createClientFixture({
+      onRequest: async () => ({
+        ok: true,
+        result:
+          failure === 'oversized-response'
+            ? 'x'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES)
+            : failure === 'invalid-response'
+              ? 1n
+              : undefined,
+      }),
+    });
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      await handshake(sockets[0]);
+      await connecting;
+      const socket = sockets[0];
+      if (!socket) throw new Error('missing socket');
+      if (failure === 'closed-socket') socket.readyState = 3;
+      else if (failure !== 'outcome-budget')
+        socket.send = () => {
+          throw new Error('send failed');
+        };
+      if (
+        failure === 'response' ||
+        failure === 'oversized-response' ||
+        failure === 'invalid-response'
+      ) {
+        socket.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: 'normal-status',
+            operation: 'sandbox.status',
+            payload: {},
+          })
+        );
+      } else if (failure === 'ping') {
+        const ping = timers.mock.calls[0]?.[0];
+        if (typeof ping !== 'function') throw new Error('missing keepalive');
+        ping();
+        ping();
+      } else {
+        expect(
+          client.sendEvent?.(
+            'session.event',
+            {
+              type: 'session.message.outcome',
+              properties: { messageId: 'msg_1', status: 'completed' },
+            },
+            {
+              directory:
+                failure === 'outcome-budget'
+                  ? 'd'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES)
+                  : '/workspace',
+            }
+          )
+        ).toBe(false);
       }
+      await waitForReconnect();
+      socket.error();
+      socket.close();
+      expect(onDisconnected).toHaveBeenCalledTimes(1);
+      expect(openWebSocket).toHaveBeenCalledTimes(1);
+      expect(client.sendEvent?.('sandbox.ready', { kiloReady: true })).toBe(false);
+      expect(client.connect()).rejects.toThrow('sandbox control client closed');
+    } finally {
+      client.close();
+      timers.mockRestore();
     }
-  );
+  });
 
   it('fences handler completion and further requests after retirement even if the socket appears open', async () => {
     const outcome = Promise.withResolvers<{ ok: boolean }>();

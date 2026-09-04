@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "fil",
       "file": "filer",
-      "file_other": "filer"
+      "file_other": "filer",
+      "openedAgo": "Åbnet {{time}}",
+      "updatedAgo": "Opdateret {{time}}",
+      "mergedAgo": "Flettet {{time}}",
+      "mergedByAgo": "Flettet af {{login}} {{time}}",
+      "closedAgo": "Lukket {{time}}",
+      "labels": "Etiketter",
+      "reviewers": "Anmeldere",
+      "assignees": "Tildelte",
+      "linkedIssues": "Tilknyttede sager",
+      "reviewApproved": "Godkendt",
+      "reviewChangesRequested": "Ændringer ønsket",
+      "reviewCommented": "Kommenteret",
+      "reviewPending": "Afventer gennemgang",
+      "openIssueA11y": "Åbn sag #{{number}} på GitHub",
+      "reviewDismissed": "Afvist"
     },
     "pendingComment": {
       "editOutdatedA11y": "Rediger forældet ventende kommentar på {{location}}",

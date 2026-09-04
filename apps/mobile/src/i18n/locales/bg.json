@@ -550,7 +550,22 @@
       "commit_other": "commits",
       "file_one": "файл",
       "file": "файлове",
-      "file_other": "файлове"
+      "file_other": "файлове",
+      "openedAgo": "Отворено {{time}}",
+      "updatedAgo": "Обновено {{time}}",
+      "mergedAgo": "Обединено {{time}}",
+      "mergedByAgo": "Слято от {{login}} {{time}}",
+      "closedAgo": "Затворено {{time}}",
+      "labels": "Етикети",
+      "reviewers": "Рецензенти",
+      "assignees": "Възложени",
+      "linkedIssues": "Свързани задачи",
+      "reviewApproved": "Одобрено",
+      "reviewChangesRequested": "Заявени промени",
+      "reviewCommented": "Коментирано",
+      "reviewPending": "Очаква преглед",
+      "openIssueA11y": "Отвори задача #{{number}} в GitHub",
+      "reviewDismissed": "Отхвърлено"
     },
     "pendingComment": {
       "editOutdatedA11y": "Редактирай остарял чакащ коментар на {{location}}",

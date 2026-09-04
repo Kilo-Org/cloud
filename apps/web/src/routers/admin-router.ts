@@ -63,6 +63,7 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminModelExperimentsRouter } from '@/routers/admin/model-experiments-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
+import { adminGatewayUsageRouter } from '@/routers/admin/gateway-usage-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
@@ -142,6 +143,10 @@ import {
   getKilocodeRepoRecentlyMergedExternalPRs,
   ALL_REPO_IDS,
 } from '@/lib/github/open-pull-request-counts';
+import { GitHubOrganizationInstallationLookupInputSchema } from '@/lib/admin/github-installation-lookup-input';
+import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
+import { GitHubInstallationUninstallInputSchema } from '@/lib/admin/github-installation-uninstall-input';
+import { uninstallGitHubOrganizationInstallation } from '@/lib/admin/github-installation-uninstall';
 
 const SyncResponseSchema = z.object({
   success: z.boolean(),
@@ -508,6 +513,30 @@ export const adminRouter = createTRPCRouter({
   impactReferrals: adminImpactReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
+    lookupOrganizationInstallation: adminProcedure
+      .input(GitHubOrganizationInstallationLookupInputSchema)
+      .mutation(async ({ input }) => {
+        try {
+          return await lookupGitHubOrganizationInstallation(input.organization);
+        } catch {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'GitHub installation lookup failed',
+          });
+        }
+      }),
+    uninstallOrganizationInstallation: adminProcedure
+      .input(GitHubInstallationUninstallInputSchema)
+      .mutation(async ({ ctx, input }) => {
+        return uninstallGitHubOrganizationInstallation({
+          input,
+          actor: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
+        });
+      }),
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });
     }),
@@ -2412,6 +2441,7 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   modelExperiments: adminModelExperimentsRouter,
   gatewayConfig: adminGatewayConfigRouter,
+  gatewayUsage: adminGatewayUsageRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,

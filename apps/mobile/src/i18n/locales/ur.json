@@ -550,7 +550,22 @@
       "commit_other": "کمیٹیں",
       "file_one": "فائل",
       "file": "فائلیں",
-      "file_other": "فائلیں"
+      "file_other": "فائلیں",
+      "openedAgo": "کھولا گیا {{time}}",
+      "updatedAgo": "اپ ڈیٹ ہوا {{time}}",
+      "mergedAgo": "مرج شدہ {{time}}",
+      "mergedByAgo": "{{login}} نے ضم کیا {{time}}",
+      "closedAgo": "بند {{time}}",
+      "labels": "لیبل",
+      "reviewers": "جائزہ لینے والے",
+      "assignees": "تفویض کردہ",
+      "linkedIssues": "منسلک مسائل",
+      "reviewApproved": "منظور شدہ",
+      "reviewChangesRequested": "تبدیلیاں طلب کی گئیں",
+      "reviewCommented": "تبصرہ کیا گیا",
+      "reviewPending": "جائزے کا منتظر",
+      "openIssueA11y": "GitHub پر مسئلہ #{{number}} کھولیں",
+      "reviewDismissed": "مسترد کیا گیا"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} پر پرانا زیر التوا تبصرہ ترمیم کریں",

@@ -18,6 +18,7 @@ import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionPromptPayloadSchema,
+  sessionGitSummaryPayloadSchema,
   type ResponseFrame,
   type SessionAttachPayload,
   type SessionMessageOutcome,
@@ -981,11 +982,9 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   orchestrationMocks.signedAttachments.mockResolvedValue([]);
   const storage = {
     kv,
+    get: async <T>(key: string) => kv.get<T>(key),
+    put: async <T>(key: string, value: T) => kv.put(key, value),
     sql: {},
-    get: async <T>(key: string): Promise<T | undefined> => kv.get<T>(key),
-    put: async (key: string, value: unknown): Promise<void> => {
-      kv.put(key, value);
-    },
     transactionSync: <T>(callback: () => T) => callback(),
     getAlarm: vi.fn(async () => alarmAt),
     setAlarm: vi.fn(async (at: number | Date) => {
@@ -3287,6 +3286,96 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
     expect(await fixture.snapshot()).toMatchObject({ preparationSnapshots: coldPreparation });
   });
+
+  it.each(['cloudflare', 'vercel'] as const)(
+    'fences captures across warm direct reattachment without clearing ambiguous dispatch on %s',
+    async sandboxProvider => {
+      const fixture = sessionFixture({
+        repository: { type: 'github', repo: 'acme/repo', upstreamBranch: 'main' },
+        workspace: { sandboxId: SANDBOX_ID, workspacePath: DIRECTORY, sandboxProvider },
+      });
+      fixture.control.ensureReady.mockResolvedValue({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        attachment: {
+          ...ATTACHMENT,
+          kilo: { ...ATTACHMENT.kilo, containmentEnabled: false },
+        },
+      });
+      const captureResponse = (input: SandboxControlOutboundRequest) =>
+        controlResponse({
+          revision: sessionGitSummaryPayloadSchema.parse(input.payload).revision,
+          comparison: {
+            baseRef: 'refs/remotes/origin/main',
+            mergeBase: 'a'.repeat(40),
+            head: 'b'.repeat(40),
+          },
+          files: [],
+          truncated: false,
+        });
+      let heldCapture: ReturnType<typeof deferred<ResponseFrame>> | undefined;
+      let heldRequest: SandboxControlOutboundRequest | undefined;
+      delegateRequest(fixture, 'session.git.summary', async input => {
+        if (!heldCapture) return captureResponse(input);
+        heldRequest = input;
+        return heldCapture.promise;
+      });
+      await fixture.admit('cold');
+      await fixture.flush();
+      await fixture.outcome('cold', 'completed');
+      await fixture.flush();
+      const saved = await fixture.session.getWorktreeChanges();
+      expect(saved.snapshot).not.toBeNull();
+      fixture.reload();
+      heldCapture = deferred<ResponseFrame>();
+      const staleRefresh = fixture.session.refreshWorktreeChanges();
+      await fixture.flush();
+      const attached = deferred<ResponseFrame>();
+      delegateRequest(fixture, 'session.attach', () => attached.promise);
+      const lostPrompt = deferred<ResponseFrame>();
+      let prompts = 0;
+      delegateRequest(fixture, 'session.prompt', async () =>
+        ++prompts === 1 ? lostPrompt.promise : controlFailure(true, 'session_busy')
+      );
+      await fixture.admit('warm');
+      await fixture.flush();
+      if (!heldRequest) throw new Error('Expected in-flight capture');
+      heldCapture.resolve(captureResponse(heldRequest));
+      heldCapture = undefined;
+      await expect(staleRefresh).resolves.toEqual({ status: 'failed', snapshot: saved.snapshot });
+      await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
+        status: 'offline',
+        snapshot: saved.snapshot,
+      });
+      expect(prompts).toBe(0);
+      attached.resolve(controlResponse({ attached: true }));
+      await fixture.flush();
+      expect(prompts).toBe(1);
+      expect(fixture.record('warm')).toMatchObject({ state: 'queued', unresolvedDispatch: true });
+      const captured = await fixture.session.getWorktreeChanges();
+      expect(captured.snapshot?.revision).toBeGreaterThan(saved.snapshot?.revision ?? 0);
+      fixture.reload();
+      await fixture.fireAlarm();
+      await fixture.flush();
+      expect(fixture.record('warm')).toMatchObject({
+        state: 'queued',
+        unresolvedDispatch: true,
+        deliveryRetryScope: 'runtime',
+      });
+      await expect(fixture.session.refreshWorktreeChanges()).resolves.toMatchObject({
+        status: 'refreshed',
+      });
+      expect(fixture.record('warm')?.unresolvedDispatch).toBe(true);
+      await fixture.session.interruptExecution();
+      expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({ wrapperInstanceId: RUNTIME_ID })
+      );
+      lostPrompt.resolve(controlResponse({ messageId: 'warm', status: 'accepted' }));
+      await fixture.flush();
+      expect(fixture.record('warm')?.state).toBe('cancelled');
+    }
+  );
 
   it.each(['stop', 'expiry'] as const)(
     'retains ambiguous warm prompt ownership through direct reattachment and %s',

@@ -16,6 +16,93 @@ const use = <A, E>(
 
 const session = { id: 'ses_1', system: 'sys', model: 'claude-opus-5' };
 
+/**
+ * A database as an earlier build of this package left it: the migrations up to
+ * that version applied, and `user_version` saying so.
+ *
+ * It is always one behind, whatever the newest migration is, so this test
+ * covers the migration being added rather than one that was added once.
+ */
+const oneVersionBehind = (): { readonly db: DatabaseSync; readonly version: number } => {
+  const db = database();
+  const version = migrations.length - 1;
+  for (const statement of migrations.slice(0, version).flat()) {
+    db.prepare(statement).run();
+  }
+  db.prepare(`PRAGMA user_version = ${String(version)}`).run();
+  return { db, version };
+};
+
+/**
+ * The migration that matters is the one applied to a database that already
+ * holds something. `check:migrations` proves the SQL matches the schema; only
+ * this proves the SQL can be applied to a conversation somebody already had.
+ */
+it('migrates a database that already holds a conversation, and keeps it', async () => {
+  const { db, version } = oneVersionBehind();
+  db.prepare('INSERT INTO sessions (id, system, model) VALUES (?, ?, ?)').run(
+    'ses_1',
+    'sys',
+    'claude-opus-5'
+  );
+  db.prepare('INSERT INTO turns (id, session_id, role) VALUES (?, ?, ?)').run(
+    'trn_1',
+    'ses_1',
+    'user'
+  );
+  db.prepare('INSERT INTO parts (id, turn_id, session_id, kind, body) VALUES (?, ?, ?, ?, ?)').run(
+    'prt_1',
+    'trn_1',
+    'ses_1',
+    'text',
+    'hello'
+  );
+
+  const read = await use(db, store =>
+    Effect.all({ options: store.read('ses_1'), turns: store.load('ses_1') })
+  );
+
+  expect(version).toBeLessThan(migrations.length);
+  expect(db.prepare('PRAGMA user_version').all()).toEqual([{ user_version: migrations.length }]);
+  expect(read.turns.map(textOf)).toEqual(['hello']);
+  /* Whatever the newest migration added, an older row has no value for it, and
+     absent is what the session was doing before the column existed. */
+  expect(Option.getOrThrow(read.options)).toEqual({
+    id: 'ses_1',
+    system: 'sys',
+    model: 'claude-opus-5',
+  });
+});
+
+it('writes the columns the migration added to a session written before it', async () => {
+  const { db } = oneVersionBehind();
+  db.prepare('INSERT INTO sessions (id, system, model) VALUES (?, ?, ?)').run(
+    'ses_1',
+    'sys',
+    'claude-opus-5'
+  );
+
+  const read = await use(db, store =>
+    Effect.zipRight(
+      store.append({
+        sessionId: 'ses_1',
+        turns: [
+          {
+            id: 'trn_1',
+            sessionId: 'ses_1',
+            role: 'user',
+            parts: [{ id: 'prt_1', kind: 'text', body: 'hello' }],
+          },
+        ],
+        prompted: 12,
+      }),
+      store.read('ses_1')
+    )
+  );
+
+  expect(Option.getOrThrow(read)).toMatchObject({ prompted: 12 });
+});
+
 it('leaves an already migrated database alone when it is opened again', async () => {
   const db = database();
   await use(db, () => Effect.void);

@@ -1107,6 +1107,62 @@ describe('setupNotificationBackgroundHandler', () => {
     unregisterGlanceableSink(sink);
   });
 
+  it('keeps the background task alive until a zero-count badge write finishes', async () => {
+    const persisted = glanceableSnapshot({
+      scopeKey: SCOPE_KEY,
+      revision: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      needsInput: 1,
+    });
+    secureStore.set('glanceable-snapshot', JSON.stringify(persisted));
+    secureStore.set('glanceable-scope-key', SCOPE_KEY);
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const badgeWrite = deferred();
+    mocks.setBadgeCountAsync.mockImplementation(async () => {
+      await badgeWrite.promise;
+      return true;
+    });
+
+    setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    let completed = false;
+    const apply = async () => {
+      const result = await executor({
+        data: {
+          notification: null,
+          data: {
+            dataString: JSON.stringify(
+              activeGlanceablePush({
+                scopeKey: SCOPE_KEY,
+                updatedAt: '2026-01-02T00:00:00.000Z',
+                status: 'empty',
+                running: 0,
+                needsInput: 0,
+                idle: 0,
+                needsInputSince: null,
+              })
+            ),
+          },
+        },
+        error: null,
+        executionInfo: {
+          eventId: 'e-clear',
+          taskName: 'active-agents-glanceable-background-task',
+        },
+      });
+      completed = true;
+      return result;
+    };
+    const applying = apply();
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(0);
+    expect(completed).toBe(false);
+
+    badgeWrite.resolve();
+    expect(await applying).toBe(0);
+  });
+
   it('ignores a headless payload that is not a glanceable push', async () => {
     _setGlanceableSinksLoaderForTests(() => undefined);
 

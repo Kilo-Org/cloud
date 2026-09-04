@@ -76,9 +76,16 @@ async function setAppBadge(count: number): Promise<void> {
   }
 }
 
+let appBadgeWrite: Promise<void> | null = null;
+
 const appBadgeSink: GlanceableSink = {
   publish(snapshot) {
-    void setAppBadge(snapshot.needsInput);
+    appBadgeWrite = setAppBadge(snapshot.needsInput);
+  },
+  async waitForNativeTerminal() {
+    if (appBadgeWrite) {
+      await appBadgeWrite;
+    }
   },
   endImmediate() {
     // A terminal snapshot already published zero.

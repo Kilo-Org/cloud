@@ -993,6 +993,17 @@ estimates one. So it is written down: a `prompted` column on `sessions`, filled
 by `append`, and read back by `continueSession`. A session reopened onto a
 conversation that already fills the window compacts before it asks anything.
 
+`pnpm test:e2e:resume` proves it live: the count the provider reported came back
+out of SQLite unchanged, and the same session reopened under a window that count
+fills compacted before its first question, while under a window ten times larger
+it did not.
+
+**A clone is measured, not asserted.** `pnpm test:e2e:clone` copies a session
+whose prefix is 11.8k tokens and asks the copy one question: 11848 read from the
+cache and 0 written, on 2026-09-04. A clone that copied an identifier into the
+prompt, or reordered one part, would pass every unit test here and double the
+bill, because the only symptom is the cache write.
+
 Until 2026-09-04 it was not stored. A reopened session started at zero, `isFull`
 was false, and its first question went out with the whole stored conversation in
 front of it. That closed itself after one answer — unless that first question was

@@ -39,6 +39,12 @@ function texts(root: TestRenderer.ReactTestInstance): string[] {
   });
 }
 
+function slotCount(root: TestRenderer.ReactTestInstance, aspectRatio: number): number {
+  return root.findAll(
+    node => (node.props.style as { aspectRatio?: number } | undefined)?.aspectRatio === aspectRatio
+  ).length;
+}
+
 function loadLabel(uri: string): string {
   return `Load ${new URL(uri).hostname.toLowerCase()}`;
 }
@@ -127,12 +133,14 @@ describe('MarkdownImage inert-until-load', () => {
     expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);
     expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(0);
     expect(texts(httpRenderer.root)).toContain('insecure.com · HTTPS images only');
+    expect(slotCount(httpRenderer.root, 4 / 3)).toBe(1);
     await unmount(httpRenderer);
 
     const dataRenderer = await mount('data:image/png;base64,abc');
     expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
     expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(0);
     expect(texts(dataRenderer.root)).toContain('HTTPS images only');
+    expect(slotCount(dataRenderer.root, 4 / 3)).toBe(1);
     await unmount(dataRenderer);
   });
 
@@ -172,16 +180,11 @@ describe('MarkdownImage inert-until-load', () => {
     await unmount(renderer);
   });
 
-  it('keeps a fixed HTML image ratio through consent, success, failure, retry, and blocking', async () => {
-    const aspectRatio = 2;
-    const renderer = await mount('https://example.com/a.png', 'shot', { aspectRatio });
-    const fixedSlots = () =>
-      renderer.root.findAll(
-        node =>
-          (node.props.style as { aspectRatio?: number } | undefined)?.aspectRatio === aspectRatio
-      );
+  it('keeps the fallback ratio through consent, load, failure, retry, refresh, and remount', async () => {
+    const uri = 'https://example.com/a.png';
+    let renderer = await mount(uri, 'shot');
 
-    expect(fixedSlots()).toHaveLength(1);
+    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
     const loadButton = findLoadButtons(renderer.root, 'https://example.com/a.png')[0];
     if (!loadButton) {
       throw new Error('load button not found');
@@ -190,9 +193,10 @@ describe('MarkdownImage inert-until-load', () => {
       await Promise.resolve();
       (loadButton.props.onPress as () => void)();
     });
-    expect(fixedSlots()).toHaveLength(1);
+    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
 
-    const image = ofType(renderer.root, 'Image')[0];
+    let image = ofType(renderer.root, 'Image')[0];
     if (!image) {
       throw new Error('image not found');
     }
@@ -202,12 +206,13 @@ describe('MarkdownImage inert-until-load', () => {
         source: { width: 100, height: 400 },
       });
     });
-    expect(fixedSlots()).toHaveLength(1);
+    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    expect(ofType(renderer.root, 'Skeleton')).toHaveLength(0);
     await act(async () => {
       await Promise.resolve();
       (image.props.onError as () => void)();
     });
-    expect(fixedSlots()).toHaveLength(1);
+    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
 
     const retry = renderer.root.find(
       node => node.props.accessibilityLabel === 'Image unavailable, retry loading'
@@ -216,18 +221,32 @@ describe('MarkdownImage inert-until-load', () => {
       await Promise.resolve();
       (retry.props.onPress as () => void)();
     });
-    expect(fixedSlots()).toHaveLength(1);
+    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    expect(ofType(renderer.root, 'Skeleton')).toHaveLength(1);
+
+    image = ofType(renderer.root, 'Image')[0];
+    if (!image) {
+      throw new Error('image not found after retry');
+    }
+    await act(async () => {
+      await Promise.resolve();
+      (image.props.onLoad as (event: unknown) => void)({
+        source: { width: 100, height: 400 },
+      });
+      renderer.update(createElement(MarkdownImage, { uri, alt: 'shot' }));
+    });
+    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
 
     await unmount(renderer);
+    renderer = await mount(uri, 'shot');
+    expect(slotCount(renderer.root, 4 / 3)).toBe(1);
+    await unmount(renderer);
+  });
 
-    const blocked = await mount('http://example.com/a.png', '', { aspectRatio });
-    expect(
-      blocked.root.findAll(
-        node =>
-          (node.props.style as { aspectRatio?: number } | undefined)?.aspectRatio === aspectRatio
-      )
-    ).toHaveLength(1);
-    await unmount(blocked);
+  it('keeps an explicit HTML image ratio', async () => {
+    const renderer = await mount('https://example.com/a.png', 'shot', { aspectRatio: 2 });
+    expect(slotCount(renderer.root, 2)).toBe(1);
+    await unmount(renderer);
   });
 
   it('renders alt text for an empty src', async () => {

@@ -12,10 +12,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { confirmMarkdownImage, isMarkdownImageConfirmed } from './markdown-image-confirm';
 import { resolveMarkdownImageSrc } from './markdown-image-src';
 import { getLinkAccessibilityActions } from './markdown-link';
-import {
-  IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
-  resolveImagePreviewAspectRatio,
-} from './tool-card-attachments';
+import { IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO } from './tool-card-attachments';
 import { getFilename } from './tool-card-utils';
 
 type MarkdownImageKind = 'https' | 'http' | 'data' | null;
@@ -45,14 +42,11 @@ function FixedImageSlot({
   aspectRatio,
   children,
 }: Readonly<{ aspectRatio: number | undefined; children: ReactElement }>): ReactElement {
-  if (aspectRatio === undefined) {
-    return children;
-  }
   return (
     <View
       className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 dark:bg-neutral-900"
-      // eslint-disable-next-line react-native/no-inline-styles -- an HTML image attribute determines this reserved ratio
-      style={{ aspectRatio }}
+      // eslint-disable-next-line react-native/no-inline-styles -- HTML dimensions or the fixed fallback determine this reserved ratio
+      style={{ aspectRatio: aspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO }}
     >
       {children}
     </View>
@@ -144,7 +138,7 @@ export function MarkdownImage({
   // instance never keeps a previous uri's consent. forceRender only re-runs
   // the render after confirmMarkdownImage mutates the module Set.
   const [, forceRender] = useReducer((n: number) => n + 1, 0);
-  const [measuredAspectRatio, setMeasuredAspectRatio] = useState<number | undefined>(undefined);
+  const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -158,7 +152,7 @@ export function MarkdownImage({
     setFailed(false);
     setViewerVisible(false);
     setAttempt(0);
-    setMeasuredAspectRatio(undefined);
+    setLoaded(false);
   }
 
   const filename =
@@ -202,7 +196,7 @@ export function MarkdownImage({
         <Pressable
           onPress={() => {
             setFailed(false);
-            setMeasuredAspectRatio(undefined);
+            setLoaded(false);
             setAttempt(prev => prev + 1);
           }}
           onLongPress={onShowLinkActions}
@@ -229,48 +223,44 @@ export function MarkdownImage({
 
   return (
     <>
-      <Pressable
-        onPress={() => {
-          setViewerVisible(true);
-        }}
-        onLongPress={onShowLinkActions}
-        className="my-1 w-full overflow-hidden rounded-md bg-neutral-100 active:opacity-80 dark:bg-neutral-900"
-        accessibilityRole="button"
-        accessibilityLabel={
-          alt
-            ? t('agentChat.filePart.viewImageWithAlt', { alt })
-            : t('agentChat.filePart.viewImage')
-        }
-        accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
-        onAccessibilityAction={event => {
-          if (event.nativeEvent.actionName === 'showLinkActions') {
-            onShowLinkActions?.();
+      <FixedImageSlot aspectRatio={aspectRatio}>
+        <Pressable
+          onPress={() => {
+            setViewerVisible(true);
+          }}
+          onLongPress={onShowLinkActions}
+          className="h-full w-full active:opacity-80"
+          accessibilityRole="button"
+          accessibilityLabel={
+            alt
+              ? t('agentChat.filePart.viewImageWithAlt', { alt })
+              : t('agentChat.filePart.viewImage')
           }
-        }}
-        // eslint-disable-next-line react-native/no-inline-styles -- measured aspect ratio cannot be a Tailwind class
-        style={{
-          aspectRatio: aspectRatio ?? measuredAspectRatio ?? IMAGE_PREVIEW_FALLBACK_ASPECT_RATIO,
-        }}
-      >
-        {measuredAspectRatio === undefined ? <Skeleton className="absolute inset-0" /> : null}
-        <Image
-          key={attempt}
-          source={{ uri: resolveMarkdownImageSrc(uri) }}
-          cachePolicy="memory"
-          className="h-full w-full"
-          contentFit="contain"
-          transition={0}
-          accessibilityIgnoresInvertColors
-          onLoad={event => {
-            setMeasuredAspectRatio(
-              resolveImagePreviewAspectRatio(event.source.width, event.source.height)
-            );
+          accessibilityActions={onShowLinkActions ? getLinkAccessibilityActions(true) : undefined}
+          onAccessibilityAction={event => {
+            if (event.nativeEvent.actionName === 'showLinkActions') {
+              onShowLinkActions?.();
+            }
           }}
-          onError={() => {
-            setFailed(true);
-          }}
-        />
-      </Pressable>
+        >
+          {!loaded ? <Skeleton className="absolute inset-0" /> : null}
+          <Image
+            key={attempt}
+            source={{ uri: resolveMarkdownImageSrc(uri) }}
+            cachePolicy="memory"
+            className="h-full w-full"
+            contentFit="contain"
+            transition={0}
+            accessibilityIgnoresInvertColors
+            onLoad={() => {
+              setLoaded(true);
+            }}
+            onError={() => {
+              setFailed(true);
+            }}
+          />
+        </Pressable>
+      </FixedImageSlot>
       {viewerVisible && (
         <ImageViewerModal
           visible={viewerVisible}

@@ -22,6 +22,8 @@ import {
   GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
 } from './internal-service-token-audiences.js';
 
 const SECRET = 'synthetic-policy-test-secret-at-least-32-chars';
@@ -903,6 +905,27 @@ describe('buildModernKiloTokenPayload and compatibility', () => {
         credentialExchange: true,
       })
     ).toThrow();
+  });
+
+  it('preserves the ordered API and gateway audience set for delegated workloads', () => {
+    const payload = buildModernKiloTokenPayload({
+      userId: 'synthetic-user',
+      pepper: 'synthetic-pepper',
+      audience: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+      issuedAt: NOW_SECONDS,
+      expiresAt: NOW_SECONDS + 60,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+    });
+
+    expect(payload.aud).toEqual([KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE]);
+    expect(isKiloResourceAudienceAllowed(payload.aud, API_POLICY)).toBe(true);
+    expect(
+      isKiloResourceAudienceAllowed(payload.aud, {
+        audience: 'unrelated-audience',
+        mode: 'required',
+      })
+    ).toBe(false);
   });
 
   it.each([

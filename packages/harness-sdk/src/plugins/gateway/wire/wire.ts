@@ -9,6 +9,10 @@ import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../
  * `redacted` is thinking the provider encrypted rather than showed. It has no
  * text at all, and it is a kind of its own so that nothing can render its bytes
  * as words by mistake.
+ *
+ * Every member is a `ModelEvent` as it stands, so a part reaches the caller
+ * unchanged and no conversion sits on the per-token path. A member added here
+ * that `ModelEvent` does not hold fails the gateway's own return type.
  */
 type WirePart =
   | { readonly kind: 'delta'; readonly text: string }

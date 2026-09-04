@@ -22,7 +22,7 @@ import { RetryPolicy } from '../../core/retry.js';
 import { TokenSource } from '../../core/token.js';
 import { raise } from '../../core/usage.js';
 import { sseReader } from './sse.js';
-import type { Wire, WirePart } from './wire/wire.js';
+import type { Wire } from './wire/wire.js';
 import { wireFor } from './wires.js';
 
 /** Everything the gateway resolved once, at layer build. */
@@ -83,23 +83,6 @@ const chunksOf = (response: { readonly stream?: () => AsyncIterable<string> }) =
     : Stream.fromAsyncIterable(body(), cause => new ModelError({ reason: 'transport', cause }));
 };
 
-/** A wire part, as the caller sees it. The two shapes carry the same payloads. */
-const asEvent = (part: WirePart): ModelEvent => {
-  switch (part.kind) {
-    case 'redacted': {
-      return { kind: 'redacted', data: part.data };
-    }
-    case 'reasoning': {
-      return part.signature === undefined
-        ? { kind: 'reasoning', text: part.text }
-        : { kind: 'reasoning', text: part.text, signature: part.signature };
-    }
-    case 'delta': {
-      return { kind: 'delta', text: part.text };
-    }
-  }
-};
-
 /** What one stream collects on the way past, to report when it ends. */
 interface Tally {
   readonly usage: Ref.Ref<ModelUsage>;
@@ -156,7 +139,6 @@ const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEve
         Stream.mapConcat(chunk => read(chunk)),
         Stream.mapEffect(data => eventsOf(wire, tally, data)),
         Stream.filterMap(part => part),
-        Stream.map(asEvent),
         Stream.concat(doneOf(tally))
       );
     })

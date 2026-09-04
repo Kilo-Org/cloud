@@ -14,22 +14,14 @@
  * still streaming, which is the only time the race can actually happen.
  */
 import assert from 'node:assert/strict';
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { SessionBusyError } from '../src/core/ask.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/wiring.js';
 import { hitRatio } from '../src/core/usage.js';
-import { layerTableCatalog } from '../src/plugins/catalog/table.js';
-import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
-import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerAssembler } from '../src/plugins/prompt/default.js';
-import { layerBackoff } from '../src/plugins/retry/backoff.js';
-import { layerStaticToken } from '../src/plugins/token/static.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { kilo } from './setup.js';
 
-const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
-const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 const questions = 10;
 
@@ -69,20 +61,7 @@ const words = [
   'nine',
   'ten',
 ] as const;
-
-const catalog = layerTableCatalog({}, { apiKinds: ['messages'] });
-const layers = Layer.mergeAll(
-  layerAssembler,
-  layerWebCrypto,
-  catalog,
-  layerKiloGateway({
-    baseUrl,
-    org: { kind: 'organization', id: organizationId },
-    fetch: nodeFetch,
-  }).pipe(
-    Layer.provide(Layer.mergeAll(catalog, layerStaticToken(await kiloToken()), layerBackoff()))
-  )
-);
+const layers = kilo({ apiKinds: ['messages'] });
 
 const growing = Effect.gen(function* () {
   const session = yield* openSession({ system, model, maxTokens: 64 });

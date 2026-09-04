@@ -12,20 +12,12 @@
  * survives the round trip.
  */
 import assert from 'node:assert/strict';
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/wiring.js';
-import { layerTableCatalog } from '../src/plugins/catalog/table.js';
-import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
-import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerAssembler } from '../src/plugins/prompt/default.js';
-import { layerBackoff } from '../src/plugins/retry/backoff.js';
-import { layerStaticToken } from '../src/plugins/token/static.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { everyShape, kilo } from './setup.js';
 
-const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
-const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 
 /** Small enough that a few turns of chat fill it. */
@@ -50,24 +42,7 @@ const say = (session: SessionHandle, text: string) =>
   Stream.runFold(session.ask(text, { maxTokens: 200 }), '', (held, event) =>
     event.kind === 'delta' ? held + event.text : held
   );
-
-const catalog = layerTableCatalog(
-  {},
-  { apiKinds: ['messages', 'responses', 'chat_completions'], contextWindow }
-);
-
-const layers = Layer.mergeAll(
-  layerAssembler,
-  layerWebCrypto,
-  catalog,
-  layerKiloGateway({
-    baseUrl,
-    org: { kind: 'organization', id: organizationId },
-    fetch: nodeFetch,
-  }).pipe(
-    Layer.provide(Layer.mergeAll(catalog, layerStaticToken(await kiloToken()), layerBackoff()))
-  )
-);
+const layers = kilo({ apiKinds: everyShape, contextWindow });
 
 const program = Effect.gen(function* () {
   const session = yield* openSession({ system, model });

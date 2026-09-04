@@ -1,28 +1,23 @@
-import { Effect, Layer, Stream } from 'effect';
-import { Chunk } from 'effect';
+import { Chunk, Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/wiring.js';
 import { hitRatio } from '../src/core/usage.js';
-import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
-import { layerAssembler } from '../src/plugins/prompt/default.js';
-import { layerTableCatalog } from '../src/plugins/catalog/table.js';
-import { layerStaticToken } from '../src/plugins/token/static.js';
-import { layerBackoff } from '../src/plugins/retry/backoff.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { kilo } from './setup.js';
 
 /**
- * The ten most used models on OpenRouter this week. Every one is cheap: the
- * dearest input is `tencent/hy4-preview` at 0.83 dollars for a million tokens.
- * `deepseek-v4-flash-0423` is not served, so the floating alias stands in.
+ * The ten most used models on OpenRouter this week, from six vendors, so a
+ * change is not tuned to one provider's quirks. Every one is cheap.
+ * `deepseek-v4-flash-0423` is not served, so the floating alias stands in, and
+ * `tencent/hy4-preview` is not sold to this team, so a qwen flash takes its
+ * place.
  */
 const models = [
   'openai/gpt-5.6-luna',
   'z-ai/glm-5.3-flash',
   'deepseek/deepseek-v4-flash-0731',
-  'tencent/hy4-preview',
+  'qwen/qwen3.8-flash',
   'xiaomi/mimo-v2.5',
   'tencent/hy3',
   'deepseek/deepseek-v4-flash',
@@ -62,21 +57,37 @@ const questions = [
 interface Answer {
   readonly said: string;
   readonly usage: ModelUsage | undefined;
+  /** Milliseconds from the question to the first piece of the answer. */
+  readonly first: number;
+  /** Milliseconds from the question to the end of the answer. */
+  readonly whole: number;
 }
 
-const ask = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text), { said: '', usage: undefined } as Answer, (held, event) =>
-    event.kind === 'delta'
-      ? { ...held, said: held.said + event.text }
-      : event.kind === 'done'
-        ? { ...held, usage: event.usage }
-        : held
-  );
+const blank: Answer = { said: '', usage: undefined, first: 0, whole: 0 };
 
-const converse = (model: string, kinds: readonly ApiKind[], token: string) => {
-  /** Both the session and the gateway ask the catalog, so it is shared, not nested. */
-  const catalog = layerTableCatalog({}, { apiKinds: kinds });
-  return Effect.scoped(
+/**
+ * Times the answer as a caller sees it. The clock starts when `ask` is called,
+ * not when the request leaves, so assembling the prompt is counted too: that
+ * is the part of the wait this package can do something about.
+ */
+const ask = (session: SessionHandle, text: string) =>
+  Effect.suspend(() => {
+    const started = performance.now();
+    return Stream.runFold(session.ask(text), blank, (held, event) =>
+      event.kind === 'delta'
+        ? {
+            ...held,
+            said: held.said + event.text,
+            first: held.first === 0 ? performance.now() - started : held.first,
+          }
+        : event.kind === 'done'
+          ? { ...held, usage: event.usage, whole: performance.now() - started }
+          : held
+    );
+  });
+
+const converse = (model: string, kinds: readonly ApiKind[]) =>
+  Effect.scoped(
     Effect.gen(function* () {
       const session = yield* openSession({
         system,
@@ -94,26 +105,7 @@ const converse = (model: string, kinds: readonly ApiKind[], token: string) => {
         total: yield* session.usage,
       };
     })
-  ).pipe(
-    Effect.provide(
-      Layer.mergeAll(
-        layerAssembler,
-        layerWebCrypto,
-        catalog,
-        layerKiloGateway({
-          baseUrl: process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai',
-          org: {
-            kind: 'organization',
-            id: process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56',
-          },
-          fetch: nodeFetch,
-        }).pipe(Layer.provide(Layer.mergeAll(catalog, layerStaticToken(token), layerBackoff())))
-      )
-    )
-  );
-};
-
-const token = await kiloToken();
+  ).pipe(Effect.provide(kilo({ apiKinds: kinds })));
 
 const preferred: readonly ApiKind[] = (process.env['KILO_KINDS']?.split(',') as
   | ApiKind[]
@@ -121,10 +113,10 @@ const preferred: readonly ApiKind[] = (process.env['KILO_KINDS']?.split(',') as
 
 /** Tries the best shape first. A model whose provider rejects it falls back. */
 const run = (model: string) =>
-  converse(model, preferred, token).pipe(
+  converse(model, preferred).pipe(
     Effect.map(result => ({ model, kind: preferred[0] ?? 'messages', result })),
     Effect.catchAll(first =>
-      converse(model, ['chat_completions'], token).pipe(
+      converse(model, ['chat_completions']).pipe(
         Effect.map(result => ({ model, kind: 'chat_completions' as ApiKind, result })),
         Effect.catchAll(second =>
           Effect.succeed({ model, kind: 'failed' as const, errors: [first, second] })
@@ -136,8 +128,15 @@ const run = (model: string) =>
 const outcomes = await Effect.runPromise(Effect.forEach(chosen, run, { concurrency: 3 }));
 
 const pad = (text: string, width: number) => text.padEnd(width);
+const ms = (taken: number) => `${taken.toFixed(0)}ms`;
+
+/** The middle answer, so one slow call does not stand for the whole run. */
+const median = (taken: readonly number[]) =>
+  taken.toSorted((a, b) => a - b)[Math.floor(taken.length / 2)] ?? 0;
+
 console.log(
-  `\n${pad('model', 34)}${pad('shape', 17)}${pad('turns', 6)}${pad('recalled', 9)}${pad('cache read', 11)}${pad('input', 8)}ratio`
+  `\n${pad('model', 34)}${pad('shape', 17)}${pad('recalled', 9)}` +
+    `${pad('first', 8)}${pad('whole', 8)}${pad('cache read', 11)}${pad('input', 8)}ratio`
 );
 
 let broken = 0;
@@ -159,11 +158,18 @@ for (const outcome of outcomes) {
     console.log(`  ${outcome.model}: empty answers at turns ${empty.join(', ')}`);
     console.log(`  said: ${JSON.stringify(answers.map(answer => answer.said))}`);
   }
+  if (turns !== questions.length * 2) {
+    broken += 1;
+    console.log(
+      `  ${outcome.model}: kept ${String(turns)} turns, not ${String(questions.length * 2)}`
+    );
+  }
   console.log(
     pad(outcome.model, 34) +
       pad(outcome.kind, 17) +
-      pad(String(turns), 6) +
       pad(recalled, 9) +
+      pad(ms(median(answers.map(answer => answer.first))), 8) +
+      pad(ms(median(answers.map(answer => answer.whole))), 8) +
       pad(String(total.cacheReadTokens), 11) +
       pad(String(total.inputTokens), 8) +
       hitRatio(total).toFixed(4)

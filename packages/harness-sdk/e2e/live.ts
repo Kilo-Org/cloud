@@ -1,19 +1,11 @@
 import assert from 'node:assert/strict';
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/wiring.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
-import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
-import { layerAssembler } from '../src/plugins/prompt/default.js';
-import { layerTableCatalog } from '../src/plugins/catalog/table.js';
-import { layerStaticToken } from '../src/plugins/token/static.js';
-import { layerBackoff } from '../src/plugins/retry/backoff.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { kilo } from './setup.js';
 
-const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
-const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 
 /**
@@ -52,21 +44,7 @@ const program = Effect.gen(function* () {
   return { id: session.id, first, second, total: yield* session.usage };
 });
 
-/** Both the session and the gateway ask the catalog, so it is shared, not nested. */
-const catalog = layerTableCatalog({}, { apiKinds: ['messages', 'responses', 'chat_completions'] });
-
-const layers = Layer.mergeAll(
-  layerAssembler,
-  layerWebCrypto,
-  catalog,
-  layerKiloGateway({
-    baseUrl,
-    org: { kind: 'organization', id: organizationId },
-    fetch: nodeFetch,
-  }).pipe(
-    Layer.provide(Layer.mergeAll(catalog, layerStaticToken(await kiloToken()), layerBackoff()))
-  )
-);
+const layers = kilo();
 
 const result = await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
 

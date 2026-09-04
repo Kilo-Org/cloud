@@ -14,21 +14,13 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import { openSession } from '../src/core/run.js';
 import type { PartDraft } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/wiring.js';
-import { layerTableCatalog } from '../src/plugins/catalog/table.js';
-import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
-import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerAssembler } from '../src/plugins/prompt/default.js';
-import { layerBackoff } from '../src/plugins/retry/backoff.js';
-import { layerStaticToken } from '../src/plugins/token/static.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { kilo } from './setup.js';
 
-const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
-const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 
 const system =
@@ -57,21 +49,8 @@ const say = (session: SessionHandle, input: string | readonly PartDraft[]) =>
     event.kind === 'delta' ? held + event.text : held
   );
 
-const token = await kiloToken();
-
 const runShape = async (kind: ApiKind, colour: string) => {
-  /* The catalog names one shape only, so `wireFor` has no choice to make. */
-  const catalog = layerTableCatalog({}, { apiKinds: [kind] });
-  const layers = Layer.mergeAll(
-    layerAssembler,
-    layerWebCrypto,
-    catalog,
-    layerKiloGateway({
-      baseUrl,
-      org: { kind: 'organization', id: organizationId },
-      fetch: nodeFetch,
-    }).pipe(Layer.provide(Layer.mergeAll(catalog, layerStaticToken(token), layerBackoff())))
-  );
+  const layers = kilo({ apiKinds: [kind] });
 
   const picture = await pictureOf(colour);
 

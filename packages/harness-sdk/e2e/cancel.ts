@@ -16,16 +16,9 @@ import { Duration, Effect, Fiber, Layer, Ref, Stream } from 'effect';
 import type { AbortLike, FetchLike } from '../src/core/fetch.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/wiring.js';
-import { layerTableCatalog } from '../src/plugins/catalog/table.js';
-import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
-import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerAssembler } from '../src/plugins/prompt/default.js';
-import { layerBackoff } from '../src/plugins/retry/backoff.js';
-import { layerStaticToken } from '../src/plugins/token/static.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
+import { kilo } from './setup.js';
+import { nodeFetch } from './node-fetch.js';
 
-const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
-const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
 
 const system = 'You do exactly what you are told, at length, with no preamble.';
@@ -50,18 +43,7 @@ const watchedFetch: FetchLike = (url, request) => {
   return nodeFetch(url, request);
 };
 
-const token = await kiloToken();
-const catalog = layerTableCatalog({}, { apiKinds: ['messages'] });
-const layers = Layer.mergeAll(
-  layerAssembler,
-  layerWebCrypto,
-  catalog,
-  layerKiloGateway({
-    baseUrl,
-    org: { kind: 'organization', id: organizationId },
-    fetch: watchedFetch,
-  }).pipe(Layer.provide(Layer.mergeAll(catalog, layerStaticToken(token), layerBackoff())))
-);
+const layers = kilo({ apiKinds: ['messages'] }, { fetch: watchedFetch });
 
 /** Counts the pieces of the answer, whether it finishes or is walked away from. */
 const counted = (session: SessionHandle, said: Ref.Ref<number>) =>

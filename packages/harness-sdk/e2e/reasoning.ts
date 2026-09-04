@@ -18,21 +18,12 @@
  * the second call would fail, not answer differently.
  */
 import assert from 'node:assert/strict';
-import { Effect, Layer, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/wiring.js';
-import { layerTableCatalog } from '../src/plugins/catalog/table.js';
-import { layerWebCrypto } from '../src/plugins/entropy/web-crypto.js';
-import { layerKiloGateway } from '../src/plugins/gateway/index.js';
-import { layerAssembler } from '../src/plugins/prompt/default.js';
-import { layerBackoff } from '../src/plugins/retry/backoff.js';
-import { layerStaticToken } from '../src/plugins/token/static.js';
-import { kiloToken, nodeFetch } from './node-fetch.js';
-
-const baseUrl = process.env['KILO_BASE_URL'] ?? 'https://app.kilo.ai';
-const organizationId = process.env['KILO_ORG_ID'] ?? '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+import { kilo } from './setup.js';
 
 const system = 'You answer briefly. Think first, then give the answer in one short sentence.';
 
@@ -84,20 +75,8 @@ const ask = (session: SessionHandle, text: string) =>
     }
   });
 
-const token = await kiloToken();
-
 const runShape = async (kind: ApiKind, model: string) => {
-  const catalog = layerTableCatalog({}, { apiKinds: [kind] });
-  const layers = Layer.mergeAll(
-    layerAssembler,
-    layerWebCrypto,
-    catalog,
-    layerKiloGateway({
-      baseUrl,
-      org: { kind: 'organization', id: organizationId },
-      fetch: nodeFetch,
-    }).pipe(Layer.provide(Layer.mergeAll(catalog, layerStaticToken(token), layerBackoff())))
-  );
+  const layers = kilo({ apiKinds: [kind] });
 
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, effort: 'medium' });

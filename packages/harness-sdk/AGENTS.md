@@ -734,6 +734,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/core/token.ts` | The `TokenSource` plugin point; the credential per call |
 | `src/core/retry.ts` | The `RetryPolicy` plugin point; an effect `Schedule` |
 | `src/core/fetch.ts` | The smallest `fetch` a transport plugin needs |
+| `src/plugins/kilo.ts` | `layerKilo`: the five layers a session needs, in one call |
 | `src/plugins/model/fake.ts` | A scripted model, for this package's tests. Excluded from `dist/` |
 | `src/plugins/prompt/default.ts` | The assembler plugin |
 | `src/plugins/catalog/table.ts` | A catalog the caller writes down |
@@ -758,6 +759,14 @@ Inside `src/plugins/gateway/`:
 | `sse.ts` | A reader over `eventsource-parser` |
 | `wire/` | One file per shape, plus the shared `Wire` |
 | `fake.ts` | The fake `fetch` the gateway tests share. Excluded from `dist/` |
+
+`layerKilo` is the wiring almost every caller writes: the assembler, the
+entropy source, the catalog, and the gateway with its token and retry policy
+under it. It exists because that wiring has an order and a trap — the catalog
+must be one instance shared by the session and the gateway, not two that agree
+— and because the package's own live runs were copying twenty-five lines of it
+each. Every plugin is still a plugin: a caller who needs a token that refreshes
+composes the layers themselves.
 
 There are four entry points: `@kilocode/harness-sdk`, `/core`,
 `/plugins/gateway` and `/plugins/prompt`. The catalog, token and retry plugins

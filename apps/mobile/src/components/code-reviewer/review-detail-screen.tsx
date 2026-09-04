@@ -9,6 +9,7 @@ import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
 import {
   isCancellableReviewStatus,
+  isInFlightReviewStatus,
   isRetriggerableReviewStatus,
 } from '@kilocode/app-shared/code-review';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
@@ -24,7 +25,9 @@ import {
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
@@ -34,6 +37,7 @@ import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getPrReviewPath } from '@/lib/profile-agent-navigation';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -71,6 +75,7 @@ export function ReviewDetailScreen({
 }: Readonly<{ scope: string; reviewId: string }>) {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
@@ -165,7 +170,15 @@ export function ReviewDetailScreen({
 
         {/* Conclusion: the outcome leads — status first, then the failure reason. */}
         <View className="gap-2">
-          <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
+          <View className="flex-row items-center gap-1.5">
+            <SpinningIcon
+              icon={Loader2}
+              size={14}
+              color={colors.mutedForeground}
+              spinning={isInFlightReviewStatus(review.status)}
+            />
+            <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
+          </View>
           {review.error_message ? (
             <View className="rounded-lg bg-danger-tile-bg p-3">
               <Text className="text-xs text-destructive">{review.error_message}</Text>

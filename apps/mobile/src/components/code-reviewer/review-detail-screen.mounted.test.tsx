@@ -35,6 +35,7 @@ const queryErrors = vi.hoisted(() => ({
 const buttons = vi.hoisted(() => ({
   rendered: [] as { children?: unknown; onPress?: () => void }[],
 }));
+const spinningIcons = vi.hoisted(() => ({ rendered: [] as { spinning?: boolean }[] }));
 
 const viewRenders = vi.hoisted(() => ({
   list: [] as { style?: unknown; className?: string; children?: unknown }[],
@@ -82,8 +83,14 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 34, left: 0, right: 0 }),
 }));
-vi.mock('@/components/ui/icons', () => ({ Share: 'Share' }));
+vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2', Share: 'Share' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
+vi.mock('@/components/ui/spinning-icon', () => ({
+  SpinningIcon: (props: { spinning?: boolean }) => {
+    spinningIcons.rendered.push(props);
+    return null;
+  },
+}));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn() },
@@ -288,6 +295,7 @@ beforeEach(() => {
   detail.refetch.mockClear();
   queryErrors.errors = [];
   buttons.rendered = [];
+  spinningIcons.rendered = [];
   viewRenders.list = [];
   modalRenders.list = [];
   nativePlatform.OS = 'ios';
@@ -319,6 +327,26 @@ beforeEach(() => {
 });
 
 describe('ReviewDetailScreen outcome-first order', () => {
+  it.each([
+    ['pending', true],
+    ['queued', true],
+    ['running', true],
+    ['completed', false],
+    ['failed', false],
+    ['cancelled', false],
+    ['interrupted', false],
+  ])('rotates the status icon for %s only while the review is in progress', (status, spinning) => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen();
+
+    expect(spinningIcons.rendered).toEqual([expect.objectContaining({ spinning })]);
+  });
+
   it('leads with conclusion, then findings, council, gate, then metadata', () => {
     detail.data = {
       success: true,

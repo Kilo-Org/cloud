@@ -177,7 +177,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `shapes`, `session`, `models` |
+| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `models` |
 
 `pnpm test:perf` is a separate config because its files must not run beside the
 unit tests: parallel workers compete for the CPU being measured. Its ceilings
@@ -356,6 +356,19 @@ Checked by reversing the signature before sending it:
 So the provider does validate it, and a pass means the block went back intact.
 Pick a model that thinks when changing `KILO_MODEL` — one that does not would
 pass this run vacuously, which is why the run fails when no thinking arrives.
+
+### A session that outgrows its window
+
+`pnpm test:e2e:compact` plants a fact, fills a deliberately tiny window with
+unrelated talk, and asks for the fact back after the session has compacted
+itself. The window is the caller's, not the model's: filling 200k tokens to
+test this would cost real money and take an hour, and what is live here is the
+summariser, the prompt it builds, and whether the fact survives.
+
+Measured on 2026-09-04 with `anthropic/claude-haiku-4.5` and an 80 token window:
+one compaction, and a summary that opens `- Vault code: 4417`. The run reads the
+summary itself, not just the answer, because the model could reach the answer
+another way.
 
 ### Many models, a longer conversation
 
@@ -601,6 +614,37 @@ Rolling back is a `Ref.set` to the session as it stood, which is safe because
 one session answers one question at a time and nothing else can have touched it.
 `SessionStore.append` takes a list for the same reason: two calls would leave a
 question committed without its answer if the second failed.
+
+### A session that fills the window summarises itself
+
+A session grows until the model refuses the request. Compaction is the answer,
+and the shape of it is not a preference:
+
+**Summarise everything into one message and replay nothing before it.** Keeping
+the recent turns verbatim and summarising only the old ones looks better and is
+refused: a thinking block is signed against the whole history that stood when it
+was produced, so a retained turn replayed after a summary fails on its
+signature. Nothing carried over here is tied to the old transcript.
+
+The summary is a turn with a `summary` part. `sinceSummary` is the only rule:
+a prompt starts at the last turn that holds one. The earlier turns stay in
+memory and stay in the store — they are the record of what happened, and only
+the prompt starts after them, so a continued session lands in the same place.
+
+**The trigger is the provider's own count.** After each call the session records
+what that request put in front of the model, cached tokens included, and
+compacts before the next question when it passes `compactAt` (0.8) of the
+catalog's `contextWindow`. No tokeniser, and no estimate that can drift. A
+catalog that names no window never compacts: a guessed window would either cut a
+conversation that fit, or fail to save one that did not.
+
+Compaction throws the model cache away, because every byte of the prefix
+changes. That is the price of the session continuing at all. `session.compact`
+forces one, for a caller that knows sooner than the number does.
+
+The summariser is told what to keep. Left to its own judgement it writes a
+readable paragraph and drops the identifiers, and the summary is all the model
+will have of that work.
 
 ### A reloaded turn must equal the turn that was written
 

@@ -13,6 +13,8 @@ import { makeId } from './id.js';
  */
 type TurnPart =
   | { readonly id: string; readonly kind: 'text'; readonly body: string }
+  /** Everything before it, in one part. See `sinceSummary`. */
+  | { readonly id: string; readonly kind: 'summary'; readonly body: string }
   | {
       readonly id: string;
       readonly kind: 'reasoning';
@@ -36,6 +38,7 @@ type TurnPart =
 /** A part before it has an identifier. */
 type PartDraft =
   | { readonly kind: 'text'; readonly body: string }
+  | { readonly kind: 'summary'; readonly body: string }
   | { readonly kind: 'reasoning'; readonly body: string; readonly signature?: string }
   | { readonly kind: 'image'; readonly body: string; readonly media: string };
 
@@ -93,6 +96,9 @@ const draftOf = (part: TurnPart): PartDraft => {
         body: part.body,
         ...(part.signature === undefined ? {} : { signature: part.signature }),
       };
+    }
+    case 'summary': {
+      return { kind: 'summary', body: part.body };
     }
     case 'text': {
       return { kind: 'text', body: part.body };

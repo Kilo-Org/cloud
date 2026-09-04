@@ -1,4 +1,4 @@
-import { Context, Data, type Effect, type Option } from 'effect';
+import { Context, Data, Effect, Option } from 'effect';
 import type { Effort } from './model.js';
 import type { Turn } from './turn.js';
 
@@ -58,5 +58,12 @@ class SessionStore extends Context.Tag('harness/SessionStore')<
   SessionStoreService
 >() {}
 
+/** Runs the work when there is a store, and does nothing when there is not. */
+const onStore = (
+  store: Option.Option<SessionStoreService>,
+  use: (plugin: SessionStoreService) => Effect.Effect<void, StoreError>
+): Effect.Effect<void, StoreError> =>
+  Option.match(store, { onNone: () => Effect.void, onSome: use });
+
 export type { SessionStoreService, StoredSession };
-export { SessionStore, StoreError };
+export { onStore, SessionStore, StoreError };

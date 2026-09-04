@@ -22,6 +22,7 @@
     "test": "vitest run --passWithNoTests",
     "test:e2e": "ttsx e2e/live.ts",
     "test:e2e:cancel": "ttsx e2e/cancel.ts",
+    "test:e2e:compact": "ttsx e2e/compact.ts",
     "test:e2e:image": "ttsx e2e/image.ts",
     "test:e2e:models": "ttsx e2e/models.ts",
     "test:e2e:reasoning": "ttsx e2e/reasoning.ts",

@@ -17,6 +17,9 @@ import type { TurnPart } from '../../core/turn.js';
  */
 const renderPart = (part: TurnPart): readonly PromptPart[] => {
   switch (part.kind) {
+    /* A summary is text to the model. It is a kind of its own only so the
+       session can find where the prompt starts. */
+    case 'summary':
     case 'text': {
       return [{ kind: 'text', text: part.body }];
     }

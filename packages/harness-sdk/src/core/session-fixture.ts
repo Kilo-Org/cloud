@@ -7,7 +7,7 @@ import { layerAssembler } from '../plugins/prompt/default.js';
 import type { SessionBusyError } from './ask.js';
 import type { ModelError, ModelRequest } from './model.js';
 import { openSession } from './run.js';
-import type { SessionHandle } from './wiring.js';
+import type { SessionHandle, SessionOptions } from './wiring.js';
 import { SessionStore, StoreError } from './storage.js';
 import { textOf, type Turn } from './turn.js';
 
@@ -82,25 +82,53 @@ const run = <A>(
   replies: readonly FakeReply[],
   use: (session: SessionHandle) => Effect.Effect<A, ModelError | StoreError | SessionBusyError>,
   store?: Layer.Layer<SessionStore>
+): Promise<{ readonly value: A; readonly calls: readonly ModelRequest[] }> =>
+  runWith({ replies, use, ...(store === undefined ? {} : { store }) });
+
+/** What one session test needs. `run` is this with the usual catalog and options. */
+interface Setup<A> {
+  readonly replies: readonly FakeReply[];
+  readonly use: (
+    session: SessionHandle
+  ) => Effect.Effect<A, ModelError | StoreError | SessionBusyError>;
+  readonly store?: Layer.Layer<SessionStore>;
+  readonly catalog?: Layer.Layer<ModelCatalog>;
+  readonly options?: SessionOptions;
+}
+
+const runWith = <A>(
+  setup: Setup<A>
 ): Promise<{ readonly value: A; readonly calls: readonly ModelRequest[] }> => {
-  const model = fakeModel(replies);
-  const layers = Layer.mergeAll(layerAssembler, silentCatalog, layerSeededEntropy(1), model.layer);
-  const program = Effect.scoped(Effect.flatMap(openSession(options), use));
+  const model = fakeModel(setup.replies);
+  const layers = Layer.mergeAll(
+    layerAssembler,
+    setup.catalog ?? silentCatalog,
+    layerSeededEntropy(1),
+    model.layer
+  );
+  const program = Effect.scoped(Effect.flatMap(openSession(setup.options ?? options), setup.use));
   return Effect.runPromise(
-    Effect.provide(program, store === undefined ? layers : Layer.merge(layers, store))
+    Effect.provide(program, setup.store === undefined ? layers : Layer.merge(layers, setup.store))
   ).then(value => ({ value, calls: model.calls }));
 };
+
+/** A catalog that names a window, which is what makes a session compact itself. */
+const catalogWindowed = (contextWindow: number): Layer.Layer<ModelCatalog> =>
+  layerTableCatalog({}, { apiKinds: ['messages'], contextWindow });
 
 const texts = (turns: Chunk.Chunk<Turn>): readonly string[] =>
   Chunk.toReadonlyArray(turns).map(turn => `${turn.role}:${textOf(turn)}`);
 
+export type { Setup };
 export {
   brokenStore,
   catalogSaying,
+  catalogWindowed,
   emptyCatalog,
   options,
   recordingStore,
   run,
+  runWith,
   silentCatalog,
   texts,
 };

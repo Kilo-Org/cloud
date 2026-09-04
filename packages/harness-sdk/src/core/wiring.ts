@@ -1,18 +1,20 @@
-import { type Chunk, Effect, Ref, type Scope, type Stream } from 'effect';
-import { type AskOptions, askWith, onStore, type SessionBusyError, type Wiring } from './ask.js';
-import { ModelCatalog } from './catalog.js';
-import { EntropySource } from './entropy.js';
+import { type Chunk, Effect, type Option, Ref, type Scope, type Stream } from 'effect';
+import { type AskOptions, askWith, type SessionBusyError } from './ask.js';
+import { ModelCatalog, type ModelCatalogService } from './catalog.js';
+import { compactSession } from './compact.js';
+import { EntropySource, type EntropySourceService } from './entropy.js';
 import {
   type Effort,
   ModelClient,
+  type ModelClientService,
   type ModelError,
   type ModelEvent,
   type ModelUsage,
   zeroUsage,
 } from './model.js';
-import { PromptAssembler } from './prompt.js';
+import { PromptAssembler, type PromptAssemblerService } from './prompt.js';
 import type { Session } from './session.js';
-import { SessionStore, type StoreError } from './storage.js';
+import { onStore, SessionStore, type SessionStoreService, type StoreError } from './storage.js';
 import type { PartDraft, Turn } from './turn.js';
 
 /**
@@ -34,6 +36,30 @@ interface SessionOptions {
   readonly maxTokens?: number;
   /** How hard the model should think. Frozen: a change invalidates the cache. */
   readonly effort?: Effort;
+  /**
+   * The share of the model's context window a session may fill before it
+   * compacts itself. `0.8` by default. A catalog that names no window for the
+   * model never compacts, whatever this says.
+   */
+  readonly compactAt?: number;
+  /** The ceiling on one summary. 2048 by default. */
+  readonly summaryTokens?: number;
+}
+
+/** Everything one session holds. Every plugin here is already resolved. */
+interface Wiring extends SessionOptions {
+  readonly id: string;
+  readonly catalog: ModelCatalogService;
+  readonly entropy: EntropySourceService;
+  readonly assembler: PromptAssemblerService;
+  readonly client: ModelClientService;
+  readonly store: Option.Option<SessionStoreService>;
+  readonly state: Ref.Ref<Session>;
+  readonly totals: Ref.Ref<ModelUsage>;
+  /** What the last request put in front of the model. Drives compaction. */
+  readonly prompted: Ref.Ref<number>;
+  /** True while a question is streaming. See `SessionBusyError`. */
+  readonly busy: Ref.Ref<boolean>;
 }
 
 /** A live session. It owns the turns, so a caller cannot lose one. */
@@ -47,6 +73,12 @@ interface SessionHandle {
   readonly history: Effect.Effect<Chunk.Chunk<Turn>>;
   /** The counts of every call so far. Pass to `hitRatio` for the cache share. */
   readonly usage: Effect.Effect<ModelUsage>;
+  /**
+   * Replaces the conversation with a summary of itself, now, whatever the
+   * window says. A session does this on its own when it fills the window; this
+   * is for a caller that knows sooner, such as one changing subject.
+   */
+  readonly compact: Effect.Effect<void, ModelError | StoreError>;
 }
 
 /** Everything a session needs from its context, whether it is new or resumed. */
@@ -74,6 +106,7 @@ const wiringFor = (
       store: yield* Effect.serviceOption(SessionStore),
       state: yield* Ref.make(session),
       totals: yield* Ref.make(zeroUsage),
+      prompted: yield* Ref.make(0),
       busy: yield* Ref.make(false),
     };
     yield* Effect.addFinalizer(() =>
@@ -87,7 +120,8 @@ const handleOf = (wiring: Wiring): SessionHandle => ({
   ask: askWith(wiring),
   history: Effect.map(Ref.get(wiring.state), session => session.turns),
   usage: Ref.get(wiring.totals),
+  compact: compactSession(wiring),
 });
 
-export type { SessionContext, SessionHandle, SessionOptions };
+export type { SessionContext, SessionHandle, SessionOptions, Wiring };
 export { handleOf, wiringFor };

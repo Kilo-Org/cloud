@@ -57,9 +57,7 @@ it('reads the stop reason of the responses shape', () => {
       response: { status: 'incomplete', incomplete_details: { reason: 'content_filter' } },
     })
   ).toBe('refusal');
-  expect(
-    responsesWire.toStop({ type: 'response.output_text.delta', delta: 'he' })
-  ).toBeUndefined();
+  expect(responsesWire.toStop({ type: 'response.output_text.delta', delta: 'he' })).toBeUndefined();
 });
 
 it('reads the stop reason of the chat shape', () => {

@@ -25,5 +25,22 @@ const appendTurn = (session: Session, turn: Turn): Session => ({
   turns: Chunk.append(session.turns, turn),
 });
 
+/**
+ * The turns a prompt is built from: everything from the last summary onward.
+ *
+ * Compaction replaces the conversation with a summary and replays nothing
+ * before it. Keeping the earlier turns and only summarising the old ones is the
+ * shape that breaks: a thinking block was signed against the whole history that
+ * stood when it was made, so replaying it after a summary is refused.
+ *
+ * The earlier turns are still in memory and still in the store. They are the
+ * record of what happened; they are simply not what the model is asked with.
+ */
+const sinceSummary = (turns: Chunk.Chunk<Turn>): Chunk.Chunk<Turn> => {
+  const all = Chunk.toReadonlyArray(turns);
+  const at = all.findLastIndex(turn => turn.parts.some(part => part.kind === 'summary'));
+  return at <= 0 ? turns : Chunk.unsafeFromArray(all.slice(at));
+};
+
 export type { Session };
-export { appendTurn, makeSession };
+export { appendTurn, makeSession, sinceSummary };

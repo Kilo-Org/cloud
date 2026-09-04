@@ -70,7 +70,7 @@ const parts = sqliteTable(
     sessionId: text('session_id')
       .notNull()
       .references(() => sessions.id),
-    kind: text('kind', { enum: ['text', 'reasoning', 'image'] }).notNull(),
+    kind: text('kind', { enum: ['text', 'summary', 'reasoning', 'image'] }).notNull(),
     body: text('body').notNull(),
     media: text('media'),
     signature: text('signature'),

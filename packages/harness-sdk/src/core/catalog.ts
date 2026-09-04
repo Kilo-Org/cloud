@@ -9,6 +9,13 @@ interface ModelFacts {
   readonly apiKinds: readonly ApiKind[];
   /** The most tokens this model will produce, when the catalog knows the number. */
   readonly maxOutputTokens?: number;
+  /**
+   * The most tokens this model reads in one request, when the catalog knows the
+   * number. A session compacts itself when it fills a share of this. Without it
+   * a session never compacts: a guessed window would either cut a conversation
+   * that fit, or fail to save one that did not.
+   */
+  readonly contextWindow?: number;
 }
 
 class CatalogError extends Data.TaggedError('harness/CatalogError')<{

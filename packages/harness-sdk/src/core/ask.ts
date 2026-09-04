@@ -1,12 +1,11 @@
-import { Data, Effect, Option, Ref, Stream } from 'effect';
-import type { ModelCatalogService } from './catalog.js';
-import type { EntropySourceService } from './entropy.js';
-import type { Effort, ModelClientService, ModelError, ModelEvent, ModelUsage } from './model.js';
-import type { PromptAssemblerService } from './prompt.js';
-import { appendTurn, type Session } from './session.js';
-import type { SessionStoreService, StoreError } from './storage.js';
+import { Data, Effect, Ref, Stream } from 'effect';
+import { compactIfFull, promptedOf } from './compact.js';
+import type { ModelError, ModelEvent, ModelUsage } from './model.js';
+import { appendTurn, sinceSummary, type Session } from './session.js';
+import { onStore, type StoreError } from './storage.js';
 import { makeTurn, partsOf, type PartDraft, type Turn } from './turn.js';
 import { add } from './usage.js';
+import type { Wiring } from './wiring.js';
 
 /**
  * A second question was asked while the first was still streaming. One session
@@ -25,31 +24,6 @@ class SessionBusyError extends Data.TaggedError('harness/SessionBusyError')<{
 interface AskOptions {
   readonly maxTokens?: number;
 }
-
-/** Everything one session holds. Every plugin here is already resolved. */
-interface Wiring {
-  readonly id: string;
-  readonly system: string;
-  readonly model: string;
-  /** What the caller named at open. Without one the catalog decides. */
-  readonly maxTokens?: number;
-  readonly effort?: Effort;
-  readonly catalog: ModelCatalogService;
-  readonly entropy: EntropySourceService;
-  readonly assembler: PromptAssemblerService;
-  readonly client: ModelClientService;
-  readonly store: Option.Option<SessionStoreService>;
-  readonly state: Ref.Ref<Session>;
-  readonly totals: Ref.Ref<ModelUsage>;
-  /** True while a question is streaming. See `SessionBusyError`. */
-  readonly busy: Ref.Ref<boolean>;
-}
-
-const onStore = (
-  store: Option.Option<SessionStoreService>,
-  use: (plugin: SessionStoreService) => Effect.Effect<void, StoreError>
-): Effect.Effect<void, StoreError> =>
-  Option.match(store, { onNone: () => Effect.void, onSome: use });
 
 /**
  * The last resort, for a model the catalog does not name a limit for. It is a
@@ -159,6 +133,10 @@ const finish = (
       onStore(wiring.store, plugin => plugin.append([exchange.question, answer]))
     ),
     Effect.zipRight(Ref.set(exchange.answered, true)),
+    /* What this call put in front of the model, which is what decides whether
+       the next one compacts first. It is the provider's own count, so no
+       tokeniser is needed and no estimate can drift. */
+    Effect.zipRight(Ref.set(wiring.prompted, promptedOf(usage))),
     Effect.zipRight(Ref.update(wiring.totals, held => add(held, usage)))
   );
 
@@ -189,6 +167,26 @@ const rollback = (wiring: Wiring, exchange: Exchange): Effect.Effect<void> =>
     done ? Effect.void : Ref.set(wiring.state, exchange.before)
   );
 
+/** Everything one question needs before it goes out, made in one place. */
+const exchangeFor = (
+  wiring: Wiring,
+  input: string | readonly PartDraft[]
+): Effect.Effect<Exchange> =>
+  Effect.all({
+    before: Ref.get(wiring.state),
+    question: makeTurn(wiring.entropy, {
+      sessionId: wiring.id,
+      role: 'user',
+      parts: partsOf(input),
+    }),
+    spoken: Effect.all({
+      text: Ref.make(''),
+      reasoning: Ref.make(''),
+      signature: Ref.make(''),
+    }),
+    answered: Ref.make(false),
+  });
+
 /**
  * Adds the question, then builds the stream of the answer. The assistant turn
  * is added only when the stream reaches `done`: a half written turn would
@@ -199,29 +197,23 @@ const answerOf = (
   wiring: Wiring,
   input: string | readonly PartDraft[],
   options: AskOptions | undefined
-): Effect.Effect<Answer, StoreError> =>
+): Effect.Effect<Answer, ModelError | StoreError> =>
   Effect.gen(function* () {
-    const exchange: Exchange = {
-      before: yield* Ref.get(wiring.state),
-      question: yield* makeTurn(wiring.entropy, {
-        sessionId: wiring.id,
-        role: 'user',
-        parts: partsOf(input),
-      }),
-      spoken: {
-        text: yield* Ref.make(''),
-        reasoning: yield* Ref.make(''),
-        signature: yield* Ref.make(''),
-      },
-      answered: yield* Ref.make(false),
-    };
+    /* Before anything else. A session that has filled the window would be
+       refused, and compacting after the question was added would summarise the
+       question along with the answers it has not had yet. */
+    yield* compactIfFull(wiring);
+    const exchange = yield* exchangeFor(wiring, input);
     yield* remember(wiring, exchange.question);
     const { turns } = yield* Ref.get(wiring.state);
+    /* Everything from the last summary onward. Before the first compaction
+       that is every turn, and the call costs one scan of a list already held. */
+    const asked = sinceSummary(turns);
     const maxTokens = yield* ceilingOf(wiring, options);
 
     return wiring.client
       .stream({
-        prompt: wiring.assembler.assemble({ system: wiring.system, turns }),
+        prompt: wiring.assembler.assemble({ system: wiring.system, turns: asked }),
         model: wiring.model,
         maxTokens,
         ...(wiring.effort === undefined ? {} : { effort: wiring.effort }),
@@ -265,7 +257,7 @@ const askWith =
     Stream.unwrap(
       Effect.flatMap(
         Ref.getAndSet(wiring.busy, true),
-        (held): Effect.Effect<Answer, StoreError | SessionBusyError> =>
+        (held): Effect.Effect<Answer, ModelError | StoreError | SessionBusyError> =>
           held
             ? Effect.fail(new SessionBusyError({ sessionId: wiring.id }))
             : answerOf(wiring, input, options).pipe(
@@ -275,5 +267,5 @@ const askWith =
       )
     );
 
-export type { AskOptions, Wiring };
-export { askWith, onStore, SessionBusyError };
+export type { AskOptions };
+export { askWith, SessionBusyError };

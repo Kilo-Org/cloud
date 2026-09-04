@@ -1,8 +1,7 @@
 import { Effect } from 'effect';
-import { onStore } from './ask.js';
 import { EntropySource } from './entropy.js';
 import { makeSession } from './session.js';
-import type { StoreError } from './storage.js';
+import { onStore, type StoreError } from './storage.js';
 import {
   handleOf,
   type SessionContext,

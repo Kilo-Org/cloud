@@ -1,4 +1,4 @@
-import { type Chunk, Context } from 'effect';
+import { Context } from 'effect';
 import type { Turn, TurnRole } from './turn.js';
 
 /**
@@ -40,7 +40,7 @@ interface Prompt {
 
 interface PromptInput {
   readonly system: string;
-  readonly turns: Chunk.Chunk<Turn>;
+  readonly turns: readonly Turn[];
 }
 
 /**

@@ -1,4 +1,4 @@
-import { Chunk, Effect, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
 import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
@@ -101,7 +101,7 @@ const converse = (model: string, kinds: readonly ApiKind[]) =>
       }
       return {
         answers,
-        turns: Chunk.size(yield* session.history),
+        turns: (yield* session.history).length,
         total: yield* session.usage,
       };
     })

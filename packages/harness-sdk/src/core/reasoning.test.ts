@@ -20,7 +20,7 @@ it('keeps the reasoning and its signature, ahead of what the model then said', a
     Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
   );
 
-  const [, answer] = Chunk.toReadonlyArray(value);
+  const [, answer] = value;
   expect(answer?.parts).toMatchObject([
     { kind: 'reasoning', body: 'first second', signature: 'sig_abc' },
     { kind: 'text', body: 'the answer' },
@@ -32,7 +32,7 @@ it('adds no reasoning part when the model did none', async () => {
     Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
   );
 
-  expect(Chunk.toReadonlyArray(value)[1]?.parts).toMatchObject([{ kind: 'text', body: 'plain' }]);
+  expect(value[1]?.parts).toMatchObject([{ kind: 'text', body: 'plain' }]);
 });
 
 it('keeps a thinking block that carries a signature and no words', async () => {
@@ -44,7 +44,7 @@ it('keeps a thinking block that carries a signature and no words', async () => {
     Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
   );
 
-  expect(Chunk.toReadonlyArray(value)[1]?.parts).toMatchObject([
+  expect(value[1]?.parts).toMatchObject([
     { kind: 'reasoning', body: '', signature: 'sig_empty' },
     { kind: 'text', body: 'said' },
   ]);
@@ -98,7 +98,7 @@ it('keeps thinking the provider encrypted, and hands it back byte for byte', asy
       )
   );
 
-  expect(Chunk.toReadonlyArray(value)[1]?.parts).toMatchObject([
+  expect(value[1]?.parts).toMatchObject([
     { kind: 'redacted', body: 'ENCRYPTED_ONE' },
     { kind: 'redacted', body: 'ENCRYPTED_TWO' },
     { kind: 'text', body: 'said' },

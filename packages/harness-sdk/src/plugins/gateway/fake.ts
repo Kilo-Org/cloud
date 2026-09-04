@@ -1,4 +1,3 @@
-import { Chunk } from 'effect';
 import type { FetchLike, HttpRequest } from '../../core/fetch.js';
 import { assemble } from '../prompt/default.js';
 import type { ModelRequest } from '../../core/model.js';
@@ -29,7 +28,7 @@ const turn = (role: Turn['role'], content: string): Turn => ({
 const sampleRequest = (stream: boolean): ModelRequest => ({
   prompt: assemble({
     system: 'sys',
-    turns: Chunk.fromIterable([turn('user', 'a'), turn('assistant', 'b')]),
+    turns: [turn('user', 'a'), turn('assistant', 'b')],
   }),
   model: 'claude-opus-5',
   maxTokens: 1024,

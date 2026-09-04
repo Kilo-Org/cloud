@@ -1,4 +1,4 @@
-import { Chunk, Effect } from 'effect';
+import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { assemble } from '../plugins/prompt/default.js';
 import { seededEntropy } from '../plugins/entropy/seeded.js';
@@ -12,16 +12,14 @@ const system = 'You are a harness.';
 const run = <A>(effect: Effect.Effect<A>): A => Effect.runSync(effect);
 
 const turns = (...contents: readonly string[]) =>
-  Chunk.fromIterable(
-    run(
-      Effect.all(
-        contents.map(content =>
-          makeTurn(entropy, {
-            sessionId: 'ses_1',
-            role: 'user',
-            parts: [{ kind: 'text', body: content }],
-          })
-        )
+  run(
+    Effect.all(
+      contents.map(content =>
+        makeTurn(entropy, {
+          sessionId: 'ses_1',
+          role: 'user',
+          parts: [{ kind: 'text', body: content }],
+        })
       )
     )
   );
@@ -48,16 +46,16 @@ it('leaves every earlier message unchanged when a turn is appended', () => {
       }),
     ])
   );
-  const after = Chunk.append(before, added);
+  const after = [...before, added];
 
   const grown = assemble({ system, turns: after });
-  expect(grown.messages.slice(0, Chunk.size(before)).map(textIn)).toEqual(
+  expect(grown.messages.slice(0, before.length).map(textIn)).toEqual(
     assemble({ system, turns: before }).messages.map(textIn)
   );
   expect(grown.system).toEqual(assemble({ system, turns: before }).system);
 });
 
 it('still breaks the cache after the system prompt when the session has no turns', () => {
-  const prompt = assemble({ system, turns: Chunk.empty() });
+  const prompt = assemble({ system, turns: [] });
   expect(prompt.system).toEqual([{ text: system, cache: true }]);
 });

@@ -102,7 +102,7 @@ const program = Effect.gen(function* () {
 
 const result = await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
 
-const roles = [...result.history].map(turn => turn.role);
+const roles = result.history.map(turn => turn.role);
 
 console.log('model         ', model);
 console.log('whole answer  ', result.whole.said, 'pieces in', result.whole.millis, 'ms');

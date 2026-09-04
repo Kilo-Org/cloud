@@ -1,4 +1,4 @@
-import { Chunk, Effect } from 'effect';
+import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { seededEntropy } from '../plugins/entropy/seeded.js';
 import { assemble } from '../plugins/prompt/default.js';
@@ -10,15 +10,13 @@ const entropy = seededEntropy(3);
 const system = 'You are a harness.';
 
 const turnsOf = (sessionId: string, count: number) =>
-  Chunk.fromIterable(
-    Array.from({ length: count }, (_, index) =>
-      Effect.runSync(
-        makeTurn(entropy, {
-          sessionId,
-          role: index % 2 === 0 ? 'user' : 'assistant',
-          parts: [{ kind: 'text', body: `message number ${String(index)}` }],
-        })
-      )
+  Array.from({ length: count }, (_, index) =>
+    Effect.runSync(
+      makeTurn(entropy, {
+        sessionId,
+        role: index % 2 === 0 ? 'user' : 'assistant',
+        parts: [{ kind: 'text', body: `message number ${String(index)}` }],
+      })
     )
   );
 
@@ -35,7 +33,7 @@ const grow = (count: number): readonly Prompt[] => {
   const session = Effect.runSync(makeSession(entropy));
   const every = turnsOf(session.id, count);
   return Array.from({ length: count }, (_, index) =>
-    assemble({ system, turns: Chunk.take(every, index + 1) })
+    assemble({ system, turns: every.slice(0, index + 1) })
   );
 };
 

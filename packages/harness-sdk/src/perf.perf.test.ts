@@ -62,14 +62,14 @@ const sessionOf = (turns: number) => {
 };
 
 it('assembles a 200 turn prompt in well under 20 us', () => {
-  const { turns } = sessionOf(200);
+  const turns = Chunk.toReadonlyArray(sessionOf(200).turns);
   const cost = medianMicros(2000, () => void assemble({ system: 'sys', turns }));
   expect(cost).toBeLessThan(20);
 });
 
 it('assembles in time linear in the turn count, not quadratic', () => {
-  const small = sessionOf(100).turns;
-  const large = sessionOf(800).turns;
+  const small = Chunk.toReadonlyArray(sessionOf(100).turns);
+  const large = Chunk.toReadonlyArray(sessionOf(800).turns);
   const smallCost = medianMicros(2000, () => void assemble({ system: 'sys', turns: small }));
   const largeCost = medianMicros(500, () => void assemble({ system: 'sys', turns: large }));
 
@@ -79,7 +79,7 @@ it('assembles in time linear in the turn count, not quadratic', () => {
 });
 
 it('builds a whole 200 turn request in well under 250 us', () => {
-  const { turns } = sessionOf(200);
+  const turns = Chunk.toReadonlyArray(sessionOf(200).turns);
   const system = Array.from({ length: 200 }, (_, index) => `Rule ${String(index)}: be terse.`).join(
     '\n'
   );

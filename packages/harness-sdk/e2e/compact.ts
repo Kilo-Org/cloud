@@ -56,7 +56,7 @@ const program = Effect.gen(function* () {
 
 const result = await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
 
-const turns = [...result.history];
+const turns = result.history;
 const isSummary = (turn: Turn): boolean => turn.parts.some(part => part.kind === 'summary');
 const summaries = turns.filter(isSummary);
 const summary = summaries[0]?.parts[0]?.body ?? '';

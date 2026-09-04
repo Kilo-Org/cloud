@@ -1,5 +1,5 @@
 import { DatabaseSync } from 'node:sqlite';
-import { Chunk, Effect } from 'effect';
+import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { layerNodeStore } from '../plugins/store/node.js';
 import { assemble } from '../plugins/prompt/default.js';
@@ -99,7 +99,7 @@ it('puts every part of the turn in the prompt, in the order it arrived', () => {
     })
   );
 
-  const prompt = assemble({ system: 'sys', turns: Chunk.of(turn) });
+  const prompt = assemble({ system: 'sys', turns: [turn] });
 
   /* The reasoning goes back with the rest. The provider drops what the model
      cannot read and does not bill for it, and a block removed by hand can fail

@@ -1,4 +1,4 @@
-import { Chunk, Effect, Stream } from 'effect';
+import { Effect, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { ModelError } from './model.js';
 import { textIn } from './prompt.js';
@@ -133,7 +133,7 @@ it('compacts when the caller says so, whatever the window says', async () => {
   ]);
   /* The earlier turns are still the record of what happened. They are simply
      not what the model is asked with. */
-  expect(Chunk.size(value)).toBe(5);
+  expect(value.length).toBe(5);
 });
 
 it('writes the summary to the store, so a continued session starts there too', async () => {

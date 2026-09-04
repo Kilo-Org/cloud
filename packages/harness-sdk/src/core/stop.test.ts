@@ -1,4 +1,4 @@
-import { Chunk, Effect, Stream } from 'effect';
+import { Chunk, Effect, Option, Stream } from 'effect';
 import { expect, it } from 'vitest';
 import { completionsWire } from '../plugins/gateway/wire/completions.js';
 import { messagesWire } from '../plugins/gateway/wire/messages.js';
@@ -13,7 +13,7 @@ import { run } from './session-fixture.js';
  */
 
 const stopOf = (events: Chunk.Chunk<ModelEvent>): StopReason | undefined => {
-  const last = Chunk.toReadonlyArray(events).at(-1);
+  const last = Chunk.last(events).pipe(Option.getOrUndefined);
   return last?.kind === 'done' ? last.stop : undefined;
 };
 
@@ -84,7 +84,5 @@ it('keeps the answer of a call the ceiling cut off', async () => {
   const { value } = await run([{ deltas: ['half a th'], stop: 'maxTokens' }], session =>
     Effect.zipRight(Stream.runDrain(session.ask('why')), session.history)
   );
-  expect(Chunk.toReadonlyArray(value)[1]?.parts).toMatchObject([
-    { kind: 'text', body: 'half a th' },
-  ]);
+  expect(value[1]?.parts).toMatchObject([{ kind: 'text', body: 'half a th' }]);
 });

@@ -1,4 +1,4 @@
-import { Chunk, Effect } from 'effect';
+import { Effect } from 'effect';
 import { expect, it } from 'vitest';
 import { asked, bench, options, prompted } from './resume-fixture.js';
 import { cloneSession, continueSession, SessionNotFoundError } from './resume.js';
@@ -73,7 +73,7 @@ it('gives a clone its own identifier and its own turns', async () => {
   expect(cloned.value.id).not.toBe(opened.value);
   /* A copied turn identifier would collide on the primary key, and every
      identifier also carries the order the turns are read back in. */
-  const ids = Chunk.toReadonlyArray(cloned.value.turns).map(turn => turn.id);
+  const ids = cloned.value.turns.map(turn => turn.id);
   expect(new Set(ids).size).toBe(2);
   expect(texts(cloned.value.turns)).toEqual(['user:first', 'assistant:an answer']);
 });

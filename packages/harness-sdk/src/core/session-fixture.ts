@@ -1,4 +1,4 @@
-import { Chunk, Effect, Layer, Option } from 'effect';
+import { Effect, Layer, Option } from 'effect';
 import { layerTableCatalog } from '../plugins/catalog/table.js';
 import type { ModelCatalog } from './catalog.js';
 import { layerSeededEntropy } from '../plugins/entropy/seeded.js';
@@ -116,8 +116,8 @@ const runWith = <A>(
 const catalogWindowed = (contextWindow: number): Layer.Layer<ModelCatalog> =>
   layerTableCatalog({}, { apiKinds: ['messages'], contextWindow });
 
-const texts = (turns: Chunk.Chunk<Turn>): readonly string[] =>
-  Chunk.toReadonlyArray(turns).map(turn => `${turn.role}:${textOf(turn)}`);
+const texts = (turns: readonly Turn[]): readonly string[] =>
+  turns.map(turn => `${turn.role}:${textOf(turn)}`);
 
 export type { Setup };
 export {

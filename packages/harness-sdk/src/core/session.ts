@@ -36,10 +36,10 @@ const appendTurn = (session: Session, turn: Turn): Session => ({
  * The earlier turns are still in memory and still in the store. They are the
  * record of what happened; they are simply not what the model is asked with.
  */
-const sinceSummary = (turns: Chunk.Chunk<Turn>): Chunk.Chunk<Turn> => {
+const sinceSummary = (turns: Chunk.Chunk<Turn>): readonly Turn[] => {
   const all = Chunk.toReadonlyArray(turns);
   const at = all.findLastIndex(turn => turn.parts.some(part => part.kind === 'summary'));
-  return at <= 0 ? turns : Chunk.unsafeFromArray(all.slice(at));
+  return at <= 0 ? all : all.slice(at);
 };
 
 export type { Session };

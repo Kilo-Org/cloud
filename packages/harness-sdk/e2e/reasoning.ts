@@ -104,7 +104,7 @@ for (const { kind, model, seals } of shapes) {
   }
 
   const { one, two, history } = result.right;
-  const stored = reasoningOf([...history][1]);
+  const stored = reasoningOf(history[1]);
   const seal = stored[0]?.signature;
   const thought = one.thought.length > 0 || seal !== undefined;
 

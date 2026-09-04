@@ -109,8 +109,8 @@ one of `end`, `maxTokens`, `refusal`, or `unknown`: an answer cut off at the
 ceiling is not a finished answer, and a caller that retries needs to tell them
 apart.
 
-The handle also carries `history` (every turn), `usage` (the counts of every
-call so far — pass it to `hitRatio`), and `compact`.
+The handle also carries `history` (every turn, as a plain array), `usage` (the
+counts of every call so far — pass it to `hitRatio`), and `compact`.
 
 One session answers one question at a time. A second question asked while the
 first is still streaming fails with `SessionBusyError` rather than queueing.

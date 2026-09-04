@@ -261,6 +261,11 @@ The calls of one turn run at once. A tool that holds one thing — a terminal, a
 file, a person — says `concurrent: false` and gets a permit, so two calls to it
 queue while everything else overlaps.
 
+The permit belongs to the tool, so it holds across sessions too: a parent and a
+subagent sharing one registry share the permit, and cannot both reach the person
+at once. Two tools built separately hold two different things and get two
+permits.
+
 ### A call that outlives the request
 
 Every call is run under a deadline, and every call can outlive it. When the

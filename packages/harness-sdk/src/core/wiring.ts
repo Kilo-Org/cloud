@@ -14,7 +14,7 @@ import { PromptAssembler, type PromptAssemblerService } from './prompt.js';
 import { type Continued, makePending, type Pending } from './queue.js';
 import type { Session } from './session.js';
 import { onStore, SessionStore, type SessionStoreService, type StoreError } from './storage.js';
-import { locksFor, resolveTools, type Tool, type ToolCall, type ToolMissingError } from './tool.js';
+import { resolveTools, type Tool, type ToolCall, type ToolMissingError } from './tool.js';
 
 /**
  * What a session is opened with. Every value is frozen for the life of the
@@ -92,11 +92,6 @@ interface Wiring extends Omit<SessionOptions, 'tools'> {
    * Empty when it named none, which is the only test anything makes.
    */
   readonly tools: readonly Tool[];
-  /**
-   * One permit per tool that refused to overlap with itself, so two calls to it
-   * queue rather than run together. A tool that allows overlap has no entry.
-   */
-  readonly locks: ReadonlyMap<string, Effect.Semaphore>;
   /**
    * The calls the model is waiting on right now, by identifier. A call is here
    * from the moment it starts until the model stops waiting for it, whether
@@ -194,7 +189,6 @@ const wiringFor = (
       prompted: yield* Ref.make(prompted),
       busy: yield* Ref.make(false),
       tools,
-      locks: yield* locksFor(tools),
       running: yield* Ref.make<ReadonlyMap<string, Running>>(new Map()),
       scope: yield* Effect.scope,
       pending: yield* makePending(yield* EntropySource),

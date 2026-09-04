@@ -203,8 +203,9 @@ const layerTools = Layer.succeed(ToolRegistry, { tools: [weather, questionTool(a
 A tool is a definition and a function. `run` never fails the session: return a
 `ToolFailure` and the model reads it as a failed result and decides what to do.
 Say `concurrent: false` for a tool that holds one thing — a terminal, a file, a
-person — and the session gives it a permit. Say `inlineFor` for one that usually
-outlives a request.
+person — and it gets a permit. The permit is the tool's, not the session's, so
+one tool in two sessions still runs one call at a time. Say `inlineFor` for one
+that usually outlives a request.
 
 Say `wait` for whether the model waits at all — the session shows it to the
 model as that field's default, and reads it from `inlineFor` when you say

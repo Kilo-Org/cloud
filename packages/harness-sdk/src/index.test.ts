@@ -103,7 +103,6 @@ it('keeps the machinery of a session out of the root', () => {
     'enqueue',
     'enqueueMessage',
     'handleOf',
-    'locksFor',
     'makeId',
     'makePending',
     'makePart',

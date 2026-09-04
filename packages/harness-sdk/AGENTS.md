@@ -982,6 +982,28 @@ are independent. A tool that holds one thing says `concurrent: false` and gets
 an `Effect.Semaphore` of one permit, so two calls to it queue while everything
 else overlaps.
 
+**The permit belongs to the tool object, not to the session.** It used to be one
+per session, built by `locksFor` inside `wiringFor`, and that was a bug rather
+than a choice: a permit locks only against whoever holds the same permit, so a
+permit per session locked nothing between two of them. A harness builds
+`questionTool(ask)` once and gives one registry to a parent and to its
+subagents; each session made a permit of its own, and the parent and the
+subagent could put two dialogs on one person at the same moment — the one thing
+`concurrent: false` exists to stop. What the flag protects is the thing the tool
+holds, and that outlives any one session.
+
+`lockFor` keeps the permits in a `WeakMap` keyed by the tool, so one lives
+exactly as long as the tool it belongs to, and two tools built separately get
+two permits. That last part is deliberate: `questionTool(askA)` and
+`questionTool(askB)` are two askers and two things to protect, and serialising
+one against the other would buy a wait for nothing.
+
+One risk this creates and did not have before: a call now waits on a permit held
+in another session. A cycle would deadlock — a serialised tool that cannot
+finish until something else acquires the same permit. Nothing shipped can do
+that, because no shipped tool waits on another session while holding a permit.
+Check that before writing one that does.
+
 ### Every call can outlive the request
 
 Every call is forked and run under a deadline — `inlineFor` on the tool, else on

@@ -222,28 +222,49 @@ const resolveTools = (names: readonly string[]): Effect.Effect<readonly Tool[], 
       );
 
 /**
- * One permit for each tool that refused to overlap with itself. A tool that
- * allows overlap has no entry, so the usual path costs no lookup beyond a miss.
+ * The one permit a tool that refuses to overlap holds, kept with the tool.
+ *
+ * **It belongs to the tool object and not to a session**, and that is the whole
+ * point. A permit is only a lock against whoever holds the same permit, so a
+ * permit made per session locks nothing between two sessions. A harness builds
+ * `questionTool(ask)` once, puts it in one registry, and gives that registry to
+ * a parent and to its subagents; each session used to make a permit of its own,
+ * so the parent and the subagent could both call the asker and put two dialogs
+ * on one person at once — which is exactly what `concurrent: false` says must
+ * not happen. What the flag protects is the thing the tool holds, and the thing
+ * the tool holds outlives any one session.
+ *
+ * Two tools built separately do not share, and should not: `questionTool(askA)`
+ * and `questionTool(askB)` are two askers, two things to protect, two permits.
+ *
+ * The map is weak, so a permit lives exactly as long as the tool it belongs to.
+ * `unsafeMakeSemaphore` is the permit itself rather than an effect that makes
+ * one — "unsafe" here means unwrapped, not risky; it allocates a counter.
+ *
+ * A tool that allows overlap never gets an entry, so the usual path costs one
+ * miss on a weak map and nothing else.
  */
-const locksFor = (tools: readonly Tool[]): Effect.Effect<ReadonlyMap<string, Effect.Semaphore>> =>
-  Effect.map(
-    Effect.forEach(
-      tools.filter(tool => tool.concurrent === false),
-      tool =>
-        Effect.map(Effect.makeSemaphore(1), (lock): readonly [string, Effect.Semaphore] => [
-          tool.definition.name,
-          lock,
-        ])
-    ),
-    entries => new Map(entries)
-  );
+const permits = new WeakMap<Tool, Effect.Semaphore>();
+
+const lockFor = (tool: Tool): Effect.Semaphore | undefined => {
+  if (tool.concurrent !== false) {
+    return undefined;
+  }
+  const held = permits.get(tool);
+  if (held !== undefined) {
+    return held;
+  }
+  const made = Effect.unsafeMakeSemaphore(1);
+  permits.set(tool, made);
+  return made;
+};
 
 export type { JsonSchema, Tool, ToolCall, ToolDefinition, ToolRegistryService, ToolResult };
 export {
   asOffered,
   defaultInlineFor,
   definitionsOf,
-  locksFor,
+  lockFor,
   resolveTools,
   ToolFailure,
   ToolMissingError,

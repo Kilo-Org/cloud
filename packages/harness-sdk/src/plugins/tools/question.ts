@@ -184,6 +184,10 @@ interface QuestionOptions {
  * arriving on one person at once. The asker is therefore never called again
  * before the last call answers, which is what lets a caller write one that owns
  * the terminal, or one dialog, without a lock of its own.
+ *
+ * That holds across sessions, because the permit belongs to this tool and not
+ * to whoever is running it. One `questionTool(ask)` in one registry, given to a
+ * parent and to its subagents, is one person being asked one thing at a time.
  */
 const questionTool = (ask: Asker, options?: QuestionOptions): Tool => ({
   definition: { name: options?.name ?? 'question', description, parameters },

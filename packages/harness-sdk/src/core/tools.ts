@@ -1,6 +1,13 @@
 import { Cause, Deferred, Duration, Effect, type Exit, Fiber, Option } from 'effect';
 import { enqueue } from './queue.js';
-import { type Tool, type ToolCall, type ToolFailure, type ToolResult, toolNamed } from './tool.js';
+import {
+  lockFor,
+  type Tool,
+  type ToolCall,
+  type ToolFailure,
+  type ToolResult,
+  toolNamed,
+} from './tool.js';
 import { makeTurn, type PartDraft, type Turn } from './turn.js';
 import { waited, waitFor, wanted, whileWaiting } from './waiting.js';
 import type { Wiring } from './wiring.js';
@@ -63,7 +70,7 @@ const stillRunning = (call: ToolCall): ToolResult => ({
  * caller stopped has nobody left to tell, and a result written after the stream
  * was dropped would land in a transcript nobody asked for.
  */
-const working = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<ToolResult> => {
+const working = (tool: Tool, call: ToolCall): Effect.Effect<ToolResult> => {
   const work: Effect.Effect<ToolResult> = tool.run(call).pipe(
     Effect.map((body): ToolResult => ({ callId: call.id, body, failed: false })),
     Effect.catchAllCause(cause =>
@@ -72,7 +79,7 @@ const working = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<Tool
         : Effect.succeed(refusal(call, reasonOf(cause)))
     )
   );
-  const permit = wiring.locks.get(tool.definition.name);
+  const permit = lockFor(tool);
   return permit === undefined ? work : permit.withPermits(1)(work);
 };
 
@@ -92,7 +99,7 @@ const working = (wiring: Wiring, tool: Tool, call: ToolCall): Effect.Effect<Tool
 const under = (wiring: Wiring, tool: Tool, asked: ToolCall): Effect.Effect<ToolResult> =>
   Effect.gen(function* () {
     const { wait: wanting, call } = wanted(asked);
-    const fiber = yield* Effect.forkIn(working(wiring, tool, call), wiring.scope);
+    const fiber = yield* Effect.forkIn(working(tool, call), wiring.scope);
     const release = yield* Deferred.make<boolean>();
     const wait = Duration.decode(waitFor(wiring, tool, wanting));
     const ended = yield* whileWaiting(wiring, { call, release }, waited(fiber, release, wait));

@@ -138,14 +138,14 @@ describe('MarkdownImage inert-until-load', () => {
     expect(ofType(httpRenderer.root, 'Image')).toHaveLength(0);
     expect(ofType(httpRenderer.root, 'Pressable')).toHaveLength(0);
     expect(texts(httpRenderer.root)).toContain('insecure.com · HTTPS images only');
-    expect(slotCount(httpRenderer.root, 4 / 3)).toBe(1);
+    expect(slotCount(httpRenderer.root, 4 / 3)).toBe(0);
     await unmount(httpRenderer);
 
     const dataRenderer = await mount('data:image/png;base64,abc');
     expect(ofType(dataRenderer.root, 'Image')).toHaveLength(0);
     expect(ofType(dataRenderer.root, 'Pressable')).toHaveLength(0);
     expect(texts(dataRenderer.root)).toContain('HTTPS images only');
-    expect(slotCount(dataRenderer.root, 4 / 3)).toBe(1);
+    expect(slotCount(dataRenderer.root, 4 / 3)).toBe(0);
     await unmount(dataRenderer);
   });
 

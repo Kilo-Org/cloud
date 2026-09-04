@@ -195,18 +195,18 @@ describe('MarkdownText HTML routing', () => {
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps Markdown on its renderer and routes only raw HTML segments', async () => {
+  it('keeps Markdown blocks on their renderer and keeps inline HTML in one flow', async () => {
     const value =
       '# Heading\n\nBefore <span>HTML</span> and **Markdown**.\n\n- one\n- two\n\n[Docs](https://example.com)\n\n<img src="https://example.com/a.png">';
     const renderer = await mount(<MarkdownText value={value} />);
     const htmlNodes = renderer.root.findAllByType(RenderHTMLType);
 
     expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual([
-      '# Heading\n\nBefore ',
-      ' and **Markdown**.\n\n- one\n- two\n\n[Docs](https://example.com)\n\n',
+      '# Heading\n\n',
+      '\n\n- one\n- two\n\n[Docs](https://example.com)\n\n',
     ]);
     expect(htmlNodes.map(node => node.props.source)).toEqual([
-      { html: '<span>HTML</span>' },
+      { html: '<p>Before <span>HTML</span> and <strong>Markdown</strong>.</p>\n' },
       { html: '<img src="https://example.com/a.png">' },
     ]);
     const props = htmlNodes[0]?.props as RenderHtmlHostProps;
@@ -223,21 +223,18 @@ describe('MarkdownText HTML routing', () => {
   it('routes inline HTML inside a Markdown heading', async () => {
     const renderer = await mount(<MarkdownText value="# Heading <span>HTML</span>" />);
 
-    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual(['# Heading ']);
+    expect(vi.mocked(useMarkdown)).not.toHaveBeenCalled();
     expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
-      { html: '<span>HTML</span>' },
+      { html: '<h1>Heading <span>HTML</span></h1>\n' },
     ]);
   });
 
   it('does not match raw HTML inside a preceding code span', async () => {
     const renderer = await mount(<MarkdownText value="Before `<span>` <span>HTML</span> after" />);
 
-    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toEqual([
-      'Before `<span>` ',
-      ' after',
-    ]);
+    expect(vi.mocked(useMarkdown)).not.toHaveBeenCalled();
     expect(renderer.root.findAllByType(RenderHTMLType).map(node => node.props.source)).toEqual([
-      { html: '<span>HTML</span>' },
+      { html: '<p>Before <code>&lt;span&gt;</code> <span>HTML</span> after</p>\n' },
     ]);
   });
 

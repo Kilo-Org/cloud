@@ -1,6 +1,6 @@
 /* oxlint-disable max-lines -- cohesive HTML segmentation, sanitization, and image/link wiring share one renderer */
 import { useMemo } from 'react';
-import { type Token } from 'marked';
+import { marked, type Token } from 'marked';
 import {
   type AccessibilityActionEvent,
   type GestureResponderEvent,
@@ -83,28 +83,6 @@ type MarkdownHtmlSegment = {
   raw: string;
 };
 
-type HtmlRange = {
-  start: number;
-  end: number;
-};
-
-const VOID_HTML_TAGS = new Set([
-  'area',
-  'base',
-  'br',
-  'col',
-  'embed',
-  'hr',
-  'img',
-  'input',
-  'link',
-  'meta',
-  'param',
-  'source',
-  'track',
-  'wbr',
-]);
-
 function pushSegment(segments: MarkdownHtmlSegment[], segment: MarkdownHtmlSegment) {
   if (segment.raw.length === 0) {
     return;
@@ -117,61 +95,11 @@ function pushSegment(segments: MarkdownHtmlSegment[], segment: MarkdownHtmlSegme
   }
 }
 
-function inlineHtmlRanges(raw: string, blockToken: Token): HtmlRange[] {
-  const htmlTokens: (HtmlRange & { raw: string })[] = [];
-  const inlineTokens: Token[] =
-    blockToken.type === 'paragraph' || blockToken.type === 'heading'
-      ? (blockToken.tokens ?? [])
-      : [];
-  let cursor =
-    blockToken.type === 'heading' ? (/^ {0,3}#{1,6}(?:[ \t]+|$)/.exec(raw)?.[0].length ?? 0) : 0;
-  for (const inlineToken of inlineTokens) {
-    const start = cursor;
-    cursor += inlineToken.raw.length;
-    if (inlineToken.type === 'html') {
-      htmlTokens.push({ start, end: cursor, raw: inlineToken.raw });
-    }
+function hasDirectHtml(token: Token): boolean {
+  if (token.type !== 'paragraph' && token.type !== 'heading') {
+    return false;
   }
-
-  const ranges: HtmlRange[] = [];
-  const openTags: (HtmlRange & { name: string })[] = [];
-  for (const token of htmlTokens) {
-    const tag = /^<\s*(\/?)\s*([A-Za-z][\w:-]*)/.exec(token.raw);
-    if (!tag) {
-      ranges.push(token);
-    } else {
-      const name = tag[2]?.toLowerCase() ?? '';
-      if (tag[1] === '/') {
-        const openIndex = openTags.findLastIndex(open => open.name === name);
-        const open = openTags[openIndex];
-        if (open) {
-          ranges.push({ start: open.start, end: token.end });
-          openTags.splice(openIndex);
-        } else {
-          ranges.push(token);
-        }
-      } else if (VOID_HTML_TAGS.has(name) || /\/\s*>$/.test(token.raw)) {
-        ranges.push(token);
-      } else {
-        openTags.push({ start: token.start, end: token.end, name });
-      }
-    }
-  }
-  ranges.push(...openTags);
-
-  const merged: HtmlRange[] = [];
-  // eslint-disable-next-line unicorn/no-array-sort -- Hermes lacks toSorted(); ranges is local and unused after this sort.
-  for (const range of ranges.sort(
-    (left, right) => left.start - right.start || right.end - left.end
-  )) {
-    const previous = merged.at(-1);
-    if (previous && range.start <= previous.end) {
-      previous.end = Math.max(previous.end, range.end);
-    } else {
-      merged.push({ ...range });
-    }
-  }
-  return merged;
+  return (token.tokens ?? []).some(inlineToken => inlineToken.type === 'html');
 }
 
 export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
@@ -181,15 +109,13 @@ export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
   for (const token of tokens) {
     if (token.type === 'html') {
       pushSegment(segments, { type: 'html', raw: token.raw });
+    } else if (hasDirectHtml(token)) {
+      pushSegment(segments, {
+        type: 'html',
+        raw: marked.parse(token.raw, { async: false, gfm: true }),
+      });
     } else {
-      const ranges = inlineHtmlRanges(token.raw, token);
-      let offset = 0;
-      for (const range of ranges) {
-        pushSegment(segments, { type: 'markdown', raw: token.raw.slice(offset, range.start) });
-        pushSegment(segments, { type: 'html', raw: token.raw.slice(range.start, range.end) });
-        offset = range.end;
-      }
-      pushSegment(segments, { type: 'markdown', raw: token.raw.slice(offset) });
+      pushSegment(segments, { type: 'markdown', raw: token.raw });
     }
   }
   return segments.some(segment => segment.type === 'html')

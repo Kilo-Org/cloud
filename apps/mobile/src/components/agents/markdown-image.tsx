@@ -171,11 +171,7 @@ export function MarkdownImage({
   const confirmed = isMarkdownImageConfirmed(uri);
 
   if (kind === 'http' || kind === 'data') {
-    return (
-      <FixedImageSlot aspectRatio={aspectRatio}>
-        <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />
-      </FixedImageSlot>
-    );
+    return <BlockedImageChip kind={kind} uri={uri} onShowLinkActions={onShowLinkActions} />;
   }
 
   if (kind === 'https' && !confirmed) {

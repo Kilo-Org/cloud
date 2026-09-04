@@ -159,10 +159,35 @@ Marginal cost through `openSession`, `ask`, the gateway and a fake transport,
 | | us / token |
 |---|---:|
 | the whole path | 7.1 |
-| the Effect operator chain in `gateway/index.ts` | 4.7 |
-| the same work in one plain loop, no Effect | 0.46 |
+| the gateway alone | 7.6 |
+| the gateway's own work: read a frame, parse it, ask the wire | 0.32 |
 | SSE parse and wire read (the validator table above) | 0.25 |
 | typia validation alone | 0.005 |
+
+Read the third row against the second. The work this package does per event is
+four percent of what the gateway takes; the rest is Effect's stream runtime,
+which pulls one element at a time through three stages. That gap is not
+optimisable from here, and a wall-clock ceiling on it would only ever fail
+because a dependency changed.
+
+A row that used to sit here said the Effect operator chain in
+`gateway/index.ts` was 4.7 us of the 7.1 and a plain loop was 0.46, which read
+as a ten-fold win waiting to be taken. It was taken on 2026-09-04 — the per
+event path is now a plain function over a mutable tally, and the whole gateway
+went from 8.60 to 7.61 us per event. Eleven percent, not ten-fold. The rewrite
+was kept because the code is simpler, not because the number moved.
+
+So the guard in `gateway.perf.test.ts` is CPU busy time, not wall clock: 14.4
+us per event over 2000, 5.0 over 5000, measured with `process.cpuUsage`. It
+catches a change in the shape of the work, which is all a ceiling can do.
+
+**Memory was measured and the measurement was thrown away.** Heap held per turn
+of a 4000 turn session read 2.05, 3.72 and 0.09 kB on three runs of the same
+code, through `process.memoryUsage().heapUsed` with `--expose-gc` and three
+collections between readings. Per streamed answer it read -8 MB on one run and
++29 MB on the next. A number that moves like that is not a guard, and shipping
+it as one would be worse than having none. If somebody needs this, it wants a
+heap snapshot and not a delta — do not re-add the delta version.
 
 What one exchange holds while the reply streams is one record behind one ref,
 not a ref per field. Copying the other field on every token costs 0.054 us

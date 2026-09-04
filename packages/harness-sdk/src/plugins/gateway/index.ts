@@ -1,4 +1,4 @@
-import { Effect, Layer, Option, Ref, Stream } from 'effect';
+import { Effect, Layer, Stream } from 'effect';
 import { abortHandle, post, type AbortHandle, type HttpCaller, type HttpConfig } from './http.js';
 import { ModelCatalog, type ModelCatalogService } from '../../core/catalog.js';
 import {
@@ -51,33 +51,50 @@ const chunksOf = (response: { readonly stream?: () => AsyncIterable<string> }) =
     : Stream.fromAsyncIterable(body(), cause => new ModelError({ reason: 'transport', cause }));
 };
 
-/** What one stream collects on the way past, to report when it ends. */
+/**
+ * What one stream collects on the way past, to report when it ends.
+ *
+ * It is mutable, and that is the one place in this package where mutation is
+ * the right answer. One of these is made per call, inside `stream` below, and
+ * never leaves it: a `Stream` is consumed by one fiber, so nothing else can see
+ * a half-written tally and no `Ref` is buying anything.
+ *
+ * What it buys instead is measured. This path runs once per streamed event, and
+ * before this it was five Effect operators over four `Ref`s per event, which is
+ * an allocation each on the one path a long answer walks thousands of times.
+ * See "What a streamed token actually costs" in AGENTS.md.
+ */
 interface Tally {
-  readonly usage: Ref.Ref<ModelUsage>;
-  readonly stop: Ref.Ref<StopReason>;
+  usage: ModelUsage;
+  stop: StopReason;
   /** The call being read, until the frame that closes it. See `collect`. */
-  readonly open: Ref.Ref<Option.Option<OpenCall>>;
+  open: OpenCall | undefined;
   /** Whether the model asked for anything. It decides the stop reason. */
-  readonly called: Ref.Ref<boolean>;
+  called: boolean;
 }
 
 /** A tool call as it arrives: the name first, then the arguments in fragments. */
 interface OpenCall {
   readonly id: string;
   readonly name: string;
-  readonly text: string;
+  /** Grown a fragment at a time, in place: a copy per fragment is quadratic. */
+  text: string;
 }
 
 /** Nothing to report from this frame. One value, so no frame allocates a list. */
 const nothing: readonly ModelEvent[] = [];
 
-const closed = (held: Option.Option<OpenCall>): readonly ModelEvent[] =>
-  Option.match(held, {
-    onNone: () => nothing,
-    onSome: (call): readonly ModelEvent[] => [
-      { kind: 'toolCall', call: { id: call.id, name: call.name, arguments: call.text } },
-    ],
-  });
+const closed = (held: OpenCall | undefined): readonly ModelEvent[] =>
+  held === undefined
+    ? nothing
+    : [{ kind: 'toolCall', call: { id: held.id, name: held.name, arguments: held.text } }];
+
+/** Closes whatever call is open, and leaves nothing open behind it. */
+const ending = (tally: Tally): readonly ModelEvent[] => {
+  const held = tally.open;
+  tally.open = undefined;
+  return closed(held);
+};
 
 /**
  * Collects the pieces of a tool call into one event, and passes everything else
@@ -88,51 +105,65 @@ const closed = (held: Option.Option<OpenCall>): readonly ModelEvent[] =>
  * what ends the first. What is still open when the stream ends is closed by
  * `lastOf`.
  */
-const collect = (tally: Tally, part: WirePart): Effect.Effect<readonly ModelEvent[]> => {
+const collect = (tally: Tally, part: WirePart): readonly ModelEvent[] => {
   switch (part.kind) {
     case 'callStart': {
-      const opened: OpenCall = { id: part.id, name: part.name, text: part.text ?? '' };
-      return Ref.getAndSet(tally.open, Option.some(opened)).pipe(
-        Effect.zipLeft(Ref.set(tally.called, true)),
-        Effect.map(closed)
-      );
+      const ended = ending(tally);
+      tally.open = { id: part.id, name: part.name, text: part.text ?? '' };
+      tally.called = true;
+      return ended;
     }
     case 'callArguments': {
-      const grow = Option.map((held: OpenCall) => ({ ...held, text: held.text + part.text }));
-      return Effect.as(Ref.update(tally.open, grow), nothing);
+      if (tally.open !== undefined) {
+        tally.open.text += part.text;
+      }
+      return nothing;
     }
     case 'callEnd': {
-      return Effect.map(Ref.getAndSet(tally.open, Option.none()), closed);
+      return ending(tally);
     }
     case 'delta':
     case 'reasoning':
     case 'redacted': {
-      return Effect.succeed([part]);
+      return [part];
     }
   }
 };
 
-const eventsOf = (wire: Wire, tally: Tally, data: string) =>
+/** Everything one frame says: what it cost, why the model stopped, what it said. */
+const read = (wire: Wire, tally: Tally, event: unknown): readonly ModelEvent[] => {
+  const spent = wire.toUsage(event);
+  if (spent !== undefined) {
+    tally.usage = raise(tally.usage, spent);
+  }
+  const reason = wire.toStop(event);
+  if (reason !== undefined) {
+    tally.stop = reason;
+  }
+  const part = wire.toDelta(event);
+  return part === undefined ? nothing : collect(tally, part);
+};
+
+/**
+ * One frame, as the stream sees it. Two operators where there were five, and
+ * the Effect stays because a body that will not parse and a failure the
+ * provider reported mid-answer are both the end of the call and have to fail
+ * it. What was worth removing was the four `Ref`s, not this.
+ */
+const eventsOf = (
+  wire: Wire,
+  tally: Tally,
+  data: string
+): Effect.Effect<readonly ModelEvent[], ModelError> =>
   Effect.try({
-    try: () => JSON.parse(data) as unknown,
+    try: (): unknown => JSON.parse(data),
     catch: cause => new ModelError({ reason: 'body', cause }),
   }).pipe(
-    Effect.filterOrFail(
-      event => !isFailure(event),
-      event => new ModelError({ reason: 'stream', cause: event })
-    ),
-    Effect.tap(event => {
-      const part = wire.toUsage(event);
-      return part === undefined ? Effect.void : Ref.update(tally.usage, held => raise(held, part));
-    }),
-    Effect.tap(event => {
-      const reason = wire.toStop(event);
-      return reason === undefined ? Effect.void : Ref.set(tally.stop, reason);
-    }),
-    Effect.flatMap(event => {
-      const part = wire.toDelta(event);
-      return part === undefined ? Effect.succeed(nothing) : collect(tally, part);
-    })
+    Effect.flatMap(event =>
+      isFailure(event)
+        ? Effect.fail(new ModelError({ reason: 'stream', cause: event }))
+        : Effect.succeed(read(wire, tally, event))
+    )
   );
 
 /**
@@ -147,27 +178,21 @@ const eventsOf = (wire: Wire, tally: Tally, data: string) =>
 const reasonOf = (stop: StopReason, called: boolean): StopReason =>
   called && stop === 'end' ? 'tools' : stop;
 
-/** The last events of every stream: the call still open, the cost, and the reason. */
+/**
+ * The last events of every stream: the call still open, the cost, and the
+ * reason. Suspended, because this is built when the stream is and read when the
+ * stream ends.
+ */
 const lastOf = (tally: Tally): Stream.Stream<ModelEvent> =>
-  Stream.fromIterableEffect(Effect.map(Ref.getAndSet(tally.open, Option.none()), closed)).pipe(
-    Stream.concat(
-      Stream.fromEffect(
-        Effect.all({
-          usage: Ref.get(tally.usage),
-          stop: Ref.get(tally.stop),
-          called: Ref.get(tally.called),
-        })
-      ).pipe(
-        Stream.map(
-          (ended): ModelEvent => ({
-            kind: 'done',
-            usage: ended.usage,
-            stop: reasonOf(ended.stop, ended.called),
-          })
-        )
-      )
-    )
-  );
+  Stream.suspend(() => {
+    const ended = ending(tally);
+    const done: ModelEvent = {
+      kind: 'done',
+      usage: tally.usage,
+      stop: reasonOf(tally.stop, tally.called),
+    };
+    return Stream.fromIterable([...ended, done]);
+  });
 
 /**
  * The handle lives as long as the stream, not as long as the request.
@@ -184,19 +209,18 @@ const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEve
         Effect.sync(() => held?.abort())
       );
       const tally: Tally = {
-        usage: yield* Ref.make(zeroUsage),
-        stop: yield* Ref.make<StopReason>('unknown'),
-        open: yield* Ref.make(Option.none<OpenCall>()),
-        called: yield* Ref.make(false),
+        usage: zeroUsage,
+        stop: 'unknown',
+        open: undefined,
+        called: false,
       };
       const wire = yield* wireFor(gateway.catalog, request.model);
-      const read = sseReader();
+      const frames = sseReader();
 
       return Stream.fromEffect(bodyFor(gateway, { wire, request, handle })).pipe(
         Stream.flatMap(chunksOf),
-        Stream.mapConcat(chunk => read(chunk)),
-        Stream.mapEffect(data => eventsOf(wire, tally, data)),
-        Stream.flattenIterables,
+        Stream.mapConcat(chunk => frames(chunk)),
+        Stream.mapConcatEffect(data => eventsOf(wire, tally, data)),
         Stream.concat(lastOf(tally))
       );
     })

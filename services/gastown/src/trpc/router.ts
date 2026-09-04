@@ -39,7 +39,11 @@ import {
 } from './schemas';
 import type { TRPCContext } from './init';
 import { ContainerBillingError } from '../billing/ContainerBilling.error';
-import { authorizeTown, TownAuthorizationUnavailableError } from '../util/town-authorization.util';
+import {
+  authorizeOrganization,
+  authorizeTown,
+  TownAuthorizationUnavailableError,
+} from '../util/town-authorization.util';
 
 // rpcSafe wrapper for TownConfigSchema (imported from ../types, not ./schemas)
 const RpcTownConfigSchema = z.any().pipe(TownConfigSchema);
@@ -148,7 +152,7 @@ type TownOwnershipResult =
         updated_at: string;
       };
     }
-  | { type: 'org'; stub: RigOwnerStub; orgId: string }
+  | { type: 'org'; stub: RigOwnerStub; orgId: string; role: string }
   | { type: 'admin' };
 
 /**
@@ -166,8 +170,12 @@ export async function resolveTownOwnership(
 ): Promise<TownOwnershipResult> {
   const { userId, isAdmin, orgMemberships: memberships } = ctx;
   const townStub = getTownDOStub(env, townId);
-  const identity = await townStub.getPrivateTownIdentity();
-  if (identity?.runtimeMode === 'modern') {
+  const identityState = await townStub.getTownIdentityState();
+  if (identityState.type === 'invalid') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Town authorization state is invalid' });
+  }
+  if (identityState.type === 'modern') {
+    const identity = identityState.identity;
     let authorization;
     try {
       authorization = await authorizeTown(env, identity, userId, ctx.apiTokenPepper);
@@ -184,6 +192,7 @@ export async function resolveTownOwnership(
         type: 'org',
         stub: getGastownOrgStub(env, authorization.organizationId),
         orgId: authorization.organizationId,
+        role: authorization.role,
       };
     }
     const ownerStub = getGastownUserStub(env, identity.ownerUserId);
@@ -225,12 +234,48 @@ export async function resolveTownOwnership(
       type: 'org',
       stub: getGastownOrgStub(env, config.organization_id),
       orgId: config.organization_id,
+      role: membership.role,
     };
   }
 
   // No owner found — admins can still access the town for debugging
   if (isAdmin) return { type: 'admin' };
   throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+}
+
+/** Authorize organization collection routes with current authority. */
+async function authorizeOrgCollection(ctx: TRPCContext, organizationId: string): Promise<string> {
+  try {
+    const authorization = await authorizeOrganization(
+      ctx.env,
+      organizationId,
+      ctx.userId,
+      ctx.apiTokenPepper
+    );
+    if (!authorization || !('role' in authorization)) throw new TRPCError({ code: 'FORBIDDEN' });
+    return authorization.role;
+  } catch (error) {
+    if (error instanceof TownAuthorizationUnavailableError) {
+      throw new TRPCError({ code: 'SERVICE_UNAVAILABLE', message: 'Authorization unavailable' });
+    }
+    throw error;
+  }
+}
+
+/** A modern town always uses its freshly-resolved role, even for a legacy bearer. */
+async function authorizeExistingOrgTown(
+  ctx: TRPCContext,
+  organizationId: string,
+  townId: string
+): Promise<string> {
+  const ownership = await resolveTownOwnership(ctx.env, ctx, townId);
+  if (ownership.type === 'org') {
+    if (ownership.orgId !== organizationId) throw new TRPCError({ code: 'FORBIDDEN' });
+    return ownership.role;
+  }
+  // Preserve the existing collection-level platform-admin policy. This also
+  // handles legacy towns, whose authorization remains claim-based.
+  return authorizeOrgCollection(ctx, organizationId);
 }
 
 /** Resolve the DO stub that owns rigs/towns. Verifies access via JWT claims. */
@@ -316,7 +361,10 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
   // Fast path: personal rig lookup
   const userStub = getGastownUserStub(env, userId);
   const personalRig = await userStub.getRigAsync(rigId);
-  if (personalRig) return personalRig;
+  if (personalRig) {
+    await resolveTownOwnership(env, ctx, personalRig.town_id);
+    return personalRig;
+  }
 
   // Check org DOs in parallel (billing_manager excluded)
   const orgIds = listAccessibleOrgIds(memberships);
@@ -325,7 +373,10 @@ async function verifyRigOwnership(env: Env, ctx: TRPCContext, rigId: string, tow
       orgIds.map(orgId => getGastownOrgStub(env, orgId).getRigAsync(rigId))
     );
     const orgRig = results.find(r => r !== null);
-    if (orgRig) return orgRig;
+    if (orgRig) {
+      await resolveTownOwnership(env, ctx, orgRig.town_id);
+      return orgRig;
+    }
   }
 
   // Admin bypass: resolve the real owner from TownDO config so we can
@@ -484,8 +535,7 @@ export const gastownRouter = router({
       }
       const ownership = await resolveTownOwnership(ctx.env, ctx, input.townId);
       if (ownership.type === 'org') {
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
-        if (!membership || membership.role !== 'owner') {
+        if (ownership.role !== 'owner') {
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Only org owners can delete towns' });
         }
       }
@@ -532,6 +582,7 @@ export const gastownRouter = router({
       const ownerStub = ownership.stub;
 
       const townStub = getTownDOStub(ctx.env, input.townId);
+      const requiresRuntimeAuthorization = await townStub.requiresRuntimeAuthorization();
 
       // For org towns, use the town owner's identity for credentials;
       // for personal towns the caller is always the owner.
@@ -542,7 +593,7 @@ export const gastownRouter = router({
       // have their own api_token_pepper in ctx). For org towns where
       // a non-owner member adds a rig, keep the existing town token.
       let kilocodeToken: string | undefined;
-      if (credentialUserId === user.id) {
+      if (!requiresRuntimeAuthorization && credentialUserId === user.id) {
         kilocodeToken = await mintKilocodeToken(ctx.env, user);
         await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
       }
@@ -577,7 +628,7 @@ export const gastownRouter = router({
           gitUrl: input.gitUrl,
           defaultBranch: input.defaultBranch,
           userId: credentialUserId,
-          kilocodeToken,
+          kilocodeToken: requiresRuntimeAuthorization ? undefined : kilocodeToken,
           platformIntegrationId: input.platformIntegrationId,
         });
         await townStub.addRig({
@@ -635,8 +686,7 @@ export const gastownRouter = router({
         });
       }
       if (ownership.type === 'org') {
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
-        if (!membership || membership.role !== 'owner') {
+        if (ownership.role !== 'owner') {
           throw new TRPCError({ code: 'FORBIDDEN', message: 'Only org owners can delete rigs' });
         }
       }
@@ -673,8 +723,7 @@ export const gastownRouter = router({
       if (ownership.type === 'org') {
         const townStubForCheck = getTownDOStub(ctx.env, rig.town_id);
         const townConfig = await townStubForCheck.getTownConfig();
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
-        const isOrgOwner = membership?.role === 'owner';
+        const isOrgOwner = ownership.role === 'owner';
         const isTownCreator = ctx.userId === townConfig.created_by_user_id;
         if (!isOrgOwner && !isTownCreator) {
           throw new TRPCError({
@@ -1092,9 +1141,8 @@ export const gastownRouter = router({
 
       const town = getTownDOStub(ctx.env, input.townId);
       if (ownership.type === 'org') {
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
         const townConfig = await town.getTownConfig();
-        const isOrgOwner = membership?.role === 'owner';
+        const isOrgOwner = ownership.role === 'owner';
         const isTownCreator = ctx.userId === townConfig.created_by_user_id;
         if (!isOrgOwner && !isTownCreator) {
           throw new TRPCError({
@@ -1263,8 +1311,7 @@ export const gastownRouter = router({
 
       // Mask secrets for non-owner, non-creator org members
       if (ownership.type === 'org') {
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
-        const isOrgOwner = membership?.role === 'owner';
+        const isOrgOwner = ownership.role === 'owner';
         const isTownCreator = ctx.userId === config.created_by_user_id;
         if (!isOrgOwner && !isTownCreator) {
           const mask = (s?: string) => (s ? '****' + s.slice(-4) : undefined);
@@ -1311,8 +1358,7 @@ export const gastownRouter = router({
 
       // For org towns, only owners or the town creator can update config
       if (ownership.type === 'org') {
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
-        const isOrgOwner = membership?.role === 'owner';
+        const isOrgOwner = ownership.role === 'owner';
         const isTownCreator = ctx.userId === existingConfig.created_by_user_id;
         if (!isOrgOwner && !isTownCreator) {
           throw new TRPCError({
@@ -1378,7 +1424,22 @@ export const gastownRouter = router({
         });
       }
       const townStub = getTownDOStub(ctx.env, input.townId);
+      const runtimeRefresh = await townStub.refreshRuntimeAuthorizationForManualRefresh();
+      if (runtimeRefresh === 'revoked') {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Town runtime requires reauthorization',
+        });
+      }
+      if (runtimeRefresh === 'unavailable') {
+        throw new TRPCError({
+          code: 'SERVICE_UNAVAILABLE',
+          message: 'Runtime authorization unavailable',
+        });
+      }
       await townStub.forceRefreshContainerToken();
+
+      if (runtimeRefresh === 'renewed') return;
 
       // Also remint and push KILOCODE_TOKEN — this is what actually
       // authenticates GT tool calls and is the main reason users hit 401s.
@@ -1426,11 +1487,16 @@ export const gastownRouter = router({
     .input(z.object({ townId: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const town = getTownDOStub(ctx.env, input.townId);
-      const identity = await town.getPrivateTownIdentity();
-      if (!identity)
+      const identityState = await town.getTownIdentityState();
+      if (identityState.type === 'invalid') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Town authorization state is invalid' });
+      }
+      const identity = identityState.identity;
+      if (!identity) {
         throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Town requires recreation' });
+      }
       let modernAuthorization;
-      if (identity.runtimeMode === 'modern') {
+      if (identityState.type === 'modern') {
         try {
           modernAuthorization = await authorizeTown(
             ctx.env,
@@ -1491,8 +1557,7 @@ export const gastownRouter = router({
       if (ownership.type === 'org') {
         const townStub = getTownDOStub(ctx.env, input.townId);
         const config = await townStub.getTownConfig();
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
-        const isOrgOwner = membership?.role === 'owner';
+        const isOrgOwner = ownership.role === 'owner';
         const isTownCreator = ctx.userId === config.created_by_user_id;
         if (!isOrgOwner && !isTownCreator) {
           throw new TRPCError({
@@ -1520,8 +1585,7 @@ export const gastownRouter = router({
       if (ownership.type === 'org') {
         const townStub = getTownDOStub(ctx.env, input.townId);
         const config = await townStub.getTownConfig();
-        const membership = getOrgMembership(ctx.orgMemberships, ownership.orgId);
-        const isOrgOwner = membership?.role === 'owner';
+        const isOrgOwner = ownership.role === 'owner';
         const isTownCreator = ctx.userId === config.created_by_user_id;
         if (!isOrgOwner && !isTownCreator) {
           throw new TRPCError({
@@ -1663,9 +1727,7 @@ export const gastownRouter = router({
     .input(z.object({ organizationId: z.string().uuid() }))
     .output(z.array(RpcOrgTownOutput))
     .query(async ({ input, ctx }) => {
-      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
-      if (!membership || membership.role === 'billing_manager')
-        throw new TRPCError({ code: 'FORBIDDEN' });
+      await authorizeOrgCollection(ctx, input.organizationId);
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       return stub.listTowns();
     }),
@@ -1674,9 +1736,7 @@ export const gastownRouter = router({
     .input(z.object({ organizationId: z.string().uuid(), name: z.string().min(1).max(64) }))
     .output(RpcOrgTownOutput)
     .mutation(async ({ input, ctx }) => {
-      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
-      if (!membership || membership.role === 'billing_manager')
-        throw new TRPCError({ code: 'FORBIDDEN' });
+      await authorizeOrgCollection(ctx, input.organizationId);
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await stub.createTown({
         name: input.name,
@@ -1720,11 +1780,13 @@ export const gastownRouter = router({
   deleteOrgTown: gastownProcedure
     .input(z.object({ organizationId: z.string().uuid(), townId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
-      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
-      if (!membership || membership.role !== 'owner') throw new TRPCError({ code: 'FORBIDDEN' });
+      const role = await authorizeOrgCollection(ctx, input.organizationId);
+      if (role !== 'owner') throw new TRPCError({ code: 'FORBIDDEN' });
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await stub.getTownAsync(input.townId);
       if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+      const townRole = await authorizeExistingOrgTown(ctx, input.organizationId, input.townId);
+      if (townRole !== 'owner') throw new TRPCError({ code: 'FORBIDDEN' });
 
       // Destroy the Town DO (handles all rigs, agents, and mayor cleanup)
       try {
@@ -1744,12 +1806,11 @@ export const gastownRouter = router({
     .input(z.object({ organizationId: z.string().uuid(), townId: z.string().uuid() }))
     .output(z.array(RpcRigOutput))
     .query(async ({ input, ctx }) => {
-      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
-      if (!membership || membership.role === 'billing_manager')
-        throw new TRPCError({ code: 'FORBIDDEN' });
+      await authorizeOrgCollection(ctx, input.organizationId);
       const stub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await stub.getTownAsync(input.townId);
       if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+      await authorizeExistingOrgTown(ctx, input.organizationId, input.townId);
       return stub.listRigs(input.townId);
     }),
 
@@ -1766,22 +1827,22 @@ export const gastownRouter = router({
     )
     .output(RpcRigOutput)
     .mutation(async ({ input, ctx }) => {
-      const membership = getOrgMembership(ctx.orgMemberships, input.organizationId);
-      if (!membership || membership.role === 'billing_manager')
-        throw new TRPCError({ code: 'FORBIDDEN' });
+      await authorizeOrgCollection(ctx, input.organizationId);
 
       const orgStub = getGastownOrgStub(ctx.env, input.organizationId);
       const town = await orgStub.getTownAsync(input.townId);
       if (!town) throw new TRPCError({ code: 'NOT_FOUND', message: 'Town not found' });
+      await authorizeExistingOrgTown(ctx, input.organizationId, input.townId);
 
       const townStub = getTownDOStub(ctx.env, input.townId);
+      const requiresRuntimeAuthorization = await townStub.requiresRuntimeAuthorization();
       // Use the town owner's identity for credentials. Only re-mint the
       // kilocode token if the caller is the owner (they have their pepper
       // in ctx). For non-owner members, keep the existing town token.
       const townConfig = await townStub.getTownConfig();
       const credentialUserId = townConfig.owner_user_id ?? ctx.userId;
       let kilocodeToken: string | undefined;
-      if (credentialUserId === ctx.userId) {
+      if (!requiresRuntimeAuthorization && credentialUserId === ctx.userId) {
         kilocodeToken = await mintKilocodeToken(ctx.env, userFromCtx(ctx));
         await townStub.updateTownConfig({ kilocode_token: kilocodeToken });
       }
@@ -1814,7 +1875,7 @@ export const gastownRouter = router({
           gitUrl: input.gitUrl,
           defaultBranch: input.defaultBranch,
           userId: credentialUserId,
-          kilocodeToken,
+          kilocodeToken: requiresRuntimeAuthorization ? undefined : kilocodeToken,
           platformIntegrationId: input.platformIntegrationId,
         });
         await townStub.addRig({

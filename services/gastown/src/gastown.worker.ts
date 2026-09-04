@@ -1364,6 +1364,7 @@ app.use(
       gastownAccess: c.get('kiloGastownAccess') ?? false,
       orgMemberships: c.get('kiloOrgMemberships') ?? [],
       controlToken: c.get('kiloControlToken') ?? '',
+      usesModernToken: c.get('kiloUsesModernToken') ?? false,
     }),
     onError: ({ error, path }: { error: Error; path?: string }) => {
       console.error(`[gastown-trpc] error on ${path ?? 'unknown'}:`, error.message);

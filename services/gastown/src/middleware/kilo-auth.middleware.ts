@@ -2,6 +2,7 @@ import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils/extract-bearer-token';
 import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import { decodeJwt } from 'jose';
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 import { resolveSecret } from '../util/secret.util';
@@ -42,6 +43,7 @@ export const kiloAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
     c.set('kiloGastownAccess', payload.gastownAccess === true);
     c.set('kiloOrgMemberships', payload.orgMemberships ?? []);
     c.set('kiloControlToken', token);
+    c.set('kiloUsesModernToken', typeof decodeJwt(token).tokenPurpose === 'string');
     logger.setTags({ userId: payload.kiloUserId });
   } catch (err) {
     console.warn(

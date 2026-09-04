@@ -4,7 +4,11 @@ const select = vi.fn();
 
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn(() => ({ select })) }));
 
-import { authorizeTown } from './town-authorization.util';
+import {
+  authorizeOrganization,
+  authorizeTown,
+  TownAuthorizationUnavailableError,
+} from './town-authorization.util';
 
 const identity = {
   ownerType: 'org' as const,
@@ -63,6 +67,36 @@ describe('authorizeTown', () => {
     ).resolves.toEqual({ type: 'admin' });
   });
 
+  it('reports a personal-town authority database failure as unavailable', async () => {
+    select.mockImplementation(() => {
+      throw new Error('database unavailable');
+    });
+    await expect(
+      authorizeTown(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        { ...identity, ownerType: 'user', organizationId: undefined },
+        'user',
+        'pepper'
+      )
+    ).rejects.toBeInstanceOf(TownAuthorizationUnavailableError);
+  });
+
+  it('uses one principal query and one membership query for a non-admin org member', async () => {
+    rows(
+      [{ pepper: 'pepper', blockedAt: null, blockedReason: null, isAdmin: false }],
+      [{ role: 'member' }]
+    );
+    await expect(
+      authorizeTown(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        identity,
+        'user',
+        'pepper'
+      )
+    ).resolves.toEqual({ type: 'org', organizationId: 'org-1', role: 'member' });
+    expect(select).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     ['removed member', []],
     ['cached billing manager role', [{ role: 'billing_manager' }]],
@@ -76,5 +110,56 @@ describe('authorizeTown', () => {
         'pepper'
       )
     ).resolves.toBeNull();
+  });
+});
+
+describe('authorizeOrganization', () => {
+  it.each([
+    ['removed member', [{ pepper: 'pepper', blockedAt: null, blockedReason: null }], []],
+    [
+      'demoted member',
+      [{ pepper: 'pepper', blockedAt: null, blockedReason: null }],
+      [{ role: 'billing_manager' }],
+    ],
+    ['missing pepper', [{ pepper: null, blockedAt: null, blockedReason: null }], []],
+    ['mismatched pepper', [{ pepper: 'other', blockedAt: null, blockedReason: null }], []],
+    ['blocked user', [{ pepper: 'pepper', blockedAt: '2026-01-01', blockedReason: null }], []],
+    ['deleted organization', [{ pepper: 'pepper', blockedAt: null, blockedReason: null }], []],
+  ])('rejects a %s', async (_name, principal, membership) => {
+    rows(principal, membership);
+    await expect(
+      authorizeOrganization(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        'org-1',
+        'user',
+        'pepper'
+      )
+    ).resolves.toBeNull();
+  });
+
+  it('returns the current membership role', async () => {
+    rows([{ pepper: 'pepper', blockedAt: null, blockedReason: null }], [{ role: 'member' }]);
+    await expect(
+      authorizeOrganization(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        'org-1',
+        'user',
+        'pepper'
+      )
+    ).resolves.toEqual({ role: 'member' });
+  });
+
+  it('reports an authority database failure as unavailable', async () => {
+    select.mockImplementation(() => {
+      throw new Error('database unavailable');
+    });
+    await expect(
+      authorizeOrganization(
+        { HYPERDRIVE: { connectionString: 'postgres://' } } as Env,
+        'org-1',
+        'user',
+        'pepper'
+      )
+    ).rejects.toBeInstanceOf(TownAuthorizationUnavailableError);
   });
 });

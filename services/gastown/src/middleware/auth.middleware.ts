@@ -17,6 +17,7 @@ export type AuthVariables = {
   kiloGastownAccess: boolean;
   kiloOrgMemberships: JwtOrgMembership[];
   kiloControlToken: string;
+  kiloUsesModernToken: boolean;
   requestStartTime: number;
   orgId?: string;
   orgRole?: string;

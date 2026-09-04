@@ -19,25 +19,29 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
   if (!userId) return c.json(resError('Authentication required'), 401);
 
   const townStub = getTownDOStub(c.env, townId);
-  const identity = await townStub.getPrivateTownIdentity();
-  if (identity) {
+  const identityState = await townStub.getTownIdentityState();
+  if (identityState.type === 'invalid') {
+    return c.json(resError('Town authorization state is invalid'), 403);
+  }
+  const identity = identityState.identity;
+  if (identityState.type === 'modern') {
     try {
       const authorization = await authorizeTown(
         c.env,
-        identity,
+        identityState.identity,
         userId,
         c.get('kiloApiTokenPepper')
       );
-      if (identity.runtimeMode === 'modern') {
-        if (!authorization) return c.json(resError('Forbidden'), 403);
-        return next();
-      }
+      if (!authorization) return c.json(resError('Forbidden'), 403);
+      return next();
     } catch (error) {
       if (error instanceof TownAuthorizationUnavailableError) {
         return c.json(resError('Authorization unavailable'), 503);
       }
       throw error;
     }
+  }
+  if (identity) {
     if (c.get('kiloIsAdmin')) return next();
     if (identity.ownerType === 'user') {
       if (identity.ownerUserId !== userId) return c.json(resError('Forbidden'), 403);

@@ -6,6 +6,7 @@ import { signModernKiloToken, verifyKiloTokenForPolicy } from './kilo-token-poli
 import type { RuntimeAuthorization } from './runtime-authorization-contract.js';
 import {
   RuntimeAuthorizationSchema,
+  runtimeAuthorizationMaximumLifetimeMs,
   RuntimeResourceKindSchema,
 } from './runtime-authorization-contract.js';
 export { RuntimeAuthorizationSchema };
@@ -50,6 +51,19 @@ export class RuntimeAuthorizationRevokedError extends Error {
     super('Runtime authorization has been revoked');
     this.name = 'RuntimeAuthorizationRevokedError';
   }
+}
+
+export class RuntimeAuthorizationExpiredError extends Error {
+  constructor() {
+    super('Runtime authorization delegation has expired');
+    this.name = 'RuntimeAuthorizationExpiredError';
+  }
+}
+
+function currentDate(now?: Date): Date {
+  const value = now ?? new Date();
+  if (!Number.isFinite(value.getTime())) throw new Error('Invalid runtime authorization time');
+  return new Date(value.getTime());
 }
 
 async function digest(value: string | null): Promise<string> {
@@ -166,6 +180,7 @@ export async function createRuntimeAuthorization(
     resourceKind: RuntimeAuthorization['resourceKind'];
     resourceId: string;
     organizationId?: string;
+    now?: Date;
   }
 ): Promise<{ authorization: RuntimeAuthorization; token: string; expiresAt: string }> {
   const resourceKind = RuntimeResourceKindSchema.parse(input.resourceKind);
@@ -230,6 +245,7 @@ export async function createRuntimeAuthorization(
     userMembershipId = userMembership.id;
     authorizationUserMembershipId = authorizationMembership.id;
   }
+  const now = currentDate(input.now);
   const authorization = RuntimeAuthorizationSchema.parse({
     version: 1,
     id: crypto.randomUUID(),
@@ -238,7 +254,10 @@ export async function createRuntimeAuthorization(
     userId: user.id,
     authorizationUserId: authorizationUser.id,
     organizationId: input.organizationId,
-    issuedAt: new Date().toISOString(),
+    issuedAt: now.toISOString(),
+    delegationExpiresAt: new Date(
+      now.getTime() + runtimeAuthorizationMaximumLifetimeMs(resourceKind)
+    ).toISOString(),
     state: 'active',
     bindings: {
       userPepperDigest: await digest(user.apiTokenPepper),
@@ -254,15 +273,20 @@ export async function createRuntimeAuthorization(
     },
     env: claims.env,
   });
-  const signed = await issueRuntimeToken(authorization, user.apiTokenPepper, input.secret);
+  const signed = await issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
   return { authorization, ...signed };
 }
 
 async function issueRuntimeToken(
   authorization: RuntimeAuthorization,
   pepper: string | null,
-  secret: string
+  secret: string,
+  now: Date
 ): Promise<{ token: string; expiresAt: string }> {
+  const maximumExpiration = Math.floor(Date.parse(authorization.delegationExpiresAt) / 1000);
+  const issuedAt = Math.floor(now.getTime() / 1000);
+  const expiresInSeconds = Math.min(60 * 60, maximumExpiration - issuedAt);
+  if (expiresInSeconds <= 0) throw new RuntimeAuthorizationExpiredError();
   const audiences =
     authorization.resourceKind === 'cloud-agent-next'
       ? ['kilo-api', 'kilo-gateway', 'session-ingest']
@@ -271,7 +295,8 @@ async function issueRuntimeToken(
     userId: authorization.userId,
     pepper,
     secret,
-    expiresInSeconds: 60 * 60,
+    expiresInSeconds,
+    now,
     audience: audiences,
     tokenPurpose: 'delegated-workload',
     credentialExchange: false,
@@ -291,12 +316,16 @@ async function issueRuntimeToken(
 }
 
 export async function renewRuntimeAuthorization(
-  input: CommonInput & { authorization: RuntimeAuthorization }
+  input: CommonInput & { authorization: RuntimeAuthorization; now?: Date }
 ): Promise<{ token: string; expiresAt: string }> {
   const authorization = RuntimeAuthorizationSchema.parse(input.authorization);
   if (authorization.state !== 'active') throw new RuntimeAuthorizationRevokedError();
+  const now = currentDate(input.now);
+  if (now.getTime() >= Date.parse(authorization.delegationExpiresAt)) {
+    throw new RuntimeAuthorizationExpiredError();
+  }
   const { user } = await requireBindings(input, authorization);
-  return issueRuntimeToken(authorization, user.apiTokenPepper, input.secret);
+  return issueRuntimeToken(authorization, user.apiTokenPepper, input.secret, now);
 }
 
 const sealedRecord = z.object({

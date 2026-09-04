@@ -17,6 +17,7 @@ import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
+import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
@@ -198,6 +199,7 @@ export type JWTTokenPayload = {
   kiloUserId: string;
   version: number;
   apiTokenPepper?: string;
+  runtimeAuthorization?: unknown;
 } & JWTTokenExtraPayload;
 
 function tryJwtVerify(token: string) {
@@ -214,7 +216,7 @@ function tryJwtVerify(token: string) {
 
 export function validateAuthorizationHeader(
   headers: Headers,
-  options?: { expectedAudience?: string }
+  options?: { expectedAudience?: string; runtimeProxyAttestationVerified?: boolean }
 ) {
   const traceability_logging_id = crypto.randomUUID();
   const authHeader = headers.get('authorization');
@@ -247,6 +249,21 @@ export function validateAuthorizationHeader(
       kiloUserId: payload.kiloUserId,
     });
     return { error: `Token version outdated, please re-authenticate (${traceability_logging_id})` };
+  }
+
+  if (
+    typeof payload.runtimeAuthorization === 'object' &&
+    payload.runtimeAuthorization !== null &&
+    'resourceKind' in payload.runtimeAuthorization &&
+    payload.runtimeAuthorization.resourceKind === 'cloud-agent-next'
+  ) {
+    const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
+      payload.runtimeAuthorization
+    );
+    if (!runtimeAuthorization.success || !options?.runtimeProxyAttestationVerified) {
+      warnExceptInTest(`Invalid token (${traceability_logging_id})`);
+      return { error: `Invalid token (${traceability_logging_id})` };
+    }
   }
 
   return {
@@ -337,7 +354,6 @@ export function generateWorkflowGatewayToken(
     organizationId?: string;
     tokenSource: string;
     expiresIn?: number;
-    authorizationUser?: User;
   }
 ): string {
   if (!isSharedResourceTokenIssuanceEnabled()) {
@@ -345,10 +361,6 @@ export function generateWorkflowGatewayToken(
   }
   if (!user.api_token_pepper) {
     throw new Error('Workflow gateway tokens require a current user pepper');
-  }
-  const authorizationUser = options.authorizationUser ?? user;
-  if (!authorizationUser.api_token_pepper) {
-    throw new Error('Workflow gateway tokens require a current authorization pepper');
   }
   const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
   if (expiresIn <= 0) {

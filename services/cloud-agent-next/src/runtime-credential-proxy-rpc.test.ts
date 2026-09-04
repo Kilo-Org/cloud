@@ -21,6 +21,7 @@ type Fence = {
 };
 
 function authorization(state: 'active' | 'revoked' = 'active'): RuntimeAuthorization {
+  const issuedAt = new Date(Date.now());
   return {
     version: 1,
     id: authorizationId,
@@ -29,7 +30,8 @@ function authorization(state: 'active' | 'revoked' = 'active'): RuntimeAuthoriza
     userId: 'user_1',
     authorizationUserId: 'user_1',
     organizationId: 'org_1',
-    issuedAt: '2026-01-01T00:00:00.000Z',
+    issuedAt: issuedAt.toISOString(),
+    delegationExpiresAt: new Date(issuedAt.getTime() + 24 * 60 * 60_000).toISOString(),
     state,
     bindings: { userPepperDigest: 'a'.repeat(64), authorizationPepperDigest: 'b'.repeat(64) },
     source: { admissionSource: 'user' },
@@ -138,6 +140,26 @@ describe('persisted runtime credential proxy RPC', () => {
     vi.useRealTimers();
   });
 
+  it('caps a proxy lease to the remaining delegation duration and issues no handle at its deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T23:40:00.000Z'));
+    const store = storage();
+    const expiringAuthorization = authorization();
+    expiringAuthorization.delegationExpiresAt = '2026-01-02T00:00:00.000Z';
+
+    await expect(issue({ store, currentAuthorization: expiringAuthorization })).resolves.toEqual(
+      expect.any(String)
+    );
+    const grant = await store.get<RuntimeProxyGrant>(RUNTIME_PROXY_GRANT_KEY);
+    expect(grant?.leaseExpiresAt).toBe(Date.UTC(2026, 0, 2));
+
+    vi.setSystemTime(new Date('2026-01-02T00:00:00.000Z'));
+    await expect(
+      issue({ store: storage(), currentAuthorization: expiringAuthorization })
+    ).resolves.toBeNull();
+    vi.useRealTimers();
+  });
+
   it('resolves a valid handle with its existing backing token', async () => {
     const store = storage();
     const token = signedToken(Date.now() + 10 * 60_000);
@@ -154,7 +176,15 @@ describe('persisted runtime credential proxy RPC', () => {
         fence: async () => fence(),
         token: getToken,
       })
-    ).resolves.toEqual({ token, organizationId: 'org_1' });
+    ).resolves.toEqual({
+      token,
+      organizationId: 'org_1',
+      runtimeAuthorization: {
+        userId: 'user_1',
+        authorizationId,
+        resourceId: 'agent_1',
+      },
+    });
     expect(getToken).toHaveBeenCalledTimes(1);
   });
 

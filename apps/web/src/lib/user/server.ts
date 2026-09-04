@@ -1,6 +1,11 @@
 import { getEnvVariable } from '@/lib/dotenvx';
 import 'server-only';
 import { validateAuthorizationHeader, JWT_TOKEN_VERSION } from '@/lib/tokens';
+import {
+  CloudAgentNextRuntimeAuthorizationClaimSchema,
+  RuntimeProxyAttestationAudienceSchema,
+  verifyRuntimeProxyAttestation,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 import { NextResponse } from 'next/server';
 import { cookies, headers } from 'next/headers';
 
@@ -1219,8 +1224,35 @@ async function resolveUserFromAuth(
   // all calls from the extension including the openrouter proxy call use this auth method
   // also val.town and other blessed API users who are given their own custom JWTs use this path
   if (headersList.get('Authorization')) {
+    const rawAuthorization = headersList.get('Authorization');
+    const bearer = rawAuthorization?.match(/^Bearer (.+)$/i)?.[1];
+    const decoded = bearer ? jwt.decode(bearer) : null;
+    const decodedPayload = decoded !== null && typeof decoded !== 'string' ? decoded : null;
+    const decodedRuntimeAuthorization = decodedPayload?.runtimeAuthorization;
+    const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
+      decodedRuntimeAuthorization
+    );
+    const attestationAudience = RuntimeProxyAttestationAudienceSchema.safeParse(
+      opts.expectedAudience ?? KILO_API_AUDIENCE
+    );
+    const runtimeProxyAttestationVerified =
+      bearer !== undefined &&
+      runtimeAuthorization.success &&
+      attestationAudience.success &&
+      typeof decodedPayload?.kiloUserId === 'string'
+        ? await verifyRuntimeProxyAttestation({
+            value: headersList.get('X-Kilo-Runtime-Proxy-Attestation'),
+            secret: NEXTAUTH_SECRET,
+            audience: attestationAudience.data,
+            userId: decodedPayload.kiloUserId,
+            authorizationId: runtimeAuthorization.data.id,
+            resourceId: runtimeAuthorization.data.resourceId,
+            bearer,
+          })
+        : false;
     const authorizationValidationResult = validateAuthorizationHeader(headersList, {
       expectedAudience: opts.expectedAudience,
+      runtimeProxyAttestationVerified,
     });
     if (authorizationValidationResult.error != undefined) {
       return authError(401, authorizationValidationResult.error, '?');

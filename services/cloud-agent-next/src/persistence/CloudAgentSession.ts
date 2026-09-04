@@ -1780,9 +1780,11 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  async resolveRuntimeCredentialProxyGrant(
-    handle: string
-  ): Promise<{ token: string; organizationId?: string } | null> {
+  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null> {
     return resolvePersistedRuntimeProxyCredential({
       env: this.env,
       storage: this.ctx.storage,

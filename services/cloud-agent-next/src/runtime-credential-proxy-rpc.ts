@@ -12,6 +12,7 @@ import {
   type RuntimeProxyGrant,
 } from './runtime-credential-proxy.js';
 import type { SessionMetadata } from './persistence/session-metadata.js';
+import type { Env } from './types.js';
 
 type Storage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -58,21 +59,27 @@ function sameFence(left: RuntimeProxyFence, right: RuntimeProxyFence): boolean {
  * can never lengthen the persisted lease.
  */
 export async function issuePersistedRuntimeProxyGrant(input: {
-  env: { NEXTAUTH_SECRET: unknown };
+  env: Pick<Env, 'NEXTAUTH_SECRET'>;
   storage: Storage;
   metadata: SessionMetadata | null;
   authorization: RuntimeAuthorization | null;
   fence: RuntimeProxyFence | null;
   token: string | null;
   mode: RuntimeProxyGrant['mode'];
+  now?: number;
 }): Promise<string | null> {
+  const now = input.now ?? Date.now();
   const current = input.metadata && input.fence ? context(input.metadata, input.fence) : null;
   const tokenExpiresAt = input.token ? tokenExpiry(input.token) : null;
+  const delegationExpiresAt =
+    input.authorization === null ? null : Date.parse(input.authorization.delegationExpiresAt);
   if (
     !current ||
     !tokenExpiresAt ||
-    tokenExpiresAt <= Date.now() ||
-    input.authorization?.state !== 'active'
+    tokenExpiresAt <= now ||
+    input.authorization?.state !== 'active' ||
+    !delegationExpiresAt ||
+    delegationExpiresAt <= now
   )
     return null;
   const existing = await input.storage.get<unknown>(RUNTIME_PROXY_GRANT_KEY);
@@ -88,39 +95,46 @@ export async function issuePersistedRuntimeProxyGrant(input: {
     parsedExisting.data.allocationId === current.fence.allocationId &&
     sameFence(parsedExisting.data, current.fence) &&
     parsedExisting.data.mode === input.mode &&
-    parsedExisting.data.leaseExpiresAt > Date.now()
+    parsedExisting.data.leaseExpiresAt > now &&
+    parsedExisting.data.leaseExpiresAt <= delegationExpiresAt
   ) {
     return issueRuntimeCredentialProxyHandle(
-      input.env as never,
+      input.env,
       parsedExisting.data,
       parsedExisting.data.issuedAt
     );
   }
-  const issuedAt = Date.now();
+  const issuedAt = now;
   const { fence, ...identity } = current;
   const grant = createRuntimeProxyGrant({
     authorizationId: input.authorization.id,
     ...identity,
     ...fence,
     mode: input.mode,
-    leaseExpiresAt: issuedAt + RUNTIME_PROXY_LEASE_MS,
+    leaseExpiresAt: Math.min(issuedAt + RUNTIME_PROXY_LEASE_MS, delegationExpiresAt),
     state: 'active',
     issuedAt,
   });
   await input.storage.put(RUNTIME_PROXY_GRANT_KEY, grant);
-  return issueRuntimeCredentialProxyHandle(input.env as never, grant, issuedAt);
+  return issueRuntimeCredentialProxyHandle(input.env, grant, issuedAt);
 }
 
 export async function resolvePersistedRuntimeProxyCredential(input: {
-  env: { NEXTAUTH_SECRET: unknown };
+  env: Pick<Env, 'NEXTAUTH_SECRET'>;
   storage: Storage;
   handle: string;
   metadata: () => Promise<SessionMetadata | null>;
   authorization: () => Promise<RuntimeAuthorization | null>;
   fence: () => Promise<RuntimeProxyFence | null>;
   token: () => Promise<string | null>;
-}): Promise<{ token: string; organizationId?: string } | null> {
-  const claims = await verifyRuntimeCredentialProxyHandle(input.env as never, input.handle);
+  now?: number;
+}): Promise<{
+  token: string;
+  organizationId?: string;
+  runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+} | null> {
+  const now = input.now ?? Date.now();
+  const claims = await verifyRuntimeCredentialProxyHandle(input.env, input.handle);
   if (!claims || !('sessionId' in claims)) return null;
   const [metadata, authorization, fence, grant] = await Promise.all([
     input.metadata(),
@@ -134,19 +148,20 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
     !matchesRuntimeProxyGrant(grant, claims, {
       ...current,
       authorizationId: authorization.id,
-      now: Date.now(),
+      now,
     })
   )
     return null;
   const backingToken = await input.token();
   if (!backingToken) return null;
   const resolved = await resolveRuntimeProxyCredential({
-    env: input.env as never,
+    env: input.env,
     handle: input.handle,
     grant,
     authorization,
     context: current,
     token: backingToken,
+    now,
     renew: async () => (await input.token()) ?? '',
   });
   if (!resolved?.token) return null;
@@ -165,7 +180,7 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
     !matchesRuntimeProxyGrant(latestGrant, claims, {
       ...latest,
       authorizationId: latestAuthorization.id,
-      now: Date.now(),
+      now,
     })
   ) {
     return null;
@@ -173,5 +188,10 @@ export async function resolvePersistedRuntimeProxyCredential(input: {
   return {
     token: resolved.token,
     ...(latest.orgId ? { organizationId: latest.orgId } : {}),
+    runtimeAuthorization: {
+      userId: latestAuthorization.userId,
+      authorizationId: latestAuthorization.id,
+      resourceId: latestAuthorization.resourceId,
+    },
   };
 }

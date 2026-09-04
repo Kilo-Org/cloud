@@ -313,6 +313,7 @@ export type SignModernKiloTokenParams = {
   env?: string;
   audience: string | string[];
   extra?: z.infer<typeof modernTokenExtra>;
+  now?: Date;
 } & ModernKiloTokenSigningPurpose;
 
 export function buildModernKiloTokenPayload(
@@ -347,7 +348,9 @@ export async function signModernKiloToken(
   params: SignModernKiloTokenParams
 ): Promise<{ token: string; expiresAt: string }> {
   const expiresInSeconds = positiveSafeInteger.parse(params.expiresInSeconds);
-  const issuedAt = Math.floor(Date.now() / 1000);
+  const now = params.now ?? new Date();
+  if (!Number.isFinite(now.getTime())) throw new Error('Invalid token issuance time');
+  const issuedAt = Math.floor(now.getTime() / 1000);
   const expiresAt = issuedAt + expiresInSeconds;
   if (!Number.isSafeInteger(expiresAt)) {
     throw new Error('Token expiration exceeds the safe integer range');

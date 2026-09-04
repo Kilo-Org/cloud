@@ -10,6 +10,10 @@ import {
   issueRuntimeCredentialProxyHandle,
   issueWorktreeRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
+import {
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+  verifyRuntimeProxyAttestation,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 const {
   getRunningTerminalClientMock,
@@ -773,6 +777,11 @@ describe('server runtime credential proxy', () => {
     const resolve = vi.fn().mockResolvedValue({
       token: 'https://provider.example.test/api/openrouter:backing-token',
       organizationId: 'org_proxy',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
     });
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn(async (request: Request) => {
@@ -781,8 +790,22 @@ describe('server runtime credential proxy', () => {
       expect(await request.text()).toBe('{"stream":true}');
       expect(request.headers.get('authorization')).toMatch(/^Bearer /);
       expect(request.headers.get('authorization')).not.toBe('Bearer caller-token');
+      expect(request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).not.toBe(
+        'caller-supplied-proof'
+      );
       expect(request.headers.get('cookie')).toBeNull();
       expect(request.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
+      await expect(
+        verifyRuntimeProxyAttestation({
+          value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+          secret,
+          audience: 'kilo-gateway',
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+          bearer: 'https://provider.example.test/api/openrouter:backing-token',
+        })
+      ).resolves.toBe(true);
       return new Response('stream-body', {
         status: 307,
         headers: { Location: 'https://other.test' },
@@ -798,6 +821,7 @@ describe('server runtime credential proxy', () => {
             Authorization: `Bearer ${await handle()}`,
             Cookie: 'session=caller',
             'X-Kilocode-OrganizationId': 'attacker-org',
+            [RUNTIME_PROXY_ATTESTATION_HEADER]: 'caller-supplied-proof',
             'Content-Type': 'application/json',
           },
           body: '{"stream":true}',
@@ -812,9 +836,180 @@ describe('server runtime credential proxy', () => {
     vi.unstubAllGlobals();
   });
 
+  it('removes every adjacent prohibited header before injecting runtime credentials', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://provider.example.test/api/openrouter:backing-token',
+        organizationId: 'org_proxy',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const prohibited = [
+      'forwarded',
+      'proxy-connection',
+      'proxy-a',
+      'proxy-b',
+      'x-forwarded-a',
+      'x-forwarded-b',
+      'x-internal-a',
+      'x-internal-b',
+      'x-kilo-a',
+      'x-kilo-b',
+      'x-kilocode-a',
+      'x-kilocode-b',
+      'x-real-ip',
+    ];
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
+          {
+            headers: {
+              ...Object.fromEntries(prohibited.map(name => [name, 'untrusted'])),
+              Authorization: `Bearer ${await handle()}`,
+              'X-Kilocode-OrganizationId': 'attacker-org',
+              'X-Client-Request-Id': 'request_proxy',
+            },
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      expect(upstream).toHaveBeenCalledOnce();
+      const forwarded = upstream.mock.calls[0][0] as Request;
+      for (const name of prohibited) expect(forwarded.headers.get(name)).toBeNull();
+      expect(forwarded.headers.get('authorization')).toBe(
+        'Bearer https://provider.example.test/api/openrouter:backing-token'
+      );
+      expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
+      expect(forwarded.headers.get('x-client-request-id')).toBe('request_proxy');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('removes generic caller credential headers before injecting runtime credentials', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://provider.example.test/api/openrouter:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const callerCredentials = ['x-api-key', 'api-key', 'x-auth-token'];
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
+          {
+            headers: {
+              ...Object.fromEntries(callerCredentials.map(name => [name, 'caller-credential'])),
+              Authorization: `Bearer ${await handle()}`,
+            },
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      const forwarded = upstream.mock.calls[0][0] as Request;
+      for (const name of callerCredentials) expect(forwarded.headers.get(name)).toBeNull();
+      expect(forwarded.headers.get('authorization')).toBe(
+        'Bearer https://provider.example.test/api/openrouter:backing-token'
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('removes unsafe upstream response headers while preserving redirects and streaming', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://provider.example.test/api/openrouter:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const unsafeHeaders = [
+      'connection',
+      'proxy-connection',
+      'keep-alive',
+      'proxy-authenticate',
+      'proxy-authorization',
+      'te',
+      'trailer',
+      'transfer-encoding',
+      'upgrade',
+      'set-cookie',
+    ];
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('stream-body'));
+        controller.close();
+      },
+    });
+    const upstream = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 307,
+        statusText: 'Temporary Redirect',
+        headers: {
+          ...Object.fromEntries(unsafeHeaders.map(name => [name, 'unsafe'])),
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-cache',
+          location: 'https://other.test/continue',
+          [RUNTIME_PROXY_ATTESTATION_HEADER]: 'upstream-proof',
+        },
+      })
+    );
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
+          { headers: { Authorization: `Bearer ${await handle()}` } }
+        ),
+        env
+      );
+      expect(response.status).toBe(307);
+      expect(response.statusText).toBe('Temporary Redirect');
+      expect(response.headers.get('location')).toBe('https://other.test/continue');
+      expect(response.headers.get('content-type')).toBe('text/event-stream');
+      expect(response.headers.get('cache-control')).toBe('no-cache');
+      for (const name of unsafeHeaders) expect(response.headers.get(name)).toBeNull();
+      expect(response.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).toBeNull();
+      await expect(response.text()).resolves.toBe('stream-body');
+      expect(upstream.mock.calls[0][1]).toEqual({ redirect: 'manual' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('forwards packaged CLI inference requests to the production gateway', async () => {
     const env = createEnv();
-    const resolve = vi.fn().mockResolvedValue({ token: jwt.sign({ exp: 4_000_000_000 }, secret) });
+    const resolve = vi.fn().mockResolvedValue({
+      token: jwt.sign({ exp: 4_000_000_000 }, secret),
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn(async (request: Request) => {
       expect(request.method).toBe('POST');
@@ -861,7 +1056,14 @@ describe('server runtime credential proxy', () => {
     const resolveCredential = vi
       .fn()
       .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ token: jwt.sign({ exp: 4_000_000_000 }, secret) });
+      .mockResolvedValueOnce({
+        token: jwt.sign({ exp: 4_000_000_000 }, secret),
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      });
     env.SANDBOX_CONTROL.getByName.mockReturnValue({
       resolveWorktreeRuntimeCredentialProxyGrant: resolveMembers,
     });
@@ -941,7 +1143,14 @@ describe('server runtime credential proxy', () => {
 
   it('validates the body-bound ingest identity before fetching upstream', async () => {
     const env = createEnv();
-    const resolve = vi.fn().mockResolvedValue({ token: jwt.sign({ exp: 4_000_000_000 }, secret) });
+    const resolve = vi.fn().mockResolvedValue({
+      token: jwt.sign({ exp: 4_000_000_000 }, secret),
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);

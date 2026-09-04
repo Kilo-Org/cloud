@@ -6,6 +6,7 @@ import {
   renewRuntimeAuthorization,
   sealRuntimeAuthorization,
   unsealRuntimeAuthorization,
+  RuntimeAuthorizationExpiredError,
   RuntimeAuthorizationRevokedError,
 } from './runtime-authorization.js';
 import type {
@@ -120,6 +121,99 @@ describe('runtime authorization', () => {
       credentialExchange: false,
       runtimeAuthorization: { id: result.authorization.id, resourceId: 'session' },
     });
+  });
+
+  it('sets a fixed resource-specific delegation deadline independently of control expiry', async () => {
+    vi.useFakeTimers();
+    const now = new Date('2026-01-01T00:00:00.000Z');
+    vi.setSystemTime(now);
+    const cloudAgent = await createRuntimeAuthorization({
+      token: (await admission({ expiresInSeconds: 60 })).token,
+      secret,
+      connectionString: 'postgres://unused',
+      resourceKind: 'cloud-agent-next',
+      resourceId: 'session',
+      organizationId: 'org',
+      adapters: adapters(),
+      now,
+    });
+    const gastown = await createRuntimeAuthorization({
+      token: (await admission({ audience: 'gastown', expiresInSeconds: 60 })).token,
+      secret,
+      connectionString: 'postgres://unused',
+      resourceKind: 'gastown',
+      resourceId: 'town',
+      organizationId: 'org',
+      adapters: adapters(),
+      now,
+    });
+
+    expect(cloudAgent.authorization.delegationExpiresAt).toBe('2026-01-02T00:00:00.000Z');
+    expect(gastown.authorization.delegationExpiresAt).toBe('2026-01-31T00:00:00.000Z');
+    expect(decodeJwt(cloudAgent.token).exp).toBe(Date.UTC(2026, 0, 1, 1) / 1000);
+  });
+
+  it('caps runtime-token expiration to the positive duration remaining before the deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-01T00:00:00.000Z'));
+    const created = await createRuntimeAuthorization({
+      token: (await admission()).token,
+      secret,
+      connectionString: 'postgres://unused',
+      resourceKind: 'cloud-agent-next',
+      resourceId: 'session',
+      organizationId: 'org',
+      adapters: adapters(),
+    });
+    const renewalTime = new Date('2026-01-01T23:40:00.000Z');
+    vi.setSystemTime(renewalTime);
+
+    const renewed = await renewRuntimeAuthorization({
+      authorization: created.authorization,
+      secret,
+      connectionString: 'postgres://unused',
+      adapters: adapters(),
+      now: renewalTime,
+    });
+
+    expect(decodeJwt(renewed.token).exp).toBe(Date.UTC(2026, 0, 2) / 1000);
+    expect(renewed.expiresAt).toBe('2026-01-02T00:00:00.000Z');
+  });
+
+  it('rejects renewal at and after the fixed delegation deadline', async () => {
+    vi.useFakeTimers();
+    const createdAt = new Date('2026-01-01T00:00:00.000Z');
+    vi.setSystemTime(createdAt);
+    const created = await createRuntimeAuthorization({
+      token: (await admission()).token,
+      secret,
+      connectionString: 'postgres://unused',
+      resourceKind: 'cloud-agent-next',
+      resourceId: 'session',
+      organizationId: 'org',
+      adapters: adapters(),
+      now: createdAt,
+    });
+    const deadline = new Date(created.authorization.delegationExpiresAt);
+
+    await expect(
+      renewRuntimeAuthorization({
+        authorization: created.authorization,
+        secret,
+        connectionString: 'postgres://unused',
+        adapters: adapters(),
+        now: deadline,
+      })
+    ).rejects.toBeInstanceOf(RuntimeAuthorizationExpiredError);
+    await expect(
+      renewRuntimeAuthorization({
+        authorization: created.authorization,
+        secret,
+        connectionString: 'postgres://unused',
+        adapters: adapters(),
+        now: new Date(deadline.getTime() + 1),
+      })
+    ).rejects.toBeInstanceOf(RuntimeAuthorizationExpiredError);
   });
 
   it('rejects normal, multi-audience, expired, and mismatched control tokens', async () => {

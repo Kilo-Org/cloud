@@ -42,14 +42,16 @@ const collect = async (kind: ApiKind, chunks: readonly string[]) => {
 const callsIn = (events: readonly ModelEvent[]) =>
   events.filter(event => event.kind === 'toolCall').map(event => event.call);
 
-const stopOf = (events: readonly ModelEvent[]) =>
-  events.find(event => event.kind === 'done')?.stop;
+const stopOf = (events: readonly ModelEvent[]) => events.find(event => event.kind === 'done')?.stop;
 
 it('collects a call the messages shape streams as blocks, and says the model wants it', async () => {
   const { sent, events } = await collect(
     'messages',
     sse(
-      { type: 'content_block_start', content_block: { type: 'tool_use', id: 'tc_1', name: 'weather' } },
+      {
+        type: 'content_block_start',
+        content_block: { type: 'tool_use', id: 'tc_1', name: 'weather' },
+      },
       { type: 'content_block_delta', delta: { partial_json: '{"city"' } },
       { type: 'content_block_delta', delta: { partial_json: ':"Oslo"}' } },
       { type: 'content_block_stop' },
@@ -63,7 +65,11 @@ it('collects a call the messages shape streams as blocks, and says the model wan
     {
       name: 'weather',
       description: 'The weather somewhere.',
-      input_schema: { type: 'object', properties: { city: { type: 'string' } }, required: ['city'] },
+      input_schema: {
+        type: 'object',
+        properties: { city: { type: 'string' } },
+        required: ['city'],
+      },
     },
   ]);
 });
@@ -140,7 +146,10 @@ it('keeps a truncated answer truncated, whatever it half asked for', async () =>
   const { events } = await collect(
     'messages',
     sse(
-      { type: 'content_block_start', content_block: { type: 'tool_use', id: 'tc_5', name: 'weather' } },
+      {
+        type: 'content_block_start',
+        content_block: { type: 'tool_use', id: 'tc_5', name: 'weather' },
+      },
       { type: 'content_block_delta', delta: { partial_json: '{"cit' } },
       { type: 'message_delta', delta: { stop_reason: 'max_tokens' }, usage: { output_tokens: 4 } }
     )

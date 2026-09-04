@@ -10,6 +10,7 @@ import { openSession } from './run.js';
 import type { SessionHandle } from './handle.js';
 import type { SessionOptions } from './wiring.js';
 import { SessionStore, StoreError, type StoredExchange } from './storage.js';
+import type { ToolRegistry } from './tool.js';
 import { textOf, type Turn } from './turn.js';
 
 /**
@@ -95,6 +96,8 @@ interface Setup<A> {
   readonly store?: Layer.Layer<SessionStore>;
   readonly catalog?: Layer.Layer<ModelCatalog>;
   readonly options?: SessionOptions;
+  /** The tools the session may name. A test that names none provides none. */
+  readonly tools?: Layer.Layer<ToolRegistry>;
 }
 
 const runWith = <A>(
@@ -105,7 +108,8 @@ const runWith = <A>(
     layerAssembler,
     setup.catalog ?? silentCatalog,
     layerSeededEntropy(1),
-    model.layer
+    model.layer,
+    setup.tools ?? Layer.empty
   );
   const program = Effect.scoped(Effect.flatMap(openSession(setup.options ?? options), setup.use));
   return Effect.runPromise(

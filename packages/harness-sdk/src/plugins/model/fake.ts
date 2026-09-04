@@ -8,6 +8,7 @@ import {
   type StopReason,
   zeroUsage,
 } from '../../core/model.js';
+import type { ToolCall } from '../../core/tool.js';
 
 /**
  * One scripted answer. `fail` ends the stream after the deltas it lists.
@@ -26,6 +27,11 @@ interface FakeReply {
   readonly stop?: StopReason;
   /** Thinking the provider encrypted, streamed whole, ahead of the deltas. */
   readonly redacted?: readonly string[];
+  /**
+   * Tools the model asks for, whole, after the words. A reply that lists any
+   * must say `stop: 'tools'` too, the way a shape reports one.
+   */
+  readonly calls?: readonly ToolCall[];
   /** Never reaches `done`, so a test can interrupt the stream part way. */
   readonly stall?: boolean;
   /**
@@ -63,6 +69,7 @@ const fakeModel = (
           ? []
           : [{ kind: 'reasoning', text: '', signature: reply.signature } as ModelEvent]),
         ...reply.deltas.map((text): ModelEvent => ({ kind: 'delta', text })),
+        ...(reply.calls ?? []).map((call): ModelEvent => ({ kind: 'toolCall', call })),
       ]
     );
     const done = Stream.succeed<ModelEvent>({

@@ -144,4 +144,4 @@ const compactSession = (wiring: Wiring): Effect.Effect<void, ModelError | StoreE
 const compactIfFull = (wiring: Wiring): Effect.Effect<void, ModelError | StoreError> =>
   Effect.flatMap(isFull(wiring), full => (full ? compactSession(wiring) : Effect.void));
 
-export { compactIfFull, compactSession, defaultCompactAt, promptedOf };
+export { compactIfFull, compactSession, defaultCompactAt, isFull, promptedOf };

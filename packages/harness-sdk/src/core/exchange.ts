@@ -1,6 +1,6 @@
 import { Effect, Ref } from 'effect';
 import { promptedOf } from './compact.js';
-import type { ModelEvent, ModelUsage } from './model.js';
+import type { ModelEvent, ModelUsage, StopReason } from './model.js';
 import { appendTurn, type Session } from './session.js';
 import { onStore, type StoreError } from './storage.js';
 import type { ToolCall } from './tool.js';
@@ -9,7 +9,7 @@ import { add } from './usage.js';
 import type { Wiring } from './wiring.js';
 
 /**
- * One question and the answer it is waiting for.
+ * One question and everything it produces before the model stops asking.
  *
  * A question and its answer are written together or not at all. Half of an
  * exchange is worse than none: a transcript that ends on an unanswered
@@ -18,7 +18,13 @@ import type { Wiring } from './wiring.js';
  * next. So the turn goes into the session as the question is asked, into the
  * store only when the answer arrives, and back out again when it does not.
  *
- * What drives the stream is `ask.ts`.
+ * Tools make one question into several rounds — the model asks for a tool, the
+ * tool answers, the model is asked again — and that rule holds across all of
+ * them. Every shape refuses a call whose result is missing, so a store holding
+ * half a round holds a session nobody can continue. The turns are collected as
+ * they are made and written once, at the end, by `commit`.
+ *
+ * What drives the rounds is `loop.ts`.
  */
 
 /** Adds a turn to the session in memory. The store hears at the end of the exchange. */
@@ -26,12 +32,12 @@ const remember = (wiring: Wiring, turn: Turn): Effect.Effect<void> =>
   Ref.update(wiring.state, session => appendTurn(session, turn));
 
 /**
- * What is collected while the reply streams, to become the assistant's turn.
+ * What is collected while one round streams, to become the assistant's turn.
  *
  * One record rather than a ref per field. Copying the other on every token
  * costs 0.054 us against 0.402 for the update alone, measured 2026-09-04 over
  * 200000 rounds, which is a third of a percent of the 18.1 us a token costs
- * through the whole session. `finish` reads it once.
+ * through the whole session. `endRound` reads it once.
  */
 interface Spoken {
   readonly text: string;
@@ -56,8 +62,18 @@ const nothingSaid: Spoken = { text: '', thought: [], calls: [] };
 
 interface Exchange {
   readonly question: Turn;
+  /** What the round now streaming has said. Emptied at the start of each one. */
   readonly spoken: Ref.Ref<Spoken>;
-  /** True once the answer arrived. See `rollback`. */
+  /**
+   * Every turn this question has made: the answers, the calls, and the results.
+   * They are written to the store together, once, when the loop ends.
+   */
+  readonly written: Ref.Ref<readonly Turn[]>;
+  /** Why the model stopped the round that just ended. `tools` means ask again. */
+  readonly stop: Ref.Ref<StopReason>;
+  /** How many times the model has been asked. See `maxRounds`. */
+  readonly rounds: Ref.Ref<number>;
+  /** True once the store has it. See `rollback`. */
   readonly answered: Ref.Ref<boolean>;
   /** The session as it stood before the question, to go back to. */
   readonly before: Session;
@@ -83,16 +99,26 @@ const partsSaid = (spoken: Spoken): readonly PartDraft[] => {
   return [...spoken.thought, ...said, ...spoken.calls];
 };
 
+/** Keeps a turn this question made, in memory and on the list to be written. */
+const collect = (wiring: Wiring, exchange: Exchange, turn: Turn): Effect.Effect<void> =>
+  Effect.zipRight(
+    remember(wiring, turn),
+    Ref.update(exchange.written, held => [...held, turn])
+  );
+
 /**
- * Writes the whole exchange and adds this call's counts to the session's. The
- * question is written here rather than when it was asked, so the store never
- * holds a question with no answer.
+ * Closes one round: what the model said becomes a turn, and what the round cost
+ * goes into the session's total and into the count that decides compaction.
+ *
+ * The turn is not written to the store here. The model may be about to ask for
+ * a tool, and a call stored without its result is a session that cannot be
+ * continued, so the writing waits for `commit`.
  */
-const finish = (
+const endRound = (
   wiring: Wiring,
   exchange: Exchange,
-  usage: ModelUsage
-): Effect.Effect<void, StoreError> =>
+  ended: { readonly usage: ModelUsage; readonly stop: StopReason }
+): Effect.Effect<Turn> =>
   Ref.get(exchange.spoken).pipe(
     Effect.flatMap(spoken =>
       makeTurn(wiring.entropy, {
@@ -101,34 +127,40 @@ const finish = (
         parts: partsSaid(spoken),
       })
     ),
-    Effect.tap(answer => remember(wiring, answer)),
-    Effect.flatMap(answer =>
-      onStore(wiring.store, plugin =>
-        plugin.append({
-          sessionId: wiring.id,
-          turns: [exchange.question, answer],
-          prompted: promptedOf(usage),
-        })
-      )
-    ),
-    Effect.zipRight(Ref.set(exchange.answered, true)),
+    Effect.tap(answer => collect(wiring, exchange, answer)),
+    Effect.tap(() => Ref.set(exchange.stop, ended.stop)),
+    Effect.tap(() => Ref.update(exchange.rounds, held => held + 1)),
     /* What this call put in front of the model, which is what decides whether
-       the next one compacts first. It is the provider's own count, so no
+       the next question compacts first. It is the provider's own count, so no
        tokeniser is needed and no estimate can drift. */
-    Effect.zipRight(Ref.set(wiring.prompted, promptedOf(usage))),
-    Effect.zipRight(Ref.update(wiring.totals, held => add(held, usage)))
+    Effect.tap(() => Ref.set(wiring.prompted, promptedOf(ended.usage))),
+    Effect.tap(() => Ref.update(wiring.totals, held => add(held, ended.usage)))
   );
+
+/**
+ * Writes the question and everything it produced, as one unit.
+ *
+ * The question is written here rather than when it was asked, so the store
+ * never holds a question with no answer, and never a call with no result.
+ */
+const commit = (wiring: Wiring, exchange: Exchange): Effect.Effect<void, StoreError> =>
+  Effect.flatMap(
+    Effect.all({ turns: Ref.get(exchange.written), prompted: Ref.get(wiring.prompted) }),
+    ({ turns, prompted }) =>
+      onStore(wiring.store, plugin =>
+        plugin.append({ sessionId: wiring.id, turns: [exchange.question, ...turns], prompted })
+      )
+  ).pipe(Effect.zipRight(Ref.set(exchange.answered, true)));
 
 /**
  * Collects one thinking event into the block it belongs to.
  *
  * The words and the signature arrive on separate events, so both land on the
  * block still open. A block stays open until something else arrives: an
- * encrypted block closes it, and the next thinking event opens a new one.
- *
- * ponytail: a signature closes nothing here, so two signed blocks in a row
- * merge into one. A model only produces those between tool calls, which this
- * package does not have yet. Split on the signature when it does.
+ * encrypted block closes it, a signature closes it, and the next thinking event
+ * opens a new one. A model produces two signed blocks in a row between tool
+ * calls, and merging them would hand the provider one block under the other's
+ * seal.
  */
 const thinking = (
   spoken: Ref.Ref<Spoken>,
@@ -136,8 +168,8 @@ const thinking = (
 ): Effect.Effect<void> =>
   Ref.update(spoken, held => {
     const last = held.thought.at(-1);
-    const open = last?.kind === 'reasoning' ? last : undefined;
-    const sealed = event.signature ?? open?.signature;
+    const open = last?.kind === 'reasoning' && last.signature === undefined ? last : undefined;
+    const sealed = event.signature;
     const grown: PartDraft = {
       kind: 'reasoning',
       body: (open?.body ?? '') + event.text,
@@ -174,8 +206,15 @@ const exchangeFor = (
       parts: partsOf(input),
     }),
     spoken: Ref.make(nothingSaid),
+    written: Ref.make<readonly Turn[]>([]),
+    stop: Ref.make<StopReason>('unknown'),
+    rounds: Ref.make(0),
     answered: Ref.make(false),
   });
+
+/** Empties what the last round said, so the next one starts its own turn. */
+const nextRound = (exchange: Exchange): Effect.Effect<void> =>
+  Ref.set(exchange.spoken, nothingSaid);
 
 /** One piece of the answer's text. The only thing on the per-token path. */
 const said = (spoken: Ref.Ref<Spoken>, text: string): Effect.Effect<void> =>
@@ -198,4 +237,17 @@ const hidden = (spoken: Ref.Ref<Spoken>, data: string): Effect.Effect<void> => {
   return Ref.update(spoken, held => ({ ...held, thought: [...held.thought, block] }));
 };
 
-export { called, exchangeFor, finish, hidden, remember, rollback, said, thinking };
+export type { Exchange };
+export {
+  called,
+  collect,
+  commit,
+  endRound,
+  exchangeFor,
+  hidden,
+  nextRound,
+  remember,
+  rollback,
+  said,
+  thinking,
+};

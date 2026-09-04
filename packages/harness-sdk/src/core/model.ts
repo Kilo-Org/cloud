@@ -1,6 +1,6 @@
 import { Context, Data, type Stream } from 'effect';
 import type { Prompt } from './prompt.js';
-import type { ToolCall, ToolDefinition } from './tool.js';
+import type { ToolCall, ToolDefinition, ToolResult } from './tool.js';
 
 /**
  * How hard the model should think. Both model SDKs spell the levels this way.
@@ -96,6 +96,12 @@ type ModelEvent =
    * half a call.
    */
   | { readonly kind: 'toolCall'; readonly call: ToolCall }
+  /**
+   * What a tool gave back. The session makes this one, not the transport: a
+   * harness shows what its tools did, and reading the transcript back after
+   * every round to find out is worse than being told.
+   */
+  | { readonly kind: 'toolResult'; readonly result: ToolResult }
   | { readonly kind: 'done'; readonly usage: ModelUsage; readonly stop: StopReason };
 
 const zeroUsage: ModelUsage = {

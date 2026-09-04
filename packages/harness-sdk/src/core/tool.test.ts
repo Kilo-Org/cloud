@@ -1,12 +1,6 @@
 import { Effect, Layer } from 'effect';
 import { expect, it } from 'vitest';
-import {
-  locksFor,
-  resolveTools,
-  type Tool,
-  ToolMissingError,
-  ToolRegistry,
-} from './tool.js';
+import { locksFor, resolveTools, type Tool, ToolMissingError, ToolRegistry } from './tool.js';
 
 /**
  * The tools a session offers are resolved when it opens, not when a question
@@ -20,8 +14,7 @@ const named = (name: string, concurrent?: boolean): Tool => ({
   run: () => Effect.succeed('done'),
 });
 
-const registry = (...tools: readonly Tool[]) =>
-  Layer.succeed(ToolRegistry, { tools });
+const registry = (...tools: readonly Tool[]) => Layer.succeed(ToolRegistry, { tools });
 
 const resolve = (names: readonly string[], ...tools: readonly Tool[]) =>
   Effect.runPromise(Effect.either(Effect.provide(resolveTools(names), registry(...tools))));

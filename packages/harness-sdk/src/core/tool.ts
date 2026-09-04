@@ -133,9 +133,7 @@ const definitionsOf = (tools: readonly Tool[]): readonly ToolDefinition[] =>
  * A session that names no tool never asks for the registry, so a caller with no
  * tools needs no layer for them.
  */
-const resolveTools = (
-  names: readonly string[]
-): Effect.Effect<readonly Tool[], ToolMissingError> =>
+const resolveTools = (names: readonly string[]): Effect.Effect<readonly Tool[], ToolMissingError> =>
   names.length === 0
     ? Effect.succeed([])
     : Effect.flatMap(Effect.serviceOption(ToolRegistry), registry =>
@@ -154,17 +152,15 @@ const resolveTools = (
  * One permit for each tool that refused to overlap with itself. A tool that
  * allows overlap has no entry, so the usual path costs no lookup beyond a miss.
  */
-const locksFor = (
-  tools: readonly Tool[]
-): Effect.Effect<ReadonlyMap<string, Effect.Semaphore>> =>
+const locksFor = (tools: readonly Tool[]): Effect.Effect<ReadonlyMap<string, Effect.Semaphore>> =>
   Effect.map(
     Effect.forEach(
       tools.filter(tool => tool.concurrent === false),
       tool =>
-        Effect.map(
-          Effect.makeSemaphore(1),
-          (lock): readonly [string, Effect.Semaphore] => [tool.definition.name, lock]
-        )
+        Effect.map(Effect.makeSemaphore(1), (lock): readonly [string, Effect.Semaphore] => [
+          tool.definition.name,
+          lock,
+        ])
     ),
     entries => new Map(entries)
   );

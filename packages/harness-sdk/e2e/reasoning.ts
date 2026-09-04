@@ -70,7 +70,8 @@ const ask = (session: SessionHandle, text: string) =>
         return { ...held, input: event.usage.inputTokens + event.usage.cacheReadTokens };
       }
       case 'redacted':
-      case 'toolCall': {
+      case 'toolCall':
+      case 'toolResult': {
         return held;
       }
     }

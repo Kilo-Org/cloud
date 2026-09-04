@@ -4,8 +4,9 @@ import {
 } from '@/lib/ai-gateway/providers/direct-byok/types';
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { redisClient } from '@/lib/redis';
-import { directByokModelsRedisKey } from '@/lib/redis-keys';
+import { readDb } from '@/lib/drizzle';
+import { direct_byok_model_lists } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 type CachedEnhancedModelListOptions = {
   providerId: DirectUserByokInferenceProviderId;
@@ -17,13 +18,17 @@ export function cachedEnhancedDirectByokModelList({
   recommendedModels,
 }: CachedEnhancedModelListOptions) {
   return createCachedFetch<ReadonlyArray<DirectByokModel>>(
-    async () =>
-      enhanceDirectByokModelList({
+    async () => {
+      const [row] = await readDb
+        .select({ models: direct_byok_model_lists.models })
+        .from(direct_byok_model_lists)
+        .where(eq(direct_byok_model_lists.provider_id, providerId))
+        .limit(1);
+      return enhanceDirectByokModelList({
         recommendedModels,
-        remainingModels: DirectByokModelArraySchema.parse(
-          JSON.parse((await redisClient.get<string>(directByokModelsRedisKey(providerId))) ?? '[]')
-        ),
-      }),
+        remainingModels: DirectByokModelArraySchema.parse(row ? row.models : []),
+      });
+    },
     600_000,
     recommendedModels
   );

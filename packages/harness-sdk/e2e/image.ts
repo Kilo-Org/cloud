@@ -55,7 +55,10 @@ const runShape = async (kind: ApiKind, colour: string) => {
   const picture = await pictureOf(colour);
 
   const program = Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 16 });
+    /* Room to spare. A reasoning model spends its thinking out of this, and a
+       tight ceiling starved the second answer to nothing on two shapes. The
+       ceiling is what `stop.ts` tests; this run tests the picture. */
+    const session = yield* openSession({ system, model, maxTokens: 256 });
     const named = yield* say(session, [
       { kind: 'text', body: 'What colour is the circle in this picture?' },
       picture,

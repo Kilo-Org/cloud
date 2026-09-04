@@ -424,6 +424,22 @@ PASS  models      67s  10 of 10 models answered every turn
 one turn with nothing. It is the model, not the package: the same model passes
 on the next run, and the failure is an empty answer rather than a refused call.
 
+Every run but two takes `KILO_MODEL`, and the sweep was run whole on a second
+model, `openai/gpt-5.6-luna`, on 2026-09-04. Thirteen of the fifteen passed
+unchanged. Both failures were the run's fault and neither was the package's:
+
+- `image` opened its session with a ceiling of 16 tokens, which a model that
+  thinks spends before it says anything, so two shapes answered with nothing.
+  The ceiling is what `stop.ts` tests; this run tests the picture, and now asks
+  for 256.
+- `replay` took its model from the environment, and what it proves is that a
+  seal survives SQLite. A model that seals nothing reported the run's own
+  subject missing and called it a defect. It names its model now, as
+  `reasoning.ts` already did.
+
+Run the sweep on a second model after a change to the wire. A run tuned to one
+model's habits is a run that passes for the wrong reason.
+
 
 `pnpm test:e2e` asks two questions in one session against the real gateway and
 checks that the second call reads the cache the first one wrote. It uses the

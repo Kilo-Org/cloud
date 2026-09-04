@@ -188,7 +188,9 @@ const wrongIf = (broken: boolean, why: string): void => {
 const { handed } = got;
 const rounds = got.rounds._tag === 'Success' ? got.rounds.value : [];
 const wordsIn = (turns: readonly Turn[]): readonly string[] =>
-  turns.filter(turn => turn.role === 'user').map(turn => turn.parts.map(part => part.body).join(''));
+  turns
+    .filter(turn => turn.role === 'user')
+    .map(turn => turn.parts.map(part => part.body).join(''));
 
 const spoken = wordsIn(got.history);
 

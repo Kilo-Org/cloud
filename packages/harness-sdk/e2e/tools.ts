@@ -151,10 +151,7 @@ const runBackgrounded = async (): Promise<void> => {
         Stream.runFold(
           /* One round and no more. The stream itself never ends: it carries
              every round the session ever starts on its own. */
-          Stream.takeUntil(
-            session.continued,
-            one => 'failed' in one || one.event.kind === 'done'
-          ),
+          Stream.takeUntil(session.continued, one => 'failed' in one || one.event.kind === 'done'),
           '',
           (held: string, one) =>
             !('failed' in one) && one.event.kind === 'delta' ? held + one.event.text : held

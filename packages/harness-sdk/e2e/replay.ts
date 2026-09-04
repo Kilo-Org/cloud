@@ -27,7 +27,10 @@ import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { kilo } from './setup.js';
 
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-sonnet-4.5';
+/* Named here and not taken from the environment, as in `reasoning.ts`. What is
+   under test is the seal, so a model that seals nothing would report the run's
+   own subject missing and call it a defect. The model is part of the fixture. */
+const model = 'anthropic/claude-sonnet-4.5';
 
 const system = 'You answer briefly. Think first, then give the answer in one short sentence.';
 const first = 'A farmer has 17 sheep. All but 9 run away. How many are left? Explain in one line.';

@@ -27,7 +27,12 @@ import type { SessionHandle } from '../src/core/handle.js';
 import type { Continued, Waiting } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
-import { type Answer, type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
+import {
+  type Answer,
+  type Asker,
+  type Question,
+  questionTool,
+} from '../src/plugins/tools/question.js';
 import { kilo } from './setup.js';
 
 const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
@@ -181,7 +186,9 @@ const program = Effect.gen(function* () {
   return { first, long, last, waiting, both, rounds };
 });
 
-const got = await Effect.runPromise(Effect.scoped(Effect.provide(program, tools.pipe(Layer.merge(kilo())))));
+const got = await Effect.runPromise(
+  Effect.scoped(Effect.provide(program, tools.pipe(Layer.merge(kilo()))))
+);
 
 const failures: string[] = [];
 const wrongIf = (broken: boolean, why: string): void => {
@@ -229,8 +236,12 @@ for (const question of askedFor) {
   console.log(`  [${question.id}] ${question.prompt} {${choices}}`);
 }
 console.log(`\nanswered without waiting: ${JSON.stringify(got.first.trim())}`);
-console.log(`\nthe line, once the answer had joined it: ${JSON.stringify(got.waiting.map(one => one.kind))}`);
-console.log(`and once a message was typed after it:  ${JSON.stringify(got.both.map(one => one.kind))}`);
+console.log(
+  `\nthe line, once the answer had joined it: ${JSON.stringify(got.waiting.map(one => one.kind))}`
+);
+console.log(
+  `and once a message was typed after it:  ${JSON.stringify(got.both.map(one => one.kind))}`
+);
 for (const [at, round] of rounds.entries()) {
   const text = round.text.trim().replaceAll('\n', ' ');
   const shown = text.length > 90 ? `${text.slice(0, 90)}…` : text;
@@ -252,7 +263,10 @@ wrongIf(
   'the answer never waited in the line, so nothing ever contended for it'
 );
 wrongIf(got.rounds._tag !== 'Success', 'the session never finished three rounds of its own');
-wrongIf(rounds.length !== 3, `the session ran ${String(rounds.length)} rounds of its own, not three`);
+wrongIf(
+  rounds.length !== 3,
+  `the session ran ${String(rounds.length)} rounds of its own, not three`
+);
 /* The one claim this run exists for. The identifiers are made in the order
    they join the line and sort that way, so their order is the order the
    session owes them, whatever the model's speed did to the clock. */

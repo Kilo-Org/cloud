@@ -1166,6 +1166,7 @@ function installModernRuntimeAuthorization(fixture: ReturnType<typeof sessionFix
     userId: 'user_1',
     authorizationUserId: 'user_1',
     issuedAt: '2026-01-01T00:00:00.000Z',
+    delegationExpiresAt: '2026-01-02T00:00:00.000Z',
     state: 'active',
     bindings: { userPepperDigest: 'a'.repeat(64), authorizationPepperDigest: 'b'.repeat(64) },
     source: { admissionSource: 'user' },

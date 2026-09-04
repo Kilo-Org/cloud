@@ -276,7 +276,7 @@ export async function resolveRuntimeProxyCredential(input: {
   handle: string;
   env: Pick<Env, 'NEXTAUTH_SECRET'>;
   grant: unknown;
-  authorization: { id: string; state: string } | null;
+  authorization: { id: string; state: string; delegationExpiresAt: string } | null;
   context: {
     sessionId: string;
     kiloSessionId: string;
@@ -290,11 +290,15 @@ export async function resolveRuntimeProxyCredential(input: {
 }): Promise<{ token: string; transportProofRequired: boolean } | null> {
   const claims = await verifyRuntimeCredentialProxyHandle(input.env, input.handle);
   const now = input.now ?? Date.now();
+  const parsedGrant = runtimeProxyGrantSchema.safeParse(input.grant);
   if (
     !claims ||
     !('sessionId' in claims) ||
     !input.authorization ||
     input.authorization.state !== 'active' ||
+    Date.parse(input.authorization.delegationExpiresAt) <= now ||
+    !parsedGrant.success ||
+    parsedGrant.data.leaseExpiresAt > Date.parse(input.authorization.delegationExpiresAt) ||
     !matchesRuntimeProxyGrant(input.grant, claims, {
       ...input.context,
       authorizationId: input.authorization.id,
@@ -311,7 +315,7 @@ export async function resolveRuntimeProxyCredential(input: {
   const token = exp > now + 5 * 60_000 ? input.token : await input.renew();
   return {
     token,
-    transportProofRequired: runtimeProxyGrantSchema.parse(input.grant).mode === 'contained',
+    transportProofRequired: parsedGrant.data.mode === 'contained',
   };
 }
 

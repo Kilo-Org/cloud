@@ -738,9 +738,11 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
-  async resolveRuntimeCredentialProxyGrant(
-    _handle: string
-  ): Promise<{ token: string; organizationId?: string } | null> {
+  async resolveRuntimeCredentialProxyGrant(_handle: string): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null> {
     return resolvePersistedRuntimeProxyCredential({
       env: this.env,
       storage: this.ctx.storage,

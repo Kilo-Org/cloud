@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { RuntimeAuthorizationRevokedError } from '@kilocode/worker-utils/runtime-authorization';
+import {
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
+} from '@kilocode/worker-utils/runtime-authorization';
 import {
   getRuntimeAuthorizationStatus,
   renewStoredRuntimeAuthorization,
@@ -20,6 +23,7 @@ const authorization = (
   authorizationUserId: 'user_1',
   organizationId: 'org_1',
   issuedAt: '2026-01-01T00:00:00.000Z',
+  delegationExpiresAt: '2026-01-02T00:00:00.000Z',
   state,
   bindings: {
     userPepperDigest: 'a'.repeat(64),
@@ -76,6 +80,7 @@ describe('runtime authorization persistence', () => {
           record = authorization('00000000-0000-4000-8000-000000000002');
           return { token: 'new-token' };
         },
+        now: Date.UTC(2026, 0, 1),
       })
     ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
     expect(record.id).toBe('00000000-0000-4000-8000-000000000002');
@@ -172,9 +177,34 @@ describe('runtime authorization persistence', () => {
         renew: async () => {
           throw new RuntimeAuthorizationRevokedError();
         },
+        now: Date.UTC(2026, 0, 1),
       })
     ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
     expect(record.state).toBe('revoked');
+  });
+
+  it('fails closed and revokes only the current record at the delegation deadline', async () => {
+    let record = {
+      ...authorization('00000000-0000-4000-8000-000000000008'),
+      delegationExpiresAt: '2026-01-02T00:00:00.000Z',
+    };
+    const renew = vi.fn(async () => ({ token: 'unexpected' }));
+
+    await expect(
+      renewStoredRuntimeAuthorization({
+        metadata: metadata(),
+        getAuthorization: async () => record,
+        putAuthorization: async value => {
+          record = value;
+        },
+        getMetadata: async () => metadata(),
+        putMetadata: async () => {},
+        renew,
+        now: Date.UTC(2026, 0, 2),
+      })
+    ).rejects.toBeInstanceOf(RuntimeAuthorizationExpiredError);
+    expect(record.state).toBe('revoked');
+    expect(renew).not.toHaveBeenCalled();
   });
 
   it('treats modern-token metadata without a valid private record as revoked', async () => {

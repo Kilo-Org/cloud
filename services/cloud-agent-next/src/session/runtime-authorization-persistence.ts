@@ -1,5 +1,8 @@
 import jwt from 'jsonwebtoken';
-import { RuntimeAuthorizationRevokedError } from '@kilocode/worker-utils/runtime-authorization';
+import {
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
+} from '@kilocode/worker-utils/runtime-authorization';
 import {
   RuntimeAuthorizationSchema,
   type RuntimeAuthorization,
@@ -30,9 +33,15 @@ export function hasModernRuntimeAuthorization(metadata: SessionMetadata): boolea
 export async function getRuntimeAuthorizationStatus(input: {
   metadata: SessionMetadata | null;
   getAuthorization: () => Promise<unknown>;
+  now?: number;
 }): Promise<'legacy' | 'active' | 'revoked'> {
   const authorization = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
-  if (authorization.success) return authorization.data.state;
+  if (authorization.success) {
+    return authorization.data.state === 'active' &&
+      Date.parse(authorization.data.delegationExpiresAt) <= (input.now ?? Date.now())
+      ? 'revoked'
+      : authorization.data.state;
+  }
   return input.metadata && hasModernRuntimeAuthorization(input.metadata) ? 'revoked' : 'legacy';
 }
 
@@ -53,13 +62,29 @@ export async function renewStoredRuntimeAuthorization(input: {
     return metadata.auth.kilocodeToken ?? null;
   }
   if (authorization.data.state !== 'active') throw new RuntimeAuthorizationRevokedError();
+  const now = input.now ?? Date.now();
+  const revokeIfCurrent = async () => {
+    const current = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
+    if (
+      current.success &&
+      current.data.id === authorization.data.id &&
+      current.data.state === 'active'
+    ) {
+      await input.putAuthorization({ ...current.data, state: 'revoked' });
+    }
+  };
+  if (Date.parse(authorization.data.delegationExpiresAt) <= now) {
+    await revokeIfCurrent();
+    throw new RuntimeAuthorizationExpiredError();
+  }
   const token = metadata.auth.kilocodeToken;
   const decoded = token ? jwt.decode(token) : null;
   if (
     typeof decoded === 'object' &&
     decoded !== null &&
     typeof decoded.exp === 'number' &&
-    decoded.exp * 1000 > (input.now ?? Date.now()) + RUNTIME_TOKEN_RENEWAL_WINDOW_MS &&
+    decoded.exp * 1000 > now + RUNTIME_TOKEN_RENEWAL_WINDOW_MS &&
+    decoded.exp * 1000 <= Date.parse(authorization.data.delegationExpiresAt) &&
     runtimeAuthorizationId(decoded.runtimeAuthorization) === authorization.data.id
   ) {
     return token ?? null;
@@ -89,11 +114,11 @@ export async function renewStoredRuntimeAuthorization(input: {
     );
     return renewed.token;
   } catch (error) {
-    if (error instanceof RuntimeAuthorizationRevokedError) {
-      const current = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
-      if (current.success && current.data.id === authorization.data.id) {
-        await input.putAuthorization({ ...current.data, state: 'revoked' });
-      }
+    if (
+      error instanceof RuntimeAuthorizationRevokedError ||
+      error instanceof RuntimeAuthorizationExpiredError
+    ) {
+      await revokeIfCurrent();
     }
     throw error;
   }

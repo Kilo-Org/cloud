@@ -54,6 +54,11 @@ import {
   verifyRuntimeCredentialProxyHandle,
 } from './runtime-credential-proxy.js';
 import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import {
+  issueRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+  type RuntimeProxyAttestationAudience,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 const app = new Hono<HonoContext>();
 
@@ -328,9 +333,13 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
   const headers = new Headers(request.headers);
   for (const name of [
     'Authorization',
+    'X-API-Key',
+    'API-Key',
+    'X-Auth-Token',
     'Cookie',
     'Host',
     'Connection',
+    'Proxy-Connection',
     'Keep-Alive',
     'Proxy-Authenticate',
     'Proxy-Authorization',
@@ -342,7 +351,7 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
   ]) {
     headers.delete(name);
   }
-  for (const [name] of headers) {
+  for (const name of [...headers.keys()]) {
     if (
       name.startsWith('proxy-') ||
       name.startsWith('x-forwarded-') ||
@@ -359,6 +368,30 @@ function runtimeProxyHeaders(request: Request, token: string, organizationId?: s
   headers.set('Authorization', `Bearer ${token}`);
   if (organizationId) headers.set('X-Kilocode-OrganizationId', organizationId);
   return headers;
+}
+
+function sanitizeRuntimeProxyResponse(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const name of [
+    'Set-Cookie',
+    'Connection',
+    'Proxy-Connection',
+    'Keep-Alive',
+    'Proxy-Authenticate',
+    'Proxy-Authorization',
+    'TE',
+    'Trailer',
+    'Transfer-Encoding',
+    'Upgrade',
+  ]) {
+    headers.delete(name);
+  }
+  headers.delete(RUNTIME_PROXY_ATTESTATION_HEADER);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
 }
 
 async function readBoundedBody(request: Request, maximumBytes: number): Promise<string | null> {
@@ -405,7 +438,11 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
     bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
     if (bodyText === undefined) return c.text('Not found', 404);
   }
-  let credential: { token: string; organizationId?: string } | null;
+  let credential: {
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null;
   let selectedWorktreeMember: { sessionId: string; kiloSessionId: string; handle: string } | null =
     null;
   try {
@@ -457,15 +494,25 @@ async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Res
   );
   if (!upstream) return c.text('Not found', 404);
   try {
-    return await fetch(
-      createSanitizedForwardRequest(
-        c.req.raw,
-        upstream,
-        runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId),
-        bodyText
-      ),
+    // The route allowlist is resolved above before a proof is issued.
+    const audience: RuntimeProxyAttestationAudience =
+      route === 'backend' ? 'kilo-api' : route === 'provider' ? 'kilo-gateway' : 'session-ingest';
+    const proof = await issueRuntimeProxyAttestation({
+      secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
+        if (!value) throw new Error('Authentication unavailable');
+        return value;
+      }),
+      audience,
+      bearer: credential.token,
+      ...credential.runtimeAuthorization,
+    });
+    const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
+    headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
+    const response = await fetch(
+      createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText),
       { redirect: 'manual' }
     );
+    return sanitizeRuntimeProxyResponse(response);
   } catch {
     return c.text('Upstream unavailable', 502);
   }

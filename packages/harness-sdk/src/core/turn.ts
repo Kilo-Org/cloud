@@ -91,29 +91,7 @@ const textOf = (turn: Turn): string =>
     .join('');
 
 /** A part without its identifier, so a copy of it becomes a part of its own. */
-const draftOf = (part: TurnPart): PartDraft => {
-  switch (part.kind) {
-    case 'image': {
-      return { kind: 'image', body: part.body, media: part.media };
-    }
-    case 'reasoning': {
-      return {
-        kind: 'reasoning',
-        body: part.body,
-        ...(part.signature === undefined ? {} : { signature: part.signature }),
-      };
-    }
-    case 'summary': {
-      return { kind: 'summary', body: part.body };
-    }
-    case 'redacted': {
-      return { kind: 'redacted', body: part.body };
-    }
-    case 'text': {
-      return { kind: 'text', body: part.body };
-    }
-  }
-};
+const draftOf = ({ id: _id, ...draft }: TurnPart): PartDraft => draft;
 
 /** What a caller means by a bare string: one turn of one text part. */
 const partsOf = (input: string | readonly PartDraft[]): readonly PartDraft[] =>

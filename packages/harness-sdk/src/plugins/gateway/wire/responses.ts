@@ -3,8 +3,8 @@ import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri } from './parts.js';
-import type { Wire, WirePart } from './wire.js';
-import type { TokenCount } from './usage.js';
+import { stopFrom, type Wire, type WirePart } from './wire.js';
+import { readCached, whole, type TokenCount } from './usage.js';
 
 /**
  * The OpenAI Responses shape. It has no cache breakpoint. It caches on
@@ -131,17 +131,10 @@ const incompleteReasons: Readonly<Record<string, StopReason>> = {
   content_filter: 'refusal',
 };
 
-const asStop = (
-  status: string | null | undefined,
-  reason: string | null | undefined
-): StopReason => {
-  if (status === 'completed') {
-    return 'end';
-  }
-  return reason === null || reason === undefined
-    ? 'unknown'
-    : (incompleteReasons[reason] ?? 'unknown');
-};
+const asIncomplete = stopFrom(incompleteReasons);
+
+const asStop = (status: string | null | undefined, reason: string | null | undefined): StopReason =>
+  status === 'completed' ? 'end' : (asIncomplete(reason) ?? 'unknown');
 
 /** This shape names its frames, so the two events are matched on `type`. */
 interface DeltaEvent {
@@ -192,31 +185,22 @@ const isEnd = createIs<EndEvent>();
 const isReasoning = createIs<ReasoningEvent>();
 const isReasoningDone = createIs<ReasoningDoneEvent>();
 
-/** The cached count is reported inside the input total, so it is subtracted out. */
-const readUsage = (usage: Counts): Partial<ModelUsage> => {
-  const cacheReadTokens = usage.input_tokens_details?.cached_tokens ?? 0;
-  return {
-    inputTokens: usage.input_tokens - cacheReadTokens,
-    outputTokens: usage.output_tokens,
-    cacheReadTokens,
-  };
-};
+const readUsage = (usage: Counts): Partial<ModelUsage> =>
+  readCached(
+    usage.input_tokens,
+    usage.output_tokens,
+    usage.input_tokens_details?.cached_tokens ?? 0
+  );
 
 const toReply = (raw: unknown): ModelReply => {
   const parsed = assertReply(raw);
-  const counts = readUsage(parsed.usage);
   return {
     content: parsed.output
       .flatMap(item => item.content ?? [])
       .map(part => part.text ?? '')
       .join(''),
     stop: asStop(parsed.status, parsed.incomplete_details?.reason),
-    usage: {
-      inputTokens: counts.inputTokens ?? 0,
-      outputTokens: counts.outputTokens ?? 0,
-      cacheReadTokens: counts.cacheReadTokens ?? 0,
-      cacheWriteTokens: 0,
-    },
+    usage: whole(readUsage(parsed.usage)),
   };
 };
 

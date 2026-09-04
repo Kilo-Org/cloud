@@ -9,8 +9,8 @@ import type {
 } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { dataUri, isLast } from './parts.js';
-import type { Wire, WirePart } from './wire.js';
-import type { TokenCount } from './usage.js';
+import { stopFrom, type Wire, type WirePart } from './wire.js';
+import { readCached, whole, type TokenCount } from './usage.js';
 
 /**
  * The OpenAI chat shape, with one extension. `cache_control` on a content block
@@ -109,8 +109,7 @@ const stopReasons: Readonly<Record<string, StopReason>> = {
   content_filter: 'refusal',
 };
 
-const asStop = (named: string | null | undefined): StopReason | undefined =>
-  named === null || named === undefined ? undefined : (stopReasons[named] ?? 'unknown');
+const asStop = stopFrom(stopReasons);
 
 interface DeltaEvent {
   choices: { delta: { content?: string | null } }[];
@@ -139,28 +138,19 @@ const isReasoning = createIs<ReasoningEvent>();
 const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
 
-/** The cached count is reported inside the prompt total, so it is subtracted out. */
-const readUsage = (usage: Counts): Partial<ModelUsage> => {
-  const cacheReadTokens = usage.prompt_tokens_details?.cached_tokens ?? 0;
-  return {
-    inputTokens: usage.prompt_tokens - cacheReadTokens,
-    outputTokens: usage.completion_tokens,
-    cacheReadTokens,
-  };
-};
+const readUsage = (usage: Counts): Partial<ModelUsage> =>
+  readCached(
+    usage.prompt_tokens,
+    usage.completion_tokens,
+    usage.prompt_tokens_details?.cached_tokens ?? 0
+  );
 
 const toReply = (raw: unknown): ModelReply => {
   const parsed = assertReply(raw);
-  const counts = readUsage(parsed.usage);
   return {
     content: parsed.choices.map(choice => choice.message.content ?? '').join(''),
     stop: asStop(parsed.choices[0]?.finish_reason) ?? 'unknown',
-    usage: {
-      inputTokens: counts.inputTokens ?? 0,
-      outputTokens: counts.outputTokens ?? 0,
-      cacheReadTokens: counts.cacheReadTokens ?? 0,
-      cacheWriteTokens: 0,
-    },
+    usage: whole(readUsage(parsed.usage)),
   };
 };
 

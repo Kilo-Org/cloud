@@ -130,7 +130,12 @@ const versionOf = async (driver: SqlDriver): Promise<number> => {
   return assert<readonly number[]>(rows)[0] ?? 0;
 };
 
-/** Runs the statements in order. A migration that reorders is a migration that fails. */
+/**
+ * Runs the statements in order. A migration that reorders is a migration that
+ * fails, so these cannot be a `Promise.all`. It recurses rather than loops
+ * because `no-await-in-loop` reads a sequential loop as a missed chance to run
+ * in parallel, which here is the whole point.
+ */
 const runAll = async (driver: SqlDriver, statements: readonly string[]): Promise<void> => {
   const [first, ...rest] = statements;
   if (first === undefined) {

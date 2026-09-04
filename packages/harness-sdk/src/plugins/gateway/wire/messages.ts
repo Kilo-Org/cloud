@@ -3,8 +3,8 @@ import { createAssert, createIs } from 'typia';
 import type { ModelReply, ModelRequest, ModelUsage, StopReason } from '../../../core/model.js';
 import type { PromptMessage, PromptPart } from '../../../core/prompt.js';
 import { isLast } from './parts.js';
-import type { Wire, WirePart } from './wire.js';
-import { type Counts, set, type TokenCount } from './usage.js';
+import { stopFrom, type Wire, type WirePart } from './wire.js';
+import { type Counts, set, type TokenCount, whole } from './usage.js';
 
 /** The Anthropic types are the contract. `cache_control` marks a breakpoint. */
 type ContentBlock =
@@ -106,8 +106,7 @@ const stopReasons: Readonly<Record<string, StopReason>> = {
   refusal: 'refusal',
 };
 
-const asStop = (named: string | null | undefined): StopReason | undefined =>
-  named === null || named === undefined ? undefined : (stopReasons[named] ?? 'unknown');
+const asStop = stopFrom(stopReasons);
 
 interface Reply {
   content: { type: string; text?: string }[];
@@ -169,17 +168,21 @@ const isUsage = createIs<UsageEvent>();
 const isStop = createIs<StopEvent>();
 const isStart = createIs<StartEvent>();
 
+const readUsage = (usage: WireUsage): Partial<ModelUsage> => {
+  const counts: Counts = {};
+  set(counts, 'inputTokens', usage.input_tokens);
+  set(counts, 'outputTokens', usage.output_tokens);
+  set(counts, 'cacheReadTokens', usage.cache_read_input_tokens);
+  set(counts, 'cacheWriteTokens', usage.cache_creation_input_tokens);
+  return counts;
+};
+
 const toReply = (raw: unknown): ModelReply => {
   const parsed = assertReply(raw);
   return {
     content: parsed.content.map(part => part.text ?? '').join(''),
     stop: asStop(parsed.stop_reason) ?? 'unknown',
-    usage: {
-      inputTokens: parsed.usage.input_tokens,
-      outputTokens: parsed.usage.output_tokens,
-      cacheReadTokens: parsed.usage.cache_read_input_tokens ?? 0,
-      cacheWriteTokens: parsed.usage.cache_creation_input_tokens ?? 0,
-    },
+    usage: whole(readUsage(parsed.usage)),
   };
 };
 
@@ -194,15 +197,6 @@ const toDelta = (event: unknown): WirePart | undefined => {
     return { kind: 'reasoning', text: '', signature: event.delta.signature };
   }
   return isRedacted(event) ? { kind: 'redacted', data: event.content_block.data } : undefined;
-};
-
-const readUsage = (usage: WireUsage): Partial<ModelUsage> => {
-  const counts: Counts = {};
-  set(counts, 'inputTokens', usage.input_tokens);
-  set(counts, 'outputTokens', usage.output_tokens);
-  set(counts, 'cacheReadTokens', usage.cache_read_input_tokens);
-  set(counts, 'cacheWriteTokens', usage.cache_creation_input_tokens);
-  return counts;
 };
 
 const toUsage = (event: unknown): Partial<ModelUsage> | undefined => {

@@ -34,4 +34,16 @@ interface Wire {
   readonly toStop: (event: unknown) => StopReason | undefined;
 }
 
+/**
+ * Reads a stop reason a shape reports by name. A name the table does not hold
+ * is `unknown` rather than nothing: the model did stop, and this package
+ * simply has no word for why. No name at all is nothing, because that frame
+ * was not the one that said.
+ */
+const stopFrom =
+  (reasons: Readonly<Record<string, StopReason>>) =>
+  (named: string | null | undefined): StopReason | undefined =>
+    named === null || named === undefined ? undefined : (reasons[named] ?? 'unknown');
+
 export type { Wire, WirePart };
+export { stopFrom };

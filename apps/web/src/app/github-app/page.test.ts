@@ -66,6 +66,50 @@ describe('GitHubAppPage install-state preflight', () => {
       expect(html).not.toContain('test-org');
       expect(mockedDetails).not.toHaveBeenCalled();
       expect(html).toContain(fromApp === '1' ? 'Return to Kilo App' : 'Go to dashboard');
+      expect(html).toContain(
+        fromApp === '1' ? 'href="/cloud/sessions?error=install_state_user_mismatch"' : 'href="/"'
+      );
+      expect(html).not.toContain('organizationId');
+    }
+  );
+
+  test.each(['user_mismatch', 'unusable'] as const)(
+    'preserves only the encoded query organization in app recovery for %s',
+    async status => {
+      mockedCheckInstallState.mockResolvedValue(
+        status === 'user_mismatch'
+          ? { status, organizationId: 'foreign-state-org', returnTo: '/cloud/sessions' }
+          : { status }
+      );
+      const html = await renderPage({
+        installState: token,
+        fromApp: '1',
+        organizationId: 'query org&scope=other',
+      });
+      const error =
+        status === 'user_mismatch' ? 'install_state_user_mismatch' : 'install_state_unusable';
+      expect(html).toContain(
+        `href="/cloud/sessions?error=${error}&amp;organizationId=query%20org%26scope%3Dother"`
+      );
+      expect(html).not.toContain('foreign-state-org');
+      expect(mockedDetails).not.toHaveBeenCalled();
+    }
+  );
+
+  test.each(['user_mismatch', 'unusable'] as const)(
+    'keeps dashboard recovery free of organization parameters for %s',
+    async status => {
+      mockedCheckInstallState.mockResolvedValue(
+        status === 'user_mismatch'
+          ? { status, organizationId: 'foreign-state-org', returnTo: '/cloud/sessions' }
+          : { status }
+      );
+      const html = await renderPage({ installState: token, organizationId: 'query-org' });
+      expect(html).toContain('href="/"');
+      expect(html).not.toContain('organizationId');
+      expect(html).not.toContain('foreign-state-org');
+      expect(html).not.toContain('query-org');
+      expect(mockedDetails).not.toHaveBeenCalled();
     }
   );
 

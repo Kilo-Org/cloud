@@ -60,6 +60,9 @@ export default async function GitHubAppPage({
   const blocked = preflight && preflight.status !== 'valid';
   const mismatch = preflight?.status === 'user_mismatch';
   const recoveryError = mismatch ? 'install_state_user_mismatch' : 'install_state_unusable';
+  const recoveryOrgParam = search.organizationId
+    ? `&organizationId=${encodeURIComponent(search.organizationId)}`
+    : '';
 
   return (
     <main className="min-h-screen bg-background px-4 py-5 sm:px-6">
@@ -86,7 +89,11 @@ export default async function GitHubAppPage({
                   : 'This setup link has expired, has already been used, or is invalid. Return to Kilo and start GitHub setup again.'}
               </p>
               <Button asChild variant="outline">
-                <Link href={isFromApp ? `/cloud/sessions?error=${recoveryError}` : '/'}>
+                <Link
+                  href={
+                    isFromApp ? `/cloud/sessions?error=${recoveryError}${recoveryOrgParam}` : '/'
+                  }
+                >
                   {isFromApp ? 'Return to Kilo App' : 'Go to dashboard'}
                 </Link>
               </Button>

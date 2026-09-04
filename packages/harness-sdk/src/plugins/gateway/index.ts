@@ -122,6 +122,12 @@ const eventsOf = (wire: Wire, tally: Tally, data: string) =>
     Effect.map(event => Option.fromNullable(wire.toDelta(event)))
   );
 
+/** The last event of every stream: what the call cost, and why it ended. */
+const doneOf = (tally: Tally): Stream.Stream<ModelEvent> =>
+  Stream.fromEffect(Effect.all({ usage: Ref.get(tally.usage), stop: Ref.get(tally.stop) })).pipe(
+    Stream.map((ended): ModelEvent => ({ kind: 'done', usage: ended.usage, stop: ended.stop }))
+  );
+
 /**
  * The handle lives as long as the stream, not as long as the request.
  *
@@ -132,41 +138,26 @@ const eventsOf = (wire: Wire, tally: Tally, data: string) =>
  */
 const stream = (gateway: Gateway, request: ModelRequest): Stream.Stream<ModelEvent, ModelError> =>
   Stream.unwrapScoped(
-    Effect.flatMap(
-      Effect.acquireRelease(abortHandle(), handle => Effect.sync(() => handle?.abort())),
-      handle => streamWith(gateway, request, handle)
-    )
-  );
-
-const streamWith = (
-  gateway: Gateway,
-  request: ModelRequest,
-  handle: AbortHandle | undefined
-): Effect.Effect<Stream.Stream<ModelEvent, ModelError>> =>
-  Effect.all({ usage: Ref.make(zeroUsage), stop: Ref.make<StopReason>('unknown') }).pipe(
-    Effect.map(tally => {
+    Effect.gen(function* () {
+      const handle = yield* Effect.acquireRelease(abortHandle(), held =>
+        Effect.sync(() => held?.abort())
+      );
+      const tally: Tally = {
+        usage: yield* Ref.make(zeroUsage),
+        stop: yield* Ref.make<StopReason>('unknown'),
+      };
+      const wire = yield* wireFor(gateway.catalog, request.model);
       const read = sseReader();
-      return Stream.unwrap(
-        Effect.map(wireFor(gateway.catalog, request.model), wire =>
-          Stream.fromEffect(
-            bodyFor(gateway, { wire, request: { ...request, stream: true }, handle })
-          ).pipe(
-            Stream.flatMap(chunksOf),
-            Stream.mapConcat(chunk => read(chunk)),
-            Stream.mapEffect(data => eventsOf(wire, tally, data)),
-            Stream.filterMap(part => part),
-            Stream.map(asEvent),
-            Stream.concat(
-              Stream.fromEffect(
-                Effect.all({ usage: Ref.get(tally.usage), stop: Ref.get(tally.stop) })
-              ).pipe(
-                Stream.map(
-                  (ended): ModelEvent => ({ kind: 'done', usage: ended.usage, stop: ended.stop })
-                )
-              )
-            )
-          )
-        )
+
+      return Stream.fromEffect(
+        bodyFor(gateway, { wire, request: { ...request, stream: true }, handle })
+      ).pipe(
+        Stream.flatMap(chunksOf),
+        Stream.mapConcat(chunk => read(chunk)),
+        Stream.mapEffect(data => eventsOf(wire, tally, data)),
+        Stream.filterMap(part => part),
+        Stream.map(asEvent),
+        Stream.concat(doneOf(tally))
       );
     })
   );

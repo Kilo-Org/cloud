@@ -727,7 +727,7 @@ an older build, or by another program, still arrives as `unknown`.
 
 | Table | Holds |
 |---|---|
-| `sessions` | What `SessionOptions` freezes: system, model, effort, maxTokens |
+| `sessions` | What `SessionOptions` freezes: system, model, effort, maxTokens, and `prompted`, the count of the last request |
 | `turns` | The identifier, the session, and the role. No content of its own |
 | `parts` | One row per piece of a turn: text, reasoning, or an image |
 

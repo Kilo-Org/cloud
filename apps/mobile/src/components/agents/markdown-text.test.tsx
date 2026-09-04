@@ -148,6 +148,29 @@ beforeEach(() => {
 });
 
 describe('MarkdownText HTML routing', () => {
+  it('renders HTML without Array.prototype.toSorted for Hermes clients', async () => {
+    const originalToSorted = Array.prototype.toSorted;
+    // eslint-disable-next-line no-extend-native -- the test reproduces the Hermes runtime without toSorted.
+    Object.defineProperty(Array.prototype, 'toSorted', {
+      configurable: true,
+      value: undefined,
+      writable: true,
+    });
+
+    try {
+      const renderer = await mount(<MarkdownText value="Before <span>HTML</span> after" />);
+
+      expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(1);
+    } finally {
+      // eslint-disable-next-line no-extend-native -- restore the runtime after the Hermes simulation.
+      Object.defineProperty(Array.prototype, 'toSorted', {
+        configurable: true,
+        value: originalToSorted,
+        writable: true,
+      });
+    }
+  });
+
   it('keeps an empty value on the Markdown renderer path', async () => {
     const renderer = await mount(<MarkdownText value="" />);
 

@@ -160,7 +160,8 @@ function inlineHtmlRanges(raw: string, blockToken: Token): HtmlRange[] {
   ranges.push(...openTags);
 
   const merged: HtmlRange[] = [];
-  for (const range of ranges.toSorted(
+  // eslint-disable-next-line unicorn/no-array-sort -- Hermes lacks toSorted(); ranges is local and unused after this sort.
+  for (const range of ranges.sort(
     (left, right) => left.start - right.start || right.end - left.end
   )) {
     const previous = merged.at(-1);

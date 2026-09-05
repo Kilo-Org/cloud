@@ -21,6 +21,8 @@ const runs = [
   'shapes',
   'stop',
   'tools',
+  'time',
+  'todo',
   'image',
   'cancel',
   'queue',

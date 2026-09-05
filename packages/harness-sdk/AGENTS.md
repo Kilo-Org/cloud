@@ -276,7 +276,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix`, `conversation` |
+| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix`, `conversation`, `time`, `todo` |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few, `full` for all eleven models) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
@@ -1285,6 +1285,28 @@ codename", four models answered by asking which project was meant. That is the
 right move on a question that names none — a model that will not guess is doing
 its job — and it scored as a tool failure. Naming the release left one reason
 not to delegate, which is the description, which is the thing under test.
+
+### The two tools that only a live run can render
+
+`pnpm test:e2e:time` and `pnpm test:e2e:todo` are the dedicated runs for the two
+tools the package writes itself. Each puts its tool on all three shapes, because
+what a unit test cannot settle is what a provider does with the schema:
+
+- **time takes nothing.** Its parameters are an object with no properties, which
+  is the schema a provider is likeliest to refuse. A shape that rejected it
+  would refuse the whole round, not one call. The run also proves the model asks
+  rather than guessing: every model was trained before today, and the answer is
+  checked against this machine's clock at the moment of the check, so the run
+  cannot rot.
+- **todo carries the richest schema here** — an array of objects with an
+  enumerated field — and the tool replaces the list rather than patching it. The
+  run dictates three steps, marks one done a turn later, and checks that all
+  three came back both times: a model that sent only the step it changed would
+  leave a list of one, which is the failure the run is for.
+
+Both print what the model chose and assert only what the package promises.
+Whether a model moves a step to `doing` or straight to `done` is its own
+discipline, and `pnpm test:e2e:tool-matrix` is the run that scores that.
 
 ### One conversation, with everything in it at once
 

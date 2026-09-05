@@ -57,6 +57,7 @@ export type Connection = {
   disconnect: () => void;
   reconnectWithRefreshedAuth?: () => void;
   retryReconnect: () => void;
+  retryExhaustedConnection: () => void;
   destroy: () => void;
 };
 
@@ -80,7 +81,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let authRefreshAttempted = false;
   let connected = false;
   let reconnectAttempt = 0;
-  let exhausted = false;
+  let exhaustionReason: 'retry-limit' | 'auth-failure' | null = null;
   let generation = 0;
   let hasConnectedOnce = false;
   let stalenessTimeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -109,8 +110,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   }
 
   function clearExhausted(): void {
-    if (exhausted) {
-      exhausted = false;
+    if (exhaustionReason !== null) {
+      exhaustionReason = null;
       config.onReconnectExhaustionChange?.(false);
     }
   }
@@ -178,8 +179,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
     if (attempt >= maxReconnectAttempts) {
-      if (!exhausted) {
-        exhausted = true;
+      if (exhaustionReason === null) {
+        exhaustionReason = 'retry-limit';
         config.onReconnectExhaustionChange?.(true);
       }
       return;
@@ -314,8 +315,8 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
         notifyReplacingConnection(expectedGeneration);
-        if (!exhausted) {
-          exhausted = true;
+        if (exhaustionReason === null) {
+          exhaustionReason = 'auth-failure';
           config.onReconnectExhaustionChange?.(true);
         }
         return;
@@ -519,6 +520,11 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     void refreshAndConnect(generation);
   }
 
+  function retryExhaustedConnection() {
+    if (exhaustionReason !== 'retry-limit') return;
+    retryReconnect();
+  }
+
   function destroy() {
     destroyed = true;
     generation += 1;
@@ -537,7 +543,14 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     connected = false;
   }
 
-  return { connect, disconnect, reconnectWithRefreshedAuth, retryReconnect, destroy };
+  return {
+    connect,
+    disconnect,
+    reconnectWithRefreshedAuth,
+    retryReconnect,
+    retryExhaustedConnection,
+    destroy,
+  };
 }
 
 export function createBrowserLifecycleHooks(): ConnectionLifecycleHooks {

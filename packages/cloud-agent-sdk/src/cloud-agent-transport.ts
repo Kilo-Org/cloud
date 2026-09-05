@@ -325,14 +325,20 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         closeConnection('destroy');
       },
 
-      send: async input =>
-        config.api.send({
+      send: async input => {
+        const expectedGeneration = lifecycleGeneration;
+        const result = await config.api.send({
           sessionId: config.sessionId,
           payload: normalizeCloudAgentPayload(input.payload),
           ...(input.messageId ? { messageId: input.messageId } : {}),
           ...(input.attachments ? { attachments: input.attachments } : {}),
           ...(input.images ? { images: input.images } : {}),
-        }),
+        });
+        if (expectedGeneration === lifecycleGeneration) {
+          connection?.retryExhaustedConnection();
+        }
+        return result;
+      },
       interrupt: () => config.api.interrupt({ sessionId: config.sessionId }),
       dropQueuedMessage: async messageId => {
         if (!config.api.cancelQueuedMessage) {

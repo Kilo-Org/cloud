@@ -196,7 +196,16 @@ export class SessionOperation {
       this.session,
       this.processes,
       deps.verifyQuiescence,
-      () => deps.onCleanupConfirmed()
+      () => deps.onCleanupConfirmed(),
+      target => {
+        const runtime = deps.getRuntime();
+        return (
+          runtime?.runtimeId === target.runtimeId &&
+          runtime.kiloClient === target.client &&
+          runtime.directory === this.session.directory &&
+          !runtime.signal.aborted
+        );
+      }
     );
     this.diagnostic('started');
     this.timeout = setTimeout(

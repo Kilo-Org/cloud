@@ -14,8 +14,14 @@ import {
   type SessionCommandResponse,
   type SessionPromptResponse,
 } from '@kilocode/sdk/v2';
+import { z } from 'zod';
 import { logToFile } from './utils.js';
 import { toSlashCommandInfo, type SlashCommandInfo } from '../../src/shared/slash-commands.js';
+
+const sessionStatusesSchema = z.record(
+  z.string().min(1),
+  z.object({ type: z.string().min(1) }).passthrough()
+);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -237,6 +243,11 @@ type PromptOptions = {
 export type WrapperKiloClient = {
   createSession: (opts?: { title?: string }) => Promise<{ id: string }>;
   getSession: (sessionId: string) => Promise<{ id: string }>;
+  getSessionDetails: (
+    sessionId: string,
+    directory: string,
+    signal?: AbortSignal
+  ) => Promise<{ id: string; directory: string }>;
   ensureSession: (sessionId: string, directory: string, signal?: AbortSignal) => Promise<void>;
   sendPrompt: (opts: PromptOptions) => Promise<SessionPromptResponse>;
   sendPromptAsync: (opts: PromptOptions) => Promise<void>;
@@ -385,6 +396,15 @@ export function createWrapperKiloClient(
       });
       const data = requireSdkData(result, `Session get for ${sessionId}`);
       return { id: data.id };
+    },
+
+    getSessionDetails: async (sessionId, directory, signal) => {
+      const result = await v2Client.session.get({ sessionID: sessionId, directory }, { signal });
+      const data = requireSdkData(result, 'Session cleanup lookup');
+      if (data.id !== sessionId || data.directory !== directory) {
+        throw new Error('Session cleanup lookup returned an invalid session');
+      }
+      return { id: data.id, directory: data.directory };
     },
 
     ensureSession: async (sessionId, directory, signal) => {
@@ -546,7 +566,9 @@ export function createWrapperKiloClient(
 
     getSessionStatuses: async (directory = workspacePath, signal) => {
       const result = await v2Client.session.status({ directory }, { signal });
-      return requireSdkData(result, 'Session status');
+      const parsed = sessionStatusesSchema.safeParse(requireSdkData(result, 'Session status'));
+      if (!parsed.success) throw new Error('Session status returned an invalid map');
+      return parsed.data;
     },
 
     getQuestions: async (directory = workspacePath, signal) => {

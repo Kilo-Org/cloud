@@ -137,6 +137,22 @@ describe('github-integration-helpers', () => {
       expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
     });
 
+    it('does not return cached repositories for a locally disconnected integration', async () => {
+      mockGetIntegrationForOwner.mockResolvedValue(
+        buildIntegration({ github_disconnected_at: '2026-09-04T00:00:00.000Z' })
+      );
+
+      const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');
+      const result = await fetchGitHubRepositoriesForUser('user-123');
+
+      expect(result).toMatchObject({
+        integrationInstalled: false,
+        repositories: [],
+        errorMessage: 'GitHub integration is disconnected',
+      });
+      expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    });
+
     it('fetches fresh repositories when forceRefresh is true', async () => {
       mockGetIntegrationForOwner.mockResolvedValue(buildIntegration());
       mockFetchGitHubRepositories.mockResolvedValue([

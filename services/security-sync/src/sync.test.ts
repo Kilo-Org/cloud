@@ -22,40 +22,42 @@ function createFakeDb(options: FakeDbOptions = {}) {
   const repositories = options.repositories ?? ['acme/widgets'];
   const sets: Array<Record<string, unknown>> = [];
   let selectCount = 0;
+  const selection = {
+    limit: async () => {
+      selectCount++;
+      if (selectCount === 1) {
+        return [
+          {
+            id: 'agent-config',
+            config: {},
+            is_enabled: true,
+            runtime_state: options.runtimeState ?? {},
+          },
+        ];
+      }
+      if (selectCount === 2) {
+        return [
+          {
+            id: 'integration-1',
+            platform_installation_id: 'installation-1',
+            permissions: { vulnerability_alerts: 'read' },
+            repositories: repositories.map((full_name, index) => ({
+              id: index + 1,
+              full_name,
+            })),
+            authInvalidAt: options.authInvalidAt ?? null,
+          },
+        ];
+      }
+      return [];
+    },
+    orderBy: () => selection,
+  };
 
   const db = {
     select: () => ({
       from: () => ({
-        where: () => ({
-          limit: async () => {
-            selectCount++;
-            if (selectCount === 1) {
-              return [
-                {
-                  id: 'agent-config',
-                  config: {},
-                  is_enabled: true,
-                  runtime_state: options.runtimeState ?? {},
-                },
-              ];
-            }
-            if (selectCount === 2) {
-              return [
-                {
-                  id: 'integration-1',
-                  platform_installation_id: 'installation-1',
-                  permissions: { vulnerability_alerts: 'read' },
-                  repositories: repositories.map((full_name, index) => ({
-                    id: index + 1,
-                    full_name,
-                  })),
-                  authInvalidAt: options.authInvalidAt ?? null,
-                },
-              ];
-            }
-            return [];
-          },
-        }),
+        where: () => selection,
       }),
     }),
     update: () => ({
@@ -197,7 +199,12 @@ describe('Worker GitHub auth-invalid sync', () => {
     });
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
-    expect(gitTokenService.getToken).toHaveBeenCalledTimes(1);
+    expect(gitTokenService.getToken).toHaveBeenCalledWith(
+      'installation-1',
+      'standard',
+      'integration-1',
+      true
+    );
     expect(sets).toContainEqual(
       expect.objectContaining({ auth_invalid_reason: 'github_dependabot_401' })
     );
@@ -246,6 +253,12 @@ describe('Worker GitHub auth-invalid sync', () => {
     ).resolves.toMatchObject({ authInvalid: 1, reauthRequired: true });
 
     expect(fetchStub).toHaveBeenCalledTimes(1);
+    expect(gitTokenService.getToken).toHaveBeenCalledWith(
+      'installation-1',
+      'standard',
+      'integration-1',
+      true
+    );
     expect(sets).toContainEqual(
       expect.objectContaining({ auth_invalid_reason: 'github_dependabot_401' })
     );

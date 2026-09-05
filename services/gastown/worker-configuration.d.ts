@@ -43,6 +43,7 @@ type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
 type GitTokenService = {
 	getTokenForRepo(params: { githubRepo: string; userId: string; orgId?: string }): Promise<GetTokenForRepoResult>;
 	getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+	getTokenForIntegration(integrationId: string): Promise<{ success: true; token: string } | { success: false; reason: 'unavailable' }>;
 };
 type WastelandRpcSuccess<T> = { success: true; data: T };
 type WastelandRpcFailure = {

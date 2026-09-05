@@ -2,6 +2,7 @@ import { NextRequest, after } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
+import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
 
 function cloneGitHubRequest(request: NextRequest, rawBody: string) {
   return new NextRequest(request.url, {
@@ -9,6 +10,26 @@ function cloneGitHubRequest(request: NextRequest, rawBody: string) {
     headers: request.headers,
     body: rawBody,
   });
+}
+
+function getGitHubInstallationId(rawBody: string): string | null {
+  try {
+    const payload: unknown = JSON.parse(rawBody);
+    if (
+      typeof payload === 'object' &&
+      payload !== null &&
+      'installation' in payload &&
+      typeof payload.installation === 'object' &&
+      payload.installation !== null &&
+      'id' in payload.installation &&
+      (typeof payload.installation.id === 'number' || typeof payload.installation.id === 'string')
+    ) {
+      return payload.installation.id.toString();
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -21,8 +42,15 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
   const botRequest = cloneGitHubRequest(request, rawBody);
+  const installationId = getGitHubInstallationId(rawBody);
 
   after(async () => {
+    if (!installationId) return;
+    try {
+      await assertGitHubInstallationRuntimeAuthorized(installationId, 'standard');
+    } catch {
+      return;
+    }
     try {
       const response = await bot.webhooks.github(botRequest, {
         waitUntil: task => after(() => task),

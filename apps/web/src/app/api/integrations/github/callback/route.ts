@@ -13,6 +13,9 @@ import {
   assertUserAdministersInstallation,
   type GitHubAppType,
 } from '@/lib/integrations/platforms/github/app-selector';
+import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
+import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
@@ -464,6 +467,8 @@ async function handleCoreInstallFlow(params: {
 
   // Require proof that the OAuth-authorized GitHub user administers the
   // installation before using app credentials to fetch or persist it.
+  let verifiedGitHubUserId: string | null = null;
+  let verifiedAccountType: 'Organization' | 'User' | null = null;
   if (setupAction === 'install' || setupAction === 'update') {
     const code = searchParams.get('code');
     const rejectUnauthorizedInstallation = () =>
@@ -486,18 +491,29 @@ async function handleCoreInstallFlow(params: {
 
     try {
       const exchangeResult = await exchangeGitHubOAuthCode(code, githubAppType);
-      const isAdmin = await assertUserAdministersInstallation({
-        accessToken: exchangeResult.accessToken,
-        installationId,
-      });
+      const authorization = isGitHubConnectionManagementEnabled()
+        ? await verifyGitHubInstallationAuthorization({
+            accessToken: exchangeResult.accessToken,
+            expectedAppId: credentials.appId,
+            installationId,
+            githubAppType,
+          })
+        : await assertUserAdministersInstallation({
+            accessToken: exchangeResult.accessToken,
+            installationId,
+          });
 
-      if (!isAdmin) {
+      if (!authorization) {
         console.log('[github_admin_proof:fail_non_admin]', {
           github_user_id: exchangeResult.id,
           github_user_login: exchangeResult.login,
           installation_id: installationId,
         });
         return rejectUnauthorizedInstallation();
+      }
+      if (typeof authorization !== 'boolean') {
+        verifiedGitHubUserId = authorization.identity.id;
+        verifiedAccountType = authorization.candidate.accountType;
       }
 
       console.log('[github_admin_proof:pass]', {
@@ -615,21 +631,38 @@ async function handleCoreInstallFlow(params: {
     const accountLogin =
       'login' in account ? account.login : 'slug' in account ? account.slug : accountId;
 
-    const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
-      platform: 'github',
-      integrationType: 'app',
-      platformInstallationId: installationId,
-      platformAccountId: accountId,
-      platformAccountLogin: accountLogin,
-      permissions: installation.permissions as IntegrationPermissions,
-      scopes: installation.events || [],
-      repositoryAccess: installation.repository_selection,
-      repositories: repositories && repositories.length > 0 ? repositories : null,
-      installedAt: installation.created_at
-        ? new Date(installation.created_at).toISOString()
-        : new Date().toISOString(),
-      githubAppType,
-    });
+    const installedAt = installation.created_at
+      ? new Date(installation.created_at).toISOString()
+      : new Date().toISOString();
+    const upsertResult =
+      isGitHubConnectionManagementEnabled() && verifiedGitHubUserId && verifiedAccountType
+        ? await connectVerifiedGitHubInstallation(owner, {
+            platformInstallationId: installationId,
+            platformAccountId: accountId,
+            platformAccountLogin: accountLogin,
+            permissions: installation.permissions as IntegrationPermissions,
+            scopes: installation.events || [],
+            repositoryAccess: installation.repository_selection,
+            repositories: repositories && repositories.length > 0 ? repositories : null,
+            installedAt,
+            githubAppType,
+            kiloUserId: user.id,
+            githubUserId: verifiedGitHubUserId,
+            accountType: verifiedAccountType,
+          })
+        : await upsertPlatformIntegrationForOwner(owner, {
+            platform: 'github',
+            integrationType: 'app',
+            platformInstallationId: installationId,
+            platformAccountId: accountId,
+            platformAccountLogin: accountLogin,
+            permissions: installation.permissions as IntegrationPermissions,
+            scopes: installation.events || [],
+            repositoryAccess: installation.repository_selection,
+            repositories: repositories && repositories.length > 0 ? repositories : null,
+            installedAt,
+            githubAppType,
+          });
 
     if (!upsertResult.ok) {
       const error =

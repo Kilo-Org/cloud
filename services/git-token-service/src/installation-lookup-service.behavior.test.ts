@@ -306,7 +306,7 @@ describe('InstallationLookupService', () => {
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
   });
 
-  it('does not accept an expected integration without an organization', async () => {
+  it('keeps an unowned expected integration fail-closed without an organization', async () => {
     const service = createService([]);
 
     await expect(
@@ -316,7 +316,7 @@ describe('InstallationLookupService', () => {
         expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
       })
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
-    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(getWorkerDb).toHaveBeenCalledOnce();
   });
 
   it('returns integration_mismatch when the expected row is not visible to the fenced query', async () => {

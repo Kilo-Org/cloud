@@ -17,6 +17,7 @@ import { collectCopyableText } from './collect-copyable-text';
 import { FilePartRenderer } from './file-part-renderer';
 import { buildAgentMessageBubbleAccessibilityProps } from './message-bubble-a11y';
 import { selectMessageFailure } from './message-failure-state';
+import { partRendersContent } from './message-visibility';
 import { PartRenderer } from './part-renderer';
 import { firstHumanText, isFilePart, isTextPart } from './part-types';
 import { useMessageCopy } from './use-message-copy';
@@ -173,23 +174,25 @@ function MessageBubbleImpl({
     const hasBadgeSlot = isQueued || holdQueuedSlot;
 
     return (
-      <>
+      <View>
         <Pressable onLongPress={handleLongPress} accessible={a11y.accessible} className="px-4 py-1">
           <View className="items-end gap-1">
-            <Bubble side="user">
-              <InMessageBubbleContext.Provider value>
-                {userTextContent ? (
-                  <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
-                ) : null}
-                {fileParts.map(part => (
-                  <FilePartRenderer
-                    key={part.id}
-                    part={part}
-                    onLongPress={onLongPressDetails ? handleLongPress : undefined}
-                  />
-                ))}
-              </InMessageBubbleContext.Provider>
-            </Bubble>
+            {message.parts.some(partRendersContent) ? (
+              <Bubble side="user">
+                <InMessageBubbleContext.Provider value>
+                  {userTextContent ? (
+                    <ChatMarkdownText value={userTextContent} variant="user" selectable={false} />
+                  ) : null}
+                  {fileParts.map(part => (
+                    <FilePartRenderer
+                      key={part.id}
+                      part={part}
+                      onLongPress={onLongPressDetails ? handleLongPress : undefined}
+                    />
+                  ))}
+                </InMessageBubbleContext.Provider>
+              </Bubble>
+            ) : null}
             {hasBadgeSlot || onRestoreQueued ? (
               <View className="flex-row items-center gap-2 self-end pr-1">
                 {hasBadgeSlot ? (
@@ -243,7 +246,7 @@ function MessageBubbleImpl({
           ) : null}
         </Pressable>
         {failureFooter}
-      </>
+      </View>
     );
   }
 
@@ -254,7 +257,7 @@ function MessageBubbleImpl({
   const isStreaming = isLastAssistantMessage && isSessionStreaming;
 
   return (
-    <>
+    <View>
       <Pressable className="px-4 py-1" onLongPress={handleLongPress} accessible={a11y.accessible}>
         <InMessageBubbleContext.Provider value>
           <View className="gap-2">
@@ -285,7 +288,7 @@ function MessageBubbleImpl({
         ) : null}
       </Pressable>
       {failureFooter}
-    </>
+    </View>
   );
 }
 

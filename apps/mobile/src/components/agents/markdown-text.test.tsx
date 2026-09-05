@@ -238,6 +238,19 @@ describe('MarkdownText HTML routing', () => {
     });
   });
 
+  it('styles HTML text like equivalent Markdown text', async () => {
+    const renderer = await mount(
+      <MarkdownText value='<p>Body <strong>bold</strong> <a href="https://example.com">link</a></p><blockquote>quote</blockquote>' />
+    );
+
+    expect(htmlProps(renderer).tagsStyles).toMatchObject({
+      a: { color: '#111111', textDecorationLine: 'underline' },
+      blockquote: { borderStartColor: '#cccccc', borderStartWidth: 3, paddingStart: 12 },
+      p: { marginVertical: 2, paddingVertical: 0 },
+      strong: { color: '#111111', fontWeight: '700' },
+    });
+  });
+
   it('does not match raw HTML inside a preceding code span', async () => {
     const renderer = await mount(<MarkdownText value="Before `<span>` <span>HTML</span> after" />);
 

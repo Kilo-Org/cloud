@@ -180,4 +180,34 @@ describe('messageRendersContent', () => {
     };
     expect(messageRendersContent(user)).toBe(true);
   });
+
+  it('returns false for a user message whose only text is removed during HTML sanitization', () => {
+    const user: StoredMessage = {
+      info: {
+        id: 'm1',
+        sessionID: 's1',
+        role: 'user',
+        time: { created: 1 },
+        agent: 'build',
+        model: { providerID: 'openrouter', modelID: 'model' },
+      },
+      parts: [textPart({ text: "<script>alert('bad')</script>" })],
+    };
+    expect(messageRendersContent(user)).toBe(false);
+  });
+
+  it.each([
+    '<!-- hidden -->',
+    '<form><input value="hidden"></form>',
+    '<iframe>hidden</iframe><style>hidden</style>',
+  ])('returns false when sanitization removes %s', text => {
+    expect(partRendersContent(textPart({ text }))).toBe(false);
+  });
+
+  it.each(['before<script>hidden</script>', '<section>safe</section>', '<hr>'])(
+    'keeps visible content in %s',
+    text => {
+      expect(partRendersContent(textPart({ text }))).toBe(true);
+    }
+  );
 });

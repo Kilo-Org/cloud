@@ -114,18 +114,34 @@ export function getMarkdownHeadingStyles(palette: MarkdownPalette) {
   };
 }
 
+export function getMarkdownHtmlTagStyles(palette: MarkdownPalette) {
+  const { textColor, borderColor } = palette;
+  return {
+    a: { color: textColor, fontStyle: 'normal' as const, textDecorationLine: 'underline' as const },
+    blockquote: {
+      borderStartWidth: 3,
+      borderStartColor: borderColor,
+      paddingStart: 12,
+      marginVertical: 4,
+    },
+    p: { marginVertical: 2, paddingVertical: 0 },
+    strong: { color: textColor, fontWeight: '700' as const },
+  };
+}
+
 // `react-native-marked`'s `useMarkdown` takes an inline styles map rather than
 // `className`, so we cannot use NativeWind here. Centralizing style creation
 // keeps both variants in sync and makes the color choices reviewable.
 export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
   const { textColor, mutedTextColor, codeBackground, borderColor } = palette;
+  const htmlTagStyles = getMarkdownHtmlTagStyles(palette);
 
   return {
     text: { color: textColor, fontSize: 16, lineHeight: 24 },
-    paragraph: { marginVertical: 2, paddingVertical: 0 },
-    strong: { color: textColor, fontWeight: '700' },
+    paragraph: htmlTagStyles.p,
+    strong: htmlTagStyles.strong,
     em: { color: textColor, fontStyle: 'italic' },
-    link: { color: textColor, fontStyle: 'normal', textDecorationLine: 'underline' },
+    link: htmlTagStyles.a,
     ...getMarkdownHeadingStyles(palette),
     // Override the library defaults that set italic + light weight on codespan.
     codespan: {
@@ -142,12 +158,7 @@ export function getMarkdownStyles(palette: MarkdownPalette): MarkedStyles {
       padding: 12,
       marginVertical: 4,
     },
-    blockquote: {
-      borderStartWidth: 3,
-      borderStartColor: borderColor,
-      paddingStart: 12,
-      marginVertical: 4,
-    },
+    blockquote: htmlTagStyles.blockquote,
     // react-native-marked maps `list` onto each item's marker box, not a list
     // container. A top margin misaligns the marker; keep this bottom-only.
     list: { marginBottom: 4 },

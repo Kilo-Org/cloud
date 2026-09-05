@@ -18,61 +18,29 @@ import RenderHTML, {
 } from 'react-native-render-html';
 
 import { isSupportedScheme } from './markdown-html-image';
+import { REMOVED_HTML_TAGS } from './markdown-html-sanitization';
 import { MarkdownImage } from './markdown-image';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
 import { getLinkAccessibilityActions, resolveLinkAccessibilityLabel } from './markdown-link';
-import { getMarkdownHeadingStyles, type MarkdownPalette } from './markdown-palette';
+import {
+  getMarkdownHeadingStyles,
+  getMarkdownHtmlTagStyles,
+  type MarkdownPalette,
+} from './markdown-palette';
 import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
 } from './markdown-renderer';
 import { resolveImagePreviewAspectRatio } from './tool-card-attachments';
 
-const REMOVED_HTML_TAGS = new Set([
-  'script',
-  'style',
-  'link',
-  'iframe',
-  'frame',
-  'frameset',
-  'object',
-  'embed',
-  'applet',
-  'audio',
-  'video',
-  'source',
-  'track',
-  'picture',
-  'form',
-  'input',
-  'button',
-  'select',
-  'option',
-  'optgroup',
-  'textarea',
-  'label',
-  'fieldset',
-  'legend',
-  'datalist',
-  'output',
-  'meter',
-  'progress',
-  'svg',
-  'canvas',
-  'base',
-  'head',
-  'meta',
-  'title',
-  'template',
-  'noscript',
-]);
+const REMOVED_HTML_TAG_SET = new Set<string>(REMOVED_HTML_TAGS);
 
 // Ignore only void tags here. The library preserves nested text when it ignores
 // a container tag, so the visitor clears container contents before rendering.
 const IGNORED_HTML_TAGS = ['link', 'frame', 'embed', 'source', 'track', 'input', 'base', 'meta'];
 const HTML_DOM_VISITORS: DomVisitorCallbacks = {
   onElement(element) {
-    if (REMOVED_HTML_TAGS.has(element.name)) {
+    if (REMOVED_HTML_TAG_SET.has(element.name)) {
       element.children.splice(0);
     }
   },
@@ -155,7 +123,10 @@ export function MarkdownHtml({
     () => ({ color: palette.textColor, fontSize: 16, lineHeight: 24 }),
     [palette]
   );
-  const tagsStyles = useMemo(() => getMarkdownHeadingStyles(palette), [palette]);
+  const tagsStyles = useMemo(
+    () => ({ ...getMarkdownHeadingStyles(palette), ...getMarkdownHtmlTagStyles(palette) }),
+    [palette]
+  );
   const renderersProps = useMemo<Partial<RenderersProps>>(
     () => ({
       a: {

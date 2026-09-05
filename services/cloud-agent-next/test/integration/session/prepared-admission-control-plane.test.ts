@@ -10,15 +10,36 @@
  * "Prepared admission is legacy-only" before a transcript exists.
  */
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 const userId = 'oauth/google:prepared-admission-control-plane';
 const kiloSessionId = 'ses_00000000000000000000000000';
 const sandboxId = `usr-${'a'.repeat(48)}` as const;
 const INITIAL_MESSAGE_ID = 'msg_018f1e2d3c4bPrepAdmitAbCdE';
 
+// Admitted messages leave dispatch and alarm work in the session DO. Interrupt
+// each session after its test, or that work finalizes after this file closes
+// and its logs race the vitest worker shutdown as pending onUserConsoleLog
+// rejections.
+const admittedSessions = new Set<`workspace_${string}`>();
+
+afterEach(async () => {
+  for (const sessionId of admittedSessions) {
+    await runInDurableObject(
+      env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`),
+      async (instance, state) => {
+        await instance.interruptExecution();
+        await state.storage.deleteAlarm();
+      }
+    ).catch(() => undefined);
+  }
+  admittedSessions.clear();
+});
+
 function cloudId(): `workspace_${string}` {
-  return `workspace_${crypto.randomUUID()}`;
+  const sessionId = `workspace_${crypto.randomUUID()}` as const;
+  admittedSessions.add(sessionId);
+  return sessionId;
 }
 
 /** Mirrors `buildSessionRegistrationCommand` for the split flow: the initial

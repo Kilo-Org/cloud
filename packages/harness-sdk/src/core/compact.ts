@@ -98,6 +98,11 @@ const summaryOf = (wiring: Wiring): Effect.Effect<string, ModelError> =>
         },
         model: wiring.model,
         maxTokens: wiring.summaryTokens ?? defaultSummaryTokens,
+        ...(wiring.effort === undefined ? {} : { effort: wiring.effort }),
+        /* The same key every other call of this session carries. The gateway
+           reads it as the session, so without it the summary routes on its own
+           and pays full price for a prefix the session already has cached. */
+        cacheKey: wiring.id,
       })
       .pipe(
         Stream.tap(event =>

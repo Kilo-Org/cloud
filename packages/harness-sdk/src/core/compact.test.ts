@@ -56,6 +56,22 @@ it('asks the next question with the summary and nothing before it', async () => 
   expect(asked).toEqual(['Summary of the conversation so far:\n\nthe notes', 'two']);
 });
 
+it('asks the summariser with the session key and the session effort', async () => {
+  /* The gateway reads `cacheKey` as the session, so a summary sent without it
+     routes on its own and pays full price for a prefix the session already has
+     cached — and this is the one call that resends everything. `effort` is part
+     of that key, so leaving it off would miss the entry even with the key. */
+  const { calls } = await runWith({
+    replies: [full, { deltas: ['the notes'] }, { deltas: ['after'] }],
+    catalog: catalogWindowed(window),
+    options: { ...options, effort: 'high' },
+    use: session =>
+      Effect.zipRight(Stream.runDrain(session.ask('one')), Stream.runDrain(session.ask('two'))),
+  });
+
+  expect(calls[1]).toMatchObject({ cacheKey: calls[0]?.cacheKey, effort: 'high' });
+});
+
 it('leaves a session that still fits alone', async () => {
   const { calls } = await runWith({
     replies: [roomy, { deltas: ['after'] }],

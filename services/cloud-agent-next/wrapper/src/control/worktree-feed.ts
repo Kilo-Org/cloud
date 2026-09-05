@@ -6,6 +6,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import { SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS } from '../../../src/shared/sandbox-control-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import { withTimeoutAndAbort } from '../utils.js';
 import { unfilteredKiloEvents } from './feed.js';
 import {
   KILO_CONTROL_REQUEST_TIMEOUT_MS,
@@ -89,7 +90,7 @@ export function createWorktreeFeed(options: {
     if (typeof close === 'function') close();
   }
 
-  async function connect(deadlineAt?: number): Promise<void> {
+  async function connect(deadlineAt?: number, cancellation?: AbortSignal): Promise<void> {
     if (!isCurrent()) throw new Error('Native feed source was superseded');
     const attempt: FeedAttempt = {
       controller: new AbortController(),
@@ -97,7 +98,9 @@ export function createWorktreeFeed(options: {
       failed: false,
     };
     active = attempt;
-    const attemptSignal = AbortSignal.any([signal, attempt.controller.signal]);
+    const attemptSignal = cancellation
+      ? AbortSignal.any([signal, attempt.controller.signal, cancellation])
+      : AbortSignal.any([signal, attempt.controller.signal]);
     const feed = await startSandboxControlEventFeed({
       signal: attemptSignal,
       deadlineAt,
@@ -150,10 +153,21 @@ export function createWorktreeFeed(options: {
     }
     attempt.feed = feed;
     if (deadlineAt !== undefined) {
-      const usable = await Promise.race([feed.usable, attempt.failure.promise.then(() => false)]);
-      if (!usable || !isCurrentAttempt(attempt) || attempt.failed) {
-        feed.close();
-        throw new Error('Native feed attempt closed before becoming usable');
+      try {
+        const usable = await withTimeoutAndAbort(
+          Promise.race([feed.usable, attempt.failure.promise.then(() => false)]),
+          {
+            signal: attemptSignal,
+            timeoutMs: Math.max(1, deadlineAt - Date.now()),
+            timeoutMessage: 'Kilo global event feed recovery timed out',
+            abortMessage: 'Kilo global event feed recovery cancelled',
+          }
+        );
+        if (!usable || !isCurrentAttempt(attempt) || attempt.failed)
+          throw new Error('Native feed attempt closed before becoming usable');
+      } catch (error) {
+        failAttempt(attempt, error);
+        throw error;
       }
     }
   }
@@ -172,7 +186,7 @@ export function createWorktreeFeed(options: {
       const deadlineAt = Math.min(current.deadlineAt, Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS);
       if (Date.now() >= deadlineAt) break;
       try {
-        await connect(deadlineAt);
+        await connect(deadlineAt, current.controller.signal);
         if (!isCurrent() || recovery !== current || current.controller.signal.aborted) return;
         recovery = undefined;
         state = 'ready';

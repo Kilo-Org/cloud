@@ -11,8 +11,8 @@ function asFetch(
   return Object.assign(fn, { preconnect: fetch.preconnect });
 }
 
-async function waitFor(condition: () => boolean): Promise<void> {
-  const deadline = Date.now() + 5_000;
+async function waitFor(condition: () => boolean, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
   while (!condition()) {
     if (Date.now() >= deadline) break;
     await Bun.sleep(10);
@@ -216,4 +216,84 @@ describe('createWorktreeFeed', () => {
       fetchSpy.mockRestore();
     }
   });
+
+  it(
+    'expires raw incomplete reconnect activity within the original recovery deadline',
+    async () => {
+      const encoder = new TextEncoder();
+      const connected = encoder.encode(
+        'data: {"payload":{"type":"server.connected","properties":{}}}\n\n'
+      );
+      const rawActivity = encoder.encode(' ');
+      let closeInitial: (() => void) | undefined;
+      let connections = 0;
+      const failures: string[] = [];
+      const activities = new Set<ReturnType<typeof setInterval>>();
+      const source = {
+        scopeId: 'worktree_a',
+        runtimeId: crypto.randomUUID(),
+        directory: '/workspace',
+        kiloClient: { serverUrl: 'http://127.0.0.1:1' },
+        signal: new AbortController().signal,
+      };
+      const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+        asFetch(async () => {
+          connections += 1;
+          let activity: ReturnType<typeof setInterval> | undefined;
+          return new Response(
+            new ReadableStream<Uint8Array>({
+              start(controller) {
+                controller.enqueue(connected);
+                if (connections === 1) {
+                  closeInitial = () => controller.close();
+                } else {
+                  activity = setInterval(() => controller.enqueue(rawActivity), 1_000);
+                  activities.add(activity);
+                }
+              },
+              cancel() {
+                if (activity) {
+                  clearInterval(activity);
+                  activities.delete(activity);
+                }
+              },
+            }),
+            { headers: { 'Content-Type': 'text/event-stream' } }
+          );
+        })
+      );
+      const feed = createWorktreeFeed({
+        source,
+        isCurrent: (runtimeId, kiloClient) =>
+          runtimeId === source.runtimeId && kiloClient === source.kiloClient,
+        onFailure: reason => failures.push(reason),
+      });
+      try {
+        await feed.open();
+        const recoveryStartedAt = Date.now();
+        closeInitial?.();
+        await waitFor(() => connections === 2);
+        expect(connections).toBe(2);
+
+        await waitFor(
+          () => failures.length === 1,
+          controlRuntime.KILO_FEED_FRESHNESS_TIMEOUT_MS + 5_000
+        );
+
+        expect(Date.now() - recoveryStartedAt).toBeLessThanOrEqual(
+          controlRuntime.KILO_FEED_FRESHNESS_TIMEOUT_MS + 5_000
+        );
+        expect(connections).toBe(4);
+        expect(connections).toBeLessThanOrEqual(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
+        expect(failures).toEqual(['feed_ended']);
+        expect(source.signal.aborted).toBe(false);
+        expect(feed.prepareForNewWork()).toBe(false);
+      } finally {
+        feed.close();
+        for (const activity of activities) clearInterval(activity);
+        fetchSpy.mockRestore();
+      }
+    },
+    controlRuntime.KILO_FEED_FRESHNESS_TIMEOUT_MS + 10_000
+  );
 });

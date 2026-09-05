@@ -41,7 +41,11 @@ const runShape = async (model: string, kind: ApiKind) => {
   const layers = kilo({ apiKinds: [kind] });
 
   const program = Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 64 });
+    /* 256, because a run that gives a model less is testing the ceiling
+       whether it means to or not: a model that thinks spends it before it says
+       a word, and the run reports an empty answer as a broken shape. This one
+       was the last at 64, because it had only ever run on one model. */
+    const session = yield* openSession({ system, model, maxTokens: 256 });
     const first = yield* ask(session, 'Answer with the word: one');
     const second = yield* ask(session, 'Answer with the word: two');
     return { first, second, total: yield* session.usage };
@@ -53,6 +57,15 @@ const runShape = async (model: string, kind: ApiKind) => {
 const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
 /** `chat_completions` sends no cache control, so it is not held to a ratio. */
 const mustCache = new Set<ApiKind>(['messages', 'responses']);
+
+/**
+ * The one pairing that reads nothing back and is not a defect: an Anthropic
+ * model on the responses shape caches nothing on this gateway, measured
+ * 2026-09-04. It is named here rather than explained in a failure, so a real
+ * regression on any other pairing still fails the run.
+ */
+const cachesNothing = (model: string, kind: ApiKind): boolean =>
+  kind === 'responses' && model.startsWith('anthropic/');
 
 for (const model of models) {
   under(model);
@@ -79,12 +92,8 @@ for (const model of models) {
     if (!answered) {
       fail(`${kind}: an answer carried no text`);
     }
-    if (mustCache.has(kind) && total.cacheReadTokens === 0) {
-      fail(
-        `${kind}: nothing was read from the cache, and this shape controls one. ` +
-          'An Anthropic model on the responses shape caches nothing on this gateway, ' +
-          'measured 2026-09-04; see AGENTS.md. Anything else here is a regression.'
-      );
+    if (mustCache.has(kind) && total.cacheReadTokens === 0 && !cachesNothing(model, kind)) {
+      fail(`${kind}: nothing was read from the cache, and this shape controls one.`);
     }
   }
 }

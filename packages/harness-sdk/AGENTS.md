@@ -504,6 +504,13 @@ that takes its time over one of them holds the whole run there.
 one turn with nothing. It is the model, not the package: the same model passes
 on the next run, and the failure is an empty answer rather than a refused call.
 
+`shapes` reads a ratio of zero about as often, and for the provider's own
+reason: the entry is not readable yet. `google/gemini-3.7-flash` on `messages`
+read nothing on 2026-09-06 and read 8010 tokens back on the next run, unchanged.
+The one pairing that reads nothing back *every* time is an Anthropic model on
+the responses shape, which this gateway does not cache; `shapes.ts` names that
+pair rather than explaining it in a failure, so every other pairing still fails.
+
 The sweep was run whole on a second model, `openai/gpt-5.6-luna`, on 2026-09-04,
 back when each run named its own. Thirteen of the fifteen passed unchanged. Both
 failures were the run's fault and neither was the package's:
@@ -519,7 +526,11 @@ failures were the run's fault and neither was the package's:
 
 Moving the default to `z-ai/glm-5.3-flash` on 2026-09-05 found two more of the
 same kind, both fixed: `live` opened with a ceiling of 32 tokens and `cancel`
-with 16, and a model that thinks spends that before it says a word. **A live
+with 16, and a model that thinks spends that before it says a word. The first
+sweep across all eleven, on 2026-09-06, found the last one: `shapes` opened with
+64 and reported twelve empty answers as twelve broken shapes. At 256 every model
+answered on every shape. A run that has only ever seen one model has not been
+held to this rule yet. **A live
 run that gives a model under 256 tokens is testing the ceiling, whether it means
 to or not.** The same move loosened `live`'s cache floor from 0.95 to 0.5: Haiku
 reads back over 0.99 of a prefix and glm reads 0.61 of the same conversation,

@@ -33,7 +33,7 @@ import {
   type Question,
   questionTool,
 } from '../src/plugins/tools/question.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { passed, under, wrongIf } from './report.js';
 import { refused, watch, type Round } from './rounds.js';
 
@@ -116,7 +116,7 @@ const program = (model: string) =>
     const session = yield* openSession({
       system,
       model,
-      maxTokens: 512,
+      maxTokens: room,
       tools: ['question', 'wait'],
     });
     const watching = yield* watch(session, 3, '180 seconds');

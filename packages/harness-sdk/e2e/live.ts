@@ -3,7 +3,7 @@ import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import type { ModelUsage } from '../src/core/model.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo, models } from './setup.js';
+import { cachedSystem as system, kilo, models, room } from './setup.js';
 import { fail, passed, wrongIf } from './report.js';
 
 interface Answer {
@@ -22,7 +22,7 @@ const ask = (session: SessionHandle, text: string) =>
 
 const program = (model: string) =>
   Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 256 });
+    const session = yield* openSession({ system, model, maxTokens: room });
     const first = yield* ask(session, 'Answer with the word: one');
     const second = yield* ask(session, 'Answer with the word: two');
     return { id: session.id, first, second, total: yield* session.usage };

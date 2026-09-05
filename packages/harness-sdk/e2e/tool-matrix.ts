@@ -40,10 +40,10 @@ import { type Asker, type Question, questionTool } from '../src/plugins/tools/qu
 import { subagentTool } from '../src/plugins/tools/subagent.js';
 import { timeTool } from '../src/plugins/tools/time.js';
 import { type Todo, todoTool } from '../src/plugins/tools/todo.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed } from './report.js';
 
-const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? '1024');
+const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? String(room));
 
 const system =
   'You are a coding harness with tools. Use a tool whenever one can answer ' +
@@ -208,7 +208,7 @@ const oneSubagent = (model: string, kinds: readonly ApiKind[]) =>
   Effect.suspend(() => {
     const sent: string[] = [];
     const under = kilo({ apiKinds: kinds });
-    const tool = noting(subagentTool({ system: subSystem, model, maxTokens: 128 }, under), sent);
+    const tool = noting(subagentTool({ system: subSystem, model, maxTokens: room }, under), sent);
     const layers = Layer.merge(under, Layer.succeed(ToolRegistry, { tools: [tool] }));
     const program = Effect.gen(function* () {
       const session = yield* openSession({ system, model, maxTokens, tools: ['subagent'] });

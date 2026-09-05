@@ -54,7 +54,7 @@ import { type SubagentReport, subagentTool } from '../src/plugins/tools/subagent
 import { timeTool } from '../src/plugins/tools/time.js';
 import { type Todo, todoTool } from '../src/plugins/tools/todo.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { passed, under, wrongIf } from './report.js';
 
 /**
@@ -221,7 +221,7 @@ const oneMore = (sessionId: string) =>
   Effect.gen(function* () {
     const clone = yield* cloneSession(sessionId);
     return yield* Stream.runFold(
-      clone.ask('Answer with the word: ok', { maxTokens: 256 }),
+      clone.ask('Answer with the word: ok', { maxTokens: room }),
       undefined as ModelUsage | undefined,
       (held, event) => (event.kind === 'done' ? event.usage : held)
     );
@@ -268,7 +268,7 @@ const converse = (model: string) =>
           model,
           /* Room for a model that thinks before it answers: at 256 tokens two
              of the eleven spent the lot on reasoning and came back empty. */
-          maxTokens: 512,
+          maxTokens: room,
           inlineFor: Duration.seconds(2),
           onFinished: report => Effect.sync(() => void reports.push(report)),
         },
@@ -285,7 +285,7 @@ const converse = (model: string) =>
       const session = yield* openSession({
         system,
         model,
-        maxTokens: 1024,
+        maxTokens: room,
         tools: ['time', 'todo', 'question', 'subagent'],
       });
       const watch = yield* watching(session, '180 seconds');

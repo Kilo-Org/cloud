@@ -19,7 +19,7 @@ import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo, models } from './setup.js';
+import { cachedSystem as system, kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 const questions = 10;
@@ -54,7 +54,7 @@ const layers = kilo({ apiKinds: ['messages'] });
 
 const growing = (model: string) =>
   Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 64 });
+    const session = yield* openSession({ system, model, maxTokens: room });
     const answers: Answer[] = [];
     for (let index = 0; index < questions; index += 1) {
       answers.push(yield* ask(session, `Answer with the word: ${words[index] ?? 'one'}`));
@@ -69,7 +69,7 @@ const growing = (model: string) =>
  */
 const racing = (model: string) =>
   Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 64 });
+    const session = yield* openSession({ system, model, maxTokens: room });
     const started = yield* Effect.fork(
       Stream.runCollect(Stream.take(session.ask('Answer with the word: one'), 1))
     );

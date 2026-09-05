@@ -35,7 +35,7 @@ import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, type ToolCall, ToolRegistry } from '../src/core/tool.js';
 import { timeTool } from '../src/plugins/tools/time.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed, under, wrongIf } from './report.js';
 
 const system =
@@ -79,7 +79,7 @@ const daysNow = (): readonly string[] => {
 const asked = async (model: string, kind: ApiKind): Promise<string | undefined> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 512, tools: ['time'] });
+    const session = yield* openSession({ system, model, maxTokens: room, tools: ['time'] });
     return yield* said(session.ask('What is the date and time right now?'));
   });
   const answer = await Effect.runPromise(

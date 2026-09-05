@@ -19,7 +19,7 @@ import { SessionStore } from '../src/core/storage.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
-import { everyShape, kilo, models } from './setup.js';
+import { everyShape, kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 const system = 'You answer briefly and remember what you are told.';
@@ -51,7 +51,7 @@ const windowed = <A, E>(
 /** One question, keeping what it said and what the provider counted for it. */
 const say = (session: SessionHandle, text: string) =>
   Stream.runFold(
-    session.ask(text, { maxTokens: 200 }),
+    session.ask(text, { maxTokens: room }),
     { said: '', prompted: 0 },
     (held, event) => {
       if (event.kind === 'delta') {

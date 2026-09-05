@@ -25,7 +25,7 @@ import type { Continued } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
 import { ToolRegistry } from '../src/core/tool.js';
 import { type SubagentReport, subagentTool } from '../src/plugins/tools/subagent.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed, under, wrongIf } from './report.js';
 
 const system =
@@ -59,7 +59,7 @@ const subagent = (model: string, inlineFor: Duration.DurationInput) =>
     {
       system: subSystem,
       model,
-      maxTokens: 128,
+      maxTokens: room,
       inlineFor,
       wait: true,
       onFinished: report => Effect.sync(() => void reports.push(report)),
@@ -76,7 +76,7 @@ const runHandOff = async (model: string): Promise<void> => {
     const session = yield* openSession({
       system,
       model,
-      maxTokens: 256,
+      maxTokens: room,
       tools: ['subagent'],
     });
     const answer = yield* said(session.ask('Ask the subagent for this quarter’s codename.'));
@@ -128,7 +128,7 @@ const runSentAway = async (model: string): Promise<void> => {
     const session = yield* openSession({
       system,
       model,
-      maxTokens: 256,
+      maxTokens: room,
       tools: ['subagent'],
     });
     const watching = yield* Effect.fork(

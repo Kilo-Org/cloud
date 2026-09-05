@@ -31,7 +31,7 @@ import { continueSession } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import type { Turn } from '../src/core/turn.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed, under, wrongIf } from './report.js';
 import { refused, watch } from './rounds.js';
 
@@ -101,7 +101,7 @@ const program = (model: string) =>
     const session = yield* openSession({
       system,
       model,
-      maxTokens: 64,
+      maxTokens: room,
     });
     /* Watch first. The rounds run whether or not anybody listens. */
     const watching = yield* watch(session, 2, '120 seconds');

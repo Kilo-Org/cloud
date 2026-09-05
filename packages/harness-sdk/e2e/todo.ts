@@ -27,7 +27,7 @@ import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import { ToolRegistry } from '../src/core/tool.js';
 import { type Todo, todoTool } from '../src/plugins/tools/todo.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 const system =
@@ -66,7 +66,7 @@ const marks = (todos: readonly Todo[]): string =>
 const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   versions.length = 0;
   const program = Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 512, tools: ['todo'] });
+    const session = yield* openSession({ system, model, maxTokens: room, tools: ['todo'] });
     yield* said(session.ask(opening));
     yield* said(session.ask(finished));
     return yield* said(session.ask(asked));

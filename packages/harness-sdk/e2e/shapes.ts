@@ -20,7 +20,7 @@ import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo, models } from './setup.js';
+import { cachedSystem as system, kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 interface Answer {
@@ -45,7 +45,7 @@ const runShape = async (model: string, kind: ApiKind) => {
        whether it means to or not: a model that thinks spends it before it says
        a word, and the run reports an empty answer as a broken shape. This one
        was the last at 64, because it had only ever run on one model. */
-    const session = yield* openSession({ system, model, maxTokens: 256 });
+    const session = yield* openSession({ system, model, maxTokens: room });
     const first = yield* ask(session, 'Answer with the word: one');
     const second = yield* ask(session, 'Answer with the word: two');
     return { first, second, total: yield* session.usage };

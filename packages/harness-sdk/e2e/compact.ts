@@ -15,7 +15,7 @@ import { Effect, Stream } from 'effect';
 import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { everyShape, kilo, models } from './setup.js';
+import { everyShape, kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 /** Small enough that a few turns of chat fill it. */
@@ -44,7 +44,7 @@ const recall = 'What was the vault code I gave you? Answer with the number only.
  * and is still billed for.
  */
 const say = (session: SessionHandle, text: string) =>
-  Stream.runFold(session.ask(text, { maxTokens: 200 }), { said: '', output: 0 }, (held, event) => {
+  Stream.runFold(session.ask(text, { maxTokens: room }), { said: '', output: 0 }, (held, event) => {
     if (event.kind === 'delta') {
       return { ...held, said: held.said + event.text };
     }

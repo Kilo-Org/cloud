@@ -15,7 +15,7 @@ import { Duration, Effect, Fiber, Ref, Stream } from 'effect';
 import type { AbortLike, FetchLike } from '../src/core/fetch.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 import { webFetch } from '../src/plugins/fetch/web.js';
 
@@ -43,7 +43,12 @@ const watchedFetch: FetchLike = (url, request) => {
 
 const layers = kilo({ apiKinds: ['messages'] }, { fetch: watchedFetch });
 
-/** Counts the pieces of the answer, whether it finishes or is walked away from. */
+/**
+ * Counts the pieces of the answer, whether it finishes or is walked away from.
+ *
+ * Its own ceiling, not the shared one: the answer has to still be running when
+ * the run walks away from it.
+ */
 const counted = (session: SessionHandle, said: Ref.Ref<number>) =>
   session.ask(long, { maxTokens: 1500 }).pipe(
     Stream.tap(event =>
@@ -95,7 +100,7 @@ const program = (model: string) =>
         /* Room for a model that thinks before it answers: at 16 tokens a
            reasoning model spends the lot on thinking and says nothing, which
            reads as a stranded session and is not one. */
-        cutSession.ask('Answer with the word: ok', { maxTokens: 256 }),
+        cutSession.ask('Answer with the word: ok', { maxTokens: room }),
         '',
         (held, event) => (event.kind === 'delta' ? held + event.text : held)
       ),

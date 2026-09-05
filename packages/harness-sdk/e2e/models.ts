@@ -4,7 +4,7 @@ import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo, models } from './setup.js';
+import { cachedSystem as system, kilo, models, room } from './setup.js';
 
 /**
  * The same five questions, put to every model in the list.
@@ -16,7 +16,7 @@ import { cachedSystem as system, kilo, models } from './setup.js';
  * 64 tokens four of the eleven answered nothing at all, which reads as a broken
  * transport and is not one.
  */
-const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? '1024');
+const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? String(room));
 const effort = process.env['KILO_EFFORT'] as Effort | undefined;
 
 /** The last question can only be answered from the history of the session. */

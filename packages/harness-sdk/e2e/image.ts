@@ -19,7 +19,7 @@ import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { PartDraft } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 const system =
@@ -55,7 +55,7 @@ const runShape = async (model: string, kind: ApiKind, colour: string) => {
     /* Room to spare. A reasoning model spends its thinking out of this, and a
        tight ceiling starved the second answer to nothing on two shapes. The
        ceiling is what `stop.ts` tests; this run tests the picture. */
-    const session = yield* openSession({ system, model, maxTokens: 256 });
+    const session = yield* openSession({ system, model, maxTokens: room });
     const named = yield* say(session, [
       { kind: 'text', body: 'What colour is the circle in this picture?' },
       picture,

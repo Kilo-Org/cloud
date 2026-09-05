@@ -60,6 +60,25 @@ const full = process.argv.includes('full') || process.env['KILO_FULL'] === '1';
 const models: readonly string[] =
   process.env['KILO_MODELS']?.split(',') ?? (full ? everyModel : [one]);
 
+/**
+ * The room a live run gives a model to answer in.
+ *
+ * A model that thinks spends this before it says a word, so a run that hands
+ * one less is testing the ceiling whether it means to or not: it reads an
+ * empty answer as a broken feature, on every model that reasons at once.
+ * Measured across the eleven on 2026-09-06 — at 64 the queue run reported
+ * three empty answers as a queue that never drained, and every run that passed
+ * the sweep unchanged had given at least 512.
+ *
+ * It is a wall, not a spend: a one word answer costs one word whatever this
+ * says. Raise it rather than tune it.
+ *
+ * A run whose subject *is* the ceiling names its own number and says so.
+ * There are two: the cut half of `stop.ts`, and the long answer `cancel.ts`
+ * interrupts.
+ */
+const room = 1024;
+
 /** For the few checks that are about a shape or a store rather than a model. */
 const model = models[0] ?? one;
 
@@ -102,4 +121,15 @@ const cachedSystem = [
   ...Array.from({ length: 200 }, (_, index) => rule(index)),
 ].join('\n');
 
-export { baseUrl, cachedSystem, everyShape, full, kilo, model, models, organizationId, token };
+export {
+  baseUrl,
+  cachedSystem,
+  everyShape,
+  full,
+  kilo,
+  model,
+  models,
+  organizationId,
+  room,
+  token,
+};

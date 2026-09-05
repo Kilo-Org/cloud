@@ -15,7 +15,7 @@ import type { ApiKind } from '../src/core/catalog.js';
 import type { StopReason } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 const system = 'You answer exactly what you are asked, with no preamble.';
@@ -47,7 +47,7 @@ const runShape = async (model: string, kind: ApiKind) => {
        must not be hit here by accident: a model that thinks spends anything
        less before it answers, and reports the wall it was meant to clear. */
     const finished = yield* Effect.flatMap(openSession({ system, model }), session =>
-      ask(session, short, 256)
+      ask(session, short, room)
     );
     const cut = yield* Effect.flatMap(openSession({ system, model }), session =>
       ask(session, long, 24)

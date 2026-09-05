@@ -18,7 +18,7 @@ import type { ResumeContext } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
-import { cachedSystem as system, kilo, models } from './setup.js';
+import { cachedSystem as system, kilo, models, room } from './setup.js';
 import { fail, passed, under } from './report.js';
 
 /** One database, two runs, as a second start of an application would have. */
@@ -30,7 +30,7 @@ const run = <A, E>(use: Effect.Effect<A, E, ResumeContext>): Promise<A> =>
 
 const ask = (session: SessionHandle, text: string) =>
   Stream.runFold(
-    session.ask(text, { maxTokens: 32 }),
+    session.ask(text, { maxTokens: room }),
     { said: '', usage: undefined as ModelUsage | undefined },
     (held, event) =>
       event.kind === 'delta'
@@ -43,7 +43,7 @@ const ask = (session: SessionHandle, text: string) =>
 /** Builds the prefix and pays for it, so there is a warm cache to inherit. */
 const source = (model: string) =>
   Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 32 });
+    const session = yield* openSession({ system, model, maxTokens: room });
     const first = yield* ask(session, 'Answer with the word: one');
     const second = yield* ask(session, 'Answer with the word: two');
     return { id: session.id, first: first.usage, second: second.usage };

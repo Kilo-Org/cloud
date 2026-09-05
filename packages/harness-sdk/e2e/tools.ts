@@ -29,7 +29,7 @@ import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, questionTool } from '../src/plugins/tools/question.js';
-import { kilo, models } from './setup.js';
+import { kilo, models, room } from './setup.js';
 import { fail, passed } from './report.js';
 
 const system =
@@ -77,7 +77,7 @@ const withTools = (kind: ApiKind, tools: readonly Tool[]) =>
 const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 256, tools: ['weather'] });
+    const session = yield* openSession({ system, model, maxTokens: room, tools: ['weather'] });
     return yield* said(session.ask('What is the weather in Oslo?'));
   });
   const answer = await Effect.runPromise(
@@ -102,7 +102,7 @@ const runShape = async (model: string, kind: ApiKind): Promise<void> => {
 const runTogether = async (model: string): Promise<void> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
-    const session = yield* openSession({ system, model, maxTokens: 256, tools: ['weather'] });
+    const session = yield* openSession({ system, model, maxTokens: room, tools: ['weather'] });
     return yield* said(session.ask('What is the weather in Oslo and in Lisbon?'));
   });
   await Effect.runPromise(
@@ -143,7 +143,7 @@ const runBackgrounded = async (model: string): Promise<void> => {
          `runWanted` is for. */
       system: `${system} Never set wait on a tool call.`,
       model,
-      maxTokens: 256,
+      maxTokens: room,
       tools: ['question'],
     });
     /* Watch first: the round the session starts on its own happens whether or
@@ -207,7 +207,7 @@ const runWanted = async (model: string): Promise<void> => {
     const session = yield* openSession({
       system: `${system} A tool call you set wait to false on runs without you. Set wait to false whenever a call would take a while and you can say something useful before it answers.`,
       model,
-      maxTokens: 256,
+      maxTokens: room,
       tools: ['weather'],
     });
     const watching = yield* Effect.fork(

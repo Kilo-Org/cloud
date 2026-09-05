@@ -2336,6 +2336,12 @@ export const adminRouter = createTRPCRouter({
 
       return summary;
     }),
+    truncate: adminProcedure
+      .input(z.object({ confirmation: z.literal('api_request_log') }))
+      .mutation(async () => {
+        await db.execute(sql`TRUNCATE TABLE api_request_log`);
+        return { success: true };
+      }),
   }),
 
   deployments: adminDeploymentsRouter,

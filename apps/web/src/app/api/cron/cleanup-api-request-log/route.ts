@@ -6,7 +6,7 @@ import {
   emitScheduledJobEvent,
 } from '@kilocode/worker-utils/scheduled-job-observability';
 import { db } from '@/lib/drizzle';
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log_2 } from '@kilocode/db/schema';
 import { asc, inArray, lt } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 
@@ -32,16 +32,16 @@ export async function GET(request: Request) {
   try {
     const cutoffDate = getDaysAgo(RETENTION_DAYS).toISOString();
     const expiredRows = await db
-      .select({ id: api_request_log.id })
-      .from(api_request_log)
-      .where(lt(api_request_log.created_at, cutoffDate))
-      .orderBy(asc(api_request_log.created_at))
+      .select({ id: api_request_log_2.id })
+      .from(api_request_log_2)
+      .where(lt(api_request_log_2.created_at, cutoffDate))
+      .orderBy(asc(api_request_log_2.created_at))
       .limit(BATCH_SIZE + 1);
 
     const batchIds = expiredRows.slice(0, BATCH_SIZE).map(row => row.id);
     const result =
       batchIds.length > 0
-        ? await db.delete(api_request_log).where(inArray(api_request_log.id, batchIds))
+        ? await db.delete(api_request_log_2).where(inArray(api_request_log_2.id, batchIds))
         : null;
 
     const deletedApiRequestLogCount = result?.rowCount ?? 0;

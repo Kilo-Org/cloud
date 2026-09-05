@@ -1,4 +1,4 @@
-import { api_request_log, type User } from '@kilocode/db/schema';
+import { api_request_log_2, type User } from '@kilocode/db/schema';
 import { isKiloExclusiveFreeModel } from '@/lib/ai-gateway/models';
 import { getCustomPricing } from '@/lib/ai-gateway/custom-pricing';
 import { detectToolCallArgumentErrors } from '@/lib/ai-gateway/api-request-log-errors';
@@ -155,7 +155,7 @@ async function createRequestLogCapture(
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
       const apiRequestLogId = await db
-        .insert(api_request_log)
+        .insert(api_request_log_2)
         .values({
           kilo_user_id: user?.id,
           organization_id,
@@ -168,15 +168,15 @@ async function createRequestLogCapture(
           response: responseText,
           error: sanitizeJsonbValue(error),
         })
-        .returning({ id: api_request_log.id });
+        .returning({ id: api_request_log_2.id });
       logExceptInTest(
-        '[rewriteModelResponse] Inserted into api_request_log',
+        '[rewriteModelResponse] Inserted into api_request_log_2',
         apiRequestLogId[0].id
       );
     } catch (e) {
       const cause = e instanceof Error ? e.cause : undefined;
       logExceptInTest(
-        `[rewriteModelResponse] failed to insert api_request_log (user=${user?.id}, status=${status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
+        `[rewriteModelResponse] failed to insert api_request_log_2 (user=${user?.id}, status=${status}, model=${model}) cause (truncated): ${String(cause).substring(0, 4000)} error (truncated): ${String(e).substring(0, 4000)}`
       );
     }
   });

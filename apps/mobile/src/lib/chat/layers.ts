@@ -9,6 +9,7 @@ import {
   TokenError,
   TokenSource,
   type TokenSourceService,
+  ToolRegistry,
 } from '@kilocode/harness-sdk';
 import { layerExpoStore } from '@kilocode/harness-sdk/plugins/store/expo';
 import * as Crypto from 'expo-crypto';
@@ -17,6 +18,7 @@ import { type SQLiteDatabase } from 'expo-sqlite';
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { API_BASE_URL } from '@/lib/config';
 import { chatFetch } from './fetch';
+import { chatTools } from './tools';
 
 /**
  * The plugins the chat runs on.
@@ -97,6 +99,13 @@ const layerToken = Layer.succeed(TokenSource, {
     }),
 } satisfies TokenSourceService);
 
+/**
+ * The tools a session may name. It is assembled once: the set is frozen for
+ * the life of a session, so a registry rebuilt per call would be the same one
+ * every time.
+ */
+const layerTools = Layer.succeed(ToolRegistry, { tools: chatTools() });
+
 /** Whose credit pays for the chat. */
 export type ChatOrg =
   | { readonly kind: 'personal' }
@@ -110,6 +119,7 @@ export function chatLayers(database: SQLiteDatabase, org: ChatOrg) {
     layerAssembler,
     layerEntropy,
     layerCatalog,
+    layerTools,
     gateway,
     layerExpoStore(database)
   );

@@ -15,6 +15,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Asked = { readonly sessionId: string; readonly text: string };
 
 const asked: Asked[] = [];
+/** What the session was opened with, so the tools it offers can be read back. */
+let openedWith: { readonly tools?: readonly string[] } | undefined = undefined;
 /** Ends the answer that is arriving, so a test decides when a turn finishes. */
 let finish: (() => void) | undefined = undefined;
 
@@ -35,7 +37,10 @@ const handleFor = (id: string) => ({
 });
 
 vi.mock('@kilocode/harness-sdk', () => ({
-  openSession: () => Effect.succeed(handleFor('s1')),
+  openSession: (options: { readonly tools?: readonly string[] }) => {
+    openedWith = options;
+    return Effect.succeed(handleFor('s1'));
+  },
   continueSession: (id: string) => Effect.succeed(handleFor(id)),
   cloneSession: () => Effect.succeed(handleFor('s2')),
 }));
@@ -91,6 +96,12 @@ beforeEach(async () => {
   finish = undefined;
   opened = await startChat(place, 'kilo/one');
   await settled();
+});
+
+describe('what a chat is opened with', () => {
+  it('offers the clock, because a model has none and answers from a stale date', () => {
+    expect(openedWith?.tools).toEqual(['time']);
+  });
 });
 
 describe('a second question while the first is being answered', () => {

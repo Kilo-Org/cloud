@@ -12,6 +12,7 @@ import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { change, forgetState, NOTHING, snapshotOf } from './state';
 import { chatLayers, type ChatOrg } from './layers';
 import { askedIn, forgetAsked, moveAsked, rememberAsked } from './pending';
+import { CHAT_TOOL_NAMES } from './tools';
 import { forgetSession, modelOfSession, moveChat, rememberChat, touchChat } from './store';
 
 /**
@@ -113,9 +114,10 @@ async function inOwnScope<E>(
 const SYSTEM =
   'You are Kilo, a helpful assistant inside a mobile app. ' +
   'Answer briefly and in plain language, in the language the person writes in. ' +
-  'You have no tools, no files and no internet: when something needs one of ' +
-  'those, say so rather than guessing. Use markdown sparingly, and code blocks ' +
-  'for code.';
+  'Your one tool tells you the date and time; the date you were trained on has ' +
+  'passed, so read the clock rather than assuming it. You have no files and no ' +
+  'internet: when something needs one of those, say so rather than guessing. ' +
+  'Use markdown sparingly, and code blocks for code.';
 
 /**
  * Makes the database ready to be read.
@@ -133,7 +135,10 @@ export async function prepareChats(place: ChatPlace): Promise<void> {
 /** Starts a chat: a session of its own, and a row so the list has it. */
 export async function startChat(place: ChatPlace, model: string): Promise<string> {
   const runtime = await runtimeFor(place);
-  const { handle, scope } = await inOwnScope(runtime, openSession({ system: SYSTEM, model }));
+  const { handle, scope } = await inOwnScope(
+    runtime,
+    openSession({ system: SYSTEM, model, tools: CHAT_TOOL_NAMES })
+  );
   rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
   chats.set(handle.id, { handle, scope, answering: undefined, waiting: [], ...place });
   change(handle.id, { ...NOTHING, model, status: 'idle' });

@@ -24,7 +24,8 @@ let mockUsesSeparateReplica = true;
 const mockTransaction = jest.mocked(readDb.transaction);
 const mockReadExecute = jest.mocked(readDb.execute);
 const mockExecute = jest.fn<Promise<{ rows: unknown[] }>, [SQL]>();
-const INPUT = { date: '2026-09-15', model: 'anthropic/claude-opus-5' };
+const INPUT = { date: '2026-09-15', hour: 12, model: 'anthropic/claude-opus-5' };
+const HOUR_START = '2026-09-15T12:00:00.000Z';
 const ROW = {
   provider: 'provider-a',
   is_byok: false,
@@ -70,7 +71,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-describe('admin.gatewayUsage.getDailyUsage', () => {
+describe('admin.gatewayUsage.getHourlyUsage', () => {
   beforeEach(() => {
     jest.spyOn(db, 'transaction').mockRejectedValue(new Error('Unexpected primary transaction'));
     jest.spyOn(db, 'execute').mockRejectedValue(new Error('Unexpected primary query'));
@@ -83,7 +84,7 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
   });
 
   it('runs text aggregates and parameterized filters in a replica-only timed transaction', async () => {
-    await caller().getDailyUsage(INPUT);
+    await caller().getHourlyUsage(INPUT);
 
     expect(mockTransaction).toHaveBeenCalledTimes(1);
     expect(mockExecute).toHaveBeenCalledTimes(2);
@@ -100,11 +101,11 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
         'SUM(mu.cost)::text AS cost, SUM(meta.market_cost)::text AS market_cost ' +
         'FROM microdollar_usage mu INNER JOIN microdollar_usage_metadata meta ON mu.id = meta.id ' +
         'WHERE mu.requested_model = $1 AND meta.is_user_byok = false AND mu.input_tokens > 0 ' +
-        "AND mu.created_at >= ($2::date::timestamp AT TIME ZONE 'UTC') " +
-        "AND mu.created_at < (($3::date + 1)::timestamp AT TIME ZONE 'UTC') " +
+        'AND mu.created_at >= $2::timestamptz ' +
+        "AND mu.created_at < ($3::timestamptz + interval '1 hour') " +
         'GROUP BY mu.provider, meta.is_byok ORDER BY mu.provider, meta.is_byok'
     );
-    expect(executedQuery().params).toEqual([INPUT.model, INPUT.date, INPUT.date]);
+    expect(executedQuery().params).toEqual([INPUT.model, HOUR_START, HOUR_START]);
   });
 
   it('waits for SET LOCAL to complete before issuing the aggregation', async () => {
@@ -114,7 +115,7 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
       started.resolve();
       return timeout.promise;
     });
-    const result = caller().getDailyUsage(INPUT);
+    const result = caller().getHourlyUsage(INPUT);
     await started.promise;
     expect(mockExecute).toHaveBeenCalledTimes(1);
     expect(executedQuery(0).sql).toBe("SET LOCAL statement_timeout = '600000'");
@@ -137,25 +138,42 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
     '2400-02-29',
     '9999-12-31',
   ])(
-    'binds valid calendar date %s and leaves next-day UTC arithmetic to PostgreSQL',
+    'binds the final hour of valid calendar date %s and leaves rollover to PostgreSQL',
     async date => {
+      const hourStart = `${date}T23:00:00.000Z`;
       mockExecute.mockResolvedValue({ rows: [ROW] });
-      await expect(caller().getDailyUsage({ ...INPUT, date })).resolves.toEqual([{ ...ROW, date }]);
-      expect(executedQuery().params).toEqual([INPUT.model, date, date]);
-      expect(executedQuery().sql).toContain(">= ($2::date::timestamp AT TIME ZONE 'UTC')");
-      expect(executedQuery().sql).toContain("< (($3::date + 1)::timestamp AT TIME ZONE 'UTC')");
+      await expect(caller().getHourlyUsage({ ...INPUT, date, hour: 23 })).resolves.toEqual([
+        { ...ROW, hour_start: hourStart },
+      ]);
+      expect(executedQuery().params).toEqual([INPUT.model, hourStart, hourStart]);
+      expect(executedQuery().sql).toContain('>= $2::timestamptz');
+      expect(executedQuery().sql).toContain("< ($3::timestamptz + interval '1 hour')");
+    }
+  );
+
+  it.each(Array.from({ length: 24 }, (_, hour) => hour))(
+    'binds hour %i as a canonical UTC timestamp',
+    async hour => {
+      const hourStart = `${INPUT.date}T${hour.toString().padStart(2, '0')}:00:00.000Z`;
+      mockExecute.mockResolvedValue({ rows: [ROW] });
+      await expect(caller().getHourlyUsage({ ...INPUT, hour })).resolves.toEqual([
+        { ...ROW, hour_start: hourStart },
+      ]);
+      expect(executedQuery().params).toEqual([INPUT.model, hourStart, hourStart]);
     }
   );
 
   it('trims model input and binds it rather than interpolating SQL', async () => {
     const model = "model' OR 1=1 --";
-    await caller().getDailyUsage({ ...INPUT, model: `  ${model}  ` });
+    await caller().getHourlyUsage({ ...INPUT, model: `  ${model}  ` });
     expect(executedQuery().params[0]).toBe(model);
     expect(executedQuery().sql).not.toContain(model);
   });
 
   it('accepts a model with exactly 256 characters', async () => {
-    await expect(caller().getDailyUsage({ ...INPUT, model: 'a'.repeat(256) })).resolves.toEqual([]);
+    await expect(caller().getHourlyUsage({ ...INPUT, model: 'a'.repeat(256) })).resolves.toEqual(
+      []
+    );
   });
 
   it.each([
@@ -191,6 +209,21 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
     { date: new Date('2026-09-15T00:00:00Z') },
     { date: null },
     { date: undefined },
+    { hour: -1 },
+    { hour: 24 },
+    { hour: 0.5 },
+    { hour: 23.5 },
+    { hour: NaN },
+    { hour: Infinity },
+    { hour: -Infinity },
+    { hour: '0' },
+    { hour: '12' },
+    { hour: '' },
+    { hour: true },
+    { hour: null },
+    { hour: undefined },
+    { hour: [] },
+    { hour: {} },
     { model: '' },
     { model: ' \t\n ' },
     { model: 'a'.repeat(257) },
@@ -198,29 +231,41 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
     { model: undefined },
   ])('rejects invalid input %p before opening a transaction', async invalid => {
     await expect(
-      caller().getDailyUsage({ ...INPUT, ...invalid } as typeof INPUT)
+      caller().getHourlyUsage({ ...INPUT, ...invalid } as typeof INPUT)
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
   });
 
-  it('rejects the old monthly input without querying the database', async () => {
-    await expect(
-      caller().getDailyUsage({ year: 2026, month: 9, model: INPUT.model } as never)
-    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  it.each([
+    { year: 2026, month: 9, model: INPUT.model },
+    { date: INPUT.date, model: INPUT.model },
+  ])('rejects legacy input %p without querying the database', async input => {
+    await expect(caller().getHourlyUsage(input as never)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
   });
 
-  it('attaches the queried date to every validated row without mutating SQL results', async () => {
-    const rows = [ROW, { ...ROW, provider: 'provider-b', date: 'unexpected-database-date' }];
+  it('attaches only the queried hour to every validated row without mutating SQL results', async () => {
+    const rows = [
+      ROW,
+      {
+        ...ROW,
+        provider: 'provider-b',
+        date: 'unexpected-database-date',
+        hour_start: '2026-09-15 11:00:00+00',
+      },
+    ];
     mockExecute.mockResolvedValue({ rows });
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([
-      { ...ROW, date: INPUT.date },
-      { ...ROW, provider: 'provider-b', date: INPUT.date },
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([
+      { ...ROW, hour_start: HOUR_START },
+      { ...ROW, provider: 'provider-b', hour_start: HOUR_START },
     ]);
-    expect(rows[0]).not.toHaveProperty('date');
+    expect(rows[0]).not.toHaveProperty('hour_start');
     expect(rows[1]).toHaveProperty('date', 'unexpected-database-date');
+    expect(rows[1]).toHaveProperty('hour_start', '2026-09-15 11:00:00+00');
   });
 
   it('preserves large numeric strings and decimal precision in microdollar costs', async () => {
@@ -237,7 +282,9 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
       market_cost: '23456789012345678901.987654321',
     };
     mockExecute.mockResolvedValue({ rows: [row] });
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([{ ...row, date: INPUT.date }]);
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([
+      { ...row, hour_start: HOUR_START },
+    ]);
   });
 
   it('keeps the existing nonnegative decimal token sum contract', async () => {
@@ -249,7 +296,9 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
       cache_write_tokens: '12345678901234567890.123456789',
     };
     mockExecute.mockResolvedValue({ rows: [row] });
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([{ ...row, date: INPUT.date }]);
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([
+      { ...row, hour_start: HOUR_START },
+    ]);
   });
 
   it('preserves null provider, BYOK and aggregates while keeping zero counts as strings', async () => {
@@ -266,13 +315,15 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
       market_cost: null,
     };
     mockExecute.mockResolvedValue({ rows: [row] });
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([{ ...row, date: INPUT.date }]);
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([
+      { ...row, hour_start: HOUR_START },
+    ]);
   });
 
   it.each([false, true])('preserves the PostgreSQL boolean %s', async is_byok => {
     mockExecute.mockResolvedValue({ rows: [{ ...ROW, is_byok }] });
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([
-      { ...ROW, is_byok, date: INPUT.date },
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([
+      { ...ROW, is_byok, hour_start: HOUR_START },
     ]);
   });
 
@@ -303,22 +354,24 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
     'rejects malformed database column %s value %p with a generic error',
     async (column, value) => {
       mockExecute.mockResolvedValue({ rows: [{ ...ROW, [column]: value }] });
-      await expect(caller().getDailyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
+      await expect(caller().getHourlyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
     }
   );
 
   it('accepts negative market costs and integer costs without conversion', async () => {
     const row = { ...ROW, cost: '0', market_cost: '-10.500000000' };
     mockExecute.mockResolvedValue({ rows: [row] });
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([{ ...row, date: INPUT.date }]);
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([
+      { ...row, hour_start: HOUR_START },
+    ]);
   });
 
   it('returns an empty array when PostgreSQL returns no rows', async () => {
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([]);
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([]);
   });
 
   it('requires admin access before opening a transaction', async () => {
-    await expect(caller(false).getDailyUsage(INPUT)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    await expect(caller(false).getHourlyUsage(INPUT)).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
   });
@@ -334,7 +387,7 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
       } else {
         mockExecute.mockResolvedValueOnce({ rows: [] }).mockRejectedValueOnce(error);
       }
-      await expect(caller().getDailyUsage(INPUT)).rejects.toMatchObject({
+      await expect(caller().getHourlyUsage(INPUT)).rejects.toMatchObject({
         ...SANITIZED_ERROR,
         cause: undefined,
       });
@@ -360,33 +413,37 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
     '2147483647',
   ])('uses exactly ten minutes regardless of timeout configuration %p', async timeout => {
     process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS = timeout;
-    await caller().getDailyUsage(INPUT);
+    await caller().getHourlyUsage(INPUT);
     expect(executedQuery(0).sql).toBe("SET LOCAL statement_timeout = '600000'");
   });
 
-  it('sets exactly ten minutes in each daily transaction when no timeout is configured', async () => {
+  it('sets exactly ten minutes in each hourly transaction when no timeout is configured', async () => {
     delete process.env.USAGE_QUERY_TIMEOUT_ADMIN_MS;
-    await caller().getDailyUsage(INPUT);
-    await caller().getDailyUsage({ ...INPUT, date: '2026-09-16' });
+    await caller().getHourlyUsage(INPUT);
+    await caller().getHourlyUsage({ ...INPUT, hour: 13 });
     expect(mockTransaction).toHaveBeenCalledTimes(2);
     expect(mockExecute).toHaveBeenCalledTimes(4);
     expect(executedQuery(0).sql).toBe("SET LOCAL statement_timeout = '600000'");
     expect(executedQuery(2).sql).toBe("SET LOCAL statement_timeout = '600000'");
-    expect(executedQuery(1).params).toEqual([INPUT.model, INPUT.date, INPUT.date]);
-    expect(executedQuery(3).params).toEqual([INPUT.model, '2026-09-16', '2026-09-16']);
+    expect(executedQuery(1).params).toEqual([INPUT.model, HOUR_START, HOUR_START]);
+    expect(executedQuery(3).params).toEqual([
+      INPUT.model,
+      '2026-09-15T13:00:00.000Z',
+      '2026-09-15T13:00:00.000Z',
+    ]);
   });
 
   it('fails closed in production when readDb would fall back to primary', async () => {
     jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: 'production' });
     mockUsesSeparateReplica = false;
-    await expect(caller().getDailyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
+    await expect(caller().getHourlyUsage(INPUT)).rejects.toMatchObject(SANITIZED_ERROR);
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
   });
 
   it('allows a separately configured replica in production', async () => {
     jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: 'production' });
-    await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([]);
+    await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([]);
     expect(mockTransaction).toHaveBeenCalledTimes(1);
   });
 
@@ -395,24 +452,97 @@ describe('admin.gatewayUsage.getDailyUsage', () => {
     async nodeEnv => {
       jest.replaceProperty(process, 'env', { ...process.env, NODE_ENV: nodeEnv });
       mockUsesSeparateReplica = false;
-      await expect(caller().getDailyUsage(INPUT)).resolves.toEqual([]);
+      await expect(caller().getHourlyUsage(INPUT)).resolves.toEqual([]);
       expect(mockTransaction).toHaveBeenCalledTimes(1);
     }
   );
 
   it('does not open a transaction for an already-aborted request', async () => {
-    await expect(caller(true, AbortSignal.abort()).getDailyUsage(INPUT)).rejects.toMatchObject(
+    await expect(caller(true, AbortSignal.abort()).getHourlyUsage(INPUT)).rejects.toMatchObject(
       SANITIZED_ERROR
     );
     expect(mockTransaction).not.toHaveBeenCalled();
     expect(mockExecute).not.toHaveBeenCalled();
   });
+
+  it('skips aggregation when aborted while waiting for a transaction connection', async () => {
+    const controller = new AbortController();
+    const started = Promise.withResolvers<void>();
+    const connection = Promise.withResolvers<void>();
+    mockTransaction.mockImplementation(async callback => {
+      started.resolve();
+      await connection.promise;
+      return callback({ execute: mockExecute } as never);
+    });
+
+    const result = caller(true, controller.signal).getHourlyUsage(INPUT);
+    await started.promise;
+    expect(mockExecute).not.toHaveBeenCalled();
+    controller.abort();
+    connection.resolve();
+
+    await expect(result).rejects.toMatchObject({ ...SANITIZED_ERROR, cause: undefined });
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+    expect(executedQuery(0).sql).toBe("SET LOCAL statement_timeout = '600000'");
+  });
+
+  it('skips aggregation when aborted while SET LOCAL is pending', async () => {
+    const controller = new AbortController();
+    const started = Promise.withResolvers<void>();
+    const timeout = Promise.withResolvers<{ rows: unknown[] }>();
+    mockExecute.mockImplementationOnce(() => {
+      started.resolve();
+      return timeout.promise;
+    });
+
+    const result = caller(true, controller.signal).getHourlyUsage(INPUT);
+    await started.promise;
+    controller.abort();
+    timeout.resolve({ rows: [] });
+
+    await expect(result).rejects.toMatchObject({ ...SANITIZED_ERROR, cause: undefined });
+    expect(mockTransaction).toHaveBeenCalledTimes(1);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['aggregation', 'transaction completion'])(
+    'discards the awaited result when aborted during %s',
+    async stage => {
+      const controller = new AbortController();
+      const started = Promise.withResolvers<void>();
+      const completion = Promise.withResolvers<{ rows: unknown[] }>();
+      if (stage === 'aggregation') {
+        mockExecute.mockResolvedValueOnce({ rows: [] }).mockImplementationOnce(() => {
+          started.resolve();
+          return completion.promise;
+        });
+      } else {
+        mockExecute.mockResolvedValue({ rows: [ROW] });
+        mockTransaction.mockImplementation(async callback => {
+          const rows = await callback({ execute: mockExecute } as never);
+          started.resolve();
+          await completion.promise;
+          return rows;
+        });
+      }
+
+      const result = caller(true, controller.signal).getHourlyUsage(INPUT);
+      await started.promise;
+      controller.abort();
+      completion.resolve({ rows: [ROW] });
+
+      await expect(result).rejects.toMatchObject({ ...SANITIZED_ERROR, cause: undefined });
+      expect(mockTransaction).toHaveBeenCalledTimes(1);
+      expect(mockExecute).toHaveBeenCalledTimes(2);
+    }
+  );
 });
 
-describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
+describe('admin.gatewayUsage.getHourlyUsage PostgreSQL semantics', () => {
   let input: typeof INPUT;
   const singleUsage = {
-    date: INPUT.date,
+    hour_start: HOUR_START,
     provider: 'provider-a',
     is_byok: false,
     users: '1',
@@ -447,7 +577,7 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
       provider: 'provider-a',
       model: 'different-resolved-model',
       requested_model: input.model,
-      created_at: `${input.date} 12:00:00+00`,
+      created_at: `${input.date} ${input.hour.toString().padStart(2, '0')}:30:00+00`,
       input_tokens: 10,
       output_tokens: 20,
       cache_hit_tokens: 3,
@@ -468,15 +598,17 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
     }
   }
 
-  it('filters exact model and false user BYOK with an inner join and a half-open UTC day', async () => {
-    await insertUsage({ created_at: '2026-09-15 00:00:00+00' });
-    await insertUsage({ created_at: '2026-09-15 23:59:59.999999+00' });
+  it('filters exact model and false user BYOK with an inner join and a half-open UTC hour', async () => {
+    await insertUsage({ created_at: '2026-09-15 12:00:00+00' });
+    await insertUsage({ created_at: '2026-09-15 12:59:59.999999+00' });
     await insertUsage({ kilo_user_id: 'anon:lowercase' });
     await insertUsage({ kilo_user_id: 'AnOn:mixed-case' });
     await insertUsage({ kilo_user_id: 'ANON-without-colon' });
-    await insertUsage({ created_at: '2026-09-14 23:59:59.999999+00' });
-    await insertUsage({ created_at: '2026-09-16 00:00:00+00' });
+    await insertUsage({ created_at: '2026-09-15 11:59:59.999999+00' });
+    await insertUsage({ created_at: '2026-09-15 13:00:00+00' });
     await insertUsage({ requested_model: 'different-requested-model', model: input.model });
+    await insertUsage({ requested_model: input.model.toUpperCase() });
+    await insertUsage({ requested_model: `${input.model}-suffix` });
     await insertUsage({ requested_model: null });
     await insertUsage({}, { is_user_byok: true });
     await insertUsage({}, { is_user_byok: null });
@@ -489,7 +621,7 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
       market_cost: 1000,
     });
 
-    await expect(caller().getDailyUsage(input)).resolves.toEqual([
+    await expect(caller().getHourlyUsage(input)).resolves.toEqual([
       {
         ...singleUsage,
         users: '4',
@@ -504,34 +636,34 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
     ]);
   });
 
-  it.each<[string, string, string]>([
-    ['2000-01-01', '1999-12-31', '2000-01-02'],
-    ['2000-02-29', '2000-02-28', '2000-03-01'],
-    ['2024-02-28', '2024-02-27', '2024-02-29'],
-    ['2024-02-29', '2024-02-28', '2024-03-01'],
-    ['2026-02-28', '2026-02-27', '2026-03-01'],
-    ['2026-03-08', '2026-03-07', '2026-03-09'],
-    ['2026-04-30', '2026-04-29', '2026-05-01'],
-    ['2026-11-01', '2026-10-31', '2026-11-02'],
-    ['2026-12-31', '2026-12-30', '2027-01-01'],
-    ['2100-02-28', '2100-02-27', '2100-03-01'],
-    ['2400-02-29', '2400-02-28', '2400-03-01'],
-    ['9999-12-31', '9999-12-30', '10000-01-01'],
-  ])('queries exactly UTC day %s in a non-UTC database session', async (date, previous, next) => {
-    input = { ...input, date };
+  it.each<[string, string]>([
+    ['2000-01-01', '2000-01-02'],
+    ['2000-02-29', '2000-03-01'],
+    ['2024-02-28', '2024-02-29'],
+    ['2024-02-29', '2024-03-01'],
+    ['2026-02-28', '2026-03-01'],
+    ['2026-03-08', '2026-03-09'],
+    ['2026-04-30', '2026-05-01'],
+    ['2026-11-01', '2026-11-02'],
+    ['2026-12-31', '2027-01-01'],
+    ['2100-02-28', '2100-03-01'],
+    ['2400-02-29', '2400-03-01'],
+    ['9999-12-31', '10000-01-01'],
+  ])('queries hour 23 of %s ending at %s in a non-UTC database session', async (date, next) => {
+    input = { ...input, date, hour: 23 };
     await insertUsage({
-      created_at: `${previous} 23:59:59.999999+00`,
+      created_at: `${date} 22:59:59.999999+00`,
       provider: 'excluded-before',
     });
-    await insertUsage({ created_at: `${date} 00:00:00+00` });
+    await insertUsage({ created_at: `${date} 23:00:00+00` });
     await insertUsage();
     await insertUsage({ created_at: `${date} 23:59:59.999999+00` });
     await insertUsage({ created_at: `${next} 00:00:00+00`, provider: 'excluded-after' });
 
-    await expect(caller().getDailyUsage(input)).resolves.toEqual([
+    await expect(caller().getHourlyUsage(input)).resolves.toEqual([
       {
         ...singleUsage,
-        date,
+        hour_start: `${date}T23:00:00.000Z`,
         input_tokens: '30',
         output_tokens: '60',
         cache_read_tokens: '9',
@@ -542,14 +674,17 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
     ]);
   });
 
-  it('reports adjacent days independently for the same provider and user', async () => {
-    await insertUsage({ created_at: '2026-09-15 00:00:00+00' });
-    await insertUsage({ created_at: '2026-09-15 23:59:59.999999+00' });
-    await insertUsage({ created_at: '2026-09-16 00:00:00+00' });
+  it('queries hour zero at the minimum supported date without including the previous year', async () => {
+    input = { ...input, date: '2000-01-01', hour: 0 };
+    await insertUsage({ created_at: '1999-12-31 23:59:59.999999+00', provider: 'excluded-before' });
+    await insertUsage({ created_at: '2000-01-01 00:00:00+00' });
+    await insertUsage({ created_at: '2000-01-01 00:59:59.999999+00' });
+    await insertUsage({ created_at: '2000-01-01 01:00:00+00', provider: 'excluded-after' });
 
-    await expect(caller().getDailyUsage(input)).resolves.toEqual([
+    await expect(caller().getHourlyUsage(input)).resolves.toEqual([
       {
         ...singleUsage,
+        hour_start: '2000-01-01T00:00:00.000Z',
         input_tokens: '20',
         output_tokens: '40',
         cache_read_tokens: '6',
@@ -558,8 +693,82 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
         market_cost: '400',
       },
     ]);
-    await expect(caller().getDailyUsage({ ...input, date: '2026-09-16' })).resolves.toEqual([
-      { ...singleUsage, date: '2026-09-16' },
+  });
+
+  it.each<[string, number, string, string, string, number]>([
+    ['2026-09-15', 12, '2026-09-15T12:00:00.000Z', '2026-09-15T13:00:00.000Z', '2026-09-15', 13],
+    ['2026-09-15', 23, '2026-09-15T23:00:00.000Z', '2026-09-16T00:00:00.000Z', '2026-09-16', 0],
+    ['2026-03-08', 9, '2026-03-08T09:00:00.000Z', '2026-03-08T10:00:00.000Z', '2026-03-08', 10],
+    ['2026-11-01', 8, '2026-11-01T08:00:00.000Z', '2026-11-01T09:00:00.000Z', '2026-11-01', 9],
+  ])(
+    'reports adjacent hours independently from %s hour %i for the same provider and user',
+    async (date, hour, start, end, nextDate, nextHour) => {
+      input = { ...input, date, hour };
+      await insertUsage({ created_at: start });
+      await insertUsage();
+      await insertUsage({ created_at: end });
+
+      await expect(caller().getHourlyUsage(input)).resolves.toEqual([
+        {
+          ...singleUsage,
+          hour_start: start,
+          input_tokens: '20',
+          output_tokens: '40',
+          cache_read_tokens: '6',
+          cache_write_tokens: '8',
+          cost: '200',
+          market_cost: '400',
+        },
+      ]);
+      await expect(
+        caller().getHourlyUsage({ ...input, date: nextDate, hour: nextHour })
+      ).resolves.toEqual([{ ...singleUsage, hour_start: end }]);
+    }
+  );
+
+  it('counts arbitrary user IDs distinctly per group while summing every qualifying row', async () => {
+    const userIds = [
+      'oauth/google/arbitrary-user',
+      'plain-user',
+      crypto.randomUUID(),
+      'anon:repeated',
+      'AnOn:mixed-case',
+      'ANON-without-colon',
+      'prefix-anon:embedded',
+      '',
+    ];
+    for (const kilo_user_id of userIds) {
+      await insertUsage({ kilo_user_id });
+      await insertUsage({ kilo_user_id });
+    }
+    await insertUsage({ provider: 'provider-b', kilo_user_id: 'anon:repeated' });
+    await insertUsage(
+      { provider: 'provider-b', kilo_user_id: 'anon:repeated' },
+      { market_cost: null }
+    );
+
+    await expect(caller().getHourlyUsage(input)).resolves.toEqual([
+      {
+        ...singleUsage,
+        users: '8',
+        logged_in_users: '6',
+        input_tokens: '160',
+        output_tokens: '320',
+        cache_read_tokens: '48',
+        cache_write_tokens: '64',
+        cost: '1600',
+        market_cost: '3200',
+      },
+      {
+        ...singleUsage,
+        provider: 'provider-b',
+        logged_in_users: '0',
+        input_tokens: '20',
+        output_tokens: '40',
+        cache_read_tokens: '6',
+        cache_write_tokens: '8',
+        cost: '200',
+      },
     ]);
   });
 
@@ -569,7 +778,7 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
     await insertUsage({ input_tokens: -1, kilo_user_id: 'excluded-negative-input-user' });
     await insertUsage({ input_tokens: 0, provider: 'excluded-provider' });
 
-    await expect(caller().getDailyUsage(input)).resolves.toEqual([
+    await expect(caller().getHourlyUsage(input)).resolves.toEqual([
       { ...singleUsage, input_tokens: '1' },
     ]);
   });
@@ -582,7 +791,7 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
     await insertUsage({ provider: 'provider-b' });
     await insertUsage({ provider: null }, { is_byok: null });
 
-    await expect(caller().getDailyUsage(input)).resolves.toEqual([
+    await expect(caller().getHourlyUsage(input)).resolves.toEqual([
       {
         ...singleUsage,
         input_tokens: '20',
@@ -608,7 +817,7 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
         kilo_user_id: 'oauth/google/test-user',
         provider: 'provider-a',
         requested_model: input.model,
-        created_at: `${input.date} 12:00:00+00`,
+        created_at: `${input.date} ${input.hour.toString().padStart(2, '0')}:30:00+00`,
         input_tokens: sql`${large}::bigint`,
         output_tokens: sql`${large}::bigint`,
         cache_hit_tokens: sql`${large}::bigint`,
@@ -626,7 +835,7 @@ describe('admin.gatewayUsage.getDailyUsage PostgreSQL semantics', () => {
       }))
     );
 
-    await expect(caller().getDailyUsage(input)).resolves.toEqual([
+    await expect(caller().getHourlyUsage(input)).resolves.toEqual([
       {
         ...singleUsage,
         is_byok: true,

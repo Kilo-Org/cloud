@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Kezdőlap",
     "agents": "Ügynökök",
+    "chat": "Csevegés",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Tétlen",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsolja be az Élő tevékenységeket a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
+  },
+  "modelChat": {
+    "title": "Csevegés",
+    "working": "Feldolgozás",
+    "composer": {
+      "placeholder": "Üzenet"
+    },
+    "empty": {
+      "title": "Kezdjen csevegést",
+      "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
+    },
+    "list": {
+      "untitled": "Cím nélküli",
+      "delete": "Törlés",
+      "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
+      "modelsFailed": "Nem sikerült betölteni a modelleket",
+      "new": "Új csevegés",
+      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg a törléshez.",
+      "deleteTitle": "Törli ezt a csevegést?"
+    },
+    "beta": "Béta"
   }
 }

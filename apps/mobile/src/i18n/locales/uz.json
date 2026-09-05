@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Bosh sahifa",
     "agents": "Agentlar",
+    "chat": "Suhbat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Kutmoqda",
     "channelName": "Faol agentlar",
     "activityKitDisabledBody": "Qulflangan ekranda Faol agentlarni ko'rish uchun Sozlamalarda Jonli faoliyatlarni yoqing."
+  },
+  "modelChat": {
+    "title": "Suhbat",
+    "working": "Ishlamoqda",
+    "composer": {
+      "placeholder": "Xabar"
+    },
+    "empty": {
+      "title": "Suhbatni boshlang",
+      "description": "Model bilan gaplashish uchun xabar yuboring."
+    },
+    "list": {
+      "untitled": "Nomsiz",
+      "delete": "O'chirish",
+      "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
+      "modelsFailed": "Modellarni yuklab bo'lmadi",
+      "new": "Yangi chat",
+      "openHint": "Chatni ochadi. Oʻchirish uchun bosib turing.",
+      "deleteTitle": "Bu chat oʻchirilsinmi?"
+    },
+    "beta": "Beta"
   }
 }

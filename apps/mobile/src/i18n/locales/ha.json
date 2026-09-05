@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Gida",
     "agents": "Wakilai",
+    "chat": "Tattaunawa",
     "profile": "Bayanan",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Rashin aiki",
     "channelName": "Wakilai da ke aiki",
     "activityKitDisabledBody": "Kunna Ayyukan Kai Tsaye a cikin Saituna don ganin Wakilai da ke Aiki a kan Allon Kulle."
+  },
+  "modelChat": {
+    "title": "Tattaunawa",
+    "working": "Yana aiki",
+    "composer": {
+      "placeholder": "Saƙo"
+    },
+    "empty": {
+      "title": "Fara tattaunawa",
+      "description": "Aika saƙo don tattaunawa da samfurin."
+    },
+    "list": {
+      "untitled": "Ba tare da suna ba",
+      "delete": "Share",
+      "loadFailed": "Ba a iya loda tarihin tattaunawa.",
+      "modelsFailed": "An kasa ɗora samfuran",
+      "new": "Sabuwar tattaunawa",
+      "openHint": "Yana buɗe tattaunawar. Danna sosai don sharewa.",
+      "deleteTitle": "A share wannan tattaunawar?"
+    },
+    "beta": "Beta"
   }
 }

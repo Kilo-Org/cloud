@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Hasiera",
     "agents": "Agenteak",
+    "chat": "Txata",
     "profile": "Profila",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Geldirik",
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu Zuzeneko jarduerak Ezarpenetan, Agente aktiboak Blokeo-pantailan ikusteko."
+  },
+  "modelChat": {
+    "title": "Txata",
+    "working": "Lanean",
+    "composer": {
+      "placeholder": "Mezua"
+    },
+    "empty": {
+      "title": "Hasi txat bat",
+      "description": "Bidali mezu bat modelo batekin hitz egiteko."
+    },
+    "list": {
+      "untitled": "Izenik gabe",
+      "delete": "Ezabatu",
+      "loadFailed": "Ezin izan da txat-historia kargatu.",
+      "modelsFailed": "Modeloak ezin izan dira kargatu",
+      "new": "Txat berria",
+      "openHint": "Txata irekitzen du. Ezabatzeko, sakatu luze.",
+      "deleteTitle": "Txat hau ezabatu?"
+    },
+    "beta": "Beta"
   }
 }

@@ -691,6 +691,7 @@
   "tabs": {
     "home": "Home",
     "agents": "Aġenti",
+    "chat": "Chat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3281,5 +3282,26 @@
     "idle": "Idle",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Ixgħel l-Attivitajiet Diretti fis-Settings biex tara l-Aġenti Attivi fuq l-Iskrin Imsakkar."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Qed jaħdem",
+    "composer": {
+      "placeholder": "Messaġġ"
+    },
+    "empty": {
+      "title": "Ibda chat",
+      "description": "Ibgħat messaġġ biex tikkellem ma' mudell."
+    },
+    "list": {
+      "untitled": "Mingħajr titlu",
+      "delete": "Ħassar",
+      "loadFailed": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
+      "modelsFailed": "Ma setgħux jittellgħu l-mudelli",
+      "new": "Chat ġdid",
+      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tħassar.",
+      "deleteTitle": "Tħassar dan iċ-chat?"
+    },
+    "beta": "Beta"
   }
 }

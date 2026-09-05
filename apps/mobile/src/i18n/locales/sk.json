@@ -684,6 +684,7 @@
   "tabs": {
     "home": "Domov",
     "agents": "Agenti",
+    "chat": "Chat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3259,5 +3260,26 @@
     "idle": "Nečinný",
     "channelName": "Aktívni agenti",
     "activityKitDisabledBody": "Zapnite živé aktivity v Nastaveniach, aby sa aktívni agenti zobrazovali na zamknutej obrazovke."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Pracuje sa",
+    "composer": {
+      "placeholder": "Správa"
+    },
+    "empty": {
+      "title": "Začať chat",
+      "description": "Pošlite správu a porozprávajte sa s modelom."
+    },
+    "list": {
+      "untitled": "Bez názvu",
+      "delete": "Odstrániť",
+      "loadFailed": "Históriu chatu sa nepodarilo načítať.",
+      "modelsFailed": "Modely sa nepodarilo načítať",
+      "new": "Nový chat",
+      "openHint": "Otvorí chat. Dlhým stlačením odstránite.",
+      "deleteTitle": "Odstrániť tento chat?"
+    },
+    "beta": "Beta"
   }
 }

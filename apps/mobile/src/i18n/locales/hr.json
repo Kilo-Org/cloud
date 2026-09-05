@@ -677,6 +677,7 @@
   "tabs": {
     "home": "Početna",
     "agents": "Agenti",
+    "chat": "Chat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3237,5 +3238,26 @@
     "idle": "Neaktivan",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključite Aktivnosti uživo u Postavkama kako biste vidjeli aktivne agente na zaključanom zaslonu."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Radim",
+    "composer": {
+      "placeholder": "Poruka"
+    },
+    "empty": {
+      "title": "Započnite chat",
+      "description": "Pošaljite poruku za razgovor s modelom."
+    },
+    "list": {
+      "untitled": "Bez naslova",
+      "delete": "Obriši",
+      "loadFailed": "Nije moguće učitati povijest razgovora.",
+      "modelsFailed": "Učitavanje modela nije uspjelo",
+      "new": "Novi razgovor",
+      "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
+      "deleteTitle": "Izbrisati ovaj razgovor?"
+    },
+    "beta": "Beta"
   }
 }

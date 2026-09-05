@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Kreu",
     "agents": "Agjentët",
+    "chat": "Bisedë",
     "profile": "Profili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "I papunë",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizoni Aktivitetet e drejtpërdrejta te Cilësimet për të parë Agjentët aktivë në Ekranin e kyçjes."
+  },
+  "modelChat": {
+    "title": "Bisedë",
+    "working": "Duke punuar",
+    "composer": {
+      "placeholder": "Mesazh"
+    },
+    "empty": {
+      "title": "Filloni një bisedë",
+      "description": "Dërgo një mesazh për të biseduar me një model."
+    },
+    "list": {
+      "untitled": "Pa titull",
+      "delete": "Fshi",
+      "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
+      "modelsFailed": "Nuk u ngarkuan modelet",
+      "new": "Bisedë e re",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
+      "deleteTitle": "Ta fshini këtë bisedë?"
+    },
+    "beta": "Beta"
   }
 }

@@ -670,6 +670,7 @@
   "tabs": {
     "home": "หน้าหลัก",
     "agents": "เอเจนต์",
+    "chat": "แชท",
     "profile": "โปรไฟล์",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "ว่าง",
     "channelName": "เอเจนต์ที่กำลังทำงาน",
     "activityKitDisabledBody": "เปิดกิจกรรมสดในการตั้งค่าเพื่อดูเอเจนต์ที่กำลังทำงานบนหน้าจอล็อค"
+  },
+  "modelChat": {
+    "title": "แชท",
+    "working": "กำลังทำงาน",
+    "composer": {
+      "placeholder": "ข้อความ"
+    },
+    "empty": {
+      "title": "เริ่มแชท",
+      "description": "ส่งข้อความเพื่อพูดคุยกับโมเดล"
+    },
+    "list": {
+      "untitled": "ไม่มีชื่อ",
+      "delete": "ลบ",
+      "loadFailed": "ไม่สามารถโหลดประวัติแชทได้",
+      "modelsFailed": "ไม่สามารถโหลดโมเดลได้",
+      "new": "แชทใหม่",
+      "openHint": "เปิดแชท กดค้างเพื่อลบ",
+      "deleteTitle": "ลบแชทนี้ไหม"
+    },
+    "beta": "เบต้า"
   }
 }

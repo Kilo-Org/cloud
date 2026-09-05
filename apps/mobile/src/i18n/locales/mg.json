@@ -670,6 +670,7 @@
   "tabs": {
     "home": "An-trano",
     "agents": "Agents",
+    "chat": "Resaka",
     "profile": "Momba ahy",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Tsy mihetsika",
     "channelName": "Agent mavitrika",
     "activityKitDisabledBody": "Alefaso ao amin'ny Fikirana ny Hetsika Mivantana mba hahitana ny Agent Mavitrika eo amin'ny Efijery Fihidy."
+  },
+  "modelChat": {
+    "title": "Resaka",
+    "working": "Miasa",
+    "composer": {
+      "placeholder": "Hafatra"
+    },
+    "empty": {
+      "title": "Atombohy resaka",
+      "description": "Mandefasa hafatra mba hiresaka amin'ny Modely."
+    },
+    "list": {
+      "untitled": "Tsy misy lohateny",
+      "delete": "Fafao",
+      "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
+      "modelsFailed": "Tsy afaka namaky ny modely",
+      "new": "Resaka vaovao",
+      "openHint": "Manokatra ny resaka. Tsindrio ela mba hamafana.",
+      "deleteTitle": "Hamafa ity resaka ity?"
+    },
+    "beta": "Beta"
   }
 }

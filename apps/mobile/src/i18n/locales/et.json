@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Avaleht",
     "agents": "Agendid",
+    "chat": "Vestlus",
     "profile": "Profiil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Ooterežiimis",
     "channelName": "Aktiivsed agendid",
     "activityKitDisabledBody": "Lülitage seadetes reaalajas tegevused sisse, et näha aktiivseid agente lukustuskuval."
+  },
+  "modelChat": {
+    "title": "Vestlus",
+    "working": "Töötamine",
+    "composer": {
+      "placeholder": "Sõnum"
+    },
+    "empty": {
+      "title": "Alusta vestlust",
+      "description": "Mudeliga vestlemiseks saada sõnum."
+    },
+    "list": {
+      "untitled": "Pealkirjata",
+      "delete": "Kustuta",
+      "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
+      "modelsFailed": "Mudeleid ei õnnestunud laadida",
+      "new": "Uus vestlus",
+      "openHint": "Avab vestluse. Kustutamiseks hoia all.",
+      "deleteTitle": "Kas kustutada see vestlus?"
+    },
+    "beta": "Beeta"
   }
 }

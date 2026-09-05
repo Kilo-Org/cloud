@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Ile",
     "agents": "Awọn aṣoju",
+    "chat": "Iwiregbe",
     "profile": "Àkójọpọ̀",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Ìsinmi",
     "channelName": "Awọn aṣoju to n ṣiṣẹ",
     "activityKitDisabledBody": "Tan Awọn Iṣẹ Lọwọlọwọ ninu Eto lati ri Awọn aṣoju to n ṣiṣẹ lori Iboju Titiipa."
+  },
+  "modelChat": {
+    "title": "Iwiregbe",
+    "working": "Nṣiṣẹ́",
+    "composer": {
+      "placeholder": "Ifiranṣẹ"
+    },
+    "empty": {
+      "title": "Bẹ̀rẹ̀ iwiregbe kan",
+      "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."
+    },
+    "list": {
+      "untitled": "Ko ni akọle",
+      "delete": "Pa",
+      "loadFailed": "Kò lè ṣagbewọ ìtàn iwiregbe.",
+      "modelsFailed": "Kò lè gbé àwọn àwoṣe",
+      "new": "Ìjíròrò tuntun",
+      "openHint": "Ṣí ìjíròrò náà. Tẹ̀ mọ́lẹ̀ láti pa á rẹ́.",
+      "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
+    },
+    "beta": "Beta"
   }
 }

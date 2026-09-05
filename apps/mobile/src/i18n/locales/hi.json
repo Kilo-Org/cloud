@@ -216,6 +216,7 @@
   "tabs": {
     "home": "होम",
     "agents": "एजेंट",
+    "chat": "चैट",
     "profile": "प्रोफ़ाइल",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "निष्क्रिय",
     "channelName": "सक्रिय एजेंट",
     "activityKitDisabledBody": "लॉक स्क्रीन पर सक्रिय एजेंट देखने के लिए सेटिंग में लाइव ऐक्टिविटी चालू करें।"
+  },
+  "modelChat": {
+    "title": "चैट",
+    "working": "काम कर रहा है",
+    "composer": {
+      "placeholder": "संदेश"
+    },
+    "empty": {
+      "title": "चैट शुरू करें",
+      "description": "किसी मॉडल से बात करने के लिए संदेश भेजें।"
+    },
+    "list": {
+      "untitled": "शीर्षक रहित",
+      "delete": "हटाएँ",
+      "loadFailed": "चैट इतिहास लोड नहीं किया जा सका।",
+      "modelsFailed": "मॉडल लोड नहीं हो सके",
+      "new": "नई चैट",
+      "openHint": "चैट खोलता है। मिटाने के लिए देर तक दबाएँ।",
+      "deleteTitle": "यह चैट मिटाएँ?"
+    },
+    "beta": "बीटा"
   }
 }

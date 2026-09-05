@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Huis",
     "agents": "Agente",
+    "chat": "Klets",
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Onaktief",
     "channelName": "Aktiewe agente",
     "activityKitDisabledBody": "Skakel Regstreekse Aktiwiteite in Instellings aan om Aktiewe Agente op die Sluitskerm te sien."
+  },
+  "modelChat": {
+    "title": "Klets",
+    "working": "Werk",
+    "composer": {
+      "placeholder": "Boodskap"
+    },
+    "empty": {
+      "title": "Begin 'n klets",
+      "description": "Stuur 'n boodskap om met 'n model te gesels."
+    },
+    "list": {
+      "untitled": "Onbenoemd",
+      "delete": "Skrap",
+      "loadFailed": "Kon nie kletsgeskiedenis laai nie.",
+      "modelsFailed": "Kon nie modelle laai nie",
+      "new": "Nuwe klets",
+      "openHint": "Maak die klets oop. Hou lank in om te skrap.",
+      "deleteTitle": "Skrap hierdie klets?"
+    },
+    "beta": "Beta"
   }
 }

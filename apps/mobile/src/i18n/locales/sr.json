@@ -677,6 +677,7 @@
   "tabs": {
     "home": "Početna",
     "agents": "Agenti",
+    "chat": "Ćaskanje",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3237,5 +3238,26 @@
     "idle": "Neaktivan",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključite Aktivnosti uživo u Podešavanjima da biste videli aktivne agente na zaključanom ekranu."
+  },
+  "modelChat": {
+    "title": "Ćaskanje",
+    "working": "Radim…",
+    "composer": {
+      "placeholder": "Poruka"
+    },
+    "empty": {
+      "title": "Započnite ćaskanje",
+      "description": "Pošaljite poruku da razgovarate sa modelom."
+    },
+    "list": {
+      "untitled": "Bez naslova",
+      "delete": "Obriši",
+      "loadFailed": "Nije moguće učitati istoriju ćaskanja.",
+      "modelsFailed": "Nije moguće učitati modele",
+      "new": "Novo ćaskanje",
+      "openHint": "Otvara ćaskanje. Dugo pritisnite za brisanje.",
+      "deleteTitle": "Izbrisati ovo ćaskanje?"
+    },
+    "beta": "Beta"
   }
 }

@@ -691,6 +691,7 @@
   "tabs": {
     "home": "Baile",
     "agents": "Gníomhairí",
+    "chat": "Comhrá",
     "profile": "Próifíl",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3281,5 +3282,26 @@
     "idle": "Díomhaoin",
     "channelName": "Gníomhairí gníomhacha",
     "activityKitDisabledBody": "Cumasaigh Gníomhaíochtaí Beo sna Socruithe chun Gníomhairí gníomhacha a fheiceáil ar an Scáileán Glasála."
+  },
+  "modelChat": {
+    "title": "Comhrá",
+    "working": "Ag obair",
+    "composer": {
+      "placeholder": "Teachtaireacht"
+    },
+    "empty": {
+      "title": "Tosaigh comhrá",
+      "description": "Seol teachtaireacht chun labhairt le samhail."
+    },
+    "list": {
+      "untitled": "Gan teideal",
+      "delete": "Scrios",
+      "loadFailed": "Níorbh fhéidir stair an chomhrá a lódáil.",
+      "modelsFailed": "Níorbh fhéidir múnlaí a lódáil",
+      "new": "Comhrá nua",
+      "openHint": "Osclaíonn sé an comhrá. Brúigh go fada chun scriosadh.",
+      "deleteTitle": "An comhrá seo a scriosadh?"
+    },
+    "beta": "Béite"
   }
 }

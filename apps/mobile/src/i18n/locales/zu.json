@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Ikhaya",
     "agents": "Ama-agent",
+    "chat": "Ingxoxo",
     "profile": "Iphrofayili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Banga",
     "channelName": "Ama-agent asebenzayo",
     "activityKitDisabledBody": "Vula Imisebenzi Ebukhoma ku-Izilungiselelo ukuze ubone Ama-agent asebenzayo Esikrinini Esikhiyiwe."
+  },
+  "modelChat": {
+    "title": "Ingxoxo",
+    "working": "Iyasebenza",
+    "composer": {
+      "placeholder": "Umlayezo"
+    },
+    "empty": {
+      "title": "Qala ingxoxo",
+      "description": "Thumela umlayezo ukuze uxoxe nomodeli."
+    },
+    "list": {
+      "untitled": "Akunasihloko",
+      "delete": "Susa",
+      "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
+      "modelsFailed": "Akukwazanga ukulayisha amamodeli",
+      "new": "Ingxoxo entsha",
+      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze usule.",
+      "deleteTitle": "Susa le ngxoxo?"
+    },
+    "beta": "Beta"
   }
 }

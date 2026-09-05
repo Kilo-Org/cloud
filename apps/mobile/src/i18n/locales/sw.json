@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Nyumbani",
     "agents": "Mawakala",
+    "chat": "Mazungumzo",
     "profile": "Wasifu",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Hakikazi",
     "channelName": "Mawakala wanaofanya kazi",
     "activityKitDisabledBody": "Washa Shughuli za Moja kwa Moja katika Mipangilio ili uone Mawakala wanaofanya kazi kwenye Skrini Iliyofungwa."
+  },
+  "modelChat": {
+    "title": "Mazungumzo",
+    "working": "Inafanya kazi",
+    "composer": {
+      "placeholder": "Ujumbe"
+    },
+    "empty": {
+      "title": "Anza mazungumzo",
+      "description": "Tuma ujumbe ili uongee na mfano."
+    },
+    "list": {
+      "untitled": "Bila jina",
+      "delete": "Futa",
+      "loadFailed": "Haikuweza kupakia historia ya mazungumzo.",
+      "modelsFailed": "Imeshindwa kupakia miundo",
+      "new": "Gumzo jipya",
+      "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kufuta.",
+      "deleteTitle": "Futa gumzo hili?"
+    },
+    "beta": "Beta"
   }
 }

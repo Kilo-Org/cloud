@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Koti",
     "agents": "Agentit",
+    "chat": "Keskustelu",
     "profile": "Profiili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Vapaalla",
     "channelName": "Aktiiviset agentit",
     "activityKitDisabledBody": "Ota live-aktiviteetit käyttöön Asetuksissa, niin näet aktiiviset agentit lukitulla näytöllä."
+  },
+  "modelChat": {
+    "title": "Keskustelu",
+    "working": "Työstetään",
+    "composer": {
+      "placeholder": "Viesti"
+    },
+    "empty": {
+      "title": "Aloita keskustelu",
+      "description": "Lähetä viesti keskustellaksesi mallin kanssa."
+    },
+    "list": {
+      "untitled": "Nimetön",
+      "delete": "Poista",
+      "loadFailed": "Keskusteluhistoriaa ei voitu ladata.",
+      "modelsFailed": "Malleja ei voitu ladata",
+      "new": "Uusi keskustelu",
+      "openHint": "Avaa keskustelun. Poista painamalla pitkään.",
+      "deleteTitle": "Poistetaanko tämä keskustelu?"
+    },
+    "beta": "Beta"
   }
 }

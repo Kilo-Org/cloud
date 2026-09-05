@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Akèy",
     "agents": "Ajans",
+    "chat": "Chat",
     "profile": "Pwofil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Anchaj",
     "channelName": "Ajans aktif yo",
     "activityKitDisabledBody": "Aktive Aktivite an dirèk nan Paramèt pou wè Ajans aktif yo sou Ekran bloke a."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Ap travay",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Kòmanse yon chat",
+      "description": "Voye yon mesaj pou pale ak yon modèl."
+    },
+    "list": {
+      "untitled": "San tit",
+      "delete": "Efase",
+      "loadFailed": "Pa t ka chaje istwa chat la.",
+      "modelsFailed": "Pa t ka chaje modèl yo",
+      "new": "Nouvo chat",
+      "openHint": "Louvri chat la. Peze lontan pou efase.",
+      "deleteTitle": "Efase chat sa a?"
+    },
+    "beta": "Beta"
   }
 }

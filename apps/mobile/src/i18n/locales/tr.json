@@ -216,6 +216,7 @@
   "tabs": {
     "home": "Ana Sayfa",
     "agents": "Ajanlar",
+    "chat": "Sohbet",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Boşta",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları Kilit Ekranı'nda görmek için Ayarlar'dan Canlı Etkinlikler'i açın."
+  },
+  "modelChat": {
+    "title": "Sohbet",
+    "working": "Çalışıyor",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Bir sohbet başlat",
+      "description": "Bir modelle konuşmak için mesaj gönder."
+    },
+    "list": {
+      "untitled": "Başlıksız",
+      "delete": "Sil",
+      "loadFailed": "Sohbet geçmişi yüklenemedi.",
+      "modelsFailed": "Modeller yüklenemedi",
+      "new": "Yeni sohbet",
+      "openHint": "Sohbeti açar. Silmek için uzun basın.",
+      "deleteTitle": "Bu sohbet silinsin mi?"
+    },
+    "beta": "Beta"
   }
 }

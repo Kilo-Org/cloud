@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Heim",
     "agents": "Umboð (Agents)",
+    "chat": "Spjall",
     "profile": "Notandasnið",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Í bið",
     "channelName": "Virk umboð",
     "activityKitDisabledBody": "Kveiktu á Beinni virkni í Stillingum til að sjá Virk umboð á Lásskjánum."
+  },
+  "modelChat": {
+    "title": "Spjall",
+    "working": "Vinnur",
+    "composer": {
+      "placeholder": "Skilaboð"
+    },
+    "empty": {
+      "title": "Byrjaðu spjall",
+      "description": "Sendu skilaboð til að tala við líkan."
+    },
+    "list": {
+      "untitled": "Án titils",
+      "delete": "Eyða",
+      "loadFailed": "Ekki tókst að hlaða samtalsferilinn.",
+      "modelsFailed": "Ekki tókst að hlaða líkön",
+      "new": "Nýtt spjall",
+      "openHint": "Opnar spjallið. Haltu inni til að eyða.",
+      "deleteTitle": "Eyða þessu spjalli?"
+    },
+    "beta": "Beta"
   }
 }

@@ -216,6 +216,7 @@
   "tabs": {
     "home": "الرئيسية",
     "agents": "الوكلاء",
+    "chat": "المحادثات",
     "profile": "الملف الشخصي",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3303,5 +3304,26 @@
     "idle": "خامل",
     "channelName": "الوكلاء النشطون",
     "activityKitDisabledBody": "فعّل الأنشطة المباشرة في الإعدادات لرؤية الوكلاء النشطين على شاشة القفل."
+  },
+  "modelChat": {
+    "title": "المحادثات",
+    "working": "جارٍ العمل",
+    "composer": {
+      "placeholder": "رسالة"
+    },
+    "empty": {
+      "title": "بدء محادثة",
+      "description": "أرسل رسالة للتحدث مع نموذج."
+    },
+    "list": {
+      "untitled": "بدون عنوان",
+      "delete": "حذف",
+      "loadFailed": "تعذّر تحميل سجل المحادثة.",
+      "modelsFailed": "تعذّر تحميل النماذج",
+      "new": "محادثة جديدة",
+      "openHint": "يفتح المحادثة. اضغط مطولاً للحذف.",
+      "deleteTitle": "حذف هذه المحادثة؟"
+    },
+    "beta": "بيتا"
   }
 }

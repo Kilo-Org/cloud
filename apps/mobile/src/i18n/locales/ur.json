@@ -670,6 +670,7 @@
   "tabs": {
     "home": "ہوم",
     "agents": "ایجینٹس",
+    "chat": "چیٹ",
     "profile": "پروفائل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "غیر فعال",
     "channelName": "فعال ایجنٹس",
     "activityKitDisabledBody": "لاک اسکرین پر فعال ایجنٹس دیکھنے کے لیے ترتیبات میں لائیو سرگرمیاں فعال کریں۔"
+  },
+  "modelChat": {
+    "title": "چیٹ",
+    "working": "کام جاری ہے",
+    "composer": {
+      "placeholder": "پیغام"
+    },
+    "empty": {
+      "title": "چیٹ شروع کریں",
+      "description": "کسی ماڈل سے بات کرنے کے لیے پیغام بھیجیں۔"
+    },
+    "list": {
+      "untitled": "بغیر عنوان",
+      "delete": "حذف کریں",
+      "loadFailed": "چیٹ کی سرگزشت لوڈ نہیں ہو سکی۔",
+      "modelsFailed": "ماڈلز لوڈ نہیں ہو سکے",
+      "new": "نئی چیٹ",
+      "openHint": "چیٹ کھولتا ہے۔ حذف کرنے کے لیے دبائے رکھیں۔",
+      "deleteTitle": "یہ چیٹ حذف کریں؟"
+    },
+    "beta": "بیٹا"
   }
 }

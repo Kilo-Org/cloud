@@ -216,6 +216,7 @@
   "tabs": {
     "home": "首頁",
     "agents": "代理",
+    "chat": "聊天",
     "profile": "個人資料",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "閒置",
     "channelName": "使用中的代理",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，以在鎖定畫面上查看使用中的代理。"
+  },
+  "modelChat": {
+    "title": "聊天",
+    "working": "處理中",
+    "composer": {
+      "placeholder": "訊息"
+    },
+    "empty": {
+      "title": "開始聊天",
+      "description": "傳送訊息以與模型對話。"
+    },
+    "list": {
+      "untitled": "無標題",
+      "delete": "刪除",
+      "loadFailed": "無法載入聊天記錄。",
+      "modelsFailed": "無法載入模型",
+      "new": "新對話",
+      "openHint": "開啟對話。長按可刪除。",
+      "deleteTitle": "刪除這個對話？"
+    },
+    "beta": "測試版"
   }
 }

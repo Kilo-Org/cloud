@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Hoyga",
     "agents": "Wakiilada",
+    "chat": "Wada sheekaysi",
     "profile": "Koontada",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Firfircooni la'aan",
     "channelName": "Wakiillada firfircoon",
     "activityKitDisabledBody": "Ku daar Hawlaha Tooska ah Dejinta si aad Wakiillada firfircoon ugu aragto Shaashadda Qufulka."
+  },
+  "modelChat": {
+    "title": "Wada sheekaysi",
+    "working": "Waa shaqaynayaa",
+    "composer": {
+      "placeholder": "Fariin"
+    },
+    "empty": {
+      "title": "Bilow wada sheekaysi",
+      "description": "Dir fariin si aad ula hadasho model."
+    },
+    "list": {
+      "untitled": "Bilaa cinwaan",
+      "delete": "Tirtir",
+      "loadFailed": "Taariikhda wada sheekaysiga lama soo gelin karin.",
+      "modelsFailed": "Moodeelada lama soo dejin karin",
+      "new": "Wada sheekaysi cusub",
+      "openHint": "Wada sheekaysiga ayuu furayaa. Si aad u tirtirto si dheer u taabo.",
+      "deleteTitle": "Ma tirtiraa wada sheekaysigan?"
+    },
+    "beta": "Beta"
   }
 }

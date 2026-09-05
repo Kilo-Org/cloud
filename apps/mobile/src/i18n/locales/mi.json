@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Kāinga",
     "agents": "Ngā Kaiāwhina",
+    "chat": "Kōrero",
     "profile": "Kōtaha",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Kore mahi",
     "channelName": "Ngā māngai hohe",
     "activityKitDisabledBody": "Whakakāngia ngā Mahi Mataora i Ngā tautuhinga kia kite i ngā Māngai Hohe i te Mata Maukati."
+  },
+  "modelChat": {
+    "title": "Kōrero",
+    "working": "Kei te mahi",
+    "composer": {
+      "placeholder": "Karere"
+    },
+    "empty": {
+      "title": "Tīmata he kōrero",
+      "description": "Tukuna he karere hei kōrero ki tētahi tauira."
+    },
+    "list": {
+      "untitled": "Kāore he taitara",
+      "delete": "Muku",
+      "loadFailed": "Kāore i taea te uta te hītori kōrero.",
+      "modelsFailed": "Kāore i taea te uta i ngā tauira",
+      "new": "Kōrero hou",
+      "openHint": "Ka whakatuwhera i te kōrero. Pēhia roa hei muku.",
+      "deleteTitle": "Muku i tēnei kōrero?"
+    },
+    "beta": "Beta"
   }
 }

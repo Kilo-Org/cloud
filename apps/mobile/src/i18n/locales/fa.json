@@ -670,6 +670,7 @@
   "tabs": {
     "home": "خانه",
     "agents": "عامل‌ها",
+    "chat": "پیام‌های گفتگو",
     "profile": "پروفایل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "غیرفعال",
     "channelName": "عامل‌های فعال",
     "activityKitDisabledBody": "برای دیدن عامل‌های فعال در صفحه قفل، فعالیت‌های زنده را در تنظیمات روشن کنید."
+  },
+  "modelChat": {
+    "title": "پیام‌های گفتگو",
+    "working": "در حال کار",
+    "composer": {
+      "placeholder": "پیام"
+    },
+    "empty": {
+      "title": "شروع گفتگو",
+      "description": "برای گفتگو با یک مدل، یک پیام ارسال کنید."
+    },
+    "list": {
+      "untitled": "بدون عنوان",
+      "delete": "حذف",
+      "loadFailed": "تاریخچه گفتگو بارگذاری نشد.",
+      "modelsFailed": "بارگذاری مدل‌ها ناموفق بود",
+      "new": "گفتگوی جدید",
+      "openHint": "گفتگو را باز می‌کند. برای حذف، لمس کنید و نگه دارید.",
+      "deleteTitle": "این گفتگو حذف شود؟"
+    },
+    "beta": "بتا"
   }
 }

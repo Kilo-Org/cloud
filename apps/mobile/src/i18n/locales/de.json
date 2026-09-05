@@ -216,6 +216,7 @@
   "tabs": {
     "home": "Start",
     "agents": "Agenten",
+    "chat": "Chat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Inaktiv",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Wird bearbeitet",
+    "composer": {
+      "placeholder": "Nachricht"
+    },
+    "empty": {
+      "title": "Chat starten",
+      "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
+    },
+    "list": {
+      "untitled": "Ohne Titel",
+      "delete": "Löschen",
+      "loadFailed": "Chatverlauf konnte nicht geladen werden.",
+      "modelsFailed": "Modelle konnten nicht geladen werden",
+      "new": "Neuer Chat",
+      "openHint": "Öffnet den Chat. Zum Löschen lange drücken.",
+      "deleteTitle": "Diesen Chat löschen?"
+    },
+    "beta": "Beta"
   }
 }

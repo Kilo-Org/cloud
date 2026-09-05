@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Ev",
     "agents": "Agentlər",
+    "chat": "Söhbət",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Boşda",
     "channelName": "Aktiv agentlər",
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün Parametrlərdə Canlı fəaliyyətləri aktivləşdirin."
+  },
+  "modelChat": {
+    "title": "Söhbət",
+    "working": "İşlənir",
+    "composer": {
+      "placeholder": "Mesaj"
+    },
+    "empty": {
+      "title": "Söhbətə başlayın",
+      "description": "Bir modellə danışmaq üçün mesaj göndərin."
+    },
+    "list": {
+      "untitled": "Adsız",
+      "delete": "Sil",
+      "loadFailed": "Söhbət tarixçəsi yüklənə bilmədi.",
+      "modelsFailed": "Modellər yüklənə bilmədi",
+      "new": "Yeni söhbət",
+      "openHint": "Söhbəti açır. Silmək üçün basıb saxlayın.",
+      "deleteTitle": "Bu söhbət silinsin?"
+    },
+    "beta": "Beta"
   }
 }

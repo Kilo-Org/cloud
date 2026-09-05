@@ -260,6 +260,10 @@ vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 
+vi.mock('@/lib/chat/sign-out', () => ({
+  clearChatsForSignOut: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
@@ -652,6 +656,22 @@ describe('sign-out teardown ordering', () => {
     expect(deleteIndex).toBeGreaterThanOrEqual(0);
     const deleteOrder = secureStore.deleteItemAsync.mock.invocationCallOrder[deleteIndex];
     expect(deleteOrder).toBeGreaterThan(secureStore.setItemAsync.mock.invocationCallOrder[0]);
+
+    unmount();
+  });
+
+  it("takes the account's chats off the device, and survives a wipe that fails", async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { clearChatsForSignOut } = await import('@/lib/chat/sign-out');
+    const wipe = vi.mocked(clearChatsForSignOut);
+    wipe.mockRejectedValueOnce(new Error('database locked'));
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(wipe).toHaveBeenCalledWith(null);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
 
     unmount();
   });

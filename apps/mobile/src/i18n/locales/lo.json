@@ -670,6 +670,7 @@
   "tabs": {
     "home": "ໜ້າຫຼັກ",
     "agents": "ເອເຈນ",
+    "chat": "ສົນທະນາ",
     "profile": "ໂປຣຟາຍ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "ບໍ່ຫຍຸ້ງ",
     "channelName": "ຕົວແທນທີ່ກຳລັງເຮັດວຽກ",
     "activityKitDisabledBody": "ເປີດກິດຈະກຳສົດໃນການຕັ້ງຄ່າ ເພື່ອເບິ່ງຕົວແທນທີ່ກຳລັງເຮັດວຽກໃນໜ້າຈໍລັອກ."
+  },
+  "modelChat": {
+    "title": "ສົນທະນາ",
+    "working": "ກຳລັງດຳເນີນການ",
+    "composer": {
+      "placeholder": "ຂໍ້ຄວາມ"
+    },
+    "empty": {
+      "title": "ເລີ່ມການສົນທະນາ",
+      "description": "ສົ່ງຂໍ້ຄວາມເພື່ອສົນທະນາກັບໂມເດວ."
+    },
+    "list": {
+      "untitled": "ບໍ່ມີຊື່",
+      "delete": "ລຶບ",
+      "loadFailed": "ບໍ່ສາມາດໂຫຼດປະຫວັດການສົນທະນາໄດ້.",
+      "modelsFailed": "ບໍ່ສາມາດໂຫຼດໂມເດວ",
+      "new": "ແຊັດໃໝ່",
+      "openHint": "ເປີດແຊັດ. ກົດຄ້າງເພື່ອລຶບ.",
+      "deleteTitle": "ລຶບແຊັດນີ້ບໍ?"
+    },
+    "beta": "ເບຕ້າ"
   }
 }

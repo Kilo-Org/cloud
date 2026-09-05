@@ -196,6 +196,7 @@
   "tabs": {
     "home": "Accueil",
     "agents": "Agents",
+    "chat": "Discussion",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3237,5 +3238,26 @@
     "idle": "Inactif",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans Réglages pour voir les agents actifs sur l'écran verrouillé."
+  },
+  "modelChat": {
+    "title": "Discussion",
+    "working": "En cours",
+    "composer": {
+      "placeholder": "Message"
+    },
+    "empty": {
+      "title": "Démarrer une discussion",
+      "description": "Envoyez un message pour discuter avec un modèle."
+    },
+    "list": {
+      "untitled": "Sans titre",
+      "delete": "Supprimer",
+      "loadFailed": "Impossible de charger l'historique de la conversation.",
+      "modelsFailed": "Impossible de charger les modèles",
+      "new": "Nouvelle discussion",
+      "openHint": "Ouvre la discussion. Appui long pour supprimer.",
+      "deleteTitle": "Supprimer cette discussion ?"
+    },
+    "beta": "Bêta"
   }
 }

@@ -684,6 +684,7 @@
   "tabs": {
     "home": "Pradžia",
     "agents": "Agentai",
+    "chat": "Pokalbis",
     "profile": "Profilis",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3259,5 +3260,26 @@
     "idle": "Neaktyvus",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunkite tiesiogines veiklas, kad užrakinimo ekrane matytumėte aktyvius agentus."
+  },
+  "modelChat": {
+    "title": "Pokalbis",
+    "working": "Vykdoma",
+    "composer": {
+      "placeholder": "Žinutė"
+    },
+    "empty": {
+      "title": "Pradėti pokalbį",
+      "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
+    },
+    "list": {
+      "untitled": "Be pavadinimo",
+      "delete": "Ištrinti",
+      "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
+      "modelsFailed": "Nepavyko įkelti modelių",
+      "new": "Naujas pokalbis",
+      "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
+      "deleteTitle": "Ištrinti šį pokalbį?"
+    },
+    "beta": "Beta"
   }
 }

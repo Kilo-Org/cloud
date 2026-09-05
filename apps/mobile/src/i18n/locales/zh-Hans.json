@@ -216,6 +216,7 @@
   "tabs": {
     "home": "首页",
     "agents": "代理",
+    "chat": "聊天",
     "profile": "个人资料",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "空闲",
     "channelName": "活动代理",
     "activityKitDisabledBody": "请在“设置”中开启“实时活动”，以在锁定屏幕上查看活动代理。"
+  },
+  "modelChat": {
+    "title": "聊天",
+    "working": "工作中",
+    "composer": {
+      "placeholder": "消息"
+    },
+    "empty": {
+      "title": "开始聊天",
+      "description": "发送消息以与模型对话。"
+    },
+    "list": {
+      "untitled": "无标题",
+      "delete": "删除",
+      "loadFailed": "无法加载聊天历史。",
+      "modelsFailed": "无法加载模型",
+      "new": "新对话",
+      "openHint": "打开对话。长按可删除。",
+      "deleteTitle": "删除这个对话？"
+    },
+    "beta": "测试版"
   }
 }

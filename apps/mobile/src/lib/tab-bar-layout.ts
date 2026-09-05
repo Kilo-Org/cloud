@@ -93,15 +93,15 @@ export type TabBarTab = 'home' | 'kiloclaw' | 'agents' | 'chat' | 'profile';
 /** Flag state that changes which tabs render. */
 export type TabBarTabFlags = {
   showKiloClaw: boolean;
-  showQuickChat: boolean;
+  showChat: boolean;
 };
 
 /**
  * Number of rendered tabs. Base three (Home, Agents, Profile) plus the two
  * flagged tabs when shown.
  */
-export function visibleTabCount(showKiloClaw: boolean, showQuickChat: boolean): number {
-  return 3 + Number(showKiloClaw) + Number(showQuickChat);
+export function visibleTabCount(showKiloClaw: boolean, showChat: boolean): number {
+  return 3 + Number(showKiloClaw) + Number(showChat);
 }
 
 /**
@@ -121,10 +121,10 @@ export function tabBarPosition(tab: TabBarTab, flags: TabBarTabFlags): number | 
       return 2 + Number(flags.showKiloClaw);
     }
     case 'chat': {
-      return flags.showQuickChat ? 3 + Number(flags.showKiloClaw) : null;
+      return flags.showChat ? 3 + Number(flags.showKiloClaw) : null;
     }
     case 'profile': {
-      return visibleTabCount(flags.showKiloClaw, flags.showQuickChat);
+      return visibleTabCount(flags.showKiloClaw, flags.showChat);
     }
     default: {
       // `TabBarTab` is a closed union; this branch is unreachable but keeps

@@ -244,6 +244,19 @@ export function resetEncryptedKvOpenForTests(): void {
   openPromise = null;
 }
 
+/**
+ * The encrypted database itself, for a caller that owns tables of its own.
+ *
+ * The chat store is the one: it hands this handle to the harness SDK, which
+ * keeps the conversations in tables of its own on the same file. One file
+ * means one key, one SQLCipher probe, and one delete-and-recreate recovery
+ * rather than a second copy of all three.
+ */
+export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
+  const db = await openDatabase();
+  return db.$client;
+}
+
 /** Reads one value; returns null when the key is absent. */
 export async function getItem(scope: string, k: string): Promise<string | null> {
   validateItemKey(scope, k);

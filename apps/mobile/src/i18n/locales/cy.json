@@ -698,6 +698,7 @@
   "tabs": {
     "home": "Cartref",
     "agents": "Asiantau",
+    "chat": "Sgwrs",
     "profile": "Proffil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3303,5 +3304,26 @@
     "idle": "Segur",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch Weithgareddau Byw ymlaen yn Gosodiadau i weld Asiantau gweithredol ar y Sgrin Glo."
+  },
+  "modelChat": {
+    "title": "Sgwrs",
+    "working": "Yn gweithio",
+    "composer": {
+      "placeholder": "Neges"
+    },
+    "empty": {
+      "title": "Dechrau sgwrs",
+      "description": "Anfonwch neges i siarad â model."
+    },
+    "list": {
+      "untitled": "Heb deitl",
+      "delete": "Dileu",
+      "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
+      "modelsFailed": "Methodd llwytho modelau",
+      "new": "Sgwrs newydd",
+      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
+      "deleteTitle": "Dileu'r sgwrs hon?"
+    },
+    "beta": "Beta"
   }
 }

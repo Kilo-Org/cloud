@@ -216,6 +216,7 @@
   "tabs": {
     "home": "Strona główna",
     "agents": "Agenci",
+    "chat": "Czat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3259,5 +3260,26 @@
     "idle": "Bezczynny",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz wydarzenia na żywo w Ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+  },
+  "modelChat": {
+    "title": "Czat",
+    "working": "Pracuję",
+    "composer": {
+      "placeholder": "Wiadomość"
+    },
+    "empty": {
+      "title": "Rozpocznij czat",
+      "description": "Wyślij wiadomość, aby porozmawiać z modelem."
+    },
+    "list": {
+      "untitled": "Bez tytułu",
+      "delete": "Usuń",
+      "loadFailed": "Nie udało się wczytać historii czatu.",
+      "modelsFailed": "Nie można załadować modeli",
+      "new": "Nowy czat",
+      "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby usunąć.",
+      "deleteTitle": "Usunąć ten czat?"
+    },
+    "beta": "Beta"
   }
 }

@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Hjem",
     "agents": "Agenter",
+    "chat": "Chat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Ledig",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på Oppdateringer i sanntid i Innstillinger for å se Aktive agenter på låst skjerm."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Jobber",
+    "composer": {
+      "placeholder": "Melding"
+    },
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en melding for å snakke med en modell."
+    },
+    "list": {
+      "untitled": "Uten tittel",
+      "delete": "Slett",
+      "loadFailed": "Kunne ikke laste inn chathistorikken.",
+      "modelsFailed": "Kunne ikke laste modeller",
+      "new": "Ny chat",
+      "openHint": "Åpner chatten. Trykk og hold for å slette.",
+      "deleteTitle": "Slette denne chatten?"
+    },
+    "beta": "Beta"
   }
 }

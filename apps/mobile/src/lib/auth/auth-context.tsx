@@ -19,6 +19,7 @@ import {
   flushLastPostHogEvent,
   LOGOUT_EVENT,
 } from '@/lib/analytics/posthog';
+import { clearChatsForSignOut } from '@/lib/chat/sign-out';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
@@ -380,6 +381,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // unknown — privacy wins). Best effort: a failed cleanup can
             // never abort sign-out.
             clearCacheScopeForSignOut(readCachedUserId(queryClient)),
+            // The chats on the device are read from the same cached user id,
+            // and an unknown one takes every chat rather than leaving one
+            // account's conversations for the next person to sign in.
+            clearChatsForSignOut(readCachedUserId(queryClient)),
             clearLastActiveInstance(),
             clearKiloClawOwned(),
             clearRecentPrs(),

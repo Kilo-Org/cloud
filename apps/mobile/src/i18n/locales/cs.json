@@ -684,6 +684,7 @@
   "tabs": {
     "home": "Domů",
     "agents": "Agenti",
+    "chat": "Chat",
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3259,5 +3260,26 @@
     "idle": "Nečinný",
     "channelName": "Aktivní agenti",
     "activityKitDisabledBody": "Zapněte Živé aktivity v Nastavení, abyste viděli aktivní agenty na zamknuté obrazovce."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Pracuji",
+    "composer": {
+      "placeholder": "Zpráva"
+    },
+    "empty": {
+      "title": "Začněte chatovat",
+      "description": "Pošlete zprávu, abyste si popovídali s modelem."
+    },
+    "list": {
+      "untitled": "Bez názvu",
+      "delete": "Smazat",
+      "loadFailed": "Historie chatu se nepodařila načíst.",
+      "modelsFailed": "Modely se nepodařilo načíst",
+      "new": "Nový chat",
+      "openHint": "Otevře chat. Dlouhým stisknutím smažete.",
+      "deleteTitle": "Smazat tento chat?"
+    },
+    "beta": "Beta"
   }
 }

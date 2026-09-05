@@ -670,6 +670,7 @@
   "tabs": {
     "home": "መነሻ",
     "agents": "ወኪሎች",
+    "chat": "ውይይት",
     "profile": "መገለጫ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "በእረፍት",
     "channelName": "ንቁ ወኪሎች",
     "activityKitDisabledBody": "ንቁ ወኪሎችን በመቆለፊያ ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን ያብሩ።"
+  },
+  "modelChat": {
+    "title": "ውይይት",
+    "working": "በመስራት ላይ",
+    "composer": {
+      "placeholder": "መልእክት"
+    },
+    "empty": {
+      "title": "ውይይት ጀምር",
+      "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
+    },
+    "list": {
+      "untitled": "ርዕስ የሌለው",
+      "delete": "ሰርዝ",
+      "loadFailed": "የውይይት ታሪክ መጫን አልተቻለም።",
+      "modelsFailed": "ሞዴሎችን መጫን አልተቻለም",
+      "new": "አዲስ ውይይት",
+      "openHint": "ውይይቱን ይከፍታል። ለመሰረዝ ተጭነው ይያዙ።",
+      "deleteTitle": "ይህ ውይይት ይሰረዝ?"
+    },
+    "beta": "ቤታ"
   }
 }

@@ -163,10 +163,10 @@ describe('visibleTabCount', () => {
 });
 
 describe('tabBarPosition', () => {
-  const noFlags = { showKiloClaw: false, showQuickChat: false };
-  const kiloclawOnly = { showKiloClaw: true, showQuickChat: false };
-  const chatOnly = { showKiloClaw: false, showQuickChat: true };
-  const both = { showKiloClaw: true, showQuickChat: true };
+  const noFlags = { showKiloClaw: false, showChat: false };
+  const kiloclawOnly = { showKiloClaw: true, showChat: false };
+  const chatOnly = { showKiloClaw: false, showChat: true };
+  const both = { showKiloClaw: true, showChat: true };
 
   it('positions Home at 1 in every combination', () => {
     expect(tabBarPosition('home', noFlags)).toBe(1);

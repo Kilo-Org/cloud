@@ -670,6 +670,7 @@
   "tabs": {
     "home": "હોમ",
     "agents": "એજન્ટ્સ",
+    "chat": "ચેટ",
     "profile": "પ્રોફાઇલ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "નિષ્ક્રિય",
     "channelName": "સક્રિય એજન્ટો",
     "activityKitDisabledBody": "લૉક સ્ક્રીન પર સક્રિય એજન્ટો જોવા માટે સેટિંગ્સમાં લાઇવ પ્રવૃત્તિઓ ચાલુ કરો."
+  },
+  "modelChat": {
+    "title": "ચેટ",
+    "working": "કામ થઈ રહ્યું છે",
+    "composer": {
+      "placeholder": "સંદેશ"
+    },
+    "empty": {
+      "title": "વાતચીત શરૂ કરો",
+      "description": "મોડેલ સાથે વાત કરવા સંદેશ મોકલો."
+    },
+    "list": {
+      "untitled": "અનામી",
+      "delete": "કાઢી નાખો",
+      "loadFailed": "વાતચીત ઇતિહાસ લોડ કરી શકાયો નહીં.",
+      "modelsFailed": "મોડેલ લોડ કરી શકાયા નહીં",
+      "new": "નવી ચેટ",
+      "openHint": "ચેટ ખોલે છે. કાઢી નાખવા માટે લાંબું દબાવો.",
+      "deleteTitle": "આ ચેટ કાઢી નાખવી?"
+    },
+    "beta": "બીટા"
   }
 }

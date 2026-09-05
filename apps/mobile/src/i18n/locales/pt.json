@@ -677,6 +677,7 @@
   "tabs": {
     "home": "Início",
     "agents": "Agentes",
+    "chat": "Conversa",
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3237,5 +3238,26 @@
     "idle": "Inativo",
     "channelName": "Agentes ativos",
     "activityKitDisabledBody": "Ative as Atividades em tempo real nas Definições para ver os agentes ativos no Ecrã bloqueado."
+  },
+  "modelChat": {
+    "title": "Conversa",
+    "working": "A trabalhar",
+    "composer": {
+      "placeholder": "Mensagem"
+    },
+    "empty": {
+      "title": "Inicie uma conversa",
+      "description": "Envie uma mensagem para falar com um modelo."
+    },
+    "list": {
+      "untitled": "Sem título",
+      "delete": "Eliminar",
+      "loadFailed": "Não foi possível carregar o histórico do chat.",
+      "modelsFailed": "Não foi possível carregar os modelos",
+      "new": "Nova conversa",
+      "openHint": "Abre a conversa. Prima continuamente para eliminar.",
+      "deleteTitle": "Eliminar esta conversa?"
+    },
+    "beta": "Beta"
   }
 }

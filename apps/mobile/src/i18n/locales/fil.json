@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Home",
     "agents": "Mga Agent",
+    "chat": "Chat",
     "profile": "Profile",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Idle",
     "channelName": "Mga aktibong agent",
     "activityKitDisabledBody": "I-on ang Mga Live na Aktibidad sa Mga setting para makita ang Mga aktibong agent sa Naka-lock na Screen."
+  },
+  "modelChat": {
+    "title": "Chat",
+    "working": "Gumagawa",
+    "composer": {
+      "placeholder": "Mensahe"
+    },
+    "empty": {
+      "title": "Magsimula ng chat",
+      "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
+    },
+    "list": {
+      "untitled": "Walang pamagat",
+      "delete": "I-delete",
+      "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
+      "modelsFailed": "Hindi maload ang mga modelo",
+      "new": "Bagong chat",
+      "openHint": "Binubuksan ang chat. Pindutin nang matagal para burahin.",
+      "deleteTitle": "Burahin ang chat na ito?"
+    },
+    "beta": "Beta"
   }
 }

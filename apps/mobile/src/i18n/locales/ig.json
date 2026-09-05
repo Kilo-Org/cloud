@@ -670,6 +670,7 @@
   "tabs": {
     "home": "Ebe obibi",
     "agents": "Ndị ọrụ",
+    "chat": "Nkata",
     "profile": "Profaịlụ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
@@ -3215,5 +3216,26 @@
     "idle": "Ọrụ na-agaghị",
     "channelName": "Ndị ọrụ na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye Ihe Omume Dị Ndụ na Ntọala iji hụ Ndị ọrụ na-arụ ọrụ na Ihuenyo Mkpọchi."
+  },
+  "modelChat": {
+    "title": "Nkata",
+    "working": "Na-arụ ọrụ",
+    "composer": {
+      "placeholder": "Ozi"
+    },
+    "empty": {
+      "title": "Malite nkata",
+      "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."
+    },
+    "list": {
+      "untitled": "Enweghị aha",
+      "delete": "Hichapụ",
+      "loadFailed": "Enweghị ike ibutu akụkọ nkata.",
+      "modelsFailed": "Enweghị ike ibunye ụdị",
+      "new": "Nkata ọhụrụ",
+      "openHint": "Na-emeghe nkata ahụ. Pịgide iji hichapụ.",
+      "deleteTitle": "Hichapụ nkata a?"
+    },
+    "beta": "Beta"
   }
 }

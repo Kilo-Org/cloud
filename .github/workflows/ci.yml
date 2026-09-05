@@ -137,6 +137,9 @@ jobs:
       - name: Build trpc types
         run: pnpm --filter @kilocode/trpc run build
 
+      - name: Build harness SDK
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       - name: Lint
         run: scripts/lint-all.sh
 

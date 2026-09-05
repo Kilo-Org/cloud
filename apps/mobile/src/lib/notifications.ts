@@ -25,6 +25,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { captureEvent } from '@/lib/analytics/posthog';
+import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
@@ -280,6 +281,9 @@ export function setupNotificationHandler() {
         // notification/widgets, never a visible banner: the local ongoing owns
         // the display. Apply it to the sinks regardless of the discard outcome.
         const applied = await applyGlanceablePushData(data);
+        if (applied) {
+          refreshActiveSessionsFromPush();
+        }
         if (!applied) {
           setTimeout(() => {
             appBadgeWrite = setAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);

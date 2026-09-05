@@ -333,6 +333,8 @@ export class ActiveSessionsLiveSync {
 /** One app-level mount owns the registry and socket lease. */
 let attachedSync: ActiveSessionsLiveSync | null = null;
 
+export const refreshActiveSessionsFromPush = (): void => attachedSync?.scheduleRefresh('manual');
+
 /** Returns false if no current owner handles this exact key. */
 export async function refreshActiveSessionsNow(
   queryKey: QueryKey

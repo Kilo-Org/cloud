@@ -51,6 +51,7 @@ const mocks = vi.hoisted(() => ({
   startTokenListeners: new Set<(event: { activityPushToStartToken: string }) => void>(),
   registerActivityToken: vi.fn(),
   unregisterActivityToken: vi.fn(),
+  refreshActiveSessionsFromPush: vi.fn(),
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
@@ -142,6 +143,9 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 vi.mock('@/lib/query-client', () => ({ queryClient: {} }));
+vi.mock('@/lib/active-sessions-live-sync', () => ({
+  refreshActiveSessionsFromPush: mocks.refreshActiveSessionsFromPush,
+}));
 vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 
 vi.mock('@kilocode/notifications', async importOriginal => ({
@@ -670,6 +674,7 @@ describe('glanceable app badge sink', () => {
 
     expect(glanceable.shouldSetBadge).toBe(true);
     expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(4);
+    expect(mocks.refreshActiveSessionsFromPush).toHaveBeenCalledOnce();
     expect(completedBeforeWrite).toBeNull();
   });
 });

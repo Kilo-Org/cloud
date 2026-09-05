@@ -75,46 +75,24 @@ export function buildGlanceableExpoMessages(
   snapshot: ActiveAgentsGlanceable,
   platform: 'ios' | 'android'
 ): ExpoPushMessage[] {
-  if (platform === 'ios') {
-    // APNs badge updates are user interactions, so keep them out of the background push.
-    return tokens.flatMap(
-      ({ token }) =>
-        [
-          {
-            to: token,
-            badge: snapshot.needsInput,
-            priority: 'high',
-            collapseId: `${snapshot.scopeKey}:badge`,
-          },
-          {
-            to: token,
-            data: snapshot,
-            _contentAvailable: true,
-            priority: 'normal',
-            collapseId: `${snapshot.scopeKey}:data`,
-          },
-        ] satisfies ExpoPushMessage[]
-    );
-  }
-
   return tokens.map(
     ({ token }) =>
       ({
         to: token,
         data: snapshot,
         badge: snapshot.needsInput,
-        // Data-only wake: `_contentAvailable` makes the OS deliver the message to
-        // the background task while the app is backgrounded/killed, and omitting
-        // title/body keeps it from becoming a visible FCM notification that skips
-        // the task. The ongoing notification and widget content come from the local
-        // `applyGlanceablePushData` path, so the push never rings or interrupts.
+        // `_contentAvailable` wakes the background task. The badge stays on this
+        // same ordered snapshot, while no title, body, or sound interrupts the user.
         _contentAvailable: true,
-        sound: null,
-        priority: 'default',
-        channelId: 'active-agents',
-        // Android collapse key = the opaque scope key, so every aggregate update
-        // for one user+org collapses into the same ongoing notification.
-        tag: snapshot.scopeKey,
+        ...(platform === 'ios'
+          ? { priority: 'normal' as const }
+          : {
+              sound: null,
+              priority: 'default' as const,
+              channelId: 'active-agents',
+              tag: snapshot.scopeKey,
+            }),
+        // One opaque scope key keeps each platform's badge and snapshot ordered together.
         collapseId: snapshot.scopeKey,
       }) satisfies ExpoPushMessage
   );
@@ -174,7 +152,7 @@ export async function deliverGlanceableSnapshot(
 
   // Read the iOS Expo rows first: they carry the only per-user locale on this
   // path, and APNs requires a localized alert on a push-to-start. The
-  // data-only wake below reuses the same rows, so this costs no extra query.
+  // background update below reuses the same rows, so this costs no extra query.
   const iosExpoTokens = await deps.listIosExpoTokens(params.userId, params.organizationId);
   const locale = iosExpoTokens.find(row => row.locale !== null)?.locale ?? null;
 
@@ -202,7 +180,7 @@ export async function deliverGlanceableSnapshot(
     );
   }
 
-  // iOS Expo tokens need a badge update plus a data-only wake for the widget timeline.
+  // The iOS badge and data share one update so neither can arrive or collapse alone.
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   if (iosExpoTokens.length > 0) {
     await deps.sendExpoPush(

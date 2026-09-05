@@ -202,7 +202,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
     vi.mocked(sendPushNotifications).mockImplementation(async incoming => {
-      messages.push(...incoming.filter(message => message.data !== undefined));
+      messages.push(...incoming);
       return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
     });
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -1664,7 +1664,7 @@ describe('toGlanceableContentState', () => {
 });
 
 describe('buildGlanceableExpoMessages', () => {
-  it.each([0, 1, 2])('separates iOS badge %i from the background wake', needsInput => {
+  it.each([0, 1, 2])('keeps iOS badge %i with its background snapshot', needsInput => {
     const nextSnapshot = { ...snapshot, needsInput };
     const messages = buildGlanceableExpoMessages(
       [{ token: 'ExponentPushToken[aaa]', locale: null }],
@@ -1675,20 +1675,13 @@ describe('buildGlanceableExpoMessages', () => {
     expect(messages).toEqual([
       expect.objectContaining({
         to: 'ExponentPushToken[aaa]',
-        badge: needsInput,
-        priority: 'high',
-      }),
-      expect.objectContaining({
-        to: 'ExponentPushToken[aaa]',
         data: nextSnapshot,
+        badge: needsInput,
         _contentAvailable: true,
         priority: 'normal',
       }),
     ]);
-    expect(messages[0]).not.toHaveProperty('data');
-    expect(messages[0]).not.toHaveProperty('_contentAvailable');
-    expect(messages[1]).not.toHaveProperty('badge');
-    expect(messages[0].collapseId).not.toBe(messages[1].collapseId);
+    expect(messages[0].collapseId).toBe(nextSnapshot.scopeKey);
   });
 
   it.each([0, 1, 3])(
@@ -1754,7 +1747,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(delivered).toHaveLength(0);
 
     await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
-    expect(delivered.map(message => message.badge)).toEqual([4, undefined]);
+    expect(delivered.map(message => message.badge)).toEqual([4]);
     expect(vi.mocked(deps.sendExpoPush).mock.calls[1][0][0].badge).toBe(4);
   });
 
@@ -1900,7 +1893,7 @@ describe('deliverGlanceableSnapshot', () => {
     });
   });
 
-  it('sends separate iOS badge and background pushes regardless of the Android token', async () => {
+  it('sends one iOS badge and background push regardless of the Android token', async () => {
     const { deps, calls } = fakeDeps({
       hasAndroidOngoingToken: vi.fn(async () => false),
       listIosExpoTokens: vi.fn(async () => [{ token: 'ExponentPushToken[ios]', locale: null }]),
@@ -1910,10 +1903,10 @@ describe('deliverGlanceableSnapshot', () => {
 
     expect(deps.listIosExpoTokens).toHaveBeenCalledWith('u1', null);
     expect(calls.expoSends).toHaveLength(1);
-    expect(calls.expoSends[0]).toHaveLength(2);
+    expect(calls.expoSends[0]).toHaveLength(1);
     expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[ios]');
     expect(calls.expoSends[0][0].badge).toBe(1);
-    expect(calls.expoSends[0][1]._contentAvailable).toBe(true);
-    expect(calls.expoSends[0][1].data).toEqual(snapshot);
+    expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
+    expect(calls.expoSends[0][0].data).toEqual(snapshot);
   });
 });

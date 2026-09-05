@@ -42,6 +42,11 @@ const SETUP_COMMAND_DIAGNOSTIC_MAX_BYTES = 1_024;
 const GIT_BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024;
 const MAX_ATTACHMENT_DOWNLOAD_BYTES = MAX_ATTACHMENT_BYTES + 1;
+const ATTACHMENT_DOWNLOAD_TIMEOUT_MS = 120_000;
+const MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS = 3;
+// Backoff before each retry attempt, keyed by attempt number: attempt 2 waits
+// 250ms and attempt 3 waits 750ms.
+const ATTACHMENT_RETRY_BACKOFF_MS: Record<number, number> = { 1: 250, 2: 750 };
 
 function cleanTerminalOutput(text: string): string {
   return stripAnsi(text)
@@ -1024,6 +1029,17 @@ async function safeUnlink(filePath: string): Promise<void> {
 }
 
 /**
+ * Permanent per-attachment failure: the body exceeded the size cap. Unlike
+ * transient network/stream errors it must never be retried.
+ */
+class AttachmentTooLargeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AttachmentTooLargeError';
+  }
+}
+
+/**
  * Bounded streaming read. We never trust the server's `content-length` header
  * alone: the response body is pulled at most `MAX_ATTACHMENT_DOWNLOAD_BYTES`
  * bytes. If the producer keeps producing after the cap, the read is aborted,
@@ -1083,7 +1099,7 @@ async function downloadBounded(
 
   if (overflowed) {
     await safeUnlink(filePath);
-    throw new Error(
+    throw new AttachmentTooLargeError(
       `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
     );
   }
@@ -1093,18 +1109,72 @@ async function downloadBounded(
 
 export type DownloadResult =
   | { kind: 'ok'; part: WrapperPromptPart; bytesWritten: number }
-  | { kind: 'failed'; part: WrapperPromptPart };
+  | { kind: 'failed'; message: string; retryable: boolean };
+
+type AttachmentReadStrategy = 'stream' | 'buffer';
+
+async function sleep(ms: number): Promise<void> {
+  await new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Buffered read used when retrying a failed attachment download. The whole
+ * body is pulled with `response.arrayBuffer()`, which bypasses the Web
+ * Streams reader that intermittently fails inside the sandbox Bun runtime
+ * (`TypeError: undefined is not a function`) when the body arrives while the
+ * stream is being read. Only used when `content-length` is present and within
+ * the cap so memory stays bounded; otherwise the bounded streaming read is
+ * used instead.
+ */
+async function downloadBuffered(
+  filePath: string,
+  response: Response,
+  signal: AbortSignal
+): Promise<{ bytesWritten: number }> {
+  signal.throwIfAborted();
+  const contentLengthHeader = response.headers.get('content-length');
+  const contentLength = contentLengthHeader === null ? undefined : Number(contentLengthHeader);
+  if (
+    contentLength === undefined ||
+    Number.isNaN(contentLength) ||
+    contentLength > MAX_ATTACHMENT_BYTES
+  ) {
+    throw new Error('Attachment download failed: unbounded body');
+  }
+
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  signal.throwIfAborted();
+  if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+    throw new AttachmentTooLargeError(
+      `Attachment too large: bytes exceeded the ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MiB cap`
+    );
+  }
+
+  const handle = await fs.open(
+    filePath,
+    fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_TRUNC | fs.constants.O_NOFOLLOW,
+    0o600
+  );
+  try {
+    await handle.write(bytes);
+  } finally {
+    await handle.close();
+  }
+  return { bytesWritten: bytes.byteLength };
+}
 
 /**
  * Download a single attachment. Per-file failure (non-2xx response,
- * read/timeout error, overflow) is converted to an explanatory text part so
- * the rest of the prompt can still proceed; the whole-message abort path is
+ * read/timeout error, overflow) is converted to a structured failure so the
+ * caller can retry transient errors or surface an explanatory text part and
+ * let the rest of the prompt proceed; the whole-message abort path is
  * reserved for non-attachment failures.
  */
 async function downloadAndMaterializeAttachment(
   attachment: WrapperBootstrapAttachment,
   fetchImpl: typeof fetch,
-  signal: AbortSignal
+  signal: AbortSignal,
+  strategy: AttachmentReadStrategy = 'stream'
 ): Promise<DownloadResult> {
   signal.throwIfAborted();
   await fs.mkdir(path.dirname(attachment.localPath), { recursive: true });
@@ -1115,39 +1185,26 @@ async function downloadAndMaterializeAttachment(
     response = await fetchImpl(attachment.signedUrl, { signal });
   } catch (error) {
     const message = redactSecrets(error instanceof Error ? error.message : String(error));
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
-      },
-    };
+    return { kind: 'failed', message, retryable: true };
   }
 
   if (!response.ok) {
     void response.body?.cancel().catch(() => {});
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (HTTP ${response.status})`,
-      },
-    };
+    const retryable = response.status === 429 || response.status >= 500;
+    return { kind: 'failed', message: `HTTP ${response.status}`, retryable };
   }
 
   let result: { bytesWritten: number };
   try {
-    result = await downloadBounded(attachment.localPath, response, signal);
+    result =
+      strategy === 'buffer'
+        ? await downloadBuffered(attachment.localPath, response, signal)
+        : await downloadBounded(attachment.localPath, response, signal);
   } catch (error) {
     void response.body?.cancel().catch(() => {});
     const message = redactSecrets(error instanceof Error ? error.message : String(error));
-    return {
-      kind: 'failed',
-      part: {
-        type: 'text',
-        text: `attachment ${attachment.filename} could not be retrieved (${message})`,
-      },
-    };
+    const retryable = !(error instanceof AttachmentTooLargeError);
+    return { kind: 'failed', message, retryable };
   }
 
   if (isPromptFileMime(attachment.mime)) {
@@ -1176,6 +1233,57 @@ async function downloadAndMaterializeAttachment(
   };
 }
 
+/**
+ * Download and materialize a single attachment, retrying transient failures.
+ * The first attempt uses the bounded streaming read; later attempts use the
+ * buffered read, which re-fetches and bypasses the flaky Web Streams reader.
+ * Returns the prompt part: a `file://` part on success, or an explanatory
+ * text part when retries are exhausted or the failure is permanent.
+ */
+async function materializeAttachment(
+  attachment: WrapperBootstrapAttachment,
+  fetchImpl: typeof fetch,
+  externalSignal?: AbortSignal
+): Promise<WrapperPromptPart> {
+  for (let attempt = 1; attempt <= MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS; attempt++) {
+    const abortController = new AbortController();
+    const timeout = setTimeout(
+      () => abortController.abort(new Error('attachment download timeout')),
+      ATTACHMENT_DOWNLOAD_TIMEOUT_MS
+    );
+    const signal = externalSignal
+      ? AbortSignal.any([abortController.signal, externalSignal])
+      : abortController.signal;
+    try {
+      const result = await downloadAndMaterializeAttachment(
+        attachment,
+        fetchImpl,
+        signal,
+        attempt === 1 ? 'stream' : 'buffer'
+      );
+      if (result.kind === 'ok') return result.part;
+      if (!result.retryable) {
+        return {
+          type: 'text',
+          text: `attachment ${attachment.filename} could not be retrieved (${result.message})`,
+        };
+      }
+      logToFile(
+        `attachment download attempt ${attempt}/${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} failed filename=${attachment.filename} reason=${result.message}`
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (attempt < MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS) {
+      await sleep(ATTACHMENT_RETRY_BACKOFF_MS[attempt] ?? 0);
+    }
+  }
+  return {
+    type: 'text',
+    text: `attachment ${attachment.filename} could not be retrieved (download failed after ${MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS} attempts)`,
+  };
+}
+
 export type MaterializeDeps = {
   fetch?: typeof fetch;
   signal?: AbortSignal;
@@ -1192,22 +1300,7 @@ export async function materializeMessageAttachments(
   const parts: WrapperPromptPart[] = [];
   for (const attachment of message.attachments) {
     deps.signal?.throwIfAborted();
-    const abortController = new AbortController();
-    const timeout = setTimeout(
-      () => abortController.abort(new Error('attachment download timeout')),
-      120_000
-    );
-    const signal = deps.signal
-      ? AbortSignal.any([abortController.signal, deps.signal])
-      : abortController.signal;
-    let result: DownloadResult;
-    try {
-      result = await downloadAndMaterializeAttachment(attachment, fetchImpl, signal);
-      deps.signal?.throwIfAborted();
-    } finally {
-      clearTimeout(timeout);
-    }
-    parts.push(result.part);
+    parts.push(await materializeAttachment(attachment, fetchImpl, deps.signal));
   }
 
   return {

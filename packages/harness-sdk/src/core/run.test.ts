@@ -6,7 +6,7 @@ import { layerAssembler } from '../plugins/prompt/default.js';
 import { ModelError } from './model.js';
 import { textIn } from './prompt.js';
 import { openSession } from './run.js';
-import { options, run, silentCatalog, texts } from './session-fixture.js';
+import { catalogWindowed, options, run, runWith, silentCatalog, texts } from './session-fixture.js';
 import { hitRatio } from './usage.js';
 
 it('keeps the question and the answer as two turns, in order', async () => {
@@ -44,6 +44,38 @@ it('takes the question back out when the caller walks away mid-stream', async ()
     })
   );
   expect(value).toEqual(['user:b', 'assistant:ok']);
+});
+
+/** A window small enough that the call below fills it, and a call that does. */
+const window = 1000;
+const full = { deltas: ['answered'], usage: { inputTokens: 900, cacheReadTokens: 0 } };
+
+it('takes the next question after a caller walks away mid-compaction', async () => {
+  /* The session is held before the summariser is called, and the stream that
+     releases it does not exist yet. An interrupt in that window must still
+     free the session, or every later question is refused as busy. */
+  const { value } = await runWith({
+    replies: [
+      full,
+      { deltas: ['the notes'], stall: true },
+      { deltas: ['the notes'] },
+      { deltas: ['ok'] },
+    ],
+    catalog: catalogWindowed(window),
+    use: session =>
+      Effect.gen(function* () {
+        yield* Stream.runDrain(session.ask('one'));
+        const reading = yield* Effect.fork(Stream.runDrain(session.ask('two')));
+        yield* Effect.sleep('10 millis');
+        yield* Fiber.interrupt(reading);
+        yield* Stream.runDrain(session.ask('three'));
+        return yield* Effect.map(session.history, texts);
+      }),
+  });
+
+  /* The abandoned summary wrote nothing, so the window is still full and the
+     next question summarises before it is asked. What it must not do is fail. */
+  expect(value).toEqual(['user:one', 'assistant:answered', 'user:', 'user:three', 'assistant:ok']);
 });
 
 it('asks the second question with the first exchange already in the prompt', async () => {

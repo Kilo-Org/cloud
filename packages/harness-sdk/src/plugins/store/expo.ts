@@ -1,4 +1,3 @@
-import type { SQLiteDatabase } from 'expo-sqlite';
 import type { Layer } from 'effect';
 import type { SessionStore, StoreError } from '../../core/storage.js';
 import type { SqlDriver, SqlValue } from './driver.js';
@@ -7,18 +6,19 @@ import { layerSqliteStore } from './sqlite.js';
 /**
  * The store on Expo's SQLite, which is how a React Native app reaches one.
  *
- * The Expo import is a type, so nothing of Expo survives the build. The
- * database arrives already open, exactly as on Node, and this file only teaches
- * the shared store how to talk to it.
+ * It names no package. The database arrives already open, exactly as on Node,
+ * and what this file needs of one is the two methods below — so an Expo
+ * database satisfies it structurally, and the plugin depends on nothing.
  */
 
 /**
- * The part of an Expo database this adapter uses.
+ * The part of an Expo database this adapter uses, and the whole of what
+ * `layerExpoStore` asks for.
  *
- * The driver is written against this rather than against `SQLiteDatabase` so a
- * test can supply one without a native module. `layerExpoStore` still takes the
- * real type, so the compiler keeps checking that a real database is one of
- * these.
+ * Naming `SQLiteDatabase` here instead would buy nothing and cost a dependency:
+ * the caller passes their own database, so their compiler checks the real type
+ * against this one at the call. It also lets a test supply one without a native
+ * module, which is how `expo.test.ts` runs at all.
  */
 interface ExpoStatement {
   readonly executeSync: (params: SqlValue[]) => unknown;
@@ -69,7 +69,7 @@ const expoDriver =
     );
 
 /** Opens the store on a database the caller already opened, and still closes. */
-const layerExpoStore = (database: SQLiteDatabase): Layer.Layer<SessionStore, StoreError> =>
+const layerExpoStore = (database: ExpoDatabase): Layer.Layer<SessionStore, StoreError> =>
   layerSqliteStore(expoDriver(database));
 
 export type { ExpoDatabase };

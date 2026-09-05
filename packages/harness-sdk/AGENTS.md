@@ -1694,10 +1694,12 @@ then fails on a package nobody told them to add. The compiler here cannot see
 it, because here they are installed, so `pnpm check:platform` reads the built
 declarations and fails on either name.
 
-The store plugins go the other way. `plugins/store/expo` names `SQLiteDatabase`
-in its types, so `expo-sqlite` is an optional peer dependency. `plugins/store/
-node` names `node:sqlite`, which needs Node 22.13 or newer to import without a
-flag.
+The store plugins go two ways. `plugins/store/expo` names no package at all: it
+asks for the two methods it calls, so an Expo database satisfies it
+structurally, the caller's own compiler checks the real type at the call, and
+the package needs no dependency on `expo-sqlite` — not even a peer one.
+`plugins/store/node` names `node:sqlite`, which needs Node 22.13 or newer to
+import without a flag.
 
 ### The count is stored beside the session
 

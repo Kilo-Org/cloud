@@ -491,10 +491,11 @@ This needs Node 22.13 or newer, which is where `node:sqlite` stopped asking for
 `--experimental-sqlite`. On 22.5 to 22.12 the import fails unless the flag is
 passed, and before 22.5 the module does not exist.
 
-`layerExpoStore` is the same store on Expo's SQLite, which the caller supplies:
-it is an optional peer dependency, because its types name it. Both stores are
-the same implementation over a one-function driver, so a session written on one
-reads back on the other.
+`layerExpoStore` is the same store on Expo's SQLite, which the caller supplies.
+It asks for the two methods it calls rather than for `SQLiteDatabase`, so the
+package depends on nothing at all and your database still typechecks at the
+call. Both stores are the same implementation over a one-function driver, so a
+session written on one reads back on the other.
 
 Then `continueSession(id)` reopens a stored session, and `cloneSession(id)`
 copies its turns onto a new one so a conversation can branch without paying to

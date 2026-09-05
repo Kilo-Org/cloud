@@ -34,13 +34,23 @@ type ChatRuntime = ReturnType<typeof openRuntime>;
 /** Every plugin the runtime holds, which is what a session may still ask for. */
 type ChatContext = ManagedRuntime.ManagedRuntime.Context<ChatRuntime>;
 
+/**
+ * A question typed while an answer was arriving, and the model it was meant
+ * for. The model is carried because a person can change it between the two,
+ * and the question was asked of the one that was on screen.
+ */
+type Waiting = {
+  readonly text: string;
+  readonly model: string;
+};
+
 /** A chat that is open: the session behind it, and what it is doing. */
 type Chat = {
   readonly handle: SessionHandle;
   readonly scope: Scope.CloseableScope;
   answering: Fiber.RuntimeFiber<void, unknown> | undefined;
   /** What was typed while `answering` was running. Drained when it ends well. */
-  readonly waiting: string[];
+  readonly waiting: Waiting[];
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
@@ -186,8 +196,8 @@ export async function say(sessionId: string, text: string, model: string): Promi
        while it works. So a second question joins the line rather than racing
        the first, and it is on screen while it waits. It is held in memory
        only: an answer that is still arriving is not written down either. */
-    held.waiting.push(text);
-    change(sessionId, { waiting: [...held.waiting] });
+    held.waiting.push({ text, model });
+    change(sessionId, { waiting: held.waiting.map(one => one.text) });
     return sessionId;
   }
   try {
@@ -322,8 +332,8 @@ async function drain(sessionId: string, chat: Chat): Promise<void> {
   if (next === undefined) {
     return;
   }
-  change(sessionId, { waiting: [...chat.waiting] });
-  await say(sessionId, next, snapshotOf(sessionId).model);
+  change(sessionId, { waiting: chat.waiting.map(one => one.text) });
+  await say(sessionId, next.text, next.model);
 }
 
 /**
@@ -366,14 +376,31 @@ async function ontoModel(sessionId: string, model: string): Promise<string> {
  */
 export async function stopChat(sessionId: string): Promise<void> {
   const chat = chats.get(sessionId);
-  if (chat?.answering === undefined) {
+  if (chat === undefined) {
     return;
+  }
+  const stopped = await halt(sessionId, chat);
+  if (stopped) {
+    await drain(sessionId, chat);
+  }
+}
+
+/**
+ * Interrupts the answer arriving, and answers whether there was one.
+ *
+ * Interrupting the reading aborts the request, so the provider stops sending.
+ * It is deliberately only the interrupt: a chat being stopped goes on to ask
+ * what is waiting, and a chat being closed does not.
+ */
+async function halt(sessionId: string, chat: Chat): Promise<boolean> {
+  if (chat.answering === undefined) {
+    return false;
   }
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
   change(sessionId, { status: 'idle', answering: '' });
-  await drain(sessionId, chat);
+  return true;
 }
 
 /**
@@ -385,7 +412,10 @@ export async function releaseChat(sessionId: string): Promise<void> {
   if (chat === undefined) {
     return;
   }
-  await stopChat(sessionId);
+  await halt(sessionId, chat);
+  /* Whatever was still waiting goes with the chat. Asking it now would open a
+     round on a session whose scope is closing under it. */
+  chat.waiting.length = 0;
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
   chats.delete(sessionId);

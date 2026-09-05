@@ -70,6 +70,79 @@ function hasDirectHtml(token: Token): boolean {
   return (token.tokens ?? []).some(inlineToken => inlineToken.type === 'html');
 }
 
+// react-native-marked renders inline HTML tokens through `MarkdownRenderer.html`,
+// which shows them as plain text: a link, heading, or emphasis tag nested inside
+// a list item or blockquote loses the styling its Markdown equivalent keeps.
+// Those tags are the ones the HTML engine styles; containers holding only
+// unstyled tags (div, span, …) stay on the Markdown path by design.
+const STYLED_HTML_TAGS = new Set([
+  'a',
+  'b',
+  'strong',
+  'em',
+  'i',
+  'u',
+  's',
+  'del',
+  'ins',
+  'mark',
+  'small',
+  'sub',
+  'sup',
+  'code',
+  'kbd',
+  'samp',
+  'var',
+  'h1',
+  'h2',
+  'h3',
+  'h4',
+  'h5',
+  'h6',
+  'br',
+  'hr',
+]);
+
+// Containers whose nested HTML the Markdown lexer cannot style. Code and table
+// descendants are excluded from routing so fenced code keeps the CodeBlock and
+// tables keep the MarkdownTable chip.
+const NESTED_HTML_CONTAINERS = new Set(['list', 'blockquote']);
+
+function tokenChildren(token: Token): Token[] {
+  const container = token as { tokens?: Token[]; items?: Token[] };
+  return [...(container.tokens ?? []), ...(container.items ?? [])];
+}
+
+function htmlRawHasStyledTag(raw: string): boolean {
+  for (const match of raw.matchAll(/<\s*\/?\s*([a-zA-Z][a-zA-Z0-9-]*)/g)) {
+    const tagName = match[1];
+    if (tagName !== undefined && STYLED_HTML_TAGS.has(tagName.toLowerCase())) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function containsStyledHtml(token: Token): boolean {
+  if (token.type === 'html') {
+    return htmlRawHasStyledTag(token.raw);
+  }
+  return tokenChildren(token).some(child => containsStyledHtml(child));
+}
+
+function containsRichBlock(token: Token): boolean {
+  if (token.type === 'code' || token.type === 'table') {
+    return true;
+  }
+  return tokenChildren(token).some(child => containsRichBlock(child));
+}
+
+function routesNestedHtml(token: Token): boolean {
+  return (
+    NESTED_HTML_CONTAINERS.has(token.type) && containsStyledHtml(token) && !containsRichBlock(token)
+  );
+}
+
 export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
   // eslint-disable-next-line new-cap -- react-native-marked exports the lexer function with this name
   const tokens = MarkedLexer(value, { gfm: true });
@@ -77,7 +150,7 @@ export function splitMarkdownHtml(value: string): MarkdownHtmlSegment[] {
   for (const token of tokens) {
     if (token.type === 'html') {
       pushSegment(segments, { type: 'html', raw: token.raw });
-    } else if (hasDirectHtml(token)) {
+    } else if (hasDirectHtml(token) || routesNestedHtml(token)) {
       pushSegment(segments, {
         type: 'html',
         raw: marked.parse(token.raw, { async: false, gfm: true }),

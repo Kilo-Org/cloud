@@ -268,6 +268,47 @@ describe('MarkdownText HTML routing', () => {
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
   });
 
+  it('routes HTML links and strong text nested in a list item to the styled HTML renderer', async () => {
+    const value =
+      '- Markdown: [example](https://example.com)\n- HTML: <a href="https://example.com">HTML link</a>\n- <strong>HTML strong</strong>';
+    const renderer = await mount(<MarkdownText value={value} />);
+    const props = htmlProps(renderer);
+
+    expect(props.source.html).toContain('<ul>');
+    expect(props.source.html).toContain('<a href="https://example.com">HTML link</a>');
+    expect(props.source.html).toContain('<strong>HTML strong</strong>');
+    expect(props.tagsStyles).toMatchObject({
+      a: { textDecorationLine: 'underline' },
+      strong: { fontWeight: '700' },
+    });
+    expect(vi.mocked(useMarkdown)).not.toHaveBeenCalled();
+  });
+
+  it('routes HTML headings nested in a list item to the styled HTML renderer', async () => {
+    const renderer = await mount(<MarkdownText value={'- <h2>HTML heading</h2>\n- text'} />);
+
+    expect(htmlProps(renderer).source.html).toContain('<h2>HTML heading</h2>');
+  });
+
+  it('routes styled inline HTML inside a blockquote to the styled HTML renderer', async () => {
+    const value = '> <a href="https://example.com">HTML link</a> and <strong>HTML strong</strong>';
+    const renderer = await mount(<MarkdownText value={value} />);
+    const props = htmlProps(renderer);
+
+    expect(props.source.html).toContain('<blockquote>');
+    expect(props.source.html).toContain('<a href="https://example.com">HTML link</a>');
+    expect(props.tagsStyles).toMatchObject({ a: { textDecorationLine: 'underline' } });
+  });
+
+  it('keeps a list with a fenced code block on the Markdown renderer', async () => {
+    const value =
+      '- item <a href="https://example.com">HTML link</a>\n\n  ```js\n  const a = 1;\n  ```\n';
+    const renderer = await mount(<MarkdownText value={value} />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(vi.mocked(useMarkdown).mock.calls.map(([source]) => source)).toContain(value);
+  });
+
   it.each([
     ['link', '[<b>bold</b>](https://example.com)'],
     ['emphasis', '*<b>bold</b>*'],

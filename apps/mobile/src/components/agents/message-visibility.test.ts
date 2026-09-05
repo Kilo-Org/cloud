@@ -200,6 +200,9 @@ describe('messageRendersContent', () => {
     '<!-- hidden -->',
     '<form><input value="hidden"></form>',
     '<iframe>hidden</iframe><style>hidden</style>',
+    '<div><script>alert("bad")</script></div>',
+    '<section><form><input></form></section>',
+    '<span><iframe></iframe></span><p></p>',
   ])('returns false when sanitization removes %s', text => {
     expect(partRendersContent(textPart({ text }))).toBe(false);
   });

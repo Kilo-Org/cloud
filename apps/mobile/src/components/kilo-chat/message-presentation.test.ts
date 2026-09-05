@@ -17,6 +17,7 @@ import {
   getVisibleEditableAttachmentBlocks,
   isMessageEdited,
   isMessageTextSelectionEnabled,
+  messageRendersBubble,
   resolveMessageAuthorLabel,
 } from './message-presentation';
 
@@ -319,5 +320,116 @@ describe('resolveMessageAuthorLabel', () => {
   it('falls back to stable labels when resolved names are missing', () => {
     expect(resolveMessageAuthorLabel({ senderId: 'bot:kiloclaw:sandbox-1' })).toBe('KiloClaw');
     expect(resolveMessageAuthorLabel({ senderId: 'user-1' })).toBe('user-1');
+  });
+});
+
+describe('messageRendersBubble', () => {
+  it('hides the bubble when the only text sanitizes to empty', () => {
+    expect(
+      messageRendersBubble(
+        message({ content: [{ type: 'text', text: "<script>alert('bad')</script>" }] }),
+        { hasReplyPreview: false }
+      )
+    ).toBe(false);
+  });
+
+  it.each([
+    '<!-- hidden -->',
+    '<form><input value="x"></form>',
+    '<iframe>hidden</iframe>',
+    '<div><script>alert("bad")</script></div>',
+    '<section><form><input></form></section>',
+  ])('hides the bubble when %s sanitizes to empty', text => {
+    expect(
+      messageRendersBubble(message({ content: [{ type: 'text', text }] }), {
+        hasReplyPreview: false,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps the bubble when text survives sanitization', () => {
+    expect(
+      messageRendersBubble(
+        message({ content: [{ type: 'text', text: 'before<script>x</script>' }] }),
+        {
+          hasReplyPreview: false,
+        }
+      )
+    ).toBe(true);
+    expect(
+      messageRendersBubble(
+        message({ content: [{ type: 'text', text: '<section>safe</section>' }] }),
+        {
+          hasReplyPreview: false,
+        }
+      )
+    ).toBe(true);
+  });
+
+  it('keeps the bubble when a sanitized text block is mixed with a visible one', () => {
+    expect(
+      messageRendersBubble(
+        message({
+          content: [
+            { type: 'text', text: "<script>alert('bad')</script>" },
+            { type: 'text', text: 'still here' },
+          ],
+        }),
+        { hasReplyPreview: false }
+      )
+    ).toBe(true);
+  });
+
+  it('keeps the bubble for attachment blocks and action groups', () => {
+    expect(
+      messageRendersBubble(
+        message({
+          content: [
+            {
+              type: 'attachment',
+              attachmentId: 'att-1',
+              mimeType: 'image/png',
+              size: 1,
+              filename: 'a.png',
+            },
+          ],
+        }),
+        { hasReplyPreview: false }
+      )
+    ).toBe(true);
+    expect(
+      messageRendersBubble(
+        message({
+          content: [
+            {
+              type: 'actions',
+              groupId: 'g1',
+              actions: [{ label: 'Allow', value: 'allow-once', style: 'primary' }],
+            },
+          ],
+        }),
+        { hasReplyPreview: false }
+      )
+    ).toBe(true);
+  });
+
+  it('keeps the bubble for deleted and delivery-failed messages and reply previews', () => {
+    expect(
+      messageRendersBubble(message({ deleted: true, content: [] }), { hasReplyPreview: false })
+    ).toBe(true);
+    expect(
+      messageRendersBubble(message({ deliveryFailed: true, content: [] }), {
+        hasReplyPreview: false,
+      })
+    ).toBe(true);
+    expect(
+      messageRendersBubble(message({ content: [{ type: 'text', text: '' }] }), {
+        hasReplyPreview: true,
+      })
+    ).toBe(true);
+  });
+
+  it('hides the bubble for a message with no content blocks at all', () => {
+    expect(messageRendersBubble(message({ content: [] }), { hasReplyPreview: false })).toBe(false);
   });
 });

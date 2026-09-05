@@ -44,6 +44,11 @@ const REMOVED_CONTAINER_RE = new RegExp(
 );
 const REMOVED_TAG_RE = new RegExp(`<\\/?(?:${REMOVED_TAG_NAMES})\\b[^>]*>`, 'gi');
 const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
+// A container emptied by the removals above draws no ink either: the HTML
+// engine renders `<div></div>` as an empty box. Stripping emptied containers
+// (iterated to a fixpoint so nesting collapses outermost-last) keeps the
+// predicate aligned with what the renderer actually paints.
+const EMPTY_CONTAINER_RE = /<([a-zA-Z][a-zA-Z0-9-]*)\b[^>]*>\s*<\/\1\s*>/g;
 
 /** True when the HTML renderer removes every non-whitespace character. */
 export function htmlSanitizesToEmpty(value: string): boolean {
@@ -52,7 +57,8 @@ export function htmlSanitizesToEmpty(value: string): boolean {
     const next = sanitized
       .replace(HTML_COMMENT_RE, '')
       .replace(REMOVED_CONTAINER_RE, '')
-      .replace(REMOVED_TAG_RE, '');
+      .replace(REMOVED_TAG_RE, '')
+      .replace(EMPTY_CONTAINER_RE, '');
     if (next === sanitized) {
       return next.trim() === '';
     }

@@ -839,6 +839,61 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(afterDropItems?.[0]?.message).toBe('Execution started');
   });
 
+  it('renders streamed assistant text while the review is running', async () => {
+    const captured: { onEvent?: (event: unknown) => void } = {};
+    spectatorStream.createReviewSpectatorStream.mockImplementation(
+      (input: { onEvent: (event: unknown) => void }) => {
+        captured.onEvent = input.onEvent;
+        return {
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          retryReconnect: vi.fn(),
+          destroy: vi.fn(),
+        };
+      }
+    );
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+    });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen(true);
+
+    expect(captured.onEvent).toBeDefined();
+    await act(async () => {
+      captured.onEvent?.({
+        eventId: 1,
+        sessionId: 'agent-1',
+        streamEventType: 'kilocode',
+        timestamp: 't1',
+        data: {
+          type: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'prt_text',
+              sessionID: 'agent-1',
+              messageID: 'msg-1',
+              type: 'text',
+              text: 'Looking at the diff now.',
+              time: { start: 1_787_054_400_000 },
+            },
+          },
+        },
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    const items = sessionListRenders.list.at(-1)?.items as { message?: string }[] | undefined;
+    expect(items?.map(item => item.message)).toContain('Looking at the diff now.');
+  });
+
   it('keeps a streamed row when the review turns terminal (no skeleton or empty copy)', async () => {
     const captured: { onEvent?: (event: unknown) => void } = {};
     spectatorStream.createReviewSpectatorStream.mockImplementation(

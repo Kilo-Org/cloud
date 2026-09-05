@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { ChatComposer } from '@/components/agents/chat-composer';
+import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { SessionMessageList } from '@/components/agents/session-message-list';
 import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
@@ -108,7 +108,8 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   });
   // The question that has no answer is the last thing on screen, and while the
   // chat is idle it is the one that offers a Retry.
-  const unanswered = state.status === 'idle' && state.asked !== null ? messages.at(-1)?.info.id : undefined;
+  const unanswered =
+    state.status === 'idle' && state.asked !== null ? messages.at(-1)?.info.id : undefined;
 
   const renderItem: ListRenderItem<StoredMessage> = useCallback(
     ({ item }) => (
@@ -132,7 +133,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   );
 
   const handleSend = useCallback(
-    (text: string) => {
+    (text: string, options?: ChatComposerSendOptions) => {
+      // The question is on screen the moment it is asked, so the composer
+      // empties now rather than when the answer lands.
+      options?.onOptimisticSend?.();
       void send(text, model);
     },
     [model, send]
@@ -220,6 +224,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t('modelChat.title')}
         titleContent={
           <View className="flex-row items-center gap-2">
             <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>

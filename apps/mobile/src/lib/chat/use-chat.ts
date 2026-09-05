@@ -7,6 +7,7 @@ import {
   type ChatPlace,
   type ChatState,
   enterChat,
+  prepareChats,
   releaseChat,
   retryChat,
   say,
@@ -14,6 +15,7 @@ import {
   startChat,
   stopChat,
   watch,
+  watchChats,
 } from './registry';
 import { type ChatSummary, deleteChat, listChats } from './store';
 
@@ -53,13 +55,31 @@ export type ChatList = {
   readonly remove: (sessionId: string) => Promise<void>;
 };
 
-export function useChatList(scope: string | null): ChatList {
+export function useChatList(place: ChatPlace | null): ChatList {
+  const scope = place?.chatScope ?? null;
   const client = useQueryClient();
   const query = useQuery({
     queryKey: listKey(scope ?? ''),
-    enabled: scope !== null,
-    queryFn: async () => listChats(await encryptedDatabase(), scope ?? ''),
+    enabled: place !== null,
+    queryFn: async () => {
+      if (place === null) {
+        return [];
+      }
+      await prepareChats(place);
+      return listChats(await encryptedDatabase(), place.chatScope);
+    },
   });
+  // A chat writes its turns when its answer ends, and the title of a row is the
+  // first thing said in it. The list is read again whenever a chat starts or
+  // stops working, whichever screen that happened on.
+  useEffect(
+    () =>
+      watchChats(() => {
+        void client.invalidateQueries({ queryKey: listKey(scope ?? '') });
+      }),
+    [client, scope]
+  );
+
   const remove = useCallback(
     async (sessionId: string) => {
       await releaseChat(sessionId);
@@ -96,7 +116,6 @@ export type OpenChat = {
 
 export function useChat(place: ChatPlace | null, opened: string): OpenChat {
   const [sessionId, setSessionId] = useState(opened);
-  const client = useQueryClient();
 
   useEffect(() => {
     if (place !== null) {
@@ -109,26 +128,16 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
     useCallback(() => snapshotOf(sessionId), [sessionId])
   );
 
-  const after = useCallback(
-    async (next: string) => {
-      setSessionId(next);
-      if (place !== null) {
-        await client.invalidateQueries({ queryKey: listKey(place.chatScope) });
-      }
-    },
-    [client, place]
-  );
-
   return {
     state,
     send: async (text, model) => {
-      await after(await say(sessionId, text, model));
+      setSessionId(await say(sessionId, text, model));
     },
     stop: async () => {
       await stopChat(sessionId);
     },
     retry: async () => {
-      await after(await retryChat(sessionId));
+      setSessionId(await retryChat(sessionId));
     },
   };
 }

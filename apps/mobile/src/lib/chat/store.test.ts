@@ -29,7 +29,7 @@ const CHATS = readFileSync(
 );
 
 const chatDatabase = (database: DatabaseSync): ChatDatabase => ({
-  getAllSync: <T,>(source: string, params: (string | number)[]) =>
+  getAllSync: <T>(source: string, params: (string | number)[]) =>
     database.prepare(source).all(...params) as T[],
   runSync: (source: string, params: (string | number)[]) => {
     database.prepare(source).run(...params);

@@ -1,9 +1,9 @@
 import { Effect, Layer } from 'effect';
 import {
+  EntropySource,
   layerAssembler,
   layerBackoff,
   layerKiloGateway,
-  layerWebCrypto,
   ModelCatalog,
   type ModelFacts,
   TokenError,
@@ -11,6 +11,7 @@ import {
   type TokenSourceService,
 } from '@kilocode/harness-sdk';
 import { layerExpoStore } from '@kilocode/harness-sdk/plugins/store/expo';
+import * as Crypto from 'expo-crypto';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
@@ -58,6 +59,18 @@ export function rememberModelFacts(
   );
 }
 
+/**
+ * Randomness, which React Native has no global `crypto` for.
+ *
+ * The SDK's default reads `crypto.getRandomValues` and says so: a runtime
+ * without one supplies its own. This app already ships expo-crypto — it is
+ * what encrypts the database — so the identifiers come from the same source
+ * as the key.
+ */
+const layerEntropy = Layer.succeed(EntropySource, {
+  bytes: (count: number) => Crypto.getRandomBytes(count),
+});
+
 /** One catalog instance, shared by the session and the gateway as it must be. */
 const layerCatalog = Layer.succeed(ModelCatalog, {
   facts: (model: string) => Effect.succeed(known.get(model) ?? EVERY_SHAPE),
@@ -95,7 +108,7 @@ export function chatLayers(database: SQLiteDatabase, org: ChatOrg) {
   );
   return Layer.mergeAll(
     layerAssembler,
-    layerWebCrypto,
+    layerEntropy,
     layerCatalog,
     gateway,
     layerExpoStore(database)

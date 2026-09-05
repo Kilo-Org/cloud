@@ -77,7 +77,9 @@ export function asMessages(input: {
   readonly answering: string;
   readonly asked: string | null;
 }): StoredMessage[] {
-  const drawn = input.turns.filter(turn => said(turn).length > 0).map(turn => asMessage(turn, input.model));
+  const drawn = input.turns
+    .filter(turn => said(turn).length > 0)
+    .map(turn => asMessage(turn, input.model));
   if (input.asked !== null) {
     drawn.push(
       asMessage(

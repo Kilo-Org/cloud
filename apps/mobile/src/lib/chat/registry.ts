@@ -1,4 +1,4 @@
-import { type Cause, Effect, Exit, Fiber, ManagedRuntime, Scope, Stream } from 'effect';
+import { Cause, Effect, Exit, Fiber, ManagedRuntime, Option, Scope, Stream } from 'effect';
 import {
   cloneSession,
   continueSession,
@@ -81,6 +81,24 @@ const states = new Map<string, ChatState>();
 
 const watchers = new Map<string, Set<() => void>>();
 
+/**
+ * Whoever draws the list of chats, rather than one of them.
+ *
+ * A chat writes its turns when the answer ends, and the title of a row is the
+ * first thing said in it — so a list drawn before that is a list with a row it
+ * cannot name yet. The screen showing the list is not the screen the answer
+ * arrived on, and may not even be mounted, so the registry says when a chat
+ * changed and the list reads the database again.
+ */
+const listWatchers = new Set<() => void>();
+
+export function watchChats(watcher: () => void): () => void {
+  listWatchers.add(watcher);
+  return () => {
+    listWatchers.delete(watcher);
+  };
+}
+
 /** One open at a time per chat, so entering a screen twice opens one session. */
 const opening = new Map<string, Promise<void>>();
 
@@ -125,6 +143,14 @@ function publish(sessionId: string): void {
 function change(sessionId: string, into: Partial<ChatState>): void {
   states.set(sessionId, { ...snapshotOf(sessionId), ...into });
   publish(sessionId);
+  // Only when a chat starts or stops working: every word of an answer is a
+  // change too, and a list that read the database once per word would read it
+  // hundreds of times for one answer.
+  if (into.status !== undefined) {
+    for (const watcher of listWatchers) {
+      watcher();
+    }
+  }
 }
 
 /** The state a screen draws, whether or not the chat has opened yet. */
@@ -172,6 +198,19 @@ const SYSTEM =
   'You have no tools, no files and no internet: when something needs one of ' +
   'those, say so rather than guessing. Use markdown sparingly, and code blocks ' +
   'for code.';
+
+/**
+ * Makes the database ready to be read.
+ *
+ * The SDK's store creates its own tables when its layer is built, and the list
+ * joins those tables. A list drawn before any chat was ever opened would be
+ * reading tables that do not exist yet, so the screen asks for the runtime
+ * first and the store's own migrations run under it.
+ */
+export async function prepareChats(place: ChatPlace): Promise<void> {
+  const runtime = await runtimeFor(place);
+  await runtime.runPromise(Effect.void);
+}
 
 /** Starts a chat: a session of its own, and a row so the list has it. */
 export async function startChat(place: ChatPlace, model: string): Promise<string> {
@@ -284,9 +323,25 @@ function reading(sessionId: string, text: string, runtime: ChatRuntime): Effect.
   );
 }
 
-/** A short reason for the log. The screen says the same thing whatever it is. */
+/**
+ * A short reason for the log. The screen says the same thing whatever it is.
+ *
+ * The failure itself is read rather than the cause's own text: every error this
+ * package raises is a tagged value whose fields — the status, the body, the
+ * tool — are what say what happened, and none of them are in its message.
+ */
 function why(cause: Cause.Cause<unknown>): string {
-  return cause.toString().slice(0, 200);
+  const failure = Option.getOrUndefined(Cause.failureOption(cause));
+  if (failure === undefined) {
+    return Cause.pretty(cause).slice(0, 300);
+  }
+  try {
+    return JSON.stringify(failure).slice(0, 300);
+  } catch {
+    // A value that will not serialise — a cycle, or a BigInt. The cause's own
+    // text is all there is left to log.
+    return Cause.pretty(cause).slice(0, 300);
+  }
 }
 
 /**

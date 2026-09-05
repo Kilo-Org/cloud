@@ -45,9 +45,11 @@ function ScopedChatListScreen() {
   const place = chatPlaceOf(userId, organizationId);
   const bottomPadding = useTabBarBottomPadding();
 
-  const { models, isError: modelsFailed, refetch: refetchModels } = useAvailableModels(
-    organizationId ?? undefined
-  );
+  const {
+    models,
+    isError: modelsFailed,
+    refetch: refetchModels,
+  } = useAvailableModels(organizationId ?? undefined);
 
   // The catalog is what tells a session its context window, and a session with
   // no window never compacts. It is handed over as it arrives.
@@ -55,7 +57,7 @@ function ScopedChatListScreen() {
     rememberModelFacts(models);
   }, [models]);
 
-  const { chats, isLoading, isError, refetch, remove } = useChatList(place?.chatScope ?? null);
+  const { chats, isLoading, isError, refetch, remove } = useChatList(place);
 
   const nameOf = useCallback(
     (id: string) => models.find(model => model.id === id)?.name ?? '',
@@ -97,11 +99,7 @@ function ScopedChatListScreen() {
   function renderBody() {
     if (isError) {
       return (
-        <QueryError
-          variant="server"
-          title={t('modelChat.list.loadFailed')}
-          onRetry={refetch}
-        />
+        <QueryError variant="server" title={t('modelChat.list.loadFailed')} onRetry={refetch} />
       );
     }
     if (modelsFailed && chats.length === 0) {
@@ -134,6 +132,9 @@ function ScopedChatListScreen() {
         data={[...chats]}
         keyExtractor={chat => chat.sessionId}
         renderItem={renderItem}
+        // Newest first: a chat that just arrived belongs on screen, and holding
+        // the old scroll position would put it above the top of the list.
+        maintainVisibleContentPosition={{ disabled: true }}
         contentContainerClassName="px-4 pt-2"
         ItemSeparatorComponent={() => <View className="h-2" />}
         contentContainerStyle={{ paddingBottom: bottomPadding + 16 }}
@@ -144,6 +145,7 @@ function ScopedChatListScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        title={t('modelChat.title')}
         titleContent={
           <View className="flex-row items-center gap-2">
             <Text className="text-[30px] font-semibold leading-9 text-foreground" numberOfLines={1}>

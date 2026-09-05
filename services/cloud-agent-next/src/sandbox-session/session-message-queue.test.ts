@@ -15,13 +15,17 @@ import type { sandboxControlRpc } from './control-rpc.js';
 import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  sessionOperationExpiresAt,
+  sessionOperationResultHash,
   sessionPromptPayloadSchema,
   sessionGitSummaryPayloadSchema,
   type ResponseFrame,
   type SessionAttachPayload,
   type SessionMessageOutcome,
   type SessionOperationAuthorization,
+  type SessionOperationDelivery,
 } from '../shared/sandbox-control-protocol.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
@@ -921,6 +925,7 @@ const ATTACHMENT = {
 
 type Control = ReturnType<typeof sandboxControlRpc>;
 type ControlStatus = Awaited<ReturnType<Control['ensureReady']>>;
+type RuntimeQuarantineResult = Awaited<ReturnType<Control['quarantineRuntime']>>;
 
 function deferred<T>() {
   let resolve: (value: T) => void = () => undefined;
@@ -1032,9 +1037,14 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
     ),
     attachSession: vi.fn(async () => ({})),
     detachSession: vi.fn(async () => ({ existed: true })),
-    quarantineRuntime: vi.fn(async (_input: Parameters<Control['quarantineRuntime']>[0]) => ({
-      quarantined: true,
-    })),
+    quarantineRuntime: vi.fn(
+      async (
+        _input: Parameters<Control['quarantineRuntime']>[0]
+      ): Promise<RuntimeQuarantineResult> => ({
+        quarantined: true,
+        disposition: 'physical_stopping',
+      })
+    ),
     validateTerminalAccess: vi.fn(async () => ({ allowed: true })),
     recordTerminalActivity: vi.fn(async () => ({ allowed: true })),
     prepareSessionCredentials: vi.fn(async () => ({})),
@@ -1187,6 +1197,186 @@ describe('SandboxSession orchestration', () => {
     await fixture.flush();
     expect(fixture.record('b')?.state).toBe('accepted');
     expect(fixture.record('b')?.deliveryDeadlineAt).toBe(Date.now() + SESSION_DELIVERY_TIMEOUT_MS);
+  });
+
+  it('dispatches the first normal attach and prompt once with operation receipts enabled', async () => {
+    const fixture = sessionFixture();
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+
+    await fixture.admit('a');
+    await fixture.flush();
+
+    const operations = fixture.control.request.mock.calls
+      .map(([input]) => input.operation)
+      .filter(operation => operation.startsWith('session.'));
+    expect(operations).toEqual(['session.attach', 'session.prompt']);
+    expect(fixture.record('a')).toMatchObject({
+      state: 'accepted',
+      operations: {
+        attach: { dispatched: true },
+        prompt: { dispatched: true },
+      },
+    });
+  });
+
+  it.each(['running', 'completed'] as const)(
+    'reconstructs a late accepted prompt from its original %s operation result without redispatch',
+    async state => {
+      const fixture = sessionFixture();
+      fixture.setStatus({
+        physical: 'running',
+        connection: 'ready',
+        wrapperInstanceId: RUNTIME_ID,
+        operationResults: true,
+      });
+      await fixture.admit('a');
+      await fixture.flush();
+      const authorization = fixture.record('a')?.operations?.prompt?.authorization;
+      if (!authorization) throw new Error('Missing prompt operation authorization');
+      const completedAt = authorization.dispatchDeadlineAt + 1;
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt,
+        result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
+        outcome: { messageId: 'a', status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+      const resultHash = await sessionOperationResultHash(delivery);
+      delegateRequest(fixture, 'session.operation.get', async input => {
+        expect(input).toMatchObject({
+          expectedWrapperInstanceId: RUNTIME_ID,
+          payload: authorization,
+        });
+        expect(input.deadlineAt).toBe(sessionOperationExpiresAt(authorization));
+        return controlResponse(
+          state === 'running' ? { state, authorization } : { state, delivery }
+        );
+      });
+      delegateRequest(fixture, 'session.operation.ack', async input => {
+        expect(state).toBe('completed');
+        expect(input).toMatchObject({
+          expectedWrapperInstanceId: RUNTIME_ID,
+          payload: {
+            version: 2,
+            authorization,
+            resultHash,
+            disposition: 'applied',
+            decision: { state: 'completed', at: completedAt },
+          },
+        });
+        expect(input.deadlineAt).toBe(completedAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS);
+        return controlResponse({ acknowledged: true });
+      });
+
+      vi.setSystemTime(authorization.dispatchDeadlineAt + 1);
+      fixture.reload();
+      await fixture.fireAlarm();
+      await fixture.flush();
+
+      expect(
+        fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+      ).toHaveLength(1);
+      expect(
+        fixture.control.request.mock.calls.filter(
+          ([input]) => input.operation === 'session.operation.get'
+        )
+      ).toHaveLength(1);
+      expect(
+        fixture.control.request.mock.calls.filter(
+          ([input]) => input.operation === 'session.operation.ack'
+        )
+      ).toHaveLength(state === 'completed' ? 1 : 0);
+      expect(fixture.record('a')?.state).toBe(state === 'completed' ? 'completed' : 'accepted');
+    }
+  );
+
+  it('allows B to reattach on the same wrapper only after native retirement is confirmed', async () => {
+    const fixture = sessionFixture();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    fixture.setStatus({
+      physical: 'running',
+      connection: 'ready',
+      wrapperInstanceId: RUNTIME_ID,
+      operationResults: true,
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+    const authorization = fixture.record('a')?.operations?.attach?.authorization;
+    if (!authorization) throw new Error('Missing attach operation authorization');
+    await fixture.session.recordNativeRuntime({
+      sandboxId: fixture.metadata.workspace?.sandboxId ?? '',
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId,
+      authorization,
+    });
+    fixture.control.quarantineRuntime.mockImplementation(async input => {
+      expect(input).toMatchObject({
+        sessionId: SESSION_ID,
+        wrapperInstanceId: RUNTIME_ID,
+        reason: 'runtime_unhealthy',
+        nativeRuntimeId,
+        authorization,
+      });
+      await fixture.session.invalidateTerminalRuntime({
+        sandboxId: fixture.metadata.workspace?.sandboxId ?? '',
+        wrapperInstanceId: RUNTIME_ID,
+        nativeRuntimeId,
+        confirmed: true,
+      });
+      return { quarantined: true, disposition: 'native_retired' };
+    });
+    delegateRequest(fixture, 'session.sync', async () =>
+      controlResponse({ status: { type: 'idle' }, questions: [], permissions: [] })
+    );
+    vi.advanceTimersByTime(DEADLINE_MS.acceptedOverdue);
+
+    await fixture.fireAlarm();
+    await fixture.flush();
+    await fixture.admit('b');
+    await fixture.flush();
+
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'runtime_unhealthy',
+    });
+    expect(fixture.record('b')).toMatchObject({ state: 'accepted', wrapperInstanceId: RUNTIME_ID });
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.attach')
+    ).toHaveLength(2);
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
+    ).toHaveLength(2);
+    expect(await fixture.session.isSandboxCleanupScheduled()).toBe(false);
+  });
+
+  it('keeps cleanup pending when a target-scoped quarantine is unconfirmed without a successor', async () => {
+    const fixture = sessionFixture();
+    const attach = deferred<ResponseFrame>();
+    delegateRequest(fixture, 'session.attach', () => attach.promise);
+    fixture.control.quarantineRuntime.mockResolvedValue({
+      quarantined: false,
+      disposition: 'unconfirmed',
+    });
+    await fixture.admit('a');
+    await fixture.flush();
+
+    await expect(fixture.session.interruptExecution()).resolves.toEqual({ success: true });
+    expect(fixture.record('a')?.state).toBe('cancelled');
+    expect(fixture.record('b')).toBeUndefined();
+    expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
+
+    attach.resolve(controlResponse({ attached: true }));
+    await fixture.fireAlarm();
+    await fixture.flush();
+    expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
+    expect(fixture.control.quarantineRuntime).toHaveBeenCalledTimes(2);
   });
 
   it.each(['cloudflare', 'vercel'] as const)(
@@ -1378,7 +1568,7 @@ describe('SandboxSession orchestration', () => {
         operation === 'ensureReady' ? DEADLINE_MS.startup : SANDBOX_CONTROL_REQUEST_TIMEOUT_MS
       );
       expect(fixture.record('a')?.state).toBe('failed');
-      expect(fixture.record('b')?.state).toBe('failed');
+      expect(fixture.record('b')?.state).toBe('queued');
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
         expect.objectContaining({ wrapperInstanceId: RUNTIME_ID })
       );
@@ -1532,8 +1722,8 @@ describe('SandboxSession orchestration', () => {
           expect(fixture.record('b')?.state).toBe('accepted');
         } else {
           expect(fixture.record('a')?.failedReason).toBe(reason);
-          expect(fixture.record('b')?.state).toBe('failed');
-          expect(fixture.terminalEvents()).toHaveLength(2);
+          expect(fixture.record('b')?.state).toBe('queued');
+          expect(fixture.terminalEvents()).toHaveLength(1);
           expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
             expect.objectContaining({ wrapperInstanceId: RUNTIME_ID, reason })
           );
@@ -1575,8 +1765,8 @@ describe('SandboxSession orchestration', () => {
         expect(fixture.control.quarantineRuntime).not.toHaveBeenCalled();
         return;
       }
-      expect(fixture.record('b')?.state).toBe('failed');
-      expect(fixture.terminalEvents()).toHaveLength(2);
+      expect(fixture.record('b')?.state).toBe('queued');
+      expect(fixture.terminalEvents()).toHaveLength(1);
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
         expect.objectContaining({ wrapperInstanceId: RUNTIME_ID, reason })
       );
@@ -1621,8 +1811,8 @@ describe('SandboxSession orchestration', () => {
           return;
         }
         expect(fixture.record('a')).toMatchObject({ state: 'failed', failedReason: reason });
-        expect(fixture.record('b')?.state).toBe('failed');
-        expect(fixture.terminalEvents()).toHaveLength(2);
+        expect(fixture.record('b')?.state).toBe('queued');
+        expect(fixture.terminalEvents()).toHaveLength(1);
         expect(fixture.control.quarantineRuntime).toHaveBeenCalledOnce();
         await fixture.fireAlarm();
         expect(
@@ -1650,7 +1840,7 @@ describe('SandboxSession orchestration', () => {
         writer.control.quarantineRuntime.mockImplementation(async input => {
           writer.setStatus({ physical: 'stopped', connection: 'disconnected' });
           await writer.session.failWaitingMessages(input.reason, input.wrapperInstanceId);
-          return { quarantined: true };
+          return { quarantined: false, disposition: 'physical_stopped' as const };
         });
         return { writer, sibling };
       }
@@ -1964,7 +2154,7 @@ describe('SandboxSession orchestration', () => {
           });
           fixture.control.quarantineRuntime.mockImplementation(async () => {
             remoteWorkRunning = false;
-            return { quarantined: true };
+            return { quarantined: true, disposition: 'physical_stopping' };
           });
           await fixture.admit('waiting');
           await fixture.flush();
@@ -2277,7 +2467,7 @@ describe('SandboxSession orchestration', () => {
     await fixture.admit('b');
     await fixture.flush();
     expect(fixture.record('a')?.state).toBe('failed');
-    expect(fixture.record('b')?.state).toBe('failed');
+    expect(fixture.record('b')?.state).toBe('queued');
     expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith({
       ownerId: 'user_1',
       sessionId: SESSION_ID,
@@ -2361,7 +2551,7 @@ describe('SandboxSession orchestration', () => {
       const fixture = sessionFixture();
       const attach = deferred<ResponseFrame>();
       const abort = deferred<ResponseFrame>();
-      const quarantine = deferred<{ quarantined: boolean }>();
+      const quarantine = deferred<RuntimeQuarantineResult>();
       if (phase === 'preparing') delegateRequest(fixture, 'session.attach', () => attach.promise);
       delegateRequest(fixture, 'session.abort', () => abort.promise);
       fixture.control.quarantineRuntime.mockImplementation(() => quarantine.promise);
@@ -2392,13 +2582,14 @@ describe('SandboxSession orchestration', () => {
           reason: 'preparation_interrupted',
         });
         attach.resolve(controlResponse({ attached: true }));
-        quarantine.resolve({ quarantined: true });
+        quarantine.resolve({ quarantined: true, disposition: 'physical_stopping' });
       }
       await expect(interruption).resolves.toEqual({ success: true });
       await fixture.flush();
       expect(fixture.record('a')?.state).toBe('cancelled');
       expect(fixture.terminalEvents()).toHaveLength(1);
       if (phase === 'preparing') {
+        expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
         expect(
           fixture.control.request.mock.calls.some(([input]) => input.operation === 'session.prompt')
         ).toBe(false);
@@ -2410,7 +2601,7 @@ describe('SandboxSession orchestration', () => {
     const fixture = sessionFixture();
     const attach = deferred<ResponseFrame>();
     delegateRequest(fixture, 'session.attach', () => attach.promise);
-    const cleanup = deferred<{ quarantined: boolean }>();
+    const cleanup = deferred<RuntimeQuarantineResult>();
     fixture.control.quarantineRuntime.mockImplementation(() => cleanup.promise);
     await fixture.admit('a');
     await fixture.flush();
@@ -2422,7 +2613,7 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.record('b')?.state).toBe('queued');
     expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
     attach.resolve(controlResponse({ attached: true }));
-    cleanup.resolve({ quarantined: true });
+    cleanup.resolve({ quarantined: true, disposition: 'physical_stopping' });
     await interrupt;
     await fixture.flush();
     expect(
@@ -2519,17 +2710,18 @@ describe('SandboxSession orchestration', () => {
     expect(acquisition.id).not.toBe(oldAcquisition.id);
     expect(fixture.control.ensureReady).toHaveBeenCalledOnce();
     fixture.reload();
-    fixture.control.quarantineRuntime.mockImplementation(async () => {
-      fixture.setStatus({ physical: 'stopping', connection: 'disconnected' });
-      return { quarantined: true };
+    fixture.control.quarantineRuntime.mockResolvedValueOnce({
+      quarantined: true,
+      disposition: 'physical_stopping',
     });
     await fixture.fireAlarm();
-    expect(await fixture.session.isSandboxCleanupScheduled()).toBe(false);
+    expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
     expect(fixture.record('b')?.state).toBe('queued');
-    expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
-      expect.objectContaining({ acquisition })
-    );
     fixture.setStatus({ physical: 'stopped', connection: 'disconnected' });
+    fixture.control.quarantineRuntime.mockResolvedValueOnce({
+      quarantined: false,
+      disposition: 'physical_stopped',
+    });
     fixture.control.ensureReady.mockImplementationOnce(async input => {
       expect(input.acquisition).toEqual(acquisition);
       const ready = {
@@ -2541,6 +2733,9 @@ describe('SandboxSession orchestration', () => {
       return { ...ready, attachment: ATTACHMENT };
     });
     await fixture.fireAlarm();
+    expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
+      expect.objectContaining({ acquisition })
+    );
     expect(fixture.record('b')).toMatchObject({
       state: 'accepted',
       intent,
@@ -2556,7 +2751,7 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.record('a')?.state).toBe('cancelled');
     expect(fixture.record('b')?.state).toBe('accepted');
     expect(fixture.record('c')?.state).toBe('queued');
-    expect(fixture.control.ensureReady).toHaveBeenCalledTimes(3);
+    expect(fixture.control.ensureReady).toHaveBeenCalledTimes(2);
     expect(
       fixture.control.request.mock.calls
         .filter(([input]) => input.operation === 'session.prompt')
@@ -2731,24 +2926,27 @@ describe('SandboxSession orchestration', () => {
         if (health === 'hang') return new Promise<ResponseFrame>(() => undefined);
         return controlResponse({ status: { type: 'idle' }, questions: [], permissions: [] });
       });
-      const cleanup = deferred<{ quarantined: boolean }>();
+      const cleanup = deferred<RuntimeQuarantineResult>();
       fixture.control.quarantineRuntime.mockImplementation(() => cleanup.promise);
       vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
       const alarm = fixture.fireAlarm();
       await vi.advanceTimersByTimeAsync(health === 'hang' ? SANDBOX_CONTROL_REQUEST_TIMEOUT_MS : 0);
       expect(fixture.record('a')?.state).toBe('failed');
-      expect(fixture.record('b')?.state).toBe('failed');
-      expect(fixture.terminalEvents()).toHaveLength(2);
+      expect(fixture.record('b')?.state).toBe('queued');
+      expect(fixture.terminalEvents()).toHaveLength(1);
       expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
       await fixture.admit('c');
       await fixture.flush();
       expect(fixture.record('c')?.state).toBe('queued');
-      const acquisition = fixture.acquisition('c');
+      const acquisition = fixture.acquisition('b');
       const ensureCount = fixture.control.ensureReady.mock.calls.length;
       await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
       await alarm;
       fixture.reload();
-      fixture.control.quarantineRuntime.mockResolvedValue({ quarantined: false });
+      fixture.control.quarantineRuntime.mockResolvedValue({
+        quarantined: false,
+        disposition: 'physical_stopped',
+      });
       fixture.setStatus({ physical: 'stopped', connection: 'disconnected' });
       fixture.control.ensureReady.mockImplementationOnce(async () => {
         const ready = {
@@ -2761,7 +2959,7 @@ describe('SandboxSession orchestration', () => {
       });
       await fixture.fireAlarm();
       expect(await fixture.session.isSandboxCleanupScheduled()).toBe(false);
-      expect(fixture.record('c')).toMatchObject({
+      expect(fixture.record('b')).toMatchObject({
         state: 'accepted',
         wrapperInstanceId: NEXT_RUNTIME_ID,
       });
@@ -2769,6 +2967,9 @@ describe('SandboxSession orchestration', () => {
       expect(fixture.control.ensureReady).toHaveBeenLastCalledWith(
         expect.objectContaining({ acquisition })
       );
+      await fixture.outcome('b', 'completed', NEXT_RUNTIME_ID);
+      await fixture.flush();
+      expect(fixture.record('c')?.state).toBe('accepted');
       await fixture.outcome('c', 'completed', NEXT_RUNTIME_ID);
       await fixture.flush();
       await fixture.admit('d');
@@ -2777,7 +2978,7 @@ describe('SandboxSession orchestration', () => {
       await fixture.session.failWaitingMessages('delayed_old_failure', RUNTIME_ID);
       expect(fixture.record('d')?.state).toBe('accepted');
       expect(fixture.record('e')?.state).toBe('queued');
-      cleanup.resolve({ quarantined: true });
+      cleanup.resolve({ quarantined: true, disposition: 'physical_stopping' });
       await fixture.flush();
       expect(fixture.record('d')?.state).toBe('accepted');
     }
@@ -2813,7 +3014,10 @@ describe('SandboxSession orchestration', () => {
 
   it('does not hand off a prompt when the runtime changes during attachment', async () => {
     const fixture = sessionFixture();
-    fixture.control.quarantineRuntime.mockResolvedValue({ quarantined: false });
+    fixture.control.quarantineRuntime.mockResolvedValue({
+      quarantined: false,
+      disposition: 'wrapper_replaced',
+    });
     delegateRequest(fixture, 'session.attach', async () => {
       fixture.setStatus({
         physical: 'running',
@@ -3690,11 +3894,11 @@ describe('SandboxSession orchestration', () => {
   });
 
   it.each(['rejected', 'malformed', 'error', 'timeout'] as const)(
-    'quarantines an accepted runtime on %s abort and fails a follow-up admitted during cancellation',
+    'quarantines an accepted runtime on %s abort and keeps a follow-up queued during cancellation',
     async failure => {
       const fixture = sessionFixture();
       const abort = deferred<ResponseFrame>();
-      const cleanup = deferred<{ quarantined: boolean }>();
+      const cleanup = deferred<RuntimeQuarantineResult>();
       delegateRequest(fixture, 'session.abort', () => abort.promise);
       fixture.control.quarantineRuntime.mockImplementation(() => cleanup.promise);
       await fixture.admit('a');
@@ -3720,15 +3924,14 @@ describe('SandboxSession orchestration', () => {
         failedReason: 'runtime_unhealthy',
       });
       expect(fixture.record('b')).toMatchObject({
-        state: 'failed',
-        failedReason: 'runtime_unhealthy',
+        state: 'queued',
       });
       expect(await fixture.session.isSandboxCleanupScheduled()).toBe(true);
       expect(fixture.control.quarantineRuntime).toHaveBeenCalledWith(
         expect.objectContaining({ wrapperInstanceId: RUNTIME_ID, reason: 'runtime_unhealthy' })
       );
-      expect(fixture.terminalEvents()).toHaveLength(2);
-      cleanup.resolve({ quarantined: true });
+      expect(fixture.terminalEvents()).toHaveLength(1);
+      cleanup.resolve({ quarantined: true, disposition: 'physical_stopping' });
       await expect(interruption).resolves.toEqual({
         success: false,
         message: 'The session runtime could not be interrupted',
@@ -3738,15 +3941,20 @@ describe('SandboxSession orchestration', () => {
         connection: 'ready',
         wrapperInstanceId: NEXT_RUNTIME_ID,
       });
+      fixture.control.quarantineRuntime.mockResolvedValue({
+        quarantined: false,
+        disposition: 'wrapper_replaced',
+      });
       await fixture.admit('c');
       await fixture.flush();
       abort.resolve(controlResponse({ status: 'aborted' }));
       await fixture.flush();
       expect(fixture.record('a')?.state).toBe('failed');
-      expect(fixture.record('c')).toMatchObject({
+      expect(fixture.record('b')).toMatchObject({
         state: 'accepted',
         wrapperInstanceId: NEXT_RUNTIME_ID,
       });
+      expect(fixture.record('c')?.state).toBe('queued');
     }
   );
 

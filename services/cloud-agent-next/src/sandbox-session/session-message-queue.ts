@@ -251,13 +251,15 @@ export function assignPreparationAttemptId(
 export function failWaitingMessages(
   messages: readonly SessionMessageRecord[],
   reason: string,
-  wrapperInstanceId?: string
+  wrapperInstanceId?: string,
+  includeUnassigned = true
 ): { messages: SessionMessageRecord[]; failedIds: string[] } {
   const head =
     messages.find(message => message.state === 'accepted') ??
     messages.find(message => message.state === 'queued');
   const failUnassigned =
-    wrapperInstanceId === undefined || head?.wrapperInstanceId === wrapperInstanceId;
+    wrapperInstanceId === undefined ||
+    (includeUnassigned && head?.wrapperInstanceId === wrapperInstanceId);
   const failedIds: string[] = [];
   return {
     messages: messages.map(message => {
@@ -524,7 +526,8 @@ export function applySessionOperationResult(
 
 export function recordSessionOperationDispatch(
   messages: readonly SessionMessageRecord[],
-  authorization: SessionOperationAuthorization
+  authorization: SessionOperationAuthorization,
+  dispatched = true
 ): SessionMessageRecord[] | undefined {
   const message = messages.find(item => item.messageId === authorization.messageId);
   const kind = authorization.operation === 'session.attach' ? 'attach' : 'prompt';
@@ -544,14 +547,14 @@ export function recordSessionOperationDispatch(
     item.messageId === message.messageId
       ? {
           ...item,
-          unresolvedDispatch: true,
+          unresolvedDispatch: dispatched ? true : undefined,
           deliveryRetryScope: undefined,
           operations: {
             ...item.operations,
             [kind]: {
               authorization: structuredClone(authorization),
-              dispatched: true,
-              ...(kind === 'prompt'
+              dispatched,
+              ...(kind === 'prompt' && dispatched
                 ? {
                     executionDeadlineAt:
                       item.executionDeadlineAt ??
@@ -560,7 +563,7 @@ export function recordSessionOperationDispatch(
                 : {}),
             },
           },
-          ...(kind === 'prompt'
+          ...(kind === 'prompt' && dispatched
             ? {
                 executionDeadlineAt:
                   item.executionDeadlineAt ??

@@ -44,7 +44,7 @@ async function fixture(instance: SandboxSession, state: DurableObjectState) {
   const control = {
     getStatus: vi.fn(async () => ({ connection: 'ready', physical: 'running', wrapperInstanceId })),
     request: vi.fn(() => pending.promise),
-    quarantineRuntime: vi.fn(async () => ({ quarantined: true })),
+    quarantineRuntime: vi.fn(async () => ({ quarantined: true, disposition: 'physical_stopping' })),
   };
   const originalEnv = instance['env'];
   Object.assign(instance, {

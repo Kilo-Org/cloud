@@ -119,4 +119,6 @@ for (const model of models) {
 }
 
 under('');
-passed('every shape carried the list, and every model kept the whole plan in it across three turns');
+passed(
+  'every shape carried the list, and every model kept the whole plan in it across three turns'
+);

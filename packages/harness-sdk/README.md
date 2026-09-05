@@ -502,6 +502,19 @@ build its prefix again. Both take the options from the store, never from the
 caller: a system prompt that differs by one byte drops the whole cached prefix,
 and the only symptom is the bill.
 
+The exception is the model, and it is the exception because a session freezes
+one. Moving a conversation to another model is a copy of it:
+
+```ts
+const onGlm = yield* cloneSession(id, { model: 'z-ai/glm-5.3-flash' });
+```
+
+`model` and `effort` are all a clone takes, and they are what a person changing
+the model picker asks for. The thinking does not come across — a provider reads
+back the signature it issued and refuses one it did not — so the copy carries
+what was said, what was shown and what the tools did, and leaves the reasoning
+with the model that made it.
+
 A reopened session knows how full it is: the store keeps the provider's count of
 the last request beside the session, so one reopened onto a conversation that
 already fills the window compacts before it asks anything. `usage` still starts

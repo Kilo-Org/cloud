@@ -79,7 +79,9 @@ const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   }
 
   const spoken = answer.right.replaceAll(/\s+/gu, ' ').trim();
-  console.log(`${kind.padEnd(18)}${String(ran.length).padEnd(7)}${JSON.stringify(spoken.slice(0, 90))}`);
+  console.log(
+    `${kind.padEnd(18)}${String(ran.length).padEnd(7)}${JSON.stringify(spoken.slice(0, 90))}`
+  );
 
   if (ran.length !== 1) {
     fail(`${kind}: the tool ran ${String(ran.length)} times, not once`);

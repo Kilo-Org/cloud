@@ -115,6 +115,66 @@ it('leaves the original alone when the clone is asked something', async () => {
 });
 
 /**
+ * Moving a conversation to another model.
+ *
+ * A session freezes its model, so this is the only way there is: the turns are
+ * copied onto a session opened on the other one. What cannot come with them is
+ * the thinking, because a provider reads back the signature it issued and
+ * refuses one it did not.
+ */
+it('opens the copy on the model it was moved onto', async () => {
+  const desk = bench();
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const moved = await desk.run(
+    Effect.flatMap(cloneSession(opened.value, { model: 'z-ai/glm-5.3-flash' }), session =>
+      asked(session, 'next')
+    )
+  );
+
+  expect(moved.calls[0]?.model).toBe('z-ai/glm-5.3-flash');
+  /* The system prompt still comes from the store: the model moves, and
+     everything the caller never asked to change stays as it was. */
+  expect(moved.calls[0]?.prompt.system[0]?.text).toBe(options.system);
+});
+
+it('leaves the thinking behind when the copy moves to another model', async () => {
+  const desk = bench({ reply: { deltas: ['an answer'], reasoning: ['because of this'] } });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const moved = await desk.run(
+    Effect.flatMap(
+      cloneSession(opened.value, { model: 'z-ai/glm-5.3-flash' }),
+      session => session.history
+    )
+  );
+
+  const kinds = moved.value.flatMap(turn => turn.parts.map(part => part.kind));
+  expect(kinds).not.toContain('reasoning');
+  /* Everything else is still there. The conversation moved; only the signed
+     thinking, which no other model can read back, did not. */
+  expect(texts(moved.value)).toEqual(['user:first', 'assistant:an answer']);
+});
+
+it('keeps the thinking when the copy stays on the same model', async () => {
+  const desk = bench({ reply: { deltas: ['an answer'], reasoning: ['because of this'] } });
+  const opened = await desk.run(
+    Effect.flatMap(openSession(options), session => Effect.as(asked(session, 'first'), session.id))
+  );
+
+  const branched = await desk.run(
+    Effect.flatMap(cloneSession(opened.value), session => session.history)
+  );
+
+  const kinds = branched.value.flatMap(turn => turn.parts.map(part => part.kind));
+  expect(kinds).toContain('reasoning');
+});
+
+/**
  * A resumed session knows how full it is.
  *
  * The compaction trigger is the provider's own count of the last request, and

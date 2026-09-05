@@ -32,7 +32,8 @@ export async function refreshGlanceableSnapshot(
   // A card raised by push-to-start carries no update token until the app runs
   // and adopts it, so nothing here can update or end it. Without this fence
   // every later refresh raises another card and the Lock Screen stacks them.
-  const iosStartKey = (token: string) => `glanceable-ios-start:${JSON.stringify(token)}`;
+  const iosStartPrefix = 'glanceable-ios-start:';
+  const iosStartKey = (token: string) => `${iosStartPrefix}${JSON.stringify(token)}`;
   const request = await storage.transaction(async tx => {
     const previous = refreshStateSchema.optional().parse(await tx.get(key));
     const now = Date.now();
@@ -86,7 +87,10 @@ export async function refreshGlanceableSnapshot(
       const tokens = await deps.listIosActivityTokens(userId, organizationId);
       const current = refreshStateSchema.parse(await storage.get(key));
       if (current.revision !== request.revision) return [];
-      const withoutFencedStarts = await dropFencedStarts(tokens, storage, iosStartKey);
+      const withoutFencedStarts = await dropFencedStarts(tokens, storage, {
+        prefix: iosStartPrefix,
+        key: iosStartKey,
+      });
       // Empty work can retry ends. Eligible work excludes every accepted or uncertain end.
       if (!eligible) return withoutFencedStarts;
       const retiring = await Promise.all(
@@ -127,26 +131,29 @@ export async function refreshGlanceableSnapshot(
  * retirement from here and every fence in the scope is released. Otherwise a
  * push-to-start whose fence has not lapsed is removed from the list, which
  * leaves `apnsSendsForTokens` with no start to send.
+ *
+ * Every read also drops the lapsed fences, including those of tokens the device
+ * has since rotated away and will never present again.
  */
 async function dropFencedStarts<T extends { token: string; kind: string }>(
   tokens: readonly T[],
   storage: DurableObjectStorage,
-  iosStartKey: (token: string) => string
+  fence: { prefix: string; key: (token: string) => string }
 ): Promise<T[]> {
+  const held = await storage.list<number>({ prefix: fence.prefix });
   if (tokens.some(({ kind }) => kind === 'ios_activity')) {
-    await storage.delete(tokens.map(({ token }) => iosStartKey(token)));
+    if (held.size > 0) {
+      await storage.delete([...held.keys()]);
+    }
     return [...tokens];
   }
   const now = Date.now();
-  const fenced = await Promise.all(
-    tokens.map(async ({ token, kind }) => {
-      if (kind !== 'ios_push_to_start') return false;
-      const until = await storage.get<number>(iosStartKey(token));
-      if (until === undefined) return false;
-      if (until > now) return true;
-      await storage.delete(iosStartKey(token));
-      return false;
-    })
-  );
-  return tokens.filter((_token, index) => !fenced[index]);
+  const lapsed = [...held].filter(([, until]) => until <= now).map(([key]) => key);
+  if (lapsed.length > 0) {
+    await storage.delete(lapsed);
+  }
+  return tokens.filter(({ token, kind }) => {
+    const until = held.get(fence.key(token));
+    return kind !== 'ios_push_to_start' || until === undefined || until <= now;
+  });
 }

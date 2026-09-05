@@ -2,7 +2,9 @@
 
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Download, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useTRPC } from '@/lib/trpc/utils';
 import AdminPage from '@/app/admin/components/AdminPage';
 import { BreadcrumbItem } from '@/components/ui/breadcrumb';
@@ -10,8 +12,18 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const BYTES_PER_GIGABYTE = 1024 * 1024 * 1024;
 
@@ -22,9 +34,24 @@ export default function ApiRequestLogPage() {
   const [model, setModel] = useState('');
   const [sessionId, setSessionId] = useState('');
   const [errorsOnly, setErrorsOnly] = useState(false);
+  const [truncateDialogOpen, setTruncateDialogOpen] = useState(false);
 
   const trpc = useTRPC();
-  const summaryQuery = useQuery(trpc.admin.apiRequestLog.getSummary.queryOptions());
+  const queryClient = useQueryClient();
+  const summaryOptions = trpc.admin.apiRequestLog.getSummary.queryOptions();
+  const summaryQuery = useQuery(summaryOptions);
+  const truncateMutation = useMutation(
+    trpc.admin.apiRequestLog.truncate.mutationOptions({
+      onSuccess: () => {
+        toast.success('API request log truncated');
+        setTruncateDialogOpen(false);
+        void queryClient.invalidateQueries({ queryKey: summaryOptions.queryKey });
+      },
+      onError: error => {
+        toast.error('Could not truncate API request log', { description: error.message });
+      },
+    })
+  );
 
   function handleDownload() {
     const params = new URLSearchParams();
@@ -145,6 +172,51 @@ export default function ApiRequestLogPage() {
               <Download className="mr-2 h-4 w-4" />
               Download ZIP
             </Button>
+          </CardContent>
+        </Card>
+        <Card className="border-destructive/40">
+          <CardHeader>
+            <CardTitle>Danger zone</CardTitle>
+            <CardDescription>
+              Permanently remove every record from the API request log table.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog
+              open={truncateDialogOpen}
+              onOpenChange={open => {
+                if (!truncateMutation.isPending) setTruncateDialogOpen(open);
+              }}
+            >
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" disabled={truncateMutation.isPending}>
+                  <Trash2 className="size-4" aria-hidden="true" />
+                  Truncate API request log
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Truncate API request log?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This permanently deletes every record in{' '}
+                    <span className="text-foreground font-mono">api_request_log</span>. This action
+                    cannot be undone. New gateway requests will continue to be logged.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel disabled={truncateMutation.isPending}>
+                    Cancel
+                  </AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    disabled={truncateMutation.isPending}
+                    onClick={() => truncateMutation.mutate({ confirmation: 'api_request_log' })}
+                  >
+                    {truncateMutation.isPending ? 'Truncating...' : 'Truncate table'}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       </div>

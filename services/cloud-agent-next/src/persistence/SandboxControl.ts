@@ -2943,7 +2943,26 @@ export class SandboxControl extends DurableObject<Env> {
       return;
     }
     if (id === 'wrapperReadiness' || id === 'startup') {
-      const physical = await loadPhysicalRecord(this.ctx.storage);
+      const [physical, runtime, recovery, readyAt] = await Promise.all([
+        loadPhysicalRecord(this.ctx.storage),
+        this.ctx.storage.get<PersistedWrapperRuntime>(ACTIVE_WRAPPER_RUNTIME_KEY),
+        loadRecoveryDecisions(this.ctx.storage),
+        this.ctx.storage.get<number>(WRAPPER_READY_AT_KEY),
+      ]);
+      if (
+        runtime?.recoveryCapable &&
+        runtime.providerInstanceId === physical.providerRef &&
+        (readyAt !== undefined ||
+          recovery.some(
+            item =>
+              controlRecovery.sameRuntime(item, runtime) &&
+              (item.cause !== 'activation_pending' || controlRecovery.activationCommitted(item))
+          ))
+      ) {
+        await this.exhaustExpiredRecovery(Date.now());
+        await this.reconcileExhaustedRecovery();
+        return;
+      }
       if (physical.state === 'creating' || physical.state === 'running') {
         await this.markFailed();
       }
@@ -3103,11 +3122,19 @@ export class SandboxControl extends DurableObject<Env> {
       }
       let deadlines = await loadDeadlines(this.ctx.storage);
       deadlines = cancelDeadline(cancelDeadline(deadlines, 'heartbeatExpiry'), 'socketHandshake');
-      deadlines = armDeadline(
-        cancelDeadline(deadlines, 'startup'),
-        'wrapperReadiness',
-        now + DEADLINE_MS.wrapperReadiness
+      const establishedRecovery = nextRecovery.some(
+        item =>
+          identity.recoveryCapable &&
+          controlRecovery.sameRuntime(item, identity) &&
+          (item.cause !== 'activation_pending' || controlRecovery.activationCommitted(item))
       );
+      deadlines = establishedRecovery
+        ? cancelDeadline(cancelDeadline(deadlines, 'startup'), 'wrapperReadiness')
+        : armDeadline(
+            cancelDeadline(deadlines, 'startup'),
+            'wrapperReadiness',
+            Math.min(deadlines.wrapperReadiness ?? Infinity, now + DEADLINE_MS.wrapperReadiness)
+          );
       deadlines = controlRecovery.recoveryDeadlines(deadlines, nextRecovery);
       await saveRecoveryDecisions(this.ctx.storage, nextRecovery);
       await saveDeadlines(this.ctx.storage, deadlines);
@@ -4001,7 +4028,7 @@ export class SandboxControl extends DurableObject<Env> {
     });
     this.readyConnectionId = null;
     this.kiloReady = false;
-    if (!started) return;
+    if (!started || started.authority || started.exhaustedAt !== undefined) return;
     const authority = await this.recoveryAuthority.load(started);
     if (!authority) return;
     await this.ctx.storage.transaction(async tx => {

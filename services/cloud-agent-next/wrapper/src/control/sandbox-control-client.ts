@@ -312,45 +312,44 @@ export function createSandboxControlClient(
             recovery.attempt === reconciliation.data.recovery.attempt &&
             recovery.deadlineAt === reconciliation.data.recovery.deadlineAt;
           if (
-            Date.now() >= reconciliation.data.recovery.deadlineAt ||
-            (reconciliation.data.phase !== 'drain' &&
-              !matchesCommittedRecovery &&
-              !matchesActiveRecovery)
+            !matchesCommittedRecovery &&
+            (Date.now() >= reconciliation.data.recovery.deadlineAt ||
+              (reconciliation.data.phase !== 'drain' && !matchesActiveRecovery))
           ) {
             outcome = {
               ok: false,
               error: { code: 'not_ready', message: 'Recovery authority changed', retryable: false },
             };
           } else {
-            if (reconciliation.data.phase === 'drain') {
-              recovery = {
-                episodeId: reconciliation.data.recovery.episodeId,
-                attempt: reconciliation.data.recovery.attempt,
-                deadlineAt: reconciliation.data.recovery.deadlineAt,
-              };
-              committedRecovery = undefined;
-            }
-            if (reconciliation.data.phase !== 'commit' || !matchesCommittedRecovery)
+            if (!matchesCommittedRecovery) {
+              if (reconciliation.data.phase === 'drain') {
+                recovery = {
+                  episodeId: reconciliation.data.recovery.episodeId,
+                  attempt: reconciliation.data.recovery.attempt,
+                  deadlineAt: reconciliation.data.recovery.deadlineAt,
+                };
+                committedRecovery = undefined;
+              }
               await options.onReconcile?.(
                 reconciliation.data.phase,
                 reconciliation.data.recovery.deadlineAt
               );
-            if (
-              state.kind !== 'ready' ||
-              state.socket !== ws ||
-              (!matchesCommittedRecovery &&
-                (recovery?.episodeId !== reconciliation.data.recovery.episodeId ||
-                  recovery.attempt !== reconciliation.data.recovery.attempt ||
-                  recovery.deadlineAt !== reconciliation.data.recovery.deadlineAt))
-            )
-              return;
-            if (reconciliation.data.phase === 'commit') {
-              committedRecovery = {
-                episodeId: reconciliation.data.recovery.episodeId,
-                attempt: reconciliation.data.recovery.attempt,
-                deadlineAt: reconciliation.data.recovery.deadlineAt,
-              };
-              recovery = undefined;
+              if (
+                state.kind !== 'ready' ||
+                state.socket !== ws ||
+                recovery?.episodeId !== reconciliation.data.recovery.episodeId ||
+                recovery.attempt !== reconciliation.data.recovery.attempt ||
+                recovery.deadlineAt !== reconciliation.data.recovery.deadlineAt
+              )
+                return;
+              if (reconciliation.data.phase === 'commit') {
+                committedRecovery = {
+                  episodeId: reconciliation.data.recovery.episodeId,
+                  attempt: reconciliation.data.recovery.attempt,
+                  deadlineAt: reconciliation.data.recovery.deadlineAt,
+                };
+                recovery = undefined;
+              }
             }
             outcome = {
               ok: true,

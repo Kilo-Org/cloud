@@ -86,6 +86,8 @@ export const sandboxRecoveryDecisionSchema = z
     activationCommittedAt: z.number().int().nonnegative().optional(),
     activationCommitDeadlineAt: z.number().int().nonnegative().optional(),
     activationCommitAttempts: z.number().int().nonnegative().optional(),
+    activationCommitAttempt: z.number().int().nonnegative().optional(),
+    activationCommitNextAttemptAt: z.number().int().nonnegative().optional(),
     activationAcknowledgedAt: z.number().int().nonnegative().optional(),
   })
   .strict();
@@ -105,6 +107,39 @@ export function activationRepairPending(recovery: SandboxRecoveryDecision): bool
   return activationCommitted(recovery) && recovery.activationAcknowledgedAt === undefined;
 }
 
+export function canRepairActivation(recovery: SandboxRecoveryDecision, now: number): boolean {
+  if (
+    !activationRepairPending(recovery) ||
+    (recovery.activationCommitDeadlineAt ?? 0) <= now ||
+    (recovery.activationCommitAttempts ?? 0) >= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS
+  )
+    return false;
+  return recovery.exhaustedAt === undefined || hasReadyActivationScope(recovery, now);
+}
+
+export function hasReadyActivationScope(recovery: SandboxRecoveryDecision, now: number): boolean {
+  return (
+    recovery.activationCommitAttempt !== undefined &&
+    (recovery.authority?.roots?.some(
+      root =>
+        root.decision === 'ready' &&
+        (root.observation === 'known' || root.observation === 'idle') &&
+        recovery.authority?.scopes.some(
+          scope =>
+            scope.sessionId === root.sessionId &&
+            scope.kiloSessionId === root.kiloSessionId &&
+            scope.directory === root.directory &&
+            scope.nativeRuntimeId === root.nativeRuntimeId &&
+            scope.wrapperInstanceId === recovery.wrapperInstanceId &&
+            scope.authorization !== undefined &&
+            scope.executionDeadlineAt !== undefined &&
+            scope.executionDeadlineAt > now
+        )
+    ) ??
+      false)
+  );
+}
+
 export function commitRecoveryActivation(
   recovery: SandboxRecoveryDecision,
   now: number
@@ -115,7 +150,8 @@ export function commitRecoveryActivation(
     activationCommitDeadlineAt:
       recovery.activationCommitDeadlineAt ?? now + RECOVERY_ACTIVATION_ACK_TIMEOUT_MS,
     activationCommitAttempts: recovery.activationCommitAttempts ?? 0,
-    nextAttemptAt: now,
+    activationCommitAttempt: recovery.activationCommitAttempt ?? recovery.attempt,
+    activationCommitNextAttemptAt: now,
   };
 }
 
@@ -246,12 +282,12 @@ export function recoveryDeadlines(
   recovery: readonly SandboxRecoveryDecision[],
   now = Date.now()
 ): DeadlineTable {
-  const active = recovery.filter(
-    item =>
-      item.exhaustedAt === undefined &&
-      (!activationRepairPending(item)
-        ? item.deadlineAt > now
-        : (item.activationCommitDeadlineAt ?? 0) > now)
+  const active = recovery.filter(item =>
+    item.exhaustedAt === undefined
+      ? activationRepairPending(item)
+        ? (item.activationCommitDeadlineAt ?? 0) > now
+        : item.deadlineAt > now
+      : canRepairActivation(item, now)
   );
   let next = cancelDeadline(cancelDeadline(deadlines, 'recoveryExpiry'), 'recoveryRetry');
   if (active.length > 0)
@@ -266,17 +302,17 @@ export function recoveryDeadlines(
         )
       )
     );
-  const retries = recovery
-    .filter(
-      item =>
-        item.exhaustedAt === undefined &&
-        item.nextAttemptAt !== undefined &&
-        (!activationRepairPending(item) ||
-          ((item.activationCommitDeadlineAt ?? 0) > now &&
-            (item.activationCommitAttempts ?? SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS) <
-              SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS))
-    )
-    .map(item => Math.max(now, item.nextAttemptAt ?? now));
+  const retries = recovery.flatMap(item => {
+    const nextAttemptAt = activationRepairPending(item)
+      ? canRepairActivation(item, now)
+        ? (item.activationCommitNextAttemptAt ??
+          (item.activationCommitAttempt === undefined ? item.nextAttemptAt : undefined))
+        : undefined
+      : item.exhaustedAt === undefined
+        ? item.nextAttemptAt
+        : undefined;
+    return nextAttemptAt === undefined ? [] : [Math.max(now, nextAttemptAt)];
+  });
   const cleanups = recovery
     .filter(
       item =>
@@ -331,7 +367,10 @@ export function beginRecovery(
       wrapperInstanceId: identity.wrapperInstanceId,
       deadlineAt,
       ...(previous.connectionId !== identity.connectionId
-        ? { activationAcknowledgedAt: undefined }
+        ? {
+            activationAcknowledgedAt: undefined,
+            activationCommitNextAttemptAt: previous.activationCommitNextAttemptAt ?? now,
+          }
         : {}),
     };
   }
@@ -352,27 +391,23 @@ export function claimAttempt(
   identity: SandboxControlConnectionIdentity,
   now: number
 ): RecoveryAttempt | undefined {
-  if (
-    !recovery ||
-    !sameConnection(recovery, identity) ||
-    recovery.exhaustedAt !== undefined ||
-    (recovery.nextAttemptAt !== undefined && now < recovery.nextAttemptAt)
-  )
-    return undefined;
+  if (!recovery || !sameConnection(recovery, identity)) return undefined;
   if (activationRepairPending(recovery)) {
     const activationCommitDeadlineAt = recovery.activationCommitDeadlineAt;
-    const activationCommitAttempts = recovery.activationCommitAttempts ?? 0;
+    const nextAttemptAt =
+      recovery.activationCommitNextAttemptAt ??
+      (recovery.activationCommitAttempt === undefined ? recovery.nextAttemptAt : undefined);
     if (
       activationCommitDeadlineAt === undefined ||
-      now >= activationCommitDeadlineAt ||
-      activationCommitAttempts >= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS
+      !canRepairActivation(recovery, now) ||
+      (nextAttemptAt !== undefined && now < nextAttemptAt)
     )
       return undefined;
     return {
       recovery: {
         ...recovery,
-        activationCommitAttempts: activationCommitAttempts + 1,
-        nextAttemptAt: undefined,
+        activationCommitAttempts: (recovery.activationCommitAttempts ?? 0) + 1,
+        activationCommitNextAttemptAt: undefined,
       },
       deadlineAt: Math.min(
         activationCommitDeadlineAt,
@@ -380,7 +415,12 @@ export function claimAttempt(
       ),
     };
   }
-  if (recovery.attempt >= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS || now >= recovery.deadlineAt)
+  if (
+    recovery.exhaustedAt !== undefined ||
+    (recovery.nextAttemptAt !== undefined && now < recovery.nextAttemptAt) ||
+    recovery.attempt >= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS ||
+    now >= recovery.deadlineAt
+  )
     return undefined;
   const claimed = { ...recovery, attempt: recovery.attempt + 1, nextAttemptAt: undefined };
   return {
@@ -403,10 +443,14 @@ export function failAttempt(
       return exhaustRecovery(recovery, now);
     return {
       ...recovery,
-      nextAttemptAt: Math.min(recovery.activationCommitDeadlineAt, now + 1_000),
+      activationCommitNextAttemptAt: Math.min(recovery.activationCommitDeadlineAt, now + 1_000),
     };
   }
-  if (now >= recovery.deadlineAt || recovery.attempt >= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS)
+  if (
+    recovery.exhaustedAt !== undefined ||
+    now >= recovery.deadlineAt ||
+    recovery.attempt >= SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS
+  )
     return exhaustRecovery(recovery, now);
   return {
     ...recovery,
@@ -420,6 +464,8 @@ export function wireRecovery(recovery: SandboxRecoveryDecision): SandboxRecovery
     cause: recovery.cause,
     startedAt: recovery.startedAt,
     deadlineAt: recovery.deadlineAt,
-    attempt: recovery.attempt,
+    attempt: activationRepairPending(recovery)
+      ? (recovery.activationCommitAttempt ?? recovery.attempt)
+      : recovery.attempt,
   };
 }

@@ -20,6 +20,7 @@ import {
   loadNativeRuntimeRetirements,
   loadRecoveryDecisions,
   loadRouteTable,
+  saveDeadlines,
   savePhysicalRecord,
   saveRecoveryDecisions,
   saveRouteTable,
@@ -420,7 +421,7 @@ async function harness() {
     },
     async reconnectForInteraction() {
       await hooks.onSocketClosed?.(true, connection);
-      connection = { ...connection, connectionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff' };
+      connection = { ...connection, connectionId: crypto.randomUUID() };
       await hooks.onHandshakeComplete?.(connection);
       await flush();
       expect(await control.getStatus()).toMatchObject({ connection: 'connected' });
@@ -704,6 +705,81 @@ describe.each([
 );
 
 describe('SandboxControl production recovery hooks', () => {
+  it.each(['wrapperReadiness', 'startup'] as const)(
+    'does not fall back to %s while a replacement activation ACK is stalled',
+    async deadline => {
+      const h = await harness();
+      await h.recover('pending Stop');
+      const original = await retained(h);
+      await h.reconnectForInteraction();
+      await h.reconstruct();
+      const markFailed = vi.spyOn(h.control, 'markFailed');
+      expect(await h.storage.get('wrapper_ready_at')).toBeUndefined();
+      await saveDeadlines(h.storage, {
+        ...(await loadDeadlines(h.storage)),
+        recoveryRetry: undefined,
+        [deadline]: original.deadlineAt,
+      });
+      vi.setSystemTime(original.deadlineAt);
+      await h.control.alarm();
+      await h.flush();
+      expect(markFailed).not.toHaveBeenCalled();
+      expect((await retained(h)).exhaustedAt).toBeUndefined();
+      expect(await loadDeadlines(h.storage)).toMatchObject({
+        recoveryExpiry: original.activationCommitDeadlineAt,
+      });
+      if (original.activationCommitDeadlineAt === undefined)
+        throw new Error('Missing original activation ACK deadline');
+      vi.setSystemTime(original.activationCommitDeadlineAt);
+      await h.control.alarm();
+      await h.flush();
+      expect(await retained(h)).toMatchObject({
+        deadlineAt: original.deadlineAt,
+        exhaustedAt: original.activationCommitDeadlineAt,
+        authority: original.authority,
+      });
+      await expectNoSiblingRetirement(h, 'pending Stop');
+    }
+  );
+
+  it.each(
+    scenarios.flatMap(scenario =>
+      (['wrapperReadiness', 'startup'] as const).map(deadline => ({ scenario, deadline }))
+    )
+  )(
+    'keeps stale $deadline under scoped cleanup while A has $scenario',
+    async ({ scenario, deadline }) => {
+      const h = await harness();
+      await h.recover(scenario);
+      const original = await retained(h);
+      await h.reconnectForInteraction();
+      await h.hooks.onReady?.(h.connection);
+      await h.flush();
+      const resumed = await retained(h);
+      expect(resumed.deadlineAt).toBe(original.deadlineAt);
+      expect(resumed.attempt).toBe(original.attempt);
+      expect(await loadDeadlines(h.storage)).not.toHaveProperty('wrapperReadiness');
+      expect(await loadDeadlines(h.storage)).not.toHaveProperty('startup');
+      const markFailed = vi.spyOn(h.control, 'markFailed');
+      await saveDeadlines(h.storage, {
+        ...(await loadDeadlines(h.storage)),
+        recoveryRetry: undefined,
+        [deadline]: original.deadlineAt,
+      });
+      vi.setSystemTime(original.deadlineAt);
+      await h.control.alarm();
+      await h.flush();
+      expect(markFailed).not.toHaveBeenCalled();
+      expect(await retained(h)).toMatchObject({
+        episodeId: original.episodeId,
+        deadlineAt: original.deadlineAt,
+        exhaustedAt: original.deadlineAt,
+      });
+      await expectScopedAdmission(h);
+      await expectNoSiblingRetirement(h, scenario);
+    }
+  );
+
   it.each(scenarios)(
     'activates B without changing its original operation while A has %s',
     async scenario => {
@@ -774,7 +850,7 @@ describe('SandboxControl production recovery hooks', () => {
   );
 
   it.each(scenarios)(
-    'preserves B admission and result through exhaustion and reconstruction when A has %s',
+    'preserves B admission, input and result through exhausted recovery connection replacement when A has %s',
     async scenario => {
       const h = await harness();
       await h.recover(scenario);
@@ -793,6 +869,51 @@ describe('SandboxControl production recovery hooks', () => {
         )
         .toBe('ready');
       await h.reconstruct();
+      await h.reconnectForInteraction();
+      const pendingActivation = await retained(h);
+      expect(pendingActivation.connectionId).not.toBe(exhausted.connectionId);
+      expect(pendingActivation.activationAcknowledgedAt).toBeUndefined();
+      await expect(
+        h.control.request(
+          prompt({ ...authorization(rootB, 'before_ack'), dispatchDeadlineAt: Date.now() + 5_000 })
+        )
+      ).rejects.toThrow('Sandbox runtime is not ready');
+      await h.reconstruct();
+      await h.hooks.onReady?.(h.connection);
+      await h.flush();
+      expect(h.sendRequest).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({
+          operation: 'sandbox.reconcile',
+          payload: {
+            phase: 'commit',
+            recovery: expect.objectContaining({
+              episodeId: initial.episodeId,
+              deadlineAt: initial.deadlineAt,
+              attempt: initial.attempt,
+            }),
+          },
+        })
+      );
+      const restored = await retained(h);
+      expect(restored).toMatchObject({
+        attempt: exhausted.attempt,
+        deadlineAt: exhausted.deadlineAt,
+        exhaustedAt: exhausted.exhaustedAt,
+        cleanupDeadlineAt: exhausted.cleanupDeadlineAt,
+        cleanupState: exhausted.cleanupState,
+        nextAttemptAt: exhausted.nextAttemptAt,
+        authority: exhausted.authority,
+        activationCommitDeadlineAt: exhausted.activationCommitDeadlineAt,
+        activationAcknowledgedAt: Date.now(),
+      });
+      await expectScopedAdmission(h);
+      await expect(
+        h.control.request({
+          operation: 'session.question.resolve',
+          session: authorization(rootB).session,
+          payload: { action: 'answer', questionId: 'question_b', answers: [['yes']] },
+        })
+      ).resolves.toEqual(response({ success: true }));
       await h.control.alarm();
       await h.flush();
       await expectNoSiblingRetirement(h, scenario);

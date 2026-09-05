@@ -6,7 +6,9 @@ import {
 import * as recovery from './control-recovery.js';
 import {
   loadDeadlines,
+  loadPhysicalRecord,
   loadRecoveryDecisions,
+  loadRouteTable,
   saveDeadlines,
   saveRecoveryDecisions,
 } from './durable-state.js';
@@ -45,6 +47,41 @@ type Dependencies = {
 export function createRecoveryExecution(dependencies: Dependencies) {
   const pending = new Map<string, Promise<boolean>>();
 
+  async function retainsReadyScope(
+    tx: DurableObjectTransaction,
+    decision: recovery.SandboxRecoveryDecision,
+    runtime: RecoveryExecutionRuntime
+  ): Promise<boolean> {
+    const [physical, routes] = await Promise.all([loadPhysicalRecord(tx), loadRouteTable(tx)]);
+    const authority = decision.authority;
+    if (
+      !authority ||
+      !runtime.acceptsPhysical(physical) ||
+      physical.providerRef !== authority.allocation.providerRef ||
+      physical.createIntent?.intentId !== authority.allocation.createIntentId
+    )
+      return false;
+    return recovery.hasReadyActivationScope(
+      {
+        ...decision,
+        authority: {
+          ...authority,
+          roots: authority.roots?.filter(root => {
+            const route = routes.get(root.sessionId);
+            return (
+              route?.ownerId === root.ownerId &&
+              route.kiloSessionId === root.kiloSessionId &&
+              route.directory === root.directory &&
+              route.nativeRuntimeId === root.nativeRuntimeId &&
+              route.retiringNativeRuntimeId === undefined
+            );
+          }),
+        },
+      },
+      Date.now()
+    );
+  }
+
   async function reconcile(runtime: RecoveryExecutionRuntime): Promise<boolean> {
     if (!runtime.identity.recoveryCapable || !runtime.isCurrent()) return false;
     const initialClaimed = await dependencies.storage.transaction(async tx => {
@@ -53,7 +90,12 @@ export function createRecoveryExecution(dependencies: Dependencies) {
         item => item.wrapperInstanceId === runtime.identity.wrapperInstanceId
       );
       const attempt = recovery.claimAttempt(current, runtime.identity, Date.now());
-      if (!attempt) return;
+      if (
+        !attempt ||
+        (attempt.recovery.exhaustedAt !== undefined &&
+          !(await retainsReadyScope(tx, attempt.recovery, runtime)))
+      )
+        return;
       await saveRecoveryDecisions(
         tx,
         records.map(item => (item === current ? attempt.recovery : item))
@@ -79,6 +121,12 @@ export function createRecoveryExecution(dependencies: Dependencies) {
         const current = records.find(item => item.episodeId === claimed.recovery.episodeId);
         if (!current || !recovery.sameConnection(current, runtime.identity) || !runtime.isCurrent())
           throw new SandboxControlConnectionError('Recovery authority changed', false);
+        if (
+          finishActivation &&
+          current.exhaustedAt !== undefined &&
+          !(await retainsReadyScope(tx, current, runtime))
+        )
+          throw new SandboxControlConnectionError('Recovered scope is no longer ready', false);
         const next = update(current);
         const remaining = next
           ? records.map(item => (item === current ? next : item))
@@ -127,10 +175,11 @@ export function createRecoveryExecution(dependencies: Dependencies) {
       };
       const phase = async (phase: 'drain' | 'ready' | 'commit') => {
         const deadlineAt = requestDeadlineAt();
+        const wireRecovery = recovery.wireRecovery(claimed.recovery);
         const response = await dependencies.sendRequest({
           operation: 'sandbox.reconcile',
           expectedWrapperInstanceId: runtime.identity.wrapperInstanceId,
-          payload: { recovery: recovery.wireRecovery(claimed.recovery), phase },
+          payload: { recovery: wireRecovery, phase },
           deadlineAt,
           timeoutMs: Math.max(1, deadlineAt - Date.now()),
         });
@@ -140,7 +189,7 @@ export function createRecoveryExecution(dependencies: Dependencies) {
         const acknowledgement = sandboxReconcileResultSchema.parse(response.result);
         if (
           acknowledgement.episodeId !== claimed.recovery.episodeId ||
-          acknowledgement.attempt !== claimed.recovery.attempt ||
+          acknowledgement.attempt !== wireRecovery.attempt ||
           acknowledgement.phase !== phase
         )
           throw new SandboxControlConnectionError('Recovery acknowledgement changed', false);
@@ -149,7 +198,8 @@ export function createRecoveryExecution(dependencies: Dependencies) {
         await persist(current => {
           if (!recovery.activationCommitted(current))
             throw new SandboxControlConnectionError('Recovery activation was not committed', true);
-          if (!recovery.hasUnresolvedRoots(current.authority)) return undefined;
+          if (current.exhaustedAt === undefined && !recovery.hasUnresolvedRoots(current.authority))
+            return undefined;
           return recovery.failAttempt(
             {
               ...current,

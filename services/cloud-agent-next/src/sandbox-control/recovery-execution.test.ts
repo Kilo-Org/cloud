@@ -19,9 +19,11 @@ import {
   loadDeadlines,
   loadPhysicalRecord,
   loadRecoveryDecisions,
+  loadRouteTable,
   saveDeadlines,
   savePhysicalRecord,
   saveRecoveryDecisions,
+  saveRouteTable,
 } from './durable-state.js';
 import type { PhysicalRecord } from './physical-lifecycle.js';
 import { createRecoveryExecution, type RecoveryExecutionRuntime } from './recovery-execution.js';
@@ -190,6 +192,15 @@ async function harness(decision = recoveryDecision()) {
     resumable: true,
   };
   await savePhysicalRecord(storage, physical);
+  await saveRouteTable(
+    storage,
+    new Map(
+      [rootA, rootB].map(root => [
+        root.sessionId,
+        { ...root, lastState: 'active', lastStateAt: NOW, idleForMs: null, waitingOn: null },
+      ])
+    )
+  );
   const runtime = {
     identity,
     isCurrent: vi.fn(() => true),
@@ -347,7 +358,7 @@ describe('createRecoveryExecution activation replay', () => {
       activationCommittedAt: NOW,
       activationCommitDeadlineAt: NOW + 90_000,
       activationCommitAttempts: 1,
-      nextAttemptAt: NOW + 1_000,
+      activationCommitNextAttemptAt: NOW + 1_000,
     });
     expect(retained.activationAcknowledgedAt).toBeUndefined();
     expect(retained.exhaustedAt).toBeUndefined();
@@ -405,7 +416,7 @@ describe('createRecoveryExecution activation replay', () => {
       activationCommittedAt: NOW,
       activationCommitDeadlineAt: NOW + 90_000,
       activationCommitAttempts: 1,
-      nextAttemptAt: NOW + 1_000,
+      activationCommitNextAttemptAt: NOW + 1_000,
     });
     expect(retained.activationAcknowledgedAt).toBeUndefined();
     expect(h.dependencies.onActivated).not.toHaveBeenCalled();
@@ -503,11 +514,115 @@ describe('createRecoveryExecution activation replay', () => {
         attempt: committed.attempt,
         activationCommittedAt: NOW,
         activationCommitAttempts: 1,
-        nextAttemptAt: NOW + 1_000,
+        activationCommitNextAttemptAt: NOW + 1_000,
       });
       expect(h.dependencies.onActivated).not.toHaveBeenCalled();
       expectActivationOnly(h.dependencies);
       expect(h.dependencies.scheduleAlarm).toHaveBeenLastCalledWith(await loadDeadlines(h.storage));
+    }
+  );
+});
+
+describe('createRecoveryExecution exhausted activation fences', () => {
+  const committed = committedDecision();
+  const decision: SandboxRecoveryDecision = {
+    ...committed,
+    attempt: 3,
+    exhaustedAt: NOW - 1_000,
+    cleanupState: 'targeted',
+    cleanupDeadlineAt: NOW + 10_000,
+    nextAttemptAt: NOW + 5_000,
+    activationCommitAttempts: 1,
+    authority: { ...authority(), roots: [{ ...rootA, decision: 'stop_pending' }, rootB] },
+  };
+
+  it.each([
+    'stopped physical',
+    'different allocation',
+    'different create intent',
+    'missing route',
+    'different owner',
+    'different native runtime',
+    'retiring runtime',
+    'expired scope',
+    'missing authorization',
+    'no ready root',
+    'expired ACK window',
+  ])('does not claim or restore readiness with %s', async failure => {
+    const h = await harness(decision);
+    const routes = await loadRouteTable(h.storage);
+    const route = routes.get(rootB.sessionId);
+    if (!route) throw new Error('Expected B route');
+    if (failure === 'stopped physical')
+      await savePhysicalRecord(h.storage, { ...h.physical, state: 'stopped' });
+    if (failure === 'different allocation')
+      await savePhysicalRecord(h.storage, { ...h.physical, providerRef: 'allocation_replaced' });
+    if (failure === 'different create intent')
+      await savePhysicalRecord(h.storage, {
+        ...h.physical,
+        createIntent: { ...h.physical.createIntent, intentId: 'create_replaced' },
+      });
+    if (failure === 'missing route') routes.delete(rootB.sessionId);
+    if (failure === 'different owner') route.ownerId = 'owner_replaced';
+    if (failure === 'different native runtime') route.nativeRuntimeId = rootA.nativeRuntimeId;
+    if (failure === 'retiring runtime') route.retiringNativeRuntimeId = rootB.nativeRuntimeId;
+    await saveRouteTable(h.storage, routes);
+    const retained = await h.retained();
+    if (failure === 'expired ACK window') retained.activationCommitDeadlineAt = NOW;
+    if (!retained.authority) throw new Error('Expected retained authority');
+    if (failure === 'no ready root')
+      retained.authority.roots = [{ ...rootA, decision: 'stop_pending' }];
+    retained.authority.scopes = retained.authority.scopes.map(scope => ({
+      ...scope,
+      ...(failure === 'expired scope' ? { executionDeadlineAt: NOW } : {}),
+      ...(failure === 'missing authorization' ? { authorization: undefined } : {}),
+    }));
+    await saveRecoveryDecisions(h.storage, [retained]);
+    const before = await h.retained();
+    const deadlines = await loadDeadlines(h.storage);
+    expect(await h.reconstruct().reconcile(h.runtime)).toBe(false);
+    expect(await h.retained()).toEqual(before);
+    expect(await loadDeadlines(h.storage)).toEqual(deadlines);
+    expect(h.dependencies.sendRequest).not.toHaveBeenCalled();
+    expect(h.dependencies.onActivated).not.toHaveBeenCalled();
+    expect(await h.storage.get(ACTIVE_WRAPPER_RUNTIME_KEY)).toBeUndefined();
+    expect(await h.storage.get(WRAPPER_READY_AT_KEY)).toBeUndefined();
+  });
+
+  it.each(['route retirement', 'physical replacement'])(
+    'rechecks %s after the ACK before restoring readiness',
+    async change => {
+      const h = await harness(decision);
+      h.dependencies.sendRequest.mockImplementationOnce(async request => {
+        if (change === 'route retirement') {
+          const routes = await loadRouteTable(h.storage);
+          const route = routes.get(rootB.sessionId);
+          if (!route) throw new Error('Expected B route');
+          route.retiringNativeRuntimeId = rootB.nativeRuntimeId;
+          await saveRouteTable(h.storage, routes);
+        } else {
+          await savePhysicalRecord(h.storage, {
+            ...h.physical,
+            createIntent: { ...h.physical.createIntent, intentId: 'create_replaced' },
+          });
+        }
+        return acknowledge(request);
+      });
+      expect(await h.reconstruct().reconcile(h.runtime)).toBe(false);
+      const retained = await h.retained();
+      expect(retained).toEqual({
+        ...decision,
+        activationCommitAttempts: 2,
+        activationCommitNextAttemptAt: NOW + 1_000,
+      });
+      expect(h.requests()).toEqual(['commit']);
+      expect(h.dependencies.onActivated).not.toHaveBeenCalled();
+      expect(await h.storage.get(ACTIVE_WRAPPER_RUNTIME_KEY)).toBeUndefined();
+      expect(await h.storage.get(WRAPPER_READY_AT_KEY)).toBeUndefined();
+      vi.setSystemTime(NOW + 1_000);
+      expect(await h.reconstruct().reconcile(h.runtime)).toBe(false);
+      expect(await h.retained()).toEqual(retained);
+      expect(h.requests()).toEqual(['commit']);
     }
   );
 });
@@ -647,6 +762,86 @@ describe('createRecoveryExecution scoped recovery', () => {
       expect(admitsRecoveryRequest([retried], identity, rootA)).toBe(false);
       expect(admitsRecoveryRequest([retried], identity, rootB)).toBe(true);
       expect(await loadPhysicalRecord(h.storage)).toEqual(h.physical);
+
+      vi.setSystemTime(NOW + 3_000);
+      expect(await h.reconstruct().reconcile(h.runtime)).toBe(true);
+      const exhausted = await h.retained();
+      expect(exhausted).toMatchObject({
+        attempt: 3,
+        activationCommitAttempt: 1,
+        activationCommitAttempts: 1,
+        exhaustedAt: NOW + 3_000,
+        cleanupState: 'pending',
+      });
+      const connection = { ...identity, connectionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff' };
+      const rebound = {
+        ...beginRecovery(exhausted, connection, 'control_disconnected', NOW + 4_000),
+        cleanupState: 'targeted' as const,
+        nextAttemptAt: NOW + 20_000,
+      };
+      await saveRecoveryDecisions(h.storage, [rebound]);
+      const runtime = { ...h.runtime, identity: connection };
+      vi.clearAllMocks();
+      vi.setSystemTime(NOW + 6_000);
+      h.dependencies.sendRequest.mockRejectedValueOnce(
+        new Error('Maintenance commit response lost')
+      );
+      expect(await h.reconstruct().reconcile(runtime)).toBe(false);
+      const retry = await h.retained();
+      expect(retry).toEqual({
+        ...rebound,
+        activationCommitAttempts: 2,
+        activationCommitNextAttemptAt: NOW + 7_000,
+      });
+      expect(await loadDeadlines(h.storage)).toMatchObject({
+        recoveryExpiry: exhausted.activationCommitDeadlineAt,
+        recoveryRetry: NOW + 7_000,
+      });
+      vi.setSystemTime(NOW + 6_999);
+      expect(await h.reconstruct().reconcile(runtime)).toBe(false);
+      expect(await h.retained()).toEqual(retry);
+      expect(h.requests()).toEqual(['commit']);
+      vi.setSystemTime(NOW + 7_000);
+      expect(await h.reconstruct().reconcile(runtime)).toBe(true);
+      const repaired = await h.retained();
+      expect(repaired).toEqual({
+        ...rebound,
+        activationCommitAttempts: 3,
+        activationCommitNextAttemptAt: undefined,
+        activationAcknowledgedAt: NOW + 7_000,
+      });
+      expectActivationOnly(h.dependencies);
+      expect(h.requests()).toEqual(['commit', 'commit']);
+      for (const [request] of h.dependencies.sendRequest.mock.calls) {
+        expect(request.payload).toEqual({
+          phase: 'commit',
+          recovery: {
+            episodeId: exhausted.episodeId,
+            cause: exhausted.cause,
+            startedAt: exhausted.startedAt,
+            deadlineAt: exhausted.deadlineAt,
+            attempt: 1,
+          },
+        });
+      }
+      expect(await h.storage.get(ACTIVE_WRAPPER_RUNTIME_KEY)).toEqual({
+        ...connection,
+        readyConnectionId: connection.connectionId,
+      });
+      expect(await h.storage.get(WRAPPER_READY_AT_KEY)).toBe(NOW);
+      expect(await loadDeadlines(h.storage)).toEqual({
+        idleStop: NOW + 300_000,
+        heartbeatExpiry: NOW + 97_000,
+        recoveryRetry: NOW + 20_000,
+      });
+      expect(admitsRecoveryRequest([repaired], connection, rootA)).toBe(false);
+      expect(admitsRecoveryRequest([repaired], connection, rootB)).toBe(true);
+      const spent = beginRecovery(repaired, identity, 'control_disconnected', NOW + 8_000);
+      await saveRecoveryDecisions(h.storage, [spent]);
+      vi.setSystemTime(NOW + 8_000);
+      expect(await h.reconstruct().reconcile(h.runtime)).toBe(false);
+      expect(await h.retained()).toEqual(spent);
+      expect(h.requests()).toEqual(['commit', 'commit']);
     }
   );
 });

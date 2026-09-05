@@ -595,6 +595,203 @@ describe('createSandboxControlClient', () => {
     client.close();
   });
 
+  it('ACKs an exact committed recovery after a lost reply and the original deadline expires', async () => {
+    const startedAt = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
+    const onReconcile = mock(async () => {});
+    const onRequest = mock(async () => ({ ok: true, result: { accepted: true } }));
+    const { client, sockets } = createClientFixture({ onReconcile, onRequest });
+    const recovery = {
+      episodeId: crypto.randomUUID(),
+      cause: 'control_disconnected',
+      startedAt,
+      deadlineAt: startedAt + 1_000,
+      attempt: 1,
+    };
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      const first = sockets[0];
+      if (!first) throw new Error('Missing first socket');
+      await handshake(first, helloResult({ connectionRecovery: true }));
+      await connecting;
+      for (const phase of ['drain', 'ready', 'commit']) {
+        if (phase === 'commit') {
+          first.send = () => {
+            throw new Error('Lost commit reply');
+          };
+        }
+        first.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: phase,
+            operation: 'sandbox.reconcile',
+            payload: { recovery, phase },
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+      }
+      expect(onReconcile).toHaveBeenNthCalledWith(1, 'drain', recovery.deadlineAt);
+      expect(onReconcile).toHaveBeenNthCalledWith(2, 'ready', recovery.deadlineAt);
+      expect(onReconcile).toHaveBeenNthCalledWith(3, 'commit', recovery.deadlineAt);
+      expect(first.sent.map(data => JSON.parse(data).requestId)).not.toContain('commit');
+      expect(first.readyState).toBe(3);
+      await waitForReconnect();
+      clock.mockReturnValue(recovery.deadlineAt + 1);
+      const replacement = sockets[1];
+      if (!replacement) throw new Error('Missing replacement socket');
+      await handshake(replacement, helloResult({ connectionRecovery: true }));
+      await client.connect();
+      for (const payload of [
+        { recovery, phase: 'commit' },
+        { recovery: { ...recovery, episodeId: crypto.randomUUID() }, phase: 'commit' },
+        { recovery: { ...recovery, attempt: 2 }, phase: 'commit' },
+        { recovery: { ...recovery, deadlineAt: recovery.deadlineAt - 1 }, phase: 'commit' },
+        { recovery, phase: 'ready' },
+        { recovery, phase: 'drain' },
+        { recovery, phase: 'commit' },
+      ]) {
+        const exactCommit = payload.recovery === recovery && payload.phase === 'commit';
+        const requestId = crypto.randomUUID();
+        replacement.respond(
+          JSON.stringify({ type: 'request', requestId, operation: 'sandbox.reconcile', payload })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(replacement.sent.at(-1) ?? '{}')).toEqual({
+          type: 'response',
+          requestId,
+          ...(exactCommit
+            ? {
+                ok: true,
+                result: {
+                  episodeId: recovery.episodeId,
+                  attempt: recovery.attempt,
+                  phase: 'commit',
+                },
+              }
+            : {
+                ok: false,
+                error: {
+                  code: 'not_ready',
+                  message: 'Recovery authority changed',
+                  retryable: false,
+                },
+              }),
+        });
+      }
+      expect(onReconcile).toHaveBeenCalledTimes(3);
+      expect(onRequest).not.toHaveBeenCalled();
+      expect(replacement.readyState).toBe(1);
+    } finally {
+      client.close();
+      clock.mockRestore();
+    }
+  });
+
+  it('rejects a stale committed replay without clearing a newer recovery gate', async () => {
+    const startedAt = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
+    const fake = new FakeWebSocket();
+    const onReconcile = mock(async () => {});
+    const onRequest = mock(async () => ({ ok: true, result: { accepted: true } }));
+    const { client } = createClientFixture({
+      openWebSocket: () => fake as unknown as WebSocket,
+      onReconcile,
+      onRequest,
+    });
+    const previous = {
+      episodeId: crypto.randomUUID(),
+      cause: 'control_disconnected',
+      startedAt,
+      deadlineAt: startedAt + 1_000,
+      attempt: 1,
+    };
+    const current = {
+      ...previous,
+      episodeId: crypto.randomUUID(),
+      deadlineAt: startedAt + 10_000,
+    };
+    try {
+      const connecting = client.connect();
+      await handshake(fake);
+      await connecting;
+      for (const payload of [
+        { recovery: previous, phase: 'drain' },
+        { recovery: previous, phase: 'ready' },
+        { recovery: previous, phase: 'commit' },
+        { recovery: current, phase: 'drain' },
+      ]) {
+        fake.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: crypto.randomUUID(),
+            operation: 'sandbox.reconcile',
+            payload,
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(fake.sent.at(-1) ?? '{}').ok).toBe(true);
+      }
+      for (const now of [startedAt, previous.deadlineAt + 1]) {
+        clock.mockReturnValue(now);
+        fake.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: 'stale-commit',
+            operation: 'sandbox.reconcile',
+            payload: { recovery: previous, phase: 'commit' },
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+          requestId: 'stale-commit',
+          ok: false,
+          error: { code: 'not_ready', retryable: false },
+        });
+        for (const operation of ['session.attach', 'session.prompt']) {
+          fake.respond(
+            JSON.stringify({ type: 'request', requestId: operation, operation, payload: {} })
+          );
+          await Promise.resolve();
+          await Promise.resolve();
+          expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+            requestId: operation,
+            ok: false,
+            error: { code: 'not_ready', retryable: true },
+          });
+        }
+      }
+      expect(onReconcile).toHaveBeenCalledTimes(4);
+      expect(onRequest).not.toHaveBeenCalled();
+      for (const phase of ['ready', 'commit']) {
+        fake.respond(
+          JSON.stringify({
+            type: 'request',
+            requestId: phase,
+            operation: 'sandbox.reconcile',
+            payload: { recovery: current, phase },
+          })
+        );
+        await Promise.resolve();
+        await Promise.resolve();
+        expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+          requestId: phase,
+          ok: true,
+          result: { episodeId: current.episodeId, attempt: current.attempt, phase },
+        });
+      }
+      expect(onReconcile).toHaveBeenCalledTimes(6);
+      expect(onReconcile).toHaveBeenLastCalledWith('commit', current.deadlineAt);
+    } finally {
+      client.close();
+      clock.mockRestore();
+    }
+  });
+
   it.each([
     { ok: true, result: '漢'.repeat(MAX_SANDBOX_CONTROL_FRAME_BYTES / 2) },
     {

@@ -20,13 +20,48 @@ const token = await kiloToken();
 const everyShape: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
 
 /**
- * The model a run uses when it does not care which. Cheap, quick, and it speaks
- * every shape. `KILO_MODEL` points a run at another one.
+ * Every live run takes a list of models and runs its checks once per model.
  *
- * Eleven runs wrote this line each, so eleven had to be edited to try a
- * different model, and one of them was always missed.
+ * The list holds one model, because these runs cost real money: a sweep of
+ * eleven is eleven times the bill for a change that touched one code path. The
+ * word `full` on the command line asks for all eleven, and nothing else does.
+ *
+ * `KILO_MODELS` names any list, and wins over `full`.
  */
-const model = process.env['KILO_MODEL'] ?? 'anthropic/claude-haiku-4.5';
+const one = 'z-ai/glm-5.3-flash';
+
+/**
+ * All of them: the ten most used models on OpenRouter this week, from six
+ * vendors, and Haiku for the one lab that list leaves out. Every one is cheap.
+ * `deepseek-v4-flash-0423` is not served, so the floating alias stands in,
+ * `tencent/hy4-preview` is not sold to this team, so a qwen flash takes its
+ * place, and `nvidia/nemotron-3-ultra-550b-a55b` is served by nobody — every
+ * provider refused it on 2026-09-04 — so a nemotron that is takes its place.
+ */
+const everyModel = [
+  'anthropic/claude-haiku-4.5',
+  'openai/gpt-5.6-luna',
+  'z-ai/glm-5.3-flash',
+  'deepseek/deepseek-v4-flash-0731',
+  'qwen/qwen3.8-flash',
+  'xiaomi/mimo-v2.5',
+  'tencent/hy3',
+  'deepseek/deepseek-v4-flash',
+  'minimax/minimax-m3',
+  'nvidia/nemotron-3.5-lightning',
+  'google/gemini-3.7-flash',
+] as const;
+
+/* `e2e/all.ts` passes `full` on to each run it spawns as this variable, because
+   a run reads its own command line and never sees the sweep's. */
+const full = process.argv.includes('full') || process.env['KILO_FULL'] === '1';
+
+/** The models this run works through, in order. Never empty. */
+const models: readonly string[] =
+  process.env['KILO_MODELS']?.split(',') ?? (full ? everyModel : [one]);
+
+/** For the few checks that are about a shape or a store rather than a model. */
+const model = models[0] ?? one;
 
 /**
  * The facts go in the fallback rather than in the table, because a live run
@@ -67,4 +102,4 @@ const cachedSystem = [
   ...Array.from({ length: 200 }, (_, index) => rule(index)),
 ].join('\n');
 
-export { baseUrl, cachedSystem, everyShape, kilo, model, organizationId, token };
+export { baseUrl, cachedSystem, everyShape, full, kilo, model, models, organizationId, token };

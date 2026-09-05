@@ -15,10 +15,8 @@ import type { ApiKind } from '../src/core/catalog.js';
 import type { StopReason } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo } from './setup.js';
-import { failures, passed } from './report.js';
-
-const model = process.env['KILO_MODEL'] ?? 'openai/gpt-5.6-luna';
+import { kilo, models } from './setup.js';
+import { fail, passed, under } from './report.js';
 
 const system = 'You answer exactly what you are asked, with no preamble.';
 const short = 'Answer with the single word: yes';
@@ -39,7 +37,7 @@ const ask = (session: SessionHandle, text: string, maxTokens: number) =>
     return event.kind === 'done' ? { ...held, stop: event.stop } : held;
   });
 
-const runShape = async (kind: ApiKind) => {
+const runShape = async (model: string, kind: ApiKind) => {
   const layers = kilo({ apiKinds: [kind] });
 
   /* Two sessions, because a truncated answer left in the first one would
@@ -59,33 +57,35 @@ const runShape = async (kind: ApiKind) => {
 
 const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
 
-console.log('model', model);
-console.log('\nshape             finished  cut off   said when cut');
+for (const model of models) {
+  under(model);
 
-for (const kind of kinds) {
-  const result = await runShape(kind);
-  if (result._tag === 'Left') {
-    console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.left)}`);
-    failures.push(`${kind}: the call failed`);
-    continue;
-  }
+  console.log('model', model);
+  console.log('\nshape             finished  cut off   said when cut');
 
-  const { finished, cut } = result.right;
-  console.log(
-    `${kind.padEnd(18)}${String(finished.stop).padEnd(10)}${String(cut.stop).padEnd(10)}` +
-      JSON.stringify(cut.said.slice(0, 30))
-  );
+  for (const kind of kinds) {
+    const result = await runShape(model, kind);
+    if (result._tag === 'Left') {
+      console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.left)}`);
+      fail(`${kind}: the call failed`);
+      continue;
+    }
 
-  if (finished.stop !== 'end') {
-    failures.push(
-      `${kind}: an answer that finished was reported as ${String(finished.stop)}, not end`
+    const { finished, cut } = result.right;
+    console.log(
+      `${kind.padEnd(18)}${String(finished.stop).padEnd(10)}${String(cut.stop).padEnd(10)}` +
+        JSON.stringify(cut.said.slice(0, 30))
     );
-  }
-  if (cut.stop !== 'maxTokens') {
-    failures.push(
-      `${kind}: an answer cut off at the ceiling was reported as ${String(cut.stop)}; a caller ` +
-        'would store half a sentence as a finished answer'
-    );
+
+    if (finished.stop !== 'end') {
+      fail(`${kind}: an answer that finished was reported as ${String(finished.stop)}, not end`);
+    }
+    if (cut.stop !== 'maxTokens') {
+      fail(
+        `${kind}: an answer cut off at the ceiling was reported as ${String(cut.stop)}; a caller ` +
+          'would store half a sentence as a finished answer'
+      );
+    }
   }
 }
 

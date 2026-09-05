@@ -20,10 +20,8 @@ import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo } from './setup.js';
-import { failures, passed } from './report.js';
-
-const model = process.env['KILO_MODEL'] ?? 'openai/gpt-5.6-luna';
+import { cachedSystem as system, kilo, models } from './setup.js';
+import { fail, passed, under } from './report.js';
 
 interface Answer {
   readonly said: string;
@@ -39,7 +37,7 @@ const ask = (session: SessionHandle, text: string) =>
         : held
   );
 
-const runShape = async (kind: ApiKind) => {
+const runShape = async (model: string, kind: ApiKind) => {
   const layers = kilo({ apiKinds: [kind] });
 
   const program = Effect.gen(function* () {
@@ -56,34 +54,38 @@ const kinds: readonly ApiKind[] = ['messages', 'responses', 'chat_completions'];
 /** `chat_completions` sends no cache control, so it is not held to a ratio. */
 const mustCache = new Set<ApiKind>(['messages', 'responses']);
 
-console.log('model', model);
-console.log('\nshape             answered  cache read  input   ratio');
+for (const model of models) {
+  under(model);
 
-for (const kind of kinds) {
-  const result = await runShape(kind);
-  if (result._tag === 'Left') {
-    console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.left)}`);
-    failures.push(`${kind}: the call failed`);
-    continue;
-  }
+  console.log('model', model);
+  console.log('\nshape             answered  cache read  input   ratio');
 
-  const { first, second, total } = result.right;
-  const ratio = hitRatio(total);
-  const answered = first.said.length > 0 && second.said.length > 0;
-  console.log(
-    `${kind.padEnd(18)}${String(answered).padEnd(10)}${String(total.cacheReadTokens).padEnd(12)}` +
-      `${String(total.inputTokens).padEnd(8)}${ratio.toFixed(4)}`
-  );
+  for (const kind of kinds) {
+    const result = await runShape(model, kind);
+    if (result._tag === 'Left') {
+      console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(result.left)}`);
+      fail(`${kind}: the call failed`);
+      continue;
+    }
 
-  if (!answered) {
-    failures.push(`${kind}: an answer carried no text`);
-  }
-  if (mustCache.has(kind) && total.cacheReadTokens === 0) {
-    failures.push(
-      `${kind}: nothing was read from the cache, and this shape controls one. ` +
-        'An Anthropic model on the responses shape caches nothing on this gateway, ' +
-        'measured 2026-09-04; see AGENTS.md. Anything else here is a regression.'
+    const { first, second, total } = result.right;
+    const ratio = hitRatio(total);
+    const answered = first.said.length > 0 && second.said.length > 0;
+    console.log(
+      `${kind.padEnd(18)}${String(answered).padEnd(10)}${String(total.cacheReadTokens).padEnd(12)}` +
+        `${String(total.inputTokens).padEnd(8)}${ratio.toFixed(4)}`
     );
+
+    if (!answered) {
+      fail(`${kind}: an answer carried no text`);
+    }
+    if (mustCache.has(kind) && total.cacheReadTokens === 0) {
+      fail(
+        `${kind}: nothing was read from the cache, and this shape controls one. ` +
+          'An Anthropic model on the responses shape caches nothing on this gateway, ' +
+          'measured 2026-09-04; see AGENTS.md. Anything else here is a regression.'
+      );
+    }
   }
 }
 

@@ -18,8 +18,8 @@ import type { ResumeContext } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
-import { cachedSystem as system, kilo, model } from './setup.js';
-import { failures, passed } from './report.js';
+import { cachedSystem as system, kilo, models } from './setup.js';
+import { fail, passed, under } from './report.js';
 
 /** One database, two runs, as a second start of an application would have. */
 const database = new DatabaseSync(':memory:');
@@ -41,12 +41,13 @@ const ask = (session: SessionHandle, text: string) =>
   );
 
 /** Builds the prefix and pays for it, so there is a warm cache to inherit. */
-const source = Effect.gen(function* () {
-  const session = yield* openSession({ system, model, maxTokens: 32 });
-  const first = yield* ask(session, 'Answer with the word: one');
-  const second = yield* ask(session, 'Answer with the word: two');
-  return { id: session.id, first: first.usage, second: second.usage };
-});
+const source = (model: string) =>
+  Effect.gen(function* () {
+    const session = yield* openSession({ system, model, maxTokens: 32 });
+    const first = yield* ask(session, 'Answer with the word: one');
+    const second = yield* ask(session, 'Answer with the word: two');
+    return { id: session.id, first: first.usage, second: second.usage };
+  });
 
 /** Branches it, asks one question, and reports what the branch was charged. */
 const branch = (sessionId: string) =>
@@ -69,52 +70,54 @@ const show = (name: string, usage: ModelUsage | undefined): void => {
   );
 };
 
-console.log('model', model, '\n');
+for (const model of models) {
+  under(model);
 
-const first = await run(source);
-const cloned = await run(branch(first.id));
-const original = await run(branch(first.id));
+  console.log('model', model, '\n');
 
-show('source call 1', first.first);
-show('source call 2', first.second);
-show('clone call 1', cloned.usage);
-show('second clone', original.usage);
-console.log('\nclone id  ', cloned.id, '\nsource id ', first.id);
-console.log('clone said', JSON.stringify(cloned.said), 'over', cloned.turns.length, 'turns');
+  const first = await run(source(model));
+  const cloned = await run(branch(first.id));
+  const original = await run(branch(first.id));
 
-const read = cloned.usage?.cacheReadTokens ?? 0;
-const written = cloned.usage?.cacheWriteTokens ?? 0;
+  show('source call 1', first.first);
+  show('source call 2', first.second);
+  show('clone call 1', cloned.usage);
+  show('second clone', original.usage);
+  console.log('\nclone id  ', cloned.id, '\nsource id ', first.id);
+  console.log('clone said', JSON.stringify(cloned.said), 'over', cloned.turns.length, 'turns');
 
-if (cloned.id === first.id) {
-  failures.push('the clone took the identifier of the session it came from');
-}
-if (cloned.turns.length !== 6) {
-  /* The four copied turns, the question this run asked, and its answer. A
-     clone that lost a turn would send a shorter prompt and still read most of
-     the prefix, so the count is checked as well as the cache. */
-  failures.push(`the clone holds ${String(cloned.turns.length)} turns where it should hold 6`);
-}
-if ((first.second?.cacheReadTokens ?? 0) === 0) {
-  failures.push('the source never cached anything, so this run cannot measure a clone');
-}
-if (read === 0) {
-  failures.push('the clone read nothing from the cache, so it paid for the prefix again');
-}
-if (written > read / 4) {
-  failures.push(
-    `the clone wrote ${String(written)} against ${String(read)} read, so its prompt is not ` +
-      'the prompt the source sent'
-  );
-}
-if (cloned.said.length === 0) {
-  failures.push('the clone answered with nothing');
-}
-if ((original.usage?.cacheReadTokens ?? 0) === 0) {
-  /* The second clone comes off the same source, which the first clone must not
-     have touched. A source that grew would move the prefix out from under it. */
-  failures.push('a second clone of the same session read nothing, so the first one changed it');
+  const read = cloned.usage?.cacheReadTokens ?? 0;
+  const written = cloned.usage?.cacheWriteTokens ?? 0;
+
+  if (cloned.id === first.id) {
+    fail('the clone took the identifier of the session it came from');
+  }
+  if (cloned.turns.length !== 6) {
+    /* The four copied turns, the question this run asked, and its answer. A
+       clone that lost a turn would send a shorter prompt and still read most of
+       the prefix, so the count is checked as well as the cache. */
+    fail(`the clone holds ${String(cloned.turns.length)} turns where it should hold 6`);
+  }
+  if ((first.second?.cacheReadTokens ?? 0) === 0) {
+    fail('the source never cached anything, so this run cannot measure a clone');
+  }
+  if (read === 0) {
+    fail('the clone read nothing from the cache, so it paid for the prefix again');
+  }
+  if (written > read / 4) {
+    fail(
+      `the clone wrote ${String(written)} against ${String(read)} read, so its prompt is not ` +
+        'the prompt the source sent'
+    );
+  }
+  if (cloned.said.length === 0) {
+    fail('the clone answered with nothing');
+  }
+  if ((original.usage?.cacheReadTokens ?? 0) === 0) {
+    /* The second clone comes off the same source, which the first clone must not
+       have touched. A source that grew would move the prefix out from under it. */
+    fail('a second clone of the same session read nothing, so the first one changed it');
+  }
 }
 
-passed(
-  `\nPASS: the clone read ${String(read)} tokens of prefix from the cache and wrote ${String(written)}.`
-);
+passed('every clone read its prefix from the cache and wrote next to nothing');

@@ -40,25 +40,9 @@ import { type Asker, type Question, questionTool } from '../src/plugins/tools/qu
 import { subagentTool } from '../src/plugins/tools/subagent.js';
 import { timeTool } from '../src/plugins/tools/time.js';
 import { type Todo, todoTool } from '../src/plugins/tools/todo.js';
-import { kilo } from './setup.js';
-import { failures, passed } from './report.js';
+import { kilo, models } from './setup.js';
+import { fail, passed } from './report.js';
 
-/** The ten of `e2e/models.ts`, and Haiku for the one lab that list leaves out. */
-const models = [
-  'anthropic/claude-haiku-4.5',
-  'openai/gpt-5.6-luna',
-  'z-ai/glm-5.3-flash',
-  'deepseek/deepseek-v4-flash-0731',
-  'qwen/qwen3.8-flash',
-  'xiaomi/mimo-v2.5',
-  'tencent/hy3',
-  'deepseek/deepseek-v4-flash',
-  'minimax/minimax-m3',
-  'nvidia/nemotron-3.5-lightning',
-  'google/gemini-3.7-flash',
-] as const;
-
-const chosen = process.env['KILO_MODELS']?.split(',') ?? models;
 const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? '1024');
 
 const system =
@@ -313,7 +297,7 @@ const scored = async (model: string) => ({
   todo: await tried(kinds => oneTodo(model, kinds)),
 });
 
-const rows = await Promise.all(chosen.map(scored));
+const rows = await Promise.all(models.map(scored));
 
 const pad = (text: string, width: number) => text.padEnd(width);
 const mark = (right: boolean) => (right ? 'yes' : 'NO');
@@ -348,9 +332,9 @@ for (const { model, question, subagent, time, todo } of rows) {
     ['todo', todo],
   ] as const) {
     if (!one.called) {
-      failures.push(`${model} never called ${name}, and said: ${JSON.stringify(one.said)}`);
+      fail(`${model} never called ${name}, and said: ${JSON.stringify(one.said)}`);
     } else if (!one.valid) {
-      failures.push(`${model} sent ${name} a payload it could not read`);
+      fail(`${model} sent ${name} a payload it could not read`);
     }
   }
 }

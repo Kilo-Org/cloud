@@ -23,7 +23,7 @@ import { openSession } from '../src/core/run.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { kilo } from './setup.js';
-import { failures, passed } from './report.js';
+import { fail, passed } from './report.js';
 
 const system = 'You answer briefly. Think first, then give the answer in one short sentence.';
 
@@ -101,7 +101,7 @@ for (const { kind, model, seals } of shapes) {
   const result = await runShape(kind, model);
   if (result._tag === 'Left') {
     console.log(`${kind.padEnd(18)}${model.padEnd(29)}FAILED ${JSON.stringify(result.left)}`);
-    failures.push(`${kind}: the call failed`);
+    fail(`${kind}: the call failed`);
     continue;
   }
 
@@ -119,7 +119,7 @@ for (const { kind, model, seals } of shapes) {
   );
 
   if (seals && !thought) {
-    failures.push(`${kind}: the model produced no thinking, so this shape proves nothing`);
+    fail(`${kind}: the model produced no thinking, so this shape proves nothing`);
   }
   /* One thinking block or several: the model decides, and a model that thinks
      again after answering part way produces two. What may never happen is a
@@ -127,16 +127,16 @@ for (const { kind, model, seals } of shapes) {
      provider signed would go back with a hole in it. */
   const unsealed = stored.filter(part => part.signature === undefined).length;
   if (seals && stored.length === 0) {
-    failures.push(`${kind}: the answer kept no thinking at all, so nothing can be replayed`);
+    fail(`${kind}: the answer kept no thinking at all, so nothing can be replayed`);
   }
   if (seals && unsealed > 0) {
-    failures.push(
+    fail(
       `${kind}: ${String(unsealed)} of ${String(stored.length)} stored thinking blocks carry ` +
         'no seal, so the wire drops them and the thinking goes back with a hole in it'
     );
   }
   if (two.said.length === 0) {
-    failures.push(`${kind}: the second call carried the thinking back and produced no answer`);
+    fail(`${kind}: the second call carried the thinking back and produced no answer`);
   }
 }
 

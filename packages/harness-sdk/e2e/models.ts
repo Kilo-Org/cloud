@@ -4,33 +4,16 @@ import type { Effort, ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo } from './setup.js';
+import { cachedSystem as system, kilo, models } from './setup.js';
 
 /**
- * The ten most used models on OpenRouter this week, from six vendors, so a
- * change is not tuned to one provider's quirks. Every one is cheap.
- * `deepseek-v4-flash-0423` is not served, so the floating alias stands in,
- * `tencent/hy4-preview` is not sold to this team, so a qwen flash takes its
- * place, and `nvidia/nemotron-3-ultra-550b-a55b` is served by nobody — every
- * provider refused it on 2026-09-04 — so a nemotron that is takes its place.
- */
-const models = [
-  'openai/gpt-5.6-luna',
-  'z-ai/glm-5.3-flash',
-  'deepseek/deepseek-v4-flash-0731',
-  'qwen/qwen3.8-flash',
-  'xiaomi/mimo-v2.5',
-  'tencent/hy3',
-  'deepseek/deepseek-v4-flash',
-  'minimax/minimax-m3',
-  'nvidia/nemotron-3.5-lightning',
-  'google/gemini-3.7-flash',
-] as const;
-
-const chosen = process.env['KILO_MODELS']?.split(',') ?? models;
-/**
+ * The same five questions, put to every model in the list.
+ *
+ * The list is one model unless the run is asked for `full` — see `e2e/setup.ts`
+ * — so this is a cheap check by default and the vendor sweep on request.
+ *
  * A reasoning model spends the budget on reasoning before it writes a word. At
- * 64 tokens four of these ten answered nothing at all, which reads as a broken
+ * 64 tokens four of the eleven answered nothing at all, which reads as a broken
  * transport and is not one.
  */
 const maxTokens = Number(process.env['KILO_MAX_TOKENS'] ?? '1024');
@@ -116,7 +99,7 @@ const run = (model: string) =>
     )
   );
 
-const outcomes = await Effect.runPromise(Effect.forEach(chosen, run, { concurrency: 3 }));
+const outcomes = await Effect.runPromise(Effect.forEach(models, run, { concurrency: 3 }));
 
 const pad = (text: string, width: number) => text.padEnd(width);
 const ms = (taken: number) => `${taken.toFixed(0)}ms`;
@@ -168,7 +151,7 @@ for (const outcome of outcomes) {
 }
 
 console.log(
-  `\n${String(chosen.length - broken)} of ${String(chosen.length)} models answered every turn.`
+  `\n${String(models.length - broken)} of ${String(models.length)} models answered every turn.`
 );
 if (broken > 0) {
   process.exitCode = 1;

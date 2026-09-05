@@ -16,10 +16,29 @@ import assert from 'node:assert/strict';
 /** What is wrong so far. Empty at the end is the run passing. */
 const failures: string[] = [];
 
+/**
+ * The model whatever fails next was working on.
+ *
+ * A run works through a list of models, and a report that says "the answer
+ * carried no text" without saying whose is a report nobody can act on. Every
+ * run calls `under` before each model, and the name is put on what it records.
+ */
+let scope = '';
+
+/** Names the model the checks after this belong to. */
+const under = (model: string): void => {
+  scope = model;
+};
+
 /** Records one thing that is wrong, and carries on. */
+const fail = (why: string): void => {
+  failures.push(scope === '' ? why : `${scope}: ${why}`);
+};
+
+/** Records one thing that is wrong if it is wrong, and carries on either way. */
 const wrongIf = (broken: boolean, why: string): void => {
   if (broken) {
-    failures.push(why);
+    fail(why);
   }
 };
 
@@ -34,4 +53,4 @@ const passed = (what: string): void => {
   console.log(`\nPASS: ${what}`);
 };
 
-export { failures, passed, wrongIf };
+export { fail, failures, passed, under, wrongIf };

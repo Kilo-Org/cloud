@@ -25,8 +25,8 @@ import type { Continued } from '../src/core/queue.js';
 import { openSession } from '../src/core/run.js';
 import { ToolRegistry } from '../src/core/tool.js';
 import { type SubagentReport, subagentTool } from '../src/plugins/tools/subagent.js';
-import { kilo, model } from './setup.js';
-import { failures, passed, wrongIf } from './report.js';
+import { kilo, models } from './setup.js';
+import { fail, passed, under, wrongIf } from './report.js';
 
 const system =
   'You are a test harness with a subagent tool. When the person asks for ' +
@@ -54,7 +54,7 @@ const layers = kilo();
  * hand-off and the sending away visible where the question was asked. The
  * package's own default is the opposite, and `subagent.test.ts` covers it.
  */
-const subagent = (inlineFor: Duration.DurationInput) =>
+const subagent = (model: string, inlineFor: Duration.DurationInput) =>
   subagentTool(
     {
       system: subSystem,
@@ -67,11 +67,11 @@ const subagent = (inlineFor: Duration.DurationInput) =>
     layers
   );
 
-const withSubagent = (inlineFor: Duration.DurationInput) =>
-  Layer.merge(layers, Layer.succeed(ToolRegistry, { tools: [subagent(inlineFor)] }));
+const withSubagent = (model: string, inlineFor: Duration.DurationInput) =>
+  Layer.merge(layers, Layer.succeed(ToolRegistry, { tools: [subagent(model, inlineFor)] }));
 
 /** A task handed down, and one answer handed up. */
-const runHandOff = async (): Promise<void> => {
+const runHandOff = async (model: string): Promise<void> => {
   const program = Effect.gen(function* () {
     const session = yield* openSession({
       system,
@@ -84,11 +84,11 @@ const runHandOff = async (): Promise<void> => {
   });
 
   const got = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withSubagent('5 minutes'))))
+    Effect.either(Effect.scoped(Effect.provide(program, withSubagent(model, '5 minutes'))))
   );
 
   if (got._tag === 'Left') {
-    failures.push(`the hand-off failed: ${JSON.stringify(got.left)}`);
+    fail(`the hand-off failed: ${JSON.stringify(got.left)}`);
     return;
   }
 
@@ -122,7 +122,7 @@ const runHandOff = async (): Promise<void> => {
  * on is a caller deciding it has waited long enough, which is the same call an
  * agent watching its own work would make.
  */
-const runSentAway = async (): Promise<void> => {
+const runSentAway = async (model: string): Promise<void> => {
   const rounds: string[] = [];
   const program = Effect.gen(function* () {
     const session = yield* openSession({
@@ -165,11 +165,11 @@ const runSentAway = async (): Promise<void> => {
   });
 
   const got = await Effect.runPromise(
-    Effect.either(Effect.scoped(Effect.provide(program, withSubagent('5 minutes'))))
+    Effect.either(Effect.scoped(Effect.provide(program, withSubagent(model, '5 minutes'))))
   );
 
   if (got._tag === 'Left') {
-    failures.push(`the sent-away run failed: ${JSON.stringify(got.left)}`);
+    fail(`the sent-away run failed: ${JSON.stringify(got.left)}`);
     return;
   }
 
@@ -188,9 +188,14 @@ const runSentAway = async (): Promise<void> => {
   wrongIf(!later.toLowerCase().includes(secret), 'the session never told the model what came back');
 };
 
-console.log('model', model);
-await runHandOff();
-await runSentAway();
+for (const model of models) {
+  under(model);
+
+  console.log('model', model);
+  reports.length = 0;
+  await runHandOff(model);
+  await runSentAway(model);
+}
 
 passed(
   'a task went down to a session of its own and one answer came up, and ' +

@@ -277,7 +277,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
 | One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix` |
-| Every live run | `pnpm test:e2e:all` (add names to pick a few) |
+| Every live run | `pnpm test:e2e:all` (add names to pick a few, `full` for all eleven models) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
 `pnpm test:perf` is a separate config because its files must not run beside the
@@ -425,34 +425,56 @@ is to learn everything that broke. Name one or more to run a subset, as in
 `pnpm test:e2e:all stop reasoning`. These runs cost real money and real time, so
 they are not part of `pnpm check` and never will be.
 
-The whole sweep, 2026-09-04, 5 minutes 16 seconds:
+### One model by default, eleven when you say so
+
+Every run takes a **list** of models and works through it. The list holds one
+model, `z-ai/glm-5.3-flash`, and the word `full` on the command line asks for
+all eleven — the ten most used models on OpenRouter, from six vendors, and
+Haiku for the lab that list leaves out. `pnpm test:e2e:all full`, or
+`pnpm test:e2e:conversation full` for one run. `KILO_MODELS` names any list and
+wins over `full`.
+
+One by default is about money: a sweep of eleven is eleven times the bill, and
+most changes touch one code path. The list lives in `e2e/setup.ts` and nowhere
+else, because two copies drift — the tool matrix ran Haiku for a week that the
+model run did not.
+
+Run the affected runs after a change, on the one model. Run `full` when the
+change is to the wire, or before saying a thing works everywhere: a run tuned to
+one model's habits is a run that passes for the wrong reason.
+
+The whole sweep, one model, 2026-09-05, 8 minutes 30 seconds:
 
 ```
-PASS  live         7s  the second call read the prefix from the cache
-PASS  shapes      13s  every shape carried the conversation
-PASS  stop        11s  a finished answer, told from one the ceiling cut off
-PASS  tools       66s  every shape ran a tool, and a late answer drove a round
-PASS  image       11s  every shape carried the picture and replayed it
-PASS  cancel      10s  the call stopped when the caller did
-PASS  queue        7s  two handed over while busy, one taken back, order kept
-PASS  together    23s  a late answer and a typed message shared one line
-PASS  subagent    10s  a task went down, one answer came up, a call was sent away
-PASS  session     21s  the prefix held across 10 calls, a busy session refused
-PASS  resume       8s  the stored count is the provider's own
-PASS  clone       10s  the clone read 11848 tokens of prefix and wrote 0
-PASS  reasoning   24s  every shape took its own thinking back
-PASS  replay      25s  every shape took back thinking that had been stored
-PASS  compact     11s  the session compacted itself and kept what it was told
-PASS  models      57s  10 of 10 models answered every turn
+PASS  live          6s  every model read the prefix back from the cache
+PASS  shapes       11s  every shape carried the conversation, and both cached
+PASS  stop          8s  a finished answer, told from one the ceiling cut off
+PASS  tools        19s  every shape ran a tool, and a late answer drove a round
+PASS  image         8s  every shape carried the picture and replayed it
+PASS  cancel       12s  the call stopped when the caller did
+FLAKE queue         6s  one empty answer; passed on the next run, unchanged
+PASS  together    276s  a late answer and a typed message shared one line
+PASS  subagent      9s  a task went down, one answer came up, a call was sent away
+PASS  session      19s  the prefix held across 10 calls, a busy session refused
+PASS  resume        8s  the stored count is the provider's own
+PASS  clone         9s  every clone read its prefix and wrote next to nothing
+PASS  reasoning    24s  every shape took its own thinking back
+PASS  replay       25s  every shape took back thinking that had been stored
+PASS  compact      10s  the session compacted itself and kept what it was told
+PASS  models       10s  1 of 1 models answered every turn
+PASS  tool-matrix  18s  every model called every tool with a payload it could read
 ```
+
+`together` is the long one: it waits for three particular rounds, and a model
+that takes its time over one of them holds the whole run there.
 
 `models` fails about one run in five on a single third-party model that answers
 one turn with nothing. It is the model, not the package: the same model passes
 on the next run, and the failure is an empty answer rather than a refused call.
 
-Every run but two takes `KILO_MODEL`, and the sweep was run whole on a second
-model, `openai/gpt-5.6-luna`, on 2026-09-04. Thirteen of the fifteen passed
-unchanged. Both failures were the run's fault and neither was the package's:
+The sweep was run whole on a second model, `openai/gpt-5.6-luna`, on 2026-09-04,
+back when each run named its own. Thirteen of the fifteen passed unchanged. Both
+failures were the run's fault and neither was the package's:
 
 - `image` opened its session with a ceiling of 16 tokens, which a model that
   thinks spends before it says anything, so two shapes answered with nothing.
@@ -463,8 +485,30 @@ unchanged. Both failures were the run's fault and neither was the package's:
   subject missing and called it a defect. It names its model now, as
   `reasoning.ts` already did.
 
-Run the sweep on a second model after a change to the wire. A run tuned to one
-model's habits is a run that passes for the wrong reason.
+Moving the default to `z-ai/glm-5.3-flash` on 2026-09-05 found two more of the
+same kind, both fixed: `live` opened with a ceiling of 32 tokens and `cancel`
+with 16, and a model that thinks spends that before it says a word. **A live
+run that gives a model under 256 tokens is testing the ceiling, whether it means
+to or not.** The same move loosened `live`'s cache floor from 0.95 to 0.5: Haiku
+reads back over 0.99 of a prefix and glm reads 0.61 of the same conversation,
+because a provider caches at a granularity of its own. What the run defends is
+that the prefix was read rather than built again.
+
+### Nothing goes around the reading of `session.continued`
+
+`Effect.timeout(watch(...), '180 seconds')` reads like a deadline on collecting
+the rounds a session runs on its own. It is not one. Measured live on
+2026-09-05, three times each: with `Effect.timeout` around it the reading
+subscribes and then receives nothing at all, while the rounds run and the store
+fills; with `Stream.interruptAfter` inside it the stream ends at once and
+reports no rounds. Both put a race around the subscription to the session's
+feed, and the subscription's scope goes with the race.
+
+`e2e/rounds.ts` forks the reading bare and puts the deadline on the *waiting*
+for it, where a race costs nothing, and it reports what was collected before the
+deadline rather than throwing it away with the failure. Two rounds of three is a
+far better failure to read than none. A caller doing this in their own harness
+needs the same shape.
 
 
 `pnpm test:e2e` asks two questions in one session against the real gateway and
@@ -1154,8 +1198,8 @@ of the event stream rather than out of the arguments — a call the model did no
 wait for gets the still-running note — so the score is what the harness actually
 did.
 
-The models are the ten of `pnpm test:e2e:models` plus `anthropic/claude-haiku-4.5`,
-which is the one lab that list leaves out.
+The models are the sweep's own list — see "One model by default, eleven when you
+say so" — so `pnpm test:e2e:tool-matrix full` is the measurement below.
 
 Measured on 2026-09-04, eleven models, every shipped tool:
 

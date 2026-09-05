@@ -15,8 +15,8 @@ import { Duration, Effect, Fiber, Ref, Stream } from 'effect';
 import type { AbortLike, FetchLike } from '../src/core/fetch.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo, model } from './setup.js';
-import { failures, passed } from './report.js';
+import { kilo, models } from './setup.js';
+import { fail, passed, under } from './report.js';
 import { webFetch } from '../src/plugins/fetch/web.js';
 
 const system = 'You do exactly what you are told, at length, with no preamble.';
@@ -65,89 +65,99 @@ const until = (said: Ref.Ref<number>, target: number) =>
     })
   );
 
-const program = Effect.gen(function* () {
-  const session = yield* openSession({ system, model });
+const program = (model: string) =>
+  Effect.gen(function* () {
+    const session = yield* openSession({ system, model });
 
-  /* The baseline. It says how long the whole answer takes, so the cancelled
+    /* The baseline. It says how long the whole answer takes, so the cancelled
      run has something to be measured against. */
-  const whole = yield* Ref.make(0);
-  const started = Date.now();
-  yield* counted(session, whole);
-  const wholeMillis = since(started);
+    const whole = yield* Ref.make(0);
+    const started = Date.now();
+    yield* counted(session, whole);
+    const wholeMillis = since(started);
 
-  const cut = yield* Ref.make(0);
-  const cutSession = yield* openSession({ system, model });
-  const cutStarted = Date.now();
-  const reading = yield* Effect.fork(counted(cutSession, cut));
-  yield* until(cut, readBeforeLeaving);
-  yield* Fiber.interrupt(reading);
-  const cutMillis = since(cutStarted);
+    const cut = yield* Ref.make(0);
+    const cutSession = yield* openSession({ system, model });
+    const cutStarted = Date.now();
+    const reading = yield* Effect.fork(counted(cutSession, cut));
+    yield* until(cut, readBeforeLeaving);
+    yield* Fiber.interrupt(reading);
+    const cutMillis = since(cutStarted);
 
-  return {
-    whole: { said: yield* Ref.get(whole), millis: wholeMillis },
-    cut: { said: yield* Ref.get(cut), millis: cutMillis },
-    /* An interrupted exchange leaves nothing: the answer never arrived, and
+    return {
+      whole: { said: yield* Ref.get(whole), millis: wholeMillis },
+      cut: { said: yield* Ref.get(cut), millis: cutMillis },
+      /* An interrupted exchange leaves nothing: the answer never arrived, and
        the question goes back out with it. */
-    history: yield* cutSession.history,
-    /* The session must still work: a `busy` flag left set would strand it. */
-    after: yield* Stream.runFold(
-      cutSession.ask('Answer with the word: ok', { maxTokens: 16 }),
-      '',
-      (held, event) => (event.kind === 'delta' ? held + event.text : held)
-    ),
-  };
-});
+      history: yield* cutSession.history,
+      /* The session must still work: a `busy` flag left set would strand it. */
+      after: yield* Stream.runFold(
+        /* Room for a model that thinks before it answers: at 16 tokens a
+           reasoning model spends the lot on thinking and says nothing, which
+           reads as a stranded session and is not one. */
+        cutSession.ask('Answer with the word: ok', { maxTokens: 256 }),
+        '',
+        (held, event) => (event.kind === 'delta' ? held + event.text : held)
+      ),
+    };
+  });
 
-const result = await Effect.runPromise(Effect.scoped(Effect.provide(program, layers)));
+for (const model of models) {
+  under(model);
 
-const roles = result.history.map(turn => turn.role);
+  /* Every model starts from an empty pair of watch lists. */
+  signals.length = 0;
+  loose.length = 0;
 
-console.log('model         ', model);
-console.log('whole answer  ', result.whole.said, 'pieces in', result.whole.millis, 'ms');
-console.log('walked away   ', result.cut.said, 'pieces in', result.cut.millis, 'ms');
-console.log('turns kept    ', JSON.stringify(roles));
-console.log('asked again   ', JSON.stringify(result.after));
-console.log('signals       ', signals.map(signal => signal?.aborted ?? 'none').join(' '));
-console.log('loose errors  ', loose.length);
+  const result = await Effect.runPromise(Effect.scoped(Effect.provide(program(model), layers)));
 
-if (result.whole.said === 0) {
-  failures.push('the baseline answer carried no text, so there is nothing to compare against');
-}
-if (result.whole.said < readBeforeLeaving * 2) {
-  failures.push(
-    `the whole answer had ${String(result.whole.said)} pieces, which is too few to tell a ` +
-      'cancelled run from a finished one; ask for a longer answer'
-  );
-}
-if (result.cut.said < readBeforeLeaving) {
-  failures.push(
-    `the cancelled run read ${String(result.cut.said)} pieces, so it never got mid-stream and ` +
-      'the run only cancelled a request that had not started answering'
-  );
-}
-if (result.cut.said >= result.whole.said) {
-  failures.push(
-    `the cancelled run read ${String(result.cut.said)} pieces and the whole answer had ` +
-      `${String(result.whole.said)}, so nothing was cut short`
-  );
-}
-if (!signals.every(signal => signal?.aborted === true)) {
-  failures.push('a call ended with its signal not aborted, so the socket was left open');
-}
-if (roles.length !== 0) {
-  failures.push(
-    `the cancelled session kept ${JSON.stringify(roles)}; an interrupted exchange must leave ` +
-      'nothing, because a half written answer poisons the prefix and an unanswered question ' +
-      'goes back out with every later request'
-  );
-}
-if (result.after.length === 0) {
-  failures.push('the session could not be asked again after the cancellation');
-}
-if (loose.length > 0) {
-  failures.push(
-    `the abort left ${String(loose.length)} unhandled rejection(s): ${String(loose[0])}`
-  );
+  const roles = result.history.map(turn => turn.role);
+
+  console.log('model         ', model);
+  console.log('whole answer  ', result.whole.said, 'pieces in', result.whole.millis, 'ms');
+  console.log('walked away   ', result.cut.said, 'pieces in', result.cut.millis, 'ms');
+  console.log('turns kept    ', JSON.stringify(roles));
+  console.log('asked again   ', JSON.stringify(result.after));
+  console.log('signals       ', signals.map(signal => signal?.aborted ?? 'none').join(' '));
+  console.log('loose errors  ', loose.length);
+
+  if (result.whole.said === 0) {
+    fail('the baseline answer carried no text, so there is nothing to compare against');
+  }
+  if (result.whole.said < readBeforeLeaving * 2) {
+    fail(
+      `the whole answer had ${String(result.whole.said)} pieces, which is too few to tell a ` +
+        'cancelled run from a finished one; ask for a longer answer'
+    );
+  }
+  if (result.cut.said < readBeforeLeaving) {
+    fail(
+      `the cancelled run read ${String(result.cut.said)} pieces, so it never got mid-stream and ` +
+        'the run only cancelled a request that had not started answering'
+    );
+  }
+  if (result.cut.said >= result.whole.said) {
+    fail(
+      `the cancelled run read ${String(result.cut.said)} pieces and the whole answer had ` +
+        `${String(result.whole.said)}, so nothing was cut short`
+    );
+  }
+  if (!signals.every(signal => signal?.aborted === true)) {
+    fail('a call ended with its signal not aborted, so the socket was left open');
+  }
+  if (roles.length !== 0) {
+    fail(
+      `the cancelled session kept ${JSON.stringify(roles)}; an interrupted exchange must leave ` +
+        'nothing, because a half written answer poisons the prefix and an unanswered question ' +
+        'goes back out with every later request'
+    );
+  }
+  if (result.after.length === 0) {
+    fail('the session could not be asked again after the cancellation');
+  }
+  if (loose.length > 0) {
+    fail(`the abort left ${String(loose.length)} unhandled rejection(s): ${String(loose[0])}`);
+  }
 }
 
 passed('the call stopped when the caller did, and the session survived it.');

@@ -1,4 +1,4 @@
-import { Effect, Stream } from 'effect';
+import { Duration, Effect, Fiber, type Scope, Stream } from 'effect';
 import type { SessionHandle } from '../src/core/handle.js';
 import type { Continued } from '../src/core/queue.js';
 
@@ -41,12 +41,39 @@ const over = (one: Continued): boolean => {
  */
 const refused: (readonly string[])[] = [];
 
-/** Collects the rounds the session runs on its own, until `count` have ended. */
-const watch = (session: SessionHandle, count: number) => {
+/** A watch that has started: what it has seen, and the wait for the rest. */
+interface Watching {
+  /** The rounds seen so far. Complete once `done` has answered. */
+  readonly rounds: readonly Round[];
+  /** Waits for `count` rounds or for the deadline, and gives back the rounds. */
+  readonly done: Effect.Effect<readonly Round[]>;
+}
+
+/**
+ * Starts watching the rounds a session runs on its own, and hands back the
+ * wait for them.
+ *
+ * **Nothing goes around the reading of `session.continued`.** Both
+ * `Effect.timeout(...)` and `Stream.interruptAfter` read the same and are not:
+ * either one puts a race around the subscription to the session's feed, the
+ * scope of that subscription closes under the race, and the run then either
+ * ends at once with nothing or waits forever on a queue no publisher can reach.
+ * Measured against a live session on 2026-09-05, both ways, three times.
+ *
+ * So the reading is forked bare, and the deadline is on the waiting for it,
+ * where a race costs nothing. What was collected before the deadline is
+ * reported rather than thrown away with the failure: two rounds of three is a
+ * far better failure to read than none.
+ */
+const watch = (
+  session: SessionHandle,
+  count: number,
+  within: Duration.DurationInput = '180 seconds'
+): Effect.Effect<Watching, never, Scope.Scope> => {
   const rounds: Round[] = [];
   let ended = 0;
   const held = { answering: [] as readonly string[], text: '' };
-  return Stream.runForEach(
+  const reading = Stream.runForEach(
     Stream.takeUntil(session.continued, one => over(one) && ++ended === count),
     (one: Continued) =>
       Effect.sync(() => {
@@ -65,8 +92,18 @@ const watch = (session: SessionHandle, count: number) => {
           held.text = '';
         }
       })
-  ).pipe(Effect.as(rounds));
+  );
+  return Effect.map(
+    Effect.forkScoped(reading),
+    (fiber): Watching => ({
+      rounds,
+      done: Effect.raceFirst(Fiber.await(fiber), Effect.sleep(within)).pipe(
+        Effect.zipRight(Fiber.interrupt(fiber)),
+        Effect.as(rounds as readonly Round[])
+      ),
+    })
+  );
 };
 
-export type { Round };
+export type { Round, Watching };
 export { eventIn, over, refused, watch };

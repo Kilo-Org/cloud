@@ -25,7 +25,7 @@ import type { Turn, TurnPart } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { kilo } from './setup.js';
-import { failures, passed } from './report.js';
+import { fail, passed } from './report.js';
 
 /* Named here and not taken from the environment, as in `reasoning.ts`. What is
    under test is the seal, so a model that seals nothing would report the run's
@@ -122,7 +122,7 @@ for (const { kind, seals } of shapes) {
     console.log(`${kind.padEnd(18)}${String(written?.length ?? 'none').padEnd(14)}FAILED`);
     /* The whole point of the run. A seal the provider will not take back is a
        session that cannot be continued at all. */
-    failures.push(`${kind}: the reopened session was refused: ${why(reopened.left)}`);
+    fail(`${kind}: the reopened session was refused: ${why(reopened.left)}`);
     continue;
   }
 
@@ -134,19 +134,19 @@ for (const { kind, seals } of shapes) {
   );
 
   if (seals && written === undefined) {
-    failures.push(`${kind}: nothing was sealed, so this shape proves nothing`);
+    fail(`${kind}: nothing was sealed, so this shape proves nothing`);
   }
   if (read !== written) {
-    failures.push(`${kind}: the seal read back is not the seal that was written`);
+    fail(`${kind}: the seal read back is not the seal that was written`);
   }
   if (seals && reopened.right.loaded.length !== opened.parts.length) {
-    failures.push(
+    fail(
       `${kind}: the store gave back ${String(reopened.right.loaded.length)} reasoning parts ` +
         `where ${String(opened.parts.length)} were written`
     );
   }
   if (reopened.right.answer.said.length === 0) {
-    failures.push(`${kind}: the reopened session answered with nothing`);
+    fail(`${kind}: the reopened session answered with nothing`);
   }
 }
 

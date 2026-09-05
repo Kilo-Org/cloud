@@ -19,8 +19,8 @@ import type { ModelUsage } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { hitRatio } from '../src/core/usage.js';
-import { cachedSystem as system, kilo, model } from './setup.js';
-import { failures, passed } from './report.js';
+import { cachedSystem as system, kilo, models } from './setup.js';
+import { fail, passed, under } from './report.js';
 
 const questions = 10;
 
@@ -52,71 +52,77 @@ const words = [
 ] as const;
 const layers = kilo({ apiKinds: ['messages'] });
 
-const growing = Effect.gen(function* () {
-  const session = yield* openSession({ system, model, maxTokens: 64 });
-  const answers: Answer[] = [];
-  for (let index = 0; index < questions; index += 1) {
-    answers.push(yield* ask(session, `Answer with the word: ${words[index] ?? 'one'}`));
-  }
-  return answers;
-});
+const growing = (model: string) =>
+  Effect.gen(function* () {
+    const session = yield* openSession({ system, model, maxTokens: 64 });
+    const answers: Answer[] = [];
+    for (let index = 0; index < questions; index += 1) {
+      answers.push(yield* ask(session, `Answer with the word: ${words[index] ?? 'one'}`));
+    }
+    return answers;
+  });
 
 /**
  * Starts a question, waits for its first token so the session is provably mid
  * answer, then asks a second one on the same session. The second must be
  * refused. The first must still finish.
  */
-const racing = Effect.gen(function* () {
-  const session = yield* openSession({ system, model, maxTokens: 64 });
-  const started = yield* Effect.fork(
-    Stream.runCollect(Stream.take(session.ask('Answer with the word: one'), 1))
-  );
-  yield* Effect.sleep('300 millis');
-  const second = yield* Effect.either(Stream.runDrain(session.ask('Answer with the word: two')));
-  yield* started.await;
-  return second;
-});
-
-console.log('model', model, '\n');
-
-const answers = await Effect.runPromise(Effect.scoped(Effect.provide(growing, layers)));
-
-console.log('call  said     input  cache read  cache write  ratio');
-answers.forEach((answer, index) => {
-  const usage = answer.usage;
-  if (usage === undefined) {
-    failures.push(`call ${String(index + 1)} carried no token counts`);
-    return;
-  }
-  console.log(
-    `${String(index + 1).padEnd(6)}${JSON.stringify(answer.said).padEnd(9)}` +
-      `${String(usage.inputTokens).padEnd(7)}${String(usage.cacheReadTokens).padEnd(12)}` +
-      `${String(usage.cacheWriteTokens).padEnd(13)}${hitRatio(usage).toFixed(4)}`
-  );
-
-  if (answer.said.length === 0) {
-    failures.push(`call ${String(index + 1)} carried no text`);
-  }
-
-  /* The first call writes the whole prefix. Every call after it must be
-     reading far more than it writes: a large write later means the prefix
-     moved, which is the regression this run exists to catch. */
-  if (index > 0 && usage.cacheWriteTokens > usage.cacheReadTokens / 4) {
-    failures.push(
-      `call ${String(index + 1)} wrote ${String(usage.cacheWriteTokens)} against ` +
-        `${String(usage.cacheReadTokens)} read, so the prefix moved`
+const racing = (model: string) =>
+  Effect.gen(function* () {
+    const session = yield* openSession({ system, model, maxTokens: 64 });
+    const started = yield* Effect.fork(
+      Stream.runCollect(Stream.take(session.ask('Answer with the word: one'), 1))
     );
+    yield* Effect.sleep('300 millis');
+    const second = yield* Effect.either(Stream.runDrain(session.ask('Answer with the word: two')));
+    yield* started.await;
+    return second;
+  });
+
+for (const model of models) {
+  under(model);
+
+  console.log('model', model, '\n');
+
+  const answers = await Effect.runPromise(Effect.scoped(Effect.provide(growing(model), layers)));
+
+  console.log('call  said     input  cache read  cache write  ratio');
+  answers.forEach((answer, index) => {
+    const usage = answer.usage;
+    if (usage === undefined) {
+      fail(`call ${String(index + 1)} carried no token counts`);
+      return;
+    }
+    console.log(
+      `${String(index + 1).padEnd(6)}${JSON.stringify(answer.said).padEnd(9)}` +
+        `${String(usage.inputTokens).padEnd(7)}${String(usage.cacheReadTokens).padEnd(12)}` +
+        `${String(usage.cacheWriteTokens).padEnd(13)}${hitRatio(usage).toFixed(4)}`
+    );
+
+    if (answer.said.length === 0) {
+      fail(`call ${String(index + 1)} carried no text`);
+    }
+
+    /* The first call writes the whole prefix. Every call after it must be
+       reading far more than it writes: a large write later means the prefix
+       moved, which is the regression this run exists to catch. */
+    if (index > 0 && usage.cacheWriteTokens > usage.cacheReadTokens / 4) {
+      fail(
+        `call ${String(index + 1)} wrote ${String(usage.cacheWriteTokens)} against ` +
+          `${String(usage.cacheReadTokens)} read, so the prefix moved`
+      );
+    }
+  });
+
+  const refused = await Effect.runPromise(Effect.scoped(Effect.provide(racing(model), layers)));
+
+  console.log(
+    '\nsecond question while the first streamed:',
+    refused._tag === 'Left' ? refused.left._tag : 'it was accepted'
+  );
+  if (!(refused._tag === 'Left' && refused.left instanceof SessionBusyError)) {
+    fail('a second question was accepted while the first was still streaming');
   }
-});
-
-const refused = await Effect.runPromise(Effect.scoped(Effect.provide(racing, layers)));
-
-console.log(
-  '\nsecond question while the first streamed:',
-  refused._tag === 'Left' ? refused.left._tag : 'it was accepted'
-);
-if (!(refused._tag === 'Left' && refused.left instanceof SessionBusyError)) {
-  failures.push('a second question was accepted while the first was still streaming');
 }
 
-passed(`\nPASS: the prefix held across ${String(questions)} calls, and a busy session refused.`);
+passed(`the prefix held across ${String(questions)} calls, and a busy session refused`);

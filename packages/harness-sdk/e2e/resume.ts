@@ -19,8 +19,8 @@ import { SessionStore } from '../src/core/storage.js';
 import type { Turn } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
-import { everyShape, kilo, model } from './setup.js';
-import { failures, passed } from './report.js';
+import { everyShape, kilo, models } from './setup.js';
+import { fail, passed, under } from './report.js';
 
 const system = 'You answer briefly and remember what you are told.';
 
@@ -38,7 +38,10 @@ const store = layerNodeStore(database);
  * what varies, because it is the only thing the stored count is measured
  * against.
  */
-const under = <A, E>(contextWindow: number, use: Effect.Effect<A, E, ResumeContext>): Promise<A> =>
+const windowed = <A, E>(
+  contextWindow: number,
+  use: Effect.Effect<A, E, ResumeContext>
+): Promise<A> =>
   Effect.runPromise(
     Effect.scoped(
       Effect.provide(use, Layer.mergeAll(kilo({ apiKinds: everyShape, contextWindow }), store))
@@ -67,17 +70,18 @@ const summariesIn = (turns: readonly Turn[]): number => turns.filter(isSummary).
  * Plants the fact under a window nothing can fill, so this run ends with a
  * count and no summary. Then reads the session back out of the store.
  */
-const planted = Effect.gen(function* () {
-  const session = yield* openSession({ system, model });
-  const answer = yield* say(session, plant);
-  const stored = yield* Effect.flatMap(SessionStore, plugin => plugin.read(session.id));
-  return {
-    id: session.id,
-    prompted: answer.prompted,
-    stored: Option.getOrUndefined(stored)?.prompted,
-    summaries: summariesIn(yield* session.history),
-  };
-});
+const planted = (model: string) =>
+  Effect.gen(function* () {
+    const session = yield* openSession({ system, model });
+    const answer = yield* say(session, plant);
+    const stored = yield* Effect.flatMap(SessionStore, plugin => plugin.read(session.id));
+    return {
+      id: session.id,
+      prompted: answer.prompted,
+      stored: Option.getOrUndefined(stored)?.prompted,
+      summaries: summariesIn(yield* session.history),
+    };
+  });
 
 /** Reopens the session and asks for the fact back, whatever the window says. */
 const reopened = (sessionId: string) =>
@@ -88,61 +92,63 @@ const reopened = (sessionId: string) =>
     return { said: answer.said, before, after: summariesIn(yield* session.history) };
   });
 
-console.log('model', model, '\n');
+for (const model of models) {
+  under(model);
 
-const first = await under(1_000_000, planted);
+  console.log('model', model, '\n');
 
-/* The window this session is now measured against. Its own count fills it, so
-   a reopened session that reads the count compacts before it asks anything. */
-const tight = first.prompted;
-const roomy = first.prompted * 10;
+  const first = await windowed(1_000_000, planted(model));
 
-const narrow = await under(tight, reopened(first.id));
-const wide = await under(roomy, reopened(first.id));
+  /* The window this session is now measured against. Its own count fills it, so
+     a reopened session that reads the count compacts before it asks anything. */
+  const tight = first.prompted;
+  const roomy = first.prompted * 10;
 
-console.log('counted by the provider', first.prompted);
-console.log('read back from SQLite  ', first.stored);
-console.log('summaries after planting', first.summaries);
-console.log(`\nreopened under a window of ${String(tight)}`);
-console.log('  summaries before the question', narrow.before, 'after', narrow.after);
-console.log('  recalled', JSON.stringify(narrow.said));
-console.log(`\nreopened under a window of ${String(roomy)}`);
-console.log('  summaries before the question', wide.before, 'after', wide.after);
-console.log('  recalled', JSON.stringify(wide.said));
+  const narrow = await windowed(tight, reopened(first.id));
+  const wide = await windowed(roomy, reopened(first.id));
 
-if (first.prompted === 0) {
-  failures.push('the provider reported no input tokens, so this run measures nothing');
-}
-if (first.stored !== first.prompted) {
-  failures.push(
-    `the store holds ${String(first.stored)} where the provider counted ` +
-      `${String(first.prompted)}, so the count did not survive the write`
-  );
-}
-if (first.summaries !== 0) {
-  failures.push('the planting run compacted, so what follows is measured against a summary');
-}
-if (narrow.after <= narrow.before) {
-  failures.push(
-    'a session reopened onto a conversation that fills its window did not compact, ' +
-      'so it started from zero rather than from the stored count'
-  );
-}
-if (!narrow.said.includes('4417')) {
-  failures.push(
-    `the fact did not survive the reopen and the summary: the model answered ` +
-      `${JSON.stringify(narrow.said)}`
-  );
-}
-if (wide.after !== wide.before) {
-  /* The other direction. Without it, a session that compacted on every
-     question would pass the check above and be worse than the defect. */
-  failures.push('a session with room to spare compacted anyway');
-}
-if (!wide.said.includes('4417')) {
-  failures.push(
-    `the fact did not survive the reopen: the model answered ${JSON.stringify(wide.said)}`
-  );
+  console.log('counted by the provider', first.prompted);
+  console.log('read back from SQLite  ', first.stored);
+  console.log('summaries after planting', first.summaries);
+  console.log(`\nreopened under a window of ${String(tight)}`);
+  console.log('  summaries before the question', narrow.before, 'after', narrow.after);
+  console.log('  recalled', JSON.stringify(narrow.said));
+  console.log(`\nreopened under a window of ${String(roomy)}`);
+  console.log('  summaries before the question', wide.before, 'after', wide.after);
+  console.log('  recalled', JSON.stringify(wide.said));
+
+  if (first.prompted === 0) {
+    fail('the provider reported no input tokens, so this run measures nothing');
+  }
+  if (first.stored !== first.prompted) {
+    fail(
+      `the store holds ${String(first.stored)} where the provider counted ` +
+        `${String(first.prompted)}, so the count did not survive the write`
+    );
+  }
+  if (first.summaries !== 0) {
+    fail('the planting run compacted, so what follows is measured against a summary');
+  }
+  if (narrow.after <= narrow.before) {
+    fail(
+      'a session reopened onto a conversation that fills its window did not compact, ' +
+        'so it started from zero rather than from the stored count'
+    );
+  }
+  if (!narrow.said.includes('4417')) {
+    fail(
+      `the fact did not survive the reopen and the summary: the model answered ` +
+        `${JSON.stringify(narrow.said)}`
+    );
+  }
+  if (wide.after !== wide.before) {
+    /* The other direction. Without it, a session that compacted on every
+       question would pass the check above and be worse than the defect. */
+    fail('a session with room to spare compacted anyway');
+  }
+  if (!wide.said.includes('4417')) {
+    fail(`the fact did not survive the reopen: the model answered ${JSON.stringify(wide.said)}`);
+  }
 }
 
 passed('the stored count is the provider’s own, and it decides what happens next.');

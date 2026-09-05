@@ -29,8 +29,8 @@ import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, questionTool } from '../src/plugins/tools/question.js';
-import { kilo, model } from './setup.js';
-import { failures, passed } from './report.js';
+import { kilo, models } from './setup.js';
+import { fail, passed } from './report.js';
 
 const system =
   'You are a test harness with tools. Call a tool whenever one answers the ' +
@@ -74,7 +74,7 @@ const withTools = (kind: ApiKind, tools: readonly Tool[]) =>
   Layer.merge(kilo({ apiKinds: [kind] }), Layer.succeed(ToolRegistry, { tools }));
 
 /** One round on one shape: the model calls, reads, and answers with the word. */
-const runShape = async (kind: ApiKind): Promise<void> => {
+const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: 256, tools: ['weather'] });
@@ -86,20 +86,20 @@ const runShape = async (kind: ApiKind): Promise<void> => {
 
   if (answer._tag === 'Left') {
     console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(answer.left)}`);
-    failures.push(`${kind}: the round failed`);
+    fail(`${kind}: the round failed`);
     return;
   }
   console.log(`${kind.padEnd(18)}${String(ran.length).padEnd(10)}${JSON.stringify(answer.right)}`);
   if (ran.length !== 1) {
-    failures.push(`${kind}: the tool ran ${String(ran.length)} times, not once`);
+    fail(`${kind}: the tool ran ${String(ran.length)} times, not once`);
   }
   if (!answer.right.includes('kestrel')) {
-    failures.push(`${kind}: the answer did not carry what the tool said`);
+    fail(`${kind}: the answer did not carry what the tool said`);
   }
 };
 
 /** Two calls in one turn have to overlap, or a slow tool costs the wall clock. */
-const runTogether = async (): Promise<void> => {
+const runTogether = async (model: string): Promise<void> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: 256, tools: ['weather'] });
@@ -111,13 +111,13 @@ const runTogether = async (): Promise<void> => {
 
   const [first, second] = [...ran].sort((one, other) => one.at - other.at);
   if (first === undefined || second === undefined) {
-    failures.push(`two cities produced ${String(ran.length)} calls, not two`);
+    fail(`two cities produced ${String(ran.length)} calls, not two`);
     return;
   }
   const overlap = first.done - second.at;
   console.log(`\ntwo calls in one turn overlapped by ${String(overlap)}ms`);
   if (overlap <= 0) {
-    failures.push('the calls of one turn ran one after the other');
+    fail('the calls of one turn ran one after the other');
   }
 };
 
@@ -128,7 +128,7 @@ const runTogether = async (): Promise<void> => {
  * are asked. The model must be told the question is out, answer without it, and
  * then be asked again on its own when the answer lands.
  */
-const runBackgrounded = async (): Promise<void> => {
+const runBackgrounded = async (model: string): Promise<void> => {
   const asker: Asker = questions =>
     Effect.as(
       Effect.sleep('3 seconds'),
@@ -175,7 +175,7 @@ const runBackgrounded = async (): Promise<void> => {
 
   if (got._tag === 'Left') {
     console.log(`\nbackgrounded      FAILED    ${JSON.stringify(got.left)}`);
-    failures.push('the backgrounded round failed');
+    fail('the backgrounded round failed');
     return;
   }
 
@@ -185,10 +185,10 @@ const runBackgrounded = async (): Promise<void> => {
   console.log(`told later:        ${JSON.stringify(told)}`);
 
   if (first.includes('ultramarine')) {
-    failures.push('the model was given the answer inline, so nothing was backgrounded');
+    fail('the model was given the answer inline, so nothing was backgrounded');
   }
   if (!told.includes('ultramarine')) {
-    failures.push('the session never told the model what the person answered');
+    fail('the session never told the model what the person answered');
   }
 };
 
@@ -201,7 +201,7 @@ const runBackgrounded = async (): Promise<void> => {
  * the model's own `wait: false` moves it on — and the answer still arrives, in
  * a round of its own, exactly as a deadline's would.
  */
-const runWanted = async (): Promise<void> => {
+const runWanted = async (model: string): Promise<void> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({
@@ -237,7 +237,7 @@ const runWanted = async (): Promise<void> => {
 
   if (got._tag === 'Left') {
     console.log(`\nwait: false       FAILED    ${JSON.stringify(got.left)}`);
-    failures.push('the round the model chose not to wait for failed');
+    fail('the round the model chose not to wait for failed');
     return;
   }
 
@@ -247,22 +247,24 @@ const runWanted = async (): Promise<void> => {
   console.log(`told later:        ${JSON.stringify(told)}`);
 
   if (first.includes('kestrel')) {
-    failures.push('the model waited for the call, so it never set wait to false');
+    fail('the model waited for the call, so it never set wait to false');
   }
   if (!told.includes('kestrel')) {
-    failures.push('the call the model walked away from never came back');
+    fail('the call the model walked away from never came back');
   }
 };
 
-console.log('model', model);
-console.log('\nshape             calls     answered');
+for (const model of models) {
+  console.log('model', model);
+  console.log('\nshape             calls     answered');
 
-for (const kind of ['messages', 'responses', 'chat_completions'] as const) {
-  await runShape(kind);
+  for (const kind of ['messages', 'responses', 'chat_completions'] as const) {
+    await runShape(model, kind);
+  }
+  await runTogether(model);
+  await runBackgrounded(model);
+  await runWanted(model);
 }
-await runTogether();
-await runBackgrounded();
-await runWanted();
 
 passed(
   'every shape ran a tool, the calls overlapped, a late answer drove a round, and the model chose not to wait.'

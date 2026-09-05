@@ -33,8 +33,8 @@ import {
   type Question,
   questionTool,
 } from '../src/plugins/tools/question.js';
-import { kilo, model } from './setup.js';
-import { passed, wrongIf } from './report.js';
+import { kilo, models } from './setup.js';
+import { passed, under, wrongIf } from './report.js';
 import { refused, watch, type Round } from './rounds.js';
 
 const system =
@@ -111,122 +111,128 @@ const untilAnswerWaits = (session: SessionHandle) =>
 const answerIn = (waiting: readonly Waiting[]): Waiting | undefined =>
   waiting.find(one => one.kind === 'toolResult');
 
-const program = Effect.gen(function* () {
-  const session = yield* openSession({
-    system,
-    model,
-    maxTokens: 512,
-    tools: ['question', 'wait'],
+const program = (model: string) =>
+  Effect.gen(function* () {
+    const session = yield* openSession({
+      system,
+      model,
+      maxTokens: 512,
+      tools: ['question', 'wait'],
+    });
+    const watching = yield* watch(session, 3, '180 seconds');
+    const first = yield* said(session.ask(opening));
+    /* The question is still out: the asker sleeps longer than the model waited. */
+    const long = yield* session.queue(slowly);
+    const waiting = yield* untilAnswerWaits(session);
+    const last = yield* session.queue(after);
+    const both = yield* session.queued;
+    const rounds = yield* watching.done;
+    return { first, long, last, waiting, both, rounds };
   });
-  const watching = yield* Effect.fork(Effect.timeout(watch(session, 3), '180 seconds'));
-  const first = yield* said(session.ask(opening));
-  /* The question is still out: the asker sleeps longer than the model waited. */
-  const long = yield* session.queue(slowly);
-  const waiting = yield* untilAnswerWaits(session);
-  const last = yield* session.queue(after);
-  const both = yield* session.queued;
-  const rounds = yield* watching.await;
-  return { first, long, last, waiting, both, rounds };
-});
+for (const model of models) {
+  under(model);
 
-const got = await Effect.runPromise(
-  Effect.scoped(Effect.provide(program, tools.pipe(Layer.merge(kilo()))))
-);
+  /* What the tool was asked, from this model only. */
+  takenUp.length = 0;
 
-const rounds = got.rounds._tag === 'Success' ? got.rounds.value : [];
-const askedFor = takenUp[0] ?? [];
+  const got = await Effect.runPromise(
+    Effect.scoped(Effect.provide(program(model), tools.pipe(Layer.merge(kilo()))))
+  );
 
-const answered = answerIn(got.waiting);
+  const rounds = got.rounds;
+  const askedFor = takenUp[0] ?? [];
 
-/**
- * Every identifier waiting in the line, in the order it joined.
- *
- * An identifier is made when its entry joins and sorts by when it was made, so
- * sorting them is the join order. Reading it off a snapshot of the line would
- * not do: by the time the caller looks, the session may already have taken the
- * first one out.
- */
-const joined = [got.long, got.last, answered?.id ?? ''].filter(id => id !== '').toSorted();
+  const answered = answerIn(got.waiting);
 
-/** What one identifier stands for, in words, so a failure reads as an order. */
-const idMarks = (id: string | undefined): string => {
-  if (id === got.long) {
-    return 'the slow message';
+  /**
+   * Every identifier waiting in the line, in the order it joined.
+   *
+   * An identifier is made when its entry joins and sorts by when it was made, so
+   * sorting them is the join order. Reading it off a snapshot of the line would
+   * not do: by the time the caller looks, the session may already have taken the
+   * first one out.
+   */
+  const joined = [got.long, got.last, answered?.id ?? ''].filter(id => id !== '').toSorted();
+
+  /** What one identifier stands for, in words, so a failure reads as an order. */
+  const idMarks = (id: string | undefined): string => {
+    if (id === got.long) {
+      return 'the slow message';
+    }
+    if (id === got.last) {
+      return 'the message typed after';
+    }
+    return 'the late answer';
+  };
+
+  const marks = (round: Round | undefined): string => idMarks(round?.answering[0]);
+
+  /** What the session said in the round that answered one identifier. */
+  const textFor = (id: string): string | undefined =>
+    rounds.find(round => round.answering.includes(id))?.text;
+
+  console.log('model', model);
+  console.log(`\nasked in one call: ${String(askedFor.length)} questions`);
+  for (const question of askedFor) {
+    const choices = (question.choices ?? []).map(one => one.value).join(', ');
+    console.log(`  [${question.id}] ${question.prompt} {${choices}}`);
   }
-  if (id === got.last) {
-    return 'the message typed after';
+  console.log(`\nanswered without waiting: ${JSON.stringify(got.first.trim())}`);
+  console.log(
+    `\nthe line, once the answer had joined it: ${JSON.stringify(got.waiting.map(one => one.kind))}`
+  );
+  console.log(
+    `and once a message was typed after it:  ${JSON.stringify(got.both.map(one => one.kind))}`
+  );
+  for (const [at, round] of rounds.entries()) {
+    const text = round.text.trim().replaceAll('\n', ' ');
+    const shown = text.length > 90 ? `${text.slice(0, 90)}…` : text;
+    console.log(`\nround ${String(at + 1)} (${marks(round)}): ${JSON.stringify(shown)}`);
   }
-  return 'the late answer';
-};
 
-const marks = (round: Round | undefined): string => idMarks(round?.answering[0]);
+  wrongIf(takenUp.length !== 1, `the tool was called ${String(takenUp.length)} times, not once`);
+  wrongIf(askedFor.length < 2, 'the model did not put both questions in one call');
+  wrongIf(
+    !askedFor.some(question => (question.choices ?? []).length > 1),
+    'the model asked nothing with choices, so the richer shape never ran'
+  );
+  wrongIf(
+    got.first.toLowerCase().includes('ultramarine'),
+    'the model was given the answer inline, so nothing was backgrounded'
+  );
+  wrongIf(
+    answered === undefined,
+    'the answer never waited in the line, so nothing ever contended for it'
+  );
+  wrongIf(
+    rounds.length !== 3,
+    `the session ran ${String(rounds.length)} rounds of its own, not three`
+  );
+  /* The one claim this run exists for. The identifiers are made in the order
+     they join the line and sort that way, so their order is the order the
+     session owes them, whatever the model's speed did to the clock. */
+  wrongIf(
+    JSON.stringify(rounds.map(round => round.answering)) !== JSON.stringify(joined.map(id => [id])),
+    `the rounds answered ${JSON.stringify(rounds.map(marks))}, not ${JSON.stringify(joined.map(idMarks))}`
+  );
+  wrongIf(
+    !(textFor(got.long) ?? '').toLowerCase().includes('narwhal'),
+    'the message that held the session open was not answered'
+  );
+  wrongIf(
+    !(textFor(answered?.id ?? '') ?? '').toLowerCase().includes('ultramarine'),
+    'the session never told the model what the person answered'
+  );
+  wrongIf(
+    !(textFor(got.last) ?? '').toLowerCase().includes('pelican'),
+    'the message typed after the answer was never answered'
+  );
 
-/** What the session said in the round that answered one identifier. */
-const textFor = (id: string): string | undefined =>
-  rounds.find(round => round.answering.includes(id))?.text;
-
-console.log('model', model);
-console.log(`\nasked in one call: ${String(askedFor.length)} questions`);
-for (const question of askedFor) {
-  const choices = (question.choices ?? []).map(one => one.value).join(', ');
-  console.log(`  [${question.id}] ${question.prompt} {${choices}}`);
+  wrongIf(
+    refused.length > 0,
+    `the session was refused ${String(refused.length)} of the rounds it ran on its own`
+  );
 }
-console.log(`\nanswered without waiting: ${JSON.stringify(got.first.trim())}`);
-console.log(
-  `\nthe line, once the answer had joined it: ${JSON.stringify(got.waiting.map(one => one.kind))}`
-);
-console.log(
-  `and once a message was typed after it:  ${JSON.stringify(got.both.map(one => one.kind))}`
-);
-for (const [at, round] of rounds.entries()) {
-  const text = round.text.trim().replaceAll('\n', ' ');
-  const shown = text.length > 90 ? `${text.slice(0, 90)}…` : text;
-  console.log(`\nround ${String(at + 1)} (${marks(round)}): ${JSON.stringify(shown)}`);
-}
-
-wrongIf(takenUp.length !== 1, `the tool was called ${String(takenUp.length)} times, not once`);
-wrongIf(askedFor.length < 2, 'the model did not put both questions in one call');
-wrongIf(
-  !askedFor.some(question => (question.choices ?? []).length > 1),
-  'the model asked nothing with choices, so the richer shape never ran'
-);
-wrongIf(
-  got.first.toLowerCase().includes('ultramarine'),
-  'the model was given the answer inline, so nothing was backgrounded'
-);
-wrongIf(
-  answered === undefined,
-  'the answer never waited in the line, so nothing ever contended for it'
-);
-wrongIf(got.rounds._tag !== 'Success', 'the session never finished three rounds of its own');
-wrongIf(
-  rounds.length !== 3,
-  `the session ran ${String(rounds.length)} rounds of its own, not three`
-);
-/* The one claim this run exists for. The identifiers are made in the order
-   they join the line and sort that way, so their order is the order the
-   session owes them, whatever the model's speed did to the clock. */
-wrongIf(
-  JSON.stringify(rounds.map(round => round.answering)) !== JSON.stringify(joined.map(id => [id])),
-  `the rounds answered ${JSON.stringify(rounds.map(marks))}, not ${JSON.stringify(joined.map(idMarks))}`
-);
-wrongIf(
-  !(textFor(got.long) ?? '').toLowerCase().includes('narwhal'),
-  'the message that held the session open was not answered'
-);
-wrongIf(
-  !(textFor(answered?.id ?? '') ?? '').toLowerCase().includes('ultramarine'),
-  'the session never told the model what the person answered'
-);
-wrongIf(
-  !(textFor(got.last) ?? '').toLowerCase().includes('pelican'),
-  'the message typed after the answer was never answered'
-);
-
-wrongIf(
-  refused.length > 0,
-  `the session was refused ${String(refused.length)} of the rounds it ran on its own`
-);
 
 passed(
   'two questions went out in one call, and a late answer and a typed ' +

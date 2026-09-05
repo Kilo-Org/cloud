@@ -31,8 +31,8 @@ import { continueSession } from '../src/core/resume.js';
 import { openSession } from '../src/core/run.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import type { Turn } from '../src/core/turn.js';
-import { kilo, model } from './setup.js';
-import { failures, passed, wrongIf } from './report.js';
+import { kilo, models } from './setup.js';
+import { fail, passed, under, wrongIf } from './report.js';
 import { refused, watch } from './rounds.js';
 
 /* Terse, and told to repeat itself when asked. The transcript test turns on
@@ -96,107 +96,117 @@ const askAndHand = (session: SessionHandle) =>
     return { said: held.text, handed: held.handed };
   });
 
-const program = Effect.gen(function* () {
-  const session = yield* openSession({
-    system,
-    model,
-    maxTokens: 64,
-  });
-  /* Watch first. The rounds run whether or not anybody listens. */
-  const watching = yield* Effect.fork(Effect.timeout(watch(session, 2), '120 seconds'));
-  const { said, handed } = yield* askAndHand(session);
-  const rounds = yield* watching.await;
-  /* Reopened from the store, which is the only place the rounds the session ran
+const program = (model: string) =>
+  Effect.gen(function* () {
+    const session = yield* openSession({
+      system,
+      model,
+      maxTokens: 64,
+    });
+    /* Watch first. The rounds run whether or not anybody listens. */
+    const watching = yield* watch(session, 2, '120 seconds');
+    const { said, handed } = yield* askAndHand(session);
+    const rounds = yield* watching.done;
+    /* Reopened from the store, which is the only place the rounds the session ran
      on its own could have gone. */
-  const reopened = yield* continueSession(session.id);
-  return {
-    said,
-    handed,
-    rounds,
-    left: yield* session.queued,
-    history: yield* session.history,
-    stored: yield* reopened.history,
-  };
-});
+    const reopened = yield* continueSession(session.id);
+    return {
+      said,
+      handed,
+      rounds,
+      left: yield* session.queued,
+      history: yield* session.history,
+      stored: yield* reopened.history,
+    };
+  });
 
-const database = new DatabaseSync(':memory:');
+for (const model of models) {
+  under(model);
 
-const got = await Effect.runPromise(
-  Effect.scoped(Effect.provide(program, Layer.merge(kilo(), layerNodeStore(database))))
-);
+  const database = new DatabaseSync(':memory:');
 
-const { handed } = got;
-const rounds = got.rounds._tag === 'Success' ? got.rounds.value : [];
-const wordsIn = (turns: readonly Turn[]): readonly string[] =>
-  turns
-    .filter(turn => turn.role === 'user')
-    .map(turn => turn.parts.map(part => part.body).join(''));
+  const got = await Effect.runPromise(
+    Effect.scoped(Effect.provide(program(model), Layer.merge(kilo(), layerNodeStore(database))))
+  );
 
-const spoken = wordsIn(got.history);
+  const { handed } = got;
+  const rounds = got.rounds;
+  const wordsIn = (turns: readonly Turn[]): readonly string[] =>
+    turns
+      .filter(turn => turn.role === 'user')
+      .map(turn => turn.parts.map(part => part.body).join(''));
 
-console.log('model', model);
-console.log(`\nasked while free:  ${JSON.stringify(got.said.trim())}`);
-for (const [at, round] of rounds.entries()) {
-  console.log(`round ${String(at + 1)} answered:  ${JSON.stringify(round.text.trim())}`);
+  const spoken = wordsIn(got.history);
+
+  console.log('model', model);
+  console.log(`\nasked while free:  ${JSON.stringify(got.said.trim())}`);
+  for (const [at, round] of rounds.entries()) {
+    console.log(`round ${String(at + 1)} answered:  ${JSON.stringify(round.text.trim())}`);
+  }
+  console.log(`\nwaiting while busy: ${JSON.stringify((handed?.waiting ?? []).map(textOf))}`);
+  console.log(`took one back: ${String(handed?.tookBack)}, and again: ${String(handed?.twice)}`);
+  console.log(`left in the line: ${String(got.left.length)}`);
+  console.log(`what the session was asked: ${JSON.stringify(spoken)}`);
+  console.log(`turns held by the store: ${String(got.stored.length)}`);
+
+  if (handed === undefined) {
+    fail('the first answer streamed no event, so nothing was ever handed over');
+  }
+
+  wrongIf(
+    !got.said.toLowerCase().includes('ferret'),
+    'the first answer was not the word asked for'
+  );
+  wrongIf(
+    (handed?.waiting ?? []).length !== 3,
+    `the line held ${String((handed?.waiting ?? []).length)} messages while busy, not three`
+  );
+  wrongIf(
+    JSON.stringify((handed?.waiting ?? []).map(textOf)) !==
+      JSON.stringify([repeating, dropped, closing]),
+    'the line was not in the order it formed'
+  );
+  wrongIf(handed?.tookBack !== true, 'cancelling a waiting message did not take it back');
+  wrongIf(handed?.twice !== false, 'cancelling the same message twice said it took it back again');
+  wrongIf(
+    rounds.length !== 2,
+    `the session ran ${String(rounds.length)} rounds of its own, not two`
+  );
+  wrongIf(
+    !(rounds[0]?.text ?? '').toLowerCase().includes('ferret'),
+    'the first queued message was not answered from this session’s transcript'
+  );
+  wrongIf(
+    !(rounds[1]?.text ?? '').toLowerCase().includes('badger'),
+    'the second queued message was not answered'
+  );
+  wrongIf(
+    rounds[0]?.answering[0] !== handed?.first || rounds[1]?.answering[0] !== handed?.second,
+    'a round did not name the message it answers'
+  );
+  wrongIf(
+    spoken.some(text => text.includes('pangolin')),
+    'the cancelled message was said to the model anyway'
+  );
+  wrongIf(
+    JSON.stringify(spoken) !== JSON.stringify([opening, repeating, closing]),
+    'the session was not asked the three messages, in the order they joined'
+  );
+  wrongIf(got.left.length !== 0, 'the line still holds a message the session never asked');
+  wrongIf(
+    JSON.stringify(wordsIn(got.stored)) !== JSON.stringify(spoken),
+    'the session reopened from the store without the rounds it ran on its own'
+  );
+  wrongIf(
+    got.stored.length !== got.history.length,
+    `the store held ${String(got.stored.length)} turns, not the ${String(got.history.length)} the session had`
+  );
+
+  wrongIf(
+    refused.length > 0,
+    `the session was refused ${String(refused.length)} of the rounds it ran on its own`
+  );
 }
-console.log(`\nwaiting while busy: ${JSON.stringify((handed?.waiting ?? []).map(textOf))}`);
-console.log(`took one back: ${String(handed?.tookBack)}, and again: ${String(handed?.twice)}`);
-console.log(`left in the line: ${String(got.left.length)}`);
-console.log(`what the session was asked: ${JSON.stringify(spoken)}`);
-console.log(`turns held by the store: ${String(got.stored.length)}`);
-
-if (handed === undefined) {
-  failures.push('the first answer streamed no event, so nothing was ever handed over');
-}
-
-wrongIf(!got.said.toLowerCase().includes('ferret'), 'the first answer was not the word asked for');
-wrongIf(
-  (handed?.waiting ?? []).length !== 3,
-  `the line held ${String((handed?.waiting ?? []).length)} messages while busy, not three`
-);
-wrongIf(
-  JSON.stringify((handed?.waiting ?? []).map(textOf)) !==
-    JSON.stringify([repeating, dropped, closing]),
-  'the line was not in the order it formed'
-);
-wrongIf(handed?.tookBack !== true, 'cancelling a waiting message did not take it back');
-wrongIf(handed?.twice !== false, 'cancelling the same message twice said it took it back again');
-wrongIf(got.rounds._tag !== 'Success', 'the session never finished two rounds of its own');
-wrongIf(rounds.length !== 2, `the session ran ${String(rounds.length)} rounds of its own, not two`);
-wrongIf(
-  !(rounds[0]?.text ?? '').toLowerCase().includes('ferret'),
-  'the first queued message was not answered from this session’s transcript'
-);
-wrongIf(
-  !(rounds[1]?.text ?? '').toLowerCase().includes('badger'),
-  'the second queued message was not answered'
-);
-wrongIf(
-  rounds[0]?.answering[0] !== handed?.first || rounds[1]?.answering[0] !== handed?.second,
-  'a round did not name the message it answers'
-);
-wrongIf(
-  spoken.some(text => text.includes('pangolin')),
-  'the cancelled message was said to the model anyway'
-);
-wrongIf(
-  JSON.stringify(spoken) !== JSON.stringify([opening, repeating, closing]),
-  'the session was not asked the three messages, in the order they joined'
-);
-wrongIf(got.left.length !== 0, 'the line still holds a message the session never asked');
-wrongIf(
-  JSON.stringify(wordsIn(got.stored)) !== JSON.stringify(spoken),
-  'the session reopened from the store without the rounds it ran on its own'
-);
-wrongIf(
-  got.stored.length !== got.history.length,
-  `the store held ${String(got.stored.length)} turns, not the ${String(got.history.length)} the session had`
-);
-
-wrongIf(
-  refused.length > 0,
-  `the session was refused ${String(refused.length)} of the rounds it ran on its own`
-);
 
 passed(
   'two messages were handed over while busy, one was taken back, and the ' +

@@ -19,8 +19,8 @@ import { said } from '../src/core/model.js';
 import { openSession } from '../src/core/run.js';
 import type { PartDraft } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
-import { kilo, model } from './setup.js';
-import { failures, passed } from './report.js';
+import { kilo, models } from './setup.js';
+import { fail, passed, under } from './report.js';
 
 const system =
   'You look at pictures and answer about them. ' +
@@ -46,7 +46,7 @@ const pictureOf = async (colour: string): Promise<PartDraft> => ({
 const say = (session: SessionHandle, input: string | readonly PartDraft[]) =>
   said(session.ask(input));
 
-const runShape = async (kind: ApiKind, colour: string) => {
+const runShape = async (model: string, kind: ApiKind, colour: string) => {
   const layers = kilo({ apiKinds: [kind] });
 
   const picture = await pictureOf(colour);
@@ -73,29 +73,33 @@ const runShape = async (kind: ApiKind, colour: string) => {
 
 const word = (said: string) => said.toLowerCase().replaceAll(/[^a-z]/gu, '');
 
-console.log('model', model);
-console.log('\nshape             sent      named     background');
+for (const model of models) {
+  under(model);
 
-for (const { kind, colour } of shapes) {
-  const result = await runShape(kind, colour);
-  if (result._tag === 'Left') {
-    console.log(`${kind.padEnd(18)}${colour.padEnd(10)}FAILED    ${JSON.stringify(result.left)}`);
-    failures.push(`${kind}: the call failed`);
-    continue;
-  }
+  console.log('model', model);
+  console.log('\nshape             sent      named     background');
 
-  const named = word(result.right.named);
-  const background = word(result.right.background);
-  console.log(`${kind.padEnd(18)}${colour.padEnd(10)}${named.padEnd(10)}${background}`);
+  for (const { kind, colour } of shapes) {
+    const result = await runShape(model, kind, colour);
+    if (result._tag === 'Left') {
+      console.log(`${kind.padEnd(18)}${colour.padEnd(10)}FAILED    ${JSON.stringify(result.left)}`);
+      fail(`${kind}: the call failed`);
+      continue;
+    }
 
-  if (named !== colour) {
-    failures.push(`${kind}: the picture was ${colour} and the model said ${JSON.stringify(named)}`);
-  }
-  if (background !== 'white') {
-    failures.push(
-      `${kind}: the background is white and the model said ${JSON.stringify(background)}, ` +
-        'so the picture did not survive into the second request'
-    );
+    const named = word(result.right.named);
+    const background = word(result.right.background);
+    console.log(`${kind.padEnd(18)}${colour.padEnd(10)}${named.padEnd(10)}${background}`);
+
+    if (named !== colour) {
+      fail(`${kind}: the picture was ${colour} and the model said ${JSON.stringify(named)}`);
+    }
+    if (background !== 'white') {
+      fail(
+        `${kind}: the background is white and the model said ${JSON.stringify(background)}, ` +
+          'so the picture did not survive into the second request'
+      );
+    }
   }
 }
 

@@ -20,6 +20,7 @@ const DEADLINES_KEY = 'deadlines';
 const LOG_KEY = 'transition_log';
 const CREDENTIAL_GRANTS_KEY = 'worktree_credential_grants';
 const RUNTIME_METADATA_KEY = 'runtime_metadata';
+const NATIVE_RUNTIME_RETIREMENTS_KEY = 'native_runtime_retirements';
 
 type ControlStorage = {
   get<T = unknown>(key: string): Promise<T | undefined>;
@@ -52,8 +53,44 @@ const sessionRouteSchema = z.object({
   lastStateAt: timestampSchema.nullable(),
   idleForMs: z.number().int().nonnegative().nullable(),
   waitingOn: z.enum(['model', 'tool', 'finalizing', 'preparation', 'input']).nullable(),
+  nativeRuntimeId: z.string().uuid().optional(),
+  retiringNativeRuntimeId: z.string().uuid().optional(),
 });
 const routeTableSchema = z.array(sessionRouteSchema);
+const nativeRuntimeRetirementRecipientSchema = sessionRouteSchema.pick({
+  sessionId: true,
+  kiloSessionId: true,
+  directory: true,
+  worktreeId: true,
+  ownerId: true,
+  nativeRuntimeId: true,
+});
+const nativeRuntimeRetirementSchema = z.object({
+  directory: z.string().min(1),
+  nativeRuntimeId: z.string().uuid(),
+  allocation: z.object({
+    providerRef: z.string().min(1),
+    createIntentId: z.string().min(1).optional(),
+  }),
+  connection: z.object({
+    connectionId: z.string().uuid(),
+    providerInstanceId: z.string().min(1),
+    wrapperInstanceId: z.string().uuid(),
+  }),
+  recipients: z.array(nativeRuntimeRetirementRecipientSchema).min(1),
+  reason: z.string().min(1).max(256),
+  cleanupDeadlineAt: timestampSchema,
+  replayUntil: timestampSchema,
+  attempts: z.number().int().nonnegative(),
+  nextAttemptAt: timestampSchema.optional(),
+  notificationAttempts: z.number().int().nonnegative().default(0),
+  nextNotificationAttemptAt: timestampSchema.optional(),
+  notificationState: z.enum(['pending', 'delivered', 'exhausted']).default('pending'),
+  state: z.enum(['pending', 'completed', 'released', 'unconfirmed']),
+  disposition: z.enum(['pending', 'retired', 'operation_only', 'physical_fallback']),
+});
+
+export type NativeRuntimeRetirementReceipt = z.infer<typeof nativeRuntimeRetirementSchema>;
 
 export type StoredSandboxControlState = {
   physical: PhysicalRecord | null;
@@ -134,6 +171,25 @@ export async function saveRouteTable(
   await storage.put(ROUTES_KEY, [...table.values()]);
 }
 
+export async function loadNativeRuntimeRetirements(
+  storage: ControlStorage
+): Promise<NativeRuntimeRetirementReceipt[]> {
+  const stored = await storage.get(NATIVE_RUNTIME_RETIREMENTS_KEY);
+  const parsed = nativeRuntimeRetirementSchema.array().safeParse(stored ?? []);
+  if (!parsed.success) throw new Error('Invalid native runtime retirement receipts');
+  return parsed.data;
+}
+
+export async function saveNativeRuntimeRetirements(
+  storage: ControlStorage,
+  receipts: NativeRuntimeRetirementReceipt[]
+): Promise<void> {
+  await storage.put(
+    NATIVE_RUNTIME_RETIREMENTS_KEY,
+    nativeRuntimeRetirementSchema.array().parse(receipts)
+  );
+}
+
 export async function loadDeadlines(storage: ControlStorage): Promise<DeadlineTable> {
   return (await storage.get<DeadlineTable>(DEADLINES_KEY)) ?? emptyDeadlines();
 }
@@ -177,5 +233,6 @@ export async function eraseSandboxRecord(storage: ControlStorage): Promise<void>
     LOG_KEY,
     CREDENTIAL_GRANTS_KEY,
     RUNTIME_METADATA_KEY,
+    NATIVE_RUNTIME_RETIREMENTS_KEY,
   ]);
 }

@@ -94,7 +94,7 @@ function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient
     answerPermission: async () => true,
     answerQuestion: async () => true,
     rejectQuestion: async () => true,
-    getSessionStatuses: async () => ({}),
+    getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
     getQuestions: async () => [],
     getPermissions: async () => [],
     ...overrides,
@@ -122,6 +122,7 @@ function deps(
   const runtime: WorktreeKiloRuntime | undefined = client
     ? {
         scopeId: kilo.scopeId,
+        runtimeId: 'native_1',
         directory: identity.directory,
         env: buildWorktreeKiloEnvironment(
           identity.directory,
@@ -140,11 +141,23 @@ function deps(
           attach: () => ({
             ready: Promise.resolve(runtime),
             signal: runtime.signal,
+            cleanup: async () => 'retired',
             commit: () => {},
             release: () => {},
           }),
           detach: () => true,
           deleteDirectory: async () => {},
+          getRetained: directory => (directory === runtime.directory ? runtime : undefined),
+          retireRuntime: async (directory, _deadlineAt, target) =>
+            directory === runtime.directory &&
+            target?.runtimeId === runtime.runtimeId &&
+            target?.client === runtime.kiloClient
+              ? 'unconfirmed'
+              : 'stale',
+          verifyQuiescence: async (directory, target) =>
+            directory === runtime.directory &&
+            target.runtimeId === runtime.runtimeId &&
+            target.client === runtime.kiloClient,
           get: directory => (directory === runtime.directory ? runtime : undefined),
           isHealthy: () => true,
           shutdown: () => {},
@@ -719,7 +732,11 @@ describe('handleControlRequest', () => {
         },
         getSessionStatuses: async () => {
           record('status', undefined);
-          return {};
+          return {
+            [session.kiloSessionId]: { type: 'idle' },
+            [sibling.kiloSessionId]: { type: 'idle' },
+            [other.kiloSessionId]: { type: 'idle' },
+          };
         },
         getPermissions: async () => {
           record('permissions', undefined);
@@ -744,6 +761,7 @@ describe('handleControlRequest', () => {
       runtimes.set(directory, {
         directory,
         scopeId: directory,
+        runtimeId: crypto.randomUUID(),
         env: buildWorktreeKiloEnvironment(
           directory,
           fs.mkdtempSync(path.join(homeRoot, 'worktree-')),
@@ -762,6 +780,24 @@ describe('handleControlRequest', () => {
         },
         detach: () => true,
         deleteDirectory: async () => {},
+        getRetained: directory => runtimes.get(directory),
+        retireRuntime: async (directory, _deadlineAt, target) => {
+          const runtime = runtimes.get(directory);
+          return runtime &&
+            target?.runtimeId === runtime.runtimeId &&
+            target?.client === runtime.kiloClient
+            ? 'unconfirmed'
+            : 'stale';
+        },
+        verifyQuiescence: async (directory, target) => {
+          const runtime = runtimes.get(directory);
+          return (
+            runtime !== undefined &&
+            target !== undefined &&
+            target.runtimeId === runtime.runtimeId &&
+            target.client === runtime.kiloClient
+          );
+        },
         get: directory => runtimes.get(directory),
         isHealthy: () => true,
         shutdown: () => {},
@@ -948,7 +984,7 @@ describe('handleControlRequest', () => {
           ok: true,
           result: { status: 'aborted' },
         });
-        expect(calls.at(-1)).toEqual({
+        expect(calls.at(-2)).toEqual({
           directory: identity.directory,
           operation: 'abort',
           value: {
@@ -956,6 +992,10 @@ describe('handleControlRequest', () => {
             directory: identity.directory,
             signal: expect.any(AbortSignal),
           },
+        });
+        expect(calls.at(-1)).toMatchObject({
+          directory: identity.directory,
+          operation: 'status',
         });
         expect(handlerDeps.operations.hasActive(identity.kiloSessionId)).toBe(false);
       } finally {
@@ -1920,6 +1960,7 @@ describe('production worktree deletion routes', () => {
     const detached: string[] = [];
     const forbidden: string[] = [];
     const siblingRuntime: WorktreeKiloRuntime = {
+      runtimeId: 'native_sibling',
       directory: siblingDirectory,
       scopeId: path.basename(siblingDirectory),
       env: {},
@@ -2346,9 +2387,9 @@ describe('owned control execution', () => {
         },
         handlerDeps
       );
-      expect(aborted).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
+      expect(aborted).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
 
-      expect(retired).toEqual(['Native cancellation did not settle']);
+      expect(retired).toEqual([]);
     } finally {
       running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
       await waitForTasks(handlerDeps);
@@ -2413,7 +2454,7 @@ describe('owned control execution', () => {
         expect(
           await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
         ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
-        expect(retired).toEqual(['Kilo cancellation failed']);
+        expect(retired).toEqual(['Kilo cancellation was not confirmed']);
         expect(handlerDeps.signal?.aborted).toBe(true);
         expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
         expect(handlerDeps.operations.counts().active).toBe(0);
@@ -2470,7 +2511,7 @@ describe('owned control execution', () => {
       expect(
         await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
       ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
-      expect(retired).toEqual(['Kilo cancellation failed']);
+      expect(retired).toEqual(['Kilo cancellation was not confirmed']);
       expect(handlerDeps.signal?.aborted).toBe(true);
       expect(handlerDeps.operations.counts().active).toBe(0);
       expect(
@@ -2538,7 +2579,7 @@ describe('owned control execution', () => {
       for (const deadline of deadlines) deadline();
       expect(await aborting).toMatchObject({ ok: false, error: { code: 'not_ready' } });
       expect(abortSignal.aborted).toBe(true);
-      expect(retired).toEqual(['Kilo cancellation failed']);
+      expect(retired).toEqual(['Kilo cancellation was not confirmed']);
       expect(handlerDeps.signal?.aborted).toBe(true);
       remoteStopped.resolve(true);
       running.resolve(completion());
@@ -2605,13 +2646,13 @@ describe('owned control execution', () => {
       if (typeof deadline !== 'function') throw new Error('Missing owned execution deadline');
       deadline();
       await waitForTasks(handlerDeps);
-      expect(retired).toEqual(['Execution exceeded the 60 minute limit']);
+      expect(retired).toEqual([]);
       expect(events[0]?.properties).toEqual({
         messageId: 'msg_1',
         status: 'cancelled',
         reason: 'Kilo execution ended with MessageAbortedError',
       });
-      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(true);
       expect(
         await handleControlRequest(
           'session.prompt',
@@ -2619,7 +2660,7 @@ describe('owned control execution', () => {
           { ...promptPayload, messageId: 'next' },
           handlerDeps
         )
-      ).toMatchObject({ ok: false });
+      ).toMatchObject({ ok: true, result: { messageId: 'next', status: 'accepted' } });
     } finally {
       running.resolve(completion());
       timers.mockRestore();
@@ -2915,7 +2956,7 @@ describe('control finalization and compact', () => {
       expect(handlerDeps.operations.counts().active).toBe(1);
       stopped.resolve({ success: false });
       await waitForTasks(handlerDeps);
-      expect(retired).toEqual(['Execution exceeded the 60 minute limit']);
+      expect(retired).toEqual([]);
       expect(events.at(-1)?.properties).toEqual({
         messageId: 'msg_1',
         status: 'failed',
@@ -3339,12 +3380,13 @@ describe('control cancellation and attachments', () => {
       expect(await attaching).toMatchObject({ ok: false });
       expect(markerWritten).toBe(false);
       expect(handlerDeps.operations.counts().active).toBe(0);
-      expect(retired).toEqual(['Session preparation timed out']);
-      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(retired).toEqual([]);
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(true);
       expect(
         await handleControlRequest('session.attach', session, { kilo }, handlerDeps)
       ).toMatchObject({
-        ok: false,
+        ok: true,
+        result: { attached: true },
       });
     } finally {
       stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
@@ -4231,9 +4273,11 @@ describe('control wrapper heartbeat source policy', () => {
     expect(source).toContain(
       "diagnosticReason: NonNullable<SandboxHeartbeatPayload['kilo']['reason']> = 'shutdown'"
     );
+    expect(source).toMatch(/void control \.reportNativeRuntimeRetirement\(\{/);
     expect(source).toContain(
-      'onUnexpectedClose: failure => shutdown( 1, `Kilo worktree failed reason=${failure.reason} directory=${failure.directory}`, failure.reason )'
+      "if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) { shutdown(1, failure.reason); return; }"
     );
+    expect(source).toContain('nativeRuntimeId: failure.runtimeId,');
     expect(source).toContain(
       "onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected')"
     );

@@ -122,6 +122,7 @@ import {
   sessionPermissionResolveResultSchema,
   sessionQuestionResolveResultSchema,
   sessionAbortResultSchema,
+  sameSessionOperation,
   wrapperInstanceIdSchema,
   type SessionOperationAck,
   type SessionOperationAuthorization,
@@ -191,6 +192,14 @@ type SandboxControlEventInput = {
 const QUEUE_RETRY_MS = 5_000;
 const PENDING_RUNTIME_CLEANUP_KEY = 'pending_runtime_cleanup';
 const PENDING_INTERACTIONS_KEY = 'session_pending_interactions';
+const NATIVE_RUNTIME_FENCE_KEY = 'native_runtime_fence';
+const nativeRuntimeFenceSchema = z.object({
+  sandboxId: z.string().min(1),
+  wrapperInstanceId: wrapperInstanceIdSchema,
+  nativeRuntimeId: z.string().uuid(),
+  attachmentEpoch: z.number().int().positive(),
+  authorization: sessionOperationAuthorizationSchema,
+});
 const pendingRuntimeCleanupSchema = z.object({
   ownerId: z.string().min(1),
   sessionId: z.string().min(1),
@@ -1186,8 +1195,74 @@ export class SandboxSession extends DurableObject<Env> {
     sandboxId: string;
     wrapperInstanceId: string;
     confirmed: boolean;
+    nativeRuntimeId?: string;
   }): Promise<void> {
+    const current = nativeRuntimeFenceSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(NATIVE_RUNTIME_FENCE_KEY)
+    );
+    if (
+      input.nativeRuntimeId !== undefined &&
+      (!current.success ||
+        current.data.sandboxId !== input.sandboxId ||
+        current.data.wrapperInstanceId !== input.wrapperInstanceId ||
+        current.data.nativeRuntimeId !== input.nativeRuntimeId)
+    )
+      return;
     this.terminalLifecycle.invalidateRuntime(input);
+  }
+
+  async recordNativeRuntime(input: {
+    sandboxId: string;
+    wrapperInstanceId: string;
+    nativeRuntimeId: string;
+    authorization?: SessionOperationAuthorization;
+  }): Promise<void> {
+    const authorization = sessionOperationAuthorizationSchema.safeParse(input.authorization);
+    const epoch = this.terminalLifecycle.captureEpoch();
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    if (
+      !authorization.success ||
+      authorization.data.operation !== 'session.attach' ||
+      authorization.data.wrapperInstanceId !== input.wrapperInstanceId ||
+      authorization.data.session.sessionId !== this.sessionId ||
+      !metadata ||
+      metadata.workspace?.sandboxId !== input.sandboxId ||
+      authorization.data.session.kiloSessionId !== metadata.auth.kiloSessionId ||
+      authorization.data.session.directory !== this.directory(metadata) ||
+      epoch === null
+    )
+      return;
+    const message = this.loadMessages().find(
+      current => current.messageId === authorization.data.messageId
+    );
+    const proof = message?.operations?.attach;
+    if (
+      !proof?.completedAt ||
+      proof.attachmentEpoch === undefined ||
+      !sameSessionOperation(proof.authorization, authorization.data) ||
+      !this.terminalLifecycle.isCurrent(epoch)
+    )
+      return;
+    const newestAttachmentEpoch = Math.max(
+      0,
+      ...this.loadMessages().map(current => current.operations?.attach?.attachmentEpoch ?? 0)
+    );
+    const current = nativeRuntimeFenceSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(NATIVE_RUNTIME_FENCE_KEY)
+    );
+    if (
+      proof.attachmentEpoch !== newestAttachmentEpoch ||
+      (current.success && current.data.attachmentEpoch > proof.attachmentEpoch)
+    )
+      return;
+    this.ctx.storage.kv.put(
+      NATIVE_RUNTIME_FENCE_KEY,
+      nativeRuntimeFenceSchema.parse({
+        ...input,
+        attachmentEpoch: proof.attachmentEpoch,
+        authorization: authorization.data,
+      })
+    );
   }
 
   async isSandboxCleanupScheduled(): Promise<boolean> {
@@ -2434,7 +2509,22 @@ export class SandboxSession extends DurableObject<Env> {
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
   }
 
-  async failWaitingMessages(reason: string, wrapperInstanceId?: string): Promise<void> {
+  async failWaitingMessages(
+    reason: string,
+    wrapperInstanceId?: string,
+    nativeRuntimeId?: string
+  ): Promise<void> {
+    if (nativeRuntimeId !== undefined) {
+      const current = nativeRuntimeFenceSchema.safeParse(
+        this.ctx.storage.kv.get<unknown>(NATIVE_RUNTIME_FENCE_KEY)
+      );
+      if (
+        !current.success ||
+        current.data.nativeRuntimeId !== nativeRuntimeId ||
+        current.data.wrapperInstanceId !== wrapperInstanceId
+      )
+        return;
+    }
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return;
     const before = this.loadMessages();

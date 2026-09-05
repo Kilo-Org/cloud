@@ -62,7 +62,8 @@ function asWs(ws: FakeWebSocket): WebSocket {
 function helloFrame(
   providerInstanceId: string,
   wrapperInstanceId?: string,
-  requestId = 'req_hello'
+  requestId = 'req_hello',
+  capabilities?: { nativeRuntimeRetirement?: boolean }
 ): string {
   return JSON.stringify({
     type: 'request',
@@ -72,6 +73,7 @@ function helloFrame(
       protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
       providerInstanceId,
       ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
+      ...(capabilities ? { capabilities } : {}),
     },
   });
 }
@@ -326,6 +328,7 @@ describe('sandbox control socket handler', () => {
             kiloVersionHeartbeat: true,
             sessionOperationResults: true,
             scopedStopAbort: true,
+            nativeRuntimeRetirement: true,
           },
         },
       })
@@ -362,6 +365,20 @@ describe('sandbox control socket handler', () => {
     expect(onHandshakeComplete).toHaveBeenCalledWith(handler.getConnectionIdentity(), {
       wrapperVersion: null,
     });
+  });
+
+  it('reads the native runtime retirement capability from the wrapper handshake', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_native_retirement', {
+        nativeRuntimeRetirement: true,
+      })
+    );
+
+    expect(handler.supportsNativeRuntimeRetirement()).toBe(true);
   });
 
   it('rejects duplicate hellos without replacing the current connection', async () => {

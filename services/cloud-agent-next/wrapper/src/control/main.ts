@@ -33,6 +33,8 @@ const retirementCauses = new Map([
   ['Wrapper uncaught exception', 'uncaught_exception'],
   ['Wrapper unhandled rejection', 'unhandled_rejection'],
   ['Kilo cancellation failed', 'cancellation_failed'],
+  ['Kilo cancellation was not confirmed', 'cancellation_failed'],
+  ['Native cancellation did not settle', 'cancellation_failed'],
   ['Session outcome delivery failed', 'outcome_delivery_failed'],
   ['Execution exceeded the 60 minute limit', 'execution_deadline'],
   ['Session preparation timed out', 'preparation_deadline'],
@@ -79,12 +81,25 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         throw new Error('Sandbox control event delivery failed');
       }
     },
-    onUnexpectedClose: failure =>
-      shutdown(
-        1,
-        `Kilo worktree failed reason=${failure.reason} directory=${failure.directory}`,
-        failure.reason
-      ),
+    onUnexpectedClose: failure => {
+      logToFile(`Kilo worktree retired reason=${failure.reason} directory=${failure.directory}`);
+      if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) {
+        shutdown(1, failure.reason);
+        return;
+      }
+      void control
+        .reportNativeRuntimeRetirement({
+          directory: failure.directory,
+          nativeRuntimeId: failure.runtimeId,
+          reason: failure.reason,
+        })
+        .then(
+          retired => {
+            if (!retired) shutdown(1, failure.reason);
+          },
+          () => shutdown(1, failure.reason)
+        );
+    },
   });
   const terminalRuntime = controlConfig.SANDBOX_CONTROL_URL
     ? createControlTerminalRuntime({

@@ -472,6 +472,7 @@ describe('scoped worktree runtime deletion', () => {
     } as WrapperKiloClient;
     const kiloRuntime: WorktreeKiloRuntime = {
       scopeId: 'test-scope',
+      runtimeId: 'native_1',
       directory,
       env: {},
       kiloClient,
@@ -479,6 +480,7 @@ describe('scoped worktree runtime deletion', () => {
     };
     const otherKiloRuntime: WorktreeKiloRuntime = {
       scopeId: 'test-scope-other',
+      runtimeId: 'native_2',
       directory: otherDirectory,
       env: {},
       kiloClient,

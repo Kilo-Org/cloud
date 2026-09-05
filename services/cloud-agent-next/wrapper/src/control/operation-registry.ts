@@ -9,6 +9,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { rejectBeforeAdmission } from './control-handler-result.js';
 import type { WorktreeKiloRuntimes } from './worktree-runtime.js';
+import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
 import {
   SessionOperation,
   type ControlHandlerResult,
@@ -17,7 +18,24 @@ import {
 } from './session-operation.js';
 
 type OperationRegistryDependencies = {
-  native: Pick<WorktreeKiloRuntimes, 'get'>;
+  native: {
+    get(
+      directory: string
+    ): WorktreeKiloRuntimes['get'] extends (directory: string) => infer Runtime ? Runtime : never;
+    getRetained(
+      directory: string
+    ): WorktreeKiloRuntimes['get'] extends (directory: string) => infer Runtime ? Runtime : never;
+    retireRuntime(
+      directory: string,
+      deadlineAt: number,
+      target?: NativeOperationTarget
+    ): Promise<NativeRetirement>;
+    verifyQuiescence(
+      directory: string,
+      target: NativeOperationTarget,
+      deadlineAt: number
+    ): Promise<boolean>;
+  };
   onStarted: (session: SessionRequestIdentity, preparation: boolean) => void;
   onCompleted: (session: SessionRequestIdentity) => void;
   retireRuntime: (reason: string) => void;
@@ -55,7 +73,13 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
   function prune(now = Date.now()): void {
     for (const [id, operation] of retained) {
       if (!operation.canPrune(now)) continue;
-      retained.delete(id);
+      if (operation.releaseProcessOwnership()) retained.delete(id);
+      else {
+        const deadlineAt = operation.captureCleanupDeadline();
+        void operation.cleanupOwnedWork(deadlineAt).then(confirmed => {
+          if (!confirmed) operation.requestRetirement('Owned process cleanup failed', deadlineAt);
+        });
+      }
     }
   }
 
@@ -147,6 +171,30 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       : fail('unauthorized', 'Operation acknowledgement does not match the result', false);
   }
 
+  async function retireDirectory(
+    directory: string,
+    reason: string,
+    deadlineAt: number,
+    target?: NativeOperationTarget
+  ): Promise<NativeRetirement> {
+    const matching = [...active.values()].filter(operation => {
+      if (operation.session.directory !== directory) return false;
+      const operationTarget = operation.nativeTarget();
+      return target === undefined || operationTarget?.runtimeId === target.runtimeId;
+    });
+    for (const operation of matching) operation.cancel(reason, 'failed', deadlineAt);
+    if (
+      !(await Promise.all(matching.map(operation => operation.stopProcesses(deadlineAt)))).every(
+        Boolean
+      )
+    )
+      return 'unconfirmed';
+    const retirement = await deps.native.retireRuntime(directory, deadlineAt, target);
+    for (const operation of matching)
+      operation.confirmCleanup(retirement === 'retired' || retirement === 'stale', deadlineAt);
+    return retirement;
+  }
+
   function start(
     session: SessionRequestIdentity,
     authorization: SessionOperationAuthorization | undefined,
@@ -158,7 +206,17 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       ...effects,
       isCurrent: () => active.get(identity.kiloSessionId) === operation,
       getRuntime: () => deps.native.get(identity.directory),
-      retireRuntime: reason => deps.retireRuntime(reason),
+      verifyQuiescence: (target, deadlineAt) =>
+        deps.native.verifyQuiescence(identity.directory, target, deadlineAt),
+      retireRuntime: (reason, deadlineAt, target) => {
+        if (!target) {
+          deps.retireRuntime(reason);
+          return;
+        }
+        void retireDirectory(identity.directory, reason, deadlineAt, target).then(retirement => {
+          if (retirement === 'unconfirmed') deps.retireRuntime(reason);
+        });
+      },
       onLocalCompletion: retain => {
         if (active.get(identity.kiloSessionId) === operation) {
           active.delete(identity.kiloSessionId);
@@ -167,6 +225,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
         if (authorization && !retain && retained.get(key(authorization)) === operation)
           retained.delete(key(authorization));
       },
+      onCleanupConfirmed: () => undefined,
     });
     if (authorization) retained.set(key(authorization), operation);
     active.set(identity.kiloSessionId, operation);
@@ -197,6 +256,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     },
     hasActive: (rootKiloSessionId: string) => active.has(rootKiloSessionId),
     activeOperations: () => [...active.values()],
+    retireDirectory,
     retained: () => [...retained.values()],
     counts: () => ({ active: active.size, retained: retained.size }),
     async drainDelivery(deadlineAt: number): Promise<void> {

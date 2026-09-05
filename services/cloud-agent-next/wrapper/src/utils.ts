@@ -1,5 +1,6 @@
 import { spawn } from 'child_process';
 import { appendFileSync } from 'fs';
+import { currentOwnedProcessScope } from './control/owned-processes.js';
 
 export type ExecResult = {
   stdout: string;
@@ -119,16 +120,21 @@ export function runProcess(
   }
 
   return new Promise((resolve, reject) => {
-    const proc = spawn(command, args, {
+    const options = {
       cwd: opts?.cwd,
       ...(opts?.inheritEnv === false
         ? { env: opts.env ?? {} }
         : opts?.env
           ? { env: { ...process.env, ...opts.env } }
           : {}),
-      detached: true,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
+    };
+    const proc =
+      currentOwnedProcessScope()?.spawn(command, args, options) ??
+      spawn(command, args, {
+        ...options,
+        detached: true,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
     let stdout = '';
     let stderr = '';
     let stdoutTruncated = false;

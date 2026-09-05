@@ -5,6 +5,7 @@ import {
 } from '../../../src/shared/control-diagnostics.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
   SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   sessionOperationExpiresAt,
@@ -26,9 +27,15 @@ import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-ap
 import { materializeMessageAttachments } from '../session-bootstrap.js';
 import { runAutoCommit, type AutoCommitResult } from '../auto-commit.js';
 import { withTimeoutAndAbort } from '../utils.js';
-import type { AttachPreparingEmitter } from './apply-attach.js';
-import { KILO_CONTROL_REQUEST_TIMEOUT_MS } from './sandbox-control-runtime.js';
+import type { ApplyAttachDeps, AttachPreparingEmitter } from './apply-attach.js';
+import { createOwnedProcessScope, type OwnedProcessScope } from './owned-processes.js';
 import type { WorktreeKiloRuntime } from './worktree-runtime.js';
+import {
+  SessionOperationCleanup,
+  type NativeCleanupEvidence,
+  type NativeOperationTarget,
+  type NativeRetirement,
+} from './session-operation-cleanup.js';
 import { operationIntent } from './operation-intent.js';
 import {
   createOperationResultDelivery,
@@ -69,7 +76,16 @@ export type SessionOperationWork =
       apply: (
         session: SessionRequestIdentity,
         payload: SessionAttachPayload,
-        hooks: { signal: AbortSignal; emitPreparing?: AttachPreparingEmitter }
+        hooks: Pick<
+          ApplyAttachDeps,
+          | 'signal'
+          | 'assertCurrent'
+          | 'onMutation'
+          | 'onRuntime'
+          | 'onError'
+          | 'onCleanupTarget'
+          | 'emitPreparing'
+        >
       ) => Promise<ControlHandlerResult>;
       onAttached: () => void;
       emitPreparing?: AttachPreparingEmitter;
@@ -86,11 +102,14 @@ export type SessionOperationDependencies = {
   signal?: AbortSignal;
   isCurrent: () => boolean;
   getRuntime: () => WorktreeKiloRuntime | undefined;
-  retireRuntime: (reason: string) => void;
+  verifyQuiescence: (target: NativeOperationTarget, deadlineAt: number) => Promise<boolean>;
+  retireRuntime: (reason: string, deadlineAt: number, target?: NativeOperationTarget) => void;
   emitSessionEvent: (payload: SessionEventPayload, options?: { retained?: true }) => void;
   sendOperationResult?: OperationResultSender;
   onLocalCompletion: (retain: boolean) => void;
+  onCleanupConfirmed: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
+  processes?: OwnedProcessScope;
 };
 
 class ControlTaskCancellation extends Error {
@@ -117,13 +136,15 @@ export class SessionOperation {
   readonly executionDeadlineAt: number;
   readonly signal: AbortSignal;
   readonly done: Promise<ControlHandlerResult>;
+  readonly processes: OwnedProcessScope;
   private readonly controller = new AbortController();
   private readonly completion = Promise.withResolvers<ControlHandlerResult>();
   private readonly intent: ReturnType<typeof operationIntent>;
   private readonly startedAt = Date.now();
   private readonly timeout: ReturnType<typeof setTimeout>;
   private phase: 'preparation' | 'execution' | 'finalizing';
-  private client?: WrapperKiloClient;
+  private target?: NativeOperationTarget;
+  private preClientCleanup?: (deadlineAt: number) => Promise<NativeRetirement>;
   private native: NativeResult = { state: 'not_started' };
   private nativePending?: Promise<unknown>;
   private finalization: Finalization = {};
@@ -131,7 +152,8 @@ export class SessionOperation {
   private outcome?: SessionMessageOutcome;
   private local?: { result: ControlHandlerResult; completedAt: number };
   private delivery?: OperationResultDelivery;
-  private cleanupDeadlineAt?: number;
+  private readonly cleanupOwner: SessionOperationCleanup;
+  private deadlineCleanup?: Promise<boolean>;
 
   constructor(
     session: SessionRequestIdentity,
@@ -165,6 +187,13 @@ export class SessionOperation {
     if (work.operation === 'session.prompt') signals.push(work.runtime.signal);
     this.signal = AbortSignal.any(signals);
     this.done = this.completion.promise;
+    this.processes = deps.processes ?? createOwnedProcessScope();
+    this.cleanupOwner = new SessionOperationCleanup(
+      this.session,
+      this.processes,
+      deps.verifyQuiescence,
+      () => deps.onCleanupConfirmed()
+    );
     this.diagnostic('started');
     this.timeout = setTimeout(
       () => this.expire(),
@@ -173,7 +202,11 @@ export class SessionOperation {
     this.timeout.unref();
     void Promise.resolve()
       .then(() =>
-        this.work.operation === 'session.attach' ? this.attach(this.work) : this.execute(this.work)
+        this.processes.run(() =>
+          this.work.operation === 'session.attach'
+            ? this.attach(this.work)
+            : this.execute(this.work)
+        )
       )
       .catch((error: unknown) => {
         this.recordUncertainty(error);
@@ -191,6 +224,38 @@ export class SessionOperation {
   get locallyComplete() {
     return this.local !== undefined;
   }
+  get cleanupDeadline() {
+    return this.cleanupOwner.cleanupDeadline;
+  }
+  get cleanup() {
+    return this.cleanupOwner.cleanupState;
+  }
+
+  nativeTarget(): NativeOperationTarget | undefined {
+    return this.target;
+  }
+
+  captureCleanupDeadline(deadlineAt = Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS): number {
+    return this.cleanupOwner.captureDeadline(deadlineAt);
+  }
+
+  stopProcesses(deadlineAt: number): Promise<boolean> {
+    return this.cleanupOwner.stopProcesses(deadlineAt);
+  }
+
+  async cleanupOwnedWork(
+    deadlineAt: number,
+    reason = 'Session aborted',
+    status: 'failed' | 'cancelled' = 'cancelled'
+  ): Promise<boolean> {
+    return this.cleanupOwner.cleanup({
+      deadlineAt,
+      target: this.target,
+      preClientCleanup: this.preClientCleanup,
+      completionEvidence: this.cleanupEvidence(),
+      cancel: () => this.cancel(reason, status, deadlineAt),
+    });
+  }
 
   snapshot() {
     const retained = this.retainedNotifications.snapshot();
@@ -202,6 +267,8 @@ export class SessionOperation {
       preparing: retained.preparing,
       outcome: this.outcome ? structuredClone(this.outcome) : undefined,
       local: this.local ? structuredClone(this.local) : undefined,
+      cleanup: this.cleanupOwner.cleanupState,
+      cleanupDeadlineAt: this.cleanupOwner.cleanupDeadline,
       delivery: this.delivery?.snapshot(),
     };
   }
@@ -212,6 +279,10 @@ export class SessionOperation {
 
   waitForDelivery(): Promise<void> {
     return this.delivery?.drain() ?? Promise.resolve();
+  }
+
+  releaseProcessOwnership(): boolean {
+    return this.processes.dispose();
   }
 
   matchesAuthorization(authorization: SessionOperationAuthorization): boolean {
@@ -241,10 +312,17 @@ export class SessionOperation {
   }
 
   cancel(reason: string, status: 'failed' | 'cancelled', cleanupDeadlineAt?: number): void {
-    if (cleanupDeadlineAt !== undefined) {
-      this.cleanupDeadlineAt = Math.min(this.cleanupDeadlineAt ?? Infinity, cleanupDeadlineAt);
-    }
+    if (cleanupDeadlineAt !== undefined) this.captureCleanupDeadline(cleanupDeadlineAt);
     if (!this.local) this.controller.abort(new ControlTaskCancellation(status, reason));
+  }
+
+  requestRetirement(reason: string, deadlineAt: number): void {
+    if (this.cleanupOwner.cleanupState === 'confirmed') return;
+    this.deps.retireRuntime(reason, this.captureCleanupDeadline(deadlineAt), this.nativeTarget());
+  }
+
+  confirmCleanup(confirmed: boolean, deadlineAt: number): boolean {
+    return this.cleanupOwner.confirm(confirmed, deadlineAt);
   }
 
   private diagnostic(phase: string): void {
@@ -259,14 +337,21 @@ export class SessionOperation {
   }
 
   private expire(): void {
-    if (this.local) return;
+    if (this.local || this.deadlineCleanup) return;
     const reason =
       this.work.operation === 'session.attach'
         ? 'Session preparation timed out'
         : 'Execution exceeded the 60 minute limit';
     this.diagnostic('deadline_expired');
-    this.cancel(reason, 'failed');
-    this.deps.retireRuntime(reason);
+    const deadlineAt = this.captureCleanupDeadline(
+      Math.max(this.executionDeadlineAt, Date.now()) + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
+    );
+    void this.stopProcesses(deadlineAt);
+    this.cancel(reason, 'failed', deadlineAt);
+    this.deadlineCleanup = this.cleanupOwnedWork(deadlineAt, reason, 'failed');
+    void this.deadlineCleanup.then(confirmed => {
+      if (!confirmed) this.requestRetirement(reason, deadlineAt);
+    });
   }
 
   private assertCurrent(): void {
@@ -283,9 +368,31 @@ export class SessionOperation {
       this.finalization.condensation = { state: 'unknown', error };
   }
 
-  private captureClient(client: WrapperKiloClient): void {
-    if (this.client) return;
-    this.client = client;
+  private captureRuntime(runtime: WorktreeKiloRuntime): void {
+    if (this.target) return;
+    this.target = Object.freeze({
+      runtimeId: runtime.runtimeId,
+      client: runtime.kiloClient,
+    });
+  }
+
+  private cleanupEvidence(): NativeCleanupEvidence {
+    if (this.native.state === 'not_started')
+      return this.local === undefined ? 'unconfirmed' : 'not_issued';
+    if (this.native.state !== 'completed') return 'unconfirmed';
+    if (
+      (this.native.completion === undefined && this.native.result === undefined) ||
+      this.native.completion?.error !== undefined ||
+      this.native.result === false ||
+      (this.finalization.autoCommit !== undefined &&
+        (this.finalization.autoCommit.state !== 'completed' ||
+          !this.finalization.autoCommit.result.success)) ||
+      (this.finalization.condensation !== undefined &&
+        (this.finalization.condensation.state !== 'completed' ||
+          this.finalization.condensation.result !== true))
+    )
+      return 'unconfirmed';
+    return 'finished';
   }
 
   private async attach(
@@ -294,6 +401,18 @@ export class SessionOperation {
     this.assertCurrent();
     const result = await work.apply(this.session, work.payload, {
       signal: this.signal,
+      assertCurrent: () => this.assertCurrent(),
+      onMutation: () => {
+        this.assertCurrent();
+        this.native.state = 'pending';
+      },
+      onRuntime: runtime => this.captureRuntime(runtime),
+      onCleanupTarget: cleanup => {
+        if (!this.preClientCleanup) this.preClientCleanup = cleanup;
+      },
+      onError: error => {
+        this.native.error = error;
+      },
       emitPreparing: event => {
         const retained =
           this.authorization && isRetainedOperationPreparing(event)
@@ -319,8 +438,17 @@ export class SessionOperation {
         true
       );
     }
-    if (result.ok) work.onAttached();
-    return result;
+    if (!result.ok) return result;
+    work.onAttached();
+    return {
+      ok: true,
+      result: {
+        attached: true,
+        ...(work.payload.captureNativeRuntimeId && this.target
+          ? { nativeRuntimeId: this.target.runtimeId }
+          : {}),
+      },
+    };
   }
 
   private emitFinalizationEvent(event: IngestEvent): void {
@@ -362,22 +490,6 @@ export class SessionOperation {
     );
     this.nativePending = observed;
     return observed;
-  }
-
-  private async waitForNativeAfterAbort(
-    pending: Promise<unknown>,
-    deadlineAt: number
-  ): Promise<void> {
-    try {
-      await withTimeoutAndAbort(pending, {
-        timeoutMs: Math.max(0, deadlineAt - Date.now()),
-        timeoutMessage: 'Native cancellation did not settle',
-        abortMessage: 'Native cancellation interrupted',
-      });
-    } catch (error) {
-      this.recordUncertainty(error);
-      this.deps.retireRuntime('Native cancellation did not settle');
-    }
   }
 
   private async summarize(
@@ -431,7 +543,7 @@ export class SessionOperation {
     const request = work.payload;
     const { runtime } = work;
     const { kiloClient, env } = runtime;
-    this.captureClient(kiloClient);
+    this.captureRuntime(runtime);
     const assertCurrent = (submitting = false) => {
       signal.throwIfAborted();
       if (
@@ -601,39 +713,26 @@ export class SessionOperation {
       };
       try {
         diagnostic('abort_started');
-        const cleanupDeadlineAt = Math.min(
-          this.cleanupDeadlineAt ?? Infinity,
-          Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS
-        );
-        const abortController = new AbortController();
-        const abortTimer = setTimeout(
-          () => abortController.abort(new Error('Kilo cancellation timed out')),
-          Math.max(0, cleanupDeadlineAt - Date.now())
-        );
-        let aborted: boolean;
-        try {
-          aborted = await withTimeoutAndAbort(
-            kiloClient.abortSession({
-              sessionId: session.kiloSessionId,
-              directory: session.directory,
-              signal: abortController.signal,
-            }),
-            {
-              timeoutMs: Math.max(0, cleanupDeadlineAt - Date.now()),
-              timeoutMessage: 'Kilo cancellation timed out',
-              abortMessage: 'Kilo cancellation interrupted',
-            }
-          );
-        } finally {
-          clearTimeout(abortTimer);
+        const cleanupDeadlineAt = this.captureCleanupDeadline();
+        const cleanupConfirmed = await this.cleanupOwnedWork(cleanupDeadlineAt);
+        if (!cleanupConfirmed && !this.deadlineCleanup)
+          this.requestRetirement('Kilo cancellation was not confirmed', cleanupDeadlineAt);
+        const pending = this.nativePending;
+        if (cleanupConfirmed && pending) {
+          try {
+            await withTimeoutAndAbort(pending, {
+              timeoutMs: Math.max(1, cleanupDeadlineAt - Date.now()),
+              timeoutMessage: 'Native cancellation did not settle',
+              abortMessage: 'Native cancellation interrupted',
+            });
+          } catch (error) {
+            this.recordUncertainty(error);
+          }
         }
-        if (aborted !== true) throw new Error('Kilo cancellation was not confirmed');
-        const pendingNative = this.nativePending;
-        if (pendingNative) await this.waitForNativeAfterAbort(pendingNative, cleanupDeadlineAt);
         diagnostic('abort_completed');
       } catch (error) {
         diagnostic('abort_failed');
-        this.deps.retireRuntime('Kilo cancellation failed');
+        this.requestRetirement('Kilo cancellation failed', this.captureCleanupDeadline());
         result = kiloFailure(error);
       }
       const original = this.native.completion;
@@ -673,7 +772,7 @@ export class SessionOperation {
         diagnostic('outcome_sent', outcome.status);
       } catch {
         diagnostic('outcome_failed', outcome.status);
-        this.deps.retireRuntime('Session outcome delivery failed');
+        this.requestRetirement('Session outcome delivery failed', this.captureCleanupDeadline());
         return fail('Session outcome delivery failed', false);
       }
     }
@@ -682,6 +781,7 @@ export class SessionOperation {
 
   private complete(result: ControlHandlerResult): void {
     result = result.ok ? { ok: true, result: result.result } : { ok: false, error: result.error };
+    this.processes.seal();
     this.local = { result: structuredClone(result), completedAt: Date.now() };
     clearTimeout(this.timeout);
     const retain =

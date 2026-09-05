@@ -57,12 +57,18 @@ import {
   sessionOperationAckSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationExpiresAt,
+  sessionOperationLookupResultSchema,
+  sessionAttachResultSchema,
+  sessionAttachPayloadSchema,
   sessionAbortPayloadSchema,
+  sessionAbortResultSchema,
+  sessionNativeRuntimeRetirementPayloadSchema,
   sessionRequestIdentitySchema,
   wrapperInstanceIdSchema,
   type ResponseFrame,
   type SessionAttachPayload,
   type SessionOperationAck,
+  type SessionOperationAuthorization,
   type SessionOperationDelivery,
   type SandboxHeartbeatPayload,
   type SessionEventIdentity,
@@ -140,7 +146,18 @@ import {
   saveTransitionLog,
   loadSessionCredentialGrants,
   saveSessionCredentialGrants,
+  loadNativeRuntimeRetirements,
+  saveNativeRuntimeRetirements,
+  type NativeRuntimeRetirementReceipt,
 } from '../sandbox-control/durable-state.js';
+import {
+  createNativeRuntimeRetirementWorkflow,
+  matchesNativeRuntimeRetirementAllocation,
+  releaseNativeRuntimeRetirement,
+  sameNativeRuntimeRetirement,
+  type NativeRuntimeRetirementConnection,
+  type NativeRuntimeRetirementWorkflow,
+} from '../sandbox-control/native-runtime-retirement.js';
 import {
   buildControlNetworkPolicy,
   prepareSessionCredentials as prepareCredentials,
@@ -321,6 +338,7 @@ export class SandboxControl extends DurableObject<Env> {
   private readonly lifecycleOperations = new Set<Promise<unknown>>();
   private worktreeDeletionChain: Promise<unknown> = Promise.resolve();
   private operationalInitialization: Promise<void> | null = null;
+  private readonly nativeRuntimeRetirement: NativeRuntimeRetirementWorkflow;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -340,8 +358,30 @@ export class SandboxControl extends DurableObject<Env> {
         this.onSessionPreparing(sessionIdentity, payload, identity),
       onOperationResult: (session, delivery, identity) =>
         this.onOperationResult(session, delivery, identity),
+      onNativeRuntimeRetired: (payload, identity) => this.onNativeRuntimeRetired(payload, identity),
       onSocketClosed: (handshakeComplete, identity) =>
         this.onSocketClosed(handshakeComplete, identity),
+    });
+    this.nativeRuntimeRetirement = createNativeRuntimeRetirementWorkflow({
+      storage: ctx.storage,
+      currentIncarnation: {
+        isCurrent: connection => this.isCurrentConnection(connection),
+        getConnection: () => {
+          const connection = this.socketHandler.getConnectionIdentity();
+          return connection ? (this.nativeRetirementConnection(connection) ?? null) : null;
+        },
+        sameConnection: (left, right) => this.sameConnection(left, right),
+      },
+      transport: {
+        supportsTargetedRetirement: () => this.supportsNativeRuntimeRetirement(),
+        abortNativeRuntime: input => this.abortNativeRuntime(input),
+        invalidateRecipients: receipt => this.invalidateNativeRetirementRecipients(receipt),
+        notifyRecipients: receipt => this.notifyNativeRetirementRecipients(receipt),
+      },
+      physicalEscalation: {
+        beginIfCurrent: receipt => this.beginNativeRetirementPhysicalFallback(receipt),
+      },
+      scheduleAlarm: deadlines => this.scheduleAlarm(deadlines),
     });
   }
 
@@ -369,6 +409,7 @@ export class SandboxControl extends DurableObject<Env> {
         );
       }
       await this.repairLifecycleScheduling(physical);
+      this.ctx.waitUntil(this.nativeRuntimeRetirement.resume());
       if (
         physical.stopTombstone ||
         (physical.state !== 'running' && physical.state !== 'creating')
@@ -623,19 +664,23 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       throw new Error('Sandbox runtime is not ready');
     }
+    const scopedSession = scopedStop
+      ? sessionRequestIdentitySchema.safeParse(input.session)
+      : undefined;
+    let scopedRoute: SessionRoute | undefined;
     if (scopedStop) {
-      const session = sessionRequestIdentitySchema.safeParse(input.session);
-      if (!session.success || expectedWrapperInstanceId === undefined)
+      if (!scopedSession?.success || expectedWrapperInstanceId === undefined)
         throw new Error('Scoped Stop identity is required');
-      const route = (await loadRouteTable(this.ctx.storage)).get(session.data.sessionId);
+      const route = (await loadRouteTable(this.ctx.storage)).get(scopedSession.data.sessionId);
       if (
         !route ||
-        route.kiloSessionId !== session.data.kiloSessionId ||
-        route.directory !== session.data.directory ||
+        route.kiloSessionId !== scopedSession.data.kiloSessionId ||
+        route.directory !== scopedSession.data.directory ||
         runtime.wrapperInstanceId !== expectedWrapperInstanceId
       )
         throw new Error('Scoped Stop target is stale');
       this.assertWorktreeAdmission(route.worktreeId);
+      scopedRoute = route;
     }
     if (input.operation === 'session.attach' || input.operation === 'session.prompt') {
       const payload = parseOperationPayload(input.operation, input.payload);
@@ -658,9 +703,10 @@ export class SandboxControl extends DurableObject<Env> {
         if (
           !route ||
           route.kiloSessionId !== identity.data.kiloSessionId ||
-          route.directory !== identity.data.directory
+          route.directory !== identity.data.directory ||
+          route.retiringNativeRuntimeId !== undefined
         ) {
-          throw new Error('Session is not attached to this sandbox runtime');
+          throw new Error('Session is not attached to a ready sandbox runtime');
         }
         this.assertWorktreeAdmission(route.worktreeId);
         const now = Date.now();
@@ -697,13 +743,116 @@ export class SandboxControl extends DurableObject<Env> {
     if (!isCurrent()) throw new Error('Sandbox wrapper runtime changed');
     if (scopedStop) {
       const payload = sessionAbortPayloadSchema.parse(input.payload);
-      return this.socketHandler.sendRequest({
-        ...input,
-        payload: stopAbortWirePayload(payload, this.socketHandler.supportsScopedStopAbort()),
-        deadlineAt: scopedStop.cleanupDeadlineAt,
-      });
+      const nativeRuntimeId = scopedRoute?.nativeRuntimeId;
+      const retirementConnection = this.nativeRetirementConnection(runtime);
+      const retirement =
+        nativeRuntimeId !== undefined && scopedRoute !== undefined && retirementConnection
+          ? await this.nativeRuntimeRetirement.begin({
+              connection: retirementConnection,
+              physical,
+              route: scopedRoute,
+              nativeRuntimeId,
+              reason: 'Scoped Stop cleanup',
+              cleanupDeadlineAt: scopedStop.cleanupDeadlineAt,
+            })
+          : undefined;
+      const retirementAttempt = retirement
+        ? await this.nativeRuntimeRetirement.claimTargetedAttempt(retirement)
+        : undefined;
+      if (retirement && !retirementAttempt)
+        return errorResponse(
+          crypto.randomUUID(),
+          'not_ready',
+          'Native runtime retirement is already in progress',
+          true
+        );
+      let response: ResponseFrame;
+      try {
+        response = await this.socketHandler.sendRequest({
+          ...input,
+          payload: stopAbortWirePayload(payload, this.socketHandler.supportsScopedStopAbort()),
+          deadlineAt: scopedStop.cleanupDeadlineAt,
+        });
+      } catch (error) {
+        if (retirementAttempt) await this.nativeRuntimeRetirement.defer(retirementAttempt);
+        throw error;
+      }
+      const result = response.ok ? sessionAbortResultSchema.safeParse(response.result) : undefined;
+      if (
+        result?.success &&
+        result.data.runtimeRetired === true &&
+        result.data.nativeRuntimeId !== undefined &&
+        nativeRuntimeId === result.data.nativeRuntimeId &&
+        retirementAttempt &&
+        this.supportsNativeRuntimeRetirement() &&
+        expectedWrapperInstanceId !== undefined
+      ) {
+        const invalidated = await this.nativeRuntimeRetirement.complete(retirementAttempt);
+        if (!invalidated)
+          return errorResponse(
+            response.requestId,
+            'not_ready',
+            'Native runtime retirement invalidation is pending',
+            true
+          );
+      } else if (retirementAttempt && result?.success) {
+        await this.nativeRuntimeRetirement.release(retirementAttempt);
+      } else if (retirementAttempt) {
+        await this.nativeRuntimeRetirement.defer(retirementAttempt);
+      }
+      return response;
     }
-    return this.socketHandler.sendRequest(input);
+    const outbound =
+      input.operation === 'session.attach' && this.supportsNativeRuntimeRetirement()
+        ? {
+            ...input,
+            payload: {
+              ...sessionAttachPayloadSchema.parse(input.payload),
+              captureNativeRuntimeId: true,
+            },
+          }
+        : input;
+    const response = await this.socketHandler.sendRequest(outbound);
+    if (input.operation === 'session.attach' && response.ok) {
+      const result = sessionAttachResultSchema.safeParse(response.result);
+      const session = sessionRequestIdentitySchema.safeParse(input.session);
+      if (result.success && session.success && result.data.nativeRuntimeId !== undefined) {
+        await this.recordNativeRuntime(
+          runtime,
+          physical,
+          session.data,
+          result.data.nativeRuntimeId,
+          authorization?.success ? authorization.data : undefined
+        );
+      }
+    }
+    if (
+      input.operation === 'session.operation.get' &&
+      response.ok &&
+      this.supportsNativeRuntimeRetirement()
+    ) {
+      const lookup = sessionOperationLookupResultSchema.safeParse(response.result);
+      const session = sessionRequestIdentitySchema.safeParse(input.session);
+      if (
+        lookup.success &&
+        lookup.data.state === 'completed' &&
+        lookup.data.delivery.authorization.operation === 'session.attach' &&
+        lookup.data.delivery.result.ok &&
+        session.success
+      ) {
+        const attached = sessionAttachResultSchema.safeParse(lookup.data.delivery.result.result);
+        if (attached.success && attached.data.nativeRuntimeId !== undefined) {
+          await this.recordNativeRuntime(
+            runtime,
+            physical,
+            session.data,
+            attached.data.nativeRuntimeId,
+            lookup.data.delivery.authorization
+          );
+        }
+      }
+    }
+    return response;
   }
 
   private async requestWorktreeChanges(
@@ -801,9 +950,27 @@ export class SandboxControl extends DurableObject<Env> {
     ]);
     if (ownerId !== input.ownerId) throw new Error('Sandbox owner mismatch');
     if (physical.state === 'stopped') return { quarantined: false };
+    const connection = this.activeConnection;
+    const retirementConnection = this.nativeRetirementConnection(connection);
     const wrapperInstanceId =
-      physical.stopTombstone?.wrapperInstanceId ?? this.activeConnection?.wrapperInstanceId;
+      physical.stopTombstone?.wrapperInstanceId ?? connection?.wrapperInstanceId;
     if (wrapperInstanceId !== input.wrapperInstanceId) return { quarantined: false };
+    const route = (await loadRouteTable(this.ctx.storage)).get(input.sessionId);
+    if (
+      route &&
+      route.ownerId === input.ownerId &&
+      retirementConnection &&
+      route.nativeRuntimeId !== undefined &&
+      !physical.stopTombstone
+    ) {
+      const retirement = await this.nativeRuntimeRetirement.retire({
+        connection: retirementConnection,
+        physical,
+        route,
+        reason: input.reason,
+      });
+      if (retirement !== 'unavailable') return { quarantined: true };
+    }
     if (!physical.stopTombstone) {
       const next = beginStop(physical, input.reason, Date.now(), wrapperInstanceId);
       await this.persistPhysical(physical, next, input.reason);
@@ -2599,6 +2766,10 @@ export class SandboxControl extends DurableObject<Env> {
       }
       return;
     }
+    if (id === 'nativeRetirement') {
+      await this.nativeRuntimeRetirement.resume();
+      return;
+    }
     if (id === 'reconciliation') {
       const physical = await loadPhysicalRecord(this.ctx.storage);
       if (this.shouldSlowReap(physical)) {
@@ -2986,6 +3157,20 @@ export class SandboxControl extends DurableObject<Env> {
             })
         )
     );
+  }
+
+  private async onNativeRuntimeRetired(
+    input: unknown,
+    connection: SandboxControlConnectionIdentity
+  ): Promise<{ retired: true } | undefined> {
+    const payload = sessionNativeRuntimeRetirementPayloadSchema.parse(input);
+    if (!this.supportsNativeRuntimeRetirement()) return undefined;
+    const retirementConnection = this.nativeRetirementConnection(connection);
+    if (!retirementConnection) return undefined;
+    return this.nativeRuntimeRetirement.receiveRetired({
+      connection: retirementConnection,
+      ...payload,
+    });
   }
 
   private async onOperationResult(
@@ -3526,6 +3711,51 @@ export class SandboxControl extends DurableObject<Env> {
     return current;
   }
 
+  private supportsNativeRuntimeRetirement(): boolean {
+    return (
+      this.socketHandler.supportsOperationResults() &&
+      this.socketHandler.supportsNativeRuntimeRetirement?.() === true
+    );
+  }
+
+  private nativeRetirementConnection(
+    connection: SandboxControlConnectionIdentity | null
+  ): NativeRuntimeRetirementConnection | undefined {
+    if (!connection?.wrapperInstanceId) return undefined;
+    return {
+      connectionId: connection.connectionId,
+      providerInstanceId: connection.providerInstanceId,
+      wrapperInstanceId: connection.wrapperInstanceId,
+    };
+  }
+
+  private async abortNativeRuntime(input: {
+    receipt: NativeRuntimeRetirementReceipt;
+    route: SessionRoute;
+  }): Promise<boolean> {
+    const response = await this.socketHandler.sendRequest({
+      operation: 'session.abort',
+      session: {
+        sessionId: input.route.sessionId,
+        kiloSessionId: input.route.kiloSessionId,
+        directory: input.route.directory,
+      },
+      payload: {
+        reason: input.receipt.reason,
+        nativeRuntimeId: input.receipt.nativeRuntimeId,
+        cleanupDeadlineAt: input.receipt.cleanupDeadlineAt,
+      },
+      deadlineAt: input.receipt.cleanupDeadlineAt,
+      timeoutMs: Math.max(1, input.receipt.cleanupDeadlineAt - Date.now()),
+    });
+    const result = response.ok ? sessionAbortResultSchema.safeParse(response.result) : undefined;
+    return (
+      result?.success === true &&
+      result.data.runtimeRetired === true &&
+      result.data.nativeRuntimeId === input.receipt.nativeRuntimeId
+    );
+  }
+
   private async readTerminalRuntime(
     input: SandboxTerminalAccessInput,
     allowExpiredCredentials = false
@@ -3683,11 +3913,20 @@ export class SandboxControl extends DurableObject<Env> {
     if (to.stopTombstone && wrapperInstanceId && !to.stopTombstone.wrapperInstanceId) {
       to = { ...to, stopTombstone: { ...to.stopTombstone, wrapperInstanceId } };
     }
+    await this.ctx.storage.transaction(() => this.persistPhysicalState(from, to, cause));
+    await this.afterPhysicalPersistence(from, to, cause, wrapperInstanceId);
+  }
+
+  private async afterPhysicalPersistence(
+    from: PhysicalRecord,
+    to: PhysicalRecord,
+    cause: string,
+    wrapperInstanceId: string | undefined
+  ): Promise<void> {
     const changed =
       from.state !== to.state || (from.stopTombstone === null && to.stopTombstone !== null);
     const unavailable =
       to.stopTombstone !== null || (to.state !== 'creating' && to.state !== 'running');
-    await this.ctx.storage.transaction(() => this.persistPhysicalState(from, to, cause));
     this.logDiagnostic('physical_committed', {
       allocationId: to.createIntent?.intentId ?? from.createIntent?.intentId,
       wrapperInstanceId,
@@ -3717,6 +3956,49 @@ export class SandboxControl extends DurableObject<Env> {
     }
   }
 
+  private async beginNativeRetirementPhysicalFallback(
+    receipt: NativeRuntimeRetirementReceipt
+  ): Promise<boolean> {
+    const committed = await this.ctx.storage.transaction(async () => {
+      const [physical, receipts] = await Promise.all([
+        loadPhysicalRecord(this.ctx.storage),
+        loadNativeRuntimeRetirements(this.ctx.storage),
+      ]);
+      const currentReceipt = receipts.find(current =>
+        sameNativeRuntimeRetirement(current, {
+          directory: receipt.directory,
+          nativeRuntimeId: receipt.nativeRuntimeId,
+          connection: receipt.connection,
+        })
+      );
+      if (
+        !currentReceipt ||
+        currentReceipt.state !== 'unconfirmed' ||
+        physical.stopTombstone ||
+        physical.state === 'stopped' ||
+        !matchesNativeRuntimeRetirementAllocation(currentReceipt, physical)
+      )
+        return undefined;
+      const next = beginStop(
+        physical,
+        currentReceipt.reason,
+        Date.now(),
+        currentReceipt.connection.wrapperInstanceId
+      );
+      await this.persistPhysicalState(physical, next, currentReceipt.reason);
+      return { physical, next, reason: currentReceipt.reason };
+    });
+    if (!committed) return false;
+    await this.afterPhysicalPersistence(
+      committed.physical,
+      committed.next,
+      committed.reason,
+      committed.next.stopTombstone?.wrapperInstanceId
+    );
+    this.ctx.waitUntil(this.recordStopAttempt());
+    return true;
+  }
+
   private async persistPhysicalState(
     from: PhysicalRecord,
     to: PhysicalRecord,
@@ -3733,6 +4015,21 @@ export class SandboxControl extends DurableObject<Env> {
     if (to.state === 'stopped') {
       await saveSessionCredentialGrants(this.ctx.storage, []);
       await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+      const [routes, receipts] = await Promise.all([
+        loadRouteTable(this.ctx.storage),
+        loadNativeRuntimeRetirements(this.ctx.storage),
+      ]);
+      const retired = receipts.filter(receipt =>
+        matchesNativeRuntimeRetirementAllocation(receipt, from)
+      );
+      for (const receipt of retired) releaseNativeRuntimeRetirement(routes, receipt, true);
+      if (retired.length > 0) {
+        await saveRouteTable(this.ctx.storage, routes);
+        await saveNativeRuntimeRetirements(
+          this.ctx.storage,
+          receipts.filter(receipt => !retired.includes(receipt))
+        );
+      }
     }
     if (changed) {
       await this.appendLog(
@@ -3793,46 +4090,173 @@ export class SandboxControl extends DurableObject<Env> {
     await this.scheduleAlarm(next);
   }
 
-  private async invalidateTerminalRuntime(
-    wrapperInstanceId: string,
-    confirmed: boolean
-  ): Promise<void> {
-    const routes = await loadRouteTable(this.ctx.storage);
-    await Promise.all(
-      [...routes.values()].map(route => {
-        return withTimeout(
+  private async recordNativeRuntime(
+    connection: SandboxControlConnectionIdentity,
+    physical: PhysicalRecord,
+    session: SessionRequestIdentity,
+    nativeRuntimeId: string,
+    authorization?: SessionOperationAuthorization
+  ): Promise<boolean> {
+    const wrapperInstanceId = connection.wrapperInstanceId;
+    if (!this.isCurrentConnection(connection) || !wrapperInstanceId) return false;
+    const recordedRoute = await this.ctx.storage.transaction(async () => {
+      const [currentPhysical, routes] = await Promise.all([
+        loadPhysicalRecord(this.ctx.storage),
+        loadRouteTable(this.ctx.storage),
+      ]);
+      const route = routes.get(session.sessionId);
+      if (
+        !route ||
+        route.kiloSessionId !== session.kiloSessionId ||
+        route.directory !== session.directory ||
+        (route.nativeRuntimeId !== undefined && route.nativeRuntimeId !== nativeRuntimeId) ||
+        route.retiringNativeRuntimeId !== undefined ||
+        !this.isCurrentConnection(connection) ||
+        currentPhysical.state !== 'running' ||
+        currentPhysical.stopTombstone ||
+        currentPhysical.providerRef !== connection.providerInstanceId ||
+        !sameAllocation(physical, currentPhysical)
+      )
+        return undefined;
+      routes.set(route.sessionId, { ...route, nativeRuntimeId });
+      await saveRouteTable(this.ctx.storage, routes);
+      return route;
+    });
+    if (!recordedRoute) return false;
+    try {
+      await withTimeout(
+        withDORetry(
+          () => getSandboxSessionStub(this.env, recordedRoute.ownerId, recordedRoute.sessionId),
+          stub =>
+            stub.recordNativeRuntime({
+              sandboxId: this.sandboxId,
+              wrapperInstanceId,
+              nativeRuntimeId,
+              ...(authorization ? { authorization } : {}),
+            }),
+          'recordNativeRuntime'
+        ),
+        DEADLINE_MS.stopAttempt,
+        'Native runtime route registration timed out'
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private async invalidateNativeRetirementRecipients(
+    receipt: NativeRuntimeRetirementReceipt
+  ): Promise<boolean> {
+    const invalidated = await Promise.all(
+      receipt.recipients.map(recipient =>
+        withTimeout(
           withDORetry(
-            () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
+            () => getSandboxSessionStub(this.env, recipient.ownerId, recipient.sessionId),
             stub =>
               stub.invalidateTerminalRuntime({
                 sandboxId: this.sandboxId,
-                wrapperInstanceId,
-                confirmed,
+                wrapperInstanceId: receipt.connection.wrapperInstanceId,
+                confirmed: true,
+                nativeRuntimeId: receipt.nativeRuntimeId,
               }),
             'invalidateTerminalRuntime'
           ),
-          DEADLINE_MS.stopAttempt,
-          'Sandbox terminal invalidation timed out'
-        ).catch(() => undefined);
-      })
-    );
-  }
-
-  private async notifyAttachedSessions(reason: string, wrapperInstanceId: string): Promise<void> {
-    const table = await loadRouteTable(this.ctx.storage);
-    await Promise.all(
-      [...table.values()].map(route =>
-        withTimeout(
-          withDORetry(
-            () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
-            stub => stub.failWaitingMessages(reason, wrapperInstanceId),
-            'failWaitingMessages'
-          ),
-          DEADLINE_MS.stopAttempt,
-          'Sandbox failure notification timed out'
-        ).catch(() => undefined)
+          Math.max(1, receipt.replayUntil - Date.now()),
+          'Native runtime terminal invalidation timed out'
+        ).then(
+          () => true,
+          () => false
+        )
       )
     );
+    return invalidated.every(Boolean);
+  }
+
+  private async notifyNativeRetirementRecipients(
+    receipt: NativeRuntimeRetirementReceipt
+  ): Promise<boolean> {
+    const notified = await Promise.all(
+      receipt.recipients.map(recipient =>
+        withTimeout(
+          withDORetry(
+            () => getSandboxSessionStub(this.env, recipient.ownerId, recipient.sessionId),
+            stub =>
+              stub.failWaitingMessages(
+                receipt.reason,
+                receipt.connection.wrapperInstanceId,
+                receipt.nativeRuntimeId
+              ),
+            'failWaitingMessages'
+          ),
+          Math.max(1, receipt.replayUntil - Date.now()),
+          'Native runtime failure notification timed out'
+        ).then(
+          () => true,
+          () => false
+        )
+      )
+    );
+    return notified.every(Boolean);
+  }
+
+  private async invalidateTerminalRuntime(
+    wrapperInstanceId: string,
+    confirmed: boolean,
+    directory?: string
+  ): Promise<boolean> {
+    const routes = await loadRouteTable(this.ctx.storage);
+    const invalidated = await Promise.all(
+      [...routes.values()]
+        .filter(route => directory === undefined || route.directory === directory)
+        .map(route => {
+          return withTimeout(
+            withDORetry(
+              () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
+              stub =>
+                stub.invalidateTerminalRuntime({
+                  sandboxId: this.sandboxId,
+                  wrapperInstanceId,
+                  confirmed,
+                }),
+              'invalidateTerminalRuntime'
+            ),
+            DEADLINE_MS.stopAttempt,
+            'Sandbox terminal invalidation timed out'
+          ).then(
+            () => true,
+            () => false
+          );
+        })
+    );
+    return invalidated.every(Boolean);
+  }
+
+  private async notifyAttachedSessions(
+    reason: string,
+    wrapperInstanceId: string,
+    directory?: string
+  ): Promise<boolean> {
+    const table = await loadRouteTable(this.ctx.storage);
+    const notified = await Promise.all(
+      [...table.values()]
+        .filter(route => directory === undefined || route.directory === directory)
+        .map(route =>
+          withTimeout(
+            withDORetry(
+              () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
+              stub => stub.failWaitingMessages(reason, wrapperInstanceId),
+              'failWaitingMessages'
+            ),
+            DEADLINE_MS.stopAttempt,
+            'Sandbox failure notification timed out'
+          ).then(
+            () => true,
+            () => false
+          )
+        )
+    );
+    return notified.every(Boolean);
   }
 
   private mutateRoutes<T>(

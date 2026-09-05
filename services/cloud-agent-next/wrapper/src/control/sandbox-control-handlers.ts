@@ -6,6 +6,7 @@ import {
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
 import {
+  SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
   SESSION_OPERATIONS,
   sandboxShutdownPayloadSchema,
   sessionAbortPayloadSchema,
@@ -324,7 +325,16 @@ export async function refreshHeartbeatPayload(
 export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>): HandlerDeps {
   const deps: HandlerDeps = Object.assign(input, {
     operations: createOperationRegistry({
-      native: { get: directory => input.kiloRuntimes?.get(directory) },
+      native: {
+        get: directory => input.kiloRuntimes?.get(directory),
+        getRetained: directory => input.kiloRuntimes?.getRetained?.(directory),
+        retireRuntime: (directory, deadlineAt, target) =>
+          input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
+          Promise.resolve('unconfirmed'),
+        verifyQuiescence: (directory, target, deadlineAt) =>
+          input.kiloRuntimes?.verifyQuiescence?.(directory, target, deadlineAt) ??
+          Promise.resolve(false),
+      },
       onStarted: (session, preparation) => {
         if (!preparation) deps.activity?.markActive(session.kiloSessionId);
         const snapshot = deps.sessions.find(item => item.kiloSessionId === session.kiloSessionId);
@@ -887,6 +897,27 @@ async function handleAbort(
 ): Promise<ControlHandlerResult> {
   const parsed = sessionAbortPayloadSchema.safeParse(payload ?? {});
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  if (parsed.data.nativeRuntimeId) {
+    const runtime = deps.kiloRuntimes?.getRetained?.(session.directory);
+    if (!runtime || runtime.runtimeId !== parsed.data.nativeRuntimeId) {
+      return ok({ status: 'unconfirmed', quiescent: false });
+    }
+    const deadlineAt =
+      parsed.data.cleanupDeadlineAt ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS;
+    const retirement = await deps.operations.retireDirectory(
+      session.directory,
+      'Native runtime retirement requested',
+      deadlineAt,
+      { runtimeId: parsed.data.nativeRuntimeId, client: runtime.kiloClient }
+    );
+    return ok({
+      status: retirement === 'unconfirmed' ? 'unconfirmed' : 'aborted',
+      quiescent: retirement !== 'unconfirmed',
+      ...(retirement === 'retired'
+        ? { runtimeRetired: true, nativeRuntimeId: parsed.data.nativeRuntimeId }
+        : {}),
+    });
+  }
   const task = deps.operations.abortTarget(session, parsed.data.messageId);
   if (task) {
     if (
@@ -899,13 +930,44 @@ async function handleAbort(
           : { status: 'already_idle' }
       );
     }
-    task.cancel('Session aborted', 'cancelled', parsed.data.cleanupDeadlineAt);
+    if (!parsed.data.operationId) {
+      task.cancel('Session aborted', 'cancelled', parsed.data.cleanupDeadlineAt);
+      const result = await task.done;
+      if (task.cleanup === 'unconfirmed')
+        return fail('not_ready', 'Kilo cancellation was not confirmed', false);
+      if (!result.ok && task.kind !== 'preparation') return result;
+      return ok({ status: 'aborted' });
+    }
+    const deadlineAt = task.captureCleanupDeadline(
+      parsed.data.cleanupDeadlineAt ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
+    );
+    let quiescent = await task.cleanupOwnedWork(deadlineAt);
+    let runtimeRetired = false;
+    let nativeRuntimeId: string | undefined;
+    const target = task.nativeTarget();
+    if (!quiescent && target && Date.now() < deadlineAt) {
+      const retirementReason = 'Native cancellation did not settle';
+      const retirement = await deps.operations.retireDirectory(
+        session.directory,
+        retirementReason,
+        deadlineAt,
+        target
+      );
+      runtimeRetired = retirement === 'retired';
+      if (runtimeRetired) nativeRuntimeId = target.runtimeId;
+      quiescent = task.confirmCleanup(retirement !== 'unconfirmed', deadlineAt);
+      if (retirement === 'unconfirmed') deps.retireRuntime(retirementReason);
+    } else if (!quiescent) {
+      task.requestRetirement('Kilo cancellation failed', deadlineAt);
+    }
     const result = await task.done;
     if (parsed.data.operationId) {
       const delivery = task.deliveryResult();
       return ok({
-        status: 'unconfirmed',
-        quiescent: false,
+        status: quiescent ? 'aborted' : 'unconfirmed',
+        quiescent,
+        ...(runtimeRetired ? { runtimeRetired: true } : {}),
+        ...(nativeRuntimeId ? { nativeRuntimeId } : {}),
         ...(delivery ? { delivery } : {}),
       });
     }

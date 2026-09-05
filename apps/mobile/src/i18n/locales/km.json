@@ -673,8 +673,7 @@
     "profile": "ប្រវត្តិរូប",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ផ្ទាំង, {{position}} នៃ {{total}}",
-    "chat": "សារជជែក"
+    "position": "{{name}}, ផ្ទាំង, {{position}} នៃ {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "នៅពេលអ្នកជឿទុកចិត្តម៉ាស៊ីនរបស់តំណ វានឹងបើកដោយមិនសួរម្តងទៀត។",
     "revoke": "ដកហូត {{host}}",
     "backToPreferences": "ត្រឡប់ទៅការកំណត់"
-  },
-  "quickChat": {
-    "title": "សារជជែក",
-    "composer": {
-      "placeholder": "សារ"
-    },
-    "empty": {
-      "title": "ចាប់ផ្តើមជជែក",
-      "description": "ផ្ញើសារដើម្បីនិយាយជាមួយគំរូមួយ។"
-    },
-    "working": "កំពុងដំណើរការ",
-    "historyRetry": "មិនអាចផ្ទុកប្រវត្តិជជែកបានទេ។",
-    "catalogRetry": "មិនអាចផ្ទុកគំរូបានទេ",
-    "sendError": "មិនអាចផ្ញើសារបានទេ។ សូមព្យាយាមម្តងទៀត។"
   },
   "glanceable": {
     "waiting": "កំពុងធ្វើបច្ចុប្បន្នភាពភ្នាក់ងារ",

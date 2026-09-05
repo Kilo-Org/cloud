@@ -673,8 +673,7 @@
     "profile": "Koontada",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} oo {{total}} ah",
-    "chat": "Wada sheekaysi"
+    "position": "{{name}}, tab, {{position}} oo {{total}} ah"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Markaad amini host-ka link, wuxuu isku furaa isagoon mar kale weydiinin.",
     "revoke": "Jooji {{host}}",
     "backToPreferences": "Ku noqo doorashooyinka"
-  },
-  "quickChat": {
-    "title": "Wada sheekaysi",
-    "composer": {
-      "placeholder": "Fariin"
-    },
-    "empty": {
-      "title": "Bilow wada sheekaysi",
-      "description": "Dir fariin si aad ula hadasho model."
-    },
-    "working": "Waa shaqaynayaa",
-    "historyRetry": "Taariikhda wada sheekaysiga lama soo gelin karin.",
-    "catalogRetry": "Moodeelada lama soo dejin karin",
-    "sendError": "Fariinta lama diri karin. Mar kale isku day."
   },
   "glanceable": {
     "waiting": "Cusboonaysiinaya wakiillada",

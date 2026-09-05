@@ -219,8 +219,7 @@
     "profile": "פרופיל",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, טאב, {{position}} מתוך {{total}}",
-    "chat": "שיחה"
+    "position": "{{name}}, טאב, {{position}} מתוך {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3224,20 +3223,6 @@
     "emptyDescription": "כשאתה בוטח במארח של קישור, הוא נפתח ללא שאלה נוספת.",
     "revoke": "בטל אמון ב{{host}}",
     "backToPreferences": "חזור להעדפות"
-  },
-  "quickChat": {
-    "title": "שיחה",
-    "composer": {
-      "placeholder": "הודעה"
-    },
-    "empty": {
-      "title": "התחל שיחה",
-      "description": "שלח הודעה כדי לשוחח עם מודל."
-    },
-    "working": "עובד",
-    "historyRetry": "לא ניתן היה לטעון את היסטוריית השיחה.",
-    "catalogRetry": "לא ניתן לטעון דגמים",
-    "sendError": "לא ניתן היה לשלוח את ההודעה. נסה שוב."
   },
   "glanceable": {
     "waiting": "מעדכן סוכנים",

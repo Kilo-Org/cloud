@@ -673,8 +673,7 @@
     "profile": "Профил",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, раздел, {{position}} от {{total}}",
-    "chat": "Чат"
+    "position": "{{name}}, раздел, {{position}} от {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Когато се доверите на хоста на връзка, тя се отваря без да пита отново.",
     "revoke": "Отмени {{host}}",
     "backToPreferences": "Обратно към предпочитанията"
-  },
-  "quickChat": {
-    "title": "Чат",
-    "composer": {
-      "placeholder": "Съобщение"
-    },
-    "empty": {
-      "title": "Започнете разговор",
-      "description": "Изпратете съобщение, за да говорите с модел."
-    },
-    "working": "Работи",
-    "historyRetry": "Не можа да се зареди историята на чата.",
-    "catalogRetry": "Не може да се заредят моделите",
-    "sendError": "Не можахме да изпратим съобщението. Опитайте отново."
   },
   "glanceable": {
     "waiting": "Актуализиране на агентите",

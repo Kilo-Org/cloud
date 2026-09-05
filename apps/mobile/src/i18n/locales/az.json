@@ -673,8 +673,7 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, nişan, {{total}}-dən {{position}}",
-    "chat": "Söhbət"
+    "position": "{{name}}, nişan, {{total}}-dən {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Bir linkin hostuna etibar etdikdə, link yenidən sorğusuz açılır.",
     "revoke": "{{host}} üçün etibarı ləğv et",
     "backToPreferences": "Tənzimləmələrə qayıt"
-  },
-  "quickChat": {
-    "title": "Söhbət",
-    "composer": {
-      "placeholder": "Mesaj"
-    },
-    "empty": {
-      "title": "Söhbətə başlayın",
-      "description": "Bir modellə danışmaq üçün mesaj göndərin."
-    },
-    "working": "İşlənir",
-    "historyRetry": "Söhbət tarixçəsi yüklənə bilmədi.",
-    "catalogRetry": "Modellər yüklənə bilmədi",
-    "sendError": "Mesaj göndərilə bilmədi. Yenidən cəhd edin."
   },
   "glanceable": {
     "waiting": "Agentlər yenilənir",

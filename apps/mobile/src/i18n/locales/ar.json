@@ -219,8 +219,7 @@
     "profile": "الملف الشخصي",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تبويب، {{position}} من {{total}}",
-    "chat": "المحادثات"
+    "position": "{{name}}، تبويب، {{position}} من {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3290,20 +3289,6 @@
     "emptyDescription": "عندما تثق بمضيف رابط، يُفتح دون سؤال مرة أخرى.",
     "revoke": "إبطال {{host}}",
     "backToPreferences": "العودة إلى التفضيلات"
-  },
-  "quickChat": {
-    "title": "المحادثات",
-    "composer": {
-      "placeholder": "رسالة"
-    },
-    "empty": {
-      "title": "بدء محادثة",
-      "description": "أرسل رسالة للتحدث مع نموذج."
-    },
-    "working": "جارٍ العمل",
-    "historyRetry": "تعذّر تحميل سجل المحادثة.",
-    "catalogRetry": "تعذّر تحميل النماذج",
-    "sendError": "تعذّر إرسال الرسالة. حاول مرة أخرى."
   },
   "glanceable": {
     "waiting": "جارٍ تحديث الوكلاء",

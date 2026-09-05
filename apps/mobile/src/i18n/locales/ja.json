@@ -219,8 +219,7 @@
     "profile": "プロフィール",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}、タブ、{{total}}中{{position}}",
-    "chat": "チャット"
+    "position": "{{name}}、タブ、{{total}}中{{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "リンクのホストを信頼すると、再度確認せずに開きます。",
     "revoke": "{{host}} を失効",
     "backToPreferences": "設定に戻る"
-  },
-  "quickChat": {
-    "title": "チャット",
-    "composer": {
-      "placeholder": "メッセージ"
-    },
-    "empty": {
-      "title": "チャットを開始",
-      "description": "モデルと話すにはメッセージを送信してください。"
-    },
-    "working": "作業中",
-    "historyRetry": "チャット履歴を読み込めませんでした。",
-    "catalogRetry": "モデルを読み込めませんでした",
-    "sendError": "メッセージを送信できませんでした。もう一度お試しください。"
   },
   "glanceable": {
     "waiting": "エージェントを更新中",

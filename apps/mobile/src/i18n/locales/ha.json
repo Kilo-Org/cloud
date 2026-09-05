@@ -673,8 +673,7 @@
     "profile": "Bayanan",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, shafi, {{position}} na {{total}}",
-    "chat": "Tattaunawa"
+    "position": "{{name}}, shafi, {{position}} na {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Idan ka amince da mazabar hanyar, za ta buɗe ba tare da sake tambaya ba.",
     "revoke": "Soke {{host}}",
     "backToPreferences": "Koma ga zaɓuɓɓuka"
-  },
-  "quickChat": {
-    "title": "Tattaunawa",
-    "composer": {
-      "placeholder": "Saƙo"
-    },
-    "empty": {
-      "title": "Fara tattaunawa",
-      "description": "Aika saƙo don tattaunawa da samfurin."
-    },
-    "working": "Yana aiki",
-    "historyRetry": "Ba a iya loda tarihin tattaunawa.",
-    "catalogRetry": "An kasa ɗora samfuran",
-    "sendError": "An kasa aika saƙon. Sake gwadawa."
   },
   "glanceable": {
     "waiting": "Ana sabunta wakilai",

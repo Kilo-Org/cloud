@@ -673,8 +673,7 @@
     "profile": "Notandasnið",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, flipi, {{position}} af {{total}}",
-    "chat": "Spjall"
+    "position": "{{name}}, flipi, {{position}} af {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Þegar þú treystir gestgjafa tengils opnast hann án þess að spyrja aftur.",
     "revoke": "Draga til baka {{host}}",
     "backToPreferences": "Til baka í stillingar"
-  },
-  "quickChat": {
-    "title": "Spjall",
-    "composer": {
-      "placeholder": "Skilaboð"
-    },
-    "empty": {
-      "title": "Byrjaðu spjall",
-      "description": "Sendu skilaboð til að tala við líkan."
-    },
-    "working": "Vinnur",
-    "historyRetry": "Ekki tókst að hlaða samtalsferilinn.",
-    "catalogRetry": "Ekki tókst að hlaða líkön",
-    "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
   },
   "glanceable": {
     "waiting": "Uppfærir umboð",

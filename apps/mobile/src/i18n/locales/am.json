@@ -673,8 +673,7 @@
     "profile": "መገለጫ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}፣ ትር፣ {{position}} ከ{{total}}",
-    "chat": "ውይይት"
+    "position": "{{name}}፣ ትር፣ {{position}} ከ{{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "የአገናኝ አስተናጋጅ ስትመን፣ እንደገና ሳይጠይቅ ይከፈታል።",
     "revoke": "{{host}} አስቀር",
     "backToPreferences": "ወደ ምርጫዎች ተመለስ"
-  },
-  "quickChat": {
-    "title": "ውይይት",
-    "composer": {
-      "placeholder": "መልእክት"
-    },
-    "empty": {
-      "title": "ውይይት ጀምር",
-      "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
-    },
-    "working": "በመስራት ላይ",
-    "historyRetry": "የውይይት ታሪክ መጫን አልተቻለም።",
-    "catalogRetry": "ሞዴሎችን መጫን አልተቻለም",
-    "sendError": "መልእክቱን መላክ አልተቻለም። እንደገና ይሞክሩ።"
   },
   "glanceable": {
     "waiting": "ወኪሎችን በማዘመን ላይ",

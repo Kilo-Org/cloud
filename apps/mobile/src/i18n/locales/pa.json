@@ -673,8 +673,7 @@
     "profile": "ਪ੍ਰੋਫਾਈਲ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ਟੈਬ, {{total}} ਵਿੱਚੋਂ {{position}}",
-    "chat": "ਚੈਟ"
+    "position": "{{name}}, ਟੈਬ, {{total}} ਵਿੱਚੋਂ {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "ਜਦੋਂ ਤੁਸੀਂ ਕਿਸੇ ਲਿੰਕ ਦੇ ਹੋਸਟ 'ਤੇ ਭਰੋਸਾ ਕਰਦੇ ਹੋ, ਇਹ ਦੁਬਾਰਾ ਪੁੱਛੇ ਬਿਨਾਂ ਖੁੱਲ੍ਹਦਾ ਹੈ।",
     "revoke": "{{host}} ਨੂੰ ਹਟਾਓ",
     "backToPreferences": "ਤਰਜੀਹਾਂ 'ਤੇ ਵਾਪਸ ਜਾਓ"
-  },
-  "quickChat": {
-    "title": "ਚੈਟ",
-    "composer": {
-      "placeholder": "ਸੁਨੇਹਾ"
-    },
-    "empty": {
-      "title": "ਚੈਟ ਸ਼ੁਰੂ ਕਰੋ",
-      "description": "ਕਿਸੇ ਮਾਡਲ ਨਾਲ ਗੱਲ ਕਰਨ ਲਈ ਸੁਨੇਹਾ ਭੇਜੋ।"
-    },
-    "working": "ਕੰਮ ਹੋ ਰਿਹਾ ਹੈ",
-    "historyRetry": "ਚੈਟ ਇਤਿਹਾਸ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
-    "catalogRetry": "ਮਾਡਲ ਲੋਡ ਨਹੀਂ ਕੀਤੇ ਜਾ ਸਕੇ",
-    "sendError": "ਸੁਨੇਹਾ ਭੇਜਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
   },
   "glanceable": {
     "waiting": "ਏਜੰਟ ਅੱਪਡੇਟ ਕੀਤੇ ਜਾ ਰਹੇ ਹਨ",

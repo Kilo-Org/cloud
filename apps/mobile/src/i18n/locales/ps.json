@@ -673,8 +673,7 @@
     "profile": "پروفایل",
     "kiloclaw": "کلیوکلاو",
     "kiloclawWrapped": "کلیو\nکلاو",
-    "position": "{{name}}, ټب، {{total}} څخه {{position}}",
-    "chat": "د چټ پیغامونه"
+    "position": "{{name}}, ټب، {{total}} څخه {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "کله چې تاسو د لینک هوسټ باور وکړئ، دا بیا له پوښتلو پرته خلاصیږي.",
     "revoke": "{{host}} لغوه کړئ",
     "backToPreferences": "بېرته ترجیحاتو ته"
-  },
-  "quickChat": {
-    "title": "د چټ پیغامونه",
-    "composer": {
-      "placeholder": "پیغام"
-    },
-    "empty": {
-      "title": "چټ پیل کړئ",
-      "description": "د ماډل سره د خبرو کولو لپاره پیغام ولېږئ."
-    },
-    "working": "روان",
-    "historyRetry": "د چټ تاریخ بار کیدلای نه شو.",
-    "catalogRetry": "ماډلونه بار نه شول",
-    "sendError": "د پیغام لیږل ممکن نه شول. بیا هڅه وکړئ."
   },
   "glanceable": {
     "waiting": "اجنټان تازه کېږي",

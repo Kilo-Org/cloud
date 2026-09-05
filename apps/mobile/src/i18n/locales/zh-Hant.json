@@ -219,8 +219,7 @@
     "profile": "個人資料",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}，標籤頁，{{total}} 中的第 {{position}} 個",
-    "chat": "聊天"
+    "position": "{{name}}，標籤頁，{{total}} 中的第 {{position}} 個"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "當您信任連結的主機時，它會直接開啟，不再詢問。",
     "revoke": "撤銷 {{host}}",
     "backToPreferences": "返回偏好設定"
-  },
-  "quickChat": {
-    "title": "聊天",
-    "composer": {
-      "placeholder": "訊息"
-    },
-    "empty": {
-      "title": "開始聊天",
-      "description": "傳送訊息以與模型對話。"
-    },
-    "working": "處理中",
-    "historyRetry": "無法載入聊天記錄。",
-    "catalogRetry": "無法載入模型",
-    "sendError": "無法傳送訊息。請再試一次。"
   },
   "glanceable": {
     "waiting": "正在更新代理",

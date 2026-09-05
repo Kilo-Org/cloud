@@ -673,8 +673,7 @@
     "profile": "ప్రొఫైల్",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ట్యాబ్, మొత్తం {{total}} లో {{position}}",
-    "chat": "చాట్"
+    "position": "{{name}}, ట్యాబ్, మొత్తం {{total}} లో {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "మీరు లింక్ యొక్క హోస్ట్ను విశ్వసించినప్పుడు, అది మళ్లీ అడగకుండా తెరుచుకుంటుంది.",
     "revoke": "{{host}}ను రద్దు చేయండి",
     "backToPreferences": "ప్రాధాన్యతలకు తిరిగి వెళ్లండి"
-  },
-  "quickChat": {
-    "title": "చాట్",
-    "composer": {
-      "placeholder": "సందేశం"
-    },
-    "empty": {
-      "title": "చాట్ ప్రారంభించండి",
-      "description": "మోడల్తో మాట్లాడటానికి సందేశం పంపండి."
-    },
-    "working": "పని జరుగుతోంది",
-    "historyRetry": "చాట్ చరిత్రను లోడ్ చేయలేకపోయాము.",
-    "catalogRetry": "మోడళ్లను లోడ్ చేయలేకపోయాము",
-    "sendError": "సందేశం పంపలేకపోయాము. మళ్ళీ ప్రయత్నించండి."
   },
   "glanceable": {
     "waiting": "ఏజెంట్లను నవీకరిస్తోంది",

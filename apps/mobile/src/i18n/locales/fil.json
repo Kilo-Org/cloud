@@ -673,8 +673,7 @@
     "profile": "Profile",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} sa {{total}}",
-    "chat": "Chat"
+    "position": "{{name}}, tab, {{position}} sa {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Kapag pinagkakatiwalaan mo ang host ng isang link, bubuksan ito nang hindi na nagtatanong.",
     "revoke": "Bawiin ang {{host}}",
     "backToPreferences": "Bumalik sa mga kagustuhan"
-  },
-  "quickChat": {
-    "title": "Chat",
-    "composer": {
-      "placeholder": "Mensahe"
-    },
-    "empty": {
-      "title": "Magsimula ng chat",
-      "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
-    },
-    "working": "Gumagawa",
-    "historyRetry": "Hindi ma-load ang kasaysayan ng chat.",
-    "catalogRetry": "Hindi maload ang mga modelo",
-    "sendError": "Nabigong magpadala ng mensahe. Pakisubukang muli."
   },
   "glanceable": {
     "waiting": "Ina-update ang mga agent",

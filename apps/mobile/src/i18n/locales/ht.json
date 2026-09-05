@@ -673,8 +673,7 @@
     "profile": "Pwofil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} sou {{total}}",
-    "chat": "Chat"
+    "position": "{{name}}, tab, {{position}} sou {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Lè ou fè konfyans ak host yon lyen, li louvri san mande ankò.",
     "revoke": "Retire {{host}}",
     "backToPreferences": "Retounen nan preferans"
-  },
-  "quickChat": {
-    "title": "Chat",
-    "composer": {
-      "placeholder": "Mesaj"
-    },
-    "empty": {
-      "title": "Kòmanse yon chat",
-      "description": "Voye yon mesaj pou pale ak yon modèl."
-    },
-    "working": "Ap travay",
-    "historyRetry": "Pa t ka chaje istwa chat la.",
-    "catalogRetry": "Pa t ka chaje modèl yo",
-    "sendError": "Pa t ka voye mesaj la. Tanpri eseye ankò."
   },
   "glanceable": {
     "waiting": "Ap mete ajans yo ajou",

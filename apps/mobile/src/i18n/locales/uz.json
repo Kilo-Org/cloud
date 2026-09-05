@@ -673,8 +673,7 @@
     "profile": "Profil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, yorliq, {{total}} tadan {{position}}",
-    "chat": "Suhbat"
+    "position": "{{name}}, yorliq, {{total}} tadan {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Havolaning xostiga ishonsangiz, u yana so'rovsiz ochiladi.",
     "revoke": "{{host}} ruxsatini bekor qilish",
     "backToPreferences": "Sozlamalarga qaytish"
-  },
-  "quickChat": {
-    "title": "Suhbat",
-    "composer": {
-      "placeholder": "Xabar"
-    },
-    "empty": {
-      "title": "Suhbatni boshlang",
-      "description": "Model bilan gaplashish uchun xabar yuboring."
-    },
-    "working": "Ishlamoqda",
-    "historyRetry": "Suhbat tarixini yuklab bo'lmadi.",
-    "catalogRetry": "Modellarni yuklab bo'lmadi",
-    "sendError": "Xabarni yuborib bo'lmadi. Iltimos, qayta urinib ko'ring."
   },
   "glanceable": {
     "waiting": "Agentlar yangilanmoqda",

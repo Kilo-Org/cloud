@@ -673,8 +673,7 @@
     "profile": "Iphrofayili",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ithebhu, {{position}} kwe-{{total}}",
-    "chat": "Ingxoxo"
+    "position": "{{name}}, ithebhu, {{position}} kwe-{{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Uma uthemba i-host yesixhumanisi, ivula ngaphandle kokubuza futhi.",
     "revoke": "Hlehlisa {{host}}",
     "backToPreferences": "Buyela kokuthandwayo"
-  },
-  "quickChat": {
-    "title": "Ingxoxo",
-    "composer": {
-      "placeholder": "Umlayezo"
-    },
-    "empty": {
-      "title": "Qala ingxoxo",
-      "description": "Thumela umlayezo ukuze uxoxe nomodeli."
-    },
-    "working": "Iyasebenza",
-    "historyRetry": "Asikwazanga ukulayisha umlando wengxoxo.",
-    "catalogRetry": "Akukwazanga ukulayisha amamodeli",
-    "sendError": "Asikwazanga ukuthumela umlayezo. Uzama futhi."
   },
   "glanceable": {
     "waiting": "Ibuyekeza ama-agent",

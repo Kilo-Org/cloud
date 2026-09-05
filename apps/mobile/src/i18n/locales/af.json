@@ -673,8 +673,7 @@
     "profile": "Profiel",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, oortjie, {{position}} van {{total}}",
-    "chat": "Klets"
+    "position": "{{name}}, oortjie, {{position}} van {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Wanneer jy 'n skakel se gasheer vertrou, maak dit oop sonder om weer te vra.",
     "revoke": "Herroep {{host}}",
     "backToPreferences": "Terug na voorkeure"
-  },
-  "quickChat": {
-    "title": "Klets",
-    "composer": {
-      "placeholder": "Boodskap"
-    },
-    "empty": {
-      "title": "Begin 'n klets",
-      "description": "Stuur 'n boodskap om met 'n model te gesels."
-    },
-    "working": "Werk",
-    "historyRetry": "Kon nie kletsgeskiedenis laai nie.",
-    "catalogRetry": "Kon nie modelle laai nie",
-    "sendError": "Kon nie die boodskap stuur nie. Probeer asseblief weer."
   },
   "glanceable": {
     "waiting": "Dateer agente op",

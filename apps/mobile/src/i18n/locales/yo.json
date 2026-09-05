@@ -673,8 +673,7 @@
     "profile": "Àkójọpọ̀",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, taabu, {{position}} nínú {{total}}",
-    "chat": "Iwiregbe"
+    "position": "{{name}}, taabu, {{position}} nínú {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Nigbati o ba gbẹkẹle agbalejo ti ọna asopọ kan, yoo ṣii laisi béèrè lẹẹkansi.",
     "revoke": "Fagilee {{host}}",
     "backToPreferences": "Pada si awọn ayanfẹ"
-  },
-  "quickChat": {
-    "title": "Iwiregbe",
-    "composer": {
-      "placeholder": "Ifiranṣẹ"
-    },
-    "empty": {
-      "title": "Bẹ̀rẹ̀ iwiregbe kan",
-      "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."
-    },
-    "working": "Nṣiṣẹ́",
-    "historyRetry": "Kò lè ṣagbewọ ìtàn iwiregbe.",
-    "catalogRetry": "Kò lè gbé àwọn àwoṣe",
-    "sendError": "Kò lè ran ifiranṣẹ náà. Jọ̀wọ́ tún gbìyànjú."
   },
   "glanceable": {
     "waiting": "Ti n ṣe imudojuiwọn awọn aṣoju",

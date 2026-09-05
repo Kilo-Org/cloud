@@ -673,8 +673,7 @@
     "profile": "ପ୍ରୋଫାଇଲ୍",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ରୁ {{position}}",
-    "chat": "ଚାଟ୍"
+    "position": "{{name}}, ଟ୍ୟାବ୍, {{total}} ରୁ {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "ଯେତେବେଳେ ଆପଣ ଏକ ଲିଙ୍କ୍‌ର ହୋଷ୍ଟକୁ ବିଶ୍ୱାସ କରନ୍ତି, ଏହା ପୁଣି ପଚାରିବା ବିନା ଖୋଲିଥାଏ।",
     "revoke": "{{host}} ରଦ୍ଦ କରନ୍ତୁ",
     "backToPreferences": "ପସନ୍ଦକୁ ଫେରନ୍ତୁ"
-  },
-  "quickChat": {
-    "title": "ଚାଟ୍",
-    "composer": {
-      "placeholder": "ସନ୍ଦେଶ"
-    },
-    "empty": {
-      "title": "ଏକ ଚାଟ୍ ଆରମ୍ଭ କରନ୍ତୁ",
-      "description": "ଏକ ମଡେଲ୍ ସହିତ କଥା ହେବାକୁ ଏକ ସନ୍ଦେଶ ପଠାନ୍ତୁ।"
-    },
-    "working": "କାମ କରୁଛି",
-    "historyRetry": "ଚାଟ୍ ଇତିହାସ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-    "catalogRetry": "ମଡେଲ ଲୋଡ୍ କରାଯାଇପାରିଲା ନାହିଁ",
-    "sendError": "ସନ୍ଦେଶ ପଠାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   },
   "glanceable": {
     "waiting": "ଏଜେଣ୍ଟଗୁଡ଼ିକ ଅପଡେଟ୍ ହେଉଛି",

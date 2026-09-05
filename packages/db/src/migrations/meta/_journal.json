@@ -1653,6 +1653,13 @@
       "when": 1788354565441,
       "tag": "0235_bent_mercury",
       "breakpoints": true
+    },
+    {
+      "idx": 236,
+      "version": "7",
+      "when": 1788574018539,
+      "tag": "0236_drop_quick_chat",
+      "breakpoints": true
     }
   ]
 }

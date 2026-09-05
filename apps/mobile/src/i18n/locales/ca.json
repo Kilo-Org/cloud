@@ -680,8 +680,7 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, pestanya, {{position}} de {{total}}",
-    "chat": "Chat"
+    "position": "{{name}}, pestanya, {{position}} de {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3224,20 +3223,6 @@
     "emptyDescription": "Quan confies en el host d'un enllaç, s'obre sense tornar a preguntar.",
     "revoke": "Revoca {{host}}",
     "backToPreferences": "Torna a les preferències"
-  },
-  "quickChat": {
-    "title": "Chat",
-    "composer": {
-      "placeholder": "Missatge"
-    },
-    "empty": {
-      "title": "Comença un xat",
-      "description": "Envia un missatge per parlar amb un model."
-    },
-    "working": "Treballant",
-    "historyRetry": "No s'ha pogut carregar l'historial del xat.",
-    "catalogRetry": "No s'han pogut carregar els models",
-    "sendError": "No s'ha pogut enviar el missatge. Torna-ho a provar."
   },
   "glanceable": {
     "waiting": "Actualitzant els agents",

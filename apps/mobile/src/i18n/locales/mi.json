@@ -673,8 +673,7 @@
     "profile": "Kōtaha",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ripa, {{position}} o {{total}}",
-    "chat": "Kōrero"
+    "position": "{{name}}, ripa, {{position}} o {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Inā whakawhirinaki koe ki te kaihautū o tētahi hono, ka tuwhera me te kore anō e pātai.",
     "revoke": "Whakakore i a {{host}}",
     "backToPreferences": "Hoki ki ngā manakohanga"
-  },
-  "quickChat": {
-    "title": "Kōrero",
-    "composer": {
-      "placeholder": "Karere"
-    },
-    "empty": {
-      "title": "Tīmata he kōrero",
-      "description": "Tukuna he karere hei kōrero ki tētahi tauira."
-    },
-    "working": "Kei te mahi",
-    "historyRetry": "Kāore i taea te uta te hītori kōrero.",
-    "catalogRetry": "Kāore i taea te uta i ngā tauira",
-    "sendError": "I rahua te tuku karere. Whakamātau anō."
   },
   "glanceable": {
     "waiting": "Kei te whakahou i ngā māngai",

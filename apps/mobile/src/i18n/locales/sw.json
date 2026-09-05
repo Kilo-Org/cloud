@@ -673,8 +673,7 @@
     "profile": "Wasifu",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, kichupo, {{position}} kati ya {{total}}",
-    "chat": "Mazungumzo"
+    "position": "{{name}}, kichupo, {{position}} kati ya {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Unapoamini mwenyeji wa kiungo, hufunguka bila kuuliza tena.",
     "revoke": "Ondoa {{host}}",
     "backToPreferences": "Rudi kwenye mapendeleo"
-  },
-  "quickChat": {
-    "title": "Mazungumzo",
-    "composer": {
-      "placeholder": "Ujumbe"
-    },
-    "empty": {
-      "title": "Anza mazungumzo",
-      "description": "Tuma ujumbe ili uongee na mfano."
-    },
-    "working": "Inafanya kazi",
-    "historyRetry": "Haikuweza kupakia historia ya mazungumzo.",
-    "catalogRetry": "Imeshindwa kupakia miundo",
-    "sendError": "Haikuweza kutuma ujumbe. Jaribu tena."
   },
   "glanceable": {
     "waiting": "Inasasisha mawakala",

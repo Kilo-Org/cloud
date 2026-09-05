@@ -673,8 +673,7 @@
     "profile": "پروفایل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تب، {{position}} از {{total}}",
-    "chat": "پیام‌های گفتگو"
+    "position": "{{name}}، تب، {{position}} از {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "وقتی به میزبان یک پیوند اعتماد کنید، بدون پرسیدن دوباره باز میشود.",
     "revoke": "بازگرداندن {{host}}",
     "backToPreferences": "بازگشت به تنظیمات"
-  },
-  "quickChat": {
-    "title": "پیام‌های گفتگو",
-    "composer": {
-      "placeholder": "پیام"
-    },
-    "empty": {
-      "title": "شروع گفتگو",
-      "description": "برای گفتگو با یک مدل، یک پیام ارسال کنید."
-    },
-    "working": "در حال کار",
-    "historyRetry": "تاریخچه گفتگو بارگذاری نشد.",
-    "catalogRetry": "بارگذاری مدل‌ها ناموفق بود",
-    "sendError": "ارسال پیام ممکن نشد. دوباره تلاش کنید."
   },
   "glanceable": {
     "waiting": "در حال به‌روزرسانی عامل‌ها",

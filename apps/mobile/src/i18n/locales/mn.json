@@ -673,8 +673,7 @@
     "profile": "Профайл",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, таб, нийт {{total}} -ийн {{position}}",
-    "chat": "Чат"
+    "position": "{{name}}, таб, нийт {{total}} -ийн {{position}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Холбоосын хостыг итгэмжлэхэд дахин асуултгүй нээгдэнэ.",
     "revoke": "{{host}} цуцлах",
     "backToPreferences": "Тохиргоо руу буцах"
-  },
-  "quickChat": {
-    "title": "Чат",
-    "composer": {
-      "placeholder": "Мессеж"
-    },
-    "empty": {
-      "title": "Чат эхлүүлэх",
-      "description": "Загвартай ярилцахын тулд мессеж илгээнэ үү."
-    },
-    "working": "Ажиллаж байна",
-    "historyRetry": "Чат түүхийг ачаалж чадсангүй.",
-    "catalogRetry": "Загваруудыг ачаалж чадсангүй",
-    "sendError": "Мессежийг илгээж чадсангүй. Дахин оролдоно уу."
   },
   "glanceable": {
     "waiting": "Агентуудыг шинэчилж байна",

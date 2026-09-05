@@ -673,8 +673,7 @@
     "profile": "پڕۆفایل",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تاب، {{position}} لە {{total}}",
-    "chat": "گفتوگۆ"
+    "position": "{{name}}، تاب، {{position}} لە {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "کاتێک متمانە بە خزمەتگوزاری بەستەرێک دەکەیت، بەبێ پرسیارکردنەوە دەکرێتەوە.",
     "revoke": "هەڵوەشاندنەوەی {{host}}",
     "backToPreferences": "گەڕانەوە بۆ پەسەندەکان"
-  },
-  "quickChat": {
-    "title": "گفتوگۆ",
-    "composer": {
-      "placeholder": "نامە"
-    },
-    "empty": {
-      "title": "دەستپێکردنی گفتوگۆیەک",
-      "description": "پەیامێک بنێرە بۆ قسەکردن لەگەڵ مۆدێلێک."
-    },
-    "working": "کارکردن",
-    "historyRetry": "نەتوانرا مێژووی گفتوگۆ بار بکرێت.",
-    "catalogRetry": "نەتوانرا مۆدێلەکان بار بکرێن",
-    "sendError": "شکستی هێنا لە ناردنی پەیام. تکایە دووبارە هەوڵ بدە."
   },
   "glanceable": {
     "waiting": "لە نوێکردنەوەی ئەجێنتەکاندایە",

@@ -701,8 +701,7 @@
     "profile": "Proffil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} o {{total}}",
-    "chat": "Sgwrs"
+    "position": "{{name}}, tab, {{position}} o {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3290,20 +3289,6 @@
     "emptyDescription": "Pan fyddwch yn ymddiried yn nhost y ddolen, bydd yn agor heb ofyn eto.",
     "revoke": "Diddymu {{host}}",
     "backToPreferences": "Yn ôl i'r dewisiadau"
-  },
-  "quickChat": {
-    "title": "Sgwrs",
-    "composer": {
-      "placeholder": "Neges"
-    },
-    "empty": {
-      "title": "Dechrau sgwrs",
-      "description": "Anfonwch neges i siarad â model."
-    },
-    "working": "Yn gweithio",
-    "historyRetry": "Ni ellid llwytho hanes y sgwrs.",
-    "catalogRetry": "Methodd llwytho modelau",
-    "sendError": "Methodd anfon neges. Ceisiwch eto."
   },
   "glanceable": {
     "waiting": "Yn diweddaru asiantau",

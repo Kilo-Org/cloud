@@ -219,8 +219,7 @@
     "profile": "प्रोफ़ाइल",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, टैब, {{position}} में से {{total}}",
-    "chat": "चैट"
+    "position": "{{name}}, टैब, {{position}} में से {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "जब आप किसी लिंक के होस्ट पर भरोसा करते हैं, तो यह बिना फिर से पूछे खुलता है।",
     "revoke": "हटाएँ {{host}}",
     "backToPreferences": "प्राथमिकताओं पर वापस जाएँ"
-  },
-  "quickChat": {
-    "title": "चैट",
-    "composer": {
-      "placeholder": "संदेश"
-    },
-    "empty": {
-      "title": "चैट शुरू करें",
-      "description": "किसी मॉडल से बात करने के लिए संदेश भेजें।"
-    },
-    "working": "काम कर रहा है",
-    "historyRetry": "चैट इतिहास लोड नहीं किया जा सका।",
-    "catalogRetry": "मॉडल लोड नहीं हो सके",
-    "sendError": "संदेश भेजा नहीं जा सका। फिर से कोशिश करें।"
   },
   "glanceable": {
     "waiting": "एजेंट अपडेट हो रहे हैं",

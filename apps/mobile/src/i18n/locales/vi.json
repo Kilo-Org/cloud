@@ -219,8 +219,7 @@
     "profile": "Hồ sơ",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tab, {{position}} trên {{total}}",
-    "chat": "Trò chuyện"
+    "position": "{{name}}, tab, {{position}} trên {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3202,20 +3201,6 @@
     "emptyDescription": "Khi bạn tin cậy máy chủ của một liên kết, liên kết đó sẽ mở mà không hỏi lại.",
     "revoke": "Thu hồi {{host}}",
     "backToPreferences": "Quay lại cài đặt"
-  },
-  "quickChat": {
-    "title": "Trò chuyện",
-    "composer": {
-      "placeholder": "Tin nhắn"
-    },
-    "empty": {
-      "title": "Bắt đầu trò chuyện",
-      "description": "Gửi tin nhắn để trò chuyện với mô hình."
-    },
-    "working": "Đang xử lý",
-    "historyRetry": "Không thể tải lịch sử trò chuyện.",
-    "catalogRetry": "Không thể tải các mô hình",
-    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
   },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",

@@ -694,8 +694,7 @@
     "profile": "Próifíl",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, cluaisín, {{position}} as {{total}}",
-    "chat": "Comhrá"
+    "position": "{{name}}, cluaisín, {{position}} as {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3268,20 +3267,6 @@
     "emptyDescription": "Nuair a bhíonn muinín agat as óstach an naisc, osclaíonn sé gan ceist a chur arís.",
     "revoke": "Cúlghair {{host}}",
     "backToPreferences": "Ar ais go dtí na roghanna"
-  },
-  "quickChat": {
-    "title": "Comhrá",
-    "composer": {
-      "placeholder": "Teachtaireacht"
-    },
-    "empty": {
-      "title": "Tosaigh comhrá",
-      "description": "Seol teachtaireacht chun labhairt le samhail."
-    },
-    "working": "Ag obair",
-    "historyRetry": "Níorbh fhéidir stair an chomhrá a lódáil.",
-    "catalogRetry": "Níorbh fhéidir múnlaí a lódáil",
-    "sendError": "Níorbh fhéidir an teachtaireacht a sheoladh. Bain triail as arís."
   },
   "glanceable": {
     "waiting": "Gníomhairí á nuashonrú",

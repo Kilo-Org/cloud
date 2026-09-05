@@ -219,8 +219,7 @@
     "profile": "Perfil",
     "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, pestaña, {{position}} de {{total}}",
-    "chat": "Chat"
+    "position": "{{name}}, pestaña, {{position}} de {{total}}"
   },
   "chat": {
     "instancePicker": {
@@ -3224,20 +3223,6 @@
     "emptyDescription": "Cuando confías en el host de un enlace, se abre sin volver a preguntar.",
     "revoke": "Revocar {{host}}",
     "backToPreferences": "Volver a preferencias"
-  },
-  "quickChat": {
-    "title": "Chat",
-    "composer": {
-      "placeholder": "Mensaje"
-    },
-    "empty": {
-      "title": "Inicia un chat",
-      "description": "Envía un mensaje para hablar con un modelo."
-    },
-    "working": "Trabajando",
-    "historyRetry": "No se pudo cargar el historial del chat.",
-    "catalogRetry": "No se pudieron cargar los modelos",
-    "sendError": "No se pudo enviar el mensaje. Inténtalo de nuevo."
   },
   "glanceable": {
     "waiting": "Actualizando agentes",

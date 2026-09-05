@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
-import { type Href, Tabs, usePathname, useRouter, useSegments } from 'expo-router';
-import { Bot, House, MessageCircle, MessageSquare, UserRound } from '@/components/ui/icons';
+import { type Href, Tabs, usePathname, useRouter } from 'expo-router';
+import { Bot, House, MessageSquare, UserRound } from '@/components/ui/icons';
 import { useEffect } from 'react';
 import { Platform, useWindowDimensions, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,7 +9,6 @@ import { useTranslation } from 'react-i18next';
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { Text } from '@/components/ui/text';
-import { FEATURE_FLAG_QUICK_CHAT, useFeatureFlag } from '@/lib/analytics/posthog';
 import { PROFILE_TAB_ROOT } from '@/lib/finding-detail-back';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { useKiloClawTabVisible } from '@/lib/hooks/use-kiloclaw-tab-visible';
@@ -67,7 +66,6 @@ function TabLabel({ label, focused }: Readonly<{ label: string; focused: boolean
 export default function TabsLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const segments = useSegments();
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
@@ -80,9 +78,8 @@ export default function TabsLayout() {
   });
   const tabIconSize = getTabBarIconSize(fontScale);
   const showKiloClawTab = useKiloClawTabVisible();
-  const showQuickChatTab = useFeatureFlag(FEATURE_FLAG_QUICK_CHAT, false);
-  const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: showQuickChatTab };
-  const tabCount = visibleTabCount(showKiloClawTab, showQuickChatTab);
+  const tabFlags = { showKiloClaw: showKiloClawTab, showQuickChat: false };
+  const tabCount = visibleTabCount(showKiloClawTab, false);
   const { t } = useTranslation();
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const { activeSessions, isLoading, isError } = useLiveAgentSessions({
@@ -107,15 +104,6 @@ export default function TabsLayout() {
   ).length;
   const needsInputBadge =
     orgLoaded && !isLoading && !isError && needsInputCount > 0 ? needsInputCount : undefined;
-
-  // If the flag flips off while the Chat tab is focused, its `href` becomes
-  // null but the route is still mounted — move to Home instead.
-  const onChatTab = segments.some(segment => segment === '(4_chat)');
-  useEffect(() => {
-    if (!showQuickChatTab && onChatTab) {
-      router.replace('/(app)/(tabs)/(0_home)' as Href);
-    }
-  }, [showQuickChatTab, onChatTab, router]);
 
   return (
     <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight + 16}>
@@ -207,27 +195,6 @@ export default function TabsLayout() {
             tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.agents')} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
-            ),
-          }}
-          listeners={{
-            tabPress: () => {
-              void Haptics.selectionAsync();
-            },
-          }}
-        />
-        <Tabs.Screen
-          name="(4_chat)"
-          options={{
-            href: showQuickChatTab ? undefined : null,
-            title: t('tabs.chat'),
-            tabBarAccessibilityLabel: tabAccessibilityLabel(
-              t('tabs.chat'),
-              tabBarPosition('chat', tabFlags) ?? 3,
-              tabCount
-            ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.chat')} focused={focused} />,
-            tabBarIcon: ({ color, focused }) => (
-              <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
           }}
           listeners={{

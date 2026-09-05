@@ -98,7 +98,10 @@ function asFetch(
   return Object.assign(fn, { preconnect: fetch.preconnect });
 }
 
-function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) {
+function createKiloStub(
+  health: unknown = { healthy: true, version: '7.4.20' },
+  statuses: Record<string, { type: string }> = {}
+) {
   const requests: Array<{ pathname: string; directory: string | null; body?: unknown }> = [];
   const permissions: Awaited<ReturnType<WrapperKiloClient['getPermissions']>> = [];
   const feeds = new Set<ReadableStreamDefaultController<Uint8Array>>();
@@ -142,7 +145,8 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
       if (request.method === 'GET' && url.pathname === '/permission') {
         return Response.json(permissions);
       }
-      if (request.method === 'GET' && url.pathname === '/session/status') return Response.json({});
+      if (request.method === 'GET' && url.pathname === '/session/status')
+        return Response.json(statuses);
       if (request.method === 'GET' && url.pathname === '/pty') return Response.json([]);
       if (request.method === 'POST' && url.pathname.startsWith('/permission/')) {
         const id = decodeURIComponent(url.pathname.split('/')[2]);
@@ -524,6 +528,94 @@ describe('worktree Kilo environments', () => {
 });
 
 describe('worktree Kilo runtime registry', () => {
+  it('waits for exit, gates replacement, and preserves a recovery acknowledgement', async () => {
+    const stopped = Promise.withResolvers<void>();
+    const directory = path.join(tmpDir, 'recovery');
+    const identity = rootIdentity(directory);
+    const stub = createKiloStub(undefined, { [identity.kiloSessionId]: { type: 'idle' } });
+    const replacementStub = createKiloStub(undefined, {
+      [identity.kiloSessionId]: { type: 'idle' },
+    });
+    servers.push(stub);
+    servers.push(replacementStub);
+    let closes = 0;
+    let starts = 0;
+    const { rawRegistry } = createRegistry({
+      startServer: async () => {
+        if (starts++ > 0) return { url: replacementStub.url, close: () => {} };
+        return {
+          url: stub.url,
+          stopped: stopped.promise,
+          close: () => {
+            closes += 1;
+          },
+        };
+      },
+    });
+    const attachment = rawRegistry.attach(identity, auth, undefined, undefined, 'per-session');
+    const runtime = await attachment.ready;
+    attachment.commit();
+    const recoveryId = '11111111-1111-4111-8111-111111111111';
+    const retirement = rawRegistry.retireForRecovery(identity, recoveryId, () => {});
+    await waitUntil(() => closes === 1);
+    expect(rawRegistry.get(identity)).toBeUndefined();
+    expect(() => rawRegistry.attach(identity, auth, undefined, undefined, 'per-session')).toThrow(
+      'Kilo runtime is retiring'
+    );
+    stopped.resolve();
+    await retirement;
+
+    const fresh = rawRegistry.attach(identity, auth, undefined, undefined, 'per-session');
+    const freshRuntime = await fresh.ready;
+    fresh.commit();
+    await rawRegistry.retireForRecovery(identity, recoveryId, () => {
+      throw new Error('Recovery acknowledgement must win');
+    });
+    expect(freshRuntime.signal.aborted).toBe(false);
+    expect(runtime.signal.aborted).toBe(true);
+    fresh.release();
+    attachment.release();
+  });
+
+  it('acknowledges an absent root without affecting a sibling or a later attachment', async () => {
+    const directory = path.join(tmpDir, 'cold-recovery');
+    const absent = rootIdentity(directory, 'absent');
+    const sibling = rootIdentity(directory, 'sibling');
+    const stub = createKiloStub(undefined, {
+      [absent.kiloSessionId]: { type: 'idle' },
+      [sibling.kiloSessionId]: { type: 'idle' },
+    });
+    servers.push(stub);
+    const { rawRegistry } = createRegistry({
+      startServer: async () => ({ url: stub.url, close: () => {} }),
+    });
+    const siblingAttachment = rawRegistry.attach(
+      sibling,
+      auth,
+      undefined,
+      undefined,
+      'per-session'
+    );
+    const siblingRuntime = await siblingAttachment.ready;
+    siblingAttachment.commit();
+    const recoveryId = '22222222-2222-4222-8222-222222222222';
+    expect(await rawRegistry.retireForRecovery(absent, recoveryId, () => {})).toBe('absent');
+    expect(rawRegistry.get(sibling)).toBe(siblingRuntime);
+
+    const pending = rawRegistry.attach(absent, auth, undefined, undefined, 'per-session');
+    expect(
+      await rejected(
+        rawRegistry.retireForRecovery(absent, '33333333-3333-4333-8333-333333333333', () => {})
+      )
+    ).toMatchObject({ code: 'session_busy' });
+    const freshRuntime = await pending.ready;
+    pending.commit();
+    expect(await rawRegistry.retireForRecovery(absent, recoveryId, () => {})).toBe('acknowledged');
+    expect(freshRuntime.signal.aborted).toBe(false);
+    pending.release();
+    siblingAttachment.release();
+  });
+
   it('defaults missing runtime isolation to a directory-shared runtime', async () => {
     const { rawRegistry, launches } = createRegistry();
     const directory = path.join(tmpDir, 'legacy-shared');

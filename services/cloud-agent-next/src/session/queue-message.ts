@@ -24,6 +24,13 @@ import { sessionPlaneFromId } from '../session-plane.js';
 import { logger } from '../logger.js';
 import { preflightExistingPromptModel } from './model-preflight.js';
 import { createMessageId } from './message-id.js';
+import {
+  createRuntimeAuthorization,
+  sealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import { resolveSecret } from '../auth.js';
+import { fetchSessionMetadata } from '../session-service.js';
+import jwt from 'jsonwebtoken';
 
 /** Retryable error codes that should map to 503 Service Unavailable. */
 const RETRYABLE_CODES: readonly RetryableResultCode[] = [
@@ -93,7 +100,68 @@ export type QueueMessageContext = {
   env: Env;
   userId: string;
   botId?: string;
+  authToken?: string;
 };
+
+async function recoverExpiredRuntimeAuthorization(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext
+): Promise<void> {
+  if (!ctx.authToken) return;
+  const claims = jwt.decode(ctx.authToken);
+  if (
+    !claims ||
+    typeof claims !== 'object' ||
+    !('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims)
+  ) {
+    return;
+  }
+  const sessionId = input.cloudAgentSessionId as SessionId;
+  const stub = resolveSessionStub(ctx.env, ctx.userId, sessionId);
+  const state = await withDORetry(
+    () => stub,
+    target => target.getRuntimeAuthorizationRecoveryState(),
+    'getRuntimeAuthorizationRecoveryState'
+  );
+  if (state.state !== 'expired' || !state.id) return;
+  const expectedOldId = state.id;
+  const recoveryId = state.recoveryId ?? crypto.randomUUID();
+  const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, input.cloudAgentSessionId);
+  if (!metadata || metadata.identity.userId !== ctx.userId) return;
+  const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
+  if (!secret)
+    throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Authentication unavailable' });
+  const created = await createRuntimeAuthorization({
+    token: ctx.authToken,
+    secret,
+    connectionString: ctx.env.HYPERDRIVE.connectionString,
+    resourceKind: 'cloud-agent-next',
+    resourceId: metadata.identity.sessionId,
+    ...(metadata.identity.orgId ? { organizationId: metadata.identity.orgId } : {}),
+  });
+  const runtimeAuthorizationSeal = await sealRuntimeAuthorization(created.authorization, secret);
+  const result = await withDORetry(
+    () => stub,
+    target =>
+      target.recoverExpiredRuntimeAuthorization({
+        ownerId: ctx.userId,
+        expectedOldId,
+        recoveryId,
+        runtimeAuthorizationSeal,
+        runtimeToken: created.token,
+      }),
+    'recoverExpiredRuntimeAuthorization'
+  );
+  if (result.status === 'denied') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+  }
+  if (result.status === 'busy' || result.status === 'retry') {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Runtime authorization recovery is waiting for the session runtime to become idle',
+    });
+  }
+}
 
 /**
  * Admit a user message via `CloudAgentSession.admitSubmittedMessage`.
@@ -132,6 +200,7 @@ export async function preflightAndAdmitPromptMessage<T>(
   procedure: string,
   admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
 ): Promise<T> {
+  await recoverExpiredRuntimeAuthorization(input, ctx);
   if (sessionPlaneFromId(input.cloudAgentSessionId) === 'control') return admit(input, ctx);
   if (await hasMessageAdmission(input, ctx)) return admit(input, ctx);
 
@@ -158,6 +227,7 @@ export async function queueMessage(
   input: QueueMessageInput,
   ctx: QueueMessageContext
 ): Promise<QueueAckResponse> {
+  await recoverExpiredRuntimeAuthorization(input, ctx);
   const sessionId = input.cloudAgentSessionId as SessionId;
   const request: SubmittedSessionMessageRequest = {
     userId: ctx.userId,

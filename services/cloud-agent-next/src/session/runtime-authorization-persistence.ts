@@ -8,8 +8,13 @@ import {
   type RuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization-contract';
 import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
+import { z } from 'zod';
 
 export const RUNTIME_AUTHORIZATION_KEY = 'runtime_authorization';
+export const RUNTIME_AUTHORIZATION_RECOVERY_KEY = 'runtime_authorization_recovery';
+export const runtimeAuthorizationRecoveryLockSchema = z
+  .object({ expectedOldId: z.string().uuid(), recoveryId: z.string().uuid() })
+  .strict();
 const RUNTIME_TOKEN_RENEWAL_WINDOW_MS = 5 * 60_000;
 
 function runtimeAuthorizationId(value: unknown): string | null {
@@ -43,6 +48,28 @@ export async function getRuntimeAuthorizationStatus(input: {
       : authorization.data.state;
   }
   return input.metadata && hasModernRuntimeAuthorization(input.metadata) ? 'revoked' : 'legacy';
+}
+
+export type RuntimeAuthorizationRecoveryState = {
+  state: 'legacy' | 'revoked' | 'active' | 'expired';
+  id?: string;
+};
+
+export async function getRuntimeAuthorizationRecoveryState(input: {
+  metadata: SessionMetadata | null;
+  getAuthorization: () => Promise<unknown>;
+  now?: number;
+}): Promise<RuntimeAuthorizationRecoveryState> {
+  const authorization = RuntimeAuthorizationSchema.safeParse(await input.getAuthorization());
+  if (!authorization.success) {
+    return input.metadata && hasModernRuntimeAuthorization(input.metadata)
+      ? { state: 'revoked' }
+      : { state: 'legacy' };
+  }
+  if (authorization.data.state !== 'active') return { state: 'revoked' };
+  return Date.parse(authorization.data.delegationExpiresAt) <= (input.now ?? Date.now())
+    ? { state: 'expired', id: authorization.data.id }
+    : { state: 'active', id: authorization.data.id };
 }
 
 export async function renewStoredRuntimeAuthorization(input: {

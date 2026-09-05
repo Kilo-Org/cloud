@@ -257,6 +257,7 @@ export type SandboxControlStatus = {
   connection: ConnectionState;
   work: WorkState;
   wrapperInstanceId?: string;
+  runtimeRecovery?: true;
 };
 
 export type ControlRuntimeCredentialProxyFence = {
@@ -2017,6 +2018,7 @@ export class SandboxControl extends DurableObject<Env> {
       ...(physical.state === 'running' && runtime?.wrapperInstanceId
         ? { wrapperInstanceId: runtime.wrapperInstanceId }
         : {}),
+      ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
     };
   }
 

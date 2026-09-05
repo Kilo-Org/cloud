@@ -126,6 +126,7 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
       };
     },
     detach: () => true,
+    retireForRecovery: async () => 'retired',
     deleteDirectory: async directory => {
       for (const [key, runtime] of runtimes) {
         if (runtime.directory === directory) runtimes.delete(key);

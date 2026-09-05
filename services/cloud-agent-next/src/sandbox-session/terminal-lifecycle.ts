@@ -815,6 +815,23 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
     }
   }
 
+  function clearAttachedWrapperAfterRecovery(wrapperInstanceId: string): boolean {
+    const attached = readAttachedSession();
+    if (!attached || attached.wrapperInstanceId !== wrapperInstanceId) return false;
+    for (const [, raw] of storage.kv.list<unknown>({ prefix: TERMINAL_PREFIX })) {
+      const terminal = terminalRecordSchema.safeParse(raw);
+      if (
+        terminal.success &&
+        terminal.data.state === 'running' &&
+        terminal.data.wrapperInstanceId === wrapperInstanceId
+      ) {
+        return false;
+      }
+    }
+    storage.kv.delete(ATTACHED_SESSION_KEY);
+    return true;
+  }
+
   function purgeDeletedState(): void {
     if (readFence()?.state !== 'deleted') return;
     const keys = Array.from(storage.kv.list<unknown>(), ([key]) => key);
@@ -826,6 +843,7 @@ export function createSandboxTerminalLifecycle(deps: TerminalLifecycleDeps) {
   return {
     beginDeletion,
     beginRevocation,
+    clearAttachedWrapperAfterRecovery,
     captureEpoch: () => snapshot()?.epoch ?? null,
     cleanupSession,
     closeTerminal,

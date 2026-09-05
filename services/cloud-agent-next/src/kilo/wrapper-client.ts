@@ -1231,6 +1231,10 @@ export class WrapperClient {
     return this.request<WrapperHealthResponse>('GET', '/health');
   }
 
+  async listTerminals(): Promise<WrapperPty[]> {
+    return this.request<WrapperPty[]>('GET', '/pty');
+  }
+
   /**
    * Get current job status.
    */
@@ -1289,6 +1293,10 @@ export class WrapperContainerClient {
 
   async health(): Promise<WrapperHealthResponse> {
     return this.request<WrapperHealthResponse>('GET', '/health');
+  }
+
+  async listTerminals(): Promise<WrapperPty[]> {
+    return this.request<WrapperPty[]>('GET', '/pty');
   }
 
   async createTerminal(size?: { cols: number; rows: number }): Promise<WrapperPty> {

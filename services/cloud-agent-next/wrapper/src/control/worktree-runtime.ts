@@ -56,6 +56,8 @@ export type WorktreeKiloAttachment = {
   release(): void;
 };
 
+type RecoveryRetirement = 'retired' | 'absent' | 'acknowledged';
+
 export type WorktreeKiloRuntimes = {
   readonly kiloCliVersion?: string | null;
   attach(
@@ -66,6 +68,11 @@ export type WorktreeKiloRuntimes = {
     runtimeIsolation?: 'per-session'
   ): WorktreeKiloAttachment;
   detach(identity: SessionRequestIdentity): boolean;
+  retireForRecovery(
+    identity: SessionRequestIdentity,
+    recoveryId: string,
+    assertIdle: () => void
+  ): Promise<RecoveryRetirement>;
   deleteDirectory(directory: string): Promise<void>;
   get(identity: SessionRequestIdentity): WorktreeKiloRuntime | undefined;
   getAll(directory: string): WorktreeKiloRuntime[];
@@ -291,6 +298,8 @@ export function createWorktreeKiloRuntimes(options: {
 }): WorktreeKiloRuntimes {
   const entries = new Map<string, RuntimeEntry>();
   const roots = new Map<string, RootAttachment>();
+  const recoveryGates = new Map<string, Promise<void>>();
+  const recoveryAcknowledgements = new Map<string, Map<string, Promise<RecoveryRetirement>>>();
   const homesByDirectory = new Map<string, Set<string>>();
   const deletedDirectories = new Set<string>();
   let observedVersion: string | null | undefined;
@@ -325,11 +334,11 @@ export function createWorktreeKiloRuntimes(options: {
     return entry.retiring;
   }
 
-  function removeRoot(root: RootAttachment): void {
+  function removeRoot(root: RootAttachment, forget = true): void {
     if (roots.get(identityKey(root.identity)) !== root) return;
     roots.delete(identityKey(root.identity));
     root.entry.roots.delete(root);
-    forgetAttachedRoot(root.identity.kiloSessionId, root.identity.directory);
+    if (forget) forgetAttachedRoot(root.identity.kiloSessionId, root.identity.directory);
     root.abort.abort();
     if (root.entry.roots.size === 0) void retire(root.entry);
   }
@@ -550,6 +559,9 @@ export function createWorktreeKiloRuntimes(options: {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktrees are closed', false);
       }
       const { directory } = identity;
+      if (recoveryGates.has(identityKey(identity))) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Kilo runtime is retiring', true);
+      }
       if (!path.isAbsolute(directory) || path.resolve(directory) !== directory) {
         throw new WorktreeKiloRuntimeError('protocol_error', 'Invalid worktree directory', false);
       }
@@ -684,6 +696,82 @@ export function createWorktreeKiloRuntimes(options: {
       removeRoot(root);
       return true;
     },
+    async retireForRecovery(identity, recoveryId, assertIdle) {
+      const key = identityKey(identity);
+      const acknowledgements = recoveryAcknowledgements.get(key);
+      const acknowledged = acknowledgements?.get(recoveryId);
+      if (acknowledged) {
+        await acknowledged;
+        return 'acknowledged';
+      }
+      if (recoveryGates.has(key)) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Kilo runtime is retiring', true);
+      }
+      const root = findRoot(identity);
+      if (!root) {
+        assertIdle();
+        if (entries.has(entryKey(identity, 'per-session')) || entries.has(identity.directory)) {
+          throw new WorktreeKiloRuntimeError(
+            'not_ready',
+            'Session runtime is not recoverable',
+            false
+          );
+        }
+        const absent = Promise.resolve<RecoveryRetirement>('absent');
+        const byRecovery = acknowledgements ?? new Map<string, Promise<RecoveryRetirement>>();
+        if (!acknowledgements) recoveryAcknowledgements.set(key, byRecovery);
+        byRecovery.set(recoveryId, absent);
+        return absent;
+      }
+      if (!root.attached) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session runtime is attaching', true);
+      }
+      if (root.entry.isolation !== 'per-session') {
+        throw new WorktreeKiloRuntimeError(
+          'not_ready',
+          'Session runtime is not recoverable',
+          false
+        );
+      }
+      const entry = root.entry;
+      if (!entry.runtime || !entry.kiloClient || !entry.stopped || entry.starting) {
+        throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is not ready', true);
+      }
+      const kiloClient = entry.kiloClient;
+      let releaseGate: () => void = () => {};
+      const gate = new Promise<void>(resolve => {
+        releaseGate = resolve;
+      });
+      recoveryGates.set(key, gate);
+      const retirement = (async (): Promise<RecoveryRetirement> => {
+        try {
+          assertIdle();
+          const statuses = await withKiloRequestDeadline(
+            signal => kiloClient.getSessionStatuses(identity.directory, signal),
+            entry.abort.signal
+          );
+          if (statuses[identity.kiloSessionId]?.type !== 'idle') {
+            throw new WorktreeKiloRuntimeError('session_busy', 'Session runtime is active', true);
+          }
+          assertIdle();
+          removeRoot(root, false);
+          await retire(entry);
+          return 'retired';
+        } finally {
+          recoveryGates.delete(key);
+          releaseGate();
+        }
+      })();
+      const byRecovery = acknowledgements ?? new Map<string, Promise<RecoveryRetirement>>();
+      if (!acknowledgements) recoveryAcknowledgements.set(key, byRecovery);
+      byRecovery.set(recoveryId, retirement);
+      try {
+        return await retirement;
+      } catch (error) {
+        if (byRecovery.get(recoveryId) === retirement) byRecovery.delete(recoveryId);
+        throw error;
+      }
+    },
     async deleteDirectory(directory) {
       deletedDirectories.add(directory);
       for (const root of roots.values()) {
@@ -703,6 +791,7 @@ export function createWorktreeKiloRuntimes(options: {
       homesByDirectory.delete(directory);
     },
     get(identity) {
+      if (recoveryGates.has(identityKey(identity))) return undefined;
       const entry = findRoot(identity)?.entry;
       const runtime = entry?.starting ? undefined : entry?.runtime;
       return !closed && runtime && !runtime.signal.aborted && entry?.feed?.isFresh()

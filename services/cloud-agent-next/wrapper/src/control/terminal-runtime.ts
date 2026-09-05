@@ -72,6 +72,9 @@ export type ControlTerminalRuntime = {
   rememberAttachedSession(identity: SessionRequestIdentity): void;
   detachSession(identity: SessionRequestIdentity): Promise<void>;
   detachDirectory(directory: string): Promise<void>;
+  hasActivePty(identity: SessionRequestIdentity): boolean;
+  beginRecoveryRetirement(identity: SessionRequestIdentity): void;
+  endRecoveryRetirement(identity: SessionRequestIdentity): void;
   create(
     identity: SessionRequestIdentity,
     payload: SessionTerminalCreatePayload
@@ -158,11 +161,12 @@ export function createControlTerminalRuntime(options: {
   const terminals = new Map<string, OwnedTerminal>();
   const operations = new Map<string, TerminalCreationOperation>();
   const bridges = new Map<string, TerminalBridge>();
+  const recoveringSessions = new Set<string>();
   let shutDown = false;
 
   function requireAttached(identity: SessionRequestIdentity): AttachedTerminalSession {
     const attached = attachedSessions.get(identity.sessionId);
-    if (!attached || shutDown) {
+    if (!attached || shutDown || recoveringSessions.has(identity.sessionId)) {
       throw new ControlTerminalRuntimeError('not_ready', 'Terminal session is not attached', true);
     }
     if (
@@ -406,6 +410,37 @@ export function createControlTerminalRuntime(options: {
     await Promise.allSettled(pending);
   }
 
+  function hasActivePty(identity: SessionRequestIdentity): boolean {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (!attached || !sameSession(attached, identity)) return false;
+    for (const operation of operations.values()) {
+      if (sameSession(operation, attached)) return true;
+    }
+    for (const terminal of terminals.values()) {
+      if (sameSession(terminal, attached) && terminal.state === 'running') return true;
+    }
+    return false;
+  }
+
+  function beginRecoveryRetirement(identity: SessionRequestIdentity): void {
+    const attached = attachedSessions.get(identity.sessionId);
+    if (attached && !sameSession(attached, identity)) {
+      throw new ControlTerminalRuntimeError(
+        'unauthorized',
+        'Terminal session ownership mismatch',
+        false
+      );
+    }
+    if (hasActivePty(identity)) {
+      throw new ControlTerminalRuntimeError('session_busy', 'Session has an active PTY', true);
+    }
+    recoveringSessions.add(identity.sessionId);
+  }
+
+  function endRecoveryRetirement(identity: SessionRequestIdentity): void {
+    recoveringSessions.delete(identity.sessionId);
+  }
+
   return {
     rememberAttachedSession(identity) {
       const kiloRuntime = options.getKiloRuntime(identity);
@@ -609,6 +644,9 @@ export function createControlTerminalRuntime(options: {
       return connection;
     },
 
+    hasActivePty,
+    beginRecoveryRetirement,
+    endRecoveryRetirement,
     shutdown() {
       if (shutDown) return;
       shutDown = true;
@@ -622,6 +660,7 @@ export function createControlTerminalRuntime(options: {
       terminals.clear();
       operations.clear();
       attachedSessions.clear();
+      recoveringSessions.clear();
     },
   };
 }

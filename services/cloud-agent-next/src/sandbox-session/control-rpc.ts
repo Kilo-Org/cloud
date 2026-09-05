@@ -38,6 +38,8 @@ type SandboxControlRpc = {
     connection: ConnectionState;
     physical: PhysicalState;
     wrapperInstanceId?: string;
+    work?: 'idle' | 'active' | 'finalizing';
+    runtimeRecovery?: true;
   }>;
   getRuntimeCredentialProxyFence(input: {
     ownerId: string;

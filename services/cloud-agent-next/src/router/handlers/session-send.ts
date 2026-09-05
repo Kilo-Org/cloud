@@ -47,7 +47,12 @@ const sendMessageHandler = protectedProcedure
         agent: input.agent,
         finalization: input.finalization,
       };
-      const admissionContext = { env: ctx.env, userId: ctx.userId, botId: ctx.botId };
+      const admissionContext = {
+        env: ctx.env,
+        userId: ctx.userId,
+        botId: ctx.botId,
+        authToken: ctx.authToken,
+      };
       return preflightAndQueuePromptMessage(queuedMessage, admissionContext, 'send');
     });
   });

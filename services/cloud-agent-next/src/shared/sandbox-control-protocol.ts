@@ -47,6 +47,7 @@ export const SESSION_OPERATIONS = [
   'session.sync',
   'session.git.summary',
   'session.detach',
+  'session.runtime.retire',
   'session.terminal.create',
   'session.terminal.resize',
   'session.terminal.close',
@@ -152,7 +153,10 @@ export const sandboxHelloPayloadSchema = z.object({
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
   wrapperVersion: z.string().min(1).max(128).optional(),
   capabilities: z
-    .object({ runtimeIsolation: z.literal(true).optional() })
+    .object({
+      runtimeIsolation: z.literal(true).optional(),
+      runtimeRecovery: z.literal(true).optional(),
+    })
     .strict()
     .optional(),
 });
@@ -463,6 +467,14 @@ export const sessionDetachResultSchema = z
   })
   .strict();
 
+export const sessionRuntimeRetirePayloadSchema = z
+  .object({ recoveryId: z.string().uuid() })
+  .strict();
+
+export const sessionRuntimeRetireResultSchema = z
+  .object({ recoveryId: z.string().uuid(), retired: z.literal(true) })
+  .strict();
+
 const terminalSizeSchema = z.object({
   cols: z.number().int().min(2).max(500),
   rows: z.number().int().min(2).max(200),
@@ -585,6 +597,8 @@ export type SessionSyncPayload = z.infer<typeof sessionSyncPayloadSchema>;
 export type SessionSyncResult = z.infer<typeof sessionSyncResultSchema>;
 export type SessionDetachPayload = z.infer<typeof sessionDetachPayloadSchema>;
 export type SessionDetachResult = z.infer<typeof sessionDetachResultSchema>;
+export type SessionRuntimeRetirePayload = z.infer<typeof sessionRuntimeRetirePayloadSchema>;
+export type SessionRuntimeRetireResult = z.infer<typeof sessionRuntimeRetireResultSchema>;
 export type SessionTerminalCreatePayload = z.infer<typeof sessionTerminalCreatePayloadSchema>;
 export type SessionTerminalCreateResult = z.infer<typeof sessionTerminalCreateResultSchema>;
 export type SessionTerminalResizePayload = z.infer<typeof sessionTerminalResizePayloadSchema>;
@@ -623,6 +637,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
   providerInstanceId: z.string().min(1).max(256).optional(),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
   runtimeIsolation: z.literal(true).optional(),
+  runtimeRecovery: z.literal(true).optional(),
   observation: sandboxControlObservationSchema.optional(),
 });
 

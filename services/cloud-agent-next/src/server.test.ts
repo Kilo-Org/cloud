@@ -185,7 +185,9 @@ function createEnv(): MockEnv {
     },
     SANDBOX_SESSION: {
       idFromName: vi.fn(),
-      get: vi.fn(),
+      get: vi.fn(() => ({
+        isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+      })),
     },
   };
 }
@@ -403,7 +405,10 @@ describe('server /terminal', () => {
     const sessionResponse = new Response('bridged', { status: 200 });
     const sessionFetch = vi.fn().mockResolvedValue(sessionResponse);
     env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
     const request = new Request(
       `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}&role=wrapper&ownerId=attacker`,
       {
@@ -457,6 +462,31 @@ describe('server /terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+
+  it('rejects a control-plane browser upgrade during runtime authorization recovery', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const env = createEnv();
+    const consume = installTerminalNonceConsumer(env);
+    const sessionFetch = vi.fn();
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
+    });
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(signTerminalTicket(sessionId))}`,
+        { headers: { Upgrade: 'websocket' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toBe('Runtime authorization recovery is in progress');
+    expect(consume).toHaveBeenCalledOnce();
+    expect(sessionFetch).not.toHaveBeenCalled();
   });
 
   it('rejects revoked control-plane access before consuming the browser ticket nonce', async () => {
@@ -548,7 +578,11 @@ describe('server /terminal', () => {
     const getMetadata = vi.fn().mockResolvedValue(metadata);
     const fetch = vi.fn();
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch, getMetadata });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      fetch,
+      getMetadata,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
 
     const request = new Request(
       `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
@@ -620,6 +654,7 @@ describe('server /terminal', () => {
     });
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
       getMetadata: vi.fn().mockResolvedValue({
         metadataSchemaVersion: 2,
         identity: {
@@ -2320,7 +2355,10 @@ describe('server /sandbox-terminal', () => {
     const sessionResponse = new Response('wrapper bridged', { status: 200 });
     const sessionFetch = vi.fn().mockResolvedValue(sessionResponse);
     env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
     const request = new Request(
       `http://worker.test/sandbox-terminal/${encodeURIComponent(ownerId)}/${sessionId}/pty_123?ticket=browser-secret&ptyId=attacker&role=browser`,
       {
@@ -2366,6 +2404,27 @@ describe('server /sandbox-terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+
+  it('rejects a valid producer WebSocket before forwarding during runtime authorization recovery', async () => {
+    const env = createEnv();
+    const sessionFetch = vi.fn();
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
+    });
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/sandbox-terminal/user-1/${sessionId}/pty_123`, {
+        headers: { Upgrade: 'websocket', Authorization: 'Bearer producer-capability' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toBe('Runtime authorization recovery in progress');
+    expect(sessionFetch).not.toHaveBeenCalled();
   });
 });
 

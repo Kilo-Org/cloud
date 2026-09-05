@@ -97,9 +97,12 @@ import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
 import {
   getRuntimeAuthorizationStatus,
+  getRuntimeAuthorizationRecoveryState,
   hasModernRuntimeAuthorization,
   renewStoredRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_RECOVERY_KEY,
   RUNTIME_AUTHORIZATION_KEY,
+  runtimeAuthorizationRecoveryLockSchema,
 } from '../session/runtime-authorization-persistence.js';
 import { validateControlSessionOptions } from './attach-payload.js';
 import {
@@ -124,6 +127,7 @@ import {
   sessionAttachResultSchema,
   sessionMessageOutcomeSchema,
   sessionPromptResultSchema,
+  sessionRuntimeRetireResultSchema,
   sessionSyncResultSchema,
   sessionPermissionResolveResultSchema,
   sessionQuestionResolveResultSchema,
@@ -693,6 +697,157 @@ export class SandboxSession extends DurableObject<Env> {
     });
   }
 
+  async getRuntimeAuthorizationRecoveryState(): Promise<{
+    state: 'legacy' | 'revoked' | 'active' | 'expired';
+    id?: string;
+    recoveryId?: string;
+  }> {
+    const state = await getRuntimeAuthorizationRecoveryState({
+      metadata: await this.getMetadata(),
+      getAuthorization: async () => this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+    const lock = runtimeAuthorizationRecoveryLockSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+    );
+    return state.state === 'expired' && lock.success && lock.data.expectedOldId === state.id
+      ? { ...state, recoveryId: lock.data.recoveryId }
+      : state;
+  }
+
+  async isRuntimeAuthorizationRecoveryInProgress(): Promise<boolean> {
+    return this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) !== undefined;
+  }
+
+  async recoverExpiredRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    recoveryId: string;
+    runtimeAuthorizationSeal: string;
+    runtimeToken: string;
+  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return { status: 'denied' };
+    let fresh: RuntimeAuthorization;
+    try {
+      fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return { status: 'denied' };
+    }
+    if (fresh.state !== 'active') return { status: 'denied' };
+    if (!metadata.auth.kiloSessionId) return { status: 'denied' };
+    const current = await this.getRuntimeAuthorizationRecoveryState();
+    if (current.state === 'legacy' || current.state === 'active') return { status: 'not-needed' };
+    if (current.state !== 'expired' || current.id !== input.expectedOldId)
+      return { status: 'denied' };
+    if (
+      this.loadMessages().some(
+        message => message.state === 'accepted' || message.state === 'queued'
+      )
+    ) {
+      return { status: 'busy' };
+    }
+    const held = runtimeAuthorizationRecoveryLockSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+    );
+    if (
+      held.success &&
+      (held.data.recoveryId !== input.recoveryId || held.data.expectedOldId !== input.expectedOldId)
+    ) {
+      return { status: 'retry' };
+    }
+    this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
+      expectedOldId: input.expectedOldId,
+      recoveryId: input.recoveryId,
+    });
+    try {
+      const sandboxId = metadata.workspace?.sandboxId;
+      if (sandboxId) {
+        const control = sandboxControlRpc(this.env, sandboxId);
+        const status = await control.getStatus();
+        if (status.physical === 'running') {
+          if (
+            status.connection !== 'ready' ||
+            !status.wrapperInstanceId ||
+            status.runtimeRecovery !== true
+          ) {
+            return { status: 'busy' };
+          }
+          const attached = this.terminalLifecycle.getAttachedWrapperInstanceId();
+          if (attached && attached !== status.wrapperInstanceId) return { status: 'retry' };
+          const retired = sessionRuntimeRetireResultSchema.parse(
+            controlRequestResult(
+              await control.request({
+                operation: 'session.runtime.retire',
+                session: {
+                  sessionId: metadata.identity.sessionId,
+                  kiloSessionId: metadata.auth.kiloSessionId ?? '',
+                  directory: this.directory(metadata),
+                },
+                expectedWrapperInstanceId: status.wrapperInstanceId,
+                payload: { recoveryId: input.recoveryId },
+              })
+            )
+          );
+          if (retired.recoveryId !== input.recoveryId || !retired.retired)
+            return { status: 'retry' };
+          if (
+            attached &&
+            !this.terminalLifecycle.clearAttachedWrapperAfterRecovery(status.wrapperInstanceId)
+          ) {
+            return { status: 'busy' };
+          }
+        } else if (status.physical !== 'stopped') {
+          return { status: 'retry' };
+        }
+      }
+      const latest = await this.getRuntimeAuthorizationRecoveryState();
+      if (latest.state !== 'expired' || latest.id !== input.expectedOldId)
+        return { status: 'retry' };
+      this.ctx.storage.transactionSync(() => {
+        const stored = RuntimeAuthorizationSchema.safeParse(
+          this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        if (
+          !stored.success ||
+          stored.data.id !== input.expectedOldId ||
+          stored.data.state !== 'active' ||
+          Date.parse(stored.data.delegationExpiresAt) > Date.now()
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        const currentMetadata = this.terminalLifecycle.getStoredMetadata();
+        if (
+          !currentMetadata ||
+          currentMetadata.identity.sessionId !== metadata.identity.sessionId ||
+          currentMetadata.identity.userId !== metadata.identity.userId ||
+          currentMetadata.identity.orgId !== metadata.identity.orgId
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        this.ctx.storage.kv.put(RUNTIME_AUTHORIZATION_KEY, fresh);
+        this.ctx.storage.kv.put(
+          METADATA_KEY,
+          serializeSessionMetadata({
+            ...currentMetadata,
+            auth: { ...currentMetadata.auth, kilocodeToken: input.runtimeToken },
+          })
+        );
+        this.ctx.storage.kv.delete(RUNTIME_PROXY_GRANT_KEY);
+        this.ctx.storage.kv.delete(RUNTIME_AUTHORIZATION_RECOVERY_KEY);
+      });
+      return { status: 'recovered' };
+    } catch {
+      return { status: 'retry' };
+    }
+  }
+
   async issueRuntimeCredentialProxyGrant(_fence: {
     wrapperRunId: string;
     wrapperGeneration: number;
@@ -1032,6 +1187,9 @@ export class SandboxSession extends DurableObject<Env> {
     rows?: number;
     operationId?: string;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     if (this.pendingRuntimeCleanup())
       return { success: false, error: 'Runtime cleanup is pending' };
     return this.trackOperation(this.terminalLifecycle.createTerminal(input));
@@ -1042,6 +1200,9 @@ export class SandboxSession extends DurableObject<Env> {
     cols?: number;
     rows?: number;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     return this.trackOperation(this.terminalLifecycle.resizeTerminal(input));
   }
 
@@ -1529,6 +1690,13 @@ export class SandboxSession extends DurableObject<Env> {
     input: ControlSessionMessageInput,
     origin: 'initial' | 'followup'
   ): Promise<SessionMessageAdmissionResult> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return {
+        success: false,
+        code: 'COMPUTE_STOPPING',
+        error: 'Runtime authorization recovery is in progress',
+      };
+    }
     const epoch = this.terminalLifecycle.captureEpoch();
     const metadata = this.terminalLifecycle.getStoredMetadata();
     if (epoch === null || !metadata || this.deletedWorktreeId) {
@@ -1684,6 +1852,7 @@ export class SandboxSession extends DurableObject<Env> {
     messageId: string,
     options?: { allowCreate?: boolean }
   ): Promise<void> {
+    if (this.ctx.storage.kv.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) return;
     if (this.deletedWorktreeId) return;
     const metadata = this.terminalLifecycle.getStoredMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();

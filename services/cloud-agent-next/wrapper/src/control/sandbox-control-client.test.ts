@@ -126,6 +126,7 @@ function versionHeartbeat(version: string | null) {
         throw new Error('Unexpected attach');
       },
       detach: () => false,
+      retireForRecovery: async () => 'retired',
       deleteDirectory: async () => {},
       get: () => undefined,
       getAll: () => [],
@@ -305,7 +306,7 @@ describe('createSandboxControlClient', () => {
         protocolVersion: number;
         wrapperVersion: string;
         providerInstanceId: string;
-        capabilities: { runtimeIsolation: true };
+        capabilities: { runtimeIsolation: true; runtimeRecovery: true };
       };
     };
     expect(hello.operation).toBe('sandbox.hello');
@@ -313,7 +314,7 @@ describe('createSandboxControlClient', () => {
       protocolVersion: 1,
       wrapperVersion: '2.4.0',
       providerInstanceId: 'inst_1',
-      capabilities: { runtimeIsolation: true },
+      capabilities: { runtimeIsolation: true, runtimeRecovery: true },
     });
     fake.respond(
       JSON.stringify({

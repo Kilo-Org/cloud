@@ -7,6 +7,7 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import {
   getRuntimeAuthorizationStatus,
+  getRuntimeAuthorizationRecoveryState,
   renewStoredRuntimeAuthorization,
 } from './runtime-authorization-persistence.js';
 import type { SessionMetadata } from '../persistence/session-metadata.js';
@@ -226,6 +227,24 @@ describe('runtime authorization persistence', () => {
       })
     ).rejects.toBeInstanceOf(RuntimeAuthorizationExpiredError);
     expect(record.state).toBe('active');
+  });
+
+  it('distinguishes natural expiry from explicit revocation for foreground recovery', async () => {
+    const expired = authorization('00000000-0000-4000-8000-000000000010');
+    await expect(
+      getRuntimeAuthorizationRecoveryState({
+        metadata: metadata(),
+        getAuthorization: async () => expired,
+        now: Date.UTC(2026, 0, 2),
+      })
+    ).resolves.toEqual({ state: 'expired', id: expired.id });
+    await expect(
+      getRuntimeAuthorizationRecoveryState({
+        metadata: metadata(),
+        getAuthorization: async () => ({ ...expired, state: 'revoked' }),
+        now: Date.UTC(2026, 0, 2),
+      })
+    ).resolves.toEqual({ state: 'revoked' });
   });
 
   it('treats modern-token metadata without a valid private record as revoked', async () => {

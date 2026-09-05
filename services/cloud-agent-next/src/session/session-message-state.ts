@@ -618,6 +618,12 @@ export async function listNonTerminalAcceptedMessages(
   return entries.filter(state => state.status === 'accepted');
 }
 
+export async function hasNonTerminalSessionMessage(
+  storage: SessionMessageStorage
+): Promise<boolean> {
+  return (await listSessionMessageStates(storage)).some(state => !isTerminalStatus(state.status));
+}
+
 async function listIndexedMessagesForWrapperRun(
   storage: SessionMessageStorage,
   wrapperRunId: string

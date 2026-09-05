@@ -110,11 +110,15 @@ describe('runtime authorization recovery', () => {
       await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
       await instance.ctx.storage.put(RUNTIME_PROXY_GRANT_KEY, { cached: 'old-grant' });
       const stops: string[] = [];
+      instance['getTerminalClient'] = async () =>
+        ({ success: true, data: { client: { listTerminals: async () => [] } } }) as never;
       instance['physicalWrapperStopper'] = async request => {
         stops.push(request.reason);
         return { status: 'absent' };
       };
-      instance['physicalWrapperObserver'] = async () => ({ status: 'absent' });
+      let observations = 0;
+      instance['physicalWrapperObserver'] = async () =>
+        ++observations === 1 ? { status: 'present' } : { status: 'absent' };
 
       const outcome = await instance.recoverExpiredRuntimeAuthorization({
         ownerId: userId,
@@ -149,7 +153,7 @@ describe('runtime authorization recovery', () => {
     });
   });
 
-  it('denies revoked seals and foreign owners and keeps queued work busy', async () => {
+  it('denies invalid recovery, preserves active PTYs, and fences terminal mutations while locked', async () => {
     const userId = 'user_cloud_recovery_guards';
     const sessionId = 'agent_cloud_recovery_guards';
     const old = authorization({
@@ -207,6 +211,98 @@ describe('runtime authorization recovery', () => {
       revoked: { status: 'denied' },
       busy: { status: 'busy' },
     });
+
+    {
+      const userId = 'user_cloud_recovery_pty';
+      const sessionId = 'agent_cloud_recovery_pty';
+      const old = authorization({
+        id: '00000000-0000-4000-8000-000000000251',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        issuedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+      });
+      const fresh = authorization({
+        id: '00000000-0000-4000-8000-000000000252',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
+      });
+      const stub = env.CLOUD_AGENT_SESSION.get(
+        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+      );
+
+      const result = await runInDurableObject(stub, async instance => {
+        await registerReadySession(instance, {
+          sessionId,
+          userId,
+          orgId: organizationId,
+          prompt: 'initial',
+          mode: 'code',
+          model: 'test-model',
+          kilocodeToken: 'expired-token',
+        });
+        await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
+        await instance.ctx.storage.put(RUNTIME_PROXY_GRANT_KEY, { cached: 'old-grant' });
+        const createTerminal = () => {
+          throw new Error('creation must be blocked by the recovery lock');
+        };
+        const resizeTerminal = () => {
+          throw new Error('reconnection must be blocked by the recovery lock');
+        };
+        const closeTerminal = async () => ({ success: true });
+        instance['getTerminalClient'] = async () =>
+          ({
+            success: true,
+            data: {
+              client: {
+                listTerminals: async () => [{ id: 'pty_active' }],
+                createTerminal,
+                resizeTerminal,
+                closeTerminal,
+              },
+            },
+          }) as never;
+        instance['physicalWrapperObserver'] = async () => ({ status: 'present' });
+        let stops = 0;
+        instance['physicalWrapperStopper'] = async () => {
+          stops += 1;
+          return { status: 'absent' };
+        };
+        const recovery = await instance.recoverExpiredRuntimeAuthorization({
+          ownerId: userId,
+          expectedOldId: old.id,
+          recoveryId: '00000000-0000-4000-8000-000000000253',
+          runtimeAuthorizationSeal: await seal(fresh),
+          runtimeToken: 'fresh-token',
+        });
+        return {
+          recovery,
+          stops,
+          authorization: await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY),
+          grant: await instance.ctx.storage.get(RUNTIME_PROXY_GRANT_KEY),
+          locked: await instance.isRuntimeAuthorizationRecoveryInProgress(),
+          create: await instance.createTerminal({}),
+          resize: await instance.resizeTerminal({ ptyId: 'pty_active', cols: 80, rows: 24 }),
+          close: await instance.closeTerminal({ ptyId: 'pty_active' }),
+        };
+      });
+
+      expect(result.recovery).toEqual({ status: 'busy' });
+      expect(result.stops).toBe(0);
+      expect(result.authorization).toMatchObject({ id: old.id });
+      expect(result.grant).toEqual({ cached: 'old-grant' });
+      expect(result.locked).toBe(true);
+      expect(result.create).toEqual({
+        success: false,
+        error: 'Runtime authorization recovery is in progress',
+      });
+      expect(result.resize).toEqual({
+        success: false,
+        error: 'Runtime authorization recovery is in progress',
+      });
+      expect(result.close).toEqual({ success: true, data: { success: true } });
+    }
   });
 
   it('retires an idle SandboxSession runtime, clears its attachment fence, and reattaches on dispatch', async () => {

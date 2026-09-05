@@ -384,7 +384,7 @@ describe('maybeStartSandboxControlClient', () => {
   });
 
   it.each(['false', 'throw'] as const)(
-    'retires the connection when heartbeat delivery returns %s',
+    'leaves final disconnect to reconnect exhaustion when heartbeat delivery returns %s',
     async failure => {
       const timers = spyOn(globalThis, 'setInterval');
       let disconnected = 0;
@@ -401,12 +401,13 @@ describe('maybeStartSandboxControlClient', () => {
           onDisconnected: () => {
             disconnected++;
           },
-          createClient: () => ({
+          createClient: clientOptions => ({
             connect: async () => {},
             close: () => {},
             sendEvent: event => {
               if (event !== 'sandbox.heartbeat') return true;
               if (failure === 'throw') throw new Error('private transport error');
+              clientOptions.onConnectionLost();
               return false;
             },
           }),
@@ -414,7 +415,7 @@ describe('maybeStartSandboxControlClient', () => {
       );
       try {
         await flushAsyncWork();
-        expect(disconnected).toBe(1);
+        expect(disconnected).toBe(0);
         expect(
           timers.mock.calls.filter(([, ms]) => ms === SANDBOX_CONTROL_REPORT_INTERVAL_MS)
         ).toHaveLength(0);
@@ -424,6 +425,38 @@ describe('maybeStartSandboxControlClient', () => {
       }
     }
   );
+
+  it('leaves final disconnect to reconnect exhaustion when the ready event fails', async () => {
+    let disconnected = 0;
+    const started = maybeStartSandboxControlClient(
+      {
+        SANDBOX_CONTROL_URL: 'wss://example.test/sandbox-control/sbx_1',
+        SANDBOX_CONTROL_CREDENTIAL: 'secret',
+        PROVIDER_INSTANCE_ID: 'inst_1',
+      },
+      () => {},
+      {
+        wrapperVersion: '2.4.0',
+        onDisconnected: () => {
+          disconnected++;
+        },
+        createClient: clientOptions => ({
+          connect: async () => {},
+          close: () => {},
+          sendEvent: () => {
+            clientOptions.onConnectionLost();
+            return false;
+          },
+        }),
+      }
+    );
+    try {
+      await flushAsyncWork();
+      expect(disconnected).toBe(0);
+    } finally {
+      started?.close();
+    }
+  });
 
   it('clears reconnect after close and omits credentials from connect failure logs', async () => {
     const credential = 'super-secret-token';

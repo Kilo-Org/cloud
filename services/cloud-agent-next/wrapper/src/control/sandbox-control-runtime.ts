@@ -417,14 +417,14 @@ export function maybeStartSandboxControlClient(
     try {
       if (!active.sendEvent?.('sandbox.heartbeat', payload)) {
         diagnostic('send_failed');
-        handleDisconnected();
+        handleConnectionLost();
       } else {
         lastSentAt = Date.now();
         diagnostic('sent');
       }
     } catch {
       diagnostic('send_threw');
-      handleDisconnected();
+      handleConnectionLost();
     }
   }
 
@@ -432,7 +432,7 @@ export function maybeStartSandboxControlClient(
     if (closed || options.isReady?.() === false) return;
     if (sampleAbort.signal.aborted) sampleAbort = new AbortController();
     if (!active.sendEvent?.('sandbox.ready', { kiloReady: true, globalFeedAttached: true })) {
-      handleDisconnected();
+      handleConnectionLost();
       return;
     }
     sendHeartbeat(active);

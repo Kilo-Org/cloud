@@ -202,7 +202,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
     vi.mocked(sendPushNotifications).mockImplementation(async incoming => {
-      messages.push(...incoming);
+      messages.push(...incoming.filter(message => message.data !== undefined));
       return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
     });
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
@@ -1425,7 +1425,10 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     );
     expect(
       messages.every(
-        message => message._contentAvailable && message.sound === null && !message.body
+        message =>
+          message._contentAvailable &&
+          (message.sound === null || message.sound === undefined) &&
+          !message.body
       )
     ).toBe(true);
   });
@@ -1661,15 +1664,43 @@ describe('toGlanceableContentState', () => {
 });
 
 describe('buildGlanceableExpoMessages', () => {
+  it.each([0, 1, 2])('separates iOS badge %i from the background wake', needsInput => {
+    const nextSnapshot = { ...snapshot, needsInput };
+    const messages = buildGlanceableExpoMessages(
+      [{ token: 'ExponentPushToken[aaa]', locale: null }],
+      nextSnapshot,
+      'ios'
+    );
+
+    expect(messages).toEqual([
+      expect.objectContaining({
+        to: 'ExponentPushToken[aaa]',
+        badge: needsInput,
+        priority: 'high',
+      }),
+      expect.objectContaining({
+        to: 'ExponentPushToken[aaa]',
+        data: nextSnapshot,
+        _contentAvailable: true,
+        priority: 'normal',
+      }),
+    ]);
+    expect(messages[0]).not.toHaveProperty('data');
+    expect(messages[0]).not.toHaveProperty('_contentAvailable');
+    expect(messages[1]).not.toHaveProperty('badge');
+    expect(messages[0].collapseId).not.toBe(messages[1].collapseId);
+  });
+
   it.each([0, 1, 3])(
-    'emits badge %i in one data-only, collapsed message per Expo token',
+    'emits badge %i in one data-only, collapsed Android message per Expo token',
     needsInput => {
       const messages = buildGlanceableExpoMessages(
         [
           { token: 'ExponentPushToken[aaa]', locale: null },
           { token: 'ExponentPushToken[bbb]', locale: 'es' },
         ],
-        { ...snapshot, needsInput }
+        { ...snapshot, needsInput },
+        'android'
       );
 
       expect(messages).toHaveLength(2);
@@ -1723,7 +1754,7 @@ describe('deliverGlanceableSnapshot', () => {
     expect(delivered).toHaveLength(0);
 
     await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
-    expect(delivered.map(message => message.badge)).toEqual([4]);
+    expect(delivered.map(message => message.badge)).toEqual([4, undefined]);
     expect(vi.mocked(deps.sendExpoPush).mock.calls[1][0][0].badge).toBe(4);
   });
 
@@ -1869,7 +1900,7 @@ describe('deliverGlanceableSnapshot', () => {
     });
   });
 
-  it('sends the data-only iOS Expo push regardless of the android_ongoing token', async () => {
+  it('sends separate iOS badge and background pushes regardless of the Android token', async () => {
     const { deps, calls } = fakeDeps({
       hasAndroidOngoingToken: vi.fn(async () => false),
       listIosExpoTokens: vi.fn(async () => [{ token: 'ExponentPushToken[ios]', locale: null }]),
@@ -1879,10 +1910,10 @@ describe('deliverGlanceableSnapshot', () => {
 
     expect(deps.listIosExpoTokens).toHaveBeenCalledWith('u1', null);
     expect(calls.expoSends).toHaveLength(1);
-    expect(calls.expoSends[0]).toHaveLength(1);
+    expect(calls.expoSends[0]).toHaveLength(2);
     expect(calls.expoSends[0][0].to).toBe('ExponentPushToken[ios]');
-    expect(calls.expoSends[0][0]._contentAvailable).toBe(true);
-    expect(calls.expoSends[0][0].title).toBeUndefined();
-    expect(calls.expoSends[0][0].body).toBeUndefined();
+    expect(calls.expoSends[0][0].badge).toBe(1);
+    expect(calls.expoSends[0][1]._contentAvailable).toBe(true);
+    expect(calls.expoSends[0][1].data).toEqual(snapshot);
   });
 });

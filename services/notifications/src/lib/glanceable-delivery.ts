@@ -72,8 +72,31 @@ export function toGlanceableContentState(
 
 export function buildGlanceableExpoMessages(
   tokens: readonly ExpoPushToken[],
-  snapshot: ActiveAgentsGlanceable
+  snapshot: ActiveAgentsGlanceable,
+  platform: 'ios' | 'android'
 ): ExpoPushMessage[] {
+  if (platform === 'ios') {
+    // APNs badge updates are user interactions, so keep them out of the background push.
+    return tokens.flatMap(
+      ({ token }) =>
+        [
+          {
+            to: token,
+            badge: snapshot.needsInput,
+            priority: 'high',
+            collapseId: `${snapshot.scopeKey}:badge`,
+          },
+          {
+            to: token,
+            data: snapshot,
+            _contentAvailable: true,
+            priority: 'normal',
+            collapseId: `${snapshot.scopeKey}:data`,
+          },
+        ] satisfies ExpoPushMessage[]
+    );
+  }
+
   return tokens.map(
     ({ token }) =>
       ({
@@ -179,18 +202,23 @@ export async function deliverGlanceableSnapshot(
     );
   }
 
-  // iOS Expo tokens always need the data-only wake: it drives the widget
-  // timeline through the background task while the app is not foregrounded.
+  // iOS Expo tokens need a badge update plus a data-only wake for the widget timeline.
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   if (iosExpoTokens.length > 0) {
-    await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot), deps.isCurrent);
+    await deps.sendExpoPush(
+      buildGlanceableExpoMessages(iosExpoTokens, snapshot, 'ios'),
+      deps.isCurrent
+    );
   }
 
   if (await deps.hasAndroidOngoingToken(params.userId, params.organizationId)) {
     const expoTokens = await deps.listAndroidExpoTokens(params.userId, params.organizationId);
     if (deps.isCurrent && !(await deps.isCurrent())) return;
     if (expoTokens.length > 0) {
-      await deps.sendExpoPush(buildGlanceableExpoMessages(expoTokens, snapshot), deps.isCurrent);
+      await deps.sendExpoPush(
+        buildGlanceableExpoMessages(expoTokens, snapshot, 'android'),
+        deps.isCurrent
+      );
     }
   }
 }

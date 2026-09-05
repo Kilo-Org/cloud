@@ -34,6 +34,7 @@ const runs = [
   'compact',
   'models',
   'tool-matrix',
+  'conversation',
 ] as const;
 
 const argv = process.argv.slice(2);

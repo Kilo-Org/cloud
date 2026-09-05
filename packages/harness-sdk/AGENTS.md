@@ -276,7 +276,7 @@ and `tsx` all emit code where every `createIs` and `createAssert` call throws
 | Tests | `pnpm test` (vitest, transformed by `@ttsc/unplugin`) |
 | Timing | `pnpm test:perf` (`vitest.perf.config.ts`, one file at a time) |
 | End-to-end | `pnpm test:e2e` (`ttsx`, not `tsx`) |
-| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix` |
+| One live run | `pnpm test:e2e:` + `image`, `cancel`, `reasoning`, `stop`, `compact`, `shapes`, `session`, `resume`, `clone`, `replay`, `models`, `queue`, `together`, `subagent`, `tool-matrix`, `conversation` |
 | Every live run | `pnpm test:e2e:all` (add names to pick a few, `full` for all eleven models) |
 | Raw frames | `pnpm test:e2e:probe <shape> <model>` (asserts nothing) |
 
@@ -463,6 +463,7 @@ PASS  replay       25s  every shape took back thinking that had been stored
 PASS  compact      10s  the session compacted itself and kept what it was told
 PASS  models       10s  1 of 1 models answered every turn
 PASS  tool-matrix  18s  every model called every tool with a payload it could read
+PASS  conversation 40s  one whole conversation, tools to summary
 ```
 
 `together` is the long one: it waits for three particular rounds, and a model
@@ -1253,6 +1254,71 @@ codename", four models answered by asking which project was meant. That is the
 right move on a question that names none — a model that will not guess is doing
 its job — and it scored as a tool failure. Naming the release left one reason
 not to delegate, which is the description, which is the thing under test.
+
+### One conversation, with everything in it at once
+
+`pnpm test:e2e:conversation` is the run that puts the package together. Every
+other live run proves one thing on its own; a harness does all of it in one
+session, and the defects that only show up there have no other test. One person
+and one agent work through a release: the time tool, a plan written down with
+the todo tool, two questions asked of the person in one call and answered slower
+than the model waits, a message typed while the session is busy, a subagent sent
+to look something up, then the session reopened from SQLite, cloned, and
+compacted — and asked at the end for a fact planted in its first turn.
+
+It asserts correctness first, then performance: the median time to the first
+word, the median whole answer, the share of the prompt read from the cache, and
+the wall clock. The ceilings are generous on purpose. They catch a change that
+makes this package slow, not a provider having a bad minute.
+
+Two things it taught, both about writing the scenario rather than about the
+package:
+
+- **An open-ended task measures the model's imagination.** "Migrate my project
+  from npm to pnpm" had models asking for filesystem access, spawning a second
+  subagent to go looking, and burying the planted fact under a page of
+  scaffolding the summariser then dropped. Naming what to do leaves the tools as
+  the only thing under test.
+- **A session busy with a round of its own refuses `ask`,** which is the package
+  doing exactly what it says. The run waits and asks again, because that is what
+  the harness has to do with the refusal. A run that treated it as a failure
+  would be testing its own impatience.
+
+Two more, about what a live run may assert:
+
+- **Wait for the session to go quiet, never for a number of rounds.** How many
+  rounds a conversation runs is the model's to decide — one that waits for its
+  subagent answers inline and runs none — and waiting for three held every other
+  model at a 180-second deadline for nothing. The sweep went from 210 seconds a
+  model to 40.
+- **Read the subagent's answer out of the parent's transcript, not out of its
+  words.** Carrying the answer back into the conversation is what the package
+  promises. Repeating it to the person is the model's own manner, and three of
+  the eleven did not.
+
+Eleven models, `pnpm test:e2e:conversation full`, 2026-09-05, 96 seconds in all:
+
+```
+model                           turns todo  asked  rounds  sub  kept  first    whole    ratio   total
+anthropic/claude-haiku-4.5      24    3     2      2       1    yes   3316ms   3594ms   0.981   38s
+openai/gpt-5.6-luna             22    3     2      1       1    yes   3283ms   3629ms   1.000   42s
+z-ai/glm-5.3-flash              26    3     2      3       1    yes   1324ms   2653ms   0.692   30s
+deepseek/deepseek-v4-flash-0731 26    3     2      3       1    yes   2856ms   2965ms   0.991   36s
+qwen/qwen3.8-flash              24    3     2      2       1    yes   5080ms   5285ms   0.988   69s
+xiaomi/mimo-v2.5                26    3     2      2       1    yes   2192ms   3457ms   0.975   59s
+tencent/hy3                     24    3     2      2       1    yes   4533ms   4732ms   0.988   62s
+deepseek/deepseek-v4-flash      24    3     2      2       1    yes   2814ms   2902ms   0.992   42s
+minimax/minimax-m3              24    3     2      2       1    yes   2661ms   2697ms   0.996   33s
+nvidia/nemotron-3.5-lightning   26    3     2      2       1    yes   1864ms   1925ms   0.843   27s
+google/gemini-3.7-flash         26    3     2      3       1    yes   4782ms   4968ms   0.736   52s
+```
+
+Every model wrote the plan down as three steps, asked the person both questions
+in one call, delegated the lookup, and answered from the conversation after it
+had been through SQLite and a summary. The first word takes 1.3 to 5.1 seconds
+and the whole answer 1.9 to 5.3, on a conversation whose prompt is read from
+cache 0.69 to 1.00 of the time. Nothing here is the package's own cost: the
+per-token work is measured in `pnpm test:perf`, and it is microseconds.
 
 ### The session does not write to the store
 

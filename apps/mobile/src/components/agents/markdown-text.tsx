@@ -45,18 +45,10 @@ export function MarkdownText({
   const palette = useMemo(() => getPalette(variant, colors), [variant, colors]);
   const segments = useMemo(() => splitMarkdownHtml(value), [value]);
 
-  if (segments.length === 1 && segments[0]?.type === 'markdown') {
-    return (
-      <MarkdownContent
-        value={value}
-        palette={palette}
-        selectable={selectable}
-        onLongPressLink={onLongPressLink}
-        onPressLink={onPressLink}
-      />
-    );
-  }
-
+  // Always render through the same wrapping View with index keys: switching to
+  // a bare MarkdownContent when no HTML token exists would change the root
+  // element type, remounting the markdown prefix (and wiping its table
+  // snapshot and CodeBlock keys) as soon as the first HTML token streams in.
   return (
     <View>
       {segments.map((segment, index) =>

@@ -17,7 +17,7 @@ import RenderHTML, {
   type TNode,
 } from 'react-native-render-html';
 
-import { isSupportedScheme } from './markdown-html-image';
+import { isSupportedScheme, resolveHtmlImageAspectRatio } from './markdown-html-image';
 import { REMOVED_HTML_TAGS } from './markdown-html-sanitization';
 import { MarkdownImage } from './markdown-image';
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
@@ -31,17 +31,25 @@ import {
   type MarkdownLinkLongPressHandler,
   type MarkdownLinkPressHandler,
 } from './markdown-renderer';
-import { resolveImagePreviewAspectRatio } from './tool-card-attachments';
 
 const REMOVED_HTML_TAG_SET = new Set<string>(REMOVED_HTML_TAGS);
 
-// Ignore only void tags here. The library preserves nested text when it ignores
-// a container tag, so the visitor clears container contents before rendering.
+// Ignore only void tags here: the engine drops an ignored tag's whole subtree.
+// The visitor below handles containers — clearing the contents of removed ones
+// and hoisting the children of `picture` so its fallback `<img>` still renders.
 const IGNORED_HTML_TAGS = ['link', 'frame', 'embed', 'source', 'track', 'input', 'base', 'meta'];
 const HTML_DOM_VISITORS: DomVisitorCallbacks = {
   onElement(element) {
     if (REMOVED_HTML_TAG_SET.has(element.name)) {
       element.children.splice(0);
+    } else if (element.name === 'picture' && element.parent !== null) {
+      // Dropping the `<picture>` wrapper must not drop its fallback `<img>`:
+      // replace the wrapper with its children (`<source>` candidates never
+      // reach the tree; removed children are already cleared above).
+      const index = element.parent.children.indexOf(element);
+      if (index !== -1) {
+        element.parent.children.splice(index, 1, ...element.children);
+      }
     }
   },
 };
@@ -259,10 +267,7 @@ export function MarkdownHtml({
         <MarkdownImage
           uri={src}
           alt={tnode.attributes.alt ?? ''}
-          aspectRatio={resolveImagePreviewAspectRatio(
-            Number(tnode.attributes.width),
-            Number(tnode.attributes.height)
-          )}
+          aspectRatio={resolveHtmlImageAspectRatio(tnode.attributes.width, tnode.attributes.height)}
           accessibilityLabel={linkLabel}
           onPress={
             href

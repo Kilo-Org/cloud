@@ -12,7 +12,6 @@ export const REMOVED_HTML_TAGS = [
   'video',
   'source',
   'track',
-  'picture',
   'form',
   'input',
   'button',

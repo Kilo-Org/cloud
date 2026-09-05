@@ -16,6 +16,7 @@ import {
 } from 'react-native-render-html';
 
 import { confirmAndOpenMarkdownLink } from './markdown-link-confirm';
+import { MarkdownRenderer } from './markdown-renderer';
 import { MarkdownText } from './markdown-text';
 
 const rnStub = vi.hoisted(() => ({
@@ -53,8 +54,11 @@ vi.mock('react-native-marked', async () => {
   };
 });
 vi.mock('react-native-render-html', () => ({ default: 'RenderHTML' }));
-vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({
+vi.mock('@/lib/hooks/use-theme-colors', () => {
+  // One stable object per suite, like the real hook's module-level constants:
+  // a fresh object per call would recreate the palette (and the segment
+  // renderer) on every render and mask remount regressions.
+  const colors = {
     foreground: '#111111',
     mutedForeground: '#666666',
     muted: '#eeeeee',
@@ -64,8 +68,9 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     primary: '#111111',
     accentSoftForeground: '#111111',
     accentSoft: '#eeeeee',
-  }),
-}));
+  };
+  return { useThemeColors: () => colors };
+});
 vi.mock('./markdown-renderer', () => ({
   MarkdownRenderer: vi.fn(),
 }));
@@ -176,7 +181,7 @@ describe('MarkdownText HTML routing', () => {
     const renderer = await mount(<MarkdownText value="" />);
 
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
-    expect(renderer.root.findAllByType(ViewType)).toHaveLength(1);
+    expect(renderer.root.findAllByType(ViewType)).toHaveLength(2);
     expect(vi.mocked(useMarkdown)).not.toHaveBeenCalled();
   });
 
@@ -185,7 +190,7 @@ describe('MarkdownText HTML routing', () => {
     const renderer = await mount(<MarkdownText value={value} />);
 
     expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
-    expect(renderer.root.findAllByType(ViewType)).toHaveLength(2);
+    expect(renderer.root.findAllByType(ViewType)).toHaveLength(3);
     expect(vi.mocked(useMarkdown)).toHaveBeenCalledWith(value, expect.any(Object));
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(2);
 
@@ -194,6 +199,27 @@ describe('MarkdownText HTML routing', () => {
       renderer.update(<MarkdownText value={value} selectable={false} />);
     });
     expect(vi.mocked(MarkedLexer)).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the markdown prefix mounted when the first HTML token arrives', async () => {
+    const renderer = await mount(<MarkdownText value={'Hello\n\n'} />);
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(0);
+    expect(vi.mocked(MarkdownRenderer)).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      renderer.update(<MarkdownText value={'Hello\n\n<img src="https://example.com/a.png">'} />);
+    });
+
+    expect(renderer.root.findAllByType(RenderHTMLType)).toHaveLength(1);
+    expect(renderer.root.findAllByType(RenderHTMLType)[0]?.props.source).toEqual({
+      html: '<img src="https://example.com/a.png">',
+    });
+    // A root type change would remount the markdown prefix and construct a
+    // fresh renderer for the unchanged segment; streaming must keep the
+    // original instance so element keys and local state survive.
+    expect(vi.mocked(MarkdownRenderer)).toHaveBeenCalledTimes(1);
   });
 
   it('keeps Markdown blocks on their renderer and keeps inline HTML in one flow', async () => {
@@ -365,6 +391,34 @@ describe('MarkdownText HTML routing', () => {
     expect(visibleText(engine.buildTTree(props.source.html))).toBe('safe');
   });
 
+  it('keeps a picture fallback image while clearing its removed children', async () => {
+    const renderer = await mount(
+      <MarkdownText value='<picture><source srcset="https://example.com/a.webp"><script>evil()</script><img src="https://example.com/a.png" alt="shot"></picture>' />
+    );
+    const props = htmlProps(renderer);
+    const actual = await vi.importActual<typeof RenderHtmlExports>('react-native-render-html');
+    const engine = actual.buildTREFromConfig({
+      baseStyle: props.baseStyle,
+      domVisitors: props.domVisitors,
+      enableCSSInlineProcessing: props.enableCSSInlineProcessing,
+      ignoredDomTags: props.ignoredDomTags,
+    });
+    const images: TNode[] = [];
+    const visit = (node: TNode): void => {
+      if (node.tagName === 'img') {
+        images.push(node);
+      }
+      for (const child of node.children) {
+        visit(child);
+      }
+    };
+    visit(engine.buildTTree(props.source.html));
+
+    expect(images).toHaveLength(1);
+    expect(images[0]?.attributes.src).toBe('https://example.com/a.png');
+    expect(visibleText(engine.buildTTree(props.source.html))).toBe('');
+  });
+
   it('renders an active-content-only source as an empty native tree', async () => {
     const renderer = await mount(<MarkdownText value="<script>alert('bad')</script>" />);
     const props = htmlProps(renderer);
@@ -440,6 +494,29 @@ describe('MarkdownText HTML links and images', () => {
     expect(textProps).not.toHaveProperty('onClick');
     (textProps.onLongPress as (event: never) => void)(event);
     expect(onLongPressLink).toHaveBeenCalledWith('https://example.com', undefined);
+  });
+
+  it.each([
+    ['missing dimensions', { src: 'https://example.com/a.png' }],
+    ['unparsable dimensions', { src: 'https://example.com/a.png', width: '400px', height: '900' }],
+    ['empty height', { src: 'https://example.com/a.png', width: '400', height: '' }],
+    ['zero width', { src: 'https://example.com/a.png', width: '0', height: '900' }],
+    ['negative width', { src: 'https://example.com/a.png', width: '-400', height: '900' }],
+  ])('leaves the aspect ratio to onLoad measurement: %s', async (_name, attributes) => {
+    const renderer = await mount(<MarkdownText value='<img src="https://example.com/a.png">' />);
+    const ImageRenderer = requiredRenderer(htmlProps(renderer).renderers, 'img');
+    const rendered = await renderCustom(ImageRenderer, { attributes, parent: null });
+    expect(rendered.root.findByType(MarkdownImageType).props.aspectRatio).toBeUndefined();
+  });
+
+  it('keeps a valid portrait dimension pair on the clamped ratio path', async () => {
+    const renderer = await mount(<MarkdownText value='<img src="https://example.com/a.png">' />);
+    const ImageRenderer = requiredRenderer(htmlProps(renderer).renderers, 'img');
+    const portrait = await renderCustom(ImageRenderer, {
+      attributes: { src: 'https://example.com/a.png', width: '1170', height: '2532' },
+      parent: null,
+    });
+    expect(portrait.root.findByType(MarkdownImageType).props.aspectRatio).toBe(0.75);
   });
 
   it('routes supported images with a fixed ratio and renders unsupported alt text', async () => {

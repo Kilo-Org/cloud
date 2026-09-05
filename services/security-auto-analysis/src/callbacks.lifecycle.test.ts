@@ -6,7 +6,7 @@ import {
   getAnalysisActorById,
   getSecurityFindingById,
 } from './db/queries.js';
-import { generateApiToken } from './token.js';
+import { generateTriageToken } from './token.js';
 import { extractSandboxAnalysis } from './extraction.js';
 import { maybeAutoDismissCompletedAnalysis } from './auto-dismiss.js';
 import { trackSecurityAnalysisCompleted } from './posthog.js';
@@ -30,7 +30,7 @@ vi.mock('./db/queries.js', () => ({
 }));
 
 vi.mock('./token.js', () => ({
-  generateApiToken: vi.fn(),
+  generateTriageToken: vi.fn(),
 }));
 
 vi.mock('./extraction.js', () => ({
@@ -84,6 +84,7 @@ describe('analysis lifecycle push emit wiring', () => {
       ignored_reason: null,
       analysis_status: 'running',
       analysis: { triggeredByUserId: 'user-1' },
+      owned_by_organization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     } as never);
     vi.mocked(getActiveAnalysisAttemptToken).mockResolvedValue(ATTEMPT_TOKEN);
     vi.mocked(getAnalysisActorById).mockResolvedValue({
@@ -92,7 +93,7 @@ describe('analysis lifecycle push emit wiring', () => {
       name: 'User',
       is_admin: false,
     } as never);
-    vi.mocked(generateApiToken).mockResolvedValue('api-token');
+    vi.mocked(generateTriageToken).mockResolvedValue('api-token');
     vi.mocked(extractSandboxAnalysis).mockResolvedValue({
       isExploitable: false,
       extractionStatus: 'succeeded',
@@ -125,6 +126,17 @@ describe('analysis lifecycle push emit wiring', () => {
         },
       })
     ).resolves.toEqual({ status: 'completed-finalized' });
+
+    expect(generateTriageToken).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1' }),
+      'nextauth-secret',
+      'development',
+      undefined,
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    );
+    expect(extractSandboxAnalysis).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' })
+    );
 
     expect(dispatchSecurityLifecycleEventForFinding).toHaveBeenCalledWith({
       env,
@@ -243,7 +255,7 @@ describe('analysis lifecycle push emit wiring', () => {
       name: 'User',
       is_admin: false,
     } as never);
-    vi.mocked(generateApiToken).mockResolvedValue('api-token');
+    vi.mocked(generateTriageToken).mockResolvedValue('api-token');
     vi.mocked(extractSandboxAnalysis).mockResolvedValue({
       isExploitable: false,
       extractionStatus: 'succeeded',

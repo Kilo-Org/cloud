@@ -78,7 +78,7 @@ function fixture() {
     aborted,
     client,
     deps: {
-      client,
+      clients: [client],
       assertDirectory: async () => undefined,
       retireDirectory: async (dir: string) => {
         retired.push(dir);
@@ -165,7 +165,7 @@ describe('Kilo 7.4.20 cleanup HTTP compatibility', () => {
     try {
       const deletion = deleteWorktree(input, {
         ...f.deps,
-        client: createWorktreeKiloCleanupClient(server.url.toString()),
+        clients: [createWorktreeKiloCleanupClient(server.url.toString())],
       });
       await abortStarted.promise;
       expect(f.sessions.get(sessionId(0))?.active).toBe(true);
@@ -240,6 +240,71 @@ describe('Kilo session DELETE confirmation', () => {
 });
 
 describe('scoped worktree runtime deletion', () => {
+  test('discovers and cleans every owning runtime client before retiring the checkout', async () => {
+    const f = fixture();
+    const events: string[] = [];
+    const createClient = (name: string, id: string): WorktreeKiloCleanupClient => {
+      const sessions = new Map([[id, { id, directory }]]);
+      return {
+        listSessionIds: async dir => (dir === directory ? [...sessions.keys()] : []),
+        getSession: async (_dir, sessionId) => sessions.get(sessionId) ?? null,
+        children: async () => [],
+        abortSession: async (_dir, sessionId) => {
+          events.push(`${name}:abort:${sessionId}`);
+        },
+        stopSessionProcesses: async (_dir, sessionId) => {
+          events.push(`${name}:stop:${sessionId}`);
+        },
+        deleteSession: async (_dir, sessionId) => {
+          events.push(`${name}:delete:${sessionId}`);
+          sessions.delete(sessionId);
+        },
+        closeTerminals: async () => {
+          events.push(`${name}:terminals`);
+        },
+        disposeDirectory: async () => {
+          events.push(`${name}:dispose`);
+        },
+      };
+    };
+    const first = createClient('first', sessionId(0));
+    const second = createClient('second', sessionId(1));
+
+    expect(
+      await deleteWorktree(
+        { worktreeId, directory, sessionIds: [sessionId(0), sessionId(1)] },
+        {
+          ...f.deps,
+          clients: [first, second],
+          detachTerminals: async () => {
+            events.push('wrapper:terminals');
+          },
+          retireDirectory: async () => {
+            events.push('runtime:retire');
+          },
+          removeDirectory: async () => {
+            events.push('checkout:remove');
+          },
+        }
+      )
+    ).toEqual({ deleted: true, sessionIds: [sessionId(0), sessionId(1)] });
+    expect(events).toEqual([
+      `first:abort:${sessionId(0)}`,
+      `second:abort:${sessionId(1)}`,
+      `first:stop:${sessionId(0)}`,
+      `second:stop:${sessionId(1)}`,
+      'wrapper:terminals',
+      'first:terminals',
+      `first:delete:${sessionId(0)}`,
+      'second:terminals',
+      `second:delete:${sessionId(1)}`,
+      'first:dispose',
+      'second:dispose',
+      'runtime:retire',
+      'checkout:remove',
+    ]);
+  });
+
   test.each([true, false])(
     'awaits terminal detachment and runtime retirement before removing the checkout: live=%s',
     async live => {
@@ -259,7 +324,7 @@ describe('scoped worktree runtime deletion', () => {
       const input = { worktreeId, directory, sessionIds: [sessionId(0), sessionId(1)] };
       const deletion = deleteWorktree(input, {
         ...f.deps,
-        client: live ? f.client : undefined,
+        clients: live ? [f.client] : [],
         detachTerminals: async dir => {
           expect(dir).toBe(directory);
           detaching.resolve();
@@ -316,7 +381,7 @@ describe('scoped worktree runtime deletion', () => {
       rememberAttachedRoot(sessionId(0), directory);
       rememberAttachedRoot(sessionId(2), otherDirectory);
       const input = { worktreeId, directory, sessionIds: [sessionId(0)] };
-      const deps = { ...f.deps, client: undefined };
+      const deps = { ...f.deps, clients: [] };
       expect(await prepareWorktreeDeletion(input, deps)).toEqual(input.sessionIds);
       for (let attempt = 0; attempt < 2; attempt++) {
         expect(await deleteWorktree(input, deps)).toEqual({
@@ -344,7 +409,7 @@ describe('scoped worktree runtime deletion', () => {
       await rejects(
         deleteWorktree(input, {
           ...f.deps,
-          client: live ? f.client : undefined,
+          clients: live ? [f.client] : [],
           retireDirectory: async () => {
             throw new Error('Runtime retirement failed');
           },
@@ -353,7 +418,7 @@ describe('scoped worktree runtime deletion', () => {
       );
       expect(f.directories.has(directory)).toBe(true);
       expect(rootForSession(sessionId(0))).toBe(sessionId(0));
-      expect(await deleteWorktree(input, { ...f.deps, client: undefined })).toEqual({
+      expect(await deleteWorktree(input, { ...f.deps, clients: [] })).toEqual({
         deleted: true,
         sessionIds: input.sessionIds,
       });
@@ -370,7 +435,7 @@ describe('scoped worktree runtime deletion', () => {
         { worktreeId, directory, sessionIds: [sessionId(0)] },
         {
           ...f.deps,
-          client: undefined,
+          clients: [],
           detachTerminals: async () => {
             throw new Error('Terminal detachment failed');
           },
@@ -393,7 +458,7 @@ describe('scoped worktree runtime deletion', () => {
       await rejects(
         deleteWorktree(
           { worktreeId, directory, sessionIds: [] },
-          { ...f.deps, client: undefined, assertDirectory: undefined }
+          { ...f.deps, clients: [], assertDirectory: undefined }
         ),
         /Invalid worktree directory/
       );
@@ -471,6 +536,7 @@ describe('scoped worktree runtime deletion', () => {
       deletePty: async (id, dir) => ptys.get(id)?.cwd === dir && ptys.delete(id),
     } as WrapperKiloClient;
     const kiloRuntime: WorktreeKiloRuntime = {
+      identity: roots[0],
       scopeId: 'test-scope',
       directory,
       env: {},
@@ -478,17 +544,28 @@ describe('scoped worktree runtime deletion', () => {
       signal: new AbortController().signal,
     };
     const otherKiloRuntime: WorktreeKiloRuntime = {
+      identity: roots[2],
       scopeId: 'test-scope-other',
       directory: otherDirectory,
       env: {},
       kiloClient,
       signal: new AbortController().signal,
     };
+    const siblingKiloRuntime: WorktreeKiloRuntime = {
+      ...kiloRuntime,
+      identity: roots[1],
+    };
     const runtime = createControlTerminalRuntime({
       controlUrl: 'ws://127.0.0.1:1/sandbox-control/sandbox',
       wrapperInstanceId: crypto.randomUUID(),
-      getKiloRuntime: dir =>
-        dir === directory ? kiloRuntime : dir === otherDirectory ? otherKiloRuntime : undefined,
+      getKiloRuntime: identity =>
+        identity.sessionId === roots[0].sessionId
+          ? kiloRuntime
+          : identity.sessionId === roots[1].sessionId
+            ? siblingKiloRuntime
+            : identity.sessionId === roots[2].sessionId
+              ? otherKiloRuntime
+              : undefined,
     });
 
     try {
@@ -610,7 +687,7 @@ describe('scoped worktree runtime deletion', () => {
       await rejects(
         deleteWorktree(
           { worktreeId, directory, sessionIds: [sessionId(0)] },
-          { ...f.deps, client: live ? f.client : undefined }
+          { ...f.deps, clients: live ? [f.client] : [] }
         ),
         /directory conflict/
       );
@@ -646,14 +723,14 @@ describe('scoped worktree runtime deletion', () => {
     expect(() =>
       validateWorktreeDirectory({ worktreeId, directory: unsafe, sessionIds: [] })
     ).toThrow('Invalid worktree directory');
-    await rejects(prepareWorktreeDeletion(input, {}), /Invalid worktree directory/);
+    await rejects(prepareWorktreeDeletion(input, { clients: [] }), /Invalid worktree directory/);
   });
 
   test.each([true, false])(
     'waits for an in-flight directory operation and permanently fences later operations for that directory only: live=%s',
     async live => {
       const f = fixture();
-      const deps = { ...f.deps, client: live ? f.client : undefined };
+      const deps = { ...f.deps, clients: live ? [f.client] : [] };
       const started = Promise.withResolvers<void>();
       const release = Promise.withResolvers<void>();
       const inflight = runDirectoryOperation(directory, async () => {

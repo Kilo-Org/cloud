@@ -23,6 +23,9 @@ const {
   withDORetryMock,
   createSessionForCloudAgentMock,
   deleteSessionForCloudAgentMock,
+  createRuntimeAuthorizationMock,
+  sealRuntimeAuthorizationMock,
+  verifyKiloTokenForPolicyMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   markReconcilePendingMock: vi.fn(),
@@ -35,6 +38,9 @@ const {
   withDORetryMock: vi.fn(),
   createSessionForCloudAgentMock: vi.fn(),
   deleteSessionForCloudAgentMock: vi.fn(),
+  createRuntimeAuthorizationMock: vi.fn(),
+  sealRuntimeAuthorizationMock: vi.fn(),
+  verifyKiloTokenForPolicyMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/db/operation-ledger', () => ({
@@ -68,6 +74,15 @@ vi.mock('../../utils/do-retry.js', () => ({
     operation: (stub: unknown) => Promise<unknown>,
     operationName: string
   ) => withDORetryMock(getStub, operation, operationName),
+}));
+
+vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
+  createRuntimeAuthorization: createRuntimeAuthorizationMock,
+  sealRuntimeAuthorization: sealRuntimeAuthorizationMock,
+}));
+
+vi.mock('@kilocode/worker-utils/kilo-token-policy', () => ({
+  verifyKiloTokenForPolicy: verifyKiloTokenForPolicyMock,
 }));
 
 const USER_ID = 'oauth/google:1234';
@@ -225,7 +240,9 @@ function fixture(options?: {
   ownershipResults?: OwnershipFixture[][];
   internalSecret?: string;
   controlPlaneIds?: string;
+  runtimeIsolationEnabled?: string;
   botId?: string;
+  authToken?: string;
 }) {
   const userId = options?.userId ?? USER_ID;
   const metadata =
@@ -243,6 +260,7 @@ function fixture(options?: {
   const sourceStub = { getMetadata: vi.fn().mockResolvedValue(metadata) };
   const destinationStub = {
     getMetadata: vi.fn().mockResolvedValue(null),
+    getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
     registerSession: vi.fn().mockResolvedValue({ success: true }),
     createSessionWithInitialAdmission: vi.fn(),
   };
@@ -259,13 +277,15 @@ function fixture(options?: {
   });
   const context = {
     userId,
-    authToken: CURRENT_AUTH_TOKEN,
+    authToken: options?.authToken ?? CURRENT_AUTH_TOKEN,
     ...(options?.botId ? { botId: options.botId } : {}),
     request: { headers } as Request,
     env: {
       INTERNAL_API_SECRET: INTERNAL_SECRET,
+      NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
       CONTROL_PLANE_IDS: options?.controlPlaneIds ?? '*',
       WORKTREE_CREATION_ENABLED_IDS: '',
+      RUNTIME_ISOLATION_ENABLED: options?.runtimeIsolationEnabled ?? 'true',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
       CLOUD_AGENT_SESSION: legacySessionNamespace,
@@ -333,6 +353,12 @@ beforeEach(() => {
   );
   settleOperationMock.mockResolvedValue({ settled: true });
   deleteSessionForCloudAgentMock.mockResolvedValue(undefined);
+  verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: {} });
+  createRuntimeAuthorizationMock.mockResolvedValue({
+    authorization: { id: 'destination-authorization', state: 'active' },
+    token: 'destination-delegated-token',
+  });
+  sealRuntimeAuthorizationMock.mockResolvedValue('destination-seal');
   createSessionForCloudAgentMock.mockResolvedValue({
     status: 'ready',
     clone: { sessionId: DESTINATION_KILO_SESSION_ID, copiedItemCount: 0 },
@@ -521,6 +547,69 @@ describe('createWorktreeChat request validation and authorization', () => {
 });
 
 describe('createWorktreeChat ownership, metadata, and control-plane routing', () => {
+  it('rejects a new destination before recording ownership when runtime isolation is disabled', async () => {
+    const { caller, input, destinationStub } = fixture({ runtimeIsolationEnabled: 'false' });
+    verifyKiloTokenForPolicyMock.mockResolvedValue({ claims: { runtimeAdmission: {} } });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'runtime_isolation_unavailable',
+    });
+    expect(recordOperationProgressMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSession).not.toHaveBeenCalled();
+  });
+
+  it('preserves legacy registration for audience-bound tokens without modern policy markers', async () => {
+    const controlToken = 'legacy.header.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next' },
+    });
+    const { caller, input, destinationStub } = fixture({ authToken: controlToken });
+
+    await caller.createWorktreeChat(input);
+
+    expect(createRuntimeAuthorizationMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: { kiloSessionId: DESTINATION_KILO_SESSION_ID, kilocodeToken: controlToken },
+      })
+    );
+  });
+
+  it('derives and seals authority for the exact destination, never persisting control authority', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, destinationStub } = fixture({ authToken: controlToken });
+
+    await caller.createWorktreeChat(input);
+
+    expect(createRuntimeAuthorizationMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        token: controlToken,
+        resourceKind: 'cloud-agent-next',
+        resourceId: DESTINATION_WORKSPACE_ID,
+      })
+    );
+    expect(destinationStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        auth: {
+          kiloSessionId: DESTINATION_KILO_SESSION_ID,
+          kilocodeToken: 'destination-delegated-token',
+        },
+        runtimeAuthorizationSeal: 'destination-seal',
+      })
+    );
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    const completed = settleOperationMock.mock.calls.at(-1)?.[1] as Record<string, unknown>;
+    expect(JSON.stringify(progress)).not.toContain(controlToken);
+    expect(JSON.stringify(progress)).not.toContain('destination-seal');
+    expect(JSON.stringify(completed)).not.toContain(controlToken);
+    expect(JSON.stringify(completed)).not.toContain('destination-seal');
+  });
+
   it.each([
     { autoCommit: true, condenseOnComplete: true },
     { autoCommit: false, condenseOnComplete: true },
@@ -779,6 +868,79 @@ describe('createWorktreeChat operation-ledger replay and conflict handling', () 
 });
 
 describe('createWorktreeChat registration rollback and unknown-outcome reconciliation', () => {
+  it('recreates a fresh destination seal after a lost response', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, metadata, destinationStub } = fixture({
+      authToken: controlToken,
+      ownershipResults: [[ownershipRow()], [ownershipRow()], [destinationOwnershipRow()]],
+    });
+    destinationStub.registerSession.mockRejectedValueOnce(new Error('lost response'));
+
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('lost response');
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+    });
+    destinationStub.getMetadata.mockResolvedValueOnce(null);
+    sealRuntimeAuthorizationMock.mockResolvedValueOnce('fresh-recovery-seal');
+
+    await caller.createWorktreeChat(input);
+
+    expect(createRuntimeAuthorizationMock).toHaveBeenCalledTimes(2);
+    expect(destinationStub.registerSession.mock.calls[1]?.[0]).toMatchObject({
+      auth: { kilocodeToken: 'destination-delegated-token' },
+      runtimeAuthorizationSeal: 'fresh-recovery-seal',
+    });
+    expect(JSON.stringify(metadata)).not.toContain('fresh-recovery-seal');
+  });
+
+  it('fails closed when current control authority is revoked during recovery', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValueOnce({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, destinationStub } = fixture({
+      authToken: controlToken,
+      ownershipResults: [[ownershipRow()], [ownershipRow()], [destinationOwnershipRow()]],
+    });
+    destinationStub.registerSession.mockRejectedValueOnce(new Error('lost response'));
+    await expect(caller.createWorktreeChat(input)).rejects.toThrow('lost response');
+
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({ status: 'reconcile_pending', canonical_result: progress }),
+    });
+    verifyKiloTokenForPolicyMock.mockRejectedValueOnce(new Error('revoked'));
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(destinationStub.registerSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not accept a modern committed destination without its private authorization record', async () => {
+    const controlToken = 'header.payload.signature';
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const { caller, input, metadata, destinationStub } = fixture({ authToken: controlToken });
+    destinationStub.getMetadata.mockResolvedValueOnce(destinationMetadata(metadata));
+    destinationStub.getRuntimeAuthorizationStatus.mockResolvedValueOnce('revoked');
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await progressFor(input),
+      }),
+    });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(destinationStub.registerSession).not.toHaveBeenCalled();
+  });
+
   it('rolls back only the empty ownership row after an explicit registration rejection', async () => {
     const { caller, input, destinationStub } = fixture();
     destinationStub.registerSession.mockResolvedValueOnce({

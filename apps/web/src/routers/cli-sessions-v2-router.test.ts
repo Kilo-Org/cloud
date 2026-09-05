@@ -39,6 +39,10 @@ jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   },
 }));
 
+jest.mock('@/lib/auth/resource-delegation', () => ({
+  createControlTokenForRequest: jest.fn(async () => ({ token: 'test-cloud-agent-control-token' })),
+}));
+
 jest.mock('@/lib/tokens', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/tokens');
   return {

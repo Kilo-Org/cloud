@@ -41,6 +41,7 @@ import {
 import { getSandboxControlStub, isSandboxControlId } from './sandbox-control/stub.js';
 import { getSandboxSessionStub, resolveSessionStub } from './sandbox-session/session-stub.js';
 import { sessionPlaneFromId } from './session-plane.js';
+import { withDORetry } from './utils/do-retry.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -48,6 +49,19 @@ import {
 } from './sandbox-control/credential.js';
 import { PtyIdSchema, sessionIdSchema } from './router/schemas.js';
 import { registerControlLogRoutes } from './sandbox-control/log-routes.js';
+import {
+  runtimeCredentialProxyFacadeBaseUrl,
+  runtimeCredentialProxyUpstream,
+  type RuntimeProxyHandleClaims,
+  verifyRuntimeCredentialProxyHandle,
+} from './runtime-credential-proxy.js';
+import { deriveKiloSandboxTargets } from './kilo/kilo-targets.js';
+import { inferRuntimeCredentialProxyRoute } from './kilo/runtime-credential-proxy-routes.js';
+import {
+  issueRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+  type RuntimeProxyAttestationAudience,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 const app = new Hono<HonoContext>();
 
@@ -181,10 +195,16 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
     const stub = getSandboxSessionStub(env, userId, cloudAgentSessionId);
+    if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+      return new Response('Runtime authorization recovery is in progress', { status: 503 });
+    }
     return stub.fetch(createTerminalForwardRequest(request, '/terminal/browser', ptyId));
   }
 
   const stub = resolveSessionStub(env, userId, cloudAgentSessionId);
+  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+    return new Response('Runtime authorization recovery is in progress', { status: 503 });
+  }
   const metadata = await stub.getMetadata();
   const terminal = await resolveTerminalWrapperClient({
     env,
@@ -207,12 +227,45 @@ app.use('*', async (c: Context<HonoContext>, next: Next) => {
   });
 });
 
+// Kilo 7.4.20 and current releases both append their own `/api/...` route to
+// configured targets. Only a verified opaque handle may turn that otherwise
+// ordinary Worker path into a facade request.
+app.use('*', async (c: Context<HonoContext>, next: Next) => {
+  const facadeBase = c.env.WORKER_URL
+    ? runtimeCredentialProxyFacadeBaseUrl(c.env.WORKER_URL)
+    : null;
+  if (!facadeBase) return next();
+  const facadePath = new URL(facadeBase).pathname.replace(/\/+$/, '');
+  const requestPath = new URL(c.req.url).pathname;
+  const path = facadePath
+    ? requestPath.startsWith(`${facadePath}/`)
+      ? requestPath.slice(facadePath.length)
+      : null
+    : requestPath;
+  if (!path) return next();
+  // This route remains available for already-issued configurations. A prefixed
+  // deployment never supported it because Hono registers the legacy route at
+  // the Worker root; root deployments retain the transition behavior.
+  if (path.startsWith('/api/runtime-credential-proxy/')) return next();
+  const handle = runtimeProxyAuthorization(c.req.raw);
+  if (!handle) return next();
+  const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
+  if (!claims) return next();
+  const route = inferRuntimeCredentialProxyRoute(path);
+  if (!route) return c.text('Not found', 404);
+  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
+});
+
 app.get('/health', (c: Context<HonoContext>) => {
   return c.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
   });
 });
+
+// Handle authentication is bearer-only; the URL contains neither a credential
+// nor an upstream authority. Register before the broad facade routes.
+app.all('/api/runtime-credential-proxy/:route/*', routeRuntimeCredentialProxy);
 
 function requireInternalApi(c: Context<HonoContext>): Response | null {
   if (!c.env.INTERNAL_API_SECRET) {
@@ -286,6 +339,9 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
   }
 
   const stub = getSandboxSessionStub(c.env, ownerId, sessionId);
+  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+    return c.text('Runtime authorization recovery in progress', 503);
+  }
   return stub.fetch(
     createTerminalForwardRequest(c.req.raw, '/terminal/wrapper', ptyId, authorization)
   );
@@ -294,17 +350,194 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
 function createSanitizedForwardRequest(
   request: Request,
   url: string | URL,
-  headers: Headers
+  headers: Headers,
+  body?: BodyInit
 ): Request {
   const init: RequestInit & { duplex?: 'half' } = {
     method: request.method,
     headers,
   };
-  if (request.body && requestMethodAllowsBody(request.method)) {
-    init.body = request.body;
+  if ((body !== undefined || request.body) && requestMethodAllowsBody(request.method)) {
+    init.body = body ?? request.body;
     init.duplex = 'half';
   }
   return new Request(url, init);
+}
+
+function runtimeProxyAuthorization(request: Request): string | null {
+  const authorization = request.headers.get('Authorization');
+  const match = authorization ? /^Bearer ([A-Za-z0-9._-]+)$/.exec(authorization) : null;
+  return match?.[1] ?? null;
+}
+
+function runtimeProxyHeaders(request: Request, token: string, organizationId?: string): Headers {
+  const headers = new Headers(request.headers);
+  for (const name of [
+    'Authorization',
+    'X-API-Key',
+    'API-Key',
+    'X-Auth-Token',
+    'Cookie',
+    'Host',
+    'Connection',
+    'Proxy-Connection',
+    'Keep-Alive',
+    'Proxy-Authenticate',
+    'Proxy-Authorization',
+    'TE',
+    'Trailer',
+    'Transfer-Encoding',
+    'Upgrade',
+    'X-Kilocode-OrganizationId',
+  ]) {
+    headers.delete(name);
+  }
+  for (const name of [...headers.keys()]) {
+    if (
+      name.startsWith('proxy-') ||
+      name.startsWith('x-forwarded-') ||
+      name.startsWith('x-internal-') ||
+      name.startsWith('x-kilo-') ||
+      name.startsWith('x-kilocode-') ||
+      name === 'forwarded' ||
+      name === 'x-real-ip' ||
+      name === 'x-kilocode-organizationid'
+    ) {
+      headers.delete(name);
+    }
+  }
+  headers.set('Authorization', `Bearer ${token}`);
+  if (organizationId) headers.set('X-Kilocode-OrganizationId', organizationId);
+  return headers;
+}
+
+function sanitizeRuntimeProxyResponse(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const name of [
+    'Set-Cookie',
+    'Connection',
+    'Proxy-Connection',
+    'Keep-Alive',
+    'Proxy-Authenticate',
+    'Proxy-Authorization',
+    'TE',
+    'Trailer',
+    'Transfer-Encoding',
+    'Upgrade',
+  ]) {
+    headers.delete(name);
+  }
+  headers.delete(RUNTIME_PROXY_ATTESTATION_HEADER);
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+async function readBoundedBody(request: Request, maximumBytes: number): Promise<string | null> {
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const decoder = new TextDecoder();
+  let size = 0;
+  let value = '';
+  try {
+    while (true) {
+      const chunk = await reader.read();
+      if (chunk.done) return value + decoder.decode();
+      const bytes = new Uint8Array(chunk.value);
+      size += bytes.byteLength;
+      if (size > maximumBytes) {
+        await reader.cancel();
+        return null;
+      }
+      value += decoder.decode(bytes, { stream: true });
+    }
+  } catch {
+    return null;
+  }
+}
+
+async function routeRuntimeCredentialProxy(c: Context<HonoContext>): Promise<Response> {
+  const handle = runtimeProxyAuthorization(c.req.raw);
+  if (!handle) return c.text('Unauthorized', 401);
+  const claims = await verifyRuntimeCredentialProxyHandle(c.env, handle);
+  if (!claims) return c.text('Unauthorized', 401);
+  const route = c.req.param('route');
+  const prefix = `/api/runtime-credential-proxy/${route}/`;
+  const requestPath = new URL(c.req.url).pathname;
+  if (!requestPath.startsWith(prefix)) return c.text('Not found', 404);
+  const path = `/${requestPath.slice(prefix.length).replace(/^\/+/, '')}`;
+  if (route !== 'backend' && route !== 'provider' && route !== 'ingest')
+    return c.text('Not found', 404);
+  return forwardRuntimeCredentialProxy(c, handle, claims, route, path);
+}
+
+async function forwardRuntimeCredentialProxy(
+  c: Context<HonoContext>,
+  handle: string,
+  claims: RuntimeProxyHandleClaims,
+  route: 'backend' | 'provider' | 'ingest',
+  path: string
+): Promise<Response> {
+  if (!claims) return c.text('Unauthorized', 401);
+  let bodyText: string | undefined;
+  if (route === 'ingest' && path === '/api/session' && c.req.method === 'POST') {
+    bodyText = (await readBoundedBody(c.req.raw, 8192)) ?? undefined;
+    if (bodyText === undefined) return c.text('Not found', 404);
+  }
+  let credential: {
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null;
+  try {
+    credential = await withDORetry(
+      () => resolveSessionStub(c.env, claims.userId, claims.sessionId),
+      session => session.resolveRuntimeCredentialProxyGrant(handle),
+      'resolveRuntimeCredentialProxyGrant'
+    );
+  } catch {
+    return c.text('Credential unavailable', 503);
+  }
+  if (!credential) return c.text('Unauthorized', 401);
+  const targets = deriveKiloSandboxTargets(c.env, credential.token, { requireHttps: true });
+  if (!targets.success) return c.text('Not found', 404);
+  const upstream = runtimeCredentialProxyUpstream(
+    targets.targets,
+    route,
+    c.req.method,
+    path,
+    new URL(c.req.url).search,
+    claims.kiloSessionId,
+    credential.organizationId,
+    c.req.header('content-type'),
+    bodyText
+  );
+  if (!upstream) return c.text('Not found', 404);
+  try {
+    // The route allowlist is resolved above before a proof is issued.
+    const audience: RuntimeProxyAttestationAudience =
+      route === 'backend' ? 'kilo-api' : route === 'provider' ? 'kilo-gateway' : 'session-ingest';
+    const proof = await issueRuntimeProxyAttestation({
+      secret: await resolveSecret(c.env.NEXTAUTH_SECRET).then(value => {
+        if (!value) throw new Error('Authentication unavailable');
+        return value;
+      }),
+      audience,
+      bearer: credential.token,
+      ...credential.runtimeAuthorization,
+    });
+    const headers = runtimeProxyHeaders(c.req.raw, credential.token, credential.organizationId);
+    headers.set(RUNTIME_PROXY_ATTESTATION_HEADER, proof);
+    const response = await fetch(
+      createSanitizedForwardRequest(c.req.raw, upstream, headers, bodyText),
+      { redirect: 'manual' }
+    );
+    return sanitizeRuntimeProxyResponse(response);
+  } catch {
+    return c.text('Upstream unavailable', 502);
+  }
 }
 
 function parseOptionalWrapperGeneration(raw: string | null): number | undefined {
@@ -360,6 +593,23 @@ function stripPublicCredentialHeaders(headers: Headers): Headers {
   sanitized.delete(KILO_FACADE_USER_ID_HEADER);
   sanitized.delete(KILO_FACADE_AUTH_TOKEN_HEADER);
   return sanitized;
+}
+
+async function rejectLegacyWrapperTokenForRuntimeGrant(
+  env: Env,
+  claims: WrapperAuthClaims,
+  userId: string,
+  sessionId: string
+): Promise<Response | null> {
+  if (claims.type !== 'legacy_kilo_token') return null;
+  const status = await withDORetry(
+    () => resolveSessionStub(env, userId, sessionId),
+    stub => stub.getRuntimeAuthorizationStatus(),
+    'getRuntimeAuthorizationStatus'
+  );
+  return status === 'legacy'
+    ? null
+    : new Response('Legacy wrapper token is not authorized', { status: 401 });
 }
 
 async function routeToUserKiloFacade(
@@ -611,6 +861,14 @@ app.all('/sessions/:userId/:sessionId/ingest', async (c: Context<HonoContext>) =
     return c.text('Token does not match session user', 403);
   }
 
+  const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
+    c.env,
+    authResult.claims,
+    userId,
+    sessionId
+  );
+  if (legacyRejection) return legacyRejection;
+
   const url = new URL(c.req.url);
   const wrapperGenerationParam = url.searchParams.get('wrapperGeneration');
   const wrapperGeneration = parseOptionalWrapperGeneration(wrapperGenerationParam);
@@ -687,6 +945,14 @@ app.put(
     if (authResult.claims.userId !== userId) {
       return c.text('Token does not match session user', 403);
     }
+
+    const legacyRejection = await rejectLegacyWrapperTokenForRuntimeGrant(
+      c.env,
+      authResult.claims,
+      userId,
+      sessionId
+    );
+    if (legacyRejection) return legacyRejection;
 
     const kiloSessionId = new URL(c.req.url).searchParams.get('kiloSessionId');
     if (!kiloSessionId && authResult.claims.type === 'wrapper_dispatch_ticket') {

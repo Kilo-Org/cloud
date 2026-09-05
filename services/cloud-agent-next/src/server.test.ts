@@ -4,6 +4,14 @@ import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/verce
 import type { Env } from './types.js';
 import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
+import {
+  createRuntimeProxyGrant,
+  issueRuntimeCredentialProxyHandle,
+} from './runtime-credential-proxy.js';
+import {
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+  verifyRuntimeProxyAttestation,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
 
 const {
   getRunningTerminalClientMock,
@@ -162,7 +170,7 @@ function createEnv(): MockEnv {
     INTERNAL_API_SECRET: 'test-internal-secret',
     CLOUD_AGENT_SESSION: {
       idFromName: vi.fn(),
-      get: vi.fn(),
+      get: vi.fn(() => ({ getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy') })),
     },
     USER_KILO_FACADE: {
       idFromName: vi.fn(),
@@ -177,7 +185,9 @@ function createEnv(): MockEnv {
     },
     SANDBOX_SESSION: {
       idFromName: vi.fn(),
-      get: vi.fn(),
+      get: vi.fn(() => ({
+        isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+      })),
     },
   };
 }
@@ -395,7 +405,10 @@ describe('server /terminal', () => {
     const sessionResponse = new Response('bridged', { status: 200 });
     const sessionFetch = vi.fn().mockResolvedValue(sessionResponse);
     env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
     const request = new Request(
       `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}&role=wrapper&ownerId=attacker`,
       {
@@ -449,6 +462,31 @@ describe('server /terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+
+  it('rejects a control-plane browser upgrade during runtime authorization recovery', async () => {
+    const sessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const env = createEnv();
+    const consume = installTerminalNonceConsumer(env);
+    const sessionFetch = vi.fn();
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
+    });
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(signTerminalTicket(sessionId))}`,
+        { headers: { Upgrade: 'websocket' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toBe('Runtime authorization recovery is in progress');
+    expect(consume).toHaveBeenCalledOnce();
+    expect(sessionFetch).not.toHaveBeenCalled();
   });
 
   it('rejects revoked control-plane access before consuming the browser ticket nonce', async () => {
@@ -540,7 +578,11 @@ describe('server /terminal', () => {
     const getMetadata = vi.fn().mockResolvedValue(metadata);
     const fetch = vi.fn();
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch, getMetadata });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      fetch,
+      getMetadata,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
 
     const request = new Request(
       `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
@@ -612,6 +654,7 @@ describe('server /terminal', () => {
     });
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
     env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
       getMetadata: vi.fn().mockResolvedValue({
         metadataSchemaVersion: 2,
         identity: {
@@ -721,6 +764,533 @@ describe('server /terminal', () => {
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Origin not allowed');
     expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+});
+
+describe('server runtime credential proxy', () => {
+  async function handle(): Promise<string> {
+    return issueRuntimeCredentialProxyHandle(
+      { NEXTAUTH_SECRET: secret } as never,
+      createRuntimeProxyGrant({
+        plane: 'legacy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        sessionId: 'agent_proxy',
+        kiloSessionId: 'kilo_proxy',
+        userId: 'usr_proxy',
+        orgId: 'org_proxy',
+        mode: 'contained',
+        generation: 1,
+        allocationId: 'allocation_proxy',
+        wrapperRunId: 'run_proxy',
+        wrapperConnectionId: 'connection_proxy',
+        leaseExpiresAt: Date.now() + 60_000,
+        state: 'active',
+      })
+    );
+  }
+
+  it('denies invalid handles before resolving a session or fetching', async () => {
+    const env = createEnv();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const response = await fetchWorker(
+      new Request('https://worker.test/api/runtime-credential-proxy/provider/models', {
+        headers: { Authorization: 'Bearer invalid' },
+      }),
+      env
+    );
+    expect(response.status).toBe(401);
+    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(upstream).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('routes verified facade requests and leaves non-handles to ordinary routing', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const resolve = vi.fn().mockResolvedValue({
+      token: 'https://api.kilo.ai:backing-token',
+      organizationId: 'org_proxy',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const authorization = `Bearer ${await handle()}`;
+      const requests = [
+        ['GET', '/api/profile', undefined],
+        ['GET', '/api/defaults', undefined],
+        ['GET', '/api/openrouter/models', undefined],
+        ['POST', '/api/openrouter/chat/completions', '{}'],
+        ['POST', '/api/gateway/chat/completions', '{}'],
+        ['POST', '/api/gateway/v1/chat/completions', '{}'],
+        ['POST', '/api/gateway/v1/responses', '{}'],
+        ['POST', '/api/session', '{"sessionId":"kilo_proxy"}'],
+        ['GET', '/api/session/kilo_proxy/export', undefined],
+        ['POST', '/api/session/kilo_proxy/ingest', '{}'],
+        ['POST', '/api/session/kilo_proxy/title', '{}'],
+      ] as const;
+      for (const [method, path, body] of requests) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, {
+            method,
+            headers: {
+              Authorization: authorization,
+              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            },
+            ...(body === undefined ? {} : { body }),
+          }),
+          env
+        );
+        expect(response.status).toBe(200);
+      }
+      expect(
+        upstream.mock.calls.map(([request]) => new URL((request as Request).url).pathname)
+      ).toEqual([
+        '/api/profile',
+        '/api/defaults',
+        '/api/gateway/models',
+        '/api/gateway/chat/completions',
+        '/api/gateway/chat/completions',
+        '/api/gateway/v1/chat/completions',
+        '/api/gateway/v1/responses',
+        '/api/session',
+        '/api/session/kilo_proxy/export',
+        '/api/session/kilo_proxy/ingest',
+        '/api/session/kilo_proxy/title',
+      ]);
+      const createRequest = upstream.mock.calls[7]?.[0] as Request;
+      expect(await createRequest.text()).toBe('{"sessionId":"kilo_proxy"}');
+
+      const invalid = await fetchWorker(
+        new Request('https://worker.test/api/profile', {
+          headers: { Authorization: 'Bearer invalid' },
+        }),
+        env
+      );
+      const unknown = await fetchWorker(
+        new Request('https://worker.test/api/not-allowed', {
+          headers: { Authorization: authorization },
+        }),
+        env
+      );
+      expect(invalid.status).toBe(404);
+      expect(unknown.status).toBe(404);
+      expect(upstream).toHaveBeenCalledTimes(requests.length);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('does not let one root handle access a sibling path or body-bound ingest request', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
+    const firstHandle = await handle();
+    const secondHandle = await issueRuntimeCredentialProxyHandle(
+      { NEXTAUTH_SECRET: secret } as never,
+      createRuntimeProxyGrant({
+        plane: 'control',
+        authorizationId: '22222222-2222-4222-8222-222222222222',
+        sessionId: 'agent_sibling',
+        kiloSessionId: 'kilo_sibling',
+        userId: 'usr_proxy',
+        mode: 'contained',
+        allocationId: 'allocation_proxy',
+        providerInstanceId: 'provider_proxy',
+        connectionId: 'connection_proxy',
+        wrapperInstanceId: 'wrapper_proxy',
+        leaseExpiresAt: Date.now() + 60_000,
+        state: 'active',
+      })
+    );
+    const firstResolve = vi.fn().mockResolvedValue({
+      token: 'https://api.kilo.ai:backing-token',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    const secondResolve = vi.fn().mockResolvedValue({
+      token: 'https://api.kilo.ai:backing-token',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '22222222-2222-4222-8222-222222222222',
+        resourceId: 'agent_sibling',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.idFromName.mockImplementation((name: string) => name);
+    env.CLOUD_AGENT_SESSION.get.mockImplementation((id: string) =>
+      id === 'usr_proxy:agent_proxy'
+        ? { resolveRuntimeCredentialProxyGrant: firstResolve }
+        : { resolveRuntimeCredentialProxyGrant: secondResolve }
+    );
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      for (const [path, body] of [
+        ['/api/session/kilo_sibling/export', undefined],
+        ['/api/session', '{"sessionId":"kilo_sibling"}'],
+      ] as const) {
+        const response = await fetchWorker(
+          new Request(`https://worker.test${path}`, {
+            method: body === undefined ? 'GET' : 'POST',
+            headers: {
+              Authorization: `Bearer ${firstHandle}`,
+              ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+            },
+            ...(body === undefined ? {} : { body }),
+          }),
+          env
+        );
+        expect(response.status).toBe(404);
+      }
+      expect(upstream).not.toHaveBeenCalled();
+
+      firstResolve.mockResolvedValue(null);
+
+      const surviving = await fetchWorker(
+        new Request('https://worker.test/api/session/kilo_sibling/export', {
+          headers: { Authorization: `Bearer ${secondHandle}` },
+        }),
+        env
+      );
+      expect(surviving.status).toBe(200);
+      expect(secondResolve).toHaveBeenCalledOnce();
+      expect(upstream).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('recognizes only paths under a safe configured facade prefix', async () => {
+    const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test/runtime' });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://api.kilo.ai:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const authorization = `Bearer ${await handle()}`;
+      expect(
+        (
+          await fetchWorker(
+            new Request('https://worker.test/runtime/api/profile', {
+              headers: { Authorization: authorization },
+            }),
+            env
+          )
+        ).status
+      ).toBe(200);
+      expect(
+        (
+          await fetchWorker(
+            new Request('https://worker.test/api/profile', {
+              headers: { Authorization: authorization },
+            }),
+            env
+          )
+        ).status
+      ).toBe(404);
+      expect(upstream).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('replaces caller credentials, enforces organization identity, and preserves request shape', async () => {
+    const env = createEnv();
+    const resolve = vi.fn().mockResolvedValue({
+      token: 'https://provider.example.test/api/openrouter:backing-token',
+      organizationId: 'org_proxy',
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn(async (request: Request) => {
+      expect(request.method).toBe('POST');
+      expect(new URL(request.url).pathname).toBe('/api/openrouter/chat/completions');
+      expect(await request.text()).toBe('{"stream":true}');
+      expect(request.headers.get('authorization')).toMatch(/^Bearer /);
+      expect(request.headers.get('authorization')).not.toBe('Bearer caller-token');
+      expect(request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).not.toBe(
+        'caller-supplied-proof'
+      );
+      expect(request.headers.get('cookie')).toBeNull();
+      expect(request.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
+      await expect(
+        verifyRuntimeProxyAttestation({
+          value: request.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+          secret,
+          audience: 'kilo-gateway',
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+          bearer: 'https://provider.example.test/api/openrouter:backing-token',
+        })
+      ).resolves.toBe(true);
+      return new Response('stream-body', {
+        status: 307,
+        headers: { Location: 'https://other.test' },
+      });
+    });
+    vi.stubGlobal('fetch', upstream);
+    const response = await fetchWorker(
+      new Request(
+        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?stream=true',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${await handle()}`,
+            Cookie: 'session=caller',
+            'X-Kilocode-OrganizationId': 'attacker-org',
+            [RUNTIME_PROXY_ATTESTATION_HEADER]: 'caller-supplied-proof',
+            'Content-Type': 'application/json',
+          },
+          body: '{"stream":true}',
+        }
+      ),
+      env
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('https://other.test');
+    await expect(response.text()).resolves.toBe('stream-body');
+    expect(resolve).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it('removes every adjacent prohibited header before injecting runtime credentials', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://provider.example.test/api/openrouter:backing-token',
+        organizationId: 'org_proxy',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const prohibited = [
+      'forwarded',
+      'proxy-connection',
+      'proxy-a',
+      'proxy-b',
+      'x-forwarded-a',
+      'x-forwarded-b',
+      'x-internal-a',
+      'x-internal-b',
+      'x-kilo-a',
+      'x-kilo-b',
+      'x-kilocode-a',
+      'x-kilocode-b',
+      'x-real-ip',
+    ];
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
+          {
+            headers: {
+              ...Object.fromEntries(prohibited.map(name => [name, 'untrusted'])),
+              Authorization: `Bearer ${await handle()}`,
+              'X-Kilocode-OrganizationId': 'attacker-org',
+              'X-Client-Request-Id': 'request_proxy',
+            },
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      expect(upstream).toHaveBeenCalledOnce();
+      const forwarded = upstream.mock.calls[0][0] as Request;
+      for (const name of prohibited) expect(forwarded.headers.get(name)).toBeNull();
+      expect(forwarded.headers.get('authorization')).toBe(
+        'Bearer https://provider.example.test/api/openrouter:backing-token'
+      );
+      expect(forwarded.headers.get('x-kilocode-organizationid')).toBe('org_proxy');
+      expect(forwarded.headers.get('x-client-request-id')).toBe('request_proxy');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('removes generic caller credential headers before injecting runtime credentials', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://provider.example.test/api/openrouter:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const callerCredentials = ['x-api-key', 'api-key', 'x-auth-token'];
+    const upstream = vi.fn().mockResolvedValue(new Response('ok'));
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
+          {
+            headers: {
+              ...Object.fromEntries(callerCredentials.map(name => [name, 'caller-credential'])),
+              Authorization: `Bearer ${await handle()}`,
+            },
+          }
+        ),
+        env
+      );
+      expect(response.status).toBe(200);
+      const forwarded = upstream.mock.calls[0][0] as Request;
+      for (const name of callerCredentials) expect(forwarded.headers.get(name)).toBeNull();
+      expect(forwarded.headers.get('authorization')).toBe(
+        'Bearer https://provider.example.test/api/openrouter:backing-token'
+      );
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('removes unsafe upstream response headers while preserving redirects and streaming', async () => {
+    const env = createEnv();
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
+        token: 'https://provider.example.test/api/openrouter:backing-token',
+        runtimeAuthorization: {
+          userId: 'usr_proxy',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          resourceId: 'agent_proxy',
+        },
+      }),
+    });
+    const unsafeHeaders = [
+      'connection',
+      'proxy-connection',
+      'keep-alive',
+      'proxy-authenticate',
+      'proxy-authorization',
+      'te',
+      'trailer',
+      'transfer-encoding',
+      'upgrade',
+      'set-cookie',
+    ];
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('stream-body'));
+        controller.close();
+      },
+    });
+    const upstream = vi.fn().mockResolvedValue(
+      new Response(stream, {
+        status: 307,
+        statusText: 'Temporary Redirect',
+        headers: {
+          ...Object.fromEntries(unsafeHeaders.map(name => [name, 'unsafe'])),
+          'content-type': 'text/event-stream',
+          'cache-control': 'no-cache',
+          location: 'https://other.test/continue',
+          [RUNTIME_PROXY_ATTESTATION_HEADER]: 'upstream-proof',
+        },
+      })
+    );
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request(
+          'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/models',
+          { headers: { Authorization: `Bearer ${await handle()}` } }
+        ),
+        env
+      );
+      expect(response.status).toBe(307);
+      expect(response.statusText).toBe('Temporary Redirect');
+      expect(response.headers.get('location')).toBe('https://other.test/continue');
+      expect(response.headers.get('content-type')).toBe('text/event-stream');
+      expect(response.headers.get('cache-control')).toBe('no-cache');
+      for (const name of unsafeHeaders) expect(response.headers.get(name)).toBeNull();
+      expect(response.headers.get(RUNTIME_PROXY_ATTESTATION_HEADER)).toBeNull();
+      await expect(response.text()).resolves.toBe('stream-body');
+      expect(upstream.mock.calls[0][1]).toEqual({ redirect: 'manual' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('forwards packaged CLI inference requests to the production gateway', async () => {
+    const env = createEnv();
+    const resolve = vi.fn().mockResolvedValue({
+      token: jwt.sign({ exp: 4_000_000_000 }, secret),
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn(async (request: Request) => {
+      expect(request.method).toBe('POST');
+      expect(request.url).toBe('https://api.kilo.ai/api/gateway/chat/completions?stream=true');
+      return new Response('ok');
+    });
+    vi.stubGlobal('fetch', upstream);
+
+    const response = await fetchWorker(
+      new Request(
+        'https://worker.test/api/runtime-credential-proxy/provider/api/openrouter/chat/completions?stream=true',
+        { method: 'POST', headers: { Authorization: `Bearer ${await handle()}` } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(upstream).toHaveBeenCalledOnce();
+    vi.unstubAllGlobals();
+  });
+
+  it('validates the body-bound ingest identity before fetching upstream', async () => {
+    const env = createEnv();
+    const resolve = vi.fn().mockResolvedValue({
+      token: jwt.sign({ exp: 4_000_000_000 }, secret),
+      runtimeAuthorization: {
+        userId: 'usr_proxy',
+        authorizationId: '11111111-1111-4111-8111-111111111111',
+        resourceId: 'agent_proxy',
+      },
+    });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const response = await fetchWorker(
+      new Request('https://worker.test/api/runtime-credential-proxy/ingest/api/session', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${await handle()}`, 'Content-Type': 'application/json' },
+        body: '{"sessionId":"other"}',
+      }),
+      env
+    );
+    expect(response.status).toBe(404);
+    expect(upstream).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });
 
@@ -887,7 +1457,9 @@ describe('server raw global feed route', () => {
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
     const facadeFetch = vi.fn().mockResolvedValue(new Response('accepted', { status: 200 }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      validateKiloGlobalFeedProducer,
+    });
     env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
     env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
     const token = signKiloToken('usr_feed');
@@ -910,7 +1482,9 @@ describe('server raw global feed route', () => {
     const env = createEnv();
     const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      validateKiloGlobalFeedProducer,
+    });
     const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
       async () => new Response('accepted', { status: 200 })
     );
@@ -1131,6 +1705,9 @@ describe('server wrapper ingest route', () => {
 
   it('keeps current session ownership enforcement for an audience-less legacy raw Kilo JWT', async () => {
     const env = createEnv();
+    const doFetch = vi.fn();
+    const getRuntimeAuthorizationStatus = vi.fn().mockResolvedValue('legacy');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ getRuntimeAuthorizationStatus, fetch: doFetch });
     const token = signKiloToken('usr_feed');
     requireCurrentSessionAccessMock.mockRejectedValue(
       Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
@@ -1149,14 +1726,18 @@ describe('server wrapper ingest route', () => {
       kiloUserId: 'usr_feed',
       cloudAgentSessionId: 'agent_live',
     });
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(getRuntimeAuthorizationStatus).toHaveBeenCalledOnce();
+    expect(doFetch).not.toHaveBeenCalled();
   });
 
   it('accepts a valid wrapper dispatch ticket and forwards to the session Durable Object', async () => {
     const env = createEnv();
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
+      fetch: doFetch,
+    });
     const ticket = signWrapperDispatchTicket();
 
     const response = await fetchWorker(
@@ -1179,7 +1760,10 @@ describe('server wrapper ingest route', () => {
     const env = createEnv();
     const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
     env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ fetch: doFetch });
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
+      fetch: doFetch,
+    });
     const token = signKiloToken('usr_feed');
 
     const response = await fetchWorker(
@@ -1231,6 +1815,80 @@ describe('server wrapper ingest route', () => {
 });
 
 describe('server wrapper log upload route', () => {
+  it('rejects a legacy wrapper token before ingest reaches a runtime-authorized session', async () => {
+    const env = createEnv();
+    const fetch = vi.fn();
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('active'),
+      fetch,
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
+        headers: {
+          Upgrade: 'websocket',
+          Authorization: `Bearer ${signKiloToken('usr_feed')}`,
+        },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(fetch).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps legacy wrapper tokens working for fenced global feed dispatch', async () => {
+    const env = createEnv();
+    const validateKiloGlobalFeedProducer = vi.fn().mockResolvedValue({ success: true });
+    const facadeFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      validateKiloGlobalFeedProducer,
+    });
+    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
+    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
+
+    const response = await fetchWorker(
+      new Request(
+        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
+        {
+          headers: {
+            Upgrade: 'websocket',
+            Authorization: `Bearer ${signKiloToken('usr_feed')}`,
+          },
+        }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledOnce();
+    expect(facadeFetch).toHaveBeenCalledOnce();
+  });
+
+  it('rejects a legacy wrapper token before writing a runtime-authorized log archive', async () => {
+    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
+    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
+    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('revoked'),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
+        body: 'archive',
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+  });
+
   it('does not accept legacy raw archives for control-plane sessions', async () => {
     const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
     const response = await fetchWorker(
@@ -1697,7 +2355,10 @@ describe('server /sandbox-terminal', () => {
     const sessionResponse = new Response('wrapper bridged', { status: 200 });
     const sessionFetch = vi.fn().mockResolvedValue(sessionResponse);
     env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
-    env.SANDBOX_SESSION.get.mockReturnValue({ fetch: sessionFetch });
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
+    });
     const request = new Request(
       `http://worker.test/sandbox-terminal/${encodeURIComponent(ownerId)}/${sessionId}/pty_123?ticket=browser-secret&ptyId=attacker&role=browser`,
       {
@@ -1743,6 +2404,27 @@ describe('server /sandbox-terminal', () => {
     expect(forwarded.headers.get('x-terminal-role')).toBeNull();
     expect(forwarded.headers.get('x-internal-role')).toBeNull();
     expect(forwarded.headers.get('x-forwarded-user')).toBeNull();
+  });
+
+  it('rejects a valid producer WebSocket before forwarding during runtime authorization recovery', async () => {
+    const env = createEnv();
+    const sessionFetch = vi.fn();
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('sandbox-session-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({
+      fetch: sessionFetch,
+      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(true),
+    });
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/sandbox-terminal/user-1/${sessionId}/pty_123`, {
+        headers: { Upgrade: 'websocket', Authorization: 'Bearer producer-capability' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(503);
+    await expect(response.text()).resolves.toBe('Runtime authorization recovery in progress');
+    expect(sessionFetch).not.toHaveBeenCalled();
   });
 });
 

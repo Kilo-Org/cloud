@@ -44,6 +44,7 @@ import {
 import {
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
+  sessionAttachPayloadSchema,
   sessionRequestIdentitySchema,
   wrapperInstanceIdSchema,
   type ResponseFrame,
@@ -131,6 +132,7 @@ import {
   type SessionCredentialGrant,
 } from '../sandbox-control/session-credentials.js';
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
+import { verifyRuntimeCredentialProxyHandle } from '../runtime-credential-proxy.js';
 import {
   diagnosticCause,
   diagnosticConnection,
@@ -255,6 +257,15 @@ export type SandboxControlStatus = {
   connection: ConnectionState;
   work: WorkState;
   wrapperInstanceId?: string;
+  runtimeRecovery?: true;
+};
+
+export type ControlRuntimeCredentialProxyFence = {
+  plane: 'control';
+  allocationId: string;
+  providerInstanceId: string;
+  connectionId: string;
+  wrapperInstanceId: string;
 };
 
 export class SandboxControl extends DurableObject<Env> {
@@ -506,6 +517,77 @@ export class SandboxControl extends DurableObject<Env> {
     return this.readOwner();
   }
 
+  async getRuntimeCredentialProxyFence(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+  }): Promise<ControlRuntimeCredentialProxyFence | null> {
+    await this.ensureOperationalInitialized();
+    if (
+      typeof input.ownerId !== 'string' ||
+      typeof input.sessionId !== 'string' ||
+      typeof input.kiloSessionId !== 'string' ||
+      typeof input.directory !== 'string'
+    ) {
+      return null;
+    }
+    const [ownerId, routes, physical, grants] = await Promise.all([
+      this.readOwner(),
+      loadRouteTable(this.ctx.storage),
+      loadPhysicalRecord(this.ctx.storage),
+      loadSessionCredentialGrants(this.ctx.storage),
+    ]);
+    if (ownerId !== input.ownerId) return null;
+    const route = routes.get(input.sessionId);
+    const provisioned = grants.some(
+      grant =>
+        grant.userId === input.ownerId &&
+        grant.directory === input.directory &&
+        grant.expiresAt > Date.now() &&
+        grant.members.some(
+          member =>
+            member.sessionId === input.sessionId && member.kiloSessionId === input.kiloSessionId
+        )
+    );
+    if (
+      (!route && !provisioned) ||
+      (route &&
+        (route.ownerId !== input.ownerId ||
+          route.kiloSessionId !== input.kiloSessionId ||
+          route.directory !== input.directory))
+    ) {
+      return null;
+    }
+    const worktreeId = route?.worktreeId ?? this.worktreeIdFromDirectory(input.directory);
+    if (
+      this.runtimeDeleted ||
+      this.exclusiveDeletionWorktreeId ||
+      (worktreeId && this.deletingWorktrees.has(worktreeId)) ||
+      physical.state !== 'running' ||
+      physical.stopTombstone !== null ||
+      physical.createIntent === null ||
+      physical.providerRef === null
+    ) {
+      return null;
+    }
+    const runtime = this.readyWrapperRuntime();
+    if (
+      !runtime ||
+      !runtime.wrapperInstanceId ||
+      runtime.providerInstanceId !== physical.providerRef
+    ) {
+      return null;
+    }
+    return {
+      plane: 'control',
+      allocationId: physical.createIntent.intentId,
+      providerInstanceId: runtime.providerInstanceId,
+      connectionId: runtime.connectionId,
+      wrapperInstanceId: runtime.wrapperInstanceId,
+    };
+  }
+
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
     await this.ensureOperationalInitialized();
     if (input.operation === 'session.git.summary') return this.requestWorktreeChanges(input);
@@ -525,6 +607,14 @@ export class SandboxControl extends DurableObject<Env> {
     ) {
       throw new Error('Sandbox wrapper runtime changed');
     }
+    if (
+      input.expectedConnection &&
+      (runtime.connectionId !== input.expectedConnection.connectionId ||
+        runtime.providerInstanceId !== input.expectedConnection.providerInstanceId ||
+        runtime.wrapperInstanceId !== input.expectedConnection.wrapperInstanceId)
+    ) {
+      throw new Error('Sandbox control connection changed');
+    }
     const isCurrent = () => {
       const current = this.readyWrapperRuntime();
       return current !== null && this.sameConnection(current, runtime);
@@ -541,6 +631,15 @@ export class SandboxControl extends DurableObject<Env> {
     if (input.operation === 'session.attach' || input.operation === 'session.prompt') {
       const payload = parseOperationPayload(input.operation, input.payload);
       if (!payload.ok) throw new Error(payload.error.message);
+      const attach =
+        input.operation === 'session.attach'
+          ? sessionAttachPayloadSchema.parse(payload.payload)
+          : undefined;
+      if (attach?.runtimeIsolation === 'per-session') {
+        if (runtime.runtimeIsolation !== true) {
+          throw new Error('Sandbox wrapper does not support per-session runtime isolation');
+        }
+      }
       const identity = sessionRequestIdentitySchema.safeParse(input.session);
       if (!identity.success) throw new Error('session identity is required');
       await this.ctx.storage.transaction(async () => {
@@ -1351,6 +1450,90 @@ export class SandboxControl extends DurableObject<Env> {
     });
   }
 
+  async bindRuntimeCredentialProxyHandle(input: {
+    ownerId: string;
+    sessionId: string;
+    kiloSessionId: string;
+    directory: string;
+    handle: string;
+  }): Promise<{ bound: true }> {
+    return this.withCredentialUpdate(async () => {
+      if (
+        typeof input.handle !== 'string' ||
+        input.handle.length === 0 ||
+        input.handle.length > 4096
+      ) {
+        throw new Error('Invalid runtime credential proxy handle');
+      }
+      const ownerId = await this.requireOwner();
+      if (ownerId !== input.ownerId) throw new Error('Sandbox owner mismatch');
+      if (this.providerKind !== 'vercel' || this.runtimeDeleted) {
+        throw new Error('Sandbox credential containment mismatch');
+      }
+      const grants = await loadSessionCredentialGrants(this.ctx.storage);
+      const now = Date.now();
+      const index = grants.findIndex(
+        grant =>
+          grant.userId === ownerId &&
+          grant.directory === input.directory &&
+          grant.expiresAt > now &&
+          grant.members.some(
+            member =>
+              member.sessionId === input.sessionId && member.kiloSessionId === input.kiloSessionId
+          ) &&
+          grant.kilo.runtimeProxy !== undefined
+      );
+      if (index < 0) throw new Error('Session has no matching runtime proxy credential grant');
+      const grant = grants[index];
+      if (!grant) throw new Error('Session has no matching runtime proxy credential grant');
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle);
+      if (
+        !claims ||
+        !('sessionId' in claims) ||
+        claims.userId !== ownerId ||
+        claims.sessionId !== input.sessionId ||
+        claims.kiloSessionId !== input.kiloSessionId
+      ) {
+        throw new Error('Invalid runtime credential proxy member handle');
+      }
+      const existingProxy = grant.kilo.runtimeProxy;
+      if (!existingProxy) throw new Error('Session has no matching runtime proxy credential grant');
+      const updated = grants.map((value, current) =>
+        current === index
+          ? {
+              ...value,
+              kilo: {
+                ...value.kilo,
+                runtimeProxy: value.kilo.runtimeProxy
+                  ? {
+                      ...value.kilo.runtimeProxy,
+                      members: [
+                        ...value.kilo.runtimeProxy.members.filter(
+                          member => member.sessionId !== input.sessionId
+                        ),
+                        {
+                          sessionId: input.sessionId,
+                          kiloSessionId: input.kiloSessionId,
+                          handle: input.handle,
+                        },
+                      ],
+                    }
+                  : undefined,
+              },
+            }
+          : value
+      );
+      await saveSessionCredentialGrants(this.ctx.storage, updated);
+      await this.updateNetworkPolicy({
+        ownerId,
+        networkPolicy: buildControlNetworkPolicy(updated.filter(value => value.expiresAt > now)),
+        requiredContainment: WORKTREE_CREDENTIAL_CONTAINMENT,
+      });
+      await this.ctx.storage.delete(CREDENTIAL_POLICY_DIRTY_KEY);
+      return { bound: true };
+    });
+  }
+
   async detachSession(sessionId: string): Promise<{ existed: boolean }> {
     await this.ensureOperationalInitialized();
     const route = (await loadRouteTable(this.ctx.storage)).get(sessionId);
@@ -1835,6 +2018,7 @@ export class SandboxControl extends DurableObject<Env> {
       ...(physical.state === 'running' && runtime?.wrapperInstanceId
         ? { wrapperInstanceId: runtime.wrapperInstanceId }
         : {}),
+      ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
     };
   }
 

@@ -4,7 +4,11 @@ import {
   createCloudAgentNextClient,
   InsufficientCreditsError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
-import { generateApiToken } from '@/lib/tokens';
+import {
+  generateCloudAgentWorkflowToken,
+  generateWorkflowGatewayToken,
+  TOKEN_EXPIRY,
+} from '@/lib/tokens';
 import { getSecurityFindingById } from '../db/security-findings';
 import {
   updateAnalysisStatus,
@@ -254,6 +258,14 @@ export async function startSecurityAnalysis(params: {
     return { started: false, error: `Finding not found: ${findingId}` };
   }
   const findingDataSnapshot = buildSecurityFindingAnalysisInput(finding);
+  const findingOrganizationId = finding.owned_by_organization_id ?? undefined;
+  const findingUserId = finding.owned_by_user_id ?? undefined;
+  if (
+    organizationId !== findingOrganizationId ||
+    (!findingOrganizationId && findingUserId !== undefined && findingUserId !== user.id)
+  ) {
+    return { started: false, error: 'Analysis organization does not match the finding owner' };
+  }
 
   const leaseAcquired = await tryAcquireAnalysisStartLease(findingId);
   if (!leaseAcquired) {
@@ -290,7 +302,15 @@ export async function startSecurityAnalysis(params: {
   const analysisStartTime = Date.now();
 
   try {
-    const authToken = generateApiToken(user, { tokenSource: 'security-agent' });
+    const cloudAgentToken = generateCloudAgentWorkflowToken(user, {
+      organizationId: findingOrganizationId,
+      tokenSource: 'security-agent',
+      expiresIn: TOKEN_EXPIRY.default,
+    });
+    const gatewayToken = generateWorkflowGatewayToken(user, {
+      organizationId: findingOrganizationId,
+      tokenSource: 'security-agent',
+    });
 
     let triage: SecurityFindingTriage;
 
@@ -306,7 +326,7 @@ export async function startSecurityAnalysis(params: {
       trackSecurityAgentAnalysisStarted({
         distinctId: user.id,
         userId: user.id,
-        organizationId,
+        organizationId: findingOrganizationId,
         findingId,
         model: analysisModel,
         triageModel,
@@ -319,7 +339,7 @@ export async function startSecurityAnalysis(params: {
       trackSecurityAgentAnalysisStarted({
         distinctId: user.id,
         userId: user.id,
-        organizationId,
+        organizationId: findingOrganizationId,
         findingId,
         model: analysisModel,
         triageModel,
@@ -330,11 +350,11 @@ export async function startSecurityAnalysis(params: {
       const tier1Start = performance.now();
       triage = await triageSecurityFinding({
         finding,
-        authToken,
+        authToken: gatewayToken,
         model: triageModel,
         correlationId,
         userId: user.id,
-        organizationId,
+        organizationId: findingOrganizationId,
       });
       const tier1DurationMs = Math.round(performance.now() - tier1Start);
 
@@ -391,7 +411,7 @@ export async function startSecurityAnalysis(params: {
       trackSecurityAgentAnalysisCompleted({
         distinctId: user.id,
         userId: user.id,
-        organizationId,
+        organizationId: findingOrganizationId,
         findingId,
         model: triageModel,
         triageModel,
@@ -403,7 +423,9 @@ export async function startSecurityAnalysis(params: {
         durationMs: Date.now() - analysisStartTime,
       });
 
-      const owner: SecurityReviewOwner = organizationId ? { organizationId } : { userId: user.id };
+      const owner: SecurityReviewOwner = findingOrganizationId
+        ? { organizationId: findingOrganizationId }
+        : { userId: user.id };
 
       void maybeAutoDismissAnalysis({
         findingId,
@@ -438,7 +460,7 @@ export async function startSecurityAnalysis(params: {
     await updateAnalysisStatus(findingId, 'pending', { analysis: partialAnalysis });
 
     const prompt = buildAnalysisPrompt(finding);
-    const client = createCloudAgentNextClient(authToken);
+    const client = createCloudAgentNextClient(cloudAgentToken);
 
     const callbackUrl = `${APP_URL}/api/internal/security-analysis-callback/${findingId}`;
     const callbackToken = await deriveCallbackToken({
@@ -453,7 +475,7 @@ export async function startSecurityAnalysis(params: {
       model: analysisModel,
       githubRepo,
       githubToken,
-      kilocodeOrganizationId: organizationId,
+      kilocodeOrganizationId: findingOrganizationId,
       createdOnPlatform: 'security-agent',
       callbackTarget: {
         url: callbackUrl,

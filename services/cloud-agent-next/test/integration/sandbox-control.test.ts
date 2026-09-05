@@ -50,6 +50,10 @@ import {
   type SessionCredentialGrant,
 } from '../../src/sandbox-control/session-credentials.js';
 import { findMatchingCredentialInjectionRule } from '../../src/sandbox-control/vercel-network-policy.js';
+import {
+  createRuntimeProxyGrant,
+  issueRuntimeCredentialProxyHandle,
+} from '../../src/runtime-credential-proxy.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from '../../src/sandbox-id.js';
 import { SandboxSession } from '../../src/sandbox-session/SandboxSession.js';
 import {
@@ -1053,6 +1057,7 @@ async function credentialFixture(
   const environment = {
     ...env,
     ...VERCEL_ENV,
+    NEXTAUTH_SECRET: 'integration-runtime-proxy-secret',
     GIT_TOKEN_SERVICE: broker.binding,
     WORKER_URL: 'https://worker.test',
     KILOCODE_BACKEND_BASE_URL: CONTAINMENT_TARGETS.backendBaseUrl,
@@ -3659,6 +3664,79 @@ describe('SandboxControl mandatory worktree credentials', () => {
 });
 
 describe('SandboxControl native worktree containment', () => {
+  it('keeps one member mapping and policy after an ambiguous bind retry', async () => {
+    const fixture = await credentialTerminalFixture('vercel');
+    const { control, registration, socket, vercel } = fixture;
+    try {
+      const [prepared] = await storedGrants(control);
+      const proxyTargets = {
+        backendBaseUrl: 'https://worker.test',
+        providerBaseUrl: 'https://worker.test',
+        sessionIngestBaseUrl: 'https://worker.test',
+      };
+      await runInDurableObject(control, async (_instance, state) => {
+        await saveSessionCredentialGrants(state.storage, [
+          {
+            ...prepared,
+            kilo: {
+              ...prepared.kilo,
+              runtimeProxy: { targets: proxyTargets, members: [] },
+            },
+          },
+        ]);
+      });
+      const fence = await control.getRuntimeCredentialProxyFence({
+        ownerId: registration.identity.userId,
+        sessionId: registration.identity.sessionId,
+        kiloSessionId: registration.auth.kiloSessionId,
+        directory: prepared.directory,
+      });
+      if (!fence) throw new Error('Expected active runtime proxy fence');
+      const memberHandle = await issueRuntimeCredentialProxyHandle(
+        fixture.environment,
+        createRuntimeProxyGrant({
+          plane: 'control',
+          authorizationId: '11111111-1111-4111-8111-111111111111',
+          sessionId: registration.identity.sessionId,
+          kiloSessionId: registration.auth.kiloSessionId,
+          userId: registration.identity.userId,
+          ...(registration.identity.orgId ? { orgId: registration.identity.orgId } : {}),
+          mode: 'contained',
+          leaseExpiresAt: Date.now() + HOUR,
+          state: 'active',
+          ...fence,
+        })
+      );
+      const input = {
+        ownerId: registration.identity.userId,
+        sessionId: registration.identity.sessionId,
+        kiloSessionId: registration.auth.kiloSessionId,
+        directory: prepared.directory,
+        handle: memberHandle,
+      };
+
+      const first = await control.bindRuntimeCredentialProxyHandle(input);
+      const firstPolicy = vercel.runtime.policy;
+      const second = await control.bindRuntimeCredentialProxyHandle(input);
+      const [stored] = await storedGrants(control);
+
+      expect(first).toEqual({ bound: true });
+      expect(second).toEqual({ bound: true });
+      expect(stored.kilo.runtimeProxy).toMatchObject({
+        members: [
+          {
+            sessionId: registration.identity.sessionId,
+            kiloSessionId: registration.auth.kiloSessionId,
+            handle: memberHandle,
+          },
+        ],
+      });
+      expect(vercel.runtime.policy).toEqual(firstPolicy);
+    } finally {
+      socket.close();
+    }
+  });
+
   it('installs, refreshes, and removes the combined Vercel policy for exact worktree roots', async () => {
     const fixture = await credentialFixture('vercel');
     const { control, registration, session, broker, vercel } = fixture;

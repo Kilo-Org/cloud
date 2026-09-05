@@ -13,6 +13,7 @@ import {
   sessionAbortPayloadSchema,
   sessionAttachPayloadSchema,
   sessionDetachPayloadSchema,
+  sessionRuntimeRetirePayloadSchema,
   sessionMessageOutcomeSchema,
   sessionEventPayloadSchema,
   sessionGitSummaryPayloadSchema,
@@ -306,39 +307,36 @@ export function buildHeartbeatPayload(deps: HandlerDeps): SandboxHeartbeatPayloa
 export async function refreshHeartbeatPayload(deps: HandlerDeps): Promise<SandboxHeartbeatPayload> {
   const { activity, kiloRuntimes } = deps;
   if (activity && kiloRuntimes) {
-    const rootsByDirectory = new Map<string, string[]>();
-    for (const { kiloSessionId } of activity.snapshots()) {
+    const roots = activity.snapshots().flatMap(({ kiloSessionId }) => {
       const directory = directoryForSession(kiloSessionId);
-      if (!directory) continue;
-      const roots = rootsByDirectory.get(directory) ?? [];
-      roots.push(kiloSessionId);
-      rootsByDirectory.set(directory, roots);
-    }
+      const runtime = directory
+        ? kiloRuntimes
+            .getAll(directory)
+            .find(runtime => runtime.identity.kiloSessionId === kiloSessionId)
+        : undefined;
+      return runtime ? [runtime] : [];
+    });
     await Promise.all(
-      [...rootsByDirectory].map(async ([directory, roots]) => {
-        const runtime = kiloRuntimes.get(directory);
-        if (!runtime) return;
-        const revisions = new Map(roots.map(root => [root, activity.revision(root)]));
+      roots.map(async runtime => {
+        const { identity } = runtime;
+        if (!identity) return;
+        const revision = activity.revision(identity.kiloSessionId);
         const kiloClient = runtime.kiloClient;
         try {
           const statuses = await withKiloRequestDeadline(
-            signal => kiloClient.getSessionStatuses(directory, signal),
+            signal => kiloClient.getSessionStatuses(identity.directory, signal),
             deps.signal ? AbortSignal.any([deps.signal, runtime.signal]) : runtime.signal
           );
           if (
             runtime.signal.aborted ||
             deps.signal?.aborted ||
-            kiloRuntimes.get(directory) !== runtime ||
+            kiloRuntimes.get(identity) !== runtime ||
             runtime.kiloClient !== kiloClient
           )
             return;
           activity.reconcile(
             statuses,
-            roots.filter(
-              root =>
-                directoryForSession(root) === directory &&
-                activity.revision(root) === revisions.get(root)
-            )
+            activity.revision(identity.kiloSessionId) === revision ? [identity.kiloSessionId] : []
           );
         } catch {
           return;
@@ -497,13 +495,18 @@ export async function handleControlRequest(
         return fail('not_ready', 'Worktree cancellation is incomplete', true);
       }
       failureStage = 'runtime_lookup';
-      const runtime = kiloRuntimes.get(input.directory);
-      const client =
-        deps.worktreeCleanupClient ??
-        (runtime ? createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl) : undefined);
+      const runtimes = kiloRuntimes.getAll(input.directory);
+      // An injected cleanup client is a fallback for a checkout whose runtime has
+      // already gone away. Live runtimes each retain their own Kilo state.
+      const clients =
+        runtimes.length > 0
+          ? runtimes.map(runtime => createWorktreeKiloCleanupClient(runtime.kiloClient.serverUrl))
+          : deps.worktreeCleanupClient
+            ? [deps.worktreeCleanupClient]
+            : [];
       const cleanupDeps = {
         onDiagnostic: deps.onDiagnostic,
-        client,
+        clients,
         detachRoot: (id: string) => {
           deps.activity?.detach(id);
           const index = deps.sessions.findIndex(snapshot => snapshot.kiloSessionId === id);
@@ -597,6 +600,8 @@ async function handleSessionControlRequest(
       return handleAttach(session, payload, deps);
     case 'session.detach':
       return handleDetach(session, payload, deps);
+    case 'session.runtime.retire':
+      return handleRuntimeRetire(session, payload, deps);
     case 'session.prompt':
       return handlePrompt(session, payload, deps);
     case 'session.abort':
@@ -663,7 +668,7 @@ function sessionKiloRuntime(
     rootForSession(session.kiloSessionId) !== session.kiloSessionId
   )
     return undefined;
-  return deps.kiloRuntimes?.get(session.directory);
+  return deps.kiloRuntimes?.get(session);
 }
 
 function terminalFailure(error: unknown): ControlHandlerResult {
@@ -752,6 +757,48 @@ async function handleDetach(
     return ok({ detached: true });
   } catch (error) {
     return terminalFailure(error);
+  }
+}
+
+async function handleRuntimeRetire(
+  session: SessionRequestIdentity,
+  payload: unknown,
+  deps: HandlerDeps
+): Promise<ControlHandlerResult> {
+  const parsed = sessionRuntimeRetirePayloadSchema.safeParse(payload);
+  if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  const runtimes = deps.kiloRuntimes;
+  if (!runtimes) return missingKilo();
+  let terminalRetirementStarted = false;
+  try {
+    deps.terminalRuntime?.beginRecoveryRetirement(session);
+    terminalRetirementStarted = true;
+    const retirement = await runtimes.retireForRecovery(session, parsed.data.recoveryId, () => {
+      const task = deps.tasks.get(session.kiloSessionId);
+      const active = deps.activity
+        ?.snapshots()
+        .some(
+          snapshot => snapshot.kiloSessionId === session.kiloSessionId && snapshot.state !== 'idle'
+        );
+      if (task || active) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session has work in progress', true);
+      }
+      if (deps.terminalRuntime?.hasActivePty(session)) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session has an active PTY', true);
+      }
+    });
+    if (retirement === 'retired') {
+      await deps.terminalRuntime?.detachSession(session);
+      forgetAttachedRoot(session.kiloSessionId, session.directory);
+      deps.activity?.detach(session.kiloSessionId);
+      const index = deps.sessions.findIndex(item => item.kiloSessionId === session.kiloSessionId);
+      if (index !== -1) deps.sessions.splice(index, 1);
+    }
+    return ok({ recoveryId: parsed.data.recoveryId, retired: true });
+  } catch (error) {
+    return terminalFailure(error);
+  } finally {
+    if (terminalRetirementStarted) deps.terminalRuntime?.endRecoveryRetirement(session);
   }
 }
 

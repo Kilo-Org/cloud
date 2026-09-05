@@ -9,7 +9,7 @@ import { captureException } from '@sentry/nextjs';
 import { db } from '@/lib/drizzle';
 import { kilocode_users } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { generateApiToken } from '@/lib/tokens';
+import { generateCloudAgentWorkflowToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { getTriageTicketById } from '../db/triage-tickets';
 import type { Owner } from '../core';
 import type { AutoTriageAgentConfig, DispatchTriageRequest } from '../core/schemas';
@@ -53,7 +53,12 @@ export async function prepareTriagePayload(
     }
 
     // 3. Generate auth token for cloud agent with bot identifier
-    const authToken = generateApiToken(user, { botId: 'auto-triage' });
+    const authToken = generateCloudAgentWorkflowToken(user, {
+      organizationId: owner.type === 'org' ? owner.id : undefined,
+      tokenSource: 'auto-triage',
+      botId: 'auto-triage',
+      expiresIn: TOKEN_EXPIRY.default,
+    });
 
     // 4. Get config values
     const config = agentConfig.config as AutoTriageAgentConfig;

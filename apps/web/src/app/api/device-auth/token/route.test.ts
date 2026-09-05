@@ -52,6 +52,58 @@ describe('POST /api/device-auth/token', () => {
     expect(mockConsume).toHaveBeenCalledWith('secret123', { supportsRefresh: true });
   });
 
+  test('passes a negotiated credential format through and preserves metadata', async () => {
+    mockConsume.mockResolvedValue({
+      status: 'approved',
+      token: 'short-jwt',
+      refreshToken: 'refresh-abc',
+      expiresIn: 3600,
+      metadata: {
+        credentialFormat: 'api-gateway-v1',
+        gatewayToken: 'gateway-token',
+        expiresAt: '2026-09-02T22:00:00.000Z',
+      },
+      userId: 'user-1',
+      userEmail: 'user@example.com',
+    });
+
+    const response = await POST(
+      createRequest({
+        deviceCode: 'secret123',
+        supportsRefresh: true,
+        credentialFormat: 'api-gateway-v1',
+      })
+    );
+
+    expect(mockConsume).toHaveBeenCalledWith('secret123', {
+      supportsRefresh: true,
+      credentialFormat: 'api-gateway-v1',
+    });
+    expect((await response.json()).metadata).toEqual({
+      credentialFormat: 'api-gateway-v1',
+      gatewayToken: 'gateway-token',
+      expiresAt: '2026-09-02T22:00:00.000Z',
+    });
+  });
+
+  test('rejects requested formats without refresh support before consuming', async () => {
+    const response = await POST(
+      createRequest({ deviceCode: 'secret123', credentialFormat: 'api-gateway-v1' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockConsume).not.toHaveBeenCalled();
+  });
+
+  test('rejects unknown formats before consuming', async () => {
+    const response = await POST(
+      createRequest({ deviceCode: 'secret123', supportsRefresh: true, credentialFormat: 'nope' })
+    );
+
+    expect(response.status).toBe(400);
+    expect(mockConsume).not.toHaveBeenCalled();
+  });
+
   test('returns refreshToken and expiresIn when consumer returns short pair', async () => {
     mockConsume.mockResolvedValue({
       status: 'approved',

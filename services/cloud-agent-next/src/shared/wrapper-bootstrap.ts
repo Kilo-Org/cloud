@@ -58,6 +58,16 @@ export type WrapperBootstrapMaterializedConfig = {
   runtimeSkills?: WrapperBootstrapRuntimeSkill[];
 };
 
+export type WrapperRuntimeCredentialProxyConfig = {
+  /** Opaque Worker-issued handle; never the renewable backing credential. */
+  handle: string;
+  targets: {
+    backendBaseUrl: string;
+    providerBaseUrl: string;
+    sessionIngestBaseUrl: string;
+  };
+};
+
 export type WrapperDevContainerMetadata = {
   workspacePath: string;
   innerWorkspaceFolder: string;
@@ -129,6 +139,7 @@ export type WrapperSessionReadyRequest = {
   repo?: WrapperBootstrapRepoSource;
   devcontainer?: WrapperBootstrapDevContainer;
   materialized: WrapperBootstrapMaterializedConfig;
+  runtimeCredentialProxy?: WrapperRuntimeCredentialProxyConfig;
   session: WrapperSessionBinding;
   preparation?: {
     attemptId: string;
@@ -247,6 +258,43 @@ function hasString(value: Record<string, unknown>, key: string): boolean {
   return typeof value[key] === 'string' && value[key].length > 0;
 }
 
+function isRuntimeCredentialProxyConfig(
+  value: unknown
+): value is WrapperRuntimeCredentialProxyConfig {
+  if (!isRecord(value) || !hasString(value, 'handle') || !isRecord(value.targets)) return false;
+  const targets = value.targets;
+  if (
+    Object.keys(value).length !== 2 ||
+    !Object.hasOwn(value, 'handle') ||
+    !Object.hasOwn(value, 'targets') ||
+    Object.keys(targets).length !== 3
+  ) {
+    return false;
+  }
+  const targetKeys = ['backendBaseUrl', 'providerBaseUrl', 'sessionIngestBaseUrl'] as const;
+  if (!targetKeys.every(key => Object.hasOwn(targets, key) && hasString(targets, key))) {
+    return false;
+  }
+  const values = Object.values(targets);
+  if (new Set(values).size !== 1) return false;
+  return targetKeys.every(key => {
+    try {
+      const target = new URL(targets[key] as string);
+      return (
+        target.protocol === 'https:' &&
+        !target.username &&
+        !target.password &&
+        !target.search &&
+        !target.hash &&
+        !target.port &&
+        !target.pathname.split('/').filter(Boolean).includes('api')
+      );
+    } catch {
+      return false;
+    }
+  });
+}
+
 function isWrapperDevContainerMetadata(value: unknown): value is WrapperDevContainerMetadata {
   if (!isRecord(value)) return false;
   if (!hasString(value, 'workspacePath')) return false;
@@ -296,6 +344,13 @@ export function isWrapperSessionReadyRequest(value: unknown): value is WrapperSe
 
   const materialized = value.materialized;
   if (!isRecord(materialized) || !isRecord(materialized.env)) return false;
+
+  if (
+    value.runtimeCredentialProxy !== undefined &&
+    !isRuntimeCredentialProxyConfig(value.runtimeCredentialProxy)
+  ) {
+    return false;
+  }
 
   const session = value.session;
   if (!isRecord(session)) return false;

@@ -53,12 +53,15 @@ export type SandboxControlOutboundRequest = {
   payload: unknown;
   timeoutMs?: number;
   expectedWrapperInstanceId?: string;
+  expectedConnection?: SandboxControlConnectionIdentity;
 };
 
 export type SandboxControlConnectionIdentity = {
   connectionId: string;
   providerInstanceId: string;
   wrapperInstanceId?: string;
+  runtimeIsolation?: true;
+  runtimeRecovery?: true;
 };
 
 export type SandboxControlSocketHooks = {
@@ -194,6 +197,8 @@ function readConnectionIdentity(
     connectionId: attachment.connectionId,
     providerInstanceId: attachment.providerInstanceId,
     ...(attachment.wrapperInstanceId ? { wrapperInstanceId: attachment.wrapperInstanceId } : {}),
+    ...(attachment.runtimeIsolation ? { runtimeIsolation: true } : {}),
+    ...(attachment.runtimeRecovery ? { runtimeRecovery: true } : {}),
   };
 }
 
@@ -470,6 +475,8 @@ export function createSandboxControlSocketHandler(
           connectionId: attachment.connectionId,
           providerInstanceId: payload.providerInstanceId,
           ...(payload.wrapperInstanceId ? { wrapperInstanceId: payload.wrapperInstanceId } : {}),
+          ...(payload.capabilities?.runtimeIsolation ? { runtimeIsolation: true as const } : {}),
+          ...(payload.capabilities?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
         };
         const completed: SandboxControlSocketAttachment = {
           handshakeComplete: true,
@@ -479,6 +486,8 @@ export function createSandboxControlSocketHandler(
           protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
           providerInstanceId: identity.providerInstanceId,
           ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
+          ...(identity.runtimeIsolation ? { runtimeIsolation: true } : {}),
+          ...(identity.runtimeRecovery ? { runtimeRecovery: true } : {}),
         };
         const superseded: WebSocket[] = [];
         let replaced = false;

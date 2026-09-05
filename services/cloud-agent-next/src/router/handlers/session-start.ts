@@ -26,6 +26,7 @@ import type { SessionCreateRequest } from '../../session/session-requests.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
 import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
 import { assertOrganizationMembership } from './organization-membership.js';
+import jwt from 'jsonwebtoken';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
@@ -126,14 +127,21 @@ const startSessionHandler = protectedProcedure
         requestWithProfile.agent.mode,
         requestWithProfile.profile?.resolved ?? {}
       );
-      await assertKiloModelAvailable({
-        env: ctx.env,
-        submittedModel: requestWithProfile.agent.model,
-        originalToken: ctx.authToken,
-        originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
-        createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
-        procedure: 'start',
-      });
+      const claims = jwt.decode(ctx.authToken);
+      const isPolicyBearing =
+        claims !== null &&
+        typeof claims === 'object' &&
+        ('aud' in claims || 'tokenPurpose' in claims || 'credentialExchange' in claims);
+      if (!isPolicyBearing) {
+        await assertKiloModelAvailable({
+          env: ctx.env,
+          submittedModel: requestWithProfile.agent.model,
+          originalToken: ctx.authToken,
+          originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
+          createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
+          procedure: 'start',
+        });
+      }
 
       const registration = await startNewSession(
         requestWithProfile,

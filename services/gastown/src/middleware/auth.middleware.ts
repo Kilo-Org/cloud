@@ -1,11 +1,12 @@
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
+import type { KiloTokenPayload } from '@kilocode/worker-utils/kilo-token';
 import { verifyAgentJWT, verifyContainerJWT, type AgentJWTPayload } from '../util/jwt.util';
 import { resError } from '../util/res.util';
 import type { GastownEnv } from '../gastown.worker';
 
-export type JwtOrgMembership = { orgId: string; role: 'owner' | 'member' | 'billing_manager' };
+export type JwtOrgMembership = NonNullable<KiloTokenPayload['orgMemberships']>[number];
 
 export type AuthVariables = {
   agentJWT: AgentJWTPayload;
@@ -15,6 +16,8 @@ export type AuthVariables = {
   kiloApiTokenPepper: string | null;
   kiloGastownAccess: boolean;
   kiloOrgMemberships: JwtOrgMembership[];
+  kiloControlToken: string;
+  kiloUsesModernToken: boolean;
   requestStartTime: number;
   orgId?: string;
   orgRole?: string;

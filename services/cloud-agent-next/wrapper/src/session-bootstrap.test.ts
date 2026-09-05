@@ -21,6 +21,7 @@ import type {
 } from '../../src/shared/wrapper-bootstrap';
 import { buildCloudAgentRules } from '../../src/shared/cloud-agent-rules.js';
 import { PNPM_STORE_DIR, PNPM_STORE_ENV_VAR } from '../../src/shared/runtime-environment.js';
+import { isWrapperSessionReadyRequest } from '../../src/shared/wrapper-bootstrap.js';
 
 function makeRequest(tmpDir: string, overrides: Partial<WrapperSessionReadyRequest> = {}) {
   const request: WrapperSessionReadyRequest = {
@@ -3225,5 +3226,55 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     ]);
     expect(await fsp.readFile(localPath, 'utf8')).toBe('zip-payload');
+  });
+});
+
+describe('runtime credential proxy ready request validation', () => {
+  it('accepts only a stable handle and Worker proxy targets', () => {
+    const request = makeRequest(fs.mkdtempSync(path.join(os.tmpdir(), 'wrapper-proxy-request-')));
+    request.runtimeCredentialProxy = {
+      handle: 'stable-proxy-handle',
+      targets: {
+        backendBaseUrl: 'https://worker.example.com',
+        providerBaseUrl: 'https://worker.example.com',
+        sessionIngestBaseUrl: 'https://worker.example.com',
+      },
+    };
+    expect(isWrapperSessionReadyRequest(request)).toBe(true);
+    expect(
+      isWrapperSessionReadyRequest({
+        ...request,
+        runtimeCredentialProxy: { ...request.runtimeCredentialProxy, credential: 'backing-token' },
+      })
+    ).toBe(false);
+    for (const [requiredKey, wrongKey] of [
+      ['backendBaseUrl', 'backendUrl'],
+      ['providerBaseUrl', 'providerUrl'],
+      ['sessionIngestBaseUrl', 'ingestUrl'],
+    ]) {
+      expect(
+        isWrapperSessionReadyRequest({
+          ...request,
+          runtimeCredentialProxy: {
+            handle: 'stable-proxy-handle',
+            targets: Object.fromEntries(
+              Object.entries(request.runtimeCredentialProxy.targets).map(([key, value]) => [
+                key === requiredKey ? wrongKey : key,
+                value,
+              ])
+            ),
+          },
+        })
+      ).toBe(false);
+    }
+    expect(
+      isWrapperSessionReadyRequest({
+        ...request,
+        runtimeCredentialProxy: {
+          handle: 'stable-proxy-handle',
+          targets: { backendBaseUrl: 'not-a-url' },
+        },
+      })
+    ).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { createCallerFactory } from '@/lib/trpc/init';
 import { findUserById } from '@/lib/user';
 import { rootRouter } from '@/routers/root-router';
+import { generateApiToken } from '@/lib/tokens';
 
 const createCaller = createCallerFactory(rootRouter);
 
@@ -10,5 +11,9 @@ export async function createCallerForUser(userId: string, opts?: { deviceSession
   if (!user) {
     throw new Error(`Test user not found: ${userId}`);
   }
-  return createCaller({ user, deviceSessionId: opts?.deviceSessionId });
+  return createCaller({
+    user,
+    deviceSessionId: opts?.deviceSessionId,
+    headersList: new Headers({ Authorization: `Bearer ${generateApiToken(user)}` }),
+  });
 }

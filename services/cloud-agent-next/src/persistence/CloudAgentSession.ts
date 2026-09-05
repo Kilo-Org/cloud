@@ -9,6 +9,12 @@ import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-q
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
 import {
+  renewRuntimeAuthorization,
+  unsealRuntimeAuthorization,
+} from '@kilocode/worker-utils/runtime-authorization';
+import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
+import { RuntimeAuthorizationSchema } from '@kilocode/worker-utils/runtime-authorization-contract';
+import {
   getSandboxProvider,
   parseSessionMetadata,
   serializeSessionMetadata,
@@ -100,6 +106,21 @@ import { deriveSharedSandboxId, generateSandboxId } from '../sandbox-id.js';
 import { recordSharedSandboxFailover } from '../shared-sandbox-route.js';
 import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-model.js';
 import { dispatchedKilocodeModelId } from './model-utils.js';
+import {
+  getRuntimeAuthorizationStatus,
+  getRuntimeAuthorizationRecoveryState,
+  renewStoredRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_RECOVERY_KEY,
+  RUNTIME_AUTHORIZATION_KEY,
+  runtimeAuthorizationRecoveryLockSchema,
+} from '../session/runtime-authorization-persistence.js';
+import { RUNTIME_PROXY_GRANT_KEY } from '../runtime-credential-proxy.js';
+import { getEffectiveCredentialContainment } from './session-metadata.js';
+import {
+  issuePersistedRuntimeProxyGrant,
+  resolvePersistedRuntimeProxyCredential,
+} from '../runtime-credential-proxy-rpc.js';
+import type { RuntimeProxyFence } from '../runtime-credential-proxy.js';
 
 import { resolveSecret, validateStreamTicket, STREAM_TICKET_AUDIENCE } from '../auth.js';
 import { isAllowedStreamWebSocketOrigin } from './ws-origin.js';
@@ -134,6 +155,7 @@ import {
 import {
   createQueuedSessionMessageState,
   getSessionMessageState,
+  hasNonTerminalSessionMessage,
   listNonTerminalAcceptedMessages,
   markAgentActivityObserved,
   markMessageAccepted,
@@ -251,6 +273,7 @@ function extractAssistantTextFromParts(parts: AssistantMessagePart[]): string {
 type GroupedRegisterSessionInput = {
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
+  runtimeAuthorizationSeal?: string;
   clone?: SessionMetadata['clone'];
   /** Omitted for a clone-only create: no synthetic initial turn is registered. */
   message?: {
@@ -1667,6 +1690,313 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     return this.getStoredMetadata();
   }
 
+  async getRuntimeToken(): Promise<string | null> {
+    const metadata = await this.getMetadata();
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) throw new Error('NEXTAUTH_SECRET is not configured on the worker');
+    return renewStoredRuntimeAuthorization({
+      metadata,
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      putAuthorization: authorization =>
+        this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization),
+      getMetadata: () => this.getMetadata(),
+      putMetadata: updated => this.ctx.storage.put('metadata', updated),
+      renew: authorization =>
+        renewRuntimeAuthorization({
+          authorization,
+          secret,
+          connectionString: this.env.HYPERDRIVE.connectionString,
+        }),
+    });
+  }
+
+  async getRuntimeAuthorizationStatus(): Promise<'legacy' | 'active' | 'revoked'> {
+    return getRuntimeAuthorizationStatus({
+      metadata: await this.getMetadata(),
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+  }
+
+  async getRuntimeAuthorizationRecoveryState(): Promise<{
+    state: 'legacy' | 'revoked' | 'active' | 'expired';
+    id?: string;
+    recoveryId?: string;
+  }> {
+    const state = await getRuntimeAuthorizationRecoveryState({
+      metadata: await this.getMetadata(),
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+    const lock = runtimeAuthorizationRecoveryLockSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+    );
+    return state.state === 'expired' && lock.success && lock.data.expectedOldId === state.id
+      ? { ...state, recoveryId: lock.data.recoveryId }
+      : state;
+  }
+
+  async isRuntimeAuthorizationRecoveryInProgress(): Promise<boolean> {
+    return (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) !== undefined;
+  }
+
+  async recoverExpiredRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    recoveryId: string;
+    runtimeAuthorizationSeal: string;
+    runtimeToken: string;
+  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return { status: 'denied' };
+    let fresh: RuntimeAuthorization;
+    try {
+      fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return { status: 'denied' };
+    }
+    if (fresh.state !== 'active') return { status: 'denied' };
+    const state = await this.getRuntimeAuthorizationRecoveryState();
+    if (state.state === 'legacy' || state.state === 'active') return { status: 'not-needed' };
+    if (state.state !== 'expired' || state.id !== input.expectedOldId) return { status: 'denied' };
+    const [active, pending] = await Promise.all([
+      hasNonTerminalSessionMessage(this.ctx.storage),
+      countPendingSessionMessages(this.ctx.storage),
+    ]);
+    if (
+      active ||
+      pending > 0 ||
+      isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage))
+    ) {
+      return { status: 'busy' };
+    }
+    const acquired = await this.ctx.storage.transaction(async transaction => {
+      if (
+        (await countPendingSessionMessages(transaction)) > 0 ||
+        (await hasNonTerminalSessionMessage(transaction))
+      ) {
+        return false;
+      }
+      const existingLock = runtimeAuthorizationRecoveryLockSchema.safeParse(
+        await transaction.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+      );
+      if (
+        existingLock.success &&
+        (existingLock.data.recoveryId !== input.recoveryId ||
+          existingLock.data.expectedOldId !== input.expectedOldId)
+      ) {
+        return false;
+      }
+      await transaction.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
+        expectedOldId: input.expectedOldId,
+        recoveryId: input.recoveryId,
+      });
+      return true;
+    });
+    if (!acquired) {
+      return { status: 'retry' };
+    }
+    try {
+      const observation = this.physicalWrapperObserver
+        ? await this.physicalWrapperObserver()
+        : this.orchestrator
+          ? { status: 'absent' as const }
+          : await createAgentSandbox(
+              this.env,
+              metadata,
+              this.getAgentSandboxRuntimeContext()
+            ).observeWrappersWithoutWaking();
+      if (observation.status === 'inspection-failed') return { status: 'retry' };
+      if (observation.status === 'present') {
+        const terminal = await this.getTerminalClient();
+        if (!terminal.success || !terminal.data) return { status: 'retry' };
+        if ((await terminal.data.client.listTerminals()).length > 0) return { status: 'busy' };
+        const supervisor = this.getWrapperSupervisor();
+        await supervisor.requestPhysicalWrapperStop('idle-timeout', { kind: 'session' });
+        await supervisor.runMaintenance(Date.now());
+        const stopped = this.physicalWrapperObserver
+          ? await this.physicalWrapperObserver()
+          : this.orchestrator
+            ? { status: 'absent' as const }
+            : await createAgentSandbox(
+                this.env,
+                metadata,
+                this.getAgentSandboxRuntimeContext()
+              ).observeWrappersWithoutWaking();
+        if (stopped.status !== 'absent') return { status: 'retry' };
+      }
+      const latest = await this.getRuntimeAuthorizationRecoveryState();
+      if (latest.state !== 'expired' || latest.id !== input.expectedOldId) {
+        return latest.state === 'active' || latest.state === 'legacy'
+          ? { status: 'not-needed' }
+          : { status: 'denied' };
+      }
+      await this.ctx.storage.transaction(async transaction => {
+        const current = RuntimeAuthorizationSchema.safeParse(
+          await transaction.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        if (
+          !current.success ||
+          current.data.id !== input.expectedOldId ||
+          current.data.state !== 'active' ||
+          Date.parse(current.data.delegationExpiresAt) > Date.now()
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        const currentMetadata = await transaction.get<unknown>('metadata');
+        const latestMetadata = currentMetadata ? parseSessionMetadata(currentMetadata) : null;
+        if (
+          !latestMetadata ||
+          latestMetadata.identity.sessionId !== metadata.identity.sessionId ||
+          latestMetadata.identity.userId !== metadata.identity.userId ||
+          latestMetadata.identity.orgId !== metadata.identity.orgId
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        await transaction.put(RUNTIME_AUTHORIZATION_KEY, fresh);
+        await transaction.put(
+          'metadata',
+          serializeSessionMetadata({
+            ...latestMetadata,
+            auth: { ...latestMetadata.auth, kilocodeToken: input.runtimeToken },
+          })
+        );
+        await transaction.delete(RUNTIME_PROXY_GRANT_KEY);
+        await transaction.delete(RUNTIME_AUTHORIZATION_RECOVERY_KEY);
+      });
+      await clearWrapperRuntimeIdentity(this.ctx.storage, {}, { incrementGeneration: true });
+      return { status: 'recovered' };
+    } catch (error) {
+      if (error instanceof Error && error.message === 'runtime_authorization_recovery_cas_failed') {
+        return { status: 'retry' };
+      }
+      return { status: 'retry' };
+    }
+  }
+
+  private async runtimeProxyFence(): Promise<RuntimeProxyFence | null> {
+    const [metadata, runtime, lease] = await Promise.all([
+      this.getMetadata(),
+      getWrapperRuntimeState(this.ctx.storage),
+      getWrapperLease(this.ctx.storage),
+    ]);
+    if (
+      !metadata ||
+      !metadata.workspace?.sandboxId ||
+      !runtime.wrapperRunId ||
+      !runtime.wrapperConnectionId ||
+      lease.state !== 'owns_wrapper' ||
+      lease.instance.instanceGeneration !== runtime.wrapperGeneration
+    ) {
+      return null;
+    }
+    return {
+      plane: 'legacy',
+      generation: runtime.wrapperGeneration,
+      allocationId: lease.instance.instanceId,
+      wrapperRunId: runtime.wrapperRunId,
+      wrapperConnectionId: runtime.wrapperConnectionId,
+    };
+  }
+
+  async issueRuntimeCredentialProxyGrant(fence: {
+    wrapperRunId: string;
+    wrapperGeneration: number;
+    wrapperConnectionId: string;
+  }): Promise<string | null> {
+    const currentFence = await this.runtimeProxyFence();
+    if (
+      !currentFence ||
+      currentFence.plane !== 'legacy' ||
+      currentFence.wrapperRunId !== fence.wrapperRunId ||
+      currentFence.generation !== fence.wrapperGeneration ||
+      currentFence.wrapperConnectionId !== fence.wrapperConnectionId
+    ) {
+      return null;
+    }
+    const token = await this.getRuntimeToken();
+    const [metadata, storedAuthorization, latestFence] = await Promise.all([
+      this.getMetadata(),
+      this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+      this.runtimeProxyFence(),
+    ]);
+    if (
+      !latestFence ||
+      latestFence.plane !== 'legacy' ||
+      latestFence.wrapperRunId !== fence.wrapperRunId ||
+      latestFence.generation !== fence.wrapperGeneration ||
+      latestFence.wrapperConnectionId !== fence.wrapperConnectionId
+    ) {
+      return null;
+    }
+    const authorization = RuntimeAuthorizationSchema.safeParse(storedAuthorization);
+    return issuePersistedRuntimeProxyGrant({
+      env: this.env,
+      storage: this.ctx.storage,
+      metadata,
+      authorization: authorization.success ? authorization.data : null,
+      fence: latestFence,
+      token,
+      mode:
+        metadata && getEffectiveCredentialContainment(metadata).kilocode ? 'contained' : 'direct',
+    });
+  }
+
+  async resolveRuntimeCredentialProxyGrant(handle: string): Promise<{
+    token: string;
+    organizationId?: string;
+    runtimeAuthorization: { userId: string; authorizationId: string; resourceId: string };
+  } | null> {
+    return resolvePersistedRuntimeProxyCredential({
+      env: this.env,
+      storage: this.ctx.storage,
+      handle,
+      metadata: () => this.getMetadata(),
+      authorization: async () => {
+        const parsed = RuntimeAuthorizationSchema.safeParse(
+          await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        return parsed.success ? parsed.data : null;
+      },
+      fence: () => this.runtimeProxyFence(),
+      token: () => this.getRuntimeToken(),
+    });
+  }
+
+  async reauthorizeRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    runtimeAuthorizationSeal: string;
+  }): Promise<boolean> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return false;
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return false;
+    let authorization: RuntimeAuthorization;
+    try {
+      authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return false;
+    }
+    if (authorization.state !== 'active') return false;
+    const current = RuntimeAuthorizationSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+    );
+    if (!current.success || current.data.id !== input.expectedOldId) return false;
+    await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, authorization);
+    return true;
+  }
+
   async getRuntimeLocation(): Promise<SessionRuntimeLocator | null> {
     const metadata = await this.getStoredMetadata();
     return metadata ? sessionRuntimeLocator(metadata) : null;
@@ -2157,6 +2487,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   async createTerminal(input: TerminalCreateInput): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     const terminal = await this.getTerminalClient();
     if (!terminal.success || !terminal.data) {
       return { success: false, error: terminal.error };
@@ -2186,6 +2519,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     cols: number;
     rows: number;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     const terminal = await this.getTerminalClient();
     if (!terminal.success || !terminal.data) {
       return { success: false, error: terminal.error };
@@ -2497,6 +2833,28 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     if (existing) {
       return { success: false, error: 'Session already registered' };
     }
+    let runtimeAuthorization: RuntimeAuthorization | undefined;
+    if (input.runtimeAuthorizationSeal) {
+      const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+      if (!secret) return { success: false, error: 'Authentication unavailable' };
+      let authorization: RuntimeAuthorization;
+      try {
+        authorization = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+          resourceKind: 'cloud-agent-next',
+          resourceId: input.identity.sessionId,
+          userId: input.identity.userId,
+          organizationId: input.identity.orgId,
+        });
+      } catch {
+        return { success: false, error: 'Invalid runtime authorization' };
+      }
+      if (authorization.state !== 'active')
+        return { success: false, error: 'Runtime authorization revoked' };
+      if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY)) {
+        return { success: false, error: 'Runtime authorization already installed' };
+      }
+      runtimeAuthorization = authorization;
+    }
     const routeAssignmentError = await validateSharedSandboxRouteAssignment(input.workspace ?? {});
     if (routeAssignmentError) {
       return { success: false, error: `Invalid metadata: ${routeAssignmentError}` };
@@ -2583,6 +2941,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       return { success: false, error: modeError };
     }
 
+    if (runtimeAuthorization) {
+      await this.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, runtimeAuthorization);
+    }
     await this.ctx.storage.put('metadata', serialized);
     await this.updateLastActivity();
     await this.ensureAlarmScheduled();
@@ -3657,6 +4018,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async admitSubmittedMessage(
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
+    if (await this.ctx.storage.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return {
+        success: false,
+        code: 'COMPUTE_STOPPING',
+        error: 'Runtime authorization recovery is in progress',
+      };
+    }
     const deletionPending = await this.deletionPendingAdmissionFailure();
     if (deletionPending) return deletionPending;
     const result = await this.getSessionMessageQueue().admitSubmittedMessage(request);

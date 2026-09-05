@@ -314,7 +314,8 @@ async function executeSessionAttach(
       session,
       attach.kilo,
       attach.env,
-      deps.canRefreshCredentials
+      deps.canRefreshCredentials,
+      attach.runtimeIsolation
     );
     const signal = AbortSignal.any([taskSignal, attachment.signal]);
     const { kiloClient, env } = await withTimeoutAndAbort(attachment.ready, {

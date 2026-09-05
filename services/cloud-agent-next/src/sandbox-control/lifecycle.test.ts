@@ -1546,6 +1546,82 @@ describe('SandboxControl lifecycle boundaries', () => {
     }
   );
 
+  it.each([
+    [
+      'connection',
+      (identity: SandboxControlConnectionIdentity) => ({
+        ...identity,
+        connectionId: crypto.randomUUID(),
+      }),
+    ],
+    [
+      'provider',
+      (identity: SandboxControlConnectionIdentity) => ({
+        ...identity,
+        providerInstanceId: 'different-provider-instance',
+      }),
+    ],
+  ] as const)(
+    'rejects an expected %s connection mismatch even when the wrapper instance is unchanged',
+    async (_field, changed) => {
+      const h = await harness();
+      await h.create();
+      const identity = await h.ready();
+
+      await expect(
+        h.control.request({
+          operation: 'session.attach',
+          session: ROUTE,
+          payload: {},
+          expectedWrapperInstanceId: identity.wrapperInstanceId,
+          expectedConnection: changed(identity),
+        })
+      ).rejects.toThrow('Sandbox control connection changed');
+      expect(h.sendRequest).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns a runtime credential proxy fence only for the current ready routed allocation', async () => {
+    const h = await harness();
+    const input = {
+      ownerId: OWNER,
+      sessionId: ROUTE.sessionId,
+      kiloSessionId: ROUTE.kiloSessionId,
+      directory: ROUTE.directory,
+    };
+    await h.create();
+    const identity = await h.ready();
+    const physical = await h.control.getPhysicalRecord();
+    expect(physical.createIntent).not.toBeNull();
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toEqual({
+      plane: 'control',
+      allocationId: physical.createIntent?.intentId,
+      providerInstanceId: identity.providerInstanceId,
+      connectionId: identity.connectionId,
+      wrapperInstanceId: identity.wrapperInstanceId,
+    });
+    await expect(
+      h.control.getRuntimeCredentialProxyFence({ ...input, directory: '/workspace/other' })
+    ).resolves.toBeNull();
+
+    await h.control.beginStop('idle');
+    await expect(h.control.getRuntimeCredentialProxyFence(input)).resolves.toBeNull();
+    await h.control.recordStopAttempt();
+    await h.flush();
+    await h.create();
+    const replacement = await h.ready();
+    expect(await h.control.getRuntimeCredentialProxyFence(input)).toMatchObject({
+      providerInstanceId: replacement.providerInstanceId,
+      connectionId: replacement.connectionId,
+      wrapperInstanceId: replacement.wrapperInstanceId,
+    });
+    vi.spyOn(h.socket, 'getConnectionIdentity').mockReturnValue({
+      ...replacement,
+      connectionId: crypto.randomUUID(),
+    });
+    await expect(h.control.getRuntimeCredentialProxyFence(input)).resolves.toBeNull();
+  });
+
   it.each(['session.attach', 'session.prompt'] as const)(
     'protects validated %s demand at the idle boundary without renewing heartbeat supervision',
     async operation => {

@@ -2,10 +2,26 @@ import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import * as z from 'zod';
 import { rotateRefreshToken } from '@/lib/auth/device-sessions';
+import {
+  nativeCredentialFormatSchema,
+  type NativeSessionCredentials,
+} from '@kilocode/app-shared/native-auth';
 
 const requestSchema = z.object({
   refreshToken: z.string().min(1),
+  credentialFormat: nativeCredentialFormatSchema.optional(),
 });
+
+function credentialResponse(credentials: NativeSessionCredentials) {
+  return {
+    token: credentials.token,
+    refreshToken: credentials.refreshToken,
+    expiresIn: credentials.expiresIn,
+    ...('metadata' in credentials && credentials.metadata
+      ? { metadata: credentials.metadata }
+      : {}),
+  };
+}
 
 /**
  * Native refresh endpoint. Accepts a refresh token and returns a new
@@ -26,9 +42,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
   }
 
-  const { refreshToken } = validation.data;
+  const { refreshToken, credentialFormat } = validation.data;
 
-  const result = await rotateRefreshToken(refreshToken);
+  const result = credentialFormat
+    ? await rotateRefreshToken(refreshToken, { credentialFormat })
+    : await rotateRefreshToken(refreshToken);
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 401 });
@@ -36,9 +54,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(
     {
-      token: result.token,
-      refreshToken: result.refreshToken,
-      expiresIn: result.expiresIn,
+      ...credentialResponse(result),
     },
     { status: 200 }
   );

@@ -1,22 +1,25 @@
 /**
- * Internal API: mint a short-lived user API token for the auto-routing
- * decider benchmark.
+ * Internal API: mint a short-lived, dual-audience user token for the
+ * auto-routing decider benchmark.
  *
  * Called by:
  * - services/auto-routing-benchmark — the decider benchmark runs each case
  *   through the real `kilo` CLI inside a Cloudflare Container. The CLI
- *   authenticates against the gateway with a user API token, so the worker
- *   fetches a fresh, short-lived token for the configured benchmark user
- *   once per queue message.
+ *   authenticates with a user API token. The immutable CLI resolves its
+ *   catalog, profile, defaults, and provider gateway requests from
+ *   KILO_API_URL, so the worker fetches one fresh token for the configured
+ *   benchmark user once per queue message.
  *
  * Auth: shared internal secret over `Authorization: Bearer <secret>` — this
  * is the exact header the benchmark worker sends
  * (`Authorization: Bearer ${INTERNAL_API_SECRET_PROD}`), and
  * INTERNAL_API_SECRET_PROD holds the same value as INTERNAL_API_SECRET here.
  *
- * The minted token is a full user API token (includes apiTokenPepper) so the
- * gateway accepts it as a real user token; an internal-service token would be
- * rejected by gateway pepper validation. It expires in 6 hours.
+ * While shared-resource issuance is disabled, this preserves the existing
+ * audience-less benchmark token. Once enabled, issuance requires an active
+ * benchmark user with a non-empty API-token pepper and (when supplied) a
+ * current owner or member organization membership. The modern token has exact
+ * API and gateway audiences and never falls back to the legacy shape.
  *
  * URL: POST /api/internal/auto-routing-benchmark/token
  */
@@ -29,8 +32,18 @@ import { z } from 'zod';
 import { and, eq } from 'drizzle-orm';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
+import {
+  isSharedResourceTokenIssuanceEnabled,
+  INTERNAL_API_SECRET,
+  NEXTAUTH_SECRET,
+} from '@/lib/config.server';
 import { generateApiToken } from '@/lib/tokens';
-import { INTERNAL_API_SECRET } from '@/lib/config.server';
+import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
+import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
+import jwt from 'jsonwebtoken';
 
 const RequestSchema = z.object({
   userId: z.string().min(1),
@@ -44,7 +57,6 @@ export async function POST(req: NextRequest) {
   if (!INTERNAL_API_SECRET || !token || !timingSafeEqual(token, INTERNAL_API_SECRET)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-
   let body: unknown;
   try {
     body = await req.json();
@@ -69,33 +81,72 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
-
+  const sharedResourceTokensEnabled = isSharedResourceTokenIssuanceEnabled();
+  if (
+    sharedResourceTokensEnabled &&
+    (typeof user.api_token_pepper !== 'string' ||
+      user.api_token_pepper.trim().length === 0 ||
+      user.blocked_at !== null ||
+      user.blocked_reason !== null)
+  ) {
+    return NextResponse.json(
+      { error: 'User is not eligible for benchmark tokens' },
+      { status: 403 }
+    );
+  }
   const extraPayload = { tokenSource: 'auto-routing-benchmark' };
   const organizationId = parsed.data.organizationId;
+  let organizationRole: Awaited<ReturnType<typeof getOrganizationRole>> | undefined;
   if (organizationId) {
-    const organizationRole = await getOrganizationRole(parsed.data.userId, organizationId);
-    if (organizationRole === null) {
+    const role = await getOrganizationRole(parsed.data.userId, organizationId);
+    if (role === null) {
       return NextResponse.json({ error: 'Organization membership not found' }, { status: 404 });
     }
-
-    const apiToken = generateApiToken(
-      user,
-      {
-        ...extraPayload,
-        organizationId,
-        organizationRole,
-      },
-      { expiresIn: SIX_HOURS_IN_SECONDS }
-    );
-    const expiresAt = new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString();
-
-    return NextResponse.json({ token: apiToken, expiresAt });
+    organizationRole = role;
   }
 
-  const apiToken = generateApiToken(user, extraPayload, { expiresIn: SIX_HOURS_IN_SECONDS });
-  const expiresAt = new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString();
+  if (!sharedResourceTokensEnabled) {
+    const legacyToken = generateApiToken(
+      user,
+      { ...extraPayload, organizationId, organizationRole },
+      { expiresIn: SIX_HOURS_IN_SECONDS }
+    );
+    return NextResponse.json({
+      token: legacyToken,
+      expiresAt: new Date(Date.now() + SIX_HOURS_IN_SECONDS * 1000).toISOString(),
+    });
+  }
 
-  return NextResponse.json({ token: apiToken, expiresAt });
+  if (organizationRole !== undefined) {
+    if (organizationRole !== 'owner' && organizationRole !== 'member') {
+      return NextResponse.json(
+        { error: 'Organization role is not supported for benchmark tokens' },
+        { status: 403 }
+      );
+    }
+  }
+
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt = issuedAt + SIX_HOURS_IN_SECONDS;
+  const signedToken = jwt.sign(
+    buildModernKiloTokenPayload({
+      userId: user.id,
+      pepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      audience: [KILO_API_AUDIENCE, KILO_GATEWAY_AUDIENCE],
+      issuedAt,
+      expiresAt,
+      tokenPurpose: 'delegated-workload',
+      credentialExchange: false,
+      extra: { ...extraPayload, organizationId, organizationRole },
+    }),
+    NEXTAUTH_SECRET,
+    { algorithm: 'HS256' }
+  );
+  return NextResponse.json({
+    token: signedToken,
+    expiresAt: new Date(expiresAt * 1000).toISOString(),
+  });
 }
 
 async function getOrganizationRole(userId: string, organizationId: string) {

@@ -30,14 +30,14 @@ const mockWorkerCreateWorktreeChat =
 const mockCreateCloudAgentNextClient = jest.fn(() => ({
   createWorktreeChat: mockWorkerCreateWorktreeChat,
 }));
-const mockGenerateCloudAgentToken = jest.fn(() => 'cloud-agent-token');
+const mockCreateControlTokenForRequest = jest.fn(async () => ({ token: 'cloud-agent-token' }));
 
 jest.mock('@/lib/drizzle', () => ({
   db: { select: mockSelect },
 }));
 
-jest.mock('@/lib/tokens', () => ({
-  generateCloudAgentToken: mockGenerateCloudAgentToken,
+jest.mock('@/lib/auth/resource-delegation', () => ({
+  createControlTokenForRequest: mockCreateControlTokenForRequest,
 }));
 
 jest.mock('./cloud-agent-client', () => ({
@@ -160,7 +160,7 @@ describe('createWorktreeChat', () => {
       expect(where.params).toContain(organizationId);
       expect(where.sql).toContain('"organization_memberships"."id" is not null');
     }
-    expect(mockGenerateCloudAgentToken).not.toHaveBeenCalled();
+    expect(mockCreateControlTokenForRequest).not.toHaveBeenCalled();
     expect(mockWorkerCreateWorktreeChat).not.toHaveBeenCalled();
   });
 

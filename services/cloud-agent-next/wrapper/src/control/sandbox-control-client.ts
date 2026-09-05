@@ -320,6 +320,7 @@ export function createSandboxControlClient(
             providerInstanceId: options.providerInstanceId,
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),
+            capabilities: { runtimeIsolation: true, runtimeRecovery: true },
           },
         };
         try {

@@ -1,6 +1,6 @@
 import 'server-only';
 import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
-import { generateApiToken } from '@/lib/tokens';
+import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import * as appBuilderService from '@/lib/app-builder/app-builder-service';
 import {
   createProjectBaseSchema,
@@ -22,7 +22,10 @@ export const appBuilderRouter = createTRPCRouter({
    */
   createProject: baseProcedure.input(createProjectBaseSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
-    const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+    const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+      headers: ctx.headersList,
+      tokenSource: 'app-builder',
+    });
 
     return appBuilderService.createProject({
       owner,
@@ -58,7 +61,10 @@ export const appBuilderRouter = createTRPCRouter({
    * Get a single project with all messages and session state
    */
   getProject: baseProcedure.input(projectIdBaseSchema).query(async ({ ctx, input }) => {
-    const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+    const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+      headers: ctx.headersList,
+      tokenSource: 'app-builder',
+    });
     return appBuilderService.getProject(
       input.projectId,
       { type: 'user', id: ctx.user.id },
@@ -136,7 +142,10 @@ export const appBuilderRouter = createTRPCRouter({
    */
   interruptSession: baseProcedure.input(projectIdBaseSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
-    const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+    const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+      headers: ctx.headersList,
+      tokenSource: 'app-builder',
+    });
     const result = await appBuilderService.interruptSession(input.projectId, owner, authToken);
     return { success: result.success };
   }),
@@ -172,7 +181,10 @@ export const appBuilderRouter = createTRPCRouter({
    */
   startSession: baseProcedure.input(projectIdBaseSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
-    const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+    const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+      headers: ctx.headersList,
+      tokenSource: 'app-builder',
+    });
 
     const result = await appBuilderService.startSessionForProject({
       projectId: input.projectId,
@@ -194,7 +206,10 @@ export const appBuilderRouter = createTRPCRouter({
    */
   sendMessage: baseProcedure.input(sendMessageBaseSchema).mutation(async ({ ctx, input }) => {
     const owner = { type: 'user' as const, id: ctx.user.id };
-    const authToken = generateApiToken(ctx.user, { tokenSource: 'app-builder' });
+    const { token: authToken } = await createControlTokenForRequest(ctx.user, 'cloud-agent-next', {
+      headers: ctx.headersList,
+      tokenSource: 'app-builder',
+    });
 
     const result = await appBuilderService.sendMessage({
       projectId: input.projectId,

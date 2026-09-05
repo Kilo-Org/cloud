@@ -313,6 +313,21 @@ describe('Token Functions', () => {
       // validateAuthorizationHeader should NOT return organizationId - that's handled at a higher level
     });
 
+    it('fails closed when a cloud-agent-next runtime bearer is used directly', () => {
+      const token = signedToken({
+        aud: KILO_API_AUDIENCE,
+        runtimeAuthorization: {
+          id: '11111111-1111-4111-8111-111111111111',
+          resourceKind: 'cloud-agent-next',
+          resourceId: 'agent_123',
+        },
+      });
+
+      expect(
+        validateAuthorizationHeader(new Headers({ authorization: `Bearer ${token}` })).error
+      ).toMatch(/^Invalid token \([a-f0-9-]+\)$/);
+    });
+
     it('should return error when authorization header is missing', () => {
       const headers = new Headers();
 

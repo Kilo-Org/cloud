@@ -3314,6 +3314,9 @@ importers:
       '@cloudflare/vitest-pool-workers':
         specifier: 'catalog:'
         version: 0.16.13(@cloudflare/workers-types@4.20260605.1)(@types/node@24.12.4)(@vitest/runner@4.1.6)(@vitest/snapshot@4.1.6)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(vitest@4.1.6)
+      '@cloudflare/workers-types':
+        specifier: 'catalog:'
+        version: 4.20260605.1
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.4

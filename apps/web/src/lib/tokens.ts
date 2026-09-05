@@ -8,6 +8,7 @@ import {
   GITHUB_USER_AUTHORIZATION_DISCONNECT_AUDIENCE,
   GITLAB_CREDENTIAL_BROKER_AUDIENCE,
   KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
   SESSION_INGEST_AUDIENCE,
   SESSION_INGEST_USER_DELETION_AUDIENCE,
   USER_DATA_EXPORT_AUDIENCE,
@@ -16,10 +17,15 @@ import {
   buildModernKiloTokenPayload,
   isKiloResourceAudienceAllowed,
 } from '@kilocode/worker-utils/kilo-token-policy';
+import { CloudAgentNextRuntimeAuthorizationClaimSchema } from '@kilocode/worker-utils/runtime-proxy-attestation';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
-import { isBoundedInternalServiceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
+import {
+  isBoundedInternalServiceTokenIssuanceEnabled,
+  isSharedResourceTokenIssuanceEnabled,
+  NEXTAUTH_SECRET,
+} from '@/lib/config.server';
 
 export { BITBUCKET_REPOSITORY_LIST_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
@@ -193,6 +199,7 @@ export type JWTTokenPayload = {
   kiloUserId: string;
   version: number;
   apiTokenPepper?: string;
+  runtimeAuthorization?: unknown;
 } & JWTTokenExtraPayload;
 
 function tryJwtVerify(token: string) {
@@ -209,7 +216,7 @@ function tryJwtVerify(token: string) {
 
 export function validateAuthorizationHeader(
   headers: Headers,
-  options?: { expectedAudience?: string }
+  options?: { expectedAudience?: string; runtimeProxyAttestationVerified?: boolean }
 ) {
   const traceability_logging_id = crypto.randomUUID();
   const authHeader = headers.get('authorization');
@@ -244,6 +251,21 @@ export function validateAuthorizationHeader(
     return { error: `Token version outdated, please re-authenticate (${traceability_logging_id})` };
   }
 
+  if (
+    typeof payload.runtimeAuthorization === 'object' &&
+    payload.runtimeAuthorization !== null &&
+    'resourceKind' in payload.runtimeAuthorization &&
+    payload.runtimeAuthorization.resourceKind === 'cloud-agent-next'
+  ) {
+    const runtimeAuthorization = CloudAgentNextRuntimeAuthorizationClaimSchema.safeParse(
+      payload.runtimeAuthorization
+    );
+    if (!runtimeAuthorization.success || !options?.runtimeProxyAttestationVerified) {
+      warnExceptInTest(`Invalid token (${traceability_logging_id})`);
+      return { error: `Invalid token (${traceability_logging_id})` };
+    }
+  }
+
   return {
     kiloUserId: payload.kiloUserId,
     apiTokenPepper: payload.apiTokenPepper,
@@ -259,4 +281,105 @@ export function validateAuthorizationHeader(
 
 export function generateCloudAgentToken(user: User) {
   return generateApiToken(user, { tokenSource: 'cloud-agent' });
+}
+
+export function generateCloudAgentWorkflowToken(
+  user: User,
+  options: {
+    organizationId?: string;
+    tokenSource: string;
+    botId?: string;
+    createdOnPlatform?: string;
+    expiresIn: number;
+    authorizationUser?: User;
+  }
+): string {
+  if (!isSharedResourceTokenIssuanceEnabled()) {
+    return generateApiToken(
+      user,
+      {
+        organizationId: options.organizationId,
+        tokenSource: options.tokenSource,
+        botId: options.botId,
+        createdOnPlatform: options.createdOnPlatform,
+      },
+      { expiresIn: options.expiresIn }
+    );
+  }
+  if (!user.api_token_pepper) {
+    throw new Error('Workflow control tokens require a current user pepper');
+  }
+  const expiresIn = Math.min(options.expiresIn, 60 * 60);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow control token expiry must be positive');
+  }
+  const authorizationUser = options.authorizationUser ?? user;
+  if (!authorizationUser.api_token_pepper) {
+    throw new Error('Workflow control tokens require a current authorization pepper');
+  }
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: 'cloud-agent-next',
+    issuedAt,
+    expiresAt: issuedAt + expiresIn,
+    tokenPurpose: 'internal-service',
+    credentialExchange: false,
+    extra: {
+      organizationId: options.organizationId,
+      tokenSource: options.tokenSource,
+      botId: options.botId,
+      createdOnPlatform: options.createdOnPlatform,
+      runtimeAdmission: {
+        source: 'automation',
+        authorizationUserId: authorizationUser.id,
+        authorizationPepper: authorizationUser.api_token_pepper,
+      },
+    },
+  });
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
+}
+
+/**
+ * Generates a gateway credential for a server-side workflow. Unlike resource
+ * delegation from an HTTP request, queued workflows have no browser bearer
+ * token to delegate from. The workflow owner is therefore the authority and
+ * the token is deliberately limited to the gateway and one hour.
+ */
+export function generateWorkflowGatewayToken(
+  user: User,
+  options: {
+    organizationId?: string;
+    tokenSource: string;
+    expiresIn?: number;
+  }
+): string {
+  if (!isSharedResourceTokenIssuanceEnabled()) {
+    return generateApiToken(user, { tokenSource: options.tokenSource });
+  }
+  if (!user.api_token_pepper) {
+    throw new Error('Workflow gateway tokens require a current user pepper');
+  }
+  const expiresIn = Math.min(options.expiresIn ?? ONE_HOUR_IN_SECONDS, ONE_HOUR_IN_SECONDS);
+  if (expiresIn <= 0) {
+    throw new Error('Workflow gateway token expiry must be positive');
+  }
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const payload = buildModernKiloTokenPayload({
+    userId: user.id,
+    pepper: user.api_token_pepper,
+    env: process.env.NODE_ENV,
+    audience: KILO_GATEWAY_AUDIENCE,
+    issuedAt,
+    expiresAt: issuedAt + expiresIn,
+    tokenPurpose: 'delegated-workload',
+    credentialExchange: false,
+    extra: {
+      organizationId: options.organizationId,
+      tokenSource: options.tokenSource,
+    },
+  });
+  return jwt.sign(payload, NEXTAUTH_SECRET, { algorithm: jwtSigningAlgorithm });
 }

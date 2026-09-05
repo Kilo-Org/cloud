@@ -44,6 +44,9 @@ PER_SESSION_SANDBOX_ORG_IDS=
 CONTROL_PLANE_IDS=*
 WORKTREE_CREATION_ENABLED_IDS=*
 
+# Non-secret rollout control for per-session Kilo runtime isolation.
+RUNTIME_ISOLATION_ENABLED=false
+
 CREDENTIAL_CONTAINMENT_ENABLED=false
 
 # Repo snapshot org IDs (optional)

@@ -138,8 +138,8 @@ const mockOrderRepositoriesByUsage =
     }) => Promise<T[]>
   >();
 
-jest.mock('@/lib/tokens', () => ({
-  generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
+jest.mock('@/lib/auth/resource-delegation', () => ({
+  createControlTokenForRequest: jest.fn(async () => ({ token: 'cloud-agent-token' })),
 }));
 
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({

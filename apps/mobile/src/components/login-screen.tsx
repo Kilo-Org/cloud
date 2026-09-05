@@ -1,8 +1,7 @@
-/* eslint-disable max-lines -- The login screen keeps its device-auth branches, keyboard padding, and language picker together. */
 import * as Clipboard from 'expo-clipboard';
 import { type Href, useRouter } from 'expo-router';
 import { ExternalLink, Globe } from '@/components/ui/icons';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -10,7 +9,6 @@ import {
   I18nManager,
   Keyboard,
   KeyboardAvoidingView,
-  type KeyboardEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -33,10 +31,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useDeviceApprovalPersistence } from '@/lib/auth/use-device-approval-persistence';
 import { useDeviceAuth } from '@/lib/auth/use-device-auth';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
-  clearLoginDrafts,
   clearPersistedLoginDrafts,
   persistLoginDrafts,
   restoreLoginDrafts,
@@ -44,30 +42,14 @@ import {
 } from '@/lib/login-draft';
 import { setLanguagePickerBridge } from '@/lib/picker-bridge';
 
-function keyboardHeightFromEvent(event: KeyboardEvent): number {
-  return event.endCoordinates.height;
-}
-
 export function LoginScreen() {
   const { sessionEnded, signIn } = useAuth();
   const router = useRouter();
-  const {
-    status,
-    token,
-    code,
-    refreshToken,
-    expiresIn,
-    error,
-    verificationUrl,
-    resumed,
-    start,
-    cancel,
-    openBrowser,
-  } = useDeviceAuth();
+  const { status, code, credentials, error, verificationUrl, resumed, start, cancel, openBrowser } =
+    useDeviceAuth();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
-  const [persistError, setPersistError] = useState<string | undefined>(undefined);
   const [androidKeyboardHeight, setAndroidKeyboardHeight] = useState(0);
   const [authFormBusy, setAuthFormBusy] = useState(false);
   const [draft, setDraft] = useState<{
@@ -75,18 +57,12 @@ export function LoginScreen() {
     ssoRecovery: SsoRecoveryDraft | null;
   } | null>(null);
 
-  const persistToken = useCallback(
-    async (tokenValue: string, refreshTokenValue?: string, expiresInValue?: number) => {
-      setPersistError(undefined);
-      try {
-        await signIn(tokenValue, refreshTokenValue, expiresInValue);
-        clearLoginDrafts();
-      } catch {
-        setPersistError(t('login.couldNotCompleteSignIn'));
-      }
-    },
-    [signIn, t]
-  );
+  const { persistError, isPersisting, persistToken } = useDeviceApprovalPersistence({
+    status,
+    credentials,
+    signIn,
+    couldNotCompleteSignIn: t('login.couldNotCompleteSignIn'),
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -116,13 +92,6 @@ export function LoginScreen() {
     }
   }, [sessionEnded, t]);
 
-  useEffect(() => {
-    if (status === 'approved' && token) {
-      void persistToken(token, refreshToken, expiresIn);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- persistToken is stable except for signIn identity; only re-run on a newly approved token
-  }, [status, token]);
-
   // Android shell keyboard pad: under API 35+ EDGE_TO_EDGE_ENFORCED the window
   // never resizes for the IME, so KeyboardAvoidingView is inert. keyboardDidShow
   // still fires with real heights; consume them here (r0b: zero layout shift for
@@ -144,7 +113,7 @@ export function LoginScreen() {
           currentPadding: current,
           event: {
             type: 'keyboard-visible',
-            keyboardHeight: keyboardHeightFromEvent(event),
+            keyboardHeight: event.endCoordinates.height,
           },
         })
       );
@@ -181,11 +150,12 @@ export function LoginScreen() {
             <Text className="text-center text-sm text-destructive">{persistError}</Text>
             <Button
               onPress={() => {
-                if (token) {
-                  void persistToken(token, refreshToken, expiresIn);
+                if (credentials) {
+                  void persistToken(credentials);
                 }
               }}
               accessibilityLabel={t('login.retrySignIn')}
+              disabled={isPersisting}
             >
               <Text>{t('common.retry')}</Text>
             </Button>

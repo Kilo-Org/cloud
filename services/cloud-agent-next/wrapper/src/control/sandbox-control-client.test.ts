@@ -126,8 +126,11 @@ function versionHeartbeat(version: string | null) {
         throw new Error('Unexpected attach');
       },
       detach: () => false,
+      retireForRecovery: async () => 'retired',
       deleteDirectory: async () => {},
       get: () => undefined,
+      getAll: () => [],
+      isCurrent: () => false,
       isHealthy: () => true,
       shutdown() {},
     },
@@ -299,13 +302,19 @@ describe('createSandboxControlClient', () => {
     const hello = JSON.parse(fake.sent[0] ?? '{}') as {
       requestId: string;
       operation: string;
-      payload: { protocolVersion: number; wrapperVersion: string; providerInstanceId: string };
+      payload: {
+        protocolVersion: number;
+        wrapperVersion: string;
+        providerInstanceId: string;
+        capabilities: { runtimeIsolation: true; runtimeRecovery: true };
+      };
     };
     expect(hello.operation).toBe('sandbox.hello');
     expect(hello.payload).toEqual({
       protocolVersion: 1,
       wrapperVersion: '2.4.0',
       providerInstanceId: 'inst_1',
+      capabilities: { runtimeIsolation: true, runtimeRecovery: true },
     });
     fake.respond(
       JSON.stringify({

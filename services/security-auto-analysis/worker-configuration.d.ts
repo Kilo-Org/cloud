@@ -86,6 +86,7 @@ declare type CloudflareEnv = {
   SECURITY_ANALYSIS_CALLBACK_WORKER_BASE_URL: string;
   SECURITY_ANALYSIS_CALLBACK_WORKER_INGRESS_ENABLED: string | undefined;
   MANUAL_ANALYSIS_COMMAND_ROUTING_ENABLED: string | undefined;
+  SHARED_RESOURCE_TOKENS_ENABLED: string | boolean | undefined;
   NEXT_PUBLIC_POSTHOG_KEY: string | undefined;
 };
 

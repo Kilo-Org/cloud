@@ -229,6 +229,86 @@ describe('SessionOperation cleanup', () => {
     expect(abort).not.toHaveBeenCalled();
   });
 
+  it('keeps an operation-only scoped Stop replay from retiring a successor native runtime', async () => {
+    const successor = Promise.withResolvers<ReturnType<typeof completion>>();
+    const successorStarted = Promise.withResolvers<void>();
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        sendPrompt: options => {
+          if (options.messageId === 'message_b') {
+            successorStarted.resolve();
+            return successor.promise;
+          }
+          return Promise.resolve(completion());
+        },
+        getSessionStatuses: async () => ({}),
+      }),
+    });
+    const authorizationA = operationAuthorization('session.prompt', 'message_a');
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_a' },
+      handlerDeps,
+      authorizationA
+    );
+    const operationA = handlerDeps.operations.retained()[0];
+    if (!operationA) throw new Error('Missing first operation');
+    await operationA.done;
+    const stopA = {
+      messageId: 'message_a',
+      operationId: '11111111-1111-4111-8111-111111111111',
+      cleanupDeadlineAt: Date.now() + 1_000,
+    };
+
+    expect(await handleControlRequest('session.abort', session, stopA, handlerDeps)).toMatchObject({
+      ok: true,
+      result: { status: 'aborted', quiescent: true },
+    });
+    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBeDefined();
+
+    const authorizationB = operationAuthorization('session.prompt', 'message_b');
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, messageId: 'message_b' },
+      handlerDeps,
+      authorizationB
+    );
+    await successorStarted.promise;
+    const operationB = handlerDeps.operations.active(session.kiloSessionId);
+
+    expect(await handleControlRequest('session.abort', session, stopA, handlerDeps)).toMatchObject({
+      ok: true,
+      result: { status: 'aborted', quiescent: true },
+    });
+    expect(handlerDeps.operations.active(session.kiloSessionId)).toBe(operationB);
+    expect(operationB?.signal.aborted).toBe(false);
+
+    const stopB = handleControlRequest(
+      'session.abort',
+      session,
+      {
+        messageId: 'message_b',
+        operationId: '22222222-2222-4222-8222-222222222222',
+        cleanupDeadlineAt: Date.now() + 1_000,
+      },
+      handlerDeps
+    );
+    successor.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+
+    expect(await stopB).toMatchObject({
+      ok: true,
+      result: {
+        status: 'aborted',
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId: 'native_1',
+      },
+    });
+    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBeUndefined();
+  });
+
   it('keeps a failed local attachment unconfirmed when its captured cleanup cannot prove retirement', async () => {
     let cleanupCalls = 0;
     const operation = new SessionOperation(

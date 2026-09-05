@@ -79,6 +79,7 @@ const nativeRuntimeRetirementSchema = z.object({
   }),
   recipients: z.array(nativeRuntimeRetirementRecipientSchema).min(1),
   reason: z.string().min(1).max(256),
+  operationId: z.string().uuid().optional(),
   cleanupDeadlineAt: timestampSchema,
   replayUntil: timestampSchema,
   attempts: z.number().int().nonnegative(),

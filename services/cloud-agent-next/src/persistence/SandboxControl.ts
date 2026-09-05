@@ -753,9 +753,17 @@ export class SandboxControl extends DurableObject<Env> {
               route: scopedRoute,
               nativeRuntimeId,
               reason: 'Scoped Stop cleanup',
+              operationId: scopedStop.operationId,
               cleanupDeadlineAt: scopedStop.cleanupDeadlineAt,
             })
           : undefined;
+      if (retirement && retirement.operationId !== scopedStop.operationId)
+        return errorResponse(
+          crypto.randomUUID(),
+          'not_ready',
+          'Native runtime retirement is already in progress',
+          true
+        );
       const retirementAttempt = retirement
         ? await this.nativeRuntimeRetirement.claimTargetedAttempt(retirement)
         : undefined;
@@ -768,10 +776,14 @@ export class SandboxControl extends DurableObject<Env> {
         );
       let response: ResponseFrame;
       try {
+        const cleanupDeadlineAt = retirement?.cleanupDeadlineAt ?? scopedStop.cleanupDeadlineAt;
         response = await this.socketHandler.sendRequest({
           ...input,
-          payload: stopAbortWirePayload(payload, this.socketHandler.supportsScopedStopAbort()),
-          deadlineAt: scopedStop.cleanupDeadlineAt,
+          payload: stopAbortWirePayload(
+            { ...payload, cleanupDeadlineAt },
+            this.socketHandler.supportsScopedStopAbort()
+          ),
+          deadlineAt: cleanupDeadlineAt,
         });
       } catch (error) {
         if (retirementAttempt) await this.nativeRuntimeRetirement.defer(retirementAttempt);
@@ -3964,12 +3976,13 @@ export class SandboxControl extends DurableObject<Env> {
         loadPhysicalRecord(this.ctx.storage),
         loadNativeRuntimeRetirements(this.ctx.storage),
       ]);
-      const currentReceipt = receipts.find(current =>
-        sameNativeRuntimeRetirement(current, {
-          directory: receipt.directory,
-          nativeRuntimeId: receipt.nativeRuntimeId,
-          connection: receipt.connection,
-        })
+      const currentReceipt = receipts.find(
+        current =>
+          sameNativeRuntimeRetirement(current, {
+            directory: receipt.directory,
+            nativeRuntimeId: receipt.nativeRuntimeId,
+            connection: receipt.connection,
+          }) && current.operationId === receipt.operationId
       );
       if (
         !currentReceipt ||

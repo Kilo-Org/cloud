@@ -139,5 +139,19 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
   };
 }
 
+/**
+ * Whether a chat is answering right now.
+ *
+ * A row in the list shows the same live mark a running session does, and the
+ * answer it is waiting on may have been asked on another screen, so the row
+ * reads the registry rather than the database.
+ */
+export function useChatStatus(sessionId: string): ChatState['status'] {
+  return useSyncExternalStore(
+    useCallback(listener => watch(sessionId, listener), [sessionId]),
+    useCallback(() => snapshotOf(sessionId).status, [sessionId])
+  );
+}
+
 /** Starts a chat and answers with the session to open. */
 export { startChat as newChat };

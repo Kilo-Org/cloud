@@ -1,16 +1,18 @@
 import { FlashList } from '@shopify/flash-list';
 import { type Href, useRouter } from 'expo-router';
-import { useCallback, useEffect } from 'react';
-import { View } from 'react-native';
+import { useCallback, useEffect, useMemo } from 'react';
+import { Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
-import { ContextControl } from '@/components/context-control';
+import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
+import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, Plus } from '@/components/ui/icons';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { rememberModelFacts } from '@/lib/chat/layers';
@@ -18,7 +20,9 @@ import { type ChatSummary } from '@/lib/chat/store';
 import { chatPlaceOf, newChat, useChatList } from '@/lib/chat/use-chat';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 import { BetaPill } from './beta-pill';
 import { ChatRow } from './chat-row';
@@ -29,7 +33,13 @@ import { ChatRow } from './chat-row';
  * Several can be running at once: the conversations are held in the registry
  * rather than by whichever screen is mounted, so a chat that is answering is
  * still answering while this list is on screen.
+ *
+ * It is laid out the way the sessions list is, because a chat is a session of
+ * a plainer kind: the same header, the same edge-to-edge rows, and the same
+ * button in the same corner for starting one.
  */
+
+const SKELETON_ROW_COUNT = 8;
 
 export function ChatListScreen() {
   const { organizationId } = useOrganization();
@@ -40,10 +50,16 @@ export function ChatListScreen() {
 function ScopedChatListScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { userId } = useCurrentUserId();
   const place = chatPlaceOf(userId, organizationId);
-  const bottomPadding = useTabBarBottomPadding();
+  const { bottom } = useSafeAreaInsets();
+  const { fontScale } = useWindowDimensions();
+  const tabBarHeight = useMemo(
+    () => getEffectiveTabBarHeight({ bottomInset: bottom, platform: Platform.OS, fontScale }),
+    [bottom, fontScale]
+  );
 
   const {
     models,
@@ -90,10 +106,37 @@ function ScopedChatListScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: ChatSummary }) => (
-      <ChatRow chat={item} modelName={nameOf(item.model)} onPress={open} onDelete={drop} />
+    ({ item, index }: { item: ChatSummary; index: number }) => (
+      <ChatRow
+        chat={item}
+        modelName={nameOf(item.model)}
+        last={index === chats.length - 1}
+        onPress={open}
+        onDelete={drop}
+      />
     ),
-    [drop, nameOf, open]
+    [chats.length, drop, nameOf, open]
+  );
+
+  // Nothing to start a chat with is nothing for the button to do, and an empty
+  // list carries its own button, so the corner one would be the second.
+  const empty = !isLoading && chats.length === 0;
+  const failed = isError || (modelsFailed && chats.length === 0);
+  const showFab = !empty && !failed && place !== null && models.length > 0;
+
+  const fabStyle = useMemo(
+    () => ({
+      bottom: tabBarHeight + FAB_MARGIN,
+      right: 20,
+      width: FAB_SIZE,
+      height: FAB_SIZE,
+    }),
+    [tabBarHeight]
+  );
+
+  const listStyle = useMemo(
+    () => ({ paddingBottom: tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0) }),
+    [showFab, tabBarHeight]
   );
 
   function renderBody() {
@@ -113,7 +156,18 @@ function ScopedChatListScreen() {
         />
       );
     }
-    if (!isLoading && chats.length === 0) {
+    if (isLoading) {
+      return (
+        <View className="pt-[18px]">
+          {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
+            <View key={index} className="py-1.5">
+              <Skeleton className="mx-[22px] h-[52px] rounded-none" />
+            </View>
+          ))}
+        </View>
+      );
+    }
+    if (empty) {
       return (
         <EmptyState
           icon={MessageCircle}
@@ -135,40 +189,45 @@ function ScopedChatListScreen() {
         // Newest first: a chat that just arrived belongs on screen, and holding
         // the old scroll position would put it above the top of the list.
         maintainVisibleContentPosition={{ disabled: true }}
-        contentContainerClassName="px-4 pt-2"
-        ItemSeparatorComponent={() => <View className="h-2" />}
-        contentContainerStyle={{ paddingBottom: bottomPadding + 16 }}
+        contentContainerStyle={listStyle}
       />
     );
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('modelChat.title')}
-        titleContent={
-          <View className="flex-row items-center gap-2">
-            <Text className="text-[30px] font-semibold leading-9 text-foreground" numberOfLines={1}>
-              {t('modelChat.title')}
-            </Text>
-            <BetaPill />
-          </View>
-        }
-        size="large"
-        showBackButton={false}
-        context={<ContextControl />}
-        headerRight={
-          <Button
-            variant="ghost"
-            size="icon"
+    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={t('modelChat.title')}
+          titleContent={
+            <View className="flex-row items-center gap-2">
+              <Text
+                className="text-[30px] font-semibold leading-9 text-foreground"
+                numberOfLines={1}
+              >
+                {t('modelChat.title')}
+              </Text>
+              <BetaPill />
+            </View>
+          }
+          size="large"
+          showBackButton={false}
+          className="px-[22px] pb-1"
+        />
+        <View className="flex-1">{renderBody()}</View>
+        {showFab && (
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel={t('modelChat.list.new')}
+            testID="chat-new-fab"
             onPress={start}
+            className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
+            style={fabStyle}
           >
-            <Plus size={20} />
-          </Button>
-        }
-      />
-      <View className="flex-1">{renderBody()}</View>
-    </View>
+            <Plus size={24} color={colors.primaryForeground} />
+          </Pressable>
+        )}
+      </View>
+    </StateSurfaceInsets>
   );
 }

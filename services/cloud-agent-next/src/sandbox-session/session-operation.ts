@@ -24,6 +24,7 @@ import {
   applySessionOperationResult,
   completeSessionOperationAttachment,
   recordSessionOperationDispatch,
+  recordSessionOperationExecutionDeadline,
   type SessionMessageRecord,
 } from './session-message-queue.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
@@ -46,6 +47,10 @@ export type SessionOperationEffects = {
   assertAdmission: () => void;
   assertScope: () => void;
   defer: (pending: Promise<void>) => void;
+  recordExecutionDeadline?: (
+    authorization: SessionOperationAuthorization,
+    executionDeadlineAt: number
+  ) => boolean;
 };
 
 type RunningOperation = Extract<
@@ -123,6 +128,12 @@ export async function reconcileSessionOperation(
       lookup.state === 'completed' ? lookup.delivery.authorization : lookup.authorization;
     if (!sameSessionOperation(observed, authorization))
       throw new Error('Operation observation identity changed');
+    if (
+      lookup.state === 'running' &&
+      lookup.executionDeadlineAt !== undefined &&
+      effects.recordExecutionDeadline?.(authorization, lookup.executionDeadlineAt) === false
+    )
+      return { state: 'uncertain', reason: 'unverified' };
     if (lookup.state === 'completed') {
       if (
         (await persistSessionOperationDelivery(lookup.delivery, operationDeadlineAt, effects)) ===
@@ -168,7 +179,17 @@ export async function dispatchSessionOperation(
       const lookup = await reconcileSessionOperation(
         authorization,
         sessionOperationExpiresAt(authorization),
-        effects
+        {
+          ...effects,
+          recordExecutionDeadline: (original, executionDeadlineAt) => {
+            const updated = recordSessionOperationExecutionDeadline(
+              messages.read(),
+              original,
+              executionDeadlineAt
+            );
+            return updated !== undefined && messages.commit(updated);
+          },
+        }
       );
       if (lookup.state !== 'completed') return lookup;
       if (!lookup.delivery.result.ok)
@@ -220,6 +241,15 @@ export async function dispatchSessionOperation(
       const prompt = sessionPromptResultSchema.parse(result);
       if (prompt.messageId !== authorization.messageId)
         throw new Error('Prompt response message identity mismatch');
+      if (prompt.executionDeadlineAt !== undefined) {
+        const updated = recordSessionOperationExecutionDeadline(
+          messages.read(),
+          authorization,
+          prompt.executionDeadlineAt
+        );
+        if (!updated || !messages.commit(updated))
+          return { state: 'uncertain', reason: 'unverified' };
+      }
       return { state: 'response', result: prompt };
     } catch (error) {
       if (rejectedBeforeAdmission(error)) record(false);

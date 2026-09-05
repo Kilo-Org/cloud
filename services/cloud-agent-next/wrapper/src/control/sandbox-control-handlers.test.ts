@@ -4318,7 +4318,7 @@ describe('control wrapper heartbeat source policy', () => {
     );
     expect(source).toMatch(/void control \.reportNativeRuntimeRetirement\(\{/);
     expect(source).toContain(
-      "if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) { shutdown(1, failure.reason); return; }"
+      "if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement)"
     );
     expect(source).toContain('nativeRuntimeId: failure.runtimeId,');
     expect(source).toContain(

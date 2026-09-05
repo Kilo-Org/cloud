@@ -108,6 +108,7 @@ import {
 } from '../session/preparation-history.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  SANDBOX_CONTROL_OPERATION_LIMIT,
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   controlErrorCodes,
@@ -150,6 +151,7 @@ import {
 } from './control-dispatch.js';
 import { acceptedAlarmDecision } from './accepted-overdue.js';
 import { createSessionStopLifecycle } from './session-stop-lifecycle.js';
+import { sessionStopReceipt } from './session-stop.js';
 import { progressSessionStop } from './session-stop-progress.js';
 import { bootPreparingStep, provisionPreparingStep } from './preparing-steps.js';
 import { createSandboxTerminalBridge, type SandboxTerminalRecord } from './terminal-bridge.js';
@@ -183,6 +185,14 @@ import {
   dispatchSessionOperation,
   operationDispatchError,
 } from './session-operation.js';
+import {
+  controlEventReceiptDisposition,
+  hasValidControlEventReceipt,
+  recordControlEventReceipt,
+  bindControlEventReceiptIdentity,
+  retireControlEventReceiptIdentity,
+  type ControlEventReceiptDisposition,
+} from './control-event-receipts.js';
 
 const METADATA_KEY = SANDBOX_SESSION_METADATA_KEY;
 const MESSAGES_KEY = 'session_messages';
@@ -190,8 +200,11 @@ const DELETED_WORKTREE_KEY = SANDBOX_SESSION_DELETED_WORKTREE_KEY;
 const DELETION_COMPLETED_KEY = 'deletion_completed';
 
 type SandboxControlEventInput = {
-  identity: { directory: string; kiloSessionId?: string; rootKiloSessionId?: string };
+  identity: SessionEventIdentity;
   payload: { type: string; properties: Record<string, unknown>; timestamp?: string };
+  receiptId?: string;
+  receiptHash?: string;
+  sequence?: number;
 };
 const QUEUE_RETRY_MS = 5_000;
 const PENDING_RUNTIME_CLEANUP_KEY = 'pending_runtime_cleanup';
@@ -406,13 +419,13 @@ export class SandboxSession extends DurableObject<Env> {
 
   receiveSandboxControlEvent(
     input: SandboxControlEventInput & { wrapperInstanceId?: string }
-  ): Promise<{ applied: boolean }> {
+  ): Promise<{ applied: boolean; retryable?: boolean }> {
     return this.trackOperation(this.applySandboxControlEvent(input));
   }
 
   private async applySandboxControlEvent(
     input: SandboxControlEventInput & { wrapperInstanceId?: string }
-  ): Promise<{ applied: boolean }> {
+  ): Promise<{ applied: boolean; retryable?: boolean }> {
     const startedAt = Date.now();
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
@@ -434,6 +447,8 @@ export class SandboxSession extends DurableObject<Env> {
       return { applied };
     };
     if (!metadata || epoch === null) return result(false, 'session_unavailable');
+    if (!(await this.hasValidControlEventReceipt('session.event', input)))
+      return result(false, 'receipt_conflict');
     const root = metadata.auth.kiloSessionId;
     if (input.identity.directory !== this.directory(metadata))
       return result(false, 'directory_mismatch');
@@ -471,6 +486,31 @@ export class SandboxSession extends DurableObject<Env> {
         }
       }
     }
+    if (
+      eventKiloSessionId !== undefined &&
+      eventKiloSessionId !== root &&
+      (root === undefined || input.identity.rootKiloSessionId !== root)
+    )
+      return result(false, 'root_mismatch');
+    if (!this.terminalLifecycle.isCurrent(epoch)) return result(false, 'epoch_changed');
+    if (input.receiptId !== undefined) {
+      if (!this.isCurrentEventRuntime(input.wrapperInstanceId))
+        return result(false, 'runtime_mismatch');
+      const receipt = this.controlEventReceipt(input);
+      if (receipt === 'duplicate') return result(true, 'duplicate');
+      if (receipt !== 'apply') return result(false, 'receipt_conflict');
+    }
+    if (input.receiptId !== undefined) {
+      const attachment = this.nativeAttachmentEventDisposition(
+        input.identity,
+        input.wrapperInstanceId
+      );
+      if (attachment === 'pending')
+        return { ...result(false, 'native_runtime_pending'), retryable: true };
+      if (attachment === 'rejected') return result(false, 'native_runtime_mismatch');
+    }
+    if (!this.isCurrentNativeEventRuntime(input.identity, input.wrapperInstanceId))
+      return result(false, 'native_runtime_mismatch');
     const sessionId = this.requireSessionId();
     if (input.payload.type === 'session.message.outcome') {
       const outcome = sessionMessageOutcomeSchema.safeParse(input.payload.properties);
@@ -496,8 +536,15 @@ export class SandboxSession extends DurableObject<Env> {
       if (
         existing?.wrapperInstanceId === input.wrapperInstanceId &&
         existing.state === outcome.data.status
-      )
-        return result(true, 'duplicate', diagnostic);
+      ) {
+        const receipt = this.commitControlEventReceipt(
+          input,
+          () => this.terminalLifecycle.isCurrent(epoch) && this.isCurrentReceiptRuntime(input)
+        );
+        return result(receipt === 'apply' || receipt === 'duplicate', 'duplicate', diagnostic);
+      }
+      if (!this.isCurrentReceiptRuntime(input))
+        return result(false, 'runtime_mismatch', diagnostic);
       const settled = applyMessageOutcome(
         messages,
         outcome.data,
@@ -517,8 +564,28 @@ export class SandboxSession extends DurableObject<Env> {
           diagnostic
         );
       }
-      if (!this.saveMessages(settled, epoch, 'wrapper_outcome'))
-        return result(false, 'epoch_changed', diagnostic);
+      let receipt: ControlEventReceiptDisposition | undefined;
+      const saved = this.saveMessages(
+        settled,
+        epoch,
+        'wrapper_outcome',
+        undefined,
+        () => this.recordControlEventReceipt(input),
+        () => {
+          if (!this.terminalLifecycle.isCurrent(epoch) || !this.isCurrentReceiptRuntime(input))
+            return false;
+          receipt = this.controlEventReceipt(input);
+          return receipt === 'apply';
+        }
+      );
+      if (!saved) {
+        if (receipt === 'duplicate') return result(true, 'duplicate', diagnostic);
+        return result(
+          false,
+          receipt === undefined || receipt === 'apply' ? 'epoch_changed' : 'receipt_conflict',
+          diagnostic
+        );
+      }
       if (this.isCurrentEventRuntime(input.wrapperInstanceId)) {
         this.worktreeChanges.onEvent(
           this.worktreeContext(metadata),
@@ -536,15 +603,15 @@ export class SandboxSession extends DurableObject<Env> {
     }
     if (!this.isCurrentEventRuntime(input.wrapperInstanceId))
       return result(false, 'runtime_mismatch');
-    if (
-      eventKiloSessionId !== undefined &&
-      eventKiloSessionId !== root &&
-      (root === undefined || input.identity.rootKiloSessionId !== root)
-    )
-      return result(false, 'root_mismatch');
     if (input.payload.type === WORKTREE_CHANGED_EVENT) {
       if (!root || eventKiloSessionId !== root) return result(false, 'root_mismatch');
       if (!input.wrapperInstanceId) return result(false, 'missing_wrapper_identity');
+      const receipt = this.commitControlEventReceipt(
+        input,
+        () => this.terminalLifecycle.isCurrent(epoch) && this.isCurrentReceiptRuntime(input)
+      );
+      if (receipt === 'duplicate') return result(true, 'duplicate');
+      if (receipt !== 'apply') return result(false, 'receipt_conflict');
       this.worktreeChanges.onEvent(
         this.worktreeContext(metadata),
         eventKiloSessionId,
@@ -558,17 +625,40 @@ export class SandboxSession extends DurableObject<Env> {
       !this.loadMessages().some(
         message => message.state === 'accepted' || message.state === 'queued'
       )
-    )
-      return result(false, 'no_pending_work');
-    this.recordPendingInteraction(input.payload);
-    persistSandboxControlSessionEvent({
-      sessionId,
-      payload: input.payload,
-      eventQueries: this.eventQueries,
-      broadcast: event => this.broadcastStoredEvent(event),
+    ) {
+      if (input.receiptId === undefined) return result(false, 'no_pending_work');
+      const receipt = this.commitControlEventReceipt(
+        input,
+        () => this.terminalLifecycle.isCurrent(epoch) && this.isCurrentReceiptRuntime(input)
+      );
+      return result(receipt === 'apply' || receipt === 'duplicate', 'no_pending_work');
+    }
+    const notifications: StoredEvent[] = [];
+    const receipt = this.ctx.storage.transactionSync(() => {
+      if (
+        !this.terminalLifecycle.isCurrent(epoch) ||
+        !this.isCurrentEventRuntime(input.wrapperInstanceId) ||
+        !this.isCurrentNativeEventRuntime(input.identity, input.wrapperInstanceId)
+      )
+        return 'stale';
+      const current = this.controlEventReceipt(input);
+      if (current !== 'apply') return current;
+      this.recordPendingInteraction(input.payload);
+      persistSandboxControlSessionEvent({
+        sessionId,
+        payload: input.payload,
+        eventQueries: this.eventQueries,
+        broadcast: event => notifications.push(event),
+      });
+      const activeMessages = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
+      if (activeMessages && this.terminalLifecycle.isCurrent(epoch))
+        this.ctx.storage.kv.put(MESSAGES_KEY, activeMessages);
+      this.recordControlEventReceipt(input);
+      return 'apply' as const;
     });
-    const activeMessages = recordAcceptedMessageActivity(this.loadMessages(), Date.now());
-    if (activeMessages) this.saveMessages(activeMessages, epoch);
+    if (receipt === 'duplicate') return result(true, 'duplicate');
+    if (receipt !== 'apply') return result(false, 'receipt_conflict');
+    for (const notification of notifications) this.broadcastStoredEvent(notification);
     this.worktreeChanges.onEvent(
       this.worktreeContext(metadata),
       eventKiloSessionId,
@@ -629,6 +719,9 @@ export class SandboxSession extends DurableObject<Env> {
     identity: SessionEventIdentity;
     payload: SessionPreparingPayload;
     wrapperInstanceId?: string;
+    receiptId?: string;
+    receiptHash?: string;
+    sequence?: number;
   }): Promise<{ applied: boolean }> {
     const metadata = await this.getMetadata();
     const epoch = this.terminalLifecycle.captureEpoch();
@@ -643,6 +736,8 @@ export class SandboxSession extends DurableObject<Env> {
       return { applied };
     };
     if (!metadata || epoch === null) return result(false, 'session_unavailable');
+    if (!(await this.hasValidControlEventReceipt('session.preparing', input)))
+      return result(false, 'receipt_conflict');
     const root = metadata.auth.kiloSessionId;
     if (input.identity.directory !== this.directory(metadata))
       return result(false, 'directory_mismatch');
@@ -674,14 +769,36 @@ export class SandboxSession extends DurableObject<Env> {
               : 'runtime_mismatch'
       );
     }
-    if (message.state !== 'queued') return result(true, 'already_settled');
+    if (message.state !== 'queued') {
+      const receipt = this.commitControlEventReceipt(
+        input,
+        () => this.terminalLifecycle.isCurrent(epoch) && this.isCurrentReceiptRuntime(input)
+      );
+      return result(receipt === 'apply' || receipt === 'duplicate', 'already_settled');
+    }
     const sessionId = this.requireSessionId();
-    applyControlPlanePreparingEvent({
-      sessionId,
-      data: input.payload,
-      eventQueries: this.eventQueries,
-      broadcast: event => this.broadcastStoredEvent(event),
+    const notifications: StoredEvent[] = [];
+    const receipt = this.ctx.storage.transactionSync(() => {
+      if (
+        !this.terminalLifecycle.isCurrent(epoch) ||
+        !this.isCurrentEventRuntime(input.wrapperInstanceId) ||
+        !this.isCurrentNativeEventRuntime(input.identity, input.wrapperInstanceId)
+      )
+        return 'stale';
+      const current = this.controlEventReceipt(input);
+      if (current !== 'apply') return current;
+      applyControlPlanePreparingEvent({
+        sessionId,
+        data: input.payload,
+        eventQueries: this.eventQueries,
+        broadcast: event => notifications.push(event),
+      });
+      this.recordControlEventReceipt(input);
+      return 'apply' as const;
     });
+    if (receipt === 'duplicate') return result(true, 'duplicate');
+    if (receipt !== 'apply') return result(false, 'receipt_conflict');
+    for (const notification of notifications) this.broadcastStoredEvent(notification);
     return result(true, 'processed');
   }
 
@@ -750,6 +867,21 @@ export class SandboxSession extends DurableObject<Env> {
       notifications,
     });
     if (!ack) return undefined;
+    if (
+      authorization.operation === 'session.attach' &&
+      delivery.result.ok &&
+      (ack.disposition === 'applied' || ack.disposition === 'identical') &&
+      metadata.workspace?.sandboxId
+    ) {
+      const attached = sessionAttachResultSchema.safeParse(delivery.result.result);
+      if (attached.success && attached.data.nativeRuntimeId !== undefined)
+        await this.recordNativeRuntime({
+          sandboxId: metadata.workspace.sandboxId,
+          wrapperInstanceId: input.wrapperInstanceId,
+          nativeRuntimeId: attached.data.nativeRuntimeId,
+          authorization,
+        });
+    }
     for (const notification of notifications) this.broadcastStoredEvent(notification);
     if (ack.disposition === 'applied' && delivery.outcome) {
       if (this.isCurrentEventRuntime(input.wrapperInstanceId))
@@ -892,11 +1024,11 @@ export class SandboxSession extends DurableObject<Env> {
     return;
   }
 
-  async getControlState(): Promise<ControlSessionState | null> {
-    return this.controlSessionState();
+  async getControlState(options?: { includeIdle: true }): Promise<ControlSessionState | null> {
+    return this.controlSessionState(options?.includeIdle === true);
   }
 
-  private controlSessionState(): ControlSessionState | null {
+  private controlSessionState(includeIdle: boolean): ControlSessionState | null {
     const metadata = this.terminalLifecycle.getStoredMetadata();
     const sandboxId = metadata?.workspace?.sandboxId;
     if (!metadata || !sandboxId || this.terminalLifecycle.captureEpoch() === null) return null;
@@ -904,7 +1036,8 @@ export class SandboxSession extends DurableObject<Env> {
       .filter(
         message =>
           (message.state === 'queued' || message.state === 'accepted') &&
-          message.cancellation === undefined
+          message.cancellation === undefined &&
+          (!includeIdle || message.state === 'accepted' || message.wrapperInstanceId !== undefined)
       )
       .map(message => ({
         messageId: message.messageId,
@@ -913,17 +1046,67 @@ export class SandboxSession extends DurableObject<Env> {
           ? { executionDeadlineAt: message.executionDeadlineAt }
           : {}),
       }));
-    if (targets.length === 0) return null;
-    return controlSessionStateSchema.parse({
-      version: 1,
-      scope: {
-        sandboxId,
-        ...(this.terminalLifecycle.getAttachedWrapperInstanceId()
-          ? { wrapperInstanceId: this.terminalLifecycle.getAttachedWrapperInstanceId() }
-          : {}),
-      },
-      targets,
+    const operations = this.loadMessages().flatMap(message => {
+      const authorization = sessionOperationAuthorizationSchema.safeParse(
+        message.operations?.prompt?.authorization
+      );
+      if (!authorization.success || !message.operations?.prompt?.dispatched) return [];
+      return [
+        {
+          messageId: message.messageId,
+          authorization: authorization.data,
+          ...(message.executionDeadlineAt
+            ? { executionDeadlineAt: message.executionDeadlineAt }
+            : {}),
+        },
+      ];
     });
+    const stops = this.stopLifecycle.pending().map(stop => sessionStopReceipt(stop));
+    if (!includeIdle && targets.length === 0 && stops.length === 0) return null;
+    return z
+      .object(controlSessionStateSchema.shape)
+      .strict()
+      .parse({
+        version: 1,
+        scope: {
+          sandboxId,
+          ...(this.terminalLifecycle.getAttachedWrapperInstanceId()
+            ? { wrapperInstanceId: this.terminalLifecycle.getAttachedWrapperInstanceId() }
+            : {}),
+        },
+        targets,
+        ...(stops.length > 0 ? { stops } : {}),
+        ...(operations.length > 0 ? { operations } : {}),
+      });
+  }
+
+  async reconcileControlRecovery(
+    input: unknown
+  ): Promise<{ state: 'reconciled' | 'unresolved' | 'stale' }> {
+    const requested = z
+      .array(sessionOperationAuthorizationSchema)
+      .max(SANDBOX_CONTROL_OPERATION_LIMIT)
+      .parse(input);
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return { state: 'stale' };
+    for (const authorization of requested) {
+      const message = this.loadMessages().find(item => item.messageId === authorization.messageId);
+      const stored = sessionOperationAuthorizationSchema.safeParse(
+        message?.operations?.prompt?.authorization
+      );
+      if (
+        !message ||
+        !stored.success ||
+        !message.operations?.prompt?.dispatched ||
+        !sameSessionOperation(stored.data, authorization) ||
+        !this.terminalLifecycle.isCurrent(epoch)
+      )
+        return { state: 'stale' };
+      const observed = await this.observeAcceptedOperation(message, epoch);
+      if (!this.terminalLifecycle.isCurrent(epoch)) return { state: 'stale' };
+      if (observed !== 'running' && observed !== 'completed') return { state: 'unresolved' };
+    }
+    return { state: 'reconciled' };
   }
 
   async interruptExecution(): Promise<{ success: boolean; message?: string }>;
@@ -1243,12 +1426,18 @@ export class SandboxSession extends DurableObject<Env> {
     );
     const proof = message?.operations?.attach;
     if (
-      !proof?.completedAt ||
+      !proof?.dispatched ||
+      !proof.completedAt ||
       proof.attachmentEpoch === undefined ||
       !sameSessionOperation(proof.authorization, authorization.data) ||
       !this.terminalLifecycle.isCurrent(epoch)
     )
       return;
+    if (proof.result !== undefined) {
+      if (!proof.result.ok) return;
+      const attached = sessionAttachResultSchema.safeParse(proof.result.result);
+      if (!attached.success || attached.data.nativeRuntimeId !== input.nativeRuntimeId) return;
+    }
     const newestAttachmentEpoch = Math.max(
       0,
       ...this.loadMessages().map(current => current.operations?.attach?.attachmentEpoch ?? 0)
@@ -1258,7 +1447,10 @@ export class SandboxSession extends DurableObject<Env> {
     );
     if (
       proof.attachmentEpoch !== newestAttachmentEpoch ||
-      (current.success && current.data.attachmentEpoch > proof.attachmentEpoch)
+      (current.success &&
+        (current.data.attachmentEpoch > proof.attachmentEpoch ||
+          (current.data.attachmentEpoch === proof.attachmentEpoch &&
+            current.data.nativeRuntimeId !== input.nativeRuntimeId)))
     )
       return;
     this.ctx.storage.kv.put(
@@ -1993,22 +2185,26 @@ export class SandboxSession extends DurableObject<Env> {
         (current.operations?.attach?.dispatched || current.operations?.prompt?.dispatched)
       )
         return;
-      wrapperInstanceId = runtime.data;
-      this.saveMessages(
+      const saved = this.saveMessages(
         this.loadMessages().map(message =>
           message.messageId === messageId
             ? {
                 ...message,
-                wrapperInstanceId,
+                wrapperInstanceId: runtime.data,
                 unresolvedDispatch:
-                  message.wrapperInstanceId === wrapperInstanceId
+                  message.wrapperInstanceId === runtime.data
                     ? message.unresolvedDispatch
                     : undefined,
               }
             : message
         ),
-        epoch
+        epoch,
+        'coordinator',
+        undefined,
+        () => bindControlEventReceiptIdentity(this.ctx.storage.kv, runtime.data),
+        isCurrent
       );
+      if (saved) wrapperInstanceId = runtime.data;
     };
     const dispatch = async <T>(
       kind: 'attach' | 'prompt',
@@ -2096,6 +2292,16 @@ export class SandboxSession extends DurableObject<Env> {
       if (dispatched.state !== 'response' && dispatched.state !== 'completed') {
         if (dispatched.state === 'running' && operation === 'session.prompt') return dispatched;
         throw operationDispatchError(dispatched);
+      }
+      if (operation === 'session.attach') {
+        const attached = sessionAttachResultSchema.parse(dispatched.result);
+        if (attached.nativeRuntimeId !== undefined)
+          await this.recordNativeRuntime({
+            sandboxId,
+            wrapperInstanceId,
+            nativeRuntimeId: attached.nativeRuntimeId,
+            authorization,
+          });
       }
       return dispatched;
     };
@@ -2468,7 +2674,6 @@ export class SandboxSession extends DurableObject<Env> {
     const sandboxId = metadata.workspace?.sandboxId;
     if (!sandboxId) return;
     const pending = this.pendingRuntimeCleanup();
-    // The first retained fence names the runtime that caused this cleanup. Never retarget it.
     if (pending) return;
     const nativeRuntime = nativeRuntimeFenceSchema.safeParse(
       this.ctx.storage.kv.get<unknown>(NATIVE_RUNTIME_FENCE_KEY)
@@ -2531,8 +2736,26 @@ export class SandboxSession extends DurableObject<Env> {
         response.disposition === 'physical_stopped' ||
         response.disposition === 'wrapper_replaced'
       ) {
-        if (this.pendingRuntimeCleanup()?.wrapperInstanceId === pending.wrapperInstanceId)
+        this.ctx.storage.transactionSync(() => {
+          const current = this.pendingRuntimeCleanup();
+          if (
+            !current ||
+            current.ownerId !== pending.ownerId ||
+            current.sessionId !== pending.sessionId ||
+            current.sandboxId !== pending.sandboxId ||
+            current.wrapperInstanceId !== pending.wrapperInstanceId ||
+            current.nativeRuntimeId !== pending.nativeRuntimeId ||
+            current.reason !== pending.reason ||
+            (pending.authorization
+              ? !current.authorization ||
+                !sameSessionOperation(current.authorization, pending.authorization)
+              : current.authorization !== undefined)
+          )
+            return;
+          if (response.disposition !== 'native_retired')
+            retireControlEventReceiptIdentity(this.ctx.storage.kv, pending.wrapperInstanceId);
           this.ctx.storage.kv.delete(PENDING_RUNTIME_CLEANUP_KEY);
+        });
         return this.pendingRuntimeCleanup() === undefined;
       }
       if (
@@ -2635,6 +2858,121 @@ export class SandboxSession extends DurableObject<Env> {
       this.ctx.storage.kv.get<unknown>(PENDING_INTERACTIONS_KEY)
     );
     return parsed.success ? parsed.data : undefined;
+  }
+
+  private controlEventReceipt(input: {
+    receiptId?: string;
+    receiptHash?: string;
+    sequence?: number;
+    wrapperInstanceId?: string;
+  }): ControlEventReceiptDisposition {
+    return controlEventReceiptDisposition(this.ctx.storage.kv, input);
+  }
+
+  private nativeAttachmentEventDisposition(
+    identity: SessionEventIdentity,
+    wrapperInstanceId?: string
+  ): 'pending' | 'rejected' | undefined {
+    if (identity.nativeRuntimeId === undefined) return undefined;
+    const messages = this.loadMessages();
+    const headId = nextQueuedMessageId(messages);
+    const message = messages.find(item => item.messageId === headId);
+    const proof = message?.operations?.attach;
+    if (
+      !proof?.dispatched ||
+      message?.cancellation !== undefined ||
+      message?.wrapperInstanceId !== wrapperInstanceId ||
+      proof.authorization.wrapperInstanceId !== wrapperInstanceId ||
+      proof.authorization.session.sessionId !== this.sessionId ||
+      proof.authorization.session.directory !== identity.directory ||
+      proof.authorization.session.kiloSessionId !==
+        (identity.rootKiloSessionId ?? identity.kiloSessionId)
+    )
+      return undefined;
+    const current = nativeRuntimeFenceSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(NATIVE_RUNTIME_FENCE_KEY)
+    );
+    if (current.success && sameSessionOperation(current.data.authorization, proof.authorization))
+      return undefined;
+    if (proof.result) {
+      if (!proof.result.ok) return 'rejected';
+      const attached = sessionAttachResultSchema.safeParse(proof.result.result);
+      if (!attached.success || attached.data.nativeRuntimeId !== identity.nativeRuntimeId)
+        return 'rejected';
+    }
+    return Date.now() < sessionOperationExpiresAt(proof.authorization) ? 'pending' : 'rejected';
+  }
+
+  private isCurrentNativeEventRuntime(
+    identity: SessionEventIdentity,
+    wrapperInstanceId?: string
+  ): boolean {
+    if (identity.nativeRuntimeId === undefined) return true;
+    const current = nativeRuntimeFenceSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(NATIVE_RUNTIME_FENCE_KEY)
+    );
+    return (
+      current.success &&
+      current.data.wrapperInstanceId === wrapperInstanceId &&
+      current.data.nativeRuntimeId === identity.nativeRuntimeId
+    );
+  }
+
+  private isCurrentReceiptRuntime(input: {
+    identity: SessionEventIdentity;
+    receiptId?: string;
+    receiptHash?: string;
+    sequence?: number;
+    wrapperInstanceId?: string;
+  }): boolean {
+    return (
+      (input.receiptId === undefined &&
+        input.receiptHash === undefined &&
+        input.sequence === undefined) ||
+      (this.isCurrentEventRuntime(input.wrapperInstanceId) &&
+        this.isCurrentNativeEventRuntime(input.identity, input.wrapperInstanceId))
+    );
+  }
+
+  private async hasValidControlEventReceipt(
+    event: 'session.event' | 'session.preparing',
+    input: {
+      identity: SessionEventIdentity;
+      payload: unknown;
+      receiptId?: string;
+      receiptHash?: string;
+      sequence?: number;
+      wrapperInstanceId?: string;
+    }
+  ): Promise<boolean> {
+    return hasValidControlEventReceipt(event, input);
+  }
+
+  private commitControlEventReceipt(
+    input: {
+      receiptId?: string;
+      receiptHash?: string;
+      sequence?: number;
+      wrapperInstanceId?: string;
+    },
+    isCurrent: () => boolean = () => true
+  ): ControlEventReceiptDisposition {
+    return this.ctx.storage.transactionSync(() => {
+      if (!isCurrent()) return 'stale';
+      const receipt = this.controlEventReceipt(input);
+      if (receipt !== 'apply') return receipt;
+      this.recordControlEventReceipt(input);
+      return 'apply';
+    });
+  }
+
+  private recordControlEventReceipt(input: {
+    receiptId?: string;
+    receiptHash?: string;
+    sequence?: number;
+    wrapperInstanceId?: string;
+  }): void {
+    recordControlEventReceipt(this.ctx.storage.kv, input);
   }
 
   private recordPendingInteraction(payload: {
@@ -3086,7 +3424,8 @@ export class SandboxSession extends DurableObject<Env> {
     epoch?: number,
     source: 'coordinator' | 'wrapper_outcome' | 'operation_result' = 'coordinator',
     deferredNotifications?: StoredEvent[],
-    onPersist?: () => void
+    onPersist?: () => void,
+    beforePersist?: () => boolean
   ): boolean {
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
     if (
@@ -3097,7 +3436,10 @@ export class SandboxSession extends DurableObject<Env> {
       return false;
     const events: StoredEvent[] = [];
     const committed: ControlDiagnosticFields[] = [];
+    let persisted = false;
     this.ctx.storage.transactionSync(() => {
+      if (!this.terminalLifecycle.isCurrent(currentEpoch)) return;
+      if (beforePersist?.() === false) return;
       const before = this.loadMessages();
       const previousById = new Map(before.map(message => [message.messageId, message]));
       const queuedHeadId = nextQueuedMessageId(before);
@@ -3167,7 +3509,9 @@ export class SandboxSession extends DurableObject<Env> {
       });
       this.ctx.storage.kv.put(MESSAGES_KEY, next);
       onPersist?.();
+      persisted = true;
     });
+    if (!persisted) return false;
     for (const fields of committed) {
       logControlDiagnostic('session_message_committed', {
         sessionId: this.sessionId,

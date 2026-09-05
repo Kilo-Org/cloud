@@ -27,6 +27,8 @@ type StartOptions = {
   onRequest?: SandboxControlRequestHandler;
   onConnected?: (client: SandboxControlClient) => void;
   onDisconnected?: () => void;
+  onEventReceiptFailure?: () => void;
+  onReconcile?: (phase: 'drain' | 'ready' | 'commit', deadlineAt: number) => Promise<void> | void;
   getHeartbeatPayload?: () => SandboxHeartbeatPayload;
   sampleHeartbeat?: (signal: AbortSignal) => Promise<void>;
   isReady?: () => boolean;
@@ -344,8 +346,9 @@ export function maybeStartSandboxControlClient(
   const createClient = options.createClient ?? createSandboxControlClient;
   let heartbeat: ReturnType<typeof setInterval> | null = null;
   let sampling: Promise<void> | undefined;
-  const sampleAbort = new AbortController();
+  let sampleAbort = new AbortController();
   let closed = false;
+  let connectedThroughCallback = false;
   let heartbeatSequence = 0;
   let lastSentAt: number | undefined;
   const diagnostic = (phase: string): void =>
@@ -361,6 +364,11 @@ export function maybeStartSandboxControlClient(
     if (heartbeat) clearInterval(heartbeat);
     heartbeat = null;
     diagnostic('stopped');
+  }
+
+  function handleConnectionLost(): void {
+    if (closed) return;
+    stopHeartbeat();
   }
 
   function handleDisconnected(): void {
@@ -422,6 +430,7 @@ export function maybeStartSandboxControlClient(
 
   function handleConnected(active: SandboxControlClient): void {
     if (closed || options.isReady?.() === false) return;
+    if (sampleAbort.signal.aborted) sampleAbort = new AbortController();
     if (!active.sendEvent?.('sandbox.ready', { kiloReady: true, globalFeedAttached: true })) {
       handleDisconnected();
       return;
@@ -446,7 +455,16 @@ export function maybeStartSandboxControlClient(
     ...(env.wrapperInstanceId ? { wrapperInstanceId: env.wrapperInstanceId } : {}),
     wrapperVersion: options.wrapperVersion,
     log,
-    onDisconnected: handleDisconnected,
+    onConnectionLost: handleConnectionLost,
+    onReconnectExhausted: handleDisconnected,
+    ...(options.onEventReceiptFailure
+      ? { onEventReceiptFailure: options.onEventReceiptFailure }
+      : {}),
+    onConnected: () => {
+      connectedThroughCallback = true;
+      handleConnected(client);
+    },
+    ...(options.onReconcile ? { onReconcile: options.onReconcile } : {}),
     ...(options.onRequest ? { onRequest: options.onRequest } : {}),
     ...(options.onDiagnostic ? { onDiagnostic: options.onDiagnostic } : {}),
   });
@@ -461,7 +479,7 @@ export function maybeStartSandboxControlClient(
   void client
     .connect()
     .then(() => {
-      handleConnected(client);
+      if (!connectedThroughCallback) handleConnected(client);
     })
     .catch(() => {
       if (!closed) {

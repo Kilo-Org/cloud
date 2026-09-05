@@ -3,6 +3,7 @@ import type { ControlStopRequest } from '../shared/control-plane-session.js';
 import type { SessionOperationAuthorization } from '../shared/sandbox-control-protocol.js';
 import {
   recordSessionOperationDispatch,
+  recordSessionOperationExecutionDeadline,
   type SessionMessageRecord,
 } from './session-message-queue.js';
 import { admitSessionStop, type PersistedSessionStop } from './session-stop.js';
@@ -181,5 +182,37 @@ describe('execution deadline persistence', () => {
 
     expect(admission.receipt).toMatchObject({ cleanupDeadlineAt: 11_000 });
     expect(admission.messages).toMatchObject([{ executionDeadlineAt: 3_611_000 }]);
+  });
+
+  it('replaces the dispatch ceiling once with the original wrapper execution boundary', () => {
+    const authorization: SessionOperationAuthorization = {
+      operation: 'session.prompt',
+      operationId: 'message-a',
+      messageId: 'message-a',
+      session: { sessionId: 'workspace-a', kiloSessionId: 'kilo-a', directory: '/workspace/a' },
+      wrapperInstanceId: RUNTIME_A,
+      dispatchDeadlineAt: 31_000,
+    };
+    const dispatched = recordSessionOperationDispatch(
+      [message('message-a', 'queued', RUNTIME_A)],
+      authorization
+    );
+    if (!dispatched) throw new Error('Initial dispatch proof was not recorded');
+
+    const started = recordSessionOperationExecutionDeadline(dispatched, authorization, 3_600_500);
+    if (!started) throw new Error('Wrapper execution boundary was not recorded');
+    const replayedBoundary = recordSessionOperationExecutionDeadline(
+      started,
+      authorization,
+      3_700_000
+    );
+    if (!replayedBoundary) throw new Error('Stored execution boundary was not preserved');
+    const recovered = recordSessionOperationDispatch(
+      structuredClone(replayedBoundary),
+      authorization
+    );
+
+    expect(recovered).toMatchObject([{ executionDeadlineAt: 3_600_500 }]);
+    expect(recovered?.[0]?.operations?.prompt).toMatchObject({ executionDeadlineAt: 3_600_500 });
   });
 });

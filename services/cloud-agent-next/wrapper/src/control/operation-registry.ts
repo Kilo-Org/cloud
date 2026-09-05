@@ -127,6 +127,9 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
               : {
                   state: 'running',
                   authorization: target,
+                  ...(existing.executionDeadlineAt
+                    ? { executionDeadlineAt: existing.executionDeadlineAt }
+                    : {}),
                 }
           )
         );
@@ -142,7 +145,11 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       return reply(
         operation === 'session.attach'
           ? existing.done
-          : ok({ messageId: target.messageId, status: 'existing' })
+          : ok({
+              messageId: target.messageId,
+              status: 'existing',
+              executionDeadlineAt: existing.executionDeadlineAt,
+            })
       );
     }
     if (operation === 'session.operation.get') return reply(ok({ state: 'missing' }));

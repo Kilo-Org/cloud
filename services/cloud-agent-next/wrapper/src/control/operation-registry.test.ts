@@ -89,6 +89,7 @@ describe('operation admission and lookup', () => {
     expect(sessionOperationLookupResultSchema.parse(lookup.result)).toEqual({
       state: 'running',
       authorization,
+      executionDeadlineAt: record.executionDeadlineAt,
     });
     expect(
       await handleControlRequest(

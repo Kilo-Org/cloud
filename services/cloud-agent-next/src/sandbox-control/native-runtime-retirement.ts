@@ -45,12 +45,15 @@ export type NativeRuntimeRetirementWorkflow = {
     route: SessionRoute;
     reason: string;
     operationId?: string;
+    cleanupDeadlineAt: number;
   }): Promise<'retired' | 'pending' | 'unavailable'>;
   receiveRetired(input: {
     connection: NativeRuntimeRetirementConnection;
+    retirementId: string;
     directory: string;
     nativeRuntimeId: string;
     reason: string;
+    cleanupDeadlineAt: number;
   }): Promise<{ retired: true } | undefined>;
   resume(): Promise<void>;
 };
@@ -60,7 +63,7 @@ export type NativeRuntimeRetirementWorkflowPorts = {
   currentIncarnation: {
     isCurrent(connection: NativeRuntimeRetirementConnection): boolean;
     getConnection(): NativeRuntimeRetirementConnection | null;
-    sameConnection(
+    sameLifetime(
       left: NativeRuntimeRetirementConnection,
       right: NativeRuntimeRetirementConnection
     ): boolean;
@@ -93,6 +96,22 @@ export function sameNativeRuntimeRetirement(
     receipt.directory === input.directory &&
     receipt.nativeRuntimeId === input.nativeRuntimeId &&
     receipt.connection.connectionId === input.connection.connectionId &&
+    receipt.connection.providerInstanceId === input.connection.providerInstanceId &&
+    receipt.connection.wrapperInstanceId === input.connection.wrapperInstanceId
+  );
+}
+
+export function sameNativeRuntimeRetirementLifetime(
+  receipt: NativeRuntimeRetirementReceipt,
+  input: {
+    directory: string;
+    nativeRuntimeId: string;
+    connection: NativeRuntimeRetirementConnection;
+  }
+): boolean {
+  return (
+    receipt.directory === input.directory &&
+    receipt.nativeRuntimeId === input.nativeRuntimeId &&
     receipt.connection.providerInstanceId === input.connection.providerInstanceId &&
     receipt.connection.wrapperInstanceId === input.connection.wrapperInstanceId
   );
@@ -220,6 +239,20 @@ function matchesReceipt(
   );
 }
 
+function matchesRetirementLifetime(
+  current: NativeRuntimeRetirementReceipt,
+  input: {
+    directory: string;
+    nativeRuntimeId: string;
+    connection: NativeRuntimeRetirementConnection;
+    operationId?: string;
+  }
+): boolean {
+  return (
+    sameNativeRuntimeRetirementLifetime(current, input) && current.operationId === input.operationId
+  );
+}
+
 function holdsNativeRuntimeRetirementFence(receipt: NativeRuntimeRetirementReceipt): boolean {
   return (
     receipt.state === 'pending' ||
@@ -292,12 +325,7 @@ export function createNativeRuntimeRetirementWorkflow(
       };
       for (const receipt of retained) {
         if (receipt.state === 'pending') {
-          scheduleAt(
-            Math.min(
-              receipt.cleanupDeadlineAt,
-              Math.max(currentTime, receipt.nextAttemptAt ?? currentTime)
-            )
-          );
+          scheduleAt(Math.max(currentTime, receipt.nextAttemptAt ?? currentTime));
           continue;
         }
         if (receipt.state === 'completed' && receipt.notificationState === 'pending') {
@@ -359,20 +387,23 @@ export function createNativeRuntimeRetirementWorkflow(
         return undefined;
       const existing = stored.find(
         current =>
-          sameNativeRuntimeRetirement(current, {
+          matchesRetirementLifetime(current, {
             directory: route.directory,
             nativeRuntimeId: input.nativeRuntimeId,
             connection: input.connection,
-          }) && current.operationId === input.operationId
+            operationId: input.operationId,
+          }) && matchesNativeRuntimeRetirementAllocation(current, currentPhysical)
       );
       if (existing) return existing;
       const active = stored.find(
         current =>
-          sameNativeRuntimeRetirement(current, {
+          sameNativeRuntimeRetirementLifetime(current, {
             directory: route.directory,
             nativeRuntimeId: input.nativeRuntimeId,
             connection: input.connection,
-          }) && holdsNativeRuntimeRetirementFence(current)
+          }) &&
+          matchesNativeRuntimeRetirementAllocation(current, currentPhysical) &&
+          holdsNativeRuntimeRetirementFence(current)
       );
       if (active) return active;
       const created = createNativeRuntimeRetirement(
@@ -520,9 +551,12 @@ export function createNativeRuntimeRetirementWorkflow(
       const current = stored.find(current => matchesReceipt(current, receipt));
       if (!current) return undefined;
       if (current.state === 'completed') return current;
+      const connection = ports.currentIncarnation.getConnection();
       if (
         current.state !== 'pending' ||
-        !ports.currentIncarnation.isCurrent(receipt.connection) ||
+        !connection ||
+        !ports.currentIncarnation.isCurrent(connection) ||
+        !ports.currentIncarnation.sameLifetime(connection, receipt.connection) ||
         physical.state !== 'running' ||
         physical.stopTombstone ||
         !matchesNativeRuntimeRetirementAllocation(current, physical) ||
@@ -552,7 +586,7 @@ export function createNativeRuntimeRetirementWorkflow(
       const fallback = {
         ...current,
         state: 'unconfirmed' as const,
-        disposition: 'physical_fallback' as const,
+        disposition: 'pending' as const,
       };
       await saveNativeRuntimeRetirements(
         ports.storage,
@@ -560,9 +594,28 @@ export function createNativeRuntimeRetirementWorkflow(
       );
       return fallback;
     });
-    if (token) await ports.physicalEscalation.beginIfCurrent(token);
+    const started = token && (await ports.physicalEscalation.beginIfCurrent(token));
+    if (token) {
+      await ports.storage.transaction(async () => {
+        const stored = await loadNativeRuntimeRetirements(ports.storage);
+        await saveNativeRuntimeRetirements(
+          ports.storage,
+          stored.map(current =>
+            matchesReceipt(current, token) && current.state === 'unconfirmed'
+              ? started
+                ? { ...current, disposition: 'physical_fallback' as const }
+                : {
+                    ...current,
+                    state: 'pending' as const,
+                    nextAttemptAt: now() + DEADLINE_MS.reconciliation,
+                  }
+              : current
+          )
+        );
+      });
+    }
     await reconcileSchedule();
-    return token !== undefined;
+    return started === true;
   };
 
   const claimRetirementAttempt = async (receipt: NativeRuntimeRetirementReceipt) => {
@@ -570,13 +623,13 @@ export function createNativeRuntimeRetirementWorkflow(
       const stored = await loadNativeRuntimeRetirements(ports.storage);
       const current = stored.find(current => matchesReceipt(current, receipt));
       if (!current || current.state !== 'pending') return { state: 'unavailable' as const };
+      if (current.nextAttemptAt !== undefined && now() < current.nextAttemptAt)
+        return { state: 'pending' as const };
       if (
         now() >= current.cleanupDeadlineAt ||
         current.attempts >= DEADLINE_MS.nativeRetirementMaxAttempts
       )
         return { state: 'escalate' as const, receipt: current };
-      if (current.nextAttemptAt !== undefined && now() < current.nextAttemptAt)
-        return { state: 'pending' as const };
       const attempt = {
         ...current,
         attempts: current.attempts + 1,
@@ -631,7 +684,7 @@ export function createNativeRuntimeRetirementWorkflow(
     const receipt = await begin({
       ...input,
       nativeRuntimeId,
-      cleanupDeadlineAt: now() + DEADLINE_MS.stopAttempt,
+      cleanupDeadlineAt: input.cleanupDeadlineAt,
     });
     if (!receipt) return 'unavailable';
     if (receipt.operationId !== input.operationId) return 'pending';
@@ -680,11 +733,11 @@ export function createNativeRuntimeRetirementWorkflow(
       loadNativeRuntimeRetirements(ports.storage),
     ]);
     const matchesExisting = (receipt: NativeRuntimeRetirementReceipt) =>
-      sameNativeRuntimeRetirement(receipt, {
+      sameNativeRuntimeRetirementLifetime(receipt, {
         directory: input.directory,
         nativeRuntimeId: input.nativeRuntimeId,
         connection: input.connection,
-      });
+      }) && matchesNativeRuntimeRetirementAllocation(receipt, physical);
     const existing =
       receipts.find(receipt => matchesExisting(receipt) && receipt.state === 'completed') ??
       receipts.find(receipt => matchesExisting(receipt) && receipt.state === 'pending');
@@ -708,7 +761,8 @@ export function createNativeRuntimeRetirementWorkflow(
       route,
       nativeRuntimeId: input.nativeRuntimeId,
       reason: input.reason,
-      cleanupDeadlineAt: now() + DEADLINE_MS.stopAttempt,
+      operationId: input.retirementId,
+      cleanupDeadlineAt: input.cleanupDeadlineAt,
     });
     return receipt && (await complete(receipt)) ? { retired: true } : undefined;
   };
@@ -734,7 +788,7 @@ export function createNativeRuntimeRetirementWorkflow(
       const connection = ports.currentIncarnation.getConnection();
       if (
         !connection ||
-        !ports.currentIncarnation.sameConnection(connection, receipt.connection) ||
+        !ports.currentIncarnation.sameLifetime(connection, receipt.connection) ||
         !ports.currentIncarnation.isCurrent(connection)
       ) {
         await defer(receipt);
@@ -755,6 +809,7 @@ export function createNativeRuntimeRetirementWorkflow(
         route,
         reason: receipt.reason,
         operationId: receipt.operationId,
+        cleanupDeadlineAt: receipt.cleanupDeadlineAt,
       });
     }
     await reconcileSchedule();

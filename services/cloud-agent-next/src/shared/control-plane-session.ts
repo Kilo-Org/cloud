@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
+  sessionOperationAuthorizationSchema,
   wrapperInstanceIdSchema,
 } from './sandbox-control-protocol.js';
 
@@ -31,14 +32,6 @@ export const controlStopRequestSchema = z
   })
   .strict();
 
-export const controlSessionStateSchema = z
-  .object({
-    version: z.literal(1),
-    scope: controlStopScopeSchema,
-    targets: z.array(controlStopTargetSchema).min(1),
-  })
-  .strict();
-
 export const controlStopReceiptSchema = z
   .object({
     version: z.literal(1),
@@ -50,6 +43,27 @@ export const controlStopReceiptSchema = z
     message: z.string().optional(),
   })
   .strict();
+
+export const controlSessionStateSchema = z
+  .object({
+    version: z.literal(1),
+    scope: controlStopScopeSchema,
+    targets: z.array(controlStopTargetSchema),
+    stops: z.array(controlStopReceiptSchema).optional(),
+    operations: z
+      .array(
+        z
+          .object({
+            messageId: z.string().min(1),
+            authorization: sessionOperationAuthorizationSchema,
+            executionDeadlineAt: timestampSchema.optional(),
+          })
+          .strict()
+      )
+      .optional(),
+  })
+  .strict()
+  .refine(value => value.targets.length > 0 || (value.stops?.length ?? 0) > 0);
 
 export type ControlStopRequest = z.infer<typeof controlStopRequestSchema>;
 export type ControlSessionState = z.infer<typeof controlSessionStateSchema>;

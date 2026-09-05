@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it, spyOn } from 'bun:test';
-import { SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS } from '../../../src/shared/sandbox-control-protocol';
+import {
+  SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
+  sandboxEventPublicationPayloadSchema,
+  type ControlFrame,
+} from '../../../src/shared/sandbox-control-protocol';
+import { createSandboxControlClient } from './sandbox-control-client';
+import { eventKiloSessionId, sessionEventIdentity } from './feed';
+import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories';
 import * as controlRuntime from './sandbox-control-runtime';
-import { createWorktreeFeed } from './worktree-feed';
+import { createWorktreeFeed, type KiloFeedEvent } from './worktree-feed';
 
 type FeedOptions = Parameters<typeof controlRuntime.startSandboxControlEventFeed>[0];
 
@@ -58,8 +65,7 @@ function fixture(rejectReconnections = false) {
   };
   const attempts: ReturnType<typeof nativeFeed>[] = [];
   const failures: string[] = [];
-  const events: Array<{ type: string; properties: Record<string, unknown>; directory?: string }> =
-    [];
+  const events: KiloFeedEvent[] = [];
   const start = spyOn(controlRuntime, 'startSandboxControlEventFeed').mockImplementation(
     async options => {
       if (rejectReconnections && attempts.length > 0) throw new Error('Feed unavailable');
@@ -85,6 +91,178 @@ afterEach(() => {
 });
 
 describe('createWorktreeFeed', () => {
+  it.each([true, false])(
+    'preserves producer lifetime with event receipts=%s',
+    async eventReceipts => {
+      const sockets: Array<ReturnType<typeof socket>> = [];
+      function socket() {
+        const events = new EventTarget();
+        return Object.assign(events, {
+          readyState: 1,
+          sent: [] as ControlFrame[],
+          send(data: string) {
+            if (data === 'ping') return;
+            const frame = JSON.parse(data) as ControlFrame;
+            this.sent.push(frame);
+            if (frame.type !== 'request') return;
+            const result =
+              frame.operation === 'sandbox.hello'
+                ? {
+                    protocolVersion: 1,
+                    handshakeComplete: true,
+                    capabilities: { connectionRecovery: true, eventReceipts },
+                  }
+                : frame.operation === 'sandbox.event.publish'
+                  ? {
+                      receiptId: sandboxEventPublicationPayloadSchema.parse(frame.payload)
+                        .receiptId,
+                      applied: true,
+                    }
+                  : undefined;
+            if (!result) return;
+            events.dispatchEvent(
+              new MessageEvent('message', {
+                data: JSON.stringify({
+                  type: 'response',
+                  requestId: frame.requestId,
+                  ok: true,
+                  result,
+                }),
+              })
+            );
+            if (frame.operation === 'sandbox.hello')
+              events.dispatchEvent(
+                new MessageEvent('message', {
+                  data: JSON.stringify({
+                    type: 'request',
+                    requestId: 'probe',
+                    operation: 'sandbox.status',
+                    payload: {},
+                  }),
+                })
+              );
+          },
+          close() {
+            this.readyState = 3;
+            events.dispatchEvent(new Event('close'));
+          },
+        });
+      }
+      const client = createSandboxControlClient({
+        url: 'wss://example.test/control',
+        credential: 'test',
+        providerInstanceId: 'test',
+        reconnectDelayMs: () => 0,
+        openWebSocket: () => {
+          const next = socket();
+          if (sockets.length > 0) next.readyState = 0;
+          sockets.push(next);
+          return next as unknown as WebSocket;
+        },
+      });
+      const h = fixture();
+      const feeds: ReturnType<typeof createWorktreeFeed>[] = [];
+      const start = () => {
+        const feed = createWorktreeFeed({
+          source: h.source,
+          isCurrent: runtimeId => runtimeId === h.source.runtimeId,
+          onEvent: async event => {
+            const identity = sessionEventIdentity({
+              ...event,
+              sessionId: eventKiloSessionId(event.properties),
+              runtimeDirectory: h.source.directory,
+            });
+            if (!identity) throw new Error('Missing event identity');
+            expect(
+              await client.publishSessionEvent?.(
+                { type: event.type, properties: event.properties },
+                identity
+              )
+            ).toBe(true);
+          },
+          onFailure: reason => h.failures.push(reason),
+        });
+        feeds.push(feed);
+        return feed.open();
+      };
+      const envelope = {
+        directory: h.source.directory,
+        nativeRuntimeId: crypto.randomUUID(),
+        payload: {
+          type: 'session.status',
+          properties: { sessionID: 'receipt_root', status: { type: 'idle' } },
+        },
+      };
+      rememberAttachedRoot('receipt_root', h.source.directory);
+      try {
+        await client.connect();
+        const originalSocket = sockets[0];
+        if (!originalSocket) throw new Error('Missing original socket');
+        if (eventReceipts) originalSocket.close();
+        await start();
+        const originalId = h.source.runtimeId;
+        await h.attempts[0]?.emit(envelope);
+        h.source.runtimeId = crypto.randomUUID();
+        await start();
+        await h.attempts[0]?.emit(envelope);
+        await h.attempts[1]?.emit(envelope);
+        const frames = () =>
+          sockets
+            .flatMap(item => item.sent)
+            .filter(frame => frame.type === 'request' || frame.type === 'event')
+            .filter(frame =>
+              eventReceipts
+                ? frame.type === 'request' && frame.operation === 'sandbox.event.publish'
+                : frame.type === 'event'
+            );
+        if (eventReceipts) {
+          expect(frames()).toEqual([]);
+          await waitFor(() => sockets.length === 2);
+          const replacement = sockets[1];
+          if (!replacement) throw new Error('Missing replacement socket');
+          replacement.readyState = 1;
+          replacement.dispatchEvent(new Event('open'));
+        }
+        await waitFor(() => frames().length === 2);
+        if (eventReceipts) {
+          expect(sockets).toHaveLength(2);
+          const publications = frames().map(frame =>
+            sandboxEventPublicationPayloadSchema.parse(frame.payload)
+          );
+          expect(publications.map(item => item.session.nativeRuntimeId)).toEqual([
+            originalId,
+            h.source.runtimeId,
+          ]);
+          expect(publications.map(item => item.sequence)).toEqual([1, 2]);
+          expect(
+            originalSocket.sent.some(
+              frame => frame.type === 'request' && frame.operation === 'sandbox.event.publish'
+            )
+          ).toBe(false);
+        } else {
+          expect(sockets).toHaveLength(1);
+          for (const frame of frames())
+            expect(frame).toEqual({
+              type: 'event',
+              event: 'session.event',
+              session: {
+                directory: h.source.directory,
+                kiloSessionId: 'receipt_root',
+                rootKiloSessionId: 'receipt_root',
+              },
+              payload: envelope.payload,
+            });
+        }
+        expect(h.failures).toEqual([]);
+      } finally {
+        for (const feed of feeds) feed.close();
+        client.close();
+        h.start.mockRestore();
+        forgetAttachedRoot('receipt_root');
+      }
+    }
+  );
+
   it.each(['feed_ended', 'feed_failed', 'feed_stale', 'feed_reconnected'] as const)(
     'replaces a %s subscription without stopping the native process',
     async reason => {
@@ -114,6 +292,7 @@ describe('createWorktreeFeed', () => {
       expect(h.events).toEqual([
         {
           directory: h.source.directory,
+          nativeRuntimeId: h.source.runtimeId,
           type: 'session.updated',
           properties: { sessionID: 'current' },
         },

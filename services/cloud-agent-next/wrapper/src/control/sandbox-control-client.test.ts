@@ -6,9 +6,14 @@ import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sandboxHeartbeatPayloadSchema,
+  sandboxEventPublicationPayloadSchema,
   sessionEventPayloadSchema,
+  type SandboxEventPublicationPayload,
+  type SessionOperationDelivery,
 } from '../../../src/shared/sandbox-control-protocol';
 import { unfilteredKiloEvents } from './feed';
+import { acknowledgeOperation, operationAuthorization } from './control-test-fixtures';
+import { createControlEventFailureHandler } from './control-event-transport';
 import {
   createSandboxControlClient,
   type SandboxControlClientOptions,
@@ -211,7 +216,7 @@ describe('heartbeat version rollout compatibility', () => {
           type: 'response',
           requestId: hello.requestId,
           ok: true,
-          result: helloResult(),
+          result: helloResult({ connectionRecovery: true }),
         })
       );
       first.close();
@@ -278,6 +283,54 @@ describe('heartbeat version rollout compatibility', () => {
 });
 
 describe('createSandboxControlClient', () => {
+  it('replays one native retirement receipt after a lost acknowledgement on reconnect', async () => {
+    const { client, sockets } = createClientFixture();
+    const payload = {
+      retirementId: '11111111-1111-4111-8111-111111111111',
+      directory: '/workspace/a',
+      nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+      reason: 'process_exited',
+      cleanupDeadlineAt: Date.now() + 5_000,
+    };
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      await handshake(sockets[0], helloResult({ connectionRecovery: true }));
+      await connecting;
+      const report = client.reportNativeRuntimeRetirement?.(payload);
+      const first = sockets[0];
+      if (!report || !first) throw new Error('Native retirement report did not start');
+      await Promise.resolve();
+      const initial = JSON.parse(first.sent.at(-1) ?? '{}');
+      expect(initial).toMatchObject({ operation: 'session.runtime.retired', payload });
+      first.close();
+
+      await waitForReconnect();
+      const replacement = sockets[1];
+      await handshake(replacement);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      const replay = JSON.parse(replacement?.sent.at(-1) ?? '{}');
+      expect(replay).toMatchObject({ operation: 'session.runtime.retired', payload });
+      replacement?.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: replay.requestId,
+          ok: true,
+          result: { retired: true },
+        })
+      );
+      expect(await report).toBe(true);
+      const replayedReport = client.reportNativeRuntimeRetirement?.(payload);
+      if (!replayedReport) throw new Error('Native retirement receipt was not retained');
+      expect(await replayedReport).toBe(true);
+      expect(
+        replacement?.sent.filter(frame => frame.includes('session.runtime.retired'))
+      ).toHaveLength(1);
+    } finally {
+      client.close();
+    }
+  });
+
   it('opens with an Authorization header and completes sandbox.hello plus status probe', async () => {
     const fake = new FakeWebSocket();
     const client = createSandboxControlClient({
@@ -308,6 +361,8 @@ describe('createSandboxControlClient', () => {
           sessionOperationResults?: boolean;
           scopedStopAbort?: boolean;
           nativeRuntimeRetirement?: boolean;
+          connectionRecovery?: boolean;
+          eventReceipts?: boolean;
         };
       };
     };
@@ -320,6 +375,8 @@ describe('createSandboxControlClient', () => {
         sessionOperationResults: true,
         scopedStopAbort: true,
         nativeRuntimeRetirement: true,
+        connectionRecovery: true,
+        eventReceipts: true,
       },
     });
     fake.respond(
@@ -429,6 +486,112 @@ describe('createSandboxControlClient', () => {
       ok: true,
       result: { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true },
     });
+    client.close();
+  });
+
+  it('gates new session work until the exact recovery episode is marked ready', async () => {
+    const fake = new FakeWebSocket();
+    const onRequest = mock(async () => ({ ok: true as const, result: { accepted: true } }));
+    const onReconcile = mock(async () => {});
+    const client = createSandboxControlClient({
+      url: 'wss://example.test/sandbox-control/sbx_1',
+      credential: 'secret',
+      providerInstanceId: 'inst_1',
+      openWebSocket: () => fake as unknown as WebSocket,
+      onRequest,
+      onReconcile,
+    });
+    const recovery = {
+      episodeId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      cause: 'control_disconnected' as const,
+      startedAt: 1,
+      deadlineAt: Date.now() + 10_000,
+      attempt: 1,
+    };
+
+    const connecting = client.connect();
+    await handshake(fake);
+    await connecting;
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'drain',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'drain' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'blocked',
+        operation: 'session.prompt',
+        payload: {},
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onReconcile).toHaveBeenCalledWith('drain', recovery.deadlineAt);
+    expect(onRequest).not.toHaveBeenCalled();
+    expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+      requestId: 'blocked',
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'ready',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'ready' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'commit',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'commit' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'commit-replay',
+        operation: 'sandbox.reconcile',
+        payload: { recovery, phase: 'commit' },
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+      requestId: 'commit-replay',
+      ok: true,
+      result: { episodeId: recovery.episodeId, attempt: recovery.attempt, phase: 'commit' },
+    });
+
+    fake.respond(
+      JSON.stringify({
+        type: 'request',
+        requestId: 'admitted',
+        operation: 'session.prompt',
+        payload: {},
+      })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onReconcile).toHaveBeenLastCalledWith('commit', recovery.deadlineAt);
+    expect(onReconcile).toHaveBeenCalledTimes(3);
+    expect(onRequest).toHaveBeenCalledTimes(1);
     client.close();
   });
 
@@ -607,6 +770,7 @@ describe('createSandboxControlClient', () => {
         directory: '/workspace',
         kiloSessionId: 'ses_1',
         rootKiloSessionId: 'ses_1',
+        nativeRuntimeId: crypto.randomUUID(),
       }
     );
 
@@ -626,6 +790,331 @@ describe('createSandboxControlClient', () => {
       payload: { type: 'session.status', properties: { sessionID: 'ses_1' } },
     });
     client.close();
+  });
+
+  it.each([
+    'event-rejected',
+    'retryable-rejection',
+    'transport-error',
+    'other-error',
+    'false-ack',
+    'wrong-receipt',
+  ] as const)(
+    'preserves N1 before N2 ordering through publication disposition: %s',
+    async disposition => {
+      const failure = mock(() => {});
+      const logs: string[] = [];
+      const { client, sockets, onDisconnected } = createClientFixture({
+        onEventReceiptFailure: failure,
+        log: message => logs.push(message),
+      });
+      const hello = {
+        protocolVersion: 1,
+        handshakeComplete: true,
+        capabilities: { connectionRecovery: true, eventReceipts: true },
+      };
+      const nativeIds = [crypto.randomUUID(), crypto.randomUUID()];
+      const published: SandboxEventPublicationPayload[] = [];
+      const firstPublished = Promise.withResolvers<void>();
+      const replacementPublished = Promise.withResolvers<void>();
+      try {
+        const connecting = client.connect();
+        await Promise.resolve();
+        await handshake(sockets[0], hello);
+        await connecting;
+        sockets[0]?.close();
+        for (const nativeRuntimeId of nativeIds)
+          expect(
+            client.sendEvent?.(
+              'session.event',
+              { type: 'session.status', properties: { status: { type: 'idle' } } },
+              {
+                directory: '/workspace',
+                kiloSessionId: 'ses_1',
+                rootKiloSessionId: 'ses_1',
+                nativeRuntimeId,
+              }
+            )
+          ).toBe(true);
+        await waitForReconnect();
+        const socket = sockets[1];
+        if (!socket) throw new Error('Missing replacement socket');
+        socket.send = data => {
+          socket.sent.push(data);
+          const frame = JSON.parse(data) as {
+            operation?: string;
+            requestId: string;
+            payload: unknown;
+          };
+          if (frame.operation !== 'sandbox.event.publish') return;
+          const publication = sandboxEventPublicationPayloadSchema.parse(frame.payload);
+          published.push(publication);
+          firstPublished.resolve();
+          if (publication.sequence === 2) replacementPublished.resolve();
+          const acknowledgement = { receiptId: publication.receiptId, applied: true };
+          const response =
+            published.length > 1
+              ? { ok: true, result: acknowledgement }
+              : disposition === 'false-ack'
+                ? { ok: true, result: { ...acknowledgement, applied: false } }
+                : disposition === 'wrong-receipt'
+                  ? { ok: true, result: { ...acknowledgement, receiptId: crypto.randomUUID() } }
+                  : {
+                      ok: false,
+                      error: {
+                        code:
+                          disposition === 'transport-error'
+                            ? 'not_ready'
+                            : disposition === 'other-error'
+                              ? 'unauthorized'
+                              : 'event_rejected',
+                        retryable:
+                          disposition === 'retryable-rejection' ||
+                          disposition === 'transport-error',
+                        message: 'private rejected input',
+                      },
+                    };
+          socket.respond(
+            JSON.stringify({ type: 'response', requestId: frame.requestId, ...response })
+          );
+        };
+        await handshake(socket, hello);
+        await firstPublished.promise;
+        await waitForReconnect();
+        if (disposition === 'retryable-rejection' || disposition === 'transport-error') {
+          expect(published.map(item => item.session.nativeRuntimeId)).toEqual(
+            nativeIds.slice(0, 1)
+          );
+          await replacementPublished.promise;
+          await waitForReconnect();
+          expect(published.map(item => item.session.nativeRuntimeId)).toEqual([
+            nativeIds[0],
+            ...nativeIds,
+          ]);
+          expect(published.map(item => item.sequence)).toEqual([1, 1, 2]);
+          expect(published[1]).toEqual(published[0]);
+          expect(failure).not.toHaveBeenCalled();
+          expect(logs).not.toContain('sandbox control event publication rejected');
+        } else {
+          expect(published.map(item => item.session.nativeRuntimeId)).toEqual(nativeIds);
+          expect(published.map(item => item.sequence)).toEqual([1, 2]);
+          expect(failure).toHaveBeenCalledTimes(1);
+          expect(failure).toHaveBeenCalledWith({
+            reason: 'rejected',
+            publication: expect.objectContaining(published[0]),
+          });
+          expect(logs).toContain('sandbox control event publication rejected');
+        }
+        expect(socket.readyState).toBe(1);
+        expect(sockets).toHaveLength(2);
+        socket.close();
+        await waitForReconnect();
+        await handshake(sockets[2], hello);
+        await waitForReconnect();
+        expect(sockets[2]?.sent.some(data => data.includes('sandbox.event.publish'))).toBe(false);
+        expect(onDisconnected).not.toHaveBeenCalled();
+        expect(logs.join('\n')).not.toContain('private rejected input');
+      } finally {
+        client.close();
+      }
+    }
+  );
+
+  it('keeps reconnect readiness, attach, maintenance and sealed results independent of expiring N1 events', async () => {
+    const startedAt = Date.now();
+    const clock = spyOn(Date, 'now').mockReturnValue(startedAt);
+    const timers = spyOn(globalThis, 'setTimeout');
+    const failure = mock();
+    const retire = mock();
+    let currentRuntime = { runtimeId: crypto.randomUUID() };
+    const handleFailure = createControlEventFailureHandler({
+      getRuntime: () => currentRuntime,
+      onFailure: retire,
+    });
+    const connected = mock();
+    const request = mock(async () => ({ ok: true, result: { attached: true } }));
+    const logs: string[] = [];
+    const { client, sockets, onDisconnected } = createClientFixture({
+      onConnected: connected,
+      onEventReceiptFailure: eventFailure => {
+        failure(eventFailure);
+        handleFailure(eventFailure);
+      },
+      onRequest: request,
+      log: message => logs.push(message),
+    });
+    const hello = {
+      protocolVersion: 1,
+      handshakeComplete: true,
+      capabilities: { connectionRecovery: true, eventReceipts: true },
+    };
+    const identity = {
+      directory: '/workspace',
+      kiloSessionId: 'kilo_1',
+      rootKiloSessionId: 'kilo_1',
+      nativeRuntimeId: currentRuntime.runtimeId,
+    };
+    const delivery: SessionOperationDelivery = {
+      version: 2,
+      authorization: operationAuthorization(),
+      completedAt: startedAt,
+      result: { ok: true, result: {} },
+      outcome: { messageId: 'msg_1', status: 'completed' },
+      events: [],
+      preparing: [],
+    };
+    const acknowledgement = await acknowledgeOperation(delivery);
+    try {
+      const connecting = client.connect();
+      await Promise.resolve();
+      await handshake(sockets[0], hello);
+      await connecting;
+      sockets[0]?.close();
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, identity)
+      ).toBe(true);
+      const result = client
+        .sendOperationResult?.(
+          delivery.authorization.session,
+          delivery,
+          new AbortController().signal,
+          startedAt + 60_000
+        )
+        .catch((error: unknown) => error);
+      const retirement = client.reportNativeRuntimeRetirement?.({
+        retirementId: crypto.randomUUID(),
+        directory: identity.directory,
+        nativeRuntimeId: identity.nativeRuntimeId,
+        reason: 'process_exited',
+        cleanupDeadlineAt: startedAt + 60_000,
+      });
+      await waitForReconnect();
+      clock.mockReturnValue(startedAt + 250);
+      const socket = sockets[1];
+      if (!socket) throw new Error('Missing replacement socket');
+      const reconnectTimers = timers.mock.calls.length;
+      await handshake(socket, hello);
+      await waitForReconnect();
+      const frames = socket.sent.map(data => JSON.parse(data));
+      const eventFrame = frames.find(frame => frame.operation === 'sandbox.event.publish');
+      const resultFrame = frames.find(frame => frame.operation === 'session.operation.result');
+      const retirementFrame = frames.find(frame => frame.operation === 'session.runtime.retired');
+      expect(connected).toHaveBeenCalledTimes(2);
+      expect(eventFrame?.payload.session.nativeRuntimeId).toBe(identity.nativeRuntimeId);
+      expect(resultFrame?.payload).toEqual(delivery);
+      expect(retirementFrame).toBeDefined();
+      socket.respond(
+        JSON.stringify({
+          type: 'request',
+          requestId: 'attach-n2',
+          operation: 'session.attach',
+          session: delivery.authorization.session,
+          payload: {},
+        })
+      );
+      expect(client.sendEvent?.('sandbox.heartbeat', versionHeartbeat(null))).toBe(true);
+      await waitForReconnect();
+      expect(request).toHaveBeenCalledTimes(1);
+      expect(socket.sent.map(data => JSON.parse(data))).toContainEqual({
+        type: 'response',
+        requestId: 'attach-n2',
+        ok: true,
+        result: { attached: true },
+      });
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: retirementFrame.requestId,
+          ok: true,
+          result: { retired: true },
+        })
+      );
+      expect(await retirement).toBe(true);
+      clock.mockReturnValue(startedAt + 29_000);
+      const replacement = { ...identity, nativeRuntimeId: crypto.randomUUID() };
+      currentRuntime = { runtimeId: replacement.nativeRuntimeId };
+      expect(
+        client.sendEvent?.('session.event', { type: 'session.idle', properties: {} }, replacement)
+      ).toBe(true);
+      clock.mockReturnValue(startedAt + 30_000);
+      for (let index = reconnectTimers; index < timers.mock.calls.length; index += 1) {
+        const [expire, ms] = timers.mock.calls[index] ?? [];
+        if (ms !== 29_750 || typeof expire !== 'function') continue;
+        clearTimeout(
+          timers.mock.results[index]?.value as ReturnType<typeof setTimeout> | undefined
+        );
+        expire();
+      }
+      await waitForReconnect();
+      expect(logs).toContain('sandbox control event publication expired');
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(failure).toHaveBeenCalledWith({
+        reason: 'expired',
+        publication: expect.objectContaining(eventFrame.payload),
+      });
+      expect(retire).not.toHaveBeenCalled();
+      expect(onDisconnected).not.toHaveBeenCalled();
+      expect(socket.readyState).toBe(1);
+      const replacementFrame = socket.sent
+        .map(data => JSON.parse(data))
+        .find(
+          frame =>
+            frame.operation === 'sandbox.event.publish' &&
+            frame.payload.session.nativeRuntimeId === replacement.nativeRuntimeId
+        );
+      expect(replacementFrame).toBeDefined();
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: resultFrame.requestId,
+          ok: true,
+          result: acknowledgement,
+        })
+      );
+      expect(await result).toEqual(acknowledgement);
+      socket.respond(
+        JSON.stringify({
+          type: 'response',
+          requestId: replacementFrame.requestId,
+          ok: true,
+          result: { receiptId: replacementFrame.payload.receiptId, applied: true },
+        })
+      );
+      await waitForReconnect();
+      expect(failure).toHaveBeenCalledTimes(1);
+      expect(retire).not.toHaveBeenCalled();
+      expect(sockets).toHaveLength(2);
+    } finally {
+      client.close();
+      timers.mockRestore();
+      clock.mockRestore();
+    }
+  });
+
+  it('uses the legacy session.event frame when event receipts are not negotiated', async () => {
+    const fake = new FakeWebSocket();
+    const { client } = createClientFixture({ openWebSocket: () => fake as unknown as WebSocket });
+    try {
+      const connecting = client.connect();
+      await handshake(fake);
+      await connecting;
+      if (!client.publishSessionEvent) throw new Error('Missing session event publisher');
+      expect(
+        await client.publishSessionEvent(
+          {
+            type: 'session.message.outcome',
+            properties: { messageId: 'msg_1', status: 'completed' },
+          },
+          { directory: '/workspace', kiloSessionId: 'ses_1', rootKiloSessionId: 'ses_1' }
+        )
+      ).toBe(true);
+      expect(JSON.parse(fake.sent.at(-1) ?? '{}')).toMatchObject({
+        type: 'event',
+        event: 'session.event',
+      });
+    } finally {
+      client.close();
+    }
   });
 
   it('bounds a producer-shaped 2 MiB PDF event and preserves the following owned outcome', async () => {
@@ -769,7 +1258,7 @@ describe('createSandboxControlClient', () => {
     }
   });
 
-  it('retires the wrapper connection instead of reconnecting across an established gap', async () => {
+  it('reconnects the wrapper connection across an established gap', async () => {
     const sockets: FakeWebSocket[] = [];
     const wrapperInstanceId = crypto.randomUUID();
     let disconnects = 0;
@@ -792,22 +1281,23 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     expect(JSON.parse(sockets[0]?.sent[0] ?? '{}')).toMatchObject({
       payload: { wrapperInstanceId },
     });
     sockets[0]?.close();
     await waitForReconnect();
-    expect(sockets).toHaveLength(1);
-    expect(disconnects).toBe(1);
+    expect(sockets).toHaveLength(2);
+    expect(disconnects).toBe(0);
+    await handshake(sockets[1], helloResult({ connectionRecovery: true }));
+    await client.connect();
     expect(
       client.sendEvent?.('session.event', {
         type: 'session.message.outcome',
         properties: { messageId: 'msg_1', status: 'completed' },
       })
-    ).toBe(false);
-    expect(client.connect()).rejects.toThrow('sandbox control client closed');
+    ).toBe(true);
     client.close();
   });
 
@@ -900,13 +1390,13 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     sockets[0]?.error();
     sockets[0]?.close();
     await waitForReconnect();
-    expect(sockets).toHaveLength(1);
-    expect(disconnects).toBe(1);
+    expect(sockets).toHaveLength(2);
+    expect(disconnects).toBe(0);
     client.close();
   });
 
@@ -926,7 +1416,7 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     client.close();
     await waitForReconnect();
@@ -951,13 +1441,13 @@ describe('createSandboxControlClient', () => {
 
     const connecting = client.connect();
     await Promise.resolve();
-    await handshake(sockets[0]);
+    await handshake(sockets[0], helloResult({ connectionRecovery: true }));
     await connecting;
     const first = sockets[0];
     if (!first) throw new Error('missing first socket');
     first.close();
     await waitForReconnect();
-    expect(sockets).toHaveLength(1);
+    expect(sockets).toHaveLength(2);
 
     first.readyState = 1;
     const sentBefore = first.sent.length;
@@ -1166,7 +1656,7 @@ describe('createSandboxControlClient', () => {
     try {
       const connecting = client.connect();
       await Promise.resolve();
-      await handshake(sockets[0]);
+      await handshake(sockets[0], helloResult({ connectionRecovery: true }));
       await connecting;
       const socket = sockets[0];
       if (!socket) throw new Error('missing socket');
@@ -1213,10 +1703,9 @@ describe('createSandboxControlClient', () => {
       await waitForReconnect();
       socket.error();
       socket.close();
-      expect(onDisconnected).toHaveBeenCalledTimes(1);
-      expect(openWebSocket).toHaveBeenCalledTimes(1);
+      expect(onDisconnected).toHaveBeenCalledTimes(0);
+      expect(openWebSocket).toHaveBeenCalledTimes(2);
       expect(client.sendEvent?.('sandbox.ready', { kiloReady: true })).toBe(false);
-      expect(client.connect()).rejects.toThrow('sandbox control client closed');
     } finally {
       client.close();
       timers.mockRestore();
@@ -1230,7 +1719,7 @@ describe('createSandboxControlClient', () => {
     try {
       const connecting = client.connect();
       await Promise.resolve();
-      await handshake(sockets[0]);
+      await handshake(sockets[0], helloResult({ connectionRecovery: true }));
       await connecting;
       const socket = sockets[0];
       if (!socket) throw new Error('missing socket');
@@ -1248,7 +1737,7 @@ describe('createSandboxControlClient', () => {
       await waitForReconnect();
       expect(onRequest).toHaveBeenCalledTimes(1);
       expect(socket.sent).toHaveLength(2);
-      expect(onDisconnected).toHaveBeenCalledTimes(1);
+      expect(onDisconnected).toHaveBeenCalledTimes(0);
     } finally {
       outcome.resolve({ ok: true });
       client.close();

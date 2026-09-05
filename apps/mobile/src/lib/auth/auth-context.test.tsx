@@ -262,6 +262,7 @@ vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
 
 vi.mock('@/lib/chat/sign-out', () => ({
   clearChatsForSignOut: vi.fn().mockResolvedValue(undefined),
+  releaseChatsForAccountSwitch: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@/lib/pr-review/recent-prs', () => ({
@@ -543,6 +544,25 @@ describe('sign-out teardown ordering', () => {
     // run on a plain sign-in.
     expect(logoutCleanupMock.unregisterActivityTokensAndTombstone).toHaveBeenCalledTimes(1);
     expect(logoutCleanupMock.runLogoutCleanup).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('ends the prior account chats on sign-in, and signs in even when that fails', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    const release = vi.mocked(releaseChatsForAccountSwitch);
+    release.mockRejectedValueOnce(new Error('the store is locked'));
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    expect(release).toHaveBeenCalledTimes(1);
+    // The rest of the switch ran: a chat that would not close cannot stop the
+    // prior account's cache being cleared.
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalled();
 
     unmount();
   });

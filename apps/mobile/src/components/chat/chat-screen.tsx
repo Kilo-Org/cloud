@@ -99,13 +99,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
     };
   }, []);
 
-  const messages = asMessages({
-    sessionId: state.sessionId,
-    model: state.model,
-    turns: state.turns,
-    answering: state.answering,
-    asked: state.status === 'working' ? null : state.asked,
-  });
+  const messages = asMessages(state);
   // The question that has no answer is the last thing on screen, and while the
   // chat is idle it is the one that offers a Retry.
   const unanswered =

@@ -63,12 +63,14 @@ function asMessage(turn: Turn, model: string): StoredMessage {
 }
 
 /**
- * The whole transcript, plus what is not in the store yet: the answer arriving
- * now, and a question nothing answered.
+ * The whole transcript, plus what is not in the store yet: the question being
+ * answered right now, the answer as it arrives, and anything typed while that
+ * was happening.
  *
  * The pending question is drawn from what the app remembers rather than from the
  * store, because the store holds a question and its answer together or neither.
- * It is what the Retry hangs off.
+ * It is what the Retry hangs off, and it is on screen from the moment it is
+ * asked rather than when its answer lands.
  */
 export function asMessages(input: {
   readonly sessionId: string;
@@ -76,6 +78,8 @@ export function asMessages(input: {
   readonly turns: readonly Turn[];
   readonly answering: string;
   readonly asked: string | null;
+  /** Questions typed while an answer was arriving, in the order they go. */
+  readonly waiting: readonly string[];
 }): StoredMessage[] {
   const drawn = input.turns
     .filter(turn => said(turn).length > 0)
@@ -101,6 +105,19 @@ export function asMessages(input: {
           sessionId: input.sessionId,
           role: 'assistant',
           parts: [{ id: `${input.sessionId}:answering:text`, kind: 'text', body: input.answering }],
+        },
+        input.model
+      )
+    );
+  }
+  for (const [index, question] of input.waiting.entries()) {
+    drawn.push(
+      asMessage(
+        {
+          id: `${input.sessionId}:waiting:${index}`,
+          sessionId: input.sessionId,
+          role: 'user',
+          parts: [{ id: `${input.sessionId}:waiting:${index}:text`, kind: 'text', body: question }],
         },
         input.model
       )

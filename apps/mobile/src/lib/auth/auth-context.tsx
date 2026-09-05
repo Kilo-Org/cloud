@@ -19,7 +19,7 @@ import {
   flushLastPostHogEvent,
   LOGOUT_EVENT,
 } from '@/lib/analytics/posthog';
-import { clearChatsForSignOut } from '@/lib/chat/sign-out';
+import { clearChatsForSignOut, releaseChatsForAccountSwitch } from '@/lib/chat/sign-out';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
@@ -261,6 +261,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // A direct account switch must not keep the prior account's query
         // cache: the org list is keyed account-independently, so a stale list
         // would otherwise drive a false lost-org blank in the org fence.
+        // A direct account switch must not keep the prior account's running
+        // chats, which outlive any screen. A release that fails can never hold
+        // up the account signing in.
+        await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
         // A direct account switch must not keep the prior account's session

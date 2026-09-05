@@ -5,18 +5,15 @@ import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
 import { chatScope } from './scope';
 import {
   type ChatPlace,
-  type ChatState,
   enterChat,
   prepareChats,
   releaseChat,
   retryChat,
   say,
-  snapshotOf,
   startChat,
   stopChat,
-  watch,
-  watchChats,
 } from './registry';
+import { type ChatState, snapshotOf, watch, watchChats } from './state';
 import { type ChatSummary, deleteChat, listChats } from './store';
 
 /**

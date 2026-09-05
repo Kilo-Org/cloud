@@ -56,7 +56,10 @@ vi.mock('@/lib/auth/logout-cleanup', () => ({
 vi.mock('@/lib/query-client', () => ({
   queryClient: { clear: vi.fn(), invalidateQueries: vi.fn() },
 }));
-vi.mock('@/lib/chat/sign-out', () => ({ clearChatsForSignOut: vi.fn() }));
+vi.mock('@/lib/chat/sign-out', () => ({
+  clearChatsForSignOut: vi.fn(),
+  releaseChatsForAccountSwitch: vi.fn(),
+}));
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({ setTrpcUnauthorizedHandler: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({ clearAgentModelPreference: vi.fn() }));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({

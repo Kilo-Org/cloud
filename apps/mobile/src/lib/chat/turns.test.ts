@@ -30,6 +30,7 @@ describe('asMessages', () => {
         ],
         answering: '',
         asked: null,
+        waiting: [],
       })
     ).toEqual([
       { role: 'user', said: 'what is a monad' },
@@ -51,6 +52,7 @@ describe('asMessages', () => {
         ],
         answering: '',
         asked: null,
+        waiting: [],
       })
     ).toEqual([{ role: 'assistant', said: 'a burrito' }]);
   });
@@ -63,6 +65,7 @@ describe('asMessages', () => {
         turns: [turn('t1', 'user', [text('p1', 'first')])],
         answering: 'well',
         asked: 'second',
+        waiting: [],
       })
     ).toEqual([
       { role: 'user', said: 'first' },
@@ -78,9 +81,44 @@ describe('asMessages', () => {
       turns: [turn('t1', 'user', [text('p1', 'first')])],
       answering: 'well',
       asked: 'second',
+      waiting: [],
     });
 
     expect(new Set(messages.map(message => message.info.id)).size).toBe(messages.length);
+  });
+
+  it('shows the question while its answer is still arriving', () => {
+    expect(
+      drawn({
+        sessionId: 's1',
+        model: 'kilo/one',
+        turns: [],
+        answering: 'a bur',
+        asked: 'what is a monad',
+        waiting: [],
+      })
+    ).toEqual([
+      { role: 'user', said: 'what is a monad' },
+      { role: 'assistant', said: 'a bur' },
+    ]);
+  });
+
+  it('draws what was typed while the answer arrived, in the order it will be asked', () => {
+    expect(
+      drawn({
+        sessionId: 's1',
+        model: 'kilo/one',
+        turns: [],
+        answering: 'a bur',
+        asked: 'what is a monad',
+        waiting: ['and a functor', 'and a natural transformation'],
+      })
+    ).toEqual([
+      { role: 'user', said: 'what is a monad' },
+      { role: 'assistant', said: 'a bur' },
+      { role: 'user', said: 'and a functor' },
+      { role: 'user', said: 'and a natural transformation' },
+    ]);
   });
 
   it('names the model the conversation is on', () => {
@@ -90,6 +128,7 @@ describe('asMessages', () => {
       turns: [turn('t1', 'assistant', [text('p1', 'a burrito')])],
       answering: '',
       asked: null,
+      waiting: [],
     });
 
     expect(message?.info).toMatchObject({ modelID: 'kilo/two', providerID: 'kilo' });

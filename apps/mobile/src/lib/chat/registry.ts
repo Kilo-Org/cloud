@@ -5,11 +5,11 @@ import {
   type ModelEvent,
   openSession,
   type SessionHandle,
-  type Turn,
 } from '@kilocode/harness-sdk';
 import { type SQLiteDatabase } from 'expo-sqlite';
 
 import { encryptedDatabase } from '@/lib/persist/encrypted-kv';
+import { change, forgetState, NOTHING, snapshotOf } from './state';
 import { chatLayers, type ChatOrg } from './layers';
 import { askedIn, forgetAsked, moveAsked, rememberAsked } from './pending';
 import { forgetSession, modelOfSession, moveChat, rememberChat, touchChat } from './store';
@@ -26,25 +26,6 @@ import { forgetSession, modelOfSession, moveChat, rememberChat, touchChat } from
  * here reads React.
  */
 
-/** What a chat screen draws. */
-export type ChatState = {
-  readonly sessionId: string;
-  readonly model: string;
-  /** Every turn the store holds, oldest first. */
-  readonly turns: readonly Turn[];
-  /** The answer arriving right now, empty when none is. */
-  readonly answering: string;
-  readonly status: 'opening' | 'idle' | 'working';
-  /**
-   * A question with no answer: still being asked, or asked and nothing came
-   * back. `status` tells the two apart, and an idle chat holding one is what
-   * puts a Retry under the last thing the person said.
-   */
-  readonly asked: string | null;
-  /** Why the last question ended with no answer, for the log rather than the screen. */
-  readonly failed: string | null;
-};
-
 const openRuntime = (database: SQLiteDatabase, org: ChatOrg) =>
   ManagedRuntime.make(chatLayers(database, org));
 
@@ -58,6 +39,8 @@ type Chat = {
   readonly handle: SessionHandle;
   readonly scope: Scope.CloseableScope;
   answering: Fiber.RuntimeFiber<void, unknown> | undefined;
+  /** What was typed while `answering` was running. Drained when it ends well. */
+  readonly waiting: string[];
   readonly chatScope: string;
   readonly org: ChatOrg;
 };
@@ -69,35 +52,6 @@ export type ChatPlace = {
 };
 
 const chats = new Map<string, Chat>();
-
-/**
- * What every chat looks like, open or not.
- *
- * It is kept apart from the sessions above so a screen can subscribe to a chat
- * before it has opened and read the same object every time it asks: a snapshot
- * built fresh on each read would tell React the screen had changed, forever.
- */
-const states = new Map<string, ChatState>();
-
-const watchers = new Map<string, Set<() => void>>();
-
-/**
- * Whoever draws the list of chats, rather than one of them.
- *
- * A chat writes its turns when the answer ends, and the title of a row is the
- * first thing said in it — so a list drawn before that is a list with a row it
- * cannot name yet. The screen showing the list is not the screen the answer
- * arrived on, and may not even be mounted, so the registry says when a chat
- * changed and the list reads the database again.
- */
-const listWatchers = new Set<() => void>();
-
-export function watchChats(watcher: () => void): () => void {
-  listWatchers.add(watcher);
-  return () => {
-    listWatchers.delete(watcher);
-  };
-}
 
 /** One open at a time per chat, so entering a screen twice opens one session. */
 const opening = new Map<string, Promise<void>>();
@@ -125,52 +79,6 @@ async function runtimeFor(place: ChatPlace): Promise<ChatRuntime> {
   const made = openRuntime(await open(), place.org);
   runtimes.set(place.chatScope, made);
   return made;
-}
-
-const NOTHING = {
-  turns: [] as readonly Turn[],
-  answering: '',
-  asked: null,
-  failed: null,
-} satisfies Omit<ChatState, 'sessionId' | 'model' | 'status'>;
-
-function publish(sessionId: string): void {
-  for (const watcher of watchers.get(sessionId) ?? []) {
-    watcher();
-  }
-}
-
-function change(sessionId: string, into: Partial<ChatState>): void {
-  states.set(sessionId, { ...snapshotOf(sessionId), ...into });
-  publish(sessionId);
-  // Only when a chat starts or stops working: every word of an answer is a
-  // change too, and a list that read the database once per word would read it
-  // hundreds of times for one answer.
-  if (into.status !== undefined) {
-    for (const watcher of listWatchers) {
-      watcher();
-    }
-  }
-}
-
-/** The state a screen draws, whether or not the chat has opened yet. */
-export function snapshotOf(sessionId: string): ChatState {
-  const held = states.get(sessionId);
-  if (held !== undefined) {
-    return held;
-  }
-  const fresh: ChatState = { sessionId, model: '', status: 'opening', ...NOTHING };
-  states.set(sessionId, fresh);
-  return fresh;
-}
-
-export function watch(sessionId: string, watcher: () => void): () => void {
-  const held = watchers.get(sessionId) ?? new Set<() => void>();
-  held.add(watcher);
-  watchers.set(sessionId, held);
-  return () => {
-    held.delete(watcher);
-  };
 }
 
 /**
@@ -217,7 +125,7 @@ export async function startChat(place: ChatPlace, model: string): Promise<string
   const runtime = await runtimeFor(place);
   const { handle, scope } = await inOwnScope(runtime, openSession({ system: SYSTEM, model }));
   rememberChat(await open(), { sessionId: handle.id, scope: place.chatScope, at: Date.now() });
-  chats.set(handle.id, { handle, scope, answering: undefined, ...place });
+  chats.set(handle.id, { handle, scope, answering: undefined, waiting: [], ...place });
   change(handle.id, { ...NOTHING, model, status: 'idle' });
   return handle.id;
 }
@@ -254,7 +162,7 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
   const { handle, scope } = await inOwnScope(runtime, continueSession(sessionId));
   const turns = await runtime.runPromise(handle.history);
   const asked = await askedIn(sessionId);
-  chats.set(sessionId, { handle, scope, answering: undefined, ...place });
+  chats.set(sessionId, { handle, scope, answering: undefined, waiting: [], ...place });
   change(sessionId, {
     ...NOTHING,
     model: modelOfSession(await open(), sessionId) ?? '',
@@ -272,18 +180,40 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
  * does, which is why this answers with the one to carry on with.
  */
 export async function say(sessionId: string, text: string, model: string): Promise<string> {
-  const moved = await ontoModel(sessionId, model);
-  const chat = chats.get(moved);
-  if (chat === undefined) {
-    return moved;
+  const held = chats.get(sessionId);
+  if (held?.answering !== undefined) {
+    /* A session answers one question at a time, and the composer stays open
+       while it works. So a second question joins the line rather than racing
+       the first, and it is on screen while it waits. It is held in memory
+       only: an answer that is still arriving is not written down either. */
+    held.waiting.push(text);
+    change(sessionId, { waiting: [...held.waiting] });
+    return sessionId;
   }
-  const runtime = await runtimeFor(chat);
-  await rememberAsked(moved, text);
-  touchChat(await open(), moved, Date.now());
-  change(moved, { status: 'working', answering: '', asked: text, failed: null });
-  chat.answering = runtime.runFork(reading(moved, text, runtime));
-  return moved;
+  try {
+    const moved = await ontoModel(sessionId, model);
+    const chat = chats.get(moved);
+    if (chat === undefined) {
+      return moved;
+    }
+    const runtime = await runtimeFor(chat);
+    await rememberAsked(moved, text);
+    touchChat(await open(), moved, Date.now());
+    change(moved, { status: 'working', answering: '', asked: text, failed: null });
+    chat.answering = runtime.runFork(reading(moved, text, runtime));
+    return moved;
+  } catch (error) {
+    /* The move, or the write that remembers the question, failed. The question
+       is not lost: it stays on screen with a Retry under it, the same as one
+       whose answer never arrived. */
+    change(sessionId, { status: 'idle', answering: '', asked: text, failed: reason(error) });
+    return sessionId;
+  }
 }
+
+/** A short reason for the log, from something thrown rather than from a cause. */
+const reason = (error: unknown): string =>
+  error instanceof Error ? error.message : 'the question could not be sent';
 
 /** Asks again what was asked and never answered. */
 export async function retryChat(sessionId: string): Promise<string> {
@@ -364,6 +294,7 @@ async function settle(
   if (failed === null) {
     await forgetAsked(sessionId);
   }
+  chat.answering = undefined;
   change(sessionId, {
     turns,
     answering: '',
@@ -371,6 +302,28 @@ async function settle(
     asked: failed === null ? null : snapshotOf(sessionId).asked,
     failed,
   });
+  /* The line moves only when the answer landed. A question that failed keeps
+     its Retry, and asking the next one would take the place that Retry hangs
+     off — so what is waiting stays waiting until the person deals with it. */
+  if (failed === null) {
+    await drain(sessionId, chat);
+  }
+}
+
+/**
+ * Asks the next question the person left, if they left one.
+ *
+ * They typed it while the last answer was arriving, so it was never a draft
+ * they could go back and change: it is a question they asked, and it is asked
+ * as soon as the session is free.
+ */
+async function drain(sessionId: string, chat: Chat): Promise<void> {
+  const next = chat.waiting.shift();
+  if (next === undefined) {
+    return;
+  }
+  change(sessionId, { waiting: [...chat.waiting] });
+  await say(sessionId, next, snapshotOf(sessionId).model);
 }
 
 /**
@@ -395,7 +348,7 @@ async function ontoModel(sessionId: string, model: string): Promise<string> {
   await moveAsked(sessionId, handle.id);
   const turns = await runtime.runPromise(handle.history);
   chats.delete(sessionId);
-  states.delete(sessionId);
+  forgetState(sessionId);
   chats.set(handle.id, { ...chat, handle, scope, answering: undefined });
   change(handle.id, { ...held, sessionId: handle.id, model, turns });
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
@@ -420,6 +373,7 @@ export async function stopChat(sessionId: string): Promise<void> {
   await runtime.runPromise(Fiber.interrupt(chat.answering));
   chat.answering = undefined;
   change(sessionId, { status: 'idle', answering: '' });
+  await drain(sessionId, chat);
 }
 
 /**
@@ -435,7 +389,7 @@ export async function releaseChat(sessionId: string): Promise<void> {
   const runtime = await runtimeFor(chat);
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
   chats.delete(sessionId);
-  states.delete(sessionId);
+  forgetState(sessionId);
 }
 
 /** Ends every chat, which is what signing out does before the wipe. */

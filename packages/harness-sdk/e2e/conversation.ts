@@ -44,7 +44,12 @@ import type { Continued } from '../src/core/queue.js';
 import type { Turn } from '../src/core/turn.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { hitRatio } from '../src/core/usage.js';
-import { type Answer, type Asker, type Question, questionTool } from '../src/plugins/tools/question.js';
+import {
+  type Answer,
+  type Asker,
+  type Question,
+  questionTool,
+} from '../src/plugins/tools/question.js';
 import { type SubagentReport, subagentTool } from '../src/plugins/tools/subagent.js';
 import { timeTool } from '../src/plugins/tools/time.js';
 import { type Todo, todoTool } from '../src/plugins/tools/todo.js';
@@ -146,23 +151,21 @@ const watching = (session: SessionHandle, within: Duration.DurationInput) =>
       return event?.kind === 'done' && event.stop !== 'tools';
     };
     const fiber = yield* Effect.forkScoped(
-      Stream.runForEach(
-        session.continued,
-        (one: Continued) =>
-          Effect.sync(() => {
-            held.answering = one.answering;
-            const event = 'failed' in one ? undefined : one.event;
-            if (event?.kind === 'delta') {
-              held.text += event.text;
-            }
-            if ('failed' in one) {
-              refused.push(String(one.failed));
-            }
-            if (over(one) || 'failed' in one) {
-              rounds.push({ answering: held.answering, text: held.text });
-              held.text = '';
-            }
-          })
+      Stream.runForEach(session.continued, (one: Continued) =>
+        Effect.sync(() => {
+          held.answering = one.answering;
+          const event = 'failed' in one ? undefined : one.event;
+          if (event?.kind === 'delta') {
+            held.text += event.text;
+          }
+          if ('failed' in one) {
+            refused.push(String(one.failed));
+          }
+          if (over(one) || 'failed' in one) {
+            rounds.push({ answering: held.answering, text: held.text });
+            held.text = '';
+          }
+        })
       )
     );
     return {
@@ -289,7 +292,11 @@ const converse = (model: string) =>
 
       const words: string[] = [];
       words.push(
-        yield* timed(session, `Remember this for later: ${secret}. Reply with the word: noted`, timings)
+        yield* timed(
+          session,
+          `Remember this for later: ${secret}. Reply with the word: noted`,
+          timings
+        )
       );
       words.push(yield* timed(session, 'What time is it right now? Give me the time.', timings));
       words.push(
@@ -326,7 +333,11 @@ const converse = (model: string) =>
       /* Asked before the summary as well as after it, because a fact the
          conversation has used twice is the fact a summariser must keep. */
       words.push(
-        yield* timed(session, 'What is the staging database called? Answer with the one word.', timings)
+        yield* timed(
+          session,
+          'What is the staging database called? Answer with the one word.',
+          timings
+        )
       );
 
       const turns = yield* session.history;
@@ -436,7 +447,8 @@ console.log(
 for (const { model, got } of rows) {
   under(model);
   const kept =
-    got.reopened.toLowerCase().includes('quokka') && got.afterSummary.toLowerCase().includes('quokka');
+    got.reopened.toLowerCase().includes('quokka') &&
+    got.afterSummary.toLowerCase().includes('quokka');
   console.log(
     pad(model, 32) +
       pad(String(got.turns.length), 6) +
@@ -465,7 +477,10 @@ for (const { model, got } of rows) {
      model that stopped talking to the person. */
   const silent = got.said.filter(one => one.trim() === '').length;
   wrongIf(silent > 2, `${String(silent)} of the answers carried no text`);
-  wrongIf(got.todos.length < 3, `the plan was written down as ${String(got.todos.length)} steps, not three or more`);
+  wrongIf(
+    got.todos.length < 3,
+    `the plan was written down as ${String(got.todos.length)} steps, not three or more`
+  );
   const questions = got.asked.flat();
   wrongIf(
     got.asked.length !== 1,
@@ -547,4 +562,6 @@ for (const { model, got } of rows) {
 }
 
 under('');
-passed('every model held one whole conversation: tools, a person, a subagent, the store, and a summary');
+passed(
+  'every model held one whole conversation: tools, a person, a subagent, the store, and a summary'
+);

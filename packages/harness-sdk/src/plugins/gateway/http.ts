@@ -59,10 +59,30 @@ interface HttpCaller extends HttpPlugins {
 
 const organizationHeader = 'x-kilocode-organizationid';
 
-const headersOf = (org: OrgContext, token: string): Record<string, string> => ({
+/**
+ * The gateway's own name for the conversation a call belongs to.
+ *
+ * It is what the gateway turns into the upstream provider's cache key — a
+ * `prompt_cache_key` on the OpenAI shapes, a `session_id` on OpenRouter's — and
+ * it seeds the routing that keeps one conversation on one provider. Without it
+ * the gateway has nothing to hash, so it sends neither, and a session's calls
+ * are as unrelated to each other as two people's are.
+ *
+ * `x-kilocode-taskid` is the same field under the editor's name for it. This is
+ * the one the gateway documents for everybody else, so this is the one a
+ * harness sends.
+ */
+const sessionHeader = 'x-kilo-session';
+
+const headersOf = (
+  org: OrgContext,
+  token: string,
+  session: string | undefined
+): Record<string, string> => ({
   'content-type': 'application/json',
   authorization: `Bearer ${token}`,
   ...(org.kind === 'organization' ? { [organizationHeader]: org.id } : {}),
+  ...(session === undefined ? {} : { [sessionHeader]: session }),
 });
 
 /** A token that cannot be fetched is a transport failure, not a bad reply. */
@@ -73,6 +93,8 @@ const asModelError = (error: TokenError | ModelError): ModelError =>
 interface Sending {
   readonly path: string;
   readonly body: string;
+  /** The conversation this call belongs to, for the gateway's cache key. */
+  readonly session: string | undefined;
   /** Absent when the runtime has no `AbortController`. */
   readonly signal: AbortLike | undefined;
 }
@@ -92,7 +114,7 @@ const post = (caller: HttpCaller, sending: Sending): Effect.Effect<HttpResponse,
         try: () =>
           caller.config.fetch(`${caller.config.baseUrl.replace(/\/+$/u, '')}${sending.path}`, {
             method: 'POST',
-            headers: headersOf(caller.config.org, token),
+            headers: headersOf(caller.config.org, token, sending.session),
             body: sending.body,
             ...(sending.signal === undefined ? {} : { signal: sending.signal }),
           }),

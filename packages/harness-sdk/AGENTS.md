@@ -417,6 +417,37 @@ A call is tried again on a transport failure and on 408, 409, 425, 429, 500,
 body is read, so a second try never repeats text the caller has already seen.
 The older `/api/openrouter` prefix also works; the package does not use it.
 
+### The gateway wants the session id in a header
+
+Every call carries `x-kilo-session`, which is the session's own id. The gateway
+hashes it into the upstream provider's cache key — a `prompt_cache_key` on the
+OpenAI shapes, a `session_id` on OpenRouter's — and seeds the routing that keeps
+one conversation on one provider with it. A call that sends none gets neither:
+`applyTrackingIds` in `apps/web/src/lib/ai-gateway/providerHash.ts` skips both
+fields when the hash is empty. `x-kilocode-taskid` is the same field under the
+editor's name for it; the gateway documents `x-kilo-session` for everybody else.
+
+The package sent nothing until 2026-09-05, so every call in a session looked to
+the gateway like a call from a stranger.
+
+**It did not change what a provider cached, measured.** Two calls over an 11.2k
+prefix on `z-ai/glm-5.3-flash`, three times — no header, `x-kilo-session`,
+`x-kilocode-taskid` — read 6912 tokens from the cache and were billed 4322 as
+fresh input every time, on the same provider. The header is sent because the
+gateway asks for it and it is what carries the cache key upstream on the OpenAI
+shapes, not because it fixed a number here.
+
+### Why a hit ratio differs so much between providers
+
+`z-ai/glm-5.3-flash` reads 0.61 of its prompt from cache where Haiku reads 0.98
+of the same conversation. It is the upstream provider, not the package: friendli
+caches 6912 tokens of an 11.2k prefix — a whole number of 256-token blocks — and
+bills the remaining 4322 every call. Anthropic caches to the breakpoint.
+
+So a floor on the hit ratio is a floor on somebody else's implementation.
+`e2e/live.ts` asserts 0.5, which every provider in the list clears, and the
+number itself goes in the table for a reader to compare.
+
 ## The local end-to-end run
 
 `pnpm test:e2e:all` runs every live check in one sweep, cheapest first, and

@@ -5,7 +5,7 @@ import { fakeFetch, type Reply, sampleRequest, sse, toAsync } from './fake.js';
 import { testGateway } from './test-gateway.js';
 import type { FetchLike } from '../../core/fetch.js';
 import type { OrgContext } from './http.js';
-import { ModelClient, type ModelEvent, zeroUsage } from '../../core/model.js';
+import { ModelClient, type ModelEvent, type ModelRequest, zeroUsage } from '../../core/model.js';
 import { TokenError, type TokenSourceService } from '../../core/token.js';
 
 /** These are the transport's tests: one short answer, told the same way twice. */
@@ -41,10 +41,11 @@ const call = async (options: {
   readonly kinds?: readonly ApiKind[];
   readonly replies?: readonly Reply[];
   readonly token?: TokenSourceService;
+  readonly request?: ModelRequest;
 }) => {
   const { calls, fetch } = fakeFetch(options.replies ?? [reply]);
   const result = await ModelClient.pipe(
-    Effect.map(client => client.stream(sampleRequest())),
+    Effect.map(client => client.stream(options.request ?? sampleRequest())),
     Stream.unwrap,
     Stream.runCollect,
     Effect.map(collected => summary([...collected])),
@@ -70,7 +71,27 @@ it('posts to the messages endpoint with a bearer token', async () => {
   expect(calls[0]?.request.headers).toEqual({
     'content-type': 'application/json',
     authorization: 'Bearer tok',
+    'x-kilo-session': 'ses_1',
   });
+});
+
+/* The gateway hashes this header into the upstream provider's cache key and
+   into the seed that keeps one conversation on one provider. A call that sends
+   none gets neither, so the session id travels on every shape. */
+it('names the session on every shape, so the gateway can key the cache by it', async () => {
+  const sent = await Promise.all(
+    (['messages', 'responses', 'chat_completions'] as const).map(kind => call({ kinds: [kind] }))
+  );
+  for (const { calls } of sent) {
+    expect(calls[0]?.request.headers['x-kilo-session']).toBe('ses_1');
+  }
+});
+
+it('sends no session header for a request that names no session', async () => {
+  const { cacheKey, ...anonymous } = sampleRequest();
+  expect(cacheKey).toBe('ses_1');
+  const { calls } = await call({ request: anonymous });
+  expect(calls[0]?.request.headers['x-kilo-session']).toBeUndefined();
 });
 
 it('names the organization when the context is an organization', async () => {

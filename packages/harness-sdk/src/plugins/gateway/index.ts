@@ -40,7 +40,12 @@ const bodyFor = (gateway: Gateway, sent: Sent) =>
     catch: cause => new ModelError({ reason: 'unsupported', cause }),
   }).pipe(
     Effect.flatMap(body =>
-      post(gateway, { path: sent.wire.path, body, signal: sent.handle?.signal })
+      post(gateway, {
+        path: sent.wire.path,
+        body,
+        session: sent.request.cacheKey,
+        signal: sent.handle?.signal,
+      })
     )
   );
 

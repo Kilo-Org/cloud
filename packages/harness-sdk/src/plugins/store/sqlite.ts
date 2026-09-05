@@ -8,7 +8,7 @@ import {
   type StoredExchange,
 } from '../../core/storage.js';
 import type { Turn, TurnPart } from '../../core/turn.js';
-import { transact, type SqlDriver } from './driver.js';
+import { connectionOf, transact, type Connection, type SqlDriver } from './driver.js';
 import { migrate } from './migrate.js';
 import {
   assertParts,
@@ -78,8 +78,8 @@ const partRow = (turn: Turn, part: TurnPart) => ({
  * with every later request, and a count written apart from either would say the
  * session holds something it does not.
  */
-const insertExchange = (db: Db, driver: SqlDriver, exchange: StoredExchange): Promise<void> =>
-  transact(driver, async () => {
+const insertExchange = (connection: Connection, db: Db, exchange: StoredExchange): Promise<void> =>
+  transact(connection, async () => {
     const written = exchange.turns;
     if (written.length > 0) {
       await db
@@ -121,14 +121,16 @@ const selectTurns = async (db: Db, sessionId: string): Promise<readonly Turn[]> 
  * nothing to do: batching would trade a lost turn for a saving this package has
  * not measured a need for.
  */
-const storeOn = (driver: SqlDriver): SessionStoreService => {
-  const db = drizzle(driver);
+const storeOn = (connection: Connection): SessionStoreService => {
+  const db = drizzle(connection.driver);
 
   return {
     create: session =>
-      attempt('create', async () => {
-        await db.insert(sessions).values({ ...session, tools: toolsIn(session.tools) });
-      }),
+      attempt('create', () =>
+        connection.write(async () => {
+          await db.insert(sessions).values({ ...session, tools: toolsIn(session.tools) });
+        })
+      ),
 
     read: sessionId =>
       attempt('read', async () => {
@@ -136,7 +138,7 @@ const storeOn = (driver: SqlDriver): SessionStoreService => {
         return Option.map(Option.fromNullable(assertSessions(rows)[0]), asStoredSession);
       }),
 
-    append: exchange => attempt('append', () => insertExchange(db, driver, exchange)),
+    append: exchange => attempt('append', () => insertExchange(connection, db, exchange)),
 
     load: sessionId => attempt('load', () => selectTurns(db, sessionId)),
 
@@ -150,15 +152,18 @@ const storeOn = (driver: SqlDriver): SessionStoreService => {
  * layer is built, not on the first question somebody asks.
  */
 const layerSqliteStore = (driver: SqlDriver): Layer.Layer<SessionStore, StoreError> =>
-  Layer.effect(
-    SessionStore,
-    Effect.map(
-      attempt('create', async () => {
-        await driver('PRAGMA foreign_keys = ON', [], 'run');
-        await migrate(driver);
-      }),
-      () => storeOn(driver)
-    )
-  );
+  Layer.suspend(() => {
+    const connection = connectionOf(driver);
+    return Layer.effect(
+      SessionStore,
+      Effect.map(
+        attempt('create', async () => {
+          await driver('PRAGMA foreign_keys = ON', [], 'run');
+          await migrate(connection);
+        }),
+        () => storeOn(connection)
+      )
+    );
+  });
 
 export { layerSqliteStore };

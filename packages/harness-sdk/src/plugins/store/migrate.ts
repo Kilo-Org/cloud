@@ -1,5 +1,5 @@
 import { assert } from 'typia';
-import { transact, type SqlDriver } from './driver.js';
+import { transact, type Connection, type SqlDriver } from './driver.js';
 import { migrations } from './migrations.js';
 
 /**
@@ -47,12 +47,13 @@ const applyPending = async (driver: SqlDriver, applied: number): Promise<void> =
 };
 
 /** Migrates in one unit, so the version and the schema always agree. */
-const migrate = async (driver: SqlDriver): Promise<void> => {
+const migrate = async (connection: Connection): Promise<void> => {
+  const { driver } = connection;
   const applied = await versionOf(driver);
   if (applied >= migrations.length) {
     return;
   }
-  await transact(driver, () => applyPending(driver, applied));
+  await transact(connection, () => applyPending(driver, applied));
 };
 
 export { migrate };

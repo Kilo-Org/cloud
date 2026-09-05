@@ -74,7 +74,7 @@ vi.mock('./store', () => ({
   touchChat: () => undefined,
 }));
 
-const { releaseChat, say, startChat, stopChat } = await import('./registry');
+const { enterChat, releaseChat, say, startChat, stopChat } = await import('./registry');
 const { snapshotOf } = await import('./state');
 
 const place = { chatScope: 'me:personal', org: { kind: 'personal' } } as const;
@@ -154,5 +154,52 @@ describe('a second question while the first is being answered', () => {
     await settled();
 
     expect(asked.map(one => one.text)).toEqual(['first']);
+  });
+});
+
+describe('a chat that moved', () => {
+  it('leaves the chat it moved off pointing at the one it became', async () => {
+    await say(opened, 'first', 'kilo/one');
+    await settled();
+    await say(opened, 'second', 'kilo/two');
+    await settled();
+
+    finish?.();
+    await settled();
+
+    /* The queued question moved the conversation, and nobody handed the new
+       identifier back to the screen. The chat it left says where it went, so a
+       screen watching the old one follows without being told. */
+    expect(snapshotOf(opened).sessionId).toBe('s2');
+  });
+});
+
+describe('a question asked before the session has opened', () => {
+  it('waits for the open rather than vanishing', async () => {
+    await releaseChat(opened);
+    asked.length = 0;
+
+    /* No await: this is a person typing while the screen is still opening the
+       chat, which is exactly the window the question used to be dropped in. */
+    const entering = enterChat(place, 'later');
+    await say('later', 'typed early', 'kilo/one');
+    await entering;
+    await settled();
+
+    expect(asked).toEqual([{ sessionId: 'later', text: 'typed early' }]);
+  });
+
+  it('says so rather than reporting success when the chat is not there', async () => {
+    await releaseChat(opened);
+    asked.length = 0;
+
+    await say(opened, 'into nothing', 'kilo/one');
+    await settled();
+
+    expect(asked).toEqual([]);
+    /* The question is on screen with a Retry under it, which is what every
+       other question that never reached the model gets. */
+    expect(snapshotOf(opened)).toMatchObject({ status: 'idle', asked: 'into nothing' });
+    expect(snapshotOf(opened).failed).not.toBeNull();
   });
 });

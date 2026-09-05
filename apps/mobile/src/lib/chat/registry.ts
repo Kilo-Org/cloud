@@ -192,37 +192,43 @@ async function reopen(place: ChatPlace, sessionId: string): Promise<void> {
  *
  * A model that is not the one the session was opened on moves the conversation
  * first, because a session freezes its model. The identifier changes when it
- * does, which is why this answers with the one to carry on with.
+ * does, and the state of the chat it moved off says where it went, so whoever
+ * is watching follows without being told.
  */
-export async function say(sessionId: string, text: string, model: string): Promise<string> {
-  const held = chats.get(sessionId);
-  if (held?.answering !== undefined) {
-    /* A session answers one question at a time, and the composer stays open
-       while it works. So a second question joins the line rather than racing
-       the first, and it is on screen while it waits. It is held in memory
-       only: an answer that is still arriving is not written down either. */
-    held.waiting.push({ text, model });
-    change(sessionId, { waiting: held.waiting.map(one => one.text) });
-    return sessionId;
-  }
+export async function say(sessionId: string, text: string, model: string): Promise<void> {
+  /* Where the failure below belongs. It is the chat the move landed on, not
+     the one it started from, or the report goes to a chat nobody is watching. */
+  let current = sessionId;
   try {
-    const moved = await ontoModel(sessionId, model);
-    const chat = chats.get(moved);
+    /* A person can type before the session has finished opening, and a
+       question asked of a chat that is not there yet used to vanish with the
+       composer reporting success. It waits for the open instead. */
+    await opening.get(sessionId);
+    const held = chats.get(sessionId);
+    if (held?.answering !== undefined) {
+      /* A session answers one question at a time, and the composer stays open
+         while it works. So a second question joins the line rather than racing
+         the first, and it is on screen while it waits. It is held in memory
+         only: an answer that is still arriving is not written down either. */
+      held.waiting.push({ text, model });
+      change(sessionId, { waiting: held.waiting.map(one => one.text) });
+      return;
+    }
+    current = await ontoModel(sessionId, model);
+    const chat = chats.get(current);
     if (chat === undefined) {
-      return moved;
+      throw new Error('the chat is not open');
     }
     const runtime = await runtimeFor(chat);
-    await rememberAsked(moved, text);
-    touchChat(await open(), moved, Date.now());
-    change(moved, { status: 'working', answering: '', asked: text, failed: null });
-    chat.answering = runtime.runFork(reading(moved, text, runtime));
-    return moved;
+    await rememberAsked(current, text);
+    touchChat(await open(), current, Date.now());
+    change(current, { status: 'working', answering: '', asked: text, failed: null });
+    chat.answering = runtime.runFork(reading(current, text, runtime));
   } catch (error) {
-    /* The move, or the write that remembers the question, failed. The question
-       is not lost: it stays on screen with a Retry under it, the same as one
-       whose answer never arrived. */
-    change(sessionId, { status: 'idle', answering: '', asked: text, failed: reason(error) });
-    return sessionId;
+    /* The open, the move, or the write that remembers the question failed. The
+       question is not lost: it stays on screen with a Retry under it, the same
+       as one whose answer never arrived. */
+    change(current, { status: 'idle', answering: '', asked: text, failed: reason(error) });
   }
 }
 
@@ -231,13 +237,11 @@ const reason = (error: unknown): string =>
   error instanceof Error ? error.message : 'the question could not be sent';
 
 /** Asks again what was asked and never answered. */
-export async function retryChat(sessionId: string): Promise<string> {
+export async function retryChat(sessionId: string): Promise<void> {
   const { asked, model } = snapshotOf(sessionId);
-  if (asked === null) {
-    return sessionId;
+  if (asked !== null) {
+    await say(sessionId, asked, model);
   }
-  const moved = await say(sessionId, asked, model);
-  return moved;
 }
 
 /** Reads one answer to the end, however it ends. */
@@ -363,9 +367,13 @@ async function ontoModel(sessionId: string, model: string): Promise<string> {
   await moveAsked(sessionId, handle.id);
   const turns = await runtime.runPromise(handle.history);
   chats.delete(sessionId);
-  forgetState(sessionId);
   chats.set(handle.id, { ...chat, handle, scope, answering: undefined });
   change(handle.id, { ...held, sessionId: handle.id, model, turns });
+  /* The chat it moved off is left pointing at the one it became, rather than
+     forgotten. Whoever asked for the move is not always the screen — a question
+     queued on another model moves the chat from inside the registry — so the
+     state is what says where the conversation went. */
+  change(sessionId, { sessionId: handle.id });
   await runtime.runPromise(Scope.close(chat.scope, Exit.void));
   forgetSession(database, sessionId);
   return handle.id;

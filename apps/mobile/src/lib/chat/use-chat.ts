@@ -125,16 +125,26 @@ export function useChat(place: ChatPlace | null, opened: string): OpenChat {
     useCallback(() => snapshotOf(sessionId), [sessionId])
   );
 
+  // Switching models clones the conversation onto a new session, and the screen
+  // has to follow it. It is not always this screen that asks: a question typed
+  // on another model while an answer was arriving moves the chat when it is
+  // finally asked. The state says where it went, so the screen reads that
+  // rather than every mover having to hand the identifier back.
+  const moved = state.sessionId;
+  useEffect(() => {
+    setSessionId(moved);
+  }, [moved]);
+
   return {
     state,
     send: async (text, model) => {
-      setSessionId(await say(sessionId, text, model));
+      await say(sessionId, text, model);
     },
     stop: async () => {
       await stopChat(sessionId);
     },
     retry: async () => {
-      setSessionId(await retryChat(sessionId));
+      await retryChat(sessionId);
     },
   };
 }

@@ -212,6 +212,88 @@ describe('github-integration-helpers', () => {
       ]);
     });
 
+    it('deduplicates a repository reachable through multiple installations, preferring the owning account', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_installation_id: 'installation-1',
+          platform_account_login: 'alice',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme/api', private: true },
+            { id: 2, name: 'docs', full_name: 'acme/docs', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme/api', private: true },
+            { id: 3, name: 'scanner', full_name: 'acme/scanner', private: true },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme/api',
+          platformIntegrationId: 'integration-2',
+          platformAccountLogin: 'acme',
+        }),
+        expect.objectContaining({
+          fullName: 'acme/docs',
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: 'alice',
+        }),
+        expect.objectContaining({
+          fullName: 'acme/scanner',
+          platformIntegrationId: 'integration-2',
+          platformAccountLogin: 'acme',
+        }),
+      ]);
+    });
+
+    it('deduplicates repositories when one account has multiple active installations', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-newest',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme/api', private: true },
+            { id: 2, name: 'docs', full_name: 'acme/docs', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-stale',
+          platform_installation_id: 'installation-1',
+          platform_account_login: 'acme',
+          repositories: [{ id: 1, name: 'api', full_name: 'acme/api', private: true }],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme/api',
+          platformIntegrationId: 'integration-newest',
+          platformAccountLogin: 'acme',
+        }),
+        expect.objectContaining({
+          fullName: 'acme/docs',
+          platformIntegrationId: 'integration-newest',
+          platformAccountLogin: 'acme',
+        }),
+      ]);
+    });
+
     it('returns repositories from healthy installations when a sibling fetch fails', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({

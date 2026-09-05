@@ -197,6 +197,40 @@ export async function fetchAllGitHubRepositoriesForOrganization(
   return fetchRepositoriesForIntegrations(integrations, forceRefresh);
 }
 
+const repositoryOwner = (fullName: string) => {
+  const slash = fullName.indexOf('/');
+  return slash === -1 ? fullName : fullName.slice(0, slash);
+};
+
+/**
+ * Keeps a single entry per repository when the same repo is reachable through
+ * more than one GitHub installation (for example the app is installed on two
+ * accounts that share a repo, or a reinstall left two active installation rows
+ * for the same account). Prefer the installation whose GitHub account owns the
+ * repository so sessions use the canonical write identity; otherwise keep the
+ * first entry, which is the newest installation (created_at desc).
+ */
+function dedupeGitHubRepositories(
+  repositories: GitHubRepositoriesResult['repositories']
+): GitHubRepositoriesResult['repositories'] {
+  const byFullName = new Map<string, GitHubRepositoriesResult['repositories'][number]>();
+  for (const repo of repositories) {
+    const key = repo.fullName.toLowerCase();
+    const existing = byFullName.get(key);
+    if (!existing) {
+      byFullName.set(key, repo);
+      continue;
+    }
+    const owner = repositoryOwner(existing.fullName).toLowerCase();
+    const existingIsOwner = (existing.platformAccountLogin ?? '').toLowerCase() === owner;
+    const candidateIsOwner = (repo.platformAccountLogin ?? '').toLowerCase() === owner;
+    if (candidateIsOwner && !existingIsOwner) {
+      byFullName.set(key, repo);
+    }
+  }
+  return [...byFullName.values()];
+}
+
 async function fetchRepositoriesForIntegrations(
   integrations: Awaited<ReturnType<typeof getIntegrationsByOrganization>>,
   forceRefresh: boolean
@@ -235,7 +269,7 @@ async function fetchRepositoriesForIntegrations(
     }
     return {
       integrationInstalled: true,
-      repositories: results.flatMap(result => result.repositories),
+      repositories: dedupeGitHubRepositories(results.flatMap(result => result.repositories)),
       syncedAt: results
         .map(result => result.syncedAt)
         .filter((value): value is string => value !== null)

@@ -1106,8 +1106,32 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
    * @param appType - 'standard' (read/write) or 'lite' (read-only)
    * @returns The installation access token
    */
-  async getToken(installationId: string, appType: GitHubAppType = 'standard'): Promise<string> {
+  async getToken(
+    installationId: string,
+    appType: GitHubAppType = 'standard',
+    expectedIntegrationId?: string,
+    allowAuthenticationRecovery = false
+  ): Promise<string> {
+    await this.installationLookupService.assertActiveAssociationForInstallation(
+      installationId,
+      appType,
+      expectedIntegrationId,
+      allowAuthenticationRecovery
+    );
     return this.githubService.getToken(installationId, appType);
+  }
+
+  async getTokenForIntegration(
+    integrationId: string
+  ): Promise<{ success: true; token: string } | { success: false; reason: 'unavailable' }> {
+    const association =
+      await this.installationLookupService.findActiveAssociationById(integrationId);
+    if (!association.success) return { success: false, reason: 'unavailable' };
+    const token = await this.githubService.getToken(
+      association.installationId,
+      association.githubAppType
+    );
+    return { success: true, token };
   }
 
   /**

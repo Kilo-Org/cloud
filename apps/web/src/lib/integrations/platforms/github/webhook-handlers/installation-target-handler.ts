@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { updateIntegrationAccountIdentity } from '@/lib/integrations/db/platform-integrations';
+import { updateGitHubInstallationAccountIdentity } from '@/lib/integrations/db/github-installations';
 import type { GitHubAppType } from '../app-selector';
 import { fetchGitHubInstallationDetails } from '@/lib/integrations/platforms/github/adapter';
 import type { InstallationTargetRenamedPayload } from '../webhook-schemas';
@@ -17,11 +17,11 @@ export async function handleInstallationTargetRenamed(
     throw new Error('GitHub installation account identity missing after rename event');
   }
 
-  await updateIntegrationAccountIdentity(
+  await updateGitHubInstallationAccountIdentity({
     integrationId,
-    details.account.id.toString(),
-    details.account.login
-  );
+    accountId: details.account.id.toString(),
+    accountLogin: details.account.login,
+  });
 
   logExceptInTest('GitHub App installation target renamed:', {
     installation_id: installationId,

@@ -9,6 +9,7 @@ import {
 import type { BotPlatform } from '@/lib/bot/platforms/types';
 import { APP_URL } from '@/lib/constants';
 import { generateGitHubInstallationToken } from '@/lib/integrations/platforms/github/adapter';
+import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import type { GitHubAdapter, GitHubRawMessage } from '@chat-adapter/github';
 import { Octokit } from '@octokit/rest';
@@ -310,6 +311,10 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
       );
     },
     async promptLinkAccount({ thread, identity, platformIntegration }) {
+      await assertGitHubInstallationRuntimeAuthorized(
+        identity.teamId,
+        platformIntegration.github_app_type ?? 'standard'
+      );
       const url = new URL(GITHUB_LINK_PATH, APP_URL);
       url.searchParams.set(
         'token',
@@ -326,7 +331,13 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
           'After linking, mention me again in this issue or pull request.',
       });
     },
-    async withAuthContext({ fn }) {
+    async withAuthContext({ platformIntegration, fn }) {
+      const installationId = platformIntegration.platform_installation_id;
+      if (!installationId) throw new Error('GitHub installation is unavailable for runtime use');
+      await assertGitHubInstallationRuntimeAuthorized(
+        installationId,
+        platformIntegration.github_app_type ?? 'standard'
+      );
       return await fn();
     },
     async getConversationContext({ thread, triggerMessage, platformIntegration }) {
@@ -423,10 +434,20 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
     async getRequesterInfo({ displayName }) {
       return { displayName, platform: PLATFORM.GITHUB };
     },
-    async startProcessingIndicator({ thread, messageId }) {
+    async startProcessingIndicator({ thread, messageId, platformIntegration }) {
+      const installationId = platformIntegration.platform_installation_id;
+      if (!installationId) throw new Error('GitHub installation is unavailable for runtime use');
+      await assertGitHubInstallationRuntimeAuthorized(
+        installationId,
+        platformIntegration.github_app_type ?? 'standard'
+      );
       await reactToTriggerMessage(thread, messageId, 'eyes');
       return async outcome => {
         if (outcome?.handedOff) return;
+        await assertGitHubInstallationRuntimeAuthorized(
+          installationId,
+          platformIntegration.github_app_type ?? 'standard'
+        );
         await reactToTriggerMessage(thread, messageId, 'thumbs_up');
       };
     },

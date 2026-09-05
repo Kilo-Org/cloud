@@ -42,6 +42,23 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';
 import { revokeStoredGitHubUserAuthorization } from './user-authorization';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
+import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
+
+async function isAvailableForDeferredGitHubDispatch(integration: {
+  platform_installation_id: string | null;
+  github_app_type: GitHubAppType | null;
+}): Promise<boolean> {
+  if (!integration.platform_installation_id) return false;
+  try {
+    await assertGitHubInstallationRuntimeAuthorized(
+      integration.platform_installation_id,
+      integration.github_app_type ?? 'standard'
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Shared GitHub App Webhook Handler
@@ -467,9 +484,9 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
     }
 
-    if (integration.suspended_at) {
-      logExceptInTest(`Integration suspended, skipping event${logSuffix}`);
-      return NextResponse.json({ message: 'Integration suspended' }, { status: 200 });
+    if (!(await isAvailableForDeferredGitHubDispatch(integration))) {
+      logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+      return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
     }
 
     const primaryIntegration = integration.owned_by_organization_id
@@ -499,6 +516,7 @@ export async function handleGitHubWebhook(
       if (!parseResult.data.deleted) {
         // Process async
         after(async () => {
+          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await handlePushEvent(parseResult.data, integration);
         });
       }
@@ -554,6 +572,7 @@ export async function handleGitHubWebhook(
       if (action === GITHUB_ACTION.CLOSED) {
         if (upsertOwner) {
           after(async () => {
+            if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
             await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
             if (logResult.webhookEventId) {
               try {
@@ -574,6 +593,7 @@ export async function handleGitHubWebhook(
 
       if (upsertOwner) {
         after(async () => {
+          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
         });
       }
@@ -627,6 +647,7 @@ export async function handleGitHubWebhook(
       if (upsertOwner) {
         after(async () => {
           try {
+            if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
             await upsertCliSessionPullRequestReviewFromWebhook(parseResult.data, upsertOwner);
             if (logResult.webhookEventId) {
               await updateWebhookEvent(logResult.webhookEventId, {
@@ -702,6 +723,7 @@ export async function handleGitHubWebhook(
       after(async () => {
         const handlersTriggered = ['pr_review_comment_fix'];
         try {
+          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await handlePRReviewComment(parseResult.data, integration);
           try {
             const reviewMemoryResult = await handleGitHubReviewCommentReply({

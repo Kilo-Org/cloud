@@ -23,10 +23,11 @@ import {
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
-import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
+import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import type { StateAdapter } from 'chat';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
+import { assertUserAdministersInstallation } from '@/lib/integrations/platforms/github/app-selector';
 
 const mockState = { kind: 'state' } as unknown as StateAdapter;
 
@@ -62,6 +63,17 @@ jest.mock('@/lib/integrations/platforms/github/app-selector', () => ({
   })),
   assertUserAdministersInstallation: jest.fn(async () => true),
 }));
+jest.mock('@/lib/integrations/github/installation-authorization', () => ({
+  verifyGitHubInstallationAuthorization: jest.fn(async () => ({
+    identity: { id: GITHUB_USER_ID, login: 'octocat' },
+    candidate: {
+      installationId: INSTALLATION_ID,
+      accountId: '1',
+      accountLogin: 'octocat',
+      accountType: 'Organization',
+    },
+  })),
+}));
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
@@ -93,10 +105,13 @@ const mockedOctokit = jest.mocked(Octokit);
 const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegrationForOwner);
 const mockedIsOrganizationMember = jest.mocked(isOrganizationMember);
 const mockedConsumeInstallState = jest.mocked(consumeInstallState);
-const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
+const mockedVerifyGitHubInstallationAuthorization = jest.mocked(
+  verifyGitHubInstallationAuthorization
+);
 const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
+const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
 
 function mockConsumedInstallState(state: GitHubInstallState) {
   mockedConsumeInstallState.mockResolvedValue({ status: 'success', state });
@@ -116,6 +131,15 @@ beforeEach(() => {
     id: GITHUB_USER_ID,
     login: 'octocat',
     accessToken: 'ghu_test-token',
+  });
+  mockedVerifyGitHubInstallationAuthorization.mockResolvedValue({
+    identity: { id: GITHUB_USER_ID, login: 'octocat' },
+    candidate: {
+      installationId: INSTALLATION_ID,
+      accountId: '1',
+      accountLogin: 'octocat',
+      accountType: 'Organization',
+    },
   });
   mockedAssertUserAdministersInstallation.mockResolvedValue(true);
 });
@@ -453,7 +477,7 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedCreateAppAuth).not.toHaveBeenCalled();
     expect(mockedOctokit).not.toHaveBeenCalled();
-    expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+    expect(mockedVerifyGitHubInstallationAuthorization).not.toHaveBeenCalled();
     expect(mockedVerifyGitHubBotLinkState).not.toHaveBeenCalled();
     const { createPendingIntegration } =
       await import('@/lib/integrations/db/platform-integrations');
@@ -1068,7 +1092,15 @@ describe('GET /api/integrations/github/callback admin proof', () => {
         }) as never
     );
     mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
-    mockedAssertUserAdministersInstallation.mockResolvedValue(true);
+    mockedVerifyGitHubInstallationAuthorization.mockResolvedValue({
+      identity: { id: GITHUB_USER_ID, login: 'octocat' },
+      candidate: {
+        installationId: INSTALLATION_ID,
+        accountId: '1',
+        accountLogin: 'octocat',
+        accountType: 'Organization',
+      },
+    });
     mockedExchangeGitHubOAuthCode.mockResolvedValue({
       id: GITHUB_USER_ID,
       login: 'octocat',
@@ -1088,7 +1120,7 @@ describe('GET /api/integrations/github/callback admin proof', () => {
     expectRedirectLocation(response, `/integrations/github?error=not_installation_admin`);
     expect(mockedUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
-    expect(mockedAssertUserAdministersInstallation).not.toHaveBeenCalled();
+    expect(mockedVerifyGitHubInstallationAuthorization).not.toHaveBeenCalled();
     expect(mockedCreateAppAuth).not.toHaveBeenCalled();
   });
 

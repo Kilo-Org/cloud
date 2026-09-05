@@ -130,7 +130,7 @@ describe('uninstallGitHubOrganizationInstallation', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 
-  test('deletes only selected user association and preserves sibling and audit attribution', async () => {
+  test('tombstones the selected user association and preserves sibling and audit attribution', async () => {
     const actor = await insertTestUser({ is_admin: true });
     const owner = await insertTestUser({ id: 'oauth/github|owner' });
     const row = await integration({ userId: owner.id });
@@ -145,7 +145,7 @@ describe('uninstallGitHubOrganizationInstallation', () => {
       await db.query.platform_integrations.findFirst({
         where: eq(platform_integrations.id, row.id),
       })
-    ).toBeUndefined();
+    ).toMatchObject({ integration_status: 'suspended', suspended_by: 'github_deleted' });
     expect(
       await db.query.platform_integrations.findFirst({
         where: eq(platform_integrations.id, sibling.id),
@@ -415,6 +415,6 @@ describe('uninstallGitHubOrganizationInstallation', () => {
       await db.query.platform_integrations.findFirst({
         where: eq(platform_integrations.id, row.id),
       })
-    ).toBeUndefined();
+    ).toMatchObject({ integration_status: 'suspended', suspended_by: 'github_deleted' });
   });
 });

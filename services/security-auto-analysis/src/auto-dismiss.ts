@@ -15,7 +15,7 @@ import {
   insertSecurityFindingAuditEvent,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { getSecurityAgentConfigForOwner, type SecurityFindingRecord } from './db/queries.js';
 import { logger } from './logger.js';
 import type { QueueOwner, SecurityFindingAnalysis } from './types.js';
@@ -71,17 +71,37 @@ async function writeBackDependabotDismissal(params: {
     repoFullName: params.finding.repo_full_name,
   });
   if (!target) return;
+  const owner = findingOwner(params.finding);
+  if (!owner) return;
 
   const rows = await params.db
-    .select({ installationId: platform_integrations.platform_installation_id })
+    .select({
+      installationId: platform_integrations.platform_installation_id,
+      githubAppType: platform_integrations.github_app_type,
+    })
     .from(platform_integrations)
-    .where(eq(platform_integrations.id, params.finding.platform_integration_id))
+    .where(
+      and(
+        eq(platform_integrations.id, params.finding.platform_integration_id),
+        eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.integration_type, 'app'),
+        eq(platform_integrations.integration_status, 'active'),
+        isNull(platform_integrations.github_disconnected_at),
+        owner.type === 'org'
+          ? eq(platform_integrations.owned_by_organization_id, owner.id)
+          : eq(platform_integrations.owned_by_user_id, owner.id)
+      )
+    )
     .limit(1);
   const installationId = rows[0]?.installationId;
   if (!installationId) return;
 
   try {
-    const token = await params.env.GIT_TOKEN_SERVICE.getToken(installationId);
+    const token = await params.env.GIT_TOKEN_SERVICE.getToken(
+      installationId,
+      rows[0]?.githubAppType ?? 'standard',
+      params.finding.platform_integration_id
+    );
     const response = await fetch(
       `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
       {

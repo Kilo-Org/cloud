@@ -3,6 +3,11 @@ import { db } from '@/lib/drizzle';
 import { eq, and, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+
+function isAvailableForBot(integration: PlatformIntegration): boolean {
+  return integration.platform !== 'github' || isPlatformIntegrationHealthy(integration);
+}
 
 /**
  * Look up the platform integration row for a given identity.
@@ -20,7 +25,7 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
     )
     .limit(1);
 
-  return integration ?? null;
+  return integration && isAvailableForBot(integration) ? integration : null;
 }
 
 export async function canKiloUserAccessPlatformIntegration(
@@ -49,6 +54,10 @@ export async function getPlatformIntegrationById(platformIntegrationId: string) 
     throw new Error(`Could not find platform integration ${platformIntegrationId}`);
   }
 
+  if (!isAvailableForBot(integration)) {
+    throw new Error(`Platform integration ${platformIntegrationId} is unavailable`);
+  }
+
   return integration;
 }
 
@@ -69,5 +78,5 @@ export async function getPlatformIntegrationByBotUserId(
     )
     .limit(1);
 
-  return integration ?? null;
+  return integration && isAvailableForBot(integration) ? integration : null;
 }

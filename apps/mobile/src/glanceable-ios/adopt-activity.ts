@@ -1,5 +1,10 @@
 import * as SecureStore from 'expo-secure-store';
 
+// The adoption hands an update token straight to the delivery, and it runs from
+// the root layout's import. The route group that would otherwise install the
+// delivery is evaluated later, so without this side-effect import the token
+// would reach the no-op delivery and the card would stay orphaned.
+import '@/lib/glanceable/delivery-registration';
 import { getLastGlanceableSnapshot, restorePersistedGlanceable } from '@/lib/glanceable/persist';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 

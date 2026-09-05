@@ -146,6 +146,7 @@ function deps(
             release: () => {},
           }),
           detach: () => true,
+          retireForRecovery: async () => 'retired',
           deleteDirectory: async () => {},
           getRetained: directory => (directory === runtime.directory ? runtime : undefined),
           retireRuntime: async (directory, _deadlineAt, target) =>
@@ -254,6 +255,9 @@ function fakeTerminalRuntime(
     rememberAttachedSession: () => {},
     detachSession: async () => {},
     detachDirectory: async () => {},
+    hasActivePty: () => false,
+    beginRecoveryRetirement: () => {},
+    endRecoveryRetirement: () => {},
     create: async () => ({ pty }),
     resize: async () => ({ pty }),
     close: async () => ({ success: true }),
@@ -823,6 +827,7 @@ describe('handleControlRequest', () => {
           throw new Error('Unexpected startup');
         },
         detach: () => true,
+        retireForRecovery: async () => 'retired',
         deleteDirectory: async () => {},
         getRetained: directory => runtimes.get(directory),
         retireRuntime: async (directory, _deadlineAt, target) => {
@@ -1647,6 +1652,7 @@ describe('production worktree deletion routes', () => {
             calls.push('detach');
             return true;
           },
+          retireForRecovery: async () => 'retired',
           deleteDirectory: async dir => {
             calls.push(`delete:${dir}`);
           },
@@ -2051,6 +2057,7 @@ describe('production worktree deletion routes', () => {
             forbidden.push('detach');
             return false;
           },
+          retireForRecovery: async () => 'retired',
           deleteDirectory: async dir => {
             retirements.push(dir);
           },

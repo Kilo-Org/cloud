@@ -195,10 +195,16 @@ async function handleTerminalWebSocket(request: Request, env: Env): Promise<Resp
 
   if (sessionPlaneFromId(cloudAgentSessionId) === 'control') {
     const stub = getSandboxSessionStub(env, userId, cloudAgentSessionId);
+    if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+      return new Response('Runtime authorization recovery is in progress', { status: 503 });
+    }
     return stub.fetch(createTerminalForwardRequest(request, '/terminal/browser', ptyId));
   }
 
   const stub = resolveSessionStub(env, userId, cloudAgentSessionId);
+  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+    return new Response('Runtime authorization recovery is in progress', { status: 503 });
+  }
   const metadata = await stub.getMetadata();
   const terminal = await resolveTerminalWrapperClient({
     env,
@@ -333,6 +339,9 @@ app.get('/sandbox-terminal/:ownerId/:sessionId/:ptyId', async (c: Context<HonoCo
   }
 
   const stub = getSandboxSessionStub(c.env, ownerId, sessionId);
+  if (await stub.isRuntimeAuthorizationRecoveryInProgress()) {
+    return c.text('Runtime authorization recovery in progress', 503);
+  }
   return stub.fetch(
     createTerminalForwardRequest(c.req.raw, '/terminal/wrapper', ptyId, authorization)
   );

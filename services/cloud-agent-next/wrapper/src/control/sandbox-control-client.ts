@@ -524,7 +524,7 @@ export function createSandboxControlClient(
             },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),
-            capabilities: { runtimeIsolation: true },
+            capabilities: { runtimeIsolation: true, runtimeRecovery: true },
           },
         };
         try {

@@ -108,9 +108,13 @@ import { nextMetadataAfterAdmittedAgentModel } from './persist-admitted-agent-mo
 import { dispatchedKilocodeModelId } from './model-utils.js';
 import {
   getRuntimeAuthorizationStatus,
+  getRuntimeAuthorizationRecoveryState,
   renewStoredRuntimeAuthorization,
+  RUNTIME_AUTHORIZATION_RECOVERY_KEY,
   RUNTIME_AUTHORIZATION_KEY,
+  runtimeAuthorizationRecoveryLockSchema,
 } from '../session/runtime-authorization-persistence.js';
+import { RUNTIME_PROXY_GRANT_KEY } from '../runtime-credential-proxy.js';
 import { getEffectiveCredentialContainment } from './session-metadata.js';
 import {
   issuePersistedRuntimeProxyGrant,
@@ -151,6 +155,7 @@ import {
 import {
   createQueuedSessionMessageState,
   getSessionMessageState,
+  hasNonTerminalSessionMessage,
   listNonTerminalAcceptedMessages,
   markAgentActivityObserved,
   markMessageAccepted,
@@ -1712,6 +1717,168 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
+  async getRuntimeAuthorizationRecoveryState(): Promise<{
+    state: 'legacy' | 'revoked' | 'active' | 'expired';
+    id?: string;
+    recoveryId?: string;
+  }> {
+    const state = await getRuntimeAuthorizationRecoveryState({
+      metadata: await this.getMetadata(),
+      getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
+    });
+    const lock = runtimeAuthorizationRecoveryLockSchema.safeParse(
+      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+    );
+    return state.state === 'expired' && lock.success && lock.data.expectedOldId === state.id
+      ? { ...state, recoveryId: lock.data.recoveryId }
+      : state;
+  }
+
+  async isRuntimeAuthorizationRecoveryInProgress(): Promise<boolean> {
+    return (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) !== undefined;
+  }
+
+  async recoverExpiredRuntimeAuthorization(input: {
+    ownerId: string;
+    expectedOldId: string;
+    recoveryId: string;
+    runtimeAuthorizationSeal: string;
+    runtimeToken: string;
+  }): Promise<{ status: 'recovered' | 'not-needed' | 'denied' | 'busy' | 'retry' }> {
+    const metadata = await this.getMetadata();
+    if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
+    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
+    if (!secret) return { status: 'denied' };
+    let fresh: RuntimeAuthorization;
+    try {
+      fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
+        resourceKind: 'cloud-agent-next',
+        resourceId: metadata.identity.sessionId,
+        userId: metadata.identity.userId,
+        organizationId: metadata.identity.orgId,
+      });
+    } catch {
+      return { status: 'denied' };
+    }
+    if (fresh.state !== 'active') return { status: 'denied' };
+    const state = await this.getRuntimeAuthorizationRecoveryState();
+    if (state.state === 'legacy' || state.state === 'active') return { status: 'not-needed' };
+    if (state.state !== 'expired' || state.id !== input.expectedOldId) return { status: 'denied' };
+    const [active, pending] = await Promise.all([
+      hasNonTerminalSessionMessage(this.ctx.storage),
+      countPendingSessionMessages(this.ctx.storage),
+    ]);
+    if (
+      active ||
+      pending > 0 ||
+      isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage))
+    ) {
+      return { status: 'busy' };
+    }
+    const acquired = await this.ctx.storage.transaction(async transaction => {
+      if (
+        (await countPendingSessionMessages(transaction)) > 0 ||
+        (await hasNonTerminalSessionMessage(transaction))
+      ) {
+        return false;
+      }
+      const existingLock = runtimeAuthorizationRecoveryLockSchema.safeParse(
+        await transaction.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+      );
+      if (
+        existingLock.success &&
+        (existingLock.data.recoveryId !== input.recoveryId ||
+          existingLock.data.expectedOldId !== input.expectedOldId)
+      ) {
+        return false;
+      }
+      await transaction.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
+        expectedOldId: input.expectedOldId,
+        recoveryId: input.recoveryId,
+      });
+      return true;
+    });
+    if (!acquired) {
+      return { status: 'retry' };
+    }
+    try {
+      const observation = this.physicalWrapperObserver
+        ? await this.physicalWrapperObserver()
+        : this.orchestrator
+          ? { status: 'absent' as const }
+          : await createAgentSandbox(
+              this.env,
+              metadata,
+              this.getAgentSandboxRuntimeContext()
+            ).observeWrappersWithoutWaking();
+      if (observation.status === 'inspection-failed') return { status: 'retry' };
+      if (observation.status === 'present') {
+        const terminal = await this.getTerminalClient();
+        if (!terminal.success || !terminal.data) return { status: 'retry' };
+        if ((await terminal.data.client.listTerminals()).length > 0) return { status: 'busy' };
+        const supervisor = this.getWrapperSupervisor();
+        await supervisor.requestPhysicalWrapperStop('idle-timeout', { kind: 'session' });
+        await supervisor.runMaintenance(Date.now());
+        const stopped = this.physicalWrapperObserver
+          ? await this.physicalWrapperObserver()
+          : this.orchestrator
+            ? { status: 'absent' as const }
+            : await createAgentSandbox(
+                this.env,
+                metadata,
+                this.getAgentSandboxRuntimeContext()
+              ).observeWrappersWithoutWaking();
+        if (stopped.status !== 'absent') return { status: 'retry' };
+      }
+      const latest = await this.getRuntimeAuthorizationRecoveryState();
+      if (latest.state !== 'expired' || latest.id !== input.expectedOldId) {
+        return latest.state === 'active' || latest.state === 'legacy'
+          ? { status: 'not-needed' }
+          : { status: 'denied' };
+      }
+      await this.ctx.storage.transaction(async transaction => {
+        const current = RuntimeAuthorizationSchema.safeParse(
+          await transaction.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        if (
+          !current.success ||
+          current.data.id !== input.expectedOldId ||
+          current.data.state !== 'active' ||
+          Date.parse(current.data.delegationExpiresAt) > Date.now()
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        const currentMetadata = await transaction.get<unknown>('metadata');
+        const latestMetadata = currentMetadata ? parseSessionMetadata(currentMetadata) : null;
+        if (
+          !latestMetadata ||
+          latestMetadata.identity.sessionId !== metadata.identity.sessionId ||
+          latestMetadata.identity.userId !== metadata.identity.userId ||
+          latestMetadata.identity.orgId !== metadata.identity.orgId
+        ) {
+          throw new Error('runtime_authorization_recovery_cas_failed');
+        }
+        await transaction.put(RUNTIME_AUTHORIZATION_KEY, fresh);
+        await transaction.put(
+          'metadata',
+          serializeSessionMetadata({
+            ...latestMetadata,
+            auth: { ...latestMetadata.auth, kilocodeToken: input.runtimeToken },
+          })
+        );
+        await transaction.delete(RUNTIME_PROXY_GRANT_KEY);
+        await transaction.delete(RUNTIME_AUTHORIZATION_RECOVERY_KEY);
+      });
+      await clearWrapperRuntimeIdentity(this.ctx.storage, {}, { incrementGeneration: true });
+      return { status: 'recovered' };
+    } catch (error) {
+      if (error instanceof Error && error.message === 'runtime_authorization_recovery_cas_failed') {
+        return { status: 'retry' };
+      }
+      return { status: 'retry' };
+    }
+  }
+
   private async runtimeProxyFence(): Promise<RuntimeProxyFence | null> {
     const [metadata, runtime, lease] = await Promise.all([
       this.getMetadata(),
@@ -2320,6 +2487,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   }
 
   async createTerminal(input: TerminalCreateInput): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     const terminal = await this.getTerminalClient();
     if (!terminal.success || !terminal.data) {
       return { success: false, error: terminal.error };
@@ -2349,6 +2519,9 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     cols: number;
     rows: number;
   }): Promise<OperationResult<{ pty: WrapperPty }>> {
+    if (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return { success: false, error: 'Runtime authorization recovery is in progress' };
+    }
     const terminal = await this.getTerminalClient();
     if (!terminal.success || !terminal.data) {
       return { success: false, error: terminal.error };
@@ -3845,6 +4018,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async admitSubmittedMessage(
     request: SubmittedSessionMessageRequest
   ): Promise<SessionMessageAdmissionResult> {
+    if (await this.ctx.storage.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return {
+        success: false,
+        code: 'COMPUTE_STOPPING',
+        error: 'Runtime authorization recovery is in progress',
+      };
+    }
     const deletionPending = await this.deletionPendingAdmissionFailure();
     if (deletionPending) return deletionPending;
     const result = await this.getSessionMessageQueue().admitSubmittedMessage(request);

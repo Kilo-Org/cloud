@@ -571,6 +571,8 @@ async function handleSessionControlRequest(
       return handleAttach(session, payload, deps, authorization);
     case 'session.detach':
       return handleDetach(session, payload, deps);
+    case 'session.runtime.retire':
+      return handleRuntimeRetire(session, payload, deps);
     case 'session.prompt':
       return handlePrompt(session, payload, deps, authorization);
     case 'session.abort':
@@ -733,6 +735,48 @@ async function handleDetach(
     return ok({ detached: true });
   } catch (error) {
     return terminalFailure(error);
+  }
+}
+
+async function handleRuntimeRetire(
+  session: SessionRequestIdentity,
+  payload: unknown,
+  deps: HandlerDeps
+): Promise<ControlHandlerResult> {
+  const parsed = sessionRuntimeRetirePayloadSchema.safeParse(payload);
+  if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  const runtimes = deps.kiloRuntimes;
+  if (!runtimes) return missingKilo();
+  let terminalRetirementStarted = false;
+  try {
+    deps.terminalRuntime?.beginRecoveryRetirement(session);
+    terminalRetirementStarted = true;
+    const retirement = await runtimes.retireForRecovery(session, parsed.data.recoveryId, () => {
+      const task = deps.tasks.get(session.kiloSessionId);
+      const active = deps.activity
+        ?.snapshots()
+        .some(
+          snapshot => snapshot.kiloSessionId === session.kiloSessionId && snapshot.state !== 'idle'
+        );
+      if (task || active) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session has work in progress', true);
+      }
+      if (deps.terminalRuntime?.hasActivePty(session)) {
+        throw new WorktreeKiloRuntimeError('session_busy', 'Session has an active PTY', true);
+      }
+    });
+    if (retirement === 'retired') {
+      await deps.terminalRuntime?.detachSession(session);
+      forgetAttachedRoot(session.kiloSessionId, session.directory);
+      deps.activity?.detach(session.kiloSessionId);
+      const index = deps.sessions.findIndex(item => item.kiloSessionId === session.kiloSessionId);
+      if (index !== -1) deps.sessions.splice(index, 1);
+    }
+    return ok({ recoveryId: parsed.data.recoveryId, retired: true });
+  } catch (error) {
+    return terminalFailure(error);
+  } finally {
+    if (terminalRetirementStarted) deps.terminalRuntime?.endRecoveryRetirement(session);
   }
 }
 

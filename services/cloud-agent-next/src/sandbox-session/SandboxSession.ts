@@ -164,6 +164,7 @@ import {
   acceptQueuedMessage,
   applyMessageOutcome,
   assignPreparationAttemptId,
+  cancelPendingMessage,
   createSessionMessageRecord,
   failQueuedMessage,
   failWaitingMessages as applyFailWaitingMessages,
@@ -180,6 +181,7 @@ import {
   type ControlSessionMessageInput,
   type SessionMessageRecord,
 } from './session-message-queue.js';
+import { PENDING_SESSION_MESSAGE_LIMIT } from '../session/pending-messages.js';
 import {
   commitSessionOperationResult,
   dispatchSessionOperation,
@@ -1107,6 +1109,16 @@ export class SandboxSession extends DurableObject<Env> {
       if (observed !== 'running' && observed !== 'completed') return { state: 'unresolved' };
     }
     return { state: 'reconciled' };
+  }
+
+  async cancelQueuedMessage(messageId: string): Promise<{ dropped: boolean }> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null || this.deletedWorktreeId) return { dropped: false };
+    const result = cancelPendingMessage(this.loadMessages(), messageId);
+    if (!result.dropped) return { dropped: false };
+    if (result.messages && !this.saveMessages(result.messages, epoch)) return { dropped: false };
+    if (nextQueuedMessageId(this.loadMessages())) await this.armQueueRetry();
+    return { dropped: true };
   }
 
   async interruptExecution(): Promise<{ success: boolean; message?: string }>;
@@ -2082,6 +2094,16 @@ export class SandboxSession extends DurableObject<Env> {
       }
       if (validationFailure) return validationFailure;
       if (!intent) return { success: false, code: 'NOT_FOUND', error: 'Message not found' };
+      if (
+        latestMessages.filter(message => message.state === 'queued').length >=
+        PENDING_SESSION_MESSAGE_LIMIT
+      ) {
+        return {
+          success: false,
+          code: 'PENDING_QUEUE_FULL',
+          error: `Pending message queue is full (${PENDING_SESSION_MESSAGE_LIMIT})`,
+        };
+      }
       const nextMessages = freezeLegacyQueuedMessages(
         latestMessages,
         latestMetadata.agent,

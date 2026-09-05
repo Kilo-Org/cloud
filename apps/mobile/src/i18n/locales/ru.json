@@ -27,14 +27,118 @@
     "somethingWentWrong": "Что-то пошло не так",
     "couldNotOpen": "Не удалось открыть {{label}}",
     "link": "ссылка",
-    "takingLonger": "Это занимает больше времени, чем ожидалось. Вы можете закрыть и проверить снова."
+    "takingLonger": "Это занимает больше времени, чем ожидалось. Вы можете закрыть и проверить снова.",
+    "cameraAccessDisabled": "Доступ к камере отключён",
+    "copyLink": "Копировать ссылку",
+    "reviewPr": "Проверить PR",
+    "sendMessage": "Отправить сообщение",
+    "remaining": "Осталось",
+    "imageUnavailable": "Изображение недоступно",
+    "open": "Открыть {{name}}",
+    "loading": "Загрузка…",
+    "queued": "В очереди",
+    "cost": "Стоимость",
+    "model": "Модель",
+    "reportSubmittedReceipt": "Жалоба отправлена. Квитанция {{receiptId}}",
+    "role": "Роль",
+    "allModels": "Все модели",
+    "noModelsAvailable": "Нет доступных моделей",
+    "recommended": "Рекомендуемые",
+    "searchModels": "Поиск моделей...",
+    "bitbucketConnected": "Bitbucket подключен",
+    "connectBitbucket": "Подключить Bitbucket",
+    "connectGithub": "Подключить GitHub",
+    "connectGitlab": "Подключить GitLab",
+    "discard": "Отменить",
+    "repository": "Репозиторий",
+    "newSession": "Новый сеанс",
+    "details": "Детали",
+    "pullRequest": "pull request",
+    "sessionExited": "Сеанс завершён",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "Доступ запрещен",
+    "notFound": "Не найдено",
+    "platform": "Платформа",
+    "contentTruncated": "Содержимое обрезано",
+    "truncated": "Обрезано",
+    "added": "Добавлено",
+    "deleted": "Удалено",
+    "updated": "Обновлено",
+    "clearFilters": "Сбросить фильтры",
+    "clearSearch": "Очистить поиск",
+    "couldNotLoadSessions": "Не удалось загрузить сеансы",
+    "delete": "Удалить",
+    "rename": "Переименовать",
+    "idle": "Неактивен",
+    "online": "В сети",
+    "starting": "Запуск…",
+    "noKiloclawInstances": "Нет экземпляров KiloClaw",
+    "personal": "Личное",
+    "reply": "Ответить",
+    "closeReactions": "Закрыть реакции",
+    "recent": "Недавние",
+    "connect": "Подключить",
+    "codeReviewer": "Проверка кода",
+    "performance": "Производительность",
+    "all": "Все",
+    "critical": "Критические",
+    "off": "Выкл.",
+    "notConnected": "Не подключено",
+    "allRepositories": "Все репозитории",
+    "repositories": "Репозитории",
+    "connected": "Подключено",
+    "organization": "Организация",
+    "couldNotLoadRepositories": "Не удалось загрузить репозитории",
+    "selectedRepositories": "Выбранные репозитории",
+    "branch": "Ветка",
+    "findings": "Замечания",
+    "keepRunning": "Продолжить выполнение",
+    "status": "Статус",
+    "retryLoadingMore": "Повторить загрузку",
+    "balanced": "Сбалансированный",
+    "couldNotLoadOrganizations": "Не удалось загрузить организации",
+    "yourOwnRepositories": "Ваши собственные репозитории",
+    "selectRepositories": "Выбрать репозитории",
+    "cancelled": "Отменено",
+    "failed": "Не удалось",
+    "pending": "Ожидается",
+    "deviceSessions": "Сеансы устройств",
+    "working": "Работаю...",
+    "goBack": "Назад",
+    "ends": "Действует до {{date}}",
+    "privacyPolicy": "Политика конфиденциальности",
+    "disabled": "Отключено",
+    "enabled": "Включено",
+    "couldNotLoadModels": "Не удалось загрузить модели",
+    "close": "Закрыть",
+    "remove": "Удалить",
+    "kiloclaw": "KiloClaw",
+    "notifications": "Уведомления",
+    "loadMore": "Загрузить больше",
+    "email": "Электронная почта",
+    "draft": "Черновик",
+    "prReview": "Проверка PR",
+    "dismissed": "Отклонено",
+    "closed": "Закрыт",
+    "preferences": "Настройки",
+    "agents": "Агенты",
+    "securityAgent": "Агент безопасности",
+    "profile": "Профиль",
+    "chat": "Чат",
+    "file": "Файл",
+    "keepEditing": "Продолжить редактирование",
+    "signOut": "Выйти",
+    "unknown": "Неизвестно",
+    "message": "Сообщение",
+    "reactions": "Реакций",
+    "openPullRequest": "Открыть pull request",
+    "couldnTLoadMore": "Не удалось загрузить больше"
   },
   "language": {
-    "title": "Язык",
     "restarting": "Перезапуск для применения языка",
     "couldNotRestart": "Не удалось перезапустить",
     "languageSaved": "Ваш язык сохранён.",
-    "retry": "Повторить",
     "catalogLoadFailed": "Не удалось загрузить язык. Попробуйте еще раз.",
     "search": "Поиск языков",
     "noMatches": "Нет совпадений по языкам",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "Код входа: {{code}}",
     "openSignInPageInBrowser": "Открыть страницу входа в браузере",
     "copySignInLink": "Копировать ссылку для входа",
-    "copyLink": "Копировать ссылку",
     "cancelSignIn": "Отменить вход",
     "startingSignIn": "Начинаем вход...",
     "organizationUsesSso": "Ваша организация использует единый вход (SSO).",
@@ -62,23 +165,19 @@
     "emailAddress": "Адрес электронной почты",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "Продолжить с электронной почтой",
-    "continue": "Продолжить",
     "enterCodeSentTo": "Введите код, отправленный на {{email}}",
     "codeArrivalHint": "Если этот адрес подходит, код придёт в течение минуты.",
     "verifyCode": "Проверить код",
     "resendCode": "Отправить код повторно",
-    "back": "Назад",
     "termsPrefix": "Продолжая, вы соглашаетесь с нашими",
     "terms": "Условиями",
     "termsConnector": " и ",
     "termsSuffix": ".",
-    "privacyPolicy": "Политика конфиденциальности",
     "moreSignInOptions": "Другие способы входа",
     "couldNotCompleteSignIn": "Не удалось завершить вход. Попробуйте снова.",
     "sessionEnded": "Ваш сеанс завершен. Войдите снова.",
     "signInCodeExpired": "Срок действия вашего кода входа истек. Попробуйте снова.",
     "accessDenied": "В доступе отказано.",
-    "somethingWentWrong": "Что-то пошло не так. Попробуйте ещё раз.",
     "codeSent": "Код отправлен",
     "signInCodeField": "Код входа",
     "accountCreated": "Аккаунт создан. Добро пожаловать в Kilo.",
@@ -86,24 +185,16 @@
     "or": "или"
   },
   "profile": {
-    "title": "Профиль",
-    "agents": "Агенты",
-    "codeReviewer": "Проверка кода",
     "codeReviewerSubtitle": "Автоматические проверки PR",
-    "securityAgent": "Агент безопасности",
     "securityAgentSubtitle": "Поиск и устранение уязвимостей",
     "reviews": "Проверки",
-    "prReview": "Проверка PR",
     "prReviewSubtitle": "Проверяйте pull request на мобильном",
-    "organization": "Организация",
     "couldNotLoadOrganization": "Не удалось загрузить организацию",
     "couldNotLoadOrganizationDescription": "Настройки организации и агентов недоступны, пока это не загрузится.",
     "linkedAccounts": "Подключенные аккаунты",
     "couldNotLoadAccounts": "Не удалось загрузить аккаунты",
     "app": "Приложение",
-    "preferences": "Настройки",
     "preferencesSubtitle": "Внешний вид, уведомления, мышление и поведение экрана",
-    "deviceSessions": "Сеансы устройств",
     "deviceSessionsSubtitle": "Просмотр и выход с других устройств",
     "feedback": "Обратная связь",
     "privacyChoices": "Настройки конфиденциальности",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "Ваш баланс кредитов пуст. Для этого аккаунта кредиты управляются вне приложения iOS.",
     "signOutTitle": "Выйти?",
     "signOutMessage": "Вам нужно будет войти снова, чтобы получить доступ к рабочему пространству.",
-    "signOutConfirm": "Выйти",
     "deleteAccountTitle": "Удалить аккаунт?",
     "deleteAccountMessage": "Это навсегда удалит ваш аккаунт и выведет вас из системы. Мы отправим код подтверждения по электронной почте.",
     "deleteAccountConfirm": "Удалить аккаунт",
     "accountDeleted": "Ваш аккаунт удален.",
     "viewOrganization": "Просмотр организации",
     "manageOrganization": "Управление организацией",
-    "personal": "Личное",
     "selectAccount": "Выбрать аккаунт",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Электронная почта",
     "providerTestAccount": "Тестовый аккаунт",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Enterprise SSO"
   },
   "preferences": {
-    "title": "Настройки",
     "autoExpandThinking": "Автоматически раскрывать мышление",
     "autoExpandThinkingSubtitle": "Показывать мышление агента раскрытым по завершении.",
     "keepScreenOn": "Не выключать экран на странице сеанса",
     "keepScreenOnSubtitle": "Держать экран включенным, пока сеанс работает.",
     "appearance": "Внешний вид",
-    "notifications": "Уведомления",
     "notificationsSubtitle": "Настройки push-уведомлений",
     "appearanceSystem": "Системная",
     "appearanceLight": "Светлая",
@@ -159,7 +243,6 @@
     "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме."
   },
   "notifications": {
-    "title": "Уведомления",
     "liveActivities": "Живые активности",
     "liveActivitySubtitle": "Показывать активных агентов на экране блокировки",
     "liveUpdates": "Обновления в реальном времени",
@@ -182,7 +265,6 @@
     "disabledMessage": "Чтобы включить уведомления, включите их в настройках устройства.",
     "disableTitle": "Отключить уведомления",
     "disableMessage": "Чтобы отключить уведомления, выключите их в настройках устройства.",
-    "openSettings": "Открыть настройки",
     "registrationFailed": "Регистрация не удалась. Проверьте разрешения на уведомления.",
     "couldNotEnable": "Не удалось включить уведомления. Попробуйте снова.",
     "previewAlways": "Всегда",
@@ -197,7 +279,6 @@
       "security": "Находки безопасности"
     },
     "category": {
-      "chatMessagesTitle": "Сообщения чата",
       "chatMessagesSubtitle": "ответы в ваших разговорах",
       "agentAttentionTitle": "Агент нуждается в вас",
       "agentAttentionSubtitle": "вопросы, разрешение, требуется ввод",
@@ -205,32 +286,23 @@
       "agentUpdatesSubtitle": "сообщения агента в середине задачи",
       "sessionStatusTitle": "Статус сеанса",
       "sessionStatusSubtitle": "завершен / не удался / готов к управлению",
-      "kiloclawActivityTitle": "Активность KiloClaw",
       "kiloclawActivitySubtitle": "экземпляр готов/не удался, запланированные действия",
-      "balanceAlertsTitle": "Оповещения о балансе",
       "balanceAlertsSubtitle": "предупреждения о низком балансе организации",
-      "securityFindingsTitle": "Находки безопасности",
       "securityFindingsSubtitle": "новые находки и напоминания об SLA"
     }
   },
   "tabs": {
     "home": "Главная",
-    "agents": "Агенты",
-    "profile": "Профиль",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, вкладка, {{position}} из {{total}}",
-    "chat": "Чат"
+    "position": "{{name}}, вкладка, {{position}} из {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Сменить экземпляр",
       "couldNotLoadInstances": "Не удалось загрузить экземпляры",
-      "noInstances": "Нет экземпляров KiloClaw",
       "noInstancesDescription": "Настройте экземпляр, чтобы начать чат.",
       "setUpKiloclaw": "Настроить KiloClaw",
-      "currentInstance": "{{title}}, текущий",
-      "personal": "Личное"
+      "currentInstance": "{{title}}, текущий"
     },
     "conversation": {
       "failedToLoad": "Не удалось загрузить разговор",
@@ -249,16 +321,12 @@
       "couldNotSignIn": "Не удалось войти в чат",
       "couldNotRefreshMessages": "Не удалось обновить сообщения",
       "couldNotLoadHistory": "Не удалось загрузить историю разговора",
-      "rename": "Переименовать",
       "leave": "Покинуть",
       "untitledConversation": "Беседа без названия",
       "createFailed": "Не удалось создать беседу",
       "leaveFailed": "Не удалось покинуть беседу"
     },
     "reactions": {
-      "title": "Реакций",
-      "close": "Закрыть реакции",
-      "recent": "Недавние",
       "common": "Обычные",
       "reactWith": "Отреагировать: {{reaction}}",
       "accessibility": "{{emoji}} реакция, {{displayCount}}"
@@ -268,16 +336,13 @@
       "cancelReply": "Отменить ответ",
       "openInstance": "Открыть экземпляр",
       "attachFile": "Прикрепить файл",
-      "messagePlaceholder": "Сообщение",
-      "cancelEdit": "Отменить редактирование",
-      "sendMessage": "Отправить сообщение"
+      "cancelEdit": "Отменить редактирование"
     },
     "conversationList": {
       "couldNotLoad": "Не удалось загрузить разговоры",
       "emptyTitle": "Разговоров пока нет",
       "emptyDescription": "Создайте разговор, чтобы начать общение с вашим экземпляром KiloClaw.",
       "create": "Создать разговор",
-      "starting": "Запуск…",
       "newConversation": "Новый разговор",
       "openInstanceSettings": "Открыть настройки экземпляра",
       "today": "Сегодня",
@@ -287,7 +352,6 @@
     },
     "attachment": {
       "open": "Открыть {{filename}}",
-      "imageUnavailable": "Изображение недоступно",
       "openFailed": "Не удалось открыть вложение. Проверьте подключение и попробуйте ещё раз.",
       "attachFailed": "Не удалось прикрепить файл",
       "limit": "Можно прикрепить до {{displayCount}} файлов.",
@@ -317,11 +381,9 @@
       "yourMessage": "Ваше сообщение",
       "messageFrom": "Сообщение от {{author}}",
       "moreActions": "Больше действий",
-      "message": "Сообщение",
       "notDelivered": "Не доставлено",
       "edited": "(изменено)",
-      "image": "Изображение",
-      "attachment": "Вложение"
+      "image": "Изображение"
     },
     "messageActions": {
       "copied": "Скопировано",
@@ -329,13 +391,11 @@
       "title": "Действия с сообщением",
       "deleteTitle": "Удалить сообщение?",
       "deleteMessage": "Сообщение будет удалено из беседы.",
-      "delete": "Удалить",
       "deleteFailed": "Не удалось удалить сообщение",
       "removeReactionFailed": "Не удалось удалить реакцию",
       "addReactionFailed": "Не удалось добавить реакцию",
       "retrySend": "Отправить повторно",
       "moreReactions": "Больше реакций",
-      "reply": "Ответить",
       "edit": "Редактировать",
       "sendFailed": "Не удалось отправить сообщение",
       "retrySendFailed": "Не удалось отправить повторно",
@@ -346,7 +406,6 @@
       "takePhoto": "Сделать фото",
       "photoLibrary": "Фотоальбом",
       "files": "Файлы",
-      "cameraAccessDisabled": "Доступ к камере отключён",
       "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото."
     },
     "typingIndicator": {
@@ -358,10 +417,7 @@
       "typing_many": "{{names}} печатают..."
     },
     "botStatus": {
-      "online": "В сети",
-      "idle": "Неактивен",
       "offline": "Не в сети",
-      "unknown": "Неизвестно",
       "loadingUser": "Загрузка пользователя...",
       "waitingForStatus": "Ожидание статуса бота...",
       "offlineMessage": "Бот не в сети. Сообщения возобновятся после повторного подключения."
@@ -374,7 +430,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Не удалось загрузить экземпляры KiloClaw",
     "billing": {
       "title": "Оплата",
@@ -382,7 +437,6 @@
       "plan": "План",
       "finalTermEnds": "Последний период заканчивается",
       "afterFinalTerm": "После последнего периода",
-      "remaining": "Осталось",
       "lessThanOneDay": "Менее 1 дня",
       "ends": "Заканчивается",
       "expires": "Истекает",
@@ -391,7 +445,6 @@
       "managedByAdmin": "Оплатой управляет администратор вашей организации.",
       "couldNotLoad": "Не удалось загрузить информацию об оплате",
       "manageOnWeb": "Управление оплатой в веб-версии",
-      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Ваш последний период Commit заканчивается {{date}}. Продолжите как Standard за {{price}}, или хостинг завершится.",
       "freeTrial": "Бесплатная пробная версия",
@@ -408,9 +461,9 @@
       "trialDaysRemaining": "Пробный период: осталось {{remaining}}",
       "trialEndingSoon": "Пробный период скоро закончится: {{remaining}}",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "Что нового",
@@ -433,7 +486,6 @@
       "destroyMessage": "Это навсегда уничтожит ваш экземпляр KiloClaw и все его данные. Это действие нельзя отменить.",
       "destroyTitle": "Уничтожить экземпляр",
       "instance": "Экземпляр",
-      "renameFailed": "Что-то пошло не так",
       "couldNotCheckStatus": "Не удалось проверить статус сервиса",
       "dangerZone": "ОПАСНАЯ ЗОНА",
       "destroying": "Уничтожение…",
@@ -461,7 +513,6 @@
       "approveDeviceTitle": "Одобрить устройство",
       "approveMessage": "Разрешить {{label}} (код: {{code}}) подключиться к вашему экземпляру?",
       "approveTitle": "Одобрить запрос на сопряжение",
-      "device": "Устройство",
       "unknownDevice": "Неизвестное устройство"
     },
     "execPolicy": {
@@ -476,35 +527,21 @@
       "title": "Аккаунт Google",
       "couldNotLoad": "Не удалось загрузить статус аккаунта Google",
       "disconnected": "Аккаунт Google отключен. Повторно разверните экземпляр, чтобы применить изменение.",
-      "redeploy": "Развернуть повторно",
       "setupCommand": "Команда настройки",
       "setupCommandHelp": "Выполните эту команду в терминале с установленным Docker на своем компьютере, чтобы подключить аккаунт Google.",
       "failedToLoadCommand": "Не удалось загрузить команду настройки",
       "gmailNotifications": "Уведомления Gmail",
       "disconnect": "Отключить аккаунт Google",
-      "connected": "Подключено",
       "copied": "Скопировано!",
       "copyCommand": "Копировать команду",
-      "disabled": "Отключено",
       "disconnectConfirm": "Отключить",
       "disconnectMessage": "Удалить аккаунт Google из этого экземпляра? Это отключит уведомления Gmail. Повторно разверните после отключения, чтобы применить изменения.",
-      "disconnectTitle": "Отключить Google",
-      "enabled": "Включено",
-      "notConnected": "Не подключено"
+      "disconnectTitle": "Отключить Google"
     },
     "modelList": {
-      "title": "Все модели",
-      "searchPlaceholder": "Поиск моделей...",
-      "couldNotLoad": "Не удалось загрузить модели",
-      "clearSearch": "Очистить поиск",
       "noMatches": "Ни одна модель не соответствует вашему запросу",
-      "noModels": "Нет доступных моделей",
       "noModelsDescription": "Модели появятся здесь, когда станут доступны.",
-      "noResultsFor": "Нет результатов по запросу \"{{query}}\"",
-      "recommended": "Рекомендуемые"
-    },
-    "model": {
-      "title": "Модель"
+      "noResultsFor": "Нет результатов по запросу \"{{query}}\""
     },
     "secrets": {
       "title": "Секреты",
@@ -515,11 +552,7 @@
       "removeTitle": "Удалить секрет",
       "saved": "{{label}} сохранен",
       "allFieldsRequired": "Для подключения {{label}} необходимо заполнить все поля.",
-      "connect": "Подключить",
-      "connected": "Подключено",
       "hide": "Скрыть {{label}}",
-      "notConnected": "Не подключено",
-      "remove": "Удалить",
       "removing": "Удаление…",
       "saving": "Сохранение…",
       "setupGuide": "Руководство по настройке",
@@ -560,22 +593,16 @@
       "iosTitle": "KiloClaw недоступен в iOS",
       "multipleCurrentConflictBody": "Мы обнаружили несколько активных подписок на вашем аккаунте, поэтому приостановили работу, чтобы не списывать средства дважды.",
       "multipleCurrentConflictCta": "Продолжить на kilo.ai",
-      "multipleCurrentConflictTitle": "Аккаунт требует проверки",
       "nonCanonicalEarlybirdBody": "Ваш тариф раннего доступа требует ручной проверки, прежде чем его можно будет использовать на мобильном устройстве.",
-      "nonCanonicalEarlybirdCta": "Продолжить на kilo.ai",
       "nonCanonicalEarlybirdTitle": "Обнаружен устаревший тариф",
       "quarantinedBody": "Ваш экземпляр KiloClaw находится в карантине и сейчас не может использоваться. Наша команда поможет его восстановить.",
-      "quarantinedCta": "Продолжить на kilo.ai",
       "quarantinedTitle": "Экземпляр требует восстановления",
       "subscriptionCanceledBody": "Чтобы использовать KiloClaw, перейдите на kilo.ai/claw из браузера. Оформить подписку в приложении нельзя.",
       "subscriptionCanceledCta": "Открыть kilo.ai/claw",
       "subscriptionCanceledTitle": "Оформите подписку в веб-версии",
       "subscriptionPastDueBody": "Возникла проблема с вашим последним платежом. Перейдите на kilo.ai/claw из браузера, чтобы обновить его. Управлять оплатой в приложении нельзя.",
-      "subscriptionPastDueCta": "Открыть kilo.ai/claw",
       "subscriptionPastDueTitle": "Обновите оплату в веб-версии",
-      "trialExpiredBody": "Чтобы продолжить использовать KiloClaw, перейдите на kilo.ai/claw из браузера. Оформить подписку в приложении нельзя.",
-      "trialExpiredCta": "Открыть kilo.ai/claw",
-      "trialExpiredTitle": "Оформите подписку в веб-версии"
+      "trialExpiredBody": "Чтобы продолжить использовать KiloClaw, перейдите на kilo.ai/claw из браузера. Оформить подписку в приложении нельзя."
     },
     "controls": {
       "redeploying": "Повторное развертывание…",
@@ -586,7 +613,6 @@
       "start": "Запустить",
       "startMessage": "Вы уверены, что хотите запустить этот экземпляр?",
       "startTitle": "Запустить экземпляр",
-      "starting": "Запуск…",
       "stop": "Остановить",
       "stopMessage": "Вы уверены, что хотите остановить этот экземпляр?",
       "stopTitle": "Остановить экземпляр",
@@ -596,7 +622,6 @@
       "finishingSetup": "Завершение настройки",
       "finishingSetupDescription": "Подождите, мы завершаем настройку вашего аккаунта. Обычно это занимает немного времени.",
       "getStarted": "Начать",
-      "noInstances": "Нет экземпляров KiloClaw",
       "noInstancesDescription": "Создайте первый экземпляр, чтобы запускать агентов для написания кода."
     },
     "instance": {
@@ -608,7 +633,6 @@
     "instanceCard": {
       "fixOnKiloAi": "Исправить на kilo.ai: {{label}}",
       "needsAttention": "{{name}} требует внимания: {{label}}",
-      "open": "Открыть {{name}}",
       "openSettings": "Открыть настройки для {{name}}",
       "openUnread": "Открыть {{name}}, непрочитанных сообщений: {{displayCount}}",
       "openUnread_other": "Открыть {{name}}, непрочитанных сообщений: {{displayCount}}",
@@ -619,7 +643,6 @@
     "list": {
       "createInstance": "Создать экземпляр",
       "organizations": "Организации",
-      "personal": "Личное",
       "accessIssue": {
         "trialExpired": "Пробный период закончился, оформите подписку, чтобы продолжить использовать этот инстанс",
         "subscriptionCanceled": "Подписка неактивна, оформите подписку снова, чтобы продолжить использовать этот инстанс",
@@ -632,25 +655,20 @@
     "modelPicker": {
       "autoModelA11y": "{{label}} авто-модель",
       "balancedDescription": "Умный баланс скорости и возможностей при меньшей стоимости.",
-      "balancedLabel": "Сбалансированная",
       "browseAllModels": "или выберите из 500+ моделей",
       "browseAllModelsA11y": "Просмотреть все 500+ моделей",
-      "cost": "Стоимость",
       "currentModel": "Текущая модель",
       "frontierDescription": "Максимальная производительность. Направляет на передовые модели с рассуждением.",
       "frontierLabel": "Frontier",
-      "kiloAuto": "Kilo Auto",
-      "performance": "Производительность"
+      "kiloAuto": "Kilo Auto"
     },
     "onboarding": {
       "complete": {
         "chatWith": "Общайтесь с {{name}}",
-        "online": "В сети",
         "ready": "{{name}} готов",
         "warmedUp": "Все готово. Напишите, когда будете готовы."
       },
       "flow": {
-        "close": "Закрыть",
         "couldNotLoad": "Не удалось загрузить состояние настройки",
         "finishingSetup": "Завершение настройки — подождите, пока мы завершаем настройку вашего аккаунта.",
         "genericErrorBody": "Нам не удалось завершить настройку вашего экземпляра прямо сейчас.",
@@ -661,13 +679,11 @@
         "provisioning": "Подготовка",
         "ready": "Готово",
         "review": "Проверка",
-        "settingUp": "Настройка…",
-        "somethingWentWrong": "Что-то пошло не так"
+        "settingUp": "Настройка…"
       },
       "identity": {
         "changePersonality": "Изменить характер",
         "chooseAvatar": "Выбрать аватар",
-        "continue": "Продолжить",
         "location": "Местоположение",
         "locationDeniedMessage": "Разрешите доступ к местоположению в настройках, чтобы использовать текущее местоположение.",
         "locationDeniedTitle": "Доступ к местоположению запрещен",
@@ -703,7 +719,6 @@
         "backgroundHint": "Обычно занимает меньше минуты. Можно закрыть — мы продолжим работу в фоне.",
         "connectingToAgent": "Подключение к агенту",
         "continueInBackground": "Продолжить в фоне",
-        "finishingSetup": "Завершение настройки",
         "queryErrorBody": "Соединение было потеряно при проверке настройки {{name}}. Возможно, она еще выполняется. Попробуйте снова или проверьте чуть позже.",
         "queryErrorTitle": "Не удалось проверить настройку",
         "settingUp": "Настройка {{name}}",
@@ -724,7 +739,6 @@
       "gatewayProcess": "ПРОЦЕСС ШЛЮЗА",
       "lastExit": "Последний выход",
       "memory": "Память",
-      "model": "Модель",
       "region": "Регион",
       "resources": "РЕСУРСЫ",
       "restarts": "Перезапуски",
@@ -744,19 +758,12 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Каналы",
       "devicePairingDescription": "Одобрение запросов устройств",
-      "devicePairingLabel": "Сопряжение устройств",
       "execPolicyDescription": "Настройки безопасности",
-      "execPolicyLabel": "Политика выполнения",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Аккаунт Google",
       "modelDescription": "Выбор ИИ-модели",
-      "modelLabel": "Модель",
       "secretsDescription": "Зашифрованные учетные данные",
-      "secretsLabel": "Секреты",
-      "versionPinDescription": "Закрепление на конкретной версии",
-      "versionPinLabel": "Закрепление версии"
+      "versionPinDescription": "Закрепление на конкретной версии"
     },
     "avatar": {
       "arcade": "Аркада",
@@ -801,21 +808,15 @@
       "placeholder": "напр., применяйте наши правила обработки ошибок…"
     },
     "repos": {
-      "title": "Репозитории",
-      "couldNotLoad": "Не удалось загрузить репозитории",
       "unavailable": "Репозитории недоступны — завершите настройку Bitbucket на kilo.ai.",
       "finishSetup": "Завершить настройку",
       "manageAccess": "Управление доступом",
-      "allRepositories": "Все репозитории",
       "bitbucketNoRepositoriesDescription": "В этом рабочем пространстве Bitbucket нет доступных репозиториев.",
-      "bitbucketSetup": "Настройка Bitbucket",
-      "couldNotOpenGithubSettings": "Не удалось открыть настройки приложения GitHub",
       "gitlabNoRepositoriesDescription": "Возможно, нужно предоставить доступ к большему числу групп или проектов в GitLab.",
       "installGithubApp": "Установить приложение GitHub на репозитории",
       "installGithubAppDescription": "Предоставьте приложению Kilo GitHub доступ к репозиториям, которые нужно проверить.",
       "noRepositoriesFound": "Репозитории не найдены",
-      "repositoryAccess": "доступ к репозиторию",
-      "selectedRepositories": "Выбранные репозитории"
+      "repositoryAccess": "доступ к репозиторию"
     },
     "style": {
       "title": "Стиль проверки",
@@ -831,17 +832,13 @@
       "setup": "Настройка Bitbucket"
     },
     "bitbucketConnect": {
-      "connect": "Подключить",
-      "connected": "Bitbucket подключен",
       "description": "Создайте токен доступа рабочего пространства с нужными правами и вставьте его ниже.",
       "scopes": "Аккаунт: чтение · Репозитории: чтение/запись · Pull requests: чтение · Вебхуки: чтение/запись",
-      "title": "Подключить Bitbucket",
       "tokenPlaceholder": "Токен доступа рабочего пространства"
     },
     "followReviewMd": "Следовать REVIEW.md",
     "followReviewMdSubtitle": "Учитывать файлы инструкций REVIEW.md в каждом репозитории",
     "manualReview": {
-      "connectGitHub": "Подключить GitHub",
       "connectProvider": "Подключить провайдера",
       "connectProviderDescription": "Подключите GitHub, чтобы начать ручную проверку pull request.",
       "couldNotCheckProviderStatus": "Не удалось проверить статус провайдера",
@@ -849,9 +846,6 @@
       "instructions": "Инструкции (необязательно)",
       "instructionsPlaceholder": "Что-то конкретное, на чём стоит сосредоточиться проверяющему…",
       "invalidUrl": "Введите корректный URL pull request",
-      "model": "Модель",
-      "notConnected": "Не подключено",
-      "platform": "Платформа",
       "pullRequestUrl": "URL pull request",
       "start": "Начать проверку",
       "starting": "Начинаем проверку…",
@@ -861,15 +855,10 @@
     "platformList": {
       "activity": "Активность",
       "checking": "Проверка…",
-      "connected": "Подключено",
-      "notConnected": "Не подключено",
-      "organization": "Организация",
       "platforms": "Платформы",
       "statusUnavailable": "Статус недоступен"
     },
     "providerConnect": {
-      "connectGitHub": "Подключить GitHub",
-      "connectGitLab": "Подключить GitLab",
       "description": "Подключите {{label}} от Kilo, чтобы проверять pull request автоматически.",
       "githubApp": "Приложение GitHub",
       "githubError": "Не удалось открыть настройку GitHub. Попробуйте снова.",
@@ -877,42 +866,30 @@
       "gitlabError": "Не удалось открыть настройку GitLab. Попробуйте снова.",
       "bitbucketError": "Не удалось открыть настройки Bitbucket. Повторите попытку."
     },
-    "readOnlyDescription": "Изменять эти настройки могут только владельцы организации и менеджеры по оплате.",
     "reviewDetail": {
-      "branch": "Ветка",
       "byline": "{{repo}} #{{number}} от {{author}}",
       "cancelMessage": "Это остановит текущую проверку кода.",
       "cancelReview": "Отменить проверку",
       "cancelTitle": "Отменить проверку?",
       "checkRun": "Запуск проверки",
-      "completed": "Завершено",
-      "cost": "Стоимость",
       "couldNotGetLatest": "Не удалось получить последнюю версию.",
       "couldNotLoad": "Не удалось загрузить проверку",
       "council": "Совет",
       "created": "Создано",
       "decision": "Решение",
-      "details": "Детали",
-      "findings": "Замечания",
       "gate": "Шлюз",
       "gateHidden": "Скрыт",
       "gateNone": "Нет",
-      "keepRunning": "Продолжить выполнение",
-      "model": "Модель",
       "noFindings": "Нет замечаний",
-      "openPullRequest": "Открыть pull request",
-      "platform": "Платформа",
       "retryMessage": "Это запустит проверку кода заново.",
       "retryReview": "Повторить проверку",
       "retryTitle": "Повторить проверку?",
       "showMore": "Показать больше",
       "started": "Начато",
-      "status": "Статус",
       "threshold": "Порог",
       "title": "Проверка",
       "tokens": "Токены",
       "tokensInOut": "{{input}} вх. / {{output}} исх.",
-      "pullRequest": "pull request",
       "transcriptWaiting": "Ожидание протокола проверки.",
       "transcriptEmpty": "Для этой проверки нет протокола.",
       "transcriptRetry": "Не удалось загрузить протокол проверки.",
@@ -927,8 +904,7 @@
       "sessionError": "Ошибка сеанса: {{error}}",
       "statusWithValue": "Статус: {{status}}",
       "toolName": "Инструмент: {{name}}",
-      "toolNameError": "Инструмент: {{name}} — ошибка",
-      "unknownError": "Неизвестная ошибка"
+      "toolNameError": "Инструмент: {{name}} — ошибка"
     },
     "reviewList": {
       "configureProvider": "Настроить провайдера",
@@ -940,7 +916,6 @@
     },
     "reviewMemory": {
       "couldNotLoad": "Не удалось загрузить память проверок",
-      "couldNotLoadMore": "Не удалось загрузить больше",
       "couldNotLoadProposals": "Не удалось загрузить предложения",
       "enable": "Включить память проверок",
       "loading": "Загрузка памяти проверок",
@@ -950,19 +925,13 @@
       "off": "Память проверок выключена",
       "offDescription": "Включите её, чтобы Kilo учился на ответах мейнтейнеров и предлагал рекомендации для REVIEW.md.",
       "readOnlyDescription": "Включить память проверок могут только владельцы организации и менеджеры по оплате.",
-      "retryLoadingMore": "Повторить загрузку",
       "title": "Память проверок"
     },
     "scopeList": {
-      "couldNotLoad": "Не удалось загрузить организации",
-      "personal": "Личное",
       "personalStillAvailable": "Личные репозитории по-прежнему доступны ниже.",
-      "personalSubtitle": "Ваши собственные репозитории",
       "viewOnly": "Только просмотр"
     },
-    "selectRepositories": "Выбрать репозитории",
     "selectRepository": "Выберите хотя бы один репозиторий, чтобы включить автоматические проверки.",
-    "title": "Проверка кода",
     "webhookSetup": "Настройка вебхука не завершена",
     "webhookSetupDescription": "Некоторые репозитории могут не получать автоматические проверки.",
     "decision": {
@@ -971,83 +940,62 @@
       "noResult": "Нет результата",
       "pass": "Пройдено"
     },
-    "eyebrow": "Проверка кода",
     "overview": {
       "allAreas": "Все области",
-      "allRepositories": "Все репозитории",
       "customInstructions": "Пользовательские инструкции",
       "focusAreas": "Области внимания",
-      "mergeGate": "Шлюз слияния",
-      "model": "Модель",
       "nSelected": "Выбрано: {{displayCount}}",
       "proposedReviewMdGuidance": "Предложенные рекомендации REVIEW.md",
-      "repositories": "Репозитории",
-      "reviewMemory": "Память проверок",
       "reviewStyle": "Стиль проверки",
       "set": "Задать"
     },
     "updateFailed": "Не удалось обновить ревьюера",
     "configSaveFailed": "Не удалось сохранить конфигурацию проверки",
     "status": {
-      "pending": "Ожидается",
-      "queued": "В очереди",
       "running": "Выполняется",
       "completed": "Завершено",
-      "failed": "Не удалось",
-      "cancelled": "Отменено",
       "interrupted": "Прервано"
     },
     "reviewStyle": {
       "strict": "Строгий",
-      "balanced": "Сбалансированный",
       "lenient": "Мягкий",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "Безопасность",
-      "performance": "Производительность",
       "bugs": "Ошибки",
       "style": "Стиль",
       "testing": "Тестирование",
       "documentation": "Документация"
     },
     "gateThreshold": {
-      "off": "Выкл.",
-      "all": "Все",
-      "warning": "Предупреждения",
-      "critical": "Критические"
+      "warning": "Предупреждения"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Code Reviewer требует внимания",
         "description": "Code Reviewer был отключен, потому что Kilo не может получить доступ к этому репозиторию с активной установкой приложения GitHub. Обновите установку приложения GitHub, затем снова включите Code Reviewer.",
         "recoveryLabel": "Обновить приложение GitHub"
       },
       "githubIpAllowList": {
-        "title": "Code Reviewer требует внимания",
-        "description": "Code Reviewer был отключен, потому что эта организация GitHub использует список разрешенных IP-адресов, который блокирует Kilo. Обратитесь за помощью на hi@kilocode.ai, затем снова включите Code Reviewer.",
-        "recoveryLabel": "Связаться с поддержкой"
+        "description": "Code Reviewer был отключен, потому что эта организация GitHub использует список разрешенных IP-адресов, который блокирует Kilo. Обратитесь за помощью на hi@kilocode.ai, затем снова включите Code Reviewer."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Code Reviewer требует внимания",
         "description": "Code Reviewer был отключен, потому что Kilo не может создать токен доступа к проекту GitLab для этого проекта. Предоставьте доступ уровня Maintainer или включите токены доступа к проектам, затем снова включите Code Reviewer.",
         "recoveryLabel": "Обновить интеграцию GitLab"
       },
       "byokInvalidKey": {
-        "title": "Code Reviewer требует внимания",
         "description": "Code Reviewer был отключен, потому что выбранный ключ API BYOK недействителен, отозван или не имеет разрешений. Обновите ключ или выберите другую модель, затем снова включите Code Reviewer.",
         "recoveryLabel": "Обновить настройки BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "Code Reviewer требует внимания",
         "description": "Code Reviewer был отключен, потому что выбранная модель недоступна для облачных сеансов агента. Выберите доступную модель, затем снова включите Code Reviewer.",
         "recoveryLabel": "Обновить настройки Code Reviewer"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Code Reviewer требует внимания",
-        "description": "Code Reviewer был отключен после трех сегодняшних превышений времени ожидания клонирования репозитория. Обратитесь за помощью на hi@kilocode.ai, затем снова включите Code Reviewer.",
-        "recoveryLabel": "Связаться с поддержкой"
-      }
+        "description": "Code Reviewer был отключен после трех сегодняшних превышений времени ожидания клонирования репозитория. Обратитесь за помощью на hi@kilocode.ai, затем снова включите Code Reviewer."
+      },
+      "title": "Code Reviewer требует внимания",
+      "recoveryLabel": "Связаться с поддержкой"
     },
     "unknownError": "Неизвестная ошибка"
   },
@@ -1056,24 +1004,12 @@
       "noFilters": "Нет доступных фильтров",
       "noFiltersDescription": "Вернитесь и снова откройте фильтры из списка находок.",
       "title": "Фильтровать находки",
-      "all": "Все",
-      "allRepositories": "Все репозитории",
       "fixed": "Исправлено",
       "outcome": "Результат",
-      "outcomeAnalyzing": "Анализируется",
-      "outcomeDismissed": "Отклонено",
-      "outcomeExploitable": "Эксплуатируемая",
-      "outcomeFailed": "Анализ не удался",
-      "outcomeNeedsReview": "Требует проверки",
-      "outcomeNotAnalyzed": "Не проанализировано",
-      "outcomeNotExploitable": "Неэксплуатируемая",
-      "outcomeSafeToDismiss": "Можно отклонить",
       "outcomeTriageComplete": "Сортировка завершена",
       "overdueOnly": "Только просроченные",
-      "repository": "Репозиторий",
       "reset": "Сбросить",
       "severity": "Критичность",
-      "severityCritical": "Критическая",
       "severityHigh": "Высокая",
       "severityLow": "Низкая",
       "severityMedium": "Средняя",
@@ -1082,8 +1018,6 @@
       "sortSeverityAsc": "Критичность: от низкой к высокой",
       "sortSeverityDesc": "Критичность: от высокой к низкой",
       "sortSlaDue": "Срок SLA",
-      "status": "Статус",
-      "statusClosed": "Закрыто",
       "statusIgnored": "Игнорируется",
       "statusOpen": "Открыто"
     },
@@ -1097,7 +1031,6 @@
       "exploitable": "Эксплуатируемая",
       "fullReport": "Полный сгенерированный отчет",
       "keepWaiting": "Продолжить ожидание",
-      "model": "Модель",
       "no": "Нет",
       "noAnalysisYet": "Анализа пока нет",
       "noAnalysisYetDescription": "Запустите его на вкладке «Детали»",
@@ -1110,7 +1043,6 @@
       "suggestedFix": "Рекомендуемое исправление",
       "triageConfidence": "Уверенность сортировки",
       "triageReasoning": "Обоснование сортировки",
-      "unknown": "Неизвестно",
       "watchInCloudAgent": "Смотреть в Cloud Agent",
       "whereFound": "Где это было найдено ({{displayCount}})",
       "yes": "Да"
@@ -1118,21 +1050,14 @@
     "analysisSettings": {
       "analysisModel": "Модель анализа",
       "couldNotLoad": "Не удалось загрузить настройки анализа",
-      "couldNotLoadModels": "Не удалось загрузить модели",
       "depth": "Глубина анализа",
-      "modeAuto": "Авто",
-      "modeDeep": "Глубокая",
-      "modeShallow": "Поверхностная",
-      "permissionNote": "Только владельцы организации и менеджеры по оплате могут изменять эти настройки.",
       "remediationModel": "Модель исправления",
       "title": "Модели и анализ",
       "triageModel": "Модель сортировки"
     },
     "auditReport": {
-      "checkConnection": "Проверьте подключение и попробуйте снова.",
       "couldNotLoad": "Не удалось загрузить отчет аудита",
       "events": "События",
-      "findings": "Замечания",
       "generated": "Создан {{generatedAt}}",
       "noActivity": "Нет записанной активности",
       "noActivityDescription": "В Kilo нет активности по находкам безопасности, о которой можно сообщить, за период с {{start}} по {{end}}.",
@@ -1169,7 +1094,6 @@
       "includeExistingFindingsAnalysisSubtitle": "Также анализировать ранее синхронизированные находки. Это может потребовать дополнительные кредиты.",
       "includeExistingFindingsRemediationSubtitle": "Также ставить в очередь уже проанализированные подходящие находки. Повторные PR не создаются.",
       "minimumSeverity": "Минимальная критичность",
-      "permissionNote": "Только владельцы организации и менеджеры по оплате могут изменять эти настройки.",
       "queued": "{{displayCount}} существующих находок поставлено в очередь на анализ.",
       "queued_other": "{{displayCount}} существующих находок поставлено в очередь на анализ.",
       "queued_one": "{{displayCount}} существующая находка поставлена в очередь на анализ.",
@@ -1183,9 +1107,6 @@
       "queued_few": "{{displayCount}} существующие находки поставлены в очередь на анализ.",
       "queued_many": "{{displayCount}} существующих находок поставлено в очередь на анализ."
     },
-    "commandRetry": {
-      "discard": "Отменить"
-    },
     "dashboard": {
       "actFirst": "Действовать первыми",
       "actionPosture": "Подход к действиям",
@@ -1197,7 +1118,6 @@
       "daysOverdue": "Просрочено на {{displayCount}} дн.",
       "deadlineToday": "Срок истекает сегодня",
       "filterByRepository": "Фильтровать по репозиторию",
-      "findings": "Замечания",
       "findingsCount": "{{displayCount}} находок",
       "highOverdue": "Высокие просроченные",
       "lastSynced": "Последняя синхронизация: {{time}}",
@@ -1226,15 +1146,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Открытые находки",
-      "openFindingsDetail": "{{critical}} критических, {{high}} высоких",
-      "confirmedExploitable": "Подтверждено эксплуатируемых",
       "confirmedExploitableDetail": "Риск проекта подтвержден анализом",
-      "needsReview": "Требует вашей проверки",
       "needsReviewDetail": "Требуется решение человека",
-      "analysisIncomplete": "Анализ не завершен",
       "analysisIncompleteDetail": "Риск проекта пока неизвестен",
       "slaCompliance": "Соответствие SLA",
-      "notMeasured": "Не измерено",
       "withinDeadlineDetail": "{{within}} из {{total}} в пределах срока",
       "noDeadlineData": "Пока нет находок со сроком SLA",
       "deadlinePassed": "Срок истек",
@@ -1262,31 +1177,22 @@
       "reasonNoBandwidth": "Нет доступных ресурсов",
       "reasonNotUsed": "Уязвимый код не используется",
       "reasonTolerableRisk": "Риск приемлем",
-      "submit": "Отклонить находку",
       "title": "Отклонить находку"
     },
     "findingDetail": {
-      "couldNotLoad": "Не удалось загрузить эту находку",
-      "dismissA11y": "Отклонить находку",
-      "notFound": "Находка не найдена",
-      "notFoundDescription": "Эта находка могла быть удалена, или у вас больше нет к ней доступа.",
       "tabAnalysis": "Анализ",
-      "tabDetails": "Детали",
       "tabRemediation": "Исправление",
       "title": "Находка"
     },
     "findingDetails": {
       "cve": "CVE",
       "detected": "Обнаружено",
-      "dismissed": "Отклонено",
       "dismissedBecause": "Отклонено, причина: {{reason}}.",
-      "fixed": "Исправлено",
       "ghsa": "GHSA",
       "manifest": "Манифест",
       "noPatchAvailable": "Нет доступного исправления",
       "package": "Пакет",
       "patchedVersion": "Исправленная версия",
-      "repository": "Репозиторий",
       "severityLabel": "Критичность: {{severity}}",
       "slaDeadline": "Срок SLA",
       "source": "Источник",
@@ -1294,12 +1200,8 @@
       "sourceRecord": "Запись источника",
       "supersededBy": "Заменена актуальной находкой",
       "supersededByDescription": "Нажмите, чтобы открыть актуальную запись со статусом, анализом и исправлением.",
-      "unknown": "Неизвестно",
-      "updated": "Обновлено",
       "viewAdvisory": "Посмотреть рекомендацию на GitHub",
       "vulnerableVersions": "Уязвимые версии",
-      "statusSuperseded": "Заменена",
-      "statusFixed": "Исправлено",
       "statusOpen": "Открыта",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "исправление уже начато",
@@ -1310,26 +1212,22 @@
       "reasonAfterReview": "после проверки"
     },
     "findingList": {
-      "clearFilters": "Сбросить фильтры",
       "couldNotLoad": "Не удалось загрузить находки",
       "couldNotLoadMore": "Не удалось загрузить больше находок",
       "emptyDescription": "Сейчас нет открытых находок, требующих внимания.",
       "emptyTitle": "Нет открытых находок",
       "noMatchesDescription": "Попробуйте изменить или сбросить выбранные фильтры.",
-      "noMatchesTitle": "Нет находок, соответствующих фильтрам",
-      "title": "Замечания"
+      "noMatchesTitle": "Нет находок, соответствующих фильтрам"
     },
     "findingRow": {
       "a11y": "Находка {{severity}}: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "Находка {{severity}}: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Анализировать",
-      "nextNeedsManualReview": "Требует ручной проверки",
       "nextRemediationAvailable": "Доступно исправление",
       "nextRemediationInProgress": "Идет исправление",
       "nextRemediationPrOpen": "Открыт PR исправления",
       "nextRetryRemediation": "Доступен повтор исправления",
       "nextViewDetails": "Просмотреть детали",
-      "retryAnalysis": "Повторить анализ",
       "runAnalysis": "Запустить анализ",
       "viewPr": "Посмотреть PR"
     },
@@ -1340,44 +1238,32 @@
       "newFindingSection": "Уведомление о новых находках",
       "newFindingSeverityLabel": "Минимальная критичность новых находок",
       "newFindingSubtitle": "Отправляется при каждой синхронизации новой находки, включая первую.",
-      "readOnly": "Только владельцы организации и менеджеры по оплате могут изменять эти настройки.",
       "slaLeadTimeAccessibility": "Заблаговременность предупреждения SLA в днях",
       "slaLeadTimeError": "Введите целое число дней от 1 до 365.",
-      "slaLeadTimeHint": "Введите целое число от 1 до 365",
       "slaLeadTimeLabel": "Заблаговременность предупреждения SLA (дни)",
       "slaPersonalTitle": "Писать мне о предупреждениях SLA",
       "slaSection": "Уведомление о предупреждениях SLA",
       "slaSeverityLabel": "Минимальная критичность уведомлений SLA",
-      "slaSubtitle": "Отправляется до и в момент приближения или нарушения срока SLA.",
-      "title": "Уведомления"
+      "slaSubtitle": "Отправляется до и в момент приближения или нарушения срока SLA."
     },
     "remediation": {
       "attemptHistory": "История попыток ({{displayCount}})",
       "attemptNumber": "Попытка №{{number}}",
-      "branch": "Ветка",
       "cancelMessage": "Security Agent остановит текущую попытку исправления.",
       "cancelRemediation": "Отменить исправление",
       "cancelTitle": "Отменить это исправление?",
       "cancellationRequested": "Запрошена отмена",
       "cancelled": "Исправление отменено",
       "couldNotLoad": "Не удалось загрузить статус исправления",
-      "keepRunning": "Продолжить выполнение",
-      "model": "Модель",
-      "noAnalysisDescription": "Запустите его на вкладке «Детали»",
-      "noAnalysisTitle": "Анализа пока нет",
       "openDraftPullRequest": "Открыть черновой pull request{{number}}",
       "openPullRequest": "Открыть pull request{{number}}",
       "progress": "Прогресс",
-      "pullRequest": "pull request",
       "retry": "Повторить исправление",
       "start": "Начать исправление",
       "startedBy": "Запущено",
       "timeline": {
         "blocked": "Исправление заблокировано",
-        "cancelled": "Отменено",
         "failed": "Исправление не удалось",
-        "noChangesNeeded": "Изменения не требуются",
-        "prOpened": "PR открыт",
         "queued": "Исправление запрошено"
       },
       "queued": "Исправление в очереди",
@@ -1385,18 +1271,12 @@
       "unavailable": "Исправление недоступно для этой находки."
     },
     "repositories": {
-      "allRepositories": "Все репозитории",
       "couldNotLoad": "Не удалось загрузить настройки репозиториев",
-      "couldNotLoadRepositories": "Не удалось загрузить репозитории",
-      "couldNotOpenGithubSettings": "Не удалось открыть настройки приложения GitHub",
       "githubAppSettings": "Настройки GitHub App",
       "manageAccess": "Управление доступом GitHub App",
       "noRepositories": "Нет репозиториев",
       "noRepositoriesDescription": "Предоставьте Kilo GitHub App доступ к репозиториям",
-      "readOnly": "Только владельцы организации и менеджеры по оплате могут изменять эти настройки.",
-      "selectAtLeastOne": "Выберите хотя бы один репозиторий.",
-      "selectedRepositories": "Выбранные репозитории",
-      "title": "Репозитории"
+      "selectAtLeastOne": "Выберите хотя бы один репозиторий."
     },
     "scopeEntry": {
       "connectDescription": "Установите Kilo GitHub App, чтобы автоматически синхронизировать оповещения Dependabot и управлять находками безопасности в ваших репозиториях.",
@@ -1409,45 +1289,25 @@
       "reauthorizeTitle": "Требуются дополнительные разрешения",
       "setupFailed": "Не удалось начать настройку GitHub. Попробуйте снова."
     },
-    "scopeList": {
-      "couldNotLoad": "Не удалось загрузить организации",
-      "personal": "Личное",
-      "personalSubtitle": "Ваши собственные репозитории",
-      "title": "Агент безопасности"
-    },
     "settingsOverview": {
-      "allRepositories": "Все репозитории",
       "analysisModeSubtitle": "Анализ: {{mode}}",
-      "automation": "Автоматизация",
       "automationAllOff": "Все выключено",
       "automationCount": "Включено {{displayCount}} из 3",
       "couldNotLoadPermissions": "Не удалось загрузить разрешения",
-      "couldNotLoadRepositories": "Не удалось загрузить репозитории",
       "couldNotLoadSettings": "Не удалось загрузить настройки Security Agent",
-      "disabled": "Отключено",
       "disabledNoManage": "Security Agent отключен. Только владельцы организации и менеджеры по оплате могут его включить.",
       "disabledNoRepo": "Выберите хотя бы один репозиторий, прежде чем включить Security Agent.",
       "disabledPrompt": "Включите Security Agent, чтобы синхронизировать оповещения Dependabot, выбрать репозитории и настроить автоматизацию.",
-      "enabled": "Включено",
-      "modelsAndAnalysis": "Модели и анализ",
-      "notifications": "Уведомления",
       "notificationsCount": "Включено {{displayCount}} из 2",
-      "off": "Выкл.",
       "on": "Вкл.",
-      "repositories": "Репозитории",
       "repositoriesCount": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_other": "Выбрано репозиториев: {{displayCount}}",
       "repositoriesCount_one": "Выбран {{displayCount}} репозиторий",
-      "securityAgent": "Агент безопасности",
-      "selectRepositories": "Выбрать репозитории",
       "selectRepositoriesSubtitle": "Выберите, какие репозитории отслеживает Security Agent",
-      "slaPolicy": "Политика SLA",
-      "title": "Настройки",
       "repositoriesCount_few": "Выбрано {{displayCount}} репозитория",
       "repositoriesCount_many": "Выбрано {{displayCount}} репозиториев"
     },
     "settingsSave": {
-      "discard": "Отменить",
       "keepEditing": "Продолжить редактирование",
       "saveChanges": "Сохранить изменения",
       "unsavedMessage": "Сохранить изменения перед уходом с этого экрана?",
@@ -1458,7 +1318,6 @@
     },
     "sla": {
       "couldNotLoad": "Не удалось загрузить настройки SLA",
-      "critical": "Критическая",
       "criticalDescription": "Удаленная эксплуатация без аутентификации.",
       "deadlinesHeading": "Сроки исправления (дни)",
       "enableTracking": "Включить отслеживание SLA",
@@ -1475,7 +1334,6 @@
       "remediationDeadlineA11y": "Срок исправления {{label}} в днях",
       "title": "Политика SLA"
     },
-    "title": "Агент безопасности",
     "initialSyncAdmissionFailed": "Security Agent включен, но начальную синхронизацию не удалось поставить в очередь. Синхронизируйте снова.",
     "queuedActionUntracked": "Действие в очереди больше нельзя отслеживать. Обновите, чтобы увидеть актуальное состояние.",
     "commands": {
@@ -1495,49 +1353,33 @@
     },
     "analysisState": {
       "queued": "Анализ в очереди",
-      "queuedTitle": "Анализ в очереди",
       "queuedDescription": "Ожидается освобождение мощности анализа.",
       "analyzing": "Анализируется",
-      "analyzingTitle": "Анализируется",
       "analyzingDescription": "Проверяется, может ли код приложения достичь затронутого компонента.",
       "failed": "Анализ не удался",
-      "failedTitle": "Анализ не удался",
       "failedDescription": "Security Agent не смог завершить анализ.",
-      "extractionFailed": "Требует проверки",
-      "extractionFailedTitle": "Требует проверки",
       "extractionFailedDescription": "Технический отчет не удалось преобразовать в структурированный результат.",
-      "exploitable": "Эксплуатируемая",
-      "exploitableTitle": "Эксплуатируемая",
       "exploitableDescription": "Код приложения может достичь затронутого компонента.",
       "notExploitable": "Недостижима",
-      "notExploitableTitle": "Недостижима",
       "notExploitableDescription": "В этом репозитории не найден достижимый путь.",
       "unknown": "Требует проверки",
-      "unknownTitle": "Требует проверки",
       "unknownDescription": "Анализ не смог подтвердить, достижим ли уязвимый компонент.",
       "safeToDismiss": "Можно отклонить",
-      "safeToDismissTitle": "Можно отклонить",
       "safeToDismissDescription": "Сортировка определила, что это можно безопасно отклонить без анализа кодовой базы.",
-      "manualReview": "Требует проверки",
       "manualReviewTitle": "Требует ручной проверки",
       "manualReviewDescription": "Сортировка пометила эту находку для ручной проверки.",
       "analysisRequired": "Требуется анализ",
       "analysisRequiredTitle": "Требуется анализ кодовой базы",
       "analysisRequiredDescription": "Сортировка рекомендует проанализировать репозиторий перед выбором решения.",
-      "completed": "Проанализировано",
-      "completedTitle": "Проанализировано",
       "completedDescription": "Анализ завершен без фиксации конкретного результата.",
       "notAnalyzed": "Не проанализировано",
-      "notAnalyzedTitle": "Не проанализировано",
       "notAnalyzedDescription": "Анализ кодовой базы для этой находки еще не выполнялся."
     },
     "deadline": {
       "fixedBeforeDeadline": "Исправлено до срока",
-      "fixed": "Исправлено",
       "fixedOn": "Исправлено {{date}}",
       "resolutionRecorded": "Решение зафиксировано",
       "superseded": "Заменена",
-      "dismissed": "Отклонено",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Срок не установлен",
       "noSlaDeadline": "Срок SLA не назначен",
@@ -1557,17 +1399,13 @@
       "dueInDays": "Срок через {{count}} дней"
     },
     "remediationStatus": {
-      "cancellationRequested": "Запрошена отмена",
       "notStarted": "Не начато",
-      "queued": "В очереди",
       "starting": "Запуск",
       "inProgress": "В процессе",
       "draftPrOpened": "Открыт черновой PR",
       "prOpened": "PR открыт",
       "blocked": "Заблокировано",
-      "failed": "Не удалось",
       "noChangesNeeded": "Изменения не требуются",
-      "cancelled": "Отменено",
       "originAutomaticPolicy": "Автоматическая политика",
       "originIncludeExistingPolicy": "Политика включения существующих находок",
       "originManual": "Вручную",
@@ -1579,7 +1417,6 @@
       "findingNotOpen": "Находка больше не открыта.",
       "repoNotInScope": "Репозиторий не выбран для Security Agent.",
       "analysisRequired": "Запустите анализ кодовой базы перед началом исправления.",
-      "sandboxAnalysisRequired": "Запустите анализ кодовой базы перед началом исправления.",
       "staleAnalysis": "Находка изменилась после анализа. Повторите анализ перед началом исправления.",
       "notExploitable": "Анализ не нашёл достижимого пути к уязвимости. Автоисправление недоступно.",
       "exploitabilityUnknown": "Анализ не смог подтвердить эксплуатируемость. Перед исправлением в один клик требуется ручная проверка.",
@@ -1595,12 +1432,10 @@
       "autoRemediationDisabled": "Автоисправление отключено. Ручное исправление всё ещё может начаться, когда проверки безопасности пройдены.",
       "includeExistingDisabled": "Существующие находки исключены из автоматического исправления.",
       "belowThreshold": "Находка ниже автоматического порога критичности. Ручное исправление всё ещё может начаться, когда проверки безопасности пройдены.",
-      "beforeEnablement": "Анализ завершен до включения автоисправления. Ручное исправление всё ещё может начаться, когда проверки безопасности пройдены.",
-      "generic": "Исправление недоступно для этой находки."
+      "beforeEnablement": "Анализ завершен до включения автоисправления. Ручное исправление всё ещё может начаться, когда проверки безопасности пройдены."
     },
     "commandFailure": {
       "ownerCapReached": "Лимит анализа исчерпан. Дождитесь завершения активного анализа, затем повторите попытку.",
-      "githubTokenUnavailable": "Авторизация GitHub требует внимания. Повторно авторизуйте приложение GitHub, затем повторите попытку.",
       "githubAuthInvalid": "Авторизация GitHub требует внимания. Повторно авторизуйте приложение GitHub, затем повторите попытку.",
       "findingUnavailable": "Находка больше недоступна. Обновите список находок и повторите, если она останется открытой.",
       "repositoryUnavailable": "Репозиторий больше недоступен для приложения GitHub. Обновите доступ к репозиторию, затем повторите попытку.",
@@ -1620,12 +1455,9 @@
     "search": {
       "searching": "Поиск",
       "searchSessions": "Поиск сеансов",
-      "searchSessionsPlaceholder": "Поиск сеансов...",
-      "clearSearch": "Очистить поиск",
-      "clearFilters": "Сбросить фильтры"
+      "searchSessionsPlaceholder": "Поиск сеансов..."
     },
     "sessionList": {
-      "couldNotLoad": "Не удалось загрузить сеансы",
       "couldNotLoadActive": "Не удалось загрузить активные сеансы",
       "noSessionsYetDescription": "Начните задачу кодирования с телефона. Ваши сеансы появятся здесь.",
       "noMatches": "Нет подходящих сеансов",
@@ -1640,9 +1472,7 @@
     "sessionRow": {
       "deleteTitle": "Удалить сеанс?",
       "deleteMessage": "Это действие нельзя отменить.",
-      "delete": "Удалить",
       "deleteSession": "Удалить сеанс",
-      "rename": "Переименовать",
       "renameMessage": "Введите новое имя для этого сеанса",
       "copyId": "Копировать идентификатор сеанса",
       "idCopied": "Идентификатор сеанса скопирован",
@@ -1680,7 +1510,6 @@
       "didNotCompleteTitle": "Установка не завершилась",
       "didNotCompleteMessage": "Установка GitHub App не была завершена. Попробуйте снова из приложения."
     },
-    "sessionExited": "Сеанс завершён",
     "remoteSpawnRetryable": "Не удалось подключиться к экземпляру — возможно, он отключился.",
     "remoteSpawnNonRetryable": "Экземпляр не смог запустить сеанс — проверьте машину или обновите CLI.",
     "remoteSpawnInstanceDisconnected": "Выбранный экземпляр отключился. Запустите сеанс в Cloud Agent или выберите другой экземпляр.",
@@ -1694,12 +1523,8 @@
       "title": "Сеанс",
       "copyErrorDetails": "Копировать сведения об ошибке",
       "backToSessions": "Назад к сеансам",
-      "accessDenied": "Доступ запрещен",
-      "accessDeniedDescription": "У вас нет разрешения на просмотр.",
       "couldNotLoad": "Не удалось загрузить сеанс",
       "failedToLoadDetails": "Не удалось загрузить сведения о сеансе",
-      "notFound": "Не найдено",
-      "notFoundDescription": "Возможно, этот элемент был удален или больше недоступен.",
       "failedToStopExecution": "Не удалось остановить выполнение",
       "renameSession": "Переименовать сеанс",
       "renamePlaceholder": "Имя сеанса",
@@ -1710,7 +1535,6 @@
       "emptyTitle": "Сообщений пока нет",
       "renameAccessibility": "Переименовать сессию: {{title}}",
       "cloningSession": "Клонирование сессии",
-      "continue": "Продолжить",
       "couldNotLoadThisSession": "Не удалось загрузить эту сессию",
       "cloneFailedRetry": "Не удалось клонировать эту сессию. Попробуйте снова.",
       "notEnoughCredits": "Недостаточно кредитов для запуска Cloud Agent. Добавьте кредиты и попробуйте снова.",
@@ -1725,7 +1549,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Не удалось создать удаленный сеанс",
-      "exited": "Сеанс завершён",
       "failedToExit": "Не удалось выйти из сеанса",
       "exitTitle": "Выйти из сеанса?",
       "exitMessage": "Это остановит текущий сеанс, но сохранит его историю.",
@@ -1743,9 +1566,6 @@
       "retryConnection": "Повторить подключение"
     },
     "newSession": {
-      "title": "Новый сеанс",
-      "repository": "Репозиторий",
-      "connectGithub": "Подключить GitHub",
       "connectGithubDescription": "Подключите GitHub в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
       "openGithub": "Открыть GitHub",
       "refreshRepositories": "Обновить репозитории",
@@ -1762,7 +1582,6 @@
       "commitAndPush": "Закоммитить и отправить",
       "startSession": "Начать сеанс",
       "promptPlaceholder": "Над чем хотите поработать?",
-      "addAttachment": "Добавить вложение",
       "couldNotLoadModels": "Не удалось загрузить модели",
       "prefillRepoAndModelUnavailable": "Репозиторий и модель исходного сеанса больше недоступны. Выберите их ниже.",
       "prefillRepoUnavailable": "{{repo}} больше недоступен. Выберите репозиторий ниже.",
@@ -1770,16 +1589,11 @@
       "couldNotReadPendingSessions": "Не удалось прочитать ожидающие сеансы. Попробуйте снова.",
       "failedToCreate": "Не удалось создать сеанс",
       "couldNotRefreshRepositories": "Не удалось обновить репозитории. Попробуйте снова.",
-      "discard": "Отменить",
       "discardDraftMessage": "Ваш запрос будет потерян.",
       "discardDraftTitle": "Отменить черновик?",
       "discardFailed": "Не удалось отменить черновик. Попробуйте снова.",
-      "keepEditing": "Продолжить редактирование",
       "remoteHint": "Запустите `kilo remote` на вашем компьютере или `/remote` в запущенном CLI-сеансе, чтобы управлять локальным процессом kilo.",
-      "bitbucketConnected": "Bitbucket подключен",
-      "connectBitbucket": "Подключить Bitbucket",
       "connectBitbucketDescription": "Подключите Bitbucket в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
-      "connectGitlab": "Подключить GitLab",
       "connectGitlabDescription": "Подключите GitLab в браузере, затем вернитесь сюда, чтобы выбрать репозиторий.",
       "couldNotLoadBitbucketRepositories": "Не удалось загрузить репозитории Bitbucket",
       "couldNotLoadGithubRepositories": "Не удалось загрузить репозитории GitHub",
@@ -1803,18 +1617,10 @@
       "updatedFileCount_few": "Обновлено {{displayCount}} файла",
       "updatedFileCount_many": "Обновлено {{displayCount}} файлов"
     },
-    "toolPatch": {
-      "operationAdded": "Добавлено",
-      "operationDeleted": "Удалено",
-      "operationUpdated": "Обновлено"
-    },
     "toolCard": {
       "accessibility": "{{label}} инструмент, {{status}}",
       "accessibilityLabel": "{{name}} инструмент, {{status}}",
-      "fileEmpty": "Этот файл пуст.",
       "noTasks": "Нет задач.",
-      "contentTruncated": "Содержимое обрезано",
-      "truncated": "Обрезано",
       "toolRead": "читать",
       "toolEdit": "редактировать",
       "toolWrite": "записать",
@@ -1846,9 +1652,7 @@
       "runOn": "Запустить на",
       "runOnAccessibility": "Запустить на: {{label}}",
       "couldNotLoad": "Не удалось загрузить экземпляры",
-      "couldNotLoadDescription": "Проверьте подключение и попробуйте снова.",
       "cloudAgent": "Облачный агент",
-      "loading": "Загрузка…",
       "cloudAgentDescription": "Запуск в облачной песочнице Kilo",
       "noCliInstances": "Нет подключенных экземпляров CLI",
       "noCliInstancesDescription": "Выполните `kilo remote` в проекте на своем компьютере или обновите Kilo CLI, если она уже запущена.",
@@ -1885,12 +1689,9 @@
       "noMatches": "Нет совпадений",
       "noRepositories": "Нет доступных репозиториев",
       "noRepositoriesDescription": "К вашей учетной записи не подключены репозитории.",
-      "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
       "loading": "Загрузка...",
       "accessibility": "Репозиторий: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Сведения о сообщении",
@@ -1900,13 +1701,10 @@
       "reportAiResponse": "Пожаловаться на ответ ИИ",
       "reportAiResponseConfirm": "Отправить этот ответ на проверку?",
       "report": "Пожаловаться",
-      "role": "Роль",
       "roleUser": "Пользователь",
       "roleAssistant": "Ассистент",
       "sent": "Отправлено",
-      "model": "Модель",
       "costAndTokens": "Стоимость и токены",
-      "cost": "Стоимость",
       "input": "Ввод",
       "output": "Вывод",
       "reasoning": "Рассуждение",
@@ -1914,8 +1712,7 @@
       "cacheWrite": "Запись кэша",
       "total": "Итого",
       "reportAiResponseFailedRetryable": "Не удалось пожаловаться на этот ответ.",
-      "reportAiResponseFailedTerminal": "На этот ответ нельзя пожаловаться.",
-      "reportAiResponseSubmitted": "Жалоба отправлена. Квитанция {{receiptId}}"
+      "reportAiResponseFailedTerminal": "На этот ответ нельзя пожаловаться."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -1926,7 +1723,6 @@
       "textDisplay": "Отображение текста",
       "thinking": "Мышление",
       "thought": "Мысль",
-      "title": "Детали",
       "showDetails": "Показать сведения",
       "pending": "Ожидание…",
       "running": "Выполняется…"
@@ -1949,16 +1745,13 @@
     "filePart": {
       "loadingImage": "Загрузка изображения",
       "imageUnavailableRetry": "Изображение недоступно, повторите загрузку",
-      "imageUnavailable": "Изображение недоступно",
       "imagePreviewUnavailableInSession": "Предпросмотр изображения недоступен в этом сеансе.",
       "viewImage": "Просмотреть изображение",
       "viewImageWithAlt": "Просмотреть изображение {{alt}}",
       "imageOutput": "Вывод изображения",
       "imageOutputWithFilename": "Вывод изображения, {{filename}}",
-      "defaultName": "Файл",
       "openFullScreen": "Открыть {{name}} на весь экран",
       "preview": "Предпросмотр {{name}}",
-      "openFile": "Открыть {{name}}",
       "couldNotLoadFile": "Не удалось загрузить этот файл.",
       "couldNotLoadFileRetry": "Не удалось загрузить этот файл. Попробуйте снова.",
       "retryLoadingFile": "Повторить загрузку файла",
@@ -2041,7 +1834,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Доступен повтор.",
       "copyToComposer": "Копировать в редактор",
-      "queued": "В очереди",
       "queuedAccessibility": "Сообщение в очереди",
       "userMessage": "Сообщение пользователя",
       "assistantMessage": "Сообщение ассистента",
@@ -2083,12 +1875,10 @@
     },
     "sessionFilter": {
       "title": "Фильтровать сеансы",
-      "platform": "Платформа",
       "platformCloud": "Облако",
       "platformExtension": "Расширение",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Другое",
       "project": "Проект"
@@ -2102,15 +1892,10 @@
     },
     "modelPicker": {
       "title": "Выбрать модель",
-      "searchPlaceholder": "Поиск моделей...",
-      "allModels": "Все модели",
       "favorites": "Избранное",
-      "noModels": "Нет доступных моделей",
-      "noModelsDescription": "Нет моделей, доступных для выбора.",
-      "recommended": "Рекомендуемые"
+      "noModelsDescription": "Нет моделей, доступных для выбора."
     },
     "modelSelector": {
-      "model": "Модель",
       "provider": "Провайдер {{id}}",
       "modelId": "Модель {{id}}",
       "unavailable": "Недоступно",
@@ -2134,7 +1919,6 @@
       "uploading": "Загрузка…",
       "uploaded": "Загружено",
       "uploadFailedRetry": "Загрузка не удалась. Нажмите, чтобы повторить.",
-      "uploadFailedTerminal": "Этот файл нельзя загрузить.",
       "moveLeft": "Переместить {{filename}} влево",
       "moveRight": "Переместить {{filename}} вправо"
     },
@@ -2146,8 +1930,6 @@
       "camera": "Камера",
       "photoLibrary": "Фотоальбом",
       "files": "Файлы",
-      "cameraAccessDisabled": "Доступ к камере отключён",
-      "cameraAccessMessage": "Разрешите доступ к камере в настройках, чтобы сделать фото.",
       "couldNotOpenPhotoPicker": "Не удалось открыть выбор фото. Перезапустите Kilo и попробуйте снова.",
       "maxFilesAllowed": "Максимум {{displayCount}} файлов",
       "onlyAddingFiles": "Добавляем только {{accepted}} из {{total}} файлов (максимум {{max}})"
@@ -2160,7 +1942,6 @@
       "waitForUploads": "Дождитесь завершения загрузки вложений.",
       "pasteFromClipboard": "Вставить из буфера обмена",
       "stopGenerating": "Остановить генерацию",
-      "sendMessage": "Отправить сообщение",
       "selectModelBeforeSending": "Выберите модель перед отправкой",
       "preparingPlaceholder": "Настройка окружения...",
       "finalizingPlaceholder": "Завершение...",
@@ -2174,9 +1955,7 @@
     },
     "chatLink": {
       "linkCopied": "Ссылка скопирована",
-      "reviewPr": "Проверить PR",
       "openLink": "Открыть ссылку",
-      "copyLink": "Копировать ссылку",
       "shareLink": "Поделиться ссылкой",
       "share": "Поделиться",
       "prLinkActions": "Действия со ссылкой на PR",
@@ -2216,13 +1995,11 @@
     "contextUsage": {
       "windowUnavailable": "Размер окна контекста недоступен",
       "tapToViewDetails": "Нажмите, чтобы просмотреть сведения о контексте.",
-      "costPrefix": "стоимость {{cost}}",
       "costSuffix": ", стоимость {{cost}}",
       "tokensWindowUnavailable": "Контекст {{used}} токенов, окно недоступно",
       "tokensUsage": "Контекст {{used}} из {{window}} токенов, использовано {{percentage}}",
       "title": "Использование контекста",
       "used": "Использовано",
-      "remaining": "Осталось",
       "provider": "Провайдер",
       "totalCost": "Общая стоимость",
       "usageReflectsLatest": "Использование отражает последний завершенный ответ ассистента.",
@@ -2250,8 +2027,7 @@
       "merged": "слитый pull request",
       "draft": "черновик pull request",
       "updating": "Обновление, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "pull request"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Загрузить",
@@ -2279,11 +2055,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Не удалось загрузить ваш аккаунт",
-    "couldNotLoadAccountDescription": "Проверьте подключение и попробуйте снова.",
     "couldNotLoadPrivacy": "Не удалось загрузить настройки конфиденциальности",
     "couldNotLoadPrivacyDescription": "Проверьте настройки безопасности устройства и попробуйте снова.",
     "contentReady": "Контент готов",
-    "signOut": "Выйти",
     "retryLoadingAccount": "Повторить загрузку аккаунта",
     "retryLoadingPrivacy": "Повторить загрузку настроек конфиденциальности"
   },
@@ -2293,7 +2067,6 @@
     "billingPage": "страница оплаты"
   },
   "deviceSessions": {
-    "couldNotLoad": "Не удалось загрузить сеансы",
     "couldNotLoadDescription": "Ваши активные сеансы недоступны, пока это не загрузится.",
     "currentDeviceUnidentified": "Не удалось определить текущее устройство",
     "noSessions": "Нет активных сеансов",
@@ -2301,7 +2074,6 @@
     "onlyKiloAppSignIns": "Здесь отображаются только входы через приложение Kilo. Входы из редактора и CLI не перечислены.",
     "signedIn": "Вход выполнен {{signedIn}} · Последняя активность {{lastSeen}}",
     "thisDevice": "Это устройство",
-    "title": "Сеансы устройств",
     "viewProfile": "Открыть профиль",
     "signOutThisDevice": "Выйти на этом устройстве",
     "signOutThisSession": "Выйти из этого сеанса",
@@ -2309,8 +2081,6 @@
     "signOutThisDeviceTitle": "Выйти на этом устройстве?",
     "signOutThisSessionTitle": "Выйти из этого сеанса?",
     "signOutThisSessionMessage": "{{device}} будет выведено из системы. Оно может сохранять доступ к API до одного часа.",
-    "signOutConfirm": "Выйти",
-    "signOutMessage": "Вам нужно будет войти снова, чтобы получить доступ к рабочему пространству.",
     "webBrowser": "Веб-браузер"
   },
   "forceUpdate": {
@@ -2331,17 +2101,13 @@
   },
   "imageViewer": {
     "close": "Закрыть {{filename}}",
-    "imageUnavailable": "Изображение недоступно",
     "share": "Поделиться {{filename}}"
   },
   "invalidRoute": {
     "description": "Эта ссылка больше не действительна.",
-    "goBack": "Назад",
     "title": "Страница не найдена"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Содержимое обрезано",
-    "truncated": "Обрезано",
     "wrap": "Перенос",
     "scroll": "Прокрутка"
   },
@@ -2350,22 +2116,16 @@
     "internetRestored": "Подключение к интернету восстановлено"
   },
   "queryError": {
-    "neutralTitle": "Что-то пошло не так",
     "neutralDescription": "Попробуйте снова.",
     "offlineTitle": "Не удалось загрузить",
-    "offlineDescription": "Что-то пошло не так",
-    "permissionTitle": "Доступ запрещен",
     "permissionDescription": "У вас нет разрешения на просмотр.",
-    "notFoundTitle": "Не найдено",
     "notFoundDescription": "Возможно, этот элемент был удален или больше недоступен.",
     "serverTitle": "Не удалось загрузить",
     "serverDescription": "Что-то пошло не так на нашей стороне. Попробуйте снова."
   },
   "screenHeader": {
     "openMenu": "Открыть меню",
-    "openMenuFor": "Открыть меню для {{title}}",
-    "close": "Закрыть",
-    "goBack": "Назад"
+    "openMenuFor": "Открыть меню для {{title}}"
   },
   "picker": {
     "optionsExpired": "Варианты устарели",
@@ -2396,10 +2156,7 @@
   },
   "share": {
     "title": "Поделиться в Kilo",
-    "close": "Закрыть",
-    "reviewPr": "Проверить PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Новый сеанс",
     "searchPlaceholder": "Поиск недавних сеансов",
     "connectedCli": "На подключенном CLI",
     "newSessionOn": "Новый сеанс на {{name}}",
@@ -2457,7 +2214,6 @@
     "statusCanceling": "Kilo Pass отменяется",
     "statusPastDue": "Kilo Pass просрочен",
     "monthlyCredits": "{{credits}} кредитов в месяц",
-    "ends": "Действует до {{date}}",
     "periodEnd": "конец периода",
     "managedOnGooglePlay": "Управляется в Google Play",
     "managedInAppStore": "Управляется в App Store",
@@ -2469,7 +2225,6 @@
     "unavailableDescription": "Kilo Pass недоступен как покупка в приложении на Android. Управляйте им в веб-версии.",
     "webManagementDescription": "Этот Kilo Pass управляется в веб-версии.",
     "legalDisclosure": "Kilo Pass — это ежемесячная подписка с автоматическим продлением. Платёж списывается с вашего Apple ID при подтверждении покупки. Подписка продлевается автоматически каждый месяц по указанной цене, если её не отменить не менее чем за 24 часа до конца текущего периода. Управляйте подпиской или отменяйте её в любой момент в настройках учётной записи App Store.",
-    "legalPrivacyPolicy": "Политика конфиденциальности",
     "legalTermsOfUse": "Условия использования (EULA)",
     "purchaseDifferentAccount": "Эта покупка в App Store не привязана к вашему аккаунту Kilo. Войдите в Apple Account, использованный для покупки, и попробуйте снова.",
     "restoreFailed": "Не удалось восстановить покупки. Попробуйте снова.",
@@ -2498,7 +2253,6 @@
     "privacyPolicyPrefix": "Ваши данные обрабатываются в соответствии с",
     "privacyPolicy": "политикой конфиденциальности Kilo",
     "onDevice": "На устройстве",
-    "loading": "Загрузка…",
     "couldNotLoadTranscription": "Не удалось загрузить настройку транскрипции.",
     "signInToManageTranscription": "Войдите, чтобы управлять онлайн-транскрипцией.",
     "onlineTranscription": "Онлайн-транскрипция",
@@ -2515,7 +2269,6 @@
     "voiceTranscriptionTitle": "Транскрипция голоса",
     "retentionPrefix": "Полные сроки хранения, ваши права и контактная информация указаны в",
     "backToConsent": "Назад к согласию",
-    "back": "Назад",
     "revokeConsent": "Отозвать согласие",
     "revokeConsentTitle": "Отозвать согласие на передачу данных?",
     "acceptAndContinue": "Принять и продолжить",
@@ -2549,7 +2302,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Замаскированные снимки экрана при ошибке и замаскированные записи небольшой выборки сеансов.",
     "errorScreenshotsWhy": "Увидеть, что приложение показывало при сбое.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Источник установки и идентификаторы кампаний.",
     "installAttributionWhy": "Понять, какие каналы приводят новых пользователей.",
     "installAttributionWho": "AppsFlyer.",
@@ -2559,12 +2311,10 @@
     "what": "Что",
     "why": "Почему",
     "who": "Кто",
-    "continue": "Продолжить",
     "installAttributionPromptMessage": "Kilo использует разрешение Apple на отслеживание только для того, чтобы узнать, какой канал привел вас сюда. Ваши запросы и разговоры никогда не используются.",
     "installAttributionPromptTitle": "Разрешить атрибуцию установки?"
   },
   "prReview": {
-    "accessDenied": "Доступ запрещен",
     "accessDeniedDescription": "У вас нет разрешения на просмотр этого pull request.",
     "checkConnection": "Проверить подключение",
     "checks": {
@@ -2581,8 +2331,7 @@
       "skipped": "{{displayCount}} пропущено",
       "title": "Проверки",
       "viewOnGitHub": "Открыть PR на GitHub",
-      "checkDetails": "сведения о проверке",
-      "pullRequest": "pull request"
+      "checkDetails": "сведения о проверке"
     },
     "composer": {
       "addTitle": "Добавить комментарий",
@@ -2591,13 +2340,11 @@
       "commentBody": "Текст комментария",
       "commentBodyPlaceholder": "Оставить комментарий",
       "commentNow": "Отправить комментарий",
-      "discard": "Отменить",
       "discardMessage": "Ваш черновик будет потерян.",
       "discardTitle": "Отменить комментарий?",
       "editTitle": "Изменить комментарий",
       "insertSuggestion": "Вставить предложение",
       "insertSuggestionA11y": "Вставить предложение по коду",
-      "keepEditing": "Продолжить редактирование",
       "loadFailedTitle": "Не удалось загрузить редактор комментария",
       "ok": "ОК",
       "unavailableMessage": "Этот ожидающий комментарий уже удален или отправлен.",
@@ -2611,12 +2358,9 @@
       "checkFailedTitle": "Не удалось проверить подключение GitHub",
       "description": "Подключите аккаунт GitHub, чтобы проверять pull request на мобильном.",
       "reconnectDescription": "Ваше подключение GitHub было отозвано. Подключитесь снова, чтобы продолжать проверять pull request на мобильном.",
-      "reconnectTitle": "Подключить GitHub снова",
-      "title": "Подключить GitHub"
+      "reconnectTitle": "Подключить GitHub снова"
     },
     "connectionExpired": "Срок подключения GitHub истек.",
-    "connectionExpiredDescription": "Ваше подключение GitHub больше недействительно. Проверьте подключение — при необходимости вам предложат подключиться снова.",
-    "connectionExpiredTitle": "Срок подключения GitHub истек",
     "couldNotLoadPullRequest": "Не удалось загрузить pull request",
     "couldNotOpenGitHubAppSettings": "Не удалось открыть настройки приложения GitHub",
     "description": "Описание",
@@ -2626,16 +2370,12 @@
       "addReaction": "Добавить реакцию",
       "block": "Заблокировать",
       "blockedUser": "{{login}} заблокирован",
-      "closeReactions": "Закрыть реакции",
       "collapseThread": "Свернуть ветку",
       "commentActions": "Действия с комментарием",
       "comment": "{{displayCount}} комментариев",
       "comment_other": "{{displayCount}} комментариев",
       "couldNotLoad": "Не удалось загрузить обсуждение",
       "couldNotLoadMore": "Не удалось загрузить больше комментариев.",
-      "couldNotReply": "Не удалось ответить.",
-      "file": "Файл",
-      "loadMore": "Загрузить больше",
       "loadMoreComments": "Загрузить больше комментариев",
       "loading": "Загрузка обсуждения",
       "moderation": {
@@ -2668,20 +2408,16 @@
       "reaction": "реакций",
       "reaction_other": "реакций",
       "reaction_one": "реакция",
-      "reactionsTitle": "Реакций",
-      "reply": "Ответить",
       "replyBadRequest": "Этот ответ нельзя отправить. Возможно, ветка изменилась.",
       "replyBody": "Текст ответа",
       "replyForbidden": "У вас нет разрешения отвечать на этот pull request.",
       "replyPlaceholder": "Ответить…",
       "reportContent": "Пожаловаться на содержимое",
-      "reportSubmitted": "Жалоба отправлена. Квитанция {{receiptId}}",
       "reportUser": "Пожаловаться на пользователя",
       "resolveThread": "Закрыть ветку",
       "resolved": "Закрыто",
       "retryLoadingMore": "Повторить загрузку комментариев",
       "reviewFiles": "Проверить файлы",
-      "somethingWentWrong": "Что-то пошло не так",
       "startedRelative": " · начато {{relative}}",
       "submitReply": "Отправить ответ",
       "termsAcceptRetry": "Не удалось принять условия. Проверьте подключение и попробуйте снова.",
@@ -2725,18 +2461,14 @@
       "noRecentPrs": "Нет недавних PR",
       "noRecentPrsDescription": "Вставьте ссылку на PR выше, чтобы начать проверку — в следующий раз он появится здесь.",
       "open": "Открыть",
-      "openPullRequest": "Открыть pull request",
       "pasteLink": "Вставить ссылку на pull request",
       "pastePrLink": "Вставить ссылку на PR",
-      "remove": "Удалить",
       "removeFromRecentsMessage": "Этот pull request будет удален из недавних.",
       "removeFromRecentsTitle": "Удалить из недавних?",
       "removeRecentAccessibility": "Удалить {{repo}} из недавних",
-      "title": "Проверка PR",
       "urlAccessibility": "URL pull request GitHub"
     },
     "eventChips": {
-      "approve": "Одобрить",
       "comment": "Комментарий",
       "label": "Событие проверки",
       "requestChanges": "Запросить изменения"
@@ -2752,7 +2484,6 @@
       "unified": "Единый"
     },
     "fileNavigator": {
-      "checkConnection": "Проверьте подключение и попробуйте снова.",
       "couldNotLoadFiles": "Не удалось загрузить файлы",
       "couldNotLoadMoreFiles": "Не удалось загрузить больше файлов",
       "diffTooLarge": "diff слишком большой",
@@ -2825,13 +2556,9 @@
     },
     "inbox": {
       "couldNotLoad": "Не удалось загрузить входящие",
-      "couldNotLoadMore": "Не удалось загрузить больше",
-      "draft": "Черновик",
       "loading": "Загрузка входящих",
       "noReviewRequests": "Нет запросов на проверку",
       "noReviewRequestsDescription": "Pull request, ожидающие вашей проверки, появятся здесь. Вы по-прежнему можете вставить любую ссылку на PR выше.",
-      "recent": "Недавние",
-      "retryLoadingMore": "Повторить загрузку",
       "title": "Входящие"
     },
     "installKiloGitHubApp": "Установить приложение Kilo GitHub",
@@ -2868,8 +2595,7 @@
       "noEnabledMethods": "В этом репозитории нет включенных методов слияния. Попросите администратора репозитория включить слияние, сквош или перебазирование.",
       "partialSuccessBanner": {
         "accessibility": "Объединено. Не удалось удалить ветку: {{reason}}",
-        "body": "Не удалось удалить ветку: {{reason}}",
-        "title": "Объединено"
+        "body": "Не удалось удалить ветку: {{reason}}"
       },
       "refreshMergeability": "Обновить возможность слияния",
       "terminal": {
@@ -2918,8 +2644,6 @@
       "file": "файлов",
       "file_other": "файлов",
       "file_one": "файл",
-      "stateClosed": "Закрыт",
-      "stateDraft": "Черновик",
       "stateMerged": "Объединен",
       "stateOpen": "Открыт",
       "stateOpenApproved": "Открыт · Одобрен",
@@ -2943,8 +2667,7 @@
       "reviewChangesRequested": "Запрошены изменения",
       "reviewCommented": "Прокомментировано",
       "reviewPending": "Ожидает рецензии",
-      "openIssueA11y": "Открыть задачу #{{number}} на GitHub",
-      "reviewDismissed": "Отклонено"
+      "openIssueA11y": "Открыть задачу #{{number}} на GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Все комментарии будут отправлены одним пакетным запросом.",
@@ -2952,9 +2675,7 @@
       "deletedAnnouncement": "Ожидающий комментарий удален",
       "editA11y": "Изменить ожидающий комментарий на {{location}}",
       "editOutdatedA11y": "Изменить устаревший ожидающий комментарий на {{location}}",
-      "emptyBody": "(пусто)",
       "noCommentsQueued": "Нет комментариев в очереди. Проверка будет отправлена только с событием выше.",
-      "outdated": "Устарело",
       "staleHint": "PR изменился с тех пор, как вы это написали.",
       "staleQueueHint": "Комментарии, написанные для старого коммита, не отправляются. Они остаются в очереди, чтобы вы могли изменить или удалить их.",
       "summaryA11y": "Итог проверки",
@@ -2963,7 +2684,6 @@
     "pullRequestUnavailable": "Pull request недоступен",
     "pullRequestUnavailableDescription": "Этот PR нельзя открыть. Возможно, он был удален, репозиторий приватный или приложение Kilo GitHub не установлено в нём.",
     "reconnectNotice": {
-      "checkConnection": "Проверить подключение",
       "message": "Ваше подключение GitHub больше недействительно. Проверьте подключение — при необходимости вам предложат подключиться снова.",
       "title": "Срок подключения GitHub истек"
     },
@@ -2973,7 +2693,6 @@
       "shareA11y": "Поделиться pull request",
       "title": "#{{number}}"
     },
-    "screenTitle": "Проверка PR",
     "sideBySide": {
       "emptyDiffColumn": "пустой столбец diff",
       "emptyDiffRow": "Пустая строка diff",
@@ -2983,7 +2702,6 @@
       "oldOnly": "Только старое: {{text}}"
     },
     "submit": {
-      "delete": "Удалить",
       "deletePendingMessage": "Этот комментарий будет удален из очереди проверки.",
       "deletePendingTitle": "Удалить ожидающий комментарий?",
       "loadFailedTitle": "Не удалось загрузить отправку проверки",
@@ -2991,7 +2709,6 @@
       "pendingComment_other": "ожидающих комментариев",
       "pendingComment_one": "ожидающий комментарий",
       "summaryOptional": "Итог (необязательно)",
-      "title": "Отправить проверку",
       "partialPostedMessage": "Опубликовано {{displayFreshCount}} комментариев. {{displayStaleCount}} комментариев указывают на старый коммит и остались в очереди.",
       "submitCountOfTotal": "Отправить {{displayFreshCount}} из {{displayTotalCount}} комментариев",
       "submitReview": "Отправить проверку",
@@ -3001,10 +2718,8 @@
       "blockedComment": "Добавьте итог или хотя бы один комментарий, чтобы отправить проверку с комментарием."
     },
     "fileStatus": {
-      "added": "Добавлено",
       "changed": "Изменено",
       "copied": "Скопировано",
-      "deleted": "Удалено",
       "modified": "Модифицировано",
       "renamed": "Переименовано"
     },
@@ -3017,9 +2732,7 @@
       "selectedTapToChange": "Выбрано {{label}}, нажмите, чтобы изменить выбор",
       "tapToComment": "{{label}}, нажмите, чтобы оставить комментарий",
       "truncationBanner": "Показаны первые {{limit}} из {{total}} изменённых файлов — лимит API GitHub",
-      "statusAdded": "Добавлено",
       "statusContext": "Контекст",
-      "statusDeleted": "Удалено",
       "lineLabel": "{{status}} строка {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(пусто)"
@@ -3055,7 +2768,6 @@
       "selectDescription": "Выберите организацию из вашего профиля, чтобы продолжить.",
       "selectOrganization": "Выбрать организацию",
       "unavailableDescription": "Эта организация больше недоступна. Выберите другую из вашего профиля, чтобы продолжить.",
-      "accessDeniedTitle": "Доступ запрещен",
       "accessDeniedDescription": "У вас нет доступа к этой организации."
     },
     "creditActivity": {
@@ -3074,25 +2786,19 @@
         "accounting_adjustment": "Бухгалтерская корректировка",
         "credits_expired": "Кредиты истекли"
       },
-      "loadMore": "Загрузить больше",
-      "loadMoreFailed": "Не удалось загрузить больше",
       "truncated": "Доступна более ранняя активность по кредитам."
     },
     "hub": {
       "balance": "Баланс",
       "lowBalanceBelow": "Ниже {{amount}}",
-      "lowBalanceOff": "Выкл.",
       "organizationSeats": "Места в организации",
       "renamePlaceholder": "Введите название организации",
-      "renameTitle": "Переименовать организацию",
-      "title": "Организация"
+      "renameTitle": "Переименовать организацию"
     },
     "inviteMember": {
       "emailError": "Введите корректный адрес электронной почты",
-      "emailLabel": "Электронная почта",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "У вас нет разрешения приглашать участников.",
-      "roleLabel": "Роль",
       "roleMember": "Роль: участник",
       "sendInvite": "Отправить приглашение",
       "title": "Пригласить участника"
@@ -3109,18 +2815,13 @@
         "paid": "Оплачено",
         "open": "Открыт",
         "void": "Аннулирован",
-        "draft": "Черновик",
-        "uncollectible": "Не подлежит взысканию",
-        "unknown": "Неизвестно"
+        "uncollectible": "Не подлежит взысканию"
       },
-      "loadMore": "Загрузить больше",
       "loadMoreFailed": "Не удалось загрузить больше",
       "truncated": "Доступны более ранние счета."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "Включить оповещение о низком балансе",
-      "enabled": "Включено",
       "notifyEmailsLabel": "Электронные письма для уведомлений",
       "permissionDenied": "У вас нет разрешения управлять оповещениями об оплате.",
       "separateEmailsHint": "Разделяйте несколько адресов запятыми.",
@@ -3144,12 +2845,10 @@
       "emptyDescriptionCanInvite": "Пригласите коллег, чтобы начать совместную работу в этой организации.",
       "emptyDescriptionCannotInvite": "Попросите владельца или менеджера по оплате пригласить коллег.",
       "emptyTitle": "Пока нет участников",
-      "inviteMember": "Пригласить участника",
       "invitedDate": "Приглашение отправлено {{date}}",
       "limitPerDay": "{{amount}}/day",
       "manageA11y": "Управление: {{name}}",
       "manageInvitationA11y": "Управление приглашением для {{email}}",
-      "removeConfirm": "Удалить",
       "removeMember": "Удалить участника",
       "removeMemberMessage": "Удалить {{name}} из этой организации?",
       "revokeConfirm": "Отозвать",
@@ -3164,18 +2863,12 @@
         "billingManager": "Менеджер по биллингу"
       },
       "emailStatusFailed": "Письмо не доставлено",
-      "emailStatusPending": "Ожидается",
       "inviteCreated": "Приглашение создано",
       "pendingInvitations": "Ожидающие приглашения",
       "resendInvite": "Отправить приглашение повторно",
       "shareInviteLink": "Поделиться ссылкой для приглашения"
     },
-    "permissionDenied": {
-      "back": "Назад",
-      "title": "Доступ запрещен"
-    },
     "usageStats": {
-      "cost": "Стоимость",
       "inputTokens": "Входные токены",
       "last30Days": "Последние 30 дней",
       "outputTokens": "Выходные токены",
@@ -3187,9 +2880,6 @@
       "couldNotLoadStatus": "Не удалось загрузить статус",
       "creditProcessingDelayed": "Обработка кредитов задерживается · повторная попытка выполняется автоматически",
       "ended": "Завершено",
-      "endsOn": "Действует до {{date}}",
-      "loading": "Загрузка…",
-      "manageHint": "Открывает управление Kilo Pass в веб-версии.",
       "notSubscribed": "Нет подписки",
       "overallocated": "Назначений Pass больше, чем оплаченных мест",
       "paidSeat_one": "{{displayCount}} оплаченное место",
@@ -3199,7 +2889,6 @@
       "paymentPending": "Оплата ожидается",
       "processingBlocked": "Обработка заблокирована",
       "processingNeedsReview": "Обработка требует проверки",
-      "retry": "Повторить",
       "retryHint": "Повторяет загрузку статуса Kilo Pass.",
       "setupHint": "Открывает настройку Kilo Pass в веб-версии.",
       "paidSeat_few": "{{displayCount}} оплаченных места",
@@ -3215,7 +2904,6 @@
     "sendFeedback": "Отправить отзыв"
   },
   "authErrors": {
-    "emailAlreadyUsed": "Аккаунт с этим email уже существует с другим способом входа. Попробуйте другой способ или используйте «$t(login.moreSignInOptions)».",
     "differentOauth": "Аккаунт с этим email уже существует с другим способом входа. Попробуйте другой способ или используйте «$t(login.moreSignInOptions)».",
     "ssoError": "Ваша организация требует SSO. Используйте «$t(login.moreSignInOptions)».",
     "blocked": "Этот аккаунт заблокирован. Обратитесь в службу поддержки.",
@@ -3233,7 +2921,6 @@
     "startSignInFailed": "Не удалось начать вход. Попробуйте снова.",
     "couldNotOpenBrowser": "Не удалось открыть браузер. Попробуйте снова.",
     "signInTimedOut": "Время входа истекло. Попробуйте снова.",
-    "signInFailed": "Не удалось войти. Попробуйте ещё раз.",
     "networkError": "Ошибка сети. Попробуйте снова.",
     "accessDeniedByUser": "Доступ отклонен пользователем",
     "codeExpired": "Срок действия кода истек",
@@ -3262,17 +2949,11 @@
     "backToPreferences": "Назад к настройкам"
   },
   "quickChat": {
-    "title": "Чат",
-    "composer": {
-      "placeholder": "Сообщение"
-    },
     "empty": {
       "title": "Начать чат",
       "description": "Отправьте сообщение, чтобы поговорить с моделью."
     },
-    "working": "Работаю...",
     "historyRetry": "Не удалось загрузить историю чата.",
-    "catalogRetry": "Не удалось загрузить модели",
     "sendError": "Не удалось отправить сообщение. Попробуйте еще раз."
   },
   "glanceable": {
@@ -3283,9 +2964,7 @@
     "signedOut": "Войдите, чтобы видеть агентов",
     "privacy": "Откройте Kilo, чтобы увидеть агентов",
     "openAgents": "Открыть агентов",
-    "running": "Работаю...",
     "needsInput": "требует ввода",
-    "idle": "Неактивен",
     "channelName": "Активные агенты",
     "activityKitDisabledBody": "Включите Эфир активности в Настройках, чтобы видеть активных агентов на экране блокировки."
   }

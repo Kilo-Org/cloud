@@ -214,7 +214,7 @@ export function ChatComposerInputRow({
             disabled={!canSend}
             hitSlop={CONTROL_HIT_SLOP}
             accessibilityRole="button"
-            accessibilityLabel={t('agentChat.composer.sendMessage')}
+            accessibilityLabel={t('common.sendMessage')}
             accessibilityState={{ disabled: !canSend, busy: isSending }}
             style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
             className={`items-center justify-center rounded-full active:opacity-70 ${

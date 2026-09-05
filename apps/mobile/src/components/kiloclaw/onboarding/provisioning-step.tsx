@@ -70,7 +70,7 @@ const TERMINAL_CONTENT = {
 
 function provisioningStageMessage(state: OnboardingState): string {
   if (state.instanceStatus === 'running' && state.gatewayReady && !state.gatewaySettled) {
-    return i18n.t('kiloclaw.onboarding.provisioning.finishingSetup');
+    return i18n.t('kiloclaw.empty.finishingSetup');
   }
   if (state.instanceStatus === 'running' && !state.gatewayReady) {
     return i18n.t('kiloclaw.onboarding.provisioning.connectingToAgent');

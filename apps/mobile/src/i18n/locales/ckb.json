@@ -27,15 +27,119 @@
     "somethingWentWrong": "شتێک هەڵەی کرد",
     "couldNotOpen": "نەتوانرا {{label}} بکرێتەوە",
     "link": "بەستەر",
-    "takingLonger": "ئەمە زیاتر لە چاوەڕوانکراو دەخایەنێت. دەتوانیت ئەمە داخەیت و دووبارە بپشکنیتەوە."
+    "takingLonger": "ئەمە زیاتر لە چاوەڕوانکراو دەخایەنێت. دەتوانیت ئەمە داخەیت و دووبارە بپشکنیتەوە.",
+    "cameraAccessDisabled": "دەستگەیشتن بە کامێرا ناچالاککراوە",
+    "copyLink": "کۆپی بەستەر",
+    "reviewPr": "پێداچوونەوەی PR",
+    "sendMessage": "ناردنی نامە",
+    "remaining": "ماوە",
+    "imageUnavailable": "وێنە بەردەست نییە",
+    "open": "کردنەوەی {{name}}",
+    "loading": "بارکردن…",
+    "queued": "ڕیزکراو",
+    "cost": "تێچوون",
+    "model": "مۆدێل",
+    "reportSubmittedReceipt": "ڕاپۆرت نێردرا. ڕەسیبۆ {{receiptId}}",
+    "role": "ڕۆڵ",
+    "allModels": "هەموو مۆدێلەکان",
+    "noModelsAvailable": "هیچ مۆدێلێک بەردەست نییە",
+    "recommended": "پێشنیارکراو",
+    "searchModels": "گەڕان لە مۆدێلەکان...",
+    "bitbucketConnected": "Bitbucket پەیوەندی کرا",
+    "connectBitbucket": "پەیوەندیکردن بە Bitbucket",
+    "connectGithub": "پەیوەندیکردن بە GitHub",
+    "connectGitlab": "پەیوەندیکردن بە GitLab",
+    "discard": "فڕێدان",
+    "repository": "کۆگا",
+    "newSession": "دانیشتنی نوێ",
+    "details": "وردەکارییەکان",
+    "pullRequest": "داواکاری ڕاکێشان",
+    "sessionExited": "سێشن دەرچوو",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "دەستگەیشتن ڕەتکرایەوە",
+    "notFound": "نەدۆزرایەوە",
+    "platform": "پلاتفۆرم",
+    "contentTruncated": "ناوەڕۆک کورتکراوەتەوە",
+    "truncated": "کورتکراوە",
+    "added": "زیادکرا",
+    "deleted": "سڕایەوە",
+    "updated": "نوێکراوە",
+    "clearFilters": "سڕینەوەی فلتەرەکان",
+    "clearSearch": "سڕینەوەی گەڕان",
+    "couldNotLoadSessions": "نەتوانرا دانیشتنەکان باربکرێن",
+    "delete": "سڕینەوە",
+    "rename": "ناوگۆڕین",
+    "idle": "بێکار",
+    "online": "سەرهێڵ",
+    "starting": "دەستپێکردن…",
+    "noKiloclawInstances": "هیچ نموونەیەکی KiloClaw نییە",
+    "personal": "کەسی",
+    "reply": "وەڵام",
+    "closeReactions": "داخستنی کاردانەوەکان",
+    "recent": "نوێترین",
+    "connect": "بەستنەوە",
+    "codeReviewer": "پێداچوونەوەکاری کۆد",
+    "performance": "کارایی",
+    "all": "هەموو",
+    "critical": "گرنگ",
+    "off": "داخراو",
+    "notConnected": "پەیوەندی نەکراو",
+    "allRepositories": "هەموو کۆگاکان",
+    "repositories": "کۆگاکان",
+    "connected": "پەیوەندی کرا",
+    "organization": "ڕێکخراو",
+    "couldNotLoadRepositories": "نەتوانرا کۆگاکان بار بکرێن",
+    "selectedRepositories": "کۆگا هەڵبژێردراوەکان",
+    "branch": "لق",
+    "findings": "دۆزینەوەکان",
+    "keepRunning": "بەردەوام بە لە کارکردن",
+    "status": "دۆخ",
+    "retryLoadingMore": "دووبارە هەوڵدانەوەی بارکردنی زیاتر",
+    "balanced": "هاوسەنگ",
+    "couldNotLoadOrganizations": "نەتوانرا ڕێکخراوەکان بار بکرێن",
+    "yourOwnRepositories": "کۆگا تایبەتەکانی خۆت",
+    "selectRepositories": "هەڵبژاردنی کۆگاکان",
+    "cancelled": "هەڵوەشایەوە",
+    "failed": "شکستی هێنا",
+    "pending": "چاوەڕوان",
+    "deviceSessions": "دانیشتنەکانی ئامێر",
+    "working": "کارکردن",
+    "goBack": "گەڕانەوە",
+    "ends": "کۆتایی {{date}}",
+    "privacyPolicy": "سیاسەتی تایبەتمەندی",
+    "disabled": "ناچالاککراو",
+    "enabled": "چالاککراو",
+    "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن",
+    "close": "داخستن",
+    "remove": "لابردن",
+    "kiloclaw": "KiloClaw",
+    "notifications": "ئاگادارکردنەوەکان",
+    "loadMore": "بارکردنی زیاتر",
+    "email": "ئیمەیڵ",
+    "draft": "ڕەشنووس",
+    "prReview": "پێداچوونەوەی PR",
+    "dismissed": "لابراو",
+    "closed": "داخراو",
+    "preferences": "پەسەندەکان",
+    "agents": "ئەجێنتەکان",
+    "securityAgent": "ئەجێنتی ئاسایش",
+    "profile": "پڕۆفایل",
+    "chat": "گفتوگۆ",
+    "file": "فایل",
+    "keepEditing": "بەردەوام بە لە دەستکاری",
+    "signOut": "دەرچوون",
+    "unknown": "نەزانراو",
+    "message": "نامە",
+    "reactions": "کاردانەوەکان",
+    "openPullRequest": "کردنەوەی داواکاری ڕاکێشان",
+    "couldnTLoadMore": "نەتوانرا زیاتر بار بکرێت"
   },
   "language": {
-    "title": "زمان",
     "restarting": "دووبارە دەستپێکردنەوە بۆ جێبەجێکردنی زمان",
     "couldNotRestart": "نەتوانرا دووبارە دەستپێبکرێتەوە",
     "languageSaved": "زمانەکەت پاشەکەوت کرا.",
     "catalogLoadFailed": "نەتوانرا زمانەکە بار بکرێت. تکایە دووبارە هەوڵبدەوە.",
-    "retry": "هەوڵدانەوە",
     "search": "گەڕان لە زمانەکان",
     "noMatches": "هیچ زمانێک نەگونجاوە",
     "deviceLanguage": "زمانی ئامێرەکە",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "کۆدی چوونە ژوورەوە: {{code}}",
     "openSignInPageInBrowser": "پەڕەی چوونە ژوورەوە لە وێبگەڕدا بکەرەوە",
     "copySignInLink": "بەستەری چوونە ژوورەوە کۆپی بکە",
-    "copyLink": "کۆپی بەستەر",
     "cancelSignIn": "چوونە ژوورەوە هەڵبوەشێنەوە",
     "startingSignIn": "دەستپێکردنی چوونە ژوورەوە...",
     "organizationUsesSso": "ڕێکخراوەکەت یەک-جۆر چوونە ژوورەوە بەکاردەهێنێت.",
@@ -62,23 +165,19 @@
     "emailAddress": "ناونیشانی ئیمەیڵ",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "بەردەوامبوون بە ئیمەیڵ",
-    "continue": "بەردەوامبوون",
     "enterCodeSentTo": "کۆدەکە بنووسە کە بۆ {{email}} نێردراوە",
     "codeArrivalHint": "ئەگەر ئەم ناونیشانە بەشداربێت، کۆدەکە لە ماوەی خولەکێکدا دەگات.",
     "verifyCode": "پشتڕاستکردنەوەی کۆد",
     "resendCode": "دووبارە ناردنی کۆد",
-    "back": "گەڕانەوە",
     "termsPrefix": "بە بەردەوامبوون ڕازی دەبیت بە",
     "terms": "مەرجەکان",
     "termsConnector": " و ",
     "termsSuffix": ".",
-    "privacyPolicy": "سیاسەتی تایبەتمەندی",
     "moreSignInOptions": "بژاردەی زیاتری چوونە ژوورەوە",
     "couldNotCompleteSignIn": "نەتوانرا چوونە ژوورەوە تەواو بکرێت. تکایە دووبارە هەوڵبدەوە.",
     "sessionEnded": "دەستپێشخەرییەکەت کۆتایی هات. تکایە دووبارە بچۆ ژوورەوە.",
     "signInCodeExpired": "کۆدی چوونە ژوورەوەکەت بەسەرچووە. تکایە دووبارە هەوڵبدەوە.",
     "accessDenied": "دەستگەیشتن ڕەتکرایەوە.",
-    "somethingWentWrong": "شتێک هەڵەی کرد. تکایە دووبارە هەوڵبدەوە.",
     "codeSent": "کۆد نێردرا",
     "accountCreated": "هەژمار دروستکرا. بەخێربێیت بۆ Kilo.",
     "pleaseEnterEmail": "تکایە ناونیشانی ئیمەیڵەکەت بنووسە.",
@@ -86,24 +185,16 @@
     "or": "یان"
   },
   "profile": {
-    "title": "پڕۆفایل",
-    "agents": "ئەجێنتەکان",
-    "codeReviewer": "پێداچوونەوەکاری کۆد",
     "codeReviewerSubtitle": "پێداچوونەوەی ئۆتۆماتیکی PR",
-    "securityAgent": "ئەجێنتی ئاسایش",
     "securityAgentSubtitle": "دۆزینەوە و چارەسەرکردنی لاوازییەکان",
     "reviews": "پێداچوونەوەکان",
-    "prReview": "پێداچوونەوەی PR",
     "prReviewSubtitle": "پێداچوونەوەی داواکاری ڕاکێشان لە مۆبایلدا",
-    "organization": "ڕێکخراو",
     "couldNotLoadOrganization": "نەتوانرا ڕێکخراوەکە بار بکرێت",
     "couldNotLoadOrganizationDescription": "ڕێکخستنەکانی ڕێکخراو و ئەجێنت بەردەست نین هەتا ئەمە بار بکرێت.",
     "linkedAccounts": "هەژمارە بەستراوەکان",
     "couldNotLoadAccounts": "نەتوانرا هەژمارەکان بار بکرێن",
     "app": "ئەپ",
-    "preferences": "پەسەندەکان",
     "preferencesSubtitle": "ڕووکار، ئاگادارکردنەوە، بیرکردنەوە و ڕەفتاری شاشە",
-    "deviceSessions": "دانیشتنەکانی ئامێر",
     "deviceSessionsSubtitle": "پێداچوونەوە و چوونە دەرەوە لە ئامێرەکانی تر",
     "feedback": "بۆچوون",
     "privacyChoices": "بژاردەکانی تایبەتمەندی",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "باڵانسی باکرێتەکەت بەتاڵە. باکرێتەکان لە دەرەوەی ئەپی iOS بۆ ئەم هەژمارە بەڕێوەدەبرێن.",
     "signOutTitle": "چوونە دەرەوە؟",
     "signOutMessage": "پێویستە دووبارە بچیتە ژوورەوە بۆ گەیشتن بە شوێنی کارەکەت.",
-    "signOutConfirm": "دەرچوون",
     "deleteAccountTitle": "سڕینەوەی هەژمار؟",
     "deleteAccountMessage": "ئەمە بە شێوەیەکی هەمیشەیی هەژمارەکەت دەسڕێتەوە و دەتباتە دەرەوە. ئێمە کۆدێکی دڵنیاکردنەوە دەنێرین بە ئیمەیڵ.",
     "deleteAccountConfirm": "سڕینەوەی هەژمار",
     "accountDeleted": "هەژمارەکەت سڕدرایەوە.",
     "viewOrganization": "بینینی ڕێکخراو",
     "manageOrganization": "بەڕێوەبردنی ڕێکخراو",
-    "personal": "کەسی",
     "selectAccount": "هەڵبژاردنی هەژمار",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "ئیمەیڵ",
     "providerTestAccount": "هەژماری تاقیکردنەوە",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "SSOی کۆمپانیا"
   },
   "preferences": {
-    "title": "پەسەندەکان",
     "autoExpandThinking": "بە شێوەیەکی ئۆتۆماتیکی بیرکردنەوە فراوان بکە",
     "autoExpandThinkingSubtitle": "بیرکردنەوەی ئەجێنتەکە پیشان بدە کە کاتێک تەواو دەبێت فراوان کراوە.",
     "keepScreenOn": "شاشەکە بەردەوام ڕاگرە لە پەڕەی دانیشتن",
     "keepScreenOnSubtitle": "شاشەکە بەخەبەر ڕابگرە کاتێک دانیشتنەکە کار دەکات.",
     "appearance": "ڕووکار",
-    "notifications": "ئاگادارکردنەوەکان",
     "notificationsSubtitle": "پەسەندەکانی پاڵدان",
     "appearanceSystem": "سیستەم",
     "appearanceLight": "ڕووناک",
@@ -161,7 +245,6 @@
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
     "pullRequestUnavailableDescription": "ئەم PR ناتوانرێت بکرێتەوە. ڕەنگە سڕابێتەوە، ڕێپۆی تایبەت بێت، یان Kilo GitHub App لەسەری دامەزرێنراو نەبێت.",
-    "accessDenied": "دەستگەیشتن ڕەتکرایەوە",
     "accessDeniedDescription": "مۆڵەتی بینینی ئەم داواکاری ڕاکێشانەت نییە.",
     "noFilesChanged": "هیچ فایلێک نەگۆڕدرا",
     "noFilesChangedDescription": "ئەم داواکاری ڕاکێشانە هیچ گۆڕانکارییەکی فایل نییە.",
@@ -177,7 +260,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "نەتوانرا فایلەکان بار بکرێن",
-      "checkConnection": "پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەوە.",
       "retryLoadingFiles": "دووبارە هەوڵدانەوەی بارکردنی فایلەکان",
       "filterPlaceholder": "فیلتەرکردنی فایلەکان بە ڕێڕەو",
       "viewedCount": "{{viewed}} لە {{total}} بینرا",
@@ -289,7 +371,6 @@
         "closed": "ئەم داواکاری ڕاکێشانە داخراوە"
       },
       "partialSuccessBanner": {
-        "title": "تێکەڵ کرا",
         "body": "نەتوانرا لقەکە بسڕێتەوە: {{reason}}",
         "accessibility": "تێکەڵ کرا. نەتوانرا لقەکە بسڕێتەوە: {{reason}}"
       },
@@ -331,7 +412,6 @@
       "unresolveThread": "ناچارەسەرکردنی زنجیرە",
       "resolved": "چارەسەر کرا",
       "outdated": "بەسەرچوو",
-      "file": "فایل",
       "comment_one": "١ بۆچوون",
       "comment": "{{displayCount}} بۆچوون",
       "comment_other": "{{displayCount}} بۆچوون",
@@ -339,9 +419,6 @@
       "couldNotLoadMore": "نەتوانرا بۆچوونە زیاتر بار بکرێن.",
       "retryLoadingMore": "دووبارە هەوڵدانەوەی بارکردنی بۆچوونە زیاتر",
       "loadMoreComments": "بارکردنی بۆچوونە زیاتر",
-      "loadMore": "بارکردنی زیاتر",
-      "closeReactions": "داخستنی کاردانەوەکان",
-      "reactionsTitle": "کاردانەوەکان",
       "addReaction": "زیادکردنی کاردانەوە",
       "reactionPill": "{{emoji}} کاردانەوە، {{displayCount}} {{countLabel}}",
       "reaction_one": "کاردانەوە",
@@ -352,14 +429,11 @@
       "reportUser": "ڕاپۆرتکردنی بەکارهێنەر",
       "mute": "بێدەنگکردن",
       "block": "بەربەستن",
-      "somethingWentWrong": "شتێک هەڵەی کرد",
-      "reportSubmitted": "ڕاپۆرت نێردرا. ڕەسیبۆ {{receiptId}}",
       "blockedUser": "{{login}} بەربەسترا",
       "mutedUser": "{{login}} بێدەنگ کرا",
       "replyPlaceholder": "وەڵام…",
       "replyBody": "ناوەڕۆکی وەڵام",
       "submitReply": "ناردنی وەڵام",
-      "reply": "وەڵام",
       "termsTitle": "مەرجەکانی بەکارهێنان",
       "termsCopy": "پێویستە تەمەنت ١٣ ساڵ یان زیاتر بێت بۆ بڵاوکردنەوە.",
       "termsAcceptRetry": "نەتوانرا مەرجەکان قبووڵ بکرێن. پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەوە.",
@@ -367,7 +441,6 @@
       "acceptTerms": "قبووڵکردن",
       "replyBadRequest": "ئەم وەڵامە ناتوانرێت بڵاو بکرێتەوە. ڕەنگە زنجیرەکە گۆڕابێت.",
       "replyForbidden": "مۆڵەتی وەڵامدانەوەت نییە بۆ ئەم داواکاری ڕاکێشانە.",
-      "couldNotReply": "نەتوانرا وەڵام بدرێتەوە.",
       "moderation": {
         "reportContent": {
           "terminal": "ئەم بۆچوونە ناتوانرێت ڕاپۆرت بکرێت.",
@@ -420,8 +493,6 @@
     },
     "couldNotOpenGitHubAppSettings": "نەتوانرا ڕێکخستنەکانی GitHub App بکرێنەوە",
     "installKiloGitHubApp": "دامەزراندنی Kilo GitHub App",
-    "connectionExpiredTitle": "پەیوەندی GitHub بەسەرچوو",
-    "connectionExpiredDescription": "پەیوەندی GitHub ئەمڕۆ چیتر دروست نییە. پەیوەندییەکەت دووبارە بپشکنە — ئەگەر پێویست بوو، داوای دووبارە بەستنەوەت لێدەکرێت.",
     "checkConnection": "پشکنینی پەیوەندی",
     "couldNotLoadPullRequest": "نەتوانرا داواکاری ڕاکێشان بار بکرێت",
     "description": "وەسف",
@@ -430,21 +501,18 @@
     "reviewPullRequest": "پێداچوونەوە بە داواکاری ڕاکێشان",
     "headLine": "{{counts}} · سەری {{sha}}",
     "entry": {
-      "title": "پێداچوونەوەی PR",
       "eyebrow": "داواکاری ڕاکێشان بە URL بکەرەوە",
       "pastePrLink": "بەستەری PR بلکێنە",
       "noRecentPrs": "هیچ PR یەکی نوێ نییە",
       "noRecentPrsDescription": "بۆ دەستپێکردنی پێداچوونەوە بەستەری PR لە سەرەوە بلکێنە — جاری داهاتوو لێرە دەردەکەوێت.",
       "couldNotLoad": "نەتوانرا بار بکرێت",
-      "remove": "لابردن",
       "removeFromRecentsTitle": "لابردن لە نوێترینەکان؟",
       "removeFromRecentsMessage": "ئەم داواکاری ڕاکێشانە لە نوێترینەکانت لادەبرێت.",
       "removeRecentAccessibility": "لابردنی {{repo}} لە نوێترینەکان",
       "urlAccessibility": "URL ی داواکاری ڕاکێشانی GitHub",
       "clearLink": "سڕینەوەی بەستەری داواکاری ڕاکێشان",
       "pasteLink": "بلکاندنی بەستەری داواکاری ڕاکێشان",
-      "open": "کردنەوە",
-      "openPullRequest": "کردنەوەی داواکاری ڕاکێشان"
+      "open": "کردنەوە"
     },
     "checks": {
       "title": "پشکنینەکان",
@@ -460,19 +528,14 @@
       "pending": "{{displayCount}} چاوەڕوانە",
       "skipped": "{{displayCount}} پەڕێندراوە",
       "checksCount": "{{displayCount}} پشکنین",
-      "checkDetails": "وردەکاری پشکنین",
-      "pullRequest": "داواکاری ڕاکێشان"
+      "checkDetails": "وردەکاری پشکنین"
     },
     "inbox": {
       "title": "سندووقی نامە",
-      "recent": "نوێترین",
-      "draft": "ڕەشنووس",
       "loading": "بارکردنی سندووقی نامە",
       "noReviewRequests": "هیچ داوای پێداچوونەوەیەک نییە",
       "noReviewRequestsDescription": "داواکاری ڕاکێشانە چاوەڕوانەکانی پێداچوونەوەکەت لێرە دەردەکەون. هێشتا دەتوانیت بەستەری هەر PR یەک لە سەرەوە بلکێنیت.",
-      "couldNotLoad": "نەتوانرا سندووقی نامە بار بکرێت",
-      "couldNotLoadMore": "نەتوانرا زیاتر بار بکرێت",
-      "retryLoadingMore": "دووبارە هەوڵدانەوەی بارکردنی زیاتر"
+      "couldNotLoad": "نەتوانرا سندووقی نامە بار بکرێت"
     },
     "composer": {
       "commentBodyPlaceholder": "بۆچوونێک جێبهێڵە",
@@ -487,8 +550,6 @@
       "loadFailedTitle": "نەتوانرا نوسەری بۆچوون بار بکرێت",
       "discardTitle": "فڕێدانی بۆچوون؟",
       "discardMessage": "ڕەشنووسەکەت لەدەستدەچێت.",
-      "keepEditing": "بەردەوام بە لە دەستکاری",
-      "discard": "فڕێدان",
       "comment": "بۆچوون",
       "insertSuggestionA11y": "داپۆشینێکی کۆد داخڵ بکە",
       "insertSuggestion": "داخڵکردنی داپۆشین",
@@ -496,12 +557,10 @@
       "suggestionsOnlyAddedLines": "داپۆشینەکان تەنها بۆ هێڵە زیادکراوەکان جێبەجێ دەبن.",
       "tapDiffLineToSuggest": "بۆ چالاککردنی داپۆشین، لەسەر هێڵێکی جیاوازی لێ بدە."
     },
-    "screenTitle": "پێداچوونەوەی PR",
     "connect": {
       "checkFailedTitle": "نەتوانرا پەیوەندی GitHub بپشکێنرێت",
       "checkFailedMessage": "باری چوونە ژوورەوە بەردەست نییە هەتا ئەمە بار بکرێت.",
       "reconnectTitle": "دووبارە بەستنەوەی GitHub",
-      "title": "پەیوەندیکردن بە GitHub",
       "reconnectDescription": "پەیوەندی GitHub ئەمڕۆ لابرا. دووبارە بیبەستەوە بۆ بەردەوامبوون لە پێداچوونەوەی داواکاری ڕاکێشان لە مۆبایلدا.",
       "description": "هەژماری GitHub هەت ببەستەرەوە بۆ پێداچوونەوەی داواکاری ڕاکێشان لە مۆبایلدا."
     },
@@ -510,11 +569,9 @@
       "shareA11y": "هاوبەشکردنی داواکاری ڕاکێشان"
     },
     "submit": {
-      "title": "ناردنی پێداچوونەوە",
       "loadFailedTitle": "نەتوانرا ناردنی پێداچوونەوە بار بکرێت",
       "deletePendingTitle": "سڕینەوەی بۆچوونی چاوەڕوان؟",
       "deletePendingMessage": "ئەم بۆچوونە لە ڕیزەکەی پێداچوونەوە لادەبرێت.",
-      "delete": "سڕینەوە",
       "summaryOptional": "کورتە (هەڵبژاردەیی)",
       "pendingComment_one": "بۆچوونی چاوەڕوان",
       "pendingComment": "بۆچوونە چاوەڕوانەکان",
@@ -527,19 +584,15 @@
     },
     "reconnectNotice": {
       "title": "پەیوەندی GitHub بەسەرچوو",
-      "message": "پەیوەندی GitHub ئەمڕۆ چیتر دروست نییە. پەیوەندییەکەت دووبارە بپشکنە — ئەگەر پێویست بوو، داوای دووبارە بەستنەوەت لێدەکرێت.",
-      "checkConnection": "پشکنینی پەیوەندی"
+      "message": "پەیوەندی GitHub ئەمڕۆ چیتر دروست نییە. پەیوەندییەکەت دووبارە بپشکنە — ئەگەر پێویست بوو، داوای دووبارە بەستنەوەت لێدەکرێت."
     },
     "eventChips": {
       "comment": "بۆچوون",
       "requestChanges": "داواکردنی گۆڕانکاری",
-      "approve": "پەسندکردن",
       "label": "ڕووداوی پێداچوونەوە"
     },
     "overview": {
       "stateMerged": "تێکەڵ کرا",
-      "stateClosed": "داخراو",
-      "stateDraft": "ڕەشنووس",
       "stateOpenApproved": "کراوە · پەسندکراو",
       "stateOpenChangesRequested": "کراوە · گۆڕانکاری داواکراوە",
       "stateOpenReviewRequired": "کراوە · پێداچوونەوە پێویستە",
@@ -564,14 +617,11 @@
       "reviewChangesRequested": "گۆڕانکاری داواکرا",
       "reviewCommented": "لێدوان درا",
       "reviewPending": "چاوەڕێی پێداچوونەوە",
-      "openIssueA11y": "کێشەی #{{number}} لە GitHub بکەرەوە",
-      "reviewDismissed": "لابراو"
+      "openIssueA11y": "کێشەی #{{number}} لە GitHub بکەرەوە"
     },
     "pendingComment": {
       "editOutdatedA11y": "دەستکاریکردنی بۆچوونی چاوەڕوانی بەسەرچوو لەسەر {{location}}",
       "editA11y": "دەستکاریکردنی بۆچوونی چاوەڕوان لەسەر {{location}}",
-      "emptyBody": "(بەتاڵ)",
-      "outdated": "بەسەرچوو",
       "staleHint": "PR جوڵا لە دوای ئەوەی ئەمەت نووسی.",
       "deleteA11y": "سڕینەوەی بۆچوونی چاوەڕوان لەسەر {{location}}",
       "deletedAnnouncement": "بۆچوونی چاوەڕوان سڕدرایەوە",
@@ -587,8 +637,6 @@
       "discussion": "گفتوگۆ"
     },
     "fileStatus": {
-      "added": "زیادکراو",
-      "deleted": "سڕراو",
       "modified": "گۆڕدراو",
       "renamed": "ناوگۆڕاو",
       "copied": "کۆپیکراو",
@@ -598,9 +646,7 @@
       "selectedTapToChange": "هەڵبژێردراو {{label}}، بۆ گۆڕینی هەڵبژاردن لێی بدە",
       "truncationBanner": "پێشاندانی یەکەم {{limit}} لە {{total}} فایلێکی گۆڕاو — سنووری APIـی GitHub",
       "tapToComment": "{{label}}، بۆ بۆچوون لێی بدە",
-      "statusAdded": "زیادکراو",
       "statusContext": "دەق",
-      "statusDeleted": "سڕراو",
       "lineLabel": "{{status}} هێڵی {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(بەتاڵ)"
@@ -628,7 +674,6 @@
     }
   },
   "notifications": {
-    "title": "ئاگادارکردنەوەکان",
     "liveActivities": "چالاکییە ڕاستەوخۆکان",
     "liveActivitySubtitle": "ئەجێنتە چالاکەکان لەسەر شاشەی داخستن پیشان بدە",
     "liveUpdates": "نوێکردنەوەی ڕاستەوخۆ",
@@ -651,7 +696,6 @@
     "disabledMessage": "بۆ چالاککردنی ئاگادارکردنەوەکان، لە ڕێکخستنەکانی ئامێرەکەتدا بیانچالاک بکە.",
     "disableTitle": "ناچالاککردنی ئاگادارکردنەوەکان",
     "disableMessage": "بۆ ناچالاککردنی ئاگادارکردنەوەکان، لە ڕێکخستنەکانی ئامێرەکەتدا بیانناچالاک بکە.",
-    "openSettings": "ڕێکخستنەکان بکەرەوە",
     "registrationFailed": "تۆمارکردن شکستی هێنا. مۆڵەتەکانی ئاگادارکردنەوەکەت بپشکنە.",
     "couldNotEnable": "نەتوانرا ئاگادارکردنەوەکان چالاک بکرێن. تکایە دووبارە هەوڵبدەوە.",
     "previewAlways": "هەمیشە",
@@ -666,7 +710,6 @@
       "security": "دۆزینەوەکانی ئاسایش"
     },
     "category": {
-      "chatMessagesTitle": "نامەکانی گفتوگۆ",
       "chatMessagesSubtitle": "وەڵامەکان لە گفتوگۆکانتدا",
       "agentAttentionTitle": "ئەجێنت پێویستی بە تۆیە",
       "agentAttentionSubtitle": "پرسیارەکان، مۆڵەت، پێویستی بە داخڵ",
@@ -674,32 +717,23 @@
       "agentUpdatesSubtitle": "نامەکانی ناوەڕاستی کار لە ئەجێنتەوە",
       "sessionStatusTitle": "باری دانیشتن",
       "sessionStatusSubtitle": "تەواوکراو / شکستی هێنا / ئامادەیە بۆ کۆنتڕۆڵکردن",
-      "kiloclawActivityTitle": "چالاکییەکانی KiloClaw",
       "kiloclawActivitySubtitle": "ئامادە/شکستەوە، کردارە خشتەکراوەکان",
-      "balanceAlertsTitle": "ئاگادارکردنەوەکانی باڵانس",
       "balanceAlertsSubtitle": "ئاگادارکردنەوەکانی نزمی باڵانسی ڕێکخراو",
-      "securityFindingsTitle": "دۆزینەوەکانی ئاسایش",
       "securityFindingsSubtitle": "دۆزینەوە نوێکان و بیرخستنەوەکانی SLA"
     }
   },
   "tabs": {
     "home": "سەرەکی",
-    "agents": "ئەجێنتەکان",
-    "profile": "پڕۆفایل",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}، تاب، {{position}} لە {{total}}",
-    "chat": "گفتوگۆ"
+    "position": "{{name}}، تاب، {{position}} لە {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "گۆڕینی نموونە",
       "couldNotLoadInstances": "نەتوانرا نموونەکان بار بکرێن",
-      "noInstances": "هیچ نموونەیەکی KiloClaw نییە",
       "noInstancesDescription": "نموونەیەک ڕێکبخە بۆ دەستپێکردنی گفتوگۆ.",
       "setUpKiloclaw": "ڕێکخستنی KiloClaw",
-      "currentInstance": "{{title}}، ئێستا",
-      "personal": "کەسی"
+      "currentInstance": "{{title}}، ئێستا"
     },
     "conversation": {
       "failedToLoad": "بارکردنی گفتوگۆ شکستی هێنا",
@@ -718,16 +752,12 @@
       "couldNotSignIn": "نەتوانرا بچیتە ژوورەوە بۆ گفتوگۆ",
       "couldNotRefreshMessages": "نەتوانرا نامەکان نوێ بکرێنەوە",
       "couldNotLoadHistory": "نەتوانرا مێژووی گفتوگۆ بار بکرێت",
-      "rename": "ناوگۆڕین",
       "leave": "بەجێهێشتن",
       "untitledConversation": "گفتوگۆی بێ ناونیشان",
       "createFailed": "دروستکردنی گفتوگۆ شکستی هێنا",
       "leaveFailed": "بەجێهێشتنی گفتوگۆ شکستی هێنا"
     },
     "reactions": {
-      "title": "کاردانەوەکان",
-      "close": "داخستنی کاردانەوەکان",
-      "recent": "نوێترین",
       "common": "هاوبەش",
       "reactWith": "کاردانەوە بە {{reaction}}",
       "accessibility": "{{emoji}} کاردانەوە، {{displayCount}}"
@@ -737,16 +767,13 @@
       "cancelReply": "هەڵوەشاندنەوەی وەڵام",
       "openInstance": "کردنەوەی نموونە",
       "attachFile": "هاوپێچکردنی فایل",
-      "messagePlaceholder": "نامە",
-      "cancelEdit": "هەڵوەشاندنەوەی دەستکاریکردن",
-      "sendMessage": "ناردنی نامە"
+      "cancelEdit": "هەڵوەشاندنەوەی دەستکاریکردن"
     },
     "conversationList": {
       "couldNotLoad": "نەتوانرا گفتوگۆکان بار بکرێن",
       "emptyTitle": "هێشتا هیچ گفتوگۆیەک نییە",
       "emptyDescription": "گفتوگۆیەک دروست بکە بۆ دەستپێکردنی گفتوگۆ لەگەڵ نموونەی KiloClaw.",
       "create": "دروستکردنی گفتوگۆ",
-      "starting": "دەستپێکردن…",
       "newConversation": "گفتوگۆی نوێ",
       "openInstanceSettings": "کردنەوەی ڕێکخستنەکانی نموونە",
       "today": "ئەمڕۆ",
@@ -756,7 +783,6 @@
     },
     "attachment": {
       "open": "کردنەوەی {{filename}}",
-      "imageUnavailable": "وێنە بەردەست نییە",
       "openFailed": "نەتوانرا هاوپێچەکە بکرێتەوە. پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەوە.",
       "attachFailed": "هاوپێچکردنی فایل شکستی هێنا",
       "limit": "دەتوانیت هەتا {{displayCount}} فایل هاوپێچ بکەیت.",
@@ -786,11 +812,9 @@
       "yourMessage": "نامەکەت",
       "messageFrom": "نامە لە {{author}}",
       "moreActions": "کردارە زیاتر",
-      "message": "نامە",
       "notDelivered": "نەگەیشت",
       "edited": "(دەستکاریکراو)",
-      "image": "وێنە",
-      "attachment": "هاوپێچ"
+      "image": "وێنە"
     },
     "messageActions": {
       "copied": "کۆپیکراو",
@@ -798,13 +822,11 @@
       "title": "کردارەکانی نامە",
       "deleteTitle": "سڕینەوەی نامە؟",
       "deleteMessage": "ئەمە نامەکە لە گفتوگۆکە لادەبات.",
-      "delete": "سڕینەوە",
       "deleteFailed": "سڕینەوەی نامە شکستی هێنا",
       "removeReactionFailed": "لابردنی کاردانەوە شکستی هێنا",
       "addReactionFailed": "زیادکردنی کاردانەوە سەرکەوتوو نەبوو",
       "retrySend": "دووبارە ناردنەوە",
       "moreReactions": "کاردانەوە زیاتر",
-      "reply": "وەڵام",
       "edit": "دەستکاری",
       "sendFailed": "ناردنی نامە سەرکەوتوو نەبوو",
       "retrySendFailed": "دووبارە ناردنەوە سەرکەوتوو نەبوو",
@@ -815,7 +837,6 @@
       "takePhoto": "وێنەگرتن",
       "photoLibrary": "گەلەری وێنەکان",
       "files": "فایلەکان",
-      "cameraAccessDisabled": "دەستگەیشتن بە کامێرا ناچالاککراوە",
       "cameraAccessMessage": "لە ڕێکخستنەکاندا ڕێگە بە دەستگەیشتن بە کامێرا بدە بۆ وێنەگرتن."
     },
     "typingIndicator": {
@@ -825,10 +846,7 @@
       "typing_other": "{{names}} لە نووسینن..."
     },
     "botStatus": {
-      "online": "سەرهێڵ",
-      "idle": "بێکار",
       "offline": "دەرهێڵ",
-      "unknown": "نەزانراو",
       "loadingUser": "بارکردنی بەکارهێنەر...",
       "waitingForStatus": "چاوەڕوانی دۆخی بۆت...",
       "offlineMessage": "بۆتەکە دەرهێڵە. نامەکان دووبارە دەست پێدەکەن کاتێک دووبارە پەیوەندی دەکاتەوە."
@@ -841,7 +859,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "نەتوانرا نموونەکانی KiloClaw بار بکرێن",
     "billing": {
       "title": "پارەدان",
@@ -849,7 +866,6 @@
       "plan": "پلان",
       "finalTermEnds": "کۆتایی وادەی کۆتایی",
       "afterFinalTerm": "دوای وادەی کۆتایی",
-      "remaining": "ماوە",
       "ends": "کۆتایی دێت",
       "expires": "بەسەر دەچێت",
       "noActivePlan": "هیچ پلانێکی چالاک نییە",
@@ -857,7 +873,6 @@
       "managedByAdmin": "پارەدان لەلایەن بەڕێوەبەری ڕێکخراوەکەتەوە بەڕێوەدەبرێت.",
       "couldNotLoad": "نەتوانرا زانیارییەکانی پارەدان بار بکرێن",
       "manageOnWeb": "بەڕێوەبردنی پارەدان لە وێب",
-      "commitPlan": "پلانی کۆمیت",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "وادەی کۆتایی پابەندبوونەکەت لە {{date}} کۆتایی دێت. وەک Standard بەردەوام بە بە {{price}}، یان میوانداری کۆتایی دێت.",
       "freeTrial": "تاقیکردنەوەی بەخۆڕایی",
@@ -875,9 +890,9 @@
       "trialEndingSoon": "تاقیکردنەوە بەم زووانە کۆتایی دێت: {{remaining}}",
       "lessThanOneDay": "کەمتر لە 1 ڕۆژ",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "پلانی کۆمیت"
     },
     "changelog": {
       "title": "چی نوێیە",
@@ -900,7 +915,6 @@
       "destroyMessage": "ئەمە بە شێوەیەکی هەمیشەیی نموونەکەت و هەموو داتاکانی لەناو دەبات. ئەم کردارە ناتوانرێت بگەڕێتەوە.",
       "destroyTitle": "لەناوبردنی نموونە",
       "instance": "نموونە",
-      "renameFailed": "شتێک هەڵەی کرد",
       "couldNotCheckStatus": "نەتوانرا دۆخی ڕاژە پشکنین بکرێت",
       "dangerZone": "ناوچەی مەترسیدار",
       "destroying": "لە لەناوبردندایە…",
@@ -928,7 +942,6 @@
       "approveDeviceTitle": "پەسندکردنی ئامێر",
       "approveMessage": "ڕێگە بدە {{label}} (کۆد: {{code}}) پەیوەندی بە نموونەکەت بکات؟",
       "approveTitle": "پەسندکردنی داواکاریی جووتبوون",
-      "device": "ئامێر",
       "unknownDevice": "ئامێری نەناسراو"
     },
     "execPolicy": {
@@ -943,35 +956,21 @@
       "title": "هەژماری Google",
       "couldNotLoad": "نەتوانرا دۆخی هەژماری Google بار بکرێت",
       "disconnected": "هەژماری Google پەیوەندی لێبڕا. نموونەکەت دووبارە جێگیر بکە بۆ جێبەجێکردنی گۆڕانکارییەکە.",
-      "redeploy": "دووبارە جێگیرکردن",
       "setupCommand": "فەرمانی ڕێکخستن",
       "setupCommandHelp": "ئەم فەرمانە لە تێرمیناڵێکدا جێبەجێ بکە کە Docker لەسەر کۆمپیوتەری خۆت دامەزراوە بۆ بەستنەوە بە هەژماری Google.",
       "failedToLoadCommand": "بارکردنی فەرمانی ڕێکخستن سەرکەوتوو نەبوو",
       "gmailNotifications": "ئاگادارکردنەوەکانی Gmail",
       "disconnect": "پچڕاندنی پەیوەندی هەژماری Google",
-      "connected": "پەیوەندی کرا",
       "copied": "کۆپیکراو",
       "copyCommand": "کۆپیکردنی فەرمان",
-      "disabled": "ناچالاککراو",
       "disconnectConfirm": "پچڕاندنی پەیوەندی",
       "disconnectMessage": "هەژماری Google لەم نموونەیە لاببە؟ ئەمە ئاگادارکردنەوەکانی Gmail ناچالاک دەکات. دوای پچڕاندنی پەیوەندی دووبارە جێگیر بکە بۆ جێبەجێکردنی گۆڕانکارییەکان.",
-      "disconnectTitle": "پچڕاندنی پەیوەندی Google",
-      "enabled": "چالاککراو",
-      "notConnected": "پەیوەندی نەکراو"
+      "disconnectTitle": "پچڕاندنی پەیوەندی Google"
     },
     "modelList": {
-      "title": "هەموو مۆدێلەکان",
-      "searchPlaceholder": "گەڕان لە مۆدێلەکان...",
-      "couldNotLoad": "نەتوانرا مۆدێلەکان بار بکرێن",
-      "clearSearch": "سڕینەوەی گەڕان",
       "noMatches": "هیچ مۆدێلێک لەگەڵ گەڕانەکەت ناگونجێت",
-      "noModels": "هیچ مۆدێلێک بەردەست نییە",
       "noModelsDescription": "مۆدێلەکان لێرە دەردەکەون هەر کاتێک بەردەست بن.",
-      "noResultsFor": "هیچ ئەنجامێک نییە بۆ \"{{query}}\"",
-      "recommended": "پێشنیارکراو"
-    },
-    "model": {
-      "title": "مۆدێل"
+      "noResultsFor": "هیچ ئەنجامێک نییە بۆ \"{{query}}\""
     },
     "secrets": {
       "title": "نهێنییەکان",
@@ -988,12 +987,8 @@
       "setupGuideA11y": "ڕێنمایی ڕێکخستنی {{label}}",
       "setupGuide": "ڕێنمایی ڕێکخستن",
       "saving": "لە پاشەکەوتکردندایە…",
-      "remove": "لابردن",
       "removing": "لە لابردندایە…",
-      "connected": "پەیوەندی کرا",
-      "notConnected": "پەیوەندی نەکراو",
-      "updateToken": "نوێکردنەوەی تۆکن",
-      "connect": "بەستنەوە"
+      "updateToken": "نوێکردنەوەی تۆکن"
     },
     "versionPin": {
       "title": "سەرقەتکردنی وەشان",
@@ -1030,7 +1025,6 @@
       "start": "دەستپێکردن",
       "startMessage": "دڵنیایت دەتەوێت ئەم نموونەیە دەستپێبکەیت؟",
       "startTitle": "دەستپێکردنی نموونە",
-      "starting": "دەستپێکردن…",
       "stop": "وەستان",
       "stopMessage": "دڵنیایت دەتەوێت ئەم نموونەیە بوەستێنیت؟",
       "stopTitle": "وەستاندنی نموونە",
@@ -1040,7 +1034,6 @@
       "finishingSetup": "تەواوکردنی ڕێکخستن",
       "finishingSetupDescription": "کەمێک چاوەڕێ بکە، لە تەواوکردنی هەژمارەکەتین. ئەمە زۆرجار کەمێک دەخایەنێت.",
       "getStarted": "دەستپێکردن",
-      "noInstances": "هیچ نموونەیەکی KiloClaw نییە",
       "noInstancesDescription": "یەکەم نموونەت دروست بکە بۆ دەستپێکردنی ئەجێنتەکانی کۆدنووسین."
     },
     "instance": {
@@ -1052,7 +1045,6 @@
     "list": {
       "createInstance": "دروستکردنی نموونە",
       "organizations": "ڕێکخراوەکان",
-      "personal": "کەسی",
       "accessIssue": {
         "trialExpired": "تاقیکردنەوە کۆتایی هات، بەشداری بکە بۆ بەردەوامبوون لە بەکارهێنانی ئەم نموونەیە",
         "subscriptionCanceled": "ئەندامێتی ناچالاکە، دووبارە بەشداری بکە بۆ بەردەوامبوون لە بەکارهێنانی ئەم نموونەیە",
@@ -1065,7 +1057,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "گفتوگۆ لەگەڵ {{name}}",
-        "online": "سەرهێڵ",
         "ready": "{{name}} ئامادەیە",
         "warmedUp": "هەموو ئامادە کراوە. سڵاو بکە هەر کاتێک ئامادە بوویت."
       },
@@ -1076,9 +1067,7 @@
         "openKiloAi": "کردنەوەی kilo.ai",
         "provisioning": "دابینکردن",
         "review": "پێداچوونەوە",
-        "somethingWentWrong": "شتێک هەڵەی کرد",
         "identityTitle": "ناسنامەیەک بدە بە بۆتەکەت",
-        "close": "داخستن",
         "couldNotLoad": "نەتوانرا دۆخی ناساندن بار بکرێت",
         "finishingSetup": "تەواوکردنی ڕێکخستن — کەمێک چاوەڕێ بکە لە کاتی تەواوکردنی هەژمارەکەتدا.",
         "ready": "ئامادە",
@@ -1095,7 +1084,6 @@
         "location": "شوێن",
         "locationPlaceholder": "شار یان ناوچە (بەدڵخواز)",
         "useCurrentLocation": "بەکارهێنانی شوێنی ئێستا",
-        "continue": "بەردەوامبوون",
         "locationDeniedTitle": "دەستگەیشتن بە شوێن ڕەتکرایەوە",
         "locationDeniedMessage": "لە ڕێکخستنەکاندا دەستگەیشتن بە شوێن چالاک بکە بۆ بەکارهێنانی شوێنی ئێستا.",
         "locationValidationFailed": "نەتوانرا شوێن پشتڕاست بکرێتەوە.",
@@ -1132,7 +1120,6 @@
         "timeoutBody": "ڕێکخستنی {{name}} زیاتر لە ئاسایی دەخایەنێت (زیاتر لە {{displayMinutes}} خولەک).",
         "continueInBackground": "لە پاشبنەما بەردەوام بە",
         "settingUp": "ڕێکخستنی {{name}}",
-        "finishingSetup": "تەواوکردنی ڕێکخستن",
         "connectingToAgent": "پەیوەندیکردن بە ئەجێنت",
         "startingSandbox": "دەستپێکردنی ساندبۆکس",
         "backgroundHint": "زۆرجار کەمتر لە خولەکێک دەخایەنێت. دەتوانیت ئەمە دابخەیت — لە پاشبنەما بەردەوام دەبین لە کارکردن."
@@ -1144,7 +1131,6 @@
       "gatewayProcess": "پرۆسەی گەیتوەی",
       "lastExit": "دوایین دەرچوون",
       "memory": "بیرگە",
-      "model": "مۆدێل",
       "region": "ناوچە",
       "resources": "سەرچاوەکان",
       "restarts": "دەستپێکردنەوەکان",
@@ -1166,34 +1152,25 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Frontier",
       "frontierDescription": "بەرزترین کارایی. ئاراستەی مۆدێلەکانی Frontier دەکات بە مێشککردنەوە.",
-      "balancedLabel": "هاوسەنگ",
       "balancedDescription": "هاوسەنگی زیرەکی خێرایی و توانا بە نرخێکی کەمتر.",
-      "cost": "تێچوون",
-      "performance": "کارایی",
       "autoModelA11y": "مۆدێلی ئۆتۆی {{label}}",
       "currentModel": "مۆدێلی ئێستا",
       "browseAllModels": "یان هەڵبژاردن لە زیاتر لە ٥٠٠ مۆدێل",
       "browseAllModelsA11y": "بینینی هەموو زیاتر لە ٥٠٠ مۆدێل"
     },
     "accessRequired": {
-      "trialExpiredTitle": "لە وێب بەشداری بکە",
       "trialExpiredBody": "بۆ بەردەوامبوون لە بەکارهێنانی KiloClaw، لە وێبگەڕەکەت بڕۆ بۆ kilo.ai/claw. ناتوانیت لە ئەپەکەدا بەشداری بکەیت.",
-      "trialExpiredCta": "کردنەوەی kilo.ai/claw",
       "subscriptionCanceledTitle": "لە وێب بەشداری بکە",
       "subscriptionCanceledBody": "بۆ بەکارهێنانی KiloClaw، لە وێبگەڕەکەت بڕۆ بۆ kilo.ai/claw. ناتوانیت لە ئەپەکەدا بەشداری بکەیت.",
       "subscriptionCanceledCta": "کردنەوەی kilo.ai/claw",
       "subscriptionPastDueTitle": "نوێکردنەوەی پارەدان لە وێب",
       "subscriptionPastDueBody": "کێشەمان هەبوو لەگەڵ دوایین پارەدانەکەت. لە وێبگەڕەکەت بڕۆ بۆ kilo.ai/claw بۆ نوێکردنەوەی. ناتوانیت لە ئەپەکەدا پارەدان بەڕێوەببەیت.",
-      "subscriptionPastDueCta": "کردنەوەی kilo.ai/claw",
       "quarantinedTitle": "نموونە پێویستی بە چاکسازییە",
       "quarantinedBody": "نموونەکەی KiloClaw لە دۆخی بەدوورگیراودایە و ئێستا ناتوانرێت بەکاربهێنرێت. تیمەکەمان پێویستی بە یارمەتیدان بۆ گەڕاندنەوەی هەیە.",
-      "quarantinedCta": "لەسەر kilo.ai بەردەوام بە",
-      "multipleCurrentConflictTitle": "هەژمار پێویستی بە پێداچوونەوەیە",
       "multipleCurrentConflictBody": "زیاتر لە یەک ئەندامێتی چالاکمان لەسەر هەژمارەکەت دۆزییەوە، بۆیە شتەکانمان ڕاگرت بۆ ئەوەی دوو جار پارە نەداویت.",
       "multipleCurrentConflictCta": "لەسەر kilo.ai بەردەوام بە",
       "nonCanonicalEarlybirdTitle": "پلانی کۆن دۆزرایەوە",
       "nonCanonicalEarlybirdBody": "پلانی دەستگەیشتنی زووت پێویستی بە پێداچوونەوەی دەستییە پێش ئەوەی لەسەر مۆبایل بەکاربهێنرێت.",
-      "nonCanonicalEarlybirdCta": "لەسەر kilo.ai بەردەوام بە",
       "iosTitle": "KiloClaw لە iOS بەردەست نییە",
       "iosBody": "دەستگەیشتنی KiloClaw بۆ ئەم هەژمارەیە لە دەرەوەی ئەپەکەی iOS بەڕێوەدەبرێت.",
       "iosContact": "پرسیار؟ پەیوەندی بکە بە hi@kilo.ai."
@@ -1203,25 +1180,17 @@
       "openUnread_one": "کردنەوەی {{name}}، {{displayCount}} نامەی نەخوێندراوەوە",
       "openUnread": "کردنەوەی {{name}}، {{displayCount}} نامەی نەخوێندراوەوە",
       "openUnread_other": "کردنەوەی {{name}}، {{displayCount}} نامەی نەخوێندراوەوە",
-      "open": "کردنەوەی {{name}}",
       "openSettings": "کردنەوەی ڕێکخستنەکان بۆ {{name}}",
       "fixOnKiloAi": "چاکسازی لەسەر kilo.ai: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "کەناڵەکان",
       "devicePairingDescription": "پەسندکردنی داواکارییەکانی ئامێر",
-      "devicePairingLabel": "جووتبوونی ئامێر",
       "execPolicyDescription": "ڕێکخستنە ئەمنییەکان",
-      "execPolicyLabel": "سیاسەتی جێبەجێکردن",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "هەژماری Google",
       "modelDescription": "هەڵبژاردنی مۆدێلی AI",
-      "modelLabel": "مۆدێل",
       "secretsDescription": "بەڵگەنامە شاردراوەکان",
-      "secretsLabel": "نهێنییەکان",
-      "versionPinDescription": "سەرقەتکردن بە وەشانێکی دیاریکراو",
-      "versionPinLabel": "سەرقەتکردنی وەشان"
+      "versionPinDescription": "سەرقەتکردن بە وەشانێکی دیاریکراو"
     },
     "avatar": {
       "arcade": "ئارکەید",
@@ -1266,21 +1235,15 @@
       "placeholder": "بۆ نموونە. ڕێکەوتەکانی مامەڵەکردن لەگەڵ هەڵەکان جێبەجێ بکە…"
     },
     "repos": {
-      "title": "کۆگاکان",
-      "couldNotLoad": "نەتوانرا کۆگاکان بار بکرێن",
       "unavailable": "کۆگاکان بەردەست نین — ڕێکخستنی Bitbucket لەسەر kilo.ai تەواو بکە.",
       "finishSetup": "تەواوکردنی ڕێکخستن",
       "manageAccess": "بەڕێوەبردنی دەستگەیشتن",
-      "allRepositories": "هەموو کۆگاکان",
       "bitbucketNoRepositoriesDescription": "هیچ کۆگایەک لەم کارگەی Bitbucketدا بەردەست نییە.",
-      "bitbucketSetup": "ڕێکخستنی Bitbucket",
-      "couldNotOpenGithubSettings": "نەتوانرا ڕێکخستنەکانی GitHub App بکرێنەوە",
       "gitlabNoRepositoriesDescription": "ڕەنگە پێویستت بێت دەستگەیشتن بدەیت بە گرووپ یان پرۆژە زیاترەکان لەسەر GitLab.",
       "installGithubApp": "دامەزراندنی GitHub App لەسەر کۆگاکان",
       "installGithubAppDescription": "دەستگەیشتنی Kilo GitHub App بدە بە کۆگاکانەی کە دەتەوێت پێداچوونەوەیان بکرێت.",
       "noRepositoriesFound": "هیچ کۆگایەک نەدۆزرایەوە",
-      "repositoryAccess": "دەستگەیشتن بە کۆگا",
-      "selectedRepositories": "کۆگا هەڵبژێردراوەکان"
+      "repositoryAccess": "دەستگەیشتن بە کۆگا"
     },
     "style": {
       "title": "شێوازی پێداچوونەوە",
@@ -1289,12 +1252,10 @@
       "roast": "بە ڕاستگۆیی توند، بەشێوەیەکی سەرگەرمکەر",
       "strict": "هەموو شتێک نیشان بکە، ئاستێکی بەرز ڕاگرە"
     },
-    "title": "پێداچوونەوەکاری کۆد",
     "reviewDetail": {
       "title": "پێداچوونەوە",
       "cancelTitle": "هەڵوەشاندنەوەی پێداچوونەوە؟",
       "cancelMessage": "ئەمە پێداچوونەوەی کۆدی بەردەوام دەوەستێنێت.",
-      "keepRunning": "بەردەوام بە لە کارکردن",
       "cancelReview": "هەڵوەشاندنەوەی پێداچوونەوە",
       "retryTitle": "دووبارە هەوڵدانەوەی پێداچوونەوە؟",
       "retryMessage": "ئەمە پێداچوونەوەی کۆد دووبارە دەکاتەوە.",
@@ -1302,29 +1263,19 @@
       "couldNotLoad": "نەتوانرا پێداچوونەوە بار بکرێت",
       "couldNotGetLatest": "نەتوانرا دوایین وەربگیرێت.",
       "byline": "{{repo}} #{{number}} لەلایەن {{author}}",
-      "findings": "دۆزینەوەکان",
       "noFindings": "هیچ دۆزینەوەیەک نییە",
       "showMore": "زیاتر پیشان بدە",
-      "details": "وردەکارییەکان",
-      "branch": "لق",
-      "platform": "پلاتفۆرم",
-      "model": "مۆدێل",
       "created": "دروستکراو",
       "started": "دەستی پێکرد",
-      "completed": "تەواو بوو",
-      "cost": "تێچوون",
       "tokens": "تۆکنەکان",
       "tokensInOut": "{{input}} چوون / {{output}} هاتن",
-      "openPullRequest": "کردنەوەی داواکاری ڕاکێشان",
       "council": "ئەنجوومەن",
       "decision": "بڕیار",
       "gate": "دەروازە",
       "gateNone": "هیچ",
       "gateHidden": "شاردراوە",
       "checkRun": "جێبەجێکردنی پشکنین",
-      "status": "دۆخ",
       "threshold": "ئاست",
-      "pullRequest": "داواکاری ڕاکێشان",
       "transcriptWaiting": "چاوەڕوانی تۆماری پێداچوونەوە",
       "transcriptEmpty": "هیچ تۆمارێک نییە بۆ ئەم پێداچوونەوەیە",
       "transcriptRetry": "نەتوانرا تۆماری پێداچوونەوە باربکرێت",
@@ -1339,13 +1290,10 @@
       "sessionError": "هەڵەی سێشن: {{error}}",
       "statusWithValue": "دۆخ: {{status}}",
       "toolName": "ئامراز: {{name}}",
-      "toolNameError": "ئامراز: {{name}} — هەڵە",
-      "unknownError": "هەڵەی نەزانراو"
+      "toolNameError": "ئامراز: {{name}} — هەڵە"
     },
     "reviewMemory": {
       "title": "بیرگەی پێداچوونەوە",
-      "couldNotLoadMore": "نەتوانرا زیاتر بار بکرێت",
-      "retryLoadingMore": "دووبارە هەوڵدانەوەی بارکردنی زیاتر",
       "loading": "بارکردنی بیرگەی پێداچوونەوە",
       "couldNotLoad": "نەتوانرا بیرگەی پێداچوونەوە بار بکرێت",
       "off": "بیرگەی پێداچوونەوە ناچالاکە",
@@ -1364,13 +1312,9 @@
       "couldNotLoadProviders": "نەمانتوانی دابینکەرە پەیوەندیکراوەکانت بار بکەین. تکایە دووبارە هەوڵبدەوە.",
       "connectProvider": "پەیوەندیکردن بە دابینکەرێک",
       "connectProviderDescription": "بۆ دەستپێکردنی پێداچوونەوەیەکی دەستی لەسەر داواکاری ڕاکێشان پەیوەندی بە GitHub بکە.",
-      "connectGitHub": "پەیوەندیکردن بە GitHub",
-      "platform": "پلاتفۆرم",
-      "notConnected": "پەیوەندی نەکراو",
       "pullRequestUrl": "ناونیشانی داواکاری ڕاکێشان",
       "instructions": "ڕێنمایی (بەدڵخواز)",
       "instructionsPlaceholder": "هەر شتێکی تایبەت کە پێداچوونەوەکار دەبێت سەرنجی لەسەر بێت…",
-      "model": "مۆدێل",
       "starting": "دەستپێکردنی پێداچوونەوە…",
       "start": "دەستپێکردنی پێداچوونەوە"
     },
@@ -1379,28 +1323,20 @@
     "webhookSetupDescription": "ڕەنگە هەندێک کۆگا پێداچوونەوەی ئۆتۆماتیکی وەرنەگرن.",
     "autoReviews": "پێداچوونەوە ئۆتۆماتیکییەکان",
     "selectRepository": "بۆ چالاککردنی پێداچوونەوە ئۆتۆماتیکییەکان لانی کەم کۆگایەک هەڵبژێرە.",
-    "selectRepositories": "هەڵبژاردنی کۆگاکان",
     "followReviewMd": "شوێنکەوتنی REVIEW.md",
     "followReviewMdSubtitle": "ڕێزگرتن لە پەڕگە ڕێنماییەکانی REVIEW.md بۆ هەر کۆگایەک",
-    "readOnlyDescription": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی پارەدان دەتوانن ئەم ڕێکخستنانە بگۆڕن.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket پەیوەندی نەکراوە. تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی پارەدان دەتوانن پەیوەندی پێوە بکەن.",
       "setupIncomplete": "ڕێکخستن ناتەواوە — ڕێکخستنەکە لەسەر kilo.ai تەواو بکە",
       "setup": "ڕێکخستنی Bitbucket"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket پەیوەندی کرا",
-      "title": "پەیوەندیکردن بە Bitbucket",
       "description": "توکنێکی دەستگەیشتن بە کارگە دروست بکە بە ڕووبەرە پێویستەکان و لە خوارەوە بلکێنە.",
       "scopes": "هەژمار: خوێندنەوە · کۆگاکان: خوێندنەوە/نووسین · داواکارییەکانی ڕاکێشان: خوێندنەوە · وێبڕووکەکان: خوێندنەوە/نووسین",
-      "tokenPlaceholder": "توکنی دەستگەیشتن بە کارگە",
-      "connect": "بەستنەوە"
+      "tokenPlaceholder": "توکنی دەستگەیشتن بە کارگە"
     },
     "scopeList": {
-      "couldNotLoad": "نەتوانرا ڕێکخراوەکان بار بکرێن",
       "personalStillAvailable": "کۆگا کەسییەکان هێشتا لە خوارەوە بەردەستن.",
-      "personal": "کەسی",
-      "personalSubtitle": "کۆگا تایبەتەکانی خۆت",
       "viewOnly": "تەنها بینین"
     },
     "reviewList": {
@@ -1414,18 +1350,13 @@
     "platformList": {
       "checking": "لە پشکنیندایە…",
       "statusUnavailable": "دۆخ بەردەست نییە",
-      "connected": "پەیوەندی کرا",
-      "notConnected": "پەیوەندی نەکراو",
-      "organization": "ڕێکخراو",
       "platforms": "پلاتفۆرمەکان",
       "activity": "چالاکی"
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "پەیوەندیکردن بە GitHub",
       "githubError": "نەتوانرا ڕێکخستنی GitHub بکرێتەوە. تکایە دووبارە هەوڵبدەوە.",
       "gitlabAccount": "هەژماری GitLab",
-      "connectGitLab": "پەیوەندیکردن بە GitLab",
       "gitlabError": "نەتوانرا ڕێکخستنی GitLab بکرێتەوە. تکایە دووبارە هەوڵبدەوە.",
       "description": "بۆ پێداچوونەوەی ئۆتۆماتیکی بە داواکارییەکانی ڕاکێشان پەیوەندی بە Kilo {{label}} بکە.",
       "bitbucketError": "نەتوانرا دامەزراندنی Bitbucket بکرێتەوە. تکایە دووبارە هەوڵبدەوە"
@@ -1436,12 +1367,7 @@
       "allAreas": "هەموو بوارەکان",
       "customInstructions": "ڕێنماییە تایبەتەکان",
       "set": "دانان",
-      "model": "مۆدێل",
-      "mergeGate": "دەروازەی تێکەڵکردن",
-      "repositories": "کۆگاکان",
-      "allRepositories": "هەموو کۆگاکان",
       "nSelected": "{{displayCount}} هەڵبژێردراو",
-      "reviewMemory": "بیرگەی پێداچوونەوە",
       "proposedReviewMdGuidance": "ڕێنمایی پێشنیارکراوی REVIEW.md"
     },
     "decision": {
@@ -1450,69 +1376,53 @@
       "noDecision": "هیچ بڕیارێک نییە",
       "noResult": "هیچ ئەنجامێک نییە"
     },
-    "eyebrow": "پێداچوونەوەکاری کۆد",
     "updateFailed": "نوێکردنەوەی پێداچوونەوەکار شکستی هێنا",
     "configSaveFailed": "پاشەکەوتکردنی ڕێکخستنی پێداچوونەوە شکستی هێنا",
     "status": {
-      "pending": "چاوەڕوان",
-      "queued": "ڕیزکراو",
       "running": "لە کاردایە",
       "completed": "تەواو بوو",
-      "failed": "شکستی هێنا",
-      "cancelled": "هەڵوەشایەوە",
       "interrupted": "ڕاگیرا"
     },
     "reviewStyle": {
       "strict": "توند",
-      "balanced": "هاوسەنگ",
       "lenient": "نەرم",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "ئاسایش",
-      "performance": "کارایی",
       "bugs": "باگەکان",
       "style": "ستایل",
       "testing": "تاقیکردنەوە",
       "documentation": "بەڵگەنامە"
     },
     "gateThreshold": {
-      "off": "داخراو",
-      "all": "هەموو",
-      "warning": "ئاگادارکردنەوە",
-      "critical": "گرنگ"
+      "warning": "ئاگادارکردنەوە"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "پێداچوونەوەکاری کۆد پێویستی بە سەرنجە",
         "description": "پێداچوونەوەکاری کۆد ناچالاککرا چونکە Kilo ناتوانێت بە دامەزراندنێکی چالاکی GitHub App دەستبگات بەم کۆگایە. دامەزراندنی GitHub App نوێ بکەوە، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە.",
         "recoveryLabel": "نوێکردنەوەی GitHub App"
       },
       "githubIpAllowList": {
-        "title": "پێداچوونەوەکاری کۆد پێویستی بە سەرنجە",
-        "description": "پێداچوونەوەکاری کۆد ناچالاککرا چونکە ئەم ڕێکخراوەی GitHub لیستی ڕێگەپێدراوی IP بەکاردەهێنێت کە Kilo بەربەست دەکات. بۆ یارمەتی پەیوەندی بکە بە hi@kilocode.ai، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە.",
-        "recoveryLabel": "پەیوەندی بە پشتیوانی"
+        "description": "پێداچوونەوەکاری کۆد ناچالاککرا چونکە ئەم ڕێکخراوەی GitHub لیستی ڕێگەپێدراوی IP بەکاردەهێنێت کە Kilo بەربەست دەکات. بۆ یارمەتی پەیوەندی بکە بە hi@kilocode.ai، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە."
       },
       "gitlabProjectAccessRequired": {
-        "title": "پێداچوونەوەکاری کۆد پێویستی بە سەرنجە",
         "description": "پێداچوونەوەکاری کۆد ناچالاککرا چونکە Kilo ناتوانێت توکنی دەستگەیشتنی پرۆژەی GitLab دروست بکات بۆ ئەم پرۆژەیە. دەستگەیشتنی پارێزەر بدە یان توکنەکانی دەستگەیشتنی پرۆژە چالاک بکە، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە.",
         "recoveryLabel": "نوێکردنەوەی یەکگرتنی GitLab"
       },
       "byokInvalidKey": {
-        "title": "پێداچوونەوەکاری کۆد پێویستی بە سەرنجە",
         "description": "پێداچوونەوەکاری کۆد ناچالاککرا چونکە کلیلی APIـی BYOKی هەڵبژێردراو نادروستە، لابراوە، یان مۆڵەتی نییە. کلیلەکە نوێ بکەوە یان مۆدێلێکی تر هەڵبژێرە، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە.",
         "recoveryLabel": "نوێکردنەوەی ڕێکخستنەکانی BYOK"
       },
       "selectedModelUnavailable": {
-        "title": "پێداچوونەوەکاری کۆد پێویستی بە سەرنجە",
         "description": "پێداچوونەوەکاری کۆد ناچالاککرا چونکە مۆدێلی هەڵبژێردراو بۆ دانیشتنەکانی ئەرکی هەور بەردەست نییە. مۆدێلێکی بەردەست هەڵبژێرە، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە.",
         "recoveryLabel": "نوێکردنەوەی ڕێکخستنەکانی پێداچوونەوەکاری کۆد"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "پێداچوونەوەکاری کۆد پێویستی بە سەرنجە",
-        "description": "پێداچوونەوەکاری کۆد ئەمڕۆ دوای سێ کات بەسەرچووی کلۆنی کۆگا ناچالاککرا. بۆ یارمەتی پەیوەندی بکە بە hi@kilocode.ai، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە.",
-        "recoveryLabel": "پەیوەندی بە پشتیوانی"
-      }
+        "description": "پێداچوونەوەکاری کۆد ئەمڕۆ دوای سێ کات بەسەرچووی کلۆنی کۆگا ناچالاککرا. بۆ یارمەتی پەیوەندی بکە بە hi@kilocode.ai، پاشان پێداچوونەوەکاری کۆد دووبارە چالاک بکە."
+      },
+      "title": "پێداچوونەوەکاری کۆد پێویستی بە سەرنجە",
+      "recoveryLabel": "پەیوەندی بە پشتیوانی"
     },
     "unknownError": "هەڵەی نەزانراو"
   },
@@ -1522,31 +1432,17 @@
       "noFiltersDescription": "بگەڕێوە و پاڵاوتنەکان لە لیستی دۆزینەوەکانەوە دووبارە بکەرەوە.",
       "title": "پاڵاوتنی دۆزینەوەکان",
       "reset": "ڕێکخستنەوە",
-      "repository": "کۆگا",
-      "status": "دۆخ",
       "severity": "گرنگی",
       "outcome": "ئەنجام",
       "slaStatus": "دۆخی SLA",
       "sortBy": "ڕیزکردن بەپێی",
-      "allRepositories": "هەموو کۆگاکان",
-      "all": "هەموو",
       "statusOpen": "کراوە",
       "fixed": "چاککراو",
       "statusIgnored": "پشتگوێخراو",
-      "statusClosed": "داخراو",
-      "severityCritical": "گرنگ",
       "severityHigh": "بەرز",
       "severityMedium": "مامناوەند",
       "severityLow": "نزم",
-      "outcomeNotAnalyzed": "شیکاری نەکراو",
-      "outcomeAnalyzing": "لە شیکاریدایە",
-      "outcomeFailed": "شیکاری سەرکەوتوو نەبوو",
-      "outcomeExploitable": "بەکارهێنراو",
-      "outcomeNotExploitable": "بەکارنەهێنراو",
-      "outcomeSafeToDismiss": "سەلامەتە بۆ لابردن",
-      "outcomeNeedsReview": "پێویستی بە پێداچوونەوەیە",
       "outcomeTriageComplete": "ڕیزبەندی تەواو بوو",
-      "outcomeDismissed": "لابراو",
       "sortSeverityDesc": "گرنگی: بەرز بۆ نزم",
       "sortSeverityAsc": "گرنگی: نزم بۆ بەرز",
       "sortSlaDue": "ڕێکەوتی ماوەی SLA",
@@ -1571,7 +1467,6 @@
       "enableAutoDismiss": "چالاککردنی لابردنی ئۆتۆماتیکی",
       "enableAutoDismissSubtitle": "دۆزینەوەکان بە شێوەی ئۆتۆماتیکی لاببە کە AI دەستنیشان دەکات بەکارنەهێنراون.",
       "confidenceThreshold": "ئاستی متمانە",
-      "permissionNote": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی پارەدان دەتوانن ئەم ڕێکخستنانە بگۆڕن.",
       "enableAutoRemediationConfirmTitle": "چالاککردنی چاکسازی ئۆتۆماتیکی؟",
       "enableAutoRemediationConfirmMessage": "ئەجێنتی ئاسایش بۆ دۆزینەوە بەکارهێنراوە گونجاوەکان بە شێوەی ئۆتۆماتیکی PRی چاکسازی دەکاتەوە.",
       "enable": "چالاککردن",
@@ -1603,14 +1498,12 @@
       "suggestedAction": "کرداری پێشنیارکراو",
       "triageReasoning": "هۆکاری هەڵسەنگاندن",
       "exploitable": "بەکارهێنراو",
-      "model": "مۆدێل",
       "notRecorded": "تۆمارنەکراو",
       "analyzed": "شیکراوە",
       "exploitabilityReasoning": "هۆکاری بەکەڵک هێنان",
       "suggestedFix": "چارەسەری پێشنیارکراو",
       "whereFound": "شوێنی دۆزینەوە ({{displayCount}})",
       "fullReport": "ڕاپۆرتی تەواوی دروستکراو",
-      "unknown": "نەزانراو",
       "yes": "بەڵێ",
       "no": "نەخێر"
     },
@@ -1641,7 +1534,6 @@
       "repoSummary": "{{open}} کراوە · {{critical}} گرنگ · {{high}} بەرز",
       "couldNotLoad": "نەتوانرا داتای پانێڵ بار بکرێت",
       "filterByRepository": "فلتەر بەپێی کۆگا",
-      "findings": "دۆزینەوەکان",
       "lastSynced": "دوایین ناوسینگ {{time}}",
       "manageRepositories": "بەڕێوەبردنی کۆگاکان",
       "notYetSynced": "هێشتا نەنووسنگاوە",
@@ -1654,15 +1546,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "دۆزینەوە کراوەکان",
-      "openFindingsDetail": "{{critical}} گرنگ، {{high}} بەرز",
-      "confirmedExploitable": "بەکەڵک هێنانی پشتڕاستکراو",
       "confirmedExploitableDetail": "مەترسیی پڕۆژە بە شیکاری پشتڕاستکراوە",
-      "needsReview": "پێویستی بە پێداچوونەوەی تۆ",
       "needsReviewDetail": "بڕیاری مرۆڤ پێویستە",
-      "analysisIncomplete": "شیکاری تەواو نییە",
       "analysisIncompleteDetail": "مەترسیی پڕۆژە هێشتا نەزانراوە",
       "slaCompliance": "پابەندی بە SLA",
-      "notMeasured": "نەپێوراو",
       "withinDeadlineDetail": "{{within}} لە {{total}} لەناو مۆڵەت",
       "noDeadlineData": "هێشتا هیچ دۆزینەوەیەک مۆڵەتی SLA نییە",
       "deadlinePassed": "مۆڵەت تێپەڕیوە",
@@ -1675,7 +1562,6 @@
     },
     "dismiss": {
       "title": "ڕەتکردنی دۆزینەوە",
-      "submit": "ڕەتکردنی دۆزینەوە",
       "reason": "هۆکار",
       "reasonFixStarted": "چارەسەرێک پێشتر دەستی پێکردووە",
       "reasonNoBandwidth": "هیچ توانایەک بەردەست نییە",
@@ -1696,28 +1582,21 @@
     "findingDetails": {
       "supersededBy": "دۆزینەوەی ئێستا جێگەی گرتووەتەوە",
       "supersededByDescription": "دابکە بۆ کردنەوەی تۆمارەکەی ئێستا بۆ ئاست، شیکاری، و چارەسەر.",
-      "dismissed": "لابراو",
       "dismissedBecause": "ڕەتکراوە چونکە {{reason}}.",
       "severityLabel": "ئاستی {{severity}}",
       "package": "پاکێج",
       "vulnerableVersions": "وەشانە لاوازەکان",
-      "unknown": "نەزانراو",
       "patchedVersion": "وەشانی چارەسەرکراو",
       "noPatchAvailable": "هیچ پاچێک بەردەست نییە",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "کۆگا",
       "manifest": "مانیفیست",
       "detected": "دۆزراوەتەوە",
-      "updated": "نوێکراوە",
-      "fixed": "چاککراو",
       "slaDeadline": "مۆڵەتی SLA",
       "sourceRecord": "تۆماری سەرچاوە",
       "source": "سەرچاوە",
       "sourceId": "ناسنامەی سەرچاوە",
       "viewAdvisory": "ڕاوێژکاری لە GitHub ببینە",
-      "statusSuperseded": "جێگەی گیراوەتەوە",
-      "statusFixed": "چاککراو",
       "statusOpen": "کراوە",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "چارەسەرێک پێشتر دەستی پێکردووە",
@@ -1728,30 +1607,17 @@
       "reasonAfterReview": "دوای پێداچوونەوە"
     },
     "settingsOverview": {
-      "title": "ڕێکخستنەکان",
       "couldNotLoadSettings": "نەتوانرا ڕێکخستنەکانی ئەرکى ئاسایش بار بکرێت",
       "couldNotLoadPermissions": "نەتوانرا مۆڵەتەکان بار بکرێن",
-      "couldNotLoadRepositories": "نەتوانرا کۆگاکان بار بکرێن",
-      "securityAgent": "ئەجێنتی ئاسایش",
-      "enabled": "چالاککراو",
-      "disabled": "ناچالاککراو",
       "on": "کراوە",
-      "off": "داخراو",
-      "allRepositories": "هەموو کۆگاکان",
       "repositoriesCount_one": "{{displayCount}} کۆگا هەڵبژێردراوە",
       "repositoriesCount": "{{displayCount}} کۆگا هەڵبژێردراون",
       "repositoriesCount_other": "{{displayCount}} کۆگا هەڵبژێردراون",
-      "selectRepositories": "هەڵبژاردنی کۆگاکان",
       "selectRepositoriesSubtitle": "دیاری بکە ئەرکى ئاسایش چ کۆگایانە چاودێری دەکات",
-      "repositories": "کۆگاکان",
-      "modelsAndAnalysis": "مۆدێلەکان و شیکاری",
       "analysisModeSubtitle": "شیکاری {{mode}}",
-      "automation": "ئۆتۆماسیۆن",
       "automationAllOff": "هەموو داخراو",
       "automationCount": "{{displayCount}} لە 3 چالاککراو",
-      "notifications": "ئاگادارکردنەوەکان",
       "notificationsCount": "{{displayCount}} لە 2 چالاککراو",
-      "slaPolicy": "سیاسەتی SLA",
       "disabledNoManage": "ئەرکى ئاسایش ناچالاکە. تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی وەرگرتن دەتوانن بیخەنە کار.",
       "disabledNoRepo": "بەلایەنی کەم یەک کۆگا هەڵبژێرە پێش چالاککردنی ئەرکى ئاسایش.",
       "disabledPrompt": "ئەرکى ئاسایش بخە کار بۆ ناوسینگی ئاگادارکردنەوەکانی Dependabot، هەڵبژاردنی کۆگاکان، و ڕێکخستنی ئۆتۆماسیۆن."
@@ -1759,15 +1625,11 @@
     "remediation": {
       "cancellationRequested": "داواکراوە بۆ هەڵوەشاندنەوە",
       "cancelled": "چارەسەر هەڵوەشایەوە",
-      "pullRequest": "داواکاری ڕاکێشان",
       "couldNotLoad": "نەتوانرا ئاستی چارەسەر بار بکرێت",
-      "noAnalysisTitle": "هێشتا شیکاری نییە",
-      "noAnalysisDescription": "لە تابى وردەکارییەکان یەکێک بهێنە",
       "start": "دەستپێکردنی چارەسەر",
       "retry": "هەوڵدانەوەی چارەسەر",
       "cancelTitle": "ئەم چارەسەرە هەڵبوەشێنیتەوە؟",
       "cancelMessage": "ئەرکى ئاسایش لە هەوڵی چارەسەری بەردەوام دەوەستێت.",
-      "keepRunning": "بەردەوام بە لە کارکردن",
       "cancelRemediation": "هەڵوەشاندنەوەی چارەسەر",
       "openPullRequest": "کردنەوەی pull request{{number}}",
       "openDraftPullRequest": "کردنەوەی draft pull request{{number}}",
@@ -1775,29 +1637,19 @@
       "attemptHistory": "مێژووی هەوڵەکان ({{displayCount}})",
       "attemptNumber": "هەوڵ #{{number}}",
       "startedBy": "دەستپێکراوە لەلایەن",
-      "model": "مۆدێل",
-      "branch": "لق",
       "queued": "چارەسەر ڕیزکرا",
       "retryQueued": "هەوڵدانەوەی چارەسەر ڕیزکرا",
       "timeline": {
         "queued": "چارەسەر داواکرا",
-        "prOpened": "PR کرایەوە",
         "failed": "چارەسەر سەرکەوتوو نەبوو",
-        "blocked": "چارەسەر بەربەستکرا",
-        "noChangesNeeded": "هیچ گۆڕانکارییەک پێویست نییە",
-        "cancelled": "هەڵوەشایەوە"
+        "blocked": "چارەسەر بەربەستکرا"
       },
       "unavailable": "چارەسەر بۆ ئەم دۆزینەوەیە بەردەست نییە."
     },
     "analysisSettings": {
       "title": "مۆدێلەکان و شیکاری",
       "couldNotLoad": "نەتوانرا ڕێکخستنەکانی شیکاری بار بکرێن",
-      "permissionNote": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی وەرگرتن دەتوانن ئەم ڕێکخستانانە بگۆڕن.",
       "depth": "قوڵایی شیکاری",
-      "modeAuto": "ئۆتۆ",
-      "modeShallow": "کەم",
-      "modeDeep": "قوڵ",
-      "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن",
       "triageModel": "مۆدێلی هەڵسەنگاندن",
       "analysisModel": "مۆدێلی شیکاری",
       "remediationModel": "مۆدێلی چارەسەر"
@@ -1805,7 +1657,6 @@
     "sla": {
       "title": "سیاسەتی SLA",
       "couldNotLoad": "نەتوانرا ڕێکخستنەکانی SLA بار بکرێن",
-      "critical": "گرنگ",
       "high": "بەرز",
       "medium": "مامناوەند",
       "low": "نزم",
@@ -1823,41 +1674,23 @@
     },
     "findingDetail": {
       "title": "دۆزینەوە",
-      "tabDetails": "وردەکارییەکان",
       "tabAnalysis": "شیکاری",
-      "tabRemediation": "چارەسەر",
-      "notFound": "دۆزینەوە نەدۆزرایەوە",
-      "notFoundDescription": "ڕەنگە ئەم دۆزینەوەیە لابرابێت، یان چیتر دەستت پێ نەگات.",
-      "couldNotLoad": "نەتوانرا ئەم دۆزینەوەیە بار بکرێت",
-      "dismissA11y": "ڕەتکردنی دۆزینەوە"
+      "tabRemediation": "چارەسەر"
     },
     "findingList": {
-      "title": "دۆزینەوەکان",
       "couldNotLoad": "نەتوانرا دۆزینەوەکان بار بکرێن",
       "couldNotLoadMore": "نەتوانرا دۆزینەوەی زیاتر بار بکرێت",
       "noMatchesTitle": "هیچ دۆزینەوەیەک لەگەڵ فلتەرەکان ناگونجێت",
       "noMatchesDescription": "هەوڵ بدە فلتەرە هەڵبژێردراوەکان بگۆڕیت یان بسڕیتەوە.",
       "emptyTitle": "هیچ دۆزینەوەیەکی کراوە نییە",
-      "emptyDescription": "ئێستا هیچ دۆزینەوەیەکی کراوە پێویستی بە سەرنج نییە.",
-      "clearFilters": "سڕینەوەی فلتەرەکان"
-    },
-    "scopeList": {
-      "title": "ئەجێنتی ئاسایش",
-      "couldNotLoad": "نەتوانرا ڕێکخراوەکان بار بکرێن",
-      "personal": "کەسی",
-      "personalSubtitle": "کۆگا تایبەتەکانی خۆت"
-    },
-    "commandRetry": {
-      "discard": "فڕێدان"
+      "emptyDescription": "ئێستا هیچ دۆزینەوەیەکی کراوە پێویستی بە سەرنج نییە."
     },
     "findingRow": {
       "nextRemediationPrOpen": "PRی چارەسەر کراوە",
       "nextRemediationInProgress": "چارەسەر لە بەردەوامیدایە",
       "nextRetryRemediation": "هەوڵدانەوەی چارەسەر بەردەستە",
       "nextRemediationAvailable": "چارەسەر بەردەستە",
-      "retryAnalysis": "هەوڵدانەوەی شیکاری",
       "runAnalysis": "جێبەجێکردنی شیکاری",
-      "nextNeedsManualReview": "پێویستی بە پێداچوونەوەی دەستی",
       "nextViewDetails": "بینینی وردەکارییەکان",
       "viewPr": "بینینی PR",
       "analyze": "شیکاری بکە",
@@ -1868,7 +1701,6 @@
       "couldNotOpenGithub": "نەتوانرا GitHub بکرێتەوە. تکایە دووبارە هەوڵ بدە."
     },
     "settingsSave": {
-      "discard": "فڕێدان",
       "keepEditing": "بەردەوام بە لە دەستکاری",
       "saveChanges": "پاشەکەوتکردنی گۆڕانکارییەکان",
       "unsavedTitle": "گۆڕانکارییە پاشەکەوتنەکراوەکان",
@@ -1880,7 +1712,6 @@
     "auditReport": {
       "couldNotLoad": "نەتوانرا ڕاپۆرتی وردبینی بار بکرێت",
       "events": "ڕووداوەکان",
-      "findings": "دۆزینەوەکان",
       "generated": "دروستکرا {{generatedAt}}",
       "noActivity": "هیچ چالاکییەکی تۆمارکراو نییە",
       "noActivityDescription": "Kilo هیچ چالاکییەکی ڕاپۆرتکراوی دۆزینەوەی ئاسایشی هەیە لە {{start}} بۆ {{end}}.",
@@ -1890,8 +1721,7 @@
       "title": "ڕاپۆرتی وردبینی",
       "unavailable": "ڕاپۆرتی وردبینی بەردەست نییە",
       "unavailableDescription": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی وەرگرتن دەتوانن ڕاپۆرتی وردبینی ببینن. لە خاوەن یان بەڕێوەبەری وەرگرتن داوابکە دەستت پێ بدات.",
-      "queryFailed": "گەڕانی ڕاپۆرت تەواو نەبوو. دووبارە هەوڵ بدە.",
-      "checkConnection": "پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەوە."
+      "queryFailed": "گەڕانی ڕاپۆرت تەواو نەبوو. دووبارە هەوڵ بدە."
     },
     "notifications": {
       "couldNotLoad": "نەتوانرا ڕێکخستنەکانی ئاگادارکردنەوە بار بکرێن",
@@ -1900,30 +1730,21 @@
       "newFindingSection": "ئاگادارکردنەوەی دۆزینەوەی نوێ",
       "newFindingSeverityLabel": "کەمترین ئاستی دۆزینەوەی نوێ",
       "newFindingSubtitle": "هەر کاتێک دۆزینەوەیەکی نوێ ناوسینگ دەکرێت دەنێردرێت، لەنێویاندا لە یەکەم ناوسینگدا.",
-      "readOnly": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی وەرگرتن دەتوانن ئەم ڕێکخستانانە بگۆڕن.",
       "slaLeadTimeAccessibility": "کاتی پێشوەختی ئاگادارکردنەوەی SLA بە ڕۆژ",
       "slaLeadTimeError": "ژمارەیەکی تەواوی ڕۆژ لە نێوان 1 و 365 بنووسە.",
-      "slaLeadTimeHint": "ژمارەیەکی تەواو لە نێوان 1 و 365 بنووسە",
       "slaLeadTimeLabel": "کاتی پێشوەختی ئاگادارکردنەوەی SLA (ڕۆژ)",
       "slaPersonalTitle": "لەبارەی ئاگادارکردنەوەکانی SLA ئیمەیلم بۆ بنێرە",
       "slaSection": "ئاگادارکردنەوەی SLA",
       "slaSeverityLabel": "کەمترین ئاستی ئاگادارکردنەوەی SLA",
-      "slaSubtitle": "پێش و کاتێک دۆزینەوەکان نزیک دەبنەوە یان مۆڵەتی SLA دەشکێنن دەنێردرێت.",
-      "title": "ئاگادارکردنەوەکان"
+      "slaSubtitle": "پێش و کاتێک دۆزینەوەکان نزیک دەبنەوە یان مۆڵەتی SLA دەشکێنن دەنێردرێت."
     },
     "repositories": {
-      "allRepositories": "هەموو کۆگاکان",
       "couldNotLoad": "نەتوانرا ڕێکخستنەکانی کۆگا بار بکرێن",
-      "couldNotLoadRepositories": "نەتوانرا کۆگاکان بار بکرێن",
-      "couldNotOpenGithubSettings": "نەتوانرا ڕێکخستنەکانی GitHub App بکرێنەوە",
       "githubAppSettings": "ڕێکخستنەکانی GitHub App",
       "manageAccess": "بەڕێوەبردنی دەستپێگەیشتنی GitHub App",
       "noRepositories": "هیچ کۆگایەک نییە",
       "noRepositoriesDescription": "دەستپێگەیشتنی GitHub Appی Kilo بە کۆگاکان بدە",
-      "readOnly": "تەنها خاوەنەکانی ڕێکخراو و بەڕێوەبەرانی وەرگرتن دەتوانن ئەم ڕێکخستانانە بگۆڕن.",
-      "selectAtLeastOne": "بەلایەنی کەم یەک کۆگا هەڵبژێرە.",
-      "selectedRepositories": "کۆگا هەڵبژێردراوەکان",
-      "title": "کۆگاکان"
+      "selectAtLeastOne": "بەلایەنی کەم یەک کۆگا هەڵبژێرە."
     },
     "scopeEntry": {
       "connectDescription": "GitHub Appی Kilo دامەزرێنە بۆ ناوسینگی خۆکارانەی ئاگادارکردنەوەکانی Dependabot و بەڕێوەبردنی دۆزینەوە ئاسایشەکان لە کۆگاکانتدا.",
@@ -1938,7 +1759,6 @@
     },
     "queuedActionUntracked": "ئەو کردارە ڕیزکراوە چیتر نەتوانرا بەدواداچوون بکرێت. نوێ بکەرەوە بۆ بینینی دوایین ئاست.",
     "initialSyncAdmissionFailed": "ئەرکى ئاسایش چالاککرا، بەڵام نەتوانرا ناوسینگی سەرەتایی ڕیز بکرێت. دووبارە ناوسینگ بکە.",
-    "title": "ئەجێنتی ئاسایش",
     "commands": {
       "findingAlreadyDismissed": "دۆزینەوەکە پێشتر ڕەتکرایەوە",
       "findingDismissed": "دۆزینەوە ڕەتکرایەوە",
@@ -1956,49 +1776,33 @@
     },
     "analysisState": {
       "queued": "شیکاری ڕیزکرا",
-      "queuedTitle": "شیکاری ڕیزکرا",
       "queuedDescription": "چاوەڕوانی بەردەستبوونی توانای شیکاری.",
       "analyzing": "لە شیکاریدایە",
-      "analyzingTitle": "لە شیکاریدایە",
       "analyzingDescription": "پشکنینی ئەوەی کە ئایا کۆدی ئەپەکە دەگاتە تایبەتمەندییە کارتێکراوەکە.",
       "failed": "شیکاری سەرکەوتوو نەبوو",
-      "failedTitle": "شیکاری سەرکەوتوو نەبوو",
       "failedDescription": "ئەرکى ئاسایش نەیتوانی شیکارییەکە تەواو بکات.",
-      "extractionFailed": "پێویستی بە پێداچوونەوەیە",
-      "extractionFailedTitle": "پێویستی بە پێداچوونەوەیە",
       "extractionFailedDescription": "نەتوانرا ڕاپۆرتی تەکنیکی بگۆڕدرێت بۆ ئەنجامێکی پێکهاتوو.",
-      "exploitable": "بەکارهێنراو",
-      "exploitableTitle": "بەکارهێنراو",
       "exploitableDescription": "کۆدی ئەپەکە دەگاتە تایبەتمەندییە کارتێکراوەکە.",
       "notExploitable": "ناگات",
-      "notExploitableTitle": "ناگات",
       "notExploitableDescription": "هیچ ڕێگایەک نەدۆزرایەوە کە بگات لەم کۆگایەدا.",
       "unknown": "پێویستی بە پێداچوونەوەیە",
-      "unknownTitle": "پێویستی بە پێداچوونەوەیە",
       "unknownDescription": "شیکاری نەیتوانی پشتڕاست بکاتەوە کە ئایا تایبەتمەندییە لاوازەکە دەگات.",
       "safeToDismiss": "سەلامەتە بۆ لابردن",
-      "safeToDismissTitle": "سەلامەتە بۆ لابردن",
       "safeToDismissDescription": "هەڵسەنگاندن دیاری کرد کە ئەمە بە سەلامەتی دەتوانرێت لاببرێت بەبێ شیکاری کۆد.",
-      "manualReview": "پێویستی بە پێداچوونەوەیە",
       "manualReviewTitle": "پێویستی بە پێداچوونەوەی دەستی",
       "manualReviewDescription": "هەڵسەنگاندن ئەم دۆزینەوەیە نیشان کرد بۆ پێداچوونەوەی دەستی.",
       "analysisRequired": "شیکاری پێویستە",
       "analysisRequiredTitle": "شیکاری کۆد پێویستە",
       "analysisRequiredDescription": "هەڵسەنگاندن پێشنیار دەکات کۆگاکە شیکاری بکرێت پێش بڕیاردان لەسەر وەڵام.",
-      "completed": "شیکراوە",
-      "completedTitle": "شیکراوە",
       "completedDescription": "شیکاری تەواو بوو بەبێ تۆمارکردنی هیچ ئەنجامێکی دیاریکراو.",
       "notAnalyzed": "شیکاری نەکراو",
-      "notAnalyzedTitle": "شیکاری نەکراو",
       "notAnalyzedDescription": "شیکاری کۆد هێشتا بۆ ئەم دۆزینەوەیە جێبەجێ نەکراوە."
     },
     "deadline": {
       "fixedBeforeDeadline": "پێش مۆڵەت چاککراوە",
-      "fixed": "چاککراو",
       "fixedOn": "لە {{date}} چاککرا",
       "resolutionRecorded": "چارەسەر تۆمارکرا",
       "superseded": "جێگەی گیراوەتەوە",
-      "dismissed": "لابراو",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "مۆڵەت دیارینەکراوە",
       "noSlaDeadline": "هیچ مۆڵەتێکی SLA نییە",
@@ -2014,17 +1818,13 @@
       "dueInDays": "مۆڵەت لە {{count}} ڕۆژدا"
     },
     "remediationStatus": {
-      "cancellationRequested": "داواکراوە بۆ هەڵوەشاندنەوە",
       "notStarted": "دەستی پێنەکراوە",
-      "queued": "ڕیزکراو",
       "starting": "لە دەستپێکردندایە",
       "inProgress": "لە بەردەوامیدایە",
       "draftPrOpened": "PRی ڕەشنووس کرایەوە",
       "prOpened": "PR کرایەوە",
       "blocked": "بەربەستکراو",
-      "failed": "شکستی هێنا",
       "noChangesNeeded": "هیچ گۆڕانکارییەک پێویست نییە",
-      "cancelled": "هەڵوەشایەوە",
       "originAutomaticPolicy": "سیاسەتی ئۆتۆماتیکی",
       "originIncludeExistingPolicy": "سیاسەتی لەخۆگرتنی هەبووەکان",
       "originManual": "دەستی",
@@ -2036,7 +1836,6 @@
       "findingNotOpen": "دۆزینەوەکە چیتر کراوە نییە.",
       "repoNotInScope": "کۆگاکە بۆ ئەرکى ئاسایش هەڵنەبژێردراوە.",
       "analysisRequired": "پێش دەستپێکردنی چارەسەر شیکاری کۆد جێبەجێ بکە.",
-      "sandboxAnalysisRequired": "پێش دەستپێکردنی چارەسەر شیکاری کۆد جێبەجێ بکە.",
       "staleAnalysis": "دۆزینەوەکە دوای شیکاری گۆڕا. پێش دەستپێکردنی چارەسەر شیکاری دووبارە جێبەجێ بکە.",
       "notExploitable": "شیکاری هیچ ڕێگایەکی لاوازی نەدۆزییەوە کە بگات. چاکسازی ئۆتۆماتیکی بەردەست نییە.",
       "exploitabilityUnknown": "شیکاری نەیتوانی بەکارهێنان پشتڕاست بکاتەوە. پێش چارەسەری یەک-کرتە پێداچوونەوەی دەستی پێویستە.",
@@ -2052,12 +1851,10 @@
       "autoRemediationDisabled": "چاکسازی ئۆتۆماتیکی ناچالاککراوە. چارەسەری دەستی هێشتا دەتوانێت دەستپێبکات کاتێک دەروازە ئاسایشەکان تێدەپەڕن.",
       "includeExistingDisabled": "دۆزینەوە هەبووەکان لە چاکسازی ئۆتۆماتیکی دووردەخرێنەوە.",
       "belowThreshold": "دۆزینەوەکە لە خوار ئاستی ئۆتۆماتیکییەوەیە. چارەسەری دەستی هێشتا دەتوانێت دەستپێبکات کاتێک دەروازە ئاسایشەکان تێدەپەڕن.",
-      "beforeEnablement": "شیکاری پێش چالاککردنی چاکسازی ئۆتۆماتیکی تەواو بووە. چارەسەری دەستی هێشتا دەتوانێت دەستپێبکات کاتێک دەروازە ئاسایشەکان تێدەپەڕن.",
-      "generic": "چارەسەر بۆ ئەم دۆزینەوەیە بەردەست نییە."
+      "beforeEnablement": "شیکاری پێش چالاککردنی چاکسازی ئۆتۆماتیکی تەواو بووە. چارەسەری دەستی هێشتا دەتوانێت دەستپێبکات کاتێک دەروازە ئاسایشەکان تێدەپەڕن."
     },
     "commandFailure": {
       "ownerCapReached": "توانای شیکاری پڕە. چاوەڕوانی تەواوبوونی شیکارییەکی چالاک بکە، پاشان دووبارە هەوڵبدەرەوە.",
-      "githubTokenUnavailable": "ڕێگاپێدانی GitHub پێویستی بە سەرنجە. دووبارە ڕێگاپێدان بە GitHub App، پاشان دووبارە هەوڵبدەرەوە.",
       "githubAuthInvalid": "ڕێگاپێدانی GitHub پێویستی بە سەرنجە. دووبارە ڕێگاپێدان بە GitHub App، پاشان دووبارە هەوڵبدەرەوە.",
       "findingUnavailable": "دۆزینەوەکە چیتر بەردەست نییە. دۆزینەوەکان نوێ بکەرەوە و ئەگەر هێشتا کراوە بێت دووبارە هەوڵبدەرەوە.",
       "repositoryUnavailable": "کۆگاکە چیتر بۆ GitHub App بەردەست نییە. دەستگەیشتنی کۆگا نوێ بکەرەوە، پاشان دووبارە هەوڵبدەرەوە.",
@@ -2077,12 +1874,9 @@
     "search": {
       "searching": "گەڕان",
       "searchSessions": "گەڕان لە سێشنەکان",
-      "searchSessionsPlaceholder": "گەڕان لە سێشنەکان...",
-      "clearSearch": "سڕینەوەی گەڕان",
-      "clearFilters": "سڕینەوەی فلتەرەکان"
+      "searchSessionsPlaceholder": "گەڕان لە سێشنەکان..."
     },
     "sessionList": {
-      "couldNotLoad": "نەتوانرا دانیشتنەکان باربکرێن",
       "couldNotLoadActive": "نەتوانرا سێشنە چالاکەکان بار بکرێن",
       "noSessionsYetDescription": "لە مۆبایلەکەتەوە کارێکی کۆدنووسین دەستپێبکە. سێشنەکانت لێرە دەردەکەون.",
       "noMatches": "هیچ سێشنێک ناگونجێت",
@@ -2097,9 +1891,7 @@
     "sessionRow": {
       "deleteTitle": "سڕینەوەی سێشن؟",
       "deleteMessage": "ئەمە ناتوانرێت هەڵبوەشێنرێتەوە.",
-      "delete": "سڕینەوە",
       "deleteSession": "سڕینەوەی سێشن",
-      "rename": "ناوگۆڕین",
       "renameMessage": "ناوێکی نوێ بۆ ئەم سێشنە بنووسە",
       "copyId": "کۆپیکردنی ناسنامەی سێشن",
       "idCopied": "ناسنامەی سێشن کۆپیکرا",
@@ -2133,7 +1925,6 @@
       "didNotCompleteTitle": "دامەزراندن تەواو نەبوو",
       "didNotCompleteMessage": "دامەزراندنی GitHub App تەواو نەبوو. لە ئەپەکەوە دووبارە هەوڵبدەوە."
     },
-    "sessionExited": "سێشن دەرچوو",
     "remoteSpawnRetryable": "نەگەیشتینە نموونەکە — لەوانەیە پەیوەندییەکە پچڕابێت.",
     "remoteSpawnNonRetryable": "نموونەکە نەیتوانی دانیشتنەکە دەستپێبکات — ئامێرەکە بپشکنە یان CLI نوێ بکەرەوە.",
     "remoteSpawnInstanceDisconnected": "نموونەی هەڵبژێردراو پەیوەندییەکەی پچڕا. لە Cloud Agent دانیشتنێک دەستپێبکە یان نموونەیەکی دیکە هەڵبژێرە.",
@@ -2145,12 +1936,8 @@
       "title": "سێشن",
       "copyErrorDetails": "کۆپیکردنی وردەکاری هەڵە",
       "backToSessions": "گەڕانەوە بۆ سێشنەکان",
-      "accessDenied": "دەستگەیشتن ڕەتکرایەوە",
-      "accessDeniedDescription": "مۆڵەتی بینینی ئەمەت نییە.",
       "couldNotLoad": "نەتوانرا سێشن بار بکرێت",
       "failedToLoadDetails": "شکستی هێنا لە بارکردنی وردەکاری سێشن",
-      "notFound": "نەدۆزرایەوە",
-      "notFoundDescription": "ڕەنگە ئەم بەندە لابرابێت یان چیتر بەردەست نەبێت.",
       "failedToStopExecution": "شکستی هێنا لە وەستانەوەی جێبەجێکردن",
       "renameSession": "ناوگۆڕینی سێشن",
       "renamePlaceholder": "ناوی سێشن",
@@ -2161,7 +1948,6 @@
       "emptyTitle": "هێشتا هیچ پەیامێک نییە",
       "renameAccessibility": "ناوگۆڕینی سێشن: {{title}}",
       "cloningSession": "کۆپیکردنی سێشن",
-      "continue": "بەردەوامبوون",
       "couldNotLoadThisSession": "نەتوانرا ئەم سێشنە بار بکرێت",
       "cloneFailedRetry": "نەتوانرا ئەم سێشنە کۆپی بکرێت. دووبارە هەوڵ بدە.",
       "notEnoughCredits": "کرێدیتەکەت بەس نییە بۆ کارکردنی Cloud Agent. کرێدیت زیاد بکە و دووبارە هەوڵ بدەرەوە.",
@@ -2176,7 +1962,6 @@
     },
     "remoteSession": {
       "failedToCreate": "شکستی هێنا لە دروستکردنی سێشنی دوور",
-      "exited": "سێشن دەرچوو",
       "failedToExit": "شکستی هێنا لە دەرچوون لە سێشن",
       "exitTitle": "دەرچوون لە سێشن؟",
       "exitMessage": "ئەمە سێشنی ڕێکخراو دەوەستێنێت بەڵام مێژووەکەی دەپارێزێت.",
@@ -2194,9 +1979,6 @@
       "retryConnection": "هەوڵدانەوەی پەیوەندی"
     },
     "newSession": {
-      "title": "دانیشتنی نوێ",
-      "repository": "کۆگا",
-      "connectGithub": "پەیوەندیکردن بە GitHub",
       "connectGithubDescription": "GitHub لە وێبگەڕەکەتدا ببەستە، پاشان بگەڕێوە لێرە بۆ هەڵبژاردنی کۆگا.",
       "openGithub": "کردنەوەی GitHub",
       "refreshRepositories": "نوێکردنەوەی کۆگاکان",
@@ -2213,7 +1995,6 @@
       "commitAndPush": "کۆمیت و پاڵدان",
       "startSession": "دەستپێکردنی سێشن",
       "promptPlaceholder": "حەز دەکەیت لەسەر چی کار بکەیت؟",
-      "addAttachment": "زیادکردنی هاوپێچ",
       "couldNotLoadModels": "نەتوانرا مۆدێلەکان بار بکرێن",
       "prefillRepoAndModelUnavailable": "کۆگا و مۆدێلی سێشنی سەرەکی چیتر بەردەست نیین. لە خوارەوە هەڵیانبژێرە.",
       "prefillRepoUnavailable": "{{repo}} چیتر بەردەست نییە. لە خوارەوە کۆگایەک هەڵبژێرە.",
@@ -2223,14 +2004,9 @@
       "couldNotRefreshRepositories": "نەتوانرا کۆگاکان نوێ بکرێنەوە. تکایە دووبارە هەوڵ بدە.",
       "discardDraftTitle": "وازلێهێنان لە نوسین؟",
       "discardDraftMessage": "نووسینەکەت لەدەست دەچێت.",
-      "keepEditing": "بەردەوام بە لە دەستکاری",
-      "discard": "فڕێدان",
       "discardFailed": "نەتوانرا لە نوسینەکە وازبهێنرێت. تکایە دووبارە هەوڵ بدە.",
       "remoteHint": "`kilo remote` لە کۆمپیوتەرەکەتدا جێبەجێ بکە، یان `/remote` لە سێشنی CLIیەکی کارا، بۆ کۆنترۆڵکردنی پرۆسەی ناوخۆیی kilo.",
-      "bitbucketConnected": "Bitbucket پەیوەندی کرا",
-      "connectBitbucket": "پەیوەندیکردن بە Bitbucket",
       "connectBitbucketDescription": "لە وێبگەڕەکەتدا پەیوەندی بە Bitbucket بکە، ئینجا بگەڕێوە بۆ ئێرە بۆ هەڵبژاردنی ڕیپۆ",
-      "connectGitlab": "پەیوەندیکردن بە GitLab",
       "connectGitlabDescription": "لە وێبگەڕەکەتدا پەیوەندی بە GitLab بکە، ئینجا بگەڕێوە بۆ ئێرە بۆ هەڵبژاردنی ڕیپۆ",
       "couldNotLoadBitbucketRepositories": "نەتوانرا ڕیپۆکانی Bitbucket بار بکرێن",
       "couldNotLoadGithubRepositories": "نەتوانرا ڕیپۆکانی GitHub بار بکرێن",
@@ -2252,18 +2028,10 @@
       "updatedFileCount": "{{displayCount}} پەڕگە نوێکرانەوە",
       "updatedFileCount_other": "{{displayCount}} پەڕگە نوێکرانەوە"
     },
-    "toolPatch": {
-      "operationAdded": "زیادکرا",
-      "operationDeleted": "سڕایەوە",
-      "operationUpdated": "نوێکراوە"
-    },
     "toolCard": {
       "accessibility": "ئامرازی {{label}}، {{status}}",
       "accessibilityLabel": "ئامرازی {{name}}، {{status}}",
-      "fileEmpty": "ئەم پەڕگەیە بەتاڵە.",
       "noTasks": "هیچ کارێک نییە.",
-      "contentTruncated": "ناوەڕۆک کورتکراوەتەوە",
-      "truncated": "کورتکراوە",
       "toolRead": "خوێندنەوە",
       "toolEdit": "دەستکاری",
       "toolWrite": "نووسین",
@@ -2295,9 +2063,7 @@
       "runOn": "جێبەجێ بکە لەسەر",
       "runOnAccessibility": "جێبەجێ بکە لەسەر: {{label}}",
       "couldNotLoad": "نەتوانرا نموونەکان بار بکرێن",
-      "couldNotLoadDescription": "پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەوە.",
       "cloudAgent": "ئەرکى هەور",
-      "loading": "بارکردن…",
       "cloudAgentDescription": "لە ساندبۆکسی هەوری Kilo جێبەجێ بکە",
       "noCliInstances": "هیچ نموونەی CLI پەیوەندیدار نییە",
       "noCliInstancesDescription": "لە پڕۆژەیەک لە کۆمپیوتەرەکەتدا `kilo remote` جێبەجێ بکە، یان ئەگەر یەکێک پێشتر کاردەکات Kilo CLI نوێ بکە.",
@@ -2334,12 +2100,9 @@
       "noMatches": "هیچ گونجاوێک نییە",
       "noRepositories": "هیچ کۆگایەک بەردەست نییە",
       "noRepositoriesDescription": "هیچ کۆگایەک پەیوەندیدار نییە بە هەژمارەکەت.",
-      "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقی بکەرەوە.",
       "loading": "بارکردن...",
       "accessibility": "کۆگا: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "وردەکاری پەیام",
@@ -2349,13 +2112,10 @@
       "reportAiResponse": "ڕاپۆرتکردنی وەڵامی AI",
       "reportAiResponseConfirm": "ئەم وەڵامە ڕاپۆرت بکەیت بۆ پێداچوونەوە؟",
       "report": "ڕاپۆرت",
-      "role": "ڕۆڵ",
       "roleUser": "بەکارهێنەر",
       "roleAssistant": "یاریدەدەر",
       "sent": "نێردراوە",
-      "model": "مۆدێل",
       "costAndTokens": "تێچوون و تۆکنەکان",
-      "cost": "تێچوون",
       "input": "داخڵ",
       "output": "دەرچوون",
       "reasoning": "هۆکاری",
@@ -2363,8 +2123,7 @@
       "cacheWrite": "نووسینی کش",
       "total": "کۆی گشتی",
       "reportAiResponseFailedRetryable": "نەتوانرا ئەم وەڵامە ڕاپۆرت بکرێت.",
-      "reportAiResponseFailedTerminal": "ناتوانرێت ئەم وەڵامە ڕاپۆرت بکرێت.",
-      "reportAiResponseSubmitted": "ڕاپۆرت نێردرا. ڕەسیبۆ {{receiptId}}"
+      "reportAiResponseFailedTerminal": "ناتوانرێت ئەم وەڵامە ڕاپۆرت بکرێت."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2375,7 +2134,6 @@
       "textDisplay": "پیشاندانی دەق",
       "thinking": "بیرکردنەوە",
       "thought": "بیر",
-      "title": "وردەکارییەکان",
       "showDetails": "نیشاندانی وردەکارییەکان",
       "pending": "چاوەڕێ…",
       "running": "کارکردن…"
@@ -2398,16 +2156,13 @@
     "filePart": {
       "loadingImage": "بارکردنی وێنە",
       "imageUnavailableRetry": "وێنە بەردەست نییە، دووبارە بارکردنەوە",
-      "imageUnavailable": "وێنە بەردەست نییە",
       "imagePreviewUnavailableInSession": "پێشبینینی وێنە لەم سێشنەدا بەردەست نییە.",
       "viewImage": "بینینی وێنە",
       "viewImageWithAlt": "بینینی وێنە {{alt}}",
       "imageOutput": "دەرچوونی وێنە",
       "imageOutputWithFilename": "دەرچوونی وێنە، {{filename}}",
-      "defaultName": "فایل",
       "openFullScreen": "کردنەوەی {{name}} بە شاشەی تەواو",
       "preview": "پێشبینینی {{name}}",
-      "openFile": "کردنەوەی {{name}}",
       "couldNotLoadFile": "نەتوانرا ئەم پەڕگەیە بار بکرێت.",
       "couldNotLoadFileRetry": "نەتوانرا ئەم پەڕگەیە بار بکرێت. دووبارە هەوڵ بدە.",
       "retryLoadingFile": "هەوڵدانەوەی بارکردنی پەڕگە",
@@ -2490,7 +2245,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. دووبارە هەوڵدان بەردەستە.",
       "copyToComposer": "کۆپیکردن بۆ ناردنەکە",
-      "queued": "ڕیزکراو",
       "queuedAccessibility": "نامە لە ڕیزدا دانرا",
       "userMessage": "نامەی بەکارهێنەر",
       "assistantMessage": "نامەی یاریدەدەر",
@@ -2526,12 +2280,10 @@
     },
     "sessionFilter": {
       "title": "پاڵاوتن بۆ دانیشتنەکان",
-      "platform": "پلاتفۆرم",
       "platformCloud": "هاور",
       "platformExtension": "ئێکستنشن",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "هی تر",
       "project": "پرۆژە"
@@ -2545,15 +2297,10 @@
     },
     "modelPicker": {
       "title": "هەڵبژاردنی مۆدێل",
-      "searchPlaceholder": "گەڕان لە مۆدێلەکان...",
-      "allModels": "هەموو مۆدێلەکان",
       "favorites": "دڵخوازەکان",
-      "noModels": "هیچ مۆدێلێک بەردەست نییە",
-      "recommended": "پێشنیارکراو",
       "noModelsDescription": "هیچ مۆدێلێک نییە بۆ هەڵبژاردن."
     },
     "modelSelector": {
-      "model": "مۆدێل",
       "provider": "دابینکەر {{id}}",
       "modelId": "مۆدێل {{id}}",
       "unavailable": "بەردەست نییە",
@@ -2577,7 +2324,6 @@
       "uploading": "بارکردن…",
       "uploaded": "بارکرا",
       "uploadFailedRetry": "بارکردن سەرکەوتوو نەبوو. دابکە بۆ دووبارە هەوڵدان.",
-      "uploadFailedTerminal": "ئەم فایلە ناتوانرێت بار بکرێت.",
       "moveLeft": "گواستنەوەی {{filename}} بۆ چەپ",
       "moveRight": "گواستنەوەی {{filename}} بۆ ڕاست"
     },
@@ -2589,8 +2335,6 @@
       "camera": "کامێرا",
       "photoLibrary": "گەلەری وێنەکان",
       "files": "فایلەکان",
-      "cameraAccessDisabled": "دەستگەیشتن بە کامێرا ناچالاککراوە",
-      "cameraAccessMessage": "لە ڕێکخستنەکاندا ڕێگە بە دەستگەیشتن بە کامێرا بدە بۆ وێنەگرتن.",
       "couldNotOpenPhotoPicker": "نەتوانرا هەڵبژێری وێنە بکرێتەوە. Kilo دووبارە دەستپێبکەرەوە و دووبارە هەوڵبدەرەوە.",
       "maxFilesAllowed": "زۆرترین {{displayCount}} فایل ڕێگەپێدراوە",
       "onlyAddingFiles": "تەنها {{accepted}} لە {{total}} فایل زیاد دەکرێت (زۆرترین {{max}})"
@@ -2603,7 +2347,6 @@
       "waitForUploads": "چاوەڕوانی تەواوبوونی بارکردنی پاشگرەکان بکە.",
       "pasteFromClipboard": "لە کلپبۆردەوە بلکێنە",
       "stopGenerating": "ڕاگرتنی دروستکردن",
-      "sendMessage": "ناردنی نامە",
       "selectModelBeforeSending": "پێش ناردن مۆدێلێک هەڵبژێرە",
       "preparingPlaceholder": "ئامادەکردنی ژینگە...",
       "finalizingPlaceholder": "کۆتایی هێنان...",
@@ -2617,9 +2360,7 @@
     },
     "chatLink": {
       "linkCopied": "بەستەرەکە کۆپی کرا",
-      "reviewPr": "پێداچوونەوەی PR",
       "openLink": "کردنەوەی بەستەر",
-      "copyLink": "کۆپی بەستەر",
       "shareLink": "هاوبەشکردنی بەستەر",
       "share": "هاوبەشکردن",
       "prLinkActions": "کردارەکانی بەستەری PR",
@@ -2659,13 +2400,11 @@
     "contextUsage": {
       "windowUnavailable": "قەبارەی پەنجەرەی ناوەڕۆک بەردەست نییە",
       "tapToViewDetails": "دابکە بۆ بینینی وردەکاری ناوەڕۆکەکە.",
-      "costPrefix": "تێچوون {{cost}}",
       "costSuffix": "، تێچوون {{cost}}",
       "tokensWindowUnavailable": "ناوەڕۆک {{used}} تۆکن، پەنجەرە بەردەست نییە",
       "tokensUsage": "ناوەڕۆک {{used}} لە {{window}} تۆکن، {{percentage}} بەکارهاتووە",
       "title": "بەکارهێنانی ناوەڕۆک",
       "used": "بەکارهاتوو",
-      "remaining": "ماوە",
       "provider": "دابینکەر",
       "totalCost": "تێچوونی گشتی",
       "usageReflectsLatest": "بەکارهێنان ئەمەندامترین وەڵامی تەواوکراوی یاریدەدەر نیشان دەدات.",
@@ -2691,8 +2430,7 @@
       "merged": "تێکەڵکردنی داواکاری ڕاکێشان",
       "draft": "داواکاری ڕاکێشانی ڕەشنووس",
       "updating": "نوێکردنەوە، {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "داواکاری ڕاکێشان"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "بارکردن",
@@ -2720,11 +2458,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "نەتوانرا هەژمارەکەت باربکرێت",
-    "couldNotLoadAccountDescription": "پەیوەندییەکەت بپشکنە و دووبارە هەوڵبدەوە.",
     "couldNotLoadPrivacy": "نەتوانرا هەڵبژاردەکانی تایبەتمەندی باربکرێت",
     "couldNotLoadPrivacyDescription": "ڕێکخستنەکانی ئاسایشی ئامێرەکەت بپشکنە و دووبارە هەوڵبدەرەوە.",
     "contentReady": "ناوەڕۆک ئامادەیە",
-    "signOut": "دەرچوون",
     "retryLoadingAccount": "دووبارە هەوڵی بارکردنی هەژمارەکە بدەرەوە",
     "retryLoadingPrivacy": "دووبارە هەوڵی بارکردنی هەڵبژاردەکانی تایبەتمەندی بدەرەوە"
   },
@@ -2734,7 +2470,6 @@
     "billingPage": "پەڕەی پارەدان"
   },
   "deviceSessions": {
-    "couldNotLoad": "نەتوانرا دانیشتنەکان باربکرێن",
     "couldNotLoadDescription": "دانیشتنە چالاکەکانت بەردەست نابن تا ئەمە باربکرێت.",
     "currentDeviceUnidentified": "ئامێری ئێستا نەتوانرا دەستنیشان بکرێت",
     "noSessions": "هیچ دانیشتنێکی چالاک نییە",
@@ -2742,7 +2477,6 @@
     "onlyKiloAppSignIns": "تەنها چوونەژوورەوەکانی ئەپی Kilo لێرە دەردەکەون. چوونەژوورەوەکانی ئێدیتەر و CLI پێرست ناکرێن.",
     "signedIn": "چووە ژوورەوە {{signedIn}} · دوایین بینین {{lastSeen}}",
     "thisDevice": "ئەم ئامێرە",
-    "title": "دانیشتنەکانی ئامێر",
     "webBrowser": "وێب بڕاوزەر",
     "viewProfile": "بینینی پڕۆفایل",
     "signOutThisDevice": "دەرچوون لەم ئامێرە",
@@ -2750,9 +2484,7 @@
     "sessionSignedOut": "دانیشتنەکە دەرچوو.",
     "signOutThisDeviceTitle": "دەرچوون لەم ئامێرە؟",
     "signOutThisSessionTitle": "دەرچوون لەم دانیشتنە؟",
-    "signOutThisSessionMessage": "{{device}} دەردەچێت. دەتوانێت تا یەک کاتژمێر دەستڕاگەیشتنی API بەردەوام بێت.",
-    "signOutConfirm": "دەرچوون",
-    "signOutMessage": "پێویستە دووبارە بچیتە ژوورەوە بۆ گەیشتن بە شوێنی کارەکەت."
+    "signOutThisSessionMessage": "{{device}} دەردەچێت. دەتوانێت تا یەک کاتژمێر دەستڕاگەیشتنی API بەردەوام بێت."
   },
   "forceUpdate": {
     "couldNotOpenStore": "نەتوانرا دوکانەکە بکرێتەوە.",
@@ -2772,17 +2504,13 @@
   },
   "imageViewer": {
     "close": "داخستنی {{filename}}",
-    "imageUnavailable": "وێنە بەردەست نییە",
     "share": "هاوبەشکردنی {{filename}}"
   },
   "invalidRoute": {
     "description": "ئەم بەستەرە چیتر دروست نییە.",
-    "goBack": "گەڕانەوە",
     "title": "پەڕە نەدۆزرایەوە"
   },
   "monoScrollBlock": {
-    "contentTruncated": "ناوەڕۆک کورتکراوەتەوە",
-    "truncated": "کورتکراوە",
     "wrap": "لەپێچ",
     "scroll": "گەڕان"
   },
@@ -2791,22 +2519,16 @@
     "internetRestored": "پەیوەندی ئینتەرنێت گەڕایەوە"
   },
   "queryError": {
-    "neutralTitle": "شتێک هەڵەی کرد",
     "neutralDescription": "تکایە دووبارە هەوڵبدەرەوە.",
     "offlineTitle": "بارکردن سەرکەوتوو نەبوو",
-    "offlineDescription": "شتێک هەڵەی کرد",
-    "permissionTitle": "دەستگەیشتن ڕەتکرایەوە",
     "permissionDescription": "مۆڵەتی بینینی ئەمەت نییە.",
-    "notFoundTitle": "نەدۆزرایەوە",
     "notFoundDescription": "ڕەنگە ئەم بەندە لابرابێت یان چیتر بەردەست نەبێت.",
     "serverTitle": "نەتوانرا باربکرێت",
     "serverDescription": "هەڵەیەک لەلای ئێمەوە ڕوویدا. تکایە دووبارە هەوڵبدەرەوە."
   },
   "screenHeader": {
     "openMenu": "کردنەوەی مێنۆ",
-    "openMenuFor": "کردنەوەی مێنۆ بۆ {{title}}",
-    "close": "داخستن",
-    "goBack": "گەڕانەوە"
+    "openMenuFor": "کردنەوەی مێنۆ بۆ {{title}}"
   },
   "picker": {
     "optionsExpired": "هەڵبژاردەکان بەسەرچوون",
@@ -2837,10 +2559,7 @@
   },
   "share": {
     "title": "هاوبەشکردن بۆ Kilo",
-    "close": "داخستن",
-    "reviewPr": "پێداچوونەوەی PR",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "دانیشتنی نوێ",
     "searchPlaceholder": "گەڕان لە دانیشتنە نوێیەکان",
     "connectedCli": "لەسەر CLIـیەکەوە پەیوەندیدارە",
     "newSessionOn": "دانیشتنی نوێ لەسەر {{name}}",
@@ -2898,7 +2617,6 @@
     "statusCanceling": "Kilo Pass پەشیمان دەبێتەوە",
     "statusPastDue": "Kilo Pass دواکەوتووە",
     "monthlyCredits": "{{credits}} کرێدتی مانگانە",
-    "ends": "کۆتایی {{date}}",
     "periodEnd": "کۆتایی ماوە",
     "managedOnGooglePlay": "بەڕێوەدەبرێت لەسەر Google Play",
     "managedInAppStore": "بەڕێوەدەبرێت لە App Store",
@@ -2910,7 +2628,6 @@
     "unavailableDescription": "Kilo Pass وەک کڕین لەناو ئەپ لە Android بەردەست نییە. لە وێبەکەدا بەڕێوەی ببە.",
     "webManagementDescription": "ئەم Kilo Passیە لە وێبەکەدا بەڕێوە دەبرێت.",
     "legalDisclosure": "Kilo Pass بەشداربوونێکی مانگانەیە کە خۆکارانە نوێ دەبێتەوە. لە کاتی پشتڕاستکردنەوەی کڕینەکە، پارە لە Apple IDی تۆ دەبەسترێت. بەشداربوونەکان هەر مانگێک بە بەهای نیشاندراو خۆکارانە نوێ دەبنەوە مەگەر لانیکەم ٢٤ کاتژمێر پێش کۆتایی ماوەی ئێستا هەڵنەوەشێنرێنەوە. لە هەر کاتێکدا لە ڕێکخستنەکانی هەژماری App Store بەڕێوەی ببە یان هەڵیبوەشێنەوە.",
-    "legalPrivacyPolicy": "سیاسەتی تایبەتمەندی",
     "legalTermsOfUse": "مەرجەکانی بەکارهێنان (EULA)",
     "purchaseDifferentAccount": "ئەم کڕینەی App Store بە هەژماری Kiloـی تۆ نەبەستراوە. بەو هەژمارەی Apple بچۆ ژوورەوە کە بۆ کڕینەکە بەکارهاتووە، پاشان دووبارە هەوڵبدەرەوە.",
     "restoreFailed": "گەڕاندنەوەی کڕینەکان شکستی هێنا. دووبارە هەوڵبدەرەوە.",
@@ -2939,7 +2656,6 @@
     "privacyPolicyPrefix": "زانیارییەکانی تۆ بەپێی",
     "privacyPolicy": "سیاسەتی تایبەتمەندیی Kilo",
     "onDevice": "لەسەر ئامێر",
-    "loading": "بارکردن…",
     "couldNotLoadTranscription": "نەتوانرا ڕێکخستنی وەرگێڕانی تۆ باربکرێت.",
     "signInToManageTranscription": "بچۆ ژوورەوە بۆ بەڕێوەبردنی وەرگێڕانی سەرهێڵ.",
     "onlineTranscription": "وەرگێڕانی سەرهێڵ",
@@ -2956,7 +2672,6 @@
     "voiceTranscriptionTitle": "وەرگێڕانی دەنگ",
     "retentionPrefix": "ماوەکانی پاراستنی تەواو، مافەکانی تۆ و زانیاری پەیوەندیکردن لە",
     "backToConsent": "گەڕانەوە بۆ ڕەزامەندی",
-    "back": "گەڕانەوە",
     "revokeConsent": "پاشەکشەکردن لە ڕەزامەندی",
     "revokeConsentTitle": "پاشەکشەکردن لە ڕەزامەندی هاوبەشکردنی زانیاری؟",
     "acceptAndContinue": "قبووڵکردن و بەردەوامبوون",
@@ -2990,7 +2705,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "وێنەگرتنی شاشەی ماسککراو کاتێک هەڵەیەک ڕوودەدات، و تۆمارکردنی ماسککراوی نموونەیەکی بچووک لە دانیشتنەکان.",
     "errorScreenshotsWhy": "بینینی ئەوەی ئەپ چ نیشانداوە کاتێک شتێک تێکچووە.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "سەرچاوەی دامەزراندن و ناسێنەرەکانی هەڵمەت.",
     "installAttributionWhy": "تێگەیشتن لەوەی کام کەناڵەکان بەکارهێنەری نوێ دەهێنن.",
     "installAttributionWho": "AppsFlyer.",
@@ -2999,7 +2713,6 @@
     "voiceTranscriptionWho": "تەنها لەسەر ئامێر، یان Apple یان Google کاتێک ئەم ئامێرە ناتوانێت بە بێ ئینتەرنێت وەربگێڕێت.",
     "installAttributionPromptTitle": "ڕێگەدان بە دەستنیشانکردنی دامەزراندن؟",
     "installAttributionPromptMessage": "Kilo تەنها مۆڵەتی شوێنگەڕاندنی Apple بەکاردەهێنێت بۆ زانین لەوەی کام کەناڵ تۆی هێناوە. داواکاری و گفتوگۆکانی تۆ هەرگیز بەکارناچێن.",
-    "continue": "بەردەوامبوون",
     "what": "چی",
     "why": "بۆچی",
     "who": "کێ"
@@ -3021,7 +2734,6 @@
       "selectDescription": "لە پڕۆفایلەکەتەوە ڕێکخراوێک هەڵبژێرە بۆ بەردەوامبوون.",
       "selectOrganization": "هەڵبژاردنی ڕێکخراوێک",
       "unavailableDescription": "ئەم ڕێکخراوە چیتر بەردەست نییە. لە پڕۆفایلەکەتەوە یەکێک هەڵبژێرە بۆ بەردەوامبوون.",
-      "accessDeniedTitle": "دەستگەیشتن ڕەتکرایەوە",
       "accessDeniedDescription": "تۆ ڕێگەپێدراو نیت بۆ ئەم ڕێکخراوە."
     },
     "creditActivity": {
@@ -3040,16 +2752,12 @@
         "accounting_adjustment": "ڕێکخستنی هەژماری",
         "credits_expired": "بەسەرچوونی کرێدت"
       },
-      "loadMore": "بارکردنی زیاتر",
-      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت",
       "truncated": "چالاکی بەرایی کۆنیتر بەردەستە."
     },
     "inviteMember": {
       "emailError": "ناونیشانی ئیمەیڵی دروست بنووسە",
-      "emailLabel": "ئیمەیڵ",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "تۆ مۆڵەتی بانگهێشتکردنی ئەندامانت نییە.",
-      "roleLabel": "ڕۆڵ",
       "roleMember": "ڕۆڵ: ئەندام",
       "sendInvite": "ناردنی بانگهێشت",
       "title": "بانگهێشتکردنی ئەندام"
@@ -3066,18 +2774,13 @@
         "paid": "پارەدراو",
         "open": "کراوە",
         "void": "پووچەڵ",
-        "draft": "ڕەشنووس",
-        "uncollectible": "نەکۆڵکراو",
-        "unknown": "نەزانراو"
+        "uncollectible": "نەکۆڵکراو"
       },
-      "loadMore": "بارکردنی زیاتر",
       "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت",
       "truncated": "فاکتورە کۆنەکان بەردەستن."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "چالاککردنی ئاگادارکردنەوەی تەوازنی نزم",
-      "enabled": "چالاککراو",
       "notifyEmailsLabel": "ئیمەیڵەکانی ئاگادارکردنەوە",
       "permissionDenied": "تۆ مۆڵەتی بەڕێوەبردنی ئاگادارکردنەوەکانی وەرگرتنت نییە.",
       "separateEmailsHint": "فرە ئیمەیڵ بە کۆمە جیابکەرەوە.",
@@ -3101,12 +2804,10 @@
       "emptyDescriptionCanInvite": "هاوکارەکان بانگهێشت بکە بۆ دەستپێکردنی هاوکاری لەم ڕێکخراوەدا.",
       "emptyDescriptionCannotInvite": "داوای خاوەن یان بەڕێوەبەری وەرگرتن بکە بۆ بانگهێشتکردنی هاوکارەکان.",
       "emptyTitle": "هێشتا هیچ ئەندامێک نییە",
-      "inviteMember": "بانگهێشتکردنی ئەندام",
       "invitedDate": "بانگهێشتکراو {{date}}",
       "limitPerDay": "{{amount}}/ڕۆژ",
       "manageA11y": "بەڕێوەبردنی {{name}}",
       "manageInvitationA11y": "بەڕێوەبردنی بانگهێشت بۆ {{email}}",
-      "removeConfirm": "لابردن",
       "removeMember": "لابردنی ئەندام",
       "removeMemberMessage": "لابردنی {{name}} لەم ڕێکخراوە؟",
       "revokeConfirm": "پاشەکشەکردن",
@@ -3121,31 +2822,23 @@
         "billingManager": "بەڕێوەبەری وەرگرتن"
       },
       "emailStatusFailed": "ئیمەیڵ سەرکەوتوو نەبوو",
-      "emailStatusPending": "چاوەڕوان",
       "inviteCreated": "بانگهێشت دروستکرا",
       "pendingInvitations": "بانگهێشتە چاوەڕوانەکان",
       "resendInvite": "دووبارە ناردنی بانگهێشت",
       "shareInviteLink": "هاوبەشکردنی بەستەری بانگهێشت"
     },
-    "permissionDenied": {
-      "back": "گەڕانەوە",
-      "title": "دەستگەیشتن ڕەتکرایەوە"
-    },
     "usageStats": {
-      "cost": "تێچوون",
       "inputTokens": "تۆکنەکانی داگرتن",
       "last30Days": "دوایین ٣٠ ڕۆژ",
       "outputTokens": "تۆکنەکانی دەرکراو",
       "requests": "داواکارییەکان"
     },
     "hub": {
-      "title": "ڕێکخراو",
       "renameTitle": "ناونانەوەی ڕێکخراوە",
       "renamePlaceholder": "ناوی ڕێکخراوە بنووسە",
       "balance": "تەوازن",
       "organizationSeats": "شوێنی ڕێکخراوە",
-      "lowBalanceBelow": "خوارەوەی {{amount}}",
-      "lowBalanceOff": "داخراو"
+      "lowBalanceBelow": "خوارەوەی {{amount}}"
     },
     "kiloPass": {
       "activating": "چالاککردن",
@@ -3153,9 +2846,6 @@
       "couldNotLoadStatus": "نەتوانرا دۆخ باربکرێت",
       "creditProcessingDelayed": "دەرخستنی کرێدت دواکەوت · دووبارە هەوڵدان بە شێوەی خۆکار",
       "ended": "کۆتایی هات",
-      "endsOn": "کۆتایی {{date}}",
-      "loading": "بارکردن…",
-      "manageHint": "بەڕێوەبردنی Kilo Pass لەسەر وێب دەکاتەوە.",
       "notSubscribed": "بەشدارنەبوو",
       "overallocated": "تەرخانکردنەکانی Pass لە شوێنی پارەدراو زیاترن",
       "paidSeat_one": "{{displayCount}} شوێنی پارەدراو",
@@ -3165,13 +2855,11 @@
       "paymentPending": "پارەدان چاوەڕوانە",
       "processingBlocked": "دەرخستن گیرا",
       "processingNeedsReview": "دەرخستن پێویستی بە پێداچوونەوەیە",
-      "retry": "هەوڵدانەوە",
       "retryHint": "دووبارە هەوڵی بارکردنی دۆخی Kilo Pass دەداتەوە.",
       "setupHint": "ڕێکخستنی Kilo Pass لەسەر وێب دەکاتەوە."
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "هەژمارێک بەم ئیمەیڵە پێشتر هەیە لەگەڵ ڕێگەیەکی جیاوازی چوونەژوورەوە. ڕێگەیەکی دیکە تاقیبکەرەوە یان '$t(login.moreSignInOptions)' بەکاربهێنە.",
     "differentOauth": "هەژمارێک بەم ئیمەیڵە پێشتر هەیە لەگەڵ ڕێگەیەکی جیاوازی چوونەژوورەوە. ڕێگەیەکی دیکە تاقیبکەرەوە یان '$t(login.moreSignInOptions)' بەکاربهێنە.",
     "ssoError": "ڕێکخراوەکەت SSO دەوێت. '$t(login.moreSignInOptions)' بەکاربهێنە.",
     "blocked": "ئەم هەژمارە ڕاگیراوە. تکایە پەیوەندی بە پشتیوانی بکە.",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "دەستپێکردنی چوونە ژوورەوە شکستی هێنا. تکایە دووبارە هەوڵبدەوە.",
     "couldNotOpenBrowser": "نەتوانرا وێبگەڕ بکرێتەوە. تکایە دووبارە هەوڵبدەوە.",
     "signInTimedOut": "کاتی چوونە ژوورەوە بەسەرچوو. تکایە دووبارە هەوڵبدەوە.",
-    "signInFailed": "چوونە ژوورەوە شکستی هێنا. تکایە دووبارە هەوڵبدەوە.",
     "networkError": "هەڵەی تۆڕ. تکایە دووبارە هەوڵبدەوە.",
     "accessDeniedByUser": "دەستگەیشتن لەلایەن بەکارهێنەرەوە ڕەتکرایەوە",
     "codeExpired": "کۆدەکە بەسەرچوو",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "گەڕانەوە بۆ پەسەندەکان"
   },
   "quickChat": {
-    "title": "گفتوگۆ",
-    "composer": {
-      "placeholder": "نامە"
-    },
     "empty": {
       "title": "دەستپێکردنی گفتوگۆیەک",
       "description": "پەیامێک بنێرە بۆ قسەکردن لەگەڵ مۆدێلێک."
     },
-    "working": "کارکردن",
     "historyRetry": "نەتوانرا مێژووی گفتوگۆ بار بکرێت.",
-    "catalogRetry": "نەتوانرا مۆدێلەکان بار بکرێن",
     "sendError": "شکستی هێنا لە ناردنی پەیام. تکایە دووبارە هەوڵ بدە."
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "بچۆ ژوورەوە بۆ بینینی ئەجێنتەکان",
     "privacy": "Kilo بکەرەوە بۆ بینینی ئەجێنتەکان",
     "openAgents": "کردنەوەی ئەجێنتەکان",
-    "running": "کارکردن",
     "needsInput": "پێویستی بە داخڵکردن",
-    "idle": "بێکار",
     "channelName": "ئەجێنتە چالاکەکان",
     "activityKitDisabledBody": "چالاکییە ڕاستەوخۆکان لە ڕێکخستنەکان چالاک بکە بۆ بینینی ئەجێنتە چالاکەکان لە شاشەی قوفڵ."
   }

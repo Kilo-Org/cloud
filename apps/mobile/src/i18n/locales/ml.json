@@ -27,15 +27,119 @@
     "somethingWentWrong": "എന്തോ പിശക് സംഭവിച്ചു",
     "couldNotOpen": "{{label}} തുറക്കാൻ കഴിഞ്ഞില്ല",
     "link": "ലിങ്ക്",
-    "takingLonger": "ഇത് പ്രതീക്ഷിച്ചതിലും കൂടുതൽ സമയമെടുക്കുന്നു. നിങ്ങൾക്ക് ഇത് അടച്ച് വീണ്ടും പരിശോധിക്കാം."
+    "takingLonger": "ഇത് പ്രതീക്ഷിച്ചതിലും കൂടുതൽ സമയമെടുക്കുന്നു. നിങ്ങൾക്ക് ഇത് അടച്ച് വീണ്ടും പരിശോധിക്കാം.",
+    "cameraAccessDisabled": "ക്യാമറ ആക്സസ് പ്രവർത്തനരഹിതമാണ്",
+    "copyLink": "ലിങ്ക് പകർത്തുക",
+    "reviewPr": "PR അവലോകനം ചെയ്യുക",
+    "sendMessage": "സന്ദേശം അയയ്ക്കുക",
+    "remaining": "ശേഷിക്കുന്നത്",
+    "imageUnavailable": "ചിത്രം ലഭ്യമല്ല",
+    "open": "{{name}} തുറക്കുക",
+    "loading": "ലോഡ് ചെയ്യുന്നു…",
+    "queued": "ക്യൂവിൽ",
+    "cost": "ചെലവ്",
+    "model": "മോഡൽ",
+    "reportSubmittedReceipt": "റിപ്പോർട്ട് സമർപ്പിച്ചു. രസീത് {{receiptId}}",
+    "role": "റോൾ",
+    "allModels": "എല്ലാ മോഡലുകൾ",
+    "noModelsAvailable": "മോഡലുകൾ ലഭ്യമല്ല",
+    "recommended": "ശുപാർശ ചെയ്യുന്നത്",
+    "searchModels": "മോഡലുകൾ തിരയുക...",
+    "bitbucketConnected": "Bitbucket കണക്റ്റുചെയ്തു",
+    "connectBitbucket": "Bitbucket കണക്റ്റുചെയ്യുക",
+    "connectGithub": "GitHub കണക്റ്റുചെയ്യുക",
+    "connectGitlab": "GitLab കണക്റ്റുചെയ്യുക",
+    "discard": "ഉപേക്ഷിക്കുക",
+    "repository": "റിപ്പോസിറ്ററി",
+    "newSession": "പുതിയ സെഷൻ",
+    "details": "വിശദാംശങ്ങൾ",
+    "pullRequest": "പുൾ റിക്വസ്റ്റ്",
+    "sessionExited": "സെഷൻ പുറത്തുകടന്നു",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "ആക്സസ് നിഷേധിച്ചു",
+    "notFound": "കണ്ടെത്തിയില്ല",
+    "platform": "പ്ലാറ്റ്ഫോം",
+    "contentTruncated": "ഉള്ളടക്കം ട്രങ്കേറ്റ് ചെയ്തു",
+    "truncated": "ട്രങ്കേറ്റ് ചെയ്തത്",
+    "added": "ചേർത്തു",
+    "deleted": "ഇല്ലാതാക്കി",
+    "updated": "അപ്ഡേറ്റ് ചെയ്തു",
+    "clearFilters": "ഫിൽട്ടറുകൾ മായ്ക്കുക",
+    "clearSearch": "തിരയൽ മായ്ക്കുക",
+    "couldNotLoadSessions": "സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "delete": "ഇല്ലാതാക്കുക",
+    "rename": "പുനർനാമകരണം ചെയ്യുക",
+    "idle": "നിഷ്ക്രിയം",
+    "online": "ഓൺലൈൻ",
+    "starting": "ആരംഭിക്കുന്നു…",
+    "noKiloclawInstances": "KiloClaw ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
+    "personal": "വ്യക്തിപരം",
+    "reply": "മറുപടി",
+    "closeReactions": "റിയാക്ഷനുകൾ അടയ്ക്കുക",
+    "recent": "സമീപകാലം",
+    "connect": "കണക്റ്റുചെയ്യുക",
+    "codeReviewer": "കോഡ് റിവ്യൂവർ",
+    "performance": "പ്രകടനം",
+    "all": "എല്ലാം",
+    "critical": "ഗുരുതരം",
+    "off": "ഓഫ്",
+    "notConnected": "കണക്റ്റുചെയ്തിട്ടില്ല",
+    "allRepositories": "എല്ലാ റിപ്പോസിറ്ററികളും",
+    "repositories": "റിപ്പോസിറ്ററികൾ",
+    "connected": "കണക്റ്റുചെയ്തു",
+    "organization": "ഓർഗനൈസേഷൻ",
+    "couldNotLoadRepositories": "റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "selectedRepositories": "തിരഞ്ഞെടുത്ത റിപ്പോസിറ്ററികൾ",
+    "branch": "ബ്രാഞ്ച്",
+    "findings": "കണ്ടെത്തലുകൾ",
+    "keepRunning": "പ്രവർത്തിക്കുന്നത് തുടരുക",
+    "status": "നില",
+    "retryLoadingMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
+    "balanced": "സമതുലിതം",
+    "couldNotLoadOrganizations": "ഓർഗനൈസേഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "yourOwnRepositories": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ",
+    "selectRepositories": "റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുക്കുക",
+    "cancelled": "റദ്ദാക്കി",
+    "failed": "പരാജയപ്പെട്ടു",
+    "pending": "കാത്തിരിക്കുന്നു",
+    "deviceSessions": "ഉപകരണ സെഷനുകൾ",
+    "working": "പ്രവർത്തിക്കുന്നു",
+    "goBack": "തിരികെ പോകുക",
+    "ends": "{{date}}-ന് അവസാനിക്കുന്നു",
+    "privacyPolicy": "സ്വകാര്യതാ നയം",
+    "disabled": "പ്രവർത്തനരഹിതം",
+    "enabled": "പ്രവർത്തനക്ഷമം",
+    "couldNotLoadModels": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
+    "close": "അടയ്ക്കുക",
+    "remove": "നീക്കം ചെയ്യുക",
+    "kiloclaw": "KiloClaw",
+    "notifications": "അറിയിപ്പുകൾ",
+    "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
+    "email": "ഇമെയിൽ",
+    "draft": "ഡ്രാഫ്റ്റ്",
+    "prReview": "PR അവലോകനം",
+    "dismissed": "നിരസിച്ചു",
+    "closed": "അടച്ചു",
+    "preferences": "മുൻഗണനകൾ",
+    "agents": "ഏജന്റുകൾ",
+    "securityAgent": "സുരക്ഷാ ഏജന്റ്",
+    "profile": "പ്രൊഫൈൽ",
+    "chat": "ചാറ്റ്",
+    "file": "ഫയൽ",
+    "keepEditing": "എഡിറ്റിംഗ് തുടരുക",
+    "signOut": "സൈൻ ഔട്ട്",
+    "unknown": "അജ്ഞാതം",
+    "message": "സന്ദേശം",
+    "reactions": "റിയാക്ഷനുകൾ",
+    "openPullRequest": "പുൾ റിക്വസ്റ്റ് തുറക്കുക",
+    "couldnTLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല"
   },
   "language": {
-    "title": "ഭാഷ",
     "restarting": "ഭാഷ പ്രയോഗിക്കാൻ പുനരാരംഭിക്കുന്നു",
     "couldNotRestart": "പുനരാരംഭിക്കാനായില്ല",
     "languageSaved": "നിങ്ങളുടെ ഭാഷ സംരക്ഷിച്ചു.",
     "catalogLoadFailed": "ഭാഷ ലോഡ് ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
-    "retry": "വീണ്ടും ശ്രമിക്കുക",
     "search": "ഭാഷകൾ തിരയുക",
     "noMatches": "ഭാഷകൾ ഒന്നും യോജിക്കുന്നില്ല",
     "deviceLanguage": "ഉപകരണ ഭാഷ",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "സൈൻ ഇൻ കോഡ്: {{code}}",
     "openSignInPageInBrowser": "ബ്രൗസറിൽ സൈൻ-ഇൻ പേജ് തുറക്കുക",
     "copySignInLink": "സൈൻ-ഇൻ ലിങ്ക് പകർത്തുക",
-    "copyLink": "ലിങ്ക് പകർത്തുക",
     "cancelSignIn": "സൈൻ ഇൻ റദ്ദാക്കുക",
     "startingSignIn": "സൈൻ ഇൻ ആരംഭിക്കുന്നു...",
     "organizationUsesSso": "നിങ്ങളുടെ ഓർഗനൈസേഷൻ സിംഗിൾ സൈൻ-ഓൺ ഉപയോഗിക്കുന്നു.",
@@ -62,23 +165,19 @@
     "emailAddress": "ഇമെയിൽ വിലാസം",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "ഇമെയിൽ ഉപയോഗിച്ച് തുടരുക",
-    "continue": "തുടരുക",
     "enterCodeSentTo": "{{email}}-ലേക്ക് അയച്ച കോഡ് നൽകുക",
     "codeArrivalHint": "ഈ വിലാസം യോഗ്യമാണെങ്കിൽ, ഒരു മിനിറ്റിനുള്ളിൽ കോഡ് എത്തും.",
     "verifyCode": "കോഡ് പരിശോധിക്കുക",
     "resendCode": "കോഡ് വീണ്ടും അയയ്ക്കുക",
-    "back": "മടങ്ങുക",
     "termsPrefix": "തുടരുന്നതിലൂടെ നിങ്ങൾ ഞങ്ങളുടെ",
     "terms": "നിബന്ധനകൾ",
     "termsConnector": " ഉം ",
     "termsSuffix": ".",
-    "privacyPolicy": "സ്വകാര്യതാ നയം",
     "moreSignInOptions": "കൂടുതൽ സൈൻ-ഇൻ ഓപ്ഷനുകൾ",
     "couldNotCompleteSignIn": "സൈൻ ഇൻ പൂർത്തിയാക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "sessionEnded": "നിങ്ങളുടെ സെഷൻ അവസാനിച്ചു. വീണ്ടും സൈൻ ഇൻ ചെയ്യുക.",
     "signInCodeExpired": "നിങ്ങളുടെ സൈൻ-ഇൻ കോഡ് കാലഹരണപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.",
     "accessDenied": "ആക്സസ് നിരസിക്കപ്പെട്ടു.",
-    "somethingWentWrong": "എന്തോ പിശക് സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക.",
     "codeSent": "കോഡ് അയച്ചു",
     "accountCreated": "അക്കൗണ്ട് സൃഷ്ടിച്ചു. Kilo-യിലേക്ക് സ്വാഗതം.",
     "pleaseEnterEmail": "നിങ്ങളുടെ ഇമെയിൽ വിലാസം നൽകുക.",
@@ -86,24 +185,16 @@
     "or": "അല്ലെങ്കിൽ"
   },
   "profile": {
-    "title": "പ്രൊഫൈൽ",
-    "agents": "ഏജന്റുകൾ",
-    "codeReviewer": "കോഡ് റിവ്യൂവർ",
     "codeReviewerSubtitle": "യാന്ത്രിക PR അവലോകനങ്ങൾ",
-    "securityAgent": "സുരക്ഷാ ഏജന്റ്",
     "securityAgentSubtitle": "ദുർബലതകൾ കണ്ടെത്തി പരിഹരിക്കുക",
     "reviews": "അവലോകനങ്ങൾ",
-    "prReview": "PR അവലോകനം",
     "prReviewSubtitle": "മൊബൈലിൽ പുൾ റിക്വസ്റ്റുകൾ അവലോകനം ചെയ്യുക",
-    "organization": "ഓർഗനൈസേഷൻ",
     "couldNotLoadOrganization": "ഓർഗനൈസേഷൻ ലോഡ് ചെയ്യാനായില്ല",
     "couldNotLoadOrganizationDescription": "ഇത് ലോഡ് ചെയ്യുന്നത് വരെ ഓർഗനൈസേഷനും ഏജന്റ് ക്രമീകരണങ്ങളും ലഭ്യമല്ല.",
     "linkedAccounts": "ലിങ്ക് ചെയ്ത അക്കൗണ്ടുകൾ",
     "couldNotLoadAccounts": "അക്കൗണ്ടുകൾ ലോഡ് ചെയ്യാനായില്ല",
     "app": "ആപ്പ്",
-    "preferences": "മുൻഗണനകൾ",
     "preferencesSubtitle": "രൂപം, അറിയിപ്പുകൾ, ചിന്ത, സ്ക്രീൻ സ്വഭാവം",
-    "deviceSessions": "ഉപകരണ സെഷനുകൾ",
     "deviceSessionsSubtitle": "മറ്റ് ഉപകരണങ്ങൾ അവലോകനം ചെയ്ത് സൈൻ ഔട്ട് ചെയ്യുക",
     "feedback": "ഫീഡ്ബാക്ക്",
     "privacyChoices": "സ്വകാര്യതാ തിരഞ്ഞെടുപ്പുകൾ",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "നിങ്ങളുടെ ക്രെഡിറ്റ് ബാലൻസ് ശൂന്യമാണ്. ഈ അക്കൗണ്ടിനായി iOS ആപ്പിന് പുറത്താണ് ക്രെഡിറ്റുകൾ കൈകാര്യം ചെയ്യുന്നത്.",
     "signOutTitle": "സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutMessage": "നിങ്ങളുടെ വർക്ക്സ്പേസ് ആക്സസ് ചെയ്യാൻ വീണ്ടും സൈൻ ഇൻ ചെയ്യേണ്ടതുണ്ട്.",
-    "signOutConfirm": "സൈൻ ഔട്ട്",
     "deleteAccountTitle": "അക്കൗണ്ട് ഇല്ലാതാക്കണോ?",
     "deleteAccountMessage": "ഇത് നിങ്ങളുടെ അക്കൗണ്ട് ശാശ്വതമായി ഇല്ലാതാക്കുകയും സൈൻ ഔട്ട് ചെയ്യുകയും ചെയ്യുന്നു. ഞങ്ങൾ സ്ഥിരീകരണ കോഡ് ഇമെയിൽ ചെയ്യും.",
     "deleteAccountConfirm": "അക്കൗണ്ട് ഇല്ലാതാക്കുക",
     "accountDeleted": "നിങ്ങളുടെ അക്കൗണ്ട് ഇല്ലാതാക്കി.",
     "viewOrganization": "ഓർഗനൈസേഷൻ കാണുക",
     "manageOrganization": "ഓർഗനൈസേഷൻ കൈകാര്യം ചെയ്യുക",
-    "personal": "വ്യക്തിപരം",
     "selectAccount": "അക്കൗണ്ട് തിരഞ്ഞെടുക്കുക",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "ഇമെയിൽ",
     "providerTestAccount": "ടെസ്റ്റ് അക്കൗണ്ട്",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "എന്റർപ്രൈസ് SSO"
   },
   "preferences": {
-    "title": "മുൻഗണനകൾ",
     "autoExpandThinking": "ചിന്ത സ്വയം വികസിപ്പിക്കുക",
     "autoExpandThinkingSubtitle": "പൂർത്തിയാകുമ്പോൾ ഏജന്റിന്റെ ചിന്ത വികസിപ്പിച്ച് കാണിക്കുക.",
     "keepScreenOn": "സെഷൻ പേജിൽ സ്ക്രീൻ ഓണായി നിർത്തുക",
     "keepScreenOnSubtitle": "സെഷൻ പ്രവർത്തിക്കുമ്പോൾ സ്ക്രീൻ ഉണർന്നിരിക്കുക.",
     "appearance": "രൂപം",
-    "notifications": "അറിയിപ്പുകൾ",
     "notificationsSubtitle": "പുഷ് മുൻഗണനകൾ",
     "appearanceSystem": "സിസ്റ്റം",
     "appearanceLight": "ലൈറ്റ്",
@@ -161,7 +245,6 @@
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
     "pullRequestUnavailableDescription": "ഈ PR തുറക്കാനാവില്ല. ഇത് ഇല്ലാതാക്കിയതോ, റിപ്പോസിറ്ററി സ്വകാര്യമോ ആകാം, അല്ലെങ്കിൽ Kilo GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ലായിരിക്കാം.",
-    "accessDenied": "ആക്സസ് നിഷേധിച്ചു",
     "accessDeniedDescription": "ഈ പുൾ റിക്വസ്റ്റ് കാണാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
     "noFilesChanged": "ഫയലുകളൊന്നും മാറിയിട്ടില്ല",
     "noFilesChangedDescription": "ഈ പുൾ റിക്വസ്റ്റിന് ഫയൽ മാറ്റങ്ങളൊന്നുമില്ല.",
@@ -177,7 +260,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "ഫയലുകൾ ലോഡ് ചെയ്യാനായില്ല",
-      "checkConnection": "നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "retryLoadingFiles": "ഫയലുകൾ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "filterPlaceholder": "പാത്ത് അനുസരിച്ച് ഫയലുകൾ ഫിൽട്ടർ ചെയ്യുക",
       "viewedCount": "{{total}}-ൽ {{viewed}} കണ്ടു",
@@ -289,7 +371,6 @@
         "closed": "ഈ പുൾ റിക്വസ്റ്റ് അടച്ചു"
       },
       "partialSuccessBanner": {
-        "title": "മെർജ് ചെയ്തു",
         "body": "ബ്രാഞ്ച് ഇല്ലാതാക്കാനായില്ല: {{reason}}",
         "accessibility": "മെർജ് ചെയ്തു. ബ്രാഞ്ച് ഇല്ലാതാക്കാനായില്ല: {{reason}}"
       },
@@ -331,7 +412,6 @@
       "unresolveThread": "ത്രെഡ് പരിഹാരം നീക്കുക",
       "resolved": "പരിഹരിച്ചു",
       "outdated": "കാലഹരണപ്പെട്ടത്",
-      "file": "ഫയൽ",
       "comment_one": "1 അഭിപ്രായം",
       "comment": "{{displayCount}} അഭിപ്രായങ്ങൾ",
       "comment_other": "{{displayCount}} അഭിപ്രായങ്ങൾ",
@@ -339,9 +419,6 @@
       "couldNotLoadMore": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യാനായില്ല.",
       "retryLoadingMore": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "loadMoreComments": "കൂടുതൽ അഭിപ്രായങ്ങൾ ലോഡ് ചെയ്യുക",
-      "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
-      "closeReactions": "റിയാക്ഷനുകൾ അടയ്ക്കുക",
-      "reactionsTitle": "റിയാക്ഷനുകൾ",
       "addReaction": "റിയാക്ഷൻ ചേർക്കുക",
       "reactionPill": "{{emoji}} റിയാക്ഷൻ, {{displayCount}} {{countLabel}}",
       "reaction_one": "റിയാക്ഷൻ",
@@ -352,14 +429,11 @@
       "reportUser": "ഉപയോക്താവിനെ റിപ്പോർട്ട് ചെയ്യുക",
       "mute": "മ്യൂട്ട് ചെയ്യുക",
       "block": "ബ്ലോക്ക് ചെയ്യുക",
-      "somethingWentWrong": "എന്തോ പിശക് സംഭവിച്ചു",
-      "reportSubmitted": "റിപ്പോർട്ട് സമർപ്പിച്ചു. രസീത് {{receiptId}}",
       "blockedUser": "{{login}} ബ്ലോക്ക് ചെയ്തു",
       "mutedUser": "{{login}} മ്യൂട്ട് ചെയ്തു",
       "replyPlaceholder": "മറുപടി…",
       "replyBody": "മറുപടി ശരീരം",
       "submitReply": "മറുപടി സമർപ്പിക്കുക",
-      "reply": "മറുപടി",
       "termsTitle": "സേവന നിബന്ധനകൾ",
       "termsCopy": "പോസ്റ്റ് ചെയ്യാൻ നിങ്ങൾക്ക് 13 വയസ്സോ അതിൽ കൂടുതലോ ആയിരിക്കണം.",
       "termsAcceptRetry": "നിബന്ധനകൾ സ്വീകരിക്കാനായില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
@@ -367,7 +441,6 @@
       "acceptTerms": "സ്വീകരിക്കുക",
       "replyBadRequest": "ഈ മറുപടി പോസ്റ്റ് ചെയ്യാൻ കഴിയില്ല. ത്രെഡ് മാറിയിരിക്കാം.",
       "replyForbidden": "ഈ പുൾ റിക്വസ്റ്റിന് മറുപടി നൽകാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
-      "couldNotReply": "മറുപടി നൽകാനായില്ല.",
       "moderation": {
         "reportContent": {
           "terminal": "ഈ അഭിപ്രായം റിപ്പോർട്ട് ചെയ്യാൻ കഴിയില്ല.",
@@ -420,8 +493,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub App ക്രമീകരണങ്ങൾ തുറക്കാൻ കഴിഞ്ഞില്ല",
     "installKiloGitHubApp": "Kilo GitHub ആപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
-    "connectionExpiredTitle": "GitHub കണക്ഷൻ കാലഹരണപ്പെട്ടു",
-    "connectionExpiredDescription": "നിങ്ങളുടെ GitHub കണക്ഷൻ ഇനി സാധുവല്ല. നിങ്ങളുടെ കണക്ഷൻ വീണ്ടും പരിശോധിക്കുക — ആവശ്യമെങ്കിൽ വീണ്ടും കണക്ട് ചെയ്യാൻ പ്രോംപ്റ്റ് ചെയ്യും.",
     "checkConnection": "കണക്ഷൻ പരിശോധിക്കുക",
     "couldNotLoadPullRequest": "പുൾ റിക്വസ്റ്റ് ലോഡ് ചെയ്യാനായില്ല",
     "description": "വിവരണം",
@@ -430,21 +501,18 @@
     "reviewPullRequest": "പുൾ റിക്വസ്റ്റ് അവലോകനം ചെയ്യുക",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "title": "PR അവലോകനം",
       "eyebrow": "URL വഴി പുൾ റിക്വസ്റ്റ് തുറക്കുക",
       "pastePrLink": "PR ലിങ്ക് ഒട്ടിക്കുക",
       "noRecentPrs": "സമീപകാല PR-കളില്ല",
       "noRecentPrsDescription": "ഒരു അവലോകനം ആരംഭിക്കാൻ മുകളിൽ PR ലിങ്ക് ഒട്ടിക്കുക — അത് അടുത്ത തവണ ഇവിടെ ദൃശ്യമാകും.",
       "couldNotLoad": "ലോഡ് ചെയ്യാനായില്ല",
-      "remove": "നീക്കം ചെയ്യുക",
       "removeFromRecentsTitle": "സമീപകാലങ്ങളിൽ നിന്ന് നീക്കം ചെയ്യണോ?",
       "removeFromRecentsMessage": "ഈ പുൾ റിക്വസ്റ്റ് നിങ്ങളുടെ സമീപകാലങ്ങളിൽ നിന്ന് നീക്കം ചെയ്യും.",
       "removeRecentAccessibility": "സമീപകാലങ്ങളിൽ നിന്ന് {{repo}} നീക്കം ചെയ്യുക",
       "urlAccessibility": "GitHub പുൾ റിക്വസ്റ്റ് URL",
       "clearLink": "പുൾ റിക്വസ്റ്റ് ലിങ്ക് മായ്ക്കുക",
       "pasteLink": "പുൾ റിക്വസ്റ്റ് ലിങ്ക് ഒട്ടിക്കുക",
-      "open": "തുറക്കുക",
-      "openPullRequest": "പുൾ റിക്വസ്റ്റ് തുറക്കുക"
+      "open": "തുറക്കുക"
     },
     "checks": {
       "title": "പരിശോധനകൾ",
@@ -460,19 +528,14 @@
       "pending": "{{displayCount}} തീർച്ചയായിട്ടില്ല",
       "skipped": "{{displayCount}} ഒഴിവാക്കി",
       "checksCount": "{{displayCount}} പരിശോധനകൾ",
-      "checkDetails": "പരിശോധന വിശദാംശങ്ങൾ",
-      "pullRequest": "പുൾ റിക്വസ്റ്റ്"
+      "checkDetails": "പരിശോധന വിശദാംശങ്ങൾ"
     },
     "inbox": {
       "title": "ഇൻബോക്സ്",
-      "recent": "സമീപകാലം",
-      "draft": "ഡ്രാഫ്റ്റ്",
       "loading": "ഇൻബോക്സ് ലോഡ് ചെയ്യുന്നു",
       "noReviewRequests": "റിവ്യൂ അഭ്യർത്ഥനകളില്ല",
       "noReviewRequestsDescription": "നിങ്ങളുടെ അവലോകനത്തിനായി കാത്തിരിക്കുന്ന പുൾ റിക്വസ്റ്റുകൾ ഇവിടെ ദൃശ്യമാകും. മുകളിൽ ഏത് PR ലിങ്കും ഒട്ടിക്കാം.",
-      "couldNotLoad": "ഇൻബോക്സ് ലോഡ് ചെയ്യാനായില്ല",
-      "couldNotLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "retryLoadingMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക"
+      "couldNotLoad": "ഇൻബോക്സ് ലോഡ് ചെയ്യാനായില്ല"
     },
     "composer": {
       "commentBodyPlaceholder": "ഒരു അഭിപ്രായം രേഖപ്പെടുത്തുക",
@@ -487,8 +550,6 @@
       "loadFailedTitle": "അഭിപ്രായ കമ്പോസർ ലോഡ് ചെയ്യാനായില്ല",
       "discardTitle": "അഭിപ്രായം ഉപേക്ഷിക്കണോ?",
       "discardMessage": "നിങ്ങളുടെ ഡ്രാഫ്റ്റ് നഷ്ടപ്പെടും.",
-      "keepEditing": "എഡിറ്റിംഗ് തുടരുക",
-      "discard": "ഉപേക്ഷിക്കുക",
       "comment": "അഭിപ്രായം",
       "insertSuggestionA11y": "ഒരു കോഡ് നിർദ്ദേശം ചേർക്കുക",
       "insertSuggestion": "നിർദ്ദേശം ചേർക്കുക",
@@ -496,12 +557,10 @@
       "suggestionsOnlyAddedLines": "നിർദ്ദേശങ്ങൾ ചേർത്ത വരികൾക്ക് മാത്രം ബാധകമാണ്.",
       "tapDiffLineToSuggest": "നിർദ്ദേശങ്ങൾ പ്രവർത്തനക്ഷമമാക്കാൻ ഒരു diff വരിയിൽ ടാപ്പ് ചെയ്യുക."
     },
-    "screenTitle": "PR അവലോകനം",
     "connect": {
       "checkFailedTitle": "GitHub കണക്ഷൻ പരിശോധിക്കാനായില്ല",
       "checkFailedMessage": "ഇത് ലോഡ് ചെയ്യുന്നത് വരെ സൈൻ-ഇൻ നില ലഭ്യമല്ല.",
       "reconnectTitle": "GitHub വീണ്ടും കണക്ട് ചെയ്യുക",
-      "title": "GitHub കണക്റ്റുചെയ്യുക",
       "reconnectDescription": "നിങ്ങളുടെ GitHub കണക്ഷൻ റദ്ദാക്കപ്പെട്ടു. മൊബൈലിൽ പുൾ റിക്വസ്റ്റുകൾ അവലോകനം ചെയ്യുന്നത് തുടരാൻ വീണ്ടും കണക്ട് ചെയ്യുക.",
       "description": "മൊബൈലിൽ പുൾ റിക്വസ്റ്റുകൾ അവലോകനം ചെയ്യാൻ നിങ്ങളുടെ GitHub അക്കൗണ്ട് കണക്ട് ചെയ്യുക."
     },
@@ -510,11 +569,9 @@
       "shareA11y": "പുൾ റിക്വസ്റ്റ് പങ്കിടുക"
     },
     "submit": {
-      "title": "അവലോകനം സമർപ്പിക്കുക",
       "loadFailedTitle": "റിവ്യൂ സമർപ്പണം ലോഡ് ചെയ്യാനായില്ല",
       "deletePendingTitle": "തീർച്ചയാകാത്ത അഭിപ്രായം ഇല്ലാതാക്കണോ?",
       "deletePendingMessage": "ഈ അഭിപ്രായം റിവ്യൂ ക്യൂവിൽ നിന്ന് നീക്കം ചെയ്യും.",
-      "delete": "ഇല്ലാതാക്കുക",
       "summaryOptional": "സംഗ്രഹം (ഓപ്ഷണൽ)",
       "pendingComment_one": "തീർച്ചയാകാത്ത അഭിപ്രായം",
       "pendingComment": "തീർച്ചയാകാത്ത അഭിപ്രായങ്ങൾ",
@@ -527,19 +584,15 @@
     },
     "reconnectNotice": {
       "title": "GitHub കണക്ഷൻ കാലഹരണപ്പെട്ടു",
-      "message": "നിങ്ങളുടെ GitHub കണക്ഷൻ ഇനി സാധുവല്ല. നിങ്ങളുടെ കണക്ഷൻ വീണ്ടും പരിശോധിക്കുക — ആവശ്യമെങ്കിൽ വീണ്ടും കണക്ട് ചെയ്യാൻ പ്രോംപ്റ്റ് ചെയ്യും.",
-      "checkConnection": "കണക്ഷൻ പരിശോധിക്കുക"
+      "message": "നിങ്ങളുടെ GitHub കണക്ഷൻ ഇനി സാധുവല്ല. നിങ്ങളുടെ കണക്ഷൻ വീണ്ടും പരിശോധിക്കുക — ആവശ്യമെങ്കിൽ വീണ്ടും കണക്ട് ചെയ്യാൻ പ്രോംപ്റ്റ് ചെയ്യും."
     },
     "eventChips": {
       "comment": "അഭിപ്രായം",
       "requestChanges": "മാറ്റങ്ങൾ അഭ്യർത്ഥിക്കുക",
-      "approve": "അംഗീകരിക്കുക",
       "label": "റിവ്യൂ ഇവന്റ്"
     },
     "overview": {
       "stateMerged": "മെർജ് ചെയ്തു",
-      "stateClosed": "അടച്ചു",
-      "stateDraft": "ഡ്രാഫ്റ്റ്",
       "stateOpenApproved": "തുറന്നത് · അംഗീകരിച്ചു",
       "stateOpenChangesRequested": "തുറന്നത് · മാറ്റങ്ങൾ അഭ്യർത്ഥിച്ചു",
       "stateOpenReviewRequired": "തുറന്നത് · അവലോകനം ആവശ്യമാണ്",
@@ -564,14 +617,11 @@
       "reviewChangesRequested": "മാറ്റങ്ങൾ ആവശ്യപ്പെട്ടു",
       "reviewCommented": "അഭിപ്രായം രേഖപ്പെടുത്തി",
       "reviewPending": "അവലോകനത്തിനായി കാത്തിരിക്കുന്നു",
-      "openIssueA11y": "GitHub-ൽ പ്രശ്നം #{{number}} തുറക്കുക",
-      "reviewDismissed": "നിരസിച്ചു"
+      "openIssueA11y": "GitHub-ൽ പ്രശ്നം #{{number}} തുറക്കുക"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}}-ലെ കാലഹരണപ്പെട്ട തീർച്ചയാകാത്ത അഭിപ്രായം എഡിറ്റ് ചെയ്യുക",
       "editA11y": "{{location}}-ലെ തീർച്ചയാകാത്ത അഭിപ്രായം എഡിറ്റ് ചെയ്യുക",
-      "emptyBody": "(ശൂന്യം)",
-      "outdated": "കാലഹരണപ്പെട്ടത്",
       "staleHint": "നിങ്ങൾ ഇത് എഴുതിയതിന് ശേഷം PR മാറി.",
       "deleteA11y": "{{location}}-ലെ തീർച്ചയാകാത്ത അഭിപ്രായം ഇല്ലാതാക്കുക",
       "deletedAnnouncement": "തീർച്ചയാകാത്ത അഭിപ്രായം ഇല്ലാതാക്കി",
@@ -587,8 +637,6 @@
       "discussion": "ചർച്ച"
     },
     "fileStatus": {
-      "added": "ചേർത്തു",
-      "deleted": "ഇല്ലാതാക്കി",
       "modified": "പരിഷ്കരിച്ചു",
       "renamed": "പുനർനാമകരണം ചെയ്തു",
       "copied": "പകർത്തി",
@@ -598,9 +646,7 @@
       "selectedTapToChange": "{{label}} തിരഞ്ഞെടുത്തു, തിരഞ്ഞെടുപ്പ് മാറ്റാൻ ടാപ്പ് ചെയ്യുക",
       "tapToComment": "{{label}}, അഭിപ്രായമിടാൻ ടാപ്പ് ചെയ്യുക",
       "truncationBanner": "{{total}} മാറ്റപ്പെട്ട ഫയലുകളിൽ ആദ്യത്തെ {{limit}} കാണിക്കുന്നു — GitHub API പരിധി",
-      "statusAdded": "ചേർത്തു",
       "statusContext": "കോണ്ടെക്സ്റ്റ്",
-      "statusDeleted": "ഇല്ലാതാക്കി",
       "lineLabel": "{{status}} വരി {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(ശൂന്യം)"
@@ -628,7 +674,6 @@
     }
   },
   "notifications": {
-    "title": "അറിയിപ്പുകൾ",
     "liveActivities": "ലൈവ് ആക്റ്റിവിറ്റികൾ",
     "liveActivitySubtitle": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണിക്കുക",
     "liveUpdates": "തത്സമയ അപ്‌ഡേറ്റുകൾ",
@@ -651,7 +696,6 @@
     "disabledMessage": "അറിയിപ്പുകൾ പ്രവർത്തനക്ഷമമാക്കാൻ, നിങ്ങളുടെ ഉപകരണ ക്രമീകരണങ്ങളിൽ അവ ഓണാക്കുക.",
     "disableTitle": "അറിയിപ്പുകൾ പ്രവർത്തനരഹിതമാക്കുക",
     "disableMessage": "അറിയിപ്പുകൾ പ്രവർത്തനരഹിതമാക്കാൻ, നിങ്ങളുടെ ഉപകരണ ക്രമീകരണങ്ങളിൽ അവ ഓഫാക്കുക.",
-    "openSettings": "ക്രമീകരണങ്ങൾ തുറക്കുക",
     "registrationFailed": "രജിസ്ട്രേഷൻ പരാജയപ്പെട്ടു. നിങ്ങളുടെ അറിയിപ്പ് അനുമതികൾ പരിശോധിക്കുക.",
     "couldNotEnable": "അറിയിപ്പുകൾ പ്രവർത്തനക്ഷമമാക്കാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "previewAlways": "എപ്പോഴും",
@@ -666,7 +710,6 @@
       "security": "സുരക്ഷാ കണ്ടെത്തലുകൾ"
     },
     "category": {
-      "chatMessagesTitle": "ചാറ്റ് സന്ദേശങ്ങൾ",
       "chatMessagesSubtitle": "നിങ്ങളുടെ സംഭാഷണങ്ങളിലെ മറുപടികൾ",
       "agentAttentionTitle": "ഏജന്റിന് നിങ്ങളെ ആവശ്യമുണ്ട്",
       "agentAttentionSubtitle": "ചോദ്യങ്ങൾ, അനുമതി, ഇൻപുട്ട് ആവശ്യമാണ്",
@@ -674,32 +717,23 @@
       "agentUpdatesSubtitle": "ഏജന്റിൽ നിന്നുള്ള ടാസ്ക് മധ്യത്തിലുള്ള സന്ദേശങ്ങൾ",
       "sessionStatusTitle": "സെഷൻ നില",
       "sessionStatusSubtitle": "പൂർത്തിയായി / പരാജയപ്പെട്ടു / നിയന്ത്രിക്കാൻ തയ്യാർ",
-      "kiloclawActivityTitle": "KiloClaw പ്രവർത്തനം",
       "kiloclawActivitySubtitle": "ഇൻസ്റ്റൻസ് തയ്യാർ/പരാജയപ്പെട്ടു, ഷെഡ്യൂൾ ചെയ്ത പ്രവർത്തനങ്ങൾ",
-      "balanceAlertsTitle": "ബാലൻസ് അലേർട്ടുകൾ",
       "balanceAlertsSubtitle": "കുറഞ്ഞ ഓർഗനൈസേഷൻ ബാലൻസ് മുന്നറിയിപ്പുകൾ",
-      "securityFindingsTitle": "സുരക്ഷാ കണ്ടെത്തലുകൾ",
       "securityFindingsSubtitle": "പുതിയ കണ്ടെത്തലുകളും SLA റിമൈൻഡറുകളും"
     }
   },
   "tabs": {
     "home": "ഹോം",
-    "agents": "ഏജന്റുകൾ",
-    "profile": "പ്രൊഫൈൽ",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, ടാബ്, {{total}} ഇൽ {{position}}",
-    "chat": "ചാറ്റ്"
+    "position": "{{name}}, ടാബ്, {{total}} ഇൽ {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "ഇൻസ്റ്റൻസ് മാറ്റുക",
       "couldNotLoadInstances": "ഇൻസ്റ്റൻസുകൾ ലോഡ് ചെയ്യാനായില്ല",
-      "noInstances": "KiloClaw ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
       "noInstancesDescription": "ചാറ്റിംഗ് ആരംഭിക്കാൻ ഒരു ഇൻസ്റ്റൻസ് സജ്ജീകരിക്കുക.",
       "setUpKiloclaw": "KiloClaw സജ്ജീകരിക്കുക",
-      "currentInstance": "{{title}}, നിലവിലുള്ളത്",
-      "personal": "വ്യക്തിപരം"
+      "currentInstance": "{{title}}, നിലവിലുള്ളത്"
     },
     "conversation": {
       "failedToLoad": "സംഭാഷണം ലോഡ് ചെയ്യാൻ പരാജയപ്പെട്ടു",
@@ -718,16 +752,12 @@
       "couldNotSignIn": "ചാറ്റിലേക്ക് സൈൻ ഇൻ ചെയ്യാനായില്ല",
       "couldNotRefreshMessages": "സന്ദേശങ്ങൾ പുതുക്കാനായില്ല",
       "couldNotLoadHistory": "സംഭാഷണ ചരിത്രം ലോഡ് ചെയ്യാനായില്ല",
-      "rename": "പുനർനാമകരണം ചെയ്യുക",
       "leave": "വിടുക",
       "untitledConversation": "ശീർഷകമില്ലാത്ത സംഭാഷണം",
       "createFailed": "സംഭാഷണം സൃഷ്ടിക്കാൻ പരാജയപ്പെട്ടു",
       "leaveFailed": "സംഭാഷണം വിടാൻ പരാജയപ്പെട്ടു"
     },
     "reactions": {
-      "title": "റിയാക്ഷനുകൾ",
-      "close": "റിയാക്ഷനുകൾ അടയ്ക്കുക",
-      "recent": "സമീപകാലം",
       "common": "സാധാരണ",
       "reactWith": "{{reaction}} ഉപയോഗിച്ച് റിയാക്ട് ചെയ്യുക",
       "accessibility": "{{emoji}} റിയാക്ഷൻ, {{displayCount}}"
@@ -737,16 +767,13 @@
       "cancelReply": "മറുപടി റദ്ദാക്കുക",
       "openInstance": "ഇൻസ്റ്റൻസ് തുറക്കുക",
       "attachFile": "ഫയൽ അറ്റാച്ച് ചെയ്യുക",
-      "messagePlaceholder": "സന്ദേശം",
-      "cancelEdit": "എഡിറ്റ് റദ്ദാക്കുക",
-      "sendMessage": "സന്ദേശം അയയ്ക്കുക"
+      "cancelEdit": "എഡിറ്റ് റദ്ദാക്കുക"
     },
     "conversationList": {
       "couldNotLoad": "സംഭാഷണങ്ങൾ ലോഡ് ചെയ്യാനായില്ല",
       "emptyTitle": "ഇതുവരെ സംഭാഷണങ്ങളില്ല",
       "emptyDescription": "നിങ്ങളുടെ KiloClaw ഇൻസ്റ്റൻസുമായി ചാറ്റിംഗ് ആരംഭിക്കാൻ ഒരു സംഭാഷണം സൃഷ്ടിക്കുക.",
       "create": "സംഭാഷണം സൃഷ്ടിക്കുക",
-      "starting": "ആരംഭിക്കുന്നു…",
       "newConversation": "പുതിയ സംഭാഷണം",
       "openInstanceSettings": "ഇൻസ്റ്റൻസ് ക്രമീകരണങ്ങൾ തുറക്കുക",
       "today": "ഇന്ന്",
@@ -756,7 +783,6 @@
     },
     "attachment": {
       "open": "{{filename}} തുറക്കുക",
-      "imageUnavailable": "ചിത്രം ലഭ്യമല്ല",
       "openFailed": "അറ്റാച്ച്മെന്റ് തുറക്കാനായില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "attachFailed": "ഫയൽ അറ്റാച്ച് ചെയ്യാൻ പരാജയപ്പെട്ടു",
       "limit": "നിങ്ങൾക്ക് {{displayCount}} വരെ ഫയലുകൾ അറ്റാച്ച് ചെയ്യാം.",
@@ -786,11 +812,9 @@
       "yourMessage": "നിങ്ങളുടെ സന്ദേശം",
       "messageFrom": "{{author}}-ൽ നിന്നുള്ള സന്ദേശം",
       "moreActions": "കൂടുതൽ പ്രവർത്തനങ്ങൾ",
-      "message": "സന്ദേശം",
       "notDelivered": "ഡെലിവർ ചെയ്തില്ല",
       "edited": "(എഡിറ്റ് ചെയ്തത്)",
-      "image": "ചിത്രം",
-      "attachment": "അറ്റാച്ച്മെന്റ്"
+      "image": "ചിത്രം"
     },
     "messageActions": {
       "copied": "പകർത്തി",
@@ -798,13 +822,11 @@
       "title": "സന്ദേശ പ്രവർത്തനങ്ങൾ",
       "deleteTitle": "സന്ദേശം ഇല്ലാതാക്കണോ?",
       "deleteMessage": "ഇത് സംഭാഷണത്തിൽ നിന്ന് സന്ദേശം നീക്കം ചെയ്യും.",
-      "delete": "ഇല്ലാതാക്കുക",
       "deleteFailed": "സന്ദേശം ഇല്ലാതാക്കാൻ പരാജയപ്പെട്ടു",
       "removeReactionFailed": "റിയാക്ഷൻ നീക്കാൻ പരാജയപ്പെട്ടു",
       "addReactionFailed": "പ്രതികരണം ചേർക്കുന്നതിൽ പരാജയപ്പെട്ടു",
       "retrySend": "വീണ്ടും അയയ്ക്കുക",
       "moreReactions": "കൂടുതൽ പ്രതികരണങ്ങൾ",
-      "reply": "മറുപടി",
       "edit": "തിരുത്തുക",
       "sendFailed": "സന്ദേശം അയയ്ക്കുന്നതിൽ പരാജയപ്പെട്ടു",
       "retrySendFailed": "വീണ്ടും അയയ്ക്കാൻ കഴിഞ്ഞില്ല",
@@ -815,7 +837,6 @@
       "takePhoto": "ഫോട്ടോ എടുക്കുക",
       "photoLibrary": "ഫോട്ടോ ലൈബ്രറി",
       "files": "ഫയലുകൾ",
-      "cameraAccessDisabled": "ക്യാമറ ആക്സസ് പ്രവർത്തനരഹിതമാണ്",
       "cameraAccessMessage": "ഒരു ഫോട്ടോ എടുക്കാൻ ക്രമീകരണങ്ങളിൽ ക്യാമറ ആക്സസ് അനുവദിക്കുക."
     },
     "typingIndicator": {
@@ -825,10 +846,7 @@
       "typing_other": "{{names}} ടൈപ്പ് ചെയ്യുന്നു..."
     },
     "botStatus": {
-      "online": "ഓൺലൈൻ",
-      "idle": "നിഷ്ക്രിയം",
       "offline": "ഓഫ്ലൈൻ",
-      "unknown": "അജ്ഞാതം",
       "loadingUser": "ഉപയോക്താവിനെ ലോഡ് ചെയ്യുന്നു...",
       "waitingForStatus": "ബോട്ട് നിലയ്ക്കായി കാത്തിരിക്കുന്നു...",
       "offlineMessage": "ബോട്ട് ഓഫ്ലൈനാണ്. അത് വീണ്ടും കണക്റ്റുചെയ്യുമ്പോൾ സന്ദേശങ്ങൾ പുനരാരംഭിക്കും."
@@ -841,7 +859,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw ഇൻസ്റ്റൻസുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "billing": {
       "title": "ബില്ലിംഗ്",
@@ -849,7 +866,6 @@
       "plan": "പ്ലാൻ",
       "finalTermEnds": "അവസാന കാലാവധി അവസാനിക്കുന്നു",
       "afterFinalTerm": "അവസാന കാലാവധിക്ക് ശേഷം",
-      "remaining": "ശേഷിക്കുന്നത്",
       "lessThanOneDay": "1 ദിവസത്തിൽ കുറവ്",
       "ends": "അവസാനിക്കുന്നു",
       "expires": "കാലഹരണപ്പെടുന്നു",
@@ -858,7 +874,6 @@
       "managedByAdmin": "ബില്ലിംഗ് നിങ്ങളുടെ ഓർഗനൈസേഷൻ അഡ്മിനാണ് കൈകാര്യം ചെയ്യുന്നത്.",
       "couldNotLoad": "ബില്ലിംഗ് വിവരങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "manageOnWeb": "വെബിൽ ബില്ലിംഗ് കൈകാര്യം ചെയ്യുക",
-      "commitPlan": "കമ്മിറ്റ്",
       "earlybird": "ആദ്യകാല പക്ഷി",
       "finalCommitTermEndsOn": "നിങ്ങളുടെ അവസാന Commit കാലാവധി {{date}} ന് അവസാനിക്കുന്നു. {{price}} നിരക്കിൽ Standard ആയി തുടരുക, അല്ലെങ്കിൽ ഹോസ്റ്റിംഗ് അവസാനിക്കും.",
       "freeTrial": "സൗജന്യ ട്രയൽ",
@@ -875,9 +890,9 @@
       "trialDaysRemaining": "ട്രയൽ: {{remaining}}",
       "trialEndingSoon": "ട്രയൽ ഉടൻ അവസാനിക്കുന്നു: {{remaining}}",
       "planName": {
-        "commit": "കമ്മിറ്റ്",
         "standard": "സ്റ്റാൻഡേർഡ്"
-      }
+      },
+      "commit": "കമ്മിറ്റ്"
     },
     "changelog": {
       "title": "പുതിയതെന്താണ്",
@@ -900,7 +915,6 @@
       "destroyMessage": "ഇത് നിങ്ങളുടെ KiloClaw ഇൻസ്റ്റൻസും അതിന്റെ എല്ലാ ഡാറ്റയും സ്ഥിരമായി നശിപ്പിക്കും. ഈ പ്രവർത്തനം റദ്ദാക്കാനാവില്ല.",
       "destroyTitle": "ഇൻസ്റ്റൻസ് നശിപ്പിക്കുക",
       "instance": "ഇൻസ്റ്റൻസ്",
-      "renameFailed": "എന്തോ പിശക് സംഭവിച്ചു",
       "couldNotCheckStatus": "സേവന നില പരിശോധിക്കാൻ കഴിഞ്ഞില്ല",
       "dangerZone": "അപകട മേഖല",
       "destroying": "നശിപ്പിക്കുന്നു…",
@@ -928,7 +942,6 @@
       "approveDeviceTitle": "ഉപകരണം അംഗീകരിക്കുക",
       "approveMessage": "{{label}} (കോഡ്: {{code}}) നിങ്ങളുടെ ഇൻസ്റ്റൻസിലേക്ക് കണക്റ്റുചെയ്യാൻ അനുവദിക്കണോ?",
       "approveTitle": "ജോടിയാക്കൽ അഭ്യർത്ഥന അംഗീകരിക്കുക",
-      "device": "ഉപകരണം",
       "unknownDevice": "അജ്ഞാത ഉപകരണം"
     },
     "execPolicy": {
@@ -943,35 +956,21 @@
       "title": "Google അക്കൗണ്ട്",
       "couldNotLoad": "Google അക്കൗണ്ട് നില ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "disconnected": "Google അക്കൗണ്ട് വിച്ഛേദിച്ചു. മാറ്റം പ്രയോഗിക്കാൻ നിങ്ങളുടെ ഇൻസ്റ്റൻസ് വീണ്ടും വിന്യസിക്കുക.",
-      "redeploy": "വീണ്ടും വിന്യസിക്കുക",
       "setupCommand": "സെറ്റപ്പ് കമാൻഡ്",
       "setupCommandHelp": "നിങ്ങളുടെ Google അക്കൗണ്ട് കണക്റ്റുചെയ്യാൻ Docker ഇൻസ്റ്റാൾ ചെയ്ത ടെർമിനലിൽ ഈ കമാൻഡ് പ്രവർത്തിപ്പിക്കുക.",
       "failedToLoadCommand": "സെറ്റപ്പ് കമാൻഡ് ലോഡ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു",
       "gmailNotifications": "Gmail അറിയിപ്പുകൾ",
       "disconnect": "Google അക്കൗണ്ട് വിച്ഛേദിക്കുക",
-      "connected": "കണക്റ്റുചെയ്തു",
       "copied": "പകർത്തി!",
       "copyCommand": "കമാൻഡ് പകർത്തുക",
-      "disabled": "പ്രവർത്തനരഹിതം",
       "disconnectConfirm": "വിച്ഛേദിക്കുക",
       "disconnectMessage": "ഈ ഇൻസ്റ്റൻസിൽ നിന്ന് നിങ്ങളുടെ Google അക്കൗണ്ട് നീക്കം ചെയ്യണോ? ഇത് Gmail അറിയിപ്പുകൾ പ്രവർത്തനരഹിതമാക്കും. മാറ്റങ്ങൾ പ്രയോഗിക്കാൻ വിച്ഛേദിച്ചതിന് ശേഷം വീണ്ടും വിന്യസിക്കുക.",
-      "disconnectTitle": "Google വിച്ഛേദിക്കുക",
-      "enabled": "പ്രവർത്തനക്ഷമം",
-      "notConnected": "കണക്റ്റുചെയ്തിട്ടില്ല"
+      "disconnectTitle": "Google വിച്ഛേദിക്കുക"
     },
     "modelList": {
-      "title": "എല്ലാ മോഡലുകൾ",
-      "searchPlaceholder": "മോഡലുകൾ തിരയുക...",
-      "couldNotLoad": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "clearSearch": "തിരയൽ മായ്ക്കുക",
       "noMatches": "നിങ്ങളുടെ തിരയലുമായി ഒത്തുപോകുന്ന മോഡലുകളില്ല",
-      "noModels": "മോഡലുകൾ ലഭ്യമല്ല",
       "noModelsDescription": "ലഭ്യമായിക്കഴിഞ്ഞാൽ മോഡലുകൾ ഇവിടെ ദൃശ്യമാകും.",
-      "noResultsFor": "\"{{query}}\" ന് ഫലങ്ങളില്ല",
-      "recommended": "ശുപാർശ ചെയ്യുന്നത്"
-    },
-    "model": {
-      "title": "മോഡൽ"
+      "noResultsFor": "\"{{query}}\" ന് ഫലങ്ങളില്ല"
     },
     "secrets": {
       "title": "രഹസ്യങ്ങൾ",
@@ -988,12 +987,8 @@
       "setupGuideA11y": "{{label}} സെറ്റപ്പ് ഗൈഡ്",
       "setupGuide": "സെറ്റപ്പ് ഗൈഡ്",
       "saving": "സംരക്ഷിക്കുന്നു…",
-      "remove": "നീക്കം ചെയ്യുക",
       "removing": "നീക്കം ചെയ്യുന്നു…",
-      "connected": "കണക്റ്റുചെയ്തു",
-      "notConnected": "കണക്റ്റുചെയ്തിട്ടില്ല",
-      "updateToken": "ടോക്കൺ അപ്ഡേറ്റ് ചെയ്യുക",
-      "connect": "കണക്റ്റുചെയ്യുക"
+      "updateToken": "ടോക്കൺ അപ്ഡേറ്റ് ചെയ്യുക"
     },
     "versionPin": {
       "title": "പതിപ്പ് പിൻ ചെയ്യൽ",
@@ -1030,7 +1025,6 @@
       "start": "ആരംഭിക്കുക",
       "startMessage": "ഈ ഇൻസ്റ്റൻസ് ആരംഭിക്കണമെന്ന് നിങ്ങൾക്ക് ഉറപ്പാണോ?",
       "startTitle": "ഇൻസ്റ്റൻസ് ആരംഭിക്കുക",
-      "starting": "ആരംഭിക്കുന്നു…",
       "stop": "നിർത്തുക",
       "stopMessage": "ഈ ഇൻസ്റ്റൻസ് നിർത്തണമെന്ന് നിങ്ങൾക്ക് ഉറപ്പാണോ?",
       "stopTitle": "ഇൻസ്റ്റൻസ് നിർത്തുക",
@@ -1040,7 +1034,6 @@
       "finishingSetup": "സെറ്റപ്പ് പൂർത്തിയാക്കുന്നു",
       "finishingSetupDescription": "അൽപ്പം കാത്തിരിക്കുക, ഞങ്ങൾ നിങ്ങളുടെ അക്കൗണ്ട് അന്തിമമാക്കുകയാണ്. ഇത് സാധാരണയായി ഒരു നിമിഷമെടുക്കും.",
       "getStarted": "ആരംഭിക്കുക",
-      "noInstances": "KiloClaw ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
       "noInstancesDescription": "കോഡിംഗ് ഏജന്റുകൾ പ്രവർത്തിപ്പിക്കാൻ നിങ്ങളുടെ ആദ്യ ഇൻസ്റ്റൻസ് സൃഷ്ടിക്കുക."
     },
     "instance": {
@@ -1052,7 +1045,6 @@
     "list": {
       "createInstance": "ഇൻസ്റ്റൻസ് സൃഷ്ടിക്കുക",
       "organizations": "ഓർഗനൈസേഷനുകൾ",
-      "personal": "വ്യക്തിപരം",
       "accessIssue": {
         "trialExpired": "ട്രയൽ അവസാനിച്ചു, ഈ ഇൻസ്റ്റൻസ് ഉപയോഗിക്കുന്നത് തുടരാൻ സബ്സ്ക്രൈബ് ചെയ്യുക",
         "subscriptionCanceled": "സബ്സ്ക്രിപ്ഷൻ നിഷ്ക്രിയമാണ്, ഈ ഇൻസ്റ്റൻസ് ഉപയോഗിക്കുന്നത് തുടരാൻ വീണ്ടും സബ്സ്ക്രൈബ് ചെയ്യുക",
@@ -1065,7 +1057,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}} നോട് ചാറ്റ് ചെയ്യുക",
-        "online": "ഓൺലൈൻ",
         "ready": "{{name}} തയ്യാറാണ്",
         "warmedUp": "എല്ലാം തയ്യാറായി. നിങ്ങൾ തയ്യാറാകുമ്പോഴെല്ലാം ഹായ് പറയുക."
       },
@@ -1076,9 +1067,7 @@
         "openKiloAi": "kilo.ai തുറക്കുക",
         "provisioning": "പ്രൊവിഷനിംഗ്",
         "review": "അവലോകനം",
-        "somethingWentWrong": "എന്തോ പിശക് സംഭവിച്ചു",
         "identityTitle": "നിങ്ങളുടെ ബോട്ടിന് ഒരു ഐഡന്റിറ്റി നൽകുക",
-        "close": "അടയ്ക്കുക",
         "couldNotLoad": "ഓൺബോർഡിംഗ് നില ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
         "finishingSetup": "സെറ്റപ്പ് പൂർത്തിയാക്കുന്നു — ഞങ്ങൾ നിങ്ങളുടെ അക്കൗണ്ട് അന്തിമമാക്കുമ്പോൾ അൽപ്പം കാത്തിരിക്കുക.",
         "ready": "തയ്യാറാണ്",
@@ -1095,7 +1084,6 @@
         "location": "സ്ഥാനം",
         "locationPlaceholder": "നഗരം അല്ലെങ്കിൽ പ്രദേശം (ഓപ്ഷണൽ)",
         "useCurrentLocation": "നിലവിലെ സ്ഥാനം ഉപയോഗിക്കുക",
-        "continue": "തുടരുക",
         "locationDeniedTitle": "സ്ഥാന ആക്സസ് നിരസിച്ചു",
         "locationDeniedMessage": "നിലവിലെ സ്ഥാനം ഉപയോഗിക്കാൻ ക്രമീകരണങ്ങളിൽ സ്ഥാന ആക്സസ് പ്രവർത്തനക്ഷമമാക്കുക.",
         "locationValidationFailed": "സ്ഥാനം സാധൂകരിക്കാൻ കഴിഞ്ഞില്ല.",
@@ -1132,7 +1120,6 @@
         "timeoutBody": "{{name}} ന്റെ സെറ്റപ്പ് പതിവിലും കൂടുതൽ സമയമെടുക്കുന്നു ({{displayMinutes}} മിനിറ്റിലധികം).",
         "continueInBackground": "പശ്ചാത്തലത്തിൽ തുടരുക",
         "settingUp": "{{name}} സെറ്റപ്പ് ചെയ്യുന്നു",
-        "finishingSetup": "സെറ്റപ്പ് പൂർത്തിയാക്കുന്നു",
         "connectingToAgent": "ഏജന്റുമായി കണക്റ്റുചെയ്യുന്നു",
         "startingSandbox": "സാൻഡ്ബോക്സ് ആരംഭിക്കുന്നു",
         "backgroundHint": "സാധാരണയായി ഒരു മിനിറ്റിൽ താഴെ എടുക്കും. നിങ്ങൾക്ക് ഇത് അടയ്ക്കാം — ഞങ്ങൾ പശ്ചാത്തലത്തിൽ പ്രവർത്തിക്കുന്നത് തുടരും."
@@ -1144,7 +1131,6 @@
       "gatewayProcess": "ഗേറ്റ്വേ പ്രോസസ്സ്",
       "lastExit": "അവസാന എക്സിറ്റ്",
       "memory": "മെമ്മറി",
-      "model": "മോഡൽ",
       "region": "മേഖല",
       "resources": "റിസോഴ്സുകൾ",
       "restarts": "പുനരാരംഭങ്ങൾ",
@@ -1166,34 +1152,25 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "ഫ്രന്റിയർ",
       "frontierDescription": "ഏറ്റവും ഉയർന്ന പ്രകടനം. റീസണിംഗുള്ള ഫ്രന്റിയർ മോഡലുകളിലേക്ക് റൂട്ട് ചെയ്യുന്നു.",
-      "balancedLabel": "സമതുലിതം",
       "balancedDescription": "കുറഞ്ഞ ചെലവിൽ വേഗതയുടെയും ശേഷിയുടെയും മികച്ച സന്തുലിതാവസ്ഥ.",
-      "cost": "ചെലവ്",
-      "performance": "പ്രകടനം",
       "autoModelA11y": "{{label}} ഓട്ടോ മോഡൽ",
       "currentModel": "നിലവിലെ മോഡൽ",
       "browseAllModels": "അല്ലെങ്കിൽ 500+ മോഡലുകളിൽ നിന്ന് തിരഞ്ഞെടുക്കുക",
       "browseAllModelsA11y": "എല്ലാ 500+ മോഡലുകളും ബ്രൗസ് ചെയ്യുക"
     },
     "accessRequired": {
-      "trialExpiredTitle": "വെബിൽ സബ്സ്ക്രൈബ് ചെയ്യുക",
       "trialExpiredBody": "KiloClaw ഉപയോഗിക്കുന്നത് തുടരാൻ, നിങ്ങളുടെ ബ്രൗസറിൽ നിന്ന് kilo.ai/claw ലേക്ക് പോകുക. അപ്പിൽ സബ്സ്ക്രൈബ് ചെയ്യാൻ കഴിയില്ല.",
-      "trialExpiredCta": "kilo.ai/claw തുറക്കുക",
       "subscriptionCanceledTitle": "വെബിൽ സബ്സ്ക്രൈബ് ചെയ്യുക",
       "subscriptionCanceledBody": "KiloClaw ഉപയോഗിക്കാൻ, നിങ്ങളുടെ ബ്രൗസറിൽ നിന്ന് kilo.ai/claw ലേക്ക് പോകുക. അപ്പിൽ സബ്സ്ക്രൈബ് ചെയ്യാൻ കഴിയില്ല.",
       "subscriptionCanceledCta": "kilo.ai/claw തുറക്കുക",
       "subscriptionPastDueTitle": "വെബിൽ പേയ്മെന്റ് അപ്ഡേറ്റ് ചെയ്യുക",
       "subscriptionPastDueBody": "നിങ്ങളുടെ ഏറ്റവും പുതിയ പേയ്മെന്റിൽ ഞങ്ങൾക്ക് പ്രശ്നമുണ്ടായി. അത് അപ്ഡേറ്റ് ചെയ്യാൻ നിങ്ങളുടെ ബ്രൗസറിൽ നിന്ന് kilo.ai/claw ലേക്ക് പോകുക. അപ്പിൽ ബില്ലിംഗ് കൈകാര്യം ചെയ്യാൻ കഴിയില്ല.",
-      "subscriptionPastDueCta": "kilo.ai/claw തുറക്കുക",
       "quarantinedTitle": "ഇൻസ്റ്റൻസിന് പരിഹാരം ആവശ്യമാണ്",
       "quarantinedBody": "നിങ്ങളുടെ KiloClaw ഇൻസ്റ്റൻസ് ക്വാറന്റീൻ നിലയിലാണ്, ഇപ്പോൾ ഉപയോഗിക്കാൻ കഴിയില്ല. ഞങ്ങളുടെ ടീമിന് അത് പുനഃസ്ഥാപിക്കാൻ സഹായിക്കേണ്ടതുണ്ട്.",
-      "quarantinedCta": "kilo.ai-യിൽ തുടരുക",
-      "multipleCurrentConflictTitle": "അക്കൗണ്ട് അവലോകനം ആവശ്യമാണ്",
       "multipleCurrentConflictBody": "നിങ്ങളുടെ അക്കൗണ്ടിൽ ഒന്നിലധികം സജീവ സബ്സ്ക്രിപ്ഷനുകൾ കണ്ടെത്തി, അതിനാൽ നിങ്ങളെ ഇരട്ടി ബില്ല് ചെയ്യാതിരിക്കാൻ ഞങ്ങൾ കാര്യങ്ങൾ താൽക്കാലികമായി നിർത്തി.",
       "multipleCurrentConflictCta": "kilo.ai-യിൽ തുടരുക",
       "nonCanonicalEarlybirdTitle": "പാരമ്പര്യ പ്ലാൻ കണ്ടെത്തി",
       "nonCanonicalEarlybirdBody": "നിങ്ങളുടെ ആദ്യകാല ആക്സസ് പ്ലാൻ മൊബൈലിൽ ഉപയോഗിക്കുന്നതിന് മുമ്പ് സ്വമേധയാ അവലോകനം ആവശ്യമാണ്.",
-      "nonCanonicalEarlybirdCta": "kilo.ai-യിൽ തുടരുക",
       "iosTitle": "iOS-ൽ KiloClaw ലഭ്യമല്ല",
       "iosBody": "ഈ അക്കൗണ്ടിനായി KiloClaw ആക്സസ് iOS അപ്പിന് പുറത്ത് കൈകാര്യം ചെയ്യുന്നു.",
       "iosContact": "ചോദ്യങ്ങളുണ്ടോ? hi@kilo.ai-യുമായി ബന്ധപ്പെടുക."
@@ -1203,25 +1180,17 @@
       "openUnread_one": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശം",
       "openUnread": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
       "openUnread_other": "{{name}} തുറക്കുക, {{displayCount}} വായിക്കാത്ത സന്ദേശങ്ങൾ",
-      "open": "{{name}} തുറക്കുക",
       "openSettings": "{{name}} ന്റെ ക്രമീകരണങ്ങൾ തുറക്കുക",
       "fixOnKiloAi": "kilo.ai-യിൽ പരിഹരിക്കുക: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "ചാനലുകൾ",
       "devicePairingDescription": "ഉപകരണ അഭ്യർത്ഥനകൾ അംഗീകരിക്കുക",
-      "devicePairingLabel": "ഉപകരണ ജോടിയാക്കൽ",
       "execPolicyDescription": "സുരക്ഷാ ക്രമീകരണങ്ങൾ",
-      "execPolicyLabel": "എക്സിക്യൂഷൻ നയം",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google അക്കൗണ്ട്",
       "modelDescription": "AI മോഡൽ തിരഞ്ഞെടുപ്പ്",
-      "modelLabel": "മോഡൽ",
       "secretsDescription": "എൻക്രിപ്റ്റ് ചെയ്ത ക്രെഡൻഷ്യലുകൾ",
-      "secretsLabel": "രഹസ്യങ്ങൾ",
-      "versionPinDescription": "ഒരു പ്രത്യേക പതിപ്പിലേക്ക് പിൻ ചെയ്യുക",
-      "versionPinLabel": "പതിപ്പ് പിൻ ചെയ്യൽ"
+      "versionPinDescription": "ഒരു പ്രത്യേക പതിപ്പിലേക്ക് പിൻ ചെയ്യുക"
     },
     "avatar": {
       "arcade": "ആർക്കേഡ്",
@@ -1266,21 +1235,15 @@
       "placeholder": "ഉദാ. ഞങ്ങളുടെ പിശക് കൈകാര്യം ചെയ്യൽ രീതികൾ നടപ്പിലാക്കുക…"
     },
     "repos": {
-      "title": "റിപ്പോസിറ്ററികൾ",
-      "couldNotLoad": "റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "unavailable": "റിപ്പോസിറ്ററികൾ ലഭ്യമല്ല — kilo.ai-യിൽ Bitbucket സെറ്റപ്പ് പൂർത്തിയാക്കുക.",
       "finishSetup": "സെറ്റപ്പ് പൂർത്തിയാക്കുക",
       "manageAccess": "ആക്സസ് കൈകാര്യം ചെയ്യുക",
-      "allRepositories": "എല്ലാ റിപ്പോസിറ്ററികളും",
       "bitbucketNoRepositoriesDescription": "ഈ Bitbucket വർക്ക്സ്പെയ്സിൽ റിപ്പോസിറ്ററികൾ ലഭ്യമല്ല.",
-      "bitbucketSetup": "Bitbucket സെറ്റപ്പ്",
-      "couldNotOpenGithubSettings": "GitHub App ക്രമീകരണങ്ങൾ തുറക്കാൻ കഴിഞ്ഞില്ല",
       "gitlabNoRepositoriesDescription": "GitLab-ൽ കൂടുതൽ ഗ്രൂപ്പുകൾക്കോ പ്രോജക്റ്റുകൾക്കോ നിങ്ങൾക്ക് ആക്സസ് അനുവദിക്കേണ്ടി വന്നേക്കാം.",
       "installGithubApp": "റിപ്പോസിറ്ററികളിൽ GitHub അപ്പ് ഇൻസ്റ്റാൾ ചെയ്യുക",
       "installGithubAppDescription": "നിങ്ങൾ അവലോകനം ചെയ്യാൻ ആഗ്രഹിക്കുന്ന റിപ്പോസിറ്ററികളിലേക്ക് Kilo GitHub App ആക്സസ് അനുവദിക്കുക.",
       "noRepositoriesFound": "റിപ്പോസിറ്ററികൾ കണ്ടെത്തിയില്ല",
-      "repositoryAccess": "റിപ്പോസിറ്ററി ആക്സസ്",
-      "selectedRepositories": "തിരഞ്ഞെടുത്ത റിപ്പോസിറ്ററികൾ"
+      "repositoryAccess": "റിപ്പോസിറ്ററി ആക്സസ്"
     },
     "style": {
       "title": "അവലോകന ശൈലി",
@@ -1289,12 +1252,10 @@
       "roast": "കഠിനമായി സത്യസന്ധമായ, രസകരമായ രീതിയിൽ",
       "strict": "എല്ലാം ഫ്ലാഗ് ചെയ്യുക, ഉയർന്ന നിലവാരം നിലനിർത്തുക"
     },
-    "title": "കോഡ് റിവ്യൂവർ",
     "reviewDetail": {
       "title": "അവലോകനം",
       "cancelTitle": "അവലോകനം റദ്ദാക്കണോ?",
       "cancelMessage": "ഇത് പുരോഗമിക്കുന്ന കോഡ് അവലോകനം നിർത്തും.",
-      "keepRunning": "പ്രവർത്തിക്കുന്നത് തുടരുക",
       "cancelReview": "അവലോകനം റദ്ദാക്കുക",
       "retryTitle": "അവലോകനം വീണ്ടും ശ്രമിക്കണോ?",
       "retryMessage": "ഇത് കോഡ് അവലോകനം വീണ്ടും പ്രവർത്തിപ്പിക്കും.",
@@ -1302,29 +1263,19 @@
       "couldNotLoad": "അവലോകനം ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "couldNotGetLatest": "ഏറ്റവും പുതിയത് ലഭിച്ചില്ല.",
       "byline": "{{author}} എഴുതിയ {{repo}} #{{number}}",
-      "findings": "കണ്ടെത്തലുകൾ",
       "noFindings": "കണ്ടെത്തലുകളില്ല",
       "showMore": "കൂടുതൽ കാണിക്കുക",
-      "details": "വിശദാംശങ്ങൾ",
-      "branch": "ബ്രാഞ്ച്",
-      "platform": "പ്ലാറ്റ്ഫോം",
-      "model": "മോഡൽ",
       "created": "സൃഷ്ടിച്ചു",
       "started": "ആരംഭിച്ചു",
-      "completed": "പൂർത്തിയാക്കി",
-      "cost": "ചെലവ്",
       "tokens": "ടോക്കണുകൾ",
       "tokensInOut": "{{input}} ഇൻ / {{output}} ഔട്ട്",
-      "openPullRequest": "പുൾ റിക്വസ്റ്റ് തുറക്കുക",
       "council": "കൗൺസിൽ",
       "decision": "തീരുമാനം",
       "gate": "ഗേറ്റ്",
       "gateNone": "ഒന്നുമില്ല",
       "gateHidden": "മറഞ്ഞിരിക്കുന്നു",
       "checkRun": "ചെക്ക് റൺ",
-      "status": "നില",
       "threshold": "പരിധി",
-      "pullRequest": "പുൾ റിക്വസ്റ്റ്",
       "transcriptWaiting": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റിനായി കാത്തിരിക്കുന്നു.",
       "transcriptEmpty": "ഈ അവലോകനത്തിന് ട്രാൻസ്ക്രിപ്റ്റ് ഇല്ല.",
       "transcriptRetry": "അവലോകന ട്രാൻസ്ക്രിപ്റ്റ് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
@@ -1339,13 +1290,10 @@
       "sessionError": "സെഷൻ പിശക്: {{error}}",
       "statusWithValue": "നില: {{status}}",
       "toolName": "ടൂൾ: {{name}}",
-      "toolNameError": "ടൂൾ: {{name}} — പിശക്",
-      "unknownError": "അജ്ഞാത പിശക്"
+      "toolNameError": "ടൂൾ: {{name}} — പിശക്"
     },
     "reviewMemory": {
       "title": "അവലോകന മെമ്മറി",
-      "couldNotLoadMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "retryLoadingMore": "കൂടുതൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
       "loading": "അവലോകന മെമ്മറി ലോഡ് ചെയ്യുന്നു",
       "couldNotLoad": "അവലോകന മെമ്മറി ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "off": "അവലോകന മെമ്മറി ഓഫാണ്",
@@ -1364,13 +1312,9 @@
       "couldNotLoadProviders": "നിങ്ങളുടെ കണക്റ്റുചെയ്ത ദാതാക്കളെ ലോഡ് ചെയ്യാൻ ഞങ്ങൾക്ക് കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "connectProvider": "ഒരു ദാതാവിനെ കണക്റ്റുചെയ്യുക",
       "connectProviderDescription": "ഒരു പുൾ റിക്വസ്റ്റിന്റെ സ്വമേധയാ അവലോകനം ആരംഭിക്കാൻ GitHub കണക്റ്റുചെയ്യുക.",
-      "connectGitHub": "GitHub കണക്റ്റുചെയ്യുക",
-      "platform": "പ്ലാറ്റ്ഫോം",
-      "notConnected": "കണക്റ്റുചെയ്തിട്ടില്ല",
       "pullRequestUrl": "പുൾ റിക്വസ്റ്റ് URL",
       "instructions": "നിർദ്ദേശങ്ങൾ (ഓപ്ഷണൽ)",
       "instructionsPlaceholder": "അവലോകനം ചെയ്യുന്നയാൾ ശ്രദ്ധിക്കേണ്ട പ്രത്യേക എന്തെങ്കിലും…",
-      "model": "മോഡൽ",
       "starting": "അവലോകനം ആരംഭിക്കുന്നു…",
       "start": "അവലോകനം ആരംഭിക്കുക"
     },
@@ -1379,28 +1323,20 @@
     "webhookSetupDescription": "ചില റിപ്പോസിറ്ററികൾക്ക് ഓട്ടോമാറ്റിക് അവലോകനങ്ങൾ ലഭിക്കില്ലായിരിക്കാം.",
     "autoReviews": "ഓട്ടോമാറ്റിക് അവലോകനങ്ങൾ",
     "selectRepository": "ഓട്ടോമാറ്റിക് അവലോകനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കാൻ ഒരു റിപ്പോസിറ്ററിയെങ്കിലും തിരഞ്ഞെടുക്കുക.",
-    "selectRepositories": "റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുക്കുക",
     "followReviewMd": "REVIEW.md പിന്തുടരുക",
     "followReviewMdSubtitle": "ഓരോ റിപ്പോയിലെയും REVIEW.md നിർദ്ദേശ ഫയലുകൾ ബഹുമാനിക്കുക",
-    "readOnlyDescription": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഈ ക്രമീകരണങ്ങൾ മാറ്റാൻ കഴിയൂ.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket കണക്റ്റുചെയ്തിട്ടില്ല. ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ അത് കണക്റ്റുചെയ്യാൻ കഴിയൂ.",
       "setupIncomplete": "സെറ്റപ്പ് അപൂർണ്ണമാണ് — kilo.ai-യിൽ കോൺഫിഗറേഷൻ പൂർത്തിയാക്കുക",
       "setup": "Bitbucket സെറ്റപ്പ്"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket കണക്റ്റുചെയ്തു",
-      "title": "Bitbucket കണക്റ്റുചെയ്യുക",
       "description": "ആവശ്യമായ സ്കോപ്പുകളുള്ള ഒരു Workspace Access Token സൃഷ്ടിച്ച് അത് ചുവടെ ഒട്ടിക്കുക.",
       "scopes": "അക്കൗണ്ട്: read · റിപ്പോസിറ്ററികൾ: read/write · പുൾ റിക്വസ്റ്റുകൾ: read · വെബ്ഹുക്കുകൾ: read/write",
-      "tokenPlaceholder": "Workspace access token",
-      "connect": "കണക്റ്റുചെയ്യുക"
+      "tokenPlaceholder": "Workspace access token"
     },
     "scopeList": {
-      "couldNotLoad": "ഓർഗനൈസേഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "personalStillAvailable": "വ്യക്തിഗത റിപ്പോസിറ്ററികൾ ഇപ്പോഴും ചുവടെ ലഭ്യമാണ്.",
-      "personal": "വ്യക്തിപരം",
-      "personalSubtitle": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ",
       "viewOnly": "വീക്ഷണം മാത്രം"
     },
     "reviewList": {
@@ -1414,18 +1350,13 @@
     "platformList": {
       "checking": "പരിശോധിക്കുന്നു…",
       "statusUnavailable": "നില ലഭ്യമല്ല",
-      "connected": "കണക്റ്റുചെയ്തു",
-      "notConnected": "കണക്റ്റുചെയ്തിട്ടില്ല",
-      "organization": "ഓർഗനൈസേഷൻ",
       "platforms": "പ്ലാറ്റ്ഫോമുകൾ",
       "activity": "പ്രവർത്തനം"
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "GitHub കണക്റ്റുചെയ്യുക",
       "githubError": "GitHub സെറ്റപ്പ് തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "gitlabAccount": "GitLab അക്കൗണ്ട്",
-      "connectGitLab": "GitLab കണക്റ്റുചെയ്യുക",
       "gitlabError": "GitLab സെറ്റപ്പ് തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "description": "പുൾ റിക്വസ്റ്റുകൾ ഓട്ടോമാറ്റിക്കായി അവലോകനം ചെയ്യാൻ Kilo {{label}} കണക്റ്റുചെയ്യുക.",
       "bitbucketError": "Bitbucket സജ്ജീകരണം തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
@@ -1436,12 +1367,7 @@
       "allAreas": "എല്ലാ മേഖലകൾ",
       "customInstructions": "ഇഷ്ടാനുസൃത നിർദ്ദേശങ്ങൾ",
       "set": "സജ്ജമാക്കുക",
-      "model": "മോഡൽ",
-      "mergeGate": "മെർജ് ഗേറ്റ്",
-      "repositories": "റിപ്പോസിറ്ററികൾ",
-      "allRepositories": "എല്ലാ റിപ്പോസിറ്ററികളും",
       "nSelected": "{{displayCount}} തിരഞ്ഞെടുത്തു",
-      "reviewMemory": "അവലോകന മെമ്മറി",
       "proposedReviewMdGuidance": "നിർദ്ദേശിച്ച REVIEW.md മാർഗ്ഗനിർദ്ദേശം"
     },
     "decision": {
@@ -1450,69 +1376,53 @@
       "noDecision": "തീരുമാനമില്ല",
       "noResult": "ഫലമില്ല"
     },
-    "eyebrow": "കോഡ് റിവ്യൂവർ",
     "updateFailed": "റിവ്യൂവർ അപ്ഡേറ്റ് ചെയ്യുന്നതിൽ പരാജയപ്പെട്ടു",
     "configSaveFailed": "റിവ്യൂ കോൺഫിഗ് സംരക്ഷിക്കുന്നതിൽ പരാജയപ്പെട്ടു",
     "status": {
-      "pending": "കാത്തിരിക്കുന്നു",
-      "queued": "ക്യൂവിൽ",
       "running": "പ്രവർത്തിക്കുന്നു",
       "completed": "പൂർത്തിയാക്കി",
-      "failed": "പരാജയപ്പെട്ടു",
-      "cancelled": "റദ്ദാക്കി",
       "interrupted": "തടസ്സപ്പെട്ടു"
     },
     "reviewStyle": {
       "strict": "കർശനം",
-      "balanced": "സമതുലിതം",
       "lenient": "വിട്ടുവീഴ്ച",
       "roast": "റോസ്റ്റ്"
     },
     "focusArea": {
       "security": "സുരക്ഷ",
-      "performance": "പ്രകടനം",
       "bugs": "ബഗുകൾ",
       "style": "ശൈലി",
       "testing": "ടെസ്റ്റിംഗ്",
       "documentation": "ഡോക്യുമെന്റേഷൻ"
     },
     "gateThreshold": {
-      "off": "ഓഫ്",
-      "all": "എല്ലാം",
-      "warning": "മുന്നറിയിപ്പ്",
-      "critical": "ഗുരുതരം"
+      "warning": "മുന്നറിയിപ്പ്"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "കോഡ് റിവ്യൂവറിന് ശ്രദ്ധ ആവശ്യമാണ്",
         "description": "സജീവമായ GitHub App ഇൻസ്റ്റാളേഷനുമായി Kilo-യ്ക്ക് ഈ റിപ്പോസിറ്ററി ആക്സസ് ചെയ്യാൻ കഴിയാത്തതിനാൽ കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. GitHub App ഇൻസ്റ്റാളേഷൻ അപ്ഡേറ്റ് ചെയ്യുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക.",
         "recoveryLabel": "GitHub App അപ്ഡേറ്റ് ചെയ്യുക"
       },
       "githubIpAllowList": {
-        "title": "കോഡ് റിവ്യൂവറിന് ശ്രദ്ധ ആവശ്യമാണ്",
-        "description": "ഈ GitHub ഓർഗനൈസേഷൻ Kilo-യെ തടയുന്ന ഒരു IP അനുവദനീയ ലിസ്റ്റ് ഉപയോഗിക്കുന്നതിനാൽ കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. സഹായത്തിനായി hi@kilocode.ai-യുമായി ബന്ധപ്പെടുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക.",
-        "recoveryLabel": "സപ്പോർട്ടുമായി ബന്ധപ്പെടുക"
+        "description": "ഈ GitHub ഓർഗനൈസേഷൻ Kilo-യെ തടയുന്ന ഒരു IP അനുവദനീയ ലിസ്റ്റ് ഉപയോഗിക്കുന്നതിനാൽ കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. സഹായത്തിനായി hi@kilocode.ai-യുമായി ബന്ധപ്പെടുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക."
       },
       "gitlabProjectAccessRequired": {
-        "title": "കോഡ് റിവ്യൂവറിന് ശ്രദ്ധ ആവശ്യമാണ്",
         "description": "ഈ പ്രോജക്ടിനായി Kilo-യ്ക്ക് GitLab പ്രോജക്ട് ആക്സസ് ടോക്കൺ സൃഷ്ടിക്കാൻ കഴിയാത്തതിനാൽ കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. മെയിന്റൈനർ ആക്സസ് അനുവദിക്കുക അല്ലെങ്കിൽ പ്രോജക്ട് ആക്സസ് ടോക്കണുകൾ പ്രവർത്തനക്ഷമമാക്കുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക.",
         "recoveryLabel": "GitLab സംയോജനം അപ്ഡേറ്റ് ചെയ്യുക"
       },
       "byokInvalidKey": {
-        "title": "കോഡ് റിവ്യൂവറിന് ശ്രദ്ധ ആവശ്യമാണ്",
         "description": "തിരഞ്ഞെടുത്ത BYOK API കീ അസാധുവാണ്, റദ്ദാക്കപ്പെട്ടതാണ്, അല്ലെങ്കിൽ അനുമതിയില്ലാത്തതാണ് എന്നതിനാൽ കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. കീ അപ്ഡേറ്റ് ചെയ്യുക അല്ലെങ്കിൽ മറ്റൊരു മോഡൽ തിരഞ്ഞെടുക്കുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക.",
         "recoveryLabel": "BYOK ക്രമീകരണങ്ങൾ അപ്ഡേറ്റ് ചെയ്യുക"
       },
       "selectedModelUnavailable": {
-        "title": "കോഡ് റിവ്യൂവറിന് ശ്രദ്ധ ആവശ്യമാണ്",
         "description": "തിരഞ്ഞെടുത്ത മോഡൽ ക്ലൗഡ് ഏജന്റ് സെഷനുകൾക്ക് ലഭ്യമല്ലാത്തതിനാൽ കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. ലഭ്യമായ ഒരു മോഡൽ തിരഞ്ഞെടുക്കുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക.",
         "recoveryLabel": "കോഡ് റിവ്യൂവർ ക്രമീകരണങ്ങൾ അപ്ഡേറ്റ് ചെയ്യുക"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "കോഡ് റിവ്യൂവറിന് ശ്രദ്ധ ആവശ്യമാണ്",
-        "description": "ഇന്ന് മൂന്ന് റിപ്പോസിറ്ററി ക്ലോൺ ടൈംഔട്ടുകൾക്ക് ശേഷം കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. സഹായത്തിനായി hi@kilocode.ai-യുമായി ബന്ധപ്പെടുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക.",
-        "recoveryLabel": "സപ്പോർട്ടുമായി ബന്ധപ്പെടുക"
-      }
+        "description": "ഇന്ന് മൂന്ന് റിപ്പോസിറ്ററി ക്ലോൺ ടൈംഔട്ടുകൾക്ക് ശേഷം കോഡ് റിവ്യൂവർ പ്രവർത്തനരഹിതമാക്കി. സഹായത്തിനായി hi@kilocode.ai-യുമായി ബന്ധപ്പെടുക, തുടർന്ന് കോഡ് റിവ്യൂവർ വീണ്ടും പ്രവർത്തനക്ഷമമാക്കുക."
+      },
+      "title": "കോഡ് റിവ്യൂവറിന് ശ്രദ്ധ ആവശ്യമാണ്",
+      "recoveryLabel": "സപ്പോർട്ടുമായി ബന്ധപ്പെടുക"
     },
     "unknownError": "അജ്ഞാത പിശക്"
   },
@@ -1522,31 +1432,17 @@
       "noFiltersDescription": "തിരികെ പോയി കണ്ടെത്തൽ പട്ടികയിൽ നിന്ന് ഫിൽട്ടറുകൾ വീണ്ടും തുറക്കുക.",
       "title": "കണ്ടെത്തലുകൾ ഫിൽട്ടർ ചെയ്യുക",
       "reset": "പുനഃസജ്ജമാക്കുക",
-      "repository": "റിപ്പോസിറ്ററി",
-      "status": "നില",
       "severity": "ഗുരുതരത്വം",
       "outcome": "ഫലം",
       "slaStatus": "SLA നില",
       "sortBy": "അടുക്കുക",
-      "allRepositories": "എല്ലാ റിപ്പോസിറ്ററികളും",
-      "all": "എല്ലാം",
       "statusOpen": "തുറക്കുക",
       "fixed": "പരിഹരിച്ചു",
       "statusIgnored": "അവഗണിച്ചു",
-      "statusClosed": "അടച്ചു",
-      "severityCritical": "ഗുരുതരം",
       "severityHigh": "ഉയർന്നത്",
       "severityMedium": "ഇടത്തരം",
       "severityLow": "താഴ്ന്നത്",
-      "outcomeNotAnalyzed": "വിശകലനം ചെയ്തിട്ടില്ല",
-      "outcomeAnalyzing": "വിശകലനം ചെയ്യുന്നു",
-      "outcomeFailed": "വിശകലനം പരാജയപ്പെട്ടു",
-      "outcomeExploitable": "ചൂഷണം ചെയ്യാവുന്നത്",
-      "outcomeNotExploitable": "ചൂഷണം ചെയ്യാവുന്നതല്ല",
-      "outcomeSafeToDismiss": "തള്ളിക്കളയുന്നത് സുരക്ഷിതം",
-      "outcomeNeedsReview": "അവലോകനം ആവശ്യമാണ്",
       "outcomeTriageComplete": "ട്രയേജ് പൂർത്തിയായി",
-      "outcomeDismissed": "നിരസിച്ചു",
       "sortSeverityDesc": "ഗുരുതരത്വം: ഉയർന്നത് മുതൽ താഴ്ന്നത് വരെ",
       "sortSeverityAsc": "ഗുരുതരത്വം: താഴ്ന്നത് മുതൽ ഉയർന്നത് വരെ",
       "sortSlaDue": "SLA തീയതി",
@@ -1571,7 +1467,6 @@
       "enableAutoDismiss": "ഓട്ടോ തള്ളൽ പ്രവർത്തനക്ഷമമാക്കുക",
       "enableAutoDismissSubtitle": "AI ചൂഷണം ചെയ്യാനാവാത്തവയെന്ന് നിർണ്ണയിക്കുന്ന കണ്ടെത്തലുകൾ സ്വയമേവ തള്ളുക.",
       "confidenceThreshold": "ആത്മവിശ്വാസ പരിധി",
-      "permissionNote": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഈ ക്രമീകരണങ്ങൾ മാറ്റാൻ കഴിയൂ.",
       "enableAutoRemediationConfirmTitle": "ഓട്ടോ പരിഹാരം പ്രവർത്തനക്ഷമമാക്കണോ?",
       "enableAutoRemediationConfirmMessage": "യോഗ്യതയുള്ള ചൂഷണം ചെയ്യാവുന്ന കണ്ടെത്തലുകൾക്ക് Security Agent പരിഹാര PR-കൾ സ്വയമേവ തുറക്കും.",
       "enable": "പ്രവർത്തനക്ഷമമാക്കുക",
@@ -1603,14 +1498,12 @@
       "suggestedAction": "നിർദ്ദേശിച്ച പ്രവർത്തനം",
       "triageReasoning": "ട്രയേജ് യുക്തി",
       "exploitable": "ചൂഷണം ചെയ്യാവുന്നത്",
-      "model": "മോഡൽ",
       "notRecorded": "രേഖപ്പെടുത്തിയിട്ടില്ല",
       "analyzed": "വിശകലനം ചെയ്തു",
       "exploitabilityReasoning": "ചൂഷണസാധ്യതയുടെ യുക്തി",
       "suggestedFix": "നിർദ്ദേശിച്ച പരിഹാരം",
       "whereFound": "ഇത് കണ്ടെത്തിയ സ്ഥലം ({{displayCount}})",
       "fullReport": "പൂർണ്ണ ജനറേറ്റഡ് റിപ്പോർട്ട്",
-      "unknown": "അജ്ഞാതം",
       "yes": "അതെ",
       "no": "ഇല്ല"
     },
@@ -1641,7 +1534,6 @@
       "repoSummary": "{{open}} തുറന്നത് · {{critical}} ക്രിട്ടിക്കൽ · {{high}} ഉയർന്നത്",
       "couldNotLoad": "ഡാഷ്ബോർഡ് ഡാറ്റ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "filterByRepository": "റിപ്പോസിറ്ററി പ്രകാരം ഫിൽട്ടർ ചെയ്യുക",
-      "findings": "കണ്ടെത്തലുകൾ",
       "lastSynced": "അവസാനം സമന്വയിപ്പിച്ചത് {{time}}",
       "manageRepositories": "റിപ്പോസിറ്ററികൾ നിയന്ത്രിക്കുക",
       "notYetSynced": "ഇതുവരെ സമന്വയിപ്പിച്ചിട്ടില്ല",
@@ -1654,15 +1546,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "തുറന്ന കണ്ടെത്തലുകൾ",
-      "openFindingsDetail": "{{critical}} നിർണായകം, {{high}} ഉയർന്നത്",
-      "confirmedExploitable": "ചൂഷണം ചെയ്യാവുന്നതായി സ്ഥിരീകരിച്ചു",
       "confirmedExploitableDetail": "വിശകലനത്തിലൂടെ പ്രോജക്ട് അപകടസാധ്യത സ്ഥിരീകരിച്ചു",
-      "needsReview": "നിങ്ങളുടെ അവലോകനം ആവശ്യമാണ്",
       "needsReviewDetail": "മനുഷ്യ തീരുമാനം ആവശ്യമാണ്",
-      "analysisIncomplete": "വിശകലനം പൂർത്തിയായിട്ടില്ല",
       "analysisIncompleteDetail": "പ്രോജക്ട് അപകടസാധ്യത ഇനിയും അറിയില്ല",
       "slaCompliance": "SLA പാലിക്കൽ",
-      "notMeasured": "അളക്കിയിട്ടില്ല",
       "withinDeadlineDetail": "{{total}} ൽ {{within}} കാലാവധിക്കുള്ളിൽ",
       "noDeadlineData": "ഒരു കണ്ടെത്തലിനും ഇതുവരെ SLA കാലാവധിയില്ല",
       "deadlinePassed": "കാലാവധി കഴിഞ്ഞു",
@@ -1675,7 +1562,6 @@
     },
     "dismiss": {
       "title": "കണ്ടെത്തൽ നിരസിക്കുക",
-      "submit": "കണ്ടെത്തൽ നിരസിക്കുക",
       "reason": "കാരണം",
       "reasonFixStarted": "ഒരു പരിഹാരം ഇതിനകം ആരംഭിച്ചു",
       "reasonNoBandwidth": "ബാൻഡ്വിഡ്ത്ത് ലഭ്യമല്ല",
@@ -1696,28 +1582,21 @@
     "findingDetails": {
       "supersededBy": "നിലവിലെ കണ്ടെത്തലിനാൽ മാറ്റിസ്ഥാപിച്ചു",
       "supersededByDescription": "നില, വിശകലനം, പരിഹാരം എന്നിവയ്ക്കായി നിലവിലെ രേഖ തുറക്കാൻ ടാപ്പ് ചെയ്യുക.",
-      "dismissed": "നിരസിച്ചു",
       "dismissedBecause": "{{reason}} കാരണം നിരസിച്ചു.",
       "severityLabel": "{{severity}} ഗൗരവം",
       "package": "പാക്കേജ്",
       "vulnerableVersions": "അപകടസാധ്യതയുള്ള പതിപ്പുകൾ",
-      "unknown": "അജ്ഞാതം",
       "patchedVersion": "പാച്ച് ചെയ്ത പതിപ്പ്",
       "noPatchAvailable": "പാച്ച് ലഭ്യമല്ല",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "റിപ്പോസിറ്ററി",
       "manifest": "മാനിഫസ്റ്റ്",
       "detected": "കണ്ടെത്തി",
-      "updated": "അപ്ഡേറ്റ് ചെയ്തു",
-      "fixed": "പരിഹരിച്ചു",
       "slaDeadline": "SLA സമയപരിധി",
       "sourceRecord": "സോഴ്സ് രേഖ",
       "source": "സോഴ്സ്",
       "sourceId": "സോഴ്സ് ID",
       "viewAdvisory": "GitHub-ൽ അഡ്വൈസറി കാണുക",
-      "statusSuperseded": "മാറ്റിസ്ഥാപിച്ചു",
-      "statusFixed": "പരിഹരിച്ചു",
       "statusOpen": "തുറക്കുക",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "ഒരു പരിഹാരം ഇതിനകം ആരംഭിച്ചു",
@@ -1728,30 +1607,17 @@
       "reasonAfterReview": "അവലോകനത്തിന് ശേഷം"
     },
     "settingsOverview": {
-      "title": "ക്രമീകരണങ്ങൾ",
       "couldNotLoadSettings": "Security Agent ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "couldNotLoadPermissions": "അനുമതികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "couldNotLoadRepositories": "റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "securityAgent": "സുരക്ഷാ ഏജന്റ്",
-      "enabled": "പ്രവർത്തനക്ഷമം",
-      "disabled": "പ്രവർത്തനരഹിതം",
       "on": "ഓൺ",
-      "off": "ഓഫ്",
-      "allRepositories": "എല്ലാ റിപ്പോസിറ്ററികളും",
       "repositoriesCount_one": "{{displayCount}} റിപ്പോസിറ്ററി തിരഞ്ഞെടുത്തു",
       "repositoriesCount": "{{displayCount}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
       "repositoriesCount_other": "{{displayCount}} റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുത്തു",
-      "selectRepositories": "റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുക്കുക",
       "selectRepositoriesSubtitle": "Security Agent ഏതൊക്കെ റിപ്പോസിറ്ററികൾ നിരീക്ഷിക്കണമെന്ന് തിരഞ്ഞെടുക്കുക",
-      "repositories": "റിപ്പോസിറ്ററികൾ",
-      "modelsAndAnalysis": "മോഡലുകളും വിശകലനവും",
       "analysisModeSubtitle": "{{mode}} വിശകലനം",
-      "automation": "ഓട്ടോമേഷൻ",
       "automationAllOff": "എല്ലാം ഓഫ്",
       "automationCount": "{{displayCount}} / 3 പ്രവർത്തനക്ഷമം",
-      "notifications": "അറിയിപ്പുകൾ",
       "notificationsCount": "{{displayCount}} / 2 പ്രവർത്തനക്ഷമം",
-      "slaPolicy": "SLA നയം",
       "disabledNoManage": "Security Agent പ്രവർത്തനരഹിതമാണ്. ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഇത് ഓണാക്കാൻ കഴിയൂ.",
       "disabledNoRepo": "Security Agent പ്രവർത്തനക്ഷമമാക്കുന്നതിന് മുമ്പ് ഒരു റിപ്പോസിറ്ററിയെങ്കിലും തിരഞ്ഞെടുക്കുക.",
       "disabledPrompt": "Dependabot അലേർട്ടുകൾ സമന്വയിപ്പിക്കാനും റിപ്പോസിറ്ററികൾ തിരഞ്ഞെടുക്കാനും ഓട്ടോമേഷൻ ക്രമീകരിക്കാനും Security Agent ഓണാക്കുക."
@@ -1759,15 +1625,11 @@
     "remediation": {
       "cancellationRequested": "റദ്ദാക്കൽ അഭ്യർത്ഥിച്ചു",
       "cancelled": "പരിഹാരം റദ്ദാക്കി",
-      "pullRequest": "പുൾ റിക്വസ്റ്റ്",
       "couldNotLoad": "പരിഹാര നില ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "noAnalysisTitle": "ഇതുവരെ വിശകലനമില്ല",
-      "noAnalysisDescription": "Details ടാബിൽ നിന്ന് ഒരെണ്ണം പ്രവർത്തിപ്പിക്കുക",
       "start": "പരിഹാരം ആരംഭിക്കുക",
       "retry": "പരിഹാരം വീണ്ടും ശ്രമിക്കുക",
       "cancelTitle": "ഈ പരിഹാരം റദ്ദാക്കണോ?",
       "cancelMessage": "Security Agent പുരോഗമിക്കുന്ന പരിഹാര ശ്രമം നിർത്തും.",
-      "keepRunning": "പ്രവർത്തിക്കുന്നത് തുടരുക",
       "cancelRemediation": "പരിഹാരം റദ്ദാക്കുക",
       "openPullRequest": "പുൾ റിക്വസ്റ്റ് തുറക്കുക{{number}}",
       "openDraftPullRequest": "ഡ്രാഫ്റ്റ് പുൾ റിക്വസ്റ്റ് തുറക്കുക{{number}}",
@@ -1775,29 +1637,19 @@
       "attemptHistory": "ശ്രമ ചരിത്രം ({{displayCount}})",
       "attemptNumber": "ശ്രമം #{{number}}",
       "startedBy": "ആരംഭിച്ചത്",
-      "model": "മോഡൽ",
-      "branch": "ബ്രാഞ്ച്",
       "queued": "പരിഹാരം ക്യൂവിലാക്കി",
       "retryQueued": "പരിഹാരം വീണ്ടും ശ്രമം ക്യൂവിലാക്കി",
       "timeline": {
         "queued": "പരിഹാരം അഭ്യർത്ഥിച്ചു",
-        "prOpened": "PR തുറന്നു",
         "failed": "പരിഹാരം പരാജയപ്പെട്ടു",
-        "blocked": "പരിഹാരം തടഞ്ഞു",
-        "noChangesNeeded": "മാറ്റങ്ങൾ ആവശ്യമില്ല",
-        "cancelled": "റദ്ദാക്കി"
+        "blocked": "പരിഹാരം തടഞ്ഞു"
       },
       "unavailable": "ഈ കണ്ടെത്തലിന് പരിഹാരം ലഭ്യമല്ല."
     },
     "analysisSettings": {
       "title": "മോഡലുകളും വിശകലനവും",
       "couldNotLoad": "വിശകലന ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "permissionNote": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഈ ക്രമീകരണങ്ങൾ മാറ്റാൻ കഴിയൂ.",
       "depth": "വിശകലന ആഴം",
-      "modeAuto": "ഓട്ടോ",
-      "modeShallow": "ആഴം കുറഞ്ഞ",
-      "modeDeep": "ആഴമുള്ള",
-      "couldNotLoadModels": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "triageModel": "ട്രയേജ് മോഡൽ",
       "analysisModel": "വിശകലന മോഡൽ",
       "remediationModel": "പരിഹാര മോഡൽ"
@@ -1805,7 +1657,6 @@
     "sla": {
       "title": "SLA നയം",
       "couldNotLoad": "SLA ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "critical": "ഗുരുതരം",
       "high": "ഉയർന്നത്",
       "medium": "ഇടത്തരം",
       "low": "താഴ്ന്നത്",
@@ -1823,41 +1674,23 @@
     },
     "findingDetail": {
       "title": "കണ്ടെത്തൽ",
-      "tabDetails": "വിശദാംശങ്ങൾ",
       "tabAnalysis": "വിശകലനം",
-      "tabRemediation": "പരിഹാരം",
-      "notFound": "കണ്ടെത്തൽ കണ്ടെത്തിയില്ല",
-      "notFoundDescription": "ഈ കണ്ടെത്തൽ നീക്കം ചെയ്തതാകാം, അല്ലെങ്കിൽ നിങ്ങൾക്ക് അതിലേക്കുള്ള ആക്സസ് ഇല്ലാതായേക്കാം.",
-      "couldNotLoad": "ഈ കണ്ടെത്തൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "dismissA11y": "കണ്ടെത്തൽ നിരസിക്കുക"
+      "tabRemediation": "പരിഹാരം"
     },
     "findingList": {
-      "title": "കണ്ടെത്തലുകൾ",
       "couldNotLoad": "കണ്ടെത്തലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "couldNotLoadMore": "കൂടുതൽ കണ്ടെത്തലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "noMatchesTitle": "ഫിൽട്ടറുകളുമായി പൊരുത്തപ്പെടുന്ന കണ്ടെത്തലുകളൊന്നുമില്ല",
       "noMatchesDescription": "തിരഞ്ഞെടുത്ത ഫിൽട്ടറുകൾ ക്രമീകരിക്കുകയോ മായ്ക്കുകയോ ചെയ്യുക.",
       "emptyTitle": "തുറന്ന കണ്ടെത്തലുകളൊന്നുമില്ല",
-      "emptyDescription": "ഇപ്പോൾ ശ്രദ്ധ ആവശ്യമുള്ള തുറന്ന കണ്ടെത്തലുകളൊന്നുമില്ല.",
-      "clearFilters": "ഫിൽട്ടറുകൾ മായ്ക്കുക"
-    },
-    "scopeList": {
-      "title": "സുരക്ഷാ ഏജന്റ്",
-      "couldNotLoad": "ഓർഗനൈസേഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "personal": "വ്യക്തിപരം",
-      "personalSubtitle": "നിങ്ങളുടെ സ്വന്തം റിപ്പോസിറ്ററികൾ"
-    },
-    "commandRetry": {
-      "discard": "ഉപേക്ഷിക്കുക"
+      "emptyDescription": "ഇപ്പോൾ ശ്രദ്ധ ആവശ്യമുള്ള തുറന്ന കണ്ടെത്തലുകളൊന്നുമില്ല."
     },
     "findingRow": {
       "nextRemediationPrOpen": "പരിഹാര PR തുറന്നു",
       "nextRemediationInProgress": "പരിഹാരം പുരോഗമിക്കുന്നു",
       "nextRetryRemediation": "പരിഹാരം വീണ്ടും ശ്രമിക്കാം",
       "nextRemediationAvailable": "പരിഹാരം ലഭ്യമാണ്",
-      "retryAnalysis": "വിശകലനം വീണ്ടും ശ്രമിക്കുക",
       "runAnalysis": "വിശകലനം പ്രവർത്തിപ്പിക്കുക",
-      "nextNeedsManualReview": "മാനുവൽ അവലോകനം ആവശ്യമാണ്",
       "nextViewDetails": "വിശദാംശങ്ങൾ കാണുക",
       "viewPr": "PR കാണുക",
       "analyze": "വിശകലനം ചെയ്യുക",
@@ -1868,7 +1701,6 @@
       "couldNotOpenGithub": "GitHub തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
     "settingsSave": {
-      "discard": "ഉപേക്ഷിക്കുക",
       "keepEditing": "എഡിറ്റിംഗ് തുടരുക",
       "saveChanges": "മാറ്റങ്ങൾ സംരക്ഷിക്കുക",
       "unsavedTitle": "സംരക്ഷിക്കാത്ത മാറ്റങ്ങൾ",
@@ -1880,7 +1712,6 @@
     "auditReport": {
       "couldNotLoad": "ഓഡിറ്റ് റിപ്പോർട്ട് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "events": "ഇവന്റുകൾ",
-      "findings": "കണ്ടെത്തലുകൾ",
       "generated": "ജനറേറ്റ് ചെയ്തത് {{generatedAt}}",
       "noActivity": "രേഖപ്പെടുത്തിയ പ്രവർത്തനമൊന്നുമില്ല",
       "noActivityDescription": "{{start}} മുതൽ {{end}} വരെയുള്ള കാലയളവിൽ Kilo-യ്ക്ക് റിപ്പോർട്ട് ചെയ്യാവുന്ന Security Finding പ്രവർത്തനമില്ല.",
@@ -1890,8 +1721,7 @@
       "title": "ഓഡിറ്റ് റിപ്പോർട്ട്",
       "unavailable": "ഓഡിറ്റ് റിപ്പോർട്ട് ലഭ്യമല്ല",
       "unavailableDescription": "ഓഡിറ്റ് റിപ്പോർട്ടുകൾ കാണാൻ ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ കഴിയൂ. ആക്സസ് നൽകാൻ ഒരു ഉടമയോടോ ബില്ലിംഗ് മാനേജറോടോ ആവശ്യപ്പെടുക.",
-      "queryFailed": "റിപ്പോർട്ട് ചോദ്യം പൂർത്തിയായില്ല. വീണ്ടും ശ്രമിക്കുക.",
-      "checkConnection": "നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക."
+      "queryFailed": "റിപ്പോർട്ട് ചോദ്യം പൂർത്തിയായില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
     "notifications": {
       "couldNotLoad": "അറിയിപ്പ് ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
@@ -1900,30 +1730,21 @@
       "newFindingSection": "പുതിയ കണ്ടെത്തൽ അറിയിപ്പ്",
       "newFindingSeverityLabel": "പുതിയ കണ്ടെത്തലിന്റെ കുറഞ്ഞ ഗൗരവം",
       "newFindingSubtitle": "ആദ്യ സമന്വയം ഉൾപ്പെടെ, പുതിയ കണ്ടെത്തൽ സമന്വയിപ്പിക്കുമ്പോഴെല്ലാം അയയ്ക്കും.",
-      "readOnly": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഈ ക്രമീകരണങ്ങൾ മാറ്റാൻ കഴിയൂ.",
       "slaLeadTimeAccessibility": "SLA മുന്നറിയിപ്പ് ലീഡ് സമയം ദിവസങ്ങളിൽ",
       "slaLeadTimeError": "1 മുതൽ 365 വരെയുള്ള ഒരു പൂർണ്ണ ദിവസ സംഖ്യ നൽകുക.",
-      "slaLeadTimeHint": "1 മുതൽ 365 വരെയുള്ള ഒരു പൂർണ്ണ സംഖ്യ നൽകുക",
       "slaLeadTimeLabel": "SLA മുന്നറിയിപ്പ് ലീഡ് സമയം (ദിവസങ്ങൾ)",
       "slaPersonalTitle": "SLA മുന്നറിയിപ്പുകളെക്കുറിച്ച് എനിക്ക് ഇമെയിൽ ചെയ്യുക",
       "slaSection": "SLA മുന്നറിയിപ്പ് അറിയിപ്പ്",
       "slaSeverityLabel": "SLA അറിയിപ്പിന്റെ കുറഞ്ഞ ഗൗരവം",
-      "slaSubtitle": "കണ്ടെത്തലുകൾ അവയുടെ SLA സമയപരിധിയെ സമീപിക്കുമ്പോഴും ലംഘിക്കുമ്പോഴും മുമ്പും അപ്പോഴും അയയ്ക്കും.",
-      "title": "അറിയിപ്പുകൾ"
+      "slaSubtitle": "കണ്ടെത്തലുകൾ അവയുടെ SLA സമയപരിധിയെ സമീപിക്കുമ്പോഴും ലംഘിക്കുമ്പോഴും മുമ്പും അപ്പോഴും അയയ്ക്കും."
     },
     "repositories": {
-      "allRepositories": "എല്ലാ റിപ്പോസിറ്ററികളും",
       "couldNotLoad": "റിപ്പോസിറ്ററി ക്രമീകരണങ്ങൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "couldNotLoadRepositories": "റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-      "couldNotOpenGithubSettings": "GitHub App ക്രമീകരണങ്ങൾ തുറക്കാൻ കഴിഞ്ഞില്ല",
       "githubAppSettings": "GitHub App ക്രമീകരണങ്ങൾ",
       "manageAccess": "GitHub App ആക്സസ് നിയന്ത്രിക്കുക",
       "noRepositories": "റിപ്പോസിറ്ററികളൊന്നുമില്ല",
       "noRepositoriesDescription": "Kilo GitHub App-ന് റിപ്പോസിറ്ററികളിലേക്കുള്ള ആക്സസ് നൽകുക",
-      "readOnly": "ഓർഗനൈസേഷൻ ഉടമകൾക്കും ബില്ലിംഗ് മാനേജർമാർക്കും മാത്രമേ ഈ ക്രമീകരണങ്ങൾ മാറ്റാൻ കഴിയൂ.",
-      "selectAtLeastOne": "ഒരു റിപ്പോസിറ്ററിയെങ്കിലും തിരഞ്ഞെടുക്കുക.",
-      "selectedRepositories": "തിരഞ്ഞെടുത്ത റിപ്പോസിറ്ററികൾ",
-      "title": "റിപ്പോസിറ്ററികൾ"
+      "selectAtLeastOne": "ഒരു റിപ്പോസിറ്ററിയെങ്കിലും തിരഞ്ഞെടുക്കുക."
     },
     "scopeEntry": {
       "connectDescription": "നിങ്ങളുടെ റിപ്പോസിറ്ററികളിലുടനീളം Dependabot അലേർട്ടുകൾ സ്വയമേവ സമന്വയിപ്പിക്കാനും സുരക്ഷാ കണ്ടെത്തലുകൾ നിയന്ത്രിക്കാനും Kilo GitHub App ഇൻസ്റ്റാൾ ചെയ്യുക.",
@@ -1938,7 +1759,6 @@
     },
     "queuedActionUntracked": "ഒരു ക്യൂവിലാക്കിയ പ്രവർത്തനം ഇനി ട്രാക്ക് ചെയ്യാനായില്ല. ഏറ്റവും പുതിയ നില കാണാൻ പുതുക്കുക.",
     "initialSyncAdmissionFailed": "Security Agent പ്രവർത്തനക്ഷമമാക്കി, പക്ഷേ പ്രാരംഭ സമന്വയം ക്യൂവിലാക്കാനായില്ല. വീണ്ടും സമന്വയിപ്പിക്കുക.",
-    "title": "സുരക്ഷാ ഏജന്റ്",
     "commands": {
       "findingAlreadyDismissed": "കണ്ടെത്തൽ ഇതിനകം നിരസിച്ചു",
       "findingDismissed": "കണ്ടെത്തൽ നിരസിച്ചു",
@@ -1956,49 +1776,33 @@
     },
     "analysisState": {
       "queued": "വിശകലനം ക്യൂവിലാക്കി",
-      "queuedTitle": "വിശകലനം ക്യൂവിലാക്കി",
       "queuedDescription": "വിശകലന ശേഷി ലഭ്യമാകുന്നതുവരെ കാത്തിരിക്കുന്നു.",
       "analyzing": "വിശകലനം ചെയ്യുന്നു",
-      "analyzingTitle": "വിശകലനം ചെയ്യുന്നു",
       "analyzingDescription": "ആപ്ലിക്കേഷൻ കോഡിന് ബാധിക്കപ്പെട്ട ഫീച്ചറിൽ എത്താൻ കഴിയുമോ എന്ന് പരിശോധിക്കുന്നു.",
       "failed": "വിശകലനം പരാജയപ്പെട്ടു",
-      "failedTitle": "വിശകലനം പരാജയപ്പെട്ടു",
       "failedDescription": "Security Agent-ന് വിശകലനം പൂർത്തിയാക്കാൻ കഴിഞ്ഞില്ല.",
-      "extractionFailed": "അവലോകനം ആവശ്യമാണ്",
-      "extractionFailedTitle": "അവലോകനം ആവശ്യമാണ്",
       "extractionFailedDescription": "സാങ്കേതിക റിപ്പോർട്ട് ഘടനാപരമായ ഫലമാക്കി മാറ്റാൻ കഴിഞ്ഞില്ല.",
-      "exploitable": "ചൂഷണം ചെയ്യാവുന്നത്",
-      "exploitableTitle": "ചൂഷണം ചെയ്യാവുന്നത്",
       "exploitableDescription": "ആപ്ലിക്കേഷൻ കോഡിന് ബാധിക്കപ്പെട്ട ഫീച്ചറിൽ എത്താനാകും.",
       "notExploitable": "എത്തിച്ചേരാനാകാത്തത്",
-      "notExploitableTitle": "എത്തിച്ചേരാനാകാത്തത്",
       "notExploitableDescription": "ഈ റിപ്പോസിറ്ററിയിൽ എത്തിച്ചേരാവുന്ന പാതയൊന്നും കണ്ടെത്തിയില്ല.",
       "unknown": "അവലോകനം ആവശ്യമാണ്",
-      "unknownTitle": "അവലോകനം ആവശ്യമാണ്",
       "unknownDescription": "ദുർബലമായ ഫീച്ചർ എത്തിച്ചേരാവുന്നതാണോ എന്ന് വിശകലനത്തിന് സ്ഥിരീകരിക്കാനായില്ല.",
       "safeToDismiss": "തള്ളിക്കളയുന്നത് സുരക്ഷിതം",
-      "safeToDismissTitle": "തള്ളിക്കളയുന്നത് സുരക്ഷിതം",
       "safeToDismissDescription": "കോഡ്ബേസ് വിശകലനം കൂടാതെ ഇത് സുരക്ഷിതമായി തള്ളിക്കളയാമെന്ന് ട്രയേജ് നിർണ്ണയിച്ചു.",
-      "manualReview": "അവലോകനം ആവശ്യമാണ്",
       "manualReviewTitle": "മാനുവൽ അവലോകനം ആവശ്യമാണ്",
       "manualReviewDescription": "മാനുവൽ അവലോകനത്തിനായി ട്രയേജ് ഈ കണ്ടെത്തൽ അടയാളപ്പെടുത്തി.",
       "analysisRequired": "വിശകലനം ആവശ്യമാണ്",
       "analysisRequiredTitle": "കോഡ്ബേസ് വിശകലനം ആവശ്യമാണ്",
       "analysisRequiredDescription": "പ്രതികരണം തീരുമാനിക്കുന്നതിന് മുമ്പ് റിപ്പോസിറ്ററി വിശകലനം ചെയ്യാൻ ട്രയേജ് ശുപാർശ ചെയ്യുന്നു.",
-      "completed": "വിശകലനം ചെയ്തു",
-      "completedTitle": "വിശകലനം ചെയ്തു",
       "completedDescription": "പ്രത്യേക ഫലമൊന്നും രേഖപ്പെടുത്താതെ വിശകലനം പൂർത്തിയായി.",
       "notAnalyzed": "വിശകലനം ചെയ്തിട്ടില്ല",
-      "notAnalyzedTitle": "വിശകലനം ചെയ്തിട്ടില്ല",
       "notAnalyzedDescription": "ഈ കണ്ടെത്തലിനായി കോഡ്ബേസ് വിശകലനം ഇതുവരെ പ്രവർത്തിപ്പിച്ചിട്ടില്ല."
     },
     "deadline": {
       "fixedBeforeDeadline": "സമയപരിധിക്ക് മുമ്പ് പരിഹരിച്ചു",
-      "fixed": "പരിഹരിച്ചു",
       "fixedOn": "{{date}}-ൽ പരിഹരിച്ചു",
       "resolutionRecorded": "പരിഹാരം രേഖപ്പെടുത്തി",
       "superseded": "മാറ്റിസ്ഥാപിച്ചു",
-      "dismissed": "നിരസിച്ചു",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "സമയപരിധി സജ്ജീകരിച്ചിട്ടില്ല",
       "noSlaDeadline": "SLA സമയപരിധിയില്ല",
@@ -2014,17 +1818,13 @@
       "dueInDays": "{{count}} ദിവസത്തിനുള്ളിൽ"
     },
     "remediationStatus": {
-      "cancellationRequested": "റദ്ദാക്കൽ അഭ്യർത്ഥിച്ചു",
       "notStarted": "ആരംഭിച്ചിട്ടില്ല",
-      "queued": "ക്യൂവിൽ",
       "starting": "ആരംഭിക്കുന്നു",
       "inProgress": "പുരോഗമിക്കുന്നു",
       "draftPrOpened": "ഡ്രാഫ്റ്റ് PR തുറന്നു",
       "prOpened": "PR തുറന്നു",
       "blocked": "തടഞ്ഞു",
-      "failed": "പരാജയപ്പെട്ടു",
       "noChangesNeeded": "മാറ്റങ്ങൾ ആവശ്യമില്ല",
-      "cancelled": "റദ്ദാക്കി",
       "originAutomaticPolicy": "ഓട്ടോമാറ്റിക് നയം",
       "originIncludeExistingPolicy": "നിലവിലുള്ളവ ഉൾപ്പെടുത്തുന്ന നയം",
       "originManual": "മാനുവൽ",
@@ -2036,7 +1836,6 @@
       "findingNotOpen": "കണ്ടെത്തൽ ഇനി തുറന്ന നിലയിലല്ല.",
       "repoNotInScope": "റിപ്പോസിറ്ററി Security Agent-നായി തിരഞ്ഞെടുത്തിട്ടില്ല.",
       "analysisRequired": "പരിഹാരം ആരംഭിക്കുന്നതിന് മുമ്പ് കോഡ്ബേസ് വിശകലനം പ്രവർത്തിപ്പിക്കുക.",
-      "sandboxAnalysisRequired": "പരിഹാരം ആരംഭിക്കുന്നതിന് മുമ്പ് കോഡ്ബേസ് വിശകലനം പ്രവർത്തിപ്പിക്കുക.",
       "staleAnalysis": "വിശകലനത്തിന് ശേഷം കണ്ടെത്തൽ മാറി. പരിഹാരം ആരംഭിക്കുന്നതിന് മുമ്പ് വിശകലനം വീണ്ടും പ്രവർത്തിപ്പിക്കുക.",
       "notExploitable": "എത്തിച്ചേരാവുന്ന ദുർബല പാത വിശകലനത്തിൽ കണ്ടെത്തിയില്ല. ഓട്ടോ പരിഹാരം ലഭ്യമല്ല.",
       "exploitabilityUnknown": "ചൂഷണസാധ്യത വിശകലനത്തിന് സ്ഥിരീകരിക്കാനായില്ല. ഒറ്റക്ലിക്ക് പരിഹാരത്തിന് മുമ്പ് മാനുവൽ അവലോകനം ആവശ്യമാണ്.",
@@ -2052,12 +1851,10 @@
       "autoRemediationDisabled": "ഓട്ടോ പരിഹാരം പ്രവർത്തനരഹിതമാണ്. സുരക്ഷാ ഗേറ്റുകൾ കടന്നുപോകുമ്പോൾ മാനുവൽ പരിഹാരം ഇപ്പോഴും ആരംഭിക്കാം.",
       "includeExistingDisabled": "നിലവിലുള്ള കണ്ടെത്തലുകൾ ഓട്ടോമാറ്റിക് പരിഹാരത്തിൽ നിന്ന് ഒഴിവാക്കിയിരിക്കുന്നു.",
       "belowThreshold": "കണ്ടെത്തൽ ഓട്ടോമാറ്റിക് ഗുരുതരത്വ പരിധിക്ക് താഴെയാണ്. സുരക്ഷാ ഗേറ്റുകൾ കടന്നുപോകുമ്പോൾ മാനുവൽ പരിഹാരം ഇപ്പോഴും ആരംഭിക്കാം.",
-      "beforeEnablement": "ഓട്ടോ പരിഹാരം പ്രവർത്തനക്ഷമമാക്കുന്നതിന് മുമ്പ് വിശകലനം പൂർത്തിയായി. സുരക്ഷാ ഗേറ്റുകൾ കടന്നുപോകുമ്പോൾ മാനുവൽ പരിഹാരം ഇപ്പോഴും ആരംഭിക്കാം.",
-      "generic": "ഈ കണ്ടെത്തലിന് പരിഹാരം ലഭ്യമല്ല."
+      "beforeEnablement": "ഓട്ടോ പരിഹാരം പ്രവർത്തനക്ഷമമാക്കുന്നതിന് മുമ്പ് വിശകലനം പൂർത്തിയായി. സുരക്ഷാ ഗേറ്റുകൾ കടന്നുപോകുമ്പോൾ മാനുവൽ പരിഹാരം ഇപ്പോഴും ആരംഭിക്കാം."
     },
     "commandFailure": {
       "ownerCapReached": "വിശകലന ശേഷി നിറഞ്ഞു. സജീവ വിശകലനം പൂർത്തിയാകുന്നതുവരെ കാത്തിരിക്കുക, തുടർന്ന് വീണ്ടും ശ്രമിക്കുക.",
-      "githubTokenUnavailable": "GitHub അംഗീകാരത്തിന് ശ്രദ്ധ ആവശ്യമാണ്. GitHub App വീണ്ടും അംഗീകരിക്കുക, തുടർന്ന് വീണ്ടും ശ്രമിക്കുക.",
       "githubAuthInvalid": "GitHub അംഗീകാരത്തിന് ശ്രദ്ധ ആവശ്യമാണ്. GitHub App വീണ്ടും അംഗീകരിക്കുക, തുടർന്ന് വീണ്ടും ശ്രമിക്കുക.",
       "findingUnavailable": "കണ്ടെത്തൽ ഇനി ലഭ്യമല്ല. കണ്ടെത്തലുകൾ പുതുക്കി, അത് തുറന്നിരിക്കുന്നുവെങ്കിൽ വീണ്ടും ശ്രമിക്കുക.",
       "repositoryUnavailable": "റിപ്പോസിറ്ററി GitHub App-ന് ഇനി ലഭ്യമല്ല. റിപ്പോസിറ്ററി ആക്സസ് പുതുക്കുക, തുടർന്ന് വീണ്ടും ശ്രമിക്കുക.",
@@ -2077,12 +1874,9 @@
     "search": {
       "searching": "തിരയുന്നു",
       "searchSessions": "സെഷനുകൾ തിരയുക",
-      "searchSessionsPlaceholder": "സെഷനുകൾ തിരയുക...",
-      "clearSearch": "തിരയൽ മായ്ക്കുക",
-      "clearFilters": "ഫിൽട്ടറുകൾ മായ്ക്കുക"
+      "searchSessionsPlaceholder": "സെഷനുകൾ തിരയുക..."
     },
     "sessionList": {
-      "couldNotLoad": "സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "couldNotLoadActive": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "noSessionsYetDescription": "നിങ്ങളുടെ ഫോണിൽ നിന്ന് ഒരു കോഡിംഗ് ജോലി ആരംഭിക്കുക. നിങ്ങളുടെ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noMatches": "പൊരുത്തപ്പെടുന്ന സെഷനുകളൊന്നുമില്ല",
@@ -2097,9 +1891,7 @@
     "sessionRow": {
       "deleteTitle": "സെഷൻ ഇല്ലാതാക്കണോ?",
       "deleteMessage": "ഇത് പഴയപടിയാക്കാനാവില്ല.",
-      "delete": "ഇല്ലാതാക്കുക",
       "deleteSession": "സെഷൻ ഇല്ലാതാക്കുക",
-      "rename": "പുനർനാമകരണം ചെയ്യുക",
       "renameMessage": "ഈ സെഷന് ഒരു പുതിയ പേര് നൽകുക",
       "copyId": "സെഷൻ ID പകർത്തുക",
       "idCopied": "സെഷൻ ID പകർത്തി",
@@ -2133,7 +1925,6 @@
       "didNotCompleteTitle": "ഇൻസ്റ്റാളേഷൻ പൂർത്തിയായില്ല",
       "didNotCompleteMessage": "GitHub ആപ്പ് ഇൻസ്റ്റാളേഷൻ പൂർത്തിയായില്ല. ആപ്പിൽ നിന്ന് വീണ്ടും ശ്രമിക്കുക."
     },
-    "sessionExited": "സെഷൻ പുറത്തുകടന്നു",
     "remoteSpawnRetryable": "ഇൻസ്റ്റൻസിൽ എത്താൻ കഴിഞ്ഞില്ല — ഇത് വിച്ഛേദിക്കപ്പെട്ടിരിക്കാം.",
     "remoteSpawnNonRetryable": "സെഷൻ ആരംഭിക്കുന്നതിൽ ഇൻസ്റ്റൻസ് പരാജയപ്പെട്ടു — മെഷീൻ പരിശോധിക്കുക അല്ലെങ്കിൽ CLI അപ്ഡേറ്റ് ചെയ്യുക.",
     "remoteSpawnInstanceDisconnected": "തിരഞ്ഞെടുത്ത ഇൻസ്റ്റൻസ് വിച്ഛേദിക്കപ്പെട്ടു. Cloud Agent-ൽ ഒരു സെഷൻ ആരംഭിക്കുക അല്ലെങ്കിൽ മറ്റൊരു ഇൻസ്റ്റൻസ് തിരഞ്ഞെടുക്കുക.",
@@ -2145,12 +1936,8 @@
       "title": "സെഷൻ",
       "copyErrorDetails": "പിശക് വിശദാംശങ്ങൾ പകർത്തുക",
       "backToSessions": "സെഷനുകളിലേക്ക് മടങ്ങുക",
-      "accessDenied": "ആക്സസ് നിഷേധിച്ചു",
-      "accessDeniedDescription": "ഇത് കാണാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "couldNotLoad": "സെഷൻ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "failedToLoadDetails": "സെഷൻ വിശദാംശങ്ങൾ ലോഡ് ചെയ്യാൻ പരാജയപ്പെട്ടു",
-      "notFound": "കണ്ടെത്തിയില്ല",
-      "notFoundDescription": "ഈ ഇനം നീക്കം ചെയ്തതോ ഇനി ലഭ്യമല്ലാത്തതോ ആകാം.",
       "failedToStopExecution": "എക്സിക്യൂഷൻ നിർത്താൻ പരാജയപ്പെട്ടു",
       "renameSession": "സെഷൻ പുനർനാമകരണം ചെയ്യുക",
       "renamePlaceholder": "സെഷൻ പേര്",
@@ -2161,7 +1948,6 @@
       "emptyTitle": "ഇതുവരെ സന്ദേശങ്ങളൊന്നുമില്ല",
       "renameAccessibility": "സെഷൻ പുനർനാമകരണം ചെയ്യുക: {{title}}",
       "cloningSession": "സെഷൻ ക്ലോൺ ചെയ്യുന്നു",
-      "continue": "തുടരുക",
       "couldNotLoadThisSession": "ഈ സെഷൻ ലോഡ് ചെയ്യാനായില്ല",
       "cloneFailedRetry": "ഈ സെഷൻ ക്ലോൺ ചെയ്യാനായില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "notEnoughCredits": "Cloud Agent പ്രവർത്തിപ്പിക്കാൻ ക്രെഡിറ്റുകൾ മതിയാകുന്നില്ല. ക്രെഡിറ്റുകൾ ചേർത്ത് വീണ്ടും ശ്രമിക്കുക.",
@@ -2176,7 +1962,6 @@
     },
     "remoteSession": {
       "failedToCreate": "വിദൂര സെഷൻ സൃഷ്ടിക്കാൻ പരാജയപ്പെട്ടു",
-      "exited": "സെഷൻ പുറത്തുകടന്നു",
       "failedToExit": "സെഷനിൽ നിന്ന് പുറത്തുകടക്കാൻ പരാജയപ്പെട്ടു",
       "exitTitle": "സെഷനിൽ നിന്ന് പുറത്തുകടക്കണോ?",
       "exitMessage": "ഇത് പ്രവർത്തിക്കുന്ന സെഷൻ നിർത്തും, പക്ഷേ അതിന്റെ ചരിത്രം നിലനിർത്തും.",
@@ -2194,9 +1979,6 @@
       "retryConnection": "കണക്ഷൻ വീണ്ടും ശ്രമിക്കുക"
     },
     "newSession": {
-      "title": "പുതിയ സെഷൻ",
-      "repository": "റിപ്പോസിറ്ററി",
-      "connectGithub": "GitHub കണക്റ്റുചെയ്യുക",
       "connectGithubDescription": "നിങ്ങളുടെ ബ്രൗസറിൽ GitHub കണക്റ്റ് ചെയ്യുക, തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടേക്ക് മടങ്ങുക.",
       "openGithub": "GitHub തുറക്കുക",
       "refreshRepositories": "റിപ്പോസിറ്ററികൾ പുതുക്കുക",
@@ -2213,7 +1995,6 @@
       "commitAndPush": "കമ്മിറ്റ് ചെയ്ത് പുഷ് ചെയ്യുക",
       "startSession": "സെഷൻ ആരംഭിക്കുക",
       "promptPlaceholder": "നിങ്ങൾ എന്തിലാണ് പ്രവർത്തിക്കാൻ ആഗ്രഹിക്കുന്നത്?",
-      "addAttachment": "അറ്റാച്ച്മെന്റ് ചേർക്കുക",
       "couldNotLoadModels": "മോഡലുകൾ ലോഡ് ചെയ്യാനായില്ല",
       "prefillRepoAndModelUnavailable": "യഥാർത്ഥ സെഷന്റെ റിപ്പോസിറ്ററിയും മോഡലും ഇനി ലഭ്യമല്ല. താഴെ അവ തിരഞ്ഞെടുക്കുക.",
       "prefillRepoUnavailable": "{{repo}} ഇനി ലഭ്യമല്ല. താഴെ ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കുക.",
@@ -2223,14 +2004,9 @@
       "couldNotRefreshRepositories": "റിപ്പോസിറ്ററികൾ പുതുക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "discardDraftTitle": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കണോ?",
       "discardDraftMessage": "നിങ്ങളുടെ പ്രോംപ്റ്റ് നഷ്ടപ്പെടും.",
-      "keepEditing": "എഡിറ്റിംഗ് തുടരുക",
-      "discard": "ഉപേക്ഷിക്കുക",
       "discardFailed": "ഡ്രാഫ്റ്റ് ഉപേക്ഷിക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "remoteHint": "നിങ്ങളുടെ കമ്പ്യൂട്ടറിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക, അല്ലെങ്കിൽ പ്രവർത്തിക്കുന്ന CLI സെഷനിൽ `/remote`, ഒരു ലോക്കൽ kilo പ്രോസസ്സ് നിയന്ത്രിക്കാൻ.",
-      "bitbucketConnected": "Bitbucket കണക്റ്റുചെയ്തു",
-      "connectBitbucket": "Bitbucket കണക്റ്റുചെയ്യുക",
       "connectBitbucketDescription": "നിങ്ങളുടെ ബ്രൗസറിൽ Bitbucket കണക്റ്റ് ചെയ്യുക, തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ തിരികെ വരിക.",
-      "connectGitlab": "GitLab കണക്റ്റുചെയ്യുക",
       "connectGitlabDescription": "നിങ്ങളുടെ ബ്രൗസറിൽ GitLab കണക്റ്റ് ചെയ്യുക, തുടർന്ന് ഒരു റിപ്പോസിറ്ററി തിരഞ്ഞെടുക്കാൻ ഇവിടെ തിരികെ വരിക.",
       "couldNotLoadBitbucketRepositories": "Bitbucket റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "couldNotLoadGithubRepositories": "GitHub റിപ്പോസിറ്ററികൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
@@ -2252,18 +2028,10 @@
       "updatedFileCount": "{{displayCount}} ഫയലുകൾ അപ്ഡേറ്റ് ചെയ്തു",
       "updatedFileCount_other": "{{displayCount}} ഫയലുകൾ അപ്ഡേറ്റ് ചെയ്തു"
     },
-    "toolPatch": {
-      "operationAdded": "ചേർത്തു",
-      "operationDeleted": "ഇല്ലാതാക്കി",
-      "operationUpdated": "അപ്ഡേറ്റ് ചെയ്തു"
-    },
     "toolCard": {
       "accessibility": "{{label}} ടൂൾ, {{status}}",
       "accessibilityLabel": "{{name}} ടൂൾ, {{status}}",
-      "fileEmpty": "ഈ ഫയൽ ശൂന്യമാണ്.",
       "noTasks": "ജോലികളൊന്നുമില്ല.",
-      "contentTruncated": "ഉള്ളടക്കം ട്രങ്കേറ്റ് ചെയ്തു",
-      "truncated": "ട്രങ്കേറ്റ് ചെയ്തത്",
       "toolRead": "read",
       "toolEdit": "തിരുത്തുക",
       "toolWrite": "write",
@@ -2295,9 +2063,7 @@
       "runOn": "ഇതിൽ പ്രവർത്തിപ്പിക്കുക",
       "runOnAccessibility": "ഇതിൽ പ്രവർത്തിപ്പിക്കുക: {{label}}",
       "couldNotLoad": "ഇൻസ്റ്റൻസുകൾ ലോഡ് ചെയ്യാനായില്ല",
-      "couldNotLoadDescription": "നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "cloudAgent": "Cloud Agent",
-      "loading": "ലോഡ് ചെയ്യുന്നു…",
       "cloudAgentDescription": "Kilo-യുടെ ക്ലൗഡ് സാൻഡ്ബോക്സിൽ പ്രവർത്തിപ്പിക്കുക",
       "noCliInstances": "ബന്ധിപ്പിച്ച CLI ഇൻസ്റ്റൻസുകളൊന്നുമില്ല",
       "noCliInstancesDescription": "നിങ്ങളുടെ കമ്പ്യൂട്ടറിലെ ഒരു പ്രോജക്ടിൽ `kilo remote` പ്രവർത്തിപ്പിക്കുക, അല്ലെങ്കിൽ ഒരെണ്ണം ഇതിനകം പ്രവർത്തിക്കുന്നുണ്ടെങ്കിൽ Kilo CLI അപ്ഡേറ്റ് ചെയ്യുക.",
@@ -2334,12 +2100,9 @@
       "noMatches": "പൊരുത്തങ്ങളൊന്നുമില്ല",
       "noRepositories": "ലഭ്യമായ റിപ്പോസിറ്ററികളൊന്നുമില്ല",
       "noRepositoriesDescription": "നിങ്ങളുടെ അക്കൗണ്ടിലേക്ക് റിപ്പോസിറ്ററികളൊന്നും കണക്റ്റ് ചെയ്തിട്ടില്ല.",
-      "tryDifferentSearch": "മറ്റൊരു തിരയൽ പദം ശ്രമിക്കുക.",
       "loading": "ലോഡ് ചെയ്യുന്നു...",
       "accessibility": "റിപ്പോസിറ്ററി: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "സന്ദേശ വിശദാംശങ്ങൾ",
@@ -2349,13 +2112,10 @@
       "reportAiResponse": "AI പ്രതികരണം റിപ്പോർട്ട് ചെയ്യുക",
       "reportAiResponseConfirm": "ഈ പ്രതികരണം അവലോകനത്തിനായി റിപ്പോർട്ട് ചെയ്യണോ?",
       "report": "റിപ്പോർട്ട്",
-      "role": "റോൾ",
       "roleUser": "ഉപയോക്താവ്",
       "roleAssistant": "അസിസ്റ്റന്റ്",
       "sent": "അയച്ചു",
-      "model": "മോഡൽ",
       "costAndTokens": "ചെലവും ടോക്കണുകളും",
-      "cost": "ചെലവ്",
       "input": "ഇൻപുട്ട്",
       "output": "ഔട്ട്പുട്ട്",
       "reasoning": "യുക്തി",
@@ -2363,8 +2123,7 @@
       "cacheWrite": "കാഷെ റൈറ്റ്",
       "total": "ആകെ",
       "reportAiResponseFailedRetryable": "ഈ പ്രതികരണം റിപ്പോർട്ട് ചെയ്യാനായില്ല.",
-      "reportAiResponseFailedTerminal": "ഈ പ്രതികരണം റിപ്പോർട്ട് ചെയ്യാനാവില്ല.",
-      "reportAiResponseSubmitted": "റിപ്പോർട്ട് സമർപ്പിച്ചു. രസീത് {{receiptId}}"
+      "reportAiResponseFailedTerminal": "ഈ പ്രതികരണം റിപ്പോർട്ട് ചെയ്യാനാവില്ല."
     },
     "modelCost": {
       "lessThan": "{{amount}} ൽ കുറവ്",
@@ -2375,7 +2134,6 @@
       "textDisplay": "ടെക്സ്റ്റ് ഡിസ്പ്ലേ",
       "thinking": "ചിന്തിക്കുന്നു",
       "thought": "ചിന്ത",
-      "title": "വിശദാംശങ്ങൾ",
       "showDetails": "വിശദാംശങ്ങൾ കാണിക്കുക",
       "pending": "തീർച്ചയില്ലാത്തത്…",
       "running": "പ്രവർത്തിക്കുന്നു…"
@@ -2398,16 +2156,13 @@
     "filePart": {
       "loadingImage": "ചിത്രം ലോഡ് ചെയ്യുന്നു",
       "imageUnavailableRetry": "ചിത്രം ലഭ്യമല്ല, ലോഡിംഗ് വീണ്ടും ശ്രമിക്കുക",
-      "imageUnavailable": "ചിത്രം ലഭ്യമല്ല",
       "imagePreviewUnavailableInSession": "ഈ സെഷനിൽ ചിത്ര പ്രിവ്യൂ ലഭ്യമല്ല.",
       "viewImage": "ചിത്രം കാണുക",
       "viewImageWithAlt": "ചിത്രം കാണുക {{alt}}",
       "imageOutput": "ചിത്ര ഔട്ട്പുട്ട്",
       "imageOutputWithFilename": "ചിത്ര ഔട്ട്പുട്ട്, {{filename}}",
-      "defaultName": "ഫയൽ",
       "openFullScreen": "{{name}} പൂർണ്ണ സ്ക്രീനിൽ തുറക്കുക",
       "preview": "{{name}} പ്രിവ്യൂ ചെയ്യുക",
-      "openFile": "{{name}} തുറക്കുക",
       "couldNotLoadFile": "ഈ ഫയൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
       "couldNotLoadFileRetry": "ഈ ഫയൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
       "retryLoadingFile": "ഫയൽ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
@@ -2490,7 +2245,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. വീണ്ടും ശ്രമിക്കാവുന്നതാണ്.",
       "copyToComposer": "കോമ്പോസറിലേക്ക് പകർത്തുക",
-      "queued": "ക്യൂവിൽ",
       "queuedAccessibility": "സന്ദേശം ക്യൂവിൽ",
       "userMessage": "ഉപയോക്തൃ സന്ദേശം",
       "assistantMessage": "സഹായി സന്ദേശം",
@@ -2526,12 +2280,10 @@
     },
     "sessionFilter": {
       "title": "സെഷനുകൾ ഫിൽട്ടർ ചെയ്യുക",
-      "platform": "പ്ലാറ്റ്ഫോം",
       "platformCloud": "ക്ലൗഡ്",
       "platformExtension": "എക്സ്റ്റൻഷൻ",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "മറ്റുള്ളവ",
       "project": "പ്രോജക്റ്റ്"
@@ -2545,15 +2297,10 @@
     },
     "modelPicker": {
       "title": "മോഡൽ തിരഞ്ഞെടുക്കുക",
-      "searchPlaceholder": "മോഡലുകൾ തിരയുക...",
-      "noModels": "മോഡലുകൾ ലഭ്യമല്ല",
       "noModelsDescription": "തിരഞ്ഞെടുക്കാൻ മോഡലുകൾ ലഭ്യമല്ല.",
-      "favorites": "പ്രിയപ്പെട്ടവ",
-      "recommended": "ശുപാർശ ചെയ്യുന്നത്",
-      "allModels": "എല്ലാ മോഡലുകൾ"
+      "favorites": "പ്രിയപ്പെട്ടവ"
     },
     "modelSelector": {
-      "model": "മോഡൽ",
       "provider": "ദാതാവ് {{id}}",
       "modelId": "മോഡൽ {{id}}",
       "unavailable": "ലഭ്യമല്ല",
@@ -2577,7 +2324,6 @@
       "uploading": "അപ്ലോഡ് ചെയ്യുന്നു…",
       "uploaded": "അപ്ലോഡ് ചെയ്തു",
       "uploadFailedRetry": "അപ്ലോഡ് പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കാൻ ടാപ്പ് ചെയ്യുക.",
-      "uploadFailedTerminal": "ഈ ഫയൽ അപ്ലോഡ് ചെയ്യാൻ കഴിയില്ല.",
       "moveLeft": "{{filename}} ഇടത്തേക്ക് നീക്കുക",
       "moveRight": "{{filename}} വലത്തേക്ക് നീക്കുക"
     },
@@ -2589,8 +2335,6 @@
       "camera": "ക്യാമറ",
       "photoLibrary": "ഫോട്ടോ ലൈബ്രറി",
       "files": "ഫയലുകൾ",
-      "cameraAccessDisabled": "ക്യാമറ ആക്സസ് പ്രവർത്തനരഹിതമാണ്",
-      "cameraAccessMessage": "ഒരു ഫോട്ടോ എടുക്കാൻ ക്രമീകരണങ്ങളിൽ ക്യാമറ ആക്സസ് അനുവദിക്കുക.",
       "couldNotOpenPhotoPicker": "ഫോട്ടോ പിക്കർ തുറക്കാൻ കഴിഞ്ഞില്ല. Kilo പുനരാരംഭിച്ച് വീണ്ടും ശ്രമിക്കുക.",
       "maxFilesAllowed": "പരമാവധി {{displayCount}} ഫയലുകൾ അനുവദനീയം",
       "onlyAddingFiles": "{{total}} ൽ {{accepted}} ഫയലുകൾ മാത്രം ചേർക്കുന്നു (പരമാവധി {{max}})"
@@ -2603,7 +2347,6 @@
       "waitForUploads": "അറ്റാച്ച്മെന്റുകൾ അപ്ലോഡ് പൂർത്തിയാകുന്നതുവരെ കാത്തിരിക്കുക.",
       "pasteFromClipboard": "ക്ലിപ്പ്ബോർഡിൽ നിന്ന് ഒട്ടിക്കുക",
       "stopGenerating": "ജനറേറ്റ് ചെയ്യുന്നത് നിർത്തുക",
-      "sendMessage": "സന്ദേശം അയയ്ക്കുക",
       "selectModelBeforeSending": "അയയ്ക്കുന്നതിന് മുമ്പ് ഒരു മോഡൽ തിരഞ്ഞെടുക്കുക",
       "preparingPlaceholder": "പരിസ്ഥിതി സജ്ജമാക്കുന്നു...",
       "finalizingPlaceholder": "പൂർത്തിയാക്കുന്നു...",
@@ -2617,9 +2360,7 @@
     },
     "chatLink": {
       "linkCopied": "ലിങ്ക് പകർത്തി",
-      "reviewPr": "PR അവലോകനം ചെയ്യുക",
       "openLink": "ലിങ്ക് തുറക്കുക",
-      "copyLink": "ലിങ്ക് പകർത്തുക",
       "shareLink": "ലിങ്ക് പങ്കിടുക",
       "share": "പങ്കിടുക",
       "prLinkActions": "PR ലിങ്ക് പ്രവർത്തനങ്ങൾ",
@@ -2659,13 +2400,11 @@
     "contextUsage": {
       "windowUnavailable": "സന്ദർഭ-വിൻഡോ വലുപ്പം ലഭ്യമല്ല",
       "tapToViewDetails": "സന്ദർഭ വിശദാംശങ്ങൾ കാണാൻ ടാപ്പ് ചെയ്യുക.",
-      "costPrefix": "ചെലവ് {{cost}}",
       "costSuffix": ", ചെലവ് {{cost}}",
       "tokensWindowUnavailable": "സന്ദർഭം {{used}} ടോക്കണുകൾ, വിൻഡോ ലഭ്യമല്ല",
       "tokensUsage": "സന്ദർഭം {{used}} / {{window}} ടോക്കണുകൾ, {{percentage}} ഉപയോഗിച്ചു",
       "title": "സന്ദർഭ ഉപയോഗം",
       "used": "ഉപയോഗിച്ചത്",
-      "remaining": "ശേഷിക്കുന്നത്",
       "provider": "ദാതാവ്",
       "totalCost": "ആകെ ചെലവ്",
       "usageReflectsLatest": "ഉപയോഗം ഏറ്റവും പുതിയ പൂർത്തിയായ സഹായി പ്രതികരണത്തെ പ്രതിഫലിപ്പിക്കുന്നു.",
@@ -2691,8 +2430,7 @@
       "merged": "ലയിപ്പിച്ച പുൾ റിക്വസ്റ്റ്",
       "draft": "ഡ്രാഫ്റ്റ് പുൾ റിക്വസ്റ്റ്",
       "updating": "അപ്ഡേറ്റ് ചെയ്യുന്നു, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "പുൾ റിക്വസ്റ്റ്"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "ലോഡ് ചെയ്യുക",
@@ -2720,11 +2458,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "നിങ്ങളുടെ അക്കൗണ്ട് ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
-    "couldNotLoadAccountDescription": "നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
     "couldNotLoadPrivacy": "സ്വകാര്യതാ തിരഞ്ഞെടുപ്പുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "couldNotLoadPrivacyDescription": "നിങ്ങളുടെ ഉപകരണ സുരക്ഷാ ക്രമീകരണങ്ങൾ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
     "contentReady": "ഉള്ളടക്കം തയ്യാറാണ്",
-    "signOut": "സൈൻ ഔട്ട്",
     "retryLoadingAccount": "അക്കൗണ്ട് ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
     "retryLoadingPrivacy": "സ്വകാര്യതാ തിരഞ്ഞെടുപ്പുകൾ ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക"
   },
@@ -2734,7 +2470,6 @@
     "billingPage": "ബില്ലിംഗ് പേജ്"
   },
   "deviceSessions": {
-    "couldNotLoad": "സെഷനുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "couldNotLoadDescription": "ഇത് ലോഡ് ആകുന്നതുവരെ നിങ്ങളുടെ സജീവ സെഷനുകൾ ലഭ്യമല്ല.",
     "currentDeviceUnidentified": "നിലവിലെ ഉപകരണം തിരിച്ചറിയാൻ കഴിഞ്ഞില്ല",
     "noSessions": "സജീവ സെഷനുകൾ ഇല്ല",
@@ -2742,7 +2477,6 @@
     "onlyKiloAppSignIns": "Kilo ആപ്പ് സൈൻ-ഇന്നുകൾ മാത്രമേ ഇവിടെ ദൃശ്യമാകൂ. എഡിറ്റർ, CLI സൈൻ-ഇന്നുകൾ ലിസ്റ്റ് ചെയ്തിട്ടില്ല.",
     "signedIn": "സൈൻ ഇൻ ചെയ്തത് {{signedIn}} · അവസാനം കണ്ടത് {{lastSeen}}",
     "thisDevice": "ഈ ഉപകരണം",
-    "title": "ഉപകരണ സെഷനുകൾ",
     "viewProfile": "പ്രൊഫൈൽ കാണുക",
     "webBrowser": "വെബ് ബ്രൗസർ",
     "signOutThisDevice": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
@@ -2750,9 +2484,7 @@
     "sessionSignedOut": "സെഷൻ സൈൻ ഔട്ട് ചെയ്തു.",
     "signOutThisDeviceTitle": "ഈ ഉപകരണത്തിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
     "signOutThisSessionTitle": "ഈ സെഷനിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യണോ?",
-    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ചെയ്യും. ഒരു മണിക്കൂർ വരെ API ആക്സസ് നിലനിർത്താം.",
-    "signOutConfirm": "സൈൻ ഔട്ട്",
-    "signOutMessage": "നിങ്ങളുടെ വർക്ക്സ്പേസ് ആക്സസ് ചെയ്യാൻ വീണ്ടും സൈൻ ഇൻ ചെയ്യേണ്ടതുണ്ട്."
+    "signOutThisSessionMessage": "{{device}} സൈൻ ഔട്ട് ചെയ്യും. ഒരു മണിക്കൂർ വരെ API ആക്സസ് നിലനിർത്താം."
   },
   "forceUpdate": {
     "couldNotOpenStore": "ആപ്പ് സ്റ്റോർ തുറക്കാൻ കഴിഞ്ഞില്ല.",
@@ -2772,17 +2504,13 @@
   },
   "imageViewer": {
     "close": "{{filename}} അടയ്ക്കുക",
-    "imageUnavailable": "ചിത്രം ലഭ്യമല്ല",
     "share": "{{filename}} പങ്കിടുക"
   },
   "invalidRoute": {
     "description": "ഈ ലിങ്ക് ഇനി സാധുവല്ല.",
-    "goBack": "തിരികെ പോകുക",
     "title": "പേജ് കണ്ടെത്തിയില്ല"
   },
   "monoScrollBlock": {
-    "contentTruncated": "ഉള്ളടക്കം ട്രങ്കേറ്റ് ചെയ്തു",
-    "truncated": "ട്രങ്കേറ്റ് ചെയ്തത്",
     "wrap": "റാപ്പ്",
     "scroll": "സ്ക്രോൾ"
   },
@@ -2791,22 +2519,16 @@
     "internetRestored": "ഇന്റർനെറ്റ് കണക്ഷൻ പുനഃസ്ഥാപിച്ചു"
   },
   "queryError": {
-    "neutralTitle": "എന്തോ പിശക് സംഭവിച്ചു",
     "neutralDescription": "വീണ്ടും ശ്രമിക്കുക.",
     "offlineTitle": "ലോഡ് ചെയ്യാൻ പരാജയപ്പെട്ടു",
-    "offlineDescription": "എന്തോ പിശക് സംഭവിച്ചു",
-    "permissionTitle": "ആക്സസ് നിഷേധിച്ചു",
     "permissionDescription": "ഇത് കാണാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
-    "notFoundTitle": "കണ്ടെത്തിയില്ല",
     "notFoundDescription": "ഈ ഇനം നീക്കം ചെയ്തതോ ഇനി ലഭ്യമല്ലാത്തതോ ആകാം.",
     "serverTitle": "ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "serverDescription": "ഞങ്ങളുടെ ഭാഗത്ത് എന്തോ കുഴപ്പം സംഭവിച്ചു. വീണ്ടും ശ്രമിക്കുക."
   },
   "screenHeader": {
     "openMenu": "മെനു തുറക്കുക",
-    "openMenuFor": "{{title}}-നുള്ള മെനു തുറക്കുക",
-    "close": "അടയ്ക്കുക",
-    "goBack": "തിരികെ പോകുക"
+    "openMenuFor": "{{title}}-നുള്ള മെനു തുറക്കുക"
   },
   "picker": {
     "optionsExpired": "ഓപ്ഷനുകൾ കാലഹരണപ്പെട്ടു",
@@ -2837,10 +2559,7 @@
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",
-    "close": "അടയ്ക്കുക",
-    "reviewPr": "PR അവലോകനം ചെയ്യുക",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "പുതിയ സെഷൻ",
     "searchPlaceholder": "സമീപകാല സെഷനുകൾ തിരയുക",
     "connectedCli": "കണക്റ്റ് ചെയ്ത CLI-യിൽ",
     "newSessionOn": "{{name}}-ൽ പുതിയ സെഷൻ",
@@ -2898,7 +2617,6 @@
     "statusCanceling": "Kilo Pass റദ്ദാക്കുന്നു",
     "statusPastDue": "Kilo Pass കാലഹരണപ്പെട്ടത്",
     "monthlyCredits": "{{credits}} പ്രതിമാസ ക്രെഡിറ്റുകൾ",
-    "ends": "{{date}}-ന് അവസാനിക്കുന്നു",
     "periodEnd": "കാലയളവ് അവസാനം",
     "managedOnGooglePlay": "Google Play-യിൽ നിയന്ത്രിക്കുന്നു",
     "managedInAppStore": "App Store-ൽ നിയന്ത്രിക്കുന്നു",
@@ -2910,7 +2628,6 @@
     "unavailableDescription": "കിലോ പാസ് Android-ൽ ഒരു ഇൻ-ആപ്പ് വാങ്ങലായി ലഭ്യമല്ല. ഇത് വെബിൽ കൈകാര്യം ചെയ്യുക.",
     "webManagementDescription": "ഈ കിലോ പാസ് വെബിൽ കൈകാര്യം ചെയ്യപ്പെടുന്നു.",
     "legalDisclosure": "കിലോ പാസ് ഒരു യാന്ത്രിക-പുതുക്കാവുന്ന പ്രതിമാസ സബ്സ്ക്രിപ്ഷൻ ആണ്. വാങ്ങൽ സ്ഥിരീകരിക്കുമ്പോൾ നിങ്ങളുടെ Apple ID-യിൽ നിന്ന് പേയ്മെന്റ് ഈടാക്കുന്നു. നിലവിലെ കാലയളവ് അവസാനിക്കുന്നതിന് കുറഞ്ഞത് 24 മണിക്കൂർ മുമ്പ് റദ്ദാക്കിയില്ലെങ്കിൽ സബ്സ്ക്രിപ്ഷനുകൾ ഓരോ മാസവും കാണിച്ചിരിക്കുന്ന വിലയിൽ സ്വയമേവ പുതുക്കുന്നു. നിങ്ങളുടെ App Store അക്കൗണ്ട് ക്രമീകരണങ്ങളിൽ എപ്പോൾ വേണമെങ്കിലും കൈകാര്യം ചെയ്യുക അല്ലെങ്കിൽ റദ്ദാക്കുക.",
-    "legalPrivacyPolicy": "സ്വകാര്യതാ നയം",
     "legalTermsOfUse": "ഉപയോഗ നിബന്ധനകൾ (EULA)",
     "purchaseDifferentAccount": "ഈ App Store വാങ്ങൽ നിങ്ങളുടെ Kilo അക്കൗണ്ടുമായി ലിങ്ക് ചെയ്തിട്ടില്ല. വാങ്ങലിനായി ഉപയോഗിച്ച Apple അക്കൗണ്ടിൽ സൈൻ ഇൻ ചെയ്യുക, തുടർന്ന് വീണ്ടും ശ്രമിക്കുക.",
     "restoreFailed": "വാങ്ങലുകൾ പുനഃസ്ഥാപിക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.",
@@ -2939,7 +2656,6 @@
     "privacyPolicyPrefix": "നിങ്ങളുടെ ഡാറ്റ",
     "privacyPolicy": "Kilo സ്വകാര്യതാ നയം",
     "onDevice": "ഉപകരണത്തിൽ",
-    "loading": "ലോഡ് ചെയ്യുന്നു…",
     "couldNotLoadTranscription": "നിങ്ങളുടെ ട്രാൻസ്ക്രിപ്ഷൻ ക്രമീകരണം ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല.",
     "signInToManageTranscription": "ഓൺലൈൻ ട്രാൻസ്ക്രിപ്ഷൻ നിയന്ത്രിക്കാൻ സൈൻ ഇൻ ചെയ്യുക.",
     "onlineTranscription": "ഓൺലൈൻ ട്രാൻസ്ക്രിപ്ഷൻ",
@@ -2956,7 +2672,6 @@
     "voiceTranscriptionTitle": "ശബ്ദ ട്രാൻസ്ക്രിപ്ഷൻ",
     "retentionPrefix": "പൂർണ്ണ നിലനിർത്തൽ കാലയളവുകൾ, നിങ്ങളുടെ അവകാശങ്ങൾ, ബന്ധപ്പെടാനുള്ള വിവരങ്ങൾ എന്നിവ",
     "backToConsent": "സമ്മതത്തിലേക്ക് മടങ്ങുക",
-    "back": "മടങ്ങുക",
     "revokeConsent": "സമ്മതം റദ്ദാക്കുക",
     "revokeConsentTitle": "ഡാറ്റ പങ്കിടൽ സമ്മതം റദ്ദാക്കണോ?",
     "acceptAndContinue": "സ്വീകരിച്ച് തുടരുക",
@@ -2990,7 +2705,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "ഒരു പിശക് സംഭവിക്കുമ്പോൾ മറച്ച സ്ക്രീൻഷോട്ടുകൾ, സെഷനുകളുടെ ഒരു ചെറിയ സാമ്പിളിന്റെ മറച്ച റെക്കോർഡിംഗുകൾ.",
     "errorScreenshotsWhy": "എന്തെങ്കിലും തകരുമ്പോൾ ആപ്പ് എന്താണ് പ്രദർശിപ്പിച്ചതെന്ന് കാണാൻ.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "ഇൻസ്റ്റാൾ സ്രോതസ്സും കാമ്പെയ്ൻ ഐഡന്റിഫയറുകളും.",
     "installAttributionWhy": "ഏത് ചാനലുകൾ പുതിയ ഉപയോക്താക്കളെ കൊണ്ടുവരുന്നുവെന്ന് മനസ്സിലാക്കാൻ.",
     "installAttributionWho": "AppsFlyer.",
@@ -2999,7 +2713,6 @@
     "voiceTranscriptionWho": "ഉപകരണത്തിൽ മാത്രം, അല്ലെങ്കിൽ ഈ ഉപകരണത്തിന് ഓഫ്ലൈനിൽ ട്രാൻസ്ക്രൈബ് ചെയ്യാൻ കഴിയാത്തപ്പോൾ Apple അല്ലെങ്കിൽ Google.",
     "installAttributionPromptTitle": "ഇൻസ്റ്റാൾ ആട്രിബ്യൂഷൻ അനുവദിക്കണോ?",
     "installAttributionPromptMessage": "ഏത് ചാനലാണ് നിങ്ങളെ ഇവിടെ കൊണ്ടുവന്നതെന്ന് അറിയാൻ മാത്രം Kilo Apple-ന്റെ ട്രാക്കിംഗ് അനുമതി ഉപയോഗിക്കുന്നു. നിങ്ങളുടെ പ്രോംപ്റ്റുകളും സംഭാഷണങ്ങളും ഒരിക്കലും ഉപയോഗിക്കില്ല.",
-    "continue": "തുടരുക",
     "what": "എന്ത്",
     "why": "എന്തുകൊണ്ട്",
     "who": "ആര്"
@@ -3021,7 +2734,6 @@
       "selectDescription": "തുടരാൻ നിങ്ങളുടെ പ്രൊഫൈലിൽ നിന്ന് ഒരു ഓർഗനൈസേഷൻ തിരഞ്ഞെടുക്കുക.",
       "selectOrganization": "ഒരു ഓർഗനൈസേഷൻ തിരഞ്ഞെടുക്കുക",
       "unavailableDescription": "ഈ ഓർഗനൈസേഷൻ ഇനി ലഭ്യമല്ല. തുടരാൻ നിങ്ങളുടെ പ്രൊഫൈലിൽ നിന്ന് ഒന്ന് തിരഞ്ഞെടുക്കുക.",
-      "accessDeniedTitle": "ആക്സസ് നിഷേധിച്ചു",
       "accessDeniedDescription": "ഈ ഓർഗനൈസേഷനിലേക്ക് നിങ്ങൾക്ക് പ്രവേശനം ഇല്ല."
     },
     "creditActivity": {
@@ -3040,16 +2752,12 @@
         "accounting_adjustment": "അക്കൗണ്ടിംഗ് ക്രമീകരണം",
         "credits_expired": "ക്രെഡിറ്റുകൾ കാലഹരണപ്പെട്ടു"
       },
-      "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
-      "loadMoreFailed": "കൂടുതൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "truncated": "പഴയ ക്രെഡിറ്റ് പ്രവർത്തനങ്ങൾ ലഭ്യമാണ്."
     },
     "inviteMember": {
       "emailError": "സാധുവായ ഒരു ഇമെയിൽ വിലാസം നൽകുക",
-      "emailLabel": "ഇമെയിൽ",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "അംഗങ്ങളെ ക്ഷണിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
-      "roleLabel": "റോൾ",
       "roleMember": "റോൾ: അംഗം",
       "sendInvite": "ക്ഷണം അയയ്ക്കുക",
       "title": "അംഗത്തെ ക്ഷണിക്കുക"
@@ -3066,18 +2774,13 @@
         "paid": "അടച്ചത്",
         "open": "തുറന്നത്",
         "void": "വാലിഡ് അല്ലാത്തത്",
-        "draft": "ഡ്രാഫ്റ്റ്",
-        "uncollectible": "ഈടാക്കാനാവാത്തത്",
-        "unknown": "അജ്ഞാതം"
+        "uncollectible": "ഈടാക്കാനാവാത്തത്"
       },
-      "loadMore": "കൂടുതൽ ലോഡ് ചെയ്യുക",
       "loadMoreFailed": "കൂടുതൽ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "truncated": "പഴയ ഇൻവോയ്സുകൾ ലഭ്യമാണ്."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "കുറഞ്ഞ ബാലൻസ് അലേർട്ട് പ്രവർത്തനക്ഷമമാക്കുക",
-      "enabled": "പ്രവർത്തനക്ഷമം",
       "notifyEmailsLabel": "ഇമെയിലുകൾ അറിയിക്കുക",
       "permissionDenied": "ബില്ലിംഗ് അലേർട്ടുകൾ നിയന്ത്രിക്കാൻ നിങ്ങൾക്ക് അനുമതിയില്ല.",
       "separateEmailsHint": "ഒന്നിലധികം ഇമെയിലുകൾ കോമകളാൽ വേർതിരിക്കുക.",
@@ -3101,12 +2804,10 @@
       "emptyDescriptionCanInvite": "ഈ ഓർഗനൈസേഷനിൽ സഹകരിക്കാൻ ടീംമേറ്റുകളെ ക്ഷണിക്കുക.",
       "emptyDescriptionCannotInvite": "ടീംമേറ്റുകളെ ക്ഷണിക്കാൻ ഒരു ഉടമയോ ബില്ലിംഗ് മാനേജരോ ആവശ്യപ്പെടുക.",
       "emptyTitle": "ഇതുവരെ അംഗങ്ങൾ ഇല്ല",
-      "inviteMember": "അംഗത്തെ ക്ഷണിക്കുക",
       "invitedDate": "{{date}}-ന് ക്ഷണിച്ചു",
       "limitPerDay": "{{amount}}/ദിവസം",
       "manageA11y": "{{name}} നിയന്ത്രിക്കുക",
       "manageInvitationA11y": "{{email}}-നുള്ള ക്ഷണം നിയന്ത്രിക്കുക",
-      "removeConfirm": "നീക്കം ചെയ്യുക",
       "removeMember": "അംഗത്തെ നീക്കം ചെയ്യുക",
       "removeMemberMessage": "{{name}}-നെ ഈ ഓർഗനൈസേഷനിൽ നിന്ന് നീക്കം ചെയ്യണോ?",
       "revokeConfirm": "റദ്ദാക്കുക",
@@ -3121,31 +2822,23 @@
         "billingManager": "ബില്ലിംഗ് മാനേജർ"
       },
       "emailStatusFailed": "ഇമെയിൽ പരാജയപ്പെട്ടു",
-      "emailStatusPending": "കാത്തിരിക്കുന്നു",
       "inviteCreated": "ക്ഷണം സൃഷ്ടിച്ചു",
       "pendingInvitations": "തീർപ്പാകാത്ത ക്ഷണങ്ങൾ",
       "resendInvite": "ക്ഷണം വീണ്ടും അയയ്ക്കുക",
       "shareInviteLink": "ക്ഷണ ലിങ്ക് പങ്കിടുക"
     },
-    "permissionDenied": {
-      "back": "മടങ്ങുക",
-      "title": "ആക്സസ് നിഷേധിച്ചു"
-    },
     "usageStats": {
-      "cost": "ചെലവ്",
       "inputTokens": "ഇൻപുട്ട് ടോക്കണുകൾ",
       "last30Days": "അവസാന 30 ദിവസം",
       "outputTokens": "ഔട്ട്പുട്ട് ടോക്കണുകൾ",
       "requests": "അഭ്യർത്ഥനകൾ"
     },
     "hub": {
-      "title": "ഓർഗനൈസേഷൻ",
       "renameTitle": "ഓർഗനൈസേഷൻ പുനർനാമകരണം ചെയ്യുക",
       "renamePlaceholder": "ഓർഗനൈസേഷൻ പേര് നൽകുക",
       "balance": "ബാലൻസ്",
       "organizationSeats": "ഓർഗനൈസേഷൻ സീറ്റുകൾ",
-      "lowBalanceBelow": "{{amount}}-ന് താഴെ",
-      "lowBalanceOff": "ഓഫ്"
+      "lowBalanceBelow": "{{amount}}-ന് താഴെ"
     },
     "kiloPass": {
       "activating": "സജീവമാക്കുന്നു",
@@ -3153,9 +2846,6 @@
       "couldNotLoadStatus": "നില ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
       "creditProcessingDelayed": "ക്രെഡിറ്റ് പ്രോസസ്സിംഗ് വൈകി · സ്വയമേവ വീണ്ടും ശ്രമിക്കുന്നു",
       "ended": "അവസാനിച്ചു",
-      "endsOn": "{{date}}-ന് അവസാനിക്കുന്നു",
-      "loading": "ലോഡ് ചെയ്യുന്നു…",
-      "manageHint": "വെബിൽ Kilo Pass മാനേജ്മെന്റ് തുറക്കുന്നു.",
       "notSubscribed": "സബ്സ്ക്രൈബ് ചെയ്തിട്ടില്ല",
       "overallocated": "പാസ് അസൈൻമെന്റുകൾ പണമടച്ച സീറ്റുകളെ കവിയുന്നു",
       "paidSeat_one": "{{displayCount}} പണമടച്ച സീറ്റ്",
@@ -3165,13 +2855,11 @@
       "paymentPending": "പേയ്മെന്റ് തീർപ്പാകാത്തത്",
       "processingBlocked": "പ്രോസസ്സിംഗ് തടഞ്ഞു",
       "processingNeedsReview": "പ്രോസസ്സിംഗിന് അവലോകനം ആവശ്യമാണ്",
-      "retry": "വീണ്ടും ശ്രമിക്കുക",
       "retryHint": "Kilo Pass നില ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുന്നു.",
       "setupHint": "വെബിൽ Kilo Pass സജ്ജീകരണം തുറക്കുന്നു."
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "ഈ ഇമെയിൽ ഉള്ള ഒരു അക്കൗണ്ട് മറ്റൊരു സൈൻ-ഇൻ രീതിയിൽ ഇതിനകം നിലവിലുണ്ട്. മറ്റൊരു രീതി പരീക്ഷിക്കുക അല്ലെങ്കിൽ '$t(login.moreSignInOptions)' ഉപയോഗിക്കുക.",
     "differentOauth": "ഈ ഇമെയിൽ ഉള്ള ഒരു അക്കൗണ്ട് മറ്റൊരു സൈൻ-ഇൻ രീതിയിൽ ഇതിനകം നിലവിലുണ്ട്. മറ്റൊരു രീതി പരീക്ഷിക്കുക അല്ലെങ്കിൽ '$t(login.moreSignInOptions)' ഉപയോഗിക്കുക.",
     "ssoError": "നിങ്ങളുടെ ഓർഗനൈസേഷന് SSO ആവശ്യമാണ്. '$t(login.moreSignInOptions)' ഉപയോഗിക്കുക.",
     "blocked": "ഈ അക്കൗണ്ട് ബ്ലോക്ക് ചെയ്യപ്പെട്ടിരിക്കുന്നു. ദയവായി പിന്തുണയുമായി ബന്ധപ്പെടുക.",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "സൈൻ ഇൻ ആരംഭിക്കുന്നതിൽ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.",
     "couldNotOpenBrowser": "ബ്രൗസർ തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക.",
     "signInTimedOut": "സൈൻ ഇൻ സമയം കഴിഞ്ഞു. വീണ്ടും ശ്രമിക്കുക.",
-    "signInFailed": "സൈൻ ഇൻ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക.",
     "networkError": "നെറ്റ്വർക്ക് പിശക്. വീണ്ടും ശ്രമിക്കുക.",
     "accessDeniedByUser": "ഉപയോക്താവ് ആക്സസ് നിരസിച്ചു",
     "codeExpired": "കോഡ് കാലഹരണപ്പെട്ടു",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "മുൻഗണനകളിലേക്ക് മടങ്ങുക"
   },
   "quickChat": {
-    "title": "ചാറ്റ്",
-    "composer": {
-      "placeholder": "സന്ദേശം"
-    },
     "empty": {
       "title": "ഒരു ചാറ്റ് ആരംഭിക്കുക",
       "description": "ഒരു മോഡലുമായി സംസാരിക്കാൻ സന്ദേശം അയയ്ക്കുക."
     },
-    "working": "പ്രവർത്തിക്കുന്നു",
     "historyRetry": "ചാറ്റ് ചരിത്രം ലോഡ് ചെയ്യാനായില്ല.",
-    "catalogRetry": "മോഡലുകൾ ലോഡ് ചെയ്യാൻ കഴിഞ്ഞില്ല",
     "sendError": "സന്ദേശം അയയ്ക്കാൻ പരാജയപ്പെട്ടു. വീണ്ടും ശ്രമിക്കുക."
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "ഏജന്റുകളെ കാണാൻ സൈൻ ഇൻ ചെയ്യുക",
     "privacy": "ഏജന്റുകളെ കാണാൻ Kilo തുറക്കുക",
     "openAgents": "ഏജന്റുകളെ തുറക്കുക",
-    "running": "പ്രവർത്തിക്കുന്നു",
     "needsInput": "ഇൻപുട്ട് ആവശ്യമാണ്",
-    "idle": "നിഷ്ക്രിയം",
     "channelName": "സജീവ ഏജന്റുകൾ",
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക."
   }

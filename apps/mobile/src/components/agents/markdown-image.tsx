@@ -225,9 +225,7 @@ export function MarkdownImage({
         >
           <AlertCircle size={14} color={colors.mutedForeground} />
           <Text className="min-w-0 flex-1 text-xs text-muted-foreground" numberOfLines={2}>
-            {alt
-              ? `${t('agentChat.filePart.imageUnavailable')}\n${alt}`
-              : t('agentChat.filePart.imageUnavailable')}
+            {alt ? `${t('common.imageUnavailable')}\n${alt}` : t('common.imageUnavailable')}
           </Text>
           <RotateCcw size={14} color={colors.foreground} />
           <Text className="shrink-0 text-xs font-medium text-foreground">{t('common.retry')}</Text>

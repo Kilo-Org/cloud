@@ -41,7 +41,7 @@ export function WriteToolCardBody({ part }: Readonly<{ part: ToolPart }>) {
     body = <ReadMarkdownBody body={{ text: content, footer: undefined }} />;
   } else if (content === '') {
     body = (
-      <Text className="text-xs text-muted-foreground">{t('agentChat.toolCard.fileEmpty')}</Text>
+      <Text className="text-xs text-muted-foreground">{t('agentChat.filePart.fileEmpty')}</Text>
     );
   } else {
     body = (

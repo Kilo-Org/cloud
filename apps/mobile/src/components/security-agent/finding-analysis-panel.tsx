@@ -278,7 +278,7 @@ export function FindingAnalysisPanel({
               value={humanize(sandbox.suggestedAction)}
             />
             <KvRow
-              label={t('securityAgent.analysis.model')}
+              label={t('common.model')}
               value={firstNonEmpty(
                 sandbox.modelUsed,
                 analysis.analysis?.analysisModel,

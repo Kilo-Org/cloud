@@ -85,7 +85,7 @@ function showModerationFailure(action: ModerationAction, error: unknown, retry: 
     announcingToast.error(failure.message);
     return;
   }
-  Alert.alert(i18n.t('prReview.discussion.somethingWentWrong'), failure.message, [
+  Alert.alert(i18n.t('common.somethingWentWrong'), failure.message, [
     { text: i18n.t('common.cancel'), style: 'cancel' },
     { text: i18n.t('common.retry'), onPress: retry },
   ]);
@@ -116,7 +116,7 @@ export function CommentRow({
     trpc.moderation.reportContent.mutationOptions({
       onSuccess: result =>
         announcingToast.success(
-          t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })
+          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
         ),
       onError: (error, variables) => {
         showModerationFailure('report-content', error, () => {
@@ -129,7 +129,7 @@ export function CommentRow({
     trpc.moderation.reportUser.mutationOptions({
       onSuccess: result =>
         announcingToast.success(
-          t('prReview.discussion.reportSubmitted', { receiptId: result.receiptId })
+          t('common.reportSubmittedReceipt', { receiptId: result.receiptId })
         ),
       onError: (error, variables) => {
         showModerationFailure('report-user', error, () => {

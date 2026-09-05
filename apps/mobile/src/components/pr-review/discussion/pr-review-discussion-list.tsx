@@ -213,7 +213,7 @@ function ListFooter({
         onPress={onLoadMore}
         accessibilityLabel={t('prReview.discussion.loadMoreComments')}
       >
-        <Text>{t('prReview.discussion.loadMore')}</Text>
+        <Text>{t('common.loadMore')}</Text>
       </Button>
     </View>
   );

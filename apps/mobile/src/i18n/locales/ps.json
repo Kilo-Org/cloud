@@ -27,15 +27,119 @@
     "somethingWentWrong": "یو څه غلط شول",
     "couldNotOpen": "{{label}} پرانیستل کیدی نشو",
     "link": "لینک",
-    "takingLonger": "دا له تمې ډیر وخت نیسي. تاسو کولی شئ دا وتړئ او بیا یې وګورئ."
+    "takingLonger": "دا له تمې ډیر وخت نیسي. تاسو کولی شئ دا وتړئ او بیا یې وګورئ.",
+    "cameraAccessDisabled": "د کامرې لاسرسی ناتوان شوی",
+    "copyLink": "لینک کاپي کړئ",
+    "reviewPr": "PR وګورئ",
+    "sendMessage": "پیغام ولېږئ",
+    "remaining": "پاتې",
+    "imageUnavailable": "انځور شتون نلري",
+    "open": "{{name}} پرانیزئ",
+    "loading": "پورته کېږي…",
+    "queued": "په صف کې",
+    "cost": "لګښت",
+    "model": "ماډل",
+    "reportSubmittedReceipt": "راپور وسپارل شو. رسید {{receiptId}}",
+    "role": "رول",
+    "allModels": "ټول ماډلونه",
+    "noModelsAvailable": "هېڅ ماډل شتون نلري",
+    "recommended": "وړاندیز شوی",
+    "searchModels": "ماډلونه ولټوئ...",
+    "bitbucketConnected": "Bitbucket وصل شو",
+    "connectBitbucket": "Bitbucket وصل کول",
+    "connectGithub": "GitHub وصل کړئ",
+    "connectGitlab": "GitLab وصل کول",
+    "discard": "لغوه کړئ",
+    "repository": "ریپوزیټورۍ",
+    "newSession": "نوې ناسته",
+    "details": "جزیات",
+    "pullRequest": "د کشولو غوښتنه",
+    "sessionExited": "ناسته پای ته ورسېده",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "لاسرسی رد شو",
+    "notFound": "ونه موندل شو",
+    "platform": "پلیټ فارم",
+    "contentTruncated": "منځپانګه لنډه شوه",
+    "truncated": "لنډه شوه",
+    "added": "اضافه شوی",
+    "deleted": "ړنګ شوی",
+    "updated": "تازه شوی",
+    "clearFilters": "فلټرونه پاک کړئ",
+    "clearSearch": "لټون پاک کړئ",
+    "couldNotLoadSessions": "ناستې بار نه شوې",
+    "delete": "ړنګ کړئ",
+    "rename": "نوم بدل کړئ",
+    "idle": "بې کاره",
+    "online": "آنلاین",
+    "starting": "پیل کیږي…",
+    "noKiloclawInstances": "کوم کلیوکلاو بیلګه نشته",
+    "personal": "شخصي",
+    "reply": "ځواب",
+    "closeReactions": "غبرګونونه وتړئ",
+    "recent": "وروستي",
+    "connect": "وصل کول",
+    "codeReviewer": "کوډ بیاکتونکی",
+    "performance": "کارکردګۍ",
+    "all": "ټول",
+    "critical": "جدي",
+    "off": "بند",
+    "notConnected": "وصل نه شوی",
+    "allRepositories": "ټولې ریپوزیټورۍ",
+    "repositories": "ریپوزیټورۍ",
+    "connected": "وصل شو",
+    "organization": "سازمان",
+    "couldNotLoadRepositories": "ریپوزیټورۍ بارول ناشوني شول",
+    "selectedRepositories": "غوره شوې ریپوزیټورۍ",
+    "branch": "څانګه",
+    "findings": "موندنې",
+    "keepRunning": "په جریان کې وساتئ",
+    "status": "حالت",
+    "retryLoadingMore": "نور بارول بیا هڅه وکړئ",
+    "balanced": "متوازن",
+    "couldNotLoadOrganizations": "سازمانونه بار نه شول",
+    "yourOwnRepositories": "ستاسو خپلې ریپوزیټورۍ",
+    "selectRepositories": "ریپوزیټورۍ غوره کړئ",
+    "cancelled": "لغوه شوی",
+    "failed": "ناکام",
+    "pending": "په انتظار",
+    "deviceSessions": "د وسیلې ناستې",
+    "working": "روان",
+    "goBack": "شاته لاړ شئ",
+    "ends": "{{date}} پای ته رسیږي",
+    "privacyPolicy": "د محرمیت پالیسي",
+    "disabled": "ناتوان شوی",
+    "enabled": "فعال شوی",
+    "couldNotLoadModels": "ماډلونه بار نه شول",
+    "close": "وتړئ",
+    "remove": "لرې کړئ",
+    "kiloclaw": "کلیوکلاو",
+    "notifications": "خبرتیاوې",
+    "loadMore": "نور بار کړئ",
+    "email": "بریښنالیک",
+    "draft": "مسوده",
+    "prReview": "د PR بیاکتنه",
+    "dismissed": "له پامه غورځول شوی",
+    "closed": "تړل شوی",
+    "preferences": "ترجیحات",
+    "agents": "اجنټان",
+    "securityAgent": "امنیت استازی",
+    "profile": "پروفایل",
+    "chat": "د چټ پیغامونه",
+    "file": "فایل",
+    "keepEditing": "سمون ته دوام ورکړئ",
+    "signOut": "وتل",
+    "unknown": "نامعلوم",
+    "message": "پیغام",
+    "reactions": "غبرګونونه",
+    "openPullRequest": "پل ریکویسټ پرانیزئ",
+    "couldnTLoadMore": "نور بار کیدی نشو"
   },
   "language": {
-    "title": "ژبه",
     "restarting": "د ژبې د پلي کولو لپاره بیا پیل کیږي",
     "couldNotRestart": "بیا پیل کیدی نشو",
     "languageSaved": "ستاسو ژبه خوندي شوه.",
     "catalogLoadFailed": "ژبه بار کیدی نشوه. مهرباني وکړئ بیا هڅه وکړئ.",
-    "retry": "بیا هڅه وکړئ",
     "search": "ژبې لټون",
     "noMatches": "هېڅ ژبه نه شته",
     "deviceLanguage": "د وسیلې ژبه",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "د ننوتلو کوډ: {{code}}",
     "openSignInPageInBrowser": "د ننوتلو پاڼه په براوزر کې پرانیزئ",
     "copySignInLink": "د ننوتلو لینک کاپي کړئ",
-    "copyLink": "لینک کاپي کړئ",
     "cancelSignIn": "ننوتل لغوه کړئ",
     "startingSignIn": "ننوتل پیل کیږي...",
     "organizationUsesSso": "ستاسو سازمان یوځل ننوتل کاروي.",
@@ -62,23 +165,19 @@
     "emailAddress": "د بریښنالیک پته",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "د بریښنالیک سره دوام ورکړئ",
-    "continue": "ادامه ورکړئ",
     "enterCodeSentTo": "{{email}} ته لیږل شوی کوډ دننه کړئ",
     "codeArrivalHint": "که دا پته وړ وي، کوډ په یوه دقیقه کې رسیږي.",
     "verifyCode": "کوډ تایید کړئ",
     "resendCode": "کوډ بیا ولېږئ",
-    "back": "شاته",
     "termsPrefix": "د دوام په واسطه تاسو زموږ سره موافقه کوئ",
     "terms": "شرایط",
     "termsConnector": " او ",
     "termsSuffix": ".",
-    "privacyPolicy": "د محرمیت پالیسي",
     "moreSignInOptions": "د ننوتلو نور انتخابونه",
     "couldNotCompleteSignIn": "ننوتل بشپړ کیدی نشو. مهرباني وکړئ بیا هڅه وکړئ.",
     "sessionEnded": "ستاسو ناسته پای ته ورسیده. مهرباني وکړئ بیا ننوځئ.",
     "signInCodeExpired": "ستاسو د ننوتلو کوډ پای ته رسیدلی. مهرباني وکړئ بیا هڅه وکړئ.",
     "accessDenied": "لاسرسی رد شو.",
-    "somethingWentWrong": "یو څه غلط شول. مهرباني وکړئ بیا هڅه وکړئ.",
     "codeSent": "کوډ ولېږل شو",
     "accountCreated": "حساب جوړ شو. کلیو ته ښه راغلاست.",
     "pleaseEnterEmail": "مهرباني وکړئ خپل بریښنالیک دننه کړئ.",
@@ -86,24 +185,16 @@
     "or": "یا"
   },
   "profile": {
-    "title": "پروفایل",
-    "agents": "اجنټان",
-    "codeReviewer": "کوډ بیاکتونکی",
     "codeReviewerSubtitle": "اتوماتیک PR بیاکتنې",
-    "securityAgent": "امنیت استازی",
     "securityAgentSubtitle": "زیانمنتیاوې ومومئ او حل کړئ",
     "reviews": "بیاکتنې",
-    "prReview": "د PR بیاکتنه",
     "prReviewSubtitle": "په موبایل کې د پل ریکویسټ بیاکتنه وکړئ",
-    "organization": "سازمان",
     "couldNotLoadOrganization": "سازمان بار کیدی نشو",
     "couldNotLoadOrganizationDescription": "تر هغه چې دا بار شي، د سازمان او اجنټ ترتیبات شتون نلري.",
     "linkedAccounts": "نښلول شوي حسابونه",
     "couldNotLoadAccounts": "حسابونه بار کیدی نشو",
     "app": "اپلیکیشن",
-    "preferences": "ترجیحات",
     "preferencesSubtitle": "بڼه، خبرتیاوې، فکر کول، او د سکرین چلند",
-    "deviceSessions": "د وسیلې ناستې",
     "deviceSessionsSubtitle": "نورې وسیلې بیاکتنه وکړئ او وځئ",
     "feedback": "غبرګون",
     "privacyChoices": "د محرمیت انتخابونه",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "ستاسو د کریډیټ بیلانس خالي دی. د دې حساب لپاره کریډیټ د iOS اپلیکیشن څخه بهر اداره کیږي.",
     "signOutTitle": "وځئ؟",
     "signOutMessage": "د خپل کاري ځای لاسرسي لپاره به بیا ننوځئ.",
-    "signOutConfirm": "وتل",
     "deleteAccountTitle": "حساب ړنګول؟",
     "deleteAccountMessage": "دا ستاسو حساب د تل لپاره ړنګوي او تاسو وځي. موږ به د تایید کوډ بریښنالیک کړو.",
     "deleteAccountConfirm": "حساب ړنګول",
     "accountDeleted": "ستاسو حساب ړنګ شو.",
     "viewOrganization": "سازمان وګورئ",
     "manageOrganization": "سازمان اداره کړئ",
-    "personal": "شخصي",
     "selectAccount": "حساب غوره کړئ",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "بریښنالیک",
     "providerTestAccount": "د ازموینې حساب",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "د سوداګرۍ SSO"
   },
   "preferences": {
-    "title": "ترجیحات",
     "autoExpandThinking": "د فکر اتومات پراخول",
     "autoExpandThinkingSubtitle": "کله چې بشپړ شي د اجنټ فکر پراخ ښودل شوی.",
     "keepScreenOn": "په ناستې پاڼه کې سکرین فعال وساتئ",
     "keepScreenOnSubtitle": "پداسې حال کې چې ناسته کار کوي سکرین ویښ وساتئ.",
     "appearance": "بڼه",
-    "notifications": "خبرتیاوې",
     "notificationsSubtitle": "د پوش ترجیحات",
     "appearanceSystem": "سیسټم",
     "appearanceLight": "روښانه",
@@ -161,7 +245,6 @@
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ شتون نلري",
     "pullRequestUnavailableDescription": "دا PR پرانیستل کیدی نشي. ممکن ړنګ شوی وي، ذخیره خصوصي وي، یا د کلیو GitHub اپلیکیشن په هغې نصب نه وي.",
-    "accessDenied": "لاسرسی رد شو",
     "accessDeniedDescription": "تاسو د دې پل ریکویسټ لیدو اجازه نلرئ.",
     "noFilesChanged": "کوم فایل نه دی بدل شوی",
     "noFilesChangedDescription": "دا پل ریکویسټ کوم فایل بدلون نلري.",
@@ -177,7 +260,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "فایلونه بار کیدی نشو",
-      "checkConnection": "خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "retryLoadingFiles": "د فایلونو بارول بیا هڅه وکړئ",
       "filterPlaceholder": "فایلونه د لارې له مخې فلټر کړئ",
       "viewedCount": "{{total}} څخه {{viewed}} لیدل شوي",
@@ -289,7 +371,6 @@
         "closed": "دا پل ریکویسټ تړل شوی"
       },
       "partialSuccessBanner": {
-        "title": "یوځای شو",
         "body": "څانګه ړنګه کیدی نشوه: {{reason}}",
         "accessibility": "یوځای شو. څانګه ړنګه کیدی نشوه: {{reason}}"
       },
@@ -331,7 +412,6 @@
       "unresolveThread": "تار بې حل کړئ",
       "resolved": "حل شوی",
       "outdated": "زوړ",
-      "file": "فایل",
       "comment_one": "۱ تبصره",
       "comment": "{{displayCount}} تبصرې",
       "comment_other": "{{displayCount}} تبصرې",
@@ -339,9 +419,6 @@
       "couldNotLoadMore": "نور تبصرې بار کیدی نشو.",
       "retryLoadingMore": "نور تبصرې بارول بیا هڅه وکړئ",
       "loadMoreComments": "نور تبصرې بار کړئ",
-      "loadMore": "نور بار کړئ",
-      "closeReactions": "غبرګونونه وتړئ",
-      "reactionsTitle": "غبرګونونه",
       "addReaction": "غبرګون اضافه کړئ",
       "reactionPill": "{{emoji}} غبرګون، {{displayCount}} {{countLabel}}",
       "reaction_one": "غبرګون",
@@ -352,14 +429,11 @@
       "reportUser": "کارن راپور کړئ",
       "mute": "خاموش",
       "block": "بندول",
-      "somethingWentWrong": "یو څه غلط شول",
-      "reportSubmitted": "راپور وسپارل شو. رسید {{receiptId}}",
       "blockedUser": "{{login}} بند شو",
       "mutedUser": "{{login}} خاموش شو",
       "replyPlaceholder": "ځواب…",
       "replyBody": "د ځواب متن",
       "submitReply": "ځواب وسپارئ",
-      "reply": "ځواب",
       "termsTitle": "د خدمت شرایط",
       "termsCopy": "د خپرولو لپاره باید ۱۳ کاله یا ډېر عمر ولرئ.",
       "termsAcceptRetry": "شرایط منل کیدی نشول. خپل اړیکه وګورئ او بیا هڅه وکړئ.",
@@ -367,7 +441,6 @@
       "acceptTerms": "ومنئ",
       "replyBadRequest": "دا ځواب خپرول کیدی نشي. تار ممکن بدل شوی وي.",
       "replyForbidden": "تاسو د دې پل ریکویسټ ځواب ورکولو اجازه نلرئ.",
-      "couldNotReply": "ځواب ورکول کیدی نشو.",
       "moderation": {
         "reportContent": {
           "terminal": "دا تبصره راپور کیدی نشي.",
@@ -420,8 +493,6 @@
     },
     "couldNotOpenGitHubAppSettings": "د GitHub اپ ترتیبات پرانیستل نشو",
     "installKiloGitHubApp": "د کلیو GitHub اپلیکیشن نصب کړئ",
-    "connectionExpiredTitle": "د GitHub اړیکه پای ته ورسیده",
-    "connectionExpiredDescription": "ستاسو د GitHub اړیکه نور اعتبار نلري. خپل اړیکه بیا وګورئ — که اړتیا وي به له تاسو څخه د بیا نښلولو غوښتنه وکړي.",
     "checkConnection": "اړیکه وګورئ",
     "couldNotLoadPullRequest": "پل ریکویسټ بار کیدی نشو",
     "description": "توضیح",
@@ -430,21 +501,18 @@
     "reviewPullRequest": "پل ریکویسټ بیاکتنه کړئ",
     "headLine": "{{counts}} · سر {{sha}}",
     "entry": {
-      "title": "د PR بیاکتنه",
       "eyebrow": "د URL له لارې پل ریکویسټ پرانیزئ",
       "pastePrLink": "د PR لینک پیسټ کړئ",
       "noRecentPrs": "کوم وروستي PR نشته",
       "noRecentPrsDescription": "د بیاکتنې پیلولو لپاره پورته د PR لینک پیسټ کړئ — بل ځل به دلته ښکاره شي.",
       "couldNotLoad": "بار کیدی نشو",
-      "remove": "لرې کړئ",
       "removeFromRecentsTitle": "له وروستیو څخه لرې کړئ؟",
       "removeFromRecentsMessage": "دا پل ریکویسټ به ستاسو له وروستیو څخه لرې شي.",
       "removeRecentAccessibility": "{{repo}} له وروستیو څخه لرې کړئ",
       "urlAccessibility": "د GitHub پل ریکویسټ URL",
       "clearLink": "د پل ریکویسټ لینک پاک کړئ",
       "pasteLink": "د پل ریکویسټ لینک پیسټ کړئ",
-      "open": "پرانیزئ",
-      "openPullRequest": "پل ریکویسټ پرانیزئ"
+      "open": "پرانیزئ"
     },
     "checks": {
       "title": "چیکونه",
@@ -460,19 +528,14 @@
       "pending": "{{displayCount}} په انتظار",
       "skipped": "{{displayCount}} پریښودل شول",
       "checksCount": "{{displayCount}} چیکونه",
-      "checkDetails": "د چیک جزئیات",
-      "pullRequest": "د کشولو غوښتنه"
+      "checkDetails": "د چیک جزئیات"
     },
     "inbox": {
       "title": "انباکس",
-      "recent": "وروستي",
-      "draft": "مسوده",
       "loading": "انباکس بار کیږي",
       "noReviewRequests": "کوم د بیاکتنې غوښتنه نشته",
       "noReviewRequestsDescription": "هغه پل ریکویسټونه چې ستاسو د بیاکتنې انتظار کوي دلته ښکاره کیږي. تاسو لاهم کولی شئ پورته هر PR لینک پیسټ کړئ.",
-      "couldNotLoad": "انباکس بار کیدی نشو",
-      "couldNotLoadMore": "نور بار کیدی نشو",
-      "retryLoadingMore": "نور بارول بیا هڅه وکړئ"
+      "couldNotLoad": "انباکس بار کیدی نشو"
     },
     "composer": {
       "commentBodyPlaceholder": "تبصره وکړئ",
@@ -487,8 +550,6 @@
       "loadFailedTitle": "د تبصرې جوړونکی بار کیدی نشو",
       "discardTitle": "تبصره پریږدئ؟",
       "discardMessage": "ستاسو مسوده به له لاسه ورکړل شي.",
-      "keepEditing": "سمون ته دوام ورکړئ",
-      "discard": "لغوه کړئ",
       "comment": "تبصره",
       "insertSuggestionA11y": "د کوډ وړاندیز داخل کړئ",
       "insertSuggestion": "وړاندیز داخل کړئ",
@@ -496,12 +557,10 @@
       "suggestionsOnlyAddedLines": "وړاندیزونه یوازې په اضافه شویو کرښو پلي کیږي.",
       "tapDiffLineToSuggest": "د وړاندیزونو فعالولو لپاره د diff کرښه ټک کړئ."
     },
-    "screenTitle": "د PR بیاکتنه",
     "connect": {
       "checkFailedTitle": "د GitHub اړیکه معاینه کیدی نشوه",
       "checkFailedMessage": "تر هغه چې دا بار شي د ننوتلو حالت شتون نلري.",
       "reconnectTitle": "GitHub بیا ونښلئ",
-      "title": "GitHub وصل کړئ",
       "reconnectDescription": "ستاسو د GitHub اړیکه لغوه شوه. په موبایل کې د پل ریکویسټ بیاکتنې دوام لپاره بیا ونښلئ.",
       "description": "په موبایل کې د پل ریکویسټ بیاکتنې لپاره خپل GitHub حساب ونښلئ."
     },
@@ -510,11 +569,9 @@
       "shareA11y": "پل ریکویسټ شریک کړئ"
     },
     "submit": {
-      "title": "بیاکتنه وسپارئ",
       "loadFailedTitle": "د بیاکتنې سپارل بار کیدی نشو",
       "deletePendingTitle": "په انتظار تبصره ړنګه کړئ؟",
       "deletePendingMessage": "دا تبصره به د بیاکتنې قطار څخه لرې شي.",
-      "delete": "ړنګ کړئ",
       "summaryOptional": "لنډیز (اختیاري)",
       "pendingComment_one": "په انتظار تبصره",
       "pendingComment": "په انتظار تبصرې",
@@ -527,19 +584,15 @@
     },
     "reconnectNotice": {
       "title": "د GitHub اړیکه پای ته ورسیده",
-      "message": "ستاسو د GitHub اړیکه نور اعتبار نلري. خپل اړیکه بیا وګورئ — که اړتیا وي به له تاسو څخه د بیا نښلولو غوښتنه وکړي.",
-      "checkConnection": "اړیکه وګورئ"
+      "message": "ستاسو د GitHub اړیکه نور اعتبار نلري. خپل اړیکه بیا وګورئ — که اړتیا وي به له تاسو څخه د بیا نښلولو غوښتنه وکړي."
     },
     "eventChips": {
       "comment": "تبصره",
       "requestChanges": "بدلونونه وغواړئ",
-      "approve": "منظور کړئ",
       "label": "د بیاکتنې پیښه"
     },
     "overview": {
       "stateMerged": "یوځای شو",
-      "stateClosed": "تړل شوی",
-      "stateDraft": "مسوده",
       "stateOpenApproved": "خلاص · منظور شوی",
       "stateOpenChangesRequested": "خلاص · بدلونونه غوښتل شوي",
       "stateOpenReviewRequired": "خلاص · بیاکتنه اړینه ده",
@@ -564,14 +617,11 @@
       "reviewChangesRequested": "بدلونونه غوښتل شوي",
       "reviewCommented": "تبصره وشوه",
       "reviewPending": "د بیاکتنې په تمه",
-      "openIssueA11y": "په GitHub کې مسئله #{{number}} پرانیزئ",
-      "reviewDismissed": "له پامه غورځول شوی"
+      "openIssueA11y": "په GitHub کې مسئله #{{number}} پرانیزئ"
     },
     "pendingComment": {
       "editOutdatedA11y": "په {{location}} زوړ په انتظار تبصره سمه کړئ",
       "editA11y": "په {{location}} په انتظار تبصره سمه کړئ",
-      "emptyBody": "(خالي)",
-      "outdated": "زوړ",
       "staleHint": "له دې چې تاسو دا ولیکه PR بدل شوی.",
       "deleteA11y": "په {{location}} په انتظار تبصره ړنګه کړئ",
       "deletedAnnouncement": "په انتظار تبصره ړنګه شوه",
@@ -587,8 +637,6 @@
       "discussion": "بحث"
     },
     "fileStatus": {
-      "added": "اضافه شوی",
-      "deleted": "ړنګ شوی",
       "modified": "بدل شوی",
       "renamed": "نوم بدل شوی",
       "copied": "کاپي شوی",
@@ -598,9 +646,7 @@
       "selectedTapToChange": "{{label}} غوره شوی، د انتخاب بدلولو لپاره ټک وکړئ",
       "tapToComment": "{{label}}، د تبصرې لپاره ټک وکړئ",
       "truncationBanner": "د {{total}} بدل شویو فایلونو څخه لومړني {{limit}} ښودل کیږي — د GitHub API حد",
-      "statusAdded": "اضافه شوی",
       "statusContext": "شرایط",
-      "statusDeleted": "ړنګ شوی",
       "lineLabel": "{{status}} کرښه {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(خالي)"
@@ -628,7 +674,6 @@
     }
   },
   "notifications": {
-    "title": "خبرتیاوې",
     "liveActivities": "ژوندۍ فعالیتونه",
     "liveActivitySubtitle": "فعال اجنټان په لاک سکرین کې وښایه",
     "liveUpdates": "ژوندي تازه معلومات",
@@ -651,7 +696,6 @@
     "disabledMessage": "د خبرتیاو فعالولو لپاره، دوی د خپلې وسیلې په تنظیماتو کې فعال کړئ.",
     "disableTitle": "خبرتیاوې بندې کړئ",
     "disableMessage": "د خبرتیاو بندولو لپاره، دوی د خپلې وسیلې په تنظیماتو کې بندې کړئ.",
-    "openSettings": "تنظیمات پرانیزئ",
     "registrationFailed": "ثبتول ناکام شول. خپل د خبرتیاو اجازې وګورئ.",
     "couldNotEnable": "خبرتیاوې فعالول کیدی نشو. مهرباني وکړئ بیا هڅه وکړئ.",
     "previewAlways": "تل",
@@ -666,7 +710,6 @@
       "security": "د امنیت موندنې"
     },
     "category": {
-      "chatMessagesTitle": "د چټ پیغامونه",
       "chatMessagesSubtitle": "ستاسو په خبرو کې ځوابونه",
       "agentAttentionTitle": "اجنټ تاسو ته اړتیا لري",
       "agentAttentionSubtitle": "پوښتنې، اجازه، داخلول اړین دي",
@@ -674,32 +717,23 @@
       "agentUpdatesSubtitle": "د اجنټ منځ-دنده پیغامونه",
       "sessionStatusTitle": "د ناستې حالت",
       "sessionStatusSubtitle": "بشپړ شوی / ناکام شوی / د کنټرول لپاره چمتو",
-      "kiloclawActivityTitle": "د کلیوکلاو فعالیت",
       "kiloclawActivitySubtitle": "بیلګه چمتو/ناکامه، مهالویش شوې کړنې",
-      "balanceAlertsTitle": "د بیلانس خبرتیاوې",
       "balanceAlertsSubtitle": "د ټیټ سازمان بیلانس خبرداری",
-      "securityFindingsTitle": "د امنیت موندنې",
       "securityFindingsSubtitle": "نوي موندنې او د SLA یادونه"
     }
   },
   "tabs": {
     "home": "کور",
-    "agents": "اجنټان",
-    "profile": "پروفایل",
-    "kiloclaw": "کلیوکلاو",
     "kiloclawWrapped": "کلیو\nکلاو",
-    "position": "{{name}}, ټب، {{total}} څخه {{position}}",
-    "chat": "د چټ پیغامونه"
+    "position": "{{name}}, ټب، {{total}} څخه {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "بیلګه بدله کړئ",
       "couldNotLoadInstances": "بیلګې بار کیدی نشو",
-      "noInstances": "کوم کلیوکلاو بیلګه نشته",
       "noInstancesDescription": "د چټ پیلولو لپاره یوه بیلګه جوړه کړئ.",
       "setUpKiloclaw": "کلیوکلاو جوړ کړئ",
-      "currentInstance": "{{title}}، اوسنی",
-      "personal": "شخصي"
+      "currentInstance": "{{title}}، اوسنی"
     },
     "conversation": {
       "failedToLoad": "خبرې اترې بار کیدی نشوې",
@@ -718,16 +752,12 @@
       "couldNotSignIn": "چټ ته ننوتل کیدی نشو",
       "couldNotRefreshMessages": "پیغامونه تازه کیدی نشو",
       "couldNotLoadHistory": "د خبرو اترو تاریخ بار کیدی نشو",
-      "rename": "نوم بدل کړئ",
       "leave": "پریږدئ",
       "untitledConversation": "بې سرلیکه خبرې اترې",
       "createFailed": "خبرې اترې جوړول ناکام شول",
       "leaveFailed": "خبرې اترې پریښودل ناکام شول"
     },
     "reactions": {
-      "title": "غبرګونونه",
-      "close": "غبرګونونه وتړئ",
-      "recent": "وروستي",
       "common": "عام",
       "reactWith": "په {{reaction}} غبرګون وکړئ",
       "accessibility": "{{emoji}} غبرګون، {{displayCount}}"
@@ -737,16 +767,13 @@
       "cancelReply": "ځواب لغوه کړئ",
       "openInstance": "بیلګه پرانیزئ",
       "attachFile": "فایل نښلول",
-      "messagePlaceholder": "پیغام",
-      "cancelEdit": "سمون لغوه کړئ",
-      "sendMessage": "پیغام ولېږئ"
+      "cancelEdit": "سمون لغوه کړئ"
     },
     "conversationList": {
       "couldNotLoad": "خبرې اترې بار کیدی نشوې",
       "emptyTitle": "تر اوسه کومې خبرې اترې نشته",
       "emptyDescription": "د خپل کلیوکلاو بیلګې سره د چټ پیلولو لپاره خبرې اترې جوړې کړئ.",
       "create": "خبرې اترې جوړې کړئ",
-      "starting": "پیل کیږي…",
       "newConversation": "نوې خبرې اترې",
       "openInstanceSettings": "د بیلګې تنظیمات پرانیزئ",
       "today": "نن",
@@ -756,7 +783,6 @@
     },
     "attachment": {
       "open": "{{filename}} پرانیزئ",
-      "imageUnavailable": "انځور شتون نلري",
       "openFailed": "نښلول شوی فایل پرانیستل کیدی نشو. خپل اړیکه وګورئ او بیا هڅه وکړئ.",
       "attachFailed": "فایل نښلول ناکام شول",
       "limit": "تاسو کولی شئ تر {{displayCount}} فایلونه ونښلئ.",
@@ -786,11 +812,9 @@
       "yourMessage": "ستاسو پیغام",
       "messageFrom": "له {{author}} څخه پیغام",
       "moreActions": "نورې کړنې",
-      "message": "پیغام",
       "notDelivered": "سپارل شوی نه دی",
       "edited": "(سم شوی)",
-      "image": "انځور",
-      "attachment": "نښلول شوی فایل"
+      "image": "انځور"
     },
     "messageActions": {
       "copied": "کاپي شوی",
@@ -798,13 +822,11 @@
       "title": "د پیغام کړنې",
       "deleteTitle": "پیغام ړنګ کړئ؟",
       "deleteMessage": "دا به پیغام له خبرو اترو څخه لرې کړي.",
-      "delete": "ړنګ کړئ",
       "deleteFailed": "پیغام ړنګول ناکام شول",
       "removeReactionFailed": "غبرګون لرې کول ناکام شول",
       "addReactionFailed": "د غبرګون اضافه کول ناکام شول",
       "retrySend": "بیا لیږل",
       "moreReactions": "نور غبرګونونه",
-      "reply": "ځواب",
       "edit": "سمول",
       "sendFailed": "د پیغام لیږل ناکام شول",
       "retrySendFailed": "بیا لیږل ناکام شول",
@@ -815,7 +837,6 @@
       "takePhoto": "انځور اخیستل",
       "photoLibrary": "د انځور کتابتون",
       "files": "فایلونه",
-      "cameraAccessDisabled": "د کامرې لاسرسی ناتوان شوی",
       "cameraAccessMessage": "په ترتیباتو کې د کامرې لاسرسی فعال کړئ ترڅو انځور واخلئ."
     },
     "typingIndicator": {
@@ -825,10 +846,7 @@
       "typing_other": "{{names}} لیکي..."
     },
     "botStatus": {
-      "online": "آنلاین",
-      "idle": "بې کاره",
       "offline": "آفلاین",
-      "unknown": "نامعلوم",
       "loadingUser": "کارن بارول...",
       "waitingForStatus": "د بوټ حالت ته انتظار...",
       "offlineMessage": "بوټ آفلاین دی. کله چې بیا وصل شي پیغامونه به دوام وکړي."
@@ -841,7 +859,6 @@
     }
   },
   "kiloclaw": {
-    "title": "کلیوکلاو",
     "couldNotLoadInstances": "د KiloClaw بیلګې بارول ناشوني شول",
     "billing": {
       "title": "بلینګ",
@@ -849,7 +866,6 @@
       "plan": "پلان",
       "finalTermEnds": "وروستۍ دوره پای ته رسېږي",
       "afterFinalTerm": "د وروستۍ دورې وروسته",
-      "remaining": "پاتې",
       "lessThanOneDay": "له ۱ ورځې کم",
       "ends": "پای ته رسېږي",
       "expires": "منقضی کېږي",
@@ -858,7 +874,6 @@
       "managedByAdmin": "بلینګ ستاسو د سازمان اډمن لخوا اداره کېږي.",
       "couldNotLoad": "د بلینګ معلومات بارول ناشوني شول",
       "manageOnWeb": "په ویب کې بلینګ اداره کړئ",
-      "commitPlan": "Commit",
       "earlybird": "لمړنی مرغۍ",
       "finalCommitTermEndsOn": "ستاسو وروستۍ Commit دوره په {{date}} پای ته رسېږي. د {{price}} په بیه د Standard په توګه دوام وکړئ، یا کوربه توب پای ته رسېږي.",
       "freeTrial": "وړیا تجربه",
@@ -875,9 +890,9 @@
       "trialDaysRemaining": "تجربه: {{remaining}} پاتې دي",
       "trialEndingSoon": "تجربه ډېر ژر پای ته رسېږي: {{remaining}}",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "نوی څه دی",
@@ -900,7 +915,6 @@
       "destroyMessage": "دا به ستاسو د KiloClaw بیلګه او ټول معلومات تل لپاره له منځه یوسي. دا کړنه بېرته نه راتللی شي.",
       "destroyTitle": "بیلګه له منځه وړل",
       "instance": "بیلګه",
-      "renameFailed": "یو څه غلط شول",
       "couldNotCheckStatus": "د خدمت حالت وړه کول ناشوني شول",
       "dangerZone": "خطرناکه سیمه",
       "destroying": "له منځه وړل...",
@@ -928,7 +942,6 @@
       "approveDeviceTitle": "وسیله تاییدول",
       "approveMessage": "آیا {{label}} (کوډ: {{code}}) ته اجازه ورکوم چې ستاسو بیلګې سره وصل شي؟",
       "approveTitle": "د جوړې غوښتنه تاییدول",
-      "device": "وسیله",
       "unknownDevice": "نامعلومه وسیله"
     },
     "execPolicy": {
@@ -943,35 +956,21 @@
       "title": "د ګوګل حساب",
       "couldNotLoad": "د ګوګل حساب حالت بارول ناشوني شول",
       "disconnected": "د ګوګل حساب جلا شوی. د بدلون پلي کولو لپاره خپله بیلګه بیا ځای پر ځای کړئ.",
-      "redeploy": "بیا ځای پر ځای کول",
       "setupCommand": "د جوړونې کمانډ",
       "setupCommandHelp": "دا کمانډ په خپل کمپیوټر کې د Docker نصب شوي ټرمینل کې پرمخ بوځئ ترڅو خپل ګوګل حساب وصل کړئ.",
       "failedToLoadCommand": "د جوړونې کمانډ بارول ناکام شول",
       "gmailNotifications": "د Gmail خبرتیاوې",
       "disconnect": "د ګوګل حساب جلا کول",
-      "connected": "وصل شو",
       "copied": "کاپي شوی",
       "copyCommand": "کمانډ کاپي کول",
-      "disabled": "ناتوان شوی",
       "disconnectConfirm": "جلا کول",
       "disconnectMessage": "آیا خپل ګوګل حساب له دې بیلګې لرې کوم؟ دا به د Gmail خبرتیاوې ناتوانه کړي. د بدلون پلي کولو لپاره له جلا کولو وروسته بیا ځای پر ځای کړئ.",
-      "disconnectTitle": "ګوګل جلا کول",
-      "enabled": "فعال شوی",
-      "notConnected": "وصل نه شوی"
+      "disconnectTitle": "ګوګل جلا کول"
     },
     "modelList": {
-      "title": "ټول ماډلونه",
-      "searchPlaceholder": "ماډلونه ولټوئ...",
-      "couldNotLoad": "ماډلونه بار نه شول",
-      "clearSearch": "لټون پاک کړئ",
       "noMatches": "هېڅ ماډل ستاسو له لټون سره سمون نه لري",
-      "noModels": "هېڅ ماډل شتون نلري",
       "noModelsDescription": "ماډلونه به کله چې شتون ومومي دلته ښکاره شي.",
-      "noResultsFor": "د \"{{query}}\" لپاره هېڅ پایله نشته",
-      "recommended": "وړاندیز شوی"
-    },
-    "model": {
-      "title": "ماډل"
+      "noResultsFor": "د \"{{query}}\" لپاره هېڅ پایله نشته"
     },
     "secrets": {
       "title": "پټ معلومات",
@@ -988,12 +987,8 @@
       "setupGuideA11y": "د {{label}} جوړونې لارښود",
       "setupGuide": "د جوړونې لارښود",
       "saving": "خوندي کول...",
-      "remove": "لرې کړئ",
       "removing": "لرې کول...",
-      "connected": "وصل شو",
-      "notConnected": "وصل نه شوی",
-      "updateToken": "توکن نوي کول",
-      "connect": "وصل کول"
+      "updateToken": "توکن نوي کول"
     },
     "versionPin": {
       "title": "د نسخې ټینګول",
@@ -1030,7 +1025,6 @@
       "start": "پیل کول",
       "startMessage": "ایا ډاډه یاست چې غواړئ دا بیلګه پیل کړئ؟",
       "startTitle": "بیلګه پیل کول",
-      "starting": "پیل کیږي…",
       "stop": "بندول",
       "stopMessage": "ایا ډاډه یاست چې غواړئ دا بیلګه ودروئ؟",
       "stopTitle": "بیلګه بندول",
@@ -1040,7 +1034,6 @@
       "finishingSetup": "د جوړونې بشپړول",
       "finishingSetupDescription": "لږ انتظار، موږ ستاسو حساب پای ته رسوو. دا معمولا یوه شیبه وخت نیسي.",
       "getStarted": "پیل کړئ",
-      "noInstances": "کوم کلیوکلاو بیلګه نشته",
       "noInstancesDescription": "د کوډینګ اجنټانو چلولو لپاره خپله لومړۍ بیلګه جوړه کړئ."
     },
     "instance": {
@@ -1052,7 +1045,6 @@
     "list": {
       "createInstance": "بیلګه جوړول",
       "organizations": "سازمانونه",
-      "personal": "شخصي",
       "accessIssue": {
         "trialExpired": "تجربه پای ته ورسېده، د دې بیلګې کارولو ته دوام ورکولو لپاره ګډون وکړئ",
         "subscriptionCanceled": "ګډون غیر فعال دی، د دې بیلګې کارولو ته دوام ورکولو لپاره بیا ګډون وکړئ",
@@ -1065,7 +1057,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "له {{name}} سره خبرې وکړئ",
-        "online": "آنلاین",
         "ready": "{{name}} چمتو دی",
         "warmedUp": "ټول تیار دي. کله چې تیار یاست سلام ووایاست."
       },
@@ -1076,9 +1067,7 @@
         "openKiloAi": "kilo.ai پرانیستل",
         "provisioning": "تدارک",
         "review": "بیاکتنه",
-        "somethingWentWrong": "یو څه غلط شول",
         "identityTitle": "خپل بوټ ته هویت ورکړئ",
-        "close": "وتړئ",
         "couldNotLoad": "د جوړونې حالت بارول ناشوني شول",
         "finishingSetup": "د جوړونې بشپړول — مهرباني وکړئ لږ انتظار وکړئ چې موږ ستاسو حساب پای ته ورسوو.",
         "ready": "چمتو",
@@ -1095,7 +1084,6 @@
         "location": "ځای",
         "locationPlaceholder": "ښار یا سیمه (اختیاري)",
         "useCurrentLocation": "اوسنی ځای وکاروئ",
-        "continue": "ادامه ورکړئ",
         "locationDeniedTitle": "د ځای لاسرسی رد شو",
         "locationDeniedMessage": "د اوسني ځای کارولو لپاره په ترتیباتو کې د ځای لاسرسی فعال کړئ.",
         "locationValidationFailed": "ځای تایید نه شو.",
@@ -1132,7 +1120,6 @@
         "timeoutBody": "د {{name}} جوړونه له معمول ډېر وخت نیسي (له {{displayMinutes}} دقیقو ډېر).",
         "continueInBackground": "په شالید کې دوام ورکړئ",
         "settingUp": "{{name}} جوړول",
-        "finishingSetup": "د جوړونې بشپړول",
         "connectingToAgent": "اجنټ ته اړیکه",
         "startingSandbox": "سینډباکس پیل کول",
         "backgroundHint": "معمولا له یوې دقیقې لږ وخت نیسي. تاسو کولی شئ دا وتړئ — موږ به په شالید کې کار ته دوام ورکړو."
@@ -1144,7 +1131,6 @@
       "gatewayProcess": "د دروازې پروسه",
       "lastExit": "وروستۍ وتنه",
       "memory": "حافظه",
-      "model": "ماډل",
       "region": "سیمه",
       "resources": "سرچینې",
       "restarts": "بیا پیلونه",
@@ -1166,34 +1152,25 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "سرحدي",
       "frontierDescription": "تر ټولو لوړ فعالیت. د استدلال سره سرحدي ماډلونو ته لارښوونه کوي.",
-      "balancedLabel": "متوازن",
       "balancedDescription": "د ټیټې بیه په لګښت د سرعت او وړتیا هوښیار توازن.",
-      "cost": "لګښت",
-      "performance": "کارکردګۍ",
       "autoModelA11y": "{{label}} اتوماتیک ماډل",
       "currentModel": "اوسنی ماډل",
       "browseAllModels": "یا له ۵۰۰+ ماډلونو څخه غوره کړئ",
       "browseAllModelsA11y": "ټول ۵۰۰+ ماډلونه وګورئ"
     },
     "accessRequired": {
-      "trialExpiredTitle": "په ویب کې ګډون وکړئ",
       "trialExpiredBody": "د KiloClaw کارولو ته دوام ورکولو لپاره، له خپل براوزر څخه kilo.ai/claw ته لاړ شئ. تاسو په اپ کې ګډون نه شئ کولی.",
-      "trialExpiredCta": "kilo.ai/claw پرانیستل",
       "subscriptionCanceledTitle": "په ویب کې ګډون وکړئ",
       "subscriptionCanceledBody": "د KiloClaw کارولو لپاره، له خپل براوزر څخه kilo.ai/claw ته لاړ شئ. تاسو په اپ کې ګډون نه شئ کولی.",
       "subscriptionCanceledCta": "kilo.ai/claw پرانیستل",
       "subscriptionPastDueTitle": "په ویب کې تادیه نوي کړئ",
       "subscriptionPastDueBody": "موږ د ستاسو وروستۍ تادیې سره ستونزه درلوده. د نوي کولو لپاره له خپل براوزر څخه kilo.ai/claw ته لاړ شئ. تاسو په اپ کې بلینګ اداره نه شئ کولی.",
-      "subscriptionPastDueCta": "kilo.ai/claw پرانیستل",
       "quarantinedTitle": "بیلګې ته اصلاح ته اړتیا ده",
       "quarantinedBody": "ستاسو KiloClaw بیلګه په قرنطینه حالت کې ده او اوس مهال نه شي کارول کېدی. زموږ ټیم باید د بیا رغونې کې مرسته وکړي.",
-      "quarantinedCta": "په kilo.ai کې دوام ورکړئ",
-      "multipleCurrentConflictTitle": "حساب ته بیاکتنې ته اړتیا ده",
       "multipleCurrentConflictBody": "موږ ستاسو په حساب کې له یو څخه ډېر فعال ګډونونه وموندل، نو موږ دوه ځله بل کولو څخه مخنیوي لپاره شیان ودرول.",
       "multipleCurrentConflictCta": "په kilo.ai کې دوام ورکړئ",
       "nonCanonicalEarlybirdTitle": "میراثي پلان وموندل شو",
       "nonCanonicalEarlybirdBody": "ستاسو د لومړي لاسرسي پلان د موبایل کې کارولو مخکې لاسي بیاکتنې ته اړتیا لري.",
-      "nonCanonicalEarlybirdCta": "په kilo.ai کې دوام ورکړئ",
       "iosTitle": "KiloClaw په iOS کې شتون نلري",
       "iosBody": "د KiloClaw لاسرسی د دې حساب لپاره د iOS اپ څخه بهر اداره کېږي.",
       "iosContact": "پوښتنې؟ hi@kilo.ai سره اړیکه ونیسئ."
@@ -1203,25 +1180,17 @@
       "openUnread_one": "{{name}} پرانیستل، {{displayCount}} نالوستی پیغام",
       "openUnread": "{{name}} پرانیستل، {{displayCount}} نالوستي پیغامونه",
       "openUnread_other": "{{name}} پرانیستل، {{displayCount}} نالوستي پیغامونه",
-      "open": "{{name}} پرانیزئ",
       "openSettings": "د {{name}} لپاره ترتیبات پرانیستل",
       "fixOnKiloAi": "په kilo.ai کې حل کړئ: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram، Discord، Slack",
-      "channelsLabel": "چینلونه",
       "devicePairingDescription": "د وسیلې غوښتنې تاییدول",
-      "devicePairingLabel": "د وسیلې جوړه کول",
       "execPolicyDescription": "امنیتي ترتیبات",
-      "execPolicyLabel": "د اجرا تګلاره",
       "googleDescription": "Gmail، Calendar، Docs",
-      "googleLabel": "د ګوګل حساب",
       "modelDescription": "د AI ماډل انتخاب",
-      "modelLabel": "ماډل",
       "secretsDescription": "کوډ شوي اعتبارونه",
-      "secretsLabel": "پټ معلومات",
-      "versionPinDescription": "یوې ځانګړې نسخې ته ټینګول",
-      "versionPinLabel": "د نسخې ټینګول"
+      "versionPinDescription": "یوې ځانګړې نسخې ته ټینګول"
     },
     "avatar": {
       "arcade": "آرکیډ",
@@ -1266,21 +1235,15 @@
       "placeholder": "لکه زموږ د خطا اداره کولو کنوانسیونونه پلي کړئ..."
     },
     "repos": {
-      "title": "ریپوزیټورۍ",
-      "couldNotLoad": "ریپوزیټورۍ بارول ناشوني شول",
       "unavailable": "ریپوزیټورۍ شتون نلري — په kilo.ai کې د Bitbucket جوړونه بشپړه کړئ.",
       "finishSetup": "جوړونه بشپړول",
       "manageAccess": "لاسرسی اداره کول",
-      "allRepositories": "ټولې ریپوزیټورۍ",
       "bitbucketNoRepositoriesDescription": "په دې Bitbucket ورک سپیس کې هېڅ ریپوزیټورۍ شتون نلري.",
-      "bitbucketSetup": "د Bitbucket جوړونه",
-      "couldNotOpenGithubSettings": "د GitHub اپ ترتیبات پرانیستل نشو",
       "gitlabNoRepositoriesDescription": "تاسو ممکن اړتیا ولرئ چې په GitLab کې نورو ګروپونو یا پروژو ته لاسرسی ورکړئ.",
       "installGithubApp": "په ریپوزیټوریو کې د GitHub اپ نصب کړئ",
       "installGithubAppDescription": "د هغو ریپوزیټوریو ته چې غواړئ بیاکتنه شي د Kilo GitHub App لاسرسی ورکړئ.",
       "noRepositoriesFound": "هېڅ ریپوزیټورۍ ونه موندل شوه",
-      "repositoryAccess": "د ریپوزیټورۍ لاسرسی",
-      "selectedRepositories": "غوره شوې ریپوزیټورۍ"
+      "repositoryAccess": "د ریپوزیټورۍ لاسرسی"
     },
     "style": {
       "title": "د بیاکتنې سټایل",
@@ -1289,12 +1252,10 @@
       "roast": "په تندۍ رښتینی، په ساتیرۍ توګه",
       "strict": "هر څه نښه کړئ، لوړه کچه وساتئ"
     },
-    "title": "کوډ بیاکتونکی",
     "reviewDetail": {
       "title": "بیاکتنه",
       "cancelTitle": "بیاکتنه لغوه کړئ؟",
       "cancelMessage": "دا به د کوډ په جریان کې بیاکتنه ودروي.",
-      "keepRunning": "په جریان کې وساتئ",
       "cancelReview": "بیاکتنه لغوه کول",
       "retryTitle": "بیا بیاکتنه؟",
       "retryMessage": "دا به د کوډ بیاکتنه بیا پرمخ بوځي.",
@@ -1302,29 +1263,19 @@
       "couldNotLoad": "بیاکتنه بارول ناشوني شول",
       "couldNotGetLatest": "تر ټولو وروستی ترلاسه نه شو.",
       "byline": "{{repo}} #{{number}} د {{author}} لخوا",
-      "findings": "موندنې",
       "noFindings": "هېڅ موندنه نشته",
       "showMore": "نور ښودل",
-      "details": "جزیات",
-      "branch": "څانګه",
-      "platform": "پلیټ فارم",
-      "model": "ماډل",
       "created": "جوړ شوی",
       "started": "پیل شوی",
-      "completed": "بشپړ شوی",
-      "cost": "لګښت",
       "tokens": "ټوکنونه",
       "tokensInOut": "{{input}} دننه / {{output}} بهر",
-      "openPullRequest": "پل ریکویسټ پرانیزئ",
       "council": "شورا",
       "decision": "پریکړه",
       "gate": "دروازه",
       "gateNone": "هېڅ",
       "gateHidden": "پټ",
       "checkRun": "د چک چلونه",
-      "status": "حالت",
       "threshold": "حد",
-      "pullRequest": "د کشولو غوښتنه",
       "transcriptWaiting": "د بیاکتنې د متن انتظار.",
       "transcriptEmpty": "د دې بیاکتنې لپاره هیڅ متن نشته.",
       "transcriptRetry": "د بیاکتنې متن پورته نه شو کېدلای.",
@@ -1339,13 +1290,10 @@
       "sessionError": "د غونډې تېروتنه: {{error}}",
       "statusWithValue": "حالت: {{status}}",
       "toolName": "وسیله: {{name}}",
-      "toolNameError": "وسیله: {{name}} — تېروتنه",
-      "unknownError": "نامعلومه تېروتنه"
+      "toolNameError": "وسیله: {{name}} — تېروتنه"
     },
     "reviewMemory": {
       "title": "د بیاکتنې حافظه",
-      "couldNotLoadMore": "نور بار کیدی نشو",
-      "retryLoadingMore": "نور بارول بیا هڅه وکړئ",
       "loading": "د بیاکتنې حافظه بارول",
       "couldNotLoad": "د بیاکتنې حافظه بارول ناشوني شول",
       "off": "د بیاکتنې حافظه بنده ده",
@@ -1364,13 +1312,9 @@
       "couldNotLoadProviders": "موږ ستاسو وصل شوي چمتو کونکي نه شو بارولی. مهرباني وکړئ بیا هڅه وکړئ.",
       "connectProvider": "چمتو کونکی وصل کول",
       "connectProviderDescription": "د کش غوښتنې لاسي بیاکتنې پیلولو لپاره GitHub وصل کړئ.",
-      "connectGitHub": "GitHub وصل کړئ",
-      "platform": "پلیټ فارم",
-      "notConnected": "وصل نه شوی",
       "pullRequestUrl": "د کش غوښتنه URL",
       "instructions": "لارښوونې (اختياري)",
       "instructionsPlaceholder": "هر ځانګړی شی چې بیاکتونکی باید پرې تمرکز وکړي...",
-      "model": "ماډل",
       "starting": "بیاکتنه پیلول...",
       "start": "بیاکتنه پیل کول"
     },
@@ -1379,28 +1323,20 @@
     "webhookSetupDescription": "ځینې ریپوزیټورۍ ممکن اتوماتیک بیاکتنې ترلاسه نه کړي.",
     "autoReviews": "اتوماتیک بیاکتنې",
     "selectRepository": "د اتوماتیک بیاکتنو فعالولو لپاره لږترلږه یوه ریپوزیټورۍ غوره کړئ.",
-    "selectRepositories": "ریپوزیټورۍ غوره کړئ",
     "followReviewMd": "د REVIEW.md تعقیبول",
     "followReviewMdSubtitle": "د هرې ریپوزیټورۍ د REVIEW.md لارښوونې فایلونو درناوی وکړئ",
-    "readOnlyDescription": "یوازې د سازمان مالکینو او بلینګ مدیرانو کولی شي دا ترتیبات بدل کړي.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket وصل نه دی. یوازې د سازمان مالکینو او بلینګ مدیرانو کولی شي یې وصل کړي.",
       "setupIncomplete": "جوړونه نیمګړې ده — په kilo.ai کې ترتیب بشپړ کړئ",
       "setup": "د Bitbucket جوړونه"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket وصل شو",
-      "title": "Bitbucket وصل کول",
       "description": "د اړینو ساحو سره د ورک سپیس لاسرسي توکن جوړ کړئ او لاندې یې پیسټ کړئ.",
       "scopes": "حساب: لوستل · ریپوزیټورۍ: لوستل/لیکل · کش غوښتنې: لوستل · ویب هوکونه: لوستل/لیکل",
-      "tokenPlaceholder": "د ورک سپیس لاسرسي توکن",
-      "connect": "وصل کول"
+      "tokenPlaceholder": "د ورک سپیس لاسرسي توکن"
     },
     "scopeList": {
-      "couldNotLoad": "سازمانونه بار نه شول",
       "personalStillAvailable": "شخصي ریپوزیټورۍ لاهم لاندې شتون لري.",
-      "personal": "شخصي",
-      "personalSubtitle": "ستاسو خپلې ریپوزیټورۍ",
       "viewOnly": "یوازې کتل"
     },
     "reviewList": {
@@ -1414,18 +1350,13 @@
     "platformList": {
       "checking": "څېړل...",
       "statusUnavailable": "حالت شتون نلري",
-      "connected": "وصل شو",
-      "notConnected": "وصل نه شوی",
-      "organization": "سازمان",
       "platforms": "پلیټ فارمونه",
       "activity": "فعالیت"
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "GitHub وصل کړئ",
       "githubError": "د GitHub جوړونه پرانیستل ناشوني شول. مهرباني وکړئ بیا هڅه وکړئ.",
       "gitlabAccount": "د GitLab حساب",
-      "connectGitLab": "GitLab وصل کول",
       "gitlabError": "د GitLab جوړونه پرانیستل ناشوني شول. مهرباني وکړئ بیا هڅه وکړئ.",
       "description": "د کش غوښتنو اتوماتیک بیاکتنې لپاره د Kilo {{label}} وصل کړئ.",
       "bitbucketError": "د Bitbucket تنظیم نه شو پرانیستلی. مهرباني وکړئ بیا هڅه وکړئ."
@@ -1436,12 +1367,7 @@
       "allAreas": "ټولې ساحې",
       "customInstructions": "ځانګړي لارښوونې",
       "set": "ټاکل",
-      "model": "ماډل",
-      "mergeGate": "د یوځای کولو دروازه",
-      "repositories": "ریپوزیټورۍ",
-      "allRepositories": "ټولې ریپوزیټورۍ",
       "nSelected": "{{displayCount}} غوره شوي",
-      "reviewMemory": "د بیاکتنې حافظه",
       "proposedReviewMdGuidance": "د REVIEW.md وړاندیز شوې لارښوونه"
     },
     "decision": {
@@ -1450,69 +1376,53 @@
       "noDecision": "هېڅ پریکړه",
       "noResult": "هېڅ پایله"
     },
-    "eyebrow": "کوډ بیاکتونکی",
     "updateFailed": "بیاکتونکی تازه کول ناکام شول",
     "configSaveFailed": "د بیاکتنې ترتیب خوندي کول ناکام شول",
     "status": {
-      "pending": "په انتظار",
-      "queued": "په صف کې",
       "running": "روان",
       "completed": "بشپړ شوی",
-      "failed": "ناکام",
-      "cancelled": "لغوه شوی",
       "interrupted": "مداخله شوی"
     },
     "reviewStyle": {
       "strict": "سخت",
-      "balanced": "متوازن",
       "lenient": "نرم",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "امنیت",
-      "performance": "کارکردګۍ",
       "bugs": "بګونه",
       "style": "سټایل",
       "testing": "ازموینه",
       "documentation": "اسناد"
     },
     "gateThreshold": {
-      "off": "بند",
-      "all": "ټول",
-      "warning": "خبرداری",
-      "critical": "جدي"
+      "warning": "خبرداری"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
         "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې Kilo نشي کولای د فعال GitHub App نصبولو سره دې ذخیرې ته لاسرسی ومومي. د GitHub App نصبول تازه کړئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
         "recoveryLabel": "د GitHub App نصبول تازه کړئ"
       },
       "githubIpAllowList": {
-        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
-        "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې دا GitHub سازمان د IP اجازه لړلیک کاروي چې Kilo بندوي. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
-        "recoveryLabel": "له ملاتړ سره اړیکه ونیسئ"
+        "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې دا GitHub سازمان د IP اجازه لړلیک کاروي چې Kilo بندوي. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا کوډ بیاکتونکی بیا فعال کړئ."
       },
       "gitlabProjectAccessRequired": {
-        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
         "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې Kilo نشي کولای د دې پروژې لپاره د GitLab Project Access Token جوړ کړي. د Maintainer لاسرسی ورکړئ یا د Project Access Tokens فعال کړئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
         "recoveryLabel": "د GitLab ادغام تازه کړئ"
       },
       "byokInvalidKey": {
-        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
         "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې غوره شوی BYOK API کلید ناسم، منسوخ، یا پرته له اجازې ده. کلید تازه کړئ یا بل ماډل وټاکئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
         "recoveryLabel": "د BYOK ترتیبات تازه کړئ"
       },
       "selectedModelUnavailable": {
-        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
         "description": "کوډ بیاکتونکی غیر فعال شو ځکه چې غوره شوی ماډل د کلاوډ اجنټ ناستو لپاره شتون نلري. یو شتون لرونکی ماډل وټاکئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
         "recoveryLabel": "د کوډ بیاکتونکي ترتیبات تازه کړئ"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
-        "description": "کوډ بیاکتونکی نن د دریو ذخیرې کلون وخت څخه د تېریدو وروسته غیر فعال شو. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا کوډ بیاکتونکی بیا فعال کړئ.",
-        "recoveryLabel": "له ملاتړ سره اړیکه ونیسئ"
-      }
+        "description": "کوډ بیاکتونکی نن د دریو ذخیرې کلون وخت څخه د تېریدو وروسته غیر فعال شو. د مرستې لپاره له hi@kilocode.ai سره اړیکه ونیسئ، بیا کوډ بیاکتونکی بیا فعال کړئ."
+      },
+      "title": "کوډ بیاکتونکی پاملرنې ته اړتیا لري",
+      "recoveryLabel": "له ملاتړ سره اړیکه ونیسئ"
     },
     "unknownError": "نامعلومه تېروتنه"
   },
@@ -1522,31 +1432,17 @@
       "noFiltersDescription": "بیرته لاړ شئ او د موندنو لیست څخه فلټرونه بیا پرانیستئ.",
       "title": "موندنې فلټر کول",
       "reset": "بیا تنظیمول",
-      "repository": "ریپوزیټورۍ",
-      "status": "حالت",
       "severity": "شدت",
       "outcome": "پایله",
       "slaStatus": "د SLA حالت",
       "sortBy": "ترتیب کول",
-      "allRepositories": "ټولې ریپوزیټورۍ",
-      "all": "ټول",
       "statusOpen": "خلاص",
       "fixed": "اصلاح شوی",
       "statusIgnored": "له پامه غورځول شوی",
-      "statusClosed": "تړل شوی",
-      "severityCritical": "جدي",
       "severityHigh": "لوړ",
       "severityMedium": "منځنی",
       "severityLow": "ټیټ",
-      "outcomeNotAnalyzed": "تحلیل نه شوی",
-      "outcomeAnalyzing": "تحلیل",
-      "outcomeFailed": "تحلیل ناکام شو",
-      "outcomeExploitable": "استحصال وړ",
-      "outcomeNotExploitable": "استحصال وړ نه دی",
-      "outcomeSafeToDismiss": "د له پامه غورځولو لپاره خوندي",
-      "outcomeNeedsReview": "بیاکتنې ته اړتیا لري",
       "outcomeTriageComplete": "ترتیب بشپړ",
-      "outcomeDismissed": "له پامه غورځول شوی",
       "sortSeverityDesc": "شدت: لوړ له ټیټ",
       "sortSeverityAsc": "شدت: ټیټ له لوړ",
       "sortSlaDue": "د SLA نیټه",
@@ -1571,7 +1467,6 @@
       "enableAutoDismiss": "اتوماتیک لرې کول فعال کړئ",
       "enableAutoDismissSubtitle": "هغه موندنې په اتوماتیک ډول لرې کړئ چې AI ټاکي کار نه اخیستونکي دي.",
       "confidenceThreshold": "د باور حد",
-      "permissionNote": "یوازې د سازمان مالکینو او بلینګ مدیرانو کولی شي دا ترتیبات بدل کړي.",
       "enableAutoRemediationConfirmTitle": "اتوماتیک اصلاح فعاله کړئ؟",
       "enableAutoRemediationConfirmMessage": "امنیتي اجنټ به د وړ وړ کار اخیستونکي موندنو لپاره په اتوماتیک ډول د اصلاح PRs پرانیستي.",
       "enable": "فعالول",
@@ -1603,14 +1498,12 @@
       "suggestedAction": "وړاندیز شوی اقدام",
       "triageReasoning": "د طبقه بندۍ دلیل",
       "exploitable": "استحصال وړ",
-      "model": "ماډل",
       "notRecorded": "نشت ثبت شوی",
       "analyzed": "تحلیل شوی",
       "exploitabilityReasoning": "د استحصال وړتیا دلیل",
       "suggestedFix": "وړاندیز شوی حل",
       "whereFound": "چیرته وموندل شوه ({{displayCount}})",
       "fullReport": "بشپړ جوړ شوی راپور",
-      "unknown": "نامعلوم",
       "yes": "هو",
       "no": "نه"
     },
@@ -1641,7 +1534,6 @@
       "repoSummary": "{{open}} خلاص · {{critical}} کریټیکل · {{high}} لوړ",
       "couldNotLoad": "د ډشبورډ ډاټا بار نه شوه",
       "filterByRepository": "د ذخیرې له مخې فلټر کړئ",
-      "findings": "موندنې",
       "lastSynced": "آخري ترکیب {{time}}",
       "manageRepositories": "ذخیرې مدیریت کړئ",
       "notYetSynced": "تر اوسه نه دی ترکیب شوی",
@@ -1654,15 +1546,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "خلاصې موندنې",
-      "openFindingsDetail": "{{critical}} کریټیکل، {{high}} لوړ",
-      "confirmedExploitable": "استحصال وړ تایید شوی",
       "confirmedExploitableDetail": "د تحلیل له مخې د پروژې خطر تایید شوی",
-      "needsReview": "ستاسو بیا کتنې ته اړتیا لري",
       "needsReviewDetail": "انساني پریکړې ته اړتیا ده",
-      "analysisIncomplete": "تحلیل بشپړ نه دی",
       "analysisIncompleteDetail": "د پروژې خطر لا تر اوسه نامعلوم دی",
       "slaCompliance": "د SLA اطاعت",
-      "notMeasured": "نمی شوی",
       "withinDeadlineDetail": "{{total}} څخه {{within}} د مهالو وخت دننه",
       "noDeadlineData": "لا د کومې موندنې SLA مهالو وخت نشته",
       "deadlinePassed": "مهالو وخت تېر شو",
@@ -1675,7 +1562,6 @@
     },
     "dismiss": {
       "title": "موندنه له پامه وغورځوئ",
-      "submit": "موندنه له پامه وغورځوئ",
       "reason": "علت",
       "reasonFixStarted": "یو اصلاح لا دمخه پیل شوې ده",
       "reasonNoBandwidth": "هیڅ ظرفیت شتون نلري",
@@ -1696,28 +1582,21 @@
     "findingDetails": {
       "supersededBy": "د اوسنۍ موندنې لخوا بدله شوې",
       "supersededByDescription": "د حالت، تحلیل او اصلاح لپاره اوسنی ریکارډ پرانیستلو لپاره ټایپ کړئ.",
-      "dismissed": "له پامه غورځول شوی",
       "dismissedBecause": "له پامه غورځول شوې ځکه {{reason}}.",
       "severityLabel": "{{severity}} کچه",
       "package": "پکیج",
       "vulnerableVersions": "زیانمنې نسخې",
-      "unknown": "نامعلوم",
       "patchedVersion": "اصلاح شوې نسخه",
       "noPatchAvailable": "هیڅ اصلاح شتون نلري",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "ریپوزیټورۍ",
       "manifest": "مانیفست",
       "detected": "موندل شوی",
-      "updated": "تازه شوی",
-      "fixed": "اصلاح شوی",
       "slaDeadline": "د SLA مهالو وخت",
       "sourceRecord": "د سرچینې ریکارډ",
       "source": "سرچینه",
       "sourceId": "د سرچینې ID",
       "viewAdvisory": "په GitHub کې مشوره وګورئ",
-      "statusSuperseded": "بدله شوې",
-      "statusFixed": "اصلاح شوی",
       "statusOpen": "خلاص",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "یو اصلاح لا دمخه پیل شوې ده",
@@ -1728,30 +1607,17 @@
       "reasonAfterReview": "د بیاکتنې وروسته"
     },
     "settingsOverview": {
-      "title": "ترتیبات",
       "couldNotLoadSettings": "د امنیت استازی ترتیبات بار نه شول",
       "couldNotLoadPermissions": "اجازې بار نه شوې",
-      "couldNotLoadRepositories": "ریپوزیټورۍ بارول ناشوني شول",
-      "securityAgent": "امنیت استازی",
-      "enabled": "فعال شوی",
-      "disabled": "ناتوان شوی",
       "on": "فعال",
-      "off": "بند",
-      "allRepositories": "ټولې ریپوزیټورۍ",
       "repositoriesCount_one": "{{displayCount}} ذخیره غوره شوه",
       "repositoriesCount": "{{displayCount}} ذخیرې غوره شوې",
       "repositoriesCount_other": "{{displayCount}} ذخیرې غوره شوې",
-      "selectRepositories": "ریپوزیټورۍ غوره کړئ",
       "selectRepositoriesSubtitle": "غوره کړئ چې د امنیت استازی کومې ذخیرې څاري",
-      "repositories": "ریپوزیټورۍ",
-      "modelsAndAnalysis": "ماډلونه او تحلیل",
       "analysisModeSubtitle": "{{mode}} تحلیل",
-      "automation": "اتوميشن",
       "automationAllOff": "ټول غیرفعال",
       "automationCount": "{{displayCount}} له 3 څخه فعال",
-      "notifications": "خبرتیاوې",
       "notificationsCount": "{{displayCount}} له 2 څخه فعال",
-      "slaPolicy": "د SLA پالیسي",
       "disabledNoManage": "د امنیت استازی غیرفعال دی. یوازې د سازمان مالکان او د بیلینګ مدیران کولی شي دا فعال کړي.",
       "disabledNoRepo": "د امنیت استازی فعالولو دمخه لږ تر لږه یوه ذخیره غوره کړئ.",
       "disabledPrompt": "د امنیت استازی فعال کړئ ترڅو د Dependabot خبرتیاوې ترکیب کړئ، ذخیرې غوره کړئ، او اتوماتیک ترتیب کړئ."
@@ -1759,15 +1625,11 @@
     "remediation": {
       "cancellationRequested": "د لغوه کولو غوښتنه وشوه",
       "cancelled": "اصلاح لغوه شوه",
-      "pullRequest": "د کشولو غوښتنه",
       "couldNotLoad": "د اصلاح حالت بار نه شو",
-      "noAnalysisTitle": "تر اوسه تحلیل نشته",
-      "noAnalysisDescription": "له تفصیلاتو ټب څخه یو پرمخ یوسئ",
       "start": "اصلاح پیل کړئ",
       "retry": "اصلاح بیا هڅه کړئ",
       "cancelTitle": "دا اصلاح لغوه کړم؟",
       "cancelMessage": "د امنیت استازی به د جریان په حال کې اصلاح هڅه ودروي.",
-      "keepRunning": "په جریان کې وساتئ",
       "cancelRemediation": "اصلاح لغوه کړئ",
       "openPullRequest": "د کشولو غوښتنه پرانیزئ{{number}}",
       "openDraftPullRequest": "د مسودې د کشولو غوښتنه پرانیزئ{{number}}",
@@ -1775,29 +1637,19 @@
       "attemptHistory": "د هڅې تاریخچه ({{displayCount}})",
       "attemptNumber": "هڅه #{{number}}",
       "startedBy": "لخوا پیل شوی",
-      "model": "ماډل",
-      "branch": "څانګه",
       "queued": "اصلاح په صف کې ده",
       "retryQueued": "د اصلاح بیا هڅه په صف کې ده",
       "timeline": {
         "queued": "د اصلاح غوښتنه وشوه",
-        "prOpened": "PR پرانیستل شو",
         "failed": "اصلاح ناکامه شوه",
-        "blocked": "اصلاح بنده شوه",
-        "noChangesNeeded": "هیڅ بدلون ته اړتیا نشته",
-        "cancelled": "لغوه شوی"
+        "blocked": "اصلاح بنده شوه"
       },
       "unavailable": "اصلاح د دې موندنې لپاره شتون نلري."
     },
     "analysisSettings": {
       "title": "ماډلونه او تحلیل",
       "couldNotLoad": "د تحلیل ترتیبات بار نه شول",
-      "permissionNote": "یوازې د سازمان مالکان او د بیلینګ مدیران کولی شي دا ترتیبات بدل کړي.",
       "depth": "د تحلیل ژوروالی",
-      "modeAuto": "اتومات",
-      "modeShallow": "سطحي",
-      "modeDeep": "ژور",
-      "couldNotLoadModels": "ماډلونه بار نه شول",
       "triageModel": "د طبقه بندۍ ماډل",
       "analysisModel": "د تحلیل ماډل",
       "remediationModel": "د اصلاح ماډل"
@@ -1805,7 +1657,6 @@
     "sla": {
       "title": "د SLA پالیسي",
       "couldNotLoad": "د SLA ترتیبات بار نه شول",
-      "critical": "جدي",
       "high": "لوړ",
       "medium": "منځنی",
       "low": "ټیټ",
@@ -1823,41 +1674,23 @@
     },
     "findingDetail": {
       "title": "موندنه",
-      "tabDetails": "جزیات",
       "tabAnalysis": "تحلیل",
-      "tabRemediation": "اصلاح",
-      "notFound": "موندنه ونه موندل شوه",
-      "notFoundDescription": "دا موندنه شاید لرې شوې وي، یا تاسو نور ورته لاسرسی نلرئ.",
-      "couldNotLoad": "دا موندنه بار نه شوه",
-      "dismissA11y": "موندنه له پامه وغورځوئ"
+      "tabRemediation": "اصلاح"
     },
     "findingList": {
-      "title": "موندنې",
       "couldNotLoad": "موندنې بار نه شوې",
       "couldNotLoadMore": "نورې موندنې بار نه شوې",
       "noMatchesTitle": "هیڅ موندنه د فلټرونو سره سمون نه خوري",
       "noMatchesDescription": "غوره شوي فلټرونه تنظیم یا پاک کړئ.",
       "emptyTitle": "هیڅ خلاصه موندنه نشته",
-      "emptyDescription": "اوس مهال هیڅ خلاصه موندنه پاملرنې ته اړتیا نلري.",
-      "clearFilters": "فلټرونه پاک کړئ"
-    },
-    "scopeList": {
-      "title": "امنیت استازی",
-      "couldNotLoad": "سازمانونه بار نه شول",
-      "personal": "شخصي",
-      "personalSubtitle": "ستاسو خپلې ریپوزیټورۍ"
-    },
-    "commandRetry": {
-      "discard": "لغوه کړئ"
+      "emptyDescription": "اوس مهال هیڅ خلاصه موندنه پاملرنې ته اړتیا نلري."
     },
     "findingRow": {
       "nextRemediationPrOpen": "د اصلاح PR خلاص دی",
       "nextRemediationInProgress": "اصلاح په جریان کې ده",
       "nextRetryRemediation": "د اصلاح بیا هڅه شتون لري",
       "nextRemediationAvailable": "اصلاح شتون لري",
-      "retryAnalysis": "تحلیل بیا هڅه کړئ",
       "runAnalysis": "تحلیل پرمخ یوسئ",
-      "nextNeedsManualReview": "لاسي بیا کتنې ته اړتیا لري",
       "nextViewDetails": "تفصیلات وګورئ",
       "viewPr": "PR وګورئ",
       "analyze": "تحلیل کړئ",
@@ -1868,7 +1701,6 @@
       "couldNotOpenGithub": "GitHub پرانیستل نشو. مهرباني وکړئ بیا هڅه وکړئ."
     },
     "settingsSave": {
-      "discard": "لغوه کړئ",
       "keepEditing": "سمون ته دوام ورکړئ",
       "saveChanges": "بدلونونه خوندي کړئ",
       "unsavedTitle": "خوندي نه شوي بدلونونه",
@@ -1880,7 +1712,6 @@
     "auditReport": {
       "couldNotLoad": "د پلټنې راپور بار نه شو",
       "events": "پیښې",
-      "findings": "موندنې",
       "generated": "جوړ شوی {{generatedAt}}",
       "noActivity": "هیڅ ثبت شوی فعالیت نشته",
       "noActivityDescription": "Kilo له {{start}} څخه تر {{end}} پورې هیڅ راپور وړ د امنیت موندنې فعالیت نلري.",
@@ -1890,8 +1721,7 @@
       "title": "د پلټنې راپور",
       "unavailable": "د پلټنې راپور شتون نلري",
       "unavailableDescription": "یوازې د سازمان مالکان او د بیلینګ مدیران کولی شي د پلټنې راپورونه وګوري. له یو مالک یا د بیلینګ مدیر څخه وغواړئ چې تاسو ته لاسرسی درکړي.",
-      "queryFailed": "د راپور پوښتنه پای ته ونه رسیده. بیا هڅه وکړئ.",
-      "checkConnection": "خپله اړیکه وګورئ او بیا هڅه وکړئ."
+      "queryFailed": "د راپور پوښتنه پای ته ونه رسیده. بیا هڅه وکړئ."
     },
     "notifications": {
       "couldNotLoad": "د خبرتیا ترتیبات بار نه شول",
@@ -1900,30 +1730,21 @@
       "newFindingSection": "د نوي موندنې خبرتیا",
       "newFindingSeverityLabel": "د نوي موندنې لږ تر لږه کچه",
       "newFindingSubtitle": "هرکله چې نوې موندنه ترکیب شي، په شمول د لومړي ترکیب، لیږل کیږي.",
-      "readOnly": "یوازې د سازمان مالکان او د بیلینګ مدیران کولی شي دا ترتیبات بدل کړي.",
       "slaLeadTimeAccessibility": "د SLA د خبرداري د وخت مخته کول په ورځو کې",
       "slaLeadTimeError": "له 1 څخه تر 365 پورې بشپړه شمېره ورځې ولیکئ.",
-      "slaLeadTimeHint": "له 1 څخه تر 365 پورې بشپړه شمېره ولیکئ",
       "slaLeadTimeLabel": "د SLA د خبرداري وخت مخته کول (ورځې)",
       "slaPersonalTitle": "د SLA د خبرداریو په اړه را بریښنالیک واستوئ",
       "slaSection": "د SLA د خبرداري خبرتیا",
       "slaSeverityLabel": "د SLA خبرتیا لږ تر لږه کچه",
-      "slaSubtitle": "مخکې او کله چې موندنې خپل SLA مهالو وخت ته نږدې شي یا یې مات کړي لیږل کیږي.",
-      "title": "خبرتیاوې"
+      "slaSubtitle": "مخکې او کله چې موندنې خپل SLA مهالو وخت ته نږدې شي یا یې مات کړي لیږل کیږي."
     },
     "repositories": {
-      "allRepositories": "ټولې ریپوزیټورۍ",
       "couldNotLoad": "د ذخیرې ترتیبات بار نه شول",
-      "couldNotLoadRepositories": "ریپوزیټورۍ بارول ناشوني شول",
-      "couldNotOpenGithubSettings": "د GitHub اپ ترتیبات پرانیستل نشو",
       "githubAppSettings": "د GitHub اپ ترتیبات",
       "manageAccess": "د GitHub اپ لاسرسی مدیریت کړئ",
       "noRepositories": "هیڅ ذخیره نشته",
       "noRepositoriesDescription": "د Kilo GitHub اپ ته د ذخیرو لاسرسی ورکړئ",
-      "readOnly": "یوازې د سازمان مالکان او د بیلینګ مدیران کولی شي دا ترتیبات بدل کړي.",
-      "selectAtLeastOne": "لږ تر لږه یوه ذخیره غوره کړئ.",
-      "selectedRepositories": "غوره شوې ریپوزیټورۍ",
-      "title": "ریپوزیټورۍ"
+      "selectAtLeastOne": "لږ تر لږه یوه ذخیره غوره کړئ."
     },
     "scopeEntry": {
       "connectDescription": "د Kilo GitHub اپ نصب کړئ ترڅو د Dependabot خبرتیاوې په اتوماتیک ډول ترکیب کړئ او د خپلو ذخیرو په اوږدو کې امنیتي موندنې مدیریت کړئ.",
@@ -1938,7 +1759,6 @@
     },
     "queuedActionUntracked": "یو صف کې موجود اقدام نور تعقیب کیدی نشي. د وروستي حالت لیدو لپاره تازه کړئ.",
     "initialSyncAdmissionFailed": "د امنیت استازی فعال شو، خو لومړنی ترکیب په صف کې واچول نشو. بیا ترکیب کړئ.",
-    "title": "امنیت استازی",
     "commands": {
       "findingAlreadyDismissed": "موندنه دمخه له پامه غورځول شوې",
       "findingDismissed": "موندنه له پامه وغورځول شوه",
@@ -1956,49 +1776,33 @@
     },
     "analysisState": {
       "queued": "تحلیل په صف کې دی",
-      "queuedTitle": "تحلیل په صف کې دی",
       "queuedDescription": "د تحلیل ظرفیت د شتون انتظار.",
       "analyzing": "تحلیل",
-      "analyzingTitle": "تحلیل",
       "analyzingDescription": "معاینه کول چې ایا د اپلیکیشن کوډ کولی شي اغیزمنې بڼې ته ورسیږي.",
       "failed": "تحلیل ناکام شو",
-      "failedTitle": "تحلیل ناکام شو",
       "failedDescription": "د امنیت استازی تحلیل بشپړ کولی نشو.",
-      "extractionFailed": "بیاکتنې ته اړتیا لري",
-      "extractionFailedTitle": "بیاکتنې ته اړتیا لري",
       "extractionFailedDescription": "تخنیکي راپور د منظمې پایلې په بڼه بدلولای نه شو.",
-      "exploitable": "استحصال وړ",
-      "exploitableTitle": "استحصال وړ",
       "exploitableDescription": "د اپلیکیشن کوډ کولی شي اغیزمنې بڼې ته ورسیږي.",
       "notExploitable": "د لاسرسي وړ نه ده",
-      "notExploitableTitle": "د لاسرسي وړ نه ده",
       "notExploitableDescription": "په دې ذخیره کې د لاسرسي وړ لاره ونه موندل شوه.",
       "unknown": "بیاکتنې ته اړتیا لري",
-      "unknownTitle": "بیاکتنې ته اړتیا لري",
       "unknownDescription": "تحلیل نشو کولی تایید کړي چې ایا زیانمنه بڼه د لاسرسي وړ ده.",
       "safeToDismiss": "د له پامه غورځولو لپاره خوندي",
-      "safeToDismissTitle": "د له پامه غورځولو لپاره خوندي",
       "safeToDismissDescription": "طبقه بندۍ وټاکله چې دا پرته له کوډبیس تحلیل څخه په خوندي توګه له پامه غورځول کیدی شي.",
-      "manualReview": "بیاکتنې ته اړتیا لري",
       "manualReviewTitle": "لاسي بیا کتنې ته اړتیا لري",
       "manualReviewDescription": "طبقه بندۍ دا موندنه د لاسي بیاکتنې لپاره په نښه کړه.",
       "analysisRequired": "تحلیل اړین دی",
       "analysisRequiredTitle": "د کوډبیس تحلیل اړین دی",
       "analysisRequiredDescription": "طبقه بندۍ د پریکړې دمخه د ذخیرې تحلیل وړاندیز کوي.",
-      "completed": "تحلیل شوی",
-      "completedTitle": "تحلیل شوی",
       "completedDescription": "تحلیل پرته له ثبت شوي ځانګړي پایلې بشپړ شو.",
       "notAnalyzed": "تحلیل نه شوی",
-      "notAnalyzedTitle": "تحلیل نه شوی",
       "notAnalyzedDescription": "د دې موندنې لپاره لا تر اوسه د کوډبیس تحلیل نه دی چلول شوی."
     },
     "deadline": {
       "fixedBeforeDeadline": "د مهالو وخت دمخه اصلاح شوی",
-      "fixed": "اصلاح شوی",
       "fixedOn": "په {{date}} اصلاح شوی",
       "resolutionRecorded": "حل ثبت شو",
       "superseded": "بدله شوې",
-      "dismissed": "له پامه غورځول شوی",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "مهالو وخت نه دی ټاکل شوی",
       "noSlaDeadline": "هیڅ SLA مهالو وخت نشته",
@@ -2014,17 +1818,13 @@
       "dueInDays": "په {{count}} ورځو کې"
     },
     "remediationStatus": {
-      "cancellationRequested": "د لغوه کولو غوښتنه وشوه",
       "notStarted": "نه دی پیل شوی",
-      "queued": "په صف کې",
       "starting": "پیلېدل",
       "inProgress": "په جریان کې",
       "draftPrOpened": "د مسودې PR پرانیستل شو",
       "prOpened": "PR پرانیستل شو",
       "blocked": "بند شوی",
-      "failed": "ناکام",
       "noChangesNeeded": "هیڅ بدلون ته اړتیا نشته",
-      "cancelled": "لغوه شوی",
       "originAutomaticPolicy": "اتوماتیک پالیسي",
       "originIncludeExistingPolicy": "د موجودو شاملولو پالیسي",
       "originManual": "لاسي",
@@ -2036,7 +1836,6 @@
       "findingNotOpen": "موندنه نوره خلاصه نه ده.",
       "repoNotInScope": "ذخیره د امنیت استازي لپاره نه ده غوره شوې.",
       "analysisRequired": "د اصلاح پیلولو دمخه د کوډبیس تحلیل پرمخ یوسئ.",
-      "sandboxAnalysisRequired": "د اصلاح پیلولو دمخه د کوډبیس تحلیل پرمخ یوسئ.",
       "staleAnalysis": "موندنه د تحلیل وروسته بدله شوه. د اصلاح پیلولو دمخه تحلیل بیا پرمخ یوسئ.",
       "notExploitable": "تحلیل هیڅ د لاسرسي وړ زیانمنه لاره ونه موندله. اتوماتیک اصلاح شتون نلري.",
       "exploitabilityUnknown": "تحلیل نشو کولی استحصال تایید کړي. د یو کلیک اصلاح څخه دمخه لاسي بیاکتنه اړینه ده.",
@@ -2052,12 +1851,10 @@
       "autoRemediationDisabled": "اتوماتیک اصلاح غیرفعاله ده. کله چې امنیتي دروازې تېرې شي، لاسي اصلاح لاهم پیل کیدی شي.",
       "includeExistingDisabled": "موجوده موندنې له اتوماتیک اصلاح څخه خارجې دي.",
       "belowThreshold": "موندنه د اتوماتیک کچې حد څخه ښکته ده. کله چې امنیتي دروازې تېرې شي، لاسي اصلاح لاهم پیل کیدی شي.",
-      "beforeEnablement": "تحلیل د اتوماتیک اصلاح فعالولو دمخه بشپړ شو. کله چې امنیتي دروازې تېرې شي، لاسي اصلاح لاهم پیل کیدی شي.",
-      "generic": "اصلاح د دې موندنې لپاره شتون نلري."
+      "beforeEnablement": "تحلیل د اتوماتیک اصلاح فعالولو دمخه بشپړ شو. کله چې امنیتي دروازې تېرې شي، لاسي اصلاح لاهم پیل کیدی شي."
     },
     "commandFailure": {
       "ownerCapReached": "د تحلیل ظرفیت ډک دی. انتظار وکړئ چې یو فعال تحلیل پای ته ورسي، بیا هڅه وکړئ.",
-      "githubTokenUnavailable": "د GitHub اجازه پاملرنې ته اړتیا لري. د GitHub App بیا اجازه ورکړئ، بیا هڅه وکړئ.",
       "githubAuthInvalid": "د GitHub اجازه پاملرنې ته اړتیا لري. د GitHub App بیا اجازه ورکړئ، بیا هڅه وکړئ.",
       "findingUnavailable": "موندنه نوره شتون نلري. موندنې تازه کړئ او که خلاصه پاتې وي بیا هڅه وکړئ.",
       "repositoryUnavailable": "ذخیره نوره د GitHub App لپاره شتون نلري. د ذخیرې لاسرسی تازه کړئ، بیا هڅه وکړئ.",
@@ -2077,12 +1874,9 @@
     "search": {
       "searching": "لټون روان دی",
       "searchSessions": "ناستې وپلټئ",
-      "searchSessionsPlaceholder": "ناستې وپلټئ...",
-      "clearSearch": "لټون پاک کړئ",
-      "clearFilters": "فلټرونه پاک کړئ"
+      "searchSessionsPlaceholder": "ناستې وپلټئ..."
     },
     "sessionList": {
-      "couldNotLoad": "ناستې بار نه شوې",
       "couldNotLoadActive": "فعالې ناستې بار نه شوې",
       "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ. ستاسو ناستې به دلته ښکاره شي.",
       "noMatches": "هیڅ ناسته سمون نه خوري",
@@ -2097,9 +1891,7 @@
     "sessionRow": {
       "deleteTitle": "ناسته حذف کړم؟",
       "deleteMessage": "دا بیرته راګرځول کیدی نشي.",
-      "delete": "ړنګ کړئ",
       "deleteSession": "ناسته حذف کړئ",
-      "rename": "نوم بدل کړئ",
       "renameMessage": "د دې ناستې لپاره نوی نوم ولیکئ",
       "copyId": "د ناستې ID کاپي کړئ",
       "idCopied": "د ناستې ID کاپي شو",
@@ -2133,7 +1925,6 @@
       "didNotCompleteTitle": "نصب بشپړ نه شو",
       "didNotCompleteMessage": "د GitHub اپ نصب بشپړ نه شو. له اپ څخه بیا هڅه وکړئ."
     },
-    "sessionExited": "ناسته پای ته ورسېده",
     "remoteSpawnRetryable": "انسټنس ته رسېدل ممکن نه وو — کېدای شي قطع شوی وي.",
     "remoteSpawnNonRetryable": "انسټنس ناسته پیلولو کې پاتې راغی — ماشین وګورئ یا CLI تازه کړئ.",
     "remoteSpawnInstanceDisconnected": "ټاکل شوی انسټنس قطع شو. په Cloud Agent کې ناسته پیل کړئ یا بل انسټنس غوره کړئ.",
@@ -2145,12 +1936,8 @@
       "title": "ناسته",
       "copyErrorDetails": "د خطا تفصیلات کاپي کړئ",
       "backToSessions": "ناستو ته بیرته",
-      "accessDenied": "لاسرسی رد شو",
-      "accessDeniedDescription": "تاسو د دې لیدو اجازه نلرئ.",
       "couldNotLoad": "ناسته بار نه شوه",
       "failedToLoadDetails": "د ناستې تفصیلات بار نه شول",
-      "notFound": "ونه موندل شو",
-      "notFoundDescription": "دا توکی شاید لرې شوی وي یا نور شتون نلري.",
       "failedToStopExecution": "اجرا ودروول نشوه",
       "renameSession": "ناسته بیا نومول",
       "renamePlaceholder": "د ناستې نوم",
@@ -2161,7 +1948,6 @@
       "emptyTitle": "تر اوسه پیغامونه نشته",
       "renameAccessibility": "ناسته بیا نومول: {{title}}",
       "cloningSession": "ناسته کلون کېږي",
-      "continue": "ادامه ورکړئ",
       "couldNotLoadThisSession": "دا ناسته بار نه شوه",
       "cloneFailedRetry": "دا ناسته کلون نه شوه. بیا هڅه وکړئ.",
       "notEnoughCredits": "د Cloud Agent د چلولو لپاره کافي کریډیټ نشته. کریډیټ اضافه کړئ او بیا هڅه وکړئ.",
@@ -2176,7 +1962,6 @@
     },
     "remoteSession": {
       "failedToCreate": "لیرې ناسته جوړه نه شوه",
-      "exited": "ناسته پای ته ورسېده",
       "failedToExit": "ناسته وتلو نشوه",
       "exitTitle": "له ناستې ووځم؟",
       "exitMessage": "دا روانه ناسته ودروي خو تاریخچه یې ساتي.",
@@ -2194,9 +1979,6 @@
       "retryConnection": "اړیکه بیا هڅه کړئ"
     },
     "newSession": {
-      "title": "نوې ناسته",
-      "repository": "ریپوزیټورۍ",
-      "connectGithub": "GitHub وصل کړئ",
       "connectGithubDescription": "GitHub په خپل براوزر کې وصل کړئ، بیا دلته راستانه شئ ترڅو یوه ذخیره غوره کړئ.",
       "openGithub": "GitHub پرانیزئ",
       "refreshRepositories": "ذخیرې تازه کړئ",
@@ -2213,7 +1995,6 @@
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
       "promptPlaceholder": "پر څه کار غواړئ وکړئ؟",
-      "addAttachment": "ضمیمه اضافه کړئ",
       "couldNotLoadModels": "ماډلونه بار نه شول",
       "prefillRepoAndModelUnavailable": "د اصلي ناستې ذخیره او ماډل نور شتون نلري. لاندې یې غوره کړئ.",
       "prefillRepoUnavailable": "{{repo}} نور شتون نلري. لاندې یوه ذخیره غوره کړئ.",
@@ -2223,14 +2004,9 @@
       "couldNotRefreshRepositories": "ذخیرې تازه کیدل نشو. مهرباني وکړئ بیا هڅه وکړئ.",
       "discardDraftTitle": "مسوده لغوه کړم؟",
       "discardDraftMessage": "ستاسو پرامپټ به له لاسه ورکړل شي.",
-      "keepEditing": "سمون ته دوام ورکړئ",
-      "discard": "لغوه کړئ",
       "discardFailed": "مسوده لغوه نه شوه. مهرباني وکړئ بیا هڅه وکړئ.",
       "remoteHint": "په خپل کمپیوټر کې `kilo remote` چل کړئ، یا په یوه روان CLI ناسته کې `/remote`، ترڅو د یوه محلي kilo پروسې کنټرول وکړئ.",
-      "bitbucketConnected": "Bitbucket وصل شو",
-      "connectBitbucket": "Bitbucket وصل کول",
       "connectBitbucketDescription": "Bitbucket په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
-      "connectGitlab": "GitLab وصل کول",
       "connectGitlabDescription": "GitLab په خپل براوزر کې ونښلئ، بیا دلته راګرځئ تر څو یو ریپوزیټري غوره کړئ.",
       "couldNotLoadBitbucketRepositories": "د Bitbucket ریپوزیټریان بارول ممکن نه شول",
       "couldNotLoadGithubRepositories": "د GitHub ریپوزیټریان بارول ممکن نه شول",
@@ -2252,18 +2028,10 @@
       "updatedFileCount": "{{displayCount}} فایلونه تازه شول",
       "updatedFileCount_other": "{{displayCount}} فایلونه تازه شول"
     },
-    "toolPatch": {
-      "operationAdded": "اضافه شوی",
-      "operationDeleted": "ړنګ شوی",
-      "operationUpdated": "تازه شوی"
-    },
     "toolCard": {
       "accessibility": "{{label}} وسیله، {{status}}",
       "accessibilityLabel": "{{name}} وسیله، {{status}}",
-      "fileEmpty": "دا فایل خالي دی.",
       "noTasks": "هیڅ دنده نشته.",
-      "contentTruncated": "منځپانګه لنډه شوه",
-      "truncated": "لنډه شوه",
       "toolRead": "read",
       "toolEdit": "سمول",
       "toolWrite": "write",
@@ -2295,9 +2063,7 @@
       "runOn": "پر باندې پرمخ یوسئ",
       "runOnAccessibility": "پر باندې پرمخ یوسئ: {{label}}",
       "couldNotLoad": "انستونسونه بار نه شول",
-      "couldNotLoadDescription": "خپله اړیکه وګورئ او بیا هڅه وکړئ.",
       "cloudAgent": "ابر ایجنټ",
-      "loading": "پورته کېږي…",
       "cloudAgentDescription": "په Kilo ابر سنډبکس باندې پرمخ یوسئ",
       "noCliInstances": "هیڅ CLI انستونس وصل نه دی",
       "noCliInstancesDescription": "په خپل کمپیوټر کې په یوه پروژه کې `kilo remote` پرمخ یوسئ، یا که یو دمخه روان وي د Kilo CLI تازه کړئ.",
@@ -2334,12 +2100,9 @@
       "noMatches": "هیڅ سمون نشته",
       "noRepositories": "هیڅ ذخیره شتون نلري",
       "noRepositoriesDescription": "هیڅ ذخیره ستاسو حساب سره وصل نه ده.",
-      "tryDifferentSearch": "مختلف لټون شرط هڅه کړئ.",
       "loading": "بارول روان دي...",
       "accessibility": "ذخیره: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "د پیغام تفصیلات",
@@ -2349,13 +2112,10 @@
       "reportAiResponse": "د AI ځواب راپور کړئ",
       "reportAiResponseConfirm": "دا ځواب د بیا کتنې لپاره راپور کړم؟",
       "report": "راپور",
-      "role": "رول",
       "roleUser": "کاروونکی",
       "roleAssistant": "مرستیال",
       "sent": "لیږل شوی",
-      "model": "ماډل",
       "costAndTokens": "لګښت او ټوکنونه",
-      "cost": "لګښت",
       "input": "ورودی",
       "output": "اوزیډه",
       "reasoning": "استدلال",
@@ -2363,8 +2123,7 @@
       "cacheWrite": "کیچ لیکل",
       "total": "ټول",
       "reportAiResponseFailedRetryable": "دا ځواب راپور کړی نشو.",
-      "reportAiResponseFailedTerminal": "دا ځواب راپور کړی نشي.",
-      "reportAiResponseSubmitted": "راپور وسپارل شو. رسید {{receiptId}}"
+      "reportAiResponseFailedTerminal": "دا ځواب راپور کړی نشي."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2375,7 +2134,6 @@
       "textDisplay": "د متن ښودنه",
       "thinking": "فکر کول",
       "thought": "فکر",
-      "title": "جزیات",
       "showDetails": "تفصیلات وښیئ",
       "pending": "پاتې…",
       "running": "روان…"
@@ -2398,16 +2156,13 @@
     "filePart": {
       "loadingImage": "انځور بارول",
       "imageUnavailableRetry": "انځور شتون نلري، بیا بارولو هڅه وکړئ",
-      "imageUnavailable": "انځور شتون نلري",
       "imagePreviewUnavailableInSession": "په دې ناسته کې د انځور مخکتنه شتون نلري.",
       "viewImage": "انځور وګورئ",
       "viewImageWithAlt": "انځور وګورئ {{alt}}",
       "imageOutput": "د انځور اوزیډه",
       "imageOutputWithFilename": "د انځور اوزیډه، {{filename}}",
-      "defaultName": "فایل",
       "openFullScreen": "{{name}} په بشپړ سکرین کې پرانیزئ",
       "preview": "{{name}} مخکتنه وکړئ",
-      "openFile": "{{name}} پرانیزئ",
       "couldNotLoadFile": "دا فایل بار نشو.",
       "couldNotLoadFileRetry": "دا فایل بار نشو. بیا هڅه وکړئ.",
       "retryLoadingFile": "د فایل بارولو بیا هڅه وکړئ",
@@ -2490,7 +2245,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. بیا هڅه شونې ده.",
       "copyToComposer": "لیکونکي ته کاپي کړئ",
-      "queued": "په صف کې",
       "queuedAccessibility": "پیغام په قطار کې ایښودل شوی",
       "userMessage": "د کاروونکي پیغام",
       "assistantMessage": "د مرستیال پیغام",
@@ -2526,12 +2280,10 @@
     },
     "sessionFilter": {
       "title": "غونډې فلټر کړئ",
-      "platform": "پلیټ فارم",
       "platformCloud": "کلاوډ",
       "platformExtension": "اکسټنشن",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "نور",
       "project": "پروژه"
@@ -2545,15 +2297,10 @@
     },
     "modelPicker": {
       "title": "ماډل وټاکئ",
-      "searchPlaceholder": "ماډلونه ولټوئ...",
-      "allModels": "ټول ماډلونه",
       "favorites": "غوره شوي",
-      "noModels": "هېڅ ماډل شتون نلري",
-      "noModelsDescription": "د ټاکنې لپاره هیڅ ماډل شتون نلري.",
-      "recommended": "وړاندیز شوی"
+      "noModelsDescription": "د ټاکنې لپاره هیڅ ماډل شتون نلري."
     },
     "modelSelector": {
-      "model": "ماډل",
       "provider": "چمتو کوونکی {{id}}",
       "modelId": "ماډل {{id}}",
       "unavailable": "شتون نلري",
@@ -2577,7 +2324,6 @@
       "uploading": "پورته کېږي…",
       "uploaded": "پورته شو",
       "uploadFailedRetry": "پورته کول ناکام شول. د بیا هڅې لپاره ټایپ کړئ.",
-      "uploadFailedTerminal": "دا فایل نه شي پورته کېدلای.",
       "moveLeft": "{{filename}} کیڼ لوري ته ولېږدوئ",
       "moveRight": "{{filename}} ښي لوري ته ولېږدوئ"
     },
@@ -2589,8 +2335,6 @@
       "camera": "کیمره",
       "photoLibrary": "د انځور کتابتون",
       "files": "فایلونه",
-      "cameraAccessDisabled": "د کامرې لاسرسی ناتوان شوی",
-      "cameraAccessMessage": "په ترتیباتو کې د کامرې لاسرسی فعال کړئ ترڅو انځور واخلئ.",
       "couldNotOpenPhotoPicker": "د انځور ټاکنکی نه شو خلاصېدلای. Kilo بیا پیل کړئ او بیا هڅه وکړئ.",
       "maxFilesAllowed": "اعظمي {{displayCount}} فایلونه اجازه لري",
       "onlyAddingFiles": "یوازې د {{total}} فایلونو څخه {{accepted}} اضافه کېږي (اعظمي {{max}})"
@@ -2603,7 +2347,6 @@
       "waitForUploads": "تر هغه چې ضمیمې پورته نشي، انتظار وکړئ.",
       "pasteFromClipboard": "له کلیپ بورډ څخه ولګوئ",
       "stopGenerating": "رامنځته کول ودرول",
-      "sendMessage": "پیغام ولېږئ",
       "selectModelBeforeSending": "د لیږلو دمخه یو ماډل وټاکئ",
       "preparingPlaceholder": "چاپېریال چمتو کېږي...",
       "finalizingPlaceholder": "بشپړېږي...",
@@ -2617,9 +2360,7 @@
     },
     "chatLink": {
       "linkCopied": "لینک کاپي شو",
-      "reviewPr": "PR وګورئ",
       "openLink": "لینک پرانیزئ",
-      "copyLink": "لینک کاپي کړئ",
       "shareLink": "لینک شریک کړئ",
       "share": "شریک کړئ",
       "prLinkActions": "د PR لینک کړنې",
@@ -2659,13 +2400,11 @@
     "contextUsage": {
       "windowUnavailable": "د شرایطو کړکۍ اندازه شتون نلري",
       "tapToViewDetails": "د شرایطو تفصیل لیدو لپاره ټایپ کړئ.",
-      "costPrefix": "لګښت {{cost}}",
       "costSuffix": "، لګښت {{cost}}",
       "tokensWindowUnavailable": "شرایط {{used}} ټوکنونه، کړکۍ شتون نلري",
       "tokensUsage": "شرایط د {{window}} ټوکنونو څخه {{used}}، {{percentage}} کارول شوي",
       "title": "د شرایطو کارول",
       "used": "کارول شوی",
-      "remaining": "پاتې",
       "provider": "چمتو کوونکی",
       "totalCost": "ټول لګښت",
       "usageReflectsLatest": "کارول د وروستي بشپړ شوي مرستیال ځواب منعکس کوي.",
@@ -2691,8 +2430,7 @@
       "merged": "یوځای شوی pull request",
       "draft": "د پل ریکویسټ مسوده",
       "updating": "تازه کېږي، {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "د کشولو غوښتنه"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "بار کړئ",
@@ -2720,11 +2458,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "ستاسو حساب نه شو پورته کېدلای",
-    "couldNotLoadAccountDescription": "خپله اړیکه وګورئ او بیا هڅه وکړئ.",
     "couldNotLoadPrivacy": "د محرمیت انتخابونه نه شول پورته کېدلای",
     "couldNotLoadPrivacyDescription": "د خپل وسیلې امنیتي تنظیمات وګورئ او بیا هڅه وکړئ.",
     "contentReady": "منځپانګه چمتو ده",
-    "signOut": "وتل",
     "retryLoadingAccount": "د حساب پورته کول بیا هڅه کړئ",
     "retryLoadingPrivacy": "د محرمیت انتخابونو پورته کول بیا هڅه کړئ"
   },
@@ -2734,7 +2470,6 @@
     "billingPage": "د بلینګ پاڼه"
   },
   "deviceSessions": {
-    "couldNotLoad": "ناستې بار نه شوې",
     "couldNotLoadDescription": "تر هغه چې دا پورته نشي، ستاسو فعالې غونډې شتون نلري.",
     "currentDeviceUnidentified": "اوسنی وسیله نه شو پېژندل کېدلای",
     "noSessions": "هیڅ فعاله غونډه نشته",
@@ -2742,7 +2477,6 @@
     "onlyKiloAppSignIns": "دلته یوازې د Kilo ایپ ننوتنې ښکاري. د اډیټور او CLI ننوتنې نه لیست کېږي.",
     "signedIn": "ننوتلی {{signedIn}} · وروستی لیدل {{lastSeen}}",
     "thisDevice": "دا وسیله",
-    "title": "د وسیلې ناستې",
     "viewProfile": "پروفایل وګورئ",
     "signOutThisDevice": "له دې وسیلې ووځئ",
     "signOutThisSession": "له دې غونډې ووځئ",
@@ -2750,8 +2484,6 @@
     "signOutThisDeviceTitle": "له دې وسیلې ووځئ؟",
     "signOutThisSessionTitle": "له دې غونډې ووځئ؟",
     "signOutThisSessionMessage": "{{device}} به ووځي. دا کولای شي تر یو ساعت پورې د API لاسرسی وساتي.",
-    "signOutConfirm": "وتل",
-    "signOutMessage": "د خپل کاري ځای لاسرسي لپاره به بیا ننوځئ.",
     "webBrowser": "ویب براوزر"
   },
   "forceUpdate": {
@@ -2772,17 +2504,13 @@
   },
   "imageViewer": {
     "close": "{{filename}} وتړئ",
-    "imageUnavailable": "انځور شتون نلري",
     "share": "{{filename}} شریک کړئ"
   },
   "invalidRoute": {
     "description": "دا لینک نور اعتبار نلري.",
-    "goBack": "شاته لاړ شئ",
     "title": "مخ ونه موندل شو"
   },
   "monoScrollBlock": {
-    "contentTruncated": "منځپانګه لنډه شوه",
-    "truncated": "لنډه شوه",
     "wrap": "لپه",
     "scroll": "سکرول"
   },
@@ -2791,22 +2519,16 @@
     "internetRestored": "د انټرنیټ اړیکه بیرته راګرځېده"
   },
   "queryError": {
-    "neutralTitle": "یو څه غلط شول",
     "neutralDescription": "مهرباني وکړئ بیا هڅه وکړئ.",
     "offlineTitle": "پورته کول ناکام شول",
-    "offlineDescription": "یو څه غلط شول",
-    "permissionTitle": "لاسرسی رد شو",
     "permissionDescription": "تاسو د دې لیدو اجازه نلرئ.",
-    "notFoundTitle": "ونه موندل شو",
     "notFoundDescription": "دا توکی شاید لرې شوی وي یا نور شتون نلري.",
     "serverTitle": "نه شو پورته کېدلای",
     "serverDescription": "زموږ په خوا کې یو څه غلط شول. مهرباني وکړئ بیا هڅه وکړئ."
   },
   "screenHeader": {
     "openMenu": "مینو پرانیزئ",
-    "openMenuFor": "د {{title}} مینو پرانیزئ",
-    "close": "وتړئ",
-    "goBack": "شاته لاړ شئ"
+    "openMenuFor": "د {{title}} مینو پرانیزئ"
   },
   "picker": {
     "optionsExpired": "انتخابونه پای ته ورسېدل",
@@ -2837,10 +2559,7 @@
   },
   "share": {
     "title": "Kilo ته شریک کړئ",
-    "close": "وتړئ",
-    "reviewPr": "PR وګورئ",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "نوې ناسته",
     "searchPlaceholder": "وروستۍ غونډې ولټوئ",
     "connectedCli": "په یو نښل شوي CLI باندې",
     "newSessionOn": "په {{name}} باندې نوې غونډه",
@@ -2898,7 +2617,6 @@
     "statusCanceling": "Kilo Pass لغوه کېږي",
     "statusPastDue": "Kilo Pass تېر شوی",
     "monthlyCredits": "{{credits}} میاشتني کریډیټونه",
-    "ends": "{{date}} پای ته رسیږي",
     "periodEnd": "د دورې پای",
     "managedOnGooglePlay": "په Google Play باندې اداره کېږي",
     "managedInAppStore": "په App Store کې اداره کېږي",
@@ -2910,7 +2628,6 @@
     "unavailableDescription": "Kilo Pass په Android کې د in-app پیرود په توګه نه شته. دا په ویب کې اداره کړئ.",
     "webManagementDescription": "دا Kilo Pass په ویب کې اداره کیږي.",
     "legalDisclosure": "Kilo Pass یو خودکار تازه کېدونکی میاشتنی ګډون دی. پیسې ستاسو Apple ID ته د پیرود د تایید په وخت کې اخیستل کیږي. ګډونونه هر میاشت په ښودل شوي نرخ باندې په اتوماتیک ډول نوي کیږي، پرته له دې چې د اوسنۍ مودې له پای ته رسېدو ۲۴ ساعته مخکې لغوه شي. هر وخت د خپل App Store حساب تنظیماتو کې اداره یا لغوه کړئ.",
-    "legalPrivacyPolicy": "د محرمیت پالیسي",
     "legalTermsOfUse": "د استعمال شرایط (EULA)",
     "purchaseDifferentAccount": "دا د App Store پیرود ستاسو د Kilo حساب سره تړلی نه دی. د پیرود لپاره کارول شوي Apple Account ته ننوځئ، بیا هڅه وکړئ.",
     "restoreFailed": "پیرودونه بیرته راوړل ناکام شول. بیا هڅه وکړئ.",
@@ -2939,7 +2656,6 @@
     "privacyPolicyPrefix": "ستاسو ډاټا د",
     "privacyPolicy": "د Kilo محرمیت پالیسي",
     "onDevice": "په وسیله",
-    "loading": "پورته کېږي…",
     "couldNotLoadTranscription": "ستاسو د لیکلو ترتیب نه شو پورته کېدلای.",
     "signInToManageTranscription": "د آنلاین لیکلو مدیریت لپاره ننوځئ.",
     "onlineTranscription": "آنلاین لیکل",
@@ -2956,7 +2672,6 @@
     "voiceTranscriptionTitle": "د غږ لیکل",
     "retentionPrefix": "بشپړ ساتلو دورې، ستاسو حقونه، او د اړیکو معلومات په",
     "backToConsent": "رضایت ته بیرته",
-    "back": "شاته",
     "revokeConsent": "رضایت لغوه کړئ",
     "revokeConsentTitle": "د ډاټا شریکولو رضایت لغوه کړئ؟",
     "acceptAndContinue": "ومنئ او دوام ورکړئ",
@@ -2990,7 +2705,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "هغه مهال پټ شوي سکرین شاټونه چې تېروتنه پېښیږي، او د غونډو د یوې کوچنۍ نمونې پټ شوي ثبتونه.",
     "errorScreenshotsWhy": "وګورئ چې ایپ هغه مهال څه ښودلي چې یو څه خراب شول.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "د نصب سرچینه او د کمپاین پېژندونکي.",
     "installAttributionWhy": "پوهیدل چې کومې چینلونه نوي کاروونکي راوړي.",
     "installAttributionWho": "AppsFlyer.",
@@ -2999,7 +2713,6 @@
     "voiceTranscriptionWho": "یوازې په وسیله، یا Apple یا Google هغه مهال چې دا وسیله آفلاین نه شي لیکلای.",
     "installAttributionPromptTitle": "د نصب منسوبیت ته اجازه ورکړئ؟",
     "installAttributionPromptMessage": "Kilo د Apple تعقیب اجازه یوازې د دې پوهیدو لپاره کاروي چې کومه چینل دلته مو راوړلی. ستاسو لارښودونه او خبرې اترې هیڅکله نه کارول کېږي.",
-    "continue": "ادامه ورکړئ",
     "what": "څه",
     "why": "ولې",
     "who": "څوک"
@@ -3021,7 +2734,6 @@
       "selectDescription": "د دوام لپاره له خپل پروفایل څخه یو سازمان وټاکئ.",
       "selectOrganization": "یو سازمان وټاکئ",
       "unavailableDescription": "دا سازمان نور شتون نلري. د دوام لپاره له خپل پروفایل څخه یو وټاکئ.",
-      "accessDeniedTitle": "لاسرسی رد شو",
       "accessDeniedDescription": "تاسو دې سازمان ته لاسرسی نه لرئ."
     },
     "creditActivity": {
@@ -3040,16 +2752,12 @@
         "accounting_adjustment": "د محاسبې سمون",
         "credits_expired": "کریډیټونه منقضي شوي"
       },
-      "loadMore": "نور بار کړئ",
-      "loadMoreFailed": "نور بار کیدی نشو",
       "truncated": "پخوانۍ کریډیټي کړنې شته دي."
     },
     "inviteMember": {
       "emailError": "یو سم بریښنالیک آدرس دننه کړئ",
-      "emailLabel": "بریښنالیک",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "تاسو د غړو بلنې اجازه نلرئ.",
-      "roleLabel": "رول",
       "roleMember": "رول: غړی",
       "sendInvite": "بلنه واستوئ",
       "title": "غړی بلنه ورکړئ"
@@ -3066,18 +2774,13 @@
         "paid": "ورکړل شوی",
         "open": "خلاص",
         "void": "باطل",
-        "draft": "مسوده",
-        "uncollectible": "نه راټولېدونکی",
-        "unknown": "نامعلوم"
+        "uncollectible": "نه راټولېدونکی"
       },
-      "loadMore": "نور بار کړئ",
       "loadMoreFailed": "نور بار کیدی نشو",
       "truncated": "پخوانۍ رسیدونه شته دي."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "د ټیټ توازن خبرتیا فعاله کړئ",
-      "enabled": "فعال شوی",
       "notifyEmailsLabel": "بریښنالیکونه خبر کړئ",
       "permissionDenied": "تاسو د بیلینګ خبرتیاو مدیریت اجازه نلرئ.",
       "separateEmailsHint": "څو بریښنالیکونه په کامو سره جلا کړئ.",
@@ -3101,12 +2804,10 @@
       "emptyDescriptionCanInvite": "د دې سازمان کې د همکارۍ پیل لپاره همکارانو ته بلنه ورکړئ.",
       "emptyDescriptionCannotInvite": "د همکارانو بلنې لپاره له یو مالک یا بیلینګ مدیر څخه وغواړئ.",
       "emptyTitle": "لا هیڅ غړی نشته",
-      "inviteMember": "غړی بلنه ورکړئ",
       "invitedDate": "{{date}} بلنه ورکړل شوه",
       "limitPerDay": "{{amount}}/ورځ",
       "manageA11y": "{{name}} اداره کړئ",
       "manageInvitationA11y": "د {{email}} بلنه اداره کړئ",
-      "removeConfirm": "لرې کړئ",
       "removeMember": "غړی لرې کړئ",
       "removeMemberMessage": "{{name}} له دې سازمان څخه لرې کړئ؟",
       "revokeConfirm": "لغوه کړئ",
@@ -3121,31 +2822,23 @@
         "billingManager": "د بیلینګ مدیر"
       },
       "emailStatusFailed": "بریښنالیک ناکام شو",
-      "emailStatusPending": "په انتظار",
       "inviteCreated": "بلنه جوړه شوه",
       "pendingInvitations": "په انتظار کې بلنې",
       "resendInvite": "بلنه بیا واستوئ",
       "shareInviteLink": "د بلنې لینک شریک کړئ"
     },
-    "permissionDenied": {
-      "back": "شاته",
-      "title": "لاسرسی رد شو"
-    },
     "usageStats": {
-      "cost": "لګښت",
       "inputTokens": "ننوتني ټوکنونه",
       "last30Days": "وروستۍ ۳۰ ورځې",
       "outputTokens": "بهرني ټوکنونه",
       "requests": "غوښتنې"
     },
     "hub": {
-      "title": "سازمان",
       "renameTitle": "سازمان نوم بدل کړئ",
       "renamePlaceholder": "د سازمان نوم دننه کړئ",
       "balance": "توازن",
       "organizationSeats": "د سازمان څوکۍ",
-      "lowBalanceBelow": "له {{amount}} لاندې",
-      "lowBalanceOff": "بند"
+      "lowBalanceBelow": "له {{amount}} لاندې"
     },
     "kiloPass": {
       "activating": "فعالول",
@@ -3153,9 +2846,6 @@
       "couldNotLoadStatus": "حالت نه شو پورته کېدلای",
       "creditProcessingDelayed": "د کریډیټ پروسس ځنډېدلی · په اتومات ډول بیا هڅه کېږي",
       "ended": "پای ته رسېدلی",
-      "endsOn": "{{date}} پای ته رسیږي",
-      "loading": "پورته کېږي…",
-      "manageHint": "په ویب باندې د Kilo Pass مدیریت پرانیزي.",
       "notSubscribed": "ګډون نه دی شوی",
       "overallocated": "د Pass ګمارنې له ورکړل شویو څوکیو ډېرې دي",
       "paidSeat_one": "{{displayCount}} ورکړل شوې څوکۍ",
@@ -3165,13 +2855,11 @@
       "paymentPending": "ورکړه په انتظار کې ده",
       "processingBlocked": "پروسس بند شوی",
       "processingNeedsReview": "پروسس بیا کتنې ته اړتیا لري",
-      "retry": "بیا هڅه وکړئ",
       "retryHint": "د Kilo Pass حالت پورته کول بیا هڅوي.",
       "setupHint": "په ویب باندې د Kilo Pass جوړول پرانیزي."
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "د دې برېښنالیک سره یو حساب لا دمخه د بل ننوتلو میتود سره شته. بل میتود هڅه وکړئ یا '$t(login.moreSignInOptions)' وکاروئ.",
     "differentOauth": "د دې برېښنالیک سره یو حساب لا دمخه د بل ننوتلو میتود سره شته. بل میتود هڅه وکړئ یا '$t(login.moreSignInOptions)' وکاروئ.",
     "ssoError": "ستاسو سازمان SSO ته اړتیا لري. '$t(login.moreSignInOptions)' وکاروئ.",
     "blocked": "دا حساب بند شوی دی. مهرباني وکړئ له ملاتړ سره اړیکه ونیسئ.",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "د ننوتلو پیل ناکام شو. مهرباني وکړئ بیا هڅه وکړئ.",
     "couldNotOpenBrowser": "براوزر خلاصول کیدی نشو. مهرباني وکړئ بیا هڅه وکړئ.",
     "signInTimedOut": "د ننوتلو وخت ختم شو. مهرباني وکړئ بیا هڅه وکړئ.",
-    "signInFailed": "ننوتل ناکام شول. مهرباني وکړئ بیا هڅه وکړئ.",
     "networkError": "د شبکې تېروتنه. مهرباني وکړئ بیا هڅه وکړئ.",
     "accessDeniedByUser": "د کارن لخوا لاسرسی رد شو",
     "codeExpired": "کوډ پای ته رسیدلی",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "بېرته ترجیحاتو ته"
   },
   "quickChat": {
-    "title": "د چټ پیغامونه",
-    "composer": {
-      "placeholder": "پیغام"
-    },
     "empty": {
       "title": "چټ پیل کړئ",
       "description": "د ماډل سره د خبرو کولو لپاره پیغام ولېږئ."
     },
-    "working": "روان",
     "historyRetry": "د چټ تاریخ بار کیدلای نه شو.",
-    "catalogRetry": "ماډلونه بار نه شول",
     "sendError": "د پیغام لیږل ممکن نه شول. بیا هڅه وکړئ."
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "د اجنټانو د لیدلو لپاره ننوزئ",
     "privacy": "اجنټان لیدلو لپاره Kilo پرانیزئ",
     "openAgents": "اجنټان پرانیزئ",
-    "running": "روان",
     "needsInput": "ورودی ته اړتیا لري",
-    "idle": "بې کاره",
     "channelName": "فعال اجنټان",
     "activityKitDisabledBody": "په قلف شوې پرده کې د فعالو اجنټانو د لیدلو لپاره په ترتیباتو کې ژوندي فعالیتونه فعال کړئ."
   }

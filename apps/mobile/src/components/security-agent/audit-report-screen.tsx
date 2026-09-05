@@ -27,13 +27,13 @@ const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
 // Literal keys, never a template: the catalog check scans the source for the
 // keys a lookup passes on, and a computed key is invisible to it.
 const SEVERITY_LABEL_KEYS = {
-  critical: 'securityAgent.sla.critical',
+  critical: 'common.critical',
   high: 'securityAgent.sla.high',
   medium: 'securityAgent.sla.medium',
   low: 'securityAgent.sla.low',
   // A finding whose severity the scanner never reported. The SLA policy has no
   // row for it, so reuse the finding-details word.
-  unknown: 'securityAgent.findingDetails.unknown',
+  unknown: 'common.unknown',
 } as const;
 
 // Personal and org procedures resolve to nominally distinct tRPC option
@@ -109,10 +109,7 @@ function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }
     <View className="gap-3 rounded-lg bg-secondary p-3">
       <Text className="text-sm font-medium">{t('securityAgent.auditReport.summary')}</Text>
       <View className="flex-row flex-wrap gap-x-6 gap-y-2">
-        <SummaryCount
-          label={t('securityAgent.auditReport.findings')}
-          value={report.summary.findingCount}
-        />
+        <SummaryCount label={t('common.findings')} value={report.summary.findingCount} />
         <SummaryCount
           label={t('securityAgent.auditReport.events')}
           value={report.summary.activityCount}
@@ -241,7 +238,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
       {query.isPending && query.isPaused && (
         <QueryError
           variant="offline"
-          message={t('securityAgent.auditReport.checkConnection')}
+          message={t('organization.boundary.loadErrorMessage')}
           onRetry={() => void query.refetch()}
         />
       )}

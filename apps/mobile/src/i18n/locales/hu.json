@@ -27,15 +27,119 @@
     "somethingWentWrong": "Valami hiba történt",
     "couldNotOpen": "Nem sikerült megnyitni a(z) {{label}} elemet",
     "link": "hivatkozás",
-    "takingLonger": "Ez tovább tart a vártnál. Bezárhatja, és később újra ellenőrizheti."
+    "takingLonger": "Ez tovább tart a vártnál. Bezárhatja, és később újra ellenőrizheti.",
+    "cameraAccessDisabled": "Kamera-hozzáférés letiltva",
+    "copyLink": "Hivatkozás másolása",
+    "reviewPr": "PR áttekintése",
+    "sendMessage": "Üzenet küldése",
+    "remaining": "Hátralévő",
+    "imageUnavailable": "A kép nem érhető el",
+    "open": "{{name}} megnyitása",
+    "loading": "Betöltés…",
+    "queued": "Sorban",
+    "cost": "Költség",
+    "model": "Modell",
+    "reportSubmittedReceipt": "Jelentés elküldve. Azonosító: {{receiptId}}",
+    "role": "Szerep",
+    "allModels": "Összes modell",
+    "noModelsAvailable": "Nem érhetők el modellek",
+    "recommended": "Ajánlott",
+    "searchModels": "Modellek keresése...",
+    "bitbucketConnected": "Bitbucket csatlakoztatva",
+    "connectBitbucket": "Bitbucket csatlakoztatása",
+    "connectGithub": "GitHub csatlakoztatása",
+    "connectGitlab": "GitLab csatlakoztatása",
+    "discard": "Elvetés",
+    "repository": "Adattár",
+    "newSession": "Új munkamenet",
+    "details": "Részletek",
+    "pullRequest": "pull request",
+    "sessionExited": "A munkamenet kilépett",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "Hozzáférés megtagadva",
+    "notFound": "Nem található",
+    "platform": "Platform",
+    "contentTruncated": "Tartalom csonkolva",
+    "truncated": "Csonkolva",
+    "added": "Hozzáadva",
+    "deleted": "Törölve",
+    "updated": "Frissítve",
+    "clearFilters": "Szűrők törlése",
+    "clearSearch": "Keresés törlése",
+    "couldNotLoadSessions": "A munkamenetek betöltése nem sikerült",
+    "delete": "Törlés",
+    "rename": "Átnevezés",
+    "idle": "Tétlen",
+    "online": "Online",
+    "starting": "Indítás...",
+    "noKiloclawInstances": "Nincsenek KiloClaw-példányok",
+    "personal": "Személyes",
+    "reply": "Válasz",
+    "closeReactions": "Reakciók bezárása",
+    "recent": "Közelmúlt",
+    "connect": "Csatlakoztatás",
+    "codeReviewer": "Kódellenőrző",
+    "performance": "Teljesítmény",
+    "all": "Összes",
+    "critical": "Kritikus",
+    "off": "Ki",
+    "notConnected": "Nincs csatlakoztatva",
+    "allRepositories": "Minden adattár",
+    "repositories": "Tárhelyek",
+    "connected": "Csatlakoztatva",
+    "organization": "Szervezet",
+    "couldNotLoadRepositories": "Nem sikerült betölteni a tárhelyeket",
+    "selectedRepositories": "Kiválasztott adattárak",
+    "branch": "Ág",
+    "findings": "Észlelések",
+    "keepRunning": "Futtatás folytatása",
+    "status": "Állapot",
+    "retryLoadingMore": "Továbbiak betöltésének újrapróbálása",
+    "balanced": "Kiegyensúlyozott",
+    "couldNotLoadOrganizations": "A szervezetek betöltése nem sikerült",
+    "yourOwnRepositories": "A saját tárhelyeid",
+    "selectRepositories": "Adattárak kiválasztása",
+    "cancelled": "Lemondva",
+    "failed": "Sikertelen",
+    "pending": "Függőben",
+    "deviceSessions": "Eszközmunkamenetek",
+    "working": "Feldolgozás",
+    "goBack": "Vissza",
+    "ends": "Vége: {{date}}",
+    "privacyPolicy": "Adatvédelmi irányelvek",
+    "disabled": "Letiltva",
+    "enabled": "Engedélyezve",
+    "couldNotLoadModels": "Nem sikerült betölteni a modelleket",
+    "close": "Bezárás",
+    "remove": "Eltávolítás",
+    "kiloclaw": "KiloClaw",
+    "notifications": "Értesítések",
+    "loadMore": "További betöltése",
+    "email": "E-mail",
+    "draft": "Piszkozat",
+    "prReview": "PR-ellenőrzés",
+    "dismissed": "Elvetve",
+    "closed": "Lezárva",
+    "preferences": "Beállítások",
+    "agents": "Ügynökök",
+    "securityAgent": "Biztonsági ügynök",
+    "profile": "Profil",
+    "chat": "Csevegés",
+    "file": "Fájl",
+    "keepEditing": "Szerkesztés folytatása",
+    "signOut": "Kijelentkezés",
+    "unknown": "Ismeretlen",
+    "message": "Üzenet",
+    "reactions": "Reakciók",
+    "openPullRequest": "Pull request megnyitása",
+    "couldnTLoadMore": "Nem sikerült betölteni továbbiakat"
   },
   "language": {
-    "title": "Nyelv",
     "restarting": "Újraindítás a nyelv alkalmazásához",
     "couldNotRestart": "Nem sikerült az újraindítás",
     "languageSaved": "A nyelv beállítása mentve.",
     "catalogLoadFailed": "Nem sikerült betölteni a nyelvet. Kérjük, próbálja újra.",
-    "retry": "Újra",
     "search": "Nyelvek keresése",
     "noMatches": "Nem található nyelv",
     "deviceLanguage": "Eszköz nyelve",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "Bejelentkezési kód: {{code}}",
     "openSignInPageInBrowser": "Bejelentkezési oldal megnyitása böngészőben",
     "copySignInLink": "Bejelentkezési hivatkozás másolása",
-    "copyLink": "Hivatkozás másolása",
     "cancelSignIn": "Bejelentkezés megszakítása",
     "startingSignIn": "Bejelentkezés indítása...",
     "organizationUsesSso": "A szervezete egyszeri bejelentkezést használ.",
@@ -62,23 +165,19 @@
     "emailAddress": "E-mail cím",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "Folytatás e-maillel",
-    "continue": "Folytatás",
     "enterCodeSentTo": "Adja meg a(z) {{email}} címre küldött kódot",
     "codeArrivalHint": "Ha jogosult erre a címre, a kód egy percen belül megérkezik.",
     "verifyCode": "Kód ellenőrzése",
     "resendCode": "Kód újraküldése",
-    "back": "Vissza",
     "termsPrefix": "A folytatással elfogadja a",
     "terms": "Feltételeket",
     "termsConnector": " és a ",
     "termsSuffix": ".",
-    "privacyPolicy": "Adatvédelmi irányelvek",
     "moreSignInOptions": "További bejelentkezési lehetőségek",
     "couldNotCompleteSignIn": "Nem sikerült a bejelentkezés. Kérjük, próbálja újra.",
     "sessionEnded": "A munkamenet lejárt. Kérjük, jelentkezzen be újra.",
     "signInCodeExpired": "A bejelentkezési kód lejárt. Kérjük, próbálja újra.",
     "accessDenied": "A hozzáférés megtagadva.",
-    "somethingWentWrong": "Valami hiba történt. Kérjük, próbálja újra.",
     "codeSent": "Kód elküldve",
     "accountCreated": "Fiók létrehozva. Üdvözöljük a Kilo szolgáltatásban.",
     "pleaseEnterEmail": "Kérjük, adja meg az e-mail címét.",
@@ -86,24 +185,16 @@
     "or": "vagy"
   },
   "profile": {
-    "title": "Profil",
-    "agents": "Ügynökök",
-    "codeReviewer": "Kódellenőrző",
     "codeReviewerSubtitle": "Automatikus PR-ellenőrzések",
-    "securityAgent": "Biztonsági ügynök",
     "securityAgentSubtitle": "Sérülékenységek keresése és javítása",
     "reviews": "Ellenőrzések",
-    "prReview": "PR-ellenőrzés",
     "prReviewSubtitle": "Pull requestek ellenőrzése mobilon",
-    "organization": "Szervezet",
     "couldNotLoadOrganization": "Nem sikerült betölteni a szervezetet",
     "couldNotLoadOrganizationDescription": "A szervezeti és ügynökbeállítások nem érhetők el, amíg ez be nem töltődik.",
     "linkedAccounts": "Összekapcsolt fiókok",
     "couldNotLoadAccounts": "Nem sikerült betölteni a fiókokat",
     "app": "Alkalmazás",
-    "preferences": "Beállítások",
     "preferencesSubtitle": "Megjelenés, értesítések, gondolkodás és képernyőviselkedés",
-    "deviceSessions": "Eszközmunkamenetek",
     "deviceSessionsSubtitle": "Más eszközök áttekintése és kijelentkeztetése",
     "feedback": "Visszajelzés",
     "privacyChoices": "Adatvédelmi döntések",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "A jóváírási egyenlege üres. Ennél a fióknál a jóváírásokat az iOS-alkalmazáson kívül kezelik.",
     "signOutTitle": "Kijelentkezik?",
     "signOutMessage": "A munkaterület eléréséhez újra be kell jelentkeznie.",
-    "signOutConfirm": "Kijelentkezés",
     "deleteAccountTitle": "Törli a fiókot?",
     "deleteAccountMessage": "Ez véglegesen törli a fiókját, és kijelentkezteti Önt. E-mailben megerősítő kódot küldünk.",
     "deleteAccountConfirm": "Fiók törlése",
     "accountDeleted": "A fiókja törölve lett.",
     "viewOrganization": "Szervezet megtekintése",
     "manageOrganization": "Szervezet kezelése",
-    "personal": "Személyes",
     "selectAccount": "Fiók kiválasztása",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-mail",
     "providerTestAccount": "Tesztfiók",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Vállalati SSO"
   },
   "preferences": {
-    "title": "Beállítások",
     "autoExpandThinking": "Gondolkodás automatikus kibontása",
     "autoExpandThinkingSubtitle": "Az ügynök gondolkodásának kibontott megjelenítése, amikor befejezi.",
     "keepScreenOn": "Képernyő bekapcsolva tartása a munkamenet oldalán",
     "keepScreenOnSubtitle": "Tartsa ébren a képernyőt, amíg a munkamenet dolgozik.",
     "appearance": "Megjelenés",
-    "notifications": "Értesítések",
     "notificationsSubtitle": "Leküldéses beállítások",
     "appearanceSystem": "Rendszer",
     "appearanceLight": "Világos",
@@ -161,7 +245,6 @@
   "prReview": {
     "pullRequestUnavailable": "Pull request nem érhető el",
     "pullRequestUnavailableDescription": "Ez a PR nem nyitható meg. Lehet, hogy törölték, a tárhely privát, vagy a Kilo GitHub App nincs telepítve rá.",
-    "accessDenied": "Hozzáférés megtagadva",
     "accessDeniedDescription": "Nincs jogosultsága ennek a pull requestnek a megtekintéséhez.",
     "noFilesChanged": "Nincs módosított fájl",
     "noFilesChangedDescription": "Ehhez a pull requesthez nincs fájlváltozás.",
@@ -177,7 +260,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Nem sikerült betölteni a fájlokat",
-      "checkConnection": "Ellenőrizze a kapcsolatot, és próbálja újra.",
       "retryLoadingFiles": "Fájlok betöltésének újrapróbálása",
       "filterPlaceholder": "Fájlok szűrése elérési út alapján",
       "viewedCount": "{{viewed}} / {{total}} megtekintve",
@@ -289,7 +371,6 @@
         "closed": "Ez a pull request lezárva"
       },
       "partialSuccessBanner": {
-        "title": "Összevonva",
         "body": "Nem sikerült törölni az ágat: {{reason}}",
         "accessibility": "Összevonva. Nem sikerült törölni az ágat: {{reason}}"
       },
@@ -331,7 +412,6 @@
       "unresolveThread": "Szál megoldásának visszavonása",
       "resolved": "Megoldva",
       "outdated": "Elavult",
-      "file": "Fájl",
       "comment_one": "1 megjegyzés",
       "comment": "{{displayCount}} megjegyzés",
       "comment_other": "{{displayCount}} megjegyzés",
@@ -339,9 +419,6 @@
       "couldNotLoadMore": "Nem sikerült betölteni további megjegyzéseket.",
       "retryLoadingMore": "További megjegyzések betöltésének újrapróbálása",
       "loadMoreComments": "További megjegyzések betöltése",
-      "loadMore": "További betöltése",
-      "closeReactions": "Reakciók bezárása",
-      "reactionsTitle": "Reakciók",
       "addReaction": "Reakció hozzáadása",
       "reactionPill": "{{emoji}} reakció, {{displayCount}} {{countLabel}}",
       "reaction_one": "reakció",
@@ -352,14 +429,11 @@
       "reportUser": "Felhasználó jelentése",
       "mute": "Némítás",
       "block": "Tiltás",
-      "somethingWentWrong": "Valami hiba történt",
-      "reportSubmitted": "Jelentés elküldve. Azonosító: {{receiptId}}",
       "blockedUser": "{{login}} tiltva",
       "mutedUser": "{{login}} némítva",
       "replyPlaceholder": "Válasz…",
       "replyBody": "Válasz szövege",
       "submitReply": "Válasz elküldése",
-      "reply": "Válasz",
       "termsTitle": "Szolgáltatási feltételek",
       "termsCopy": "A hozzászóláshoz legalább 13 évesnek kell lennie.",
       "termsAcceptRetry": "Nem sikerült elfogadni a feltételeket. Ellenőrizze a kapcsolatot, és próbálja újra.",
@@ -367,7 +441,6 @@
       "acceptTerms": "Elfogadás",
       "replyBadRequest": "Ez a válasz nem küldhető el. Lehet, hogy a szál megváltozott.",
       "replyForbidden": "Nincs jogosultsága válaszolni erre a pull requestre.",
-      "couldNotReply": "Nem sikerült válaszolni.",
       "moderation": {
         "reportContent": {
           "terminal": "Ez a megjegyzés nem jelenthető be.",
@@ -420,8 +493,6 @@
     },
     "couldNotOpenGitHubAppSettings": "Nem sikerült megnyitni a GitHub App beállításait",
     "installKiloGitHubApp": "A Kilo GitHub App telepítése",
-    "connectionExpiredTitle": "A GitHub-kapcsolat lejárt",
-    "connectionExpiredDescription": "A GitHub-kapcsolata már nem érvényes. Ellenőrizze újra a kapcsolatot — szükség esetén a rendszer felkéri az újracsatlakozásra.",
     "checkConnection": "Kapcsolat ellenőrzése",
     "couldNotLoadPullRequest": "Nem sikerült betölteni a pull requestet",
     "description": "Leírás",
@@ -430,21 +501,18 @@
     "reviewPullRequest": "Pull request ellenőrzése",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "title": "PR-ellenőrzés",
       "eyebrow": "Pull request megnyitása URL-lel",
       "pastePrLink": "PR-hivatkozás beillesztése",
       "noRecentPrs": "Nincs közelmúltbeli PR",
       "noRecentPrsDescription": "Illesszen be egy PR-hivatkozást fent az ellenőrzés indításához — legközelebb itt fog megjelenni.",
       "couldNotLoad": "Nem sikerült betölteni",
-      "remove": "Eltávolítás",
       "removeFromRecentsTitle": "Eltávolítás a közelmúltból?",
       "removeFromRecentsMessage": "Ez a pull request eltávolításra kerül a közelmúltbeli elemei közül.",
       "removeRecentAccessibility": "{{repo}} eltávolítása a közelmúltból",
       "urlAccessibility": "GitHub pull request URL",
       "clearLink": "Pull request hivatkozás törlése",
       "pasteLink": "Pull request hivatkozás beillesztése",
-      "open": "Megnyitás",
-      "openPullRequest": "Pull request megnyitása"
+      "open": "Megnyitás"
     },
     "checks": {
       "title": "Ellenőrzések",
@@ -460,19 +528,14 @@
       "pending": "{{displayCount}} függőben",
       "skipped": "{{displayCount}} kihagyva",
       "checksCount": "{{displayCount}} ellenőrzés",
-      "checkDetails": "ellenőrzés részletei",
-      "pullRequest": "pull request"
+      "checkDetails": "ellenőrzés részletei"
     },
     "inbox": {
       "title": "Bejövő",
-      "recent": "Közelmúlt",
-      "draft": "Piszkozat",
       "loading": "Bejövő betöltése",
       "noReviewRequests": "Nincs ellenőrzési kérelem",
       "noReviewRequestsDescription": "Az Ön ellenőrzésére váró pull requestek itt jelennek meg. Fent bármelyik PR-hivatkozást beillesztheti.",
-      "couldNotLoad": "Nem sikerült betölteni a bejövőt",
-      "couldNotLoadMore": "Nem sikerült betölteni továbbiakat",
-      "retryLoadingMore": "Továbbiak betöltésének újrapróbálása"
+      "couldNotLoad": "Nem sikerült betölteni a bejövőt"
     },
     "composer": {
       "commentBodyPlaceholder": "Megjegyzés írása",
@@ -487,8 +550,6 @@
       "loadFailedTitle": "Nem sikerült betölteni a megjegyzés-szerkesztőt",
       "discardTitle": "Elveti a megjegyzést?",
       "discardMessage": "A piszkozata el fog veszni.",
-      "keepEditing": "Szerkesztés folytatása",
-      "discard": "Elvetés",
       "comment": "Megjegyzés",
       "insertSuggestionA11y": "Kódsugallat beszúrása",
       "insertSuggestion": "Sugallat beszúrása",
@@ -496,12 +557,10 @@
       "suggestionsOnlyAddedLines": "A sugallatok csak hozzáadott sorokra vonatkoznak.",
       "tapDiffLineToSuggest": "A sugallatok engedélyezéséhez koppintson egy diff-sorra."
     },
-    "screenTitle": "PR-ellenőrzés",
     "connect": {
       "checkFailedTitle": "Nem sikerült ellenőrizni a GitHub-kapcsolatot",
       "checkFailedMessage": "A bejelentkezési állapot nem érhető el, amíg ez be nem töltődik.",
       "reconnectTitle": "Újracsatlakozás a GitHubhoz",
-      "title": "GitHub csatlakoztatása",
       "reconnectDescription": "A GitHub-kapcsolata visszavonásra került. Csatlakozzon újra a pull requestek mobilos ellenőrzéséhez.",
       "description": "Csatlakoztassa GitHub-fiókját a pull requestek mobilos ellenőrzéséhez."
     },
@@ -510,11 +569,9 @@
       "shareA11y": "Pull request megosztása"
     },
     "submit": {
-      "title": "Ellenőrzés elküldése",
       "loadFailedTitle": "Nem sikerült betölteni az ellenőrzés elküldését",
       "deletePendingTitle": "Törli a függőben lévő megjegyzést?",
       "deletePendingMessage": "Ez a megjegyzés eltávolításra kerül az ellenőrzési sorból.",
-      "delete": "Törlés",
       "summaryOptional": "Összefoglaló (opcionális)",
       "pendingComment_one": "függőben lévő megjegyzés",
       "pendingComment": "függőben lévő megjegyzés",
@@ -527,19 +584,15 @@
     },
     "reconnectNotice": {
       "title": "A GitHub-kapcsolat lejárt",
-      "message": "A GitHub-kapcsolata már nem érvényes. Ellenőrizze újra a kapcsolatot — szükség esetén a rendszer felkéri az újracsatlakozásra.",
-      "checkConnection": "Kapcsolat ellenőrzése"
+      "message": "A GitHub-kapcsolata már nem érvényes. Ellenőrizze újra a kapcsolatot — szükség esetén a rendszer felkéri az újracsatlakozásra."
     },
     "eventChips": {
       "comment": "Megjegyzés",
       "requestChanges": "Módosítások kérése",
-      "approve": "Jóváhagyás",
       "label": "Ellenőrzési esemény"
     },
     "overview": {
       "stateMerged": "Összevonva",
-      "stateClosed": "Lezárva",
-      "stateDraft": "Piszkozat",
       "stateOpenApproved": "Nyitva · Jóváhagyva",
       "stateOpenChangesRequested": "Nyitva · Módosítások kérve",
       "stateOpenReviewRequired": "Nyitva · Ellenőrzés szükséges",
@@ -564,14 +617,11 @@
       "reviewChangesRequested": "Változtatásokat kértek",
       "reviewCommented": "Hozzászólva",
       "reviewPending": "Értékelésre vár",
-      "openIssueA11y": "#{{number}} hibajegy megnyitása a GitHubon",
-      "reviewDismissed": "Elvetve"
+      "openIssueA11y": "#{{number}} hibajegy megnyitása a GitHubon"
     },
     "pendingComment": {
       "editOutdatedA11y": "Elavult függőben lévő megjegyzés szerkesztése itt: {{location}}",
       "editA11y": "Függőben lévő megjegyzés szerkesztése itt: {{location}}",
-      "emptyBody": "(üres)",
-      "outdated": "Elavult",
       "staleHint": "a PR azóta elmozdult, hogy ezt írta.",
       "deleteA11y": "Függőben lévő megjegyzés törlése itt: {{location}}",
       "deletedAnnouncement": "Függőben lévő megjegyzés törölve",
@@ -587,8 +637,6 @@
       "discussion": "Beszélgetés"
     },
     "fileStatus": {
-      "added": "Hozzáadva",
-      "deleted": "Törölve",
       "modified": "Módosítva",
       "renamed": "Átnevezve",
       "copied": "Másolva",
@@ -598,9 +646,7 @@
       "selectedTapToChange": "Kijelölve: {{label}}, koppintson a kijelölés módosításához",
       "tapToComment": "{{label}}, koppintson a megjegyzéshez",
       "truncationBanner": "A módosított {{total}} fájl közül az első {{limit}} megjelenítése — GitHub API-korlát",
-      "statusAdded": "Hozzáadva",
       "statusContext": "Kontextus",
-      "statusDeleted": "Törölve",
       "lineLabel": "{{status}} sor {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(üres)"
@@ -628,7 +674,6 @@
     }
   },
   "notifications": {
-    "title": "Értesítések",
     "liveActivities": "Élő tevékenységek",
     "liveActivitySubtitle": "Aktív ügynökök megjelenítése a zárolási képernyőn",
     "liveUpdates": "Élő frissítések",
@@ -651,7 +696,6 @@
     "disabledMessage": "Az értesítések engedélyezéséhez kapcsolja be őket az eszközbeállításokban.",
     "disableTitle": "Értesítések letiltása",
     "disableMessage": "Az értesítések letiltásához kapcsolja ki őket az eszközbeállításokban.",
-    "openSettings": "Beállítások megnyitása",
     "registrationFailed": "A regisztráció sikertelen volt. Ellenőrizze az értesítési engedélyeit.",
     "couldNotEnable": "Nem sikerült engedélyezni az értesítéseket. Kérjük, próbálja újra.",
     "previewAlways": "Mindig",
@@ -666,7 +710,6 @@
       "security": "Biztonsági megállapítások"
     },
     "category": {
-      "chatMessagesTitle": "Chat-üzenetek",
       "chatMessagesSubtitle": "válaszok a beszélgetéseiben",
       "agentAttentionTitle": "Az ügynöknek szüksége van Önre",
       "agentAttentionSubtitle": "kérések, engedély, bevitel szükséges",
@@ -674,32 +717,23 @@
       "agentUpdatesSubtitle": "köztes feladatüzenetek az ügynöktől",
       "sessionStatusTitle": "Munkamenet állapota",
       "sessionStatusSubtitle": "befejezett / sikertelen / vezérelhető",
-      "kiloclawActivityTitle": "KiloClaw-tevékenység",
       "kiloclawActivitySubtitle": "példány kész/sikertelen, ütemezett műveletek",
-      "balanceAlertsTitle": "Egyenlegriasztások",
       "balanceAlertsSubtitle": "alacsony szervezeti egyenlegre figyelmeztetések",
-      "securityFindingsTitle": "Biztonsági megállapítások",
       "securityFindingsSubtitle": "új megállapítások és SLA-emlékeztetők"
     }
   },
   "tabs": {
     "home": "Kezdőlap",
-    "agents": "Ügynökök",
-    "profile": "Profil",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fül, {{position}} a {{total}} közül",
-    "chat": "Csevegés"
+    "position": "{{name}}, fül, {{position}} a {{total}} közül"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Példány váltása",
       "couldNotLoadInstances": "Nem sikerült betölteni a példányokat",
-      "noInstances": "Nincsenek KiloClaw-példányok",
       "noInstancesDescription": "A csevegés indításához állítson be egy példányt.",
       "setUpKiloclaw": "KiloClaw beállítása",
-      "currentInstance": "{{title}}, aktuális",
-      "personal": "Személyes"
+      "currentInstance": "{{title}}, aktuális"
     },
     "conversation": {
       "failedToLoad": "Nem sikerült betölteni a beszélgetést",
@@ -718,16 +752,12 @@
       "couldNotSignIn": "Nem sikerült bejelentkezni a csevegésbe",
       "couldNotRefreshMessages": "Nem sikerült frissíteni az üzeneteket",
       "couldNotLoadHistory": "Nem sikerült betölteni a beszélgetési előzményeket",
-      "rename": "Átnevezés",
       "leave": "Elhagyás",
       "untitledConversation": "Cím nélküli beszélgetés",
       "createFailed": "Nem sikerült létrehozni a beszélgetést",
       "leaveFailed": "Nem sikerült elhagyni a beszélgetést"
     },
     "reactions": {
-      "title": "Reakciók",
-      "close": "Reakciók bezárása",
-      "recent": "Közelmúlt",
       "common": "Gyakori",
       "reactWith": "Reagálás: {{reaction}}",
       "accessibility": "{{emoji}} reakció, {{displayCount}}"
@@ -737,16 +767,13 @@
       "cancelReply": "Válasz visszavonása",
       "openInstance": "Példány megnyitása",
       "attachFile": "Fájl csatolása",
-      "messagePlaceholder": "Üzenet",
-      "cancelEdit": "Szerkesztés visszavonása",
-      "sendMessage": "Üzenet küldése"
+      "cancelEdit": "Szerkesztés visszavonása"
     },
     "conversationList": {
       "couldNotLoad": "Nem sikerült betölteni a beszélgetéseket",
       "emptyTitle": "Még nincs beszélgetés",
       "emptyDescription": "Hozzon létre egy beszélgetést a KiloClaw-példányával való csevegéshez.",
       "create": "Beszélgetés létrehozása",
-      "starting": "Indítás...",
       "newConversation": "Új beszélgetés",
       "openInstanceSettings": "Példánybeállítások megnyitása",
       "today": "Ma",
@@ -756,7 +783,6 @@
     },
     "attachment": {
       "open": "{{filename}} megnyitása",
-      "imageUnavailable": "A kép nem érhető el",
       "openFailed": "Nem sikerült megnyitni a csatolmányt. Ellenőrizze a kapcsolatot, és próbálja újra.",
       "attachFailed": "Nem sikerült csatolni a fájlt",
       "limit": "Legfeljebb {{displayCount}} fájlt csatolhat.",
@@ -786,11 +812,9 @@
       "yourMessage": "Az Ön üzenete",
       "messageFrom": "Üzenet tőle: {{author}}",
       "moreActions": "További műveletek",
-      "message": "Üzenet",
       "notDelivered": "Nem kézbesítve",
       "edited": "(szerkesztve)",
-      "image": "Kép",
-      "attachment": "Csatolmány"
+      "image": "Kép"
     },
     "messageActions": {
       "copied": "Másolva",
@@ -798,13 +822,11 @@
       "title": "Üzenet műveletei",
       "deleteTitle": "Törli az üzenetet?",
       "deleteMessage": "Ez eltávolítja az üzenetet a beszélgetésből.",
-      "delete": "Törlés",
       "deleteFailed": "Nem sikerült törölni az üzenetet",
       "removeReactionFailed": "Nem sikerült eltávolítani a reakciót",
       "addReactionFailed": "Nem sikerült reakciót hozzáadni",
       "retrySend": "Küldés újra",
       "moreReactions": "További reakciók",
-      "reply": "Válasz",
       "edit": "Szerkesztés",
       "sendFailed": "Nem sikerült elküldeni az üzenetet",
       "retrySendFailed": "Nem sikerült újraküldeni",
@@ -815,7 +837,6 @@
       "takePhoto": "Fotó készítése",
       "photoLibrary": "Fotótár",
       "files": "Fájlok",
-      "cameraAccessDisabled": "Kamera-hozzáférés letiltva",
       "cameraAccessMessage": "A fénykép készítéséhez engedélyezd a kamera-hozzáférést a Beállításokban."
     },
     "typingIndicator": {
@@ -825,10 +846,7 @@
       "typing_other": "{{names}} gépel..."
     },
     "botStatus": {
-      "online": "Online",
-      "idle": "Tétlen",
       "offline": "Offline",
-      "unknown": "Ismeretlen",
       "loadingUser": "Felhasználó betöltése...",
       "waitingForStatus": "Várakozás a bot állapotára...",
       "offlineMessage": "A bot offline. Az üzenetek folytatódnak, amikor újra csatlakozik."
@@ -841,7 +859,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Nem sikerült betölteni a KiloClaw példányokat",
     "billing": {
       "title": "Számlázás",
@@ -849,7 +866,6 @@
       "plan": "Terv",
       "finalTermEnds": "Utolsó időszak vége",
       "afterFinalTerm": "Az utolsó időszak után",
-      "remaining": "Hátralévő",
       "ends": "Vége",
       "expires": "Lejár",
       "noActivePlan": "Nincs aktív csomag",
@@ -857,7 +873,6 @@
       "managedByAdmin": "A számlázást a szervezeted adminisztrátora kezeli.",
       "couldNotLoad": "Nem sikerült betölteni a számlázási adatokat",
       "manageOnWeb": "Számlázás kezelése a weben",
-      "commitPlan": "Commit",
       "earlybird": "Korai madár",
       "finalCommitTermEndsOn": "Az utolsó Commit-időszakod {{date}}-kor ér véget. Folytasd Standard csomaggal {{price}} áron, vagy a tárhely megszűnik.",
       "freeTrial": "Ingyenes próba",
@@ -875,9 +890,9 @@
       "trialDaysRemaining": "Próba: {{remaining}} van hátra",
       "trialEndingSoon": "Próba hamarosan vége: {{remaining}}",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "Mi újság",
@@ -900,7 +915,6 @@
       "destroyMessage": "Ez véglegesen megsemmisíti a KiloClaw-példányodat és minden adatát. Ez a művelet nem vonható vissza.",
       "destroyTitle": "Példány megsemmisítése",
       "instance": "Példány",
-      "renameFailed": "Valami hiba történt",
       "couldNotCheckStatus": "Nem sikerült ellenőrizni a szolgáltatás állapotát",
       "dangerZone": "VESZÉLYES ZÓNA",
       "destroying": "Megsemmisítés...",
@@ -928,7 +942,6 @@
       "approveDeviceTitle": "Eszköz jóváhagyása",
       "approveMessage": "Engedélyezed a(z) {{label}} (kód: {{code}}) csatlakozását a példányodhoz?",
       "approveTitle": "Párosítási kérelem jóváhagyása",
-      "device": "Eszköz",
       "unknownDevice": "Ismeretlen eszköz"
     },
     "execPolicy": {
@@ -943,35 +956,21 @@
       "title": "Google-fiók",
       "couldNotLoad": "Nem sikerült betölteni a Google-fiók állapotát",
       "disconnected": "A Google-fiók le van választva. Telepítsd újra a példányt a változtatás érvényesítéséhez.",
-      "redeploy": "Újratelepítés",
       "setupCommand": "Beállítási parancs",
       "setupCommandHelp": "Futtasd ezt a parancsot egy terminálban, Dockerrel a saját számítógépeden, a Google-fiók csatlakoztatásához.",
       "failedToLoadCommand": "Nem sikerült betölteni a beállítási parancsot",
       "gmailNotifications": "Gmail-értesítések",
       "disconnect": "Google-fiók leválasztása",
-      "connected": "Csatlakoztatva",
       "copied": "Másolva!",
       "copyCommand": "Parancs másolása",
-      "disabled": "Letiltva",
       "disconnectConfirm": "Leválasztás",
       "disconnectMessage": "Eltávolítod a Google-fiókodat erről a példányról? Ez letiltja a Gmail-értesítéseket. A leválasztás után telepítsd újra a változtatások érvényesítéséhez.",
-      "disconnectTitle": "Google leválasztása",
-      "enabled": "Engedélyezve",
-      "notConnected": "Nincs csatlakoztatva"
+      "disconnectTitle": "Google leválasztása"
     },
     "modelList": {
-      "title": "Összes modell",
-      "searchPlaceholder": "Modellek keresése...",
-      "couldNotLoad": "Nem sikerült betölteni a modelleket",
-      "clearSearch": "Keresés törlése",
       "noMatches": "Egyetlen modell sem egyezik a kereséseddel",
-      "noModels": "Nem érhetők el modellek",
       "noModelsDescription": "A modellek itt jelennek meg, ha elérhetők lesznek.",
-      "noResultsFor": "Nincs eredmény a következőre: \"{{query}}\"",
-      "recommended": "Ajánlott"
-    },
-    "model": {
-      "title": "Modell"
+      "noResultsFor": "Nincs eredmény a következőre: \"{{query}}\""
     },
     "secrets": {
       "title": "Titkok",
@@ -988,12 +987,8 @@
       "setupGuideA11y": "{{label}} beállítási útmutató",
       "setupGuide": "Beállítási útmutató",
       "saving": "Mentés...",
-      "remove": "Eltávolítás",
       "removing": "Eltávolítás...",
-      "connected": "Csatlakoztatva",
-      "notConnected": "Nincs csatlakoztatva",
-      "updateToken": "Token frissítése",
-      "connect": "Csatlakoztatás"
+      "updateToken": "Token frissítése"
     },
     "versionPin": {
       "title": "Verziórögzítés",
@@ -1030,7 +1025,6 @@
       "start": "Indítás",
       "startMessage": "Biztos, hogy elindítod ezt a példányt?",
       "startTitle": "Példány indítása",
-      "starting": "Indítás...",
       "stop": "Leállítás",
       "stopMessage": "Biztos, hogy leállítod ezt a példányt?",
       "stopTitle": "Példány leállítása",
@@ -1040,7 +1034,6 @@
       "finishingSetup": "Beállítás befejezése",
       "finishingSetupDescription": "Légy türelmes, véglegesítjük a fiókodat. Ez általában csak egy pillanatot vesz igénybe.",
       "getStarted": "Kezdés",
-      "noInstances": "Nincsenek KiloClaw-példányok",
       "noInstancesDescription": "Hozd létre az első példányodat a kódolási ügynökök futtatásához."
     },
     "instance": {
@@ -1052,7 +1045,6 @@
     "list": {
       "createInstance": "Példány létrehozása",
       "organizations": "Szervezetek",
-      "personal": "Személyes",
       "accessIssue": {
         "trialExpired": "A próba lejárt, fizess elő a példány további használatához",
         "subscriptionCanceled": "Az előfizetés inaktív, fizess elő újra a példány további használatához",
@@ -1065,7 +1057,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Beszélgetés vele: {{name}}",
-        "online": "Online",
         "ready": "{{name}} készen áll",
         "warmedUp": "Minden készen van. Köszönj, amikor készen állsz."
       },
@@ -1076,9 +1067,7 @@
         "openKiloAi": "kilo.ai megnyitása",
         "provisioning": "Létrehozás",
         "review": "Felülvizsgálat",
-        "somethingWentWrong": "Valami hiba történt",
         "identityTitle": "Adj a botodnak egy személyazonosságot",
-        "close": "Bezárás",
         "couldNotLoad": "Nem sikerült betölteni a beállítási állapotot",
         "finishingSetup": "Beállítás befejezése — légy türelmes, miközben véglegesítjük a fiókodat.",
         "ready": "Kész",
@@ -1095,7 +1084,6 @@
         "location": "Helyszín",
         "locationPlaceholder": "Város vagy régió (opcionális)",
         "useCurrentLocation": "Jelenlegi hely használata",
-        "continue": "Folytatás",
         "locationDeniedTitle": "A helyhozzáférés megtagadva",
         "locationDeniedMessage": "A jelenlegi hely használatához engedélyezd a helyhozzáférést a Beállításokban.",
         "locationValidationFailed": "A helyszín nem volt ellenőrizhető.",
@@ -1132,7 +1120,6 @@
         "timeoutBody": "A(z) {{name}} beállítása a szokásosnál tovább tart (több mint {{displayMinutes}} perc).",
         "continueInBackground": "Folytatás a háttérben",
         "settingUp": "{{name}} beállítása",
-        "finishingSetup": "Beállítás befejezése",
         "connectingToAgent": "Csatlakozás az ügynökhöz",
         "startingSandbox": "A sandbox elindítása",
         "backgroundHint": "Általában kevesebb mint egy percet vesz igénybe. Bezárhatod — a háttérben folytatjuk a munkát."
@@ -1144,7 +1131,6 @@
       "gatewayProcess": "ÁTJÁRÓ FOLYAMAT",
       "lastExit": "Utolsó kilépés",
       "memory": "Memória",
-      "model": "Modell",
       "region": "Régió",
       "resources": "ERŐFORRÁSOK",
       "restarts": "Újraindítások",
@@ -1166,34 +1152,25 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Frontier",
       "frontierDescription": "A legmagasabb teljesítmény. A frontier modellekhez irányít érveléssel.",
-      "balancedLabel": "Kiegyensúlyozott",
       "balancedDescription": "A sebesség és a képesség okos egyensúlya alacsonyabb költséggel.",
-      "cost": "Költség",
-      "performance": "Teljesítmény",
       "autoModelA11y": "{{label}} automata modell",
       "currentModel": "Jelenlegi modell",
       "browseAllModels": "vagy válassz az 500+ modell közül",
       "browseAllModelsA11y": "Az összes 500+ modell böngészése"
     },
     "accessRequired": {
-      "trialExpiredTitle": "Fizess elő a weben",
       "trialExpiredBody": "A KiloClaw további használatához lépj a kilo.ai/claw oldalra a böngésződből. Az alkalmazásban nem tudsz előfizetni.",
-      "trialExpiredCta": "kilo.ai/claw megnyitása",
       "subscriptionCanceledTitle": "Fizess elő a weben",
       "subscriptionCanceledBody": "A KiloClaw használatához lépj a kilo.ai/claw oldalra a böngésződből. Az alkalmazásban nem tudsz előfizetni.",
       "subscriptionCanceledCta": "kilo.ai/claw megnyitása",
       "subscriptionPastDueTitle": "Fizetés frissítése a weben",
       "subscriptionPastDueBody": "Probléma volt a legutóbbi fizetéseddel. Lépj a kilo.ai/claw oldalra a böngésződből a frissítéshez. Az alkalmazásban nem tudod kezelni a számlázást.",
-      "subscriptionPastDueCta": "kilo.ai/claw megnyitása",
       "quarantinedTitle": "A példány karbantartást igényel",
       "quarantinedBody": "A KiloClaw-példányod karantén állapotban van, és jelenleg nem használható. A csapatunknak kell segítenie a helyreállításban.",
-      "quarantinedCta": "Folytatás a kilo.ai-n",
-      "multipleCurrentConflictTitle": "A fiók felülvizsgálatra szorul",
       "multipleCurrentConflictBody": "Egynél több aktív előfizetést találtunk a fiókodban, ezért szüneteltettük a dolgokat, hogy ne számlázzunk kétszer.",
       "multipleCurrentConflictCta": "Folytatás a kilo.ai-n",
       "nonCanonicalEarlybirdTitle": "Régebbi csomag észlelve",
       "nonCanonicalEarlybirdBody": "A korai hozzáférésű csomagod kézi felülvizsgálatot igényel, mielőtt mobilon használható lenne.",
-      "nonCanonicalEarlybirdCta": "Folytatás a kilo.ai-n",
       "iosTitle": "A KiloClaw nem érhető el iOS-en",
       "iosBody": "A KiloClaw hozzáférést a fiókhoz az iOS-alkalmazáson kívül kezelik.",
       "iosContact": "Kérdésed van? Lépj kapcsolatba: hi@kilo.ai."
@@ -1203,25 +1180,17 @@
       "openUnread_one": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
       "openUnread": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
       "openUnread_other": "{{name}} megnyitása, {{displayCount}} olvasatlan üzenet",
-      "open": "{{name}} megnyitása",
       "openSettings": "Beállítások megnyitása ehhez: {{name}}",
       "fixOnKiloAi": "Javítás a kilo.ai-n: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Csatornák",
       "devicePairingDescription": "Eszközkérelmek jóváhagyása",
-      "devicePairingLabel": "Eszközpárosítás",
       "execPolicyDescription": "Biztonsági beállítások",
-      "execPolicyLabel": "Végrehajtási szabályzat",
       "googleDescription": "Gmail, Naptár, Dokumentumok",
-      "googleLabel": "Google-fiók",
       "modelDescription": "AI-modell kiválasztása",
-      "modelLabel": "Modell",
       "secretsDescription": "Titkosított hitelesítő adatok",
-      "secretsLabel": "Titkok",
-      "versionPinDescription": "Rögzítés egy adott verzióhoz",
-      "versionPinLabel": "Verziórögzítés"
+      "versionPinDescription": "Rögzítés egy adott verzióhoz"
     },
     "avatar": {
       "arcade": "Játékterem",
@@ -1266,21 +1235,15 @@
       "placeholder": "pl. Érvényesítsd a hibakezelési konvencióinkat..."
     },
     "repos": {
-      "title": "Tárhelyek",
-      "couldNotLoad": "Nem sikerült betölteni a tárhelyeket",
       "unavailable": "A tárhelyek nem érhetők el — fejezd be a Bitbucket beállítását a kilo.ai-n.",
       "finishSetup": "Beállítás befejezése",
       "manageAccess": "Hozzáférés kezelése",
-      "allRepositories": "Minden adattár",
       "bitbucketNoRepositoriesDescription": "Ebben a Bitbucket-munkaterületen nem érhetők el tárhelyek.",
-      "bitbucketSetup": "Bitbucket beállítás",
-      "couldNotOpenGithubSettings": "Nem sikerült megnyitni a GitHub App beállításait",
       "gitlabNoRepositoriesDescription": "Lehet, hogy több csoporthoz vagy projekthez kell hozzáférést adnod a GitLabon.",
       "installGithubApp": "A GitHub-alkalmazás telepítése a tárhelyekre",
       "installGithubAppDescription": "Adj a Kilo GitHub-alkalmazásnak hozzáférést az átvizsgálni kívánt tárhelyekhez.",
       "noRepositoriesFound": "Nem találhatók tárhelyek",
-      "repositoryAccess": "tárhely-hozzáférés",
-      "selectedRepositories": "Kiválasztott adattárak"
+      "repositoryAccess": "tárhely-hozzáférés"
     },
     "style": {
       "title": "Áttekintési stílus",
@@ -1289,12 +1252,10 @@
       "roast": "Nyersen őszinte, és szórakoztatóan az",
       "strict": "Minden kijelölése, magas mérce"
     },
-    "title": "Kódellenőrző",
     "reviewDetail": {
       "title": "Felülvizsgálat",
       "cancelTitle": "Áttekintés lemondása?",
       "cancelMessage": "Ez leállítja a folyamatban lévő kód-áttekintést.",
-      "keepRunning": "Futtatás folytatása",
       "cancelReview": "Áttekintés lemondása",
       "retryTitle": "Áttekintés újra?",
       "retryMessage": "Ez újra lefuttatja a kód-áttekintést.",
@@ -1302,29 +1263,19 @@
       "couldNotLoad": "Nem sikerült betölteni az áttekintést",
       "couldNotGetLatest": "Nem sikerült lekérni a legújabbat.",
       "byline": "{{repo}} #{{number}}, szerző: {{author}}",
-      "findings": "Észlelések",
       "noFindings": "Nincsenek megállapítások",
       "showMore": "Továbbiak megjelenítése",
-      "details": "Részletek",
-      "branch": "Ág",
-      "platform": "Platform",
-      "model": "Modell",
       "created": "Létrehozva",
       "started": "Elkezdve",
-      "completed": "Befejezve",
-      "cost": "Költség",
       "tokens": "Tokenek",
       "tokensInOut": "{{input}} be / {{output}} ki",
-      "openPullRequest": "Pull request megnyitása",
       "council": "Tanács",
       "decision": "Döntés",
       "gate": "Átjáró",
       "gateNone": "Nincs",
       "gateHidden": "Rejtett",
       "checkRun": "Ellenőrzés futtatása",
-      "status": "Állapot",
       "threshold": "Küszöb",
-      "pullRequest": "pull request",
       "transcriptEmpty": "Ehhez az áttekintéshez nincs átirat.",
       "transcriptLive": "Élő",
       "transcriptRetry": "Nem sikerült betölteni az áttekintés átiratát.",
@@ -1339,13 +1290,10 @@
       "sessionError": "Munkamenet hiba: {{error}}",
       "statusWithValue": "Állapot: {{status}}",
       "toolName": "Eszköz: {{name}}",
-      "toolNameError": "Eszköz: {{name}} — hiba",
-      "unknownError": "Ismeretlen hiba"
+      "toolNameError": "Eszköz: {{name}} — hiba"
     },
     "reviewMemory": {
       "title": "Áttekintési memória",
-      "couldNotLoadMore": "Nem sikerült betölteni továbbiakat",
-      "retryLoadingMore": "Továbbiak betöltésének újrapróbálása",
       "loading": "Áttekintési memória betöltése",
       "couldNotLoad": "Nem sikerült betölteni az áttekintési memóriát",
       "off": "Az áttekintési memória ki van kapcsolva",
@@ -1364,13 +1312,9 @@
       "couldNotLoadProviders": "Nem sikerült betölteni a csatlakoztatott szolgáltatóidat. Kérjük, próbáld újra.",
       "connectProvider": "Szolgáltató csatlakoztatása",
       "connectProviderDescription": "Csatlakoztasd a GitHubot egy pull request kézi áttekintéséhez.",
-      "connectGitHub": "GitHub csatlakoztatása",
-      "platform": "Platform",
-      "notConnected": "Nincs csatlakoztatva",
       "pullRequestUrl": "Pull request URL",
       "instructions": "Utasítások (opcionális)",
       "instructionsPlaceholder": "Bármi, amire az áttekintőnek különösen figyelnie kell...",
-      "model": "Modell",
       "starting": "Áttekintés indítása...",
       "start": "Áttekintés indítása"
     },
@@ -1379,28 +1323,20 @@
     "webhookSetupDescription": "Egyes tárhelyek nem kapnak automatikus áttekintést.",
     "autoReviews": "Automatikus áttekintések",
     "selectRepository": "Az automatikus áttekintések engedélyezéséhez válassz ki legalább egy tárhelyet.",
-    "selectRepositories": "Adattárak kiválasztása",
     "followReviewMd": "REVIEW.md követése",
     "followReviewMdSubtitle": "Tárhelyenkénti REVIEW.md utasításfájlok tiszteletben tartása",
-    "readOnlyDescription": "Csak a szervezet tulajdonosai és a számlázási kezelők módosíthatják ezeket a beállításokat.",
     "bitbucket": {
       "notConnectedReadOnly": "A Bitbucket nincs csatlakoztatva. Csak a szervezet tulajdonosai és a számlázási kezelők csatlakoztathatják.",
       "setupIncomplete": "A beállítás hiányos — fejezd be a konfigurációt a kilo.ai-n",
       "setup": "Bitbucket beállítás"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket csatlakoztatva",
-      "title": "Bitbucket csatlakoztatása",
       "description": "Hozz létre egy Workspace Access Tokent a szükséges hatókörökkel, és illeszd be alább.",
       "scopes": "Fiók: olvasás · Tárhelyek: olvasás/írás · Pull requestek: olvasás · Webhookok: olvasás/írás",
-      "tokenPlaceholder": "Munkaterület-hozzáférési token",
-      "connect": "Csatlakoztatás"
+      "tokenPlaceholder": "Munkaterület-hozzáférési token"
     },
     "scopeList": {
-      "couldNotLoad": "A szervezetek betöltése nem sikerült",
       "personalStillAvailable": "A személyes tárhelyek alább továbbra is elérhetők.",
-      "personal": "Személyes",
-      "personalSubtitle": "A saját tárhelyeid",
       "viewOnly": "Csak megtekintés"
     },
     "reviewList": {
@@ -1414,18 +1350,13 @@
     "platformList": {
       "checking": "Ellenőrzés...",
       "statusUnavailable": "Az állapot nem érhető el",
-      "connected": "Csatlakoztatva",
-      "notConnected": "Nincs csatlakoztatva",
-      "organization": "Szervezet",
       "platforms": "Platformok",
       "activity": "Tevékenység"
     },
     "providerConnect": {
       "githubApp": "GitHub-alkalmazás",
-      "connectGitHub": "GitHub csatlakoztatása",
       "githubError": "Nem sikerült megnyitni a GitHub beállítását. Kérjük, próbáld újra.",
       "gitlabAccount": "GitLab-fiók",
-      "connectGitLab": "GitLab csatlakoztatása",
       "gitlabError": "Nem sikerült megnyitni a GitLab beállítását. Kérjük, próbáld újra.",
       "description": "Csatlakoztasd a Kilo {{label}}t a pull requestek automatikus áttekintéséhez.",
       "bitbucketError": "Nem sikerült megnyitni a Bitbucket beállítását. Kérjük, próbáld újra."
@@ -1436,12 +1367,7 @@
       "allAreas": "Minden terület",
       "customInstructions": "Egyéni utasítások",
       "set": "Beállítás",
-      "model": "Modell",
-      "mergeGate": "Merge-átjáró",
-      "repositories": "Tárhelyek",
-      "allRepositories": "Minden adattár",
       "nSelected": "{{displayCount}} kijelölve",
-      "reviewMemory": "Áttekintési memória",
       "proposedReviewMdGuidance": "Javasolt REVIEW.md útmutató"
     },
     "decision": {
@@ -1450,69 +1376,53 @@
       "noDecision": "Nincs döntés",
       "noResult": "Nincs eredmény"
     },
-    "eyebrow": "Kódellenőrző",
     "updateFailed": "Nem sikerült frissíteni az ellenőrzőt",
     "configSaveFailed": "Nem sikerült menteni az ellenőrzési beállításokat",
     "status": {
-      "pending": "Függőben",
-      "queued": "Sorban",
       "running": "Folyamatban",
       "completed": "Befejezve",
-      "failed": "Sikertelen",
-      "cancelled": "Lemondva",
       "interrupted": "Megszakítva"
     },
     "reviewStyle": {
       "strict": "Szigorú",
-      "balanced": "Kiegyensúlyozott",
       "lenient": "Engedékeny",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "Biztonság",
-      "performance": "Teljesítmény",
       "bugs": "Hibák",
       "style": "Stílus",
       "testing": "Tesztelés",
       "documentation": "Dokumentáció"
     },
     "gateThreshold": {
-      "off": "Ki",
-      "all": "Összes",
-      "warning": "Figyelmeztetés",
-      "critical": "Kritikus"
+      "warning": "Figyelmeztetés"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "A Kódellenőrző figyelmet igényel",
         "description": "A Kódellenőrző azért lett letiltva, mert a Kilo nem fér hozzá ehhez a tárhelyhez egy aktív GitHub App-telepítéssel. Frissítse a GitHub App telepítését, majd engedélyezze újra a Kódellenőrzőt.",
         "recoveryLabel": "GitHub App frissítése"
       },
       "githubIpAllowList": {
-        "title": "A Kódellenőrző figyelmet igényel",
-        "description": "A Kódellenőrző azért lett letiltva, mert ez a GitHub-szervezet IP-engedélyezési listát használ, amely blokkolja a Kilót. Kérjen segítséget itt: hi@kilocode.ai, majd engedélyezze újra a Kódellenőrzőt.",
-        "recoveryLabel": "Forduljon az ügyfélszolgálathoz"
+        "description": "A Kódellenőrző azért lett letiltva, mert ez a GitHub-szervezet IP-engedélyezési listát használ, amely blokkolja a Kilót. Kérjen segítséget itt: hi@kilocode.ai, majd engedélyezze újra a Kódellenőrzőt."
       },
       "gitlabProjectAccessRequired": {
-        "title": "A Kódellenőrző figyelmet igényel",
         "description": "A Kódellenőrző azért lett letiltva, mert a Kilo nem tud GitLab Project Access Tokent létrehozni ehhez a projekthez. Adjon Maintainer hozzáférést vagy engedélyezze a Project Access Tokeneket, majd engedélyezze újra a Kódellenőrzőt.",
         "recoveryLabel": "GitLab-integráció frissítése"
       },
       "byokInvalidKey": {
-        "title": "A Kódellenőrző figyelmet igényel",
         "description": "A Kódellenőrző azért lett letiltva, mert a kiválasztott BYOK API-kulcs érvénytelen, visszavonták, vagy nincs jogosultsága. Frissítse a kulcsot vagy válasszon másik modellt, majd engedélyezze újra a Kódellenőrzőt.",
         "recoveryLabel": "BYOK-beállítások frissítése"
       },
       "selectedModelUnavailable": {
-        "title": "A Kódellenőrző figyelmet igényel",
         "description": "A Kódellenőrző azért lett letiltva, mert a kiválasztott modell nem érhető el felhőügynök-munkamenetekhez. Válasszon egy elérhető modellt, majd engedélyezze újra a Kódellenőrzőt.",
         "recoveryLabel": "A Kódellenőrző beállításainak frissítése"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "A Kódellenőrző figyelmet igényel",
-        "description": "A Kódellenőrző azért lett letiltva, mert ma három tárhely-klónozási időtúllépés történt. Kérjen segítséget itt: hi@kilocode.ai, majd engedélyezze újra a Kódellenőrzőt.",
-        "recoveryLabel": "Forduljon az ügyfélszolgálathoz"
-      }
+        "description": "A Kódellenőrző azért lett letiltva, mert ma három tárhely-klónozási időtúllépés történt. Kérjen segítséget itt: hi@kilocode.ai, majd engedélyezze újra a Kódellenőrzőt."
+      },
+      "title": "A Kódellenőrző figyelmet igényel",
+      "recoveryLabel": "Forduljon az ügyfélszolgálathoz"
     },
     "unknownError": "Ismeretlen hiba"
   },
@@ -1522,31 +1432,17 @@
       "noFiltersDescription": "Menj vissza, és nyisd meg újra a szűrőket a megállapítások listájából.",
       "title": "Megállapítások szűrése",
       "reset": "Visszaállítás",
-      "repository": "Adattár",
-      "status": "Állapot",
       "severity": "Súlyosság",
       "outcome": "Eredmény",
       "slaStatus": "SLA-állapot",
       "sortBy": "Rendezés",
-      "allRepositories": "Minden adattár",
-      "all": "Összes",
       "statusOpen": "Nyitott",
       "fixed": "Javítva",
       "statusIgnored": "Figyelmen kívül hagyva",
-      "statusClosed": "Lezárva",
-      "severityCritical": "Kritikus",
       "severityHigh": "Magas",
       "severityMedium": "Közepes",
       "severityLow": "Alacsony",
-      "outcomeNotAnalyzed": "Nem elemezve",
-      "outcomeAnalyzing": "Elemzés folyamatban",
-      "outcomeFailed": "Az elemzés sikertelen",
-      "outcomeExploitable": "Kihasználható",
-      "outcomeNotExploitable": "Nem kihasználható",
-      "outcomeSafeToDismiss": "Biztonságosan elvethető",
-      "outcomeNeedsReview": "Felülvizsgálatot igényel",
       "outcomeTriageComplete": "A triage kész",
-      "outcomeDismissed": "Elvetve",
       "sortSeverityDesc": "Súlyosság: magastól alacsonyig",
       "sortSeverityAsc": "Súlyosság: alacsonytól magasig",
       "sortSlaDue": "SLA határidő",
@@ -1571,7 +1467,6 @@
       "enableAutoDismiss": "Automatikus elvetés engedélyezése",
       "enableAutoDismissSubtitle": "Automatikusan elveti azokat a megállapításokat, amelyekről az AI megállapítja, hogy nem kihasználhatók.",
       "confidenceThreshold": "Bizalmi küszöb",
-      "permissionNote": "Csak a szervezet tulajdonosai és a számlázási kezelők módosíthatják ezeket a beállításokat.",
       "enableAutoRemediationConfirmTitle": "Engedélyezed az automatikus hibajavítást?",
       "enableAutoRemediationConfirmMessage": "A Security Agent automatikusan hibajavító PR-eket nyit a jogosult, kihasználható megállapításokhoz.",
       "enable": "Engedélyezés",
@@ -1603,14 +1498,12 @@
       "suggestedAction": "Javasolt művelet",
       "triageReasoning": "Triage indoklás",
       "exploitable": "Kihasználható",
-      "model": "Modell",
       "notRecorded": "Nincs rögzítve",
       "analyzed": "Elemezve",
       "exploitabilityReasoning": "Kihasználhatósági indoklás",
       "suggestedFix": "Javasolt javítás",
       "whereFound": "Ahol ez megtalálható volt ({{displayCount}})",
       "fullReport": "Teljes generált jelentés",
-      "unknown": "Ismeretlen",
       "yes": "Igen",
       "no": "Nem"
     },
@@ -1641,7 +1534,6 @@
       "repoSummary": "{{open}} nyitott · {{critical}} kritikus · {{high}} magas",
       "couldNotLoad": "Az irányítópult adatainak betöltése nem sikerült",
       "filterByRepository": "Szűrés adattár szerint",
-      "findings": "Észlelések",
       "lastSynced": "Utoljára szinkronizálva: {{time}}",
       "manageRepositories": "Adattárak kezelése",
       "notYetSynced": "Még nincs szinkronizálva",
@@ -1654,15 +1546,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Nyitott észlelések",
-      "openFindingsDetail": "{{critical}} kritikus, {{high}} magas",
-      "confirmedExploitable": "Megerősítetten kihasználható",
       "confirmedExploitableDetail": "A projekt kockázatát az elemzés megerősítette",
-      "needsReview": "Az Ön felülvizsgálatát igényli",
       "needsReviewDetail": "Emberi döntés szükséges",
-      "analysisIncomplete": "Az elemzés nem teljes",
       "analysisIncompleteDetail": "A projekt kockázata még ismeretlen",
       "slaCompliance": "SLA-megfelelés",
-      "notMeasured": "Nincs mérve",
       "withinDeadlineDetail": "{{total}} közül {{within}} határidőn belül",
       "noDeadlineData": "Még egyetlen észlelésnek sincs SLA-határideje",
       "deadlinePassed": "Határidő lejárt",
@@ -1675,7 +1562,6 @@
     },
     "dismiss": {
       "title": "Észlelés elutasítása",
-      "submit": "Észlelés elutasítása",
       "reason": "Indok",
       "reasonFixStarted": "Már elindult egy javítás",
       "reasonNoBandwidth": "Nincs rendelkezésre álló kapacitás",
@@ -1696,28 +1582,21 @@
     "findingDetails": {
       "supersededBy": "Felváltva egy aktuális észlelés által",
       "supersededByDescription": "Koppintson az aktuális rekord megnyitásához az állapothoz, elemzéshez és kijavításhoz.",
-      "dismissed": "Elvetve",
       "dismissedBecause": "Elutasítva, mert {{reason}}.",
       "severityLabel": "{{severity}} súlyosság",
       "package": "Csomag",
       "vulnerableVersions": "Sebezhető verziók",
-      "unknown": "Ismeretlen",
       "patchedVersion": "Javított verzió",
       "noPatchAvailable": "Nincs elérhető javítás",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Adattár",
       "manifest": "Manifest",
       "detected": "Észlelve",
-      "updated": "Frissítve",
-      "fixed": "Javítva",
       "slaDeadline": "SLA határidő",
       "sourceRecord": "Forrásrekord",
       "source": "Forrás",
       "sourceId": "Forrásazonosító",
       "viewAdvisory": "Tájékoztató megtekintése a GitHubon",
-      "statusSuperseded": "Felváltva",
-      "statusFixed": "Javítva",
       "statusOpen": "Nyitott",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "már elindult egy javítás",
@@ -1728,30 +1607,17 @@
       "reasonAfterReview": "áttekintés után"
     },
     "settingsOverview": {
-      "title": "Beállítások",
       "couldNotLoadSettings": "A Security Agent beállításainak betöltése nem sikerült",
       "couldNotLoadPermissions": "A jogosultságok betöltése nem sikerült",
-      "couldNotLoadRepositories": "Nem sikerült betölteni a tárhelyeket",
-      "securityAgent": "Biztonsági ügynök",
-      "enabled": "Engedélyezve",
-      "disabled": "Letiltva",
       "on": "Be",
-      "off": "Ki",
-      "allRepositories": "Minden adattár",
       "repositoriesCount_one": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount": "{{displayCount}} adattár kiválasztva",
       "repositoriesCount_other": "{{displayCount}} adattár kiválasztva",
-      "selectRepositories": "Adattárak kiválasztása",
       "selectRepositoriesSubtitle": "Válassza ki, hogy a Security Agent mely adattárakat figyeli",
-      "repositories": "Tárhelyek",
-      "modelsAndAnalysis": "Modellek és elemzés",
       "analysisModeSubtitle": "{{mode}} elemzés",
-      "automation": "Automatizálás",
       "automationAllOff": "Mind kikapcsolva",
       "automationCount": "{{displayCount}} a 3-ból engedélyezve",
-      "notifications": "Értesítések",
       "notificationsCount": "{{displayCount}} a 2-ből engedélyezve",
-      "slaPolicy": "SLA szabályzat",
       "disabledNoManage": "A Security Agent le van tiltva. Csak szervezeti tulajdonosok és számlázási vezetők kapcsolhatják be.",
       "disabledNoRepo": "A Security Agent engedélyezése előtt válasszon ki legalább egy adattárat.",
       "disabledPrompt": "Kapcsolja be a Security Agentet a Dependabot-riasztások szinkronizálásához, az adattárak kiválasztásához és az automatizálás beállításához."
@@ -1759,15 +1625,11 @@
     "remediation": {
       "cancellationRequested": "Lemondás kérve",
       "cancelled": "Kijavítás lemondva",
-      "pullRequest": "pull request",
       "couldNotLoad": "A kijavítási állapot betöltése nem sikerült",
-      "noAnalysisTitle": "Még nincs elemzés",
-      "noAnalysisDescription": "Indítson egyet a Részletek fülön",
       "start": "Kijavítás indítása",
       "retry": "Kijavítás újrapróbálása",
       "cancelTitle": "Lemondja ezt a kijavítást?",
       "cancelMessage": "A Security Agent leállítja a folyamatban lévő kijavítási kísérletet.",
-      "keepRunning": "Futtatás folytatása",
       "cancelRemediation": "Kijavítás lemondása",
       "openPullRequest": "Pull request megnyitása{{number}}",
       "openDraftPullRequest": "Piszkozat pull request megnyitása{{number}}",
@@ -1775,29 +1637,19 @@
       "attemptHistory": "Kísérletelőzmények ({{displayCount}})",
       "attemptNumber": "{{number}}. kísérlet",
       "startedBy": "Indította",
-      "model": "Modell",
-      "branch": "Ág",
       "queued": "Kijavítás sorba állítva",
       "retryQueued": "Kijavítás újrapróbálása sorba állítva",
       "timeline": {
         "queued": "Kijavítás kérve",
-        "prOpened": "PR megnyitva",
         "failed": "A kijavítás meghiúsult",
-        "blocked": "A kijavítás blokkolva",
-        "noChangesNeeded": "Nincs szükség változtatásra",
-        "cancelled": "Lemondva"
+        "blocked": "A kijavítás blokkolva"
       },
       "unavailable": "A kijavítás nem érhető el ehhez az észleléshez."
     },
     "analysisSettings": {
       "title": "Modellek és elemzés",
       "couldNotLoad": "Az elemzési beállítások betöltése nem sikerült",
-      "permissionNote": "Csak szervezeti tulajdonosok és számlázási vezetők módosíthatják ezeket a beállításokat.",
       "depth": "Elemzési mélység",
-      "modeAuto": "Automatikus",
-      "modeShallow": "Felszínes",
-      "modeDeep": "Mély",
-      "couldNotLoadModels": "Nem sikerült betölteni a modelleket",
       "triageModel": "Triage modell",
       "analysisModel": "Elemzési modell",
       "remediationModel": "Kijavítási modell"
@@ -1805,7 +1657,6 @@
     "sla": {
       "title": "SLA szabályzat",
       "couldNotLoad": "Az SLA beállítások betöltése nem sikerült",
-      "critical": "Kritikus",
       "high": "Magas",
       "medium": "Közepes",
       "low": "Alacsony",
@@ -1823,41 +1674,23 @@
     },
     "findingDetail": {
       "title": "Észlelés",
-      "tabDetails": "Részletek",
       "tabAnalysis": "Elemzés",
-      "tabRemediation": "Kijavítás",
-      "notFound": "Észlelés nem található",
-      "notFoundDescription": "Ez az észlelés lehet, hogy eltávolításra került, vagy Ön már nem férhet hozzá.",
-      "couldNotLoad": "Ennek az észlelésnek a betöltése nem sikerült",
-      "dismissA11y": "Észlelés elutasítása"
+      "tabRemediation": "Kijavítás"
     },
     "findingList": {
-      "title": "Észlelések",
       "couldNotLoad": "Az észlelések betöltése nem sikerült",
       "couldNotLoadMore": "További észlelések betöltése nem sikerült",
       "noMatchesTitle": "Nincs észlelés, amely megfelel a szűrőknek",
       "noMatchesDescription": "Próbálja módosítani vagy törölni a kiválasztott szűrőket.",
       "emptyTitle": "Nincs nyitott észlelés",
-      "emptyDescription": "Jelenleg nincs nyitott észlelés, amely figyelmet igényelne.",
-      "clearFilters": "Szűrők törlése"
-    },
-    "scopeList": {
-      "title": "Biztonsági ügynök",
-      "couldNotLoad": "A szervezetek betöltése nem sikerült",
-      "personal": "Személyes",
-      "personalSubtitle": "A saját tárhelyeid"
-    },
-    "commandRetry": {
-      "discard": "Elvetés"
+      "emptyDescription": "Jelenleg nincs nyitott észlelés, amely figyelmet igényelne."
     },
     "findingRow": {
       "nextRemediationPrOpen": "Kijavítási PR nyitva",
       "nextRemediationInProgress": "Kijavítás folyamatban",
       "nextRetryRemediation": "Kijavítás újrapróbálása elérhető",
       "nextRemediationAvailable": "Kijavítás elérhető",
-      "retryAnalysis": "Elemzés újrapróbálása",
       "runAnalysis": "Elemzés futtatása",
-      "nextNeedsManualReview": "Kézi felülvizsgálatot igényel",
       "nextViewDetails": "Részletek megtekintése",
       "viewPr": "PR megtekintése",
       "analyze": "Elemzés",
@@ -1868,7 +1701,6 @@
       "couldNotOpenGithub": "A GitHub megnyitása nem sikerült. Próbálja újra."
     },
     "settingsSave": {
-      "discard": "Elvetés",
       "keepEditing": "Szerkesztés folytatása",
       "saveChanges": "Változtatások mentése",
       "unsavedTitle": "El nem mentett változtatások",
@@ -1880,7 +1712,6 @@
     "auditReport": {
       "couldNotLoad": "Az auditjelentés betöltése nem sikerült",
       "events": "Események",
-      "findings": "Észlelések",
       "generated": "Generálva: {{generatedAt}}",
       "noActivity": "Nincs rögzített tevékenység",
       "noActivityDescription": "A Kilo nem jelenthető Security Finding tevékenységet rögzített {{start}} és {{end}} között.",
@@ -1890,8 +1721,7 @@
       "title": "Auditjelentés",
       "unavailable": "Auditjelentés nem érhető el",
       "unavailableDescription": "Csak szervezeti tulajdonosok és számlázási vezetők tekinthetik meg az auditjelentéseket. Kérjen hozzáférést egy tulajdonostól vagy számlázási vezetőtől.",
-      "queryFailed": "A jelentéslekérdezés nem fejeződött be. Próbálja újra.",
-      "checkConnection": "Ellenőrizze a kapcsolatot, és próbálja újra."
+      "queryFailed": "A jelentéslekérdezés nem fejeződött be. Próbálja újra."
     },
     "notifications": {
       "couldNotLoad": "Az értesítési beállítások betöltése nem sikerült",
@@ -1900,30 +1730,21 @@
       "newFindingSection": "Új észlelés értesítés",
       "newFindingSeverityLabel": "Új észlelés minimális súlyossága",
       "newFindingSubtitle": "Elküldés minden új észlelés szinkronizálásakor, beleértve az első szinkronizálást is.",
-      "readOnly": "Csak szervezeti tulajdonosok és számlázási vezetők módosíthatják ezeket a beállításokat.",
       "slaLeadTimeAccessibility": "SLA figyelmeztetési átfutási idő napokban",
       "slaLeadTimeError": "Adjon meg egy egész számot 1 és 365 nap között.",
-      "slaLeadTimeHint": "Adjon meg egy egész számot 1 és 365 között",
       "slaLeadTimeLabel": "SLA figyelmeztetési átfutási idő (napok)",
       "slaPersonalTitle": "E-mail küldése nekem az SLA figyelmeztetésekről",
       "slaSection": "SLA figyelmeztetési értesítés",
       "slaSeverityLabel": "SLA értesítés minimális súlyossága",
-      "slaSubtitle": "Elküldés azelőtt és akkor, amikor az észlelések megközelítik vagy megsértik az SLA határidejüket.",
-      "title": "Értesítések"
+      "slaSubtitle": "Elküldés azelőtt és akkor, amikor az észlelések megközelítik vagy megsértik az SLA határidejüket."
     },
     "repositories": {
-      "allRepositories": "Minden adattár",
       "couldNotLoad": "Az adattár beállítások betöltése nem sikerült",
-      "couldNotLoadRepositories": "Nem sikerült betölteni a tárhelyeket",
-      "couldNotOpenGithubSettings": "Nem sikerült megnyitni a GitHub App beállításait",
       "githubAppSettings": "GitHub App beállítások",
       "manageAccess": "GitHub App hozzáférés kezelése",
       "noRepositories": "Nincs adattár",
       "noRepositoriesDescription": "Adjon hozzáférést a Kilo GitHub Appnak az adattárakhoz",
-      "readOnly": "Csak szervezeti tulajdonosok és számlázási vezetők módosíthatják ezeket a beállításokat.",
-      "selectAtLeastOne": "Válasszon ki legalább egy adattárat.",
-      "selectedRepositories": "Kiválasztott adattárak",
-      "title": "Tárhelyek"
+      "selectAtLeastOne": "Válasszon ki legalább egy adattárat."
     },
     "scopeEntry": {
       "connectDescription": "Telepítse a Kilo GitHub Appot a Dependabot-riasztások automatikus szinkronizálásához és a biztonsági észlelések kezeléséhez az adattárai között.",
@@ -1938,7 +1759,6 @@
     },
     "queuedActionUntracked": "Egy sorba állított műveletet már nem lehetett követni. Frissítse a legújabb állapot megtekintéséhez.",
     "initialSyncAdmissionFailed": "A Security Agent engedélyezve lett, de a kezdeti szinkronizálást nem lehetett sorba állítani. Szinkronizáljon újra.",
-    "title": "Biztonsági ügynök",
     "commands": {
       "findingAlreadyDismissed": "Az észlelés már elutasítva",
       "findingDismissed": "Észlelés elutasítva",
@@ -1956,49 +1776,33 @@
     },
     "analysisState": {
       "queued": "Elemzés sorban",
-      "queuedTitle": "Elemzés sorban",
       "queuedDescription": "Várakozás az elemzési kapacitás felszabadulására.",
       "analyzing": "Elemzés folyamatban",
-      "analyzingTitle": "Elemzés folyamatban",
       "analyzingDescription": "Annak ellenőrzése, hogy az alkalmazáskód eléri-e az érintett funkciót.",
       "failed": "Az elemzés sikertelen",
-      "failedTitle": "Az elemzés sikertelen",
       "failedDescription": "A Security Agent nem tudta befejezni az elemzést.",
-      "extractionFailed": "Felülvizsgálatot igényel",
-      "extractionFailedTitle": "Felülvizsgálatot igényel",
       "extractionFailedDescription": "A technikai jelentés nem alakítható át strukturált eredménnyé.",
-      "exploitable": "Kihasználható",
-      "exploitableTitle": "Kihasználható",
       "exploitableDescription": "Az alkalmazáskód eléri az érintett funkciót.",
       "notExploitable": "Elérhetetlen",
-      "notExploitableTitle": "Elérhetetlen",
       "notExploitableDescription": "Ebben az adattárban nem található elérhető út.",
       "unknown": "Felülvizsgálatot igényel",
-      "unknownTitle": "Felülvizsgálatot igényel",
       "unknownDescription": "Az elemzés nem tudta megerősíteni, hogy a sebezhető funkció elérhető-e.",
       "safeToDismiss": "Biztonságosan elvethető",
-      "safeToDismissTitle": "Biztonságosan elvethető",
       "safeToDismissDescription": "A triage megállapította, hogy ez elemzés nélkül biztonságosan elvethető.",
-      "manualReview": "Felülvizsgálatot igényel",
       "manualReviewTitle": "Kézi felülvizsgálatot igényel",
       "manualReviewDescription": "A triage kézi felülvizsgálatra jelölte ezt az észlelést.",
       "analysisRequired": "Elemzés szükséges",
       "analysisRequiredTitle": "Kódbázis-elemzés szükséges",
       "analysisRequiredDescription": "A triage az adattár elemzését javasolja a válasz eldöntése előtt.",
-      "completed": "Elemezve",
-      "completedTitle": "Elemezve",
       "completedDescription": "Az elemzés befejeződött, de nem rögzített konkrét eredményt.",
       "notAnalyzed": "Nem elemezve",
-      "notAnalyzedTitle": "Nem elemezve",
       "notAnalyzedDescription": "Ehhez az észleléshez még nem futott le a kódbázis-elemzés."
     },
     "deadline": {
       "fixedBeforeDeadline": "Határidő előtt javítva",
-      "fixed": "Javítva",
       "fixedOn": "Javítva: {{date}}",
       "resolutionRecorded": "Megoldás rögzítve",
       "superseded": "Felváltva",
-      "dismissed": "Elvetve",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Nincs határidő beállítva",
       "noSlaDeadline": "Nincs SLA határidő",
@@ -2014,17 +1818,13 @@
       "dueInDays": "Esedékes {{count}} nap múlva"
     },
     "remediationStatus": {
-      "cancellationRequested": "Lemondás kérve",
       "notStarted": "Nincs elkezdve",
-      "queued": "Sorban",
       "starting": "Indítás",
       "inProgress": "Folyamatban",
       "draftPrOpened": "Piszkozat PR megnyitva",
       "prOpened": "PR megnyitva",
       "blocked": "Blokkolva",
-      "failed": "Sikertelen",
       "noChangesNeeded": "Nincs szükség változtatásra",
-      "cancelled": "Lemondva",
       "originAutomaticPolicy": "Automatikus szabályzat",
       "originIncludeExistingPolicy": "Meglévő szabályzat bevonása",
       "originManual": "Kézi",
@@ -2036,7 +1836,6 @@
       "findingNotOpen": "Az észlelés már nincs nyitva.",
       "repoNotInScope": "Az adattár nincs kiválasztva a Security Agent számára.",
       "analysisRequired": "A kijavítás megkezdése előtt futtassa a kódbázis-elemzést.",
-      "sandboxAnalysisRequired": "A kijavítás megkezdése előtt futtassa a kódbázis-elemzést.",
       "staleAnalysis": "Az észlelés az elemzés után megváltozott. A kijavítás megkezdése előtt futtassa újra az elemzést.",
       "notExploitable": "Az elemzés nem talált elérhető sebezhető utat. Az automatikus hibajavítás nem érhető el.",
       "exploitabilityUnknown": "Az elemzés nem tudta megerősíteni a kihasználhatóságot. Az egykattintásos kijavítás előtt kézi felülvizsgálat szükséges.",
@@ -2052,12 +1851,10 @@
       "autoRemediationDisabled": "Az automatikus hibajavítás le van tiltva. A kézi kijavítás akkor is elindítható, ha a biztonsági átjárók teljesülnek.",
       "includeExistingDisabled": "A meglévő észlelések ki vannak zárva az automatikus kijavításból.",
       "belowThreshold": "Az észlelés az automatikus súlyossági küszöb alatt van. A kézi kijavítás akkor is elindítható, ha a biztonsági átjárók teljesülnek.",
-      "beforeEnablement": "Az elemzés az automatikus hibajavítás engedélyezése előtt készült el. A kézi kijavítás akkor is elindítható, ha a biztonsági átjárók teljesülnek.",
-      "generic": "A kijavítás nem érhető el ehhez az észleléshez."
+      "beforeEnablement": "Az elemzés az automatikus hibajavítás engedélyezése előtt készült el. A kézi kijavítás akkor is elindítható, ha a biztonsági átjárók teljesülnek."
     },
     "commandFailure": {
       "ownerCapReached": "Az elemzési kapacitás megtelt. Várja meg, amíg egy aktív elemzés befejeződik, majd próbálja újra.",
-      "githubTokenUnavailable": "A GitHub-hitelesítés figyelmet igényel. Engedélyezze újra a GitHub Appot, majd próbálja újra.",
       "githubAuthInvalid": "A GitHub-hitelesítés figyelmet igényel. Engedélyezze újra a GitHub Appot, majd próbálja újra.",
       "findingUnavailable": "Az észlelés már nem érhető el. Frissítse az észleléseket, és próbálja újra, ha még mindig nyitott.",
       "repositoryUnavailable": "Az adattár már nem érhető el a GitHub App számára. Frissítse az adattár-hozzáférést, majd próbálja újra.",
@@ -2077,12 +1874,9 @@
     "search": {
       "searching": "Keresés",
       "searchSessions": "Munkamenetek keresése",
-      "searchSessionsPlaceholder": "Munkamenetek keresése...",
-      "clearSearch": "Keresés törlése",
-      "clearFilters": "Szűrők törlése"
+      "searchSessionsPlaceholder": "Munkamenetek keresése..."
     },
     "sessionList": {
-      "couldNotLoad": "A munkamenetek betöltése nem sikerült",
       "couldNotLoadActive": "Az aktív munkamenetek betöltése nem sikerült",
       "noSessionsYetDescription": "Indítson egy kódolási feladatot a telefonjáról. A munkamenetei itt jelennek meg.",
       "noMatches": "Nincs egyező munkamenet",
@@ -2097,9 +1891,7 @@
     "sessionRow": {
       "deleteTitle": "Munkamenet törlése?",
       "deleteMessage": "Ez nem vonható vissza.",
-      "delete": "Törlés",
       "deleteSession": "Munkamenet törlése",
-      "rename": "Átnevezés",
       "renameMessage": "Adjon meg új nevet ehhez a munkamenethez",
       "copyId": "Munkamenet-azonosító másolása",
       "idCopied": "Munkamenet-azonosító másolva",
@@ -2133,7 +1925,6 @@
       "didNotCompleteTitle": "A telepítés nem fejeződött be",
       "didNotCompleteMessage": "A GitHub App telepítése nem fejeződött be. Próbálja újra az alkalmazásból."
     },
-    "sessionExited": "A munkamenet kilépett",
     "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
     "remoteSpawnNonRetryable": "A példány nem tudta elindítani a munkamenetet — ellenőrizze a gépet vagy frissítse a CLI-t.",
     "remoteSpawnInstanceDisconnected": "A kiválasztott példány megszakadt. Indítson munkamenetet a Cloud Agenten, vagy válasszon másik példányt.",
@@ -2145,12 +1936,8 @@
       "title": "Munkamenet",
       "copyErrorDetails": "Hibarészletek másolása",
       "backToSessions": "Vissza a munkamenetekhez",
-      "accessDenied": "Hozzáférés megtagadva",
-      "accessDeniedDescription": "Önnek nincs jogosultsága ennek a megtekintéséhez.",
       "couldNotLoad": "A munkamenet betöltése nem sikerült",
       "failedToLoadDetails": "A munkamenet részleteinek betöltése nem sikerült",
-      "notFound": "Nem található",
-      "notFoundDescription": "Ez az elem eltávolításra kerülhetett, vagy már nem érhető el.",
       "failedToStopExecution": "A végrehajtás leállítása nem sikerült",
       "renameSession": "Munkamenet átnevezése",
       "renamePlaceholder": "Munkamenet neve",
@@ -2161,7 +1948,6 @@
       "emptyTitle": "Még nincs üzenet",
       "renameAccessibility": "Munkamenet átnevezése: {{title}}",
       "cloningSession": "Munkamenet klónozása",
-      "continue": "Folytatás",
       "couldNotLoadThisSession": "Ennek a munkamenetnek a betöltése nem sikerült",
       "cloneFailedRetry": "Ennek a munkamenetnek a klónozása nem sikerült. Próbálja újra.",
       "notEnoughCredits": "Nincs elég kredit a Cloud Agent futtatásához. Adjon hozzá krediteket, és próbálja újra.",
@@ -2176,7 +1962,6 @@
     },
     "remoteSession": {
       "failedToCreate": "A távoli munkamenet létrehozása nem sikerült",
-      "exited": "A munkamenet kilépett",
       "failedToExit": "A munkamenetből való kilépés nem sikerült",
       "exitTitle": "Kilép a munkamenetből?",
       "exitMessage": "Ez leállítja a futó munkamenetet, de megőrzi az előzményeit.",
@@ -2194,9 +1979,6 @@
       "retryConnection": "Kapcsolat újrapróbálása"
     },
     "newSession": {
-      "title": "Új munkamenet",
-      "repository": "Adattár",
-      "connectGithub": "GitHub csatlakoztatása",
       "connectGithubDescription": "Csatlakoztassa a GitHubot a böngészőjében, majd térjen vissza ide egy adattár kiválasztásához.",
       "openGithub": "GitHub megnyitása",
       "refreshRepositories": "Adattárak frissítése",
@@ -2213,7 +1995,6 @@
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
       "promptPlaceholder": "Miben szeretne dolgozni?",
-      "addAttachment": "Csatolmány hozzáadása",
       "couldNotLoadModels": "A modellek betöltése nem sikerült",
       "prefillRepoAndModelUnavailable": "Az eredeti munkamenet adattára és modellje már nem érhető el. Válassza ki őket lent.",
       "prefillRepoUnavailable": "{{repo}} már nem érhető el. Válasszon adattárat lent.",
@@ -2223,14 +2004,9 @@
       "couldNotRefreshRepositories": "Az adattárak frissítése nem sikerült. Próbálja újra.",
       "discardDraftTitle": "Piszkozat elvetése?",
       "discardDraftMessage": "A promptja el fog veszni.",
-      "keepEditing": "Szerkesztés folytatása",
-      "discard": "Elvetés",
       "discardFailed": "A piszkozat elvetése nem sikerült. Próbálja újra.",
       "remoteHint": "A helyi kilo folyamat vezérléséhez futtassa a(z) `kilo remote` parancsot a számítógépén, vagy a(z) `/remote` parancsot egy futó CLI-munkamenetben.",
-      "bitbucketConnected": "Bitbucket csatlakoztatva",
-      "connectBitbucket": "Bitbucket csatlakoztatása",
       "connectBitbucketDescription": "Csatlakoztasd a Bitbucketet a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
-      "connectGitlab": "GitLab csatlakoztatása",
       "connectGitlabDescription": "Csatlakoztasd a GitLabot a böngésződben, majd térj vissza ide a tároló kiválasztásához.",
       "couldNotLoadBitbucketRepositories": "Nem sikerült betölteni a Bitbucket-tárolókat",
       "couldNotLoadGithubRepositories": "Nem sikerült betölteni a GitHub-tárolókat",
@@ -2252,18 +2028,10 @@
       "updatedFileCount": "{{displayCount}} fájl frissítve",
       "updatedFileCount_other": "{{displayCount}} fájl frissítve"
     },
-    "toolPatch": {
-      "operationAdded": "Hozzáadva",
-      "operationDeleted": "Törölve",
-      "operationUpdated": "Frissítve"
-    },
     "toolCard": {
       "accessibility": "{{label}} eszköz, {{status}}",
       "accessibilityLabel": "{{name}} eszköz, {{status}}",
-      "fileEmpty": "Ez a fájl üres.",
       "noTasks": "Nincs feladat.",
-      "contentTruncated": "Tartalom csonkolva",
-      "truncated": "Csonkolva",
       "toolRead": "olvasás",
       "toolEdit": "szerkesztés",
       "toolWrite": "írás",
@@ -2295,9 +2063,7 @@
       "runOn": "Futtatás a következőn",
       "runOnAccessibility": "Futtatás a következőn: {{label}}",
       "couldNotLoad": "A példányok betöltése nem sikerült",
-      "couldNotLoadDescription": "Ellenőrizze a kapcsolatot, és próbálja újra.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Betöltés…",
       "cloudAgentDescription": "Futtatás a Kilo felhőalapú sandboxában",
       "noCliInstances": "Nincs csatlakoztatott CLI-példány",
       "noCliInstancesDescription": "Futtassa a `kilo remote` parancsot egy projekten a számítógépén, vagy frissítse a Kilo CLI-t, ha már fut egy.",
@@ -2338,12 +2104,9 @@
       "noMatches": "Nincs találat",
       "noRepositories": "Nincs elérhető adattár",
       "noRepositoriesDescription": "Nem kapcsolódik adattár a fiókjához.",
-      "tryDifferentSearch": "Próbáljon másik keresőszót.",
       "loading": "Betöltés...",
       "accessibility": "Adattár: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Üzenet részletei",
@@ -2353,13 +2116,10 @@
       "reportAiResponse": "AI-válasz jelentése",
       "reportAiResponseConfirm": "Jelenti ezt a választ felülvizsgálatra?",
       "report": "Jelentés",
-      "role": "Szerep",
       "roleUser": "Felhasználó",
       "roleAssistant": "Asszisztens",
       "sent": "Elküldve",
-      "model": "Modell",
       "costAndTokens": "Költség és tokenek",
-      "cost": "Költség",
       "input": "Bemenet",
       "output": "Kimenet",
       "reasoning": "Érvelés",
@@ -2367,15 +2127,13 @@
       "cacheWrite": "Gyorsítótár írás",
       "total": "Összesen",
       "reportAiResponseFailedRetryable": "Ennek a válasznak a jelentése nem sikerült.",
-      "reportAiResponseFailedTerminal": "Ez a válasz nem jelenthető.",
-      "reportAiResponseSubmitted": "Jelentés elküldve. Azonosító: {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Ez a válasz nem jelenthető."
     },
     "partDetail": {
       "detailsUnavailable": "A részletek nem érhetők el",
       "textDisplay": "Szöveg megjelenítése",
       "thinking": "Gondolkodás",
       "thought": "Gondolat",
-      "title": "Részletek",
       "showDetails": "Részletek megjelenítése",
       "pending": "Függőben…",
       "running": "Futás…"
@@ -2398,16 +2156,13 @@
     "filePart": {
       "loadingImage": "Kép betöltése",
       "imageUnavailableRetry": "Kép nem érhető el, a betöltés újrapróbálása",
-      "imageUnavailable": "A kép nem érhető el",
       "imagePreviewUnavailableInSession": "Kép előnézete nem érhető el ebben a munkamenetben.",
       "viewImage": "Kép megtekintése",
       "viewImageWithAlt": "Kép megtekintése {{alt}}",
       "imageOutput": "Képkimenet",
       "imageOutputWithFilename": "Képkimenet, {{filename}}",
-      "defaultName": "Fájl",
       "openFullScreen": "{{name}} megnyitása teljes képernyőn",
       "preview": "{{name}} előnézete",
-      "openFile": "{{name}} megnyitása",
       "couldNotLoadFile": "Ennek a fájlnak a betöltése nem sikerült.",
       "couldNotLoadFileRetry": "Ennek a fájlnak a betöltése nem sikerült. Próbálja újra.",
       "retryLoadingFile": "Fájl betöltésének újrapróbálása",
@@ -2490,7 +2245,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Újrapróbálás elérhető.",
       "copyToComposer": "Másolás a szerkesztőbe",
-      "queued": "Sorban",
       "queuedAccessibility": "Üzenet sorban",
       "userMessage": "Felhasználói üzenet",
       "assistantMessage": "Asszisztens üzenet",
@@ -2526,12 +2280,10 @@
     },
     "sessionFilter": {
       "title": "Munkamenetek szűrése",
-      "platform": "Platform",
       "platformCloud": "Felhő",
       "platformExtension": "Bővítmény",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Egyéb",
       "project": "Projekt"
@@ -2545,15 +2297,10 @@
     },
     "modelPicker": {
       "title": "Modell kiválasztása",
-      "searchPlaceholder": "Modellek keresése...",
-      "noModels": "Nem érhetők el modellek",
       "noModelsDescription": "Nincs kiválasztható modell.",
-      "favorites": "Kedvencek",
-      "recommended": "Ajánlott",
-      "allModels": "Összes modell"
+      "favorites": "Kedvencek"
     },
     "modelSelector": {
-      "model": "Modell",
       "provider": "Szolgáltató {{id}}",
       "modelId": "Modell {{id}}",
       "unavailable": "Nem elérhető",
@@ -2577,7 +2324,6 @@
       "uploading": "Feltöltés…",
       "uploaded": "Feltöltve",
       "uploadFailedRetry": "A feltöltés nem sikerült. Az újrapróbáláshoz koppints.",
-      "uploadFailedTerminal": "Ezt a fájlt nem lehet feltölteni.",
       "moveLeft": "{{filename}} mozgatása balra",
       "moveRight": "{{filename}} mozgatása jobbra"
     },
@@ -2589,8 +2335,6 @@
       "camera": "Kamera",
       "photoLibrary": "Fotótár",
       "files": "Fájlok",
-      "cameraAccessDisabled": "Kamera-hozzáférés letiltva",
-      "cameraAccessMessage": "A fénykép készítéséhez engedélyezd a kamera-hozzáférést a Beállításokban.",
       "couldNotOpenPhotoPicker": "A fotóválasztó nem nyitható meg. Indítsd újra a Kilo-t és próbáld újra.",
       "maxFilesAllowed": "Legfeljebb {{displayCount}} fájl engedélyezett",
       "onlyAddingFiles": "Csak {{accepted}} fájl hozzáadása a(z) {{total}} közül (max. {{max}})"
@@ -2603,7 +2347,6 @@
       "waitForUploads": "Várd meg, amíg a csatolmányok feltöltődnek.",
       "pasteFromClipboard": "Beillesztés a vágólapról",
       "stopGenerating": "Generálás leállítása",
-      "sendMessage": "Üzenet küldése",
       "selectModelBeforeSending": "Küldés előtt válassz modellt",
       "preparingPlaceholder": "Környezet beállítása...",
       "finalizingPlaceholder": "Befejezés...",
@@ -2617,9 +2360,7 @@
     },
     "chatLink": {
       "linkCopied": "Hivatkozás másolva",
-      "reviewPr": "PR áttekintése",
       "openLink": "Hivatkozás megnyitása",
-      "copyLink": "Hivatkozás másolása",
       "shareLink": "Hivatkozás megosztása",
       "share": "Megosztás",
       "prLinkActions": "PR hivatkozás műveletek",
@@ -2659,13 +2400,11 @@
     "contextUsage": {
       "windowUnavailable": "A kontextusablak mérete nem elérhető",
       "tapToViewDetails": "A kontextus részleteihez koppints.",
-      "costPrefix": "költség {{cost}}",
       "costSuffix": ", költség {{cost}}",
       "tokensWindowUnavailable": "Kontextus {{used}} token, ablak nem elérhető",
       "tokensUsage": "Kontextus {{used}} a(z) {{window}} tokenből, {{percentage}} felhasználva",
       "title": "Kontextus használat",
       "used": "Felhasználva",
-      "remaining": "Hátralévő",
       "provider": "Szolgáltató",
       "totalCost": "Teljes költség",
       "usageReflectsLatest": "A használat a legutóbbi befejezett asszisztens választ tükrözi.",
@@ -2691,8 +2430,7 @@
       "merged": "egybeolvasztott lekérési kérelem",
       "draft": "piszkozat pull request",
       "updating": "Frissítés, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "pull request"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Betöltés",
@@ -2720,11 +2458,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "A fiókod nem tölthető be",
-    "couldNotLoadAccountDescription": "Ellenőrizze a kapcsolatot, és próbálja újra.",
     "couldNotLoadPrivacy": "Az adatvédelmi választások nem tölthetők be",
     "couldNotLoadPrivacyDescription": "Ellenőrizd az eszköz biztonsági beállításait, és próbáld újra.",
     "contentReady": "A tartalom kész",
-    "signOut": "Kijelentkezés",
     "retryLoadingAccount": "A fiók betöltésének újrapróbálása",
     "retryLoadingPrivacy": "Az adatvédelmi választások betöltésének újrapróbálása"
   },
@@ -2734,7 +2470,6 @@
     "billingPage": "számlázási oldal"
   },
   "deviceSessions": {
-    "couldNotLoad": "A munkamenetek betöltése nem sikerült",
     "couldNotLoadDescription": "Az aktív munkameneteid nem érhetők el, amíg ez be nem töltődik.",
     "currentDeviceUnidentified": "Az aktuális eszköz nem azonosítható",
     "noSessions": "Nincs aktív munkamenet",
@@ -2742,7 +2477,6 @@
     "onlyKiloAppSignIns": "Csak a Kilo alkalmazás bejelentkezései jelennek meg itt. A szerkesztői és CLI bejelentkezések nem szerepelnek a listán.",
     "signedIn": "Bejelentkezve: {{signedIn}} · Utoljára látva: {{lastSeen}}",
     "thisDevice": "Ez az eszköz",
-    "title": "Eszközmunkamenetek",
     "viewProfile": "Profil megtekintése",
     "signOutThisDevice": "Kijelentkezés erről az eszközről",
     "signOutThisSession": "Kijelentkezés ebből a munkamenetből",
@@ -2750,8 +2484,6 @@
     "signOutThisDeviceTitle": "Kijelentkezel erről az eszközről?",
     "signOutThisSessionTitle": "Kijelentkezel ebből a munkamenetből?",
     "signOutThisSessionMessage": "{{device}} ki lesz jelentkeztetve. Akár egy óráig megtarthatja az API-hozzáférést.",
-    "signOutConfirm": "Kijelentkezés",
-    "signOutMessage": "A munkaterület eléréséhez újra be kell jelentkeznie.",
     "webBrowser": "Webböngésző"
   },
   "forceUpdate": {
@@ -2772,17 +2504,13 @@
   },
   "imageViewer": {
     "close": "{{filename}} bezárása",
-    "imageUnavailable": "A kép nem érhető el",
     "share": "{{filename}} megosztása"
   },
   "invalidRoute": {
     "description": "Ez a hivatkozás már nem érvényes.",
-    "goBack": "Vissza",
     "title": "Az oldal nem található"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Tartalom csonkolva",
-    "truncated": "Csonkolva",
     "wrap": "Tördelés",
     "scroll": "Görgetés"
   },
@@ -2791,22 +2519,16 @@
     "internetRestored": "Az internetkapcsolat helyreállt"
   },
   "queryError": {
-    "neutralTitle": "Valami hiba történt",
     "neutralDescription": "Próbáld újra.",
     "offlineTitle": "A betöltés nem sikerült",
-    "offlineDescription": "Valami hiba történt",
-    "permissionTitle": "Hozzáférés megtagadva",
     "permissionDescription": "Önnek nincs jogosultsága ennek a megtekintéséhez.",
-    "notFoundTitle": "Nem található",
     "notFoundDescription": "Ez az elem eltávolításra kerülhetett, vagy már nem érhető el.",
     "serverTitle": "A betöltés nem sikerült",
     "serverDescription": "Nálunk hiba történt. Próbáld újra."
   },
   "screenHeader": {
     "openMenu": "Menü megnyitása",
-    "openMenuFor": "{{title}} menüjének megnyitása",
-    "close": "Bezárás",
-    "goBack": "Vissza"
+    "openMenuFor": "{{title}} menüjének megnyitása"
   },
   "picker": {
     "optionsExpired": "Az opciók lejártak",
@@ -2837,10 +2559,7 @@
   },
   "share": {
     "title": "Megosztás a Kilo-val",
-    "close": "Bezárás",
-    "reviewPr": "PR áttekintése",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Új munkamenet",
     "searchPlaceholder": "Korábbi munkamenetek keresése",
     "connectedCli": "Csatlakoztatott CLI-n",
     "newSessionOn": "Új munkamenet ezen: {{name}}",
@@ -2898,7 +2617,6 @@
     "statusCanceling": "A Kilo Pass törlés alatt",
     "statusPastDue": "A Kilo Pass lejárt",
     "monthlyCredits": "{{credits}} havi kredit",
-    "ends": "Vége: {{date}}",
     "periodEnd": "időszak vége",
     "managedOnGooglePlay": "A Google Play felügyeli",
     "managedInAppStore": "Az App Store felügyeli",
@@ -2910,7 +2628,6 @@
     "unavailableDescription": "A Kilo Pass nem érhető el alkalmazáson belüli vásárlásként Androidon. Kezelje a weben.",
     "webManagementDescription": "Ez a Kilo Pass a weben van kezelve.",
     "legalDisclosure": "A Kilo Pass automatikusan megújuló havi előfizetés. A fizetés az Apple ID-hoz kerül felszámításra a vásárlás megerősítésekor. Az előfizetés minden hónapban automatikusan megújul a megjelenített áron, hacsak nem mondja le legalább 24 órával az aktuális időszak vége előtt. Kezelje vagy mondja le bármikor az App Store fiókbeállításaiban.",
-    "legalPrivacyPolicy": "Adatvédelmi irányelvek",
     "legalTermsOfUse": "Felhasználási feltételek (EULA)",
     "purchaseDifferentAccount": "Ez az App Store-vásárlás nincs hozzárendelve a Kilo-fiókjához. Jelentkezzen be a vásárláshoz használt Apple-fiókkal, majd próbálja újra.",
     "restoreFailed": "Nem sikerült visszaállítani a vásárlásokat. Próbálja újra.",
@@ -2939,7 +2656,6 @@
     "privacyPolicyPrefix": "Az adataidat a",
     "privacyPolicy": "Kilo adatvédelmi szabályzata",
     "onDevice": "Az eszközön",
-    "loading": "Betöltés…",
     "couldNotLoadTranscription": "Az átírási beállításod nem tölthető be.",
     "signInToManageTranscription": "Az online átírás kezeléséhez jelentkezz be.",
     "onlineTranscription": "Online átírás",
@@ -2956,7 +2672,6 @@
     "voiceTranscriptionTitle": "Hangátírás",
     "retentionPrefix": "A teljes megőrzési időtartamok, a jogaid és az elérhetőségek a",
     "backToConsent": "Vissza a hozzájáruláshoz",
-    "back": "Vissza",
     "revokeConsent": "Hozzájárulás visszavonása",
     "revokeConsentTitle": "Visszavonod az adatmegosztási hozzájárulást?",
     "acceptAndContinue": "Elfogadás és folytatás",
@@ -2990,7 +2705,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Maszkolt képernyőképek hiba esetén, és maszkolt felvételek a munkamenetek kis mintájáról.",
     "errorScreenshotsWhy": "Annak megtekintése, hogy az alkalmazás mit jelenített meg, amikor valami meghibásodott.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Telepítési forrás és kampányazonosítók.",
     "installAttributionWhy": "Annak megértése, hogy mely csatornák hoznak új felhasználókat.",
     "installAttributionWho": "AppsFlyer.",
@@ -2999,7 +2713,6 @@
     "voiceTranscriptionWho": "Csak az eszközön, vagy az Apple vagy a Google, ha ez az eszköz nem tud offline átírni.",
     "installAttributionPromptTitle": "Engedélyezed a telepítési attribúciót?",
     "installAttributionPromptMessage": "A Kilo az Apple nyomkövetési engedélyét csak annak megtudására használja, hogy melyik csatorna hozott ide. A promptjaidat és beszélgetéseidet soha nem használja.",
-    "continue": "Folytatás",
     "what": "Mit",
     "why": "Miért",
     "who": "Ki"
@@ -3021,7 +2734,6 @@
       "selectDescription": "A folytatáshoz válassz szervezetet a profilodból.",
       "selectOrganization": "Szervezet kiválasztása",
       "unavailableDescription": "Ez a szervezet már nem érhető el. A folytatáshoz válassz egyet a profilodból.",
-      "accessDeniedTitle": "Hozzáférés megtagadva",
       "accessDeniedDescription": "Nincs hozzáférése ehhez a szervezethez."
     },
     "creditActivity": {
@@ -3040,16 +2752,12 @@
         "accounting_adjustment": "Számviteli kiigazítás",
         "credits_expired": "Lejárt kreditek"
       },
-      "loadMore": "További betöltése",
-      "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
       "truncated": "Korábbi hitelaktivitás érhető el."
     },
     "inviteMember": {
       "emailError": "Adj meg érvényes e-mail címet",
-      "emailLabel": "E-mail",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "Nincs jogosultságod tagok meghívására.",
-      "roleLabel": "Szerep",
       "roleMember": "Szerep: Tag",
       "sendInvite": "Meghívó küldése",
       "title": "Tag meghívása"
@@ -3066,18 +2774,13 @@
         "paid": "Fizetve",
         "open": "Nyitott",
         "void": "Érvénytelen",
-        "draft": "Piszkozat",
-        "uncollectible": "Behajthatatlan",
-        "unknown": "Ismeretlen"
+        "uncollectible": "Behajthatatlan"
       },
-      "loadMore": "További betöltése",
       "loadMoreFailed": "Nem sikerült betölteni továbbiakat",
       "truncated": "Korábbi számlák érhetők el."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "Alacsony egyenleg figyelmeztetés engedélyezése",
-      "enabled": "Engedélyezve",
       "notifyEmailsLabel": "Értesítési e-mailek",
       "permissionDenied": "Nincs jogosultságod a számlázási figyelmeztetések kezelésére.",
       "separateEmailsHint": "Több e-mailt vesszővel válassz el.",
@@ -3101,12 +2804,10 @@
       "emptyDescriptionCanInvite": "Hívd meg a csapattársaidat, hogy együttműködjenek ebben a szervezetben.",
       "emptyDescriptionCannotInvite": "Kérd meg a tulajdonost vagy a számlázási felelőst, hogy hívja meg a csapattársakat.",
       "emptyTitle": "Még nincs tag",
-      "inviteMember": "Tag meghívása",
       "invitedDate": "Meghívva: {{date}}",
       "limitPerDay": "{{amount}}/nap",
       "manageA11y": "{{name}} kezelése",
       "manageInvitationA11y": "{{email}} meghívásának kezelése",
-      "removeConfirm": "Eltávolítás",
       "removeMember": "Tag eltávolítása",
       "removeMemberMessage": "Eltávolítod {{name}}-t ebből a szervezetből?",
       "revokeConfirm": "Visszavonás",
@@ -3121,31 +2822,23 @@
         "billingManager": "Számlázási felelős"
       },
       "emailStatusFailed": "Az e-mail nem sikerült",
-      "emailStatusPending": "Függőben",
       "inviteCreated": "Meghívó létrehozva",
       "pendingInvitations": "Függőben lévő meghívók",
       "resendInvite": "Meghívó újraküldése",
       "shareInviteLink": "Meghívó hivatkozás megosztása"
     },
-    "permissionDenied": {
-      "back": "Vissza",
-      "title": "Hozzáférés megtagadva"
-    },
     "usageStats": {
-      "cost": "Költség",
       "inputTokens": "Bemeneti tokenek",
       "last30Days": "Utolsó 30 nap",
       "outputTokens": "Kimeneti tokenek",
       "requests": "Kérések"
     },
     "hub": {
-      "title": "Szervezet",
       "renameTitle": "Szervezet átnevezése",
       "renamePlaceholder": "Add meg a szervezet nevét",
       "balance": "Egyenleg",
       "organizationSeats": "Szervezeti férőhelyek",
-      "lowBalanceBelow": "{{amount}} alatt",
-      "lowBalanceOff": "Ki"
+      "lowBalanceBelow": "{{amount}} alatt"
     },
     "kiloPass": {
       "activating": "Aktiválás",
@@ -3153,9 +2846,6 @@
       "couldNotLoadStatus": "Az állapot nem tölthető be",
       "creditProcessingDelayed": "A kredit feldolgozása késik · automatikus újrapróbálás",
       "ended": "Befejezve",
-      "endsOn": "Vége: {{date}}",
-      "loading": "Betöltés…",
-      "manageHint": "Megnyitja a Kilo Pass kezelést a weben.",
       "notSubscribed": "Nincs előfizetve",
       "overallocated": "A Pass-hozzárendelések meghaladják a fizetett férőhelyeket",
       "paidSeat_one": "{{displayCount}} fizetett férőhely",
@@ -3165,13 +2855,11 @@
       "paymentPending": "A fizetés függőben",
       "processingBlocked": "A feldolgozás blokkolva",
       "processingNeedsReview": "A feldolgozás felülvizsgálatot igényel",
-      "retry": "Újra",
       "retryHint": "A Kilo Pass állapot betöltésének újrapróbálása.",
       "setupHint": "Megnyitja a Kilo Pass beállítást a weben."
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Ezzel az e-mail címmel már létezik fiók, más bejelentkezési móddal. Próbáljon másik módszert, vagy használja a „$t(login.moreSignInOptions)” opciót.",
     "differentOauth": "Ezzel az e-mail címmel már létezik fiók, más bejelentkezési móddal. Próbáljon másik módszert, vagy használja a „$t(login.moreSignInOptions)” opciót.",
     "ssoError": "A szervezete SSO-t igényel. Használja a „$t(login.moreSignInOptions)” opciót.",
     "blocked": "Ez a fiók le lett tiltva. Kérjük, vegye fel a kapcsolatot az ügyfélszolgálattal.",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "Nem sikerült elindítani a bejelentkezést. Kérjük, próbálja újra.",
     "couldNotOpenBrowser": "Nem sikerült megnyitni a böngészőt. Kérjük, próbálja újra.",
     "signInTimedOut": "A bejelentkezés időtúllépés miatt megszakadt. Kérjük, próbálja újra.",
-    "signInFailed": "A bejelentkezés nem sikerült. Kérjük, próbálja újra.",
     "networkError": "Hálózati hiba. Kérjük, próbálja újra.",
     "accessDeniedByUser": "A hozzáférést a felhasználó megtagadta",
     "codeExpired": "A kód lejárt",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "Vissza a beállításokhoz"
   },
   "quickChat": {
-    "title": "Csevegés",
-    "composer": {
-      "placeholder": "Üzenet"
-    },
     "empty": {
       "title": "Kezdjen csevegést",
       "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
     },
-    "working": "Feldolgozás",
     "historyRetry": "Nem sikerült betölteni a csevegés előzményeit.",
-    "catalogRetry": "Nem sikerült betölteni a modelleket",
     "sendError": "Az üzenet küldése nem sikerült. Próbálja újra."
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "Jelentkezzen be az ügynökök megtekintéséhez",
     "privacy": "Nyisd meg a Kilót az ügynökök megtekintéséhez",
     "openAgents": "Ügynökök megnyitása",
-    "running": "Feldolgozás",
     "needsInput": "bemenetet igényel",
-    "idle": "Tétlen",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsolja be az Élő tevékenységeket a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
   }

@@ -44,11 +44,11 @@ type FindingRemediationPanelProps = {
 // action values (same labels as the web audit report ACTION_LABELS).
 const REMEDIATION_TIMELINE_LABELS = {
   'security.remediation.queued': 'securityAgent.remediation.timeline.queued',
-  'security.remediation.pr_opened': 'securityAgent.remediation.timeline.prOpened',
+  'security.remediation.pr_opened': 'securityAgent.remediationStatus.prOpened',
   'security.remediation.failed': 'securityAgent.remediation.timeline.failed',
   'security.remediation.blocked': 'securityAgent.remediation.timeline.blocked',
-  'security.remediation.no_changes_needed': 'securityAgent.remediation.timeline.noChangesNeeded',
-  'security.remediation.cancelled': 'securityAgent.remediation.timeline.cancelled',
+  'security.remediation.no_changes_needed': 'securityAgent.remediationStatus.noChangesNeeded',
+  'security.remediation.cancelled': 'common.cancelled',
 } as const satisfies Record<string, string>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -61,17 +61,17 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 // plus the PR-draft flag decides the key; icon, tone, and spinning still come
 // from app-shared.
 const REMEDIATION_STATUS_KEYS = {
-  cancellationRequested: 'securityAgent.remediationStatus.cancellationRequested',
+  cancellationRequested: 'securityAgent.remediation.cancellationRequested',
   notStarted: 'securityAgent.remediationStatus.notStarted',
-  queued: 'securityAgent.remediationStatus.queued',
+  queued: 'common.queued',
   starting: 'securityAgent.remediationStatus.starting',
   inProgress: 'securityAgent.remediationStatus.inProgress',
   draftPrOpened: 'securityAgent.remediationStatus.draftPrOpened',
   prOpened: 'securityAgent.remediationStatus.prOpened',
   blocked: 'securityAgent.remediationStatus.blocked',
-  failed: 'securityAgent.remediationStatus.failed',
+  failed: 'common.failed',
   noChangesNeeded: 'securityAgent.remediationStatus.noChangesNeeded',
-  cancelled: 'securityAgent.remediationStatus.cancelled',
+  cancelled: 'common.cancelled',
 } as const satisfies Record<string, string>;
 
 function getRemediationStatusKey(
@@ -138,7 +138,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   finding_not_open: 'securityAgent.remediationUnavailable.findingNotOpen',
   repo_not_in_scope: 'securityAgent.remediationUnavailable.repoNotInScope',
   analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  sandbox_analysis_required: 'securityAgent.remediationUnavailable.sandboxAnalysisRequired',
+  sandbox_analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
   stale_analysis: 'securityAgent.remediationUnavailable.staleAnalysis',
   not_exploitable: 'securityAgent.remediationUnavailable.notExploitable',
   exploitability_unknown: 'securityAgent.remediationUnavailable.exploitabilityUnknown',
@@ -157,7 +157,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   before_enablement: 'securityAgent.remediationUnavailable.beforeEnablement',
 } as const satisfies Record<string, string>;
 
-const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediationUnavailable.generic';
+const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediation.unavailable';
 
 function getRemediationUnavailableKey(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') {
@@ -223,7 +223,7 @@ export function FindingRemediationPanel({
       router.push(getPrReviewPath(destination.owner, destination.repo, destination.number));
       return;
     }
-    void openExternalUrl(url, { label: t('securityAgent.remediation.pullRequest') });
+    void openExternalUrl(url, { label: t('common.pullRequest') });
   };
 
   if (isLoading && !analysis) {
@@ -243,8 +243,8 @@ export function FindingRemediationPanel({
     return (
       <EmptyState
         icon={Wrench}
-        title={t('securityAgent.remediation.noAnalysisTitle')}
-        description={t('securityAgent.remediation.noAnalysisDescription')}
+        title={t('securityAgent.analysis.noAnalysisYet')}
+        description={t('securityAgent.analysis.noAnalysisYetDescription')}
       />
     );
   }
@@ -350,7 +350,7 @@ export function FindingRemediationPanel({
               t('securityAgent.remediation.cancelTitle'),
               t('securityAgent.remediation.cancelMessage'),
               [
-                { text: t('securityAgent.remediation.keepRunning'), style: 'cancel' },
+                { text: t('common.keepRunning'), style: 'cancel' },
                 {
                   text: t('securityAgent.remediation.cancelRemediation'),
                   style: 'destructive',
@@ -470,16 +470,11 @@ export function FindingRemediationPanel({
                     value={originKey ? t(originKey) : attempt.origin.replaceAll('_', ' ')}
                   />
                   <KvRow
-                    label={t('securityAgent.remediation.model')}
+                    label={t('common.model')}
                     value={attempt.remediationModelSlug}
                     selectable
                   />
-                  <KvRow
-                    label={t('securityAgent.remediation.branch')}
-                    value={attempt.branchName}
-                    last
-                    selectable
-                  />
+                  <KvRow label={t('common.branch')} value={attempt.branchName} last selectable />
                   {outcome ? (
                     <Text variant="muted" className="text-xs" selectable>
                       {outcome}

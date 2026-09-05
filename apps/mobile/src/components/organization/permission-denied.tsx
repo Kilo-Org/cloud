@@ -23,7 +23,7 @@ export function PermissionDenied({ description }: PermissionDeniedProps) {
     <EmptyState
       className="bg-background"
       icon={Lock}
-      title={t('organization.permissionDenied.title')}
+      title={t('common.accessDenied')}
       description={description}
       action={
         <Button
@@ -32,7 +32,7 @@ export function PermissionDenied({ description }: PermissionDeniedProps) {
             router.back();
           }}
         >
-          <Text>{t('organization.permissionDenied.back')}</Text>
+          <Text>{t('common.back')}</Text>
         </Button>
       }
     />

@@ -27,15 +27,119 @@
     "somethingWentWrong": "Zerbait gaizki joan da",
     "couldNotOpen": "Ezin da {{label}} ireki",
     "link": "esteka",
-    "takingLonger": "Espero baino gehiago ari da hartzen. Itxi ezazu eta berriro egiaztatu dezakezu."
+    "takingLonger": "Espero baino gehiago ari da hartzen. Itxi ezazu eta berriro egiaztatu dezakezu.",
+    "cameraAccessDisabled": "Kamera sarbidea desgaituta",
+    "copyLink": "Kopiatu esteka",
+    "reviewPr": "Berrikusi PR-a",
+    "sendMessage": "Bidali mezua",
+    "remaining": "Gainerakoa",
+    "imageUnavailable": "Irudia ez dago eskuragarri",
+    "open": "Ireki {{name}}",
+    "loading": "Kargatzen…",
+    "queued": "Ilaran",
+    "cost": "Kostua",
+    "model": "Modeloa",
+    "reportSubmittedReceipt": "Salaketa bidalita. Ordainagiria {{receiptId}}",
+    "role": "Rola",
+    "allModels": "Modelo guztiak",
+    "noModelsAvailable": "Ez dago modelo erabilgarririk",
+    "recommended": "Gomendatuta",
+    "searchModels": "Bilatu modeloak...",
+    "bitbucketConnected": "Bitbucket konektatuta",
+    "connectBitbucket": "Konektatu Bitbucket",
+    "connectGithub": "Konektatu GitHub",
+    "connectGitlab": "Konektatu GitLab",
+    "discard": "Baztertu",
+    "repository": "Biltegia",
+    "newSession": "Saio berria",
+    "details": "Xehetasunak",
+    "pullRequest": "pull request",
+    "sessionExited": "Saioa itxi da",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "Sarbidea ukatu da",
+    "notFound": "Ez da aurkitu",
+    "platform": "Plataforma",
+    "contentTruncated": "Edukia moztuta",
+    "truncated": "Moztuta",
+    "added": "Gehituta",
+    "deleted": "Ezabatuta",
+    "updated": "Eguneratuta",
+    "clearFilters": "Garbitu iragazkiak",
+    "clearSearch": "Garbitu bilaketa",
+    "couldNotLoadSessions": "Ezin dira saioak kargatu",
+    "delete": "Ezabatu",
+    "rename": "Berrizendatu",
+    "idle": "Geldirik",
+    "online": "Konektatuta",
+    "starting": "Hasten...",
+    "noKiloclawInstances": "Ez dago KiloClaw instantziarik",
+    "personal": "Pertsonala",
+    "reply": "Erantzun",
+    "closeReactions": "Itxi erreakzioak",
+    "recent": "Berriak",
+    "connect": "Konektatu",
+    "codeReviewer": "Kode-berrikuslea",
+    "performance": "Errendimendua",
+    "all": "Dena",
+    "critical": "Kritikoa",
+    "off": "Desaktibo",
+    "notConnected": "Ez konektatuta",
+    "allRepositories": "Biltegi guztiak",
+    "repositories": "Biltegiak",
+    "connected": "Konektatuta",
+    "organization": "Erakundea",
+    "couldNotLoadRepositories": "Biltegiak ezin izan dira kargatu",
+    "selectedRepositories": "Hautatutako biltegiak",
+    "branch": "Adarra",
+    "findings": "Aurkikuntzak",
+    "keepRunning": "Exekutatzen jarraitu",
+    "status": "Egoera",
+    "retryLoadingMore": "Saiatu berriro gehiago kargatzen",
+    "balanced": "Orekatua",
+    "couldNotLoadOrganizations": "Erakundeak ezin izan dira kargatu",
+    "yourOwnRepositories": "Zure biltegi propioak",
+    "selectRepositories": "Hautatu biltegiak",
+    "cancelled": "Bertan behera utzita",
+    "failed": "Huts egin du",
+    "pending": "Zain",
+    "deviceSessions": "Gailuen saioak",
+    "working": "Lanean",
+    "goBack": "Itzuli",
+    "ends": "Amaitzen da {{date}}",
+    "privacyPolicy": "Pribatutasun-politika",
+    "disabled": "Desgaituta",
+    "enabled": "Gaituta",
+    "couldNotLoadModels": "Modeloak ezin izan dira kargatu",
+    "close": "Itxi",
+    "remove": "Kendu",
+    "kiloclaw": "KiloClaw",
+    "notifications": "Jakinarazpenak",
+    "loadMore": "Kargatu gehiago",
+    "email": "Posta elektronikoa",
+    "draft": "Zirriborroa",
+    "prReview": "PR berrikuspena",
+    "dismissed": "Baztertuta",
+    "closed": "Itxita",
+    "preferences": "Hobespenak",
+    "agents": "Agenteak",
+    "securityAgent": "Segurtasun-agentea",
+    "profile": "Profila",
+    "chat": "Txata",
+    "file": "Fitxategia",
+    "keepEditing": "Jarraitu editatzen",
+    "signOut": "Amaitu saioa",
+    "unknown": "Ezezaguna",
+    "message": "Mezua",
+    "reactions": "Erreakzioak",
+    "openPullRequest": "Ireki pull request-a",
+    "couldnTLoadMore": "Ezin izan dira gehiago kargatu"
   },
   "language": {
-    "title": "Hizkuntza",
     "restarting": "Berrabiarazten hizkuntza aplikatzeko",
     "couldNotRestart": "Ezin izan da berrabiarazi",
     "languageSaved": "Zure hizkuntza gordeta dago.",
     "catalogLoadFailed": "Ezin izan da hizkuntza kargatu. Saiatu berriro.",
-    "retry": "Saiatu berriro",
     "search": "Hizkuntzak bilatu",
     "noMatches": "Hizkuntza batek ere ez du bat egiten",
     "deviceLanguage": "Gailuaren hizkuntza",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "Saio-kodea: {{code}}",
     "openSignInPageInBrowser": "Ireki saio-orria nabigatzailean",
     "copySignInLink": "Kopiatu saio-esteka",
-    "copyLink": "Kopiatu esteka",
     "cancelSignIn": "Utzi saioa",
     "startingSignIn": "Saioa hasten...",
     "organizationUsesSso": "Zure erakundeak behin bakarrik saioa hasteko sistema erabiltzen du.",
@@ -62,23 +165,19 @@
     "emailAddress": "Helbide elektronikoa",
     "emailPlaceholder": "zu@adibidea.com",
     "continueWithEmail": "Jarraitu posta elektronikoarekin",
-    "continue": "Jarraitu",
     "enterCodeSentTo": "Sartu {{email}}-ra bidalitako kodea",
     "codeArrivalHint": "Helbide hau onargarria bada, kodea minutu batean iritsiko da.",
     "verifyCode": "Egiaztatu kodea",
     "resendCode": "Bidali kodea berriro",
-    "back": "Atzera",
     "termsPrefix": "Jarraituta, onartzen dituzu gure",
     "terms": "Baldintzak",
     "termsConnector": " eta ",
     "termsSuffix": ".",
-    "privacyPolicy": "Pribatutasun-politika",
     "moreSignInOptions": "Saioa hasteko aukera gehiago",
     "couldNotCompleteSignIn": "Ezin izan da saioa amaitu. Saiatu berriro.",
     "sessionEnded": "Zure saioa amaitu da. Hasi saioa berriro.",
     "signInCodeExpired": "Zure saio-kodea iraungi da. Saiatu berriro.",
     "accessDenied": "Sarbidea ukatu da.",
-    "somethingWentWrong": "Zerbait gaizki joan da. Saiatu berriro.",
     "codeSent": "Kodea bidalita",
     "accountCreated": "Kontua sortuta. Ongi etorri Kilo-ra.",
     "pleaseEnterEmail": "Sartu zure helbide elektronikoa.",
@@ -86,24 +185,16 @@
     "or": "edo"
   },
   "profile": {
-    "title": "Profila",
-    "agents": "Agenteak",
-    "codeReviewer": "Kode-berrikuslea",
     "codeReviewerSubtitle": "PR-ak automatikoki berrikustea",
-    "securityAgent": "Segurtasun-agentea",
     "securityAgentSubtitle": "Aurkitu eta konpondu ahultasunak",
     "reviews": "Berrikuspenak",
-    "prReview": "PR berrikuspena",
     "prReviewSubtitle": "Berrikusi eskaerak mugikorrean",
-    "organization": "Erakundea",
     "couldNotLoadOrganization": "Ezin izan da erakundea kargatu",
     "couldNotLoadOrganizationDescription": "Erakundearen eta agenteen ezarpenak ez daude eskuragarri hau kargatu arte.",
     "linkedAccounts": "Estekatutako kontuak",
     "couldNotLoadAccounts": "Ezin izan dira kontuak kargatu",
     "app": "Aplikazioa",
-    "preferences": "Hobespenak",
     "preferencesSubtitle": "Itxura, jakinarazpenak, pentsamendua eta pantailaren jokabidea",
-    "deviceSessions": "Gailuen saioak",
     "deviceSessionsSubtitle": "Berrikusi eta amaitu beste gailuen saioak",
     "feedback": "Iruzkina",
     "privacyChoices": "Pribatutasun-aukerak",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "Zure kreditubalantzea hutsik dago. Kredituak iOS aplikaziotik kanpo kudeatzen dira kontu honetarako.",
     "signOutTitle": "Amaitu saioa?",
     "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
-    "signOutConfirm": "Amaitu saioa",
     "deleteAccountTitle": "Ezabatu kontua?",
     "deleteAccountMessage": "Honek betiko ezabatzen du zure kontua eta saioa amaitzen du. Berrespen-kode bat bidaliko dizugu postaz.",
     "deleteAccountConfirm": "Ezabatu kontua",
     "accountDeleted": "Zure kontua ezabatuta dago.",
     "viewOrganization": "Ikusi erakundea",
     "manageOrganization": "Kudeatu erakundea",
-    "personal": "Pertsonala",
     "selectAccount": "Aukeratu kontua",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "Posta elektronikoa",
     "providerTestAccount": "Test-kontua",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Enpresako SSO"
   },
   "preferences": {
-    "title": "Hobespenak",
     "autoExpandThinking": "Zabaldu pentsamendua automatikoki",
     "autoExpandThinkingSubtitle": "Erakutsi agentearen pentsamendua zabalduta amaitzen denean.",
     "keepScreenOn": "Mantendu pantaila piztuta saio-orrian",
     "keepScreenOnSubtitle": "Mantendu pantaila esnatuta saioa lanean ari den bitartean.",
     "appearance": "Itxura",
-    "notifications": "Jakinarazpenak",
     "notificationsSubtitle": "Bultzadazko hobespenak",
     "appearanceSystem": "Sistema",
     "appearanceLight": "Argia",
@@ -161,7 +245,6 @@
   "prReview": {
     "pullRequestUnavailable": "Pull request-a ez dago eskuragarri",
     "pullRequestUnavailableDescription": "PR hau ezin da ireki. Baliteke ezabatuta egotea, biltegia pribatua izatea, edo Kilo GitHub aplikazioa instalatuta ez egotea.",
-    "accessDenied": "Sarbidea ukatu da",
     "accessDeniedDescription": "Ez duzu baimenik pull request hau ikusteko.",
     "noFilesChanged": "Ez da fitxategirik aldatu",
     "noFilesChangedDescription": "Pull request honek ez du fitxategi-aldaketarik.",
@@ -177,7 +260,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "Ezin izan dira fitxategiak kargatu",
-      "checkConnection": "Egiaztatu konexioa eta saiatu berriro.",
       "retryLoadingFiles": "Saiatu fitxategiak berriro kargatzen",
       "filterPlaceholder": "Iragazi fitxategiak bidearen arabera",
       "viewedCount": "{{viewed}} / {{total}} ikusita",
@@ -289,7 +371,6 @@
         "closed": "Pull request hau itxita dago"
       },
       "partialSuccessBanner": {
-        "title": "Batuta",
         "body": "Ezin izan da adarra ezabatu: {{reason}}",
         "accessibility": "Batuta. Ezin izan da adarra ezabatu: {{reason}}"
       },
@@ -331,7 +412,6 @@
       "unresolveThread": "Desegin hariaren konponketa",
       "resolved": "Konponduta",
       "outdated": "Zaharkitua",
-      "file": "Fitxategia",
       "comment_one": "1 iruzkin",
       "comment": "{{displayCount}} iruzkin",
       "comment_other": "{{displayCount}} iruzkin",
@@ -339,9 +419,6 @@
       "couldNotLoadMore": "Ezin izan dira iruzkin gehiago kargatu.",
       "retryLoadingMore": "Saiatu iruzkin gehiago berriro kargatzen",
       "loadMoreComments": "Kargatu iruzkin gehiago",
-      "loadMore": "Kargatu gehiago",
-      "closeReactions": "Itxi erreakzioak",
-      "reactionsTitle": "Erreakzioak",
       "addReaction": "Gehitu erreakzioa",
       "reactionPill": "{{emoji}} erreakzioa, {{displayCount}} {{countLabel}}",
       "reaction_one": "erreakzio",
@@ -352,14 +429,11 @@
       "reportUser": "Salatu erabiltzailea",
       "mute": "Isilarazi",
       "block": "Blokeatu",
-      "somethingWentWrong": "Zerbait gaizki joan da",
-      "reportSubmitted": "Salaketa bidalita. Ordainagiria {{receiptId}}",
       "blockedUser": "{{login}} blokeatuta",
       "mutedUser": "{{login}} isilduta",
       "replyPlaceholder": "Erantzun...",
       "replyBody": "Erantzunaren gorputza",
       "submitReply": "Bidali erantzuna",
-      "reply": "Erantzun",
       "termsTitle": "Zerbitzu-baldintzak",
       "termsCopy": "13 urte edo gehiago izan behar dituzu argitaratzeko.",
       "termsAcceptRetry": "Ezin izan dira Baldintzak onartu. Egiaztatu konexioa eta saiatu berriro.",
@@ -367,7 +441,6 @@
       "acceptTerms": "Onartu",
       "replyBadRequest": "Erantzun hau ezin da argitaratu. Baliteke haria aldatu izana.",
       "replyForbidden": "Ez duzu baimenik pull request honi erantzuteko.",
-      "couldNotReply": "Ezin izan da erantzun.",
       "moderation": {
         "reportContent": {
           "terminal": "Iruzkin hau ezin da salatu.",
@@ -420,8 +493,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub App ezarpenak ezin izan dira ireki",
     "installKiloGitHubApp": "Instalatu Kilo GitHub aplikazioa",
-    "connectionExpiredTitle": "GitHub konexioa iraungi da",
-    "connectionExpiredDescription": "Zure GitHub konexioa ez da gehiago baliozkoa. Egiaztatu berriro zure konexioa — konektatze-eskaera jasoko duzu behar izanez gero.",
     "checkConnection": "Egiaztatu konexioa",
     "couldNotLoadPullRequest": "Ezin izan da pull request-a kargatu",
     "description": "Deskribapena",
@@ -430,21 +501,18 @@
     "reviewPullRequest": "Berrikusi pull request-a",
     "headLine": "{{counts}} · burua {{sha}}",
     "entry": {
-      "title": "PR berrikuspena",
       "eyebrow": "Ireki pull request bat URLaren bidez",
       "pastePrLink": "Itsatsi PR esteka bat",
       "noRecentPrs": "Ez dago PR berririk",
       "noRecentPrsDescription": "Itsatsi PR esteka bat goian berrikuspena hasteko — hemen agertuko da hurrengoan.",
       "couldNotLoad": "Ezin izan da kargatu",
-      "remove": "Kendu",
       "removeFromRecentsTitle": "Kendu berrietatik?",
       "removeFromRecentsMessage": "Pull request hau kenduko da zure berrietatik.",
       "removeRecentAccessibility": "Kendu {{repo}} berrietatik",
       "urlAccessibility": "GitHub pull request URL-a",
       "clearLink": "Garbitu pull request esteka",
       "pasteLink": "Itsatsi pull request esteka",
-      "open": "Ireki",
-      "openPullRequest": "Ireki pull request-a"
+      "open": "Ireki"
     },
     "checks": {
       "title": "Egiaztapenak",
@@ -460,19 +528,14 @@
       "pending": "{{displayCount}} zain",
       "skipped": "{{displayCount}} alde batera utzita",
       "checksCount": "{{displayCount}} egiaztapen",
-      "checkDetails": "egiaztapenen xehetasunak",
-      "pullRequest": "pull request"
+      "checkDetails": "egiaztapenen xehetasunak"
     },
     "inbox": {
       "title": "Sarrera-ontzia",
-      "recent": "Berriak",
-      "draft": "Zirriborroa",
       "loading": "Sarrera-ontzia kargatzen",
       "noReviewRequests": "Ez dago berrikuspen-eskaerarik",
       "noReviewRequestsDescription": "Zure berrikuspenaren zain dauden pull request-ak hemen agertuko dira. PR esteka bat ere itsats dezakezu goian.",
-      "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu",
-      "couldNotLoadMore": "Ezin izan dira gehiago kargatu",
-      "retryLoadingMore": "Saiatu berriro gehiago kargatzen"
+      "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu"
     },
     "composer": {
       "commentBodyPlaceholder": "Utzi iruzkin bat",
@@ -487,8 +550,6 @@
       "loadFailedTitle": "Ezin izan da iruzkin-osatzailea kargatu",
       "discardTitle": "Baztertu iruzkina?",
       "discardMessage": "Zure zirriborroa galduko da.",
-      "keepEditing": "Jarraitu editatzen",
-      "discard": "Baztertu",
       "comment": "Iruzkina",
       "insertSuggestionA11y": "Txertatu kode-iradokizun bat",
       "insertSuggestion": "Txertatu iradokizuna",
@@ -496,12 +557,10 @@
       "suggestionsOnlyAddedLines": "Iradokizunak gehitutako lerroei soilik aplikatzen zaizkie.",
       "tapDiffLineToSuggest": "Sakatu diff lerro bat iradokizunak gaitzeko."
     },
-    "screenTitle": "PR berrikuspena",
     "connect": {
       "checkFailedTitle": "Ezin izan da GitHub konexioa egiaztatu",
       "checkFailedMessage": "Saioaren egoera ez dago eskuragarri hau kargatu arte.",
       "reconnectTitle": "Konektatu GitHub berriro",
-      "title": "Konektatu GitHub",
       "reconnectDescription": "Zure GitHub konexioa baliogabetu da. Konektatu berriro pull request-ak mugikorrean berrikusten jarraitzeko.",
       "description": "Konektatu zure GitHub kontua pull request-ak mugikorrean berrikusteko."
     },
@@ -510,11 +569,9 @@
       "shareA11y": "Partekatu pull request-a"
     },
     "submit": {
-      "title": "Bidali berrikuspena",
       "loadFailedTitle": "Ezin izan da berrikuspenaren bidalketa kargatu",
       "deletePendingTitle": "Ezabatu zain dagoen iruzkina?",
       "deletePendingMessage": "Iruzkin hau berrikuspen-ilaratik kenduko da.",
-      "delete": "Ezabatu",
       "summaryOptional": "Laburpena (hautazkoa)",
       "pendingComment_one": "zain dagoen iruzkin",
       "pendingComment": "zain dauden iruzkin",
@@ -527,19 +584,15 @@
     },
     "reconnectNotice": {
       "title": "GitHub konexioa iraungi da",
-      "message": "Zure GitHub konexioa ez da gehiago baliozkoa. Egiaztatu berriro zure konexioa — konektatze-eskaera jasoko duzu behar izanez gero.",
-      "checkConnection": "Egiaztatu konexioa"
+      "message": "Zure GitHub konexioa ez da gehiago baliozkoa. Egiaztatu berriro zure konexioa — konektatze-eskaera jasoko duzu behar izanez gero."
     },
     "eventChips": {
       "comment": "Iruzkina",
       "requestChanges": "Eskatu aldaketak",
-      "approve": "Onartu",
       "label": "Berrikuspen-gertaera"
     },
     "overview": {
       "stateMerged": "Batuta",
-      "stateClosed": "Itxita",
-      "stateDraft": "Zirriborroa",
       "stateOpenApproved": "Irekia · Onartuta",
       "stateOpenChangesRequested": "Irekia · Aldaketak eskatuta",
       "stateOpenReviewRequired": "Irekia · Berrikuspena beharrezkoa",
@@ -564,14 +617,11 @@
       "reviewChangesRequested": "Aldaketak eskatuta",
       "reviewCommented": "Iruzkindua",
       "reviewPending": "Berrikuspenaren zain",
-      "openIssueA11y": "Ireki #{{number}} arazoa GitHuben",
-      "reviewDismissed": "Baztertuta"
+      "openIssueA11y": "Ireki #{{number}} arazoa GitHuben"
     },
     "pendingComment": {
       "editOutdatedA11y": "Editatu {{location}}-ko iruzkin zaharkitua",
       "editA11y": "Editatu {{location}}-ko iruzkin zain egongo bat",
-      "emptyBody": "(hutsik)",
-      "outdated": "Zaharkitua",
       "staleHint": "PR-a mugitu da hau idatzi zenuenetik.",
       "deleteA11y": "Ezabatu {{location}}-ko iruzkin zain egongo bat",
       "deletedAnnouncement": "Iruzkin zain egongo bat ezabatuta",
@@ -587,8 +637,6 @@
       "discussion": "Eztabaida"
     },
     "fileStatus": {
-      "added": "Gehituta",
-      "deleted": "Ezabatuta",
       "modified": "Aldatuta",
       "renamed": "Berrizendatuta",
       "copied": "Kopiatuta",
@@ -598,9 +646,7 @@
       "selectedTapToChange": "{{label}} hautatuta, sakatu hautaketa aldatzeko",
       "tapToComment": "{{label}}, sakatu iruzkintzeko",
       "truncationBanner": "Aldatutako {{total}} fitxategietatik lehenengo {{limit}} erakusten — GitHub API muga",
-      "statusAdded": "Gehituta",
       "statusContext": "Testuingurua",
-      "statusDeleted": "Ezabatuta",
       "lineLabel": "{{status}} lerroa {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(hutsik)"
@@ -628,7 +674,6 @@
     }
   },
   "notifications": {
-    "title": "Jakinarazpenak",
     "liveActivities": "Zuzeneko jarduerak",
     "liveActivitySubtitle": "Erakutsi agente aktiboak blokeo-pantailan",
     "liveUpdates": "Zuzeneko eguneratzeak",
@@ -651,7 +696,6 @@
     "disabledMessage": "Jakinarazpenak gaitzeko, piztu itzazu zure gailuaren ezarpenetan.",
     "disableTitle": "Desgaitu jakinarazpenak",
     "disableMessage": "Jakinarazpenak desgaitzeko, itzali itzazu zure gailuaren ezarpenetan.",
-    "openSettings": "Ireki ezarpenak",
     "registrationFailed": "Erregistroak huts egin du. Egiaztatu zure jakinarazpen-baimenak.",
     "couldNotEnable": "Ezin izan dira jakinarazpenak gaituta. Saiatu berriro.",
     "previewAlways": "Beti",
@@ -666,7 +710,6 @@
       "security": "Segurtasun-aurkikuntzak"
     },
     "category": {
-      "chatMessagesTitle": "Txat-mezuak",
       "chatMessagesSubtitle": "erantzunak zure elkarrizketetan",
       "agentAttentionTitle": "Agenteak zure beharra du",
       "agentAttentionSubtitle": "galderak, baimena, sarrera behar da",
@@ -674,32 +717,23 @@
       "agentUpdatesSubtitle": "agentearen tarteko mezuak",
       "sessionStatusTitle": "Saioaren egoera",
       "sessionStatusSubtitle": "amaituta / huts eginda / kontrolatzeko prest",
-      "kiloclawActivityTitle": "KiloClaw jarduera",
       "kiloclawActivitySubtitle": "instantzia prest/gaizki, programatutako ekintzak",
-      "balanceAlertsTitle": "Saldoaren alertak",
       "balanceAlertsSubtitle": "erakundearen saldo baxuaren abisuak",
-      "securityFindingsTitle": "Segurtasun-aurkikuntzak",
       "securityFindingsSubtitle": "aurkikuntza berriak eta SLA gogorarazleak"
     }
   },
   "tabs": {
     "home": "Hasiera",
-    "agents": "Agenteak",
-    "profile": "Profila",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, fitxa, {{position}} / {{total}}",
-    "chat": "Txata"
+    "position": "{{name}}, fitxa, {{position}} / {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Aldatu instantzia",
       "couldNotLoadInstances": "Ezin izan dira instantziak kargatu",
-      "noInstances": "Ez dago KiloClaw instantziarik",
       "noInstancesDescription": "Konfiguratu instantzia bat txateatzen hasteko.",
       "setUpKiloclaw": "Konfiguratu KiloClaw",
-      "currentInstance": "{{title}}, oraingoa",
-      "personal": "Pertsonala"
+      "currentInstance": "{{title}}, oraingoa"
     },
     "conversation": {
       "failedToLoad": "Ezin izan da elkarrizketa kargatu",
@@ -718,16 +752,12 @@
       "couldNotSignIn": "Ezin izan da txatean saioa hasi",
       "couldNotRefreshMessages": "Ezin izan dira mezuak freskatu",
       "couldNotLoadHistory": "Ezin izan da elkarrizketaren historia kargatu",
-      "rename": "Berrizendatu",
       "leave": "Utzi",
       "untitledConversation": "Izenik gabeko elkarrizketa",
       "createFailed": "Ezin izan da elkarrizketa sortu",
       "leaveFailed": "Ezin izan da elkarrizketa utzi"
     },
     "reactions": {
-      "title": "Erreakzioak",
-      "close": "Itxi erreakzioak",
-      "recent": "Berriak",
       "common": "Ohikoak",
       "reactWith": "Erreakzionatu {{reaction}}-ekin",
       "accessibility": "{{emoji}} erreakzioa, {{displayCount}}"
@@ -737,16 +767,13 @@
       "cancelReply": "Utzi erantzuna",
       "openInstance": "Ireki instantzia",
       "attachFile": "Erantsi fitxategia",
-      "messagePlaceholder": "Mezua",
-      "cancelEdit": "Utzi edizioa",
-      "sendMessage": "Bidali mezua"
+      "cancelEdit": "Utzi edizioa"
     },
     "conversationList": {
       "couldNotLoad": "Ezin izan dira elkarrizketak kargatu",
       "emptyTitle": "Ez dago elkarrizketarik oraindik",
       "emptyDescription": "Sortu elkarrizketa bat zure KiloClaw instantziarekin txateatzen hasteko.",
       "create": "Sortu elkarrizketa",
-      "starting": "Hasten...",
       "newConversation": "Elkarrizketa berria",
       "openInstanceSettings": "Ireki instantziaren ezarpenak",
       "today": "Gaur",
@@ -756,7 +783,6 @@
     },
     "attachment": {
       "open": "Ireki {{filename}}",
-      "imageUnavailable": "Irudia ez dago eskuragarri",
       "openFailed": "Ezin izan da eranskina ireki. Egiaztatu konexioa eta saiatu berriro.",
       "attachFailed": "Ezin izan da fitxategia erantsi",
       "limit": "Gehienez {{displayCount}} fitxategi erantsi ditzakezu.",
@@ -786,11 +812,9 @@
       "yourMessage": "Zure mezua",
       "messageFrom": "{{author}} -en mezua",
       "moreActions": "Ekintza gehiago",
-      "message": "Mezua",
       "notDelivered": "Ez da bidali",
       "edited": "(editatuta)",
-      "image": "Irudia",
-      "attachment": "Eranskina"
+      "image": "Irudia"
     },
     "messageActions": {
       "copied": "Kopiatuta",
@@ -798,13 +822,11 @@
       "title": "Mezuaren ekintzak",
       "deleteTitle": "Ezabatu mezua?",
       "deleteMessage": "Honek mezua elkarrizketatik kenduko du.",
-      "delete": "Ezabatu",
       "deleteFailed": "Ezin izan da mezua ezabatu",
       "removeReactionFailed": "Ezin izan da erreakzioa kendu",
       "addReactionFailed": "Erreakzioa ezin izan da gehitu",
       "retrySend": "Berriro bidali",
       "moreReactions": "Erreakzio gehiago",
-      "reply": "Erantzun",
       "edit": "Editatu",
       "sendFailed": "Mezua ezin izan da bidali",
       "retrySendFailed": "Ezin izan da berriro bidaltzen saiatu",
@@ -815,7 +837,6 @@
       "takePhoto": "Argazkia hartu",
       "photoLibrary": "Argazki-bilduma",
       "files": "Fitxategiak",
-      "cameraAccessDisabled": "Kamera sarbidea desgaituta",
       "cameraAccessMessage": "Eman kamera sarbidea Ezarpenetan argazki bat hartzeko."
     },
     "typingIndicator": {
@@ -825,10 +846,7 @@
       "typing_other": "{{names}} idazten ari dira..."
     },
     "botStatus": {
-      "online": "Konektatuta",
-      "idle": "Geldirik",
       "offline": "Deskonektatuta",
-      "unknown": "Ezezaguna",
       "loadingUser": "Erabiltzailea kargatzen...",
       "waitingForStatus": "Botaren egoeraren zain...",
       "offlineMessage": "Bota deskonektatuta dago. Mezuak berriro hasiko dira berriro konektatzen denean."
@@ -841,7 +859,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw instantziak ezin izan dira kargatu",
     "billing": {
       "title": "Fakturazioa",
@@ -849,7 +866,6 @@
       "plan": "Plana",
       "finalTermEnds": "Azken epea amaitzen da",
       "afterFinalTerm": "Azken epearen ondoren",
-      "remaining": "Gainerakoa",
       "lessThanOneDay": "Egun 1 baino gutxiago",
       "ends": "Amaitzen da",
       "expires": "Iraungitzen da",
@@ -858,7 +874,6 @@
       "managedByAdmin": "Fakturazioa zure erakundeko administratzaileak kudeatzen du.",
       "couldNotLoad": "Fakturazio-informazioa ezin izan da kargatu",
       "manageOnWeb": "Kudeatu fakturazioa webgunean",
-      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Zure azken Commit epea {{date}}n amaitzen da. Jarraitu Standard gisa {{price}}rekin, edo hostinga amaitzen da.",
       "freeTrial": "Doako proba",
@@ -875,9 +890,9 @@
       "trialDaysRemaining": "Proba: {{remaining}} geratzen dira",
       "trialEndingSoon": "Proba laster amaitzen da: {{remaining}}",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "Zer berri",
@@ -900,7 +915,6 @@
       "destroyMessage": "Honek betirako suntsituko du zure KiloClaw instantzia eta bere datu guztiak. Ekintza hau ezin da desegin.",
       "destroyTitle": "Suntsitu instantzia",
       "instance": "Instantzia",
-      "renameFailed": "Zerbait gaizki joan da",
       "couldNotCheckStatus": "Zerbitzuaren egoera ezin izan da egiaztatu",
       "dangerZone": "ARRISKU-ZONA",
       "destroying": "Suntsitzen…",
@@ -928,7 +942,6 @@
       "approveDeviceTitle": "Onartu gailua",
       "approveMessage": "Baimendu {{label}} (kodea: {{code}}) zure instantziara konektatzea?",
       "approveTitle": "Onartu parekatze-eskaera",
-      "device": "Gailua",
       "unknownDevice": "Gailu ezezaguna"
     },
     "execPolicy": {
@@ -943,35 +956,21 @@
       "title": "Google kontua",
       "couldNotLoad": "Google kontuaren egoera ezin izan da kargatu",
       "disconnected": "Google kontua deskonektatuta. Berriro zabaldu zure instantzia aldaketa aplikatzeko.",
-      "redeploy": "Berriro zabaldu",
       "setupCommand": "Konfigurazio-komandoa",
       "setupCommandHelp": "Exekutatu komando hau Docker instalatuta duen terminal batean zure ordenagailuan, zure Google kontua konektatzeko.",
       "failedToLoadCommand": "Konfigurazio-komandoa ezin izan da kargatu",
       "gmailNotifications": "Gmail jakinarazpenak",
       "disconnect": "Deskonektatu Google kontua",
-      "connected": "Konektatuta",
       "copied": "Kopiatuta!",
       "copyCommand": "Kopiatu komandoa",
-      "disabled": "Desgaituta",
       "disconnectConfirm": "Deskonektatu",
       "disconnectMessage": "Kendu zure Google kontua instantzia honetatik? Horrek Gmail jakinarazpenak desgaitu egingo ditu. Berriro zabaldu deskonektatu ondoren aldaketak aplikatzeko.",
-      "disconnectTitle": "Deskonektatu Google",
-      "enabled": "Gaituta",
-      "notConnected": "Ez konektatuta"
+      "disconnectTitle": "Deskonektatu Google"
     },
     "modelList": {
-      "title": "Modelo guztiak",
-      "searchPlaceholder": "Bilatu modeloak...",
-      "couldNotLoad": "Modeloak ezin izan dira kargatu",
-      "clearSearch": "Garbitu bilaketa",
       "noMatches": "Ez dago modelorik zure bilaketarekin bat datorrenik",
-      "noModels": "Ez dago modelo erabilgarririk",
       "noModelsDescription": "Modeloak hemen agertuko dira eskuragarri daudenean.",
-      "noResultsFor": "Ez dago emaitzarik \"{{query}}\"-rentzat",
-      "recommended": "Gomendatuta"
-    },
-    "model": {
-      "title": "Modeloa"
+      "noResultsFor": "Ez dago emaitzarik \"{{query}}\"-rentzat"
     },
     "secrets": {
       "title": "Sekretuak",
@@ -988,12 +987,8 @@
       "setupGuideA11y": "{{label}} konfigurazio-gida",
       "setupGuide": "Konfigurazio-gida",
       "saving": "Gordetzen…",
-      "remove": "Kendu",
       "removing": "Kentzen…",
-      "connected": "Konektatuta",
-      "notConnected": "Ez konektatuta",
-      "updateToken": "Eguneratu tokena",
-      "connect": "Konektatu"
+      "updateToken": "Eguneratu tokena"
     },
     "versionPin": {
       "title": "Bertsioen finkapena",
@@ -1030,7 +1025,6 @@
       "start": "Hasi",
       "startMessage": "Ziur zaude instantzia hau hasi nahi duzula?",
       "startTitle": "Hasi instantzia",
-      "starting": "Hasten...",
       "stop": "Gelditu",
       "stopMessage": "Ziur zaude instantzia hau gelditu nahi duzula?",
       "stopTitle": "Gelditu instantzia",
@@ -1040,7 +1034,6 @@
       "finishingSetup": "Konfigurazioa amaitzen",
       "finishingSetupDescription": "Itxaron apur bat, zure kontua finkatzen ari gara. Normalean une bat behar da.",
       "getStarted": "Hasi",
-      "noInstances": "Ez dago KiloClaw instantziarik",
       "noInstancesDescription": "Sortu zure lehen instantzia kode-agenteak exekutatzen hasteko."
     },
     "instance": {
@@ -1052,7 +1045,6 @@
     "list": {
       "createInstance": "Sortu instantzia",
       "organizations": "Erakundeak",
-      "personal": "Pertsonala",
       "accessIssue": {
         "trialExpired": "Proba amaitu da, harpidetu instantzia hau erabiltzen jarraitzeko",
         "subscriptionCanceled": "Harpidetza ez aktiboa, harpidetu berriro instantzia hau erabiltzen jarraitzeko",
@@ -1065,7 +1057,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "Txateatu {{name}}rekin",
-        "online": "Konektatuta",
         "ready": "{{name}} prest dago",
         "warmedUp": "Guztiz prest. Esan kaixo prest zaudenean."
       },
@@ -1076,9 +1067,7 @@
         "openKiloAi": "Ireki kilo.ai",
         "provisioning": "Hornidura",
         "review": "Berrikusi",
-        "somethingWentWrong": "Zerbait gaizki joan da",
         "identityTitle": "Eman zure botari identitate bat",
-        "close": "Itxi",
         "couldNotLoad": "Ongietorri-egoera ezin izan da kargatu",
         "finishingSetup": "Konfigurazioa amaitzen — itxaron apur bat zure kontua finkatzen dugun bitartean.",
         "ready": "Prest",
@@ -1095,7 +1084,6 @@
         "location": "Kokalekua",
         "locationPlaceholder": "Hiria edo eskualdea (aukerakoa)",
         "useCurrentLocation": "Erabili uneko kokalekua",
-        "continue": "Jarraitu",
         "locationDeniedTitle": "Kokaleku-sarbidea ukatu da",
         "locationDeniedMessage": "Gaitu kokaleku-sarbidea Ezarpenetan zure uneko kokalekua erabiltzeko.",
         "locationValidationFailed": "Kokalekua ezin izan da balioztatu.",
@@ -1132,7 +1120,6 @@
         "timeoutBody": "{{name}}ren konfigurazioa ohi baino gehiago ari da ({{displayMinutes}} minutu baino gehiago).",
         "continueInBackground": "Jarraitu atzealdean",
         "settingUp": "{{name}} konfiguratzen",
-        "finishingSetup": "Konfigurazioa amaitzen",
         "connectingToAgent": "Agentearekin konektatzen",
         "startingSandbox": "Sandbox-a hasten",
         "backgroundHint": "Normalean minutu bat baino gutxiago behar da. Itxi dezakezu — atzealdean lanean jarraituko dugu."
@@ -1144,7 +1131,6 @@
       "gatewayProcess": "ATEBITOKO PROZESUA",
       "lastExit": "Azken irteera",
       "memory": "Memoria",
-      "model": "Modeloa",
       "region": "Eskualdea",
       "resources": "BALIABIDEAK",
       "restarts": "Berrabiarazpenak",
@@ -1166,34 +1152,25 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Muga",
       "frontierDescription": "Errendimendu handiena. Arrazoiketadun modelo aurreratuetara bideratzen du.",
-      "balancedLabel": "Orekatua",
       "balancedDescription": "Abiaduraren eta gaitasunaren oreka adimentsua kostu txikiagoan.",
-      "cost": "Kostua",
-      "performance": "Errendimendua",
       "autoModelA11y": "{{label}} modelo automatikoa",
       "currentModel": "Uneko modeloa",
       "browseAllModels": "edo hautatu 500+ modeloen artetik",
       "browseAllModelsA11y": "Arakatu 500+ modelo guztiak"
     },
     "accessRequired": {
-      "trialExpiredTitle": "Harpidetu webgunean",
       "trialExpiredBody": "KiloClaw erabiltzen jarraitzeko, joan kilo.ai/claw-ra zure nabigatzailetik. Ezin zara aplikazioan harpidetu.",
-      "trialExpiredCta": "Ireki kilo.ai/claw",
       "subscriptionCanceledTitle": "Harpidetu webgunean",
       "subscriptionCanceledBody": "KiloClaw erabiltzeko, joan kilo.ai/claw-ra zure nabigatzailetik. Ezin zara aplikazioan harpidetu.",
       "subscriptionCanceledCta": "Ireki kilo.ai/claw",
       "subscriptionPastDueTitle": "Eguneratu ordainketa webgunean",
       "subscriptionPastDueBody": "Arazoren bat izan genuen zure azken ordainketarekin. Joan kilo.ai/claw-ra zure nabigatzailetik eguneratzeko. Ezin duzu fakturazioa aplikazioan kudeatu.",
-      "subscriptionPastDueCta": "Ireki kilo.ai/claw",
       "quarantinedTitle": "Instantziak konponketa behar du",
       "quarantinedBody": "Zure KiloClaw instantzia berrogeialdi-egoeran dago eta ezin da oraintxe erabili. Gure taldeak bere lehengoratzea lagundu behar du.",
-      "quarantinedCta": "Jarraitu kilo.ai-n",
-      "multipleCurrentConflictTitle": "Kontuak berrikuspena behar du",
       "multipleCurrentConflictBody": "Harpidetza aktibo bat baino gehiago aurkitu dugu zure kontuan, beraz gauzak gelditu ditugu biko ordainketa saihesteko.",
       "multipleCurrentConflictCta": "Jarraitu kilo.ai-n",
       "nonCanonicalEarlybirdTitle": "Ondare-plana atzeman da",
       "nonCanonicalEarlybirdBody": "Zure goiz-sarbide planak berrikuspen manuala behar du mugikorrean erabili ahal izateko.",
-      "nonCanonicalEarlybirdCta": "Jarraitu kilo.ai-n",
       "iosTitle": "KiloClaw ez dago eskuragarri iOS-en",
       "iosBody": "KiloClaw sarbidea iOS aplikaziotik kanpo kudeatzen da kontu honetarako.",
       "iosContact": "Galderarik? Jarri harremanetan hi@kilo.ai-rekin."
@@ -1203,25 +1180,17 @@
       "openUnread_one": "Ireki {{name}}, {{displayCount}} irakurri gabeko mezu",
       "openUnread": "Ireki {{name}}, {{displayCount}} irakurri gabeko mezu",
       "openUnread_other": "Ireki {{name}}, {{displayCount}} irakurri gabeko mezu",
-      "open": "Ireki {{name}}",
       "openSettings": "Ireki {{name}}ren ezarpenak",
       "fixOnKiloAi": "Konpondu kilo.ai-n: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Kanalak",
       "devicePairingDescription": "Onartu gailu-eskaerak",
-      "devicePairingLabel": "Gailu parekatzea",
       "execPolicyDescription": "Segurtasun-ezarpenak",
-      "execPolicyLabel": "Exekuzio-politika",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google kontua",
       "modelDescription": "AI modeloaren hautaketa",
-      "modelLabel": "Modeloa",
       "secretsDescription": "Enkriptatutako kredentzialak",
-      "secretsLabel": "Sekretuak",
-      "versionPinDescription": "Finkatu bertsio zehatz batera",
-      "versionPinLabel": "Bertsioen finkapena"
+      "versionPinDescription": "Finkatu bertsio zehatz batera"
     },
     "avatar": {
       "arcade": "Arcade",
@@ -1266,21 +1235,15 @@
       "placeholder": "adib. Ezarri gure erroreak kudeatzeko konbentzioak…"
     },
     "repos": {
-      "title": "Biltegiak",
-      "couldNotLoad": "Biltegiak ezin izan dira kargatu",
       "unavailable": "Biltegiak ez daude eskuragarri — amaitu Bitbucket konfigurazioa kilo.ai-n.",
       "finishSetup": "Amaitu konfigurazioa",
       "manageAccess": "Kudeatu sarbidea",
-      "allRepositories": "Biltegi guztiak",
       "bitbucketNoRepositoriesDescription": "Ez dago biltegirik Bitbucket lan-espazio honetan.",
-      "bitbucketSetup": "Bitbucket konfigurazioa",
-      "couldNotOpenGithubSettings": "GitHub App ezarpenak ezin izan dira ireki",
       "gitlabNoRepositoriesDescription": "Baliteke sarbidea eman behar izatea GitLab-eko talde edo proiektu gehiagori.",
       "installGithubApp": "Instalatu GitHub aplikazioa biltegietan",
       "installGithubAppDescription": "Eman Kilo GitHub App-ari sarbidea berrikusi nahi dituzun biltegietara.",
       "noRepositoriesFound": "Ez da biltegirik aurkitu",
-      "repositoryAccess": "biltegien sarbidea",
-      "selectedRepositories": "Hautatutako biltegiak"
+      "repositoryAccess": "biltegien sarbidea"
     },
     "style": {
       "title": "Berrikuspen-estiloa",
@@ -1289,12 +1252,10 @@
       "roast": "Zintzoa gordin, entretenigarria den bezala",
       "strict": "Nabarmendu dena, mantendu maila altua"
     },
-    "title": "Kode-berrikuslea",
     "reviewDetail": {
       "title": "Berrikuspena",
       "cancelTitle": "Bertan behera utzi berrikuspena?",
       "cancelMessage": "Honek martxan dagoen kode-berrikuspena geldituko du.",
-      "keepRunning": "Exekutatzen jarraitu",
       "cancelReview": "Bertan behera utzi berrikuspena",
       "retryTitle": "Berriro saiatu berrikuspena?",
       "retryMessage": "Honek kode-berrikuspena berriro exekutatuko du.",
@@ -1302,29 +1263,19 @@
       "couldNotLoad": "Berrikuspena ezin izan da kargatu",
       "couldNotGetLatest": "Azkena ezin izan da lortu.",
       "byline": "{{repo}} #{{number}} egilea: {{author}}",
-      "findings": "Aurkikuntzak",
       "noFindings": "Ez dago aurkikuntzarik",
       "showMore": "Erakutsi gehiago",
-      "details": "Xehetasunak",
-      "branch": "Adarra",
-      "platform": "Plataforma",
-      "model": "Modeloa",
       "created": "Sortuta",
       "started": "Hasita",
-      "completed": "Osatuta",
-      "cost": "Kostua",
       "tokens": "Tokenak",
       "tokensInOut": "{{input}} sartu / {{output}} irten",
-      "openPullRequest": "Ireki pull request-a",
       "council": "Kontseilua",
       "decision": "Erabakia",
       "gate": "Atea",
       "gateNone": "Bat ere ez",
       "gateHidden": "Ezkutuan",
       "checkRun": "Egiaztapen-exekuzioa",
-      "status": "Egoera",
       "threshold": "Atalasea",
-      "pullRequest": "pull request",
       "transcriptWaiting": "Berrikuspenaren transkripzioaren zain.",
       "transcriptEmpty": "Berrikuspen honetarako transkripziorik ez.",
       "transcriptRetry": "Ezin izan da berrikuspenaren transkripzioa kargatu.",
@@ -1339,13 +1290,10 @@
       "sessionError": "Saioaren errorea: {{error}}",
       "statusWithValue": "Egoera: {{status}}",
       "toolName": "Tresna: {{name}}",
-      "toolNameError": "Tresna: {{name}} — errorea",
-      "unknownError": "Errore ezezaguna"
+      "toolNameError": "Tresna: {{name}} — errorea"
     },
     "reviewMemory": {
       "title": "Berrikuspen-memoria",
-      "couldNotLoadMore": "Ezin izan dira gehiago kargatu",
-      "retryLoadingMore": "Saiatu berriro gehiago kargatzen",
       "loading": "Berrikuspen-memoria kargatzen",
       "couldNotLoad": "Berrikuspen-memoria ezin izan da kargatu",
       "off": "Berrikuspen-memoria itzalita dago",
@@ -1364,13 +1312,9 @@
       "couldNotLoadProviders": "Zure konektatutako hornitzaileak ezin izan ditugu kargatu. Saiatu berriro.",
       "connectProvider": "Konektatu hornitzaile bat",
       "connectProviderDescription": "Konektatu GitHub pull request baten berrikuspen manuala hasteko.",
-      "connectGitHub": "Konektatu GitHub",
-      "platform": "Plataforma",
-      "notConnected": "Ez konektatuta",
       "pullRequestUrl": "Pull request URL-a",
       "instructions": "Argibideak (aukerakoa)",
       "instructionsPlaceholder": "Berrikusleak aztertu beharreko zerbait zehatza…",
-      "model": "Modeloa",
       "starting": "Berrikuspena hasten…",
       "start": "Hasi berrikuspena"
     },
@@ -1379,28 +1323,20 @@
     "webhookSetupDescription": "Baliteke biltegi batzuek berrikuspen automatiko ez jasotzea.",
     "autoReviews": "Berrikuspen automatikoak",
     "selectRepository": "Hautatu gutxienez biltegi bat berrikuspen automatikoak gaitzeko.",
-    "selectRepositories": "Hautatu biltegiak",
     "followReviewMd": "Jarraitu REVIEW.md",
     "followReviewMdSubtitle": "Errespetatu biltegiko REVIEW.md argibide-fitxategiak",
-    "readOnlyDescription": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket ez dago konektatuta. Erakundeko jabeek eta fakturazio-kudeatzaileek soilik konekta dezakete.",
       "setupIncomplete": "Konfigurazioa osatu gabe — amaitu konfigurazioa kilo.ai-n",
       "setup": "Bitbucket konfigurazioa"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket konektatuta",
-      "title": "Konektatu Bitbucket",
       "description": "Sortu Workspace Access Token bat beharrezko baimenekin eta itsatsi behean.",
       "scopes": "Kontua: irakurri · Biltegiak: irakurri/idatzi · Pull request-ak: irakurri · Webhook-ak: irakurri/idatzi",
-      "tokenPlaceholder": "Workspace sarbide-tokena",
-      "connect": "Konektatu"
+      "tokenPlaceholder": "Workspace sarbide-tokena"
     },
     "scopeList": {
-      "couldNotLoad": "Erakundeak ezin izan dira kargatu",
       "personalStillAvailable": "Biltegi pertsonalak behean daude eskuragarri oraindik.",
-      "personal": "Pertsonala",
-      "personalSubtitle": "Zure biltegi propioak",
       "viewOnly": "Soilik ikusi"
     },
     "reviewList": {
@@ -1414,18 +1350,13 @@
     "platformList": {
       "checking": "Egiaztatzen…",
       "statusUnavailable": "Egoera ez eskuragarri",
-      "connected": "Konektatuta",
-      "notConnected": "Ez konektatuta",
-      "organization": "Erakundea",
       "platforms": "Plataformak",
       "activity": "Jarduera"
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "Konektatu GitHub",
       "githubError": "GitHub konfigurazioa ezin izan da ireki. Saiatu berriro.",
       "gitlabAccount": "GitLab kontua",
-      "connectGitLab": "Konektatu GitLab",
       "gitlabError": "GitLab konfigurazioa ezin izan da ireki. Saiatu berriro.",
       "description": "Konektatu Kilo {{label}} pull request-ak automatikoki berrikusteko.",
       "bitbucketError": "Ezin izan da Bitbucket-en konfigurazioa ireki. Mesedez, saiatu berriro."
@@ -1436,12 +1367,7 @@
       "allAreas": "Eremu guztiak",
       "customInstructions": "Pertsonalizatutako argibideak",
       "set": "Ezarri",
-      "model": "Modeloa",
-      "mergeGate": "Merge atea",
-      "repositories": "Biltegiak",
-      "allRepositories": "Biltegi guztiak",
       "nSelected": "{{displayCount}} hautatuta",
-      "reviewMemory": "Berrikuspen-memoria",
       "proposedReviewMdGuidance": "Proposatutako REVIEW.md jarraibideak"
     },
     "decision": {
@@ -1450,69 +1376,53 @@
       "noDecision": "Ez dago erabakirik",
       "noResult": "Ez dago emaitzarik"
     },
-    "eyebrow": "Kode-berrikuslea",
     "updateFailed": "Ezin izan da berrikuslea eguneratu",
     "configSaveFailed": "Ezin izan da berrikuspenaren konfigurazioa gorde",
     "status": {
-      "pending": "Zain",
-      "queued": "Ilaran",
       "running": "Exekutatzen",
       "completed": "Osatuta",
-      "failed": "Huts egin du",
-      "cancelled": "Bertan behera utzita",
       "interrupted": "Etena"
     },
     "reviewStyle": {
       "strict": "Zorrotza",
-      "balanced": "Orekatua",
       "lenient": "Onbera",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "Segurtasuna",
-      "performance": "Errendimendua",
       "bugs": "Akatsak",
       "style": "Estiloa",
       "testing": "Probak",
       "documentation": "Dokumentazioa"
     },
     "gateThreshold": {
-      "off": "Desaktibo",
-      "all": "Dena",
-      "warning": "Abisua",
-      "critical": "Kritikoa"
+      "warning": "Abisua"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Kode-berrikusleak arreta behar du",
         "description": "Kode-berrikuslea desgaitu egin da, Kilo-k ezin duelako biltegi honetara sartu GitHub App instalazio aktibo batekin. Eguneratu GitHub App instalazioa, eta gero berriro gaitu Kode-berrikuslea.",
         "recoveryLabel": "Eguneratu GitHub App"
       },
       "githubIpAllowList": {
-        "title": "Kode-berrikusleak arreta behar du",
-        "description": "Kode-berrikuslea desgaitu egin da, GitHub erakunde honek Kilo blokeatzen duen IP baimen-zerrenda erabiltzen duelako. Jarri harremanetan hi@kilocode.ai helbidearekin laguntza eskuratzeko, eta gero berriro gaitu Kode-berrikuslea.",
-        "recoveryLabel": "Jarri harremanetan laguntzarekin"
+        "description": "Kode-berrikuslea desgaitu egin da, GitHub erakunde honek Kilo blokeatzen duen IP baimen-zerrenda erabiltzen duelako. Jarri harremanetan hi@kilocode.ai helbidearekin laguntza eskuratzeko, eta gero berriro gaitu Kode-berrikuslea."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Kode-berrikusleak arreta behar du",
         "description": "Kode-berrikuslea desgaitu egin da, Kilo-k ezin duelako GitLab Proiektu Sarbide Token bat sortu proiektu honetarako. Eman Maintainer sarbidea edo gaitu Proiektu Sarbide Token-ak, eta gero berriro gaitu Kode-berrikuslea.",
         "recoveryLabel": "Eguneratu GitLab integrazioa"
       },
       "byokInvalidKey": {
-        "title": "Kode-berrikusleak arreta behar du",
         "description": "Kode-berrikuslea desgaitu egin da, hautatutako BYOK API gakoa baliogabea, ezeztatua edo baimenik gabea delako. Eguneratu gakoa edo aukeratu beste modelo bat, eta gero berriro gaitu Kode-berrikuslea.",
         "recoveryLabel": "Eguneratu BYOK ezarpenak"
       },
       "selectedModelUnavailable": {
-        "title": "Kode-berrikusleak arreta behar du",
         "description": "Kode-berrikuslea desgaitu egin da, hautatutako modeloa ez dagoelako erabilgarri cloud agent saioetarako. Aukeratu modelo erabilgarri bat, eta gero berriro gaitu Kode-berrikuslea.",
         "recoveryLabel": "Eguneratu Kode-berrikuslearen ezarpenak"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Kode-berrikusleak arreta behar du",
-        "description": "Kode-berrikuslea desgaitu egin da gaur hiru biltegi-klonazio denbora-muga izan ondoren. Jarri harremanetan hi@kilocode.ai helbidearekin laguntza eskuratzeko, eta gero berriro gaitu Kode-berrikuslea.",
-        "recoveryLabel": "Jarri harremanetan laguntzarekin"
-      }
+        "description": "Kode-berrikuslea desgaitu egin da gaur hiru biltegi-klonazio denbora-muga izan ondoren. Jarri harremanetan hi@kilocode.ai helbidearekin laguntza eskuratzeko, eta gero berriro gaitu Kode-berrikuslea."
+      },
+      "title": "Kode-berrikusleak arreta behar du",
+      "recoveryLabel": "Jarri harremanetan laguntzarekin"
     },
     "unknownError": "Errore ezezaguna"
   },
@@ -1522,31 +1432,17 @@
       "noFiltersDescription": "Itzuli eta ireki berriro iragazkiak aurkikuntzen zerrendatik.",
       "title": "Iragazi aurkikuntzak",
       "reset": "Berrezarri",
-      "repository": "Biltegia",
-      "status": "Egoera",
       "severity": "Larritasuna",
       "outcome": "Emaitza",
       "slaStatus": "SLA egoera",
       "sortBy": "Ordenatu honen arabera",
-      "allRepositories": "Biltegi guztiak",
-      "all": "Dena",
       "statusOpen": "Irekita",
       "fixed": "Konponduta",
       "statusIgnored": "Baztertuta",
-      "statusClosed": "Itxita",
-      "severityCritical": "Kritikoa",
       "severityHigh": "Altua",
       "severityMedium": "Ertaina",
       "severityLow": "Baxua",
-      "outcomeNotAnalyzed": "Ez aztertuta",
-      "outcomeAnalyzing": "Aztertzen",
-      "outcomeFailed": "Azterketa huts egin du",
-      "outcomeExploitable": "Ustia daiteke",
-      "outcomeNotExploitable": "Ez da ustia daitekeena",
-      "outcomeSafeToDismiss": "Baztertzeko segurua",
-      "outcomeNeedsReview": "Berrikuspena behar du",
       "outcomeTriageComplete": "Triajea osatuta",
-      "outcomeDismissed": "Baztertuta",
       "sortSeverityDesc": "Larritasuna: altutik baxura",
       "sortSeverityAsc": "Larritasuna: baxutik altura",
       "sortSlaDue": "SLA epemuga",
@@ -1571,7 +1467,6 @@
       "enableAutoDismiss": "Gaitu baztertze automatikoa",
       "enableAutoDismissSubtitle": "Baztertu automatikoki AI-k ez ustiaezina direla zehazten dituen aurkikuntzak.",
       "confidenceThreshold": "Konfiantza-atalasea",
-      "permissionNote": "Erakundeko jabeek eta fakturazio-kudeatzaileek soilik alda ditzakete ezarpen hauek.",
       "enableAutoRemediationConfirmTitle": "Gaitu konponketa automatikoa?",
       "enableAutoRemediationConfirmMessage": "Segurtasun-agenteak konponketa PR-ak irekiko ditu automatikoki ustiaezinak diren aurkikuntza baliagarrietarako.",
       "enable": "Gaitu",
@@ -1603,14 +1498,12 @@
       "suggestedAction": "Proposatutako ekintza",
       "triageReasoning": "Triage-arrazoia",
       "exploitable": "Ustia daiteke",
-      "model": "Modeloa",
       "notRecorded": "Ez da erregistratu",
       "analyzed": "Aztertuta",
       "exploitabilityReasoning": "Ustiagarritasun-arrazoia",
       "suggestedFix": "Proposatutako konponketa",
       "whereFound": "Non aurkitu den ({{displayCount}})",
       "fullReport": "Sorrarazitako txosten osoa",
-      "unknown": "Ezezaguna",
       "yes": "Bai",
       "no": "Ez"
     },
@@ -1641,7 +1534,6 @@
       "repoSummary": "{{open}} ireki · {{critical}} kritiko · {{high}} handi",
       "couldNotLoad": "Ezin da paneleko datua kargatu",
       "filterByRepository": "Iragazi biltegiz biltegi",
-      "findings": "Aurkikuntzak",
       "lastSynced": "Azken sinkronizazioa {{time}}",
       "manageRepositories": "Kudeatu biltegiak",
       "notYetSynced": "Oraindik ez da sinkronizatu",
@@ -1654,15 +1546,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Emaitza irekiak",
-      "openFindingsDetail": "{{critical}} kritiko, {{high}} handi",
-      "confirmedExploitable": "Ustia daitekeela baieztatuta",
       "confirmedExploitableDetail": "Proiektuaren arriskua analisiaren bidez baieztatuta",
-      "needsReview": "Zure berrikuspena behar du",
       "needsReviewDetail": "Giza erabakia behar da",
-      "analysisIncomplete": "Analisia ez da osatu",
       "analysisIncompleteDetail": "Proiektuaren arriskua oraindik ezezaguna",
       "slaCompliance": "SLA betetzea",
-      "notMeasured": "Ez da neurtu",
       "withinDeadlineDetail": "{{within}} / {{total}} epearen barruan",
       "noDeadlineData": "Oraindik ez da emaitzarik SLA-eperik duenik",
       "deadlinePassed": "Epea gainditu da",
@@ -1675,7 +1562,6 @@
     },
     "dismiss": {
       "title": "Baztertu emaitza",
-      "submit": "Baztertu emaitza",
       "reason": "Arrazoia",
       "reasonFixStarted": "Konponketa bat hasi da jada",
       "reasonNoBandwidth": "Ez dago ahalmenik",
@@ -1696,28 +1582,21 @@
     "findingDetails": {
       "supersededBy": "Egungo emaitza batek ordezkatu du",
       "supersededByDescription": "Sakatu uneko erregistroa irekitzeko, egoera, analisia eta konponketa ikusteko.",
-      "dismissed": "Baztertuta",
       "dismissedBecause": "{{reason}} delako baztertu da.",
       "severityLabel": "{{severity}} larritasuna",
       "package": "Paketea",
       "vulnerableVersions": "Bertsio ahulak",
-      "unknown": "Ezezaguna",
       "patchedVersion": "Adabakitako bertsioa",
       "noPatchAvailable": "Ez dago adabakirik",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "Biltegia",
       "manifest": "Manifestua",
       "detected": "Detektatuta",
-      "updated": "Eguneratuta",
-      "fixed": "Konponduta",
       "slaDeadline": "SLA-ederik",
       "sourceRecord": "Jatorri-erregistroa",
       "source": "Jatorria",
       "sourceId": "Jatorri-IDa",
       "viewAdvisory": "Ikusi aholkularitza GitHub-en",
-      "statusSuperseded": "Ordezkatuta",
-      "statusFixed": "Konponduta",
       "statusOpen": "Irekita",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "konponketa bat hasi da jada",
@@ -1728,30 +1607,17 @@
       "reasonAfterReview": "berrikuspenaren ondoren"
     },
     "settingsOverview": {
-      "title": "Ezarpenak",
       "couldNotLoadSettings": "Ezin dira Security Agent-en ezarpenak kargatu",
       "couldNotLoadPermissions": "Ezin dira baimenak kargatu",
-      "couldNotLoadRepositories": "Biltegiak ezin izan dira kargatu",
-      "securityAgent": "Segurtasun-agentea",
-      "enabled": "Gaituta",
-      "disabled": "Desgaituta",
       "on": "Aktibo",
-      "off": "Desaktibo",
-      "allRepositories": "Biltegi guztiak",
       "repositoriesCount_one": "{{displayCount}} biltegi hautatu da",
       "repositoriesCount": "{{displayCount}} biltegi hautatu dira",
       "repositoriesCount_other": "{{displayCount}} biltegi hautatu dira",
-      "selectRepositories": "Hautatu biltegiak",
       "selectRepositoriesSubtitle": "Aukeratu zein biltegitan kontrolatzen duen Security Agent-ek",
-      "repositories": "Biltegiak",
-      "modelsAndAnalysis": "Modeloak eta analisia",
       "analysisModeSubtitle": "{{mode}} analisia",
-      "automation": "Automatizazioa",
       "automationAllOff": "Guztiak itzalita",
       "automationCount": "3tik {{displayCount}} gaituta",
-      "notifications": "Jakinarazpenak",
       "notificationsCount": "2tik {{displayCount}} gaituta",
-      "slaPolicy": "SLA-politika",
       "disabledNoManage": "Security Agent desgaituta dago. Soilik erakundeko jabeek eta fakturazio-kudeatzaileek aktiba dezakete.",
       "disabledNoRepo": "Hautatu gutxienez biltegi bat Security Agent aktibatu aurretik.",
       "disabledPrompt": "Aktibatu Security Agent Dependabot abisuak sinkronizatzeko, biltegiak aukeratzeko eta automatizazioa konfiguratzeko."
@@ -1759,15 +1625,11 @@
     "remediation": {
       "cancellationRequested": "Bertan behera uztea eskatu da",
       "cancelled": "Konponketa bertan behera utzi da",
-      "pullRequest": "pull request",
       "couldNotLoad": "Ezin da konponketa-egoera kargatu",
-      "noAnalysisTitle": "Oraindik ez dago analisirik",
-      "noAnalysisDescription": "Exekutatu bat Xehetasunak fitxatik",
       "start": "Hasi konponketa",
       "retry": "Saiatu berriro konponketa",
       "cancelTitle": "Bertan behera utzi konponketa hau?",
       "cancelMessage": "Security Agent-ek egiten ari den konponketa-saiakera geldituko du.",
-      "keepRunning": "Exekutatzen jarraitu",
       "cancelRemediation": "Bertan behera utzi konponketa",
       "openPullRequest": "Ireki pull request{{number}}",
       "openDraftPullRequest": "Ireki pull request zirriborroa{{number}}",
@@ -1775,29 +1637,19 @@
       "attemptHistory": "Saiakera-historia ({{displayCount}})",
       "attemptNumber": "{{number}}. saiakera",
       "startedBy": "Hasi duena",
-      "model": "Modeloa",
-      "branch": "Adarra",
       "queued": "Konponketa ilaran",
       "retryQueued": "Konponketa-saiakera berria ilaran",
       "timeline": {
         "queued": "Konponketa eskatu da",
-        "prOpened": "PR ireki da",
         "failed": "Konponketa huts egin du",
-        "blocked": "Konponketa blokeatuta",
-        "noChangesNeeded": "Ez da aldaketarik behar",
-        "cancelled": "Bertan behera utzita"
+        "blocked": "Konponketa blokeatuta"
       },
       "unavailable": "Konponketa ez dago eskuragarri emaitza honentzat."
     },
     "analysisSettings": {
       "title": "Modeloak eta analisia",
       "couldNotLoad": "Ezin dira analisi-ezarpenak kargatu",
-      "permissionNote": "Soilik erakundeko jabeek eta fakturazio-kudeatzaileek alda ditzakete ezarpen hauek.",
       "depth": "Analisi-sakonera",
-      "modeAuto": "Automatikoa",
-      "modeShallow": "Azalekoa",
-      "modeDeep": "Sakona",
-      "couldNotLoadModels": "Modeloak ezin izan dira kargatu",
       "triageModel": "Triage-modeloa",
       "analysisModel": "Analisi-modeloa",
       "remediationModel": "Konponketa-modeloa"
@@ -1805,7 +1657,6 @@
     "sla": {
       "title": "SLA-politika",
       "couldNotLoad": "Ezin dira SLA-ezarpenak kargatu",
-      "critical": "Kritikoa",
       "high": "Altua",
       "medium": "Ertaina",
       "low": "Baxua",
@@ -1823,41 +1674,23 @@
     },
     "findingDetail": {
       "title": "Emaitza",
-      "tabDetails": "Xehetasunak",
       "tabAnalysis": "Analisia",
-      "tabRemediation": "Konponketa",
-      "notFound": "Ez da emaitzarik aurkitu",
-      "notFoundDescription": "Emaitza hau kendu egin daiteke, edo jada ez duzu sarbiderik berera.",
-      "couldNotLoad": "Ezin da emaitza hau kargatu",
-      "dismissA11y": "Baztertu emaitza"
+      "tabRemediation": "Konponketa"
     },
     "findingList": {
-      "title": "Aurkikuntzak",
       "couldNotLoad": "Ezin dira emaitzak kargatu",
       "couldNotLoadMore": "Ezin dira emaitza gehiago kargatu",
       "noMatchesTitle": "Ez dago iragazkinekin bat datorren emaitzarik",
       "noMatchesDescription": "Saiatu hautatutako iragazkiak doitzen edo ezabatzen.",
       "emptyTitle": "Ez dago emaitza irekirik",
-      "emptyDescription": "Ez dago orain arreta behar duen emaitza irekirik.",
-      "clearFilters": "Garbitu iragazkiak"
-    },
-    "scopeList": {
-      "title": "Segurtasun-agentea",
-      "couldNotLoad": "Erakundeak ezin izan dira kargatu",
-      "personal": "Pertsonala",
-      "personalSubtitle": "Zure biltegi propioak"
-    },
-    "commandRetry": {
-      "discard": "Baztertu"
+      "emptyDescription": "Ez dago orain arreta behar duen emaitza irekirik."
     },
     "findingRow": {
       "nextRemediationPrOpen": "Konponketa-PR irekia",
       "nextRemediationInProgress": "Konponketa egiten",
       "nextRetryRemediation": "Konponketa-saiakera berria erabilgarri",
       "nextRemediationAvailable": "Konponketa erabilgarri",
-      "retryAnalysis": "Saiatu berriro analisia",
       "runAnalysis": "Exekutatu analisia",
-      "nextNeedsManualReview": "Eskuzko berrikuspena behar du",
       "nextViewDetails": "Ikusi xehetasunak",
       "viewPr": "Ikusi PR",
       "analyze": "Aztertu",
@@ -1868,7 +1701,6 @@
       "couldNotOpenGithub": "Ezin izan da GitHub ireki. Saiatu berriro."
     },
     "settingsSave": {
-      "discard": "Baztertu",
       "keepEditing": "Jarraitu editatzen",
       "saveChanges": "Gorde aldaketak",
       "unsavedTitle": "Gabeko aldaketak",
@@ -1880,7 +1712,6 @@
     "auditReport": {
       "couldNotLoad": "Ezin da auditoria-txostena kargatu",
       "events": "Gertaerak",
-      "findings": "Aurkikuntzak",
       "generated": "Sortuta {{generatedAt}}",
       "noActivity": "Ez dago erregistratutako jarduerarik",
       "noActivityDescription": "Kilo-k ez du txostena egin daitekeen Segurtasun-Emaitzen jarduerarik {{start}}tik {{end}}ra.",
@@ -1890,8 +1721,7 @@
       "title": "Auditoria-txostena",
       "unavailable": "Auditoria-txostena ez dago erabilgarri",
       "unavailableDescription": "Soilik erakundeko jabeek eta fakturazio-kudeatzaileek ikus ditzakete auditoria-txostenak. Eskatu jabe bati edo fakturazio-kudeatzaile bati sarbidea emateko.",
-      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro.",
-      "checkConnection": "Egiaztatu konexioa eta saiatu berriro."
+      "queryFailed": "Txostenaren kontsulta ez da amaitu. Saiatu berriro."
     },
     "notifications": {
       "couldNotLoad": "Ezin dira jakinarazpen-ezarpenak kargatu",
@@ -1900,30 +1730,21 @@
       "newFindingSection": "Emaitza berrien jakinarazpena",
       "newFindingSeverityLabel": "Emaitza berrien gutxieneko larritasuna",
       "newFindingSubtitle": "Emaitza berri bat sinkronizatzen denean bidaltzen da, lehen sinkronizazioa barne.",
-      "readOnly": "Soilik erakundeko jabeek eta fakturazio-kudeatzaileek alda ditzakete ezarpen hauek.",
       "slaLeadTimeAccessibility": "SLA-abisuaren aurretiko epea egunetan",
       "slaLeadTimeError": "Sartu 1 eta 365 arteko egun kopuru oso bat.",
-      "slaLeadTimeHint": "Sartu 1 eta 365 arteko zenbaki oso bat",
       "slaLeadTimeLabel": "SLA-abisuaren aurretiko epea (egunak)",
       "slaPersonalTitle": "E-maila jaso SLA-ohartarazpenei buruz",
       "slaSection": "SLA-ohartarazpenaren jakinarazpena",
       "slaSeverityLabel": "SLA-jakinarazpenaren gutxieneko larritasuna",
-      "slaSubtitle": "Emaitzek beren SLA-ederik hurbildu edo urratzen dutenean bidaltzen da, aurretik eta unean.",
-      "title": "Jakinarazpenak"
+      "slaSubtitle": "Emaitzek beren SLA-ederik hurbildu edo urratzen dutenean bidaltzen da, aurretik eta unean."
     },
     "repositories": {
-      "allRepositories": "Biltegi guztiak",
       "couldNotLoad": "Ezin dira biltegi-ezarpenak kargatu",
-      "couldNotLoadRepositories": "Biltegiak ezin izan dira kargatu",
-      "couldNotOpenGithubSettings": "GitHub App ezarpenak ezin izan dira ireki",
       "githubAppSettings": "GitHub App ezarpenak",
       "manageAccess": "Kudeatu GitHub App sarbidea",
       "noRepositories": "Ez dago biltegirik",
       "noRepositoriesDescription": "Eman Kilo GitHub App-ari biltegietarako sarbidea",
-      "readOnly": "Soilik erakundeko jabeek eta fakturazio-kudeatzaileek alda ditzakete ezarpen hauek.",
-      "selectAtLeastOne": "Hautatu gutxienez biltegi bat.",
-      "selectedRepositories": "Hautatutako biltegiak",
-      "title": "Biltegiak"
+      "selectAtLeastOne": "Hautatu gutxienez biltegi bat."
     },
     "scopeEntry": {
       "connectDescription": "Instalatu Kilo GitHub App Dependabot abisuak automatikoki sinkronizatzeko eta segurtasun-emaitzak zure biltegietan kudeatzeko.",
@@ -1938,7 +1759,6 @@
     },
     "queuedActionUntracked": "Ilaran jarritako ekintza bat ezin da jada jarraitu. Freskatu azken egoera ikusteko.",
     "initialSyncAdmissionFailed": "Security Agent gaituta, baina hasierako sinkronizazioa ezin da ilaran jarri. Sinkronizatu berriro.",
-    "title": "Segurtasun-agentea",
     "commands": {
       "findingAlreadyDismissed": "Emaitza jada baztertuta",
       "findingDismissed": "Emaitza baztertuta",
@@ -1956,49 +1776,33 @@
     },
     "analysisState": {
       "queued": "Analisia ilaran",
-      "queuedTitle": "Analisia ilaran",
       "queuedDescription": "Analisi-ahalmena eskuragarri jartzeko zain.",
       "analyzing": "Aztertzen",
-      "analyzingTitle": "Aztertzen",
       "analyzingDescription": "Aplikazioaren kodeak kaltetutako funtziora irits dezakeen egiaztatzen.",
       "failed": "Azterketa huts egin du",
-      "failedTitle": "Azterketa huts egin du",
       "failedDescription": "Security Agent-ek ezin izan du analisia osatu.",
-      "extractionFailed": "Berrikuspena behar du",
-      "extractionFailedTitle": "Berrikuspena behar du",
       "extractionFailedDescription": "Txosten teknikoa ezin da emaitza egituratu bihurtu.",
-      "exploitable": "Ustia daiteke",
-      "exploitableTitle": "Ustia daiteke",
       "exploitableDescription": "Aplikazioaren kodeak kaltetutako funtziora irits dezake.",
       "notExploitable": "Ez da ustia daitekeena",
-      "notExploitableTitle": "Ez da ustia daitekeena",
       "notExploitableDescription": "Ez da bide eskuragarririk aurkitu biltegi honetan.",
       "unknown": "Berrikuspena behar du",
-      "unknownTitle": "Berrikuspena behar du",
       "unknownDescription": "Analisiak ezin du baieztatu funtzio ahula eskuragarria den.",
       "safeToDismiss": "Baztertzeko segurua",
-      "safeToDismissTitle": "Baztertzeko segurua",
       "safeToDismissDescription": "Triajeak zehaztu du hau segurtasunez baztertu daitekeela kode-basearen analisirik gabe.",
-      "manualReview": "Berrikuspena behar du",
       "manualReviewTitle": "Eskuzko berrikuspena behar du",
       "manualReviewDescription": "Triajeak emaitza hau berrikuspen manualerako markatu du.",
       "analysisRequired": "Analisia beharrezkoa da",
       "analysisRequiredTitle": "Kode-basearen analisia beharrezkoa da",
       "analysisRequiredDescription": "Triajeak biltegia aztertzea gomendatzen du erantzun bat erabaki aurretik.",
-      "completed": "Aztertuta",
-      "completedTitle": "Aztertuta",
       "completedDescription": "Analisia amaitu da emaitza zehatzik erregistratu gabe.",
       "notAnalyzed": "Ez aztertuta",
-      "notAnalyzedTitle": "Ez aztertuta",
       "notAnalyzedDescription": "Kode-basearen analisia oraindik ez da exekutatu emaitza honentzat."
     },
     "deadline": {
       "fixedBeforeDeadline": "Epea baino lehen konponduta",
-      "fixed": "Konponduta",
       "fixedOn": "Konponduta {{date}}",
       "resolutionRecorded": "Ebazpena erregistratuta",
       "superseded": "Ordezkatuta",
-      "dismissed": "Baztertuta",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Ez da eperik ezarri",
       "noSlaDeadline": "Ez dago SLA-ederik esleituta",
@@ -2014,17 +1818,13 @@
       "dueInDays": "{{count}} egun barru amaitzen da"
     },
     "remediationStatus": {
-      "cancellationRequested": "Bertan behera uztea eskatu da",
       "notStarted": "Ez da hasi",
-      "queued": "Ilaran",
       "starting": "Hasten",
       "inProgress": "Martxan",
       "draftPrOpened": "PR zirriborroa ireki da",
       "prOpened": "PR ireki da",
       "blocked": "Blokeatuta",
-      "failed": "Huts egin du",
       "noChangesNeeded": "Ez da aldaketarik behar",
-      "cancelled": "Bertan behera utzita",
       "originAutomaticPolicy": "Politika automatikoa",
       "originIncludeExistingPolicy": "Lehendik daudenak sartzeko politika",
       "originManual": "Manuala",
@@ -2036,7 +1836,6 @@
       "findingNotOpen": "Emaitza jada ez dago irekia.",
       "repoNotInScope": "Biltegia ez dago hautatuta Security Agent-entzat.",
       "analysisRequired": "Exekutatu kode-basearen analisia konponketa hasi aurretik.",
-      "sandboxAnalysisRequired": "Exekutatu kode-basearen analisia konponketa hasi aurretik.",
       "staleAnalysis": "Emaitza aldatu da analisiaren ondoren. Exekutatu analisia berriro konponketa hasi aurretik.",
       "notExploitable": "Analisiak ez du eskuragarri dagoen bide ahulik aurkitu. Konponketa automatikoa ez dago eskuragarri.",
       "exploitabilityUnknown": "Analisiak ezin du ustiagarritasuna baieztatu. Berrikuspen manuala beharrezkoa da klik bakarreko konponketa aurretik.",
@@ -2052,12 +1851,10 @@
       "autoRemediationDisabled": "Konponketa automatikoa desgaituta dago. Konponketa manuala oraindik has daiteke segurtasun-ateak gainditzen direnean.",
       "includeExistingDisabled": "Lehendik dauden emaitzak ez dira sartzen konponketa automatikoan.",
       "belowThreshold": "Emaitza automatikoko larritasun-atalasearen azpitik dago. Konponketa manuala oraindik has daiteke segurtasun-ateak gainditzen direnean.",
-      "beforeEnablement": "Analisia konponketa automatikoa gaitu aurretik osatu zen. Konponketa manuala oraindik has daiteke segurtasun-ateak gainditzen direnean.",
-      "generic": "Konponketa ez dago eskuragarri emaitza honentzat."
+      "beforeEnablement": "Analisia konponketa automatikoa gaitu aurretik osatu zen. Konponketa manuala oraindik has daiteke segurtasun-ateak gainditzen direnean."
     },
     "commandFailure": {
       "ownerCapReached": "Analisi-ahalmena beteta dago. Itxaron martxan dagoen analisia amaitzeko, eta gero saiatu berriro.",
-      "githubTokenUnavailable": "GitHub baimenak arreta behar du. Berriz baimendu GitHub App, eta gero saiatu berriro.",
       "githubAuthInvalid": "GitHub baimenak arreta behar du. Berriz baimendu GitHub App, eta gero saiatu berriro.",
       "findingUnavailable": "Emaitza ez dago jada erabilgarri. Freskatu emaitzak eta saiatu berriro irekita badago.",
       "repositoryUnavailable": "Biltegia ez dago jada erabilgarri GitHub App-entzat. Freskatu biltegirako sarbidea, eta gero saiatu berriro.",
@@ -2077,12 +1874,9 @@
     "search": {
       "searching": "Bilatzen",
       "searchSessions": "Bilatu saioak",
-      "searchSessionsPlaceholder": "Bilatu saioak...",
-      "clearSearch": "Garbitu bilaketa",
-      "clearFilters": "Garbitu iragazkiak"
+      "searchSessionsPlaceholder": "Bilatu saioak..."
     },
     "sessionList": {
-      "couldNotLoad": "Ezin dira saioak kargatu",
       "couldNotLoadActive": "Ezin dira saio aktiboak kargatu",
       "noSessionsYetDescription": "Hasi kodetze-lan bat zure telefonotik. Zure saioak hemen agertuko dira.",
       "noMatches": "Ez dago bat datorren saiorik",
@@ -2097,9 +1891,7 @@
     "sessionRow": {
       "deleteTitle": "Ezabatu saioa?",
       "deleteMessage": "Hau ezin da desegin.",
-      "delete": "Ezabatu",
       "deleteSession": "Ezabatu saioa",
-      "rename": "Berrizendatu",
       "renameMessage": "Sartu izen berri bat saio honetarako",
       "copyId": "Kopiatu saio-IDa",
       "idCopied": "Saio-IDa kopiatuta",
@@ -2133,7 +1925,6 @@
       "didNotCompleteTitle": "Instalazioa ez da osatu",
       "didNotCompleteMessage": "GitHub aplikazioaren instalazioa ez da osatu. Saiatu berriro aplikaziotik."
     },
-    "sessionExited": "Saioa itxi da",
     "remoteSpawnRetryable": "Ezin izan da instantziara iritsi; baliteke deskonektatuta egotea.",
     "remoteSpawnNonRetryable": "Instantziak ezin izan du saioa hasi; egiaztatu makina edo eguneratu CLI-a.",
     "remoteSpawnInstanceDisconnected": "Hautatutako instantzia deskonektatu da. Hasi saioa Cloud Agent-en edo aukeratu beste instantzia bat.",
@@ -2145,12 +1936,8 @@
       "title": "Saioa",
       "copyErrorDetails": "Kopiatu errorearen xehetasunak",
       "backToSessions": "Itzuli saioetara",
-      "accessDenied": "Sarbidea ukatu da",
-      "accessDeniedDescription": "Ez duzu baimenik hau ikusteko.",
       "couldNotLoad": "Ezin da saioa kargatu",
       "failedToLoadDetails": "Ezin dira saioaren xehetasunak kargatu",
-      "notFound": "Ez da aurkitu",
-      "notFoundDescription": "Elementu hau kendu edo jada ez dago erabilgarri.",
       "failedToStopExecution": "Ezin da exekuzioa gelditu",
       "renameSession": "Berrizendatu saioa",
       "renamePlaceholder": "Saioaren izena",
@@ -2161,7 +1948,6 @@
       "emptyTitle": "Oraindik ez dago mezurik",
       "renameAccessibility": "Berrizendatu saioa: {{title}}",
       "cloningSession": "Saioa klonatzen",
-      "continue": "Jarraitu",
       "couldNotLoadThisSession": "Ezin da saio hau kargatu",
       "cloneFailedRetry": "Ezin da saio hau klonatu. Saiatu berriro.",
       "notEnoughCredits": "Kreditu nahikorik ez Cloud Agent exekutatzeko. Gehitu kreditua eta saiatu berriro.",
@@ -2176,7 +1962,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Ezin da urruneko saioa sortu",
-      "exited": "Saioa itxi da",
       "failedToExit": "Ezin da saiotik irten",
       "exitTitle": "Irten saiotik?",
       "exitMessage": "Honek egiten ari den saioa gelditzen du, baina haren historia gordetzen du.",
@@ -2194,9 +1979,6 @@
       "retryConnection": "Saiatu berriro konexioa"
     },
     "newSession": {
-      "title": "Saio berria",
-      "repository": "Biltegia",
-      "connectGithub": "Konektatu GitHub",
       "connectGithubDescription": "Konektatu GitHub zure arakatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
       "refreshRepositories": "Freskatu biltegiak",
@@ -2213,7 +1995,6 @@
       "commitAndPush": "Konprometitu eta igo",
       "startSession": "Hasi saioa",
       "promptPlaceholder": "Zertan lan egin nahi zenuke?",
-      "addAttachment": "Gehitu eranskina",
       "couldNotLoadModels": "Ezin dira modeloak kargatu",
       "prefillRepoAndModelUnavailable": "Jatorrizko saioaren biltegia eta modeloa jada ez daude erabilgarri. Hautatu behean.",
       "prefillRepoUnavailable": "{{repo}} jada ez dago erabilgarri. Hautatu biltegi bat behean.",
@@ -2223,14 +2004,9 @@
       "couldNotRefreshRepositories": "Ezin dira biltegiak freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",
       "discardDraftMessage": "Zure proposamena galduko da.",
-      "keepEditing": "Jarraitu editatzen",
-      "discard": "Baztertu",
       "discardFailed": "Ezin da zirriborroa baztertu. Saiatu berriro.",
       "remoteHint": "Exekutatu `kilo remote` zure ordenagailuan, edo `/remote` exekutatzen ari den CLI saio batean, tokiko kilo prozesu bat kontrolatzeko.",
-      "bitbucketConnected": "Bitbucket konektatuta",
-      "connectBitbucket": "Konektatu Bitbucket",
       "connectBitbucketDescription": "Konektatu Bitbucket-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
-      "connectGitlab": "Konektatu GitLab",
       "connectGitlabDescription": "Konektatu GitLab-era zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu",
       "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu",
@@ -2252,18 +2028,10 @@
       "updatedFileCount": "{{displayCount}} fitxategi eguneratu dira",
       "updatedFileCount_other": "{{displayCount}} fitxategi eguneratu dira"
     },
-    "toolPatch": {
-      "operationAdded": "Gehituta",
-      "operationDeleted": "Ezabatuta",
-      "operationUpdated": "Eguneratuta"
-    },
     "toolCard": {
       "accessibility": "{{label}} tresna, {{status}}",
       "accessibilityLabel": "{{name}} tresna, {{status}}",
-      "fileEmpty": "Fitxategi hau hutsik dago.",
       "noTasks": "Ez dago zereginik.",
-      "contentTruncated": "Edukia moztuta",
-      "truncated": "Moztuta",
       "toolRead": "irakurri",
       "toolEdit": "editatu",
       "toolWrite": "idatzi",
@@ -2295,9 +2063,7 @@
       "runOn": "Exekutatu honetan",
       "runOnAccessibility": "Exekutatu honetan: {{label}}",
       "couldNotLoad": "Ezin dira instantziak kargatu",
-      "couldNotLoadDescription": "Egiaztatu konexioa eta saiatu berriro.",
       "cloudAgent": "Cloud Agent",
-      "loading": "Kargatzen…",
       "cloudAgentDescription": "Exekutatu Kilo-ren hodei sandbox-ean",
       "noCliInstances": "Ez dago CLI instantzia konektaturik",
       "noCliInstancesDescription": "Exekutatu `kilo remote` zure ordenagailuko projektuan, edo eguneratu Kilo CLI jada exekutatzen ari bada.",
@@ -2334,12 +2100,9 @@
       "noMatches": "Ez dago bat-etortzerik",
       "noRepositories": "Ez dago biltegi erabilgarririk",
       "noRepositoriesDescription": "Ez dago biltegirik zure kontuarekin konektatuta.",
-      "tryDifferentSearch": "Saiatu bilaketa-termino desberdin batekin.",
       "loading": "Kargatzen...",
       "accessibility": "Biltegia: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Mezuaren xehetasunak",
@@ -2349,13 +2112,10 @@
       "reportAiResponse": "Salatu AI erantzuna",
       "reportAiResponseConfirm": "Salatu erantzun hau berrikusketarako?",
       "report": "Salatu",
-      "role": "Rola",
       "roleUser": "Erabiltzailea",
       "roleAssistant": "Laguntzailea",
       "sent": "Bidalia",
-      "model": "Modeloa",
       "costAndTokens": "Kostua eta tokenak",
-      "cost": "Kostua",
       "input": "Sarrera",
       "output": "Irteera",
       "reasoning": "Arrazoiketa",
@@ -2363,8 +2123,7 @@
       "cacheWrite": "Cache-idazketa",
       "total": "Guztira",
       "reportAiResponseFailedRetryable": "Ezin da erantzun hau salatu.",
-      "reportAiResponseFailedTerminal": "Erantzun hau ezin da salatu.",
-      "reportAiResponseSubmitted": "Salaketa bidalita. Ordainagiria {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Erantzun hau ezin da salatu."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2375,7 +2134,6 @@
       "textDisplay": "Testuaren bistaratzea",
       "thinking": "Pentsatzen",
       "thought": "Pentsamendua",
-      "title": "Xehetasunak",
       "showDetails": "Erakutsi xehetasunak",
       "pending": "Zain…",
       "running": "Exekutatzen…"
@@ -2398,16 +2156,13 @@
     "filePart": {
       "loadingImage": "Irudia kargatzen",
       "imageUnavailableRetry": "Irudia ez dago erabilgarri, saiatu berriro kargatzen",
-      "imageUnavailable": "Irudia ez dago eskuragarri",
       "imagePreviewUnavailableInSession": "Aurreikuspena ez dago erabilgarri saio honetan.",
       "viewImage": "Ikusi irudia",
       "viewImageWithAlt": "Ikusi irudia {{alt}}",
       "imageOutput": "Irudi-irteera",
       "imageOutputWithFilename": "Irudi-irteera, {{filename}}",
-      "defaultName": "Fitxategia",
       "openFullScreen": "Ireki {{name}} pantaila osoan",
       "preview": "Aurrebista: {{name}}",
-      "openFile": "Ireki {{name}}",
       "couldNotLoadFile": "Ezin da fitxategi hau kargatu.",
       "couldNotLoadFileRetry": "Ezin da fitxategi hau kargatu. Saiatu berriro.",
       "retryLoadingFile": "Saiatu berriro fitxategia kargatzen",
@@ -2490,7 +2245,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Berriro saiatzeko aukera.",
       "copyToComposer": "Kopiatu konpositorean",
-      "queued": "Ilaran",
       "queuedAccessibility": "Mezua antolatuta",
       "userMessage": "Erabiltzailearen mezua",
       "assistantMessage": "Laguntzailearen mezua",
@@ -2526,12 +2280,10 @@
     },
     "sessionFilter": {
       "title": "Iragazi saioak",
-      "platform": "Plataforma",
       "platformCloud": "Hodeia",
       "platformExtension": "Hedapena",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Beste bat",
       "project": "Proiektua"
@@ -2545,15 +2297,10 @@
     },
     "modelPicker": {
       "title": "Hautatu modeloa",
-      "searchPlaceholder": "Bilatu modeloak...",
-      "noModels": "Ez dago modelo erabilgarririk",
       "noModelsDescription": "Ez dago hautatzeko moduko modelorik.",
-      "favorites": "Gogokoak",
-      "recommended": "Gomendatuta",
-      "allModels": "Modelo guztiak"
+      "favorites": "Gogokoak"
     },
     "modelSelector": {
-      "model": "Modeloa",
       "provider": "Hornitzailea {{id}}",
       "modelId": "Modeloa {{id}}",
       "unavailable": "Ez erabilgarri",
@@ -2577,7 +2324,6 @@
       "uploading": "Igotzen…",
       "uploaded": "Igota",
       "uploadFailedRetry": "Igoerak huts egin du. Sakatu berriro saiatzeko.",
-      "uploadFailedTerminal": "Fitxategi hau ezin da igo.",
       "moveLeft": "Mugitu {{filename}} ezkerrera",
       "moveRight": "Mugitu {{filename}} eskuinera"
     },
@@ -2589,8 +2335,6 @@
       "camera": "Kamera",
       "photoLibrary": "Argazki-bilduma",
       "files": "Fitxategiak",
-      "cameraAccessDisabled": "Kamera sarbidea desgaituta",
-      "cameraAccessMessage": "Eman kamera sarbidea Ezarpenetan argazki bat hartzeko.",
       "couldNotOpenPhotoPicker": "Ezin izan da argazki-hautatzailea ireki. Berrabiarazi Kilo eta saiatu berriro.",
       "maxFilesAllowed": "Gehienez {{displayCount}} fitxategi onartzen dira",
       "onlyAddingFiles": "{{total}} fitxategietatik {{accepted}} bakarrik gehitzen (gehienez {{max}})"
@@ -2603,7 +2347,6 @@
       "waitForUploads": "Itxaron eranskinak igotzen amaitzeko.",
       "pasteFromClipboard": "Itsatsi arbelatik",
       "stopGenerating": "Gelditu sorrera",
-      "sendMessage": "Bidali mezua",
       "selectModelBeforeSending": "Hautatu modeloa bidali aurretik",
       "preparingPlaceholder": "Ingurunea prestatzen...",
       "finalizingPlaceholder": "Amaitzen...",
@@ -2617,9 +2360,7 @@
     },
     "chatLink": {
       "linkCopied": "Esteka kopiatuta",
-      "reviewPr": "Berrikusi PR-a",
       "openLink": "Ireki esteka",
-      "copyLink": "Kopiatu esteka",
       "shareLink": "Partekatu esteka",
       "share": "Partekatu",
       "prLinkActions": "PR estekaren ekintzak",
@@ -2659,13 +2400,11 @@
     "contextUsage": {
       "windowUnavailable": "Testuinguru-leihoaren tamaina ez erabilgarri",
       "tapToViewDetails": "Sakatu testuinguruaren xehetasunak ikusteko.",
-      "costPrefix": "kostua {{cost}}",
       "costSuffix": ", kostua {{cost}}",
       "tokensWindowUnavailable": "Testuingurua {{used}} token, leihoa ez erabilgarri",
       "tokensUsage": "Testuingurua {{window}} tokenetik {{used}} erabilita, {{percentage}} erabilita",
       "title": "Testuinguruaren erabilera",
       "used": "Erabilita",
-      "remaining": "Gainerakoa",
       "provider": "Hornitzailea",
       "totalCost": "Kostu osoa",
       "usageReflectsLatest": "Erabilerak amaierako laguntzaile-erantzun berriena islatzen du.",
@@ -2691,8 +2430,7 @@
       "merged": "pull request fusionatua",
       "draft": "pull request zirriborroa",
       "updating": "Eguneratzen, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "pull request"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Kargatu",
@@ -2720,11 +2458,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Ezin izan da zure kontua kargatu",
-    "couldNotLoadAccountDescription": "Egiaztatu konexioa eta saiatu berriro.",
     "couldNotLoadPrivacy": "Ezin izan dira pribatutasun-aukerak kargatu",
     "couldNotLoadPrivacyDescription": "Egiaztatu zure gailuaren segurtasun-ezarpenak eta saiatu berriro.",
     "contentReady": "Edukia prest",
-    "signOut": "Amaitu saioa",
     "retryLoadingAccount": "Saiatu berriro kontua kargatzen",
     "retryLoadingPrivacy": "Saiatu berriro pribatutasun-aukerak kargatzen"
   },
@@ -2734,7 +2470,6 @@
     "billingPage": "fakturazio-orria"
   },
   "deviceSessions": {
-    "couldNotLoad": "Ezin dira saioak kargatu",
     "couldNotLoadDescription": "Zure saio aktiboak ez daude erabilgarri hau kargatu arte.",
     "currentDeviceUnidentified": "Ezin izan da gailu aktuala identifikatu",
     "noSessions": "Ez dago saio aktiborik",
@@ -2742,7 +2477,6 @@
     "onlyKiloAppSignIns": "Kilo aplikazioko saio-hasierak bakarrik agertzen dira hemen. Editore eta CLIko saio-hasierak ez daude zerrendatuta.",
     "signedIn": "Saioa hasita {{signedIn}} · Azken ikusita {{lastSeen}}",
     "thisDevice": "Gailu hau",
-    "title": "Gailuen saioak",
     "viewProfile": "Ikusi profila",
     "signOutThisDevice": "Itxi saioa gailu honetan",
     "signOutThisSession": "Itxi saio hau",
@@ -2750,8 +2484,6 @@
     "signOutThisDeviceTitle": "Itxi saioa gailu honetan?",
     "signOutThisSessionTitle": "Itxi saio hau?",
     "signOutThisSessionMessage": "{{device}} saioa itxiko da. Ordubetez gorde dezake API sarbidea.",
-    "signOutConfirm": "Amaitu saioa",
-    "signOutMessage": "Zure lan-eremura sartzeko berriro hasi beharko duzu saioa.",
     "webBrowser": "Web arakatzailea"
   },
   "forceUpdate": {
@@ -2772,17 +2504,13 @@
   },
   "imageViewer": {
     "close": "Itxi {{filename}}",
-    "imageUnavailable": "Irudia ez dago eskuragarri",
     "share": "Partekatu {{filename}}"
   },
   "invalidRoute": {
     "description": "Esteka hau jada ez da baliozkoa.",
-    "goBack": "Itzuli",
     "title": "Ez da orria aurkitu"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Edukia moztuta",
-    "truncated": "Moztuta",
     "wrap": "Bildu",
     "scroll": "Korritzea"
   },
@@ -2791,22 +2519,16 @@
     "internetRestored": "Interneteko konexioa berreskuratu da"
   },
   "queryError": {
-    "neutralTitle": "Zerbait gaizki joan da",
     "neutralDescription": "Mesedez, saiatu berriro.",
     "offlineTitle": "Huts egin du kargatzean",
-    "offlineDescription": "Zerbait gaizki joan da",
-    "permissionTitle": "Sarbidea ukatu da",
     "permissionDescription": "Ez duzu baimenik hau ikusteko.",
-    "notFoundTitle": "Ez da aurkitu",
     "notFoundDescription": "Elementu hau kendu edo jada ez dago erabilgarri.",
     "serverTitle": "Ezin izan da kargatu",
     "serverDescription": "Zerbait gaizki joan da gure aldetik. Mesedez, saiatu berriro."
   },
   "screenHeader": {
     "openMenu": "Ireki menua",
-    "openMenuFor": "Ireki {{title}}-ren menua",
-    "close": "Itxi",
-    "goBack": "Itzuli"
+    "openMenuFor": "Ireki {{title}}-ren menua"
   },
   "picker": {
     "optionsExpired": "Aukerak iraungita",
@@ -2837,10 +2559,7 @@
   },
   "share": {
     "title": "Partekatu Kilo-n",
-    "close": "Itxi",
-    "reviewPr": "Berrikusi PR-a",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Saio berria",
     "searchPlaceholder": "Bilatu azken saioak",
     "connectedCli": "Konektatutako CLI batean",
     "newSessionOn": "Saio berria {{name}}-n",
@@ -2898,7 +2617,6 @@
     "statusCanceling": "Kilo Pass baliogabetzen",
     "statusPastDue": "Kilo Pass atzeratua",
     "monthlyCredits": "{{credits}} hileroko kredituak",
-    "ends": "Amaitzen da {{date}}",
     "periodEnd": "aldiaren amaiera",
     "managedOnGooglePlay": "Google Play-n kudeatzen da",
     "managedInAppStore": "App Store-n kudeatzen da",
@@ -2910,7 +2628,6 @@
     "unavailableDescription": "Kilo Pass ez dago erabilgarri aplikazio barruko erosketa gisa Android-en. Kudeatu webgunean.",
     "webManagementDescription": "Kilo Pass hau webgunean kudeatzen da.",
     "legalDisclosure": "Kilo Pass hilero automatikoki berritzen den harpidetza da. Erosketa baieztatzen denean, ordainketa zure Apple ID-ra kobratzen da. Harpidetzak automatikoki berritzen dira hilero agertzen den prezioan, uneko aldia amaitu baino 24 ordu lehenago gutxienez ezeztatu ezean. Kudeatu edo ezeztatu edonoiz zure App Store kontuaren ezarpenetan.",
-    "legalPrivacyPolicy": "Pribatutasun-politika",
     "legalTermsOfUse": "Erabilera-baldintzak (EULA)",
     "purchaseDifferentAccount": "App Store-ko erosketa hau ez dago zure Kilo kontuarekin lotuta. Hasi saioa erosketarako erabilitako Apple kontuarekin, eta saiatu berriro.",
     "restoreFailed": "Ezin dira erosketa berreskuratu. Saiatu berriro.",
@@ -2939,7 +2656,6 @@
     "privacyPolicyPrefix": "Zure datuak honen arabera kudeatzen dira",
     "privacyPolicy": "Kilo pribatutasun-politika",
     "onDevice": "Gailuan",
-    "loading": "Kargatzen…",
     "couldNotLoadTranscription": "Ezin izan da zure transkripzio-ezarpena kargatu.",
     "signInToManageTranscription": "Hasi saioa lineako transkripzioa kudeatzeko.",
     "onlineTranscription": "Lineako transkripzioa",
@@ -2956,7 +2672,6 @@
     "voiceTranscriptionTitle": "Ahots-transkripzioa",
     "retentionPrefix": "Atxikipen-epe osoak, zure eskubideak eta harremanetarako informazioa hemen daude",
     "backToConsent": "Itzuli baimenera",
-    "back": "Atzera",
     "revokeConsent": "Kendu baimena",
     "revokeConsentTitle": "Kendu datuak partekatzeko baimena?",
     "acceptAndContinue": "Onartu eta jarraitu",
@@ -2990,7 +2705,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Errore bat gertatzen denean maskaratutako pantaila-argazkiak, eta saioen lagin txiki baten grabazio maskaratuak.",
     "errorScreenshotsWhy": "Zerbait apurtzean aplikazioak zer erakutsi duen ikustea.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Instalazio-iturria eta kanpaina-identifikatzaileak.",
     "installAttributionWhy": "Zein kanalek ekartzen dituzten erabiltzaile berriak ulertzea.",
     "installAttributionWho": "AppsFlyer.",
@@ -2999,7 +2713,6 @@
     "voiceTranscriptionWho": "Gailuan bakarrik, edo Apple edo Google gailu honek lineaz kanpo transkribatu ezin duenean.",
     "installAttributionPromptTitle": "Baimendu instalazioaren esleipena?",
     "installAttributionPromptMessage": "Kilo-k Apple-ren jarraipen-baimena soilik erabiltzen du zein kanalek ekarri zaituen hemen jakiteko. Zure eskaerak eta elkarrizketak ez dira inoiz erabiltzen.",
-    "continue": "Jarraitu",
     "what": "Zer",
     "why": "Zergatik",
     "who": "Nor"
@@ -3021,7 +2734,6 @@
       "selectDescription": "Aukeratu erakunde bat zure profiletik jarraitzeko.",
       "selectOrganization": "Hautatu erakunde bat",
       "unavailableDescription": "Erakunde hau jada ez daude erabilgarri. Aukeratu bat zure profiletik jarraitzeko.",
-      "accessDeniedTitle": "Sarbidea ukatu da",
       "accessDeniedDescription": "Ez duzu erakunde honetarako sarbiderik."
     },
     "creditActivity": {
@@ -3040,16 +2752,12 @@
         "accounting_adjustment": "Kontabilitate-doikuntza",
         "credits_expired": "Kredituak iraungita"
       },
-      "loadMore": "Kargatu gehiago",
-      "loadMoreFailed": "Ezin izan dira gehiago kargatu",
       "truncated": "Kreditu-jarduera zaharragoa eskuragarri dago."
     },
     "inviteMember": {
       "emailError": "Sartu posta-helbide baliozko bat",
-      "emailLabel": "Posta elektronikoa",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "Ez duzu kideak gonbidatzeko baimenik.",
-      "roleLabel": "Rola",
       "roleMember": "Rola: Kidea",
       "sendInvite": "Bidali gonbidapena",
       "title": "Gonbidatu kidea"
@@ -3066,18 +2774,13 @@
         "paid": "Ordainduta",
         "open": "Irekita",
         "void": "Ballogabea",
-        "draft": "Zirriborroa",
-        "uncollectible": "Kobratu ezina",
-        "unknown": "Ezezaguna"
+        "uncollectible": "Kobratu ezina"
       },
-      "loadMore": "Kargatu gehiago",
       "loadMoreFailed": "Ezin izan dira gehiago kargatu",
       "truncated": "Faktura zaharrak eskuragarri daude."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "Gaitu saldo baxuko alerta",
-      "enabled": "Gaituta",
       "notifyEmailsLabel": "Jakinarazteko postak",
       "permissionDenied": "Ez duzu fakturazio-alertak kudeatzeko baimenik.",
       "separateEmailsHint": "Bereizi posta anitz komekin.",
@@ -3101,12 +2804,10 @@
       "emptyDescriptionCanInvite": "Gonbidatu lankideak erakunde honetan elkarlanean hasteko.",
       "emptyDescriptionCannotInvite": "Eskatu jabeari edo fakturazio-kudeatzaileari lankideak gonbidatzeko.",
       "emptyTitle": "Oraindik ez dago kiderik",
-      "inviteMember": "Gonbidatu kidea",
       "invitedDate": "Gonbidatuta {{date}}",
       "limitPerDay": "{{amount}}/egun",
       "manageA11y": "Kudeatu {{name}}",
       "manageInvitationA11y": "Kudeatu {{email}}-ren gonbidapena",
-      "removeConfirm": "Kendu",
       "removeMember": "Kendu kidea",
       "removeMemberMessage": "Kendu {{name}} erakunde honetatik?",
       "revokeConfirm": "Baliogabetu",
@@ -3121,31 +2822,23 @@
         "billingManager": "Fakturazio-kudeatzailea"
       },
       "emailStatusFailed": "Postak huts egin du",
-      "emailStatusPending": "Zain",
       "inviteCreated": "Gonbidapena sortuta",
       "pendingInvitations": "Gonbidapen zain daudenak",
       "resendInvite": "Bidali gonbidapena berriro",
       "shareInviteLink": "Partekatu gonbidapen-esteka"
     },
-    "permissionDenied": {
-      "back": "Atzera",
-      "title": "Sarbidea ukatu da"
-    },
     "usageStats": {
-      "cost": "Kostua",
       "inputTokens": "Sarrerako tokenak",
       "last30Days": "Azken 30 egunak",
       "outputTokens": "Irteerako tokenak",
       "requests": "Eskaerak"
     },
     "hub": {
-      "title": "Erakundea",
       "renameTitle": "Berrizendatu erakundea",
       "renamePlaceholder": "Sartu erakundearen izena",
       "balance": "Saldoa",
       "organizationSeats": "Erakundearen eserlekuak",
-      "lowBalanceBelow": "{{amount}} azpitik",
-      "lowBalanceOff": "Desaktibo"
+      "lowBalanceBelow": "{{amount}} azpitik"
     },
     "kiloPass": {
       "activating": "Aktibatzen",
@@ -3153,9 +2846,6 @@
       "couldNotLoadStatus": "Ezin izan da egoera kargatu",
       "creditProcessingDelayed": "Kredituen prozesamendua atzeratuta · automatikoki berriro saiatzen",
       "ended": "Amaituta",
-      "endsOn": "Amaitzen da {{date}}",
-      "loading": "Kargatzen…",
-      "manageHint": "Kilo Pass kudeaketa webean irekitzen du.",
       "notSubscribed": "Ez harpidetuta",
       "overallocated": "Pasabideen esleipenak ordaindutako eserlekuak gainditzen ditu",
       "paidSeat_one": "{{displayCount}} ordaindutako eserleku",
@@ -3165,13 +2855,11 @@
       "paymentPending": "Ordainketa zain",
       "processingBlocked": "Prozesamendua blokeatuta",
       "processingNeedsReview": "Prozesamenduak berrikuspena behar du",
-      "retry": "Saiatu berriro",
       "retryHint": "Kilo Pass egoera kargatzen berriro saiatzen du.",
       "setupHint": "Kilo Pass konfigurazioa webean irekitzen du."
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "Kontu bat badago helbide elektroniko honekin, beste saio-hasteko metodo batekin. Probatu beste metodo bat edo erabili '$t(login.moreSignInOptions)'.",
     "differentOauth": "Kontu bat badago helbide elektroniko honekin, beste saio-hasteko metodo batekin. Probatu beste metodo bat edo erabili '$t(login.moreSignInOptions)'.",
     "ssoError": "Zure erakundeak SSO eskatzen du. Erabili '$t(login.moreSignInOptions)'.",
     "blocked": "Kontu hau blokeatu da. Jarri harremanetan laguntzarekin.",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "Ezin da saioa hasi. Saiatu berriro.",
     "couldNotOpenBrowser": "Ezin da nabigatzailea ireki. Saiatu berriro.",
     "signInTimedOut": "Saioa iraungi da. Saiatu berriro.",
-    "signInFailed": "Saioa hasteak huts egin du. Saiatu berriro.",
     "networkError": "Sare-errorea. Saiatu berriro.",
     "accessDeniedByUser": "Erabiltzaileak sarbidea ukatu du",
     "codeExpired": "Kodea iraungi da",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "Itzuli hobespenetara"
   },
   "quickChat": {
-    "title": "Txata",
-    "composer": {
-      "placeholder": "Mezua"
-    },
     "empty": {
       "title": "Hasi txat bat",
       "description": "Bidali mezu bat modelo batekin hitz egiteko."
     },
-    "working": "Lanean",
     "historyRetry": "Ezin izan da txat-historia kargatu.",
-    "catalogRetry": "Modeloak ezin izan dira kargatu",
     "sendError": "Ezin izan da mezua bidali. Saiatu berriro."
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "Hasi saioa agenteak ikusteko",
     "privacy": "Ireki Kilo agenteak ikusteko",
     "openAgents": "Ireki agenteak",
-    "running": "Lanean",
     "needsInput": "sarreraren zain",
-    "idle": "Geldirik",
     "channelName": "Agente aktiboak",
     "activityKitDisabledBody": "Aktibatu Zuzeneko jarduerak Ezarpenetan, Agente aktiboak Blokeo-pantailan ikusteko."
   }

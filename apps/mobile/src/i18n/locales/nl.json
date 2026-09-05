@@ -27,14 +27,118 @@
     "somethingWentWrong": "Er is iets misgegaan",
     "couldNotOpen": "Kon {{label}} niet openen",
     "link": "link",
-    "takingLonger": "Dit duurt langer dan verwacht. Je kunt dit sluiten en later opnieuw controleren."
+    "takingLonger": "Dit duurt langer dan verwacht. Je kunt dit sluiten en later opnieuw controleren.",
+    "cameraAccessDisabled": "Cameratoegang uitgeschakeld",
+    "copyLink": "Link kopiëren",
+    "reviewPr": "PR beoordelen",
+    "sendMessage": "Bericht verzenden",
+    "remaining": "Resterend",
+    "imageUnavailable": "Afbeelding niet beschikbaar",
+    "open": "{{name}} openen",
+    "loading": "Laden…",
+    "queued": "In wachtrij",
+    "cost": "Kosten",
+    "model": "Model",
+    "reportSubmittedReceipt": "Melding verzonden. Ontvangstbewijs {{receiptId}}",
+    "role": "Rol",
+    "allModels": "Alle modellen",
+    "noModelsAvailable": "Geen modellen beschikbaar",
+    "recommended": "Aanbevolen",
+    "searchModels": "Modellen zoeken...",
+    "bitbucketConnected": "Bitbucket verbonden",
+    "connectBitbucket": "Bitbucket verbinden",
+    "connectGithub": "GitHub verbinden",
+    "connectGitlab": "GitLab verbinden",
+    "discard": "Weggooien",
+    "repository": "Repository",
+    "newSession": "Nieuwe sessie",
+    "details": "Details",
+    "pullRequest": "pull-aanvraag",
+    "sessionExited": "Sessie beëindigd",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "Toegang geweigerd",
+    "notFound": "Niet gevonden",
+    "platform": "Platform",
+    "contentTruncated": "Inhoud afgekapt",
+    "truncated": "Afgekapt",
+    "added": "Toegevoegd",
+    "deleted": "Verwijderd",
+    "updated": "Bijgewerkt",
+    "clearFilters": "Filters wissen",
+    "clearSearch": "Zoekopdracht wissen",
+    "couldNotLoadSessions": "Kon sessies niet laden",
+    "delete": "Verwijderen",
+    "rename": "Hernoemen",
+    "idle": "Inactief",
+    "online": "Online",
+    "starting": "Starten…",
+    "noKiloclawInstances": "Geen KiloClaw-instanties",
+    "personal": "Persoonlijk",
+    "reply": "Beantwoorden",
+    "closeReactions": "Reacties sluiten",
+    "recent": "Recent",
+    "connect": "Verbinden",
+    "codeReviewer": "Code Reviewer",
+    "performance": "Prestaties",
+    "all": "Alles",
+    "critical": "Kritiek",
+    "off": "Uit",
+    "notConnected": "Niet verbonden",
+    "allRepositories": "Alle repositories",
+    "repositories": "Repositories",
+    "connected": "Verbonden",
+    "organization": "Organisatie",
+    "couldNotLoadRepositories": "Kon repositories niet laden",
+    "selectedRepositories": "Geselecteerde repositories",
+    "branch": "Branch",
+    "findings": "Bevindingen",
+    "keepRunning": "Blijven draaien",
+    "status": "Status",
+    "retryLoadingMore": "Opnieuw meer laden",
+    "balanced": "Gebalanceerd",
+    "couldNotLoadOrganizations": "Kon organisaties niet laden",
+    "yourOwnRepositories": "Je eigen repositories",
+    "selectRepositories": "Repositories selecteren",
+    "cancelled": "Geannuleerd",
+    "failed": "Mislukt",
+    "pending": "In behandeling",
+    "deviceSessions": "Apparaatsessies",
+    "working": "Bezig",
+    "goBack": "Terug",
+    "ends": "Eindigt op {{date}}",
+    "privacyPolicy": "Privacybeleid",
+    "disabled": "Uitgeschakeld",
+    "enabled": "Ingeschakeld",
+    "couldNotLoadModels": "Kon modellen niet laden",
+    "close": "Sluiten",
+    "remove": "Verwijderen",
+    "kiloclaw": "KiloClaw",
+    "notifications": "Meldingen",
+    "loadMore": "Meer laden",
+    "email": "E-mail",
+    "draft": "Concept",
+    "prReview": "PR-review",
+    "dismissed": "Afgewezen",
+    "closed": "Gesloten",
+    "preferences": "Voorkeuren",
+    "agents": "Agents",
+    "securityAgent": "Security Agent",
+    "profile": "Profiel",
+    "chat": "Chat",
+    "file": "Bestand",
+    "keepEditing": "Blijven bewerken",
+    "signOut": "Afmelden",
+    "unknown": "Onbekend",
+    "message": "Bericht",
+    "reactions": "Reacties",
+    "openPullRequest": "Pull-aanvraag openen",
+    "couldnTLoadMore": "Kon niet meer laden"
   },
   "language": {
-    "title": "Taal",
     "restarting": "Opnieuw opstarten om de taal toe te passen",
     "couldNotRestart": "Opnieuw opstarten niet mogelijk",
     "languageSaved": "Je taal is opgeslagen.",
-    "retry": "Opnieuw proberen",
     "catalogLoadFailed": "De taal kon niet worden geladen. Probeer het opnieuw.",
     "search": "Talen zoeken",
     "noMatches": "Geen talen gevonden",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "Aanmeldcode: {{code}}",
     "openSignInPageInBrowser": "Aanmeldpagina openen in browser",
     "copySignInLink": "Aanmeldlink kopiëren",
-    "copyLink": "Link kopiëren",
     "cancelSignIn": "Aanmelden annuleren",
     "startingSignIn": "Aanmelden starten...",
     "organizationUsesSso": "Je organisatie gebruikt single sign-on.",
@@ -62,23 +165,19 @@
     "emailAddress": "E-mailadres",
     "emailPlaceholder": "jij@voorbeeld.nl",
     "continueWithEmail": "Doorgaan met e-mail",
-    "continue": "Doorgaan",
     "enterCodeSentTo": "Voer de code in die naar {{email}} is verzonden",
     "codeArrivalHint": "Als dit adres in aanmerking komt, arriveert de code binnen een minuut.",
     "verifyCode": "Code verifiëren",
     "resendCode": "Code opnieuw verzenden",
-    "back": "Terug",
     "termsPrefix": "Door verder te gaan ga je akkoord met onze",
     "terms": "Voorwaarden",
     "termsConnector": " en ",
     "termsSuffix": ".",
-    "privacyPolicy": "Privacybeleid",
     "moreSignInOptions": "Meer aanmeldopties",
     "couldNotCompleteSignIn": "Aanmelden kon niet worden voltooid. Probeer het opnieuw.",
     "sessionEnded": "Je sessie is beëindigd. Meld je opnieuw aan.",
     "signInCodeExpired": "Je aanmeldcode is verlopen. Probeer het opnieuw.",
     "accessDenied": "Toegang is geweigerd.",
-    "somethingWentWrong": "Er is iets misgegaan. Probeer het opnieuw.",
     "codeSent": "Code verzonden",
     "signInCodeField": "Aanmeldcode",
     "accountCreated": "Account aangemaakt. Welkom bij Kilo.",
@@ -86,24 +185,16 @@
     "or": "of"
   },
   "profile": {
-    "title": "Profiel",
-    "agents": "Agents",
-    "codeReviewer": "Code Reviewer",
     "codeReviewerSubtitle": "Automatische PR-reviews",
-    "securityAgent": "Security Agent",
     "securityAgentSubtitle": "Kwetsbaarheden vinden en verhelpen",
     "reviews": "Reviews",
-    "prReview": "PR-review",
     "prReviewSubtitle": "Pull requests beoordelen op mobiel",
-    "organization": "Organisatie",
     "couldNotLoadOrganization": "Organisatie kon niet worden geladen",
     "couldNotLoadOrganizationDescription": "Organisatie- en agentinstellingen zijn niet beschikbaar tot dit is geladen.",
     "linkedAccounts": "Gekoppelde accounts",
     "couldNotLoadAccounts": "Accounts konden niet worden geladen",
     "app": "App",
-    "preferences": "Voorkeuren",
     "preferencesSubtitle": "Weergave, meldingen, denken en schermgedrag",
-    "deviceSessions": "Apparaatsessies",
     "deviceSessionsSubtitle": "Bekijk en meld andere apparaten af",
     "feedback": "Feedback",
     "privacyChoices": "Privacykeuzes",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "Je creditsaldo is leeg. Credits worden voor dit account buiten de iOS-app beheerd.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
-    "signOutConfirm": "Afmelden",
     "deleteAccountTitle": "Account verwijderen?",
     "deleteAccountMessage": "Dit verwijdert je account permanent en meldt je af. We e-mailen een bevestigingscode.",
     "deleteAccountConfirm": "Account verwijderen",
     "accountDeleted": "Je account is verwijderd.",
     "viewOrganization": "Organisatie bekijken",
     "manageOrganization": "Organisatie beheren",
-    "personal": "Persoonlijk",
     "selectAccount": "Account selecteren",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "E-mail",
     "providerTestAccount": "Testaccount",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "Enterprise SSO"
   },
   "preferences": {
-    "title": "Voorkeuren",
     "autoExpandThinking": "Denken automatisch uitvouwen",
     "autoExpandThinkingSubtitle": "Toon het denken van de agent uitgevouwen wanneer het klaar is.",
     "keepScreenOn": "Scherm aan houden op de sessiepagina",
     "keepScreenOnSubtitle": "Houd het scherm wakker terwijl de sessie werkt.",
     "appearance": "Weergave",
-    "notifications": "Meldingen",
     "notificationsSubtitle": "Pushvoorkeuren",
     "appearanceSystem": "Systeem",
     "appearanceLight": "Licht",
@@ -167,7 +251,6 @@
       "security": "Beveiligingsbevindingen"
     },
     "category": {
-      "chatMessagesTitle": "Chatberichten",
       "chatMessagesSubtitle": "antwoorden in je gesprekken",
       "agentAttentionTitle": "Agent heeft je nodig",
       "agentAttentionSubtitle": "vragen, toestemming, invoer nodig",
@@ -175,14 +258,10 @@
       "agentUpdatesSubtitle": "tussentijdse berichten van de agent",
       "sessionStatusTitle": "Sessiestatus",
       "sessionStatusSubtitle": "voltooid / mislukt / klaar om te besturen",
-      "kiloclawActivityTitle": "KiloClaw-activiteit",
       "kiloclawActivitySubtitle": "instantie gereed/mislukt, geplande acties",
-      "balanceAlertsTitle": "Saldo-waarschuwingen",
       "balanceAlertsSubtitle": "waarschuwingen voor laag organisatiesaldo",
-      "securityFindingsTitle": "Beveiligingsbevindingen",
       "securityFindingsSubtitle": "nieuwe bevindingen en SLA-herinneringen"
     },
-    "title": "Meldingen",
     "liveActivities": "Live activiteiten",
     "liveActivitySubtitle": "Actieve agents tonen op het toegangsscherm",
     "liveUpdates": "Live-updates",
@@ -205,7 +284,6 @@
     "disabledMessage": "Schakel meldingen in de instellingen van je apparaat in om ze in te schakelen.",
     "disableTitle": "Meldingen uitschakelen",
     "disableMessage": "Schakel meldingen in de instellingen van je apparaat uit om ze uit te schakelen.",
-    "openSettings": "Instellingen openen",
     "registrationFailed": "Registratie mislukt. Controleer je meldingstoestemmingen.",
     "couldNotEnable": "Meldingen konden niet worden ingeschakeld. Probeer het opnieuw.",
     "previewAlways": "Altijd",
@@ -215,22 +293,16 @@
   },
   "tabs": {
     "home": "Home",
-    "agents": "Agents",
-    "profile": "Profiel",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, tabblad, {{position}} van {{total}}",
-    "chat": "Chat"
+    "position": "{{name}}, tabblad, {{position}} van {{total}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "Wissel van instantie",
       "couldNotLoadInstances": "Kon instanties niet laden",
-      "noInstances": "Geen KiloClaw-instanties",
       "noInstancesDescription": "Stel een instantie in om te beginnen met chatten.",
       "setUpKiloclaw": "KiloClaw instellen",
-      "currentInstance": "{{title}}, huidig",
-      "personal": "Persoonlijk"
+      "currentInstance": "{{title}}, huidig"
     },
     "conversation": {
       "failedToLoad": "Kon gesprek niet laden",
@@ -249,16 +321,12 @@
       "couldNotSignIn": "Kon niet aanmelden bij chat",
       "couldNotRefreshMessages": "Kon berichten niet vernieuwen",
       "couldNotLoadHistory": "Kon gespreksgeschiedenis niet laden",
-      "rename": "Hernoemen",
       "leave": "Verlaten",
       "untitledConversation": "Gesprek zonder titel",
       "createFailed": "Gesprek maken mislukt",
       "leaveFailed": "Gesprek verlaten mislukt"
     },
     "reactions": {
-      "title": "Reacties",
-      "close": "Reacties sluiten",
-      "recent": "Recent",
       "common": "Algemeen",
       "reactWith": "Reageren met {{reaction}}",
       "accessibility": "{{emoji}} reactie, {{displayCount}}"
@@ -268,16 +336,13 @@
       "cancelReply": "Antwoord annuleren",
       "openInstance": "Instantie openen",
       "attachFile": "Bestand bijvoegen",
-      "messagePlaceholder": "Bericht",
-      "cancelEdit": "Bewerken annuleren",
-      "sendMessage": "Bericht verzenden"
+      "cancelEdit": "Bewerken annuleren"
     },
     "conversationList": {
       "couldNotLoad": "Kon gesprekken niet laden",
       "emptyTitle": "Nog geen gesprekken",
       "emptyDescription": "Maak een gesprek om te beginnen met chatten met je KiloClaw-instantie.",
       "create": "Gesprek maken",
-      "starting": "Starten…",
       "newConversation": "Nieuw gesprek",
       "openInstanceSettings": "Instantie-instellingen openen",
       "today": "Vandaag",
@@ -287,7 +352,6 @@
     },
     "attachment": {
       "open": "{{filename}} openen",
-      "imageUnavailable": "Afbeelding niet beschikbaar",
       "openFailed": "Bijlage kon niet worden geopend. Controleer je verbinding en probeer het opnieuw.",
       "attachFailed": "Bestand bijvoegen mislukt",
       "limit": "Je kunt maximaal {{displayCount}} bestanden bijvoegen.",
@@ -317,11 +381,9 @@
       "yourMessage": "Jouw bericht",
       "messageFrom": "Bericht van {{author}}",
       "moreActions": "Meer acties",
-      "message": "Bericht",
       "notDelivered": "Niet bezorgd",
       "edited": "(bewerkt)",
-      "image": "Afbeelding",
-      "attachment": "Bijlage"
+      "image": "Afbeelding"
     },
     "messageActions": {
       "copied": "Gekopieerd",
@@ -329,13 +391,11 @@
       "title": "Berichtacties",
       "deleteTitle": "Bericht verwijderen?",
       "deleteMessage": "Hiermee wordt het bericht uit het gesprek verwijderd.",
-      "delete": "Verwijderen",
       "deleteFailed": "Bericht verwijderen mislukt",
       "removeReactionFailed": "Reactie verwijderen mislukt",
       "addReactionFailed": "Reactie toevoegen mislukt",
       "retrySend": "Opnieuw verzenden",
       "moreReactions": "Meer reacties",
-      "reply": "Beantwoorden",
       "edit": "Bewerken",
       "sendFailed": "Bericht verzenden mislukt",
       "retrySendFailed": "Opnieuw verzenden mislukt",
@@ -346,7 +406,6 @@
       "takePhoto": "Foto maken",
       "photoLibrary": "Fotobibliotheek",
       "files": "Bestanden",
-      "cameraAccessDisabled": "Cameratoegang uitgeschakeld",
       "cameraAccessMessage": "Sta cameratoegang toe in Instellingen om een foto te maken."
     },
     "typingIndicator": {
@@ -356,10 +415,7 @@
       "typing_other": "{{names}} typen..."
     },
     "botStatus": {
-      "online": "Online",
-      "idle": "Inactief",
       "offline": "Offline",
-      "unknown": "Onbekend",
       "loadingUser": "Gebruiker laden...",
       "waitingForStatus": "Wachten op botstatus...",
       "offlineMessage": "De bot is offline. Berichten worden hervat zodra deze opnieuw verbinding maakt."
@@ -372,7 +428,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "Kon KiloClaw-instanties niet laden",
     "billing": {
       "title": "Facturering",
@@ -380,7 +435,6 @@
       "plan": "Plan",
       "finalTermEnds": "Laatste termijn eindigt",
       "afterFinalTerm": "Na de laatste termijn",
-      "remaining": "Resterend",
       "lessThanOneDay": "Minder dan 1 dag",
       "ends": "Eindigt",
       "expires": "Verloopt",
@@ -389,7 +443,6 @@
       "managedByAdmin": "Facturering wordt beheerd door je organisatiebeheerder.",
       "couldNotLoad": "Kon factureringsgegevens niet laden",
       "manageOnWeb": "Facturering beheren op het web",
-      "commitPlan": "Commit",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "Je laatste Commit-periode eindigt op {{date}}. Ga verder als Standard voor {{price}}, of de hosting stopt.",
       "freeTrial": "Gratis proefperiode",
@@ -406,9 +459,9 @@
       "trialDaysRemaining": "Proefperiode: {{remaining}} resterend",
       "trialEndingSoon": "Proefperiode eindigt binnenkort: {{remaining}}",
       "planName": {
-        "commit": "Commit",
         "standard": "Standard"
-      }
+      },
+      "commit": "Commit"
     },
     "changelog": {
       "title": "Wat is er nieuw",
@@ -431,7 +484,6 @@
       "destroyMessage": "Dit vernietigt je KiloClaw-instantie en al zijn gegevens permanent. Deze actie kan niet ongedaan worden gemaakt.",
       "destroyTitle": "Instantie vernietigen",
       "instance": "Instantie",
-      "renameFailed": "Er is iets misgegaan",
       "couldNotCheckStatus": "Servicestatus kon niet worden gecontroleerd",
       "dangerZone": "GEVARENZONE",
       "destroying": "Vernietigen…",
@@ -459,7 +511,6 @@
       "approveDeviceTitle": "Apparaat goedkeuren",
       "approveMessage": "{{label}} (code: {{code}}) toestaan om verbinding te maken met je instantie?",
       "approveTitle": "Koppelingsverzoek goedkeuren",
-      "device": "Apparaat",
       "unknownDevice": "Onbekend apparaat"
     },
     "execPolicy": {
@@ -474,35 +525,21 @@
       "title": "Google-account",
       "couldNotLoad": "Kon Google-accountstatus niet laden",
       "disconnected": "Google-account losgekoppeld. Implementeer je instantie opnieuw om de wijziging toe te passen.",
-      "redeploy": "Opnieuw implementeren",
       "setupCommand": "Installatieopdracht",
       "setupCommandHelp": "Voer deze opdracht uit in een terminal met Docker op je eigen computer om je Google-account te verbinden.",
       "failedToLoadCommand": "Kon installatieopdracht niet laden",
       "gmailNotifications": "Gmail-meldingen",
       "disconnect": "Google-account loskoppelen",
-      "connected": "Verbonden",
       "copied": "Gekopieerd!",
       "copyCommand": "Opdracht kopiëren",
-      "disabled": "Uitgeschakeld",
       "disconnectConfirm": "Loskoppelen",
       "disconnectMessage": "Je Google-account van deze instantie verwijderen? Dit schakelt Gmail-meldingen uit. Implementeer opnieuw na het loskoppelen om wijzigingen toe te passen.",
-      "disconnectTitle": "Google loskoppelen",
-      "enabled": "Ingeschakeld",
-      "notConnected": "Niet verbonden"
+      "disconnectTitle": "Google loskoppelen"
     },
     "modelList": {
-      "title": "Alle modellen",
-      "searchPlaceholder": "Modellen zoeken...",
-      "couldNotLoad": "Kon modellen niet laden",
-      "clearSearch": "Zoekopdracht wissen",
       "noMatches": "Geen modellen komen overeen met je zoekopdracht",
-      "noModels": "Geen modellen beschikbaar",
       "noModelsDescription": "Modellen verschijnen hier zodra ze beschikbaar zijn.",
-      "noResultsFor": "Geen resultaten voor \"{{query}}\"",
-      "recommended": "Aanbevolen"
-    },
-    "model": {
-      "title": "Model"
+      "noResultsFor": "Geen resultaten voor \"{{query}}\""
     },
     "secrets": {
       "title": "Geheimen",
@@ -513,11 +550,7 @@
       "removeTitle": "Geheim verwijderen",
       "saved": "{{label}} opgeslagen",
       "allFieldsRequired": "Alle velden zijn vereist om {{label}} te verbinden.",
-      "connect": "Verbinden",
-      "connected": "Verbonden",
       "hide": "{{label}} verbergen",
-      "notConnected": "Niet verbonden",
-      "remove": "Verwijderen",
       "removing": "Verwijderen…",
       "saving": "Opslaan…",
       "setupGuide": "Installatiehandleiding",
@@ -558,22 +591,16 @@
       "iosTitle": "KiloClaw niet beschikbaar in iOS",
       "multipleCurrentConflictBody": "We hebben meer dan één actief abonnement op je account gevonden. We hebben alles gepauzeerd om dubbele facturering te voorkomen.",
       "multipleCurrentConflictCta": "Doorgaan op kilo.ai",
-      "multipleCurrentConflictTitle": "Account moet worden beoordeeld",
       "nonCanonicalEarlybirdBody": "Je early-access-abonnement moet handmatig worden beoordeeld voordat het op mobiel kan worden gebruikt.",
-      "nonCanonicalEarlybirdCta": "Doorgaan op kilo.ai",
       "nonCanonicalEarlybirdTitle": "Verouderd abonnement gedetecteerd",
       "quarantinedBody": "Je KiloClaw-instantie staat in quarantaine en kan nu niet worden gebruikt. Ons team moet helpen deze te herstellen.",
-      "quarantinedCta": "Doorgaan op kilo.ai",
       "quarantinedTitle": "Instantie moet worden hersteld",
       "subscriptionCanceledBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te gebruiken. Je kunt je niet in de app abonneren.",
       "subscriptionCanceledCta": "kilo.ai/claw openen",
       "subscriptionCanceledTitle": "Abonneren op het web",
       "subscriptionPastDueBody": "Er was een probleem met je meest recente betaling. Ga vanuit je browser naar kilo.ai/claw om deze bij te werken. Je kunt facturering niet in de app beheren.",
-      "subscriptionPastDueCta": "kilo.ai/claw openen",
       "subscriptionPastDueTitle": "Betaling bijwerken op het web",
-      "trialExpiredBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te blijven gebruiken. Je kunt je niet in de app abonneren.",
-      "trialExpiredCta": "kilo.ai/claw openen",
-      "trialExpiredTitle": "Abonneren op het web"
+      "trialExpiredBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te blijven gebruiken. Je kunt je niet in de app abonneren."
     },
     "controls": {
       "redeploying": "Opnieuw implementeren…",
@@ -584,7 +611,6 @@
       "start": "Starten",
       "startMessage": "Weet je zeker dat je deze instantie wilt starten?",
       "startTitle": "Instantie starten",
-      "starting": "Starten…",
       "stop": "Stoppen",
       "stopMessage": "Weet je zeker dat je deze instantie wilt stoppen?",
       "stopTitle": "Instantie stoppen",
@@ -594,7 +620,6 @@
       "finishingSetup": "Installatie afronden",
       "finishingSetupDescription": "Even geduld, we ronden je account af. Dit duurt meestal even.",
       "getStarted": "Aan de slag",
-      "noInstances": "Geen KiloClaw-instanties",
       "noInstancesDescription": "Maak je eerste instantie om codeeragents te gaan draaien."
     },
     "instance": {
@@ -606,7 +631,6 @@
     "instanceCard": {
       "fixOnKiloAi": "Oplossen op kilo.ai: {{label}}",
       "needsAttention": "{{name}} heeft aandacht nodig: {{label}}",
-      "open": "{{name}} openen",
       "openSettings": "Instellingen openen voor {{name}}",
       "openUnread": "{{name}} openen, {{displayCount}} ongelezen berichten",
       "openUnread_other": "{{name}} openen, {{displayCount}} ongelezen berichten",
@@ -615,7 +639,6 @@
     "list": {
       "createInstance": "Instantie maken",
       "organizations": "Organisaties",
-      "personal": "Persoonlijk",
       "accessIssue": {
         "trialExpired": "Proefperiode beëindigd, abonneer je om dit exemplaar te blijven gebruiken",
         "subscriptionCanceled": "Abonnement inactief, abonneer je opnieuw om dit exemplaar te blijven gebruiken",
@@ -628,25 +651,20 @@
     "modelPicker": {
       "autoModelA11y": "{{label}} automatisch model",
       "balancedDescription": "Slimme balans tussen snelheid en capaciteit tegen lagere kosten.",
-      "balancedLabel": "Gebalanceerd",
       "browseAllModels": "of kies uit 500+ modellen",
       "browseAllModelsA11y": "Alle 500+ modellen bekijken",
-      "cost": "Kosten",
       "currentModel": "Huidig model",
       "frontierDescription": "Hoogste prestaties. Routeert naar frontier-modellen met redeneren.",
       "frontierLabel": "Frontier",
-      "kiloAuto": "Kilo Auto",
-      "performance": "Prestaties"
+      "kiloAuto": "Kilo Auto"
     },
     "onboarding": {
       "complete": {
         "chatWith": "Chatten met {{name}}",
-        "online": "Online",
         "ready": "{{name}} is klaar",
         "warmedUp": "Helemaal opgewarmd. Zeg hallo wanneer je er klaar voor bent."
       },
       "flow": {
-        "close": "Sluiten",
         "couldNotLoad": "Onboardingstatus kon niet worden geladen",
         "finishingSetup": "Installatie afronden — even geduld terwijl we je account afronden.",
         "genericErrorBody": "We konden je instantie zojuist niet volledig instellen.",
@@ -657,13 +675,11 @@
         "provisioning": "Inrichten",
         "ready": "Klaar",
         "review": "Review",
-        "settingUp": "Instellen…",
-        "somethingWentWrong": "Er is iets misgegaan"
+        "settingUp": "Instellen…"
       },
       "identity": {
         "changePersonality": "Persoonlijkheid wijzigen",
         "chooseAvatar": "Avatar kiezen",
-        "continue": "Doorgaan",
         "location": "Locatie",
         "locationDeniedMessage": "Schakel locatietoegang in Instellingen in om je huidige locatie te gebruiken.",
         "locationDeniedTitle": "Locatietoegang geweigerd",
@@ -699,7 +715,6 @@
         "backgroundHint": "Duurt meestal minder dan een minuut. Je kunt dit sluiten — we werken op de achtergrond verder.",
         "connectingToAgent": "Verbinden met de agent",
         "continueInBackground": "Op de achtergrond doorgaan",
-        "finishingSetup": "Installatie afronden",
         "queryErrorBody": "We zijn de verbinding verloren tijdens het controleren van de installatie van {{name}}. Deze draait mogelijk nog. Probeer het opnieuw of kijk binnenkort nog eens.",
         "queryErrorTitle": "Installatie kon niet worden gecontroleerd",
         "settingUp": "{{name}} instellen",
@@ -720,7 +735,6 @@
       "gatewayProcess": "GATEWAYPROCES",
       "lastExit": "Laatste afsluiting",
       "memory": "Geheugen",
-      "model": "Model",
       "region": "Regio",
       "resources": "BRONNEN",
       "restarts": "Herstarts",
@@ -740,19 +754,12 @@
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "Kanalen",
       "devicePairingDescription": "Apparaatverzoeken goedkeuren",
-      "devicePairingLabel": "Apparaatkoppeling",
       "execPolicyDescription": "Beveiligingsinstellingen",
-      "execPolicyLabel": "Uitvoeringsbeleid",
       "googleDescription": "Gmail, Agenda, Documenten",
-      "googleLabel": "Google-account",
       "modelDescription": "AI-modelselectie",
-      "modelLabel": "Model",
       "secretsDescription": "Versleutelde inloggegevens",
-      "secretsLabel": "Geheimen",
-      "versionPinDescription": "Pinnen op een specifieke versie",
-      "versionPinLabel": "Versiepinning"
+      "versionPinDescription": "Pinnen op een specifieke versie"
     },
     "avatar": {
       "arcade": "Arcade",
@@ -797,21 +804,15 @@
       "placeholder": "bijv. Handhaaf onze foutafhandelingsconventies…"
     },
     "repos": {
-      "title": "Repositories",
-      "couldNotLoad": "Kon repositories niet laden",
       "unavailable": "Repositories niet beschikbaar — voltooi de Bitbucket-installatie op kilo.ai.",
       "finishSetup": "Installatie voltooien",
       "manageAccess": "Toegang beheren",
-      "allRepositories": "Alle repositories",
       "bitbucketNoRepositoriesDescription": "Er zijn geen repositories beschikbaar in deze Bitbucket-werkruimte.",
-      "bitbucketSetup": "Bitbucket-instellingen",
-      "couldNotOpenGithubSettings": "Kon de instellingen van de GitHub-app niet openen",
       "gitlabNoRepositoriesDescription": "Je moet mogelijk toegang verlenen tot meer groepen of projecten op GitLab.",
       "installGithubApp": "Installeer de GitHub-app op repositories",
       "installGithubAppDescription": "Geef de Kilo GitHub-app toegang tot de repositories die je wilt laten beoordelen.",
       "noRepositoriesFound": "Geen repositories gevonden",
-      "repositoryAccess": "repositorytoegang",
-      "selectedRepositories": "Geselecteerde repositories"
+      "repositoryAccess": "repositorytoegang"
     },
     "style": {
       "title": "Beoordelingsstijl",
@@ -827,17 +828,13 @@
       "setup": "Bitbucket-instellingen"
     },
     "bitbucketConnect": {
-      "connect": "Verbinden",
-      "connected": "Bitbucket verbonden",
       "description": "Maak een Workspace Access Token met de vereiste scopes en plak deze hieronder.",
       "scopes": "Account: lezen · Repositories: lezen/schrijven · Pull-aanvragen: lezen · Webhooks: lezen/schrijven",
-      "title": "Bitbucket verbinden",
       "tokenPlaceholder": "Workspace access token"
     },
     "followReviewMd": "REVIEW.md volgen",
     "followReviewMdSubtitle": "Volg de REVIEW.md-instructiebestanden per repository",
     "manualReview": {
-      "connectGitHub": "GitHub verbinden",
       "connectProvider": "Een provider verbinden",
       "connectProviderDescription": "Verbind GitHub om een handmatige review van een pull-aanvraag te starten.",
       "couldNotCheckProviderStatus": "Kon de providerstatus niet controleren",
@@ -845,9 +842,6 @@
       "instructions": "Instructies (optioneel)",
       "instructionsPlaceholder": "Iets specifieks waar de reviewer zich op moet richten…",
       "invalidUrl": "Voer een geldige pull-aanvraag-URL in",
-      "model": "Model",
-      "notConnected": "Niet verbonden",
-      "platform": "Platform",
       "pullRequestUrl": "Pull-aanvraag-URL",
       "start": "Review starten",
       "starting": "Review starten…",
@@ -857,15 +851,10 @@
     "platformList": {
       "activity": "Activiteit",
       "checking": "Controleren…",
-      "connected": "Verbonden",
-      "notConnected": "Niet verbonden",
-      "organization": "Organisatie",
       "platforms": "Platforms",
       "statusUnavailable": "Status niet beschikbaar"
     },
     "providerConnect": {
-      "connectGitHub": "GitHub verbinden",
-      "connectGitLab": "GitLab verbinden",
       "description": "Verbind de Kilo {{label}} om pull-aanvragen automatisch te beoordelen.",
       "githubApp": "GitHub-app",
       "githubError": "Kon de GitHub-installatie niet openen. Probeer het opnieuw.",
@@ -873,42 +862,30 @@
       "gitlabError": "Kon de GitLab-installatie niet openen. Probeer het opnieuw.",
       "bitbucketError": "Kon de Bitbucket-instellingen niet openen. Probeer het opnieuw."
     },
-    "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
     "reviewDetail": {
-      "branch": "Branch",
       "byline": "{{repo}} #{{number}} door {{author}}",
       "cancelMessage": "Dit stopt de lopende codereview.",
       "cancelReview": "Review annuleren",
       "cancelTitle": "Review annuleren?",
       "checkRun": "Checkrun",
-      "completed": "Voltooid",
-      "cost": "Kosten",
       "couldNotGetLatest": "Kon de nieuwste niet ophalen.",
       "couldNotLoad": "Kon review niet laden",
       "council": "Council",
       "created": "Aangemaakt",
       "decision": "Beslissing",
-      "details": "Details",
-      "findings": "Bevindingen",
       "gate": "Poort",
       "gateHidden": "Verborgen",
       "gateNone": "Geen",
-      "keepRunning": "Blijven draaien",
-      "model": "Model",
       "noFindings": "Geen bevindingen",
-      "openPullRequest": "Pull-aanvraag openen",
-      "platform": "Platform",
       "retryMessage": "Dit voert de codereview opnieuw uit.",
       "retryReview": "Review opnieuw proberen",
       "retryTitle": "Review opnieuw proberen?",
       "showMore": "Meer tonen",
       "started": "Gestart",
-      "status": "Status",
       "threshold": "Drempel",
       "title": "Review",
       "tokens": "Tokens",
       "tokensInOut": "{{input}} in / {{output}} uit",
-      "pullRequest": "pull-aanvraag",
       "transcriptWaiting": "Wachten op het reviewtranscript.",
       "transcriptEmpty": "Geen transcript voor deze review.",
       "transcriptRetry": "Het reviewtranscript kon niet worden geladen.",
@@ -923,8 +900,7 @@
       "sessionError": "Sessiefout: {{error}}",
       "statusWithValue": "Status: {{status}}",
       "toolName": "Tool: {{name}}",
-      "toolNameError": "Tool: {{name}} — fout",
-      "unknownError": "Onbekende fout"
+      "toolNameError": "Tool: {{name}} — fout"
     },
     "reviewList": {
       "configureProvider": "Provider configureren",
@@ -936,7 +912,6 @@
     },
     "reviewMemory": {
       "couldNotLoad": "Kon reviewgeheugen niet laden",
-      "couldNotLoadMore": "Kon niet meer laden",
       "couldNotLoadProposals": "Kon voorstellen niet laden",
       "enable": "Reviewgeheugen inschakelen",
       "loading": "Reviewgeheugen laden",
@@ -946,19 +921,13 @@
       "off": "Reviewgeheugen staat uit",
       "offDescription": "Zet het aan zodat Kilo leert van antwoorden van maintainers en REVIEW.md-richtlijnen voorstelt.",
       "readOnlyDescription": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen reviewgeheugen inschakelen.",
-      "retryLoadingMore": "Opnieuw meer laden",
       "title": "Reviewgeheugen"
     },
     "scopeList": {
-      "couldNotLoad": "Kon organisaties niet laden",
-      "personal": "Persoonlijk",
       "personalStillAvailable": "Persoonlijke repositories zijn hieronder nog steeds beschikbaar.",
-      "personalSubtitle": "Je eigen repositories",
       "viewOnly": "Alleen bekijken"
     },
-    "selectRepositories": "Repositories selecteren",
     "selectRepository": "Selecteer minimaal één repository om automatische reviews in te schakelen.",
-    "title": "Code Reviewer",
     "webhookSetup": "Webhook-installatie niet voltooid",
     "webhookSetupDescription": "Sommige repositories ontvangen mogelijk geen automatische reviews.",
     "decision": {
@@ -967,83 +936,62 @@
       "noResult": "Geen resultaat",
       "pass": "Geslaagd"
     },
-    "eyebrow": "Code Reviewer",
     "overview": {
       "allAreas": "Alle gebieden",
-      "allRepositories": "Alle repositories",
       "customInstructions": "Aangepaste instructies",
       "focusAreas": "Focusgebieden",
-      "mergeGate": "Merge-poort",
-      "model": "Model",
       "nSelected": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",
-      "repositories": "Repositories",
-      "reviewMemory": "Reviewgeheugen",
       "reviewStyle": "Beoordelingsstijl",
       "set": "Ingesteld"
     },
     "updateFailed": "Reviewer bijwerken mislukt",
     "configSaveFailed": "Reviewconfig opslaan mislukt",
     "status": {
-      "pending": "In behandeling",
-      "queued": "In wachtrij",
       "running": "Bezig",
       "completed": "Voltooid",
-      "failed": "Mislukt",
-      "cancelled": "Geannuleerd",
       "interrupted": "Onderbroken"
     },
     "reviewStyle": {
       "strict": "Strict",
-      "balanced": "Gebalanceerd",
       "lenient": "Soepel",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "Beveiliging",
-      "performance": "Prestaties",
       "bugs": "Bugs",
       "style": "Stijl",
       "testing": "Testen",
       "documentation": "Documentatie"
     },
     "gateThreshold": {
-      "off": "Uit",
-      "all": "Alles",
-      "warning": "Waarschuwing",
-      "critical": "Kritiek"
+      "warning": "Waarschuwing"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "Code Reviewer heeft aandacht nodig",
         "description": "Code Reviewer is uitgeschakeld omdat Kilo geen toegang tot deze repository heeft met een actieve GitHub App-installatie. Werk de GitHub App-installatie bij en schakel Code Reviewer vervolgens weer in.",
         "recoveryLabel": "GitHub App bijwerken"
       },
       "githubIpAllowList": {
-        "title": "Code Reviewer heeft aandacht nodig",
-        "description": "Code Reviewer is uitgeschakeld omdat deze GitHub-organisatie een IP-toegangslijst gebruikt die Kilo blokkeert. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in.",
-        "recoveryLabel": "Contact opnemen met ondersteuning"
+        "description": "Code Reviewer is uitgeschakeld omdat deze GitHub-organisatie een IP-toegangslijst gebruikt die Kilo blokkeert. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in."
       },
       "gitlabProjectAccessRequired": {
-        "title": "Code Reviewer heeft aandacht nodig",
         "description": "Code Reviewer is uitgeschakeld omdat Kilo geen GitLab Project Access Token voor dit project kan aanmaken. Verleen Maintainer-toegang of schakel Project Access Tokens in en schakel Code Reviewer vervolgens weer in.",
         "recoveryLabel": "GitLab-integratie bijwerken"
       },
       "byokInvalidKey": {
-        "title": "Code Reviewer heeft aandacht nodig",
         "description": "Code Reviewer is uitgeschakeld omdat de geselecteerde BYOK API-sleutel ongeldig is, is ingetrokken of onvoldoende rechten heeft. Werk de sleutel bij of kies een ander model en schakel Code Reviewer vervolgens weer in.",
         "recoveryLabel": "BYOK-instellingen bijwerken"
       },
       "selectedModelUnavailable": {
-        "title": "Code Reviewer heeft aandacht nodig",
         "description": "Code Reviewer is uitgeschakeld omdat het geselecteerde model niet beschikbaar is voor cloudagentsessies. Kies een beschikbaar model en schakel Code Reviewer vervolgens weer in.",
         "recoveryLabel": "Code Reviewer-instellingen bijwerken"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "Code Reviewer heeft aandacht nodig",
-        "description": "Code Reviewer is uitgeschakeld na drie time-outs bij het klonen van de repository vandaag. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in.",
-        "recoveryLabel": "Contact opnemen met ondersteuning"
-      }
+        "description": "Code Reviewer is uitgeschakeld na drie time-outs bij het klonen van de repository vandaag. Neem contact op met hi@kilocode.ai voor hulp en schakel Code Reviewer vervolgens weer in."
+      },
+      "title": "Code Reviewer heeft aandacht nodig",
+      "recoveryLabel": "Contact opnemen met ondersteuning"
     },
     "unknownError": "Onbekende fout"
   },
@@ -1052,24 +1000,12 @@
       "noFilters": "Geen filters beschikbaar",
       "noFiltersDescription": "Ga terug en open filters opnieuw vanuit de bevindingenlijst.",
       "title": "Bevindingen filteren",
-      "all": "Alle",
-      "allRepositories": "Alle repositories",
       "fixed": "Opgelost",
       "outcome": "Uitkomst",
-      "outcomeAnalyzing": "Analyseren",
-      "outcomeDismissed": "Afgewezen",
-      "outcomeExploitable": "Exploiteerbaar",
-      "outcomeFailed": "Analyse mislukt",
-      "outcomeNeedsReview": "Beoordeling nodig",
-      "outcomeNotAnalyzed": "Niet geanalyseerd",
-      "outcomeNotExploitable": "Niet exploiteerbaar",
-      "outcomeSafeToDismiss": "Veilig om af te wijzen",
       "outcomeTriageComplete": "Triage voltooid",
       "overdueOnly": "Alleen achterstallig",
-      "repository": "Repository",
       "reset": "Herstellen",
       "severity": "Ernst",
-      "severityCritical": "Kritiek",
       "severityHigh": "Hoog",
       "severityLow": "Laag",
       "severityMedium": "Gemiddeld",
@@ -1078,8 +1014,6 @@
       "sortSeverityAsc": "Ernst: laag naar hoog",
       "sortSeverityDesc": "Ernst: hoog naar laag",
       "sortSlaDue": "SLA-vervaldatum",
-      "status": "Status",
-      "statusClosed": "Gesloten",
       "statusIgnored": "Genegeerd",
       "statusOpen": "Open"
     },
@@ -1093,7 +1027,6 @@
       "exploitable": "Exploiteerbaar",
       "fullReport": "Volledig gegenereerd rapport",
       "keepWaiting": "Blijven wachten",
-      "model": "Model",
       "no": "Nee",
       "noAnalysisYet": "Nog geen analyse",
       "noAnalysisYetDescription": "Voer er een uit vanaf het tabblad Details",
@@ -1106,7 +1039,6 @@
       "suggestedFix": "Voorgestelde oplossing",
       "triageConfidence": "Triage-zekerheid",
       "triageReasoning": "Triage-redenering",
-      "unknown": "Onbekend",
       "watchInCloudAgent": "Bekijken in Cloud Agent",
       "whereFound": "Waar dit is gevonden ({{displayCount}})",
       "yes": "Ja"
@@ -1114,21 +1046,14 @@
     "analysisSettings": {
       "analysisModel": "Analysemodel",
       "couldNotLoad": "Analyse-instellingen konden niet worden geladen",
-      "couldNotLoadModels": "Kon modellen niet laden",
       "depth": "Analysediepte",
-      "modeAuto": "Auto",
-      "modeDeep": "Diep",
-      "modeShallow": "Ondiep",
-      "permissionNote": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
       "remediationModel": "Herstelmodel",
       "title": "Modellen en analyse",
       "triageModel": "Triagemodel"
     },
     "auditReport": {
-      "checkConnection": "Controleer je verbinding en probeer het opnieuw.",
       "couldNotLoad": "Auditrapport kon niet worden geladen",
       "events": "Gebeurtenissen",
-      "findings": "Bevindingen",
       "generated": "Gegenereerd {{generatedAt}}",
       "noActivity": "Geen vastgelegde activiteit",
       "noActivityDescription": "Kilo heeft geen te rapporteren Security Finding-activiteit van {{start}} tot {{end}}.",
@@ -1165,7 +1090,6 @@
       "includeExistingFindingsAnalysisSubtitle": "Ook eerder gesynchroniseerde bevindingen analyseren. Dit kan extra credits kosten.",
       "includeExistingFindingsRemediationSubtitle": "Ook al geanalyseerde, in aanmerking komende bevindingen in de wachtrij zetten. Dubbele PR's blijven onderdrukt.",
       "minimumSeverity": "Minimale ernst",
-      "permissionNote": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
       "queued": "{{displayCount}} bestaande bevindingen in de wachtrij voor analyse.",
       "queued_other": "{{displayCount}} bestaande bevindingen in de wachtrij voor analyse.",
       "queued_one": "{{displayCount}} bestaande bevinding in de wachtrij voor analyse.",
@@ -1176,9 +1100,6 @@
       "severityHighAndAbove": "Hoog en hoger",
       "severityMediumAndAbove": "Gemiddeld en hoger",
       "title": "Automatisering"
-    },
-    "commandRetry": {
-      "discard": "Weggooien"
     },
     "dashboard": {
       "actFirst": "Eerst handelen",
@@ -1191,7 +1112,6 @@
       "daysOverdue": "{{displayCount}} dagen achterstallig",
       "deadlineToday": "Deadline vandaag bereikt",
       "filterByRepository": "Filteren op repository",
-      "findings": "Bevindingen",
       "findingsCount": "{{displayCount}} bevindingen",
       "highOverdue": "Hoog achterstallig",
       "lastSynced": "Laatst gesynchroniseerd {{time}}",
@@ -1220,15 +1140,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "Open bevindingen",
-      "openFindingsDetail": "{{critical}} kritiek, {{high}} hoog",
-      "confirmedExploitable": "Bevestigd exploiteerbaar",
       "confirmedExploitableDetail": "Projectrisico bevestigd door analyse",
-      "needsReview": "Heeft jouw beoordeling nodig",
       "needsReviewDetail": "Menselijke beslissing vereist",
-      "analysisIncomplete": "Analyse niet voltooid",
       "analysisIncompleteDetail": "Projectrisico nog onbekend",
       "slaCompliance": "SLA-naleving",
-      "notMeasured": "Niet gemeten",
       "withinDeadlineDetail": "{{within}} van {{total}} binnen de deadline",
       "noDeadlineData": "Nog geen bevindingen met een SLA-deadline",
       "deadlinePassed": "Deadline verstreken",
@@ -1256,31 +1171,22 @@
       "reasonNoBandwidth": "Er is geen capaciteit beschikbaar",
       "reasonNotUsed": "Kwetsbare code wordt niet gebruikt",
       "reasonTolerableRisk": "Het risico is aanvaardbaar",
-      "submit": "Bevinding afwijzen",
       "title": "Bevinding afwijzen"
     },
     "findingDetail": {
-      "couldNotLoad": "Deze bevinding kon niet worden geladen",
-      "dismissA11y": "Bevinding afwijzen",
-      "notFound": "Bevinding niet gevonden",
-      "notFoundDescription": "Deze bevinding is mogelijk verwijderd, of je hebt er geen toegang meer toe.",
       "tabAnalysis": "Analyse",
-      "tabDetails": "Details",
       "tabRemediation": "Herstel",
       "title": "Bevinding"
     },
     "findingDetails": {
       "cve": "CVE",
       "detected": "Gedetecteerd",
-      "dismissed": "Afgewezen",
       "dismissedBecause": "Afgewezen vanwege {{reason}}.",
-      "fixed": "Opgelost",
       "ghsa": "GHSA",
       "manifest": "Manifest",
       "noPatchAvailable": "Geen patch beschikbaar",
       "package": "Pakket",
       "patchedVersion": "Gepatchte versie",
-      "repository": "Repository",
       "severityLabel": "{{severity}} ernst",
       "slaDeadline": "SLA-deadline",
       "source": "Bron",
@@ -1288,12 +1194,8 @@
       "sourceRecord": "Bronrecord",
       "supersededBy": "Vervangen door een actuele bevinding",
       "supersededByDescription": "Tik om het actuele record te openen voor status, analyse en herstel.",
-      "unknown": "Onbekend",
-      "updated": "Bijgewerkt",
       "viewAdvisory": "Advies bekijken op GitHub",
       "vulnerableVersions": "Kwetsbare versies",
-      "statusSuperseded": "Vervangen",
-      "statusFixed": "Opgelost",
       "statusOpen": "Open",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "er is al een oplossing gestart",
@@ -1304,26 +1206,22 @@
       "reasonAfterReview": "na beoordeling"
     },
     "findingList": {
-      "clearFilters": "Filters wissen",
       "couldNotLoad": "Bevindingen konden niet worden geladen",
       "couldNotLoadMore": "Meer bevindingen konden niet worden geladen",
       "emptyDescription": "Geen open bevindingen hebben nu aandacht nodig.",
       "emptyTitle": "Geen open bevindingen",
       "noMatchesDescription": "Probeer de geselecteerde filters aan te passen of te wissen.",
-      "noMatchesTitle": "Geen bevindingen komen overeen met de filters",
-      "title": "Bevindingen"
+      "noMatchesTitle": "Geen bevindingen komen overeen met de filters"
     },
     "findingRow": {
       "a11y": "{{severity}} bevinding: {{title}}. {{repo}}. {{analysis}}",
       "a11yWithDeadline": "{{severity}} bevinding: {{title}}. {{repo}}. {{analysis}}. {{deadline}}",
       "analyze": "Analyseren",
-      "nextNeedsManualReview": "Handmatige beoordeling nodig",
       "nextRemediationAvailable": "Herstel beschikbaar",
       "nextRemediationInProgress": "Herstel bezig",
       "nextRemediationPrOpen": "Herstel-PR open",
       "nextRetryRemediation": "Herstel opnieuw proberen beschikbaar",
       "nextViewDetails": "Details bekijken",
-      "retryAnalysis": "Analyse opnieuw proberen",
       "runAnalysis": "Analyse uitvoeren",
       "viewPr": "PR bekijken"
     },
@@ -1334,44 +1232,32 @@
       "newFindingSection": "Melding over nieuwe bevindingen",
       "newFindingSeverityLabel": "Minimale ernst voor nieuwe bevindingen",
       "newFindingSubtitle": "Verzonden wanneer een nieuwe bevinding wordt gesynchroniseerd, ook bij de eerste synchronisatie.",
-      "readOnly": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
       "slaLeadTimeAccessibility": "Voorlooptijd SLA-waarschuwing in dagen",
       "slaLeadTimeError": "Voer een geheel aantal dagen in tussen 1 en 365.",
-      "slaLeadTimeHint": "Voer een geheel getal in tussen 1 en 365",
       "slaLeadTimeLabel": "Voorlooptijd SLA-waarschuwing (dagen)",
       "slaPersonalTitle": "E-mail mij over SLA-waarschuwingen",
       "slaSection": "SLA-waarschuwingsmelding",
       "slaSeverityLabel": "Minimale ernst voor SLA-meldingen",
-      "slaSubtitle": "Verzonden vóór en wanneer bevindingen hun SLA-deadline naderen of overschrijden.",
-      "title": "Meldingen"
+      "slaSubtitle": "Verzonden vóór en wanneer bevindingen hun SLA-deadline naderen of overschrijden."
     },
     "remediation": {
       "attemptHistory": "Pogingsgeschiedenis ({{displayCount}})",
       "attemptNumber": "Poging #{{number}}",
-      "branch": "Branch",
       "cancelMessage": "Security Agent stopt de lopende herstelpoging.",
       "cancelRemediation": "Herstel annuleren",
       "cancelTitle": "Dit herstel annuleren?",
       "cancellationRequested": "Annulering aangevraagd",
       "cancelled": "Herstel geannuleerd",
       "couldNotLoad": "Herstelstatus kon niet worden geladen",
-      "keepRunning": "Blijven draaien",
-      "model": "Model",
-      "noAnalysisDescription": "Voer er een uit vanaf het tabblad Details",
-      "noAnalysisTitle": "Nog geen analyse",
       "openDraftPullRequest": "Concept-pull-aanvraag openen{{number}}",
       "openPullRequest": "Pull-aanvraag openen{{number}}",
       "progress": "Voortgang",
-      "pullRequest": "pull-aanvraag",
       "retry": "Herstel opnieuw proberen",
       "start": "Herstel starten",
       "startedBy": "Gestart door",
       "timeline": {
         "blocked": "Herstel geblokkeerd",
-        "cancelled": "Geannuleerd",
         "failed": "Herstel mislukt",
-        "noChangesNeeded": "Geen wijzigingen nodig",
-        "prOpened": "PR geopend",
         "queued": "Herstel aangevraagd"
       },
       "queued": "Herstel in de wachtrij gezet",
@@ -1379,18 +1265,12 @@
       "unavailable": "Herstel is niet beschikbaar voor deze bevinding."
     },
     "repositories": {
-      "allRepositories": "Alle repositories",
       "couldNotLoad": "Repository-instellingen konden niet worden geladen",
-      "couldNotLoadRepositories": "Kon repositories niet laden",
-      "couldNotOpenGithubSettings": "Kon de instellingen van de GitHub-app niet openen",
       "githubAppSettings": "Instellingen van de GitHub-app",
       "manageAccess": "Toegang tot de GitHub-app beheren",
       "noRepositories": "Geen repositories",
       "noRepositoriesDescription": "Geef de Kilo GitHub-app toegang tot repositories",
-      "readOnly": "Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze instellingen wijzigen.",
-      "selectAtLeastOne": "Selecteer minimaal één repository.",
-      "selectedRepositories": "Geselecteerde repositories",
-      "title": "Repositories"
+      "selectAtLeastOne": "Selecteer minimaal één repository."
     },
     "scopeEntry": {
       "connectDescription": "Installeer de Kilo GitHub-app om Dependabot-waarschuwingen automatisch te synchroniseren en beveiligingsbevindingen in je repositories te beheren.",
@@ -1403,43 +1283,23 @@
       "reauthorizeTitle": "Extra machtigingen vereist",
       "setupFailed": "GitHub-installatie kon niet worden gestart. Probeer het opnieuw."
     },
-    "scopeList": {
-      "couldNotLoad": "Kon organisaties niet laden",
-      "personal": "Persoonlijk",
-      "personalSubtitle": "Je eigen repositories",
-      "title": "Security Agent"
-    },
     "settingsOverview": {
-      "allRepositories": "Alle repositories",
       "analysisModeSubtitle": "{{mode}} analyse",
-      "automation": "Automatisering",
       "automationAllOff": "Alles uit",
       "automationCount": "{{displayCount}} van 3 ingeschakeld",
       "couldNotLoadPermissions": "Rechten konden niet worden geladen",
-      "couldNotLoadRepositories": "Kon repositories niet laden",
       "couldNotLoadSettings": "Instellingen van Security Agent konden niet worden geladen",
-      "disabled": "Uitgeschakeld",
       "disabledNoManage": "Security Agent is uitgeschakeld. Alleen organisatie-eigenaren en factureringsbeheerders kunnen deze inschakelen.",
       "disabledNoRepo": "Selecteer minimaal één repository voordat je Security Agent inschakelt.",
       "disabledPrompt": "Schakel Security Agent in om Dependabot-waarschuwingen te synchroniseren, repositories te kiezen en automatisering te configureren.",
-      "enabled": "Ingeschakeld",
-      "modelsAndAnalysis": "Modellen en analyse",
-      "notifications": "Meldingen",
       "notificationsCount": "{{displayCount}} van 2 ingeschakeld",
-      "off": "Uit",
       "on": "Aan",
-      "repositories": "Repositories",
       "repositoriesCount": "{{displayCount}} repositories geselecteerd",
       "repositoriesCount_other": "{{displayCount}} repositories geselecteerd",
       "repositoriesCount_one": "{{displayCount}} repository geselecteerd",
-      "securityAgent": "Security Agent",
-      "selectRepositories": "Repositories selecteren",
-      "selectRepositoriesSubtitle": "Kies welke repositories Security Agent bewaakt",
-      "slaPolicy": "SLA-beleid",
-      "title": "Instellingen"
+      "selectRepositoriesSubtitle": "Kies welke repositories Security Agent bewaakt"
     },
     "settingsSave": {
-      "discard": "Weggooien",
       "keepEditing": "Blijven bewerken",
       "saveChanges": "Wijzigingen opslaan",
       "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
@@ -1450,7 +1310,6 @@
     },
     "sla": {
       "couldNotLoad": "SLA-instellingen konden niet worden geladen",
-      "critical": "Kritiek",
       "criticalDescription": "Exploitatie op afstand zonder authenticatie.",
       "deadlinesHeading": "Hersteldeadlines (dagen)",
       "enableTracking": "SLA-tracking inschakelen",
@@ -1467,7 +1326,6 @@
       "remediationDeadlineA11y": "{{label}} hersteldeadline in dagen",
       "title": "SLA-beleid"
     },
-    "title": "Security Agent",
     "initialSyncAdmissionFailed": "Security Agent is ingeschakeld, maar de eerste synchronisatie kon niet in de wachtrij worden gezet. Synchroniseer opnieuw.",
     "queuedActionUntracked": "Een actie in de wachtrij kon niet meer worden gevolgd. Vernieuw om de nieuwste status te zien.",
     "commands": {
@@ -1487,49 +1345,33 @@
     },
     "analysisState": {
       "queued": "Analyse in wachtrij",
-      "queuedTitle": "Analyse in wachtrij",
       "queuedDescription": "Wachten tot er analysecapaciteit beschikbaar is.",
       "analyzing": "Analyseren",
-      "analyzingTitle": "Analyseren",
       "analyzingDescription": "Controleren of applicatiecode het getroffen onderdeel kan bereiken.",
       "failed": "Analyse mislukt",
-      "failedTitle": "Analyse mislukt",
       "failedDescription": "Security Agent kon de analyse niet voltooien.",
-      "extractionFailed": "Beoordeling nodig",
-      "extractionFailedTitle": "Beoordeling nodig",
       "extractionFailedDescription": "Het technische rapport kon niet worden omgezet in een gestructureerd resultaat.",
-      "exploitable": "Exploiteerbaar",
-      "exploitableTitle": "Exploiteerbaar",
       "exploitableDescription": "Applicatiecode kan het getroffen onderdeel bereiken.",
       "notExploitable": "Onbereikbaar",
-      "notExploitableTitle": "Onbereikbaar",
       "notExploitableDescription": "In deze repository is geen bereikbaar pad gevonden.",
       "unknown": "Beoordeling nodig",
-      "unknownTitle": "Beoordeling nodig",
       "unknownDescription": "Analyse kon niet bevestigen of het kwetsbare onderdeel bereikbaar is.",
       "safeToDismiss": "Veilig om af te wijzen",
-      "safeToDismissTitle": "Veilig om af te wijzen",
       "safeToDismissDescription": "Triage bepaalde dat dit zonder codebase-analyse veilig kan worden afgewezen.",
-      "manualReview": "Beoordeling nodig",
       "manualReviewTitle": "Handmatige beoordeling nodig",
       "manualReviewDescription": "Triage markeerde deze bevinding voor handmatige beoordeling.",
       "analysisRequired": "Analyse vereist",
       "analysisRequiredTitle": "Codebase-analyse vereist",
       "analysisRequiredDescription": "Triage raadt aan de repository te analyseren voordat je een reactie kiest.",
-      "completed": "Geanalyseerd",
-      "completedTitle": "Geanalyseerd",
       "completedDescription": "Analyse voltooid zonder een specifieke uitkomst vast te leggen.",
       "notAnalyzed": "Niet geanalyseerd",
-      "notAnalyzedTitle": "Niet geanalyseerd",
       "notAnalyzedDescription": "Codebase-analyse is voor deze bevinding nog niet uitgevoerd."
     },
     "deadline": {
       "fixedBeforeDeadline": "Opgelost vóór deadline",
-      "fixed": "Opgelost",
       "fixedOn": "Opgelost op {{date}}",
       "resolutionRecorded": "Oplossing vastgelegd",
       "superseded": "Vervangen",
-      "dismissed": "Afgewezen",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "Deadline niet ingesteld",
       "noSlaDeadline": "Geen SLA-deadline",
@@ -1545,17 +1387,13 @@
       "dueInDays": "Vervalt over {{count}} dagen"
     },
     "remediationStatus": {
-      "cancellationRequested": "Annulering aangevraagd",
       "notStarted": "Niet gestart",
-      "queued": "In wachtrij",
       "starting": "Starten",
       "inProgress": "Bezig",
       "draftPrOpened": "Concept-PR geopend",
       "prOpened": "PR geopend",
       "blocked": "Geblokkeerd",
-      "failed": "Mislukt",
       "noChangesNeeded": "Geen wijzigingen nodig",
-      "cancelled": "Geannuleerd",
       "originAutomaticPolicy": "Automatisch beleid",
       "originIncludeExistingPolicy": "Bestaand beleid opnemen",
       "originManual": "Handmatig",
@@ -1567,7 +1405,6 @@
       "findingNotOpen": "De bevinding is niet meer open.",
       "repoNotInScope": "De repository is niet geselecteerd voor Security Agent.",
       "analysisRequired": "Voer codebase-analyse uit voordat je herstel start.",
-      "sandboxAnalysisRequired": "Voer codebase-analyse uit voordat je herstel start.",
       "staleAnalysis": "De bevinding is na de analyse gewijzigd. Voer de analyse opnieuw uit voordat je herstel start.",
       "notExploitable": "Analyse vond geen bereikbaar kwetsbaar pad. Automatisch herstel is niet beschikbaar.",
       "exploitabilityUnknown": "Analyse kon de exploiteerbaarheid niet bevestigen. Handmatige beoordeling is vereist vóór herstel met één klik.",
@@ -1583,12 +1420,10 @@
       "autoRemediationDisabled": "Automatisch herstel is uitgeschakeld. Handmatig herstel kan nog steeds starten als de veiligheidscontroles slagen.",
       "includeExistingDisabled": "Bestaande bevindingen zijn uitgesloten van automatisch herstel.",
       "belowThreshold": "De bevinding zit onder de automatische ernstdrempel. Handmatig herstel kan nog steeds starten als de veiligheidscontroles slagen.",
-      "beforeEnablement": "Analyse is voltooid voordat Automatisch herstel werd ingeschakeld. Handmatig herstel kan nog steeds starten als de veiligheidscontroles slagen.",
-      "generic": "Herstel is niet beschikbaar voor deze bevinding."
+      "beforeEnablement": "Analyse is voltooid voordat Automatisch herstel werd ingeschakeld. Handmatig herstel kan nog steeds starten als de veiligheidscontroles slagen."
     },
     "commandFailure": {
       "ownerCapReached": "Analysecapaciteit is vol. Wacht tot een actieve analyse is afgerond en probeer het opnieuw.",
-      "githubTokenUnavailable": "GitHub-autorisatie heeft aandacht nodig. Autoriseer de GitHub App opnieuw en probeer het opnieuw.",
       "githubAuthInvalid": "GitHub-autorisatie heeft aandacht nodig. Autoriseer de GitHub App opnieuw en probeer het opnieuw.",
       "findingUnavailable": "De bevinding is niet meer beschikbaar. Vernieuw de bevindingen en probeer het opnieuw als deze nog open is.",
       "repositoryUnavailable": "De repository is niet meer beschikbaar voor de GitHub App. Vernieuw de repositorytoegang en probeer het opnieuw.",
@@ -1608,12 +1443,9 @@
     "search": {
       "searching": "Zoeken",
       "searchSessions": "Sessies zoeken",
-      "searchSessionsPlaceholder": "Sessies zoeken...",
-      "clearSearch": "Zoekopdracht wissen",
-      "clearFilters": "Filters wissen"
+      "searchSessionsPlaceholder": "Sessies zoeken..."
     },
     "sessionList": {
-      "couldNotLoad": "Kon sessies niet laden",
       "couldNotLoadActive": "Kon actieve sessies niet laden",
       "noSessionsYetDescription": "Start een codeertaak vanaf je telefoon. Je sessies verschijnen hier.",
       "noMatches": "Geen sessies komen overeen",
@@ -1628,9 +1460,7 @@
     "sessionRow": {
       "deleteTitle": "Sessie verwijderen?",
       "deleteMessage": "Dit kan niet ongedaan worden gemaakt.",
-      "delete": "Verwijderen",
       "deleteSession": "Sessie verwijderen",
-      "rename": "Hernoemen",
       "renameMessage": "Voer een nieuwe naam in voor deze sessie",
       "copyId": "Sessie-ID kopiëren",
       "idCopied": "Sessie-ID gekopieerd",
@@ -1664,7 +1494,6 @@
       "didNotCompleteTitle": "Installatie niet voltooid",
       "didNotCompleteMessage": "De installatie van de GitHub App is niet voltooid. Probeer het opnieuw vanuit de app."
     },
-    "sessionExited": "Sessie beëindigd",
     "remoteSpawnRetryable": "De instantie is niet bereikbaar — deze is mogelijk verbroken.",
     "remoteSpawnNonRetryable": "De instantie kon de sessie niet starten — controleer de machine of werk de CLI bij.",
     "remoteSpawnInstanceDisconnected": "De geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie.",
@@ -1676,12 +1505,8 @@
       "title": "Sessie",
       "copyErrorDetails": "Foutdetails kopiëren",
       "backToSessions": "Terug naar sessies",
-      "accessDenied": "Toegang geweigerd",
-      "accessDeniedDescription": "Je hebt geen toestemming om dit te bekijken.",
       "couldNotLoad": "Sessie kon niet worden geladen",
       "failedToLoadDetails": "Sessiedetails konden niet worden geladen",
-      "notFound": "Niet gevonden",
-      "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar.",
       "failedToStopExecution": "Uitvoering stoppen mislukt",
       "renameSession": "Sessie hernoemen",
       "renamePlaceholder": "Sessienaam",
@@ -1692,7 +1517,6 @@
       "emptyTitle": "Nog geen berichten",
       "renameAccessibility": "Sessie hernoemen: {{title}}",
       "cloningSession": "Sessie klonen",
-      "continue": "Doorgaan",
       "couldNotLoadThisSession": "Deze sessie kon niet worden geladen",
       "cloneFailedRetry": "Deze sessie kon niet worden gekloond. Probeer het opnieuw.",
       "notEnoughCredits": "Niet genoeg credits om Cloud Agent te starten. Voeg credits toe en probeer opnieuw.",
@@ -1707,7 +1531,6 @@
     },
     "remoteSession": {
       "failedToCreate": "Externe sessie maken mislukt",
-      "exited": "Sessie beëindigd",
       "failedToExit": "Sessie afsluiten mislukt",
       "exitTitle": "Sessie afsluiten?",
       "exitMessage": "Dit stopt de lopende sessie maar behoudt de geschiedenis.",
@@ -1725,9 +1548,6 @@
       "retryConnection": "Opnieuw verbinden"
     },
     "newSession": {
-      "title": "Nieuwe sessie",
-      "repository": "Repository",
-      "connectGithub": "GitHub verbinden",
       "connectGithubDescription": "Verbind GitHub in je browser en kom dan hier terug om een repository te kiezen.",
       "openGithub": "GitHub openen",
       "refreshRepositories": "Repositories vernieuwen",
@@ -1744,7 +1564,6 @@
       "commitAndPush": "Committen en pushen",
       "startSession": "Sessie starten",
       "promptPlaceholder": "Waar wil je aan werken?",
-      "addAttachment": "Bijlage toevoegen",
       "couldNotLoadModels": "Kon modellen niet laden",
       "prefillRepoAndModelUnavailable": "De repository en het model van de oorspronkelijke sessie zijn niet meer beschikbaar. Kies ze hieronder.",
       "prefillRepoUnavailable": "{{repo}} is niet meer beschikbaar. Kies hieronder een repository.",
@@ -1752,16 +1571,11 @@
       "couldNotReadPendingSessions": "Kon openstaande sessies niet lezen. Probeer opnieuw.",
       "failedToCreate": "Sessie maken mislukt",
       "couldNotRefreshRepositories": "Kon repositories niet vernieuwen. Probeer het opnieuw.",
-      "discard": "Weggooien",
       "discardDraftMessage": "Je prompt gaat verloren.",
       "discardDraftTitle": "Concept weggooien?",
       "discardFailed": "Kon het concept niet weggooien. Probeer het opnieuw.",
-      "keepEditing": "Blijven bewerken",
       "remoteHint": "Voer `kilo remote` uit op je computer, of `/remote` in een actieve CLI-sessie, om een lokaal kilo-proces te besturen.",
-      "bitbucketConnected": "Bitbucket verbonden",
-      "connectBitbucket": "Bitbucket verbinden",
       "connectBitbucketDescription": "Verbind Bitbucket in uw browser en kom daarna hier terug om een repository te kiezen.",
-      "connectGitlab": "GitLab verbinden",
       "connectGitlabDescription": "Verbind GitLab in uw browser en kom daarna hier terug om een repository te kiezen.",
       "couldNotLoadBitbucketRepositories": "Kon de Bitbucket-repositories niet laden",
       "couldNotLoadGithubRepositories": "Kon de GitHub-repositories niet laden",
@@ -1783,18 +1597,10 @@
       "updatedFileCount": "{{displayCount}} bestanden bijgewerkt",
       "updatedFileCount_other": "{{displayCount}} bestanden bijgewerkt"
     },
-    "toolPatch": {
-      "operationAdded": "Toegevoegd",
-      "operationDeleted": "Verwijderd",
-      "operationUpdated": "Bijgewerkt"
-    },
     "toolCard": {
       "accessibility": "{{label}} tool, {{status}}",
       "accessibilityLabel": "{{name}} tool, {{status}}",
-      "fileEmpty": "Dit bestand is leeg.",
       "noTasks": "Geen taken.",
-      "contentTruncated": "Inhoud afgekapt",
-      "truncated": "Afgekapt",
       "toolRead": "lezen",
       "toolEdit": "bewerken",
       "toolWrite": "schrijven",
@@ -1826,9 +1632,7 @@
       "runOn": "Uitvoeren op",
       "runOnAccessibility": "Uitvoeren op: {{label}}",
       "couldNotLoad": "Kon instanties niet laden",
-      "couldNotLoadDescription": "Controleer je verbinding en probeer het opnieuw.",
       "cloudAgent": "Cloudagent",
-      "loading": "Laden…",
       "cloudAgentDescription": "Uitvoeren in Kilo's cloudsandbox",
       "noCliInstances": "Geen CLI-instanties verbonden",
       "noCliInstancesDescription": "Voer `kilo remote` uit in een project op je computer, of werk Kilo CLI bij als er al een draait.",
@@ -1865,12 +1669,9 @@
       "noMatches": "Geen overeenkomsten",
       "noRepositories": "Geen repositories beschikbaar",
       "noRepositoriesDescription": "Er zijn geen repositories verbonden met je account.",
-      "tryDifferentSearch": "Probeer een andere zoekterm.",
       "loading": "Laden...",
       "accessibility": "Repository: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "Berichtdetails",
@@ -1880,13 +1681,10 @@
       "reportAiResponse": "AI-antwoord rapporteren",
       "reportAiResponseConfirm": "Dit antwoord rapporteren voor beoordeling?",
       "report": "Rapporteren",
-      "role": "Rol",
       "roleUser": "Gebruiker",
       "roleAssistant": "Assistent",
       "sent": "Verzonden",
-      "model": "Model",
       "costAndTokens": "Kosten en tokens",
-      "cost": "Kosten",
       "input": "Invoer",
       "output": "Uitvoer",
       "reasoning": "Redeneren",
@@ -1894,8 +1692,7 @@
       "cacheWrite": "Cache geschreven",
       "total": "Totaal",
       "reportAiResponseFailedRetryable": "Deze reactie kon niet worden gerapporteerd.",
-      "reportAiResponseFailedTerminal": "Deze reactie kan niet worden gerapporteerd.",
-      "reportAiResponseSubmitted": "Melding verzonden. Ontvangstbewijs {{receiptId}}"
+      "reportAiResponseFailedTerminal": "Deze reactie kan niet worden gerapporteerd."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -1906,7 +1703,6 @@
       "textDisplay": "Tekstweergave",
       "thinking": "Denken",
       "thought": "Gedachte",
-      "title": "Details",
       "showDetails": "Details tonen",
       "pending": "In behandeling…",
       "running": "Bezig…"
@@ -1929,16 +1725,13 @@
     "filePart": {
       "loadingImage": "Afbeelding laden",
       "imageUnavailableRetry": "Afbeelding niet beschikbaar, opnieuw laden",
-      "imageUnavailable": "Afbeelding niet beschikbaar",
       "imagePreviewUnavailableInSession": "Afbeeldingsvoorbeeld niet beschikbaar in deze sessie.",
       "viewImage": "Afbeelding bekijken",
       "viewImageWithAlt": "Afbeelding bekijken {{alt}}",
       "imageOutput": "Afbeeldingsuitvoer",
       "imageOutputWithFilename": "Afbeeldingsuitvoer, {{filename}}",
-      "defaultName": "Bestand",
       "openFullScreen": "{{name}} op volledig scherm openen",
       "preview": "Voorbeeld {{name}}",
-      "openFile": "{{name}} openen",
       "couldNotLoadFile": "Kon dit bestand niet laden.",
       "couldNotLoadFileRetry": "Kon dit bestand niet laden. Probeer opnieuw.",
       "retryLoadingFile": "Bestand opnieuw laden",
@@ -2021,7 +1814,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. Opnieuw proberen beschikbaar.",
       "copyToComposer": "Naar composer kopiëren",
-      "queued": "In wachtrij",
       "queuedAccessibility": "Bericht in wachtrij",
       "userMessage": "Gebruikersbericht",
       "assistantMessage": "Assistentbericht",
@@ -2057,12 +1849,10 @@
     },
     "sessionFilter": {
       "title": "Sessies filteren",
-      "platform": "Platform",
       "platformCloud": "Cloud",
       "platformExtension": "Extensie",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "Overig",
       "project": "Project"
@@ -2076,15 +1866,10 @@
     },
     "modelPicker": {
       "title": "Model selecteren",
-      "searchPlaceholder": "Modellen zoeken...",
-      "allModels": "Alle modellen",
       "favorites": "Favorieten",
-      "noModels": "Geen modellen beschikbaar",
-      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren.",
-      "recommended": "Aanbevolen"
+      "noModelsDescription": "Er zijn geen modellen beschikbaar om te selecteren."
     },
     "modelSelector": {
-      "model": "Model",
       "provider": "Provider {{id}}",
       "modelId": "Model {{id}}",
       "unavailable": "Niet beschikbaar",
@@ -2108,7 +1893,6 @@
       "uploading": "Uploaden…",
       "uploaded": "Geüpload",
       "uploadFailedRetry": "Uploaden mislukt. Tik om opnieuw te proberen.",
-      "uploadFailedTerminal": "Dit bestand kan niet worden geüpload.",
       "moveLeft": "{{filename}} naar links verplaatsen",
       "moveRight": "{{filename}} naar rechts verplaatsen"
     },
@@ -2120,8 +1904,6 @@
       "camera": "Camera",
       "photoLibrary": "Fotobibliotheek",
       "files": "Bestanden",
-      "cameraAccessDisabled": "Cameratoegang uitgeschakeld",
-      "cameraAccessMessage": "Sta cameratoegang toe in Instellingen om een foto te maken.",
       "couldNotOpenPhotoPicker": "Kon de fotokiezer niet openen. Start Kilo opnieuw op en probeer het opnieuw.",
       "maxFilesAllowed": "Maximaal {{displayCount}} bestanden toegestaan",
       "onlyAddingFiles": "Alleen {{accepted}} van {{total}} bestanden worden toegevoegd (max. {{max}})"
@@ -2134,7 +1916,6 @@
       "waitForUploads": "Wacht tot bijlagen klaar zijn met uploaden.",
       "pasteFromClipboard": "Plakken vanaf klembord",
       "stopGenerating": "Stoppen met genereren",
-      "sendMessage": "Bericht verzenden",
       "selectModelBeforeSending": "Selecteer een model voordat je verzendt",
       "preparingPlaceholder": "Omgeving instellen...",
       "finalizingPlaceholder": "Afronden...",
@@ -2148,9 +1929,7 @@
     },
     "chatLink": {
       "linkCopied": "Link gekopieerd",
-      "reviewPr": "PR beoordelen",
       "openLink": "Link openen",
-      "copyLink": "Link kopiëren",
       "shareLink": "Link delen",
       "share": "Delen",
       "prLinkActions": "PR-linkacties",
@@ -2190,13 +1969,11 @@
     "contextUsage": {
       "windowUnavailable": "Contextvenstergrootte niet beschikbaar",
       "tapToViewDetails": "Tik om contextdetails te bekijken.",
-      "costPrefix": "kosten {{cost}}",
       "costSuffix": ", kosten {{cost}}",
       "tokensWindowUnavailable": "Context {{used}} tokens, venster niet beschikbaar",
       "tokensUsage": "Context {{used}} van {{window}} tokens, {{percentage}} gebruikt",
       "title": "Contextgebruik",
       "used": "Gebruikt",
-      "remaining": "Resterend",
       "provider": "Provider",
       "totalCost": "Totale kosten",
       "usageReflectsLatest": "Het gebruik weerspiegelt het laatst voltooide assistent-antwoord.",
@@ -2222,8 +1999,7 @@
       "merged": "samengevoegde pull-aanvraag",
       "draft": "concept-pull-aanvraag",
       "updating": "Bijwerken, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "pull-aanvraag"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "Laden",
@@ -2251,11 +2027,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "Kon je account niet laden",
-    "couldNotLoadAccountDescription": "Controleer je verbinding en probeer het opnieuw.",
     "couldNotLoadPrivacy": "Kon privacykeuzes niet laden",
     "couldNotLoadPrivacyDescription": "Controleer de beveiligingsinstellingen van je apparaat en probeer het opnieuw.",
     "contentReady": "Inhoud gereed",
-    "signOut": "Afmelden",
     "retryLoadingAccount": "Opnieuw account laden",
     "retryLoadingPrivacy": "Opnieuw privacykeuzes laden"
   },
@@ -2265,7 +2039,6 @@
     "billingPage": "factureringspagina"
   },
   "deviceSessions": {
-    "couldNotLoad": "Kon sessies niet laden",
     "couldNotLoadDescription": "Je actieve sessies zijn niet beschikbaar tot dit is geladen.",
     "currentDeviceUnidentified": "Huidig apparaat kon niet worden geïdentificeerd",
     "noSessions": "Geen actieve sessies",
@@ -2273,7 +2046,6 @@
     "onlyKiloAppSignIns": "Alleen aanmeldingen van de Kilo-app verschijnen hier. Editor- en CLI-aanmeldingen worden niet vermeld.",
     "signedIn": "Aangemeld {{signedIn}} · Laatst gezien {{lastSeen}}",
     "thisDevice": "Dit apparaat",
-    "title": "Apparaatsessies",
     "viewProfile": "Profiel bekijken",
     "signOutThisDevice": "Dit apparaat afmelden",
     "signOutThisSession": "Deze sessie afmelden",
@@ -2281,8 +2053,6 @@
     "signOutThisDeviceTitle": "Dit apparaat afmelden?",
     "signOutThisSessionTitle": "Deze sessie afmelden?",
     "signOutThisSessionMessage": "{{device}} wordt afgemeld. Het kan nog tot een uur API-toegang behouden.",
-    "signOutConfirm": "Afmelden",
-    "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "webBrowser": "Webbrowser"
   },
   "forceUpdate": {
@@ -2303,17 +2073,13 @@
   },
   "imageViewer": {
     "close": "{{filename}} sluiten",
-    "imageUnavailable": "Afbeelding niet beschikbaar",
     "share": "{{filename}} delen"
   },
   "invalidRoute": {
     "description": "Deze link is niet meer geldig.",
-    "goBack": "Terug",
     "title": "Pagina niet gevonden"
   },
   "monoScrollBlock": {
-    "contentTruncated": "Inhoud afgekapt",
-    "truncated": "Afgekapt",
     "wrap": "Terugloop",
     "scroll": "Scrollen"
   },
@@ -2322,22 +2088,16 @@
     "internetRestored": "Internetverbinding hersteld"
   },
   "queryError": {
-    "neutralTitle": "Er is iets misgegaan",
     "neutralDescription": "Probeer het opnieuw.",
     "offlineTitle": "Laden mislukt",
-    "offlineDescription": "Er is iets misgegaan",
-    "permissionTitle": "Toegang geweigerd",
     "permissionDescription": "Je hebt geen toestemming om dit te bekijken.",
-    "notFoundTitle": "Niet gevonden",
     "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar.",
     "serverTitle": "Kon niet laden",
     "serverDescription": "Er is aan onze kant iets misgegaan. Probeer het opnieuw."
   },
   "screenHeader": {
     "openMenu": "Menu openen",
-    "openMenuFor": "Menu openen voor {{title}}",
-    "close": "Sluiten",
-    "goBack": "Terug"
+    "openMenuFor": "Menu openen voor {{title}}"
   },
   "picker": {
     "optionsExpired": "Opties verlopen",
@@ -2368,10 +2128,7 @@
   },
   "share": {
     "title": "Delen naar Kilo",
-    "close": "Sluiten",
-    "reviewPr": "PR beoordelen",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "Nieuwe sessie",
     "searchPlaceholder": "Recente sessies zoeken",
     "connectedCli": "Op een verbonden CLI",
     "newSessionOn": "Nieuwe sessie op {{name}}",
@@ -2429,7 +2186,6 @@
     "statusCanceling": "Kilo Pass wordt geannuleerd",
     "statusPastDue": "Kilo Pass achterstallig",
     "monthlyCredits": "{{credits}} maandelijkse credits",
-    "ends": "Eindigt op {{date}}",
     "periodEnd": "einde periode",
     "managedOnGooglePlay": "Beheerd via Google Play",
     "managedInAppStore": "Beheerd in de App Store",
@@ -2441,7 +2197,6 @@
     "unavailableDescription": "Kilo Pass is niet beschikbaar als aankoop in de app op Android. Beheer het op het web.",
     "webManagementDescription": "Deze Kilo Pass wordt op het web beheerd.",
     "legalDisclosure": "Kilo Pass is een maandelijks abonnement dat automatisch wordt verlengd. De betaling wordt bij bevestiging van de aankoop in rekening gebracht op je Apple ID. Abonnementen worden elke maand automatisch verlengd voor de weergegeven prijs, tenzij je ten minste 24 uur voor het einde van de huidige periode opzegt. Beheer of annuleer op elk moment in de accountinstellingen van de App Store.",
-    "legalPrivacyPolicy": "Privacybeleid",
     "legalTermsOfUse": "Gebruiksvoorwaarden (EULA)",
     "purchaseDifferentAccount": "Deze App Store-aankoop is niet gekoppeld aan je Kilo-account. Meld je aan met het Apple-account dat voor de aankoop is gebruikt, en probeer het opnieuw.",
     "restoreFailed": "Aankopen herstellen mislukt. Probeer het opnieuw.",
@@ -2470,7 +2225,6 @@
     "privacyPolicyPrefix": "Je gegevens worden verwerkt volgens het",
     "privacyPolicy": "privacybeleid van Kilo",
     "onDevice": "Op apparaat",
-    "loading": "Laden…",
     "couldNotLoadTranscription": "Je transcriptie-instelling kon niet worden geladen.",
     "signInToManageTranscription": "Meld je aan om online transcriptie te beheren.",
     "onlineTranscription": "Online transcriptie",
@@ -2487,7 +2241,6 @@
     "voiceTranscriptionTitle": "Spraaktranscriptie",
     "retentionPrefix": "Volledige bewaartermijnen, je rechten en contactgegevens staan in het",
     "backToConsent": "Terug naar toestemming",
-    "back": "Terug",
     "revokeConsent": "Toestemming intrekken",
     "revokeConsentTitle": "Toestemming voor het delen van gegevens intrekken?",
     "acceptAndContinue": "Accepteren en doorgaan",
@@ -2521,7 +2274,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "Gemaskeerde schermafbeeldingen bij een fout, en gemaskeerde opnames van een kleine steekproef van sessies.",
     "errorScreenshotsWhy": "Zien wat de app toonde toen er iets misging.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "Installatiebron en campagne-identificatoren.",
     "installAttributionWhy": "Begrijpen welke kanalen nieuwe gebruikers opleveren.",
     "installAttributionWho": "AppsFlyer.",
@@ -2531,12 +2283,10 @@
     "what": "Wat",
     "why": "Waarom",
     "who": "Wie",
-    "continue": "Doorgaan",
     "installAttributionPromptMessage": "Kilo gebruikt de trackingtoestemming van Apple alleen om te zien via welk kanaal je hier bent gekomen. Je prompts en gesprekken worden nooit gebruikt.",
     "installAttributionPromptTitle": "Installatie-attributie toestaan?"
   },
   "prReview": {
-    "accessDenied": "Toegang geweigerd",
     "accessDeniedDescription": "Je hebt geen toestemming om deze pull-aanvraag te bekijken.",
     "checkConnection": "Verbinding controleren",
     "checks": {
@@ -2553,8 +2303,7 @@
       "skipped": "{{displayCount}} overgeslagen",
       "title": "Checks",
       "viewOnGitHub": "PR op GitHub bekijken",
-      "checkDetails": "checkdetails",
-      "pullRequest": "pull-aanvraag"
+      "checkDetails": "checkdetails"
     },
     "composer": {
       "addTitle": "Opmerking toevoegen",
@@ -2563,13 +2312,11 @@
       "commentBody": "Opmerkingtekst",
       "commentBodyPlaceholder": "Laat een opmerking achter",
       "commentNow": "Nu reageren",
-      "discard": "Weggooien",
       "discardMessage": "Je concept gaat verloren.",
       "discardTitle": "Opmerking weggooien?",
       "editTitle": "Opmerking bewerken",
       "insertSuggestion": "Suggestie invoegen",
       "insertSuggestionA11y": "Een codesuggestie invoegen",
-      "keepEditing": "Blijven bewerken",
       "loadFailedTitle": "Kon de opmerking-editor niet laden",
       "ok": "OK",
       "unavailableMessage": "Deze openstaande opmerking is al verwijderd of verzonden.",
@@ -2583,12 +2330,9 @@
       "checkFailedTitle": "Kon de GitHub-verbinding niet controleren",
       "description": "Verbind je GitHub-account om pull-aanvragen op mobiel te beoordelen.",
       "reconnectDescription": "Je GitHub-verbinding is ingetrokken. Maak opnieuw verbinding om pull-aanvragen op mobiel te blijven beoordelen.",
-      "reconnectTitle": "GitHub opnieuw verbinden",
-      "title": "GitHub verbinden"
+      "reconnectTitle": "GitHub opnieuw verbinden"
     },
     "connectionExpired": "GitHub-verbinding verlopen.",
-    "connectionExpiredDescription": "Je GitHub-verbinding is niet meer geldig. Controleer je verbinding opnieuw — je wordt gevraagd om opnieuw verbinding te maken als dat nodig is.",
-    "connectionExpiredTitle": "GitHub-verbinding verlopen",
     "couldNotLoadPullRequest": "Kon pull-aanvraag niet laden",
     "couldNotOpenGitHubAppSettings": "Kon de instellingen van de GitHub-app niet openen",
     "description": "Beschrijving",
@@ -2598,16 +2342,12 @@
       "addReaction": "Reactie toevoegen",
       "block": "Blokkeren",
       "blockedUser": "{{login}} geblokkeerd",
-      "closeReactions": "Reacties sluiten",
       "collapseThread": "Thread samenvouwen",
       "commentActions": "Opmerkingacties",
       "comment": "{{displayCount}} opmerkingen",
       "comment_other": "{{displayCount}} opmerkingen",
       "couldNotLoad": "Kon discussie niet laden",
       "couldNotLoadMore": "Kon niet meer opmerkingen laden.",
-      "couldNotReply": "Kon niet reageren.",
-      "file": "Bestand",
-      "loadMore": "Meer laden",
       "loadMoreComments": "Meer opmerkingen laden",
       "loading": "Discussie laden",
       "moderation": {
@@ -2640,20 +2380,16 @@
       "reaction": "reacties",
       "reaction_other": "reacties",
       "reaction_one": "reactie",
-      "reactionsTitle": "Reacties",
-      "reply": "Beantwoorden",
       "replyBadRequest": "Deze reactie kan niet worden geplaatst. De thread is mogelijk gewijzigd.",
       "replyBody": "Reactietekst",
       "replyForbidden": "Je hebt geen toestemming om op deze pull-aanvraag te reageren.",
       "replyPlaceholder": "Reageren…",
       "reportContent": "Inhoud rapporteren",
-      "reportSubmitted": "Melding verzonden. Ontvangstbewijs {{receiptId}}",
       "reportUser": "Gebruiker rapporteren",
       "resolveThread": "Thread oplossen",
       "resolved": "Opgelost",
       "retryLoadingMore": "Opnieuw meer opmerkingen laden",
       "reviewFiles": "Bestanden beoordelen",
-      "somethingWentWrong": "Er is iets misgegaan",
       "startedRelative": " · gestart {{relative}}",
       "submitReply": "Reactie verzenden",
       "termsAcceptRetry": "Kon de voorwaarden niet accepteren. Controleer je verbinding en probeer het opnieuw.",
@@ -2693,18 +2429,14 @@
       "noRecentPrs": "Geen recente PR's",
       "noRecentPrsDescription": "Plak hierboven een PR-link om een review te starten — deze verschijnt hier de volgende keer.",
       "open": "Openen",
-      "openPullRequest": "Pull-aanvraag openen",
       "pasteLink": "Pull-aanvraag-link plakken",
       "pastePrLink": "Plak een PR-link",
-      "remove": "Verwijderen",
       "removeFromRecentsMessage": "Deze pull-aanvraag wordt uit je recente items verwijderd.",
       "removeFromRecentsTitle": "Uit recente items verwijderen?",
       "removeRecentAccessibility": "{{repo}} uit recente items verwijderen",
-      "title": "PR-review",
       "urlAccessibility": "GitHub-pull-aanvraag-URL"
     },
     "eventChips": {
-      "approve": "Goedkeuren",
       "comment": "Opmerking",
       "label": "Reviewgebeurtenis",
       "requestChanges": "Wijzigingen aanvragen"
@@ -2720,7 +2452,6 @@
       "unified": "Gecombineerd"
     },
     "fileNavigator": {
-      "checkConnection": "Controleer je verbinding en probeer het opnieuw.",
       "couldNotLoadFiles": "Kon bestanden niet laden",
       "couldNotLoadMoreFiles": "Kon niet meer bestanden laden",
       "diffTooLarge": "diff te groot",
@@ -2789,13 +2520,9 @@
     },
     "inbox": {
       "couldNotLoad": "Kon inbox niet laden",
-      "couldNotLoadMore": "Kon niet meer laden",
-      "draft": "Concept",
       "loading": "Inbox laden",
       "noReviewRequests": "Geen reviewverzoeken",
       "noReviewRequestsDescription": "Pull-aanvragen die op jouw review wachten verschijnen hier. Je kunt hierboven nog steeds een PR-link plakken.",
-      "recent": "Recent",
-      "retryLoadingMore": "Opnieuw meer laden",
       "title": "Inbox"
     },
     "installKiloGitHubApp": "Installeer de Kilo GitHub-app",
@@ -2832,8 +2559,7 @@
       "noEnabledMethods": "Deze repository heeft geen ingeschakelde samenvoegmethoden. Vraag een repositorybeheerder om samenvoegen, squash of rebase in te schakelen.",
       "partialSuccessBanner": {
         "accessibility": "Samengevoegd. Kon de branch niet verwijderen: {{reason}}",
-        "body": "Kon de branch niet verwijderen: {{reason}}",
-        "title": "Samengevoegd"
+        "body": "Kon de branch niet verwijderen: {{reason}}"
       },
       "refreshMergeability": "Samenvoegbaarheid vernieuwen",
       "terminal": {
@@ -2882,8 +2608,6 @@
       "file": "bestanden",
       "file_other": "bestanden",
       "file_one": "bestand",
-      "stateClosed": "Gesloten",
-      "stateDraft": "Concept",
       "stateMerged": "Samengevoegd",
       "stateOpen": "Open",
       "stateOpenApproved": "Open · Goedgekeurd",
@@ -2903,8 +2627,7 @@
       "reviewChangesRequested": "Wijzigingen gevraagd",
       "reviewCommented": "Becommentarieerd",
       "reviewPending": "Wacht op beoordeling",
-      "openIssueA11y": "Issue #{{number}} openen op GitHub",
-      "reviewDismissed": "Afgewezen"
+      "openIssueA11y": "Issue #{{number}} openen op GitHub"
     },
     "pendingComment": {
       "allQueuedHint": "Alle opmerkingen worden in één gebundeld verzoek verzonden.",
@@ -2912,9 +2635,7 @@
       "deletedAnnouncement": "Openstaande opmerking verwijderd",
       "editA11y": "Openstaande opmerking op {{location}} bewerken",
       "editOutdatedA11y": "Verouderde openstaande opmerking op {{location}} bewerken",
-      "emptyBody": "(leeg)",
       "noCommentsQueued": "Geen opmerkingen in de wachtrij. De review wordt alleen met de gebeurtenis hierboven verzonden.",
-      "outdated": "Verouderd",
       "staleHint": "de PR is gewijzigd sinds je dit schreef.",
       "staleQueueHint": "Opmerkingen die bij een oudere commit zijn geschreven, worden niet verzonden. Ze blijven in je wachtrij zodat je ze kunt bewerken of verwijderen.",
       "summaryA11y": "Reviewsamenvatting",
@@ -2923,7 +2644,6 @@
     "pullRequestUnavailable": "Pull-aanvraag niet beschikbaar",
     "pullRequestUnavailableDescription": "Deze PR kan niet worden geopend. Deze is mogelijk verwijderd, de repository is privé, of de Kilo GitHub-app is er niet op geïnstalleerd.",
     "reconnectNotice": {
-      "checkConnection": "Verbinding controleren",
       "message": "Je GitHub-verbinding is niet meer geldig. Controleer je verbinding opnieuw — je wordt gevraagd om opnieuw verbinding te maken als dat nodig is.",
       "title": "GitHub-verbinding verlopen"
     },
@@ -2933,7 +2653,6 @@
       "shareA11y": "Pull-aanvraag delen",
       "title": "#{{number}}"
     },
-    "screenTitle": "PR-review",
     "sideBySide": {
       "emptyDiffColumn": "lege diff-kolom",
       "emptyDiffRow": "Lege diff-rij",
@@ -2943,7 +2662,6 @@
       "oldOnly": "Alleen oud: {{text}}"
     },
     "submit": {
-      "delete": "Verwijderen",
       "deletePendingMessage": "Deze opmerking wordt uit de reviewwachtrij verwijderd.",
       "deletePendingTitle": "Openstaande opmerking verwijderen?",
       "loadFailedTitle": "Kon de reviewinzending niet laden",
@@ -2951,7 +2669,6 @@
       "pendingComment_other": "openstaande opmerkingen",
       "pendingComment_one": "openstaande opmerking",
       "summaryOptional": "Samenvatting (optioneel)",
-      "title": "Review verzenden",
       "partialPostedMessage": "{{displayFreshCount}} opmerking(en) geplaatst. {{displayStaleCount}} opmerking(en) verwijzen naar een oudere commit en blijven in je wachtrij.",
       "submitCountOfTotal": "{{displayFreshCount}} van {{displayTotalCount}} opmerkingen verzenden",
       "submitReview": "Review verzenden",
@@ -2959,10 +2676,8 @@
       "blockedComment": "Voeg een samenvatting of ten minste één opmerking toe om een review met opmerking te plaatsen."
     },
     "fileStatus": {
-      "added": "Toegevoegd",
       "changed": "Gewijzigd",
       "copied": "Gekopieerd",
-      "deleted": "Verwijderd",
       "modified": "Aangepast",
       "renamed": "Hernoemd"
     },
@@ -2975,9 +2690,7 @@
       "selectedTapToChange": "{{label}} geselecteerd, tik om de selectie te wijzigen",
       "tapToComment": "{{label}}, tik om te reageren",
       "truncationBanner": "De eerste {{limit}} van {{total}} gewijzigde bestanden worden getoond — GitHub API-limiet",
-      "statusAdded": "Toegevoegd",
       "statusContext": "Context",
-      "statusDeleted": "Verwijderd",
       "lineLabel": "{{status}} regel {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(leeg)"
@@ -3013,7 +2726,6 @@
       "selectDescription": "Kies een organisatie uit je profiel om door te gaan.",
       "selectOrganization": "Een organisatie selecteren",
       "unavailableDescription": "Deze organisatie is niet meer beschikbaar. Kies er een uit je profiel om door te gaan.",
-      "accessDeniedTitle": "Toegang geweigerd",
       "accessDeniedDescription": "U heeft geen toegang tot deze organisatie."
     },
     "creditActivity": {
@@ -3032,25 +2744,19 @@
         "accounting_adjustment": "Boekhoudkundige correctie",
         "credits_expired": "Credits verlopen"
       },
-      "loadMore": "Meer laden",
-      "loadMoreFailed": "Kon niet meer laden",
       "truncated": "Oudere creditactiviteit is beschikbaar."
     },
     "hub": {
       "balance": "Saldo",
       "lowBalanceBelow": "Onder {{amount}}",
-      "lowBalanceOff": "Uit",
       "organizationSeats": "Organisatiezetels",
       "renamePlaceholder": "Voer een organisatienaam in",
-      "renameTitle": "Organisatie hernoemen",
-      "title": "Organisatie"
+      "renameTitle": "Organisatie hernoemen"
     },
     "inviteMember": {
       "emailError": "Voer een geldig e-mailadres in",
-      "emailLabel": "E-mail",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "Je hebt geen toestemming om leden uit te nodigen.",
-      "roleLabel": "Rol",
       "roleMember": "Rol: Lid",
       "sendInvite": "Uitnodiging verzenden",
       "title": "Lid uitnodigen"
@@ -3067,18 +2773,13 @@
         "paid": "Betaald",
         "open": "Open",
         "void": "Ongegrond",
-        "draft": "Concept",
-        "uncollectible": "Oninbaar",
-        "unknown": "Onbekend"
+        "uncollectible": "Oninbaar"
       },
-      "loadMore": "Meer laden",
       "loadMoreFailed": "Kon niet meer laden",
       "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "Waarschuwing voor laag saldo inschakelen",
-      "enabled": "Ingeschakeld",
       "notifyEmailsLabel": "E-mails voor meldingen",
       "permissionDenied": "Je hebt geen toestemming om factureringswaarschuwingen te beheren.",
       "separateEmailsHint": "Scheid meerdere e-mailadressen met komma's.",
@@ -3102,12 +2803,10 @@
       "emptyDescriptionCanInvite": "Nodig teamleden uit om in deze organisatie te gaan samenwerken.",
       "emptyDescriptionCannotInvite": "Vraag een eigenaar of factureringsbeheerder om teamleden uit te nodigen.",
       "emptyTitle": "Nog geen leden",
-      "inviteMember": "Lid uitnodigen",
       "invitedDate": "Uitgenodigd {{date}}",
       "limitPerDay": "{{amount}}/day",
       "manageA11y": "{{name}} beheren",
       "manageInvitationA11y": "Uitnodiging voor {{email}} beheren",
-      "removeConfirm": "Verwijderen",
       "removeMember": "Lid verwijderen",
       "removeMemberMessage": "{{name}} uit deze organisatie verwijderen?",
       "revokeConfirm": "Intrekken",
@@ -3122,18 +2821,12 @@
         "billingManager": "Factuurbeheerder"
       },
       "emailStatusFailed": "E-mail mislukt",
-      "emailStatusPending": "In behandeling",
       "inviteCreated": "Uitnodiging aangemaakt",
       "pendingInvitations": "Openstaande uitnodigingen",
       "resendInvite": "Uitnodiging opnieuw verzenden",
       "shareInviteLink": "Uitnodigingslink delen"
     },
-    "permissionDenied": {
-      "back": "Terug",
-      "title": "Toegang geweigerd"
-    },
     "usageStats": {
-      "cost": "Kosten",
       "inputTokens": "Invoertokens",
       "last30Days": "Laatste 30 dagen",
       "outputTokens": "Uitvoertokens",
@@ -3145,9 +2838,6 @@
       "couldNotLoadStatus": "Kon status niet laden",
       "creditProcessingDelayed": "Creditverwerking vertraagd · automatisch opnieuw proberen",
       "ended": "Beëindigd",
-      "endsOn": "Eindigt op {{date}}",
-      "loading": "Laden…",
-      "manageHint": "Opent Kilo Pass-beheer op het web.",
       "notSubscribed": "Geen abonnement",
       "overallocated": "Pass-toewijzingen overschrijden de betaalde licenties",
       "paidSeat_one": "{{displayCount}} betaalde licentie",
@@ -3157,7 +2847,6 @@
       "paymentPending": "Betaling in behandeling",
       "processingBlocked": "Verwerking geblokkeerd",
       "processingNeedsReview": "Verwerking moet worden beoordeeld",
-      "retry": "Opnieuw proberen",
       "retryHint": "Probeert de Kilo Pass-status opnieuw te laden.",
       "setupHint": "Opent de Kilo Pass-instellingen op het web."
     }
@@ -3171,7 +2860,6 @@
     "sendFeedback": "Feedback sturen"
   },
   "authErrors": {
-    "emailAlreadyUsed": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik '$t(login.moreSignInOptions)'.",
     "differentOauth": "Er bestaat al een account met dit e-mailadres via een andere aanmeldmethode. Probeer een andere methode of gebruik '$t(login.moreSignInOptions)'.",
     "ssoError": "Je organisatie vereist SSO. Gebruik '$t(login.moreSignInOptions)'.",
     "blocked": "Dit account is geblokkeerd. Neem contact op met de ondersteuning.",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "Aanmelden starten is mislukt. Probeer het opnieuw.",
     "couldNotOpenBrowser": "Browser kon niet worden geopend. Probeer het opnieuw.",
     "signInTimedOut": "Aanmelden is verlopen. Probeer het opnieuw.",
-    "signInFailed": "Aanmelden is mislukt. Probeer het opnieuw.",
     "networkError": "Netwerkfout. Probeer het opnieuw.",
     "accessDeniedByUser": "Toegang geweigerd door gebruiker",
     "codeExpired": "Code verlopen",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "Terug naar voorkeuren"
   },
   "quickChat": {
-    "title": "Chat",
-    "composer": {
-      "placeholder": "Bericht"
-    },
     "empty": {
       "title": "Start een chat",
       "description": "Stuur een bericht om met een model te praten."
     },
-    "working": "Bezig",
     "historyRetry": "Kon de chatgeschiedenis niet laden.",
-    "catalogRetry": "Kon modellen niet laden",
     "sendError": "Kan het bericht niet verzenden. Probeer het opnieuw."
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "Log in om agents te zien",
     "privacy": "Open Kilo om agents te zien",
     "openAgents": "Agents openen",
-    "running": "Bezig",
     "needsInput": "heeft invoer nodig",
-    "idle": "Inactief",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via Instellingen om actieve agents op het toegangsscherm te zien."
   }

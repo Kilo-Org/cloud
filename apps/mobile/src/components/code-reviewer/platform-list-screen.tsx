@@ -43,9 +43,7 @@ function connectionSubtitle(status: {
   if (status.isError) {
     return i18n.t('codeReviewer.platformList.statusUnavailable');
   }
-  return status.data?.connected
-    ? i18n.t('codeReviewer.platformList.connected')
-    : i18n.t('codeReviewer.platformList.notConnected');
+  return status.data?.connected ? i18n.t('common.connected') : i18n.t('common.notConnected');
 }
 
 export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
@@ -59,9 +57,9 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
     enabled: !isPersonal,
   });
   const scopeTitle = isPersonal
-    ? t('codeReviewer.scopeList.personal')
+    ? t('common.personal')
     : (orgs?.find(org => org.organizationId === scope)?.organizationName ??
-      t('codeReviewer.platformList.organization'));
+      t('common.organization'));
 
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);
@@ -83,7 +81,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={scopeTitle} eyebrow={t('codeReviewer.title')} />
+      <ScreenHeader title={scopeTitle} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">

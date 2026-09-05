@@ -36,7 +36,7 @@ const AUTO_MODEL_CARDS = [
   },
   {
     id: 'kilo-auto/balanced',
-    labelKey: 'kiloclaw.modelPicker.balancedLabel',
+    labelKey: 'common.balanced',
     descriptionKey: 'kiloclaw.modelPicker.balancedDescription',
     icon: Scale,
     iconBg: 'bg-agent-sky-tile-bg',
@@ -53,7 +53,7 @@ function CostIndicator({ level }: { level: number }) {
   const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="text-xs text-muted-foreground">{t('kiloclaw.modelPicker.cost')}</Text>
+      <Text className="text-xs text-muted-foreground">{t('common.cost')}</Text>
       <View className="flex-row gap-0.5">
         {[0, 1, 2].map(i => (
           <Text
@@ -72,7 +72,7 @@ function PerformanceIndicator({ level, dotColor }: { level: number; dotColor: st
   const { t } = useTranslation();
   return (
     <View className="flex-row items-center justify-between">
-      <Text className="text-xs text-muted-foreground">{t('kiloclaw.modelPicker.performance')}</Text>
+      <Text className="text-xs text-muted-foreground">{t('common.performance')}</Text>
       <View className="flex-row gap-1">
         {[0, 1, 2].map(i => (
           <View

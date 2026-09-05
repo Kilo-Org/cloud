@@ -34,9 +34,9 @@ import { cn } from '@/lib/utils';
 type AnalysisMode = SecurityAgentConfig['analysisMode'];
 
 const ANALYSIS_MODES = [
-  { value: 'auto', labelKey: 'securityAgent.analysisSettings.modeAuto' },
-  { value: 'shallow', labelKey: 'securityAgent.analysisSettings.modeShallow' },
-  { value: 'deep', labelKey: 'securityAgent.analysisSettings.modeDeep' },
+  { value: 'auto', labelKey: 'securityAgent.analysisMode.auto' },
+  { value: 'shallow', labelKey: 'securityAgent.analysisMode.shallow' },
+  { value: 'deep', labelKey: 'securityAgent.analysisMode.deep' },
 ] as const satisfies readonly { value: AnalysisMode; labelKey: string }[];
 
 function AnalysisSettingsSkeleton() {
@@ -156,7 +156,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-6 pt-4">
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            {t('securityAgent.analysisSettings.permissionNote')}
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
         <View className="gap-2">
@@ -209,7 +209,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           <QueryError
             variant="server"
             placement="top"
-            title={t('securityAgent.analysisSettings.couldNotLoadModels')}
+            title={t('common.couldNotLoadModels')}
             onRetry={() => void refetchModels()}
             isRetrying={modelsLoading}
           />

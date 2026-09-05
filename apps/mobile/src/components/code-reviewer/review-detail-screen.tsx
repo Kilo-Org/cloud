@@ -44,7 +44,7 @@ function confirmCancel(onConfirm: () => void) {
     i18n.t('codeReviewer.reviewDetail.cancelTitle'),
     i18n.t('codeReviewer.reviewDetail.cancelMessage'),
     [
-      { text: i18n.t('codeReviewer.reviewDetail.keepRunning'), style: 'cancel' },
+      { text: i18n.t('common.keepRunning'), style: 'cancel' },
       {
         text: i18n.t('codeReviewer.reviewDetail.cancelReview'),
         style: 'destructive',
@@ -175,7 +175,7 @@ export function ReviewDetailScreen({
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <View className="gap-2">
-          <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.findings')}</Text>
+          <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
             <Text variant="muted" className="text-xs">
               {t('codeReviewer.reviewDetail.noFindings')}
@@ -212,19 +212,11 @@ export function ReviewDetailScreen({
 
         {/* Metadata: technical details after the outcome. */}
         <View className="gap-2">
-          <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.details')}</Text>
+          <Text className="text-sm font-medium">{t('common.details')}</Text>
           <View className="gap-1 rounded-lg bg-secondary p-4">
-            <MetaRow
-              label={t('codeReviewer.reviewDetail.branch')}
-              value={`${review.head_ref} → ${review.base_ref}`}
-            />
-            <MetaRow
-              label={t('codeReviewer.reviewDetail.platform')}
-              value={reviewerPlatformLabel(review.platform)}
-            />
-            {review.model ? (
-              <MetaRow label={t('codeReviewer.reviewDetail.model')} value={review.model} />
-            ) : null}
+            <MetaRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
+            <MetaRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} />
+            {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
             <MetaRow
               label={t('codeReviewer.reviewDetail.created')}
               value={timeAgo(parseTimestamp(review.created_at))}
@@ -237,13 +229,13 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('codeReviewer.reviewDetail.completed')}
+                label={t('codeReviewer.status.completed')}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
               <MetaRow
-                label={t('codeReviewer.reviewDetail.cost')}
+                label={t('common.cost')}
                 value={formatMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
               />
             ) : null}
@@ -275,11 +267,11 @@ export function ReviewDetailScreen({
                 return;
               }
               void openExternalUrl(review.pr_url, {
-                label: t('codeReviewer.reviewDetail.pullRequest'),
+                label: t('common.pullRequest'),
               });
             }}
           >
-            <Text>{t('codeReviewer.reviewDetail.openPullRequest')}</Text>
+            <Text>{t('common.openPullRequest')}</Text>
           </Button>
 
           {canCancel ? (

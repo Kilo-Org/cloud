@@ -97,13 +97,13 @@ const CLOUD_SESSION_IMPORT_ACCESS_DENIED_LITERAL = 'cloud session import access 
  */
 export function resolveCloneImportFailureKey(message: string): string {
   if (message === CLOUD_SESSION_NOT_FOUND_LITERAL) {
-    return 'agentChat.session.notFound';
+    return 'common.notFound';
   }
   if (
     message === CLOUD_SESSION_IMPORT_UNAUTHORIZED_LITERAL ||
     message === CLOUD_SESSION_IMPORT_ACCESS_DENIED_LITERAL
   ) {
-    return 'agentChat.session.accessDenied';
+    return 'common.accessDenied';
   }
   return 'agentChat.newSession.importFailed';
 }

@@ -27,14 +27,118 @@
     "somethingWentWrong": "問題が発生しました",
     "couldNotOpen": "{{label}}を開けませんでした",
     "link": "リンク",
-    "takingLonger": "通常より時間がかかっています。閉じて、後でもう一度確認してください。"
+    "takingLonger": "通常より時間がかかっています。閉じて、後でもう一度確認してください。",
+    "cameraAccessDisabled": "かめらへのあくせすがむこうです",
+    "copyLink": "リンクをコピー",
+    "reviewPr": "PRをレビュー",
+    "sendMessage": "メッセージを送信",
+    "remaining": "残り",
+    "imageUnavailable": "画像を利用できません",
+    "open": "{{name}}を開く",
+    "loading": "読み込み中…",
+    "queued": "きゅーについかずみ",
+    "cost": "コスト",
+    "model": "モデル",
+    "reportSubmittedReceipt": "報告を送信しました。受領番号 {{receiptId}}",
+    "role": "役割",
+    "allModels": "すべてのモデル",
+    "noModelsAvailable": "利用可能なモデルはありません",
+    "recommended": "おすすめ",
+    "searchModels": "モデルを検索...",
+    "bitbucketConnected": "Bitbucket接続済み",
+    "connectBitbucket": "Bitbucketを接続",
+    "connectGithub": "GitHubを接続",
+    "connectGitlab": "GitLabを接続",
+    "discard": "破棄",
+    "repository": "リポジトリ",
+    "newSession": "新しいセッション",
+    "details": "詳細",
+    "pullRequest": "プルリクエスト",
+    "sessionExited": "セッションが終了しました",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "アクセスが拒否されました",
+    "notFound": "見つかりません",
+    "platform": "プラットフォーム",
+    "contentTruncated": "コンテンツが切り詰められました",
+    "truncated": "切り詰め",
+    "added": "追加",
+    "deleted": "削除",
+    "updated": "こうしん",
+    "clearFilters": "フィルターをクリア",
+    "clearSearch": "検索をクリア",
+    "couldNotLoadSessions": "セッションを読み込めませんでした",
+    "delete": "削除",
+    "rename": "名前を変更",
+    "idle": "アイドル",
+    "online": "オンライン",
+    "starting": "開始中…",
+    "noKiloclawInstances": "KiloClawインスタンスがありません",
+    "personal": "個人",
+    "reply": "返信",
+    "closeReactions": "リアクションを閉じる",
+    "recent": "最近",
+    "connect": "接続",
+    "codeReviewer": "コードレビュアー",
+    "performance": "せいのう",
+    "all": "すべて",
+    "critical": "重大",
+    "off": "オフ",
+    "notConnected": "未接続",
+    "allRepositories": "すべてのリポジトリ",
+    "repositories": "リポジトリ",
+    "connected": "接続済み",
+    "organization": "組織",
+    "couldNotLoadRepositories": "リポジトリを読み込めませんでした",
+    "selectedRepositories": "選択したリポジトリ",
+    "branch": "ブランチ",
+    "findings": "所見",
+    "keepRunning": "実行を続ける",
+    "status": "ステータス",
+    "retryLoadingMore": "さらに読み込むのを再試行",
+    "balanced": "バランス",
+    "couldNotLoadOrganizations": "組織を読み込めませんでした",
+    "yourOwnRepositories": "自分のリポジトリ",
+    "selectRepositories": "リポジトリを選択",
+    "cancelled": "キャンセル済み",
+    "failed": "失敗",
+    "pending": "保留中",
+    "deviceSessions": "デバイスセッション",
+    "working": "作業中",
+    "goBack": "戻る",
+    "ends": "{{date}}に終了",
+    "privacyPolicy": "プライバシーポリシー",
+    "disabled": "無効",
+    "enabled": "有効",
+    "couldNotLoadModels": "モデルを読み込めませんでした",
+    "close": "閉じる",
+    "remove": "削除",
+    "kiloclaw": "KiloClaw",
+    "notifications": "通知",
+    "loadMore": "さらに読み込む",
+    "email": "メール",
+    "draft": "下書き",
+    "prReview": "PRレビュー",
+    "dismissed": "却下済み",
+    "closed": "くろーずずみ",
+    "preferences": "設定",
+    "agents": "エージェント",
+    "securityAgent": "せきゅりてぃえーじぇんと",
+    "profile": "プロフィール",
+    "chat": "チャット",
+    "file": "ファイル",
+    "keepEditing": "編集を続ける",
+    "signOut": "サインアウト",
+    "unknown": "不明",
+    "message": "メッセージ",
+    "reactions": "りあくしょん",
+    "openPullRequest": "ぷるりくえすとをひらく",
+    "couldnTLoadMore": "これ以上読み込めませんでした"
   },
   "language": {
-    "title": "言語",
     "restarting": "言語を適用するために再起動しています",
     "couldNotRestart": "再起動できませんでした",
     "languageSaved": "言語を保存しました。",
-    "retry": "再試行",
     "catalogLoadFailed": "言語を読み込めませんでした。もう一度お試しください。",
     "search": "言語を検索",
     "noMatches": "一致する言語がありません",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "サインインコード: {{code}}",
     "openSignInPageInBrowser": "ブラウザーでサインインページを開く",
     "copySignInLink": "サインインリンクをコピー",
-    "copyLink": "リンクをコピー",
     "cancelSignIn": "サインインをキャンセル",
     "startingSignIn": "サインインを開始しています...",
     "organizationUsesSso": "組織はシングルサインオンを使用しています。",
@@ -62,23 +165,19 @@
     "emailAddress": "メールアドレス",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "メールで続行",
-    "continue": "続行",
     "enterCodeSentTo": "{{email}}に送信されたコードを入力してください",
     "codeArrivalHint": "このアドレスが対象の場合、コードは1分以内に届きます。",
     "verifyCode": "コードを確認",
     "resendCode": "コードを再送信",
-    "back": "戻る",
     "termsPrefix": "続行すると、以下に同意したことになります：",
     "terms": "利用規約",
     "termsConnector": " および ",
     "termsSuffix": "。",
-    "privacyPolicy": "プライバシーポリシー",
     "moreSignInOptions": "その他のサインインオプション",
     "couldNotCompleteSignIn": "サインインを完了できませんでした。もう一度お試しください。",
     "sessionEnded": "セッションが終了しました。もう一度サインインしてください。",
     "signInCodeExpired": "サインインコードの有効期限が切れました。もう一度お試しください。",
     "accessDenied": "アクセスが拒否されました。",
-    "somethingWentWrong": "問題が発生しました。もう一度お試しください。",
     "codeSent": "コードを送信しました",
     "signInCodeField": "サインインコード",
     "accountCreated": "アカウントが作成されました。Kiloへようこそ。",
@@ -86,24 +185,16 @@
     "or": "または"
   },
   "profile": {
-    "title": "プロフィール",
-    "agents": "エージェント",
-    "codeReviewer": "コードレビュアー",
     "codeReviewerSubtitle": "自動PRレビュー",
-    "securityAgent": "せきゅりてぃえーじぇんと",
     "securityAgentSubtitle": "脆弱性を検出して修正",
     "reviews": "レビュー",
-    "prReview": "PRレビュー",
     "prReviewSubtitle": "モバイルでプルリクエストをレビュー",
-    "organization": "組織",
     "couldNotLoadOrganization": "組織を読み込めませんでした",
     "couldNotLoadOrganizationDescription": "これが読み込まれるまで、組織とエージェントの設定は利用できません。",
     "linkedAccounts": "リンクされたアカウント",
     "couldNotLoadAccounts": "アカウントを読み込めませんでした",
     "app": "アプリ",
-    "preferences": "設定",
     "preferencesSubtitle": "外観、通知、思考、画面の動作",
-    "deviceSessions": "デバイスセッション",
     "deviceSessionsSubtitle": "他のデバイスを確認してサインアウト",
     "feedback": "フィードバック",
     "privacyChoices": "プライバシー設定",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "クレジット残高が空です。このアカウントでは、クレジットはiOSアプリの外で管理されます。",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
-    "signOutConfirm": "サインアウト",
     "deleteAccountTitle": "アカウントを削除しますか？",
     "deleteAccountMessage": "これによりアカウントが完全に削除され、サインアウトされます。確認コードをメールで送信します。",
     "deleteAccountConfirm": "アカウントを削除",
     "accountDeleted": "アカウントが削除されました。",
     "viewOrganization": "組織を表示",
     "manageOrganization": "組織を管理",
-    "personal": "個人",
     "selectAccount": "アカウントを選択",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "メール",
     "providerTestAccount": "テストアカウント",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "エンタープライズSSO"
   },
   "preferences": {
-    "title": "設定",
     "autoExpandThinking": "思考を自動展開",
     "autoExpandThinkingSubtitle": "エージェントの思考が終了したときに展開して表示します。",
     "keepScreenOn": "セッションページで画面を常時オン",
     "keepScreenOnSubtitle": "セッションの動作中は画面を起動したままにします。",
     "appearance": "外観",
-    "notifications": "通知",
     "notificationsSubtitle": "プッシュ設定",
     "appearanceSystem": "システム",
     "appearanceLight": "ライト",
@@ -159,7 +243,6 @@
     "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。"
   },
   "notifications": {
-    "title": "通知",
     "liveActivities": "ライブアクティビティ",
     "liveActivitySubtitle": "ロック画面に稼働中のエージェントを表示",
     "liveUpdates": "ライブアップデート",
@@ -182,7 +265,6 @@
     "disabledMessage": "通知を有効にするには、デバイス設定でオンにしてください。",
     "disableTitle": "通知を無効にする",
     "disableMessage": "通知を無効にするには、デバイス設定でオフにしてください。",
-    "openSettings": "設定を開く",
     "registrationFailed": "登録に失敗しました。通知権限を確認してください。",
     "couldNotEnable": "通知を有効にできませんでした。もう一度お試しください。",
     "previewAlways": "常に",
@@ -197,7 +279,6 @@
       "security": "セキュリティ所見"
     },
     "category": {
-      "chatMessagesTitle": "チャットメッセージ",
       "chatMessagesSubtitle": "会話内の返信",
       "agentAttentionTitle": "エージェントが対応を求めています",
       "agentAttentionSubtitle": "質問、権限、入力が必要です",
@@ -205,32 +286,23 @@
       "agentUpdatesSubtitle": "エージェントからのタスク途中のメッセージ",
       "sessionStatusTitle": "セッションの状態",
       "sessionStatusSubtitle": "完了 / 失敗 / 操作可能",
-      "kiloclawActivityTitle": "KiloClawアクティビティ",
       "kiloclawActivitySubtitle": "インスタンスの準備完了/失敗、スケジュールされたアクション",
-      "balanceAlertsTitle": "残高アラート",
       "balanceAlertsSubtitle": "組織の残高不足の警告",
-      "securityFindingsTitle": "セキュリティ所見",
       "securityFindingsSubtitle": "新しい所見とSLAリマインダー"
     }
   },
   "tabs": {
     "home": "ホーム",
-    "agents": "エージェント",
-    "profile": "プロフィール",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}、タブ、{{total}}中{{position}}",
-    "chat": "チャット"
+    "position": "{{name}}、タブ、{{total}}中{{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "インスタンスを切り替え",
       "couldNotLoadInstances": "インスタンスを読み込めませんでした",
-      "noInstances": "KiloClawインスタンスがありません",
       "noInstancesDescription": "チャットを開始するにはインスタンスを設定してください。",
       "setUpKiloclaw": "KiloClawを設定",
-      "currentInstance": "{{title}}、現在",
-      "personal": "個人"
+      "currentInstance": "{{title}}、現在"
     },
     "conversation": {
       "failedToLoad": "会話を読み込めませんでした",
@@ -249,16 +321,12 @@
       "couldNotSignIn": "チャットにサインインできませんでした",
       "couldNotRefreshMessages": "メッセージを更新できませんでした",
       "couldNotLoadHistory": "会話履歴を読み込めませんでした",
-      "rename": "名前を変更",
       "leave": "退出",
       "untitledConversation": "無題の会話",
       "createFailed": "会話を作成できませんでした",
       "leaveFailed": "会話を退出できませんでした"
     },
     "reactions": {
-      "title": "りあくしょん",
-      "close": "リアクションを閉じる",
-      "recent": "最近",
       "common": "共通",
       "reactWith": "{{reaction}}でリアクション",
       "accessibility": "{{emoji}}のリアクション、{{displayCount}}"
@@ -268,16 +336,13 @@
       "cancelReply": "返信をキャンセル",
       "openInstance": "インスタンスを開く",
       "attachFile": "ファイルを添付",
-      "messagePlaceholder": "メッセージ",
-      "cancelEdit": "編集をキャンセル",
-      "sendMessage": "メッセージを送信"
+      "cancelEdit": "編集をキャンセル"
     },
     "conversationList": {
       "couldNotLoad": "会話を読み込めませんでした",
       "emptyTitle": "まだ会話はありません",
       "emptyDescription": "KiloClawインスタンスとチャットを開始するには会話を作成してください。",
       "create": "会話を作成",
-      "starting": "開始中…",
       "newConversation": "新しい会話",
       "openInstanceSettings": "インスタンス設定を開く",
       "today": "今日",
@@ -287,7 +352,6 @@
     },
     "attachment": {
       "open": "{{filename}}を開く",
-      "imageUnavailable": "画像を利用できません",
       "openFailed": "添付ファイルを開けませんでした。接続を確認して、もう一度お試しください。",
       "attachFailed": "ファイルを添付できませんでした",
       "limit": "最大{{displayCount}}個のファイルを添付できます。",
@@ -317,11 +381,9 @@
       "yourMessage": "あなたのメッセージ",
       "messageFrom": "{{author}}からのメッセージ",
       "moreActions": "その他のアクション",
-      "message": "メッセージ",
       "notDelivered": "未配信",
       "edited": "(編集済み)",
-      "image": "画像",
-      "attachment": "添付ファイル"
+      "image": "画像"
     },
     "messageActions": {
       "copied": "こぴーしました",
@@ -329,13 +391,11 @@
       "title": "メッセージの操作",
       "deleteTitle": "メッセージを削除しますか？",
       "deleteMessage": "会話からこのメッセージが削除されます。",
-      "delete": "削除",
       "deleteFailed": "メッセージを削除できませんでした",
       "removeReactionFailed": "リアクションを削除できませんでした",
       "addReactionFailed": "リアクションを追加できませんでした",
       "retrySend": "再送",
       "moreReactions": "その他のリアクション",
-      "reply": "返信",
       "edit": "編集",
       "sendFailed": "メッセージを送信できませんでした",
       "retrySendFailed": "再送できませんでした",
@@ -346,7 +406,6 @@
       "takePhoto": "写真を撮る",
       "photoLibrary": "フォトライブラリ",
       "files": "ファイル",
-      "cameraAccessDisabled": "かめらへのあくせすがむこうです",
       "cameraAccessMessage": "しゃしんをとるには、せっていでかめらへのあくせすをきょかしてください。"
     },
     "typingIndicator": {
@@ -356,10 +415,7 @@
       "typing_other": "{{names}}が入力しています..."
     },
     "botStatus": {
-      "online": "オンライン",
-      "idle": "アイドル",
       "offline": "オフライン",
-      "unknown": "不明",
       "loadingUser": "ユーザーを読み込み中...",
       "waitingForStatus": "ボットのステータスを待機中...",
       "offlineMessage": "ボットはオフラインです。再接続するとメッセージが再開されます。"
@@ -372,7 +428,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClawインスタンスを読み込めませんでした",
     "billing": {
       "title": "請求",
@@ -380,7 +435,6 @@
       "plan": "プラン",
       "finalTermEnds": "最終期間の終了",
       "afterFinalTerm": "最終期間の後",
-      "remaining": "残り",
       "lessThanOneDay": "1日未満",
       "ends": "終了",
       "expires": "失効",
@@ -389,7 +443,6 @@
       "managedByAdmin": "請求は組織の管理者が管理しています。",
       "couldNotLoad": "請求情報を読み込めませんでした",
       "manageOnWeb": "Webで請求を管理",
-      "commitPlan": "こみっと",
       "earlybird": "Earlybird",
       "finalCommitTermEndsOn": "最後のCommit期間は{{date}}に終了します。{{price}}でStandardとして続行するか、ホスティングが終了します。",
       "freeTrial": "無料トライアル",
@@ -406,9 +459,9 @@
       "trialDaysRemaining": "トライアル: 残り{{remaining}}",
       "trialEndingSoon": "トライアル終了間近: {{remaining}}",
       "planName": {
-        "commit": "こみっと",
         "standard": "Standard"
-      }
+      },
+      "commit": "こみっと"
     },
     "changelog": {
       "title": "新着情報",
@@ -431,7 +484,6 @@
       "destroyMessage": "これにより、KiloClawインスタンスとそのすべてのデータが完全に破棄されます。この操作は元に戻せません。",
       "destroyTitle": "インスタンスを破棄",
       "instance": "インスタンス",
-      "renameFailed": "問題が発生しました",
       "couldNotCheckStatus": "サービスのステータスを確認できませんでした",
       "dangerZone": "危険ゾーン",
       "destroying": "破棄中…",
@@ -459,7 +511,6 @@
       "approveDeviceTitle": "デバイスを承認",
       "approveMessage": "{{label}}（コード: {{code}}）がインスタンスに接続することを許可しますか？",
       "approveTitle": "ペアリングリクエストを承認",
-      "device": "デバイス",
       "unknownDevice": "不明なデバイス"
     },
     "execPolicy": {
@@ -474,35 +525,21 @@
       "title": "Googleアカウント",
       "couldNotLoad": "Googleアカウントの状態を読み込めませんでした",
       "disconnected": "Googleアカウントが切断されました。変更を適用するにはインスタンスを再デプロイしてください。",
-      "redeploy": "再デプロイ",
       "setupCommand": "セットアップコマンド",
       "setupCommandHelp": "Googleアカウントを接続するには、Dockerがインストールされた自分のコンピューターのターミナルでこのコマンドを実行してください。",
       "failedToLoadCommand": "セットアップコマンドを読み込めませんでした",
       "gmailNotifications": "Gmail通知",
       "disconnect": "Googleアカウントを切断",
-      "connected": "接続済み",
       "copied": "こぴーしました",
       "copyCommand": "コマンドをコピー",
-      "disabled": "無効",
       "disconnectConfirm": "切断",
       "disconnectMessage": "このインスタンスからGoogleアカウントを削除しますか？これによりGmail通知が無効になります。変更を適用するには、切断後に再デプロイしてください。",
-      "disconnectTitle": "Googleを切断",
-      "enabled": "有効",
-      "notConnected": "未接続"
+      "disconnectTitle": "Googleを切断"
     },
     "modelList": {
-      "title": "すべてのモデル",
-      "searchPlaceholder": "モデルを検索...",
-      "couldNotLoad": "モデルを読み込めませんでした",
-      "clearSearch": "検索をクリア",
       "noMatches": "検索に一致するモデルはありません",
-      "noModels": "利用可能なモデルはありません",
       "noModelsDescription": "モデルは利用可能になるとここに表示されます。",
-      "noResultsFor": "\"{{query}}\"の結果はありません",
-      "recommended": "おすすめ"
-    },
-    "model": {
-      "title": "モデル"
+      "noResultsFor": "\"{{query}}\"の結果はありません"
     },
     "secrets": {
       "title": "シークレット",
@@ -513,11 +550,7 @@
       "removeTitle": "シークレットを削除",
       "saved": "{{label}}を保存しました",
       "allFieldsRequired": "{{label}}に接続するには、すべての項目を入力する必要があります。",
-      "connect": "接続",
-      "connected": "接続済み",
       "hide": "{{label}}を非表示",
-      "notConnected": "未接続",
-      "remove": "削除",
       "removing": "削除中…",
       "saving": "保存中…",
       "setupGuide": "セットアップガイド",
@@ -558,22 +591,16 @@
       "iosTitle": "iOSではKiloClawを利用できません",
       "multipleCurrentConflictBody": "アカウントに複数のアクティブなサブスクリプションが見つかったため、二重請求を避けるために処理を一時停止しました。",
       "multipleCurrentConflictCta": "kilo.aiで続行",
-      "multipleCurrentConflictTitle": "あかうんとのれびゅーがひつようです",
       "nonCanonicalEarlybirdBody": "アーリーアクセスプランをモバイルで使用するには、手動での確認が必要です。",
-      "nonCanonicalEarlybirdCta": "kilo.aiで続行",
       "nonCanonicalEarlybirdTitle": "従来のプランが検出されました",
       "quarantinedBody": "お使いのKiloClawインスタンスは隔離状態にあり、現在使用できません。復元にはチームのサポートが必要です。",
-      "quarantinedCta": "kilo.aiで続行",
       "quarantinedTitle": "インスタンスの修復が必要です",
       "subscriptionCanceledBody": "KiloClawを使用するには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではサブスクライブできません。",
       "subscriptionCanceledCta": "kilo.ai/clawを開く",
       "subscriptionCanceledTitle": "Webでサブスクライブ",
       "subscriptionPastDueBody": "直近のお支払いに問題がありました。ブラウザーからkilo.ai/clawにアクセスして更新してください。アプリ内では請求を管理できません。",
-      "subscriptionPastDueCta": "kilo.ai/clawを開く",
       "subscriptionPastDueTitle": "Webでお支払いを更新",
-      "trialExpiredBody": "KiloClawを引き続き使用するには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではサブスクライブできません。",
-      "trialExpiredCta": "kilo.ai/clawを開く",
-      "trialExpiredTitle": "Webでサブスクライブ"
+      "trialExpiredBody": "KiloClawを引き続き使用するには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではサブスクライブできません。"
     },
     "controls": {
       "redeploying": "再デプロイ中…",
@@ -584,7 +611,6 @@
       "start": "開始",
       "startMessage": "このインスタンスを開始してもよろしいですか？",
       "startTitle": "インスタンスを開始",
-      "starting": "開始中…",
       "stop": "停止",
       "stopMessage": "このインスタンスを停止してもよろしいですか？",
       "stopTitle": "インスタンスを停止",
@@ -594,7 +620,6 @@
       "finishingSetup": "セットアップを完了中",
       "finishingSetupDescription": "お待ちください。アカウントを最終処理しています。通常は少し時間がかかります。",
       "getStarted": "始める",
-      "noInstances": "KiloClawインスタンスがありません",
       "noInstancesDescription": "最初のインスタンスを作成して、コーディングエージェントの実行を開始してください。"
     },
     "instance": {
@@ -606,7 +631,6 @@
     "instanceCard": {
       "fixOnKiloAi": "kilo.aiで修正: {{label}}",
       "needsAttention": "{{name}}の対応が必要です: {{label}}",
-      "open": "{{name}}を開く",
       "openSettings": "{{name}}の設定を開く",
       "openUnread": "{{name}}を開く、未読メッセージ{{displayCount}}件",
       "openUnread_other": "{{name}}を開く、未読メッセージ{{displayCount}}件",
@@ -615,7 +639,6 @@
     "list": {
       "createInstance": "インスタンスを作成",
       "organizations": "組織",
-      "personal": "個人",
       "accessIssue": {
         "trialExpired": "トライアルが終了しました。このインスタンスを使い続けるにはサブスクライブしてください",
         "subscriptionCanceled": "サブスクリプションが無効です。このインスタンスを使い続けるには再サブスクライブしてください",
@@ -628,25 +651,20 @@
     "modelPicker": {
       "autoModelA11y": "{{label}} 自動モデル",
       "balancedDescription": "速度と性能のスマートなバランスを低コストで実現します。",
-      "balancedLabel": "バランス",
       "browseAllModels": "または500以上のモデルから選択",
       "browseAllModelsA11y": "500以上のすべてのモデルを閲覧",
-      "cost": "コスト",
       "currentModel": "現在のモデル",
       "frontierDescription": "最高の性能。推論付きのフロンティアモデルにルーティングします。",
       "frontierLabel": "フロンティア",
-      "kiloAuto": "Kilo Auto",
-      "performance": "せいのう"
+      "kiloAuto": "Kilo Auto"
     },
     "onboarding": {
       "complete": {
         "chatWith": "{{name}}とチャット",
-        "online": "オンライン",
         "ready": "{{name}}の準備ができました",
         "warmedUp": "準備完了です。いつでも話しかけてください。"
       },
       "flow": {
-        "close": "閉じる",
         "couldNotLoad": "オンボーディングの状態を読み込めませんでした",
         "finishingSetup": "セットアップを完了中 — アカウントを最終処理している間お待ちください。",
         "genericErrorBody": "インスタンスのセットアップを完了できませんでした。",
@@ -657,13 +675,11 @@
         "provisioning": "プロビジョニング",
         "ready": "準備完了",
         "review": "れびゅー",
-        "settingUp": "セットアップ中…",
-        "somethingWentWrong": "問題が発生しました"
+        "settingUp": "セットアップ中…"
       },
       "identity": {
         "changePersonality": "性格を変更",
         "chooseAvatar": "アバターを選択",
-        "continue": "続行",
         "location": "場所",
         "locationDeniedMessage": "現在地を使用するには、設定で位置情報へのアクセスを許可してください。",
         "locationDeniedTitle": "位置情報へのアクセスが拒否されました",
@@ -699,7 +715,6 @@
         "backgroundHint": "通常は1分もかかりません。閉じても構いません — バックグラウンドで処理を続けます。",
         "connectingToAgent": "エージェントに接続中",
         "continueInBackground": "バックグラウンドで続行",
-        "finishingSetup": "セットアップを完了中",
         "queryErrorBody": "{{name}}のセットアップを確認中に接続が失われました。処理は続行中かもしれません。もう一度試すか、しばらくしてから確認してください。",
         "queryErrorTitle": "セットアップを確認できませんでした",
         "settingUp": "{{name}}をセットアップ中",
@@ -720,7 +735,6 @@
       "gatewayProcess": "ゲートウェイプロセス",
       "lastExit": "最終終了",
       "memory": "メモリ",
-      "model": "モデル",
       "region": "リージョン",
       "resources": "リソース",
       "restarts": "再起動回数",
@@ -740,19 +754,12 @@
     },
     "settings": {
       "channelsDescription": "Telegram、Discord、Slack",
-      "channelsLabel": "チャンネル",
       "devicePairingDescription": "デバイスリクエストを承認",
-      "devicePairingLabel": "デバイスペアリング",
       "execPolicyDescription": "セキュリティ設定",
-      "execPolicyLabel": "実行ポリシー",
       "googleDescription": "Gmail、カレンダー、ドキュメント",
-      "googleLabel": "Googleアカウント",
       "modelDescription": "AIモデルの選択",
-      "modelLabel": "モデル",
       "secretsDescription": "暗号化された認証情報",
-      "secretsLabel": "シークレット",
-      "versionPinDescription": "特定のバージョンに固定",
-      "versionPinLabel": "バージョン固定"
+      "versionPinDescription": "特定のバージョンに固定"
     },
     "avatar": {
       "arcade": "アーケード",
@@ -797,21 +804,15 @@
       "placeholder": "例：エラー処理の規則を適用…"
     },
     "repos": {
-      "title": "リポジトリ",
-      "couldNotLoad": "リポジトリを読み込めませんでした",
       "unavailable": "リポジトリを利用できません — kilo.aiでBitbucketのセットアップを完了してください。",
       "finishSetup": "セットアップを完了",
       "manageAccess": "アクセスを管理",
-      "allRepositories": "すべてのリポジトリ",
       "bitbucketNoRepositoriesDescription": "このBitbucketワークスペースに利用可能なリポジトリはありません。",
-      "bitbucketSetup": "Bitbucketのセットアップ",
-      "couldNotOpenGithubSettings": "GitHub Appの設定を開けませんでした",
       "gitlabNoRepositoriesDescription": "GitLabでより多くのグループまたはプロジェクトへのアクセスを許可する必要がある場合があります。",
       "installGithubApp": "リポジトリにGitHubアプリをインストール",
       "installGithubAppDescription": "レビュー対象のリポジトリへのアクセスをKilo GitHub Appに許可します。",
       "noRepositoriesFound": "リポジトリが見つかりません",
-      "repositoryAccess": "リポジトリアクセス",
-      "selectedRepositories": "選択したリポジトリ"
+      "repositoryAccess": "リポジトリアクセス"
     },
     "style": {
       "title": "レビュースタイル",
@@ -827,17 +828,13 @@
       "setup": "Bitbucketのセットアップ"
     },
     "bitbucketConnect": {
-      "connect": "接続",
-      "connected": "Bitbucket接続済み",
       "description": "必要なスコープでワークスペースアクセストークンを作成し、下に貼り付けてください。",
       "scopes": "Account: read · Repositories: read/write · Pull requests: read · Webhooks: read/write",
-      "title": "Bitbucketを接続",
       "tokenPlaceholder": "ワークスペースアクセストークン"
     },
     "followReviewMd": "REVIEW.mdに従う",
     "followReviewMdSubtitle": "リポジトリごとのREVIEW.md指示ファイルを尊重する",
     "manualReview": {
-      "connectGitHub": "GitHubを接続",
       "connectProvider": "プロバイダーを接続",
       "connectProviderDescription": "プルリクエストの手動レビューを開始するにはGitHubを接続してください。",
       "couldNotCheckProviderStatus": "プロバイダーのステータスを確認できませんでした",
@@ -845,9 +842,6 @@
       "instructions": "指示（任意）",
       "instructionsPlaceholder": "レビュアーに注目してほしい点があれば入力…",
       "invalidUrl": "有効なプルリクエストURLを入力してください",
-      "model": "モデル",
-      "notConnected": "未接続",
-      "platform": "プラットフォーム",
       "pullRequestUrl": "プルリクエストURL",
       "start": "レビューを開始",
       "starting": "レビューを開始中…",
@@ -857,15 +851,10 @@
     "platformList": {
       "activity": "アクティビティ",
       "checking": "確認中…",
-      "connected": "接続済み",
-      "notConnected": "未接続",
-      "organization": "組織",
       "platforms": "プラットフォーム",
       "statusUnavailable": "ステータスを利用できません"
     },
     "providerConnect": {
-      "connectGitHub": "GitHubを接続",
-      "connectGitLab": "GitLabを接続",
       "description": "Kiloの{{label}}を接続してプルリクエストを自動レビューします。",
       "githubApp": "GitHub App",
       "githubError": "GitHubのセットアップを開けませんでした。もう一度お試しください。",
@@ -873,42 +862,30 @@
       "gitlabError": "GitLabのセットアップを開けませんでした。もう一度お試しください。",
       "bitbucketError": "Bitbucket のセットアップを開けませんでした。もう一度お試しください。"
     },
-    "readOnlyDescription": "これらの設定を変更できるのは組織のオーナーと請求管理者のみです。",
     "reviewDetail": {
-      "branch": "ブランチ",
       "byline": "{{repo}} #{{number}} · {{author}}",
       "cancelMessage": "進行中のコードレビューが停止されます。",
       "cancelReview": "レビューをキャンセル",
       "cancelTitle": "レビューをキャンセルしますか？",
       "checkRun": "チェック実行",
-      "completed": "完了",
-      "cost": "コスト",
       "couldNotGetLatest": "最新の情報を取得できませんでした。",
       "couldNotLoad": "レビューを読み込めませんでした",
       "council": "Council",
       "created": "作成日時",
       "decision": "判定",
-      "details": "詳細",
-      "findings": "所見",
       "gate": "ゲート",
       "gateHidden": "非表示",
       "gateNone": "なし",
-      "keepRunning": "実行を続ける",
-      "model": "モデル",
       "noFindings": "所見はありません",
-      "openPullRequest": "ぷるりくえすとをひらく",
-      "platform": "プラットフォーム",
       "retryMessage": "コードレビューが再実行されます。",
       "retryReview": "レビューを再試行",
       "retryTitle": "レビューを再試行しますか？",
       "showMore": "さらに表示",
       "started": "開始日時",
-      "status": "ステータス",
       "threshold": "しきい値",
       "title": "れびゅー",
       "tokens": "トークン",
       "tokensInOut": "{{input}}入力 / {{output}}出力",
-      "pullRequest": "プルリクエスト",
       "transcriptWaiting": "レビューのトランスクリプトを待っています。",
       "transcriptEmpty": "このレビューのトランスクリプトはありません。",
       "transcriptRetry": "レビューのトランスクリプトを読み込めませんでした。",
@@ -923,8 +900,7 @@
       "sessionError": "セッションエラー: {{error}}",
       "statusWithValue": "ステータス: {{status}}",
       "toolName": "ツール: {{name}}",
-      "toolNameError": "ツール: {{name}} — エラー",
-      "unknownError": "不明なエラー"
+      "toolNameError": "ツール: {{name}} — エラー"
     },
     "reviewList": {
       "configureProvider": "プロバイダーを設定",
@@ -936,7 +912,6 @@
     },
     "reviewMemory": {
       "couldNotLoad": "レビューメモリを読み込めませんでした",
-      "couldNotLoadMore": "これ以上読み込めませんでした",
       "couldNotLoadProposals": "提案を読み込めませんでした",
       "enable": "レビューメモリを有効にする",
       "loading": "レビューメモリを読み込み中",
@@ -946,19 +921,13 @@
       "off": "レビューメモリはオフです",
       "offDescription": "オンにすると、Kiloがメンテナーの返信から学習し、REVIEW.mdのガイダンスを提案します。",
       "readOnlyDescription": "レビューメモリを有効にできるのは組織のオーナーと請求管理者のみです。",
-      "retryLoadingMore": "さらに読み込むのを再試行",
       "title": "レビューメモリ"
     },
     "scopeList": {
-      "couldNotLoad": "組織を読み込めませんでした",
-      "personal": "個人",
       "personalStillAvailable": "個人リポジトリは引き続き下に表示されます。",
-      "personalSubtitle": "自分のリポジトリ",
       "viewOnly": "表示のみ"
     },
-    "selectRepositories": "リポジトリを選択",
     "selectRepository": "自動レビューを有効にするには、少なくとも1つのリポジトリを選択してください。",
-    "title": "コードレビュアー",
     "webhookSetup": "Webhookのセットアップが未完了です",
     "webhookSetupDescription": "一部のリポジトリは自動レビューを受け取れない可能性があります。",
     "decision": {
@@ -967,83 +936,62 @@
       "noResult": "結果なし",
       "pass": "合格"
     },
-    "eyebrow": "コードレビュアー",
     "overview": {
       "allAreas": "すべての領域",
-      "allRepositories": "すべてのリポジトリ",
       "customInstructions": "カスタム指示",
       "focusAreas": "重点領域",
-      "mergeGate": "マージゲート",
-      "model": "モデル",
       "nSelected": "{{displayCount}}件選択",
       "proposedReviewMdGuidance": "提案されたREVIEW.mdガイダンス",
-      "repositories": "リポジトリ",
-      "reviewMemory": "レビューメモリ",
       "reviewStyle": "レビュースタイル",
       "set": "設定"
     },
     "updateFailed": "レビュアーを更新できませんでした",
     "configSaveFailed": "レビュー設定を保存できませんでした",
     "status": {
-      "pending": "保留中",
-      "queued": "きゅーまち",
       "running": "実行中",
       "completed": "完了",
-      "failed": "失敗",
-      "cancelled": "キャンセル済み",
       "interrupted": "中断"
     },
     "reviewStyle": {
       "strict": "厳格",
-      "balanced": "バランス",
       "lenient": "寛容",
       "roast": "容赦なし"
     },
     "focusArea": {
       "security": "セキュリティ",
-      "performance": "せいのう",
       "bugs": "バグ",
       "style": "スタイル",
       "testing": "テスト",
       "documentation": "ドキュメント"
     },
     "gateThreshold": {
-      "off": "オフ",
-      "all": "すべて",
-      "warning": "警告",
-      "critical": "重大"
+      "warning": "警告"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "コードレビュアーに対応が必要です",
         "description": "KiloがアクティブなGitHub Appインストールでこのリポジトリにアクセスできないため、コードレビュアーは無効になりました。GitHub Appのインストールを更新してから、コードレビュアーを再度有効にしてください。",
         "recoveryLabel": "GitHub Appを更新"
       },
       "githubIpAllowList": {
-        "title": "コードレビュアーに対応が必要です",
-        "description": "このGitHub組織がKiloをブロックするIP許可リストを使用しているため、コードレビュアーは無効になりました。サポートが必要な場合はhi@kilocode.aiに連絡してから、コードレビュアーを再度有効にしてください。",
-        "recoveryLabel": "サポートに連絡"
+        "description": "このGitHub組織がKiloをブロックするIP許可リストを使用しているため、コードレビュアーは無効になりました。サポートが必要な場合はhi@kilocode.aiに連絡してから、コードレビュアーを再度有効にしてください。"
       },
       "gitlabProjectAccessRequired": {
-        "title": "コードレビュアーに対応が必要です",
         "description": "KiloがこのプロジェクトのGitLab Project Access Tokenを作成できないため、コードレビュアーは無効になりました。Maintainerアクセスを付与するか、Project Access Tokensを有効にしてから、コードレビュアーを再度有効にしてください。",
         "recoveryLabel": "GitLabインテグレーションを更新"
       },
       "byokInvalidKey": {
-        "title": "コードレビュアーに対応が必要です",
         "description": "選択したBYOK APIキーが無効、失効、または権限がないため、コードレビュアーは無効になりました。キーを更新するか別のモデルを選択してから、コードレビュアーを再度有効にしてください。",
         "recoveryLabel": "BYOK設定を更新"
       },
       "selectedModelUnavailable": {
-        "title": "コードレビュアーに対応が必要です",
         "description": "選択したモデルがクラウドエージェントセッションで利用できないため、コードレビュアーは無効になりました。利用可能なモデルを選択してから、コードレビュアーを再度有効にしてください。",
         "recoveryLabel": "コードレビュアー設定を更新"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "コードレビュアーに対応が必要です",
-        "description": "今日3回のリポジトリクローンタイムアウトが発生したため、コードレビュアーは無効になりました。サポートが必要な場合はhi@kilocode.aiに連絡してから、コードレビュアーを再度有効にしてください。",
-        "recoveryLabel": "サポートに連絡"
-      }
+        "description": "今日3回のリポジトリクローンタイムアウトが発生したため、コードレビュアーは無効になりました。サポートが必要な場合はhi@kilocode.aiに連絡してから、コードレビュアーを再度有効にしてください。"
+      },
+      "title": "コードレビュアーに対応が必要です",
+      "recoveryLabel": "サポートに連絡"
     },
     "unknownError": "不明なエラー"
   },
@@ -1052,24 +1000,12 @@
       "noFilters": "利用可能なフィルターがありません",
       "noFiltersDescription": "戻って、検出結果リストからフィルターを再度開いてください。",
       "title": "検出結果をフィルター",
-      "all": "すべて",
-      "allRepositories": "すべてのリポジトリ",
       "fixed": "修正済み",
       "outcome": "結果",
-      "outcomeAnalyzing": "分析中",
-      "outcomeDismissed": "却下済み",
-      "outcomeExploitable": "悪用可能",
-      "outcomeFailed": "ぶんせきにしっぱい",
-      "outcomeNeedsReview": "確認が必要",
-      "outcomeNotAnalyzed": "未分析",
-      "outcomeNotExploitable": "悪用可能ではない",
-      "outcomeSafeToDismiss": "安全に却下可能",
       "outcomeTriageComplete": "トリアージ完了",
       "overdueOnly": "期限超過のみ",
-      "repository": "リポジトリ",
       "reset": "リセット",
       "severity": "重大度",
-      "severityCritical": "重大",
       "severityHigh": "高",
       "severityLow": "低",
       "severityMedium": "中",
@@ -1078,8 +1014,6 @@
       "sortSeverityAsc": "重大度: 低から高",
       "sortSeverityDesc": "重大度: 高から低",
       "sortSlaDue": "SLA期限",
-      "status": "ステータス",
-      "statusClosed": "くろーずずみ",
       "statusIgnored": "無視",
       "statusOpen": "みかいけつ"
     },
@@ -1093,7 +1027,6 @@
       "exploitable": "悪用可能",
       "fullReport": "生成された完全なレポート",
       "keepWaiting": "待機を続ける",
-      "model": "モデル",
       "no": "いいえ",
       "noAnalysisYet": "まだ分析がありません",
       "noAnalysisYetDescription": "詳細タブから実行してください",
@@ -1106,7 +1039,6 @@
       "suggestedFix": "推奨修正",
       "triageConfidence": "トリアージの信頼度",
       "triageReasoning": "トリアージの理由",
-      "unknown": "不明",
       "watchInCloudAgent": "Cloud Agentで見る",
       "whereFound": "検出場所（{{displayCount}}）",
       "yes": "はい"
@@ -1114,21 +1046,14 @@
     "analysisSettings": {
       "analysisModel": "分析モデル",
       "couldNotLoad": "分析設定を読み込めませんでした",
-      "couldNotLoadModels": "モデルを読み込めませんでした",
       "depth": "分析深度",
-      "modeAuto": "自動",
-      "modeDeep": "詳細",
-      "modeShallow": "簡易",
-      "permissionNote": "これらの設定を変更できるのは、組織のオーナーと請求管理者のみです。",
       "remediationModel": "修復モデル",
       "title": "モデルと分析",
       "triageModel": "トリアージモデル"
     },
     "auditReport": {
-      "checkConnection": "接続を確認して、もう一度お試しください。",
       "couldNotLoad": "監査レポートを読み込めませんでした",
       "events": "イベント",
-      "findings": "所見",
       "generated": "生成日時: {{generatedAt}}",
       "noActivity": "記録されたアクティビティはありません",
       "noActivityDescription": "{{start}}から{{end}}までの期間に、Kiloが報告すべきSecurity Findingアクティビティはありません。",
@@ -1165,7 +1090,6 @@
       "includeExistingFindingsAnalysisSubtitle": "以前に同期された所見も分析します。追加のクレジットを使用する場合があります。",
       "includeExistingFindingsRemediationSubtitle": "分析済みの対象所見もキューに入れます。重複するPRは抑制されたままです。",
       "minimumSeverity": "最低重大度",
-      "permissionNote": "これらの設定を変更できるのは、組織のオーナーと請求管理者のみです。",
       "queued": "{{displayCount}}件の既存の所見が分析待ちです。",
       "queued_other": "{{displayCount}}件の既存の所見が分析待ちです。",
       "queued_one": "{{displayCount}}件の既存の所見が分析待ちです。",
@@ -1176,9 +1100,6 @@
       "severityHighAndAbove": "高以上",
       "severityMediumAndAbove": "中以上",
       "title": "自動化"
-    },
-    "commandRetry": {
-      "discard": "破棄"
     },
     "dashboard": {
       "actFirst": "まず対応",
@@ -1191,7 +1112,6 @@
       "daysOverdue": "{{displayCount}}日超過",
       "deadlineToday": "期限は本日です",
       "filterByRepository": "リポジトリで絞り込み",
-      "findings": "所見",
       "findingsCount": "{{displayCount}}件の所見",
       "highOverdue": "高・期限超過",
       "lastSynced": "最終同期: {{time}}",
@@ -1220,15 +1140,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "未解決の所見",
-      "openFindingsDetail": "重大 {{critical}}、高 {{high}}",
-      "confirmedExploitable": "悪用可能と確認",
       "confirmedExploitableDetail": "分析によりプロジェクトのリスクが確認されました",
-      "needsReview": "確認が必要です",
       "needsReviewDetail": "人間の判断が必要です",
-      "analysisIncomplete": "分析が完了していません",
       "analysisIncompleteDetail": "プロジェクトのリスクはまだ不明です",
       "slaCompliance": "SLA コンプライアンス",
-      "notMeasured": "未測定",
       "withinDeadlineDetail": "{{total}} 件中 {{within}} 件が期限内",
       "noDeadlineData": "SLA 期限のある所見はまだありません",
       "deadlinePassed": "期限切れ",
@@ -1256,31 +1171,22 @@
       "reasonNoBandwidth": "対応する余裕がない",
       "reasonNotUsed": "脆弱なコードは使用されていない",
       "reasonTolerableRisk": "リスクは許容範囲",
-      "submit": "所見を却下",
       "title": "所見を却下"
     },
     "findingDetail": {
-      "couldNotLoad": "この所見を読み込めませんでした",
-      "dismissA11y": "所見を却下",
-      "notFound": "所見が見つかりません",
-      "notFoundDescription": "この所見は削除されたか、アクセス権がなくなった可能性があります。",
       "tabAnalysis": "分析",
-      "tabDetails": "詳細",
       "tabRemediation": "修復",
       "title": "所見"
     },
     "findingDetails": {
       "cve": "CVE",
       "detected": "検出日時",
-      "dismissed": "却下済み",
       "dismissedBecause": "却下理由: {{reason}}。",
-      "fixed": "修正済み",
       "ghsa": "GHSA",
       "manifest": "マニフェスト",
       "noPatchAvailable": "利用可能なパッチはありません",
       "package": "パッケージ",
       "patchedVersion": "修正済みバージョン",
-      "repository": "リポジトリ",
       "severityLabel": "{{severity}}の重大度",
       "slaDeadline": "SLA期限",
       "source": "ソース",
@@ -1288,12 +1194,8 @@
       "sourceRecord": "ソースレコード",
       "supersededBy": "現在の所見に置き換えられました",
       "supersededByDescription": "タップして、ステータス、分析、修復の現在のレコードを開きます。",
-      "unknown": "不明",
-      "updated": "こうしん",
       "viewAdvisory": "GitHubでアドバイザリを表示",
       "vulnerableVersions": "脆弱なバージョン",
-      "statusSuperseded": "置き換え済み",
-      "statusFixed": "修正済み",
       "statusOpen": "みかいけつ",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "修正がすでに開始されている",
@@ -1304,26 +1206,22 @@
       "reasonAfterReview": "確認後"
     },
     "findingList": {
-      "clearFilters": "フィルターをクリア",
       "couldNotLoad": "所見を読み込めませんでした",
       "couldNotLoadMore": "これ以上所見を読み込めませんでした",
       "emptyDescription": "今すぐ対応が必要な未解決の所見はありません。",
       "emptyTitle": "未解決の所見はありません",
       "noMatchesDescription": "選択したフィルターを調整またはクリアしてお試しください。",
-      "noMatchesTitle": "フィルターに一致する所見はありません",
-      "title": "所見"
+      "noMatchesTitle": "フィルターに一致する所見はありません"
     },
     "findingRow": {
       "a11y": "{{severity}}の所見: {{title}}。{{repo}}。{{analysis}}",
       "a11yWithDeadline": "{{severity}}の所見: {{title}}。{{repo}}。{{analysis}}。{{deadline}}",
       "analyze": "分析",
-      "nextNeedsManualReview": "手動確認が必要",
       "nextRemediationAvailable": "修復を利用できます",
       "nextRemediationInProgress": "修復が進行中",
       "nextRemediationPrOpen": "修復PRが開いています",
       "nextRetryRemediation": "修復の再試行を利用できます",
       "nextViewDetails": "詳細を表示",
-      "retryAnalysis": "分析を再試行",
       "runAnalysis": "分析を実行",
       "viewPr": "PRを表示"
     },
@@ -1334,44 +1232,32 @@
       "newFindingSection": "新規所見の通知",
       "newFindingSeverityLabel": "新規所見の最低重大度",
       "newFindingSubtitle": "新しい所見が同期されるたびに送信されます（初回同期を含む）。",
-      "readOnly": "これらの設定を変更できるのは、組織のオーナーと請求管理者のみです。",
       "slaLeadTimeAccessibility": "SLA警告のリードタイム（日数）",
       "slaLeadTimeError": "1から365までの整数の日数を入力してください。",
-      "slaLeadTimeHint": "1から365までの整数を入力してください",
       "slaLeadTimeLabel": "SLA警告のリードタイム（日数）",
       "slaPersonalTitle": "SLA警告についてメールで通知",
       "slaSection": "SLA警告の通知",
       "slaSeverityLabel": "SLA通知の最低重大度",
-      "slaSubtitle": "所見がSLA期限に近づいたとき、および期限を超えたときに送信されます。",
-      "title": "通知"
+      "slaSubtitle": "所見がSLA期限に近づいたとき、および期限を超えたときに送信されます。"
     },
     "remediation": {
       "attemptHistory": "試行履歴（{{displayCount}}）",
       "attemptNumber": "試行 #{{number}}",
-      "branch": "ブランチ",
       "cancelMessage": "Security Agentは進行中の修復試行を停止します。",
       "cancelRemediation": "修復をキャンセル",
       "cancelTitle": "この修復をキャンセルしますか？",
       "cancellationRequested": "キャンセルを要求しました",
       "cancelled": "修復をキャンセルしました",
       "couldNotLoad": "修復ステータスを読み込めませんでした",
-      "keepRunning": "実行を続ける",
-      "model": "モデル",
-      "noAnalysisDescription": "詳細タブから実行してください",
-      "noAnalysisTitle": "まだ分析がありません",
       "openDraftPullRequest": "ドラフトプルリクエスト{{number}}を開く",
       "openPullRequest": "プルリクエスト{{number}}を開く",
       "progress": "進捗",
-      "pullRequest": "プルリクエスト",
       "retry": "修復を再試行",
       "start": "修復を開始",
       "startedBy": "開始者",
       "timeline": {
         "blocked": "修復がブロックされました",
-        "cancelled": "キャンセル済み",
         "failed": "修復に失敗しました",
-        "noChangesNeeded": "変更は不要です",
-        "prOpened": "PRが開かれました",
         "queued": "修復がリクエストされました"
       },
       "queued": "修復をキューに入れました",
@@ -1379,18 +1265,12 @@
       "unavailable": "このけんしゅつにはしゅうふくをりようできません。"
     },
     "repositories": {
-      "allRepositories": "すべてのリポジトリ",
       "couldNotLoad": "リポジトリ設定を読み込めませんでした",
-      "couldNotLoadRepositories": "リポジトリを読み込めませんでした",
-      "couldNotOpenGithubSettings": "GitHub Appの設定を開けませんでした",
       "githubAppSettings": "GitHub Appの設定",
       "manageAccess": "GitHub Appのアクセスを管理",
       "noRepositories": "リポジトリがありません",
       "noRepositoriesDescription": "Kilo GitHub Appにリポジトリへのアクセスを許可してください",
-      "readOnly": "これらの設定を変更できるのは、組織のオーナーと請求管理者のみです。",
-      "selectAtLeastOne": "少なくとも1つのリポジトリを選択してください。",
-      "selectedRepositories": "選択したリポジトリ",
-      "title": "リポジトリ"
+      "selectAtLeastOne": "少なくとも1つのリポジトリを選択してください。"
     },
     "scopeEntry": {
       "connectDescription": "Kilo GitHub Appをインストールして、Dependabotアラートを自動同期し、リポジトリ全体のセキュリティ所見を管理します。",
@@ -1403,43 +1283,23 @@
       "reauthorizeTitle": "追加の権限が必要です",
       "setupFailed": "GitHubセットアップを開始できませんでした。もう一度お試しください。"
     },
-    "scopeList": {
-      "couldNotLoad": "組織を読み込めませんでした",
-      "personal": "個人",
-      "personalSubtitle": "自分のリポジトリ",
-      "title": "せきゅりてぃえーじぇんと"
-    },
     "settingsOverview": {
-      "allRepositories": "すべてのリポジトリ",
       "analysisModeSubtitle": "{{mode}}分析",
-      "automation": "自動化",
       "automationAllOff": "すべてオフ",
       "automationCount": "3件中{{displayCount}}件が有効",
       "couldNotLoadPermissions": "権限を読み込めませんでした",
-      "couldNotLoadRepositories": "リポジトリを読み込めませんでした",
       "couldNotLoadSettings": "Security Agentの設定を読み込めませんでした",
-      "disabled": "無効",
       "disabledNoManage": "Security Agentは無効です。オンにできるのは、組織のオーナーと請求管理者のみです。",
       "disabledNoRepo": "Security Agentを有効にする前に、少なくとも1つのリポジトリを選択してください。",
       "disabledPrompt": "Security Agentをオンにして、Dependabotアラートの同期、リポジトリの選択、自動化の設定を行います。",
-      "enabled": "有効",
-      "modelsAndAnalysis": "モデルと分析",
-      "notifications": "通知",
       "notificationsCount": "2件中{{displayCount}}件が有効",
-      "off": "オフ",
       "on": "オン",
-      "repositories": "リポジトリ",
       "repositoriesCount": "{{displayCount}}件のリポジトリを選択中",
       "repositoriesCount_other": "{{displayCount}}件のリポジトリを選択中",
       "repositoriesCount_one": "{{displayCount}}件のリポジトリを選択中",
-      "securityAgent": "せきゅりてぃえーじぇんと",
-      "selectRepositories": "リポジトリを選択",
-      "selectRepositoriesSubtitle": "Security Agentが監視するリポジトリを選択します",
-      "slaPolicy": "SLAポリシー",
-      "title": "設定"
+      "selectRepositoriesSubtitle": "Security Agentが監視するリポジトリを選択します"
     },
     "settingsSave": {
-      "discard": "破棄",
       "keepEditing": "編集を続ける",
       "saveChanges": "変更を保存",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
@@ -1450,7 +1310,6 @@
     },
     "sla": {
       "couldNotLoad": "SLA設定を読み込めませんでした",
-      "critical": "重大",
       "criticalDescription": "認証なしのリモート悪用。",
       "deadlinesHeading": "修復期限（日数）",
       "enableTracking": "SLAトラッキングを有効化",
@@ -1467,7 +1326,6 @@
       "remediationDeadlineA11y": "{{label}}の修復期限（日数）",
       "title": "SLAポリシー"
     },
-    "title": "せきゅりてぃえーじぇんと",
     "initialSyncAdmissionFailed": "Security Agentは有効になりましたが、初回同期をキューに入れられませんでした。もう一度同期してください。",
     "queuedActionUntracked": "キューに入れたアクションを追跡できなくなりました。更新して最新の状態を確認してください。",
     "commands": {
@@ -1487,49 +1345,33 @@
     },
     "analysisState": {
       "queued": "分析がキューに入りました",
-      "queuedTitle": "分析がキューに入りました",
       "queuedDescription": "分析のキャパシティが解放されるのを待っています。",
       "analyzing": "分析中",
-      "analyzingTitle": "分析中",
       "analyzingDescription": "アプリケーションコードが影響を受ける機能に到達できるかを確認しています。",
       "failed": "ぶんせきにしっぱいしました",
-      "failedTitle": "ぶんせきにしっぱいしました",
       "failedDescription": "Security Agentは分析を完了できませんでした。",
-      "extractionFailed": "確認が必要",
-      "extractionFailedTitle": "確認が必要",
       "extractionFailedDescription": "技術レポートを構造化された結果に変換できませんでした。",
-      "exploitable": "悪用可能",
-      "exploitableTitle": "悪用可能",
       "exploitableDescription": "アプリケーションコードは影響を受ける機能に到達できます。",
       "notExploitable": "到達不可",
-      "notExploitableTitle": "到達不可",
       "notExploitableDescription": "このリポジトリには到達可能なパスは見つかりませんでした。",
       "unknown": "確認が必要",
-      "unknownTitle": "確認が必要",
       "unknownDescription": "分析では、脆弱な機能が到達可能かどうかを確認できませんでした。",
       "safeToDismiss": "安全に却下可能",
-      "safeToDismissTitle": "安全に却下可能",
       "safeToDismissDescription": "トリアージにより、コードベース分析なしで安全に却下できると判断されました。",
-      "manualReview": "確認が必要",
       "manualReviewTitle": "手動確認が必要",
       "manualReviewDescription": "トリアージにより、この所見は手動確認が必要とフラグが立てられました。",
       "analysisRequired": "分析が必要",
       "analysisRequiredTitle": "コードベース分析が必要",
       "analysisRequiredDescription": "トリアージは、対応を決定する前にリポジトリの分析を推奨します。",
-      "completed": "分析済み",
-      "completedTitle": "分析済み",
       "completedDescription": "特定の結果が記録されずに分析が完了しました。",
       "notAnalyzed": "未分析",
-      "notAnalyzedTitle": "未分析",
       "notAnalyzedDescription": "この所見のコードベース分析はまだ実行されていません。"
     },
     "deadline": {
       "fixedBeforeDeadline": "期限前に修正済み",
-      "fixed": "修正済み",
       "fixedOn": "{{date}}に修正",
       "resolutionRecorded": "解決が記録されました",
       "superseded": "置き換え済み",
-      "dismissed": "却下済み",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "期限が設定されていません",
       "noSlaDeadline": "SLA期限なし",
@@ -1545,17 +1387,13 @@
       "dueInDays_one": "{{count}}日後に期限"
     },
     "remediationStatus": {
-      "cancellationRequested": "キャンセルを要求しました",
       "notStarted": "未開始",
-      "queued": "きゅーまち",
       "starting": "開始中",
       "inProgress": "進行中",
       "draftPrOpened": "ドラフトPRが開かれました",
       "prOpened": "PRが開かれました",
       "blocked": "ブロック",
-      "failed": "失敗",
       "noChangesNeeded": "変更は不要です",
-      "cancelled": "キャンセル済み",
       "originAutomaticPolicy": "自動ポリシー",
       "originIncludeExistingPolicy": "既存ポリシーを含める",
       "originManual": "手動",
@@ -1567,7 +1405,6 @@
       "findingNotOpen": "所見はもう未解決ではありません。",
       "repoNotInScope": "リポジトリがSecurity Agent用に選択されていません。",
       "analysisRequired": "修復を開始する前にコードベース分析を実行してください。",
-      "sandboxAnalysisRequired": "修復を開始する前にコードベース分析を実行してください。",
       "staleAnalysis": "分析後に所見が変更されました。修復を開始する前に分析を再実行してください。",
       "notExploitable": "分析では到達可能な脆弱なパスは見つかりませんでした。自動修復は利用できません。",
       "exploitabilityUnknown": "分析では悪用可能性を確認できませんでした。ワンクリック修復の前に手動確認が必要です。",
@@ -1583,12 +1420,10 @@
       "autoRemediationDisabled": "自動修復は無効です。安全ゲートを通過すれば、手動修復はまだ開始できます。",
       "includeExistingDisabled": "既存の所見は自動修復から除外されています。",
       "belowThreshold": "所見が自動修復の重大度しきい値を下回っています。安全ゲートを通過すれば、手動修復はまだ開始できます。",
-      "beforeEnablement": "分析は自動修復が有効になる前に完了しました。安全ゲートを通過すれば、手動修復はまだ開始できます。",
-      "generic": "このけんしゅつにはしゅうふくをりようできません。"
+      "beforeEnablement": "分析は自動修復が有効になる前に完了しました。安全ゲートを通過すれば、手動修復はまだ開始できます。"
     },
     "commandFailure": {
       "ownerCapReached": "分析キャパシティがいっぱいです。アクティブな分析が終了するまで待ってから、再試行してください。",
-      "githubTokenUnavailable": "GitHubの承認に対応が必要です。GitHub Appを再承認してから、再試行してください。",
       "githubAuthInvalid": "GitHubの承認に対応が必要です。GitHub Appを再承認してから、再試行してください。",
       "findingUnavailable": "所見は利用できなくなりました。所見を更新し、未解決のままなら再試行してください。",
       "repositoryUnavailable": "リポジトリがGitHub Appから利用できなくなりました。リポジトリアクセスを更新してから、再試行してください。",
@@ -1608,12 +1443,9 @@
     "search": {
       "searching": "検索中",
       "searchSessions": "セッションを検索",
-      "searchSessionsPlaceholder": "セッションを検索...",
-      "clearSearch": "検索をクリア",
-      "clearFilters": "フィルターをクリア"
+      "searchSessionsPlaceholder": "セッションを検索..."
     },
     "sessionList": {
-      "couldNotLoad": "セッションを読み込めませんでした",
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした",
       "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
       "noMatches": "一致するセッションはありません",
@@ -1628,9 +1460,7 @@
     "sessionRow": {
       "deleteTitle": "セッションを削除しますか？",
       "deleteMessage": "この操作は元に戻せません。",
-      "delete": "削除",
       "deleteSession": "セッションを削除",
-      "rename": "名前を変更",
       "renameMessage": "このセッションの新しい名前を入力",
       "copyId": "セッションIDをコピー",
       "idCopied": "セッションIDをコピーしました",
@@ -1664,7 +1494,6 @@
       "didNotCompleteTitle": "インストールが完了しませんでした",
       "didNotCompleteMessage": "GitHub Appのインストールが完了しませんでした。アプリからもう一度お試しください。"
     },
-    "sessionExited": "セッションが終了しました",
     "remoteSpawnRetryable": "インスタンスに到達できませんでした。接続が切断された可能性があります。",
     "remoteSpawnNonRetryable": "インスタンスがセッションの開始に失敗しました。マシンを確認するか、CLI を更新してください。",
     "remoteSpawnInstanceDisconnected": "選択したインスタンスが切断されました。Cloud Agent でセッションを開始するか、別のインスタンスを選択してください。",
@@ -1676,12 +1505,8 @@
       "title": "セッション",
       "copyErrorDetails": "エラー詳細をコピー",
       "backToSessions": "セッションに戻る",
-      "accessDenied": "アクセスが拒否されました",
-      "accessDeniedDescription": "これを表示する権限がありません。",
       "couldNotLoad": "セッションを読み込めませんでした",
       "failedToLoadDetails": "セッションの詳細を読み込めませんでした",
-      "notFound": "見つかりません",
-      "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。",
       "failedToStopExecution": "実行を停止できませんでした",
       "renameSession": "セッション名を変更",
       "renamePlaceholder": "セッション名",
@@ -1692,7 +1517,6 @@
       "emptyTitle": "メッセージはまだありません",
       "renameAccessibility": "セッション名を変更: {{title}}",
       "cloningSession": "セッションをクローン中",
-      "continue": "続行",
       "couldNotLoadThisSession": "このセッションを読み込めませんでした",
       "cloneFailedRetry": "このセッションを複製できませんでした。もう一度お試しください。",
       "notEnoughCredits": "Cloud Agentを実行するクレジットが不足しています。クレジットを追加して再試行してください。",
@@ -1707,7 +1531,6 @@
     },
     "remoteSession": {
       "failedToCreate": "リモートセッションを作成できませんでした",
-      "exited": "セッションが終了しました",
       "failedToExit": "セッションを終了できませんでした",
       "exitTitle": "セッションを終了しますか？",
       "exitMessage": "実行中のセッションは停止しますが、履歴は保持されます。",
@@ -1725,9 +1548,6 @@
       "retryConnection": "接続を再試行"
     },
     "newSession": {
-      "title": "新しいセッション",
-      "repository": "リポジトリ",
-      "connectGithub": "GitHubを接続",
       "connectGithubDescription": "ブラウザーでGitHubを接続し、ここに戻ってリポジトリを選択してください。",
       "openGithub": "GitHubを開く",
       "refreshRepositories": "リポジトリを更新",
@@ -1744,7 +1564,6 @@
       "commitAndPush": "コミットしてプッシュ",
       "startSession": "セッションを開始",
       "promptPlaceholder": "何に取り組みますか？",
-      "addAttachment": "添付ファイルを追加",
       "couldNotLoadModels": "モデルを読み込めませんでした",
       "prefillRepoAndModelUnavailable": "元のセッションのリポジトリとモデルは利用できなくなりました。以下で選択してください。",
       "prefillRepoUnavailable": "{{repo}}は利用できなくなりました。以下でリポジトリを選択してください。",
@@ -1752,16 +1571,11 @@
       "couldNotReadPendingSessions": "保留中のセッションを読み取れませんでした。もう一度お試しください。",
       "failedToCreate": "セッションを作成できませんでした",
       "couldNotRefreshRepositories": "リポジトリを更新できませんでした。もう一度お試しください。",
-      "discard": "破棄",
       "discardDraftMessage": "プロンプトは失われます。",
       "discardDraftTitle": "下書きを破棄しますか？",
       "discardFailed": "下書きを破棄できませんでした。もう一度お試しください。",
-      "keepEditing": "編集を続ける",
       "remoteHint": "コンピューターで`kilo remote`を実行するか、実行中のCLIセッションで`/remote`を実行して、ローカルのkiloプロセスを制御します。",
-      "bitbucketConnected": "Bitbucket接続済み",
-      "connectBitbucket": "Bitbucketを接続",
       "connectBitbucketDescription": "ブラウザで Bitbucket に接続し、この画面に戻ってリポジトリを選択してください。",
-      "connectGitlab": "GitLabを接続",
       "connectGitlabDescription": "ブラウザで GitLab に接続し、この画面に戻ってリポジトリを選択してください。",
       "couldNotLoadBitbucketRepositories": "Bitbucket のリポジトリを読み込めませんでした",
       "couldNotLoadGithubRepositories": "GitHub のリポジトリを読み込めませんでした",
@@ -1783,18 +1597,10 @@
       "updatedFileCount": "{{displayCount}}件のファイルを更新しました",
       "updatedFileCount_other": "{{displayCount}}件のファイルを更新しました"
     },
-    "toolPatch": {
-      "operationAdded": "追加",
-      "operationDeleted": "削除",
-      "operationUpdated": "こうしん"
-    },
     "toolCard": {
       "accessibility": "{{label}}ツール、{{status}}",
       "accessibilityLabel": "{{name}}ツール、{{status}}",
-      "fileEmpty": "このファイルは空です。",
       "noTasks": "タスクはありません。",
-      "contentTruncated": "コンテンツが切り詰められました",
-      "truncated": "切り詰め",
       "toolRead": "読み取り",
       "toolEdit": "編集",
       "toolWrite": "書き込み",
@@ -1826,9 +1632,7 @@
       "runOn": "実行先",
       "runOnAccessibility": "実行先: {{label}}",
       "couldNotLoad": "インスタンスを読み込めませんでした",
-      "couldNotLoadDescription": "接続を確認して、もう一度お試しください。",
       "cloudAgent": "クラウドエージェント",
-      "loading": "読み込み中…",
       "cloudAgentDescription": "Kiloのクラウドサンドボックスで実行",
       "noCliInstances": "接続されたCLIインスタンスがありません",
       "noCliInstancesDescription": "コンピューター上のプロジェクトで`kilo remote`を実行するか、すでに実行中の場合はKilo CLIを更新してください。",
@@ -1865,12 +1669,9 @@
       "noMatches": "一致なし",
       "noRepositories": "利用可能なリポジトリはありません",
       "noRepositoriesDescription": "アカウントに接続されたリポジトリはありません。",
-      "tryDifferentSearch": "別の検索語をお試しください。",
       "loading": "読み込み中...",
       "accessibility": "リポジトリ: {{label}}",
-      "platformBitbucket": "Bitbucket",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "Bitbucket"
     },
     "messageDetails": {
       "title": "メッセージの詳細",
@@ -1880,13 +1681,10 @@
       "reportAiResponse": "AI応答を報告",
       "reportAiResponseConfirm": "この応答をレビュー対象として報告しますか？",
       "report": "報告",
-      "role": "役割",
       "roleUser": "ユーザー",
       "roleAssistant": "アシスタント",
       "sent": "送信日時",
-      "model": "モデル",
       "costAndTokens": "コストとトークン",
-      "cost": "コスト",
       "input": "入力",
       "output": "出力",
       "reasoning": "推論",
@@ -1894,8 +1692,7 @@
       "cacheWrite": "キャッシュ書き込み",
       "total": "合計",
       "reportAiResponseFailedRetryable": "この応答を報告できませんでした。",
-      "reportAiResponseFailedTerminal": "この応答は報告できません。",
-      "reportAiResponseSubmitted": "報告を送信しました。受領番号 {{receiptId}}"
+      "reportAiResponseFailedTerminal": "この応答は報告できません。"
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -1906,7 +1703,6 @@
       "textDisplay": "テキスト表示",
       "thinking": "思考",
       "thought": "思考",
-      "title": "詳細",
       "showDetails": "詳細を表示",
       "pending": "保留中…",
       "running": "実行中…"
@@ -1929,16 +1725,13 @@
     "filePart": {
       "loadingImage": "画像を読み込み中",
       "imageUnavailableRetry": "画像を利用できません。読み込みを再試行してください",
-      "imageUnavailable": "画像を利用できません",
       "imagePreviewUnavailableInSession": "このセッションでは画像プレビューを利用できません。",
       "viewImage": "画像を表示",
       "viewImageWithAlt": "画像を表示 {{alt}}",
       "imageOutput": "画像出力",
       "imageOutputWithFilename": "画像出力、{{filename}}",
-      "defaultName": "ファイル",
       "openFullScreen": "{{name}}を全画面で開く",
       "preview": "{{name}}をプレビュー",
-      "openFile": "{{name}}を開く",
       "couldNotLoadFile": "このファイルを読み込めませんでした。",
       "couldNotLoadFileRetry": "このファイルを読み込めませんでした。もう一度お試しください。",
       "retryLoadingFile": "ファイルの読み込みを再試行",
@@ -2021,7 +1814,6 @@
       "failure": "{{title}}。",
       "failureRetryAvailable": "{{title}}。再試行できます。",
       "copyToComposer": "コンポーザーにコピー",
-      "queued": "きゅーについかずみ",
       "queuedAccessibility": "メッセージがキューに追加されました",
       "userMessage": "ユーザーメッセージ",
       "assistantMessage": "アシスタントメッセージ",
@@ -2057,12 +1849,10 @@
     },
     "sessionFilter": {
       "title": "セッションをフィルター",
-      "platform": "プラットフォーム",
       "platformCloud": "クラウド",
       "platformExtension": "拡張機能",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "その他",
       "project": "プロジェクト"
@@ -2076,15 +1866,10 @@
     },
     "modelPicker": {
       "title": "モデルを選択",
-      "searchPlaceholder": "モデルを検索...",
-      "noModels": "利用可能なモデルはありません",
       "noModelsDescription": "選択できるモデルはありません。",
-      "favorites": "お気に入り",
-      "recommended": "おすすめ",
-      "allModels": "すべてのモデル"
+      "favorites": "お気に入り"
     },
     "modelSelector": {
-      "model": "モデル",
       "provider": "プロバイダー {{id}}",
       "modelId": "モデル {{id}}",
       "unavailable": "利用不可",
@@ -2108,7 +1893,6 @@
       "uploading": "アップロード中…",
       "uploaded": "アップロード済み",
       "uploadFailedRetry": "アップロードに失敗しました。タップして再試行してください。",
-      "uploadFailedTerminal": "このファイルはアップロードできません。",
       "moveLeft": "{{filename}}を左に移動",
       "moveRight": "{{filename}}を右に移動"
     },
@@ -2120,8 +1904,6 @@
       "camera": "カメラ",
       "photoLibrary": "フォトライブラリ",
       "files": "ファイル",
-      "cameraAccessDisabled": "かめらへのあくせすがむこうです",
-      "cameraAccessMessage": "しゃしんをとるには、せっていでかめらへのあくせすをきょかしてください。",
       "couldNotOpenPhotoPicker": "写真ピッカーを開けませんでした。Kiloを再起動してもう一度お試しください。",
       "maxFilesAllowed": "最大{{displayCount}}個のファイルまで添付できます",
       "onlyAddingFiles": "{{total}}個中{{accepted}}個のファイルのみ追加します（最大{{max}}個）"
@@ -2134,7 +1916,6 @@
       "waitForUploads": "添付ファイルのアップロードが完了するまでお待ちください。",
       "pasteFromClipboard": "クリップボードから貼り付け",
       "stopGenerating": "生成を停止",
-      "sendMessage": "メッセージを送信",
       "selectModelBeforeSending": "送信前にモデルを選択してください",
       "preparingPlaceholder": "環境をセットアップ中...",
       "finalizingPlaceholder": "終了処理中...",
@@ -2148,9 +1929,7 @@
     },
     "chatLink": {
       "linkCopied": "リンクをコピーしました",
-      "reviewPr": "PRをレビュー",
       "openLink": "リンクを開く",
-      "copyLink": "リンクをコピー",
       "shareLink": "リンクを共有",
       "share": "共有",
       "prLinkActions": "PRリンクの操作",
@@ -2190,13 +1969,11 @@
     "contextUsage": {
       "windowUnavailable": "コンテキストウィンドウのサイズを利用できません",
       "tapToViewDetails": "タップしてコンテキストの詳細を表示。",
-      "costPrefix": "コスト {{cost}}",
       "costSuffix": "、コスト {{cost}}",
       "tokensWindowUnavailable": "コンテキスト {{used}}トークン、ウィンドウを利用できません",
       "tokensUsage": "コンテキスト {{window}}トークン中{{used}}トークン、{{percentage}}使用",
       "title": "コンテキスト使用量",
       "used": "使用済み",
-      "remaining": "残り",
       "provider": "プロバイダー",
       "totalCost": "合計コスト",
       "usageReflectsLatest": "使用量は直近に完了したアシスタントの応答を反映しています。",
@@ -2222,8 +1999,7 @@
       "merged": "マージ済みのプルリクエスト",
       "draft": "したがきのぷるりくえすと",
       "updating": "更新中、{{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "プルリクエスト"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "読み込む",
@@ -2251,11 +2027,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "アカウントを読み込めませんでした",
-    "couldNotLoadAccountDescription": "接続を確認して、もう一度お試しください。",
     "couldNotLoadPrivacy": "プライバシー設定を読み込めませんでした",
     "couldNotLoadPrivacyDescription": "デバイスのセキュリティ設定を確認して、もう一度お試しください。",
     "contentReady": "コンテンツ準備完了",
-    "signOut": "サインアウト",
     "retryLoadingAccount": "アカウントの読み込みを再試行",
     "retryLoadingPrivacy": "プライバシー選択の読み込みを再試行"
   },
@@ -2265,7 +2039,6 @@
     "billingPage": "請求ページ"
   },
   "deviceSessions": {
-    "couldNotLoad": "セッションを読み込めませんでした",
     "couldNotLoadDescription": "これが読み込まれるまで、アクティブなセッションは利用できません。",
     "currentDeviceUnidentified": "現在のデバイスを特定できませんでした",
     "noSessions": "アクティブなセッションはありません",
@@ -2273,7 +2046,6 @@
     "onlyKiloAppSignIns": "ここにはKiloアプリのサインインのみ表示されます。エディターとCLIのサインインは表示されません。",
     "signedIn": "{{signedIn}}にサインイン · 最終確認 {{lastSeen}}",
     "thisDevice": "このデバイス",
-    "title": "デバイスセッション",
     "viewProfile": "プロフィールを表示",
     "signOutThisDevice": "このデバイスをサインアウト",
     "signOutThisSession": "このセッションをサインアウト",
@@ -2281,8 +2053,6 @@
     "signOutThisDeviceTitle": "このデバイスをサインアウトしますか？",
     "signOutThisSessionTitle": "このセッションをサインアウトしますか？",
     "signOutThisSessionMessage": "{{device}}がサインアウトされます。最大1時間はAPIアクセスを維持できます。",
-    "signOutConfirm": "サインアウト",
-    "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "webBrowser": "Webブラウザ"
   },
   "forceUpdate": {
@@ -2303,17 +2073,13 @@
   },
   "imageViewer": {
     "close": "{{filename}}を閉じる",
-    "imageUnavailable": "画像を利用できません",
     "share": "{{filename}}を共有"
   },
   "invalidRoute": {
     "description": "このリンクは無効になりました。",
-    "goBack": "戻る",
     "title": "ページが見つかりません"
   },
   "monoScrollBlock": {
-    "contentTruncated": "コンテンツが切り詰められました",
-    "truncated": "切り詰め",
     "wrap": "折り返し",
     "scroll": "スクロール"
   },
@@ -2322,22 +2088,16 @@
     "internetRestored": "インターネット接続が復旧しました"
   },
   "queryError": {
-    "neutralTitle": "問題が発生しました",
     "neutralDescription": "もう一度お試しください。",
     "offlineTitle": "読み込みに失敗しました",
-    "offlineDescription": "問題が発生しました",
-    "permissionTitle": "アクセスが拒否されました",
     "permissionDescription": "これを表示する権限がありません。",
-    "notFoundTitle": "見つかりません",
     "notFoundDescription": "この項目は削除されたか、利用できなくなった可能性があります。",
     "serverTitle": "読み込めませんでした",
     "serverDescription": "当社側で問題が発生しました。もう一度お試しください。"
   },
   "screenHeader": {
     "openMenu": "メニューを開く",
-    "openMenuFor": "{{title}}のメニューを開く",
-    "close": "閉じる",
-    "goBack": "戻る"
+    "openMenuFor": "{{title}}のメニューを開く"
   },
   "picker": {
     "optionsExpired": "オプションの有効期限が切れました",
@@ -2368,10 +2128,7 @@
   },
   "share": {
     "title": "Kiloに共有",
-    "close": "閉じる",
-    "reviewPr": "PRをレビュー",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "新しいセッション",
     "searchPlaceholder": "最近のセッションを検索",
     "connectedCli": "接続されたCLI上",
     "newSessionOn": "{{name}}で新しいセッション",
@@ -2429,7 +2186,6 @@
     "statusCanceling": "Kilo Pass 解約中",
     "statusPastDue": "Kilo Pass 支払い期限超過",
     "monthlyCredits": "毎月{{credits}}のクレジット",
-    "ends": "{{date}}に終了",
     "periodEnd": "期間終了",
     "managedOnGooglePlay": "Google Playで管理",
     "managedInAppStore": "App Storeで管理",
@@ -2441,7 +2197,6 @@
     "unavailableDescription": "Kilo Pass は Android のアプリ内課金では利用できません。Web で管理してください。",
     "webManagementDescription": "この Kilo Pass は Web で管理されています。",
     "legalDisclosure": "Kilo Pass は自動更新の月額サブスクリプションです。購入の確認時に、お支払いは Apple ID に請求されます。サブスクリプションは、現在の期間終了の 24 時間前までに解約しない限り、表示された価格で毎月自動更新されます。App Store のアカウント設定でいつでも管理または解約できます。",
-    "legalPrivacyPolicy": "プライバシーポリシー",
     "legalTermsOfUse": "利用規約 (EULA)",
     "purchaseDifferentAccount": "このApp Store購入はKiloアカウントにリンクされていません。購入に使用したApple Accountにサインインして、もう一度お試しください。",
     "restoreFailed": "購入の復元に失敗しました。もう一度お試しください。",
@@ -2470,7 +2225,6 @@
     "privacyPolicyPrefix": "データは以下に従って取り扱われます：",
     "privacyPolicy": "Kiloプライバシーポリシー",
     "onDevice": "デバイス上",
-    "loading": "読み込み中…",
     "couldNotLoadTranscription": "文字起こし設定を読み込めませんでした。",
     "signInToManageTranscription": "オンライン文字起こしを管理するにはサインインしてください。",
     "onlineTranscription": "オンライン文字起こし",
@@ -2487,7 +2241,6 @@
     "voiceTranscriptionTitle": "音声文字起こし",
     "retentionPrefix": "完全な保持期間、お客様の権利、連絡先情報は以下に記載されています：",
     "backToConsent": "同意に戻る",
-    "back": "戻る",
     "revokeConsent": "同意を取り消す",
     "revokeConsentTitle": "データ共有の同意を取り消しますか？",
     "acceptAndContinue": "同意して続行",
@@ -2521,7 +2274,6 @@
     "productAnalyticsWho": "PostHog。",
     "errorScreenshotsWhat": "エラー発生時のマスク済みスクリーンショットと、一部のセッションのマスク済み録画。",
     "errorScreenshotsWhy": "問題発生時にアプリが表示していた内容を確認するため。",
-    "errorScreenshotsWho": "Sentry。",
     "installAttributionWhat": "インストール元とキャンペーン識別子。",
     "installAttributionWhy": "どのチャネルが新規ユーザーをもたらすかを把握するため。",
     "installAttributionWho": "AppsFlyer。",
@@ -2531,12 +2283,10 @@
     "what": "内容",
     "why": "理由",
     "who": "対象",
-    "continue": "続行",
     "installAttributionPromptMessage": "Kiloは、どのチャネルからこのアプリにたどり着いたかを知るためにのみ、Appleのトラッキング権限を使用します。プロンプトや会話が使用されることはありません。",
     "installAttributionPromptTitle": "インストール元の特定を許可しますか？"
   },
   "prReview": {
-    "accessDenied": "アクセスが拒否されました",
     "accessDeniedDescription": "このプルリクエストを表示する権限がありません。",
     "checkConnection": "接続を確認",
     "checks": {
@@ -2553,8 +2303,7 @@
       "skipped": "{{displayCount}}件スキップ",
       "title": "チェック",
       "viewOnGitHub": "GitHubでPRを表示",
-      "checkDetails": "チェックの詳細",
-      "pullRequest": "プルリクエスト"
+      "checkDetails": "チェックの詳細"
     },
     "composer": {
       "addTitle": "コメントを追加",
@@ -2563,13 +2312,11 @@
       "commentBody": "コメント本文",
       "commentBodyPlaceholder": "コメントを入力",
       "commentNow": "今すぐコメント",
-      "discard": "破棄",
       "discardMessage": "下書きは失われます。",
       "discardTitle": "コメントを破棄しますか？",
       "editTitle": "コメントを編集",
       "insertSuggestion": "提案を挿入",
       "insertSuggestionA11y": "コード提案を挿入",
-      "keepEditing": "編集を続ける",
       "loadFailedTitle": "コメントコンポーザーを読み込めませんでした",
       "ok": "OK",
       "unavailableMessage": "この保留中のコメントはすでに削除されたか、送信されました。",
@@ -2583,12 +2330,9 @@
       "checkFailedTitle": "GitHub接続を確認できませんでした",
       "description": "モバイルでプルリクエストをレビューするには、GitHubアカウントを接続してください。",
       "reconnectDescription": "GitHub接続が取り消されました。モバイルでプルリクエストのレビューを続けるには再接続してください。",
-      "reconnectTitle": "GitHubを再接続",
-      "title": "GitHubを接続"
+      "reconnectTitle": "GitHubを再接続"
     },
     "connectionExpired": "GitHub接続の有効期限が切れました。",
-    "connectionExpiredDescription": "GitHub接続が無効になりました。接続を再確認してください。必要に応じて再接続を求められます。",
-    "connectionExpiredTitle": "GitHub接続の有効期限が切れました",
     "couldNotLoadPullRequest": "プルリクエストを読み込めませんでした",
     "couldNotOpenGitHubAppSettings": "GitHub Appの設定を開けませんでした",
     "description": "説明",
@@ -2598,16 +2342,12 @@
       "addReaction": "リアクションを追加",
       "block": "ブロック",
       "blockedUser": "{{login}}をブロックしました",
-      "closeReactions": "リアクションを閉じる",
       "collapseThread": "スレッドを折りたたむ",
       "commentActions": "コメントの操作",
       "comment": "{{displayCount}}件のコメント",
       "comment_other": "{{displayCount}}件のコメント",
       "couldNotLoad": "ディスカッションを読み込めませんでした",
       "couldNotLoadMore": "これ以上コメントを読み込めませんでした。",
-      "couldNotReply": "返信できませんでした。",
-      "file": "ファイル",
-      "loadMore": "さらに読み込む",
       "loadMoreComments": "さらにコメントを読み込む",
       "loading": "ディスカッションを読み込み中",
       "moderation": {
@@ -2640,20 +2380,16 @@
       "reaction": "けん",
       "reaction_other": "けん",
       "reaction_one": "件",
-      "reactionsTitle": "りあくしょん",
-      "reply": "返信",
       "replyBadRequest": "この返信は投稿できません。スレッドが変更された可能性があります。",
       "replyBody": "返信本文",
       "replyForbidden": "このプルリクエストに返信する権限がありません。",
       "replyPlaceholder": "返信…",
       "reportContent": "コンテンツを報告",
-      "reportSubmitted": "報告を送信しました。受領番号 {{receiptId}}",
       "reportUser": "ユーザーを報告",
       "resolveThread": "スレッドを解決",
       "resolved": "解決済み",
       "retryLoadingMore": "さらにコメントを読み込むのを再試行",
       "reviewFiles": "ファイルをレビュー",
-      "somethingWentWrong": "問題が発生しました",
       "startedRelative": " · {{relative}}に開始",
       "submitReply": "返信を送信",
       "termsAcceptRetry": "利用規約に同意できませんでした。接続を確認して、もう一度お試しください。",
@@ -2693,18 +2429,14 @@
       "noRecentPrs": "最近のPRはありません",
       "noRecentPrsDescription": "上にPRリンクを貼り付けてレビューを開始すると、次回ここに表示されます。",
       "open": "ひらく",
-      "openPullRequest": "ぷるりくえすとをひらく",
       "pasteLink": "プルリクエストリンクを貼り付け",
       "pastePrLink": "PRリンクを貼り付け",
-      "remove": "削除",
       "removeFromRecentsMessage": "このプルリクエストは最近の履歴から削除されます。",
       "removeFromRecentsTitle": "最近の履歴から削除しますか？",
       "removeRecentAccessibility": "{{repo}}を最近の履歴から削除",
-      "title": "PRレビュー",
       "urlAccessibility": "GitHubプルリクエストURL"
     },
     "eventChips": {
-      "approve": "承認",
       "comment": "コメント",
       "label": "レビューイベント",
       "requestChanges": "変更をリクエスト"
@@ -2720,7 +2452,6 @@
       "unified": "統合"
     },
     "fileNavigator": {
-      "checkConnection": "接続を確認して、もう一度お試しください。",
       "couldNotLoadFiles": "ファイルを読み込めませんでした",
       "couldNotLoadMoreFiles": "これ以上ファイルを読み込めませんでした",
       "diffTooLarge": "diffが大きすぎます",
@@ -2789,13 +2520,9 @@
     },
     "inbox": {
       "couldNotLoad": "受信トレイを読み込めませんでした",
-      "couldNotLoadMore": "これ以上読み込めませんでした",
-      "draft": "下書き",
       "loading": "受信トレイを読み込み中",
       "noReviewRequests": "レビューリクエストはありません",
       "noReviewRequestsDescription": "あなたのレビューを待っているプルリクエストがここに表示されます。上にPRリンクを貼り付けることもできます。",
-      "recent": "最近",
-      "retryLoadingMore": "さらに読み込むのを再試行",
       "title": "受信トレイ"
     },
     "installKiloGitHubApp": "Kilo GitHub Appをインストール",
@@ -2832,8 +2559,7 @@
       "noEnabledMethods": "このリポジトリには有効なマージ方法がありません。リポジトリ管理者にマージ、スカッシュ、またはリベースを有効にするよう依頼してください。",
       "partialSuccessBanner": {
         "accessibility": "マージしました。ブランチを削除できませんでした: {{reason}}",
-        "body": "ブランチを削除できませんでした: {{reason}}",
-        "title": "まーじしました"
+        "body": "ブランチを削除できませんでした: {{reason}}"
       },
       "refreshMergeability": "マージ可能性を更新",
       "terminal": {
@@ -2882,8 +2608,6 @@
       "file": "ファイル",
       "file_other": "ファイル",
       "file_one": "ファイル",
-      "stateClosed": "くろーずずみ",
-      "stateDraft": "下書き",
       "stateMerged": "まーじずみ",
       "stateOpen": "おーぷん",
       "stateOpenApproved": "オープン · 承認済み",
@@ -2903,8 +2627,7 @@
       "reviewChangesRequested": "変更を要求",
       "reviewCommented": "コメント済み",
       "reviewPending": "レビュー待ち",
-      "openIssueA11y": "GitHub でイシュー #{{number}} を開く",
-      "reviewDismissed": "却下済み"
+      "openIssueA11y": "GitHub でイシュー #{{number}} を開く"
     },
     "pendingComment": {
       "allQueuedHint": "すべてのコメントは1つのバッチリクエストで送信されます。",
@@ -2912,9 +2635,7 @@
       "deletedAnnouncement": "保留中のコメントを削除しました",
       "editA11y": "{{location}}の保留中のコメントを編集",
       "editOutdatedA11y": "{{location}}の古い保留中のコメントを編集",
-      "emptyBody": "（空）",
       "noCommentsQueued": "キューに入ったコメントはありません。レビューは上記のイベントのみで送信されます。",
-      "outdated": "古い",
       "staleHint": "あなたが書いた後にPRが移動しました。",
       "staleQueueHint": "古いコミットに対して書かれたコメントは送信されません。編集または削除できるようキューに残ります。",
       "summaryA11y": "レビュー概要",
@@ -2923,7 +2644,6 @@
     "pullRequestUnavailable": "プルリクエストを利用できません",
     "pullRequestUnavailableDescription": "このPRは開けません。削除されたか、リポジトリがプライベートであるか、Kilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
-      "checkConnection": "接続を確認",
       "message": "GitHub接続が無効になりました。接続を再確認してください。必要に応じて再接続を求められます。",
       "title": "GitHub接続の有効期限が切れました"
     },
@@ -2933,7 +2653,6 @@
       "shareA11y": "プルリクエストを共有",
       "title": "#{{number}}"
     },
-    "screenTitle": "PRレビュー",
     "sideBySide": {
       "emptyDiffColumn": "空のdiff列",
       "emptyDiffRow": "空のdiff行",
@@ -2943,7 +2662,6 @@
       "oldOnly": "旧のみ: {{text}}"
     },
     "submit": {
-      "delete": "削除",
       "deletePendingMessage": "このコメントはレビューキューから削除されます。",
       "deletePendingTitle": "保留中のコメントを削除しますか？",
       "loadFailedTitle": "レビュー送信を読み込めませんでした",
@@ -2951,7 +2669,6 @@
       "pendingComment_other": "保留中のコメント",
       "pendingComment_one": "保留中のコメント",
       "summaryOptional": "概要（任意）",
-      "title": "レビューを送信",
       "partialPostedMessage": "{{displayFreshCount}}件のコメントを投稿しました。{{displayStaleCount}}件のコメントは古いコミットを指しているため、キューに残りました。",
       "submitCountOfTotal": "{{displayTotalCount}}件中{{displayFreshCount}}件のコメントを送信",
       "submitReview": "レビューを送信",
@@ -2959,10 +2676,8 @@
       "blockedComment": "コメントレビューを投稿するには、概要またはコメントを1件以上追加してください。"
     },
     "fileStatus": {
-      "added": "追加",
       "changed": "変更",
       "copied": "こぴー",
-      "deleted": "削除",
       "modified": "変更",
       "renamed": "リネーム"
     },
@@ -2975,9 +2690,7 @@
       "selectedTapToChange": "{{label}}を選択中。タップして選択を変更",
       "tapToComment": "{{label}}をタップしてコメント",
       "truncationBanner": "変更されたファイル {{total}} 件中、最初の {{limit}} 件を表示中 — GitHub API の制限",
-      "statusAdded": "追加",
       "statusContext": "コンテキスト",
-      "statusDeleted": "削除",
       "lineLabel": "{{status}} {{line}}行: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "（空）"
@@ -3013,7 +2726,6 @@
       "selectDescription": "続行するには、プロフィールから組織を選択してください。",
       "selectOrganization": "組織を選択",
       "unavailableDescription": "この組織は利用できなくなりました。続行するには、プロフィールから組織を選択してください。",
-      "accessDeniedTitle": "アクセスが拒否されました",
       "accessDeniedDescription": "この組織にアクセスする権限がありません。"
     },
     "creditActivity": {
@@ -3032,25 +2744,19 @@
         "accounting_adjustment": "会計調整",
         "credits_expired": "クレジット失効"
       },
-      "loadMore": "さらに読み込む",
-      "loadMoreFailed": "これ以上読み込めませんでした",
       "truncated": "以前のクレジット利用状況が利用可能です。"
     },
     "hub": {
       "balance": "残高",
       "lowBalanceBelow": "{{amount}}未満",
-      "lowBalanceOff": "オフ",
       "organizationSeats": "組織のシート",
       "renamePlaceholder": "組織名を入力",
-      "renameTitle": "組織名を変更",
-      "title": "組織"
+      "renameTitle": "組織名を変更"
     },
     "inviteMember": {
       "emailError": "有効なメールアドレスを入力してください",
-      "emailLabel": "メール",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "メンバーを招待する権限がありません。",
-      "roleLabel": "役割",
       "roleMember": "役割: メンバー",
       "sendInvite": "招待を送信",
       "title": "メンバーを招待"
@@ -3067,18 +2773,13 @@
         "paid": "支払い済み",
         "open": "みはらい",
         "void": "無効",
-        "draft": "下書き",
-        "uncollectible": "回収不能",
-        "unknown": "不明"
+        "uncollectible": "回収不能"
       },
-      "loadMore": "さらに読み込む",
       "loadMoreFailed": "これ以上読み込めませんでした",
       "truncated": "以前の請求書が利用可能です。"
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "残高不足アラートを有効化",
-      "enabled": "有効",
       "notifyEmailsLabel": "通知メール",
       "permissionDenied": "請求アラートを管理する権限がありません。",
       "separateEmailsHint": "複数のメールアドレスはカンマで区切ってください。",
@@ -3102,12 +2803,10 @@
       "emptyDescriptionCanInvite": "この組織で共同作業を始めるには、チームメイトを招待してください。",
       "emptyDescriptionCannotInvite": "チームメイトを招待するよう、オーナーまたは請求管理者に依頼してください。",
       "emptyTitle": "まだメンバーがいません",
-      "inviteMember": "メンバーを招待",
       "invitedDate": "{{date}}に招待",
       "limitPerDay": "{{amount}}/日",
       "manageA11y": "{{name}}を管理",
       "manageInvitationA11y": "{{email}}への招待を管理",
-      "removeConfirm": "削除",
       "removeMember": "メンバーを削除",
       "removeMemberMessage": "{{name}}をこの組織から削除しますか？",
       "revokeConfirm": "取り消し",
@@ -3122,18 +2821,12 @@
         "billingManager": "請求管理者"
       },
       "emailStatusFailed": "メール送信に失敗",
-      "emailStatusPending": "保留中",
       "inviteCreated": "招待を作成しました",
       "pendingInvitations": "保留中の招待",
       "resendInvite": "招待を再送信",
       "shareInviteLink": "招待リンクを共有"
     },
-    "permissionDenied": {
-      "back": "戻る",
-      "title": "アクセスが拒否されました"
-    },
     "usageStats": {
-      "cost": "コスト",
       "inputTokens": "入力トークン",
       "last30Days": "過去30日間",
       "outputTokens": "出力トークン",
@@ -3145,9 +2838,6 @@
       "couldNotLoadStatus": "ステータスを読み込めませんでした",
       "creditProcessingDelayed": "クレジット処理が遅延しています · 自動的に再試行中",
       "ended": "終了済み",
-      "endsOn": "{{date}}に終了",
-      "loading": "読み込み中…",
-      "manageHint": "うぇぶでKilo Passのかんりをひらきます。",
       "notSubscribed": "未登録",
       "overallocated": "パスの割り当てが有料シート数を超えています",
       "paidSeat_one": "{{displayCount}}有料シート",
@@ -3157,7 +2847,6 @@
       "paymentPending": "お支払い保留中",
       "processingBlocked": "処理がブロックされています",
       "processingNeedsReview": "処理に確認が必要です",
-      "retry": "再試行",
       "retryHint": "Kilo Passステータスの読み込みを再試行します。",
       "setupHint": "WebでKilo Passセットアップを開きます。"
     }
@@ -3171,7 +2860,6 @@
     "sendFeedback": "フィードバックを送信"
   },
   "authErrors": {
-    "emailAlreadyUsed": "このメールアドレスのアカウントは、別のサインイン方法ですでに存在します。別の方法を試すか、[$t(login.moreSignInOptions)] を使用してください。",
     "differentOauth": "このメールアドレスのアカウントは、別のサインイン方法ですでに存在します。別の方法を試すか、[$t(login.moreSignInOptions)] を使用してください。",
     "ssoError": "組織では SSO が必要です。[$t(login.moreSignInOptions)] を使用してください。",
     "blocked": "このアカウントはブロックされています。サポートにお問い合わせください。",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "サインインを開始できませんでした。もう一度お試しください。",
     "couldNotOpenBrowser": "ブラウザーを開けませんでした。もう一度お試しください。",
     "signInTimedOut": "サインインがタイムアウトしました。もう一度お試しください。",
-    "signInFailed": "サインインに失敗しました。もう一度お試しください。",
     "networkError": "ネットワークエラーが発生しました。もう一度お試しください。",
     "accessDeniedByUser": "ユーザーによってアクセスが拒否されました",
     "codeExpired": "コードの有効期限が切れました",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "設定に戻る"
   },
   "quickChat": {
-    "title": "チャット",
-    "composer": {
-      "placeholder": "メッセージ"
-    },
     "empty": {
       "title": "チャットを開始",
       "description": "モデルと話すにはメッセージを送信してください。"
     },
-    "working": "作業中",
     "historyRetry": "チャット履歴を読み込めませんでした。",
-    "catalogRetry": "モデルを読み込めませんでした",
     "sendError": "メッセージを送信できませんでした。もう一度お試しください。"
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "エージェントを表示するにはサインインしてください",
     "privacy": "エージェントを表示するには Kilo を開いてください",
     "openAgents": "エージェントを開く",
-    "running": "作業中",
     "needsInput": "入力が必要",
-    "idle": "アイドル",
     "channelName": "アクティブなエージェント",
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
   }

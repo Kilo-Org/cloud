@@ -1588,10 +1588,10 @@ export function SessionDetailContent({
             <Button
               variant="outline"
               size="sm"
-              accessibilityLabel={t('agentChat.session.continue')}
+              accessibilityLabel={t('common.continue')}
               onPress={handleContinueInNewSession}
             >
-              <Text>{t('agentChat.session.continue')}</Text>
+              <Text>{t('common.continue')}</Text>
             </Button>
           </View>
         ) : null}

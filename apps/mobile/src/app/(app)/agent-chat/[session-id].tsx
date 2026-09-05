@@ -171,19 +171,19 @@ export default function SessionDetailScreen() {
     );
     let message = t(
       identityFailed
-        ? 'bootstrap.couldNotLoadAccountDescription'
+        ? 'organization.boundary.loadErrorMessage'
         : 'agentChat.session.failedToLoadDetails'
     );
     let variant: 'neutral' | 'not-found' | 'permission' | 'server' = identityFailed
       ? 'neutral'
       : 'server';
     if (notFound) {
-      title = t('agentChat.session.notFound');
-      message = t('agentChat.session.notFoundDescription');
+      title = t('common.notFound');
+      message = t('queryError.notFoundDescription');
       variant = 'not-found';
     } else if (unauthorized) {
-      title = t('agentChat.session.accessDenied');
-      message = t('agentChat.session.accessDeniedDescription');
+      title = t('common.accessDenied');
+      message = t('queryError.permissionDescription');
       variant = 'permission';
     }
     const retry = identityFailed ? confirmation.retry : () => void sessionQuery.refetch();

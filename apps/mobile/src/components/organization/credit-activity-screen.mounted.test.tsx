@@ -344,7 +344,7 @@ describe('OrganizationCreditActivityScreen pagination', () => {
     const texts = await renderScreen();
 
     expect(texts).toContain('Top-up');
-    expect(texts).toContain("Couldn't load more.");
+    expect(texts).toContain("Couldn't load more");
     expect(texts).not.toContain('Older credit activity is available.');
 
     const retry = buttons.rendered.find(button => button.accessibilityLabel === 'Retry');

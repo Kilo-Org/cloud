@@ -28,7 +28,7 @@ export function PrReviewReviewSubmitScreen() {
   const repo = parseParam(params.repo) ?? '';
   const rawNumber = parseParam(params.number) ?? '';
   const number = Number.parseInt(rawNumber, 10);
-  const title = t('prReview.submit.title');
+  const title = t('prReview.submit.submitReview');
   const eyebrow = `${owner}/${repo}#${rawNumber}`;
   const dismiss = () => {
     router.back();

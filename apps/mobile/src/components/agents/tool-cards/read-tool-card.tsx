@@ -44,7 +44,7 @@ function renderReadCodeBody(
     if (codeBody.text === '') {
       return (
         <Text className="text-xs text-muted-foreground">
-          {i18n.t('agentChat.toolCard.fileEmpty')}
+          {i18n.t('agentChat.filePart.fileEmpty')}
         </Text>
       );
     }

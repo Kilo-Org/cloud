@@ -27,15 +27,119 @@
     "somethingWentWrong": "ஏதோ தவறு நடந்தது",
     "couldNotOpen": "{{label}} திறக்க முடியவில்லை",
     "link": "இணைப்பு",
-    "takingLonger": "இது எதிர்பார்த்ததை விட அதிக நேரம் எடுக்கிறது. நீங்கள் இதை மூடிவிட்டு மீண்டும் சரிபார்க்கலாம்."
+    "takingLonger": "இது எதிர்பார்த்ததை விட அதிக நேரம் எடுக்கிறது. நீங்கள் இதை மூடிவிட்டு மீண்டும் சரிபார்க்கலாம்.",
+    "cameraAccessDisabled": "கேமரா அணுகல் முடக்கப்பட்டது",
+    "copyLink": "இணைப்பை நகலெடு",
+    "reviewPr": "PRஐ மதிப்பாய்வு செய்",
+    "sendMessage": "செய்தியை அனுப்பு",
+    "remaining": "மீதம்",
+    "imageUnavailable": "படம் கிடைக்கவில்லை",
+    "open": "{{name}} ஐ திற",
+    "loading": "ஏற்றுகிறது…",
+    "queued": "வரிசையில்",
+    "cost": "செலவு",
+    "model": "மாதிரி",
+    "reportSubmittedReceipt": "அறிக்கை சமர்ப்பிக்கப்பட்டது. ரசீது {{receiptId}}",
+    "role": "பங்கு",
+    "allModels": "அனைத்து மாதிரிகள்",
+    "noModelsAvailable": "கிடைக்கக்கூடிய மாதிரிகள் இல்லை",
+    "recommended": "பரிந்துரைக்கப்படுகிறது",
+    "searchModels": "மாதிரிகளைத் தேடு...",
+    "bitbucketConnected": "Bitbucket இணைக்கப்பட்டது",
+    "connectBitbucket": "Bitbucket ஐ இணை",
+    "connectGithub": "GitHub உடன் இணை",
+    "connectGitlab": "GitLab ஐ இணை",
+    "discard": "நிராகரி",
+    "repository": "களஞ்சியம்",
+    "newSession": "புதிய அமர்வு",
+    "details": "விவரங்கள்",
+    "pullRequest": "இழுப்பு கோரிக்கை",
+    "sessionExited": "அமர்வு வெளியேறியது",
+    "github": "GitHub",
+    "gitlab": "GitLab",
+    "accessDenied": "அணுகல் மறுக்கப்பட்டது",
+    "notFound": "காணப்படவில்லை",
+    "platform": "தளம்",
+    "contentTruncated": "உள்ளடக்கம் துண்டிக்கப்பட்டது",
+    "truncated": "துண்டிக்கப்பட்டது",
+    "added": "சேர்க்கப்பட்டது",
+    "deleted": "நீக்கப்பட்டது",
+    "updated": "புதுப்பிக்கப்பட்டது",
+    "clearFilters": "வடிகட்டிகளை அழி",
+    "clearSearch": "தேடலை அழி",
+    "couldNotLoadSessions": "அமர்வுகளை ஏற்ற முடியவில்லை",
+    "delete": "நீக்கு",
+    "rename": "மறுபெயரிடு",
+    "idle": "செயலற்று",
+    "online": "ஆன்லைன்",
+    "starting": "தொடங்குகிறது…",
+    "noKiloclawInstances": "KiloClaw நிகழ்வுகள் இல்லை",
+    "personal": "தனிப்பட்ட",
+    "reply": "பதிலளி",
+    "closeReactions": "எதிர்வினைகளை மூடு",
+    "recent": "சமீபத்திய",
+    "connect": "இணை",
+    "codeReviewer": "குறியீடு மதிப்பாய்வாளர்",
+    "performance": "செயல்திறன்",
+    "all": "அனைத்தும்",
+    "critical": "முக்கியமானது",
+    "off": "ஆஃப்",
+    "notConnected": "இணைக்கப்படவில்லை",
+    "allRepositories": "அனைத்து களஞ்சியங்கள்",
+    "repositories": "களஞ்சியங்கள்",
+    "connected": "இணைக்கப்பட்டது",
+    "organization": "நிறுவனம்",
+    "couldNotLoadRepositories": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
+    "selectedRepositories": "தேர்ந்தெடுக்கப்பட்ட களஞ்சியங்கள்",
+    "branch": "கிளை",
+    "findings": "கண்டுபிடிப்புகள்",
+    "keepRunning": "இயங்க வை",
+    "status": "நிலை",
+    "retryLoadingMore": "மேலும் ஏற்றுவதை மீண்டும் முயற்சி",
+    "balanced": "சமநிலையானது",
+    "couldNotLoadOrganizations": "நிறுவனங்களை ஏற்ற முடியவில்லை",
+    "yourOwnRepositories": "உங்கள் சொந்த களஞ்சியங்கள்",
+    "selectRepositories": "களஞ்சியங்களைத் தேர்ந்தெடு",
+    "cancelled": "ரத்து செய்யப்பட்டது",
+    "failed": "தோல்வியடைந்தது",
+    "pending": "நிலுவையில்",
+    "deviceSessions": "சாதன அமர்வுகள்",
+    "working": "வேலை செய்கிறது",
+    "goBack": "பின் செல்",
+    "ends": "{{date}} அன்று முடிகிறது",
+    "privacyPolicy": "தனியுரிமைக் கொள்கை",
+    "disabled": "முடக்கப்பட்டது",
+    "enabled": "இயக்கப்பட்டது",
+    "couldNotLoadModels": "மாதிரிகளை ஏற்ற முடியவில்லை",
+    "close": "மூடு",
+    "remove": "நீக்கு",
+    "kiloclaw": "KiloClaw",
+    "notifications": "அறிவிப்புகள்",
+    "loadMore": "மேலும் ஏற்று",
+    "email": "மின்னஞ்சல்",
+    "draft": "வரைவு",
+    "prReview": "PR மதிப்பாய்வு",
+    "dismissed": "நிராகரிக்கப்பட்டது",
+    "closed": "மூடப்பட்டது",
+    "preferences": "விருப்பத்தேர்வுகள்",
+    "agents": "முகவர்கள்",
+    "securityAgent": "பாதுகாப்பு முகவர்",
+    "profile": "சுயவிவரம்",
+    "chat": "அரட்டை",
+    "file": "கோப்பு",
+    "keepEditing": "தொடர்ந்து திருத்து",
+    "signOut": "வெளியேறு",
+    "unknown": "தெரியவில்லை",
+    "message": "செய்தி",
+    "reactions": "எதிர்வினைகள்",
+    "openPullRequest": "இழுப்பு கோரிக்கையைத் திற",
+    "couldnTLoadMore": "மேலும் ஏற்ற முடியவில்லை"
   },
   "language": {
-    "title": "மொழி",
     "restarting": "மொழியைப் பயன்படுத்த மறுதொடக்கம்",
     "couldNotRestart": "மறுதொடக்கம் செய்ய முடியவில்லை",
     "languageSaved": "உங்கள் மொழி சேமிக்கப்பட்டது.",
     "catalogLoadFailed": "மொழியை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
-    "retry": "மீண்டும் முயற்சி",
     "search": "மொழிகளைத் தேடு",
     "noMatches": "எந்த மொழியும் பொருந்தவில்லை",
     "deviceLanguage": "சாதன மொழி",
@@ -51,7 +155,6 @@
     "signInCodeAccessibility": "உள்நுழைவு குறியீடு: {{code}}",
     "openSignInPageInBrowser": "உள்நுழைவு பக்கத்தை உலாவியில் திற",
     "copySignInLink": "உள்நுழைவு இணைப்பை நகலெடு",
-    "copyLink": "இணைப்பை நகலெடு",
     "cancelSignIn": "உள்நுழைவை ரத்து செய்",
     "startingSignIn": "உள்நுழைவு தொடங்குகிறது...",
     "organizationUsesSso": "உங்கள் நிறுவனம் ஒற்றை உள்நுழைவைப் பயன்படுத்துகிறது.",
@@ -62,23 +165,19 @@
     "emailAddress": "மின்னஞ்சல் முகவரி",
     "emailPlaceholder": "you@example.com",
     "continueWithEmail": "மின்னஞ்சலுடன் தொடரவும்",
-    "continue": "தொடரவும்",
     "enterCodeSentTo": "{{email}} க்கு அனுப்பப்பட்ட குறியீட்டை உள்ளிடவும்",
     "codeArrivalHint": "இந்த முகவரி தகுதி பெற்றிருந்தால், குறியீடு ஒரு நிமிடத்திற்குள் வரும்.",
     "verifyCode": "குறியீட்டைச் சரிபார்",
     "resendCode": "குறியீட்டை மீண்டும் அனுப்பு",
-    "back": "பின்",
     "termsPrefix": "தொடர்வதன் மூலம் நீங்கள் எங்கள்",
     "terms": "விதிமுறைகளை",
     "termsConnector": " மற்றும் ",
     "termsSuffix": ".",
-    "privacyPolicy": "தனியுரிமைக் கொள்கை",
     "moreSignInOptions": "மேலும் உள்நுழைவு விருப்பங்கள்",
     "couldNotCompleteSignIn": "உள்நுழைவை முடிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     "sessionEnded": "உங்கள் அமர்வு முடிவடைந்தது. மீண்டும் உள்நுழையவும்.",
     "signInCodeExpired": "உங்கள் உள்நுழைவு குறியீடு காலாவதியானது. மீண்டும் முயற்சிக்கவும்.",
     "accessDenied": "அணுகல் மறுக்கப்பட்டது.",
-    "somethingWentWrong": "ஏதோ தவறு நடந்தது. மீண்டும் முயற்சிக்கவும்.",
     "codeSent": "குறியீடு அனுப்பப்பட்டது",
     "accountCreated": "கணக்கு உருவாக்கப்பட்டது. Kilo விற்கு வரவேற்கிறோம்.",
     "pleaseEnterEmail": "உங்கள் மின்னஞ்சல் முகவரியை உள்ளிடவும்.",
@@ -86,24 +185,16 @@
     "or": "அல்லது"
   },
   "profile": {
-    "title": "சுயவிவரம்",
-    "agents": "முகவர்கள்",
-    "codeReviewer": "குறியீடு மதிப்பாய்வாளர்",
     "codeReviewerSubtitle": "தானியங்கி PR மதிப்பாய்வுகள்",
-    "securityAgent": "பாதுகாப்பு முகவர்",
     "securityAgentSubtitle": "பாதிப்புகளைக் கண்டறிந்து சரிசெய்யவும்",
     "reviews": "மதிப்பாய்வுகள்",
-    "prReview": "PR மதிப்பாய்வு",
     "prReviewSubtitle": "மொபைலில் இழுப்பு கோரிக்கைகளை மதிப்பாய்வு செய்யவும்",
-    "organization": "நிறுவனம்",
     "couldNotLoadOrganization": "நிறுவனத்தை ஏற்ற முடியவில்லை",
     "couldNotLoadOrganizationDescription": "இது ஏற்றப்படும் வரை நிறுவன மற்றும் முகவர் அமைப்புகள் கிடைக்காது.",
     "linkedAccounts": "இணைக்கப்பட்ட கணக்குகள்",
     "couldNotLoadAccounts": "கணக்குகளை ஏற்ற முடியவில்லை",
     "app": "பயன்பாடு",
-    "preferences": "விருப்பத்தேர்வுகள்",
     "preferencesSubtitle": "தோற்றம், அறிவிப்புகள், சிந்தனை மற்றும் திரை நடத்தை",
-    "deviceSessions": "சாதன அமர்வுகள்",
     "deviceSessionsSubtitle": "மற்ற சாதனங்களை மதிப்பாய்வு செய்து வெளியேறவும்",
     "feedback": "கருத்து",
     "privacyChoices": "தனியுரிமைத் தேர்வுகள்",
@@ -118,34 +209,27 @@
     "creditBalanceEmpty": "உங்கள் கடன் இருப்பு காலியாக உள்ளது. இந்த கணக்கிற்கு iOS பயன்பாட்டிற்கு வெளியே கடன்கள் நிர்வகிக்கப்படுகின்றன.",
     "signOutTitle": "வெளியேறவா?",
     "signOutMessage": "உங்கள் பணியிடத்தை அணுக மீண்டும் உள்நுழைய வேண்டும்.",
-    "signOutConfirm": "வெளியேறு",
     "deleteAccountTitle": "கணக்கை நீக்கவா?",
     "deleteAccountMessage": "இது உங்கள் கணக்கை நிரந்தரமாக நீக்கி உங்களை வெளியேற்றும். உறுதிப்படுத்தல் குறியீட்டை மின்னஞ்சல் செய்வோம்.",
     "deleteAccountConfirm": "கணக்கை நீக்கு",
     "accountDeleted": "உங்கள் கணக்கு நீக்கப்பட்டது.",
     "viewOrganization": "நிறுவனத்தைப் பார்",
     "manageOrganization": "நிறுவனத்தை நிர்வகி",
-    "personal": "தனிப்பட்ட",
     "selectAccount": "கணக்கைத் தேர்ந்தெடு",
     "providerAnaconda": "Anaconda",
     "providerApple": "Apple",
     "providerDiscord": "Discord",
-    "providerEmail": "மின்னஞ்சல்",
     "providerTestAccount": "சோதனை கணக்கு",
-    "providerGithub": "GitHub",
-    "providerGitlab": "GitLab",
     "providerGoogle": "Google",
     "providerLinkedin": "LinkedIn",
     "providerEnterpriseSso": "நிறுவன SSO"
   },
   "preferences": {
-    "title": "விருப்பத்தேர்வுகள்",
     "autoExpandThinking": "சிந்தனையை தானாக விரிவாக்கு",
     "autoExpandThinkingSubtitle": "முடிவடையும் போது முகவரின் சிந்தனையை விரிவாகக் காட்டவும்.",
     "keepScreenOn": "அமர்வு பக்கத்தில் இருக்கும் போது திரையை இயக்கத்தில் வை",
     "keepScreenOnSubtitle": "அமர்வு வேலை செய்யும் போது திரையை விழித்திருக்க வை.",
     "appearance": "தோற்றம்",
-    "notifications": "அறிவிப்புகள்",
     "notificationsSubtitle": "அழுத்து விருப்பத்தேர்வுகள்",
     "appearanceSystem": "கணினி",
     "appearanceLight": "வெளிச்சம்",
@@ -161,7 +245,6 @@
   "prReview": {
     "pullRequestUnavailable": "இழுப்பு கோரிக்கை கிடைக்கவில்லை",
     "pullRequestUnavailableDescription": "இந்த PR ஐ திறக்க முடியாது. அது நீக்கப்பட்டிருக்கலாம், களஞ்சியம் தனிப்பட்டதாக இருக்கலாம், அல்லது Kilo GitHub App நிறுவப்படவில்லை.",
-    "accessDenied": "அணுகல் மறுக்கப்பட்டது",
     "accessDeniedDescription": "இந்த இழுப்பு கோரிக்கையைப் பார்க்க உங்களுக்கு அனுமதி இல்லை.",
     "noFilesChanged": "கோப்புகள் மாற்றப்படவில்லை",
     "noFilesChangedDescription": "இந்த இழுப்பு கோரிக்கைக்கு கோப்பு மாற்றங்கள் இல்லை.",
@@ -177,7 +260,6 @@
     },
     "fileNavigator": {
       "couldNotLoadFiles": "கோப்புகளை ஏற்ற முடியவில்லை",
-      "checkConnection": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
       "retryLoadingFiles": "கோப்புகளை ஏற்றுவதை மீண்டும் முயற்சி",
       "filterPlaceholder": "பாதையின் மூலம் கோப்புகளை வடிகட்டு",
       "viewedCount": "{{viewed}} / {{total}} பார்க்கப்பட்டது",
@@ -289,7 +371,6 @@
         "closed": "இந்த இழுப்பு கோரிக்கை மூடப்பட்டது"
       },
       "partialSuccessBanner": {
-        "title": "இணைக்கப்பட்டது",
         "body": "கிளையை நீக்க முடியவில்லை: {{reason}}",
         "accessibility": "இணைக்கப்பட்டது. கிளையை நீக்க முடியவில்லை: {{reason}}"
       },
@@ -331,7 +412,6 @@
       "unresolveThread": "நூலை தீர்க்காமல் வை",
       "resolved": "தீர்க்கப்பட்டது",
       "outdated": "காலாவதியானது",
-      "file": "கோப்பு",
       "comment_one": "1 கருத்து",
       "comment": "{{displayCount}} கருத்துகள்",
       "comment_other": "{{displayCount}} கருத்துகள்",
@@ -339,9 +419,6 @@
       "couldNotLoadMore": "மேலும் கருத்துகளை ஏற்ற முடியவில்லை.",
       "retryLoadingMore": "மேலும் கருத்துகளை ஏற்றுவதை மீண்டும் முயற்சி",
       "loadMoreComments": "மேலும் கருத்துகளை ஏற்று",
-      "loadMore": "மேலும் ஏற்று",
-      "closeReactions": "எதிர்வினைகளை மூடு",
-      "reactionsTitle": "எதிர்வினைகள்",
       "addReaction": "எதிர்வினை சேர்",
       "reactionPill": "{{emoji}} எதிர்வினை, {{displayCount}} {{countLabel}}",
       "reaction_one": "எதிர்வினை",
@@ -352,14 +429,11 @@
       "reportUser": "பயனரைப் புகார் செய்",
       "mute": "முடக்கு",
       "block": "தடு",
-      "somethingWentWrong": "ஏதோ தவறு நடந்தது",
-      "reportSubmitted": "அறிக்கை சமர்ப்பிக்கப்பட்டது. ரசீது {{receiptId}}",
       "blockedUser": "{{login}} தடுக்கப்பட்டது",
       "mutedUser": "{{login}} முடக்கப்பட்டது",
       "replyPlaceholder": "பதில்…",
       "replyBody": "பதில் உடல்",
       "submitReply": "பதிலை சமர்ப்பி",
-      "reply": "பதிலளி",
       "termsTitle": "சேவை விதிமுறைகள்",
       "termsCopy": "இடுகையிட நீங்கள் 13 அல்லது அதற்கு மேல் இருக்க வேண்டும்.",
       "termsAcceptRetry": "விதிமுறைகளை ஏற்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
@@ -367,7 +441,6 @@
       "acceptTerms": "ஏற்கவும்",
       "replyBadRequest": "இந்த பதிலை இடுகையிட முடியாது. நூல் மாறியிருக்கலாம்.",
       "replyForbidden": "இந்த இழுப்பு கோரிக்கைக்கு பதிலளிக்க உங்களுக்கு அனுமதி இல்லை.",
-      "couldNotReply": "பதிலளிக்க முடியவில்லை.",
       "moderation": {
         "reportContent": {
           "terminal": "இந்த கருத்தைப் புகார் செய்ய முடியாது.",
@@ -420,8 +493,6 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub App அமைப்புகளைத் திறக்க முடியவில்லை",
     "installKiloGitHubApp": "Kilo GitHub App ஐ நிறுவு",
-    "connectionExpiredTitle": "GitHub இணைப்பு காலாவதியானது",
-    "connectionExpiredDescription": "உங்கள் GitHub இணைப்பு இனி செல்லுபடியாகாது. உங்கள் இணைப்பை மீண்டும் சரிபார்க்கவும் — தேவைப்பட்டால் மீண்டும் இணைக்க கேட்கப்படுவீர்கள்.",
     "checkConnection": "இணைப்பைச் சரிபார்",
     "couldNotLoadPullRequest": "இழுப்பு கோரிக்கையை ஏற்ற முடியவில்லை",
     "description": "விளக்கம்",
@@ -430,21 +501,18 @@
     "reviewPullRequest": "இழுப்பு கோரிக்கையை மதிப்பாய்வு செய்",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "title": "PR மதிப்பாய்வு",
       "eyebrow": "URL மூலம் இழுப்பு கோரிக்கையைத் திற",
       "pastePrLink": "PR இணைப்பை ஒட்டவும்",
       "noRecentPrs": "சமீபத்திய PR இல்லை",
       "noRecentPrsDescription": "மதிப்பாய்வைத் தொடங்க மேலே ஒரு PR இணைப்பை ஒட்டவும் — அடுத்த முறை அது இங்கே காட்டப்படும்.",
       "couldNotLoad": "ஏற்ற முடியவில்லை",
-      "remove": "நீக்கு",
       "removeFromRecentsTitle": "சமீபத்தியவற்றிலிருந்து அகற்றவா?",
       "removeFromRecentsMessage": "இந்த இழுப்பு கோரிக்கை உங்கள் சமீபத்தியவற்றிலிருந்து அகற்றப்படும்.",
       "removeRecentAccessibility": "{{repo}} ஐ சமீபத்தியவற்றிலிருந்து அகற்று",
       "urlAccessibility": "GitHub இழுப்பு கோரிக்கை URL",
       "clearLink": "இழுப்பு கோரிக்கை இணைப்பை அழி",
       "pasteLink": "இழுப்பு கோரிக்கை இணைப்பை ஒட்டவும்",
-      "open": "திற",
-      "openPullRequest": "இழுப்பு கோரிக்கையைத் திற"
+      "open": "திற"
     },
     "checks": {
       "title": "சோதனைகள்",
@@ -460,19 +528,14 @@
       "pending": "{{displayCount}} நிலுவையில் உள்ளது",
       "skipped": "{{displayCount}} தவிர்க்கப்பட்டது",
       "checksCount": "{{displayCount}} சோதனைகள்",
-      "checkDetails": "சோதனை விவரங்கள்",
-      "pullRequest": "இழுப்பு கோரிக்கை"
+      "checkDetails": "சோதனை விவரங்கள்"
     },
     "inbox": {
       "title": "இன்பாக்ஸ்",
-      "recent": "சமீபத்திய",
-      "draft": "வரைவு",
       "loading": "இன்பாக்ஸ் ஏற்றப்படுகிறது",
       "noReviewRequests": "மதிப்பாய்வு கோரிக்கைகள் இல்லை",
       "noReviewRequestsDescription": "உங்கள் மதிப்பாய்வுக்காக காத்திருக்கும் இழுப்பு கோரிக்கைகள் இங்கே காட்டப்படும். மேலே எந்த PR இணைப்பையும் ஒட்டலாம்.",
-      "couldNotLoad": "இன்பாக்ஸை ஏற்ற முடியவில்லை",
-      "couldNotLoadMore": "மேலும் ஏற்ற முடியவில்லை",
-      "retryLoadingMore": "மேலும் ஏற்றுவதை மீண்டும் முயற்சி"
+      "couldNotLoad": "இன்பாக்ஸை ஏற்ற முடியவில்லை"
     },
     "composer": {
       "commentBodyPlaceholder": "கருத்தை விடுங்கள்",
@@ -487,8 +550,6 @@
       "loadFailedTitle": "கருத்து இசையமைப்பியை ஏற்ற முடியவில்லை",
       "discardTitle": "கருத்தை நிராகரிக்கவா?",
       "discardMessage": "உங்கள் வரைவு இழக்கப்படும்.",
-      "keepEditing": "தொடர்ந்து திருத்து",
-      "discard": "நிராகரி",
       "comment": "கருத்து",
       "insertSuggestionA11y": "குறியீடு பரிந்துரையைச் செருகு",
       "insertSuggestion": "பரிந்துரையைச் செருகு",
@@ -496,12 +557,10 @@
       "suggestionsOnlyAddedLines": "பரிந்துரைகள் சேர்க்கப்பட்ட வரிகளுக்கு மட்டுமே பொருந்தும்.",
       "tapDiffLineToSuggest": "பரிந்துரைகளை இயக்க diff வரியைத் தட்டவும்."
     },
-    "screenTitle": "PR மதிப்பாய்வு",
     "connect": {
       "checkFailedTitle": "GitHub இணைப்பைச் சரிபார்க்க முடியவில்லை",
       "checkFailedMessage": "இது ஏற்றப்படும் வரை உள்நுழைவு நிலை கிடைக்காது.",
       "reconnectTitle": "GitHub உடன் மீண்டும் இணை",
-      "title": "GitHub உடன் இணை",
       "reconnectDescription": "உங்கள் GitHub இணைப்பு ரத்து செய்யப்பட்டது. மொபைலில் இழுப்பு கோரிக்கைகளைத் தொடர்ந்து மதிப்பாய்வு செய்ய மீண்டும் இணைக்கவும்.",
       "description": "மொபைலில் இழுப்பு கோரிக்கைகளை மதிப்பாய்வு செய்ய உங்கள் GitHub கணக்கை இணைக்கவும்."
     },
@@ -510,11 +569,9 @@
       "shareA11y": "இழுப்பு கோரிக்கையைப் பகிர்"
     },
     "submit": {
-      "title": "மதிப்பாய்வை சமர்ப்பி",
       "loadFailedTitle": "மதிப்பாய்வு சமர்ப்பிப்பை ஏற்ற முடியவில்லை",
       "deletePendingTitle": "நிலுவை கருத்தை நீக்கவா?",
       "deletePendingMessage": "இந்த கருத்து மதிப்பாய்வு வரிசையிலிருந்து அகற்றப்படும்.",
-      "delete": "நீக்கு",
       "summaryOptional": "சுருக்கம் (விருப்பம்)",
       "pendingComment_one": "நிலுவை கருத்து",
       "pendingComment": "நிலுவை கருத்துகள்",
@@ -527,19 +584,15 @@
     },
     "reconnectNotice": {
       "title": "GitHub இணைப்பு காலாவதியானது",
-      "message": "உங்கள் GitHub இணைப்பு இனி செல்லுபடியாகாது. உங்கள் இணைப்பை மீண்டும் சரிபார்க்கவும் — தேவைப்பட்டால் மீண்டும் இணைக்க கேட்கப்படுவீர்கள்.",
-      "checkConnection": "இணைப்பைச் சரிபார்"
+      "message": "உங்கள் GitHub இணைப்பு இனி செல்லுபடியாகாது. உங்கள் இணைப்பை மீண்டும் சரிபார்க்கவும் — தேவைப்பட்டால் மீண்டும் இணைக்க கேட்கப்படுவீர்கள்."
     },
     "eventChips": {
       "comment": "கருத்து",
       "requestChanges": "மாற்றங்களைக் கோரவும்",
-      "approve": "அங்கீகரி",
       "label": "மதிப்பாய்வு நிகழ்வு"
     },
     "overview": {
       "stateMerged": "இணைக்கப்பட்டது",
-      "stateClosed": "மூடப்பட்டது",
-      "stateDraft": "வரைவு",
       "stateOpenApproved": "திற · அங்கீகரிக்கப்பட்டது",
       "stateOpenChangesRequested": "திற · மாற்றங்கள் கோரப்பட்டன",
       "stateOpenReviewRequired": "திற · மதிப்பாய்வு தேவை",
@@ -564,14 +617,11 @@
       "reviewChangesRequested": "மாற்றங்கள் கோரப்பட்டன",
       "reviewCommented": "கருத்து தெரிவிக்கப்பட்டது",
       "reviewPending": "மதிப்பாய்வுக்காகக் காத்திருக்கிறது",
-      "openIssueA11y": "GitHub இல் சிக்கல் #{{number}} ஐத் திறக்கவும்",
-      "reviewDismissed": "நிராகரிக்கப்பட்டது"
+      "openIssueA11y": "GitHub இல் சிக்கல் #{{number}} ஐத் திறக்கவும்"
     },
     "pendingComment": {
       "editOutdatedA11y": "{{location}} இல் காலாவதியான நிலுவை கருத்தைத் திருத்து",
       "editA11y": "{{location}} இல் நிலுவை கருத்தைத் திருத்து",
-      "emptyBody": "(காலி)",
-      "outdated": "காலாவதியானது",
       "staleHint": "நீங்கள் இதை எழுதியதிலிருந்து PR நகர்ந்தது.",
       "deleteA11y": "{{location}} இல் நிலுவை கருத்தை நீக்கு",
       "deletedAnnouncement": "நிலுவை கருத்து நீக்கப்பட்டது",
@@ -587,8 +637,6 @@
       "discussion": "விவாதம்"
     },
     "fileStatus": {
-      "added": "சேர்க்கப்பட்டது",
-      "deleted": "நீக்கப்பட்டது",
       "modified": "மாற்றப்பட்டது",
       "renamed": "மறுபெயரிடப்பட்டது",
       "copied": "நகலெடுக்கப்பட்டது",
@@ -598,9 +646,7 @@
       "selectedTapToChange": "{{label}} தேர்ந்தெடுக்கப்பட்டது, தேர்வை மாற்ற தட்டவும்",
       "tapToComment": "{{label}}, கருத்து தெரிவிக்க தட்டவும்",
       "truncationBanner": "மாற்றப்பட்ட {{total}} கோப்புகளில் முதல் {{limit}} காட்டப்படுகின்றன — GitHub API வரம்பு",
-      "statusAdded": "சேர்க்கப்பட்டது",
       "statusContext": "சூழல்",
-      "statusDeleted": "நீக்கப்பட்டது",
       "lineLabel": "{{status}} வரி {{line}}: {{text}}",
       "lineLabelNoNumber": "{{status}}: {{text}}",
       "emptyLine": "(காலி)"
@@ -628,7 +674,6 @@
     }
   },
   "notifications": {
-    "title": "அறிவிப்புகள்",
     "liveActivities": "நேரடி செயல்பாடுகள்",
     "liveActivitySubtitle": "பூட்டுத் திரையில் செயலில் உள்ள முகவர்களைக் காட்டு",
     "liveUpdates": "நேரடி புதுப்பிப்புகள்",
@@ -651,7 +696,6 @@
     "disabledMessage": "அறிவிப்புகளை இயக்க, அவற்றை உங்கள் சாதன அமைப்புகளில் இயக்கவும்.",
     "disableTitle": "அறிவிப்புகளை முடக்கு",
     "disableMessage": "அறிவிப்புகளை முடக்க, அவற்றை உங்கள் சாதன அமைப்புகளில் முடக்கவும்.",
-    "openSettings": "அமைப்புகளைத் திற",
     "registrationFailed": "பதிவு தோல்வியடைந்தது. உங்கள் அறிவிப்பு அனுமதிகளைச் சரிபார்க்கவும்.",
     "couldNotEnable": "அறிவிப்புகளை இயக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     "previewAlways": "எப்போதும்",
@@ -666,7 +710,6 @@
       "security": "பாதுகாப்பு கண்டறிதல்கள்"
     },
     "category": {
-      "chatMessagesTitle": "அரட்டை செய்திகள்",
       "chatMessagesSubtitle": "உங்கள் உரையாடல்களில் பதில்கள்",
       "agentAttentionTitle": "முகவருக்கு நீங்கள் தேவை",
       "agentAttentionSubtitle": "கேள்விகள், அனுமதி, உள்ளீடு தேவை",
@@ -674,32 +717,23 @@
       "agentUpdatesSubtitle": "முகவரிடமிருந்து பணி நடுவில் வரும் செய்திகள்",
       "sessionStatusTitle": "அமர்வு நிலை",
       "sessionStatusSubtitle": "முடிந்தது / தோல்வி / கட்டுப்படுத்த தயார்",
-      "kiloclawActivityTitle": "KiloClaw செயல்பாடு",
       "kiloclawActivitySubtitle": "instance தயார்/தோல்வி, திட்டமிட்ட செயல்கள்",
-      "balanceAlertsTitle": "இருப்பு எச்சரிக்கைகள்",
       "balanceAlertsSubtitle": "குறைந்த நிறுவன இருப்பு எச்சரிக்கைகள்",
-      "securityFindingsTitle": "பாதுகாப்பு கண்டறிதல்கள்",
       "securityFindingsSubtitle": "புதிய கண்டறிதல்கள் மற்றும் SLA நினைவூட்டல்கள்"
     }
   },
   "tabs": {
     "home": "முகப்பு",
-    "agents": "முகவர்கள்",
-    "profile": "சுயவிவரம்",
-    "kiloclaw": "KiloClaw",
     "kiloclawWrapped": "Kilo\nClaw",
-    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}",
-    "chat": "அரட்டை"
+    "position": "{{name}}, தாவல், மொத்தம் {{total}} இல் {{position}}"
   },
   "chat": {
     "instancePicker": {
       "switchInstance": "instance ஐ மாற்று",
       "couldNotLoadInstances": "instances ஐ ஏற்ற முடியவில்லை",
-      "noInstances": "KiloClaw நிகழ்வுகள் இல்லை",
       "noInstancesDescription": "அரட்டையிடத் தொடங்க ஒரு instance ஐ அமைக்கவும்.",
       "setUpKiloclaw": "KiloClaw ஐ அமைக்கவும்",
-      "currentInstance": "{{title}}, தற்போது",
-      "personal": "தனிப்பட்ட"
+      "currentInstance": "{{title}}, தற்போது"
     },
     "conversation": {
       "failedToLoad": "உரையாடலை ஏற்ற முடியவில்லை",
@@ -718,16 +752,12 @@
       "couldNotSignIn": "அரட்டையில் உள்நுழைய முடியவில்லை",
       "couldNotRefreshMessages": "செய்திகளைப் புதுப்பிக்க முடியவில்லை",
       "couldNotLoadHistory": "உரையாடல் வரலாற்றை ஏற்ற முடியவில்லை",
-      "rename": "மறுபெயரிடு",
       "leave": "வெளியேறு",
       "untitledConversation": "தலைப்பற்ற உரையாடல்",
       "createFailed": "உரையாடலை உருவாக்க முடியவில்லை",
       "leaveFailed": "உரையாடலை விட்டு வெளியேற முடியவில்லை"
     },
     "reactions": {
-      "title": "எதிர்வினைகள்",
-      "close": "எதிர்வினைகளை மூடு",
-      "recent": "சமீபத்திய",
       "common": "பொதுவான",
       "reactWith": "{{reaction}} உடன் எதிர்வினை",
       "accessibility": "{{emoji}} எதிர்வினை, {{displayCount}}"
@@ -737,16 +767,13 @@
       "cancelReply": "பதிலை ரத்து செய்",
       "openInstance": "instance ஐ திற",
       "attachFile": "கோப்பை இணை",
-      "messagePlaceholder": "செய்தி",
-      "cancelEdit": "திருத்தத்தை ரத்து செய்",
-      "sendMessage": "செய்தியை அனுப்பு"
+      "cancelEdit": "திருத்தத்தை ரத்து செய்"
     },
     "conversationList": {
       "couldNotLoad": "உரையாடல்களை ஏற்ற முடியவில்லை",
       "emptyTitle": "இன்னும் உரையாடல்கள் இல்லை",
       "emptyDescription": "உங்கள் KiloClaw instance உடன் அரட்டையிடத் தொடங்க ஒரு உரையாடலை உருவாக்கவும்.",
       "create": "உரையாடலை உருவாக்கு",
-      "starting": "தொடங்குகிறது…",
       "newConversation": "புதிய உரையாடல்",
       "openInstanceSettings": "instance அமைப்புகளைத் திற",
       "today": "இன்று",
@@ -756,7 +783,6 @@
     },
     "attachment": {
       "open": "{{filename}} ஐ திற",
-      "imageUnavailable": "படம் கிடைக்கவில்லை",
       "openFailed": "இணைப்பைத் திறக்க முடியவில்லை. உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
       "attachFailed": "கோப்பை இணைக்க முடியவில்லை",
       "limit": "நீங்கள் {{displayCount}} கோப்புகள் வரை இணைக்கலாம்.",
@@ -786,11 +812,9 @@
       "yourMessage": "உங்கள் செய்தி",
       "messageFrom": "{{author}} இலிருந்து செய்தி",
       "moreActions": "மேலும் செயல்கள்",
-      "message": "செய்தி",
       "notDelivered": "வழங்கப்படவில்லை",
       "edited": "(திருத்தப்பட்டது)",
-      "image": "படம்",
-      "attachment": "இணைப்பு"
+      "image": "படம்"
     },
     "messageActions": {
       "copied": "நகலெடுக்கப்பட்டது",
@@ -798,13 +822,11 @@
       "title": "செய்தி செயல்கள்",
       "deleteTitle": "செய்தியை நீக்கவா?",
       "deleteMessage": "இது உரையாடலில் இருந்து செய்தியை நீக்கும்.",
-      "delete": "நீக்கு",
       "deleteFailed": "செய்தியை நீக்க முடியவில்லை",
       "removeReactionFailed": "எதிர்வினையை அகற்ற முடியவில்லை",
       "addReactionFailed": "எதிர்வினை சேர்க்க முடியவில்லை",
       "retrySend": "மீண்டும் அனுப்பு",
       "moreReactions": "மேலும் எதிர்வினைகள்",
-      "reply": "பதிலளி",
       "edit": "திருத்து",
       "sendFailed": "செய்தியை அனுப்ப முடியவில்லை",
       "retrySendFailed": "மீண்டும் அனுப்ப முடியவில்லை",
@@ -815,7 +837,6 @@
       "takePhoto": "புகைப்படம் எடு",
       "photoLibrary": "புகைப்பட நூலகம்",
       "files": "கோப்புகள்",
-      "cameraAccessDisabled": "கேமரா அணுகல் முடக்கப்பட்டது",
       "cameraAccessMessage": "புகைப்படம் எடுக்க அமைப்புகளில் கேமரா அணுகலை அனுமதிக்கவும்."
     },
     "typingIndicator": {
@@ -825,10 +846,7 @@
       "typing_other": "{{names}} தட்டச்சு செய்கின்றனர்..."
     },
     "botStatus": {
-      "online": "ஆன்லைன்",
-      "idle": "செயலற்று",
       "offline": "ஆஃப்லைன்",
-      "unknown": "தெரியவில்லை",
       "loadingUser": "பயனரை ஏற்றுகிறது...",
       "waitingForStatus": "போட் நிலைக்காக காத்திருக்கிறது...",
       "offlineMessage": "போட் ஆஃப்லைனில் உள்ளது. மீண்டும் இணைக்கும்போது செய்திகள் தொடரும்."
@@ -841,7 +859,6 @@
     }
   },
   "kiloclaw": {
-    "title": "KiloClaw",
     "couldNotLoadInstances": "KiloClaw நிகழ்வுகளை ஏற்ற முடியவில்லை",
     "billing": {
       "title": "பில்லிங்",
@@ -849,7 +866,6 @@
       "plan": "திட்டம்",
       "finalTermEnds": "இறுதி காலம் முடிவடைகிறது",
       "afterFinalTerm": "இறுதி காலத்திற்குப் பிறகு",
-      "remaining": "மீதம்",
       "lessThanOneDay": "1 நாளுக்கும் குறைவு",
       "ends": "முடிவடைகிறது",
       "expires": "காலாவதியாகிறது",
@@ -858,7 +874,6 @@
       "managedByAdmin": "பில்லிங் உங்கள் நிறுவன நிர்வாகியால் நிர்வகிக்கப்படுகிறது.",
       "couldNotLoad": "பில்லிங் தகவலை ஏற்ற முடியவில்லை",
       "manageOnWeb": "வலைத்தளத்தில் பில்லிங் நிர்வகி",
-      "commitPlan": "கமிட்",
       "earlybird": "முன்கூட்டிய சலுகை",
       "finalCommitTermEndsOn": "உங்கள் இறுதி உறுதி காலம் {{date}} அன்று முடிவடைகிறது. {{price}} விலையில் Standard ஆக தொடரவும், இல்லையெனில் ஹோஸ்டிங் முடிவடையும்.",
       "freeTrial": "இலவச சோதனை",
@@ -875,9 +890,9 @@
       "trialDaysRemaining": "சோதனை: {{remaining}} நாட்கள் மீதம்",
       "trialEndingSoon": "சோதனை விரைவில் முடிவடைகிறது: {{remaining}}",
       "planName": {
-        "commit": "கமிட்",
         "standard": "Standard"
-      }
+      },
+      "commit": "கமிட்"
     },
     "changelog": {
       "title": "என்ன புதியது",
@@ -900,7 +915,6 @@
       "destroyMessage": "இது உங்கள் KiloClaw நிகழ்வையும் அதன் எல்லா தரவையும் நிரந்தரமாக அழிக்கும். இந்தச் செயலை மீட்டெடுக்க முடியாது.",
       "destroyTitle": "நிகழ்வை அழி",
       "instance": "நிகழ்வு",
-      "renameFailed": "ஏதோ தவறு நடந்தது",
       "couldNotCheckStatus": "சேவை நிலையைச் சரிபார்க்க முடியவில்லை",
       "dangerZone": "ஆபத்து மண்டலம்",
       "destroying": "அழிக்கிறது...",
@@ -928,7 +942,6 @@
       "approveDeviceTitle": "சாதனத்தை அங்கீகரி",
       "approveMessage": "{{label}} (குறியீடு: {{code}}) உங்கள் நிகழ்வுடன் இணைக்க அனுமதிக்கவா?",
       "approveTitle": "இணைப்பு கோரிக்கையை அங்கீகரி",
-      "device": "சாதனம்",
       "unknownDevice": "தெரியாத சாதனம்"
     },
     "execPolicy": {
@@ -943,35 +956,21 @@
       "title": "Google கணக்கு",
       "couldNotLoad": "Google கணக்கு நிலையை ஏற்ற முடியவில்லை",
       "disconnected": "Google கணக்கு துண்டிக்கப்பட்டது. மாற்றத்தைப் பயன்படுத்த உங்கள் நிகழ்வை மீண்டும் வரிசைப்படுத்தவும்.",
-      "redeploy": "மீண்டும் வரிசைப்படுத்து",
       "setupCommand": "அமைவு கட்டளை",
       "setupCommandHelp": "உங்கள் கணினியில் Docker நிறுவப்பட்ட முனையத்தில் இந்த கட்டளையை இயக்கி உங்கள் Google கணக்கை இணைக்கவும்.",
       "failedToLoadCommand": "அமைவு கட்டளையை ஏற்ற முடியவில்லை",
       "gmailNotifications": "Gmail அறிவிப்புகள்",
       "disconnect": "Google கணக்கைத் துண்டி",
-      "connected": "இணைக்கப்பட்டது",
       "copied": "நகலெடுக்கப்பட்டது!",
       "copyCommand": "கட்டளையை நகலெடு",
-      "disabled": "முடக்கப்பட்டது",
       "disconnectConfirm": "துண்டி",
       "disconnectMessage": "இந்த நிகழ்விலிருந்து உங்கள் Google கணக்கை நீக்கவா? இது Gmail அறிவிப்புகளை முடக்கும். மாற்றங்களைப் பயன்படுத்த துண்டித்த பிறகு மீண்டும் வரிசைப்படுத்தவும்.",
-      "disconnectTitle": "Google ஐத் துண்டி",
-      "enabled": "இயக்கப்பட்டது",
-      "notConnected": "இணைக்கப்படவில்லை"
+      "disconnectTitle": "Google ஐத் துண்டி"
     },
     "modelList": {
-      "title": "அனைத்து மாதிரிகள்",
-      "searchPlaceholder": "மாதிரிகளைத் தேடு...",
-      "couldNotLoad": "மாதிரிகளை ஏற்ற முடியவில்லை",
-      "clearSearch": "தேடலை அழி",
       "noMatches": "உங்கள் தேடலுக்கு பொருந்தும் மாதிரிகள் இல்லை",
-      "noModels": "கிடைக்கக்கூடிய மாதிரிகள் இல்லை",
       "noModelsDescription": "கிடைக்கும்போது மாதிரிகள் இங்கே தோன்றும்.",
-      "noResultsFor": "\"{{query}}\" க்கு முடிவுகள் இல்லை",
-      "recommended": "பரிந்துரைக்கப்படுகிறது"
-    },
-    "model": {
-      "title": "மாதிரி"
+      "noResultsFor": "\"{{query}}\" க்கு முடிவுகள் இல்லை"
     },
     "secrets": {
       "title": "ரகசியங்கள்",
@@ -988,12 +987,8 @@
       "setupGuideA11y": "{{label}} அமைவு வழிகாட்டி",
       "setupGuide": "அமைவு வழிகாட்டி",
       "saving": "சேமிக்கிறது...",
-      "remove": "நீக்கு",
       "removing": "நீக்குகிறது...",
-      "connected": "இணைக்கப்பட்டது",
-      "notConnected": "இணைக்கப்படவில்லை",
-      "updateToken": "டோக்கனைப் புதுப்பி",
-      "connect": "இணை"
+      "updateToken": "டோக்கனைப் புதுப்பி"
     },
     "versionPin": {
       "title": "பதிப்பு பொருத்துதல்",
@@ -1030,7 +1025,6 @@
       "start": "தொடங்கு",
       "startMessage": "இந்த நிகழ்வைத் தொடங்க விரும்புகிறீர்களா?",
       "startTitle": "நிகழ்வைத் தொடங்கு",
-      "starting": "தொடங்குகிறது…",
       "stop": "நிறுத்து",
       "stopMessage": "இந்த நிகழ்வை நிறுத்த விரும்புகிறீர்களா?",
       "stopTitle": "நிகழ்வை நிறுத்து",
@@ -1040,7 +1034,6 @@
       "finishingSetup": "அமைவை முடிக்கிறது",
       "finishingSetupDescription": "காத்திருங்கள், உங்கள் கணக்கை இறுதி செய்கிறோம். இது பொதுவாக ஒரு கணம் எடுக்கும்.",
       "getStarted": "தொடங்குங்கள்",
-      "noInstances": "KiloClaw நிகழ்வுகள் இல்லை",
       "noInstancesDescription": "குறியீட்டு ஏஜெண்டுகளை இயக்க உங்கள் முதல் நிகழ்வை உருவாக்கவும்."
     },
     "instance": {
@@ -1052,7 +1045,6 @@
     "list": {
       "createInstance": "நிகழ்வை உருவாக்கு",
       "organizations": "நிறுவனங்கள்",
-      "personal": "தனிப்பட்ட",
       "accessIssue": {
         "trialExpired": "சோதனை முடிந்தது, இந்த நிகழ்வை தொடர்ந்து பயன்படுத்த சந்தா பெறவும்",
         "subscriptionCanceled": "சந்தா செயலற்றது, இந்த நிகழ்வை தொடர்ந்து பயன்படுத்த மீண்டும் சந்தா பெறவும்",
@@ -1065,7 +1057,6 @@
     "onboarding": {
       "complete": {
         "chatWith": "{{name}} உடன் அரட்டை",
-        "online": "ஆன்லைன்",
         "ready": "{{name}} தயாராக உள்ளது",
         "warmedUp": "அனைத்தும் தயார். நீங்கள் தயாராக இருக்கும்போது வணக்கம் சொல்லுங்கள்."
       },
@@ -1076,9 +1067,7 @@
         "openKiloAi": "kilo.ai திற",
         "provisioning": "வழங்குகிறது",
         "review": "மதிப்பாய்வு",
-        "somethingWentWrong": "ஏதோ தவறு நடந்தது",
         "identityTitle": "உங்கள் போட்டிற்கு ஒரு அடையாளத்தைக் கொடுங்கள்",
-        "close": "மூடு",
         "couldNotLoad": "ஆன்போர்டிங் நிலையை ஏற்ற முடியவில்லை",
         "finishingSetup": "அமைவை முடிக்கிறது — உங்கள் கணக்கை இறுதி செய்யும்போது காத்திருங்கள்.",
         "ready": "தயார்",
@@ -1095,7 +1084,6 @@
         "location": "இருப்பிடம்",
         "locationPlaceholder": "நகரம் அல்லது பகுதி (விருப்பம்)",
         "useCurrentLocation": "தற்போதைய இருப்பிடத்தைப் பயன்படுத்து",
-        "continue": "தொடரவும்",
         "locationDeniedTitle": "இருப்பிட அணுகல் மறுக்கப்பட்டது",
         "locationDeniedMessage": "உங்கள் தற்போதைய இருப்பிடத்தைப் பயன்படுத்த அமைப்புகளில் இருப்பிட அணுகலை இயக்கவும்.",
         "locationValidationFailed": "இருப்பிடத்தை சரிபார்க்க முடியவில்லை.",
@@ -1132,7 +1120,6 @@
         "timeoutBody": "{{name}} இன் அமைவு வழக்கத்தை விட அதிக நேரம் எடுக்கிறது ({{displayMinutes}} நிமிடங்களுக்கு மேல்).",
         "continueInBackground": "பின்னணியில் தொடரவும்",
         "settingUp": "{{name}} ஐ அமைக்கிறது",
-        "finishingSetup": "அமைவை முடிக்கிறது",
         "connectingToAgent": "ஏஜெண்டுடன் இணைக்கிறது",
         "startingSandbox": "சாண்ட்பாக்ஸைத் தொடங்குகிறது",
         "backgroundHint": "பொதுவாக ஒரு நிமிடத்திற்குள் எடுக்கும். இதை மூடலாம் — நாங்கள் பின்னணியில் தொடர்ந்து வேலை செய்வோம்."
@@ -1144,7 +1131,6 @@
       "gatewayProcess": "கேட்வே செயல்முறை",
       "lastExit": "கடைசி வெளியேற்றம்",
       "memory": "நினைவகம்",
-      "model": "மாதிரி",
       "region": "பகுதி",
       "resources": "வளங்கள்",
       "restarts": "மறுதொடக்கங்கள்",
@@ -1166,34 +1152,25 @@
       "kiloAuto": "Kilo Auto",
       "frontierLabel": "Frontier",
       "frontierDescription": "அதிக செயல்திறன். பகுத்தறிவுடன் கூடிய frontier மாதிரிகளுக்கு வழிநடத்துகிறது.",
-      "balancedLabel": "சமநிலையானது",
       "balancedDescription": "குறைந்த செலவில் வேகம் மற்றும் திறனின் சிறந்த சமநிலை.",
-      "cost": "செலவு",
-      "performance": "செயல்திறன்",
       "autoModelA11y": "{{label}} தானியங்கி மாதிரி",
       "currentModel": "தற்போதைய மாதிரி",
       "browseAllModels": "அல்லது 500+ மாதிரிகளில் இருந்து தேர்ந்தெடுக்கவும்",
       "browseAllModelsA11y": "அனைத்து 500+ மாதிரிகளையும் உலாவு"
     },
     "accessRequired": {
-      "trialExpiredTitle": "வலைத்தளத்தில் சந்தா பெறவும்",
       "trialExpiredBody": "KiloClaw ஐ தொடர்ந்து பயன்படுத்த, உங்கள் உலாவியில் இருந்து kilo.ai/claw க்கு செல்லவும். பயன்பாட்டில் சந்தா பெற முடியாது.",
-      "trialExpiredCta": "kilo.ai/claw திற",
       "subscriptionCanceledTitle": "வலைத்தளத்தில் சந்தா பெறவும்",
       "subscriptionCanceledBody": "KiloClaw ஐ பயன்படுத்த, உங்கள் உலாவியில் இருந்து kilo.ai/claw க்கு செல்லவும். பயன்பாட்டில் சந்தா பெற முடியாது.",
       "subscriptionCanceledCta": "kilo.ai/claw திற",
       "subscriptionPastDueTitle": "வலைத்தளத்தில் கட்டணத்தை புதுப்பிக்கவும்",
       "subscriptionPastDueBody": "உங்கள் சமீபத்திய கட்டணத்தில் சிக்கல் ஏற்பட்டது. அதை புதுப்பிக்க உங்கள் உலாவியில் இருந்து kilo.ai/claw க்கு செல்லவும். பயன்பாட்டில் பில்லிங்கை நிர்வகிக்க முடியாது.",
-      "subscriptionPastDueCta": "kilo.ai/claw திற",
       "quarantinedTitle": "நிகழ்வுக்கு சரிசெய்தல் தேவை",
       "quarantinedBody": "உங்கள் KiloClaw நிகழ்வு தனிமைப்படுத்தப்பட்ட நிலையில் உள்ளது, இப்போது அதை பயன்படுத்த முடியாது. அதை மீட்டெடுக்க எங்கள் குழு உதவ வேண்டும்.",
-      "quarantinedCta": "kilo.ai இல் தொடரவும்",
-      "multipleCurrentConflictTitle": "கணக்கு மதிப்பாய்வு தேவை",
       "multipleCurrentConflictBody": "உங்கள் கணக்கில் ஒன்றுக்கு மேற்பட்ட செயலில் உள்ள சந்தாக்களைக் கண்டோம், எனவே இரட்டை பில்லிங்கைத் தவிர்க்க விஷயங்களை இடைநிறுத்தியுள்ளோம்.",
       "multipleCurrentConflictCta": "kilo.ai இல் தொடரவும்",
       "nonCanonicalEarlybirdTitle": "மரபு திட்டம் கண்டறியப்பட்டது",
       "nonCanonicalEarlybirdBody": "உங்கள் முன்கூட்டிய அணுகல் திட்டம் மொபைலில் பயன்படுத்துவதற்கு முன் கைமுறை மதிப்பாய்வு தேவை.",
-      "nonCanonicalEarlybirdCta": "kilo.ai இல் தொடரவும்",
       "iosTitle": "KiloClaw iOS இல் கிடைக்கவில்லை",
       "iosBody": "இந்த கணக்கிற்கு KiloClaw அணுகல் iOS பயன்பாட்டிற்கு வெளியே நிர்வகிக்கப்படுகிறது.",
       "iosContact": "கேள்விகளா? hi@kilo.ai ஐ தொடர்பு கொள்ளவும்."
@@ -1203,25 +1180,17 @@
       "openUnread_one": "{{name}} திற, {{displayCount}} படிக்காத செய்தி",
       "openUnread": "{{name}} திற, {{displayCount}} படிக்காத செய்திகள்",
       "openUnread_other": "{{name}} திற, {{displayCount}} படிக்காத செய்திகள்",
-      "open": "{{name}} ஐ திற",
       "openSettings": "{{name}} க்கான அமைப்புகளை திற",
       "fixOnKiloAi": "kilo.ai இல் சரிசெய்: {{label}}"
     },
     "settings": {
       "channelsDescription": "Telegram, Discord, Slack",
-      "channelsLabel": "சேனல்கள்",
       "devicePairingDescription": "சாதன கோரிக்கைகளை அங்கீகரி",
-      "devicePairingLabel": "சாதன இணைப்பு",
       "execPolicyDescription": "பாதுகாப்பு அமைப்புகள்",
-      "execPolicyLabel": "செயலாக்க கொள்கை",
       "googleDescription": "Gmail, Calendar, Docs",
-      "googleLabel": "Google கணக்கு",
       "modelDescription": "AI மாதிரி தேர்வு",
-      "modelLabel": "மாதிரி",
       "secretsDescription": "மறைகுறியாக்கப்பட்ட சான்றுகள்",
-      "secretsLabel": "ரகசியங்கள்",
-      "versionPinDescription": "ஒரு குறிப்பிட்ட பதிப்பில் பொருத்து",
-      "versionPinLabel": "பதிப்பு பொருத்துதல்"
+      "versionPinDescription": "ஒரு குறிப்பிட்ட பதிப்பில் பொருத்து"
     },
     "avatar": {
       "arcade": "Arcade",
@@ -1266,21 +1235,15 @@
       "placeholder": "எ.கா. எங்கள் பிழை கையாளும் மரபுகளை செயல்படுத்தவும்..."
     },
     "repos": {
-      "title": "களஞ்சியங்கள்",
-      "couldNotLoad": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
       "unavailable": "களஞ்சியங்கள் கிடைக்கவில்லை — kilo.ai இல் Bitbucket அமைவை முடிக்கவும்.",
       "finishSetup": "அமைவை முடிக்கவும்",
       "manageAccess": "அணுகலை நிர்வகி",
-      "allRepositories": "அனைத்து களஞ்சியங்கள்",
       "bitbucketNoRepositoriesDescription": "இந்த Bitbucket பணியிடத்தில் களஞ்சியங்கள் எதுவும் இல்லை.",
-      "bitbucketSetup": "Bitbucket அமைவு",
-      "couldNotOpenGithubSettings": "GitHub App அமைப்புகளைத் திறக்க முடியவில்லை",
       "gitlabNoRepositoriesDescription": "GitLab இல் மேலும் குழுக்கள் அல்லது திட்டங்களுக்கு அணுகலை வழங்க வேண்டியிருக்கலாம்.",
       "installGithubApp": "களஞ்சியங்களில் GitHub app ஐ நிறுவு",
       "installGithubAppDescription": "நீங்கள் மதிப்பாய்வு செய்ய விரும்பும் களஞ்சியங்களுக்கு Kilo GitHub App அணுகலை வழங்கவும்.",
       "noRepositoriesFound": "களஞ்சியங்கள் எதுவும் கிடைக்கவில்லை",
-      "repositoryAccess": "களஞ்சிய அணுகல்",
-      "selectedRepositories": "தேர்ந்தெடுக்கப்பட்ட களஞ்சியங்கள்"
+      "repositoryAccess": "களஞ்சிய அணுகல்"
     },
     "style": {
       "title": "மதிப்பாய்வு பாணி",
@@ -1289,12 +1252,10 @@
       "roast": "கடுமையாக நேர்மையான, பொழுதுபோக்காக",
       "strict": "எல்லாவற்றையும் கொடி, உயர் தரத்தை பராமரி"
     },
-    "title": "குறியீடு மதிப்பாய்வாளர்",
     "reviewDetail": {
       "title": "மதிப்பாய்வு",
       "cancelTitle": "மதிப்பாய்வை ரத்து செய்யவா?",
       "cancelMessage": "இது நடந்துகொண்டிருக்கும் குறியீடு மதிப்பாய்வை நிறுத்தும்.",
-      "keepRunning": "இயங்க வை",
       "cancelReview": "மதிப்பாய்வை ரத்து செய்",
       "retryTitle": "மதிப்பாய்வை மீண்டும் முயற்சிக்கவா?",
       "retryMessage": "இது குறியீடு மதிப்பாய்வை மீண்டும் இயக்கும்.",
@@ -1302,29 +1263,19 @@
       "couldNotLoad": "மதிப்பாய்வை ஏற்ற முடியவில்லை",
       "couldNotGetLatest": "சமீபத்தியதை பெற முடியவில்லை.",
       "byline": "{{repo}} #{{number}} {{author}} ஆல்",
-      "findings": "கண்டுபிடிப்புகள்",
       "noFindings": "கண்டுபிடிப்புகள் இல்லை",
       "showMore": "மேலும் காட்டு",
-      "details": "விவரங்கள்",
-      "branch": "கிளை",
-      "platform": "தளம்",
-      "model": "மாதிரி",
       "created": "உருவாக்கப்பட்டது",
       "started": "தொடங்கப்பட்டது",
-      "completed": "முடிந்தது",
-      "cost": "செலவு",
       "tokens": "டோக்கன்கள்",
       "tokensInOut": "{{input}} உள்ளீடு / {{output}} வெளியீடு",
-      "openPullRequest": "இழுப்பு கோரிக்கையைத் திற",
       "council": "குழு",
       "decision": "முடிவு",
       "gate": "நுழைவாயில்",
       "gateNone": "ஏதுமில்லை",
       "gateHidden": "மறைக்கப்பட்டது",
       "checkRun": "சரிபார்ப்பு இயக்கம்",
-      "status": "நிலை",
       "threshold": "வரம்பு",
-      "pullRequest": "இழுப்பு கோரிக்கை",
       "transcriptWaiting": "மதிப்பாய்வு டிரான்ஸ்கிரிப்டுக்காக காத்திருக்கிறது",
       "transcriptEmpty": "இந்த மதிப்பாய்வுக்கு டிரான்ஸ்கிரிப்ட் இல்லை",
       "transcriptRetry": "மதிப்பாய்வு டிரான்ஸ்கிரிப்டை ஏற்ற முடியவில்லை",
@@ -1339,13 +1290,10 @@
       "sessionError": "அமர்வு பிழை: {{error}}",
       "statusWithValue": "நிலை: {{status}}",
       "toolName": "கருவி: {{name}}",
-      "toolNameError": "கருவி: {{name}} — பிழை",
-      "unknownError": "தெரியாத பிழை"
+      "toolNameError": "கருவி: {{name}} — பிழை"
     },
     "reviewMemory": {
       "title": "மதிப்பாய்வு நினைவகம்",
-      "couldNotLoadMore": "மேலும் ஏற்ற முடியவில்லை",
-      "retryLoadingMore": "மேலும் ஏற்றுவதை மீண்டும் முயற்சி",
       "loading": "மதிப்பாய்வு நினைவகத்தை ஏற்றுகிறது",
       "couldNotLoad": "மதிப்பாய்வு நினைவகத்தை ஏற்ற முடியவில்லை",
       "off": "மதிப்பாய்வு நினைவகம் முடக்கப்பட்டுள்ளது",
@@ -1364,13 +1312,9 @@
       "couldNotLoadProviders": "உங்கள் இணைக்கப்பட்ட வழங்குநர்களை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "connectProvider": "ஒரு வழங்குநரை இணைக்கவும்",
       "connectProviderDescription": "Pull request இன் கைமுறை மதிப்பாய்வைத் தொடங்க GitHub ஐ இணைக்கவும்.",
-      "connectGitHub": "GitHub உடன் இணை",
-      "platform": "தளம்",
-      "notConnected": "இணைக்கப்படவில்லை",
       "pullRequestUrl": "Pull request URL",
       "instructions": "வழிமுறைகள் (விருப்பம்)",
       "instructionsPlaceholder": "மதிப்பாய்வாளர் கவனம் செலுத்த வேண்டிய குறிப்பிட்ட ஏதேனும்...",
-      "model": "மாதிரி",
       "starting": "மதிப்பாய்வைத் தொடங்குகிறது...",
       "start": "மதிப்பாய்வைத் தொடங்கு"
     },
@@ -1379,28 +1323,20 @@
     "webhookSetupDescription": "சில களஞ்சியங்கள் தானியங்கி மதிப்பாய்வுகளைப் பெறாமல் போகலாம்.",
     "autoReviews": "தானியங்கி மதிப்பாய்வுகள்",
     "selectRepository": "தானியங்கி மதிப்பாய்வுகளை இயக்க குறைந்தது ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
-    "selectRepositories": "களஞ்சியங்களைத் தேர்ந்தெடு",
     "followReviewMd": "REVIEW.md ஐ பின்பற்று",
     "followReviewMdSubtitle": "ஒவ்வொரு களஞ்சியத்தின் REVIEW.md வழிமுறை கோப்புகளை மதிக்கவும்",
-    "readOnlyDescription": "நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே இந்த அமைப்புகளை மாற்ற முடியும்.",
     "bitbucket": {
       "notConnectedReadOnly": "Bitbucket இணைக்கப்படவில்லை. நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே அதை இணைக்க முடியும்.",
       "setupIncomplete": "அமைவு முழுமையடையவில்லை — kilo.ai இல் கட்டமைப்பை முடிக்கவும்",
       "setup": "Bitbucket அமைவு"
     },
     "bitbucketConnect": {
-      "connected": "Bitbucket இணைக்கப்பட்டது",
-      "title": "Bitbucket ஐ இணை",
       "description": "தேவையான நோக்கங்களுடன் Workspace Access Token உருவாக்கி கீழே ஒட்டவும்.",
       "scopes": "கணக்கு: படிக்க · களஞ்சியங்கள்: படிக்க/எழுத · Pull requests: படிக்க · Webhooks: படிக்க/எழுத",
-      "tokenPlaceholder": "பணியிட அணுகல் டோக்கன்",
-      "connect": "இணை"
+      "tokenPlaceholder": "பணியிட அணுகல் டோக்கன்"
     },
     "scopeList": {
-      "couldNotLoad": "நிறுவனங்களை ஏற்ற முடியவில்லை",
       "personalStillAvailable": "தனிப்பட்ட களஞ்சியங்கள் கீழே இன்னும் கிடைக்கின்றன.",
-      "personal": "தனிப்பட்ட",
-      "personalSubtitle": "உங்கள் சொந்த களஞ்சியங்கள்",
       "viewOnly": "பார்வை மட்டும்"
     },
     "reviewList": {
@@ -1414,18 +1350,13 @@
     "platformList": {
       "checking": "சரிபார்க்கிறது...",
       "statusUnavailable": "நிலை கிடைக்கவில்லை",
-      "connected": "இணைக்கப்பட்டது",
-      "notConnected": "இணைக்கப்படவில்லை",
-      "organization": "நிறுவனம்",
       "platforms": "தளங்கள்",
       "activity": "செயல்பாடு"
     },
     "providerConnect": {
       "githubApp": "GitHub App",
-      "connectGitHub": "GitHub உடன் இணை",
       "githubError": "GitHub அமைவை திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "gitlabAccount": "GitLab கணக்கு",
-      "connectGitLab": "GitLab ஐ இணை",
       "gitlabError": "GitLab அமைவை திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "description": "Pull requests ஐ தானாக மதிப்பாய்வு செய்ய Kilo {{label}} ஐ இணைக்கவும்.",
       "bitbucketError": "பிட்பக்கெட் அமைப்பைத் திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
@@ -1436,12 +1367,7 @@
       "allAreas": "அனைத்து பகுதிகள்",
       "customInstructions": "தனிப்பயன் வழிமுறைகள்",
       "set": "அமை",
-      "model": "மாதிரி",
-      "mergeGate": "ஒருங்கிணைப்பு நுழைவாயில்",
-      "repositories": "களஞ்சியங்கள்",
-      "allRepositories": "அனைத்து களஞ்சியங்கள்",
       "nSelected": "{{displayCount}} தேர்ந்தெடுக்கப்பட்டது",
-      "reviewMemory": "மதிப்பாய்வு நினைவகம்",
       "proposedReviewMdGuidance": "முன்மொழியப்பட்ட REVIEW.md வழிகாட்டுதல்"
     },
     "decision": {
@@ -1450,69 +1376,53 @@
       "noDecision": "முடிவு இல்லை",
       "noResult": "முடிவு இல்லை"
     },
-    "eyebrow": "குறியீடு மதிப்பாய்வாளர்",
     "updateFailed": "மதிப்பாய்வாளரை புதுப்பிக்க முடியவில்லை",
     "configSaveFailed": "மதிப்பாய்வு உள்ளமைவை சேமிக்க முடியவில்லை",
     "status": {
-      "pending": "நிலுவையில்",
-      "queued": "வரிசையில்",
       "running": "இயங்குகிறது",
       "completed": "முடிந்தது",
-      "failed": "தோல்வியடைந்தது",
-      "cancelled": "ரத்து செய்யப்பட்டது",
       "interrupted": "குறுக்கிடப்பட்டது"
     },
     "reviewStyle": {
       "strict": "கடுமையானது",
-      "balanced": "சமநிலையானது",
       "lenient": "தளர்வானது",
       "roast": "Roast"
     },
     "focusArea": {
       "security": "பாதுகாப்பு",
-      "performance": "செயல்திறன்",
       "bugs": "பிழைகள்",
       "style": "பாணி",
       "testing": "சோதனை",
       "documentation": "ஆவணங்கள்"
     },
     "gateThreshold": {
-      "off": "ஆஃப்",
-      "all": "அனைத்தும்",
-      "warning": "எச்சரிக்கை",
-      "critical": "முக்கியமானது"
+      "warning": "எச்சரிக்கை"
     },
     "actionRequired": {
       "githubInstallationRequired": {
-        "title": "குறியீடு மதிப்பாய்வாளர் கவனம் தேவை",
         "description": "செயலில் உள்ள GitHub App நிறுவலுடன் Kilo இந்த களஞ்சியத்தை அணுக முடியாததால் குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. GitHub App நிறுவலைப் புதுப்பித்து, பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்.",
         "recoveryLabel": "GitHub App ஐ புதுப்பி"
       },
       "githubIpAllowList": {
-        "title": "குறியீடு மதிப்பாய்வாளர் கவனம் தேவை",
-        "description": "இந்த GitHub நிறுவனம் Kilo வைத் தடுக்கும் IP அனுமதி பட்டியலைப் பயன்படுத்துவதால் குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. உதவிக்கு hi@kilocode.ai ஐ தொடர்பு கொண்டு, பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்.",
-        "recoveryLabel": "ஆதரவைத் தொடர்பு கொள்ளவும்"
+        "description": "இந்த GitHub நிறுவனம் Kilo வைத் தடுக்கும் IP அனுமதி பட்டியலைப் பயன்படுத்துவதால் குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. உதவிக்கு hi@kilocode.ai ஐ தொடர்பு கொண்டு, பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்."
       },
       "gitlabProjectAccessRequired": {
-        "title": "குறியீடு மதிப்பாய்வாளர் கவனம் தேவை",
         "description": "இந்த திட்டத்திற்கு Kilo ஒரு GitLab Project Access Token ஐ உருவாக்க முடியாததால் குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. Maintainer அணுகலை வழங்கவும் அல்லது Project Access Tokens ஐ இயக்கவும், பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்.",
         "recoveryLabel": "GitLab ஒருங்கிணைப்பைப் புதுப்பி"
       },
       "byokInvalidKey": {
-        "title": "குறியீடு மதிப்பாய்வாளர் கவனம் தேவை",
         "description": "தேர்ந்தெடுக்கப்பட்ட BYOK API விசை செல்லுபடியாகாதது, ரத்து செய்யப்பட்டது, அல்லது அனுமதி இல்லாதது என்பதால் குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. விசையைப் புதுப்பிக்கவும் அல்லது வேறு மாதிரியைத் தேர்ந்தெடுக்கவும், பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்.",
         "recoveryLabel": "BYOK அமைப்புகளைப் புதுப்பி"
       },
       "selectedModelUnavailable": {
-        "title": "குறியீடு மதிப்பாய்வாளர் கவனம் தேவை",
         "description": "தேர்ந்தெடுக்கப்பட்ட மாதிரி கிளவுட் முகவர் அமர்வுகளுக்கு கிடைக்காததால் குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. கிடைக்கக்கூடிய மாதிரியைத் தேர்ந்தெடுத்து, பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்.",
         "recoveryLabel": "குறியீடு மதிப்பாய்வாளர் அமைப்புகளைப் புதுப்பி"
       },
       "repeatedRepositoryCloneTimeout": {
-        "title": "குறியீடு மதிப்பாய்வாளர் கவனம் தேவை",
-        "description": "இன்று மூன்று களஞ்சிய குளோன் நேரம் முடிவடைந்த பிறகு குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. உதவிக்கு hi@kilocode.ai ஐ தொடர்பு கொண்டு, பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்.",
-        "recoveryLabel": "ஆதரவைத் தொடர்பு கொள்ளவும்"
-      }
+        "description": "இன்று மூன்று களஞ்சிய குளோன் நேரம் முடிவடைந்த பிறகு குறியீடு மதிப்பாய்வாளர் முடக்கப்பட்டது. உதவிக்கு hi@kilocode.ai ஐ தொடர்பு கொண்டு, பின்னர் குறியீடு மதிப்பாய்வாளரை மீண்டும் இயக்கவும்."
+      },
+      "title": "குறியீடு மதிப்பாய்வாளர் கவனம் தேவை",
+      "recoveryLabel": "ஆதரவைத் தொடர்பு கொள்ளவும்"
     },
     "unknownError": "தெரியாத பிழை"
   },
@@ -1522,31 +1432,17 @@
       "noFiltersDescription": "திரும்பிச் சென்று கண்டுபிடிப்புகள் பட்டியலில் இருந்து வடிப்பான்களை மீண்டும் திறக்கவும்.",
       "title": "கண்டுபிடிப்புகளை வடிகட்டு",
       "reset": "மீட்டமை",
-      "repository": "களஞ்சியம்",
-      "status": "நிலை",
       "severity": "தீவிரத்தன்மை",
       "outcome": "விளைவு",
       "slaStatus": "SLA நிலை",
       "sortBy": "வரிசைப்படுத்து",
-      "allRepositories": "அனைத்து களஞ்சியங்கள்",
-      "all": "அனைத்தும்",
       "statusOpen": "திறந்த",
       "fixed": "சரிசெய்யப்பட்டது",
       "statusIgnored": "புறக்கணிக்கப்பட்டது",
-      "statusClosed": "மூடப்பட்டது",
-      "severityCritical": "முக்கியமானது",
       "severityHigh": "உயர்",
       "severityMedium": "நடுத்தரம்",
       "severityLow": "குறைந்த",
-      "outcomeNotAnalyzed": "பகுப்பாய்வு செய்யப்படவில்லை",
-      "outcomeAnalyzing": "பகுப்பாய்வு செய்கிறது",
-      "outcomeFailed": "பகுப்பாய்வு தோல்வியடைந்தது",
-      "outcomeExploitable": "சுரண்டக்கூடியது",
-      "outcomeNotExploitable": "சுரண்ட முடியாதது",
-      "outcomeSafeToDismiss": "நிராகரிக்க பாதுகாப்பானது",
-      "outcomeNeedsReview": "மதிப்பாய்வு தேவை",
       "outcomeTriageComplete": "வகைப்படுத்தல் முடிந்தது",
-      "outcomeDismissed": "நிராகரிக்கப்பட்டது",
       "sortSeverityDesc": "தீவிரத்தன்மை: உயர்ந்திலிருந்து தாழ்வுக்கு",
       "sortSeverityAsc": "தீவிரத்தன்மை: தாழ்ந்திலிருந்து உயர்வுக்கு",
       "sortSlaDue": "SLA காலக்கெடு",
@@ -1571,7 +1467,6 @@
       "enableAutoDismiss": "தானியங்கி நிராகரிப்பை இயக்கு",
       "enableAutoDismissSubtitle": "AI சுரண்டக்கூடியவை அல்ல என தீர்மானிக்கும் கண்டுபிடிப்புகளை தானாக நிராகரிக்கவும்.",
       "confidenceThreshold": "நம்பிக்கை வரம்பு",
-      "permissionNote": "நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே இந்த அமைப்புகளை மாற்ற முடியும்.",
       "enableAutoRemediationConfirmTitle": "தானியங்கி திருத்தத்தை இயக்கவா?",
       "enableAutoRemediationConfirmMessage": "பாதுகாப்பு ஏஜெண்ட் தகுதியுள்ள சுரண்டக்கூடிய கண்டுபிடிப்புகளுக்கு தானாக திருத்த PR களை திறக்கும்.",
       "enable": "இயக்கு",
@@ -1603,14 +1498,12 @@
       "suggestedAction": "பரிந்துரைக்கப்பட்ட செயல்",
       "triageReasoning": "வகைப்படுத்தல் பகுத்தறிவு",
       "exploitable": "சுரண்டக்கூடியது",
-      "model": "மாதிரி",
       "notRecorded": "பதிவு செய்யப்படவில்லை",
       "analyzed": "பகுப்பாய்வு செய்யப்பட்டது",
       "exploitabilityReasoning": "சுரண்டக்கூடிய தன்மை பகுத்தறிவு",
       "suggestedFix": "பரிந்துரைக்கப்பட்ட திருத்தம்",
       "whereFound": "இது கண்டுபிடிக்கப்பட்ட இடம் ({{displayCount}})",
       "fullReport": "முழு உருவாக்கப்பட்ட அறிக்கை",
-      "unknown": "தெரியவில்லை",
       "yes": "ஆம்",
       "no": "இல்லை"
     },
@@ -1641,7 +1534,6 @@
       "repoSummary": "{{open}} திறந்த · {{critical}} முக்கியமான · {{high}} உயர்",
       "couldNotLoad": "டாஷ்போர்டு தரவை ஏற்ற முடியவில்லை",
       "filterByRepository": "களஞ்சியத்தின் படி வடிகட்டு",
-      "findings": "கண்டுபிடிப்புகள்",
       "lastSynced": "கடைசியாக ஒத்திசைக்கப்பட்டது {{time}}",
       "manageRepositories": "களஞ்சியங்களை நிர்வகி",
       "notYetSynced": "இன்னும் ஒத்திசைக்கப்படவில்லை",
@@ -1654,15 +1546,10 @@
     },
     "dashboardMetrics": {
       "openFindings": "திறந்த கண்டுபிடிப்புகள்",
-      "openFindingsDetail": "{{critical}} முக்கியமான, {{high}} உயர்",
-      "confirmedExploitable": "சுரண்டக்கூடியதாக உறுதிப்படுத்தப்பட்டது",
       "confirmedExploitableDetail": "திட்ட இடர் பகுப்பாய்வால் உறுதிப்படுத்தப்பட்டது",
-      "needsReview": "உங்கள் மதிப்பாய்வு தேவை",
       "needsReviewDetail": "மனித முடிவு தேவை",
-      "analysisIncomplete": "பகுப்பாய்வு முடிவடையவில்லை",
       "analysisIncompleteDetail": "திட்ட இடர் இன்னும் தெரியவில்லை",
       "slaCompliance": "SLA இணக்கம்",
-      "notMeasured": "அளவிடப்படவில்லை",
       "withinDeadlineDetail": "{{total}} இல் {{within}} காலக்கெடுவிற்குள்",
       "noDeadlineData": "எந்த கண்டுபிடிப்புகளுக்கும் SLA காலக்கெடு இன்னும் இல்லை",
       "deadlinePassed": "காலக்கெடு கடந்துவிட்டது",
@@ -1675,7 +1562,6 @@
     },
     "dismiss": {
       "title": "கண்டுபிடிப்பை நிராகரி",
-      "submit": "கண்டுபிடிப்பை நிராகரி",
       "reason": "காரணம்",
       "reasonFixStarted": "ஒரு திருத்தம் ஏற்கனவே தொடங்கப்பட்டது",
       "reasonNoBandwidth": "போதுமான அலைவரிசை கிடைக்கவில்லை",
@@ -1696,28 +1582,21 @@
     "findingDetails": {
       "supersededBy": "தற்போதைய கண்டுபிடிப்பால் மாற்றப்பட்டது",
       "supersededByDescription": "நிலை, பகுப்பாய்வு மற்றும் சரிசெய்தலுக்காக தற்போதைய பதிவைத் திறக்கவும்.",
-      "dismissed": "நிராகரிக்கப்பட்டது",
       "dismissedBecause": "{{reason}} என்பதால் நிராகரிக்கப்பட்டது.",
       "severityLabel": "{{severity}} தீவிரம்",
       "package": "தொகுப்பு",
       "vulnerableVersions": "பாதிக்கப்படக்கூடிய பதிப்புகள்",
-      "unknown": "தெரியவில்லை",
       "patchedVersion": "திருத்தப்பட்ட பதிப்பு",
       "noPatchAvailable": "திருத்தம் கிடைக்கவில்லை",
       "cve": "CVE",
       "ghsa": "GHSA",
-      "repository": "களஞ்சியம்",
       "manifest": "மேனிஃபெஸ்ட்",
       "detected": "கண்டறியப்பட்டது",
-      "updated": "புதுப்பிக்கப்பட்டது",
-      "fixed": "சரிசெய்யப்பட்டது",
       "slaDeadline": "SLA காலக்கெடு",
       "sourceRecord": "மூல பதிவு",
       "source": "மூலம்",
       "sourceId": "மூல ID",
       "viewAdvisory": "GitHub இல் ஆலோசனையைப் பார்",
-      "statusSuperseded": "மாற்றப்பட்டது",
-      "statusFixed": "சரிசெய்யப்பட்டது",
       "statusOpen": "திறந்த",
       "sourceDependabot": "GitHub Dependabot",
       "reasonFixStarted": "ஒரு திருத்தம் ஏற்கனவே தொடங்கப்பட்டது",
@@ -1728,30 +1607,17 @@
       "reasonAfterReview": "மதிப்பாய்வுக்குப் பிறகு"
     },
     "settingsOverview": {
-      "title": "அமைப்புகள்",
       "couldNotLoadSettings": "Security Agent அமைப்புகளை ஏற்ற முடியவில்லை",
       "couldNotLoadPermissions": "அனுமதிகளை ஏற்ற முடியவில்லை",
-      "couldNotLoadRepositories": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
-      "securityAgent": "பாதுகாப்பு முகவர்",
-      "enabled": "இயக்கப்பட்டது",
-      "disabled": "முடக்கப்பட்டது",
       "on": "ஆன்",
-      "off": "ஆஃப்",
-      "allRepositories": "அனைத்து களஞ்சியங்கள்",
       "repositoriesCount_one": "{{displayCount}} களஞ்சியம் தேர்ந்தெடுக்கப்பட்டது",
       "repositoriesCount": "{{displayCount}} களஞ்சியங்கள் தேர்ந்தெடுக்கப்பட்டன",
       "repositoriesCount_other": "{{displayCount}} களஞ்சியங்கள் தேர்ந்தெடுக்கப்பட்டன",
-      "selectRepositories": "களஞ்சியங்களைத் தேர்ந்தெடு",
       "selectRepositoriesSubtitle": "Security Agent எந்த களஞ்சியங்களைக் கண்காணிக்கிறது என்பதைத் தேர்ந்தெடுக்கவும்",
-      "repositories": "களஞ்சியங்கள்",
-      "modelsAndAnalysis": "மாதிரிகள் & பகுப்பாய்வு",
       "analysisModeSubtitle": "{{mode}} பகுப்பாய்வு",
-      "automation": "ஆட்டோமேஷன்",
       "automationAllOff": "அனைத்தும் ஆஃப்",
       "automationCount": "{{displayCount}}/3 இயக்கப்பட்டது",
-      "notifications": "அறிவிப்புகள்",
       "notificationsCount": "{{displayCount}}/2 இயக்கப்பட்டது",
-      "slaPolicy": "SLA கொள்கை",
       "disabledNoManage": "Security Agent முடக்கப்பட்டுள்ளது. நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே அதை இயக்க முடியும்.",
       "disabledNoRepo": "Security Agent ஐ இயக்கும் முன் குறைந்தது ஒரு களஞ்சியத்தையாவது தேர்ந்தெடுக்கவும்.",
       "disabledPrompt": "Dependabot எச்சரிக்கைகளை ஒத்திசைக்கவும், களஞ்சியங்களைத் தேர்ந்தெடுக்கவும், ஆட்டோமேஷனை கட்டமைக்கவும் Security Agent ஐ இயக்கவும்."
@@ -1759,15 +1625,11 @@
     "remediation": {
       "cancellationRequested": "ரத்து கோரப்பட்டது",
       "cancelled": "சரிசெய்தல் ரத்து செய்யப்பட்டது",
-      "pullRequest": "இழுப்பு கோரிக்கை",
       "couldNotLoad": "சரிசெய்தல் நிலையை ஏற்ற முடியவில்லை",
-      "noAnalysisTitle": "இன்னும் பகுப்பாய்வு இல்லை",
-      "noAnalysisDescription": "விவரங்கள் தாவலில் இருந்து ஒன்றை இயக்கவும்",
       "start": "சரிசெய்தலைத் தொடங்கு",
       "retry": "சரிசெய்தலை மீண்டும் முயற்சி செய்",
       "cancelTitle": "இந்த சரிசெய்தலை ரத்து செய்யவா?",
       "cancelMessage": "Security Agent செயல்பாட்டில் உள்ள சரிசெய்தல் முயற்சியை நிறுத்தும்.",
-      "keepRunning": "இயங்க வை",
       "cancelRemediation": "சரிசெய்தலை ரத்து செய்",
       "openPullRequest": "புல் ரிக்வெஸ்டைத் திற{{number}}",
       "openDraftPullRequest": "வரைவு புல் ரிக்வெஸ்டைத் திற{{number}}",
@@ -1775,29 +1637,19 @@
       "attemptHistory": "முயற்சி வரலாறு ({{displayCount}})",
       "attemptNumber": "முயற்சி #{{number}}",
       "startedBy": "தொடங்கியவர்",
-      "model": "மாதிரி",
-      "branch": "கிளை",
       "queued": "சரிசெய்தல் வரிசையில் உள்ளது",
       "retryQueued": "சரிசெய்தல் மீண்டும் முயற்சி வரிசையில் உள்ளது",
       "timeline": {
         "queued": "சரிசெய்தல் கோரப்பட்டது",
-        "prOpened": "PR திறக்கப்பட்டது",
         "failed": "சரிசெய்தல் தோல்வியடைந்தது",
-        "blocked": "சரிசெய்தல் தடுக்கப்பட்டது",
-        "noChangesNeeded": "மாற்றங்கள் தேவையில்லை",
-        "cancelled": "ரத்து செய்யப்பட்டது"
+        "blocked": "சரிசெய்தல் தடுக்கப்பட்டது"
       },
       "unavailable": "இந்த கண்டுபிடிப்பிற்கு சரிசெய்தல் கிடைக்கவில்லை."
     },
     "analysisSettings": {
       "title": "மாதிரிகள் & பகுப்பாய்வு",
       "couldNotLoad": "பகுப்பாய்வு அமைப்புகளை ஏற்ற முடியவில்லை",
-      "permissionNote": "நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே இந்த அமைப்புகளை மாற்ற முடியும்.",
       "depth": "பகுப்பாய்வு ஆழம்",
-      "modeAuto": "தானியங்கி",
-      "modeShallow": "மேலோட்டமான",
-      "modeDeep": "ஆழமான",
-      "couldNotLoadModels": "மாதிரிகளை ஏற்ற முடியவில்லை",
       "triageModel": "வகைப்படுத்தல் மாதிரி",
       "analysisModel": "பகுப்பாய்வு மாதிரி",
       "remediationModel": "சரிசெய்தல் மாதிரி"
@@ -1805,7 +1657,6 @@
     "sla": {
       "title": "SLA கொள்கை",
       "couldNotLoad": "SLA அமைப்புகளை ஏற்ற முடியவில்லை",
-      "critical": "முக்கியமானது",
       "high": "உயர்",
       "medium": "நடுத்தரம்",
       "low": "குறைந்த",
@@ -1823,41 +1674,23 @@
     },
     "findingDetail": {
       "title": "கண்டுபிடிப்பு",
-      "tabDetails": "விவரங்கள்",
       "tabAnalysis": "பகுப்பாய்வு",
-      "tabRemediation": "சரிசெய்தல்",
-      "notFound": "கண்டுபிடிப்பு கிடைக்கவில்லை",
-      "notFoundDescription": "இந்த கண்டுபிடிப்பு நீக்கப்பட்டிருக்கலாம், அல்லது இனி உங்களுக்கு அணுகல் இல்லாமல் இருக்கலாம்.",
-      "couldNotLoad": "இந்த கண்டுபிடிப்பை ஏற்ற முடியவில்லை",
-      "dismissA11y": "கண்டுபிடிப்பை நிராகரி"
+      "tabRemediation": "சரிசெய்தல்"
     },
     "findingList": {
-      "title": "கண்டுபிடிப்புகள்",
       "couldNotLoad": "கண்டுபிடிப்புகளை ஏற்ற முடியவில்லை",
       "couldNotLoadMore": "மேலும் கண்டுபிடிப்புகளை ஏற்ற முடியவில்லை",
       "noMatchesTitle": "வடிகட்டிகளுடன் பொருந்தும் கண்டுபிடிப்புகள் இல்லை",
       "noMatchesDescription": "தேர்ந்தெடுக்கப்பட்ட வடிகட்டிகளை சரிசெய்யவும் அல்லது அழிக்கவும்.",
       "emptyTitle": "திறந்த கண்டுபிடிப்புகள் இல்லை",
-      "emptyDescription": "இப்போது கவனம் தேவைப்படும் திறந்த கண்டுபிடிப்புகள் இல்லை.",
-      "clearFilters": "வடிகட்டிகளை அழி"
-    },
-    "scopeList": {
-      "title": "பாதுகாப்பு முகவர்",
-      "couldNotLoad": "நிறுவனங்களை ஏற்ற முடியவில்லை",
-      "personal": "தனிப்பட்ட",
-      "personalSubtitle": "உங்கள் சொந்த களஞ்சியங்கள்"
-    },
-    "commandRetry": {
-      "discard": "நிராகரி"
+      "emptyDescription": "இப்போது கவனம் தேவைப்படும் திறந்த கண்டுபிடிப்புகள் இல்லை."
     },
     "findingRow": {
       "nextRemediationPrOpen": "சரிசெய்தல் PR திறந்துள்ளது",
       "nextRemediationInProgress": "சரிசெய்தல் நடைபெறுகிறது",
       "nextRetryRemediation": "சரிசெய்தலை மீண்டும் முயற்சி கிடைக்கிறது",
       "nextRemediationAvailable": "சரிசெய்தல் கிடைக்கிறது",
-      "retryAnalysis": "பகுப்பாய்வை மீண்டும் முயற்சி செய்",
       "runAnalysis": "பகுப்பாய்வை இயக்கு",
-      "nextNeedsManualReview": "கைமுறை மதிப்பாய்வு தேவை",
       "nextViewDetails": "விவரங்களைப் பார்",
       "viewPr": "PR ஐப் பார்",
       "analyze": "பகுப்பாய்வு",
@@ -1868,7 +1701,6 @@
       "couldNotOpenGithub": "GitHub ஐ திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
     "settingsSave": {
-      "discard": "நிராகரி",
       "keepEditing": "தொடர்ந்து திருத்து",
       "saveChanges": "மாற்றங்களைச் சேமி",
       "unsavedTitle": "சேமிக்கப்படாத மாற்றங்கள்",
@@ -1880,7 +1712,6 @@
     "auditReport": {
       "couldNotLoad": "தணிக்கை அறிக்கையை ஏற்ற முடியவில்லை",
       "events": "நிகழ்வுகள்",
-      "findings": "கண்டுபிடிப்புகள்",
       "generated": "{{generatedAt}} இல் உருவாக்கப்பட்டது",
       "noActivity": "பதிவுசெய்யப்பட்ட செயல்பாடு இல்லை",
       "noActivityDescription": "{{start}} முதல் {{end}} வரை Kilo க்கு அறிக்கை செய்யக்கூடிய Security Finding செயல்பாடு இல்லை.",
@@ -1890,8 +1721,7 @@
       "title": "தணிக்கை அறிக்கை",
       "unavailable": "தணிக்கை அறிக்கை கிடைக்கவில்லை",
       "unavailableDescription": "நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே தணிக்கை அறிக்கைகளைப் பார்க்க முடியும். உங்களுக்கு அணுகலை வழங்க ஒரு உரிமையாளர் அல்லது பில்லிங் மேலாளரிடம் கேளுங்கள்.",
-      "queryFailed": "அறிக்கை வினவல் முடிவடையவில்லை. மீண்டும் முயற்சிக்கவும்.",
-      "checkConnection": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்."
+      "queryFailed": "அறிக்கை வினவல் முடிவடையவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
     "notifications": {
       "couldNotLoad": "அறிவிப்பு அமைப்புகளை ஏற்ற முடியவில்லை",
@@ -1900,30 +1730,21 @@
       "newFindingSection": "புதிய கண்டுபிடிப்பு அறிவிப்பு",
       "newFindingSeverityLabel": "புதிய கண்டுபிடிப்பு குறைந்தபட்ச தீவிரம்",
       "newFindingSubtitle": "ஒவ்வொரு முறை புதிய கண்டுபிடிப்பு ஒத்திசைக்கப்படும்போதும், முதல் ஒத்திசைவு உட்பட அனுப்பப்படும்.",
-      "readOnly": "நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே இந்த அமைப்புகளை மாற்ற முடியும்.",
       "slaLeadTimeAccessibility": "SLA எச்சரிக்கை முன் நடத்தும் நாட்கள்",
       "slaLeadTimeError": "1 மற்றும் 365 க்கு இடையில் ஒரு முழு எண் நாட்களை உள்ளிடவும்.",
-      "slaLeadTimeHint": "1 மற்றும் 365 க்கு இடையில் ஒரு முழு எண்ணை உள்ளிடவும்",
       "slaLeadTimeLabel": "SLA எச்சரிக்கை முன் நடத்தும் நேரம் (நாட்கள்)",
       "slaPersonalTitle": "SLA எச்சரிக்கைகளைப் பற்றி எனக்கு மின்னஞ்சல் செய்",
       "slaSection": "SLA எச்சரிக்கை அறிவிப்பு",
       "slaSeverityLabel": "SLA அறிவிப்பு குறைந்தபட்ச தீவிரம்",
-      "slaSubtitle": "கண்டுபிடிப்புகள் அவற்றின் SLA காலக்கெடுவை நெருங்கும் முன் மற்றும் மீறும்போது அனுப்பப்படும்.",
-      "title": "அறிவிப்புகள்"
+      "slaSubtitle": "கண்டுபிடிப்புகள் அவற்றின் SLA காலக்கெடுவை நெருங்கும் முன் மற்றும் மீறும்போது அனுப்பப்படும்."
     },
     "repositories": {
-      "allRepositories": "அனைத்து களஞ்சியங்கள்",
       "couldNotLoad": "களஞ்சிய அமைப்புகளை ஏற்ற முடியவில்லை",
-      "couldNotLoadRepositories": "களஞ்சியங்களை ஏற்ற முடியவில்லை",
-      "couldNotOpenGithubSettings": "GitHub App அமைப்புகளைத் திறக்க முடியவில்லை",
       "githubAppSettings": "GitHub App அமைப்புகள்",
       "manageAccess": "GitHub App அணுகலை நிர்வகி",
       "noRepositories": "களஞ்சியங்கள் இல்லை",
       "noRepositoriesDescription": "Kilo GitHub App க்கு களஞ்சியங்களுக்கு அணுகலை வழங்கவும்",
-      "readOnly": "நிறுவன உரிமையாளர்கள் மற்றும் பில்லிங் மேலாளர்கள் மட்டுமே இந்த அமைப்புகளை மாற்ற முடியும்.",
-      "selectAtLeastOne": "குறைந்தது ஒரு களஞ்சியத்தையாவது தேர்ந்தெடுக்கவும்.",
-      "selectedRepositories": "தேர்ந்தெடுக்கப்பட்ட களஞ்சியங்கள்",
-      "title": "களஞ்சியங்கள்"
+      "selectAtLeastOne": "குறைந்தது ஒரு களஞ்சியத்தையாவது தேர்ந்தெடுக்கவும்."
     },
     "scopeEntry": {
       "connectDescription": "Dependabot எச்சரிக்கைகளை தானாக ஒத்திசைக்கவும் உங்கள் களஞ்சியங்களில் பாதுகாப்பு கண்டுபிடிப்புகளை நிர்வகிக்கவும் Kilo GitHub App ஐ நிறுவவும்.",
@@ -1938,7 +1759,6 @@
     },
     "queuedActionUntracked": "வரிசையில் உள்ள செயலை இனி கண்காணிக்க முடியவில்லை. சமீபத்திய நிலையைப் பார்க்க புதுப்பிக்கவும்.",
     "initialSyncAdmissionFailed": "Security Agent இயக்கப்பட்டது, ஆனால் ஆரம்ப ஒத்திசைவை வரிசையில் சேர்க்க முடியவில்லை. மீண்டும் ஒத்திசைக்கவும்.",
-    "title": "பாதுகாப்பு முகவர்",
     "commands": {
       "findingAlreadyDismissed": "கண்டுபிடிப்பு ஏற்கனவே நிராகரிக்கப்பட்டது",
       "findingDismissed": "கண்டுபிடிப்பு நிராகரிக்கப்பட்டது",
@@ -1956,49 +1776,33 @@
     },
     "analysisState": {
       "queued": "பகுப்பாய்வு வரிசையில் உள்ளது",
-      "queuedTitle": "பகுப்பாய்வு வரிசையில் உள்ளது",
       "queuedDescription": "பகுப்பாய்வு திறன் கிடைக்க காத்திருக்கிறது.",
       "analyzing": "பகுப்பாய்வு செய்கிறது",
-      "analyzingTitle": "பகுப்பாய்வு செய்கிறது",
       "analyzingDescription": "பயன்பாட்டு குறியீடு பாதிக்கப்பட்ட அம்சத்தை அடைய முடியுமா என்பதைச் சரிபார்க்கிறது.",
       "failed": "பகுப்பாய்வு தோல்வியடைந்தது",
-      "failedTitle": "பகுப்பாய்வு தோல்வியடைந்தது",
       "failedDescription": "Security Agent பகுப்பாய்வை முடிக்க முடியவில்லை.",
-      "extractionFailed": "மதிப்பாய்வு தேவை",
-      "extractionFailedTitle": "மதிப்பாய்வு தேவை",
       "extractionFailedDescription": "தொழில்நுட்ப அறிக்கையை கட்டமைக்கப்பட்ட முடிவாக மாற்ற முடியவில்லை.",
-      "exploitable": "சுரண்டக்கூடியது",
-      "exploitableTitle": "சுரண்டக்கூடியது",
       "exploitableDescription": "பயன்பாட்டு குறியீடு பாதிக்கப்பட்ட அம்சத்தை அடையலாம்.",
       "notExploitable": "அடைய முடியாதது",
-      "notExploitableTitle": "அடைய முடியாதது",
       "notExploitableDescription": "இந்த களஞ்சியத்தில் அடையக்கூடிய பாதை எதுவும் கண்டறியப்படவில்லை.",
       "unknown": "மதிப்பாய்வு தேவை",
-      "unknownTitle": "மதிப்பாய்வு தேவை",
       "unknownDescription": "பாதிக்கப்படக்கூடிய அம்சம் அடையக்கூடியதா என்பதை பகுப்பாய்வு உறுதிப்படுத்த முடியவில்லை.",
       "safeToDismiss": "நிராகரிக்க பாதுகாப்பானது",
-      "safeToDismissTitle": "நிராகரிக்க பாதுகாப்பானது",
       "safeToDismissDescription": "குறியீடு அடிப்படை பகுப்பாய்வு இல்லாமல் இதை பாதுகாப்பாக நிராகரிக்கலாம் என வகைப்படுத்தல் தீர்மானித்தது.",
-      "manualReview": "மதிப்பாய்வு தேவை",
       "manualReviewTitle": "கைமுறை மதிப்பாய்வு தேவை",
       "manualReviewDescription": "கைமுறை மதிப்பாய்வுக்காக வகைப்படுத்தல் இந்த கண்டுபிடிப்பைக் குறித்தது.",
       "analysisRequired": "பகுப்பாய்வு தேவை",
       "analysisRequiredTitle": "குறியீடு அடிப்படை பகுப்பாய்வு தேவை",
       "analysisRequiredDescription": "பதிலை முடிவு செய்வதற்கு முன் களஞ்சியத்தை பகுப்பாய்வு செய்ய வகைப்படுத்தல் பரிந்துரைக்கிறது.",
-      "completed": "பகுப்பாய்வு செய்யப்பட்டது",
-      "completedTitle": "பகுப்பாய்வு செய்யப்பட்டது",
       "completedDescription": "பகுப்பாய்வு குறிப்பிட்ட விளைவு பதிவு செய்யப்படாமல் முடிந்தது.",
       "notAnalyzed": "பகுப்பாய்வு செய்யப்படவில்லை",
-      "notAnalyzedTitle": "பகுப்பாய்வு செய்யப்படவில்லை",
       "notAnalyzedDescription": "இந்த கண்டுபிடிப்புக்கு குறியீடு அடிப்படை பகுப்பாய்வு இன்னும் இயக்கப்படவில்லை."
     },
     "deadline": {
       "fixedBeforeDeadline": "காலக்கெடுவுக்கு முன் சரிசெய்யப்பட்டது",
-      "fixed": "சரிசெய்யப்பட்டது",
       "fixedOn": "{{date}} அன்று சரிசெய்யப்பட்டது",
       "resolutionRecorded": "தீர்வு பதிவு செய்யப்பட்டது",
       "superseded": "மாற்றப்பட்டது",
-      "dismissed": "நிராகரிக்கப்பட்டது",
       "closedOn": "{{status}} {{date}}",
       "deadlineNotSet": "காலக்கெடு அமைக்கப்படவில்லை",
       "noSlaDeadline": "SLA காலக்கெடு இல்லை",
@@ -2014,17 +1818,13 @@
       "dueInDays": "{{count}} நாட்களில் காலக்கெடு"
     },
     "remediationStatus": {
-      "cancellationRequested": "ரத்து கோரப்பட்டது",
       "notStarted": "தொடங்கப்படவில்லை",
-      "queued": "வரிசையில்",
       "starting": "தொடங்குகிறது",
       "inProgress": "நடைபெறுகிறது",
       "draftPrOpened": "வரைவு PR திறக்கப்பட்டது",
       "prOpened": "PR திறக்கப்பட்டது",
       "blocked": "தடுக்கப்பட்டது",
-      "failed": "தோல்வியடைந்தது",
       "noChangesNeeded": "மாற்றங்கள் தேவையில்லை",
-      "cancelled": "ரத்து செய்யப்பட்டது",
       "originAutomaticPolicy": "தானியங்கி கொள்கை",
       "originIncludeExistingPolicy": "தற்போதுள்ள கொள்கையைச் சேர்க்கவும்",
       "originManual": "கைமுறை",
@@ -2036,7 +1836,6 @@
       "findingNotOpen": "கண்டுபிடிப்பு இனி திறந்திருக்கவில்லை.",
       "repoNotInScope": "Security Agent க்கு களஞ்சியம் தேர்ந்தெடுக்கப்படவில்லை.",
       "analysisRequired": "சரிசெய்தலைத் தொடங்கும் முன் குறியீடு அடிப்படை பகுப்பாய்வை இயக்கவும்.",
-      "sandboxAnalysisRequired": "சரிசெய்தலைத் தொடங்கும் முன் குறியீடு அடிப்படை பகுப்பாய்வை இயக்கவும்.",
       "staleAnalysis": "பகுப்பாய்விற்குப் பிறகு கண்டுபிடிப்பு மாறியது. சரிசெய்தலைத் தொடங்கும் முன் பகுப்பாய்வை மீண்டும் இயக்கவும்.",
       "notExploitable": "பகுப்பாய்வு அடையக்கூடிய பாதிக்கப்படக்கூடிய பாதையை கண்டறியவில்லை. தானியங்கி திருத்தம் கிடைக்கவில்லை.",
       "exploitabilityUnknown": "பகுப்பாய்வு சுரண்டக்கூடிய தன்மையை உறுதிப்படுத்த முடியவில்லை. ஒரே கிளிக்கில் சரிசெய்வதற்கு முன் கைமுறை மதிப்பாய்வு தேவை.",
@@ -2052,12 +1851,10 @@
       "autoRemediationDisabled": "தானியங்கி திருத்தம் முடக்கப்பட்டுள்ளது. பாதுகாப்பு சோதனைகள் நிறைவேறும்போது கைமுறை சரிசெய்தல் இன்னும் தொடங்கலாம்.",
       "includeExistingDisabled": "தற்போதுள்ள கண்டுபிடிப்புகள் தானியங்கி சரிசெய்தலிலிருந்து விலக்கப்படுகின்றன.",
       "belowThreshold": "கண்டுபிடிப்பு தானியங்கி தீவிர வரம்பிற்கு கீழே உள்ளது. பாதுகாப்பு சோதனைகள் நிறைவேறும்போது கைமுறை சரிசெய்தல் இன்னும் தொடங்கலாம்.",
-      "beforeEnablement": "தானியங்கி திருத்தம் இயக்கப்படுவதற்கு முன் பகுப்பாய்வு முடிந்தது. பாதுகாப்பு சோதனைகள் நிறைவேறும்போது கைமுறை சரிசெய்தல் இன்னும் தொடங்கலாம்.",
-      "generic": "இந்த கண்டுபிடிப்பிற்கு சரிசெய்தல் கிடைக்கவில்லை."
+      "beforeEnablement": "தானியங்கி திருத்தம் இயக்கப்படுவதற்கு முன் பகுப்பாய்வு முடிந்தது. பாதுகாப்பு சோதனைகள் நிறைவேறும்போது கைமுறை சரிசெய்தல் இன்னும் தொடங்கலாம்."
     },
     "commandFailure": {
       "ownerCapReached": "பகுப்பாய்வு திறன் நிரம்பியுள்ளது. செயலில் உள்ள பகுப்பாய்வு முடிவடையும் வரை காத்திருந்து, பின்னர் மீண்டும் முயற்சிக்கவும்.",
-      "githubTokenUnavailable": "GitHub அங்கீகாரத்திற்கு கவனம் தேவை. GitHub App ஐ மீண்டும் அங்கீகரிக்கவும், பின்னர் மீண்டும் முயற்சிக்கவும்.",
       "githubAuthInvalid": "GitHub அங்கீகாரத்திற்கு கவனம் தேவை. GitHub App ஐ மீண்டும் அங்கீகரிக்கவும், பின்னர் மீண்டும் முயற்சிக்கவும்.",
       "findingUnavailable": "கண்டுபிடிப்பு இனி கிடைக்கவில்லை. கண்டுபிடிப்புகளைப் புதுப்பித்து, அது திறந்திருந்தால் மீண்டும் முயற்சிக்கவும்.",
       "repositoryUnavailable": "களஞ்சியம் GitHub App க்கு இனி கிடைக்கவில்லை. களஞ்சிய அணுகலைப் புதுப்பித்து, பின்னர் மீண்டும் முயற்சிக்கவும்.",
@@ -2077,12 +1874,9 @@
     "search": {
       "searching": "தேடுகிறது",
       "searchSessions": "அமர்வுகளைத் தேடு",
-      "searchSessionsPlaceholder": "அமர்வுகளைத் தேடு...",
-      "clearSearch": "தேடலை அழி",
-      "clearFilters": "வடிகட்டிகளை அழி"
+      "searchSessionsPlaceholder": "அமர்வுகளைத் தேடு..."
     },
     "sessionList": {
-      "couldNotLoad": "அமர்வுகளை ஏற்ற முடியவில்லை",
       "couldNotLoadActive": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை",
       "noSessionsYetDescription": "உங்கள் மொபைலில் இருந்து ஒரு குறியீட்டு பணியைத் தொடங்கவும். உங்கள் அமர்வுகள் இங்கே தோன்றும்.",
       "noMatches": "பொருந்தும் அமர்வுகள் இல்லை",
@@ -2097,9 +1891,7 @@
     "sessionRow": {
       "deleteTitle": "அமர்வை நீக்கவா?",
       "deleteMessage": "இதை மீட்டெடுக்க முடியாது.",
-      "delete": "நீக்கு",
       "deleteSession": "அமர்வை நீக்கு",
-      "rename": "மறுபெயரிடு",
       "renameMessage": "இந்த அமர்விற்கு ஒரு புதிய பெயரை உள்ளிடவும்",
       "copyId": "அமர்வு ID ஐ நகலெடு",
       "idCopied": "அமர்வு ID நகலெடுக்கப்பட்டது",
@@ -2133,7 +1925,6 @@
       "didNotCompleteTitle": "நிறுவல் முடிக்கப்படவில்லை",
       "didNotCompleteMessage": "GitHub App நிறுவல் முடிக்கப்படவில்லை. பயன்பாட்டிலிருந்து மீண்டும் முயற்சிக்கவும்."
     },
-    "sessionExited": "அமர்வு வெளியேறியது",
     "remoteSpawnRetryable": "இன்ஸ்டன்ஸை அணுக முடியவில்லை — அது துண்டிக்கப்பட்டிருக்கலாம்.",
     "remoteSpawnNonRetryable": "இன்ஸ்டன்ஸால் அமர்வைத் தொடங்க முடியவில்லை — கணினியைச் சரிபார்க்கவும் அல்லது CLI-ஐப் புதுப்பிக்கவும்.",
     "remoteSpawnInstanceDisconnected": "தேர்ந்தெடுத்த இன்ஸ்டன்ஸ் துண்டிக்கப்பட்டது. Cloud Agent-ல் அமர்வைத் தொடங்கவும் அல்லது வேறு இன்ஸ்டன்ஸைத் தேர்ந்தெடுக்கவும்.",
@@ -2145,12 +1936,8 @@
       "title": "அமர்வு",
       "copyErrorDetails": "பிழை விவரங்களை நகலெடு",
       "backToSessions": "அமர்வுகளுக்கு திரும்பு",
-      "accessDenied": "அணுகல் மறுக்கப்பட்டது",
-      "accessDeniedDescription": "இதைப் பார்க்க உங்களுக்கு அனுமதி இல்லை.",
       "couldNotLoad": "அமர்வை ஏற்ற முடியவில்லை",
       "failedToLoadDetails": "அமர்வு விவரங்களை ஏற்ற முடியவில்லை",
-      "notFound": "காணப்படவில்லை",
-      "notFoundDescription": "இந்த உருப்படி நீக்கப்பட்டிருக்கலாம் அல்லது இனி கிடைக்காமல் இருக்கலாம்.",
       "failedToStopExecution": "செயலாக்கத்தை நிறுத்த முடியவில்லை",
       "renameSession": "அமர்வை மறுபெயரிடு",
       "renamePlaceholder": "அமர்வு பெயர்",
@@ -2161,7 +1948,6 @@
       "emptyTitle": "இன்னும் செய்திகள் இல்லை",
       "renameAccessibility": "அமர்வை மறுபெயரிடு: {{title}}",
       "cloningSession": "அமர்வை குளோன் செய்கிறது",
-      "continue": "தொடரவும்",
       "couldNotLoadThisSession": "இந்த அமர்வை ஏற்ற முடியவில்லை",
       "cloneFailedRetry": "இந்த அமர்வை குளோன் செய்ய முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "notEnoughCredits": "Cloud Agent ஐ இயக்க போதுமான கிரெடிட்கள் இல்லை. கிரெடிட்களைச் சேர்த்து மீண்டும் முயற்சிக்கவும்.",
@@ -2176,7 +1962,6 @@
     },
     "remoteSession": {
       "failedToCreate": "தொலை அமர்வை உருவாக்க முடியவில்லை",
-      "exited": "அமர்வு வெளியேறியது",
       "failedToExit": "அமர்விலிருந்து வெளியேற முடியவில்லை",
       "exitTitle": "அமர்விலிருந்து வெளியேறவா?",
       "exitMessage": "இது இயங்கும் அமர்வை நிறுத்தும் ஆனால் அதன் வரலாற்றை வைத்திருக்கும்.",
@@ -2194,9 +1979,6 @@
       "retryConnection": "இணைப்பை மீண்டும் முயற்சி செய்"
     },
     "newSession": {
-      "title": "புதிய அமர்வு",
-      "repository": "களஞ்சியம்",
-      "connectGithub": "GitHub உடன் இணை",
       "connectGithubDescription": "உங்கள் உலாவியில் GitHub ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கு திரும்பவும்.",
       "openGithub": "GitHub ஐ திற",
       "refreshRepositories": "களஞ்சியங்களை புதுப்பி",
@@ -2213,7 +1995,6 @@
       "commitAndPush": "கமிட் செய்து புஷ் செய்",
       "startSession": "அமர்வைத் தொடங்கு",
       "promptPlaceholder": "நீங்கள் எதில் வேலை செய்ய விரும்புகிறீர்கள்?",
-      "addAttachment": "இணைப்பு சேர்",
       "couldNotLoadModels": "மாதிரிகளை ஏற்ற முடியவில்லை",
       "prefillRepoAndModelUnavailable": "அசல் அமர்வின் களஞ்சியம் மற்றும் மாதிரி இனி கிடைக்கவில்லை. கீழே அவற்றைத் தேர்ந்தெடுக்கவும்.",
       "prefillRepoUnavailable": "{{repo}} இனி கிடைக்கவில்லை. கீழே ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்கவும்.",
@@ -2223,14 +2004,9 @@
       "couldNotRefreshRepositories": "களஞ்சியங்களை புதுப்பிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "discardDraftTitle": "வரைவை நிராகரிக்கவா?",
       "discardDraftMessage": "உங்கள் வினவல் இழக்கப்படும்.",
-      "keepEditing": "தொடர்ந்து திருத்து",
-      "discard": "நிராகரி",
       "discardFailed": "வரைவை நிராகரிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "remoteHint": "உங்கள் கணினியில் `kilo remote` ஐ இயக்கவும், அல்லது இயங்கும் CLI அமர்வில் `/remote` ஐ இயக்கவும், ஒரு உள்ளூர் kilo செயல்முறையைக் கட்டுப்படுத்தவும்",
-      "bitbucketConnected": "Bitbucket இணைக்கப்பட்டது",
-      "connectBitbucket": "Bitbucket ஐ இணை",
       "connectBitbucketDescription": "உங்கள் உலாவியில் பிட்பக்கெட்டை இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
-      "connectGitlab": "GitLab ஐ இணை",
       "connectGitlabDescription": "உங்கள் உலாவியில் GitLab-ஐ இணைக்கவும், பின்னர் ஒரு களஞ்சியத்தைத் தேர்ந்தெடுக்க இங்கே திரும்பவும்.",
       "couldNotLoadBitbucketRepositories": "பிட்பக்கெட் களஞ்சியங்களை ஏற்ற முடியவில்லை",
       "couldNotLoadGithubRepositories": "GitHub களஞ்சியங்களை ஏற்ற முடியவில்லை",
@@ -2252,18 +2028,10 @@
       "updatedFileCount": "{{displayCount}} கோப்புகள் புதுப்பிக்கப்பட்டன",
       "updatedFileCount_other": "{{displayCount}} கோப்புகள் புதுப்பிக்கப்பட்டன"
     },
-    "toolPatch": {
-      "operationAdded": "சேர்க்கப்பட்டது",
-      "operationDeleted": "நீக்கப்பட்டது",
-      "operationUpdated": "புதுப்பிக்கப்பட்டது"
-    },
     "toolCard": {
       "accessibility": "{{label}} கருவி, {{status}}",
       "accessibilityLabel": "{{name}} கருவி, {{status}}",
-      "fileEmpty": "இந்த கோப்பு காலியாக உள்ளது.",
       "noTasks": "பணிகள் இல்லை.",
-      "contentTruncated": "உள்ளடக்கம் துண்டிக்கப்பட்டது",
-      "truncated": "துண்டிக்கப்பட்டது",
       "toolRead": "படிக்க",
       "toolEdit": "திருத்து",
       "toolWrite": "எழுத",
@@ -2295,9 +2063,7 @@
       "runOn": "இதில் இயக்கு",
       "runOnAccessibility": "இதில் இயக்கு: {{label}}",
       "couldNotLoad": "நிகழ்வுகளை ஏற்ற முடியவில்லை",
-      "couldNotLoadDescription": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
       "cloudAgent": "Cloud Agent",
-      "loading": "ஏற்றுகிறது…",
       "cloudAgentDescription": "Kilo இன் கிளவுட் சாண்ட்பாக்ஸில் இயக்கு",
       "noCliInstances": "CLI நிகழ்வுகள் எதுவும் இணைக்கப்படவில்லை",
       "noCliInstancesDescription": "உங்கள் கணினியில் ஒரு திட்டத்தில் `kilo remote` ஐ இயக்கவும், அல்லது ஒன்று ஏற்கனவே இயங்கினால் Kilo CLI ஐ புதுப்பிக்கவும்.",
@@ -2334,12 +2100,9 @@
       "noMatches": "பொருத்தங்கள் இல்லை",
       "noRepositories": "களஞ்சியங்கள் கிடைக்கவில்லை",
       "noRepositoriesDescription": "உங்கள் கணக்கில் களஞ்சியங்கள் எதுவும் இணைக்கப்படவில்லை.",
-      "tryDifferentSearch": "வேறு தேடல் சொல்லை முயற்சிக்கவும்.",
       "loading": "ஏற்றுகிறது...",
       "accessibility": "களஞ்சியம்: {{label}}",
-      "platformBitbucket": "பிட்பக்கெட்",
-      "platformGithub": "GitHub",
-      "platformGitlab": "GitLab"
+      "platformBitbucket": "பிட்பக்கெட்"
     },
     "messageDetails": {
       "title": "செய்தி விவரங்கள்",
@@ -2349,13 +2112,10 @@
       "reportAiResponse": "AI பதிலை அறிக்கை செய்",
       "reportAiResponseConfirm": "மதிப்பாய்விற்காக இந்த பதிலை அறிக்கை செய்யவா?",
       "report": "அறிக்கை",
-      "role": "பங்கு",
       "roleUser": "பயனர்",
       "roleAssistant": "உதவியாளர்",
       "sent": "அனுப்பப்பட்டது",
-      "model": "மாதிரி",
       "costAndTokens": "செலவு & டோக்கன்கள்",
-      "cost": "செலவு",
       "input": "உள்ளீடு",
       "output": "வெளியீடு",
       "reasoning": "பகுத்தறிவு",
@@ -2363,8 +2123,7 @@
       "cacheWrite": "கேச் எழுத்து",
       "total": "மொத்தம்",
       "reportAiResponseFailedRetryable": "இந்த பதிலை அறிக்கை செய்ய முடியவில்லை.",
-      "reportAiResponseFailedTerminal": "இந்த பதிலை அறிக்கை செய்ய முடியாது.",
-      "reportAiResponseSubmitted": "அறிக்கை சமர்ப்பிக்கப்பட்டது. ரசீது {{receiptId}}"
+      "reportAiResponseFailedTerminal": "இந்த பதிலை அறிக்கை செய்ய முடியாது."
     },
     "modelCost": {
       "lessThan": "<{{amount}}",
@@ -2375,7 +2134,6 @@
       "textDisplay": "உரை காட்சி",
       "thinking": "சிந்திக்கிறது",
       "thought": "சிந்தனை",
-      "title": "விவரங்கள்",
       "showDetails": "விவரங்களைக் காட்டு",
       "pending": "நிலுவையில்…",
       "running": "இயங்குகிறது…"
@@ -2398,16 +2156,13 @@
     "filePart": {
       "loadingImage": "படத்தை ஏற்றுகிறது",
       "imageUnavailableRetry": "படம் கிடைக்கவில்லை, ஏற்றுவதை மீண்டும் முயற்சி செய்",
-      "imageUnavailable": "படம் கிடைக்கவில்லை",
       "imagePreviewUnavailableInSession": "இந்த அமர்வில் பட முன்னோட்டம் கிடைக்கவில்லை.",
       "viewImage": "படத்தைப் பார்",
       "viewImageWithAlt": "படத்தைப் பார் {{alt}}",
       "imageOutput": "பட வெளியீடு",
       "imageOutputWithFilename": "பட வெளியீடு, {{filename}}",
-      "defaultName": "கோப்பு",
       "openFullScreen": "{{name}} ஐ முழு திரையில் திற",
       "preview": "{{name}} ஐ முன்னோட்டம்",
-      "openFile": "{{name}} ஐ திற",
       "couldNotLoadFile": "இந்த கோப்பை ஏற்ற முடியவில்லை.",
       "couldNotLoadFileRetry": "இந்த கோப்பை ஏற்ற முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
       "retryLoadingFile": "கோப்பை ஏற்றுவதை மீண்டும் முயற்சி செய்",
@@ -2490,7 +2245,6 @@
       "failure": "{{title}}.",
       "failureRetryAvailable": "{{title}}. மீண்டும் முயற்சி கிடைக்கிறது.",
       "copyToComposer": "கம்போசருக்கு நகலெடுக்கவும்",
-      "queued": "வரிசையில்",
       "queuedAccessibility": "செய்தி வரிசையில் உள்ளது",
       "userMessage": "பயனர் செய்தி",
       "assistantMessage": "உதவியாளர் செய்தி",
@@ -2526,12 +2280,10 @@
     },
     "sessionFilter": {
       "title": "அமர்வுகளை வடிகட்டு",
-      "platform": "தளம்",
       "platformCloud": "Cloud",
       "platformExtension": "Extension",
       "platformCli": "CLI",
       "platformSlack": "Slack",
-      "platformGithub": "GitHub",
       "platformLinear": "Linear",
       "platformOther": "மற்றவை",
       "project": "திட்டம்"
@@ -2545,15 +2297,10 @@
     },
     "modelPicker": {
       "title": "மாதிரியைத் தேர்ந்தெடுக்கவும்",
-      "searchPlaceholder": "மாதிரிகளைத் தேடு...",
-      "noModels": "கிடைக்கக்கூடிய மாதிரிகள் இல்லை",
       "noModelsDescription": "தேர்ந்தெடுக்கக்கூடிய மாதிரிகள் எதுவும் இல்லை.",
-      "favorites": "பிடித்தவை",
-      "recommended": "பரிந்துரைக்கப்படுகிறது",
-      "allModels": "அனைத்து மாதிரிகள்"
+      "favorites": "பிடித்தவை"
     },
     "modelSelector": {
-      "model": "மாதிரி",
       "provider": "வழங்குநர் {{id}}",
       "modelId": "மாதிரி {{id}}",
       "unavailable": "கிடைக்கவில்லை",
@@ -2577,7 +2324,6 @@
       "uploading": "பதிவேற்றுகிறது…",
       "uploaded": "பதிவேற்றப்பட்டது",
       "uploadFailedRetry": "பதிவேற்றம் தோல்வியடைந்தது. மீண்டும் முயற்சிக்க தட்டவும்.",
-      "uploadFailedTerminal": "இந்த கோப்பை பதிவேற்ற முடியாது.",
       "moveLeft": "{{filename}} ஐ இடப்புறம் நகர்த்தவும்",
       "moveRight": "{{filename}} ஐ வலப்புறம் நகர்த்தவும்"
     },
@@ -2589,8 +2335,6 @@
       "camera": "கேமரா",
       "photoLibrary": "புகைப்பட நூலகம்",
       "files": "கோப்புகள்",
-      "cameraAccessDisabled": "கேமரா அணுகல் முடக்கப்பட்டது",
-      "cameraAccessMessage": "புகைப்படம் எடுக்க அமைப்புகளில் கேமரா அணுகலை அனுமதிக்கவும்.",
       "couldNotOpenPhotoPicker": "புகைப்பட தேர்வியைத் திறக்க முடியவில்லை. Kiloவை மறுதொடக்கம் செய்து மீண்டும் முயற்சிக்கவும்.",
       "maxFilesAllowed": "அதிகபட்சம் {{displayCount}} கோப்புகள் அனுமதிக்கப்படும்",
       "onlyAddingFiles": "{{total}} கோப்புகளில் {{accepted}} மட்டுமே சேர்க்கிறது (அதிகபட்சம் {{max}})"
@@ -2603,7 +2347,6 @@
       "waitForUploads": "இணைப்புகள் பதிவேற்றம் முடியும் வரை காத்திருக்கவும்.",
       "pasteFromClipboard": "கிளிப்போர்டிலிருந்து ஒட்டவும்",
       "stopGenerating": "உருவாக்குவதை நிறுத்து",
-      "sendMessage": "செய்தியை அனுப்பு",
       "selectModelBeforeSending": "அனுப்பும் முன் ஒரு மாதிரியைத் தேர்ந்தெடுக்கவும்",
       "preparingPlaceholder": "சூழலை அமைக்கிறது...",
       "finalizingPlaceholder": "முடிக்கிறது...",
@@ -2617,9 +2360,7 @@
     },
     "chatLink": {
       "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது",
-      "reviewPr": "PRஐ மதிப்பாய்வு செய்",
       "openLink": "இணைப்பைத் திற",
-      "copyLink": "இணைப்பை நகலெடு",
       "shareLink": "இணைப்பைப் பகிர்",
       "share": "பகிர்",
       "prLinkActions": "PR இணைப்பு செயல்கள்",
@@ -2659,13 +2400,11 @@
     "contextUsage": {
       "windowUnavailable": "சூழல்-சாளர அளவு கிடைக்கவில்லை",
       "tapToViewDetails": "சூழல் விவரங்களைப் பார்க்க தட்டவும்.",
-      "costPrefix": "செலவு {{cost}}",
       "costSuffix": ", செலவு {{cost}}",
       "tokensWindowUnavailable": "சூழல் {{used}} டோக்கன்கள், சாளரம் கிடைக்கவில்லை",
       "tokensUsage": "சூழல் {{window}} டோக்கன்களில் {{used}}, {{percentage}} பயன்படுத்தப்பட்டது",
       "title": "சூழல் பயன்பாடு",
       "used": "பயன்படுத்தப்பட்டது",
-      "remaining": "மீதம்",
       "provider": "வழங்குநர்",
       "totalCost": "மொத்த செலவு",
       "usageReflectsLatest": "பயன்பாடு சமீபத்திய முடிந்த உதவியாளர் பதிலை பிரதிபலிக்கிறது.",
@@ -2691,8 +2430,7 @@
       "merged": "இணைக்கப்பட்ட இழு கோரிக்கை",
       "draft": "வரைவு இழுப்பு கோரிக்கை",
       "updating": "புதுப்பிக்கிறது, {{label}} #{{number}}",
-      "label": "{{label}} #{{number}}",
-      "externalLinkLabel": "இழுப்பு கோரிக்கை"
+      "label": "{{label}} #{{number}}"
     },
     "markdownImage": {
       "load": "ஏற்று",
@@ -2720,11 +2458,9 @@
   },
   "bootstrap": {
     "couldNotLoadAccount": "உங்கள் கணக்கை ஏற்ற முடியவில்லை",
-    "couldNotLoadAccountDescription": "உங்கள் இணைப்பைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
     "couldNotLoadPrivacy": "தனியுரிமை தேர்வுகளை ஏற்ற முடியவில்லை",
     "couldNotLoadPrivacyDescription": "உங்கள் சாதன பாதுகாப்பு அமைப்புகளைச் சரிபார்த்து மீண்டும் முயற்சிக்கவும்.",
     "contentReady": "உள்ளடக்கம் தயார்",
-    "signOut": "வெளியேறு",
     "retryLoadingAccount": "கணக்கை ஏற்றுவதை மீண்டும் முயற்சிக்கவும்",
     "retryLoadingPrivacy": "தனியுரிமை தேர்வுகளை ஏற்றுவதை மீண்டும் முயற்சிக்கவும்"
   },
@@ -2734,7 +2470,6 @@
     "billingPage": "பில்லிங் பக்கம்"
   },
   "deviceSessions": {
-    "couldNotLoad": "அமர்வுகளை ஏற்ற முடியவில்லை",
     "couldNotLoadDescription": "இது ஏற்றப்படும் வரை உங்கள் செயலில் உள்ள அமர்வுகள் கிடைக்காது.",
     "currentDeviceUnidentified": "தற்போதைய சாதனத்தை அடையாளம் காண முடியவில்லை",
     "noSessions": "செயலில் உள்ள அமர்வுகள் இல்லை",
@@ -2742,7 +2477,6 @@
     "onlyKiloAppSignIns": "Kilo பயன்பாட்டு உள்நுழைவுகள் மட்டுமே இங்கே தோன்றும். எடிட்டர் மற்றும் CLI உள்நுழைவுகள் பட்டியலிடப்படாது.",
     "signedIn": "{{signedIn}} இல் உள்நுழைந்தது · கடைசியாகப் பார்த்தது {{lastSeen}}",
     "thisDevice": "இந்த சாதனம்",
-    "title": "சாதன அமர்வுகள்",
     "viewProfile": "சுயவிவரத்தைப் பார்க்கவும்",
     "signOutThisDevice": "இந்த சாதனத்திலிருந்து வெளியேறு",
     "signOutThisSession": "இந்த அமர்விலிருந்து வெளியேறு",
@@ -2750,8 +2484,6 @@
     "signOutThisDeviceTitle": "இந்த சாதனத்திலிருந்து வெளியேறவா?",
     "signOutThisSessionTitle": "இந்த அமர்விலிருந்து வெளியேறவா?",
     "signOutThisSessionMessage": "{{device}} வெளியேற்றப்படும். இது ஒரு மணி நேரம் வரை API அணுகலை வைத்திருக்க முடியும்.",
-    "signOutConfirm": "வெளியேறு",
-    "signOutMessage": "உங்கள் பணியிடத்தை அணுக மீண்டும் உள்நுழைய வேண்டும்.",
     "webBrowser": "இணைய உலாவி"
   },
   "forceUpdate": {
@@ -2772,17 +2504,13 @@
   },
   "imageViewer": {
     "close": "{{filename}} மூடு",
-    "imageUnavailable": "படம் கிடைக்கவில்லை",
     "share": "{{filename}} பகிர்"
   },
   "invalidRoute": {
     "description": "இந்த இணைப்பு இனி செல்லுபடியாகாது.",
-    "goBack": "பின் செல்",
     "title": "பக்கம் கிடைக்கவில்லை"
   },
   "monoScrollBlock": {
-    "contentTruncated": "உள்ளடக்கம் துண்டிக்கப்பட்டது",
-    "truncated": "துண்டிக்கப்பட்டது",
     "wrap": "மடக்கு",
     "scroll": "உருட்டு"
   },
@@ -2791,22 +2519,16 @@
     "internetRestored": "இணைய இணைப்பு மீட்டமைக்கப்பட்டது"
   },
   "queryError": {
-    "neutralTitle": "ஏதோ தவறு நடந்தது",
     "neutralDescription": "மீண்டும் முயற்சிக்கவும்.",
     "offlineTitle": "ஏற்ற முடியவில்லை",
-    "offlineDescription": "ஏதோ தவறு நடந்தது",
-    "permissionTitle": "அணுகல் மறுக்கப்பட்டது",
     "permissionDescription": "இதைப் பார்க்க உங்களுக்கு அனுமதி இல்லை.",
-    "notFoundTitle": "காணப்படவில்லை",
     "notFoundDescription": "இந்த உருப்படி நீக்கப்பட்டிருக்கலாம் அல்லது இனி கிடைக்காமல் இருக்கலாம்.",
     "serverTitle": "ஏற்ற முடியவில்லை",
     "serverDescription": "எங்கள் பக்கத்தில் ஏதோ தவறு ஏற்பட்டது. மீண்டும் முயற்சிக்கவும்."
   },
   "screenHeader": {
     "openMenu": "மெனுவைத் திற",
-    "openMenuFor": "{{title}}க்கான மெனுவைத் திற",
-    "close": "மூடு",
-    "goBack": "பின் செல்"
+    "openMenuFor": "{{title}}க்கான மெனுவைத் திற"
   },
   "picker": {
     "optionsExpired": "விருப்பங்கள் காலாவதியானது",
@@ -2837,10 +2559,7 @@
   },
   "share": {
     "title": "Kiloவுக்கு பகிர்",
-    "close": "மூடு",
-    "reviewPr": "PRஐ மதிப்பாய்வு செய்",
     "reviewPrSubtitle": "{{owner}}/{{repo}} #{{number}}",
-    "newSession": "புதிய அமர்வு",
     "searchPlaceholder": "சமீபத்திய அமர்வுகளைத் தேடு",
     "connectedCli": "இணைக்கப்பட்ட CLI இல்",
     "newSessionOn": "{{name}} இல் புதிய அமர்வு",
@@ -2898,7 +2617,6 @@
     "statusCanceling": "Kilo Pass ரத்து செய்யப்படுகிறது",
     "statusPastDue": "Kilo Pass காலக்கெடு கடந்தது",
     "monthlyCredits": "{{credits}} மாதாந்திர கிரெடிட்கள்",
-    "ends": "{{date}} அன்று முடிகிறது",
     "periodEnd": "கால முடிவு",
     "managedOnGooglePlay": "Google Play இல் நிர்வகிக்கப்படுகிறது",
     "managedInAppStore": "App Store இல் நிர்வகிக்கப்படுகிறது",
@@ -2910,7 +2628,6 @@
     "unavailableDescription": "Kilo Pass Android-ல் ஆப்-இன் வாங்குதலாகக் கிடைக்காது. இதை வலைத்தளத்தில் நிர்வகிக்கவும்.",
     "webManagementDescription": "இந்த Kilo Pass வலைத்தளத்தில் நிர்வகிக்கப்படுகிறது.",
     "legalDisclosure": "Kilo Pass தானாகப் புதுப்பிக்கப்படும் மாதாந்திர சந்தா. வாங்குதல் உறுதிசெய்யப்பட்டதும் உங்கள் Apple ID-க்கு கட்டணம் வசூலிக்கப்படும். நடப்புக் காலகட்டம் முடிவதற்கு 24 மணிநேரத்திற்கு முன்னர் ரத்து செய்யப்படாவிட்டால், சந்தாக்கள் ஒவ்வொரு மாதமும் காட்டப்படும் விலையில் தானாகவே புதுப்பிக்கப்படும். உங்கள் App Store கணக்கு அமைப்புகளில் எப்போது வேண்டுமானாலும் நிர்வகிக்கவும் அல்லது ரத்து செய்யவும்.",
-    "legalPrivacyPolicy": "தனியுரிமைக் கொள்கை",
     "legalTermsOfUse": "பயன்பாட்டு விதிமுறைகள் (EULA)",
     "purchaseDifferentAccount": "இந்த App Store வாங்குதல் உங்கள் Kilo கணக்குடன் இணைக்கப்படவில்லை. வாங்குதலுக்குப் பயன்படுத்திய Apple கணக்கில் உள்நுழைந்து, பின்னர் மீண்டும் முயற்சிக்கவும்.",
     "restoreFailed": "வாங்குதல்களை மீட்டமைக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
@@ -2939,7 +2656,6 @@
     "privacyPolicyPrefix": "உங்கள் தரவு",
     "privacyPolicy": "Kilo தனியுரிமைக் கொள்கையின்",
     "onDevice": "சாதனத்தில்",
-    "loading": "ஏற்றுகிறது…",
     "couldNotLoadTranscription": "உங்கள் டிரான்ஸ்கிரிப்ஷன் அமைப்பை ஏற்ற முடியவில்லை.",
     "signInToManageTranscription": "ஆன்லைன் டிரான்ஸ்கிரிப்ஷனை நிர்வகிக்க உள்நுழையவும்.",
     "onlineTranscription": "ஆன்லைன் டிரான்ஸ்கிரிப்ஷன்",
@@ -2956,7 +2672,6 @@
     "voiceTranscriptionTitle": "குரல் டிரான்ஸ்கிரிப்ஷன்",
     "retentionPrefix": "முழு தக்கவைப்பு காலங்கள், உங்கள் உரிமைகள் மற்றும் தொடர்பு தகவல்",
     "backToConsent": "ஒப்புதல் திரைக்குத் திரும்பு",
-    "back": "பின்",
     "revokeConsent": "ஒப்புதலை ரத்து செய்",
     "revokeConsentTitle": "தரவு பகிர்வு ஒப்புதலை ரத்து செய்யவா?",
     "acceptAndContinue": "ஏற்று தொடரவும்",
@@ -2990,7 +2705,6 @@
     "productAnalyticsWho": "PostHog.",
     "errorScreenshotsWhat": "பிழை ஏற்படும்போது மறைக்கப்பட்ட ஸ்கிரீன்ஷாட்கள், மற்றும் சிறிய அமர்வுகளின் மறைக்கப்பட்ட பதிவுகள்.",
     "errorScreenshotsWhy": "ஏதாவது உடையும்போது ஆப் எதைக் காட்டியது என்பதைப் பார்க்க.",
-    "errorScreenshotsWho": "Sentry.",
     "installAttributionWhat": "நிறுவல் மூலம் மற்றும் பிரச்சார அடையாளங்காட்டிகள்.",
     "installAttributionWhy": "எந்த சேனல்கள் புதிய பயனர்களைக் கொண்டு வருகின்றன என்பதைப் புரிந்துகொள்ள.",
     "installAttributionWho": "AppsFlyer.",
@@ -2999,7 +2713,6 @@
     "voiceTranscriptionWho": "சாதனத்தில் மட்டும், அல்லது இந்த சாதனம் ஆஃப்லைனில் டிரான்ஸ்கிரைப் செய்ய முடியாதபோது Apple அல்லது Google.",
     "installAttributionPromptTitle": "நிறுவல் பங்கீட்டை அனுமதிக்கவா?",
     "installAttributionPromptMessage": "Kilo உங்களை எந்த சேனல் கொண்டு வந்தது என்பதை அறிய மட்டுமே Apple இன் கண்காணிப்பு அனுமதியைப் பயன்படுத்துகிறது. உங்கள் கேள்விகள் மற்றும் உரையாடல்கள் ஒருபோதும் பயன்படுத்தப்படாது.",
-    "continue": "தொடரவும்",
     "what": "என்ன",
     "why": "ஏன்",
     "who": "யார்"
@@ -3021,7 +2734,6 @@
       "selectDescription": "தொடர உங்கள் சுயவிவரத்திலிருந்து ஒரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்.",
       "selectOrganization": "ஒரு நிறுவனத்தைத் தேர்ந்தெடுக்கவும்",
       "unavailableDescription": "இந்த நிறுவனம் இனி கிடைக்காது. தொடர உங்கள் சுயவிவரத்திலிருந்து ஒன்றைத் தேர்ந்தெடுக்கவும்.",
-      "accessDeniedTitle": "அணுகல் மறுக்கப்பட்டது",
       "accessDeniedDescription": "இந்த அமைப்பை அணுக உங்களுக்கு அனுமதி இல்லை."
     },
     "creditActivity": {
@@ -3040,16 +2752,12 @@
         "accounting_adjustment": "கணக்கியல் சரிசெய்தல்",
         "credits_expired": "கிரெடிட்கள் காலாவதியானது"
       },
-      "loadMore": "மேலும் ஏற்று",
-      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
       "truncated": "பழைய கிரெடிட் செயல்பாடு கிடைக்கிறது."
     },
     "inviteMember": {
       "emailError": "செல்லுபடியாகும் மின்னஞ்சல் முகவரியை உள்ளிடவும்",
-      "emailLabel": "மின்னஞ்சல்",
       "emailPlaceholder": "name@company.com",
       "permissionDenied": "உறுப்பினர்களை அழைக்க உங்களுக்கு அனுமதி இல்லை.",
-      "roleLabel": "பங்கு",
       "roleMember": "பங்கு: உறுப்பினர்",
       "sendInvite": "அழைப்பை அனுப்பு",
       "title": "உறுப்பினரை அழைக்கவும்"
@@ -3066,18 +2774,13 @@
         "paid": "செலுத்தப்பட்டது",
         "open": "திறந்த",
         "void": "செல்லாது",
-        "draft": "வரைவு",
-        "uncollectible": "வசூலிக்க முடியாதது",
-        "unknown": "தெரியவில்லை"
+        "uncollectible": "வசூலிக்க முடியாதது"
       },
-      "loadMore": "மேலும் ஏற்று",
       "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை",
       "truncated": "பழைய விலைப்பட்டியல்கள் கிடைக்கின்றன."
     },
     "lowBalanceAlert": {
-      "emailPlaceholder": "name@company.com",
       "enableA11y": "குறைந்த இருப்பு எச்சரிக்கையை இயக்கு",
-      "enabled": "இயக்கப்பட்டது",
       "notifyEmailsLabel": "மின்னஞ்சல்களை அறிவிக்கவும்",
       "permissionDenied": "பில்லிங் எச்சரிக்கைகளை நிர்வகிக்க உங்களுக்கு அனுமதி இல்லை.",
       "separateEmailsHint": "பல மின்னஞ்சல்களை கமாவுடன் பிரிக்கவும்.",
@@ -3101,12 +2804,10 @@
       "emptyDescriptionCanInvite": "இந்த நிறுவனத்தில் ஒத்துழைக்க அணிக்குழு உறுப்பினர்களை அழைக்கவும்.",
       "emptyDescriptionCannotInvite": "அணிக்குழு உறுப்பினர்களை அழைக்க ஒரு உரிமையாளர் அல்லது பில்லிங் மேலாளரிடம் கேட்கவும்.",
       "emptyTitle": "இன்னும் உறுப்பினர்கள் இல்லை",
-      "inviteMember": "உறுப்பினரை அழைக்கவும்",
       "invitedDate": "{{date}} அன்று அழைக்கப்பட்டது",
       "limitPerDay": "{{amount}}/நாள்",
       "manageA11y": "{{name}} நிர்வகி",
       "manageInvitationA11y": "{{email}}க்கான அழைப்பை நிர்வகி",
-      "removeConfirm": "நீக்கு",
       "removeMember": "உறுப்பினரை அகற்று",
       "removeMemberMessage": "இந்த நிறுவனத்திலிருந்து {{name}}வை அகற்றவா?",
       "revokeConfirm": "ரத்து செய்",
@@ -3121,31 +2822,23 @@
         "billingManager": "பில்லிங் மேலாளர்"
       },
       "emailStatusFailed": "மின்னஞ்சல் தோல்வியடைந்தது",
-      "emailStatusPending": "நிலுவையில்",
       "inviteCreated": "அழைப்பு உருவாக்கப்பட்டது",
       "pendingInvitations": "நிலுவையில் உள்ள அழைப்புகள்",
       "resendInvite": "அழைப்பை மீண்டும் அனுப்பு",
       "shareInviteLink": "அழைப்பு இணைப்பைப் பகிர்"
     },
-    "permissionDenied": {
-      "back": "பின்",
-      "title": "அணுகல் மறுக்கப்பட்டது"
-    },
     "usageStats": {
-      "cost": "செலவு",
       "inputTokens": "உள்ளீட்டு டோக்கன்கள்",
       "last30Days": "கடந்த 30 நாட்கள்",
       "outputTokens": "வெளியீட்டு டோக்கன்கள்",
       "requests": "கோரிக்கைகள்"
     },
     "hub": {
-      "title": "நிறுவனம்",
       "renameTitle": "நிறுவனத்தை மறுபெயரிடு",
       "renamePlaceholder": "நிறுவனப் பெயரை உள்ளிடவும்",
       "balance": "இருப்பு",
       "organizationSeats": "நிறுவன இருக்கைகள்",
-      "lowBalanceBelow": "{{amount}} க்கு கீழே",
-      "lowBalanceOff": "ஆஃப்"
+      "lowBalanceBelow": "{{amount}} க்கு கீழே"
     },
     "kiloPass": {
       "activating": "செயல்படுத்துகிறது",
@@ -3153,9 +2846,6 @@
       "couldNotLoadStatus": "நிலையை ஏற்ற முடியவில்லை",
       "creditProcessingDelayed": "கிரெடிட் செயலாக்கம் தாமதமானது · தானாக மீண்டும் முயற்சிக்கிறது",
       "ended": "முடிந்தது",
-      "endsOn": "{{date}} அன்று முடிகிறது",
-      "loading": "ஏற்றுகிறது…",
-      "manageHint": "Kilo Pass நிர்வாகத்தை வலையில் திறக்கிறது.",
       "notSubscribed": "சந்தா எடுக்கப்படவில்லை",
       "overallocated": "Pass ஒதுக்கீடுகள் செலுத்திய இருக்கைகளை விட அதிகம்",
       "paidSeat_one": "{{displayCount}} செலுத்திய இருக்கை",
@@ -3165,13 +2855,11 @@
       "paymentPending": "கட்டணம் நிலுவையில் உள்ளது",
       "processingBlocked": "செயலாக்கம் தடுக்கப்பட்டது",
       "processingNeedsReview": "செயலாக்கத்திற்கு மதிப்பாய்வு தேவை",
-      "retry": "மீண்டும் முயற்சி",
       "retryHint": "Kilo Pass நிலையை ஏற்றுவதை மீண்டும் முயற்சிக்கிறது.",
       "setupHint": "Kilo Pass அமைப்பை வலையில் திறக்கிறது."
     }
   },
   "authErrors": {
-    "emailAlreadyUsed": "இந்த மின்னஞ்சலுடன் வேறு உள்நுழைவு முறையில் ஒரு கணக்கு ஏற்கனவே உள்ளது. வேறு முறையை முயற்சிக்கவும் அல்லது '$t(login.moreSignInOptions)' பயன்படுத்தவும்.",
     "differentOauth": "இந்த மின்னஞ்சலுடன் வேறு உள்நுழைவு முறையில் ஒரு கணக்கு ஏற்கனவே உள்ளது. வேறு முறையை முயற்சிக்கவும் அல்லது '$t(login.moreSignInOptions)' பயன்படுத்தவும்.",
     "ssoError": "உங்கள் நிறுவனத்திற்கு SSO தேவை. '$t(login.moreSignInOptions)' பயன்படுத்தவும்.",
     "blocked": "இந்த கணக்கு தடுக்கப்பட்டுள்ளது. ஆதரவைத் தொடர்பு கொள்ளவும்.",
@@ -3189,7 +2877,6 @@
     "startSignInFailed": "உள்நுழைவைத் தொடங்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     "couldNotOpenBrowser": "உலாவியைத் திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.",
     "signInTimedOut": "உள்நுழைவு நேரம் முடிந்தது. மீண்டும் முயற்சிக்கவும்.",
-    "signInFailed": "உள்நுழைவு தோல்வியடைந்தது. மீண்டும் முயற்சிக்கவும்.",
     "networkError": "நெட்வொர்க் பிழை. மீண்டும் முயற்சிக்கவும்.",
     "accessDeniedByUser": "பயனரால் அணுகல் மறுக்கப்பட்டது",
     "codeExpired": "குறியீடு காலாவதியானது",
@@ -3218,17 +2905,11 @@
     "backToPreferences": "விருப்பங்களுக்குத் திரும்பு"
   },
   "quickChat": {
-    "title": "அரட்டை",
-    "composer": {
-      "placeholder": "செய்தி"
-    },
     "empty": {
       "title": "அரட்டையைத் தொடங்கு",
       "description": "ஒரு மாதிரியுடன் பேசுவதற்கு ஒரு செய்தியை அனுப்பவும்."
     },
-    "working": "வேலை செய்கிறது",
     "historyRetry": "அரட்டை வரலாற்றை ஏற்ற முடியவில்லை.",
-    "catalogRetry": "மாதிரிகளை ஏற்ற முடியவில்லை",
     "sendError": "செய்தியை அனுப்ப முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
   },
   "glanceable": {
@@ -3239,9 +2920,7 @@
     "signedOut": "முகவர்களைக் காண உள்நுழையவும்",
     "privacy": "முகவர்களைப் பார்க்க Kilo திறக்கவும்",
     "openAgents": "முகவர்களைத் திறக்கவும்",
-    "running": "வேலை செய்கிறது",
     "needsInput": "உள்ளீடு தேவை",
-    "idle": "செயலற்று",
     "channelName": "செயலில் உள்ள முகவர்கள்",
     "activityKitDisabledBody": "பூட்டுத் திரையில் செயலில் உள்ள முகவர்களைக் காண அமைப்புகளில் நேரலைச் செயல்பாடுகளை இயக்கவும்."
   }

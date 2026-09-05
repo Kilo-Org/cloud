@@ -233,7 +233,7 @@ export function PrDiffFileNavigator({
       <CenteredState>
         <View className="items-center px-6">
           <Text className="text-center text-lg font-semibold text-foreground">
-            {t('prReview.accessDenied')}
+            {t('common.accessDenied')}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
             {t('prReview.accessDeniedDescription')}
@@ -249,7 +249,7 @@ export function PrDiffFileNavigator({
             {t('prReview.fileNavigator.couldNotLoadFiles')}
           </Text>
           <Text variant="muted" className="text-center">
-            {t('prReview.fileNavigator.checkConnection')}
+            {t('organization.boundary.loadErrorMessage')}
           </Text>
           <Pressable
             onPress={() => {

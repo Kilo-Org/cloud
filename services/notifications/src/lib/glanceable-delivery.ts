@@ -85,7 +85,7 @@ export function buildGlanceableExpoMessages(
         // same ordered snapshot, while no title, body, or sound interrupts the user.
         _contentAvailable: true,
         ...(platform === 'ios'
-          ? { priority: 'normal' as const }
+          ? { priority: 'high' as const }
           : {
               sound: null,
               priority: 'default' as const,

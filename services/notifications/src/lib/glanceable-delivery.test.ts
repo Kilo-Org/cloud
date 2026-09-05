@@ -1664,7 +1664,7 @@ describe('toGlanceableContentState', () => {
 });
 
 describe('buildGlanceableExpoMessages', () => {
-  it.each([0, 1, 2])('keeps iOS badge %i with its background snapshot', needsInput => {
+  it.each([0, 1, 2])('sends iOS badge %i without a low-priority delay', needsInput => {
     const nextSnapshot = { ...snapshot, needsInput };
     const messages = buildGlanceableExpoMessages(
       [{ token: 'ExponentPushToken[aaa]', locale: null }],
@@ -1678,7 +1678,7 @@ describe('buildGlanceableExpoMessages', () => {
         data: nextSnapshot,
         badge: needsInput,
         _contentAvailable: true,
-        priority: 'normal',
+        priority: 'high',
       }),
     ]);
     expect(messages[0].collapseId).toBe(nextSnapshot.scopeKey);

@@ -558,6 +558,29 @@ describe('glanceable app badge sink', () => {
     expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[3], [3], [1]]);
   });
 
+  it('leaves a push-set launcher badge alone across re-publications of the same count', async () => {
+    const { sink } = await loadBadgeSink();
+
+    // e7 baseline: a needs-input session published count 1 to the launcher.
+    sink.publish(glanceableSnapshot({ needsInput: 1 }));
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[1]]);
+
+    // The OS then moves the launcher badge itself: a visible foreground push
+    // with badge 2 is applied through the shouldSetBadge: true path. Every
+    // tray refresh re-publishes the unchanged snapshot afterwards; none of
+    // those re-publications may undo the badge the push carried.
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 1 }));
+    sink.publish(glanceableSnapshot({ revision: 3, status: 'stale', needsInput: 1 }));
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[1]]);
+
+    // A real count change still reaches the launcher.
+    sink.publish(glanceableSnapshot({ revision: 4, needsInput: 2 }));
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[1], [2]]);
+  });
+
   it.each([
     ['busy-only', { status: 'happy', running: 2, needsInput: 0 }],
     ['empty', { status: 'empty', running: 0, needsInput: 0, needsInputSince: null }],
@@ -676,6 +699,76 @@ describe('glanceable app badge sink', () => {
     expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(4);
     expect(mocks.refreshActiveSessionsFromPush).toHaveBeenCalledOnce();
     expect(completedBeforeWrite).toBeNull();
+  });
+
+  it('does not re-assert the local count when a later glanceable push is discarded', async () => {
+    const { loaded } = await loadBadgeSink();
+    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
+    mockSecureStoreKeys();
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: (notification: {
+        request: { content: { data: unknown } };
+      }) => Promise<{ shouldSetBadge: boolean }>;
+    };
+
+    // A fresh glanceable push confirms count 2 on the launcher through the sink.
+    await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2026-01-02T00:00:00.000Z',
+            needsInput: 2,
+          }),
+        },
+      },
+    });
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2]]);
+
+    // A visible push then moves the launcher itself (badge 3, shouldSetBadge).
+    // A stale glanceable push is discarded: it carries no new count, so the
+    // fallback must NOT re-write the unchanged local truth — that would undo
+    // the badge the visible push carried (the e7 clobber).
+    await registration.handleNotification({
+      request: {
+        content: {
+          data: {
+            type: 'chat.message',
+            sandboxId: 'sandbox-1',
+            conversationId: 'conversation-1',
+            messageId: 'message-1',
+          },
+        },
+      },
+    });
+    const stale = await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2025-12-31T00:00:00.000Z',
+            needsInput: 9,
+          }),
+        },
+      },
+    });
+    expect(stale.shouldSetBadge).toBe(false);
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2]]);
+
+    // A real count change still reaches the launcher after the discard.
+    await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2026-01-03T00:00:00.000Z',
+            needsInput: 3,
+          }),
+        },
+      },
+    });
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [3]]);
   });
 });
 

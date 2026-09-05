@@ -62,11 +62,19 @@ function getProjectId(): string {
 // is registered once and must always read the latest value without stale closures.
 let activeChatLocation: { sandboxId: string; conversationId: string } | null = null;
 
+let appBadgeWrite: Promise<void> | null = null;
+
+// The count the last successful native write put on the launcher badge. The
+// badge is shared with iOS itself: a visible push that carries its own badge
+// moves the icon through the shouldSetBadge path without the app writing.
+let badgeWrittenCount: number | null = null;
+
 async function setAppBadge(count: number): Promise<void> {
   try {
     await chainSave('glanceable-app-badge', async () => {
       await Notifications.setBadgeCountAsync(count);
     });
+    badgeWrittenCount = count;
   } catch (error) {
     Sentry.captureException(error, {
       tags: {
@@ -77,11 +85,20 @@ async function setAppBadge(count: number): Promise<void> {
   }
 }
 
-let appBadgeWrite: Promise<void> | null = null;
+function syncAppBadge(count: number): void {
+  // Only a change of the needs-input count owns a badge write. Re-asserting
+  // an unchanged count would undo a badge iOS applied from a visible push
+  // payload (e7: foreground push badge 2 was clobbered back to needsInput 1
+  // before the app was terminated).
+  if (count === badgeWrittenCount) {
+    return;
+  }
+  appBadgeWrite = setAppBadge(count);
+}
 
 const appBadgeSink: GlanceableSink = {
   publish(snapshot) {
-    appBadgeWrite = setAppBadge(snapshot.needsInput);
+    syncAppBadge(snapshot.needsInput);
   },
   async waitForNativeTerminal() {
     if (appBadgeWrite) {
@@ -286,7 +303,11 @@ export function setupNotificationHandler() {
         }
         if (!applied) {
           setTimeout(() => {
-            appBadgeWrite = setAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);
+            // A discarded push carries no new count, so the local truth is
+            // unchanged. Re-asserting it here would undo a badge iOS applied
+            // from a later visible push (the same e7 clobber as an unchanged
+            // re-publication), so it goes through the guarded write too.
+            syncAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);
           }, 0);
         }
         return { ...suppressed, shouldSetBadge: applied };

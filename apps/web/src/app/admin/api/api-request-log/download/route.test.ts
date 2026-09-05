@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { randomBytes } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import { strFromU8, unzipSync } from 'fflate';
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log_2 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { getUserFromAuth } from '@/lib/user/server';
 import { defineTestUser } from '@/tests/helpers/user.helper';
@@ -47,7 +47,7 @@ describe('GET /admin/api/api-request-log/download', () => {
   });
 
   afterEach(async () => {
-    await db.delete(api_request_log).where(eq(api_request_log.kilo_user_id, TEST_USER_ID));
+    await db.delete(api_request_log_2).where(eq(api_request_log_2.kilo_user_id, TEST_USER_ID));
   });
 
   it('streams a complete ZIP across backpressured DB batches', async () => {
@@ -55,7 +55,7 @@ describe('GET /admin/api/api-request-log/download', () => {
     // keeps page two blocked until the test starts consuming the response.
     const payload = randomBytes(128 * 1024).toString('base64');
     const rows = await db
-      .insert(api_request_log)
+      .insert(api_request_log_2)
       .values(
         Array.from({ length: BATCH_SIZE + 1 }, (_, index) => ({
           created_at: '2026-08-01T12:00:00.000Z',
@@ -66,7 +66,7 @@ describe('GET /admin/api/api-request-log/download', () => {
           response: JSON.stringify({ output: index, payload }),
         }))
       )
-      .returning({ id: api_request_log.id });
+      .returning({ id: api_request_log_2.id });
 
     const response = await GET(createRequest());
 

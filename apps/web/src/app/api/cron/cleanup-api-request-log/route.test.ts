@@ -14,7 +14,7 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log_2 } from '@kilocode/db/schema';
 import { db, sql } from '@/lib/drizzle';
 import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-observability';
 import { GET } from './route';
@@ -37,12 +37,12 @@ function makeRequest(headers?: Record<string, string>) {
 }
 
 async function insertApiRequestLogRecord(created_at: string, provider = 'test-provider') {
-  const [row] = await db.insert(api_request_log).values({ created_at, provider }).returning();
+  const [row] = await db.insert(api_request_log_2).values({ created_at, provider }).returning();
   return row;
 }
 
 async function insertApiRequestLogRecords(count: number, created_at: string) {
-  await db.insert(api_request_log).values(
+  await db.insert(api_request_log_2).values(
     Array.from({ length: count }, (_, index) => ({
       created_at,
       provider: `test-provider-${index}`,
@@ -53,7 +53,7 @@ async function insertApiRequestLogRecords(count: number, created_at: string) {
 describe('GET /api/cron/cleanup-api-request-log', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
-    await db.delete(api_request_log).where(sql`true`);
+    await db.delete(api_request_log_2).where(sql`true`);
   });
 
   it('rejects requests without authorization header', async () => {
@@ -102,7 +102,7 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
       })
     );
 
-    const remaining = await db.select().from(api_request_log);
+    const remaining = await db.select().from(api_request_log_2);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe(recent.id);
   });
@@ -120,7 +120,7 @@ describe('GET /api/cron/cleanup-api-request-log', () => {
     expect(body.batchSize).toBe(BATCH_SIZE);
     expect(body.hasMore).toBe(true);
 
-    const remaining = await db.select().from(api_request_log);
+    const remaining = await db.select().from(api_request_log_2);
     expect(remaining).toHaveLength(7);
 
     const remainingIds = remaining.map(row => row.id.toString()).sort();

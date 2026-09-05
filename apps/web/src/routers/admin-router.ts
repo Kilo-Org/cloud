@@ -26,7 +26,7 @@ import {
   kiloclaw_instances,
   organizations,
   modelsByProvider,
-  api_request_log,
+  api_request_log_2,
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
@@ -2327,12 +2327,12 @@ export const adminRouter = createTRPCRouter({
       const [summary] = await db
         .select({
           recordCount: count(),
-          sizeBytes: sql<number>`pg_total_relation_size('api_request_log'::regclass)`.mapWith(
+          sizeBytes: sql<number>`pg_total_relation_size('api_request_log_2'::regclass)`.mapWith(
             Number
           ),
-          oldestCreatedAt: min(api_request_log.created_at),
+          oldestCreatedAt: min(api_request_log_2.created_at),
         })
-        .from(api_request_log);
+        .from(api_request_log_2);
 
       return summary;
     }),

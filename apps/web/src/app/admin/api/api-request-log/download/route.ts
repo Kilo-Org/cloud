@@ -1,7 +1,7 @@
 import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { db } from '@/lib/drizzle';
-import { api_request_log } from '@kilocode/db/schema';
+import { api_request_log_2 } from '@kilocode/db/schema';
 import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
@@ -72,24 +72,24 @@ function buildFilter(
 ) {
   const conditions: SQL[] = [];
   if (userId) {
-    conditions.push(eq(api_request_log.kilo_user_id, userId));
+    conditions.push(eq(api_request_log_2.kilo_user_id, userId));
   }
   if (parsedStart) {
-    conditions.push(gte(api_request_log.created_at, parsedStart.toISOString()));
+    conditions.push(gte(api_request_log_2.created_at, parsedStart.toISOString()));
   }
   if (parsedEnd) {
-    conditions.push(lte(api_request_log.created_at, parsedEnd.toISOString()));
+    conditions.push(lte(api_request_log_2.created_at, parsedEnd.toISOString()));
   }
   if (model) {
-    conditions.push(eq(api_request_log.model, model));
+    conditions.push(eq(api_request_log_2.model, model));
   }
   if (sessionId) {
-    conditions.push(eq(api_request_log.session_id, sessionId));
+    conditions.push(eq(api_request_log_2.session_id, sessionId));
   }
   if (errorsOnly) {
     const errorsCondition = or(
-      gte(api_request_log.status_code, 400),
-      isNotNull(api_request_log.error)
+      gte(api_request_log_2.status_code, 400),
+      isNotNull(api_request_log_2.error)
     );
     if (errorsCondition) {
       conditions.push(errorsCondition);
@@ -122,7 +122,7 @@ export async function GET(request: NextRequest) {
 
   const filter = buildFilter(userId, parsedStart, parsedEnd, model, sessionId, errorsOnly);
 
-  const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
+  const [result] = await db.select({ total: count() }).from(api_request_log_2).where(filter);
   if (result.total === 0) {
     return jsonError('No records found for the given criteria', 404);
   }
@@ -175,9 +175,9 @@ export async function GET(request: NextRequest) {
     for (;;) {
       const rows = await db
         .select()
-        .from(api_request_log)
-        .where(cursor ? and(filter, gt(api_request_log.id, cursor)) : filter)
-        .orderBy(asc(api_request_log.id))
+        .from(api_request_log_2)
+        .where(cursor ? and(filter, gt(api_request_log_2.id, cursor)) : filter)
+        .orderBy(asc(api_request_log_2.id))
         .limit(BATCH_SIZE);
 
       if (rows.length === 0) break;

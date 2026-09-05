@@ -1,0 +1,219 @@
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+import { SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS } from '../../../src/shared/sandbox-control-protocol';
+import * as controlRuntime from './sandbox-control-runtime';
+import { createWorktreeFeed } from './worktree-feed';
+
+type FeedOptions = Parameters<typeof controlRuntime.startSandboxControlEventFeed>[0];
+
+function asFetch(
+  fn: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>
+): typeof fetch {
+  return Object.assign(fn, { preconnect: fetch.preconnect });
+}
+
+async function waitFor(condition: () => boolean): Promise<void> {
+  const deadline = Date.now() + 5_000;
+  while (!condition()) {
+    if (Date.now() >= deadline) break;
+    await Bun.sleep(10);
+  }
+  if (condition()) return;
+  throw new Error('Timed out waiting for native feed state');
+}
+
+function nativeFeed(options: FeedOptions) {
+  let fresh = true;
+  return {
+    emit: async (value: unknown) => {
+      await options.consume(
+        (async function* () {
+          yield value;
+        })()
+      );
+    },
+    fail: (reason: controlRuntime.KiloEventFeedError['reason']) => {
+      fresh = false;
+      options.onUnexpectedClose(
+        new controlRuntime.KiloEventFeedError(reason, 'Native feed failed')
+      );
+    },
+    result: {
+      isFresh: () => fresh && !options.signal.aborted,
+      usable: Promise.resolve(true),
+      close: () => {
+        fresh = false;
+      },
+      settled: Promise.resolve(),
+    },
+  };
+}
+
+function fixture(rejectReconnections = false) {
+  const source = {
+    scopeId: 'worktree_a',
+    runtimeId: crypto.randomUUID(),
+    directory: '/workspace',
+    kiloClient: { serverUrl: 'http://127.0.0.1:1' },
+    signal: new AbortController().signal,
+  };
+  const attempts: ReturnType<typeof nativeFeed>[] = [];
+  const failures: string[] = [];
+  const events: Array<{ type: string; properties: Record<string, unknown>; directory?: string }> =
+    [];
+  const start = spyOn(controlRuntime, 'startSandboxControlEventFeed').mockImplementation(
+    async options => {
+      if (rejectReconnections && attempts.length > 0) throw new Error('Feed unavailable');
+      const attempt = nativeFeed(options);
+      attempts.push(attempt);
+      return attempt.result;
+    }
+  );
+  const feed = createWorktreeFeed({
+    source,
+    isCurrent: (runtimeId, kiloClient) =>
+      runtimeId === source.runtimeId && kiloClient === source.kiloClient,
+    onEvent: event => events.push(event),
+    onFailure: reason => failures.push(reason),
+  });
+  return { attempts, events, failures, feed, source, start };
+}
+
+const cleanups: Array<() => void> = [];
+
+afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup();
+});
+
+describe('createWorktreeFeed', () => {
+  it.each(['feed_ended', 'feed_failed', 'feed_stale', 'feed_reconnected'] as const)(
+    'replaces a %s subscription without stopping the native process',
+    async reason => {
+      const h = fixture();
+      cleanups.push(() => {
+        h.feed.close();
+        h.start.mockRestore();
+      });
+      await h.feed.open();
+      const original = h.attempts[0];
+      if (!original) throw new Error('Missing original subscription');
+      original.fail(reason);
+      expect(h.feed.prepareForNewWork()).toBe(false);
+      await waitFor(() => h.attempts.length === 2 && h.feed.isFresh());
+      const replacement = h.attempts[1];
+      if (!replacement) throw new Error('Missing replacement subscription');
+      await original.emit({
+        directory: h.source.directory,
+        payload: { type: 'session.updated', properties: { sessionID: 'stale' } },
+      });
+      await replacement.emit({
+        directory: h.source.directory,
+        payload: { type: 'session.updated', properties: { sessionID: 'current' } },
+      });
+      expect(h.source.signal.aborted).toBe(false);
+      expect(h.feed.prepareForNewWork()).toBe(true);
+      expect(h.events).toEqual([
+        {
+          directory: h.source.directory,
+          type: 'session.updated',
+          properties: { sessionID: 'current' },
+        },
+      ]);
+      expect(h.failures).toEqual([]);
+    }
+  );
+
+  it('exhausts only the original recovery episode when replacement subscriptions cannot open', async () => {
+    const h = fixture(true);
+    cleanups.push(() => {
+      h.feed.close();
+      h.start.mockRestore();
+    });
+    await h.feed.open();
+    h.attempts[0]?.fail('feed_ended');
+    await waitFor(() => h.failures.length === 1);
+    expect(h.start).toHaveBeenCalledTimes(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
+    expect(h.failures).toEqual(['feed_ended']);
+    expect(h.source.signal.aborted).toBe(false);
+    expect(h.feed.prepareForNewWork()).toBe(false);
+  });
+
+  it('does not start a second recovery loop while an earlier attempt is uncertain', async () => {
+    const h = fixture();
+    cleanups.push(() => {
+      h.feed.close();
+      h.start.mockRestore();
+    });
+    await h.feed.open();
+    const original = h.attempts[0];
+    if (!original) throw new Error('Missing original subscription');
+    original.fail('feed_ended');
+    original.fail('feed_failed');
+    await waitFor(() => h.attempts.length === 2 && h.feed.isFresh());
+    expect(h.start).toHaveBeenCalledTimes(2);
+    expect(h.failures).toEqual([]);
+  });
+
+  it('keeps immediate real reconnects inside one bounded recovery episode', async () => {
+    const encoder = new TextEncoder();
+    const connected = encoder.encode(
+      'data: {"payload":{"type":"server.connected","properties":{}}}\n\n'
+    );
+    let closeInitial: (() => void) | undefined;
+    let connections = 0;
+    const failures: string[] = [];
+    const diagnostics: Array<{ event: string; fields: Record<string, unknown> }> = [];
+    const fetchSpy = spyOn(globalThis, 'fetch').mockImplementation(
+      asFetch(async () => {
+        connections += 1;
+        const immediateReconnect = connections > 1;
+        return new Response(
+          new ReadableStream<Uint8Array>({
+            start(controller) {
+              controller.enqueue(connected);
+              if (immediateReconnect) {
+                controller.enqueue(connected);
+                controller.close();
+              } else {
+                closeInitial = () => controller.close();
+              }
+            },
+          }),
+          { headers: { 'Content-Type': 'text/event-stream' } }
+        );
+      })
+    );
+    const source = {
+      scopeId: 'worktree_a',
+      runtimeId: crypto.randomUUID(),
+      directory: '/workspace',
+      kiloClient: { serverUrl: 'http://127.0.0.1:1' },
+      signal: new AbortController().signal,
+    };
+    const feed = createWorktreeFeed({
+      source,
+      isCurrent: (runtimeId, kiloClient) =>
+        runtimeId === source.runtimeId && kiloClient === source.kiloClient,
+      onFailure: reason => failures.push(reason),
+      onDiagnostic: (event, fields) => diagnostics.push({ event, fields }),
+    });
+    try {
+      await feed.open();
+      closeInitial?.();
+      await waitFor(() => connections >= 2);
+      expect(feed.prepareForNewWork()).toBe(false);
+      await waitFor(() => failures.length === 1);
+      expect(connections).toBe(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
+      expect(failures).toEqual(['feed_ended']);
+      expect(feed.prepareForNewWork()).toBe(false);
+      expect(diagnostics).toContainEqual(
+        expect.objectContaining({
+          event: 'control.feed',
+          fields: expect.objectContaining({ scopeId: source.scopeId }),
+        })
+      );
+    } finally {
+      feed.close();
+      fetchSpy.mockRestore();
+    }
+  });
+});

@@ -35,7 +35,12 @@ vi.mock('../../../wrapper/src/kilo-api.js', async importOriginal => ({
 }));
 vi.mock('../../../wrapper/src/control/sandbox-control-runtime.js', async importOriginal => ({
   ...(await importOriginal<typeof ControlRuntimeModule>()),
-  startSandboxControlEventFeed: vi.fn(async () => ({ isFresh: () => true })),
+  startSandboxControlEventFeed: vi.fn(async () => ({
+    isFresh: () => true,
+    usable: Promise.resolve(true),
+    close: () => {},
+    settled: Promise.resolve(),
+  })),
 }));
 vi.mock('../../../wrapper/src/restore-session.js', () => ({
   seedSessionIngestRegistration: vi.fn(async () => undefined),
@@ -337,7 +342,12 @@ describe('direct worktree credential refresh', () => {
     async condition => {
       const f = fixture();
       let fresh = true;
-      vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({ isFresh: () => fresh });
+      vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({
+        isFresh: () => fresh,
+        usable: Promise.resolve(true),
+        close: () => {},
+        settled: Promise.resolve(),
+      });
       await f.attach();
       await f.attach(auth, originalEnv, sibling);
       if (condition === 'stale') fresh = false;
@@ -548,7 +558,7 @@ describe('direct worktree credential refresh', () => {
   });
 
   it.each(['connection', 'http'] as const)(
-    'classifies real SDK SSE startup %s errors without retaining private data',
+    'recovers from real SDK SSE startup %s errors without retaining private data',
     async failure => {
       vi.mocked(fetch).mockImplementation(async request => {
         const url = request instanceof Request ? request.url : String(request);
@@ -582,17 +592,15 @@ describe('direct worktree credential refresh', () => {
       ).toHaveLength(1);
       expect(runtime.signal.aborted).toBe(false);
       feed.onUnexpectedClose(error);
-      await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
-      expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
-        directory: identity.directory,
-        reason: 'feed_failed',
-        cleanup: 'confirmed',
-      });
-      expect(runtime.signal.aborted).toBe(true);
+      await vi.waitFor(() =>
+        expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(2)
+      );
+      expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+      expect(runtime.signal.aborted).toBe(false);
     }
   );
 
-  it('ignores retired process feed failures but reports current feed errors without private data', async () => {
+  it('ignores retired process feed failures and recovers current feed errors', async () => {
     const f = fixture();
     const runtime = await f.attach();
     const oldFeed = vi.mocked(startSandboxControlEventFeed).mock.calls[0]?.[0];
@@ -606,23 +614,27 @@ describe('direct worktree credential refresh', () => {
     expect(currentFeed).toBeDefined();
     currentFeed?.onUnexpectedClose(new Error('private-current-feed-credential'));
     currentFeed?.onUnexpectedClose(new Error('private-duplicate-feed-credential'));
-    await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
-    expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
-      directory: identity.directory,
-      reason: 'feed_failed',
-      cleanup: 'confirmed',
-    });
-    expect(runtime.signal.aborted).toBe(true);
+    await vi.waitFor(() =>
+      expect(vi.mocked(startSandboxControlEventFeed)).toHaveBeenCalledTimes(3)
+    );
+    expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+    expect(runtime.signal.aborted).toBe(false);
   });
 
-  it('does not expose a stale runtime before its watchdog fires', async () => {
+  it('keeps a stale runtime while its feed recovery begins', async () => {
     const f = fixture();
     let fresh = true;
-    vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({ isFresh: () => fresh });
-    await f.attach();
+    vi.mocked(startSandboxControlEventFeed).mockResolvedValueOnce({
+      isFresh: () => fresh,
+      usable: Promise.resolve(true),
+      close: () => {},
+      settled: Promise.resolve(),
+    });
+    const runtime = await f.attach();
     fresh = false;
-    expect(f.registry.get(identity.directory)).toBeUndefined();
-    expect(f.registry.isHealthy()).toBe(false);
+    expect(f.registry.prepareForNewWork?.(identity.directory)).toBe(false);
+    expect(f.registry.get(identity.directory)).toBe(runtime);
+    expect(f.registry.isHealthy()).toBe(true);
   });
 
   it('discards heartbeat statuses from a replaced process with the same logical runtime', async () => {

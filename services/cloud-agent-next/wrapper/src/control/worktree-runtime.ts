@@ -5,10 +5,7 @@ import path from 'node:path';
 import { createKiloClient } from '@kilocode/sdk';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import { CONTROL_PLANE_SANDBOX_PERMISSION } from '../../../src/shared/control-plane-permission.js';
-import {
-  emitControlDiagnostic,
-  type ControlDiagnosticReporter,
-} from '../../../src/shared/control-diagnostics.js';
+import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
 import { safeSandboxRuntimeVersion } from '../../../src/shared/sandbox-status.js';
 import {
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
@@ -24,16 +21,12 @@ import {
 } from '../kilo-api.js';
 import { withTimeoutAndAbort } from '../utils.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
-import { unfilteredKiloEvents } from './feed.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from './owned-processes.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
 import { retireWorktreeRuntime } from './worktree-runtime-cleanup.js';
 import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
-import {
-  KiloEventFeedError,
-  startSandboxControlEventFeed,
-  withKiloRequestDeadline,
-} from './sandbox-control-runtime.js';
+import { withKiloRequestDeadline, type KiloEventFeedError } from './sandbox-control-runtime.js';
+import { createWorktreeFeed, type WorktreeFeed } from './worktree-feed.js';
 
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
 
@@ -85,6 +78,7 @@ export type WorktreeKiloRuntimes = {
   ): Promise<boolean>;
   getRetained?(directory: string): WorktreeKiloRuntime | undefined;
   get(directory: string): WorktreeKiloRuntime | undefined;
+  prepareForNewWork?(directory: string): boolean;
   isHealthy(): boolean;
   shutdown(): void;
 };
@@ -124,7 +118,7 @@ type RuntimeEntry = {
   processIssued?: boolean;
   runtimeId: string;
   pendingPtys: number;
-  feed?: Awaited<ReturnType<typeof startSandboxControlEventFeed>>;
+  feed?: WorktreeFeed;
   starting?: Promise<WorktreeKiloRuntime>;
   stopped?: Promise<void>;
   retiring?: Promise<NativeRetirement>;
@@ -441,6 +435,8 @@ export function createWorktreeKiloRuntimes(options: {
     beforeMutation?: () => void
   ): Promise<WorktreeKiloRuntime> {
     const abort = new AbortController();
+    entry.feed?.close();
+    entry.feed = undefined;
     entry.processes = undefined;
     entry.processIssued = false;
     entry.stopped = undefined;
@@ -535,48 +531,36 @@ export function createWorktreeKiloRuntimes(options: {
         },
         signal: entry.abort.signal,
       };
+      const feed = createWorktreeFeed({
+        source: {
+          scopeId: entry.kilo.scopeId,
+          runtimeId: entry.runtimeId,
+          directory: entry.directory,
+          kiloClient: runtimeKiloClient,
+          signal: abort.signal,
+        },
+        isCurrent: (runtimeId, client) =>
+          entries.get(entry.directory) === entry &&
+          entry.runtimeId === runtimeId &&
+          entry.kiloClient === client &&
+          entry.processAbort === abort,
+        onEvent: event => options.onEvent?.(runtime, event),
+        onFailure: reason => failRuntime(entry, reason),
+        onDiagnostic: options.onDiagnostic,
+      });
+      entry.feed = feed;
+      await withTimeoutAndAbort(feed.open(), {
+        timeoutMs: KILO_STARTUP_TIMEOUT_MS,
+        timeoutMessage: 'Kilo event feed startup timed out',
+        signal: abort.signal,
+        abortMessage: 'Kilo worktree closed',
+      });
+      abort.signal.throwIfAborted();
+      entry.runtime = runtime;
       const eventClient = createKiloEventClient({
         baseUrl: server.url,
         directory: entry.directory,
       });
-      entry.feed = await withTimeoutAndAbort(
-        startSandboxControlEventFeed({
-          signal: abort.signal,
-          onDiagnostic: (event, fields) =>
-            emitControlDiagnostic(options.onDiagnostic, event, {
-              ...fields,
-              scopeId: entry.kilo.scopeId,
-            }),
-          open: signal =>
-            eventClient.global.event({
-              signal,
-              sseMaxRetryAttempts: 1,
-              onSseError: () => {
-                if (!signal.aborted) {
-                  throw new KiloEventFeedError('feed_failed', 'Kilo global event feed failed');
-                }
-              },
-            }),
-          consume: async stream => {
-            for await (const event of unfilteredKiloEvents(stream)) {
-              if (abort.signal.aborted) return;
-              options.onEvent?.(runtime, event);
-            }
-          },
-          onUnexpectedClose: error => {
-            if (abort.signal.aborted) return;
-            failRuntime(entry, error instanceof KiloEventFeedError ? error.reason : 'feed_failed');
-          },
-        }),
-        {
-          timeoutMs: KILO_STARTUP_TIMEOUT_MS,
-          timeoutMessage: 'Kilo event feed startup timed out',
-          signal: abort.signal,
-          abortMessage: 'Kilo worktree closed',
-        }
-      );
-      abort.signal.throwIfAborted();
-      entry.runtime = runtime;
       void withKiloRequestDeadline(
         signal => eventClient.global.health({ signal }),
         abort.signal
@@ -887,16 +871,22 @@ export function createWorktreeKiloRuntimes(options: {
     get(directory) {
       const entry = entries.get(directory);
       const runtime = entry?.starting ? undefined : entry?.runtime;
-      return !closed && runtime && !runtime.signal.aborted && entry?.feed?.isFresh()
-        ? runtime
-        : undefined;
+      return !closed && runtime && !runtime.signal.aborted ? runtime : undefined;
+    },
+    prepareForNewWork(directory) {
+      const entry = entries.get(directory);
+      return (
+        !entry ||
+        (!entry.abort.signal.aborted &&
+          (entry.runtime === undefined || entry.feed?.prepareForNewWork() === true))
+      );
     },
     isHealthy() {
       const healthy = [...entries.values()].some(
         entry =>
           entry.retiring === undefined &&
           !entry.abort.signal.aborted &&
-          (entry.starting !== undefined || !entry.runtime || entry.feed?.isFresh() === true)
+          (entry.starting !== undefined || !entry.runtime || !entry.runtime.signal.aborted)
       );
       return !closed && failedDirectories.size === 0 && (entries.size === 0 || healthy);
     },

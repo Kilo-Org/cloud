@@ -3067,7 +3067,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       { type: 'text', text: 'Process this file' },
       {
         type: 'text',
-        text: 'attachment interrupted.bin could not be retrieved (stream reset)',
+        text: 'attachment interrupted.bin could not be retrieved (download failed after 3 attempts)',
       },
     ]);
     expect(fs.existsSync(localPath)).toBe(false);
@@ -3131,7 +3131,7 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(await fsp.readFile(okPath, 'utf8')).toBe('png-bytes');
   });
 
-  it('converts a network/timeout failure into an explanatory text part and continues', async () => {
+  it('converts an exhausted retry into an explanatory text part and continues', async () => {
     const okPath = path.join(tmpDir, 'ok.json');
     const failPath = path.join(tmpDir, 'bad.json');
     const prompt: WrapperPromptRequest = {
@@ -3162,21 +3162,24 @@ describe('prepareWrapperBootstrapWorkspace', () => {
       },
     };
 
+    let badRequests = 0;
     const result = await materializePromptAttachments(prompt, {
       fetch: asFetch(async input => {
         const url = typeof input === 'string' ? input : (input as Request).url;
         if (url === 'https://r2.example.com/bad.json') {
+          badRequests += 1;
           throw new Error('socket hang up');
         }
         return new Response('{"ok":true}', { status: 200 });
       }),
     });
 
+    expect(badRequests).toBe(3);
     expect(result.message.parts).toEqual([
       { type: 'text', text: 'Read both' },
       {
         type: 'text',
-        text: 'attachment bad.json could not be retrieved (socket hang up)',
+        text: 'attachment bad.json could not be retrieved (download failed after 3 attempts)',
       },
       {
         type: 'file',
@@ -3187,6 +3190,115 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     ]);
     expect(fs.existsSync(failPath)).toBe(false);
     expect(await fsp.readFile(okPath, 'utf8')).toBe('{"ok":true}');
+  });
+
+  it('retries a transient fetch failure and materializes the attachment on the retry', async () => {
+    const localPath = path.join(tmpDir, 'retry.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_retry',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'retry.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/retry.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('socket hang up');
+        }
+        return new Response('png-bytes', {
+          status: 200,
+          headers: { 'content-length': '9' },
+        });
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'retry.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('falls back to a buffered read when the streaming read fails mid-transfer', async () => {
+    const localPath = path.join(tmpDir, 'fallback.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_fallback',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'fallback.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/fallback.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          const chunk = new Uint8Array(64 * 1024);
+          const body = new ReadableStream<Uint8Array>({
+            pull(controller) {
+              controller.enqueue(chunk);
+              controller.error(new Error('stream reset'));
+            },
+          });
+          return new Response(body, { status: 200 });
+        }
+        return new Response('png-bytes', {
+          status: 200,
+          headers: { 'content-length': '9' },
+        });
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'fallback.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
   });
 
   it('materializes a generic binary attachment as a text part describing the saved file', async () => {

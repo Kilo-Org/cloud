@@ -210,6 +210,44 @@ describe('isEligibleGlanceableWork and revision discard', () => {
     expect(isEligibleGlanceableWork(busy)).toBe(true);
   });
 
+  it('resolves the surfaces when every session went idle without being opened', () => {
+    // e23: a question session answered elsewhere lands in `idle`. The badge
+    // and the Agents list clear on that transition, so the Live Activity must
+    // resolve too: an idle-only fleet keeps no surface alive, and the island
+    // must not go on showing the count the user just resolved.
+    const question = buildGlanceableSnapshot({
+      sessions: [{ status: 'question' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    const idled = buildGlanceableSnapshot({
+      sessions: [{ status: 'idle' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW + 60_000,
+      previousRevision: question.revision,
+    });
+    expect(isEligibleGlanceableWork(question)).toBe(true);
+    expect(isEligibleGlanceableWork(idled)).toBe(false);
+    expect(idled.status).toBe('empty');
+    // The idle count survives on the snapshot: ranked rows still read it
+    // while other work keeps a surface alive.
+    expect(idled.idle).toBe(1);
+  });
+
+  it('keeps a surface alive while any session works even if others idle', () => {
+    const mixed = buildGlanceableSnapshot({
+      sessions: [{ status: 'busy' }, { status: 'idle' }, { status: 'idle' }],
+      userId: 'u1',
+      organizationId: null,
+      now: NOW,
+    });
+    expect(isEligibleGlanceableWork(mixed)).toBe(true);
+    expect(mixed.status).toBe('happy');
+    expect(mixed.idle).toBe(2);
+  });
+
   it('discards a lower revision and an older updatedAt at equal revision', () => {
     const current = buildGlanceableSnapshot({
       sessions: [{ status: 'busy' }],

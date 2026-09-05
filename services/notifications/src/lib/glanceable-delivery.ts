@@ -35,9 +35,11 @@ export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push
 export type ExpoPushToken = { token: string; locale: string | null };
 
 /**
- * Update eligible activities or end zero-count activities. Never start empty work.
- * A push-to-start token is used only when no activity target remains, avoiding
- * duplicate activities while allowing fresh work after terminal target retirement.
+ * Update eligible activities or end activities whose work has resolved (no
+ * running or needs-input session; idle alone resolves too). Never start empty
+ * work. A push-to-start token is used only when no activity target remains,
+ * avoiding duplicate activities while allowing fresh work after terminal
+ * target retirement.
  */
 export function apnsSendsForTokens(
   tokens: readonly IosActivityToken[],
@@ -158,7 +160,7 @@ export async function deliverGlanceableSnapshot(
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
+  const eligible = snapshot.running + snapshot.needsInput > 0;
   const iosSends = apnsSendsForTokens(iosTokens, eligible);
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(

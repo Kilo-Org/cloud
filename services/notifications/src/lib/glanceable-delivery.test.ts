@@ -401,7 +401,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
     await service.refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
-    current = freshSnapshot({ running: 0, idle: 1 });
+    current = freshSnapshot({ running: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:20:00.000Z'));
     current = freshSnapshot({ running: 0, needsInput: 1 });
@@ -414,7 +414,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       { running: 2, needsInputSince: '2026-08-27T10:00:00.000Z', revision: 1 },
       // The wait is read from the rows on every build, so each delivery carries
       // its own snapshot's value instead of one latched at the first emit.
-      { idle: 1, needsInputSince: '2026-08-27T10:10:00.000Z', revision: 2 },
+      { running: 1, needsInputSince: '2026-08-27T10:10:00.000Z', revision: 2 },
       { needsInput: 1, needsInputSince: '2026-08-27T10:20:00.000Z', revision: 3 },
     ]);
   });
@@ -447,7 +447,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     release.resolve();
     await oldIdle;
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:20:00.000Z'));
-    current = freshSnapshot({ running: 0, idle: 1 });
+    current = freshSnapshot({ running: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(
       messages
@@ -457,7 +457,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       { status: 'happy', needsInputSince: '2026-08-27T10:00:00.000Z' },
       { status: 'empty', needsInputSince: null },
       { status: 'happy', needsInputSince: '2026-08-27T10:10:00.000Z' },
-      { idle: 1, needsInputSince: '2026-08-27T10:20:00.000Z' },
+      { running: 1, needsInputSince: '2026-08-27T10:20:00.000Z' },
     ]);
   });
 
@@ -517,7 +517,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     await createService().refreshGlanceableSessions(personalRefresh);
     unavailable = false;
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
-    current = freshSnapshot({ running: 0, idle: 1 });
+    current = freshSnapshot({ running: 1 });
     vi.mocked(sendPushNotifications).mockRejectedValueOnce(new Error('Expo unavailable'));
     await createService().refreshGlanceableSessions(personalRefresh);
     await createService().refreshGlanceableSessions(personalRefresh);
@@ -527,7 +527,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .map(message => message.data)
     ).toMatchObject([
       { running: 2, needsInputSince: '2026-08-27T10:00:00.000Z' },
-      { idle: 1, needsInputSince: '2026-08-27T10:10:00.000Z' },
+      { running: 1, needsInputSince: '2026-08-27T10:10:00.000Z' },
     ]);
   });
 
@@ -538,7 +538,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     current = freshSnapshot({ status: 'stale', running: 0, needsInputSince: null });
     await createService().refreshGlanceableSessions(personalRefresh);
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:10:00.000Z'));
-    current = freshSnapshot({ running: 0, idle: 1 });
+    current = freshSnapshot({ running: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(
       messages
@@ -546,7 +546,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
         .map(message => message.data)
     ).toMatchObject([
       { running: 2, needsInputSince: '2026-08-27T10:00:00.000Z' },
-      { idle: 1, needsInputSince: '2026-08-27T10:10:00.000Z' },
+      { running: 1, needsInputSince: '2026-08-27T10:10:00.000Z' },
     ]);
   });
 
@@ -588,14 +588,14 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
     });
 
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
-    current = freshSnapshot({ running: 0, idle: 1 });
+    current = freshSnapshot({ running: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
       ['scope-token', 'start'],
     ]);
     expect(JSON.parse(apns[1].aps['content-state'].props)).toMatchObject({
-      idle: 1,
+      running: 1,
       needsInputSince: '2026-08-27T10:00:01.000Z',
     });
     expect([...activityRows.keys()]).toEqual(['scope-token']);
@@ -741,13 +741,13 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       }
       expect(activityRows.get('old-activity')).toEqual(renewedRow);
       vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
-      current = freshSnapshot({ running: 0, idle: 1 });
+      current = freshSnapshot({ running: 1 });
       await createService().refreshGlanceableSessions(personalRefresh);
       expect(liveActivityProps()).toMatchObject([
         {
-          running: 0,
+          running: 1,
           needsInput: 0,
-          idle: 1,
+          idle: 0,
           // Forwarded from this refresh's snapshot, not latched at the earlier one.
           needsInputSince: '2026-08-27T10:00:02.000Z',
         },
@@ -945,10 +945,10 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       });
     }
     vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
-    current = freshSnapshot({ running: 0, idle: 1 });
+    current = freshSnapshot({ running: 1 });
     await createService().refreshGlanceableSessions(personalRefresh);
     expect(liveActivityProps()).toMatchObject([
-      { running: 0, needsInput: 0, idle: 1, needsInputSince: '2026-08-27T10:00:02.000Z' },
+      { running: 1, needsInput: 0, idle: 0, needsInputSince: '2026-08-27T10:00:02.000Z' },
     ]);
     expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
       ['old-activity', 'end'],
@@ -1091,9 +1091,9 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
           });
         }
       }
-      current = freshSnapshot({ running: 0, idle: 1 });
+      current = freshSnapshot({ running: 1 });
       await createService().refreshGlanceableSessions(personalRefresh);
-      expect(liveActivityProps()).toMatchObject([{ running: 0, needsInput: 0, idle: 1 }]);
+      expect(liveActivityProps()).toMatchObject([{ running: 1, needsInput: 0, idle: 0 }]);
       expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
         ['old-activity', 'end'],
         ['old-activity', 'end'],
@@ -1807,6 +1807,36 @@ describe('deliverGlanceableSnapshot', () => {
     ];
     expect(tokens).toEqual([{ token: 'ptt-token', event: 'start' }]);
     expect(calls.expoSends).toHaveLength(0);
+  });
+
+  it('ends the activity instead of updating it when every session went idle', async () => {
+    // e23: a question session answered outside the app lands in `idle`. The
+    // badge push carries 0, so the Live Activity must resolve too — an idle
+    // fleet must not keep the island alive showing the count just resolved.
+    const idledSnapshot: ActiveAgentsGlanceable = {
+      ...snapshot,
+      status: 'empty',
+      running: 0,
+      needsInput: 0,
+      idle: 1,
+      needsInputSince: null,
+    };
+    const { deps, calls } = fakeDeps({
+      buildSnapshot: vi.fn(async () => idledSnapshot),
+      listIosActivityTokens: vi.fn(async () => [
+        { token: 'ptt-token', kind: 'ios_push_to_start' as const, id: 'row-0', updated_at: 'x' },
+        { token: 'activity-token', kind: 'ios_activity' as const, id: 'row-1', updated_at: 'x' },
+      ]),
+    });
+
+    await deliverGlanceableSnapshot({ userId: 'u1', organizationId: null }, deps);
+
+    expect(calls.iosSends).toHaveLength(1);
+    const [tokens] = calls.iosSends[0] as [
+      { token: string; event: string }[],
+      GlanceableApnsContentState,
+    ];
+    expect(tokens).toEqual([{ token: 'activity-token', event: 'end' }]);
   });
 
   it('skips Android when no android_ongoing activity token exists', async () => {

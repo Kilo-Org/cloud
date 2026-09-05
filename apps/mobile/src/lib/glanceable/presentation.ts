@@ -45,8 +45,9 @@ const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind
  *
  * A zero row still draws: dropping it would move every remaining row as work
  * changes state, and a surface the user only glances at must not reflow. The
- * surfaces show these rows only while some work exists — a snapshot with three
- * zeros carries the `empty` status and draws its status line instead.
+ * surfaces show these rows only while some work exists — a snapshot without a
+ * running or needs-input session (idle alone included) carries the `empty`
+ * status and draws its status line instead.
  */
 export function glanceableCountLines(snapshot: GlanceableAgentsSnapshot): GlanceableCountLine[] {
   return COUNT_ORDER.map(({ key, kind }) => ({ key, kind, count: snapshot[kind] }));

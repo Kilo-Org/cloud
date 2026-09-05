@@ -72,6 +72,13 @@ const layout: LiveActivityComponent<ContentState> = props => {
 
   const status = props.status ?? 'empty';
   const statusLine = status === 'happy' ? null : COPY[status];
+  // Counts draw only while the snapshot carries work. Idle is not work: a
+  // session resolved elsewhere lands in `idle` and the snapshot carries the
+  // `empty` status, and the surface must clear with the badge and the Agents
+  // list instead of drawing the number the user just resolved. This mirrors
+  // `showCounts` in the app-side builders; the pushed content state cannot
+  // carry derived fields, so the layout derives them here.
+  const showCounts = status === 'happy' || status === 'stale';
 
   // Rank order: what the user must act on, then what is making progress, then
   // what is only connected. The Dynamic Island shows one number, so this
@@ -102,10 +109,11 @@ const layout: LiveActivityComponent<ContentState> = props => {
     // `as const` keeps each `icon` an SF Symbol literal, which the Image prop
     // type requires.
   ] as const;
-  // A zero row still draws, so the rows never reflow as work changes state.
-  // `primary` skips the zeros: one number on the Dynamic Island must be a
-  // number worth showing.
-  const primary = countLines.find(line => line.count > 0) ?? null;
+  // A zero row still draws, so the rows never reflow as work changes state —
+  // but only while counts draw at all. `primary` skips the zeros: one number
+  // on the Dynamic Island must be a number worth showing, and an idle-only
+  // `empty` snapshot has none.
+  const primary = showCounts ? (countLines.find(line => line.count > 0) ?? null) : null;
   const hasCounts = primary !== null;
   const primaryCount = count(primary === null ? 0 : primary.count);
   // Only the needs-input row carries a duration, and only the oldest wait: a
@@ -115,10 +123,14 @@ const layout: LiveActivityComponent<ContentState> = props => {
 
   // Spoken label: status word, numeric counts, then Open agents. The whole
   // surface deep-links to the agents list, so "Open agents" stays in the
-  // spoken label even though no line draws it.
+  // spoken label even though no line draws it. Zeros and a resolved idle row
+  // are layout anchors, not news: the spoken label keeps only the counts that
+  // draw as work, the way `glanceableSpokenLabel` does in the app.
   const spokenParts = [
     ...(statusLine !== null ? [statusLine] : []),
-    ...countLines.map(line => `${line.count} ${line.label}`),
+    ...(showCounts
+      ? countLines.filter(line => line.count > 0).map(line => `${line.count} ${line.label}`)
+      : []),
     COPY.openAgents,
   ];
   const accessibility = spokenParts.join(', ');

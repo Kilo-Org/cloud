@@ -68,7 +68,7 @@ export async function refreshGlanceableSnapshot(
   });
   if (committed === null) return;
 
-  const eligible = committed.running + committed.needsInput + committed.idle > 0;
+  const eligible = committed.running + committed.needsInput > 0;
   await deliverGlanceableSnapshot(scope, {
     ...deps,
     buildSnapshot: async () => committed,

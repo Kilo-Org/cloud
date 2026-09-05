@@ -48,11 +48,15 @@ export function buildGlanceableViewProps(
   translate: (key: string) => string
 ): GlanceableViewProps {
   const statusKey = glanceableStatusCopyKey(snapshot, flags);
-  const primary = primaryGlanceableCount(snapshot);
   // Only these two statuses draw rows; the rest draw their status line, so the
   // locked frames carry no count payload at all.
   const status = resolveGlanceableStatus(snapshot, flags);
   const showCounts = status === 'happy' || status === 'stale';
+  // The compact fields follow the same gate as the rows (see Android's
+  // `buildAndroidWidgetProps`): an idle-only snapshot carries `empty`, and a
+  // circular or inline accessory that still drew its idle number would keep
+  // showing the count the badge and the Agents list already cleared.
+  const primary = showCounts ? primaryGlanceableCount(snapshot) : null;
 
   return {
     statusLine: statusKey === null ? null : translate(statusKey),

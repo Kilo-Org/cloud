@@ -192,9 +192,11 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
-  // Idle counts: a connected agent doing nothing is still something the user
-  // wants on the Lock Screen, and the Dynamic Island ranks it last.
-  const eligible = counts.running + counts.needsInput + counts.idle > 0;
+  // Idle is not work: when the last needs-input session resolves without being
+  // opened it lands in `idle`, and every glanceable surface must clear with the
+  // badge and the Agents list. Idle counts stay on the snapshot so ranked rows
+  // keep showing them while working or waiting sessions hold a surface alive.
+  const eligible = counts.running + counts.needsInput > 0;
   const now = input.now;
   const updatedAt = new Date(now).toISOString();
 
@@ -214,9 +216,12 @@ export function buildGlanceableSnapshot(
   };
 }
 
-/** True when any agent is connected, whether working, waiting, or idle. */
+/**
+ * True when any agent is working or waits on the user. Idle agents stay on the
+ * snapshot's counts but never keep a glanceable surface alive.
+ */
 export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
-  return snapshot.running + snapshot.needsInput + snapshot.idle > 0;
+  return snapshot.running + snapshot.needsInput > 0;
 }
 
 /**

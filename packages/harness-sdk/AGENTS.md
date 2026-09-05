@@ -527,10 +527,13 @@ failures were the run's fault and neither was the package's:
 Moving the default to `z-ai/glm-5.3-flash` on 2026-09-05 found two more of the
 same kind, both fixed: `live` opened with a ceiling of 32 tokens and `cancel`
 with 16, and a model that thinks spends that before it says a word. The first
-sweep across all eleven, on 2026-09-06, found the last one: `shapes` opened with
-64 and reported twelve empty answers as twelve broken shapes. At 256 every model
-answered on every shape. A run that has only ever seen one model has not been
-held to this rule yet. **A live
+sweep across all eleven, on 2026-09-06, found two more. `shapes` opened with 64
+and reported twelve empty answers as twelve broken shapes; at 256 every model
+answered on every shape. `stop` gave 64 tokens to a question whose answer is one
+word, and seven model-shape pairs reported the wall they were meant to clear —
+its *other* half, the ceiling it means to hit, stays at 24. A run that has only
+ever seen one model has not been held to this rule yet, and a run whose subject
+is the ceiling has to be read twice. **A live
 run that gives a model under 256 tokens is testing the ceiling, whether it means
 to or not.** The same move loosened `live`'s cache floor from 0.95 to 0.5: Haiku
 reads back over 0.99 of a prefix and glm reads 0.61 of the same conversation,

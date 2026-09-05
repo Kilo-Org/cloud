@@ -43,8 +43,11 @@ const runShape = async (model: string, kind: ApiKind) => {
   /* Two sessions, because a truncated answer left in the first one would
      change what the second question is answering. */
   const program = Effect.gen(function* () {
+    /* 256 to say one word, because the ceiling is this run's other subject and
+       must not be hit here by accident: a model that thinks spends anything
+       less before it answers, and reports the wall it was meant to clear. */
     const finished = yield* Effect.flatMap(openSession({ system, model }), session =>
-      ask(session, short, 64)
+      ask(session, short, 256)
     );
     const cut = yield* Effect.flatMap(openSession({ system, model }), session =>
       ask(session, long, 24)

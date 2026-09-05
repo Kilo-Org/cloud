@@ -668,6 +668,23 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(texts).toContain('No transcript for this review.');
   });
 
+  it('shows empty copy, not waiting copy, for a failed review without a session', () => {
+    // The dispatch worker refused the review: the server failed it. The sheet
+    // must leave the "Waiting for the review transcript" state once the status
+    // is terminal, or the user is stranded on an eternal spinner copy.
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'failed' });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen(true);
+
+    expect(texts).toContain('No transcript for this review.');
+    expect(texts).not.toContain('Waiting for the review transcript.');
+  });
+
   it('shows empty copy when a completed non-v2 review has stale stream info', () => {
     spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'running', agentVersion: 'v1' });
     detail.data = {

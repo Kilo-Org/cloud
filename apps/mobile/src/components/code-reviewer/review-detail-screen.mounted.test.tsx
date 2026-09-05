@@ -363,6 +363,33 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(texts).toContain('review crashed');
     expect(texts.indexOf('Completed')).toBeLessThan(texts.indexOf('review crashed'));
   });
+
+  it('clamps a multi-kilobyte failure dump so the retry action stays mounted', () => {
+    // A failed admission stores the raw upstream error (a serialized TRPC
+    // stack) in `error_message`. Rendered unclamped it filled the screen and
+    // pushed "Retry review" below the fold (e1-review-status.png), leaving no
+    // visible way out. The failure block must keep a bounded height.
+    statusHelpers.retriggerable = true;
+    const dump = `Dispatch failed: ${'at Object.<anonymous> (worker.js:1:1234)\n'.repeat(60)}`;
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', error_message: dump }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
+    expect(texts).toContain('Retry review');
+
+    const errorNode = renderer.root.findAll(
+      node =>
+        (node.type as string) === 'Text' &&
+        collectText([node.props.children]).some(text => text.includes('Dispatch failed:'))
+    )[0];
+    expect(errorNode).toBeDefined();
+    expect(typeof errorNode?.props.numberOfLines).toBe('number');
+    expect(errorNode?.props.numberOfLines).toBeLessThanOrEqual(4);
+  });
 });
 
 describe('ReviewDetailScreen empty council', () => {

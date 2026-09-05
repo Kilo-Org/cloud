@@ -230,22 +230,27 @@ async function promptForUrl(args: {
     if (raw === '') return '';
     const result = validateUrl(raw);
     if (result.ok) return result.value;
+    let displaySuggestion: string | undefined;
     if (result.suggestion) {
-      // Make sure the suggestion itself is valid before offering it.
+      // Validate the suggestion before offering it, and normalize it the same
+      // way successful inputs are normalized so the persisted value is
+      // origin-only and matches what the validator would return.
       const suggestionCheck = validateUrl(result.suggestion);
-      if (!suggestionCheck.ok) delete result.suggestion;
+      if (suggestionCheck.ok) {
+        displaySuggestion = suggestionCheck.value;
+      }
     }
     console.log(`  ${RED}✗ ${args.key}: ${result.error}${RESET}`);
-    if (result.suggestion) {
-      console.log(`  ${YELLOW}Suggested: ${result.suggestion}${RESET}`);
+    if (displaySuggestion) {
+      console.log(`  ${YELLOW}Suggested: ${displaySuggestion}${RESET}`);
     }
     console.log('  Options:');
     console.log('    [r] Re-enter');
-    if (result.suggestion) console.log('    [s] Use suggested');
+    if (displaySuggestion) console.log('    [s] Use suggested');
     console.log('    [d] Use default / clear');
-    const choice = await promptForUrlRecoveryChoice(Boolean(result.suggestion));
+    const choice = await promptForUrlRecoveryChoice(Boolean(displaySuggestion));
     if (choice === 'r') continue;
-    if (choice === 's' && result.suggestion) return result.suggestion;
+    if (choice === 's' && displaySuggestion) return displaySuggestion;
     return '';
   }
 }
@@ -425,7 +430,10 @@ async function main(): Promise<void> {
   }
 
   if (baseUrl) {
-    collected.set('APP_URL_OVERRIDE', baseUrl);
+    // Derive APP_URL_OVERRIDE from the final NEXTAUTH_URL rather than from
+    // the raw BASE_URL input, so the two stay in sync even if the user
+    // overrode NEXTAUTH_URL at its prompt.
+    collected.set('APP_URL_OVERRIDE', collected.get('NEXTAUTH_URL') ?? baseUrl);
   }
 
   // -----------------------------------------------------------------------

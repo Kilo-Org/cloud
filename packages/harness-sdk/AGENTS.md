@@ -1463,6 +1463,15 @@ sort, because a ULID already carries the order.
 A turn and its parts are written in one transaction. A turn whose parts went
 missing would read back as an empty message and quietly shorten the prompt.
 
+**Every write of one connection stands in one line.** A session and its subagent
+share a connection by design, and every adapter is async, so each `await` inside
+a transaction lets the other one's statement in. SQLite cannot start a
+transaction inside a transaction: the second `BEGIN` throws, its `ROLLBACK`
+takes the first writer's rows with it, and the first then commits nothing. So
+`driver.ts` pairs a driver with the line its writes queue in, and `transact`
+holds that line for the whole unit. Reads stay out of it — a session holds
+itself while it writes, so no read asks for the rows being written.
+
 **An image is stored as base64, not as a blob.** Base64 is what every gateway
 shape wants on the wire, so storing it that way costs a third more space and
 saves encoding the image again on every single request. The read path is the
@@ -1711,6 +1720,13 @@ session that had ever compacted, by the whole cost of every summary. It sets
 request starts from the summary, so what the last one cost says nothing about
 what the next one will.
 
+**The summary call carries the session key and the session effort**, the way
+every other call of the session does. The gateway reads `cacheKey` as the
+session, so a summary sent without it routes on its own and pays full price for
+a prefix the session already has cached — and this is the one call that resends
+everything before it. `effort` is part of that key, so leaving it off would miss
+the entry even with the key.
+
 ### The two model SDKs are types, not code
 
 `openai` and `@anthropic-ai/sdk` are the contract the three wires are written
@@ -1884,7 +1900,7 @@ It exempts `*.test.ts`: a core test needs a plugin to run against.
 | `src/plugins/tools/subagent.ts` | The subagent tool: `openSession` from inside a tool |
 | `src/plugins/retry/backoff.ts` | Exponential backoff with jitter, and no-retry |
 | `src/plugins/store/sqlite.ts` | Every query, written once for every platform |
-| `src/plugins/store/driver.ts` | The one-function seam an adapter fills, and `transact` |
+| `src/plugins/store/driver.ts` | The one-function seam an adapter fills, the write line, and `transact` |
 | `src/plugins/store/rows.ts` | What comes off the disk, and the assertions that check it |
 | `src/plugins/store/migrate.ts` | Applying the migrations the bundle carries |
 | `src/plugins/store/node.ts`, `expo.ts` | One adapter per platform |

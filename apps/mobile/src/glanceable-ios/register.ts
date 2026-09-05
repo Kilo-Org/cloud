@@ -7,6 +7,7 @@ import {
   subscribeLiveActivityEnabled,
 } from '@/lib/glanceable/live-activity-switch';
 
+import { adoptPushStartedActivity } from './adopt-activity';
 import { refreshActiveAgentsLiveActivityCopy } from './active-agents-live-activity';
 import { refreshActiveAgentsWidgetCopy } from './active-agents-widget';
 import { iosSink } from './ios-sink';
@@ -23,6 +24,11 @@ registerGlanceableSink(iosSink);
 // it. Fire and forget: it lands long before the first snapshot arrives, and a
 // failure only costs the logo.
 void ensureWidgetLogo();
+
+// Claim a card raised by a push-to-start before anything else runs. iOS grants
+// this process background run time for exactly that, and the server cannot
+// update or end the card until its update token arrives.
+void adoptPushStartedActivity();
 
 // The layouts bake their copy in at import, when i18n still holds English: the
 // stored language is applied a few ticks later. Re-bake on every language

@@ -1,3 +1,4 @@
+import { GLANCEABLE_STALE_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { getWorkerDb } from '@kilocode/db/client';
 import { user_activity_tokens, user_push_tokens } from '@kilocode/db/schema';
 import { pushDataSchema } from '@kilocode/notifications';
@@ -13,7 +14,7 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
   const getDbForCall = () => (db ??= getWorkerDb(env.HYPERDRIVE.connectionString));
   const iosTargets = new Map<
     string,
-    Pick<typeof user_activity_tokens.$inferSelect, 'id' | 'updated_at'>
+    Pick<typeof user_activity_tokens.$inferSelect, 'id' | 'updated_at' | 'kind'>
   >();
 
   return {
@@ -83,8 +84,10 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
             inArray(user_activity_tokens.kind, ['ios_activity', 'ios_push_to_start'])
           )
         );
+      // Both kinds: an APNs 410 retires whichever registration it names, and a
+      // dead push-to-start row would otherwise keep raising rejected starts.
       for (const row of rows) {
-        if (row.kind === 'ios_activity') iosTargets.set(row.token, row);
+        iosTargets.set(row.token, row);
       }
       return rows.map(row => ({ ...row, kind: row.kind as IosActivityToken['kind'] }));
     },
@@ -95,7 +98,8 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
       timestampSeconds,
       isCurrent,
       beforeEnd,
-      onEndRejected
+      onEndRejected,
+      onStarted
     ) => {
       const credentials = await readApnsCredentials(env);
       if (credentials === null || (isCurrent && !(await isCurrent()))) return;
@@ -106,21 +110,25 @@ export function glanceableDeliveryDeps(env: Env): GlanceableDeliveryDeps {
         startAlert,
         nowSeconds: Math.floor(Date.now() / 1000),
         timestampSeconds,
+        // A card whose updates stop must dim rather than keep asserting counts
+        // the device can no longer confirm. Same window the local sink uses.
+        staleDateSeconds: Math.floor(Date.now() / 1000) + GLANCEABLE_STALE_MS / 1000,
         isCurrent,
         beforeEnd,
         onEndRejected,
+        onStarted,
         onEnded: async token => {
           const target = iosTargets.get(token);
           if (!target) return;
-          // A delayed end must not delete a scope subscription, another activity,
-          // or a registration refreshed since this delivery selected its target.
+          // A delayed end must not delete another activity or a registration
+          // refreshed since this delivery selected its target.
           await getDbForCall()
             .delete(user_activity_tokens)
             .where(
               and(
                 eq(user_activity_tokens.id, target.id),
                 eq(user_activity_tokens.token, token),
-                eq(user_activity_tokens.kind, 'ios_activity'),
+                eq(user_activity_tokens.kind, target.kind),
                 eq(user_activity_tokens.updated_at, target.updated_at)
               )
             );

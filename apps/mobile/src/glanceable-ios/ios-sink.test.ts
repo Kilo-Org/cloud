@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
@@ -21,6 +22,7 @@ import {
 
 import {
   _resetIosSinkForTests,
+  adoptNativeActivity,
   clearActivityKitDeniedIfAvailable,
   getActivityKitDenied,
   iosSink,
@@ -658,6 +660,41 @@ describe('iosSink end', () => {
     }
   );
 
+  it('registers the update token of a card this process did not start', async () => {
+    const ended: string[] = [];
+    // Two cards a server that could never reach the first one raised by push.
+    for (const name of ['first', 'second']) {
+      mockState.instances.push({
+        getPushToken: vi.fn().mockResolvedValue(`${name}-token`),
+        end: () => ended.push(name),
+      });
+    }
+
+    adoptNativeActivity(snapshotFor([{ status: 'busy' }]), CTX);
+    await iosSink.waitForNativeTerminal?.();
+
+    expect(delivery.registerTokens).toHaveBeenCalledTimes(1);
+    expect(subscriptions).toContain('activity');
+    // Whichever one survives, the Lock Screen is left holding exactly one card.
+    expect(ended).toHaveLength(1);
+  });
+
+  it('registers nothing when no card is on screen', () => {
+    adoptNativeActivity(snapshotFor([{ status: 'busy' }]), CTX);
+
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+    expect(mockState.started).toEqual([]);
+  });
+
+  it('leaves a card alone while the in-app switch is off', () => {
+    setLiveActivityEnabledValue(false);
+    mockState.instances.push({ getPushToken: vi.fn().mockResolvedValue('token'), end: vi.fn() });
+
+    adoptNativeActivity(snapshotFor([{ status: 'busy' }]), CTX);
+
+    expect(delivery.registerTokens).not.toHaveBeenCalled();
+  });
+
   it('supersedes a pending terminal intent without ending new-scope work', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
@@ -728,12 +765,11 @@ describe('iosSink widget publish', () => {
       iosSink.publish(snapshot);
 
       expect(mockState.snapshots.length).toBe(1);
-      expect(mockState.timeline).toHaveLength(2);
       expect(mockState.timeline[0]?.props).toMatchObject({
         primaryCount: 1,
         primaryKind: 'running',
       });
-      const expired = mockState.timeline[1];
+      const expired = mockState.timeline.at(-1);
       expect(expired?.date.getTime()).toBe(Date.parse(snapshot.expiresAt));
 
       const expiredProps = expired?.props as GlanceableViewProps;
@@ -744,6 +780,37 @@ describe('iosSink widget publish', () => {
       expect(expiredProps.primaryKind).toBeUndefined();
     }
   );
+
+  it('stops calling happy counts current once a stale window passes with no refresh', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    const snapshot = snapshotFor([{ status: 'busy' }]);
+
+    iosSink.publish(snapshot);
+
+    // WidgetKit owns this clock: the app may be force quit, and then no
+    // background wake ever arrives to correct the frame it is showing.
+    expect(mockState.timeline.map(entry => entry.date.getTime())).toEqual([
+      NOW,
+      NOW + GLANCEABLE_STALE_MS,
+      Date.parse(snapshot.expiresAt),
+    ]);
+    expect(mockState.timeline[1]?.props).toMatchObject({
+      statusLine: "Can't update now",
+      primaryCount: 1,
+      primaryKind: 'running',
+    });
+  });
+
+  it('retracts nothing on a surface that asserts no counts', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+
+    iosSink.publish(snapshotFor([]));
+
+    expect(mockState.timeline).toHaveLength(2);
+    expect(mockState.timeline[0]?.props).toMatchObject({ statusLine: 'No work in progress' });
+  });
 
   it.each([
     ['signed_out', 'Sign in to see agents'],

@@ -2979,6 +2979,9 @@ importers:
 
   services/notifications:
     dependencies:
+      '@kilocode/app-shared':
+        specifier: workspace:*
+        version: link:../../packages/app-shared
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db

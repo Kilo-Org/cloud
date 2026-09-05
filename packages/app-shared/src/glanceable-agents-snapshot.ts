@@ -92,6 +92,25 @@ export type GlanceableSessionRow = {
 /** Statuses that mean the agent waits on the user and cannot go on alone. */
 const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
 
+/** What a session's status means to a user: the one vocabulary every surface reads. */
+export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle';
+
+/**
+ * Map one session status to the kind the glanceable surfaces and the session
+ * lists both show, or null when the status means nothing to either. The counts
+ * below and the list rows share this map, so a row can never disagree with the
+ * widget beside it.
+ */
+export function glanceableStatusKind(status: string): GlanceableStatusKind | null {
+  if (status === 'busy') {
+    return 'running';
+  }
+  if (NEEDS_INPUT_STATUSES.has(status)) {
+    return 'needsInput';
+  }
+  return status === 'idle' ? 'idle' : null;
+}
+
 /**
  * Map session rows to the three glanceable counts. `busy` → running,
  * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any
@@ -105,28 +124,15 @@ const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
 export function countGlanceableSessions(
   sessions: readonly GlanceableSessionRow[]
 ): GlanceableCounts {
-  let running = 0;
-  let needsInput = 0;
-  let idle = 0;
+  const counts = { running: 0, needsInput: 0, idle: 0 };
   for (const session of sessions) {
-    switch (session.status) {
-      case 'busy':
-        running += 1;
-        break;
-      case 'question':
-      case 'permission':
-      case 'retry':
-        needsInput += 1;
-        break;
-      case 'idle':
-        idle += 1;
-        break;
-      default:
-        // An unknown status contributes nothing.
-        break;
+    // An unknown status contributes nothing.
+    const kind = glanceableStatusKind(session.status);
+    if (kind !== null) {
+      counts[kind] += 1;
     }
   }
-  return { running, needsInput, idle };
+  return counts;
 }
 
 /**

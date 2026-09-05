@@ -86,3 +86,6 @@ export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
 
 export const githubUserAuthorizationPkceRedisKey = (verifierRef: string) =>
   redisKey(`auth-pkce:github-user:${verifierRef}`);
+
+export const githubConnectionPkceRedisKey = (verifierRef: string) =>
+  redisKey(`auth-pkce:github-connection:${verifierRef}`);

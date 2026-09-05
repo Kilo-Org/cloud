@@ -22,6 +22,7 @@ const mockHandleInstallationDeleted = jest.fn();
 const mockHandleInstallationSuspend = jest.fn();
 const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
+const mockAssertGitHubInstallationRuntimeAuthorized = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -47,6 +48,11 @@ jest.mock('@/lib/integrations/db/webhook-events', () => ({
 jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
   revokeStoredGitHubUserAuthorization: (githubUserId: string, appType: string, reason: string) =>
     mockRevokeStoredGitHubUserAuthorization(githubUserId, appType, reason),
+}));
+
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
+    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
@@ -361,6 +367,21 @@ describe('handleGitHubWebhook', () => {
       'we_1',
       expect.objectContaining({ handlers_triggered: ['pr_review_comment_fix'] })
     );
+  });
+
+  it('skips deferred GitHub work when the association disconnects after receipt', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new Error('GitHub installation is unavailable for runtime use')
+    );
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    await waitForAfterTask();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
   it('logs review memory feedback only when it records feedback', async () => {

@@ -101,6 +101,7 @@ import {
   github_branch_pull_requests,
   user_github_app_tokens,
   github_install_states,
+  github_connection_attempts,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -1347,6 +1348,18 @@ export async function anonymizeCloudUserData(
         isNull(platform_access_token_credentials.provider_resource_id)
       )
     );
+
+  await tx
+    .update(platform_integrations)
+    .set({
+      github_authorized_by_user_id: null,
+      github_authorized_user_id: null,
+      github_authorized_at: null,
+    })
+    .where(eq(platform_integrations.github_authorized_by_user_id, userId));
+  await tx
+    .delete(github_connection_attempts)
+    .where(eq(github_connection_attempts.kilo_user_id, userId));
 
   await tx.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
   await tx.execute(sql`

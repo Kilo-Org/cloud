@@ -899,6 +899,7 @@ export async function POST(
               thread,
               messageId: requestRow.platform_message_id,
               status: 'Processing Cloud Agent result...',
+              platformIntegration,
             }),
         });
 

@@ -80,6 +80,8 @@ const mockUnlinkTeamKiloUsers =
   jest.fn<(state: unknown, platform: string, teamId: string) => Promise<number>>();
 const mockCaptureException = jest.fn<(...args: unknown[]) => void>();
 const mockLogExceptInTest = jest.fn<(...args: unknown[]) => void>();
+const mockObserveGitHubInstallationLifecycle = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockUpdateGitHubInstallationRepositories = jest.fn<(...args: unknown[]) => Promise<void>>();
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   findIntegrationByInstallationId: (
@@ -123,6 +125,13 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     repositories: PlatformRepository[],
     appType: GitHubAppType
   ) => mockUpdateIntegrationRepositories(platform, installationId, repositories, appType),
+}));
+
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  observeGitHubInstallationLifecycle: (...args: unknown[]) =>
+    mockObserveGitHubInstallationLifecycle(...args),
+  updateGitHubInstallationRepositories: (...args: unknown[]) =>
+    mockUpdateGitHubInstallationRepositories(...args),
 }));
 
 jest.mock('@/lib/bot', () => ({
@@ -194,6 +203,8 @@ describe('handleInstallationDeleted', () => {
     mockBotGetState.mockReturnValue({});
     mockUnlinkTeamKiloUsers.mockResolvedValue(0);
     mockDeleteGitHubInstallationRecords.mockResolvedValue(undefined);
+    mockObserveGitHubInstallationLifecycle.mockResolvedValue(undefined);
+    mockUpdateGitHubInstallationRepositories.mockResolvedValue(undefined);
   });
 
   it('standard app deletion unlinks bot identities and passes the app type', async () => {
@@ -202,7 +213,11 @@ describe('handleInstallationDeleted', () => {
     expect(response.status).toBe(200);
     expect(mockBotInitialize).toHaveBeenCalled();
     expect(mockUnlinkTeamKiloUsers).toHaveBeenCalledWith(expect.anything(), 'github', '98765');
-    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'standard');
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      state: 'deleted',
+    });
   });
 
   it('lite app deletion does not unlink bot identities and passes the app type', async () => {
@@ -211,7 +226,11 @@ describe('handleInstallationDeleted', () => {
     expect(response.status).toBe(200);
     expect(mockBotInitialize).not.toHaveBeenCalled();
     expect(mockUnlinkTeamKiloUsers).not.toHaveBeenCalled();
-    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'lite');
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+      state: 'deleted',
+    });
   });
 });
 
@@ -228,15 +247,9 @@ describe('handleInstallationSuspend', () => {
     const response = await handleInstallationSuspend(suspendPayload, 'standard');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
-    expect(mockSuspendIntegration).toHaveBeenCalledWith(
-      'org_1',
-      'github',
-      'octocat',
-      'standard',
-      '98765'
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: '98765', appType: 'standard', state: 'suspended' })
     );
-    expect(mockSuspendIntegrationForOwner).not.toHaveBeenCalled();
   });
 
   it('passes the webhook app type to the user suspend helper', async () => {
@@ -245,14 +258,9 @@ describe('handleInstallationSuspend', () => {
     const response = await handleInstallationSuspend(suspendPayload, 'lite');
 
     expect(response.status).toBe(200);
-    expect(mockSuspendIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user_1' },
-      'github',
-      'octocat',
-      'lite',
-      '98765'
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: '98765', appType: 'lite', state: 'suspended' })
     );
-    expect(mockSuspendIntegration).not.toHaveBeenCalled();
   });
 });
 
@@ -269,9 +277,11 @@ describe('handleInstallationUnsuspend', () => {
     const response = await handleInstallationUnsuspend(unsuspendPayload, 'lite');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
-    expect(mockUnsuspendIntegration).toHaveBeenCalledWith('org_1', 'github', 'lite', '98765');
-    expect(mockUnsuspendIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+      state: 'active',
+    });
   });
 
   it('passes the webhook app type to the user unsuspend helper', async () => {
@@ -280,13 +290,11 @@ describe('handleInstallationUnsuspend', () => {
     const response = await handleInstallationUnsuspend(unsuspendPayload, 'standard');
 
     expect(response.status).toBe(200);
-    expect(mockUnsuspendIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user_1' },
-      'github',
-      'standard',
-      '98765'
-    );
-    expect(mockUnsuspendIntegration).not.toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      state: 'active',
+    });
   });
 });
 
@@ -313,16 +321,12 @@ describe('handleInstallationRepositories', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
-    expect(mockUpdateIntegrationRepositories).toHaveBeenCalledWith(
-      'github',
-      '98765',
-      [
-        { id: 1, name: 'keep', full_name: 'acme/keep', private: false },
-        { id: 2, name: 'new', full_name: 'acme/new', private: true },
-      ],
-      'standard'
-    );
+    expect(mockUpdateGitHubInstallationRepositories).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      repositoriesAdded: [{ id: 2, name: 'new', full_name: 'acme/new', private: true }],
+      repositoryIdsRemoved: [],
+    });
   });
 
   it('removes repositories and passes the lite app type', async () => {
@@ -336,7 +340,11 @@ describe('handleInstallationRepositories', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
-    expect(mockUpdateIntegrationRepositories).toHaveBeenCalledWith('github', '98765', [], 'lite');
+    expect(mockUpdateGitHubInstallationRepositories).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+      repositoriesAdded: [],
+      repositoryIdsRemoved: [1],
+    });
   });
 });

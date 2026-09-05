@@ -24,14 +24,21 @@ function buildConfig(overrides: {
 function fakeEnv(opts: {
   tokenServiceResponse?: string | null;
   tokenServiceShouldThrow?: boolean;
+  tokenServiceAccessDenied?: boolean;
 }): Env {
   return {
     GIT_TOKEN_SERVICE: {
-      getToken: async (_id: string) => {
+      getTokenForIntegration: async (_id: string) => {
         if (opts.tokenServiceShouldThrow) {
           throw new Error('integration lookup failed');
         }
-        return opts.tokenServiceResponse ?? FRESH_INSTALLATION_TOKEN;
+        if (opts.tokenServiceAccessDenied) {
+          return { success: false as const, reason: 'unavailable' as const };
+        }
+        const token = opts.tokenServiceResponse ?? FRESH_INSTALLATION_TOKEN;
+        return token
+          ? { success: true as const, token }
+          : { success: false as const, reason: 'unavailable' as const };
       },
     },
   } as unknown as Env;
@@ -83,7 +90,7 @@ describe('resolveGitHubToken priority chain', () => {
     });
   });
 
-  it('falls back to stored github_token when integration lookup throws', async () => {
+  it('does not fall back to stored github_token when integration lookup throws', async () => {
     const cfg = buildConfig({
       github_token: STORED_GITHUB_TOKEN,
       platform_integration_id: INTEGRATION_ID,
@@ -94,9 +101,24 @@ describe('resolveGitHubToken priority chain', () => {
       getTownConfig: () => Promise.resolve(cfg),
     });
     expect(result).toEqual({
-      ok: true,
-      token: STORED_GITHUB_TOKEN,
-      source: 'town.git_auth.github_token',
+      ok: false,
+      tried: ['town.github_cli_pat', 'town platform integration'],
+    });
+  });
+
+  it('does not fall back to a stored installation token after a disconnect denial', async () => {
+    const cfg = buildConfig({
+      github_token: STORED_GITHUB_TOKEN,
+      platform_integration_id: INTEGRATION_ID,
+    });
+    const result = await resolveGitHubToken({
+      env: fakeEnv({ tokenServiceAccessDenied: true }),
+      townId: 'town-1',
+      getTownConfig: () => Promise.resolve(cfg),
+    });
+    expect(result).toEqual({
+      ok: false,
+      tried: ['town.github_cli_pat', 'town platform integration'],
     });
   });
 
@@ -132,7 +154,7 @@ describe('resolveGitHubToken priority chain', () => {
     });
   });
 
-  it('falls back to stored github_token when integration returns empty string', async () => {
+  it('does not fall back to stored github_token when integration is unavailable', async () => {
     const cfg = buildConfig({
       github_token: STORED_GITHUB_TOKEN,
       platform_integration_id: INTEGRATION_ID,
@@ -143,9 +165,8 @@ describe('resolveGitHubToken priority chain', () => {
       getTownConfig: () => Promise.resolve(cfg),
     });
     expect(result).toEqual({
-      ok: true,
-      token: STORED_GITHUB_TOKEN,
-      source: 'town.git_auth.github_token',
+      ok: false,
+      tried: ['town.github_cli_pat', 'town platform integration'],
     });
   });
 });

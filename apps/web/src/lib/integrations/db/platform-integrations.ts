@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, or, isNull, asc, desc, sql } from 'drizzle-orm';
+import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
+import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
   GitHubRequester,
   IntegrationPermissions,
@@ -187,10 +187,10 @@ export async function upsertPlatformIntegration(data: {
         permissions: sql`EXCLUDED.permissions`,
         scopes: sql`EXCLUDED.scopes`,
         repository_access: sql`EXCLUDED.repository_access`,
-        integration_status: sql`EXCLUDED.integration_status`,
+        integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN EXCLUDED.integration_status ELSE ${platform_integrations.integration_status} END`,
         repositories: sql`EXCLUDED.repositories`,
-        auth_invalid_at: null,
-        auth_invalid_reason: null,
+        auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
+        auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
         updated_at: sql`now()`,
       },
     });
@@ -226,6 +226,22 @@ export async function updateIntegrationRepositories(
       updated_at: new Date().toISOString(),
     })
     .where(and(...conditions));
+  if (platform === PLATFORM.GITHUB && githubAppType) {
+    await db
+      .update(github_app_installations)
+      .set({
+        repositories,
+        repositories_synced_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .where(
+        and(
+          eq(github_app_installations.github_app_type, githubAppType),
+          eq(github_app_installations.installation_id, installationId),
+          ne(github_app_installations.lifecycle_state, 'deleted')
+        )
+      );
+  }
 }
 
 /**
@@ -867,11 +883,11 @@ export async function upsertPlatformIntegrationForOwner(
           permissions: values.permissions,
           scopes: values.scopes,
           repository_access: values.repository_access,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
+          integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
           repositories: values.repositories,
           github_app_type: appType,
-          auth_invalid_at: null,
-          auth_invalid_reason: null,
+          auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
+          auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
           updated_at: new Date().toISOString(),
         })
         .where(eq(platform_integrations.id, existing.id));
@@ -909,11 +925,11 @@ export async function upsertPlatformIntegrationForOwner(
         permissions: values.permissions,
         scopes: values.scopes,
         repository_access: values.repository_access,
-        integration_status: INTEGRATION_STATUS.ACTIVE,
+        integration_status: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN ${INTEGRATION_STATUS.ACTIVE} ELSE ${platform_integrations.integration_status} END`,
         repositories: values.repositories,
         github_app_type: appType,
-        auth_invalid_at: null,
-        auth_invalid_reason: null,
+        auth_invalid_at: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_at} END`,
+        auth_invalid_reason: sql`CASE WHEN ${platform_integrations.github_disconnected_at} IS NULL THEN NULL ELSE ${platform_integrations.auth_invalid_reason} END`,
         updated_at: new Date().toISOString(),
       })
       .where(eq(platform_integrations.id, existing.id));

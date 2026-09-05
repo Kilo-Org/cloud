@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, ExternalLink, Github, MoreHorizontal, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ type OrganizationGitHubInstallationsProps = {
 
 const statusLabel = {
   connected: 'Connected',
+  disconnected: 'Disconnected',
   pending: 'Pending approval',
   suspended: 'Suspended',
   needs_attention: 'Needs attention',
@@ -40,6 +42,9 @@ export function OrganizationGitHubInstallations({
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [starting, setStarting] = useState(false);
+  const searchParams = useSearchParams();
+  const connectionAttemptId = searchParams.get('github_connection_attempt');
+  const connectionError = searchParams.get('github_connection_error');
   const input = { organizationId };
   const { data: organization } = useOrganizationWithMembers(organizationId);
   const githubAppName =
@@ -92,7 +97,18 @@ export function OrganizationGitHubInstallations({
   const uninstall = useMutation(
     trpc.githubApps.uninstallApp.mutationOptions({
       onSuccess: async () => {
-        toast.success('GitHub organization disconnected');
+        toast.success('GitHub App uninstalled');
+        await invalidate();
+      },
+      onError: error =>
+        toast.error('Could not uninstall GitHub App', { description: error.message }),
+    })
+  );
+
+  const disconnect = useMutation(
+    trpc.githubApps.disconnectConnection.mutationOptions({
+      onSuccess: async () => {
+        toast.success('GitHub organization disconnected from Kilo');
         await invalidate();
       },
       onError: error =>
@@ -110,6 +126,18 @@ export function OrganizationGitHubInstallations({
     })
   );
   const mint = useMutation(trpc.githubApps.mintInstallState.mutationOptions());
+  const beginConnection = useMutation(trpc.githubApps.beginConnection.mutationOptions());
+  const selectConnection = useMutation(
+    trpc.githubApps.selectConnectionInstallation.mutationOptions()
+  );
+  const connectionAttempt = useQuery({
+    ...trpc.githubApps.getConnectionAttempt.queryOptions(
+      connectionAttemptId
+        ? { attemptId: connectionAttemptId, organizationId }
+        : { attemptId: '00000000-0000-4000-8000-000000000000', organizationId }
+    ),
+    enabled: Boolean(connectionAttemptId),
+  });
 
   const startInstall = async () => {
     setStarting(true);
@@ -119,6 +147,31 @@ export function OrganizationGitHubInstallations({
     } catch (error) {
       setStarting(false);
       toast.error('Could not open GitHub setup', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
+
+  const startConnection = async () => {
+    try {
+      const result = await beginConnection.mutateAsync({ organizationId });
+      window.location.assign(result.authorizationUrl);
+    } catch (error) {
+      toast.error('Could not start GitHub connection', {
+        description: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+  };
+
+  const confirmConnection = async (installationId: string) => {
+    try {
+      const result = await selectConnection.mutateAsync({
+        attemptId: connectionAttemptId ?? '',
+        installationId,
+      });
+      window.location.assign(result.authorizationUrl);
+    } catch (error) {
+      toast.error('Could not confirm GitHub connection', {
         description: error instanceof Error ? error.message : 'Unknown error',
       });
     }
@@ -142,6 +195,7 @@ export function OrganizationGitHubInstallations({
   }
 
   const installations = query.data?.installations ?? [];
+  const connectionManagementEnabled = query.data?.connectionManagementEnabled ?? false;
   return (
     <section className="min-w-0" aria-labelledby="github-organizations-heading">
       <Card className="overflow-hidden">
@@ -149,21 +203,75 @@ export function OrganizationGitHubInstallations({
           <h2 id="github-organizations-heading" className="type-heading">
             GitHub organizations
           </h2>
-          {query.data?.canAdd && (
-            <Button
-              onClick={startInstall}
-              disabled={starting}
-              className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
-            >
-              <Github className="size-4" />
-              {starting
-                ? 'Opening GitHub...'
-                : installations.length
-                  ? 'Add organization'
-                  : 'Connect GitHub'}
-            </Button>
+          {(query.data?.canAdd || query.data?.canConnectExisting) && (
+            <div className="flex gap-2">
+              {query.data?.canConnectExisting && (
+                <Button
+                  variant="outline"
+                  onClick={startConnection}
+                  disabled={beginConnection.isPending}
+                >
+                  Connect existing
+                </Button>
+              )}
+              {query.data?.canAdd && (
+                <Button
+                  onClick={startInstall}
+                  disabled={starting}
+                  className="min-h-11 w-full shrink-0 sm:min-h-0 sm:w-auto"
+                >
+                  <Github className="size-4" />
+                  {starting
+                    ? 'Opening GitHub...'
+                    : installations.length
+                      ? 'Add organization'
+                      : 'Connect GitHub'}
+                </Button>
+              )}
+            </div>
           )}
         </div>
+        {connectionError && (
+          <p className="border-border border-t px-5 py-4 text-sm text-destructive sm:px-6">
+            {connectionError === 'claimed_by_other_owner'
+              ? 'This GitHub installation is already connected to another Kilo account or organization. Sharing is not available yet.'
+              : connectionError === 'authorization_revoked'
+                ? 'GitHub ownership or Kilo administration could not be verified. Start again to reconnect.'
+                : 'The GitHub connection could not be completed. Start again or install the App on GitHub.'}
+          </p>
+        )}
+        {connectionAttemptId && (
+          <div className="border-border border-t px-5 py-5 sm:px-6">
+            <h3 className="font-medium">Choose a GitHub organization</h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Only organizations where you are an active GitHub owner are shown.
+            </p>
+            {connectionAttempt.isLoading ? (
+              <p className="mt-3 text-sm text-muted-foreground">Loading eligible installations…</p>
+            ) : connectionAttempt.data?.candidates.length ? (
+              <div className="mt-3 grid gap-2">
+                {connectionAttempt.data.candidates.map(candidate => (
+                  <Button
+                    key={candidate.installationId}
+                    variant="outline"
+                    className="justify-between"
+                    onClick={() => confirmConnection(candidate.installationId)}
+                    disabled={selectConnection.isPending}
+                  >
+                    {candidate.accountLogin}
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {candidate.installationId}
+                    </span>
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">
+                No eligible existing GitHub installations were found.
+              </p>
+            )}
+          </div>
+        )}
         {query.isError ? (
           <p className="border-border border-t px-5 py-6 text-sm text-destructive sm:px-6">
             Could not load GitHub organizations.
@@ -270,20 +378,35 @@ export function OrganizationGitHubInstallations({
                                   installation.accountLogin ?? 'this GitHub organization';
                                 if (
                                   await confirm({
-                                    title: `Disconnect ${account}?`,
-                                    description: `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`,
-                                    confirmLabel: `Disconnect ${account}`,
+                                    title: connectionManagementEnabled
+                                      ? `Disconnect ${account}?`
+                                      : `Uninstall Kilo from ${account}?`,
+                                    description: connectionManagementEnabled
+                                      ? `This disconnects ${account} from this Kilo organization. The GitHub App stays installed and can be reconnected after fresh verification.`
+                                      : `This uninstalls the Kilo GitHub App from ${account}. Kilo will lose access to its repositories.`,
+                                    confirmLabel: connectionManagementEnabled
+                                      ? `Disconnect ${account}`
+                                      : `Uninstall from ${account}`,
                                     destructive: true,
                                   })
                                 ) {
-                                  uninstall.mutate({
-                                    organizationId,
-                                    integrationId: installation.id,
-                                  });
+                                  if (connectionManagementEnabled) {
+                                    disconnect.mutate({
+                                      organizationId,
+                                      integrationId: installation.id,
+                                    });
+                                  } else {
+                                    uninstall.mutate({
+                                      organizationId,
+                                      integrationId: installation.id,
+                                    });
+                                  }
                                 }
                               }}
                             >
-                              Disconnect organization
+                              {connectionManagementEnabled
+                                ? 'Disconnect from Kilo'
+                                : 'Uninstall GitHub App'}
                             </DropdownMenuItem>
                           )}
                         </DropdownMenuContent>

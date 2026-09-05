@@ -4241,6 +4241,11 @@ export const platform_integrations = pgTable(
     // GitHub App type (for GitHub platform only)
     // 'standard' = full KiloConnect app, 'lite' = read-only KiloConnect-Lite app
     github_app_type: text().$type<'standard' | 'lite'>().default('standard'),
+    github_installation_id: uuid(),
+    github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    github_authorized_by_user_id: text(),
+    github_authorized_user_id: text(),
+    github_authorized_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     // Timestamps
     installed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4316,6 +4321,88 @@ export const platform_integrations = pgTable(
 );
 
 export type PlatformIntegration = typeof platform_integrations.$inferSelect;
+
+export const github_app_installations = pgTable(
+  'github_app_installations',
+  {
+    id: idPrimaryKeyColumn,
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    installation_id: text().notNull(),
+    account_id: text(),
+    account_login: text(),
+    account_type: text().$type<'Organization' | 'User'>(),
+    permissions: jsonb().$type<IntegrationPermissions>(),
+    scopes: text().array(),
+    repository_access: text(),
+    repositories: jsonb().$type<PlatformRepository<number | string>[]>(),
+    repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
+    lifecycle_state: text()
+      .$type<'unknown' | 'active' | 'suspended' | 'deleted'>()
+      .notNull()
+      .default('unknown'),
+    suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_reason: text(),
+    revision: integer().notNull().default(0),
+    observed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_github_app_installations_app_installation').on(
+      table.github_app_type,
+      table.installation_id
+    ),
+    check(
+      'github_app_installations_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'github_app_installations_installation_id_check',
+      sql`${table.installation_id} ~ '^[1-9][0-9]*$'`
+    ),
+    check(
+      'github_app_installations_lifecycle_state_check',
+      sql`${table.lifecycle_state} IN ('unknown', 'active', 'suspended', 'deleted')`
+    ),
+  ]
+);
+
+export const github_connection_attempts = pgTable(
+  'github_connection_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text().notNull(),
+    owner_type: text().$type<'user' | 'org'>().notNull(),
+    owner_id: text().notNull(),
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    return_to: text(),
+    selected_installation_id: text(),
+    github_user_id: text(),
+    eligible_installations: jsonb(),
+    completed_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'restrict',
+    }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_github_connection_attempts_expires_at').on(table.expires_at),
+    check(
+      'github_connection_attempts_owner_type_check',
+      sql`${table.owner_type} IN ('user', 'org')`
+    ),
+    check(
+      'github_connection_attempts_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+  ]
+);
 
 export const user_github_app_tokens = pgTable(
   'user_github_app_tokens',

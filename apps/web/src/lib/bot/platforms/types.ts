@@ -75,6 +75,7 @@ export type BotPlatform = {
     thread: Thread;
     messageId: string;
     status?: string;
+    platformIntegration: PlatformIntegration;
   }): Promise<StopProcessingIndicator>;
   handleAction?(event: ActionEvent): Promise<void>;
   handleAssistantThreadStarted?(event: AssistantThreadStartedEvent): Promise<void>;

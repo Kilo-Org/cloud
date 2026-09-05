@@ -2,6 +2,7 @@ const mockIssuesGetFn = jest.fn();
 const mockIssuesListCommentsFn = jest.fn();
 const mockPullsListReviewCommentsFn = jest.fn();
 const mockGenerateGitHubInstallationTokenFn = jest.fn();
+const mockAssertGitHubInstallationRuntimeAuthorized = jest.fn();
 
 function mockIssuesGet(...args: unknown[]) {
   return mockIssuesGetFn(...args);
@@ -33,6 +34,11 @@ jest.mock('@octokit/rest', () => ({
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   generateGitHubInstallationToken: mockGenerateGitHubInstallationToken,
+}));
+
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
+    mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType),
 }));
 
 import type { Message, Thread } from 'chat';
@@ -126,6 +132,11 @@ function createIntegration(overrides: Partial<PlatformIntegration> = {}): Platfo
     suspended_at: null,
     suspended_by: null,
     github_app_type: 'standard',
+    github_installation_id: null,
+    github_disconnected_at: null,
+    github_authorized_by_user_id: null,
+    github_authorized_user_id: null,
+    github_authorized_at: null,
     installed_at: '2026-05-05T07:00:00Z',
     created_at: '2026-05-05T07:00:00Z',
     updated_at: '2026-05-05T07:00:00Z',
@@ -139,6 +150,25 @@ describe('createGitHubBotPlatform.isEnabledForBot', () => {
     expect(
       githubPlatform.isEnabledForBot(createIntegration({ metadata: { bot_enabled: false } }))
     ).toBe(true);
+  });
+});
+
+describe('createGitHubBotPlatform.withAuthContext', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('does not allow Chat SDK actions after a local disconnect', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new Error('GitHub installation is unavailable for runtime use')
+    );
+    const fn = jest.fn(async () => {});
+
+    await expect(
+      githubPlatform.withAuthContext({ platformIntegration: createIntegration(), fn })
+    ).rejects.toThrow('GitHub installation is unavailable for runtime use');
+
+    expect(fn).not.toHaveBeenCalled();
   });
 });
 

@@ -415,6 +415,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # apps/mobile tests the app against the built harness SDK, the way it
+      # already runs against built trpc types.
+      - name: Build harness SDK
+        if: matrix.workspace.name == 'kilo-app'
+        run: pnpm --filter @kilocode/harness-sdk run build
+
       - name: Run tests
         run: pnpm --filter ${{ matrix.workspace.name }} test
 

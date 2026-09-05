@@ -62,7 +62,7 @@ vi.mock('@/components/icons/slack-icon', () => ({ SlackIcon: 'SlackIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'Chevron' }));
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
-vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
+vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
@@ -159,7 +159,7 @@ describe('StoredSessionRow live speech', () => {
     const nonliveLabel =
       'Fix login bug, feature/live, pull request 42, CLI, and cost 12 cents, 5 minutes ago';
     expect(button?.props.accessibilityLabel).toBe(nonliveLabel);
-    expect(hosts(renderer, 'StatusDot')).toHaveLength(0);
+    expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
     expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
 
     act(() => {
@@ -169,7 +169,9 @@ describe('StoredSessionRow live speech', () => {
     expect(button?.props.accessibilityLabel).toBe(
       'Fix login bug, LIVE, feature/live, pull request 42, CLI, and cost 12 cents, 5 minutes ago'
     );
-    expect(hosts(renderer, 'StatusDot').map(dot => dot.props)).toEqual([{ tone: 'good' }]);
+    expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+      { kind: 'running' },
+    ]);
     expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
     expect(texts(renderer)).toContain('feature/live · #42');
 
@@ -177,7 +179,7 @@ describe('StoredSessionRow live speech', () => {
       renderer.update(row({ ...props, live: false }));
     });
     expect(button?.props.accessibilityLabel).toBe(nonliveLabel);
-    expect(hosts(renderer, 'StatusDot')).toHaveLength(0);
+    expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(0);
   });
 
   it('updates an existing live row to localized speech and locale-aware list composition', async () => {
@@ -195,7 +197,7 @@ describe('StoredSessionRow live speech', () => {
       'Fix login bug, EN DIRECTO, CLI y hace 5 minutos'
     );
     expect(texts(renderer)).toContain('HACE 5 MINUTOS');
-    expect(hosts(renderer, 'StatusDot')).toHaveLength(1);
+    expect(hosts(renderer, 'SessionStatusIcon')).toHaveLength(1);
   });
 
   it.each(['question', 'permission'])(
@@ -207,8 +209,8 @@ describe('StoredSessionRow live speech', () => {
       expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
         'Fix login bug, needs input, feature/live, and CLI'
       );
-      expect(hosts(renderer, 'StatusDot').map(dot => dot.props)).toEqual([
-        { tone: 'warn', pulse: true },
+      expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+        { kind: 'needsInput' },
       ]);
       expect(texts(renderer)).toContain('NEEDS INPUT');
       expect(texts(renderer)).not.toContain('$0.12 · 5 MINUTES AGO');
@@ -261,7 +263,9 @@ describe('StoredSessionRow live speech', () => {
         'Fix login bug, LIVE, feature/live, CLI, and cost 12 cents, 5 minutes ago'
       );
       expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
-      expect(hosts(renderer, 'StatusDot').map(dot => dot.props)).toEqual([{ tone: 'good' }]);
+      expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
+        { kind: 'running' },
+      ]);
       expect(button.props.onLongPress).toBeUndefined();
       const { onPress } = button.props as Pick<Parameters<typeof StoredSessionRow>[0], 'onPress'>;
       act(onPress);

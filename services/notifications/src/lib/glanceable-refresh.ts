@@ -1,3 +1,4 @@
+import { GLANCEABLE_SNAPSHOT_EXPIRY_MS } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { z } from 'zod';
 
 import { deliverGlanceableSnapshot, type GlanceableDeliveryDeps } from './glanceable-delivery';
@@ -28,6 +29,10 @@ export async function refreshGlanceableSnapshot(
   const key = `glanceable:${JSON.stringify([scope.userId, scope.organizationId])}`;
   // Row renewal or temporary absence cannot prove that the native token is live.
   const iosEndPrefix = (token: string) => `glanceable-ios-end:${JSON.stringify(token)}:`;
+  // A card raised by push-to-start carries no update token until the app runs
+  // and adopts it, so nothing here can update or end it. Without this fence
+  // every later refresh raises another card and the Lock Screen stacks them.
+  const iosStartKey = (token: string) => `glanceable-ios-start:${JSON.stringify(token)}`;
   const request = await storage.transaction(async tx => {
     const previous = refreshStateSchema.optional().parse(await tx.get(key));
     const now = Date.now();
@@ -81,16 +86,23 @@ export async function refreshGlanceableSnapshot(
       const tokens = await deps.listIosActivityTokens(userId, organizationId);
       const current = refreshStateSchema.parse(await storage.get(key));
       if (current.revision !== request.revision) return [];
+      const withoutFencedStarts = await dropFencedStarts(tokens, storage, iosStartKey);
       // Empty work can retry ends. Eligible work excludes every accepted or uncertain end.
-      if (!eligible) return tokens;
+      if (!eligible) return withoutFencedStarts;
       const retiring = await Promise.all(
-        tokens.map(async ({ token, kind }) =>
+        withoutFencedStarts.map(async ({ token, kind }) =>
           kind === 'ios_activity'
             ? (await storage.list({ prefix: iosEndPrefix(token), limit: 1 })).size > 0
             : false
         )
       );
-      return tokens.filter((_, index) => !retiring[index]);
+      return withoutFencedStarts.filter((_, index) => !retiring[index]);
+    },
+    onIosStarted: async token => {
+      // Hold the fence for the whole maximum life of the card it raised. An
+      // orphan card cannot be ended remotely, so a second one would simply sit
+      // beside it until ActivityKit dismisses them both.
+      await storage.put(iosStartKey(token), Date.now() + GLANCEABLE_SNAPSHOT_EXPIRY_MS);
     },
     beforeIosEnd: async token => {
       return storage.transaction(async tx => {
@@ -106,4 +118,35 @@ export async function refreshGlanceableSnapshot(
       await storage.delete(`${iosEndPrefix(token)}${key}:${request.revision}`);
     },
   });
+}
+
+/**
+ * Drop the push-to-start tokens that already raised a card nobody has adopted.
+ *
+ * An `ios_activity` row proves the app adopted its card, so it owns duplicate
+ * retirement from here and every fence in the scope is released. Otherwise a
+ * push-to-start whose fence has not lapsed is removed from the list, which
+ * leaves `apnsSendsForTokens` with no start to send.
+ */
+async function dropFencedStarts<T extends { token: string; kind: string }>(
+  tokens: readonly T[],
+  storage: DurableObjectStorage,
+  iosStartKey: (token: string) => string
+): Promise<T[]> {
+  if (tokens.some(({ kind }) => kind === 'ios_activity')) {
+    await storage.delete(tokens.map(({ token }) => iosStartKey(token)));
+    return [...tokens];
+  }
+  const now = Date.now();
+  const fenced = await Promise.all(
+    tokens.map(async ({ token, kind }) => {
+      if (kind !== 'ios_push_to_start') return false;
+      const until = await storage.get<number>(iosStartKey(token));
+      if (until === undefined) return false;
+      if (until > now) return true;
+      await storage.delete(iosStartKey(token));
+      return false;
+    })
+  );
+  return tokens.filter((_token, index) => !fenced[index]);
 }

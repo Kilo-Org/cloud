@@ -21,6 +21,7 @@
     "wrangler": "catalog:"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/event-service": "workspace:*",
     "@kilocode/notifications": "workspace:*",

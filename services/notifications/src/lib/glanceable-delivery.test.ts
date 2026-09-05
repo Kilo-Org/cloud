@@ -85,6 +85,7 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       event: string;
       timestamp: number;
       'dismissal-date'?: number;
+      'stale-date'?: number;
       'content-state': GlanceableApnsContentState;
     };
   };
@@ -606,6 +607,93 @@ describe('NotificationsService.refreshGlanceableSessions', () => {
       needsInputSince: '2026-08-27T10:00:01.000Z',
     });
     expect([...activityRows.keys()]).toEqual(['scope-token']);
+  });
+
+  it('raises one card per push-to-start token, however many refreshes find no activity', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { createService, apns } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [{ token: 'scope-token', kind: 'ios_push_to_start' }],
+      response: () => Response.json(freshSnapshot({ running: 1 })),
+    });
+    // Nothing registers an activity token while the app never runs, so without
+    // the fence every refresh would stack another card on the Lock Screen.
+    for (const second of [0, 1, 2]) {
+      vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:00.000Z') + second * 1000);
+      await createService().refreshGlanceableSessions(personalRefresh);
+    }
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['scope-token', 'start']]);
+  });
+
+  it('releases the push-to-start fence once the app adopts the card it raised', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    let current = freshSnapshot({ running: 1 });
+    const { createService, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [{ token: 'scope-token', kind: 'ios_push_to_start' }],
+      response: () => Response.json(current),
+    });
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([['scope-token', 'start']]);
+
+    // The app woke, adopted the pushed card, and registered its update token.
+    activityRows.set('activity-token', {
+      id: 'row-adopted',
+      kind: 'ios_activity',
+      updated_at: '2026-08-27 10:00:00+00',
+    });
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    current = freshSnapshot({ status: 'empty', running: 0, needsInputSince: null });
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect([...activityRows.keys()]).toEqual(['scope-token']);
+
+    // That end retired the card, so fresh work may raise another one.
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:02.000Z'));
+    current = freshSnapshot({ running: 1 });
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ token, aps }) => [token, aps.event])).toEqual([
+      ['scope-token', 'start'],
+      ['activity-token', 'end'],
+      ['scope-token', 'start'],
+    ]);
+  });
+
+  it('retires a token APNs rejects with 410 on an update, not only on an end', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { service, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [
+        { token: 'scope-token', kind: 'ios_push_to_start' },
+        { token: 'gone-token', kind: 'ios_activity' },
+      ],
+      apnsStatus: token => (token === 'gone-token' ? 410 : 200),
+      response: () => Response.json(freshSnapshot({ running: 1 })),
+    });
+    // A dead activity row would otherwise absorb every update and keep the
+    // push-to-start from raising the card those updates never reach.
+    await service.refreshGlanceableSessions(personalRefresh);
+    expect([...activityRows.keys()]).toEqual(['scope-token']);
+  });
+
+  it('marks every start and update stale after the shared window', async () => {
+    const pem = await generateTestPrivateKeyPem();
+    const { createService, apns, activityRows } = setupService({
+      privateKey: async () => pem,
+      iosTokens: [{ token: 'scope-token', kind: 'ios_push_to_start' }],
+      response: () => Response.json(freshSnapshot({ running: 1 })),
+    });
+    await createService().refreshGlanceableSessions(personalRefresh);
+    activityRows.set('activity-token', {
+      id: 'row-adopted',
+      kind: 'ios_activity',
+      updated_at: '2026-08-27 10:00:00+00',
+    });
+    vi.mocked(Date.now).mockReturnValue(Date.parse('2026-08-27T10:00:01.000Z'));
+    await createService().refreshGlanceableSessions(personalRefresh);
+    expect(apns.map(({ aps }) => [aps.event, aps['stale-date']])).toEqual([
+      ['start', Date.parse('2026-08-27T10:30:00.000Z') / 1000],
+      ['update', Date.parse('2026-08-27T10:30:01.000Z') / 1000],
+    ]);
   });
 
   it('retires only successful ends and preserves failed targets and scope subscriptions', async () => {

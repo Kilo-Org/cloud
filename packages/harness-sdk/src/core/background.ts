@@ -1,7 +1,7 @@
 import { Duration, Effect, PubSub, Queue, Schedule, Stream } from 'effect';
 import { askHeld, type SessionBusyError, whileFree } from './ask.js';
 import type { ModelError } from './model.js';
-import { type Continued, takeRun, type Waiting } from './queue.js';
+import { type Continued, takeRun, wake, type Waiting } from './queue.js';
 import type { StoreError } from './storage.js';
 import type { Wiring } from './wiring.js';
 
@@ -89,10 +89,15 @@ const drivePending = (wiring: Wiring): Effect.Effect<void> =>
         Effect.retry({ while: () => true, schedule: whenBusy }),
         /* Five minutes of a session that never went free. Nothing was taken out
            of the line, so the entries are still in it: they are shown by
-           `queued`, they can still be cancelled, and the next thing to join
-           wakes the driver onto them again. */
+           `queued` and they can still be cancelled. The token that pointed at
+           them is spent, though, so the bell is rung again — otherwise the line
+           waits on the next thing to join it, and a caller's last message is
+           never asked. */
         Effect.catchAll(failed =>
-          Effect.asVoid(PubSub.publish(wiring.continued, { answering: [], failed }))
+          Effect.zipRight(
+            PubSub.publish(wiring.continued, { answering: [], failed }),
+            wake(wiring.pending)
+          )
         )
       )
     )

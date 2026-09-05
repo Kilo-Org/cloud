@@ -137,5 +137,20 @@ const takeRun = (pending: Pending): Effect.Effect<readonly Waiting[]> =>
     return [held.slice(0, taken), held.slice(taken)];
   });
 
+/**
+ * Rings the bell again for a line that still holds something.
+ *
+ * A round the driver gave up on took nothing out of the line, but the token
+ * that pointed at it is spent. Without this the entries wait for whatever joins
+ * next, which for the last message a caller sends is forever.
+ */
+const wake = (pending: Pending): Effect.Effect<void> =>
+  Effect.flatMap(Ref.get(pending.waiting), held => {
+    const [first] = held;
+    return first === undefined
+      ? Effect.void
+      : Effect.asVoid(Queue.offer(pending.arrived, first.id));
+  });
+
 export type { Answering, Continued, Pending, Waiting };
-export { cancelQueued, enqueue, enqueueMessage, makePending, takeRun };
+export { cancelQueued, enqueue, enqueueMessage, makePending, takeRun, wake };

@@ -273,6 +273,7 @@ type UrlValidation =
 //   - parseable by the URL parser
 //   - http or https protocol
 //   - non-empty hostname
+//   - origin only: no credentials, path, query, or fragment
 // On failure, returns an error and (when possible) a suggested fix such as
 // prepending http:// for a protocol-less input.
 function validateUrl(raw: string): UrlValidation {
@@ -299,7 +300,16 @@ function validateUrl(raw: string): UrlValidation {
   if (!parsed.hostname) {
     return { ok: false, error: 'URL is missing a hostname' };
   }
-  return { ok: true, value: raw };
+  if (parsed.username || parsed.password) {
+    return { ok: false, error: 'URL must not contain credentials (user:pass@)' };
+  }
+  if (parsed.pathname !== '/') {
+    return { ok: false, error: 'URL must not contain a path (origin only, e.g. http://host:port)' };
+  }
+  if (parsed.search) {
+    return { ok: false, error: 'URL must not contain a query string' };
+  }
+  return { ok: true, value: parsed.origin };
 }
 
 // ---------------------------------------------------------------------------
@@ -426,9 +436,13 @@ async function main(): Promise<void> {
   for (const [key, value] of collected) {
     const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const regex = new RegExp(`^(${escapedKey}=).*$`, 'm');
-    const replacement = `$1${formatValue(value)}`;
     if (regex.test(finalContent)) {
-      finalContent = finalContent.replace(regex, replacement);
+      // Use the function form so `$`, `$&`, etc. in `value` are treated literally
+      // instead of being interpreted as replacement tokens.
+      finalContent = finalContent.replace(
+        regex,
+        (_match, prefix) => `${prefix}${formatValue(value)}`
+      );
     } else {
       finalContent = finalContent.trimEnd() + `\n${key}=${formatValue(value)}\n`;
     }

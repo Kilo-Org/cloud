@@ -1247,6 +1247,37 @@ to be wrong and nothing to wait on. What its column asks is whether a model
 notices its own answer would be stale: asked how many days are left in the
 month, without being told to check, all eleven called it.
 
+### A model that says it has no tools
+
+One model does not always see the tools it was sent. Measured on 2026-09-05,
+`minimax/minimax-m3` answers "I don't have access to a time tool" about one
+round in eight and then gives a date from around its training cutoff, with the
+tool plainly in the request. What was tried, on `chat_completions`:
+
+| | Called |
+|---|---:|
+| A one-line description: "Answers with the current date and time." | 2 of 6 |
+| The shipped description | 7 of 8 |
+| The shipped description, plus "never say you are unable to check the time" | 7 of 8 |
+| The shipped description, with `tool_choice: "required"` | 3 of 6 |
+
+The first row is why the description is worth its length. The last is the
+finding: the relay does not honour `tool_choice` for this model, so there is no
+switch to throw. Hand-written requests carrying no part of this package miss at
+the same rate, so it is not an encoding to fix here.
+
+`pnpm test:e2e:time` therefore counts a miss and asserts the floor underneath
+it: every shape carries a tool that takes nothing, and a model that called the
+tool answers with what the tool wrote. A model that calls on none of the three
+shapes still fails the run — that is the description failing rather than one bad
+round. Asserting on every call would put the suite red on a different model
+every sweep for something nothing here can change.
+
+The same sweep caught the other way to measure the wrong thing: `xiaomi/mimo-v2.5`
+refused two shapes outright on one run and carried all three on the next, which
+is a relay having a bad minute. A failed round is now tried once more before it
+counts.
+
 There is no right answer to the waiting column, which is why `Tool.wait` is a
 default and not a rule. Both scenarios block — a deployment nobody has answered
 about, a codename the model cannot know — so waiting is correct in both, and the

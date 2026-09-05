@@ -179,21 +179,22 @@ interface DeltaEvent {
   delta: string;
 }
 
+/**
+ * The frame that carries the counts, which is either frame that ends an answer:
+ * one stopped at the wall reports them exactly as a finished one does. Reading
+ * only the finished one counts a truncated answer as zero, and the session then
+ * believes its window is empty.
+ */
 interface CompletedEvent {
-  type: 'response.completed';
+  type: 'response.completed' | 'response.incomplete';
   response: { usage: Counts };
 }
 
-/**
- * The frame that says the answer ended, whether it finished or was cut off.
- * The usage frame cannot say: a completed response and one stopped at the wall
- * both report their counts the same way.
- */
+/** The frame that says the answer ended, and names the wall when it hit one. */
 interface EndEvent {
   type: 'response.completed' | 'response.incomplete' | 'response.failed';
   response: { status?: string | null; incomplete_details?: { reason?: string | null } | null };
 }
-
 /**
  * This shape streams the thinking under a name of its own, and under two of
  * them: `reasoning_summary_text` when the provider returns a summary, and

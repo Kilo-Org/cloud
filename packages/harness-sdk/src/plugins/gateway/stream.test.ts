@@ -100,6 +100,36 @@ it('streams a responses reply and names the cache key', async () => {
   expect(events.at(-1)).toMatchObject({ usage: { cacheReadTokens: 19, inputTokens: 1 } });
 });
 
+it('counts a responses reply that stopped at the wall', async () => {
+  /* The truncated frame carries its counts exactly as the finished one does.
+     Reading only `response.completed` reports zero for a call that filled the
+     window, and the session then believes it has room it does not have. */
+  const { events } = await collect(
+    ['responses'],
+    sse(
+      { type: 'response.output_text.delta', delta: 'cut' },
+      {
+        type: 'response.incomplete',
+        response: {
+          status: 'incomplete',
+          incomplete_details: { reason: 'max_output_tokens' },
+          usage: {
+            input_tokens: 30,
+            output_tokens: 8,
+            input_tokens_details: { cached_tokens: 29 },
+          },
+        },
+      }
+    )
+  );
+
+  expect(events.at(-1)).toEqual({
+    kind: 'done',
+    usage: { inputTokens: 1, outputTokens: 8, cacheReadTokens: 29, cacheWriteTokens: 0 },
+    stop: 'maxTokens',
+  });
+});
+
 const doneUsage = (events: readonly ModelEvent[]) => {
   const last = events.at(-1);
   return last?.kind === 'done' ? last.usage : undefined;

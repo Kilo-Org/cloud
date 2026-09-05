@@ -2,7 +2,7 @@ import { createCloudAgentTransport } from './cloud-agent-transport';
 import { createServiceState } from './service-state';
 import { createEventHelpers } from './__fixtures__/helpers';
 import type { ChatEvent, ServiceEvent } from './normalizer';
-import type { CloudAgentApi, TransportSendInput } from './transport';
+import type { CloudAgentApi, Transport, TransportSendInput } from './transport';
 import { cloudAgentId, kiloId, makeSnapshot } from './test-helpers';
 
 type TestSocket = {
@@ -83,6 +83,14 @@ function createHarness() {
   const send = jest.fn<ReturnType<CloudAgentApi['send']>, Parameters<CloudAgentApi['send']>>(
     async () => ({ accepted: true })
   );
+  const api = {
+    send,
+    interrupt: jest.fn(async () => ({ success: true })),
+    cancelQueuedMessage: jest.fn(async () => ({ dropped: true })),
+    answer: jest.fn(async () => ({ success: true })),
+    reject: jest.fn(async () => ({ success: true })),
+    respondToPermission: jest.fn(async () => ({ success: true })),
+  } satisfies CloudAgentApi;
   const getTicket = jest.fn(async () => ({
     ticket: 'local-stream-ticket',
     expiresAt: Math.floor(Date.now() / 1000) + 60,
@@ -94,13 +102,7 @@ function createHarness() {
     websocketBaseUrl: 'ws://localhost:9999',
     getTicket,
     fetchSnapshot,
-    api: {
-      send,
-      interrupt: jest.fn(),
-      answer: jest.fn(),
-      reject: jest.fn(),
-      respondToPermission: jest.fn(),
-    },
+    api,
   })({
     onChatEvent: event => chatEvents.push(event),
     onServiceEvent: event => {
@@ -111,6 +113,7 @@ function createHarness() {
   return {
     transport,
     state,
+    api,
     send,
     getTicket,
     fetchSnapshot,
@@ -127,6 +130,23 @@ async function connect(harness: ReturnType<typeof createHarness>): Promise<void>
   harness.transport.connect();
   await jest.advanceTimersByTimeAsync(0);
   receive({ ...createEvent('connected', {}), eventId: 7 });
+}
+
+type MutationName = 'interrupt' | 'dropQueuedMessage' | 'answer' | 'reject' | 'permission';
+
+async function performMutation(transport: Transport, mutation: MutationName): Promise<unknown> {
+  switch (mutation) {
+    case 'interrupt':
+      return transport.interrupt?.();
+    case 'dropQueuedMessage':
+      return transport.dropQueuedMessage?.('queued-message');
+    case 'answer':
+      return transport.answer?.({ requestId: 'question-1', answers: [['yes']] });
+    case 'reject':
+      return transport.reject?.({ requestId: 'question-1' });
+    case 'permission':
+      return transport.respondToPermission?.({ requestId: 'permission-1', response: 'once' });
+  }
 }
 
 async function exhaustRetries(): Promise<void> {
@@ -203,6 +223,47 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
         part: expect.objectContaining({ text: 'canonical reply', sessionID: 'ses-1' }),
       }),
     ]);
+    harness.transport.destroy();
+  });
+
+  it.each(['interrupt', 'dropQueuedMessage', 'answer', 'reject', 'permission'] as const)(
+    'reopens an exhausted stream after a successful %s mutation',
+    async mutation => {
+      const harness = createHarness();
+      await connect(harness);
+      await exhaustRetries();
+      const ticketCount = harness.getTicket.mock.calls.length;
+
+      await performMutation(harness.transport, mutation);
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(sockets).toHaveLength(10);
+      expect(harness.getTicket).toHaveBeenCalledTimes(ticketCount + 1);
+      expect(new URL(latestSocket().url).searchParams.get('fromId')).toBe('7');
+      harness.transport.destroy();
+    }
+  );
+
+  it('reserves one recovery budget when a mutation succeeds before retries exhaust', async () => {
+    const harness = createHarness();
+    await connect(harness);
+    closeSocket();
+    for (let attempt = 0; attempt < 7; attempt += 1) {
+      await jest.advanceTimersByTimeAsync(Math.min(30_000, 1000 * 2 ** attempt) / 2);
+      closeSocket();
+    }
+    expect(sockets).toHaveLength(8);
+
+    await performMutation(harness.transport, 'interrupt');
+    await jest.advanceTimersByTimeAsync(15_000);
+    closeSocket();
+    await jest.advanceTimersByTimeAsync(0);
+
+    expect(sockets).toHaveLength(10);
+    expect(new URL(latestSocket().url).searchParams.get('fromId')).toBe('7');
+    receive(createEvent('connected', {}));
+    await jest.advanceTimersByTimeAsync(600_000);
+    expect(sockets).toHaveLength(10);
     harness.transport.destroy();
   });
 
@@ -292,7 +353,7 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     harness.transport.destroy();
   });
 
-  it('coalesces accepted sends while renewing the stream ticket and keeps retries bounded', async () => {
+  it('coalesces concurrent sends and requires a new mutation after recovery exhausts', async () => {
     const harness = createHarness();
     await connect(harness);
     await exhaustRetries();
@@ -309,6 +370,12 @@ describe('Cloud Agent stream recovery after a backend outage', () => {
     expect(new URL(latestSocket().url).searchParams.get('ticket')).toBe('renewed-ticket');
     await exhaustRetries();
     expect(harness.send).toHaveBeenCalledTimes(2);
+
+    const exhaustedSocketCount = sockets.length;
+    await harness.submit();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(sockets).toHaveLength(exhaustedSocketCount + 1);
+    expect(harness.send).toHaveBeenCalledTimes(3);
     harness.transport.destroy();
   });
 

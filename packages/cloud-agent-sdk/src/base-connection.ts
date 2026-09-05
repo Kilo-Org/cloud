@@ -57,7 +57,7 @@ export type Connection = {
   disconnect: () => void;
   reconnectWithRefreshedAuth?: () => void;
   retryReconnect: () => void;
-  retryExhaustedConnection: () => void;
+  recoverAfterSuccessfulMutation: () => void;
   destroy: () => void;
 };
 
@@ -88,6 +88,9 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
   let lastMessageTime = 0;
   let hiddenAt = 0;
   let preconnectAuthRefreshAttempted = false;
+  // Coalesce successful mutations into one retry budget at a time. A later mutation may
+  // request another bounded cycle after that budget exhausts without any inbound event.
+  let mutationRecovery: 'idle' | 'pending' | 'active' = 'idle';
   const stalenessTimeoutMs = config.stalenessTimeoutMs ?? DEFAULT_STALENESS_TIMEOUT_MS;
   const maxReconnectAttempts = config.maxReconnectAttempts ?? MAX_RECONNECT_ATTEMPTS;
 
@@ -179,6 +182,12 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     if (destroyed || intentionalDisconnect || expectedGeneration !== generation) return;
 
     if (attempt >= maxReconnectAttempts) {
+      if (mutationRecovery === 'pending') {
+        mutationRecovery = 'active';
+        retryReconnect();
+        return;
+      }
+      mutationRecovery = 'idle';
       if (exhaustionReason === null) {
         exhaustionReason = 'retry-limit';
         config.onReconnectExhaustionChange?.(true);
@@ -263,6 +272,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // Reset auth refresh flag on successful message
       authRefreshAttempted = false;
       reconnectAttempt = 0;
+      mutationRecovery = 'idle';
       clearExhausted();
 
       if (!connected) {
@@ -314,6 +324,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
       // Already tried refreshing auth and still failing - stop retrying.
       // The current physical route is gone even though no new socket follows.
       if (isAuthFailure && authRefreshAttempted) {
+        mutationRecovery = 'idle';
         notifyReplacingConnection(expectedGeneration);
         if (exhaustionReason === null) {
           exhaustionReason = 'auth-failure';
@@ -458,6 +469,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     destroyed = false;
     authRefreshAttempted = false;
     preconnectAuthRefreshAttempted = false;
+    mutationRecovery = 'idle';
     connected = false;
     reconnectAttempt = 0;
     clearExhausted();
@@ -474,6 +486,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     intentionalDisconnect = true;
     generation += 1;
     preconnectAuthRefreshAttempted = false;
+    mutationRecovery = 'idle';
 
     clearReconnectTimer();
     clearStalenessTimeout();
@@ -520,15 +533,28 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     void refreshAndConnect(generation);
   }
 
-  function retryExhaustedConnection() {
-    if (exhaustionReason !== 'retry-limit') return;
-    retryReconnect();
+  function recoverAfterSuccessfulMutation() {
+    if (
+      destroyed ||
+      intentionalDisconnect ||
+      connected ||
+      exhaustionReason === 'auth-failure' ||
+      mutationRecovery !== 'idle'
+    )
+      return;
+    if (exhaustionReason === 'retry-limit') {
+      mutationRecovery = 'active';
+      retryReconnect();
+      return;
+    }
+    mutationRecovery = 'pending';
   }
 
   function destroy() {
     destroyed = true;
     generation += 1;
     preconnectAuthRefreshAttempted = false;
+    mutationRecovery = 'idle';
 
     clearReconnectTimer();
     clearStalenessTimeout();
@@ -548,7 +574,7 @@ export function createBaseConnection<T>(config: BaseConnectionConfig<T>): Connec
     disconnect,
     reconnectWithRefreshedAuth,
     retryReconnect,
-    retryExhaustedConnection,
+    recoverAfterSuccessfulMutation,
     destroy,
   };
 }

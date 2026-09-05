@@ -12,6 +12,7 @@ describe('unavailable models', () => {
     expect(isUnavailableModel('openai/gpt-oss-20b')).toBe(false);
     expect(isUnavailableModel('tencent/hy3:free')).toBe(true);
     expect(isUnavailableModel('tencent/hy3')).toBe(false);
+    expect(isUnavailableModel('meituan/longcat-2.0-free')).toBe(true);
   });
 
   test('matches normalized families for provider metadata', () => {

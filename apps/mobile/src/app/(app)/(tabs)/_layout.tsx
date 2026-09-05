@@ -71,7 +71,7 @@ export default function TabsLayout() {
   const colors = useThemeColors();
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
-  const hideTabs = shouldHideTabBar(pathname);
+  const hideTabs = shouldHideTabBar(pathname, segments);
   const showTabLabel = shouldShowTabLabel(fontScale);
   const tabBarHeight = getEffectiveTabBarHeight({
     bottomInset: bottom,

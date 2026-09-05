@@ -2,6 +2,7 @@ import { type ListRenderItem } from '@shopify/flash-list';
 import { type RemoteModelState, type StoredMessage } from '@kilocode/cloud-agent-sdk';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
 import { ChatComposer, type ChatComposerSendOptions } from '@/components/agents/chat-composer';
@@ -11,7 +12,6 @@ import { getSessionKeyboardContainerKind } from '@/components/agents/session-key
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
-import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { MessageCircle } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
@@ -141,9 +141,10 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   }, [stop]);
 
   const keyboardKind = getSessionKeyboardContainerKind(Platform.OS);
-  const tabBarPadding = useTabBarBottomPadding();
-  // The tab bar is behind the composer, except while the keyboard covers it.
-  const composerPadding = { paddingBottom: keyboardVisible ? 0 : tabBarPadding };
+  const { bottom } = useSafeAreaInsets();
+  // A conversation fills the screen: the tab bar is gone and the composer sits
+  // on the home indicator, except while the keyboard covers it.
+  const composerPadding = { paddingBottom: keyboardVisible ? 0 : bottom };
 
   function renderTranscript() {
     if (messages.length === 0) {

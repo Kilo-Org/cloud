@@ -20,7 +20,7 @@ import { openSession } from '../src/core/run.js';
 import type { PartDraft } from '../src/core/turn.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { kilo, models, room } from './setup.js';
-import { fail, passed, under } from './report.js';
+import { fail, passed, under, wrongIf } from './report.js';
 
 const system =
   'You look at pictures and answer about them. ' +
@@ -73,15 +73,35 @@ const runShape = async (model: string, kind: ApiKind, colour: string) => {
 
 const word = (said: string) => said.toLowerCase().replaceAll(/[^a-z]/gu, '');
 
+/**
+ * Whether the gateway refused the call because the model has no eyes.
+ *
+ * Read from the refusal rather than a list of names: the model list changes and
+ * a list of blind ones written here would rot silently, passing the run by
+ * asking a model nothing at all. Measured on 2026-09-06,
+ * `nvidia/nemotron-3.5-lightning` refuses every shape with a 405 saying so.
+ */
+const cannotSee = (error: unknown): boolean =>
+  JSON.stringify(error).includes('does not accept image input');
+
+/** The models that could see, so the run can say the sweep proved something. */
+const saw: string[] = [];
+
 for (const model of models) {
   under(model);
 
   console.log('model', model);
   console.log('\nshape             sent      named     background');
 
+  let blind = false;
   for (const { kind, colour } of shapes) {
     const result = await runShape(model, kind, colour);
     if (result._tag === 'Left') {
+      if (cannotSee(result.left)) {
+        console.log(`${kind.padEnd(18)}${colour.padEnd(10)}the model takes no pictures`);
+        blind = true;
+        continue;
+      }
       console.log(`${kind.padEnd(18)}${colour.padEnd(10)}FAILED    ${JSON.stringify(result.left)}`);
       fail(`${kind}: the call failed`);
       continue;
@@ -101,6 +121,15 @@ for (const model of models) {
       );
     }
   }
+  if (!blind) {
+    saw.push(model);
+  }
 }
 
-passed('every shape carried the picture, and every shape replayed it.');
+under('');
+console.log(`\ntook pictures: ${String(saw.length)} of ${String(models.length)} models`);
+/* The floor under the skip: a package that stopped sending pictures at all
+   would have every model refuse, and that must go red rather than quiet. */
+wrongIf(saw.length === 0, 'not one model took a picture, so nothing here sent one');
+
+passed('every shape carried the picture to a model with eyes, and every shape replayed it.');

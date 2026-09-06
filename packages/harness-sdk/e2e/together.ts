@@ -129,15 +129,31 @@ const program = (model: string) =>
     const rounds = yield* watching.done;
     return { first, long, last, waiting, both, rounds };
   });
+/** The models that put a question out and left it out. The floor is that one did. */
+const asked: string[] = [];
+
 for (const model of models) {
   under(model);
 
   /* What the tool was asked, from this model only. */
   takenUp.length = 0;
 
-  const got = await Effect.runPromise(
-    Effect.scoped(Effect.provide(program(model), tools.pipe(Layer.merge(kilo()))))
+  const ran = await Effect.runPromise(
+    Effect.either(Effect.scoped(Effect.provide(program(model), tools.pipe(Layer.merge(kilo())))))
   );
+  if (ran._tag === 'Left') {
+    /* `not yet` is the wait giving up: a minute passed and no answer ever
+       joined the line, because the model never asked. Whether it calls the tool
+       is the model's own — `openai/gpt-5.6-luna` answered the two questions out
+       of its own head on 2026-09-06 — and there is no order to test between a
+       message and an answer that was never asked for. */
+    const why = ran.left === 'not yet' ? 'never left a question outstanding' : String(ran.left);
+    console.log(`model ${model}: ${why}`);
+    wrongIf(ran.left !== 'not yet', `the run failed: ${why}`);
+    continue;
+  }
+  asked.push(model);
+  const got = ran.right;
 
   const rounds = got.rounds;
   const askedFor = takenUp[0] ?? [];
@@ -233,6 +249,15 @@ for (const model of models) {
     `the session was refused ${String(refused.length)} of the rounds it ran on its own`
   );
 }
+
+under('');
+console.log(`\nput a question out: ${String(asked.length)} of ${String(models.length)} models`);
+/* The floor under the skip: a line that never held an answer for any model is
+   the package, not eleven models each deciding the same way. */
+wrongIf(
+  asked.length === 0,
+  'not one model left a question outstanding, so the line was never tested'
+);
 
 passed(
   'two questions went out in one call, and a late answer and a typed ' +

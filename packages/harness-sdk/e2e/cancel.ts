@@ -52,7 +52,13 @@ const layers = kilo({ apiKinds: ['messages'] }, { fetch: watchedFetch });
 const counted = (session: SessionHandle, said: Ref.Ref<number>) =>
   session.ask(long, { maxTokens: 1500 }).pipe(
     Stream.tap(event =>
-      event.kind === 'delta' ? Ref.update(said, held => held + 1) : Effect.void
+      /* Thinking counts. A model that reasons first spends longer on its first
+         word than the whole wait allows — `minimax/minimax-m3` passed thirty
+         seconds with none — and it is answering the whole time. Walking away
+         mid-thought is the same walking away this run is about. */
+      event.kind === 'delta' || event.kind === 'reasoning'
+        ? Ref.update(said, held => held + 1)
+        : Effect.void
     ),
     Stream.runDrain
   );
@@ -114,7 +120,18 @@ for (const model of models) {
   signals.length = 0;
   loose.length = 0;
 
-  const result = await Effect.runPromise(Effect.scoped(Effect.provide(program(model), layers)));
+  /* One model's bad round must not take the other ten with it: these runs cost
+     money and minutes, and learning one failure per sweep turns an afternoon
+     into a week. */
+  const got = await Effect.runPromise(
+    Effect.either(Effect.scoped(Effect.provide(program(model), layers)))
+  );
+  if (got._tag === 'Left') {
+    console.log('model         ', model, 'FAILED', JSON.stringify(String(got.left)));
+    fail(`the run failed: ${String(got.left)}`);
+    continue;
+  }
+  const result = got.right;
 
   const roles = result.history.map(turn => turn.role);
 

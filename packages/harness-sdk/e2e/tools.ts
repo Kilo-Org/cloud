@@ -22,6 +22,17 @@
  * - **The model decides for itself.** A tool that named no deadline is walked
  *   away from because the model set `wait: false` on the call, and what it says
  *   still comes back.
+ *
+ * The last three read a **choice the model makes**, not a rule it must follow.
+ * Measured on 2026-09-06, `nvidia/nemotron-3.5-lightning` sent the two calls of
+ * one turn one after the other and guessed an answer the tool had not given
+ * yet. Nothing in this package can make a model call in parallel or wait, so a
+ * run that failed on it would go red on a different model every sweep. Those
+ * three count a miss and assert the floor underneath: what the package does
+ * once the model has chosen. The first, the shape carrying a round at all, is
+ * the package's own and stays absolute.
+ *
+ * The same line is drawn in `e2e/time.ts`, for the same reason.
  */
 import { Duration, Effect, Layer, Stream } from 'effect';
 import type { ApiKind } from '../src/core/catalog.js';
@@ -30,7 +41,7 @@ import { openSession } from '../src/core/run.js';
 import { type Tool, ToolRegistry } from '../src/core/tool.js';
 import { type Asker, questionTool } from '../src/plugins/tools/question.js';
 import { kilo, models, room } from './setup.js';
-import { fail, passed } from './report.js';
+import { fail, passed, under, wrongIf } from './report.js';
 
 const system =
   'You are a test harness with tools. Call a tool whenever one answers the ' +
@@ -98,8 +109,13 @@ const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   }
 };
 
-/** Two calls in one turn have to overlap, or a slow tool costs the wall clock. */
-const runTogether = async (model: string): Promise<void> => {
+/**
+ * Two calls in one turn have to overlap, or a slow tool costs the wall clock.
+ *
+ * Says whether this model sent them together. Whether it does is its own; that
+ * the package runs them together when it does is the floor.
+ */
+const runTogether = async (model: string): Promise<boolean> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: room, tools: ['weather'] });
@@ -111,14 +127,12 @@ const runTogether = async (model: string): Promise<void> => {
 
   const [first, second] = [...ran].sort((one, other) => one.at - other.at);
   if (first === undefined || second === undefined) {
-    fail(`two cities produced ${String(ran.length)} calls, not two`);
-    return;
+    console.log(`\ntwo cities produced ${String(ran.length)} calls, not two`);
+    return false;
   }
   const overlap = first.done - second.at;
   console.log(`\ntwo calls in one turn overlapped by ${String(overlap)}ms`);
-  if (overlap <= 0) {
-    fail('the calls of one turn ran one after the other');
-  }
+  return overlap > 0;
 };
 
 /**
@@ -128,7 +142,7 @@ const runTogether = async (model: string): Promise<void> => {
  * are asked. The model must be told the question is out, answer without it, and
  * then be asked again on its own when the answer lands.
  */
-const runBackgrounded = async (model: string): Promise<void> => {
+const runBackgrounded = async (model: string): Promise<boolean> => {
   const asker: Asker = questions =>
     Effect.as(
       Effect.sleep('3 seconds'),
@@ -176,7 +190,7 @@ const runBackgrounded = async (model: string): Promise<void> => {
   if (got._tag === 'Left') {
     console.log(`\nbackgrounded      FAILED    ${JSON.stringify(got.left)}`);
     fail('the backgrounded round failed');
-    return;
+    return false;
   }
 
   const { first, later } = got.right;
@@ -184,12 +198,18 @@ const runBackgrounded = async (model: string): Promise<void> => {
   console.log(`\nasked, not waited: ${JSON.stringify(first)}`);
   console.log(`told later:        ${JSON.stringify(told)}`);
 
+  /* The asker takes three seconds and the deadline is half of one, so the word
+     cannot have been handed over yet. A model that says it anyway guessed, and
+     a guess is the model's own: it never left a question outstanding, so there
+     is nothing here for the late round to carry. */
   if (first.includes('ultramarine')) {
-    fail('the model was given the answer inline, so nothing was backgrounded');
+    return false;
   }
-  if (!told.includes('ultramarine')) {
-    fail('the session never told the model what the person answered');
-  }
+  wrongIf(
+    !told.includes('ultramarine'),
+    'the model left the question outstanding and the session never told it what the person answered'
+  );
+  return true;
 };
 
 /**
@@ -201,7 +221,7 @@ const runBackgrounded = async (model: string): Promise<void> => {
  * the model's own `wait: false` moves it on — and the answer still arrives, in
  * a round of its own, exactly as a deadline's would.
  */
-const runWanted = async (model: string): Promise<void> => {
+const runWanted = async (model: string): Promise<boolean> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({
@@ -238,7 +258,7 @@ const runWanted = async (model: string): Promise<void> => {
   if (got._tag === 'Left') {
     console.log(`\nwait: false       FAILED    ${JSON.stringify(got.left)}`);
     fail('the round the model chose not to wait for failed');
-    return;
+    return false;
   }
 
   const { first, later } = got.right;
@@ -246,26 +266,52 @@ const runWanted = async (model: string): Promise<void> => {
   console.log(`\ndid not wait:      ${JSON.stringify(first)}`);
   console.log(`told later:        ${JSON.stringify(told)}`);
 
+  /* It waited. `wait` is a field the model is offered, not one it is held to,
+     so this is the model deciding and not the package failing to honour it. */
   if (first.includes('kestrel')) {
-    fail('the model waited for the call, so it never set wait to false');
+    return false;
   }
-  if (!told.includes('kestrel')) {
-    fail('the call the model walked away from never came back');
-  }
+  wrongIf(
+    !told.includes('kestrel'),
+    'the model set wait to false and the call it walked away from never came back'
+  );
+  return true;
 };
 
+/** Which models made each choice. The floor is that some model made it. */
+const chose: Record<string, string[]> = { together: [], backgrounded: [], wanted: [] };
+
 for (const model of models) {
+  under(model);
   console.log('model', model);
   console.log('\nshape             calls     answered');
 
   for (const kind of ['messages', 'responses', 'chat_completions'] as const) {
     await runShape(model, kind);
   }
-  await runTogether(model);
-  await runBackgrounded(model);
-  await runWanted(model);
+  /* Tried once more before it counts: measured on 2026-09-06, one model refused
+     a round on one sweep and carried it on the next. Twice is a finding. */
+  const made = {
+    together: (await runTogether(model)) || (await runTogether(model)),
+    backgrounded: (await runBackgrounded(model)) || (await runBackgrounded(model)),
+    wanted: (await runWanted(model)) || (await runWanted(model)),
+  };
+  for (const [phase, held] of Object.entries(chose)) {
+    if (made[phase as keyof typeof made]) {
+      held.push(model);
+    }
+  }
+}
+
+under('');
+for (const [phase, held] of Object.entries(chose)) {
+  console.log(`\n${phase.padEnd(14)}${String(held.length)} of ${String(models.length)} models`);
+  wrongIf(
+    held.length === 0,
+    `not one model ${phase === 'together' ? 'sent two calls of a turn together' : phase === 'backgrounded' ? 'left a question outstanding' : 'set wait to false'}, which is the package and not a model's choice`
+  );
 }
 
 passed(
-  'every shape ran a tool, the calls overlapped, a late answer drove a round, and the model chose not to wait.'
+  'every shape ran a tool, and where a model chose to overlap, to leave a question outstanding, or not to wait, the package carried it'
 );

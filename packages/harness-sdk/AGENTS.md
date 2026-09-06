@@ -474,6 +474,40 @@ Run the affected runs after a change, on the one model. Run `full` when the
 change is to the wire, or before saying a thing works everywhere: a run tuned to
 one model's habits is a run that passes for the wrong reason.
 
+### What a live run may assert, and what it may only count
+
+Eleven models is eleven vendors' habits, and a run that asserts a habit goes red
+on a different model every sweep for something no change here can fix. So a live
+run draws one line:
+
+- **What this package does is asserted.** The shape carried the tool. The word
+  the tool wrote came back. The line kept its order. The store held the rounds.
+  The signal ended aborted. These are absolute, on every model, always.
+- **What the model chooses is counted.** Whether it calls the tool, sends two
+  calls together, sets `wait`, leaves a question outstanding, or answers before
+  the caller can send a call away. The run prints how many models chose it and
+  asserts the **floor**: that some model did, because none of them doing it is
+  the package and not eleven vendors agreeing.
+
+Two more rules hold the line honest:
+
+- **A round that failed is tried once more before it counts.** A relay having a
+  bad minute is not a finding; twice is.
+- **A model that cannot do the thing is not asked to.** `e2e/image.ts` skips a
+  model on the gateway's own "does not accept image input", read from the
+  refusal rather than a list of names here that would rot without saying so.
+
+Measured on 2026-09-06, this is what the line separates in practice:
+`nvidia/nemotron-3.5-lightning` sends the two calls of one turn one after the
+other and takes no pictures at all, `openai/gpt-5.6-luna` answers two questions
+out of its own head rather than asking, `google/gemini-3.7-flash` answers before
+a subagent can be sent away, and `minimax/minimax-m3` spends over thirty seconds
+thinking before its first word. Not one of those is a defect in this package,
+and every one of them failed a run before the line was drawn.
+
+`e2e/report.ts` is how a run says both: `wrongIf` for what is asserted, a
+printed count for what is chosen.
+
 The whole sweep, one model, 2026-09-05, 8 minutes 30 seconds:
 
 ```

@@ -120,14 +120,31 @@ const program = (model: string) =>
     };
   });
 
+/** One whole run of the model, on a store of its own. */
+const attempt = (model: string) =>
+  Effect.runPromise(
+    Effect.scoped(
+      Effect.provide(
+        program(model),
+        Layer.merge(kilo(), layerNodeStore(new DatabaseSync(':memory:')))
+      )
+    )
+  );
+
+/** Whether the two rounds the session ran on its own said what they were asked. */
+const spoke = (rounds: readonly { readonly text: string }[]): boolean =>
+  (rounds[0]?.text ?? '').toLowerCase().includes('ferret') &&
+  (rounds[1]?.text ?? '').toLowerCase().includes('badger');
+
 for (const model of models) {
   under(model);
 
-  const database = new DatabaseSync(':memory:');
-
-  const got = await Effect.runPromise(
-    Effect.scoped(Effect.provide(program(model), Layer.merge(kilo(), layerNodeStore(database))))
-  );
+  /* Tried once more before it counts. Measured on 2026-09-06,
+     `nvidia/nemotron-3.5-lightning` ran both rounds, named the right message on
+     each and stored all six turns, and said nothing at all in the second: the
+     line worked and the model went quiet. Twice is a finding. */
+  const first = await attempt(model);
+  const got = spoke(first.rounds) ? first : await attempt(model);
 
   const { handed } = got;
   const rounds = got.rounds;

@@ -140,6 +140,15 @@ for (const model of models) {
     if (named !== colour) {
       fail(`the picture was ${colour} and the model said ${JSON.stringify(named)}`);
     }
+    if (background === '') {
+      /* It said nothing, which says nothing about the picture. A request that
+         lost the picture leaves the model with its own earlier word and it says
+         so — measured, `i don't see any image attached to your message`, which
+         is caught below. `minimax/minimax-m3` spends the whole answer thinking
+         and says nothing at all on 2026-09-06. */
+      console.log('the model said nothing about the background');
+      continue;
+    }
     if (background !== 'white') {
       fail(
         `the background is white and the model said ${JSON.stringify(background)}, ` +

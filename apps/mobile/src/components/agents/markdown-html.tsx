@@ -17,6 +17,8 @@ import RenderHTML, {
   type TNode,
 } from 'react-native-render-html';
 
+import { withRtlWritingDirection } from '@/lib/rtl-text';
+
 import { isSupportedScheme, resolveHtmlImageAspectRatio } from './markdown-html-image';
 import { REMOVED_HTML_TAGS } from './markdown-html-sanitization';
 import { MarkdownImage } from './markdown-image';
@@ -253,7 +255,7 @@ export function MarkdownHtml({
       const src = tnode.attributes.src ?? '';
       if (!isSupportedScheme(src)) {
         return (
-          <Text selectable={selectable} style={baseStyle}>
+          <Text selectable={selectable} style={withRtlWritingDirection(baseStyle)}>
             {tnode.attributes.alt ?? ''}
           </Text>
         );

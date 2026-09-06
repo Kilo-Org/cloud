@@ -204,3 +204,29 @@ describe('MarkdownHtml nested-list styling (real HTML engine)', () => {
     expect(heading?.style.some(s => s.fontSize === 20 && s.fontWeight === '700')).toBe(true);
   });
 });
+
+describe('MarkdownHtml unsupported-image fallback', () => {
+  it('renders the alt text through the raw Text with the palette base style', async () => {
+    const renderer = await mountHtml('<img src="ftp://example.com/photo.png" alt="A photo">');
+    const fallback = styledTexts(renderer).find(entry => entry.text === 'A photo');
+
+    expect(fallback).toBeDefined();
+    const style: Record<string, unknown> = Object.assign({}, ...(fallback?.style ?? []));
+    expect(style).toMatchObject({ color: '#111111', fontSize: 16, lineHeight: 24 });
+  });
+
+  it('applies the RTL paragraph direction to the fallback text in RTL', async () => {
+    const isRtl = rnStub.I18nManager;
+    isRtl.isRTL = true;
+    try {
+      const renderer = await mountHtml('<img src="ftp://example.com/photo.png" alt="A photo">');
+      const fallback = styledTexts(renderer).find(entry => entry.text === 'A photo');
+
+      expect(fallback).toBeDefined();
+      const style: Record<string, unknown> = Object.assign({}, ...(fallback?.style ?? []));
+      expect(style.writingDirection).toBe('rtl');
+    } finally {
+      isRtl.isRTL = false;
+    }
+  });
+});

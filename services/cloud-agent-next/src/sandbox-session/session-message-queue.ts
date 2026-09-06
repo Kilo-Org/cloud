@@ -307,6 +307,7 @@ export function releaseUnadmittedWaitingMessages(
         wrapperInstanceId: undefined,
         preparationAttemptId: undefined,
         deliveryDeadlineAt: undefined,
+        operations: undefined,
       };
     }),
     releasedIds,

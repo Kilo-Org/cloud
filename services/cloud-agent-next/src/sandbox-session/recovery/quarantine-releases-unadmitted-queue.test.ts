@@ -170,4 +170,22 @@ describe('quarantine releases unadmitted queued messages', () => {
     expect(released[0].preparationAttemptId).toBeUndefined();
     expect(released[0].deliveryDeadlineAt).toBeUndefined();
   });
+
+  it('drops incomplete attach proofs on release', () => {
+    const attachProof = {
+      authorization: {},
+      dispatched: false,
+    } as SessionOperationProof;
+    const messages: SessionMessageRecord[] = [
+      queued('unadmitted', { attachFailures: 1, operations: { attach: attachProof } }),
+    ];
+
+    const { messages: released, releasedIds } = releaseUnadmittedWaitingMessages(
+      messages,
+      wrapperA
+    );
+
+    expect(releasedIds).toEqual(['unadmitted']);
+    expect(released[0].operations).toBeUndefined();
+  });
 });

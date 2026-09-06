@@ -279,6 +279,40 @@ export function failWaitingMessages(
   };
 }
 
+/**
+ * Release queued messages bound to a dying wrapper that never reached a
+ * committed attach or prompt. These are safe to retry on a replacement
+ * runtime. Messages with a completed attach proof, a prompt operation,
+ * or exhausted attach failures remain bound so `failWaitingMessages`
+ * can fail them as today.
+ */
+export function releaseUnadmittedWaitingMessages(
+  messages: readonly SessionMessageRecord[],
+  wrapperInstanceId: string
+): { messages: SessionMessageRecord[]; releasedIds: string[] } {
+  const releasedIds: string[] = [];
+  return {
+    messages: messages.map(message => {
+      if (message.state !== 'queued' || message.wrapperInstanceId !== wrapperInstanceId) {
+        return message;
+      }
+      if (message.unresolvedDispatch) return message;
+      if (message.operations?.prompt) return message;
+      if (message.operations?.attach?.completedAt !== undefined) return message;
+      if ((message.attachFailures ?? 0) >= ATTACH_FAILURE_LIMIT) return message;
+
+      releasedIds.push(message.messageId);
+      return {
+        ...message,
+        wrapperInstanceId: undefined,
+        preparationAttemptId: undefined,
+        deliveryDeadlineAt: undefined,
+      };
+    }),
+    releasedIds,
+  };
+}
+
 export function incrementDeliveryFailure(
   messages: readonly SessionMessageRecord[],
   messageId: string,

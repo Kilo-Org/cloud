@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Pelan akses awal anda memerlukan semakan manual sebelum boleh digunakan pada peranti mudah alih.",
       "iosTitle": "KiloClaw tidak tersedia dalam iOS",
       "iosBody": "Akses KiloClaw diuruskan di luar apl iOS untuk akaun ini.",
-      "iosContact": "Ada soalan? Hubungi hi@kilo.ai."
+      "iosContact": "Ada soalan? Hubungi hi@kilo.ai.",
+      "quarantinedCta": "Hantar e-mel kepada pasukan kami",
+      "nonCanonicalEarlybirdCta": "Semak pelan anda di kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} memerlukan perhatian: {{label}}",

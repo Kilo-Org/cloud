@@ -11,7 +11,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';

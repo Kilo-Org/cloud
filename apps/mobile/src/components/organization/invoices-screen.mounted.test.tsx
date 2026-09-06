@@ -135,6 +135,7 @@ vi.mock('react-native-reanimated', () => ({
   FadeOut: { duration: () => ({}) },
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',

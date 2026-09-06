@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Jou plan vir vroeë toegang moet deur 'n persoon hersien word voordat jy dit op jou foon kan gebruik.",
       "iosTitle": "KiloClaw nie op iOS beskikbaar nie",
       "iosBody": "KiloClaw-toegang vir hierdie rekening word buite die iOS-toep bestuur.",
-      "iosContact": "Vrae? Kontak hi@kilo.ai."
+      "iosContact": "Vrae? Kontak hi@kilo.ai.",
+      "quarantinedCta": "Stuur ons span 'n e-pos",
+      "nonCanonicalEarlybirdCta": "Hersien jou plan op kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} verg aandag: {{label}}",

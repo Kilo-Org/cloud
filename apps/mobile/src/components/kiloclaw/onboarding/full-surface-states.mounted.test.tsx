@@ -6,6 +6,8 @@ import { CenteredState } from '@/components/centered-state';
 import { AccessRequiredScreen, type AccessRequiredSubcase } from '../access-required-screen';
 import { EmptyStateContent } from '../empty-state-content';
 import { OnboardingFlow } from '../onboarding-flow';
+import { openExternalUrl } from '@/lib/external-link';
+import { SUPPORT_EMAIL } from '@/lib/kiloclaw/access-issue';
 import { INITIAL_STATE } from '@/lib/onboarding';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { CompleteStep } from './complete-step';
@@ -33,16 +35,22 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'AnimatedView' },
+  cancelAnimation: vi.fn(),
   FadeIn: { duration: vi.fn() },
   FadeOut: { duration: vi.fn() },
   LinearTransition: {},
   ZoomIn: { springify: () => ({ damping: () => ({ stiffness: vi.fn() }) }) },
   useAnimatedStyle: vi.fn(),
   useSharedValue: (value: number) => ({ value }),
-  useReducedMotion: () => true,
   withDelay: vi.fn(),
   withSequence: vi.fn(),
   withTiming: vi.fn(),
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: true, scrollAnimated: false }),
+}));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key, language: 'en' } }));
@@ -98,6 +106,13 @@ async function mount(ui: ReactElement) {
 
 function press(node: { props: unknown }) {
   (node.props as { onPress: () => void }).onPress();
+}
+
+function buttonLabel(button: { findByType(type: ElementType): { children: unknown[] } }) {
+  return button
+    .findByType('Text' as ElementType)
+    .children.filter((child): child is string => typeof child === 'string')
+    .join('');
 }
 
 beforeEach(() => {
@@ -162,6 +177,32 @@ describe('KiloClaw onboarding full-body states', () => {
     const ios = await mount(createElement(AccessRequiredScreen, { subcase }));
     expect(ios.findAllByType(CenteredState)).toHaveLength(1);
     expect(ios.findAllByType('Button' as ElementType)).toHaveLength(0);
+  });
+
+  it('gives quarantined its own support label and opens the support inbox, not the site', async () => {
+    const root = await mount(createElement(AccessRequiredScreen, { subcase: 'quarantined' }));
+    const button = root.findByType('Button' as ElementType);
+    expect(buttonLabel(button)).toBe('kiloclaw.accessRequired.quarantinedCta');
+    press(button);
+    expect(openExternalUrl).toHaveBeenCalledWith(`mailto:${SUPPORT_EMAIL}`, {
+      label: SUPPORT_EMAIL,
+    });
+  });
+
+  it('gives non_canonical_earlybird its own review label instead of sharing the conflict CTA', async () => {
+    const earlybird = await mount(
+      createElement(AccessRequiredScreen, { subcase: 'non_canonical_earlybird' })
+    );
+    expect(buttonLabel(earlybird.findByType('Button' as ElementType))).toBe(
+      'kiloclaw.accessRequired.nonCanonicalEarlybirdCta'
+    );
+
+    const conflict = await mount(
+      createElement(AccessRequiredScreen, { subcase: 'multiple_current_conflict' })
+    );
+    expect(buttonLabel(conflict.findByType('Button' as ElementType))).toBe(
+      'kiloclaw.accessRequired.multipleCurrentConflictCta'
+    );
   });
 
   it.each(['access_conflict', 'generic'] as const)(

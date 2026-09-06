@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Yfirfara þarf áskriftina þína með snemmbúnum aðgangi handvirkt áður en hægt er að nota hana í símanum.",
       "iosTitle": "KiloClaw ekki fáanlegt í iOS",
       "iosBody": "Fyrir þennan reikning er aðgangi að KiloClaw stýrt utan iOS-appsins.",
-      "iosContact": "Spurningar? Sendu tölvupóst á hi@kilo.ai."
+      "iosContact": "Spurningar? Sendu tölvupóst á hi@kilo.ai.",
+      "quarantinedCta": "Sendu tölvupóst á teymið okkar",
+      "nonCanonicalEarlybirdCta": "Skoðaðu áskriftina þína á kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} þarfnast athygli: {{label}}",

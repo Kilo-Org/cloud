@@ -1181,7 +1181,9 @@
       "nonCanonicalEarlybirdBody": "Tvoj plan ranog pristupa mora da prođe ručnu proveru pre korišćenja u mobilnoj aplikaciji.",
       "iosTitle": "KiloClaw nije dostupan u iOS-u",
       "iosBody": "Pristupom usluzi KiloClaw za ovaj nalog upravlja se van iOS aplikacije.",
-      "iosContact": "Imaš pitanja? Piši na hi@kilo.ai."
+      "iosContact": "Imaš pitanja? Piši na hi@kilo.ai.",
+      "quarantinedCta": "Pošalji e-mejl našem timu",
+      "nonCanonicalEarlybirdCta": "Pregledaj svoj plan na kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} zahteva pažnju: {{label}}",

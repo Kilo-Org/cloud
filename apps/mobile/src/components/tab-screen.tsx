@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 // FlatList/FlashList screens use this directly for contentContainerStyle.paddingBottom.
@@ -23,6 +24,7 @@ export function TabScreenScrollView({ children, ...props }: ScrollViewProps) {
   // caller's contentContainerClassName (gap/padding), collapsing section spacing.
   return (
     <ScrollView {...props}>
+      {props.refreshControl ? <RefreshProgress refreshControl={props.refreshControl} /> : null}
       {children}
       <View style={{ height: paddingBottom }} pointerEvents="none" />
     </ScrollView>

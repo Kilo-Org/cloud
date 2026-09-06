@@ -1189,7 +1189,9 @@
       "nonCanonicalEarlybirdBody": "Перш чым карыстацца тваім тарыфам ранняга доступу на мабільнай прыладзе, трэба праверыць яго ўручную.",
       "iosTitle": "KiloClaw недаступны ў iOS",
       "iosBody": "Для гэтага ўліковага запісу кіраваць доступам да KiloClaw можна толькі па-за праграмай для iOS.",
-      "iosContact": "Ёсць пытанні? Напішы на hi@kilo.ai."
+      "iosContact": "Ёсць пытанні? Напішы на hi@kilo.ai.",
+      "quarantinedCta": "Напісаць нашай камандзе",
+      "nonCanonicalEarlybirdCta": "Праверыць свой тарыф на kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} патрабуе ўвагі: {{label}}",

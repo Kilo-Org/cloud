@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',

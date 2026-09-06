@@ -602,7 +602,9 @@
       "subscriptionCanceledTitle": "Подписка на сайте",
       "subscriptionPastDueBody": "Возникла проблема с последним платежом. Откройте kilo.ai/claw в браузере, чтобы обновить платёжные данные. Управлять оплатой в приложении нельзя.",
       "subscriptionPastDueTitle": "Обновление платёжных данных на сайте",
-      "trialExpiredBody": "Чтобы продолжить пользоваться KiloClaw, откройте kilo.ai/claw в браузере. Оформить подписку в приложении нельзя."
+      "trialExpiredBody": "Чтобы продолжить пользоваться KiloClaw, откройте kilo.ai/claw в браузере. Оформить подписку в приложении нельзя.",
+      "quarantinedCta": "Написать нашей команде",
+      "nonCanonicalEarlybirdCta": "Проверить свой тариф на kilo.ai"
     },
     "controls": {
       "redeploying": "Повторное развёртывание…",

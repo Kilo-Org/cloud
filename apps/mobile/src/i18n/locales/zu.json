@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Uhlelo lwakho lokufinyelela kusenesikhathi ludinga ukubuyekezwa umuntu ngaphambi kokuba lusetshenziswe efonini.",
       "iosTitle": "I-KiloClaw ayitholakali ku-iOS",
       "iosBody": "Ukufinyelela kwe-KiloClaw kule akhawunti kulawulwa ngaphandle kohlelo lokusebenza lwe-iOS.",
-      "iosContact": "Unemibuzo? Xhumana no-hi@kilo.ai."
+      "iosContact": "Unemibuzo? Xhumana no-hi@kilo.ai.",
+      "quarantinedCta": "Thumela i-imeyili eqenjini lethu",
+      "nonCanonicalEarlybirdCta": "Hlole uhlelo lwakho ku-kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} idinga ukunakwa: {{label}}",

@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Zure sarbide aurreratuko plana eskuz berrikusi behar da mugikorrean erabili ahal izateko.",
       "iosTitle": "KiloClaw ez dago eskuragarri iOS-en",
       "iosBody": "KiloClaw sarbidea iOS aplikaziotik kanpo kudeatzen da kontu honetarako.",
-      "iosContact": "Galderarik? Jarri harremanetan hi@kilo.ai-rekin."
+      "iosContact": "Galderarik? Jarri harremanetan hi@kilo.ai-rekin.",
+      "quarantinedCta": "Idatzi gure taldeari",
+      "nonCanonicalEarlybirdCta": "Berrikusi zure plana kilo.ai-n"
     },
     "instanceCard": {
       "needsAttention": "{{name}} izeneko instantziak arreta behar du: {{label}}",

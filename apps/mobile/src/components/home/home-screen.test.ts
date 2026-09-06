@@ -8,6 +8,7 @@ vi.mock('@/lib/analytics/posthog', () => ({
   FEATURE_FLAG_PR_REVIEW: 'pr-review',
   useFeatureFlag: () => true,
 }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',

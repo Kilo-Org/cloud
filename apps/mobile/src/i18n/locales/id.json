@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "Berlangganan di web",
       "subscriptionPastDueBody": "Pembayaran terakhirmu bermasalah. Buka kilo.ai/claw melalui peramban untuk memperbarui informasi pembayaran. Kamu tidak dapat mengelola penagihan di aplikasi.",
       "subscriptionPastDueTitle": "Perbarui informasi pembayaran di web",
-      "trialExpiredBody": "Untuk terus menggunakan KiloClaw, buka kilo.ai/claw melalui peramban. Kamu tidak dapat berlangganan di aplikasi."
+      "trialExpiredBody": "Untuk terus menggunakan KiloClaw, buka kilo.ai/claw melalui peramban. Kamu tidak dapat berlangganan di aplikasi.",
+      "quarantinedCta": "Kirim email ke tim kami",
+      "nonCanonicalEarlybirdCta": "Tinjau paket Anda di kilo.ai"
     },
     "controls": {
       "redeploying": "Menerapkan ulang…",

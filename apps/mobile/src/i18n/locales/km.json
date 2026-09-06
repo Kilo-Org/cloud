@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "គម្រោងចូលប្រើមុនរបស់អ្នកត្រូវការបុគ្គលិកពិនិត្យ មុនពេលអាចប្រើនៅលើទូរស័ព្ទបាន។",
       "iosTitle": "KiloClaw មិនអាចប្រើបាននៅលើ iOS",
       "iosBody": "ការចូលប្រើ KiloClaw ត្រូវបានគ្រប់គ្រងនៅខាងក្រៅកម្មវិធី iOS សម្រាប់គណនីនេះ។",
-      "iosContact": "មានសំណួរ? ទាក់ទង hi@kilo.ai។"
+      "iosContact": "មានសំណួរ? ទាក់ទង hi@kilo.ai។",
+      "quarantinedCta": "ផ្ញើអ៊ីមែលទៅក្រុមការងារយើង",
+      "nonCanonicalEarlybirdCta": "ពិនិត្យគម្រោងរបស់អ្នកនៅលើ kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ត្រូវការការយកចិត្តទុកដាក់៖ {{label}}",

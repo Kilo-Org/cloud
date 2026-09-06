@@ -1,7 +1,8 @@
 import { GitBranch, GitMerge } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';

@@ -1205,7 +1205,9 @@
       "nonCanonicalEarlybirdBody": "Rhaid i berson adolygu'ch cynllun mynediad cynnar cyn y gallwch ei ddefnyddio ar eich ffôn.",
       "iosTitle": "KiloClaw ddim ar gael ar iOS",
       "iosBody": "Ar gyfer y cyfrif hwn, rheolir mynediad at KiloClaw y tu allan i'r ap iOS.",
-      "iosContact": "Cwestiynau? Cysylltwch â hi@kilo.ai."
+      "iosContact": "Cwestiynau? Cysylltwch â hi@kilo.ai.",
+      "quarantinedCta": "Anfon e-bost i'n tîm",
+      "nonCanonicalEarlybirdCta": "Adolygu eich cynllun ar kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Mae angen sylw ar {{name}}: {{label}}",

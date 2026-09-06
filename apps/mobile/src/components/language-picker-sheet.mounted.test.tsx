@@ -48,6 +48,7 @@ const flatListMock = vi.hoisted(
       return createElement('FlatList', null, ListHeaderComponent, ...rows, empty);
     }
 );
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   FlatList: flatListMock,

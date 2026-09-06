@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshControl, View } from 'react-native';
+import { View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import logo from '@/../assets/images/logo.png';

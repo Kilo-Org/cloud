@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "ადრეული წვდომის შენი ტარიფი მობილურზე გამოყენებამდე ხელით უნდა შემოწმდეს.",
       "iosTitle": "KiloClaw ხელმისაწვდომი არ არის iOS-ზე",
       "iosBody": "ამ ანგარიშისთვის KiloClaw-ზე წვდომა iOS აპის გარეთ იმართება.",
-      "iosContact": "კითხვები გაქვს? მოგვწერე hi@kilo.ai-ზე."
+      "iosContact": "კითხვები გაქვს? მოგვწერე hi@kilo.ai-ზე.",
+      "quarantinedCta": "დაგვიკავშირდით ელფოსტით",
+      "nonCanonicalEarlybirdCta": "შეამოწმეთ თქვენი ტარიფი kilo.ai-ზე"
     },
     "instanceCard": {
       "needsAttention": "{{name}}-ს სჭირდება ყურადღება: {{label}}",

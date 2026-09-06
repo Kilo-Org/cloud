@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Kailangang suriin ng tao ang plano mo para sa maagang pag-access bago ito magamit sa mobile.",
       "iosTitle": "Hindi magagamit ang KiloClaw sa iOS",
       "iosBody": "Pinamamahalaan ang access sa KiloClaw sa labas ng iOS app para sa account na ito.",
-      "iosContact": "May mga tanong? Makipag-ugnayan sa hi@kilo.ai."
+      "iosContact": "May mga tanong? Makipag-ugnayan sa hi@kilo.ai.",
+      "quarantinedCta": "Mag-email sa aming team",
+      "nonCanonicalEarlybirdCta": "Suriin ang iyong plano sa kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Kailangang asikasuhin ang {{name}}: {{label}}",

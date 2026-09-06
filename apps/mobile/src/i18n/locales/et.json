@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Sinu varajase ligipääsu pakett vajab enne mobiilis kasutamist käsitsi kontrollimist.",
       "iosTitle": "KiloClaw pole iOS-is saadaval",
       "iosBody": "Selle konto juurdepääsu KiloClaw’ teenusele hallatakse väljaspool iOS-i rakendust.",
-      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile hi@kilo.ai."
+      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile hi@kilo.ai.",
+      "quarantinedCta": "Kirjuta meie meeskonnale",
+      "nonCanonicalEarlybirdCta": "Vaata oma pakett üle kilo.ai-s"
     },
     "instanceCard": {
       "needsAttention": "{{name}} vajab tähelepanu: {{label}}",

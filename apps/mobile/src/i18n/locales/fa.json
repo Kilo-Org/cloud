@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "طرح دسترسی زودهنگام شما قبل از استفاده در موبایل نیاز به بررسی دستی دارد.",
       "iosTitle": "KiloClaw در iOS در دسترس نیست",
       "iosBody": "دسترسی این حساب به KiloClaw خارج از برنامهٔ iOS مدیریت می‌شود.",
-      "iosContact": "پرسشی دارید؟ به hi@kilo.ai ایمیل بزنید."
+      "iosContact": "پرسشی دارید؟ به hi@kilo.ai ایمیل بزنید.",
+      "quarantinedCta": "ارسال ایمیل به تیم ما",
+      "nonCanonicalEarlybirdCta": "بررسی طرح خود در kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} نیاز به رسیدگی دارد: {{label}}",

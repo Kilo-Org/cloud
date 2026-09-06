@@ -6,7 +6,8 @@ import {
 } from 'expo-apple-authentication';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Platform, useColorScheme, View } from 'react-native';
+import { Platform, useColorScheme, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 import * as WebBrowser from 'expo-web-browser';
 

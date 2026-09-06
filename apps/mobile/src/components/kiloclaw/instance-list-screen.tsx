@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Plus } from '@/components/ui/icons';
-import { RefreshControl, View } from 'react-native';
+import { View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
@@ -16,7 +17,7 @@ import { type AccessRequiredSubcase } from '@/lib/analytics/onboarding-events';
 import { openExternalUrl } from '@/lib/external-link';
 import { type ClawInstance } from '@/lib/hooks/use-instance-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
+import { accessIssueTargetLabel, resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
 
 type Props = {
   instances: ClawInstance[];
@@ -118,7 +119,8 @@ export function InstanceListScreen({
     ? {
         label: t(ACCESS_ISSUE_LABEL_KEYS[personalAccessIssue]),
         onOpen: () => {
-          void openExternalUrl(resolveAccessIssueUrl(personalAccessIssue), { label: 'kilo.ai' });
+          const url = resolveAccessIssueUrl(personalAccessIssue);
+          void openExternalUrl(url, { label: accessIssueTargetLabel(url) });
         },
       }
     : null;

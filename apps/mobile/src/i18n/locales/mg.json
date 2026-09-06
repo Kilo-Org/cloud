@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Mila dinihin'ny mpitantana ny tolotra fidirana mialoha anananao vao azo ampiasaina amin'ny finday.",
       "iosTitle": "Tsy azo ampiasaina ny KiloClaw amin'ny iOS",
       "iosBody": "Tantanana ivelan'ny rindranasa iOS ny fidirana amin'ny KiloClaw ho an'ity kaonty ity.",
-      "iosContact": "Fanontaniana? Mifandraisa amin'ny hi@kilo.ai."
+      "iosContact": "Fanontaniana? Mifandraisa amin'ny hi@kilo.ai.",
+      "quarantinedCta": "Alefaso mailaka ho an'ny ekipanay",
+      "nonCanonicalEarlybirdCta": "Jereo ny tolotranao amin'ny kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Mila dinihana ny {{name}}: {{label}}",

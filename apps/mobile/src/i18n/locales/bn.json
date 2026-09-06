@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "মোবাইলে ব্যবহারের আগে আপনার আগাম ব্যবহারের প্ল্যানটি সরাসরি যাচাই করা প্রয়োজন।",
       "iosTitle": "IOS-এ KiloClaw ব্যবহার করা যাচ্ছে না",
       "iosBody": "এই অ্যাকাউন্টের জন্য KiloClaw অ্যাক্সেস iOS অ্যাপের বাইরে পরিচালিত হয়।",
-      "iosContact": "প্রশ্ন আছে? hi@kilo.ai-এ যোগাযোগ করুন।"
+      "iosContact": "প্রশ্ন আছে? hi@kilo.ai-এ যোগাযোগ করুন।",
+      "quarantinedCta": "আমাদের দলকে ইমেইল করুন",
+      "nonCanonicalEarlybirdCta": "আপনার প্ল্যানটি Kilo.ai-তে পর্যালোচনা করুন"
     },
     "instanceCard": {
       "needsAttention": "{{name}}-এর দিকে নজর দেওয়া প্রয়োজন: {{label}}",

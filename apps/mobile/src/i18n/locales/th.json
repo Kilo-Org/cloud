@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "แพ็กเกจสิทธิ์ใช้งานล่วงหน้าของคุณต้องผ่านการตรวจสอบจากเจ้าหน้าที่ก่อนจึงจะใช้บนมือถือได้",
       "iosTitle": "ใช้ KiloClaw บน iOS ไม่ได้",
       "iosBody": "บัญชีนี้ต้องจัดการสิทธิ์ใช้งาน KiloClaw นอกแอป iOS",
-      "iosContact": "หากมีคำถาม ติดต่อ hi@kilo.ai"
+      "iosContact": "หากมีคำถาม ติดต่อ hi@kilo.ai",
+      "quarantinedCta": "ส่งอีเมลถึงทีมงาน",
+      "nonCanonicalEarlybirdCta": "ตรวจสอบแพ็กเกจของคุณที่ kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ต้องได้รับการตรวจสอบ: {{label}}",

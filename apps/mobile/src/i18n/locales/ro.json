@@ -1181,7 +1181,9 @@
       "nonCanonicalEarlybirdBody": "Planul tău de acces timpuriu necesită o revizuire manuală înainte de a putea fi folosit pe mobil.",
       "iosTitle": "KiloClaw indisponibil pe iOS",
       "iosBody": "Pentru acest cont, accesul la KiloClaw este gestionat în afara aplicației iOS.",
-      "iosContact": "Ai întrebări? Scrie-ne la hi@kilo.ai."
+      "iosContact": "Ai întrebări? Scrie-ne la hi@kilo.ai.",
+      "quarantinedCta": "Trimite un e-mail echipei noastre",
+      "nonCanonicalEarlybirdCta": "Verifică-ți planul pe kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} necesită atenție: {{label}}",

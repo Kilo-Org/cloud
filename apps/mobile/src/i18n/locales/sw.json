@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Mpango wako wa ufikiaji wa mapema unahitaji kukaguliwa na mtu kabla ya kutumika kwenye simu.",
       "iosTitle": "KiloClaw haipatikani kwenye iOS",
       "iosBody": "Ufikiaji wa KiloClaw unasimamiwa nje ya programu ya iOS kwa akaunti hii.",
-      "iosContact": "Maswali? Wasiliana na hi@kilo.ai."
+      "iosContact": "Maswali? Wasiliana na hi@kilo.ai.",
+      "quarantinedCta": "Tuma barua pepe kwa timu yetu",
+      "nonCanonicalEarlybirdCta": "Kagua mpango wako kwenye kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} inahitaji kushughulikiwa: {{label}}",

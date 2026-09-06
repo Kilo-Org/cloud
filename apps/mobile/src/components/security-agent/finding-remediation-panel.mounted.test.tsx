@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer for RN trees under vitest (node env, no jsdom). */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the mounted remediation timeline shares one native test fixture. */
 
 // Finding-remediation progress timeline: the panel renders the ordered
 // remediation audit events (queued → pr_opened, or a terminal event) above the
@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   cancel: vi.fn(),
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',

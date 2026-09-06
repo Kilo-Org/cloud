@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "Auf der Website abonnieren",
       "subscriptionPastDueBody": "Bei deiner letzten Zahlung gab es ein Problem. Öffne kilo.ai/claw im Browser, um deine Zahlungsdaten zu aktualisieren. Die Abrechnung kannst du in der App nicht verwalten.",
       "subscriptionPastDueTitle": "Zahlungsdaten im Browser aktualisieren",
-      "trialExpiredBody": "Öffne kilo.ai/claw im Browser, um KiloClaw weiter zu nutzen. In der App kannst du kein Abo abschließen."
+      "trialExpiredBody": "Öffne kilo.ai/claw im Browser, um KiloClaw weiter zu nutzen. In der App kannst du kein Abo abschließen.",
+      "quarantinedCta": "Unser Team per E-Mail kontaktieren",
+      "nonCanonicalEarlybirdCta": "Ihren Tarif auf kilo.ai überprüfen"
     },
     "controls": {
       "redeploying": "Wird erneut bereitgestellt …",

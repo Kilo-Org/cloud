@@ -601,7 +601,9 @@
       "subscriptionCanceledTitle": "רכישת מינוי באתר",
       "subscriptionPastDueBody": "הייתה בעיה בתשלום האחרון שלך. פתח את kilo.ai/claw בדפדפן כדי לעדכן את אמצעי התשלום. לא ניתן לנהל חיובים באפליקציה.",
       "subscriptionPastDueTitle": "עדכון אמצעי התשלום באתר",
-      "trialExpiredBody": "כדי להמשיך להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה."
+      "trialExpiredBody": "כדי להמשיך להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה.",
+      "quarantinedCta": "שליחת אימייל לצוות שלנו",
+      "nonCanonicalEarlybirdCta": "בדיקת התוכנית שלך ב-kilo.ai"
     },
     "controls": {
       "redeploying": "פריסה מחדש…",

@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Dole mutum ya yi bitar tsarin samun damar amfani da wuri da kake da shi kafin a yi amfani da shi a waya.",
       "iosTitle": "KiloClaw ba ya samuwa a cikin iOS",
       "iosBody": "Ana sarrafa damar amfani da KiloClaw ga wannan asusun a wajen manhajar iOS.",
-      "iosContact": "Tambayoyi? Tuntuɓi hi@kilo.ai."
+      "iosContact": "Tambayoyi? Tuntuɓi hi@kilo.ai.",
+      "quarantinedCta": "Aika imel ga tawagar mu",
+      "nonCanonicalEarlybirdCta": "Bitar da tsarinka a kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} yana buƙatar kulawa: {{label}}",

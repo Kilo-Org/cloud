@@ -602,7 +602,9 @@
       "subscriptionCanceledTitle": "Wykup subskrypcję na stronie internetowej",
       "subscriptionPastDueBody": "Wystąpił problem z twoją ostatnią płatnością. Otwórz kilo.ai/claw w przeglądarce, aby zaktualizować dane płatności. W aplikacji nie można zarządzać rozliczeniami.",
       "subscriptionPastDueTitle": "Aktualizacja płatności w przeglądarce",
-      "trialExpiredBody": "Aby nadal korzystać z KiloClaw, otwórz kilo.ai/claw w przeglądarce. W aplikacji nie można wykupić subskrypcji."
+      "trialExpiredBody": "Aby nadal korzystać z KiloClaw, otwórz kilo.ai/claw w przeglądarce. W aplikacji nie można wykupić subskrypcji.",
+      "quarantinedCta": "Napisz do naszego zespołu",
+      "nonCanonicalEarlybirdCta": "Sprawdź swój plan w serwisie kilo.ai"
     },
     "controls": {
       "redeploying": "Ponowne wdrażanie…",

@@ -1,14 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  AppState,
-  FlatList,
-  Platform,
-  Pressable,
-  RefreshControl,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Bot, Plus } from '@/components/ui/icons';
@@ -43,7 +36,6 @@ const SKELETON_ROW_COUNT = 8;
 export function AgentSessionListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
@@ -86,6 +78,7 @@ export function AgentSessionListScreen() {
   const pull = usePullRefresh(refetchRequest);
   const handleRefresh = pull.startPull;
   const { markSettled } = pull;
+  const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
 
   // Focus return and app-foreground refreshes run outside the pull lifecycle.
   // A failed pull leaves the reserved line on "Couldn't refresh" + Retry; when
@@ -122,18 +115,17 @@ export function AgentSessionListScreen() {
     }, [])
   );
 
-  // Preserve the focused foreground refresh and the active-sessions tray invalidation.
+  // Refresh the focused list through the live-sync owner.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active' && navigation.isFocused()) {
         runForegroundRefresh();
-        void queryClient.invalidateQueries({ queryKey: [['activeSessions']] });
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [queryClient, navigation, runForegroundRefresh]);
+  }, [navigation, runForegroundRefresh]);
 
   const navigateToSession = useAgentSessionNavigator();
 
@@ -216,7 +208,7 @@ export function AgentSessionListScreen() {
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />}
+        refreshControl={refreshControl}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')
@@ -234,10 +226,7 @@ export function AgentSessionListScreen() {
     );
   } else if (content === 'empty') {
     body = (
-      <LiveSessionListEmptyState
-        organizationId={organizationId}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />}
-      />
+      <LiveSessionListEmptyState organizationId={organizationId} refreshControl={refreshControl} />
     );
   } else if (hasLiveRows) {
     body = (
@@ -248,7 +237,8 @@ export function AgentSessionListScreen() {
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
-        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />}
+        ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
+        refreshControl={refreshControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
     );
@@ -290,9 +280,7 @@ export function AgentSessionListScreen() {
               failed: pull.failed,
               onRetry: pull.startRetry,
             }}
-            refreshControl={
-              <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />
-            }
+            refreshControl={refreshControl}
           />
         </View>
         {body}

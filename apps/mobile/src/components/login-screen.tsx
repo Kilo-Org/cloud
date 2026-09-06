@@ -5,7 +5,6 @@ import { ExternalLink, Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
   AppState,
   I18nManager,
   Keyboard,
@@ -16,6 +15,7 @@ import {
   ScrollView,
   View,
 } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 

@@ -1,6 +1,6 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
   PENDING_SESSION_MESSAGE_LIMIT,
   clearPendingSessionMessages,
@@ -41,13 +41,44 @@ const createMessage = (overrides: Partial<PendingSessionMessage>): PendingSessio
   ...overrides,
 });
 
+// Queued and accepted messages leave dispatch and alarm work in the session
+// DO. Interrupt every session a test touched and clear its alarm, or that work
+// wakes after this file closes and its logs race the vitest worker shutdown as
+// pending onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('pending session messages', () => {
   it('lists messages in FIFO key order', async () => {
     const userId = 'user_pending_fifo';
     const sessionId = 'agent_pending_fifo';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const messages = await runInDurableObject(stub, async instance => {
       await storePendingSessionMessage(
@@ -71,9 +102,7 @@ describe('pending session messages', () => {
   it('deletes every matching messageId', async () => {
     const userId = 'user_pending_delete';
     const sessionId = 'agent_pending_delete';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await storePendingSessionMessage(
@@ -113,9 +142,7 @@ describe('pending session messages', () => {
     const sessionId = 'agent_pending_cancel_queued';
     const pendingMessageId = 'msg_018f1e2d3c4bCancelQueuedAA';
     const currentMessageId = 'msg_018f1e2d3c4bCurrentRunABCD';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -192,9 +219,7 @@ describe('pending session messages', () => {
   it('finds by clientRequestId', async () => {
     const userId = 'user_pending_client_request';
     const sessionId = 'agent_pending_client_request';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const found = await runInDurableObject(stub, async instance => {
       await storePendingSessionMessage(
@@ -216,9 +241,7 @@ describe('pending session messages', () => {
   it('ignores invalid stored entries', async () => {
     const userId = 'user_pending_invalid';
     const sessionId = 'agent_pending_invalid';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const messages = await runInDurableObject(stub, async instance => {
       await instance.ctx.storage.put('pending_message:0000000000000001:invalid', {
@@ -241,9 +264,7 @@ describe('pending session messages', () => {
   it('clears valid messages and ignores invalid stored entries', async () => {
     const userId = 'user_pending_clear';
     const sessionId = 'agent_pending_clear';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.ctx.storage.put('pending_message:0000000000000001:invalid', {
@@ -278,9 +299,7 @@ describe('pending session messages', () => {
   it('counts messages up to the queue limit', async () => {
     const userId = 'user_pending_count';
     const sessionId = 'agent_pending_count';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const count = await runInDurableObject(stub, async instance => {
       for (let index = 0; index < PENDING_SESSION_MESSAGE_LIMIT; index++) {
@@ -302,9 +321,7 @@ describe('pending session messages', () => {
   it('refreshes stale past alarms when queue admission schedules pending work', async () => {
     const userId = 'user_pending_stale_alarm';
     const sessionId = 'agent_pending_stale_alarm';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -337,9 +354,7 @@ describe('pending session messages', () => {
   it('pulls a far-future alarm forward when durable pending work already exists', async () => {
     const userId = 'user_pending_reconstruct_alarm';
     const sessionId = 'agent_pending_reconstruct_alarm';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -375,9 +390,7 @@ describe('pending session messages', () => {
   it('pre-arms the next wake-up before alarm work can block', async () => {
     const userId = 'user_pending_alarm_prearm';
     const sessionId = 'agent_pending_alarm_prearm';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let releaseFlush: ((result: { remainingPendingCount: number }) => void) | undefined;
@@ -411,9 +424,7 @@ describe('pending session messages', () => {
   it('flushes one FIFO message on alarm and deletes after orchestrator accepts', async () => {
     const userId = 'user_pending_flush';
     const sessionId = 'agent_pending_flush';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let acceptedMessageId: string | undefined;
@@ -474,9 +485,7 @@ describe('pending session messages', () => {
   it('flushes canonical document attachment descriptors through the durable queue plan', async () => {
     const userId = 'user_pending_flush_attachments';
     const sessionId = 'agent_pending_flush_attachments';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const attachments = {
       path: '123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
@@ -529,9 +538,7 @@ describe('pending session messages', () => {
   it('keeps queued messages when flush returns an unsuccessful result without throwing', async () => {
     const userId = 'user_pending_flush_unsuccessful';
     const sessionId = 'agent_pending_flush_unsuccessful';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       instance['executeDirectly'] = async () => ({
@@ -580,9 +587,7 @@ describe('pending session messages', () => {
   it('records a failed flush attempt and schedules a delayed retry', async () => {
     const userId = 'user_pending_flush_fail';
     const sessionId = 'agent_pending_flush_fail';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {
@@ -630,9 +635,7 @@ describe('pending session messages', () => {
   it('does not consume a delivery attempt while physical wrapper cleanup is still in progress', async () => {
     const userId = 'user_pending_cleanup_gate';
     const sessionId = 'agent_pending_cleanup_gate';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let deliveryAttempts = 0;
@@ -712,9 +715,7 @@ describe('pending session messages', () => {
   it('records a retryable sandbox failure when wrapper authorization discovers required cleanup', async () => {
     const userId = 'user_pending_cleanup_discovery';
     const sessionId = 'agent_pending_cleanup_discovery';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let deliveryAttempts = 0;
@@ -796,9 +797,7 @@ describe('pending session messages', () => {
     const userId = 'user_pending_discovery_recovery';
     const sessionId = 'agent_pending_discovery_recovery';
     const messageId = 'msg_018f1e2d3c4bDiscRecoverAbC';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const sharedFailoverRouteKeys: string[] = [];
@@ -857,9 +856,7 @@ describe('pending session messages', () => {
     const sessionId = 'agent_pending_shared_rotation';
     const messageId = 'msg_018f1e2d3c4bSharedRouteAbC';
     const sandboxId = 'usr-000000000000000000000000000000000000000000000000' as const;
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const failoverRouteKeys: string[] = [];
@@ -940,9 +937,7 @@ describe('pending session messages', () => {
     const userId = 'user_pending_terminalization_repair';
     const sessionId = 'agent_pending_terminalization_repair';
     const messageId = 'msg_018f1e2d3c4bTermRepairABCD';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let deliveryAttempts = 0;
@@ -1050,9 +1045,7 @@ describe('pending session messages', () => {
     const userId = 'user_pending_vercel_disabled';
     const sessionId = 'agent_pending_vercel_disabled';
     const messageId = 'msg_018f1e2d3c4bVercelDisabled';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       instance.env.VERCEL_PROJECT_ID = '';
@@ -1116,9 +1109,7 @@ describe('pending session messages', () => {
   it('exhausts failed flush retries, emits cloud.message.failed, and removes the pending message', async () => {
     const userId = 'user_pending_flush_exhaust';
     const sessionId = 'agent_pending_flush_exhaust';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       (instance as any).orchestrator = {
@@ -1189,9 +1180,7 @@ describe('pending session messages', () => {
   it('interrupt clears pending messages and emits cloud.message.failed for each queued message', async () => {
     const userId = 'user_pending_interrupt_clear';
     const sessionId = 'agent_pending_interrupt_clear';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -1284,9 +1273,7 @@ describe('pending session messages', () => {
   it('interrupt with pending-only ignores stranded legacy execution identity', async () => {
     const userId = 'user_pending_interrupt_only';
     const sessionId = 'agent_pending_interrupt_only';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1332,9 +1319,7 @@ describe('pending session messages', () => {
   it('retains queued pending anchors when the interrupted state write fails', async () => {
     const userId = 'user_pending_interrupt_transition_failure';
     const sessionId = 'agent_pending_interrupt_transition_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1392,9 +1377,7 @@ describe('pending session messages', () => {
   it('retains accepted wrapper ownership when its interrupted state write fails', async () => {
     const userId = 'user_accepted_interrupt_transition_failure';
     const sessionId = 'agent_accepted_interrupt_transition_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1458,9 +1441,7 @@ describe('pending session messages', () => {
   it('interrupt remains durable when terminal effects and runtime stop fail once', async () => {
     const userId = 'user_pending_interrupt_failure';
     const sessionId = 'agent_pending_interrupt_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1542,9 +1523,7 @@ describe('pending session messages', () => {
   it('interrupt with accepted work preserves durable physical cleanup when absence cannot be confirmed', async () => {
     const userId = 'user_pending_interrupt_cleanup';
     const sessionId = 'agent_pending_interrupt_cleanup';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1594,9 +1573,7 @@ describe('pending session messages', () => {
   it('interrupt with accepted work and no live socket fences and requests current wrapper cleanup', async () => {
     const userId = 'user_pending_interrupt_no_socket';
     const sessionId = 'agent_pending_interrupt_no_socket';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const stopped: string[] = [];
@@ -1653,9 +1630,7 @@ describe('pending session messages', () => {
   it('interrupt with a live fenced socket and no accepted work requests cleanup and fences reuse', async () => {
     const userId = 'user_pending_interrupt_idle_wrapper';
     const sessionId = 'agent_pending_interrupt_idle_wrapper';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const sentCommands: unknown[] = [];
@@ -1711,9 +1686,7 @@ describe('pending session messages', () => {
   it('interrupt fences a live wrapper when immediate kill signaling fails', async () => {
     const userId = 'user_pending_interrupt_signal_failure';
     const sessionId = 'agent_pending_interrupt_signal_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const stopped: string[] = [];
@@ -1765,9 +1738,7 @@ describe('pending session messages', () => {
   it('interrupt with a live fenced socket sends kill then fences accepted work', async () => {
     const userId = 'user_pending_interrupt_active';
     const sessionId = 'agent_pending_interrupt_active';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const sentCommands: unknown[] = [];
@@ -1826,9 +1797,7 @@ describe('pending session messages', () => {
   it('ignores late terminal events from the fenced run after current interrupt', async () => {
     const userId = 'user_pending_interrupt_late';
     const sessionId = 'agent_pending_interrupt_late';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1868,9 +1837,7 @@ describe('pending session messages', () => {
   it('derives accepted current work health from fenced liveness deadlines', async () => {
     const userId = 'user_pending_health_fence';
     const sessionId = 'agent_pending_health_fence';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await putSessionMessageState(instance.ctx.storage, {
@@ -1908,9 +1875,7 @@ describe('pending session messages', () => {
       const userId = `user_pending_health_${kind}`;
       const sessionId = `agent_pending_health_${kind}`;
       const messageId = 'msg_018f1e2d3c4bHealthInputAbC';
-      const stub = env.CLOUD_AGENT_SESSION.get(
-        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-      );
+      const stub = sessionStub(userId, sessionId);
 
       const result = await runInDurableObject(stub, async instance => {
         const now = Date.now();
@@ -2007,9 +1972,7 @@ describe('pending session messages', () => {
   it('drains a pending current message while another accepted message shares the fenced wrapper run', async () => {
     const userId = 'user_pending_flush_active';
     const sessionId = 'agent_pending_flush_active';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let callCount = 0;
@@ -2103,9 +2066,7 @@ describe('pending session messages', () => {
   it('metadata-not-ready flush keeps pending and schedules retry', async () => {
     const userId = 'user_pending_not_ready';
     const sessionId = 'agent_pending_not_ready';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.updateMetadata({
@@ -2141,9 +2102,7 @@ describe('pending session messages', () => {
   it('accepted execution completion emits cloud.message.completed with messageId and executionId', async () => {
     const userId = 'user_accepted_completed';
     const sessionId = 'agent_accepted_completed';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -2199,9 +2158,7 @@ describe('pending session messages', () => {
   it('suppressed accepted execution completion skips terminal event and callback enqueue', async () => {
     const userId = 'user_accepted_suppressed';
     const sessionId = 'agent_accepted_suppressed';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const sentCallbackJobs: unknown[] = [];
@@ -2256,9 +2213,7 @@ describe('pending session messages', () => {
   it('accepted execution completion callback includes messageId when present', async () => {
     const userId = 'user_accepted_callback_message';
     const sessionId = 'agent_accepted_callback_message';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const sentCallbackJobs: Array<{
@@ -2323,9 +2278,7 @@ describe('pending session messages', () => {
   it('prepared initial execution completion uses the prepared initialMessageId', async () => {
     const userId = 'user_prepared_initial_completed';
     const sessionId = 'agent_prepared_initial_completed';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {
@@ -2381,9 +2334,7 @@ describe('pending session messages', () => {
   it('accepted execution failure emits cloud.message.failed with accepted marker', async () => {
     const userId = 'user_accepted_failed';
     const sessionId = 'agent_accepted_failed';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -2432,9 +2383,7 @@ describe('pending session messages', () => {
   it('alarm drains the next pending message through current message acceptance', async () => {
     const userId = 'user_pending_completion';
     const sessionId = 'agent_pending_completion';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const acceptedMessageIds: string[] = [];
@@ -2480,9 +2429,7 @@ describe('pending session messages', () => {
   it('does not redeliver exhausted work when terminal effect processing fails once', async () => {
     const userId = 'user_pending_exhaust_repair';
     const sessionId = 'agent_pending_exhaust_repair';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       let deliveryAttempts = 0;
@@ -2550,9 +2497,7 @@ describe('pending session messages', () => {
   it('does not redeliver after exhausted pending disposition survives terminal state put failure', async () => {
     const userId = 'user_pending_exhaust_state_failure';
     const sessionId = 'agent_pending_exhaust_state_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const callbacks: Array<{ payload: { messageId?: string; status: string } }> = [];
@@ -2635,9 +2580,7 @@ describe('pending session messages', () => {
   it('continues a partially failed multi-message interrupt without dispatching captured work', async () => {
     const userId = 'user_pending_interrupt_batch_failure';
     const sessionId = 'agent_pending_interrupt_batch_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let deliveryAttempts = 0;
@@ -2720,9 +2663,7 @@ describe('pending session messages', () => {
   it('enqueues callback-required delivery exhaustion in the terminalization alarm pass', async () => {
     const userId = 'user_pending_exhaust_callback_progress';
     const sessionId = 'agent_pending_exhaust_callback_progress';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const callbacks: Array<{ payload: { messageId?: string; status: string } }> = [];
@@ -2782,9 +2723,7 @@ describe('pending session messages', () => {
   it('terminalizes session message state when delivery retries exhaust', async () => {
     const userId = 'user_pending_exhaust_terminal';
     const sessionId = 'agent_pending_exhaust_terminal';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       (instance as any).orchestrator = {
@@ -2859,9 +2798,7 @@ describe('pending session messages', () => {
   it('terminalizes session message state when queued message is interrupted', async () => {
     const userId = 'user_pending_interrupt_terminal';
     const sessionId = 'agent_pending_interrupt_terminal';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -2934,9 +2871,7 @@ describe('pending session messages', () => {
   it('rejects reuse of a failed message id and admits a fresh identity', async () => {
     const userId = 'user_pending_retry_terminal';
     const sessionId = 'agent_pending_retry_terminal';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, _state) => {
       (instance as any).orchestrator = {
@@ -3015,9 +2950,7 @@ describe('pending session messages', () => {
   it('callback-required failed delivery is visible to listMessagesWithPendingCallbacks', async () => {
     const userId = 'user_pending_callback_visible';
     const sessionId = 'agent_pending_callback_visible';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, _state) => {
       (instance as any).orchestrator = {

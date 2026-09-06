@@ -78,6 +78,16 @@ export function readPoolGauges(): PoolGauges {
   };
 }
 
+/**
+ * Whether a new request would have to queue for the primary pool.
+ *
+ * Fail open if the pool implementation does not expose its configured maximum.
+ */
+export function isPrimaryPoolSaturated(gauges: PoolGauges): boolean {
+  const max = poolMax();
+  return max !== null && gauges.idle === 0 && gauges.total >= max;
+}
+
 function eventLoopLagMs() {
   return {
     mean_ms: Math.round(eventLoopDelay.mean / 1e6),

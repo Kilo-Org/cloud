@@ -240,7 +240,12 @@
     "returnSendsMessage": "ਰਿਟਰਨ ਕੁੰਜੀ ਸੁਨੇਹਾ ਭੇਜਦੀ ਹੈ",
     "returnSendsMessageSubtitle": "ਇਹ ਸੈਟਿੰਗ ਬੰਦ ਹੋਣ 'ਤੇ, ਰਿਟਰਨ ਕੁੰਜੀ ਏਜੰਟ ਨੂੰ ਸੁਨੇਹਾ ਲਿਖਣ ਵਾਲੇ ਖਾਨੇ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਪਾਉਂਦੀ ਹੈ।",
     "biometricUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ ਨਾਲ ਅਨਲੌਕ ਕਰੋ",
-    "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ।"
+    "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ।",
+    "featureFlags": "ਫ਼ੀਚਰ ਫ਼ਲੈਗ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",

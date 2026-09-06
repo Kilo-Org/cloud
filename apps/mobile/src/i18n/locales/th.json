@@ -240,7 +240,12 @@
     "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",
     "returnSendsMessageSubtitle": "เมื่อปิด ปุ่มขึ้นบรรทัดใหม่จะแทรกบรรทัดใหม่ในช่องป้อนข้อความของเอเจนต์",
     "biometricUnlock": "ปลดล็อกด้วยข้อมูลชีวมิติ",
-    "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที"
+    "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที",
+    "featureFlags": "แฟล็กฟีเจอร์",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",

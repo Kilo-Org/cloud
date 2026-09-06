@@ -240,7 +240,12 @@
     "returnSendsMessage": "Клавіша вводу надсилає повідомлення",
     "returnSendsMessageSubtitle": "Якщо вимкнено, клавіша вводу вставляє новий рядок у полях введення повідомлень агентам.",
     "biometricUnlock": "Біометричне розблокування",
-    "biometricUnlockSubtitle": "Запитувати біометричне розблокування під час запуску та після п'яти хвилин у фоновому режимі."
+    "biometricUnlockSubtitle": "Запитувати біометричне розблокування під час запуску та після п'яти хвилин у фоновому режимі.",
+    "featureFlags": "Прапори функцій",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Дії наживо",

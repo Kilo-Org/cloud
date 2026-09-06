@@ -240,7 +240,12 @@
     "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
     "returnSendsMessageSubtitle": "આ બંધ હોય ત્યારે રિટર્ન કી એજન્ટના સંદેશના ખાનામાં નવી પંક્તિ ઉમેરે છે.",
     "biometricUnlock": "બાયોમેટ્રિક્સથી અનલૉક કરો",
-    "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે."
+    "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે.",
+    "featureFlags": "ફીચર ફ્લેગ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",

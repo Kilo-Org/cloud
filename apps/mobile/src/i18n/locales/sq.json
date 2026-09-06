@@ -240,7 +240,12 @@
     "returnSendsMessage": "Tasti Enter dërgon mesazhin",
     "returnSendsMessageSubtitle": "Kur ky opsion është i çaktivizuar, tasti Enter shton një rresht të ri në fushën e mesazhit për agjentin.",
     "biometricUnlock": "Zhbllokim me biometri",
-    "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur hap aplikacionin dhe pasi ai qëndron pesë minuta në sfond."
+    "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur hap aplikacionin dhe pasi ai qëndron pesë minuta në sfond.",
+    "featureFlags": "Flamujt e veçorive",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",

@@ -240,7 +240,12 @@
     "returnSendsMessage": "Enter tugmasi xabar yuboradi",
     "returnSendsMessageSubtitle": "O'chirilganda Enter tugmasi agentga xabar kiritish maydonida yangi qator ochadi.",
     "biometricUnlock": "Biometriya yordamida qulfni ochish",
-    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi."
+    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi.",
+    "featureFlags": "Funksiya bayroqlari",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",

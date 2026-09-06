@@ -240,7 +240,12 @@
     "returnSendsMessage": "מקש אנטר שולח הודעה",
     "returnSendsMessageSubtitle": "כשהאפשרות כבויה, מקש אנטר מוסיף שורה חדשה בשדות ההודעה של הסוכנים.",
     "biometricUnlock": "ביטול נעילה באמצעות זיהוי ביומטרי",
-    "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע."
+    "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע.",
+    "featureFlags": "דגלי תכונות",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "פעילויות בזמן אמת",

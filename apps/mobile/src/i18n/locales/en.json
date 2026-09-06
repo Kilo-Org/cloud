@@ -240,7 +240,12 @@
     "prReviewAttribution": "Add app attribution to PR reviews",
     "prReviewAttributionSubtitle": "Append a Reviewed via Kilo footer when you submit a review.",
     "returnSendsMessage": "Return key sends message",
-    "returnSendsMessageSubtitle": "When off, Return inserts a newline in agent composers."
+    "returnSendsMessageSubtitle": "When off, Return inserts a newline in agent composers.",
+    "featureFlags": "Feature flags",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",

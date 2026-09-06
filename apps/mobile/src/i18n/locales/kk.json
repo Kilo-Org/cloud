@@ -240,7 +240,12 @@
     "returnSendsMessage": "Enter пернесімен хабарлама жіберу",
     "returnSendsMessageSubtitle": "Бұл баптау өшірулі болса, Enter пернесі агентке хабарлама жазу өрісінде жаңа жолға ауыстырады.",
     "biometricUnlock": "Биометрия арқылы құлыпты ашу",
-    "biometricUnlockSubtitle": "Қолданбаны ашқанда және ол фондық режимде бес минут болғаннан кейін құлыпты ашу қажет."
+    "biometricUnlockSubtitle": "Қолданбаны ашқанда және ол фондық режимде бес минут болғаннан кейін құлыпты ашу қажет.",
+    "featureFlags": "Функция байрақтары",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",

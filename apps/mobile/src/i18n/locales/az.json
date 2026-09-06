@@ -240,7 +240,12 @@
     "returnSendsMessage": "Sətirsonu düyməsi mesaj göndərir",
     "returnSendsMessageSubtitle": "Bu seçim deaktiv olduqda sətirsonu düyməsi agentin mesaj sahəsinə yeni sətir əlavə edir.",
     "biometricUnlock": "Biometrik məlumatlarla kilidi aç",
-    "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur."
+    "biometricUnlockSubtitle": "Tətbiq başladıqda və arxa planda beş dəqiqə qaldıqdan sonra kilidi açmaq tələb olunur.",
+    "featureFlags": "Funksiya bayroqları",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Birləşdirmə sorğusu əlçatan deyil",

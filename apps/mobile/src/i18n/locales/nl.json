@@ -240,7 +240,12 @@
     "returnSendsMessage": "Return-toets verzendt bericht",
     "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel toe in het berichtveld van de agent.",
     "biometricUnlock": "Ontgrendelen met biometrie",
-    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan."
+    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan.",
+    "featureFlags": "Functievlaggen",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "channel": {

@@ -240,7 +240,12 @@
     "returnSendsMessage": "Kekunci baris baharu menghantar mesej",
     "returnSendsMessageSubtitle": "Apabila tetapan ini dinyahdayakan, kekunci baris baharu menyisipkan baris baharu dalam ruang mesej ejen.",
     "biometricUnlock": "Buka kunci dengan biometrik",
-    "biometricUnlockSubtitle": "Buka kunci apabila apl dilancarkan dan selepas lima minit di latar belakang."
+    "biometricUnlockSubtitle": "Buka kunci apabila apl dilancarkan dan selepas lima minit di latar belakang.",
+    "featureFlags": "Bendera ciri",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Permintaan tarik tidak tersedia",

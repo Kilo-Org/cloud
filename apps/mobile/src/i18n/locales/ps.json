@@ -240,7 +240,12 @@
     "returnSendsMessage": "د انټر کیلي پیغام لېږي",
     "returnSendsMessageSubtitle": "که دا تنظیم بند وي، د انټر کیلي د ایجنټ د پیغام لیکلو په ځای کې نوې کرښه زیاتوي.",
     "biometricUnlock": "د بایومیټریک له لارې د قلف خلاصول",
-    "biometricUnlockSubtitle": "د اپلیکیشن د پیل پر مهال او په شالید کې له پنځو دقیقو تېرولو وروسته قلف خلاص کړئ."
+    "biometricUnlockSubtitle": "د اپلیکیشن د پیل پر مهال او په شالید کې له پنځو دقیقو تېرولو وروسته قلف خلاص کړئ.",
+    "featureFlags": "د ځانګړتیاوو بیرغونه",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسټ نشته",

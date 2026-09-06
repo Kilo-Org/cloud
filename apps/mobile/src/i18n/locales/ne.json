@@ -240,7 +240,12 @@
     "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
     "returnSendsMessageSubtitle": "यो विकल्प बन्द हुँदा रिटर्न कुञ्जीले एजेन्टको सन्देश लेख्ने ठाउँमा नयाँ पङ्क्ति थप्छ।",
     "biometricUnlock": "बायोमेट्रिक अनलक",
-    "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।"
+    "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।",
+    "featureFlags": "विशेषता झन्डा",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट उपलब्ध छैन",

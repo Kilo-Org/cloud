@@ -240,7 +240,12 @@
     "returnSendsMessage": "Klawisz Enter wysyła wiadomość",
     "returnSendsMessageSubtitle": "Gdy ta opcja jest wyłączona, klawisz Enter wstawia nowy wiersz w polach wiadomości agentów.",
     "biometricUnlock": "Odblokowywanie biometryczne",
-    "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle."
+    "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle.",
+    "featureFlags": "Flagi funkcji",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",

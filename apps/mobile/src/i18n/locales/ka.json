@@ -240,7 +240,12 @@
     "returnSendsMessage": "შეყვანის კლავიშით შეტყობინების გაგზავნა",
     "returnSendsMessageSubtitle": "თუ გამორთულია, შეყვანის კლავიში აგენტის შეტყობინების ველში ახალ სტრიქონს ამატებს.",
     "biometricUnlock": "ბიომეტრიით განბლოკვა",
-    "biometricUnlockSubtitle": "განბლოკვა საჭიროა აპის გაშვებისას და ფონურ რეჟიმში ხუთი წუთის გასვლის შემდეგ."
+    "biometricUnlockSubtitle": "განბლოკვა საჭიროა აპის გაშვებისას და ფონურ რეჟიმში ხუთი წუთის გასვლის შემდეგ.",
+    "featureFlags": "ფუნქციების დროშები",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",

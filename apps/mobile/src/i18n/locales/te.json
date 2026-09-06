@@ -240,7 +240,12 @@
     "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
     "returnSendsMessageSubtitle": "దీన్ని ఆఫ్ చేస్తే, రిటర్న్ కీ ఏజెంట్ సందేశ పెట్టెల్లో కొత్త పంక్తిని చేర్చుతుంది.",
     "biometricUnlock": "బయోమెట్రిక్స్‌తో అన్‌లాక్ చేయండి",
-    "biometricUnlockSubtitle": "యాప్‌ను తెరిచినప్పుడు, అలాగే అది నేపథ్యంలో ఐదు నిమిషాలు ఉన్న తర్వాత అన్‌లాక్ చేయాలి."
+    "biometricUnlockSubtitle": "యాప్‌ను తెరిచినప్పుడు, అలాగే అది నేపథ్యంలో ఐదు నిమిషాలు ఉన్న తర్వాత అన్‌లాక్ చేయాలి.",
+    "featureFlags": "ఫీచర్ ఫ్లాగులు",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",

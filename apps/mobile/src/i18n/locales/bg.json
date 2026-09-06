@@ -240,7 +240,12 @@
     "returnSendsMessage": "Клавишът за нов ред изпраща съобщение",
     "returnSendsMessageSubtitle": "Когато настройката е изключена, клавишът за нов ред вмъква нов ред в полетата за въвеждане на съобщения до агенти.",
     "biometricUnlock": "Отключване с биометрични данни",
-    "biometricUnlockSubtitle": "Изисква се отключване при стартиране и след пет минути във фонов режим."
+    "biometricUnlockSubtitle": "Изисква се отключване при стартиране и след пет минути във фонов режим.",
+    "featureFlags": "Флагове на функции",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",

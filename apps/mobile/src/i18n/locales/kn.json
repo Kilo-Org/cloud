@@ -240,7 +240,12 @@
     "returnSendsMessage": "ರಿಟರ್ನ್ ಕೀಲಿಯು ಸಂದೇಶ ಕಳುಹಿಸುತ್ತದೆ",
     "returnSendsMessageSubtitle": "ಈ ಆಯ್ಕೆ ನಿಷ್ಕ್ರಿಯವಾಗಿದ್ದಾಗ ರಿಟರ್ನ್ ಕೀಲಿಯು ಏಜೆಂಟ್‌ನ ಸಂದೇಶ ಪೆಟ್ಟಿಗೆಯಲ್ಲಿ ಹೊಸ ಸಾಲನ್ನು ಸೇರಿಸುತ್ತದೆ.",
     "biometricUnlock": "ಬಯೋಮೆಟ್ರಿಕ್ಸ್ ಮೂಲಕ ಅನ್‌ಲಾಕ್ ಮಾಡಿ",
-    "biometricUnlockSubtitle": "ಅಪ್ಲಿಕೇಶನ್ ಪ್ರಾರಂಭಿಸಿದಾಗ ಮತ್ತು ಐದು ನಿಮಿಷ ಹಿನ್ನೆಲೆಯಲ್ಲಿ ಇದ್ದ ನಂತರ ಅನ್‌ಲಾಕ್ ಮಾಡಬೇಕು."
+    "biometricUnlockSubtitle": "ಅಪ್ಲಿಕೇಶನ್ ಪ್ರಾರಂಭಿಸಿದಾಗ ಮತ್ತು ಐದು ನಿಮಿಷ ಹಿನ್ನೆಲೆಯಲ್ಲಿ ಇದ್ದ ನಂತರ ಅನ್‌ಲಾಕ್ ಮಾಡಬೇಕು.",
+    "featureFlags": "ಫೀಚರ್ ಫ್ಲ್ಯಾಗ್ಗಳು",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",

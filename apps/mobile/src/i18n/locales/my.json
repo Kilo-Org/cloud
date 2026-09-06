@@ -240,7 +240,12 @@
     "returnSendsMessage": "စာကြောင်းပြန်ခလုတ်ဖြင့် မက်ဆေ့ခ်ျပို့ပါ",
     "returnSendsMessageSubtitle": "ပိတ်ထားပါက စာကြောင်းပြန်ခလုတ်သည် အေးဂျင့်ထံ စာရေးသည့်အကွက်တွင် စာကြောင်းအသစ် ထည့်ပေးပါသည်။",
     "biometricUnlock": "ဇီဝအချက်အလက်ဖြင့် သော့ဖွင့်ခြင်း",
-    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။"
+    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။",
+    "featureFlags": "လုပ်ဆောင်ချက်အလံများ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR မရနိုင်ပါ",

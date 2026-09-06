@@ -240,7 +240,12 @@
     "returnSendsMessage": "Mandefa hafatra ny bokotra fampidirana",
     "returnSendsMessageSubtitle": "Raha tsy mandeha ity safidy ity, dia mampiditra andalana vaovao ao amin'ny faritra fanoratana hafatra ho an'ny mpanampy ny bokotra fampidirana.",
     "biometricUnlock": "Vahao amin'ny biometrika ny hidy",
-    "biometricUnlockSubtitle": "Ilaina ny mamaha ny hidy rehefa manomboka ny rindranasa sy rehefa tsy naseho nandritra ny dimy minitra."
+    "biometricUnlockSubtitle": "Ilaina ny mamaha ny hidy rehefa manomboka ny rindranasa sy rehefa tsy naseho nandritra ny dimy minitra.",
+    "featureFlags": "Saina endri-javatra",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",

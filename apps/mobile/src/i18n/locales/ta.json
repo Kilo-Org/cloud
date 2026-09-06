@@ -240,7 +240,12 @@
     "returnSendsMessage": "என்டர் விசை செய்தியை அனுப்பும்",
     "returnSendsMessageSubtitle": "இதை முடக்கினால், ஏஜென்ட்டின் செய்திப் பெட்டியில் என்டர் விசை புதிய வரியைச் செருகும்.",
     "biometricUnlock": "உயிரளவியல் மூலம் பூட்டைத் திறக்கவும்",
-    "biometricUnlockSubtitle": "செயலியைத் தொடங்கும்போதும், பின்னணியில் ஐந்து நிமிடங்கள் இருந்த பிறகும் பூட்டைத் திறக்க வேண்டும்."
+    "biometricUnlockSubtitle": "செயலியைத் தொடங்கும்போதும், பின்னணியில் ஐந்து நிமிடங்கள் இருந்த பிறகும் பூட்டைத் திறக்க வேண்டும்.",
+    "featureFlags": "அம்சக் கொடிகள்",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",

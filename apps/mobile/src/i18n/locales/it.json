@@ -2046,7 +2046,12 @@
     "returnSendsMessage": "Il tasto Invio invia il messaggio",
     "returnSendsMessageSubtitle": "Se disattivato, il tasto Invio inserisce un'interruzione di riga nei campi dei messaggi agli agenti.",
     "biometricUnlock": "Sblocco biometrico",
-    "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano."
+    "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano.",
+    "featureFlags": "Flag di funzionalità",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "addCredits": {
     "cta": "Aggiungi crediti",

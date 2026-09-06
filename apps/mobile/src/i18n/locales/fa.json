@@ -240,7 +240,12 @@
     "returnSendsMessage": "ارسال پیام با کلید اینتر",
     "returnSendsMessageSubtitle": "اگر این گزینه غیرفعال باشد، کلید اینتر در کادر پیام عامل یک خط جدید ایجاد می‌کند.",
     "biometricUnlock": "باز کردن قفل با احراز هویت زیست‌سنجی",
-    "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است."
+    "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است.",
+    "featureFlags": "پرچم‌های ویژگی",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",

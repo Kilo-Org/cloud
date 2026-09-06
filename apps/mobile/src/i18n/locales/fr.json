@@ -1982,7 +1982,12 @@
     "returnSendsMessage": "La touche Entrée envoie le message",
     "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents.",
     "biometricUnlock": "Déverrouillage biométrique",
-    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan."
+    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan.",
+    "featureFlags": "Indicateurs de fonctionnalités",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "addCredits": {
     "cta": "Ajouter des crédits",

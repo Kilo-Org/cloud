@@ -240,7 +240,12 @@
     "returnSendsMessage": "La tecla Intro envía el mensaje",
     "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente.",
     "biometricUnlock": "Desbloqueo biométrico",
-    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano."
+    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano.",
+    "featureFlags": "Indicadores de funciones",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "channel": {

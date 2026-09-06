@@ -240,7 +240,12 @@
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
     "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng sẽ chèn dòng mới vào ô nhập tin nhắn gửi cho tác nhân.",
     "biometricUnlock": "Mở khóa bằng sinh trắc học",
-    "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút."
+    "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút.",
+    "featureFlags": "Cờ tính năng",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",

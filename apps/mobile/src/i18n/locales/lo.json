@@ -240,7 +240,12 @@
     "returnSendsMessage": "ກົດປຸ່ມຂຶ້ນແຖວໃໝ່ເພື່ອສົ່ງຂໍ້ຄວາມ",
     "returnSendsMessageSubtitle": "ເມື່ອປິດຕົວເລືອກນີ້ ປຸ່ມຂຶ້ນແຖວໃໝ່ຈະແຊກແຖວໃໝ່ໃນຊ່ອງຂຽນຂໍ້ຄວາມຫາຕົວແທນ.",
     "biometricUnlock": "ປົດລັອກດ້ວຍຂໍ້ມູນຊີວະມິຕິ",
-    "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ."
+    "biometricUnlockSubtitle": "ຕ້ອງປົດລັອກເມື່ອເປີດແອັບ ແລະ ຫຼັງຈາກແອັບຢູ່ໃນພື້ນຫຼັງເປັນເວລາຫ້ານາທີ.",
+    "featureFlags": "ທຸງຄຸນສົມບັດ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "ບໍ່ສາມາດເປີດຄຳຂໍລວມໂຄດ",

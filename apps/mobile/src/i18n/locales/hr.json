@@ -240,7 +240,12 @@
     "returnSendsMessage": "Tipka za novi redak šalje poruku",
     "returnSendsMessageSubtitle": "Kad je isključeno, tipka za novi redak umeće novi redak u polja za unos poruke agentima.",
     "biometricUnlock": "Otključavanje biometrijom",
-    "biometricUnlockSubtitle": "Otključavanje je potrebno pri pokretanju aplikacije i nakon pet minuta u pozadini."
+    "biometricUnlockSubtitle": "Otključavanje je potrebno pri pokretanju aplikacije i nakon pet minuta u pozadini.",
+    "featureFlags": "Zastavice značajki",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtjev za spajanje nije dostupan",

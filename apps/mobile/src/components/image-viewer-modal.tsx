@@ -198,7 +198,7 @@ export function ImageViewerModal({
               <CenteredState className="w-full">
                 <View className="flex-row items-center justify-center gap-2 px-6">
                   <AlertCircle size={14} color="#ffffff" />
-                  <Text className="text-xs text-white">{t('imageViewer.imageUnavailable')}</Text>
+                  <Text className="text-xs text-white">{t('common.imageUnavailable')}</Text>
                 </View>
               </CenteredState>
             ) : null}

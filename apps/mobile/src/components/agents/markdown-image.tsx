@@ -195,7 +195,7 @@ export function MarkdownImage({
         <Text className="text-xs text-muted-foreground">
           {alt
             ? t('agentChat.filePart.imageUnavailableWithAlt', { alt })
-            : t('agentChat.filePart.imageUnavailable')}
+            : t('common.imageUnavailable')}
         </Text>
       </Pressable>
     );

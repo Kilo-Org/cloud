@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useSearchParams } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -53,6 +53,8 @@ import {
 import { billingPayerPresentation } from './billing-payer-presentation';
 import type { OrganizationRole } from '@/lib/organizations/organization-types';
 import { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
+import { WorktreeChangesDrawer } from './WorktreeChanges';
+import { canOpenWorktreeChanges } from './worktree-changes';
 import {
   CHAT_TAB_ID,
   addTerminalTab,
@@ -163,6 +165,8 @@ export default function CloudChatPage({
   const childSessionDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
   const [preparationDrawerAttemptId, setPreparationDrawerAttemptId] = useState<string | null>(null);
   const preparationDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
+  const [changesDrawerSessionId, setChangesDrawerSessionId] = useState<string | null>(null);
+  const changesDrawerFocusTargetRef = useRef<HTMLElement | null>(null);
 
   // URL-driven session switching
   const sessionIdFromParams = searchParams?.get('sessionId') ?? null;
@@ -171,6 +175,8 @@ export default function CloudChatPage({
     setChildSessionStack([]);
     preparationDrawerFocusTargetRef.current = null;
     setPreparationDrawerAttemptId(null);
+    changesDrawerFocusTargetRef.current = null;
+    setChangesDrawerSessionId(null);
     if (sessionIdFromParams) {
       void manager.switchSession(sessionIdFromParams as KiloSessionId);
     } else {
@@ -255,6 +261,12 @@ export default function CloudChatPage({
     organizationId,
     scope: workspaceTabScope,
   });
+  const canOpenChanges =
+    sessionIdFromParams !== null &&
+    isCurrentSession &&
+    canOpenWorktreeChanges(sessionId, isReadOnly) &&
+    fetchedSessionData?.organizationId === (organizationId ?? null);
+  const changesDrawerOpen = canOpenChanges && changesDrawerSessionId === sessionId;
 
   if (
     resolvedWorkspaceScope.currentUserId !== currentUserId ||
@@ -279,6 +291,11 @@ export default function CloudChatPage({
       setWorkspaceTabs(state => selectWorkspaceTab(state, CHAT_TAB_ID));
     }
   }, [sessionIdFromParams]);
+
+  useEffect(() => {
+    changesDrawerFocusTargetRef.current = null;
+    setChangesDrawerSessionId(null);
+  }, [sessionId, currentUserId, organizationId, canOpenChanges]);
 
   // -- Session models -------------------------------------------------------
   const sessionModels = useSessionModels({
@@ -693,9 +710,10 @@ export default function CloudChatPage({
     const activeElement = document.activeElement;
     childSessionDrawerFocusTargetRef.current =
       activeElement instanceof HTMLElement ? activeElement : null;
-    // The two drawers overlay the same chat pane — only one may be open.
     preparationDrawerFocusTargetRef.current = null;
     setPreparationDrawerAttemptId(null);
+    changesDrawerFocusTargetRef.current = null;
+    setChangesDrawerSessionId(null);
     setChildSessionStack([entry]);
   }, []);
 
@@ -723,9 +741,10 @@ export default function CloudChatPage({
     const activeElement = document.activeElement;
     preparationDrawerFocusTargetRef.current =
       activeElement instanceof HTMLElement ? activeElement : null;
-    // The two drawers overlay the same chat pane — only one may be open.
     childSessionDrawerFocusTargetRef.current = null;
     setChildSessionStack([]);
+    changesDrawerFocusTargetRef.current = null;
+    setChangesDrawerSessionId(null);
     setPreparationDrawerAttemptId(attemptId);
   }, []);
 
@@ -736,6 +755,30 @@ export default function CloudChatPage({
   const handlePreparationDrawerCloseAutoFocus = useCallback((event: Event) => {
     const focusTarget = preparationDrawerFocusTargetRef.current;
     preparationDrawerFocusTargetRef.current = null;
+    if (!focusTarget?.isConnected) return;
+    event.preventDefault();
+    focusTarget.focus();
+  }, []);
+
+  const handleToggleChanges = useCallback(
+    (event: MouseEvent<HTMLButtonElement>) => {
+      changesDrawerFocusTargetRef.current = event.currentTarget;
+      childSessionDrawerFocusTargetRef.current = null;
+      setChildSessionStack([]);
+      preparationDrawerFocusTargetRef.current = null;
+      setPreparationDrawerAttemptId(null);
+      setChangesDrawerSessionId(current => (current === sessionId ? null : sessionId));
+    },
+    [sessionId]
+  );
+
+  const handleChangesDrawerOpenChange = useCallback((open: boolean) => {
+    if (!open) setChangesDrawerSessionId(null);
+  }, []);
+
+  const handleChangesDrawerCloseAutoFocus = useCallback((event: Event) => {
+    const focusTarget = changesDrawerFocusTargetRef.current;
+    changesDrawerFocusTargetRef.current = null;
     if (!focusTarget?.isConnected) return;
     event.preventDefault();
     focusTarget.focus();
@@ -950,6 +993,8 @@ export default function CloudChatPage({
       sessionInfoTriggerRef={sessionInfoTriggerRef}
       soundEnabled={soundEnabled}
       onToggleSound={handleToggleSound}
+      changesOpen={changesDrawerOpen}
+      onToggleChanges={canOpenChanges ? handleToggleChanges : undefined}
       sessionActive={isStreaming || activity.type === 'busy' || activity.type === 'retrying'}
       sandboxStatusEligible={isSandboxStatusEligible({
         currentUserId,
@@ -1051,7 +1096,11 @@ export default function CloudChatPage({
                   className="relative flex min-h-0 flex-1 flex-col"
                 >
                   <div
-                    inert={childSessionStack.length > 0 || preparationDrawerAttemptId !== null}
+                    inert={
+                      childSessionStack.length > 0 ||
+                      preparationDrawerAttemptId !== null ||
+                      changesDrawerOpen
+                    }
                     className="flex min-h-0 flex-1 flex-col"
                   >
                     <div className="relative min-h-0 flex-1">
@@ -1302,6 +1351,17 @@ export default function CloudChatPage({
               onCloseAutoFocus={handlePreparationDrawerCloseAutoFocus}
               portalContainer={childSessionDrawerContainer}
             />
+            {canOpenChanges && sessionId && (
+              <WorktreeChangesDrawer
+                key={`${organizationId ?? 'personal'}:${sessionId}`}
+                cloudAgentSessionId={sessionId}
+                organizationId={organizationId}
+                open={changesDrawerOpen}
+                onOpenChange={handleChangesDrawerOpenChange}
+                onCloseAutoFocus={handleChangesDrawerCloseAutoFocus}
+                portalContainer={childSessionDrawerContainer}
+              />
+            )}
           </div>
         </SuggestionContextProvider>
       </PermissionContextProvider>

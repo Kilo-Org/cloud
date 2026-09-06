@@ -420,7 +420,7 @@ describe('QuickChatScreen composer', () => {
     expect(latestComposer()?.disabled).toBeUndefined();
     const error = queryErrors.list[0];
     expect(error?.variant).toBe('server');
-    expect(error?.title).toBe(i18n.t('quickChat.catalogRetry'));
+    expect(error?.title).toBe(i18n.t('common.couldNotLoadModels'));
     expect(error?.onRetry).toBeDefined();
     expect(emptyStateRenders.list).toHaveLength(0);
   });

@@ -25,7 +25,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   finding_not_open: 'securityAgent.remediationUnavailable.findingNotOpen',
   repo_not_in_scope: 'securityAgent.remediationUnavailable.repoNotInScope',
   analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  sandbox_analysis_required: 'securityAgent.remediationUnavailable.sandboxAnalysisRequired',
+  sandbox_analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
   stale_analysis: 'securityAgent.remediationUnavailable.staleAnalysis',
   not_exploitable: 'securityAgent.remediationUnavailable.notExploitable',
   exploitability_unknown: 'securityAgent.remediationUnavailable.exploitabilityUnknown',
@@ -44,7 +44,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   before_enablement: 'securityAgent.remediationUnavailable.beforeEnablement',
 } as const satisfies Record<string, string>;
 
-const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediationUnavailable.generic';
+const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediation.unavailable';
 
 function getRemediationUnavailableKey(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') {

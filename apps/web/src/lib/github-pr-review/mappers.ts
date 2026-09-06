@@ -23,6 +23,9 @@ import {
   type GitHubPrReviewOverview,
 } from './dtos';
 
+type OverviewReviewer = GitHubPrReviewOverview['reviewers'][number];
+type OverviewAuthor = GitHubPrReviewOverview['author'];
+
 export type PullRequestRestData = {
   number: number;
   title: string;
@@ -41,6 +44,15 @@ export type PullRequestRestData = {
   mergeable: boolean | null;
   mergeable_state?: string | null;
   auto_merge?: { merge_method?: string | null } | null;
+  labels?: { name?: string | null; color?: string | null }[] | null;
+  assignees?: ({ login: string; avatar_url: string } | null)[] | null;
+  created_at: string;
+  updated_at: string;
+  closed_at?: string | null;
+  merged_at?: string | null;
+  merged_by?: { login: string; avatar_url: string } | null;
+  comments?: number | null;
+  review_comments?: number | null;
 };
 
 export type RepoRestData = {
@@ -55,10 +67,21 @@ export type RepoRestData = {
 
 export type ViewerInfo = { login: string } | null;
 
+type GraphQlActor = { login: string; avatarUrl?: string | null } | null;
+
 export type OverviewGraphQlData = {
   repository: {
     pullRequest: {
       reviewDecision: string | null;
+      latestReviews?: {
+        nodes?: ({ state: string; author: GraphQlActor } | null)[] | null;
+      } | null;
+      reviewRequests?: {
+        nodes?: ({ requestedReviewer: GraphQlActor } | null)[] | null;
+      } | null;
+      closingIssuesReferences?: {
+        nodes?: ({ number: number; title: string; url: string; closed: boolean } | null)[] | null;
+      } | null;
     } | null;
   } | null;
   viewer: { login: string } | null;
@@ -69,6 +92,79 @@ function normalizeReviewDecision(value: string | null): GitHubPrReviewOverview['
     return value;
   }
   return null;
+}
+
+/** REST `{ login, avatar_url }` -> the DTO author shape, or null when unusable. */
+function restAuthor(
+  user: { login: string; avatar_url: string } | null | undefined
+): OverviewAuthor {
+  if (!user) {
+    return null;
+  }
+  const parsed = GitHubPrReviewAuthorSchema.safeParse({
+    login: user.login,
+    avatarUrl: user.avatar_url,
+  });
+  return parsed.success ? parsed.data : null;
+}
+
+const REVIEW_STATES = new Set<OverviewReviewer['state']>([
+  'APPROVED',
+  'CHANGES_REQUESTED',
+  'COMMENTED',
+  'DISMISSED',
+  'PENDING',
+]);
+
+function normalizeReviewState(value: string): OverviewReviewer['state'] | null {
+  return REVIEW_STATES.has(value as OverviewReviewer['state'])
+    ? (value as OverviewReviewer['state'])
+    : null;
+}
+
+/**
+ * One row per reviewer, in GitHub's own sidebar order: everyone who has
+ * already submitted a review (their LATEST state) first, then everyone who is
+ * only requested, as PENDING. A login that appears in both keeps its submitted
+ * state — GitHub re-requests a review without discarding the old verdict.
+ *
+ * `requestedReviewer` is null for a requested TEAM (the query selects only the
+ * `User` inline fragment), and such an entry is skipped rather than guessed at.
+ */
+function buildReviewers(
+  pullRequest: NonNullable<NonNullable<OverviewGraphQlData>['repository']>['pullRequest']
+): OverviewReviewer[] {
+  const reviewers: OverviewReviewer[] = [];
+  const seen = new Set<string>();
+
+  const push = (actor: GraphQlActor, state: OverviewReviewer['state']) => {
+    if (!actor || seen.has(actor.login)) {
+      return;
+    }
+    const parsed = GitHubPrReviewAuthorSchema.safeParse({
+      login: actor.login,
+      avatarUrl: actor.avatarUrl ?? null,
+    });
+    if (!parsed.success) {
+      return;
+    }
+    seen.add(actor.login);
+    reviewers.push({ ...parsed.data, state });
+  };
+
+  for (const node of pullRequest?.latestReviews?.nodes ?? []) {
+    if (!node) {
+      continue;
+    }
+    const state = normalizeReviewState(node.state);
+    if (state) {
+      push(node.author, state);
+    }
+  }
+  for (const node of pullRequest?.reviewRequests?.nodes ?? []) {
+    push(node?.requestedReviewer ?? null, 'PENDING');
+  }
+  return reviewers;
 }
 
 const GitHubRestUserSchema = z
@@ -85,18 +181,13 @@ export function buildOverviewDto(args: {
   viewer: ViewerInfo;
 }): GitHubPrReviewOverview {
   const { pr, repo, graphQl, viewer } = args;
+  const pullRequest = graphQl?.repository?.pullRequest ?? null;
   const state: GitHubPrReviewOverview['state'] = pr.merged
     ? 'merged'
     : pr.state === 'open'
       ? 'open'
       : 'closed';
-  const authorParsed = pr.user
-    ? GitHubPrReviewAuthorSchema.safeParse({
-        login: pr.user.login,
-        avatarUrl: pr.user.avatar_url,
-      })
-    : null;
-  const author = authorParsed?.success ? authorParsed.data : null;
+  const author = restAuthor(pr.user);
   const headRepoFullName = pr.head.repo?.full_name ?? null;
   const isCrossRepo = Boolean(
     pr.base.repo?.full_name && headRepoFullName && pr.base.repo.full_name !== headRepoFullName
@@ -125,9 +216,24 @@ export function buildOverviewDto(args: {
     mergeable: pr.mergeable,
     mergeableState: pr.mergeable_state ?? null,
     autoMerge,
-    reviewDecision: normalizeReviewDecision(
-      graphQl?.repository?.pullRequest?.reviewDecision ?? null
+    reviewDecision: normalizeReviewDecision(pullRequest?.reviewDecision ?? null),
+    labels: (pr.labels ?? []).flatMap(label =>
+      label?.name ? [{ name: label.name, color: label.color ?? '' }] : []
     ),
+    assignees: (pr.assignees ?? []).flatMap(user => {
+      const parsed = restAuthor(user);
+      return parsed ? [parsed] : [];
+    }),
+    reviewers: buildReviewers(pullRequest),
+    linkedIssues: (pullRequest?.closingIssuesReferences?.nodes ?? []).flatMap(node =>
+      node ? [{ number: node.number, title: node.title, url: node.url, closed: node.closed }] : []
+    ),
+    createdAt: pr.created_at,
+    updatedAt: pr.updated_at,
+    closedAt: pr.closed_at ?? null,
+    mergedAt: pr.merged_at ?? null,
+    mergedBy: restAuthor(pr.merged_by),
+    commentCount: (pr.comments ?? 0) + (pr.review_comments ?? 0),
     repo: {
       allowMergeCommit: Boolean(repo.allow_merge_commit),
       allowSquashMerge: Boolean(repo.allow_squash_merge),

@@ -136,7 +136,7 @@ export function InstanceListScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('kiloclaw.title')}
+        title={t('common.kiloclaw')}
         size="large"
         showBackButton={false}
         className="px-[22px]"
@@ -172,7 +172,7 @@ export function InstanceListScreen({
           ) : null}
 
           <InstanceSection
-            title={t('kiloclaw.list.personal')}
+            title={t('common.personal')}
             instances={personal}
             onSelect={handleSelect}
             onSettingsPress={handleSettingsPress}

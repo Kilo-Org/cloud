@@ -21,9 +21,9 @@ export function PrReviewReconnectNotice() {
           connection.mutate();
         }}
         loading={connection.isPending}
-        accessibilityLabel={t('prReview.reconnectNotice.checkConnection')}
+        accessibilityLabel={t('prReview.checkConnection')}
       >
-        <Text>{t('prReview.reconnectNotice.checkConnection')}</Text>
+        <Text>{t('prReview.checkConnection')}</Text>
       </Button>
     </View>
   );

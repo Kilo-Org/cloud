@@ -289,8 +289,19 @@ const layout: LiveActivityComponent<ContentState> = props => {
 
 const LIVE_ACTIVITY_NAME = 'ActiveAgentsLiveActivity';
 
+/**
+ * The whole surface deep-links here, and registration persists it. A
+ * push-to-start creates the activity with no JavaScript running, so a URL
+ * supplied only at `start` would leave a remotely started card untappable.
+ */
+export const OPEN_AGENTS_URL = 'kiloapp:///cloud/sessions';
+
 const registerLayout = () =>
-  createLiveActivity<ContentState>(LIVE_ACTIVITY_NAME, withGlanceableCopy(withWidgetLogo(layout)));
+  createLiveActivity<ContentState>(
+    LIVE_ACTIVITY_NAME,
+    withGlanceableCopy(withWidgetLogo(layout)),
+    OPEN_AGENTS_URL
+  );
 
 export const ActiveAgentsLiveActivity = registerLayout();
 

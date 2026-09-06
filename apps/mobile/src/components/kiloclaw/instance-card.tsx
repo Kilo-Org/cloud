@@ -68,7 +68,7 @@ function resolveAccessibilityLabel(
       displayCount: formatNumber(unreadCount, i18n.language),
     });
   }
-  return i18n.t('kiloclaw.instanceCard.open', { name: displayName });
+  return i18n.t('common.open', { name: displayName });
 }
 
 export function KiloClawCard({

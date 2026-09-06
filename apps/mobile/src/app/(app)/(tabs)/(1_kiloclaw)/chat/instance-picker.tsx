@@ -44,7 +44,7 @@ function InstanceRow({
         </Text>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <Text variant="muted" numberOfLines={1}>
-            {instance.organizationName ?? t('chat.instancePicker.personal')}
+            {instance.organizationName ?? t('common.personal')}
           </Text>
           <StatusBadge status={instance.status} />
         </View>
@@ -100,7 +100,7 @@ export default function InstancePickerScreen() {
       {showList && loadedInstances.length === 0 ? (
         <EmptyState
           icon={Server}
-          title={t('chat.instancePicker.noInstances')}
+          title={t('common.noKiloclawInstances')}
           description={t('chat.instancePicker.noInstancesDescription')}
           action={
             <Button

@@ -62,9 +62,9 @@ export function useNewSessionDiscardGuard({
           : 'agentChat.newSession.discardDraftMessage'
       ),
       [
-        { text: i18n.t('agentChat.newSession.keepEditing'), style: 'cancel' },
+        { text: i18n.t('common.keepEditing'), style: 'cancel' },
         {
-          text: i18n.t('agentChat.newSession.discard'),
+          text: i18n.t('common.discard'),
           style: 'destructive',
           onPress: () => {
             void (async () => {

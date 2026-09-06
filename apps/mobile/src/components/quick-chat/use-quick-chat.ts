@@ -319,7 +319,7 @@ export function useQuickChat(model: string) {
       throw new Error('Organization scope not loaded');
     }
     if (!model) {
-      toast.error(i18n.t('quickChat.catalogRetry'));
+      toast.error(i18n.t('common.couldNotLoadModels'));
       throw new Error('No model selected');
     }
     const clientId = ulid();

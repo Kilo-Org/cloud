@@ -8,6 +8,7 @@ import {
   baseCancelQueuedMessageNextSchema,
   SANDBOX_STATUS_DETAIL_MESSAGES,
   type SandboxStatusSnapshot,
+  baseWorktreeChangesNextSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
@@ -212,6 +213,33 @@ describe('baseGetSandboxStatusNextSchema', () => {
       false
     );
   });
+});
+
+describe('baseWorktreeChangesNextSchema', () => {
+  const cloudAgentSessionId = `workspace_${MESSAGE_UUID}`;
+
+  it('accepts only a control-plane session ID', () => {
+    expect(baseWorktreeChangesNextSchema.parse({ cloudAgentSessionId })).toEqual({
+      cloudAgentSessionId,
+    });
+  });
+
+  it.each([`agent_${MESSAGE_UUID}`, KILO_SESSION_ID, '', 'workspace_', 'workspace_not-a-uuid'])(
+    'rejects legacy or malformed session ID %s',
+    cloudAgentSessionId => {
+      expect(baseWorktreeChangesNextSchema.safeParse({ cloudAgentSessionId }).success).toBe(false);
+    }
+  );
+
+  it.each(['directory', 'baseRef', 'sandboxId', 'revision'])(
+    'rejects client-controlled %s',
+    field => {
+      expect(
+        baseWorktreeChangesNextSchema.safeParse({ cloudAgentSessionId, [field]: 'override' })
+          .success
+      ).toBe(false);
+    }
+  );
 });
 
 describe('cloudAgentGetAttachmentUploadUrlSchema', () => {

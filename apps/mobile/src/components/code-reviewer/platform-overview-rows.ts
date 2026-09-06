@@ -16,14 +16,14 @@ import { type ModelOption } from '@/lib/hooks/use-available-models';
 
 const reviewStyleLabels = {
   strict: 'codeReviewer.reviewStyle.strict',
-  balanced: 'codeReviewer.reviewStyle.balanced',
+  balanced: 'common.balanced',
   lenient: 'codeReviewer.reviewStyle.lenient',
   roast: 'codeReviewer.reviewStyle.roast',
 } as const;
 
 const focusAreaLabels = {
   security: 'codeReviewer.focusArea.security',
-  performance: 'codeReviewer.focusArea.performance',
+  performance: 'common.performance',
   bugs: 'codeReviewer.focusArea.bugs',
   style: 'codeReviewer.focusArea.style',
   testing: 'codeReviewer.focusArea.testing',
@@ -31,10 +31,10 @@ const focusAreaLabels = {
 } as const;
 
 const gateThresholdLabels = {
-  off: 'codeReviewer.gateThreshold.off',
-  all: 'codeReviewer.gateThreshold.all',
+  off: 'common.off',
+  all: 'common.all',
   warning: 'codeReviewer.gateThreshold.warning',
-  critical: 'codeReviewer.gateThreshold.critical',
+  critical: 'common.critical',
 } as const;
 
 type OverviewRow = {
@@ -106,7 +106,7 @@ export function buildOverviewRows({
     {
       field: 'model',
       icon: FileSliders,
-      title: i18n.t('codeReviewer.overview.model'),
+      title: i18n.t('common.model'),
       subtitle: models.find(model => model.id === data.modelSlug)?.name ?? data.modelSlug,
       onPress: modelsLoading || models.length === 0 ? undefined : onOpenModelPicker,
     },
@@ -115,7 +115,7 @@ export function buildOverviewRows({
           {
             field: 'gate',
             icon: Gauge,
-            title: i18n.t('codeReviewer.overview.mergeGate'),
+            title: i18n.t('codeReviewer.gate.title'),
             subtitle: i18n.t(gateThresholdLabels[data.gateThreshold]),
           },
         ]
@@ -123,10 +123,10 @@ export function buildOverviewRows({
     {
       field: 'repos',
       icon: FolderGit2,
-      title: i18n.t('codeReviewer.overview.repositories'),
+      title: i18n.t('common.repositories'),
       subtitle:
         capabilities.selectionModePicker && data.repositorySelectionMode === 'all'
-          ? i18n.t('codeReviewer.overview.allRepositories')
+          ? i18n.t('common.allRepositories')
           : i18n.t('codeReviewer.overview.nSelected', {
               count: data.selectedRepositoryIds.length,
               displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
@@ -141,7 +141,7 @@ export function buildOverviewRows({
           {
             field: 'review-memory',
             icon: Brain,
-            title: i18n.t('codeReviewer.overview.reviewMemory'),
+            title: i18n.t('codeReviewer.reviewMemory.title'),
             subtitle: i18n.t('codeReviewer.overview.proposedReviewMdGuidance'),
             onPress: onOpenReviewMemory,
             readOnlyAccessible: true,

@@ -124,7 +124,7 @@ export function PartDetailSheet({ visible, part, onClose }: Readonly<PartDetailS
   return (
     <SessionPageSheet visible={visible} onClose={onClose}>
       <SheetHeader
-        title={part ? getPartDetailTitle(part) : t('agentChat.partDetail.title')}
+        title={part ? getPartDetailTitle(part) : t('common.details')}
         onDone={onClose}
         doneLabel={t('common.done')}
       />

@@ -1,11 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
-import { modelStats } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import { publishEnkryptModelStats } from '@/lib/model-stats/enkrypt-publication';
+import { getModelStatsSnapshot } from '@/lib/model-stats/model-stats-cache';
 
-export const revalidate = 3600;
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
+const headers = { 'Cache-Control': 'no-store' };
 
 /**
  * GET /api/models/stats/[slug]
@@ -18,19 +20,28 @@ export async function GET(
   try {
     const { slug } = await params;
 
-    const [stat] = await db.select().from(modelStats).where(eq(modelStats.slug, slug)).limit(1);
+    const snapshot = await getModelStatsSnapshot();
+    const entry = snapshot.entries.find(({ stat }) => stat.slug === slug);
 
-    if (!stat) {
-      return NextResponse.json({ error: `Model with slug "${slug}" not found` }, { status: 404 });
+    if (!entry) {
+      return NextResponse.json(
+        { error: `Model with slug "${slug}" not found` },
+        { status: 404, headers }
+      );
     }
 
-    return NextResponse.json(stat);
+    return NextResponse.json(publishEnkryptModelStats(entry.stat, snapshot, entry.verification), {
+      headers,
+    });
   } catch (error) {
     console.error('Error fetching model stat by slug:', error);
     captureException(error, {
       tags: { endpoint: 'api/models/stats/[slug]' },
     });
 
-    return NextResponse.json({ error: 'Failed to fetch model statistics' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch model statistics' },
+      { status: 500, headers }
+    );
   }
 }

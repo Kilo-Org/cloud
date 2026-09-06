@@ -132,9 +132,7 @@ export function AgentSessionListContent({
   const clearQueryAction = useMemo(
     () => (
       <Button variant="outline" onPress={onClearQuery}>
-        <Text>
-          {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
-        </Text>
+        <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
       </Button>
     ),
     [isSearching, onClearQuery, t]
@@ -208,7 +206,7 @@ export function AgentSessionListContent({
     return (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <QueryError
-          message={t('agents.sessionList.couldNotLoad')}
+          message={t('common.couldNotLoadSessions')}
           onRetry={onRetry}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         />

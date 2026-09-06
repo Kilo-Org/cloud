@@ -566,6 +566,17 @@ export const baseGetSandboxStatusNextSchema = z
   })
   .strict();
 
+export const baseWorktreeChangesNextSchema = z
+  .object({
+    cloudAgentSessionId: z
+      .string()
+      .regex(
+        /^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/,
+        'Changes require a control-plane session'
+      ),
+  })
+  .strict();
+
 export const cloudAgentTerminalSizeSchema = z.object({
   cols: z.number().int().min(2).max(500),
   rows: z.number().int().min(2).max(200),

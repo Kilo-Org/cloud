@@ -1,3 +1,6 @@
+import { createStore } from 'jotai';
+import { assistantMsg, toolPart } from './__fixtures__/helpers';
+import { createSessionManager } from './session-manager';
 import { createCloudAgentSession, REMOTE_SESSION_CREATION_NOT_SUPPORTED } from './session';
 import type { CloudAgentSession } from './session';
 import type { CloudAgentApi } from './transport';
@@ -153,6 +156,155 @@ function emitHeartbeatOwner(
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe('Cloud Agent worktree refresh event pipeline', () => {
+  it.each([false, true])(
+    'signals every idle reconnect independently of chat replay (cursor: %p)',
+    async withReplayCursor => {
+      jest.useFakeTimers();
+      const store = createStore();
+      const fetchSnapshot = jest.fn(() => Promise.resolve(makeSnapshot({ id: kiloSessionId })));
+      const pageshow = {
+        handler: undefined as ((event: { persisted: boolean }) => void) | undefined,
+      };
+      const manager = createSessionManager({
+        store,
+        resolveSession: async () => ({ type: 'cloud-agent', kiloSessionId, cloudAgentSessionId }),
+        getTicket: () => 'ticket',
+        fetchSnapshot,
+        websocketBaseUrl: 'ws://localhost:9999',
+        userWebConnection: createUserWebConnection(),
+        api: createMockApi(),
+        prepare: jest.fn(),
+        initiate: jest.fn(),
+        fetchSession: async () => ({
+          kiloSessionId,
+          cloudAgentSessionId,
+          title: null,
+          organizationId: null,
+          gitUrl: null,
+          gitBranch: null,
+          mode: null,
+          model: null,
+          variant: null,
+          repository: null,
+          isInitiated: true,
+          needsLegacyPrepare: false,
+          isPreparingAsync: false,
+          prompt: null,
+          initialMessageId: null,
+          associatedPr: null,
+        }),
+        lifecycleHooks: {
+          onPageshow: handler => {
+            pageshow.handler = handler;
+            return jest.fn();
+          },
+        },
+      });
+      const sendEnvelope = (streamEventType: string, data: unknown, eventId = 0) => {
+        mockWs.onmessage?.({
+          data: JSON.stringify({
+            eventId,
+            sessionId: cloudAgentSessionId,
+            streamEventType,
+            timestamp: '2026-09-02T00:00:00.000Z',
+            data,
+          }),
+        } as MessageEvent);
+      };
+      const listener = jest.fn();
+      const unsubscribe = store.sub(manager.atoms.worktreeChangesRefresh, listener);
+      try {
+        await manager.switchSession(kiloSessionId);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(store.get(manager.atoms.worktreeChangesRefresh)).toBeNull();
+        sendEnvelope('connected', { sessionStatus: { type: 'idle' } });
+        expect(store.get(manager.atoms.worktreeChangesRefresh)).toEqual({
+          cloudSessionId: cloudAgentSessionId,
+          connectionVersion: 1,
+        });
+        expect(listener).toHaveBeenCalledTimes(1);
+        if (withReplayCursor) sendEnvelope('heartbeat', {}, 12);
+        fetchSnapshot.mockImplementation(() => new Promise(() => {}));
+
+        for (let reconnect = 1; reconnect <= 2; reconnect++) {
+          const previousSignal = store.get(manager.atoms.worktreeChangesRefresh);
+          pageshow.handler?.({ persisted: true });
+          await jest.advanceTimersByTimeAsync(0);
+          expect(store.get(manager.atoms.activity)).toEqual({ type: 'idle' });
+          sendEnvelope('connected', { sessionStatus: { type: 'idle' } });
+          expect(store.get(manager.atoms.activity)).toEqual({ type: 'idle' });
+          expect(store.get(manager.atoms.worktreeChangesRefresh)).toEqual({
+            cloudSessionId: cloudAgentSessionId,
+            connectionVersion: reconnect + 1,
+          });
+          expect(store.get(manager.atoms.worktreeChangesRefresh)).not.toBe(previousSignal);
+          expect(listener).toHaveBeenCalledTimes(reconnect + 1);
+          expect(fetchSnapshot).toHaveBeenCalledTimes(withReplayCursor ? 1 : reconnect + 1);
+          const url = String(jest.mocked(global.WebSocket).mock.calls.at(-1)?.[0]);
+          expect(url).toContain(withReplayCursor ? 'fromId=12' : 'replay=false');
+        }
+
+        sendEnvelope('kilocode', {
+          type: 'message.updated',
+          properties: { info: assistantMsg('msg-assistant', 'msg-user', kiloSessionId) },
+        });
+        sendEnvelope('kilocode', {
+          type: 'message.part.updated',
+          properties: { part: toolPart('part-tool', 'msg-assistant', 'bash', kiloSessionId) },
+        });
+        sendEnvelope('cloud.message.sent', { messageId: 'msg-user' });
+        sendEnvelope('kilocode', {
+          type: 'session.status',
+          properties: { sessionID: kiloSessionId, status: { type: 'busy' } },
+        });
+        expect(store.get(manager.atoms.messagesList)).toHaveLength(1);
+        expect(store.get(manager.atoms.activity)).toEqual({ type: 'busy' });
+        const activity = store.get(manager.atoms.activity);
+        const status = store.get(manager.atoms.agentStatus);
+        const cloudStatus = store.get(manager.atoms.cloudStatus);
+        const messages = store.get(manager.atoms.messagesList);
+        const pending = store.get(manager.atoms.pendingMessages);
+        for (const revision of [2, 2, 1, 3]) {
+          const previousSignal = store.get(manager.atoms.worktreeChangesRefresh);
+          sendEnvelope('cloud.worktree.changes.ready', { revision }, 13);
+          expect(store.get(manager.atoms.worktreeChangesRefresh)).toEqual({
+            cloudSessionId: cloudAgentSessionId,
+            revision: Math.max(2, revision),
+            connectionVersion: 3,
+          });
+          if (revision <= (previousSignal?.revision ?? 0)) {
+            expect(store.get(manager.atoms.worktreeChangesRefresh)).toBe(previousSignal);
+          } else {
+            expect(store.get(manager.atoms.worktreeChangesRefresh)).not.toBe(previousSignal);
+          }
+          expect(store.get(manager.atoms.activity)).toBe(activity);
+          expect(store.get(manager.atoms.agentStatus)).toBe(status);
+          expect(store.get(manager.atoms.cloudStatus)).toBe(cloudStatus);
+          expect(store.get(manager.atoms.messagesList)).toBe(messages);
+          expect(store.get(manager.atoms.pendingMessages)).toBe(pending);
+        }
+        const oldOnMessage = mockWs.onmessage;
+        manager.destroy();
+        oldOnMessage?.({
+          data: JSON.stringify({
+            eventId: 14,
+            sessionId: cloudAgentSessionId,
+            streamEventType: 'cloud.worktree.changes.ready',
+            timestamp: '2026-09-02T00:00:00.000Z',
+            data: { revision: 4 },
+          }),
+        } as MessageEvent);
+        expect(store.get(manager.atoms.worktreeChangesRefresh)).toBeNull();
+      } finally {
+        unsubscribe();
+        manager.destroy();
+        jest.useRealTimers();
+      }
+    }
+  );
+});
 
 describe('session transport delegation (cloud agent)', () => {
   it('session.send() delegates to api.send with resolved cloudAgentSessionId', async () => {

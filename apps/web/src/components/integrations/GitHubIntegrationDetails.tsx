@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
 import { DevAddGitHubInstallationCard } from './DevAddGitHubInstallationCard';
@@ -120,6 +120,27 @@ export function buildAppReturnOutcomeView(input: {
   };
 }
 
+export function getGitHubUserConnectionErrorMessage(
+  error: string | undefined,
+  flow: string | null
+): string | null {
+  if (flow !== 'user-connect') return null;
+  switch (error) {
+    case 'authorization_cancelled':
+      return 'GitHub account authorization was cancelled. Start a new connection when you are ready.';
+    case 'missing_code':
+      return 'GitHub did not return a valid authorization code. Start a new connection.';
+    case 'invalid_state':
+      return 'This GitHub account connection attempt is no longer valid. Start a new connection.';
+    case 'connection_failed':
+      return 'We could not complete your GitHub account connection. Start a new connection and try again.';
+    case 'account_mismatch':
+      return 'Sign in to the Kilo account that started this GitHub connection, then start a new connection.';
+    default:
+      return null;
+  }
+}
+
 function GitHubIntegrationOutcomeToasts({
   success,
   userConnectionSuccess,
@@ -170,7 +191,11 @@ function GitHubIntegrationOutcomeToasts({
     } else if (error === 'install_state_user_mismatch') {
       // Handled by the fromApp fallback card or non-app mismatch landing.
     } else if (error) {
-      toast.error(`GitHub connection failed: ${error}`);
+      const userConnectionMessage = getGitHubUserConnectionErrorMessage(
+        error,
+        new URLSearchParams(window.location.search).get('flow')
+      );
+      toast.error(userConnectionMessage ?? `GitHub connection failed: ${error}`);
     }
   }, [success, userConnectionSuccess, error, pendingApproval, existingPendingOrg]);
 
@@ -178,6 +203,31 @@ function GitHubIntegrationOutcomeToasts({
 }
 
 export function GitHubIntegrationDetails(props: GitHubIntegrationDetailsProps) {
+  if (props.error === 'install_state_invalid') {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Restart GitHub setup</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-muted-foreground text-sm">
+            This setup link has expired, has already been used, or is invalid. Start GitHub setup
+            again from the Kilo account and organization you want to connect.
+          </p>
+          <Button asChild>
+            <Link
+              href={
+                props.fromApp ? '/cloud/sessions?error=install_state_unusable' : '/integrations'
+              }
+            >
+              {props.fromApp ? 'Return to Kilo App' : 'Open integration settings'}
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       <GitHubIntegrationOutcomeToasts {...props} />
@@ -257,6 +307,7 @@ function GitHubIntegrationDetailsContent({
   // Track selected model
   const [selectedModel, setSelectedModel] = useState<string>('');
   const installationDetectedRef = useRef(false);
+  const launchedInstallStates = useRef(new Set<string>());
 
   const { data: onboardingAppType } = useQuery({
     ...trpc.githubApps.getAppType.queryOptions(input),
@@ -421,6 +472,11 @@ function GitHubIntegrationDetailsContent({
       // second mint.  The state token is the raw database token; it must be
       // passed to GitHub exactly as received.
       if (installState) {
+        if (launchedInstallStates.current.has(installState)) {
+          window.location.href = `/github-app?error=install_state_invalid${fromApp ? '&fromApp=1' : ''}`;
+          return;
+        }
+        launchedInstallStates.current.add(installState);
         const installUrl = `https://github.com/apps/${githubAppName}/installations/new?state=${encodeURIComponent(buildGitHubInstallState(installState))}`;
         window.open(installUrl, '_blank', 'noopener,noreferrer');
         return;
@@ -448,6 +504,10 @@ function GitHubIntegrationDetailsContent({
    * token was consumed by the callback.  A retry must never reuse it.
    */
   const handleAppRetry = async () => {
+    if (installState) {
+      window.location.href = `/github-app?error=install_state_invalid${fromApp ? '&fromApp=1' : ''}`;
+      return;
+    }
     try {
       const result = await mintInstallState.mutateAsync({
         organizationId: organizationId ?? undefined,

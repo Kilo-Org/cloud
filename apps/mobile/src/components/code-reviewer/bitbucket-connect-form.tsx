@@ -24,7 +24,7 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
       { accessToken: token },
       {
         onSuccess: () => {
-          toast.success(t('codeReviewer.bitbucketConnect.connected'));
+          toast.success(t('common.bitbucketConnected'));
         },
       }
     );
@@ -32,9 +32,7 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="gap-3 rounded-lg bg-secondary p-6">
-      <Text className="text-center text-sm font-medium">
-        {t('codeReviewer.bitbucketConnect.title')}
-      </Text>
+      <Text className="text-center text-sm font-medium">{t('common.connectBitbucket')}</Text>
       <Text className="text-center text-xs text-muted-foreground">
         {t('codeReviewer.bitbucketConnect.description')}
       </Text>
@@ -59,7 +57,7 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
         onPress={onConnect}
       >
         {connect.isPending ? <ActivityIndicator size="small" /> : null}
-        <Text>{t('codeReviewer.bitbucketConnect.connect')}</Text>
+        <Text>{t('common.connect')}</Text>
       </Button>
     </View>
   );

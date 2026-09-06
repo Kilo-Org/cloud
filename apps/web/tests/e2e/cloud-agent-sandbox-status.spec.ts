@@ -5,6 +5,7 @@ import { organization_memberships, organizations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import type { SandboxStatusSnapshot } from '@/routers/cloud-agent-next-schemas';
+import type { WorktreeChangesSnapshot } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 const firstId = 'ses_sandbox_status_first';
 const secondId = 'ses_sandbox_status_second';
@@ -37,6 +38,7 @@ type SessionFixture = {
   kind?: 'remote' | 'read-only' | 'unresolved' | 'unrelated';
 };
 type StatusRequest = { cloudAgentSessionId: string; organizationId?: string; at: number };
+type WorktreeChangesRequest = { cloudAgentSessionId: string; organizationId?: string };
 type RpcResult =
   | { result: { data: unknown } }
   | { error: { message: string; code: number; data: { code: string; httpStatus: number } } };
@@ -63,6 +65,33 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
+function worktreeSnapshot(revision: number): WorktreeChangesSnapshot {
+  return {
+    schemaVersion: 1,
+    revision,
+    capturedAt: new Date(baseTime + revision).toISOString(),
+    comparison: {
+      baseRef: 'refs/remotes/origin/main',
+      mergeBase: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+    },
+    files: [
+      {
+        path: `src/revision-${revision}.ts`,
+        status: 'modified',
+        additions: revision,
+        deletions: 0,
+        tracked: true,
+        binary: false,
+        countsComplete: true,
+      },
+    ],
+    truncated: false,
+  };
+}
+
+const worktreeSummary = (revision: number) => `1 changed files, ${revision} additions, 0 deletions`;
+
 async function mountFixtures(
   page: Page,
   sessions: SessionFixture[] = [
@@ -73,9 +102,21 @@ async function mountFixtures(
   let now = baseTime;
   await page.clock.install({ time: new Date(baseTime) });
   const statusRequests: StatusRequest[] = [];
+  const worktreeRequests: WorktreeChangesRequest[] = [];
   const procedures: string[] = [];
   const sockets = new Map<string, WebSocketRoute>();
+  const replayedReadyRevisions = new Map<string, number[]>();
+  const savedChanges = new Map<string, WorktreeChangesSnapshot>();
+  const worktreeKey = (cloudId: string, organizationId?: string) =>
+    `${organizationId ?? 'personal'}:${cloudId}`;
   let reply: (request: StatusRequest) => RpcResult | Promise<RpcResult> = () => success(snapshot());
+  let worktreeReply: (
+    request: WorktreeChangesRequest
+  ) => RpcResult | Promise<RpcResult> = request =>
+    success({
+      snapshot:
+        savedChanges.get(worktreeKey(request.cloudAgentSessionId, request.organizationId)) ?? null,
+    });
   let eventId = 0;
 
   function snapshot(overrides: Partial<SandboxStatusSnapshot> = {}): SandboxStatusSnapshot {
@@ -121,11 +162,11 @@ async function mountFixtures(
     };
   }
 
-  function send(cloudId: string, streamEventType: string, data: unknown) {
+  function send(cloudId: string, streamEventType: string, data: unknown, sessionId = cloudId) {
     sockets.get(cloudId)?.send(
       JSON.stringify({
         eventId: ++eventId,
-        sessionId: cloudId,
+        sessionId,
         streamEventType,
         timestamp: new Date(now).toISOString(),
         data,
@@ -143,6 +184,10 @@ async function mountFixtures(
     if (!cloudId) return;
     sockets.set(cloudId, socket);
     send(cloudId, 'connected', { sessionStatus: { type: 'idle' }, cloudStatus: { type: 'ready' } });
+    for (const revision of replayedReadyRevisions.get(cloudId) ?? []) {
+      send(cloudId, 'cloud.worktree.changes.ready', { revision });
+    }
+    replayedReadyRevisions.delete(cloudId);
   });
   await page.route('**/api/cloud-agent-next/sessions/stream-ticket', route =>
     route.fulfill({
@@ -204,6 +249,19 @@ async function mountFixtures(
           });
         if (procedure === 'cliSessionsV2.getSessionMessages')
           return success({ info: { id: args.session_id }, messages: [] });
+        if (procedure.endsWith('.getWorktreeChanges')) {
+          const worktreeRequest: WorktreeChangesRequest = {
+            cloudAgentSessionId: args.cloudAgentSessionId,
+            organizationId: args.organizationId,
+          };
+          worktreeRequests.push(worktreeRequest);
+          return worktreeReply(worktreeRequest);
+        }
+        if (procedure.endsWith('.refreshWorktreeChanges')) {
+          const snapshot =
+            savedChanges.get(worktreeKey(args.cloudAgentSessionId, args.organizationId)) ?? null;
+          return success({ status: snapshot ? 'refreshed' : 'offline', snapshot });
+        }
         if (procedure.endsWith('.getComputeBillingStatus'))
           return success({ phase: 'unavailable' });
         if (procedure.endsWith('.sendMessage'))
@@ -226,10 +284,38 @@ async function mountFixtures(
 
   return {
     statusRequests,
+    worktreeRequests,
     procedures,
     snapshot,
     setReply(handler: typeof reply) {
       reply = handler;
+    },
+    setWorktreeReply(handler: typeof worktreeReply) {
+      worktreeReply = handler;
+    },
+    setWorktreeChanges(
+      snapshot: WorktreeChangesSnapshot,
+      cloudId = firstWorkspace,
+      organizationId?: string
+    ) {
+      savedChanges.set(worktreeKey(cloudId, organizationId), snapshot);
+    },
+    async worktreeReady(cloudId: string, revision: number, sessionId = cloudId) {
+      await expect.poll(() => sockets.has(cloudId)).toBe(true);
+      send(cloudId, 'cloud.worktree.changes.ready', { revision }, sessionId);
+    },
+    async reconnect(cloudId: string, readyRevisions: number[] = []) {
+      const previous = sockets.get(cloudId);
+      if (!previous) throw new Error('Missing stream socket');
+      replayedReadyRevisions.set(cloudId, readyRevisions);
+      await previous.close({ code: 1012, reason: 'Test stream reconnect' });
+      await expect
+        .poll(async () => {
+          await page.clock.fastForward(1_000);
+          return sockets.get(cloudId) !== previous;
+        })
+        .toBe(true);
+      now = await page.evaluate(() => Date.now());
     },
     async open(id = firstId, organizationId?: string) {
       await page.goto(
@@ -483,6 +569,329 @@ test.describe('control-plane sandbox header', () => {
       }
     }
   });
+
+  test('keeps status and changes controls distinct across workspace navigation', async ({
+    page,
+  }) => {
+    const duplicateKeyErrors: string[] = [];
+    page.on('console', message => {
+      if (message.text().includes('Encountered two children with the same key')) {
+        duplicateKeyErrors.push(message.text());
+      }
+    });
+    const fixture = await mountFixtures(page);
+    fixture.setReply(request =>
+      success(
+        fixture.snapshot(
+          request.cloudAgentSessionId === secondWorkspace
+            ? { status: 'sleeping', detailCode: 'sandbox_stopped', estimatedSleepAt: null }
+            : {}
+        )
+      )
+    );
+    await fixture.open();
+    for (const [sessionId, status] of [
+      [firstId, 'Active'],
+      [secondId, 'Sleeping'],
+      [firstId, 'Active'],
+    ]) {
+      await fixture.navigate(sessionId);
+      await expect(indicator(page)).toHaveAccessibleName(`Sandbox status: ${status}`);
+      const changes = page.getByRole('button', { name: 'Changes', exact: true });
+      await expect(changes).toHaveCount(1);
+      await expect(changes).toBeVisible();
+      expect(duplicateKeyErrors).toEqual([]);
+    }
+  });
+
+  for (const scope of ['personal', 'organization'] as const) {
+    test(`pushes saved file changes and reconciles reconnects without polling in ${scope} scope`, async ({
+      page,
+    }) => {
+      async function run(organizationId?: string) {
+        const fixture = await mountFixtures(page, [
+          { id: firstId, cloudId: firstWorkspace, title: 'Push updates', organizationId },
+        ]);
+        const readCount = () => fixture.worktreeRequests.length;
+        const captureCount = () =>
+          fixture.procedures.filter(procedure => procedure.endsWith('.refreshWorktreeChanges'))
+            .length;
+        const publish = (revision: number) =>
+          fixture.setWorktreeChanges(worktreeSnapshot(revision), firstWorkspace, organizationId);
+        const changes = page.getByRole('button', { name: 'Changes', exact: true });
+        const drawer = page.getByRole('dialog', { name: 'Changes', exact: true });
+        publish(1);
+        await fixture.open(firstId, organizationId);
+        await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+        await fixture.activity(firstWorkspace, 'busy');
+        await expect(
+          page.getByRole('button', { name: 'Stop response', exact: true })
+        ).toBeVisible();
+        await fixture.advance(1_000);
+        const initialReads = readCount();
+        publish(2);
+        await fixture.advance(15_000);
+        expect(readCount()).toBe(initialReads);
+        await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+
+        await fixture.worktreeReady(firstWorkspace, 2);
+        await expect(changes).toHaveAttribute('aria-description', worktreeSummary(2));
+        expect(readCount()).toBe(initialReads + 1);
+        expect(captureCount()).toBe(0);
+        await fixture.worktreeReady(firstWorkspace, 2);
+        await fixture.worktreeReady(firstWorkspace, 1);
+        await fixture.activity(firstWorkspace, 'idle');
+        await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toHaveCount(
+          0
+        );
+        publish(3);
+        await fixture.advance(40_000);
+        expect(readCount()).toBe(initialReads + 1);
+        await expect(changes).toHaveAttribute('aria-description', worktreeSummary(2));
+
+        await changes.click();
+        await expect(drawer.getByText('revision-3.ts', { exact: true })).toBeVisible();
+        await expect.poll(captureCount).toBe(1);
+        const openReads = readCount();
+        publish(4);
+        await fixture.advance(15_000);
+        expect(readCount()).toBe(openReads);
+        await expect(drawer.getByText('revision-3.ts', { exact: true })).toBeVisible();
+        await fixture.worktreeReady(firstWorkspace, 4);
+        await expect(drawer.getByText('revision-4.ts', { exact: true })).toBeVisible();
+        await expect(changes).toHaveAttribute('aria-description', worktreeSummary(4));
+        expect(readCount()).toBe(openReads + 1);
+        expect(captureCount()).toBe(1);
+        await page.keyboard.press('Escape');
+        await expect(drawer).toHaveCount(0);
+        const closedReads = readCount();
+        publish(5);
+        await fixture.advance(15_000);
+        expect(readCount()).toBe(closedReads);
+        await fixture.reconnect(firstWorkspace, [4, 3]);
+        await expect(changes).toHaveAttribute('aria-description', worktreeSummary(5));
+        expect(readCount()).toBe(closedReads + 1);
+        expect(captureCount()).toBe(1);
+        expect(
+          fixture.worktreeRequests.every(
+            request =>
+              request.cloudAgentSessionId === firstWorkspace &&
+              request.organizationId === organizationId
+          )
+        ).toBe(true);
+      }
+      if (scope === 'organization') await withOrganization(page, run);
+      else await run();
+    });
+  }
+
+  test('retries a transient final saved read without another ready notification', async ({
+    page,
+  }) => {
+    const fixture = await mountFixtures(page);
+    fixture.setWorktreeChanges(worktreeSnapshot(1));
+    await fixture.open();
+    const changes = page.getByRole('button', { name: 'Changes', exact: true });
+    await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+    await fixture.activity(firstWorkspace, 'busy');
+    await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+    await fixture.advance(1_000);
+    let attempts = 0;
+    fixture.setWorktreeReply(() =>
+      ++attempts === 1 ? failure() : success({ snapshot: worktreeSnapshot(2) })
+    );
+    await fixture.worktreeReady(firstWorkspace, 2);
+    await expect.poll(() => attempts).toBe(1);
+    await fixture.advance(1_100);
+    await expect(changes).toHaveAttribute('aria-description', worktreeSummary(2));
+    expect(attempts).toBe(2);
+    await fixture.advance(15_000);
+    expect(attempts).toBe(2);
+  });
+
+  for (const { code, attempts: expectedAttempts } of [
+    { code: 'INTERNAL_SERVER_ERROR', attempts: 3 },
+    { code: 'FORBIDDEN', attempts: 1 },
+  ]) {
+    test(`bounds saved-read retries for ${code} and accepts a later ready revision`, async ({
+      page,
+    }) => {
+      const fixture = await mountFixtures(page);
+      fixture.setWorktreeChanges(worktreeSnapshot(1));
+      await fixture.open();
+      const changes = page.getByRole('button', { name: 'Changes', exact: true });
+      await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+      await fixture.activity(firstWorkspace, 'busy');
+      await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+      await fixture.advance(1_000);
+      let attempts = 0;
+      fixture.setWorktreeReply(() => {
+        attempts++;
+        return failure(code);
+      });
+      await fixture.worktreeReady(firstWorkspace, 2);
+      await expect.poll(() => attempts).toBe(1);
+      for (let attempt = 2; attempt <= expectedAttempts; attempt++) {
+        await fixture.advance(2_100);
+        await expect.poll(() => attempts).toBe(attempt);
+      }
+      await fixture.advance(30_000);
+      expect(attempts).toBe(expectedAttempts);
+      await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+      fixture.setWorktreeReply(() => success({ snapshot: worktreeSnapshot(3) }));
+      await fixture.worktreeReady(firstWorkspace, 3);
+      await expect(changes).toHaveAttribute('aria-description', worktreeSummary(3));
+    });
+  }
+
+  test('coalesces ready bursts and reconnects behind one saved read', async ({ page }) => {
+    const fixture = await mountFixtures(page);
+    fixture.setWorktreeChanges(worktreeSnapshot(1));
+    await fixture.open();
+    const changes = page.getByRole('button', { name: 'Changes', exact: true });
+    await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+    await fixture.activity(firstWorkspace, 'busy');
+    await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+    await fixture.advance(1_000);
+    const held = deferred<RpcResult>();
+    let reads = 0;
+    fixture.setWorktreeReply(() =>
+      ++reads === 1 ? held.promise : success({ snapshot: worktreeSnapshot(5) })
+    );
+    try {
+      await fixture.worktreeReady(firstWorkspace, 2);
+      await expect.poll(() => reads).toBe(1);
+      for (const revision of [3, 5, 4]) {
+        await fixture.worktreeReady(firstWorkspace, revision);
+        await fixture.advance(1);
+      }
+      await fixture.reconnect(firstWorkspace, [4, 3]);
+      await fixture.advance(1_000);
+      expect(reads).toBe(1);
+      held.resolve(success({ snapshot: worktreeSnapshot(2) }));
+      await expect(changes).toHaveAttribute('aria-description', worktreeSummary(5));
+      expect(reads).toBe(2);
+      await fixture.advance(15_000);
+      expect(reads).toBe(2);
+    } finally {
+      held.resolve(success({ snapshot: worktreeSnapshot(2) }));
+    }
+  });
+
+  test('a ready notification supersedes an in-flight initial saved read', async ({ page }) => {
+    const fixture = await mountFixtures(page);
+    let abortedReads = 0;
+    page.on('requestfailed', request => {
+      if (
+        request.url().includes('.getWorktreeChanges') &&
+        request.failure()?.errorText.includes('ABORTED')
+      )
+        abortedReads++;
+    });
+    const held = deferred<RpcResult>();
+    let ready = false;
+    fixture.setWorktreeReply(() =>
+      ready ? success({ snapshot: worktreeSnapshot(2) }) : held.promise
+    );
+    try {
+      await fixture.open();
+      await fixture.activity(firstWorkspace, 'busy');
+      await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+      await fixture.advance(1_000);
+      await expect.poll(() => fixture.worktreeRequests.length).toBeGreaterThan(0);
+      const initialReads = fixture.worktreeRequests.length;
+      const initialAbortedReads = abortedReads;
+      ready = true;
+      await fixture.worktreeReady(firstWorkspace, 2);
+      const changes = page.getByRole('button', { name: 'Changes', exact: true });
+      await expect(changes).toHaveAttribute('aria-description', worktreeSummary(2));
+      expect(fixture.worktreeRequests.length).toBe(initialReads + 1);
+      await expect.poll(() => abortedReads).toBeGreaterThan(initialAbortedReads);
+      held.resolve(success({ snapshot: worktreeSnapshot(1) }));
+      await fixture.advance(15_000);
+      await expect(changes).toHaveAttribute('aria-description', worktreeSummary(2));
+      expect(fixture.worktreeRequests.length).toBe(initialReads + 1);
+    } finally {
+      held.resolve(success({ snapshot: worktreeSnapshot(1) }));
+    }
+  });
+
+  test('ignores ready notifications for another session after navigation', async ({ page }) => {
+    const fixture = await mountFixtures(page);
+    fixture.setWorktreeChanges(worktreeSnapshot(7));
+    fixture.setWorktreeChanges(worktreeSnapshot(1), secondWorkspace);
+    const changes = page.getByRole('button', { name: 'Changes', exact: true });
+    await fixture.open();
+    await expect(changes).toHaveAttribute('aria-description', worktreeSummary(7));
+    await fixture.navigate(secondId);
+    await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+    await fixture.activity(secondWorkspace, 'busy');
+    await expect(page.getByRole('button', { name: 'Stop response', exact: true })).toBeVisible();
+    await fixture.advance(1_000);
+    const selectedReads = fixture.worktreeRequests.length;
+    fixture.setWorktreeChanges(worktreeSnapshot(2), secondWorkspace);
+    await fixture.worktreeReady(secondWorkspace, 8, firstWorkspace);
+    await fixture.advance(15_000);
+    expect(fixture.worktreeRequests.length).toBe(selectedReads);
+    await expect(changes).toHaveAttribute('aria-description', worktreeSummary(1));
+    await fixture.worktreeReady(secondWorkspace, 2);
+    await expect(changes).toHaveAttribute('aria-description', worktreeSummary(2));
+    expect(fixture.worktreeRequests.slice(selectedReads)).toEqual([
+      { cloudAgentSessionId: secondWorkspace, organizationId: undefined },
+    ]);
+  });
+
+  for (const { width, reducedMotion } of [
+    { width: 375, reducedMotion: 'no-preference' },
+    { width: 820, reducedMotion: 'no-preference' },
+    { width: 1440, reducedMotion: 'no-preference' },
+    { width: 1440, reducedMotion: 'reduce' },
+  ] as const) {
+    test(`opens Changes without scrolling the chat at ${width}px with ${reducedMotion} motion`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1000 });
+      await page.emulateMedia({ reducedMotion });
+      const fixture = await mountFixtures(page);
+      await fixture.open();
+      await expect(indicator(page)).toHaveAccessibleName('Sandbox status: Active');
+      await page.addStyleTag({
+        content:
+          '#worktree-changes-panel[data-state="open"] { animation-play-state: paused !important; }',
+      });
+      const changes = page.getByRole('button', { name: 'Changes', exact: true });
+      const drawer = page.getByRole('dialog', { name: 'Changes', exact: true });
+      for (const layout of ['Flat', 'Tree']) {
+        await changes.click();
+        await expect(drawer.getByRole('tab', { name: layout, exact: true })).toBeFocused();
+        const opening = await drawer.evaluate(element => {
+          const scrollOffsets: number[] = [];
+          for (let parent = element.parentElement; parent; parent = parent.parentElement) {
+            if (parent.scrollLeft !== 0) scrollOffsets.push(parent.scrollLeft);
+          }
+          return {
+            left: element.getBoundingClientRect().left,
+            width: element.getBoundingClientRect().width,
+            scrollOffsets,
+          };
+        });
+        expect(opening.scrollOffsets).toEqual([]);
+        await drawer.evaluate(element => {
+          for (const animation of element.getAnimations()) animation.finish();
+        });
+        const openedLeft = await drawer.evaluate(element => element.getBoundingClientRect().left);
+        expect(opening.left - openedLeft).toBeCloseTo(
+          reducedMotion === 'reduce' ? 0 : opening.width,
+          0
+        );
+        await expect(drawer).toBeInViewport();
+        await drawer.getByRole('tab', { name: 'Tree', exact: true }).click();
+        await page.keyboard.press('Escape');
+        await expect(drawer).toHaveCount(0);
+        await expect(changes).toBeFocused();
+      }
+    });
+  }
 
   test('keeps the sandbox icon fixed with distinct static lifecycle badges independently of agent progress', async ({
     page,
@@ -935,7 +1344,7 @@ test.describe('control-plane sandbox header', () => {
     await expectDebugCollapsed(page);
     await expect(debugSummary(page)).toBeFocused();
     await page.keyboard.press('Tab');
-    await expect(page.getByRole('button', { name: 'Mute completion sounds' })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Changes', exact: true })).toBeFocused();
     await expect(details(page)).toHaveCount(0);
     await indicator(page).click();
     await expect(details(page)).toBeVisible();
@@ -1005,7 +1414,7 @@ test.describe('control-plane sandbox header', () => {
         await expect(page.getByRole('tooltip')).toHaveCount(0);
         const destination =
           key === 'Tab'
-            ? page.getByRole('button', { name: 'Mute completion sounds' })
+            ? page.getByRole('button', { name: 'Changes', exact: true })
             : key === 'Shift+Tab'
               ? page.getByRole('button', { name: 'New terminal' })
               : indicator(page);

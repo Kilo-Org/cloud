@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull, asc, desc, sql } from 'drizzle-orm';
+import { eq, and, or, isNull, asc, desc, sql } from 'drizzle-orm';
 import type {
   GitHubRequester,
   IntegrationPermissions,
@@ -361,6 +361,29 @@ export async function deleteIntegration(
   }
 
   await db.delete(platform_integrations).where(and(...conditions));
+}
+
+export async function deleteGitHubInstallationRecords(
+  installationId: string,
+  githubAppType: GitHubAppType
+) {
+  const appTypeCondition =
+    githubAppType === 'standard'
+      ? or(
+          eq(platform_integrations.github_app_type, githubAppType),
+          isNull(platform_integrations.github_app_type)
+        )
+      : eq(platform_integrations.github_app_type, githubAppType);
+
+  await db
+    .delete(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.GITHUB),
+        eq(platform_integrations.platform_installation_id, installationId),
+        appTypeCondition
+      )
+    );
 }
 
 /**

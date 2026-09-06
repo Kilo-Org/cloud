@@ -10,6 +10,7 @@ import {
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionSyncResultSchema,
   type SessionEventPayload,
+  type SessionGitSummaryResult,
 } from '../../../src/shared/sandbox-control-protocol';
 import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from '../kilo-api';
 import { materializeMessageAttachments } from '../session-bootstrap';
@@ -17,8 +18,10 @@ import { runProcess, withTimeoutAndAbort } from '../utils';
 import { applySessionAttach } from './apply-attach';
 import { updateSessionSnapshots, unfilteredKiloEvents } from './feed';
 import {
+  forgetAttachedRoot,
   rememberAttachedRoot,
   rememberChildSession,
+  rememberSessionDirectory,
   resetSessionDirectoryState,
 } from './session-directories';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
@@ -4804,5 +4807,300 @@ describe('createSessionActivityRegistry', () => {
     expect(activity.snapshots()).toEqual([
       { kiloSessionId: 'root_a', state: 'idle', idleForMs: 0 },
     ]);
+  });
+});
+
+describe('session.git.summary', () => {
+  const captured: SessionGitSummaryResult = {
+    revision: 1,
+    comparison: {
+      baseRef: 'refs/remotes/origin/main',
+      mergeBase: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+    },
+    files: [],
+    truncated: false,
+  };
+
+  beforeEach(() => {
+    resetSessionDirectoryState();
+  });
+
+  it('allows each attached shared-worktree root without waking Kilo or changing activity', async () => {
+    const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
+    const activity = createSessionActivityRegistry(() => 100);
+    const directories: string[] = [];
+    for (const identity of [session, sibling]) {
+      rememberAttachedRoot(identity.kiloSessionId, identity.directory);
+      activity.attach(identity.kiloSessionId);
+    }
+    activity.markActive(session.kiloSessionId);
+    const snapshots = activity.snapshots();
+    const handlerDeps = deps({
+      kiloClient: undefined,
+      kiloReady: false,
+      activity,
+      collectWorktreeChanges: async directory => {
+        directories.push(directory);
+        return captured;
+      },
+    });
+
+    expect(rootForSession(undefined, session.directory)).toBeUndefined();
+    for (const identity of [session, sibling]) {
+      expect(
+        await handleControlRequest('session.git.summary', identity, { revision: 1 }, handlerDeps)
+      ).toEqual({ ok: true, result: captured });
+    }
+    expect(directories).toEqual([session.directory, session.directory]);
+    expect(activity.snapshots()).toEqual(snapshots);
+    expect(handlerDeps.sessions).toEqual([]);
+    expect(handlerDeps.tasks.size).toBe(0);
+  });
+
+  it('drains in-flight capture before deletion and rejects late results without fencing another worktree', async () => {
+    const sibling = { sessionId: 'ses_2', kiloSessionId: 'kilo_2', directory: '/other' };
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+    const started = Promise.withResolvers<void>();
+    const capture = Promise.withResolvers<SessionGitSummaryResult>();
+    const directories: string[] = [];
+    const handlerDeps = deps({
+      kiloClient: undefined,
+      collectWorktreeChanges: async directory => {
+        directories.push(directory);
+        if (directory !== session.directory) return captured;
+        started.resolve();
+        return capture.promise;
+      },
+    });
+    const request = handleControlRequest(
+      'session.git.summary',
+      session,
+      { revision: 1 },
+      handlerDeps
+    );
+    await started.promise;
+    let fenced = false;
+    const deletion = fenceDirectoryOperations(session.directory).then(() => {
+      fenced = true;
+    });
+    try {
+      await Promise.resolve();
+      expect(fenced).toBe(false);
+      expect(
+        await handleControlRequest('session.git.summary', session, { revision: 2 }, handlerDeps)
+      ).toEqual({
+        ok: false,
+        error: { code: 'not_ready', message: 'Worktree is being deleted', retryable: false },
+      });
+      expect(
+        await handleControlRequest('session.git.summary', sibling, { revision: 1 }, handlerDeps)
+      ).toEqual({ ok: true, result: captured });
+      expect(directories).toEqual([session.directory, sibling.directory]);
+      expect(fenced).toBe(false);
+      capture.resolve(captured);
+      expect(await request).toEqual({
+        ok: false,
+        error: { code: 'not_ready', message: 'Worktree is being deleted', retryable: false },
+      });
+      await deletion;
+      expect(fenced).toBe(true);
+      expect(handlerDeps.tasks.size).toBe(0);
+      expect(handlerDeps.sessions).toEqual([]);
+    } finally {
+      capture.resolve(captured);
+      await Promise.all([request, deletion]);
+    }
+  });
+
+  it.each(['detached', 'moved', 'retired'] as const)(
+    'rejects capture completed after its root is %s while preserving its sibling',
+    async change => {
+      const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
+      rememberAttachedRoot(session.kiloSessionId, session.directory);
+      rememberAttachedRoot(sibling.kiloSessionId, sibling.directory);
+      const abort = new AbortController();
+      const started = Promise.withResolvers<AbortSignal | undefined>();
+      const capture = Promise.withResolvers<SessionGitSummaryResult>();
+      const handlerDeps = deps({
+        kiloClient: undefined,
+        signal: abort.signal,
+        collectWorktreeChanges: async (_directory, _request, _runGit, signal) => {
+          started.resolve(signal);
+          return capture.promise;
+        },
+      });
+      const request = handleControlRequest(
+        'session.git.summary',
+        session,
+        { revision: 1 },
+        handlerDeps
+      );
+      try {
+        expect(await started.promise).toBe(abort.signal);
+        if (change === 'detached') {
+          expect(await handleControlRequest('session.detach', session, {}, handlerDeps)).toEqual({
+            ok: true,
+            result: { detached: true },
+          });
+        } else if (change === 'moved') {
+          rememberAttachedRoot(session.kiloSessionId, '/moved');
+        } else {
+          abort.abort();
+        }
+        capture.resolve(captured);
+        expect(await request).toEqual({
+          ok: false,
+          error:
+            change === 'retired'
+              ? { code: 'not_ready', message: 'Kilo is not ready', retryable: true }
+              : {
+                  code: 'not_ready',
+                  message: 'Session directory is not attached',
+                  retryable: false,
+                },
+        });
+        expect(rootForSession(sibling.kiloSessionId, sibling.directory)).toBe(
+          sibling.kiloSessionId
+        );
+        expect(handlerDeps.tasks.size).toBe(0);
+      } finally {
+        capture.resolve(captured);
+        await request;
+      }
+    }
+  );
+
+  it('collects only from the attached root without calling Kilo or attaching anything', async () => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    const calls: unknown[] = [];
+    const capture = {
+      revision: 12,
+      comparison: {
+        baseRef: 'refs/remotes/origin/main',
+        mergeBase: 'a'.repeat(40),
+        head: 'b'.repeat(40),
+      },
+      files: [],
+      truncated: false,
+    };
+    const payload = { revision: 12, baseRef: 'refs/remotes/origin/main' };
+    const result = await handleControlRequest(
+      'session.git.summary',
+      session,
+      payload,
+      deps({
+        kiloClient: undefined,
+        kiloReady: false,
+        collectWorktreeChanges: async (directory, request) => {
+          calls.push({ directory, request });
+          return capture;
+        },
+      })
+    );
+    expect(calls).toEqual([{ directory: session.directory, request: payload }]);
+    expect(result).toEqual({ ok: true, result: capture });
+  });
+
+  it('requires the request envelope identity', async () => {
+    const result = await handleControlRequest(
+      'session.git.summary',
+      undefined,
+      { revision: 1 },
+      deps()
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'session identity is required', retryable: false },
+    });
+  });
+
+  it.each([
+    'unattached',
+    'directory-only',
+    'wrong-directory',
+    'child',
+    'unknown-root',
+    'detached-root',
+  ])('rejects %s scope without running capture', async scope => {
+    if (scope === 'directory-only')
+      rememberSessionDirectory(session.kiloSessionId, session.directory);
+    if (scope === 'wrong-directory') rememberAttachedRoot(session.kiloSessionId, '/other');
+    if (scope === 'child') {
+      rememberAttachedRoot('root', session.directory);
+      rememberChildSession({
+        childId: session.kiloSessionId,
+        parentId: 'root',
+        directory: session.directory,
+      });
+    }
+    if (scope === 'unknown-root') rememberAttachedRoot('other', session.directory);
+    if (scope === 'detached-root') {
+      rememberAttachedRoot(session.kiloSessionId, session.directory);
+      rememberAttachedRoot('replacement', session.directory);
+      forgetAttachedRoot(session.kiloSessionId, session.directory);
+    }
+    let called = false;
+    const result = await handleControlRequest(
+      'session.git.summary',
+      session,
+      { revision: 1 },
+      deps({
+        collectWorktreeChanges: async () => {
+          called = true;
+          throw new Error('Must not run');
+        },
+      })
+    );
+    expect(called).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'not_ready', message: 'Session directory is not attached', retryable: false },
+    });
+  });
+
+  it.each([
+    { revision: 1, directory: '/outside' },
+    { revision: 1, baseRef: '--help' },
+    { revision: 0 },
+    { revision: Number.MAX_SAFE_INTEGER + 1 },
+  ])('rejects invalid payload %j without capture', async payload => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    let called = false;
+    const result = await handleControlRequest(
+      'session.git.summary',
+      session,
+      payload,
+      deps({
+        collectWorktreeChanges: async () => {
+          called = true;
+          throw new Error('Must not run');
+        },
+      })
+    );
+    expect(called).toBe(false);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
+    });
+  });
+
+  it('returns a safe failure without exposing subprocess output or file data', async () => {
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    const result = await handleControlRequest(
+      'session.git.summary',
+      session,
+      { revision: 1 },
+      deps({
+        collectWorktreeChanges: async () => {
+          throw new Error('private stdout, stderr, file contents, token');
+        },
+      })
+    );
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'capture_failed', message: 'Worktree capture failed', retryable: true },
+    });
   });
 });

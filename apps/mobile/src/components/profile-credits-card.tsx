@@ -100,8 +100,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   const selectedLabel = selectedOrgId
     ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
-      t('profile.organization'))
-    : t('profile.personal');
+      t('common.organization'))
+    : t('common.personal');
 
   const canPickContext = orgs !== undefined;
 

@@ -37,7 +37,7 @@ export function useConversationOptionsSheet({
       {
         title: conversationTitle,
         options: [
-          i18n.t('chat.conversation.rename'),
+          i18n.t('common.rename'),
           i18n.t('chat.conversation.leave'),
           i18n.t('common.cancel'),
         ],

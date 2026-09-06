@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils';
 type FindingTab = 'details' | 'analysis' | 'remediation';
 
 const TABS = [
-  { key: 'details', labelKey: 'securityAgent.findingDetail.tabDetails' },
+  { key: 'details', labelKey: 'common.details' },
   { key: 'analysis', labelKey: 'securityAgent.findingDetail.tabAnalysis' },
   { key: 'remediation', labelKey: 'securityAgent.findingDetail.tabRemediation' },
 ] as const satisfies readonly { key: FindingTab; labelKey: string }[];
@@ -124,8 +124,8 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
         />
         <EmptyState
           icon={ShieldOff}
-          title={t('securityAgent.findingDetail.notFound')}
-          description={t('securityAgent.findingDetail.notFoundDescription')}
+          title={t('securityAgent.dismiss.notFoundTitle')}
+          description={t('securityAgent.dismiss.notFoundDescription')}
         />
       </View>
     );
@@ -140,7 +140,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           onBack={handleBack}
         />
         <QueryError
-          message={t('securityAgent.findingDetail.couldNotLoad')}
+          message={t('securityAgent.dismiss.couldNotLoad')}
           onRetry={() => void findingQuery.refetch()}
         />
       </View>
@@ -186,7 +186,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
                 router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.findingDetail.dismissA11y')}
+              accessibilityLabel={t('securityAgent.dismiss.title')}
               className="size-11 items-center justify-center active:opacity-70"
             >
               <Ban size={20} color={colors.mutedForeground} />
@@ -197,7 +197,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
       {findingQuery.isError ? (
         <View className="px-6 pb-2">
           <SettingsRecoveryStatus
-            message={t('securityAgent.findingDetail.couldNotLoad')}
+            message={t('securityAgent.dismiss.couldNotLoad')}
             isRetrying={findingQuery.isFetching}
             onRetry={() => void findingQuery.refetch()}
           />

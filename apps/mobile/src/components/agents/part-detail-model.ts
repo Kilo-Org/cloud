@@ -116,7 +116,7 @@ export function getPartDetailTitle(part: Part): string {
     const display = getToolDisplay(part);
     return display.subtitle ? `${display.title}: ${display.subtitle}` : display.title;
   }
-  return i18n.t('agentChat.partDetail.title');
+  return i18n.t('common.details');
 }
 
 /**

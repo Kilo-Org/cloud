@@ -40,10 +40,10 @@ type SubcaseContent = {
 const SUBCASE_CONTENT = {
   trial_expired: {
     bodyKey: 'kiloclaw.accessRequired.trialExpiredBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.trialExpiredCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionCanceledCta',
     ctaVariant: 'default',
     icon: Clock,
-    titleKey: 'kiloclaw.accessRequired.trialExpiredTitle',
+    titleKey: 'kiloclaw.accessRequired.subscriptionCanceledTitle',
     tone: 'warn',
   },
   subscription_canceled: {
@@ -56,7 +56,7 @@ const SUBCASE_CONTENT = {
   },
   subscription_past_due: {
     bodyKey: 'kiloclaw.accessRequired.subscriptionPastDueBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionPastDueCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionCanceledCta',
     ctaVariant: 'default',
     icon: AlertTriangle,
     titleKey: 'kiloclaw.accessRequired.subscriptionPastDueTitle',
@@ -64,7 +64,7 @@ const SUBCASE_CONTENT = {
   },
   quarantined: {
     bodyKey: 'kiloclaw.accessRequired.quarantinedBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.quarantinedCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
     ctaVariant: 'outline',
     icon: ShieldAlert,
     titleKey: 'kiloclaw.accessRequired.quarantinedTitle',
@@ -75,12 +75,12 @@ const SUBCASE_CONTENT = {
     ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
     ctaVariant: 'outline',
     icon: AlertTriangle,
-    titleKey: 'kiloclaw.accessRequired.multipleCurrentConflictTitle',
+    titleKey: 'kiloclaw.list.accessIssue.multipleCurrentConflict',
     tone: 'warn',
   },
   non_canonical_earlybird: {
     bodyKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
     ctaVariant: 'outline',
     icon: LifeBuoy,
     titleKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdTitle',

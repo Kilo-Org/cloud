@@ -108,9 +108,7 @@ export function MessageAttachment({ client, conversationId, block, isFromMe }: P
     return (
       <View className="aspect-[4/3] w-full items-center justify-center gap-2">
         <AlertCircle size={18} color={colors.mutedForeground} />
-        <Text className="text-xs text-muted-foreground">
-          {t('chat.attachment.imageUnavailable')}
-        </Text>
+        <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
       </View>
     );
   }

@@ -1,9 +1,59 @@
 import {
   activeSessionSchema,
+  cloudAgentEventSchema,
+  cloudWorktreeChangesReadyDataSchema,
   parseCustomerBillingFailure,
   sessionEventPayloadSchema,
   sessionEventV2RowSchema,
 } from './schemas';
+
+describe('cloudWorktreeChangesReadyDataSchema', () => {
+  it.each([1, 42, Number.MAX_SAFE_INTEGER])('accepts positive safe revision %p', revision => {
+    expect(cloudWorktreeChangesReadyDataSchema.parse({ revision })).toEqual({ revision });
+  });
+
+  it.each([
+    NaN,
+    Infinity,
+    -Infinity,
+    Number.MAX_SAFE_INTEGER + 1,
+    0,
+    -1,
+    1.5,
+    '1',
+    true,
+    null,
+    undefined,
+    {},
+    [],
+  ])('rejects invalid revision %p', revision => {
+    expect(cloudWorktreeChangesReadyDataSchema.safeParse({ revision }).success).toBe(false);
+  });
+
+  it.each([null, undefined, [], {}, { revision: 1, extra: true }])(
+    'rejects invalid payload %p',
+    data => {
+      expect(cloudWorktreeChangesReadyDataSchema.safeParse(data).success).toBe(false);
+    }
+  );
+
+  it('keeps envelope event names open and accepts events without executionId', () => {
+    const envelope = {
+      eventId: 1,
+      sessionId: 'agent-1',
+      streamEventType: 'cloud.worktree.changes.ready',
+      timestamp: '2026-09-02T00:00:00.000Z',
+      data: { revision: 1 },
+    };
+    expect(cloudAgentEventSchema.parse(envelope)).toEqual(envelope);
+    expect(
+      cloudAgentEventSchema.safeParse({
+        ...envelope,
+        streamEventType: 'future.event',
+      }).success
+    ).toBe(true);
+  });
+});
 
 describe('parseCustomerBillingFailure', () => {
   const failure = {

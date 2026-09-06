@@ -1954,7 +1954,8 @@ async function getEmailAccountCandidates(email: string) {
 
 export async function getCrossAccountEmailConflicts(
   emails: string[],
-  currentUserId: string
+  currentUserId: string,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<Map<string, boolean>> {
   const uniqueEmails = [...new Set(emails)];
   if (uniqueEmails.length === 0) return new Map();
@@ -1962,7 +1963,7 @@ export async function getCrossAccountEmailConflicts(
   const lowerEmails = [...new Set(uniqueEmails.map(email => email.toLowerCase().trim()))];
   const normalizedEmails = [...new Set(uniqueEmails.map(normalizeEmail))];
   const [linkedProviderMatches, primaryEmailMatches] = await Promise.all([
-    db
+    database
       .select({ email: user_auth_provider.email })
       .from(user_auth_provider)
       .where(
@@ -1971,7 +1972,7 @@ export async function getCrossAccountEmailConflicts(
           ne(user_auth_provider.kilo_user_id, currentUserId)
         )
       ),
-    db
+    database
       .select({
         normalizedEmail: kilocode_users.normalized_email,
         primaryEmail: kilocode_users.google_user_email,

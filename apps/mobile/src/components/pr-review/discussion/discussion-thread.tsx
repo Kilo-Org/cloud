@@ -244,9 +244,7 @@ function ThreadHeader({
           <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} />
         ) : null}
         {outdated ? <Badge tone="muted" label={t('prReview.discussion.outdated')} /> : null}
-        {fileLevel && !resolved ? (
-          <Badge tone="muted" label={t('prReview.discussion.file')} />
-        ) : null}
+        {fileLevel && !resolved ? <Badge tone="muted" label={t('common.file')} /> : null}
         <Text variant="muted" className="text-xs">
           {t('prReview.discussion.comment', {
             count: commentCount,

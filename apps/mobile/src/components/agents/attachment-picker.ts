@@ -85,8 +85,8 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
-      title: i18n.t('agentChat.attachmentPicker.cameraAccessDisabled'),
-      message: i18n.t('agentChat.attachmentPicker.cameraAccessMessage'),
+      title: i18n.t('common.cameraAccessDisabled'),
+      message: i18n.t('chat.attachmentPicker.cameraAccessMessage'),
     });
     return [];
   }

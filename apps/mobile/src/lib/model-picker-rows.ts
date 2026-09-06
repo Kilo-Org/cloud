@@ -137,7 +137,7 @@ function groupForModel(model: SessionModelOption): Pick<ModelGroup, 'key' | 'tit
     };
   }
   if (model.isPreferred) {
-    return { key: 'recommended', title: i18n.t('agentChat.modelPicker.recommended') };
+    return { key: 'recommended', title: i18n.t('common.recommended') };
   }
-  return { key: 'all', title: i18n.t('agentChat.modelPicker.allModels') };
+  return { key: 'all', title: i18n.t('common.allModels') };
 }

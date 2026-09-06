@@ -68,7 +68,10 @@ export function MessageReactionPickerSheet({
       >
         <Pressable
           className="flex-1"
-          accessibilityLabel={t('common.closeReactions')}
+          accessibilityLabel={t(
+            // i18n-dup-ok: 'common.closeReactions' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+            'common.closeReactions'
+          )}
           onPress={onClose}
         />
         <Animated.View
@@ -84,7 +87,10 @@ export function MessageReactionPickerSheet({
               accessibilityRole="header"
               className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
             >
-              {t('common.reactions')}
+              {t(
+                // i18n-dup-ok: 'common.reactions' — prReview.discussion.reaction is a plural count suffix, not a title
+                'common.reactions'
+              )}
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -96,7 +102,14 @@ export function MessageReactionPickerSheet({
             </Pressable>
           </View>
           {recent.length > 0 ? (
-            <ReactionGrid title={t('common.recent')} reactions={recent} onSelect={onSelect} />
+            <ReactionGrid
+              title={t(
+                // i18n-dup-ok: 'common.recent' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.recent'
+              )}
+              reactions={recent}
+              onSelect={onSelect}
+            />
           ) : null}
           <ReactionGrid
             title={t('chat.reactions.common')}

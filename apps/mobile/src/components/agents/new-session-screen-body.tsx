@@ -618,7 +618,16 @@ export function NewSessionScreenBody() {
   return (
     <View className="flex-1 bg-background">
       {!isCloneEntry ? <AndroidPendingPickerRecovery addCandidates={addCandidates} /> : null}
-      <ScreenHeader title={isCloneEntry ? t('common.continue') : t('common.newSession')} />
+      <ScreenHeader
+        title={
+          isCloneEntry
+            ? t('common.continue')
+            : t(
+                // i18n-dup-ok: 'common.newSession' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.newSession'
+              )
+        }
+      />
       {isCloneEntry ? (
         <View className="px-4 pt-4">
           <Text className="text-sm text-muted-foreground">

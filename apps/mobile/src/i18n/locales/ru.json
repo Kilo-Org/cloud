@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Просмотр устройств и выход из аккаунта на них",
     "feedback": "Обратная связь",
     "privacyChoices": "Настройки конфиденциальности",
-    "signOut": "Выйти",
     "deleteAccount": "Удалить аккаунт",
     "confirmationCode": "Код подтверждения",
     "confirmationCodePlaceholder": "6-значный код",
@@ -1308,7 +1307,6 @@
       "repositoriesCount_many": "Выбрано {{displayCount}} репозиториев"
     },
     "settingsSave": {
-      "keepEditing": "Продолжить редактирование",
       "saveChanges": "Сохранить изменения",
       "unsavedMessage": "Сохранить изменения перед выходом?",
       "unsavedTitle": "Несохраненные изменения"
@@ -1946,7 +1944,6 @@
       "selectModelBeforeSending": "Выберите модель перед отправкой.",
       "preparingPlaceholder": "Настройка окружения…",
       "finalizingPlaceholder": "Завершение…",
-      "messagePlaceholder": "Сообщение",
       "cannotReceiveFiles": "В этом сеансе нельзя получать файлы. Удалите вложения, чтобы отправить сообщение.",
       "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить.",
       "discardAttachmentsMessage": "Загруженные файлы, не прикреплённые к отправленным сообщениям, будут удалены.",
@@ -2818,7 +2815,6 @@
         "void": "Аннулирован",
         "uncollectible": "Безнадёжный долг"
       },
-      "loadMoreFailed": "Не удалось загрузить следующие записи.",
       "truncated": "Доступны более ранние счета."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Ara l-apparati l-oħra u oħroġ mill-kont fuqhom",
     "feedback": "Agħti l-fehma tiegħek",
     "privacyChoices": "Għażliet tal-privatezza",
-    "signOut": "Oħroġ",
     "deleteAccount": "Ħassar il-kont",
     "confirmationCode": "Kodiċi ta' konferma",
     "confirmationCodePlaceholder": "kodiċi ta' 6 ċifri",
@@ -1734,7 +1733,6 @@
       "couldNotOpenGithub": "Ma setax jinfetaħ GitHub. Jekk jogħġbok erġa' pprova."
     },
     "settingsSave": {
-      "keepEditing": "Kompli editja",
       "saveChanges": "Issejvja l-bidliet",
       "unsavedTitle": "Bidliet mhux issejvjati",
       "unsavedMessage": "Trid tissejvja l-bidliet tiegħek qabel ma titlaq minn dan l-iskrin?"
@@ -2411,7 +2409,6 @@
       "selectModelBeforeSending": "Agħżel mudell qabel ma tibgħat.",
       "preparingPlaceholder": "Qed jitħejja l-ambjent...",
       "finalizingPlaceholder": "Qed jitlesta...",
-      "messagePlaceholder": "Messaġġ",
       "cannotReceiveFiles": "Din is-sessjoni ma tistax tirċievi fajls. Neħħi l-annessi biex tibgħat il-messaġġ tiegħek.",
       "couldNotAttachFiles": "Ma setgħux jiġu mehmuża l-fajls. Tektek Ibgħat biex terġa' tipprova.",
       "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
@@ -2840,7 +2837,6 @@
         "void": "Annullata",
         "uncollectible": "Ma tistax tinġabar"
       },
-      "loadMoreFailed": "Ma stajniex ngħabbu aktar.",
       "truncated": "Hemm fatturi ta' qabel disponibbli."
     },
     "lowBalanceAlert": {

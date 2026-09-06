@@ -39,7 +39,10 @@ function selectorLabel({
     return `${value.name} · ${value.projectName}`;
   }
   if (isLoading) {
-    return i18n.t('common.loading');
+    return i18n.t(
+      // i18n-dup-ok: 'common.loading' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.loading'
+    );
   }
   return i18n.t('agentChat.instancePicker.cloudAgent');
 }

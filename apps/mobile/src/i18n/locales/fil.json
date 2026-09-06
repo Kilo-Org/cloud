@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Suriin at i-sign out ang ibang mga device",
     "feedback": "Magbigay ng puna",
     "privacyChoices": "Mga pagpipilian sa pagkapribado",
-    "signOut": "Mag-sign out",
     "deleteAccount": "Burahin ang account",
     "confirmationCode": "Code ng kumpirmasyon",
     "confirmationCodePlaceholder": "code na may 6 na numero",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Hindi mabuksan ang GitHub. Pakisubukang muli."
     },
     "settingsSave": {
-      "keepEditing": "Ituloy ang pag-edit",
       "saveChanges": "I-save ang mga pagbabago",
       "unsavedTitle": "Mga hindi na-save na pagbabago",
       "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Pumili ng modelo bago magpadala.",
       "preparingPlaceholder": "Inihahanda ang kapaligiran...",
       "finalizingPlaceholder": "Tinatapos na…",
-      "messagePlaceholder": "Mensahe",
       "cannotReceiveFiles": "Hindi makakatanggap ng mga file ang sesyong ito. Alisin ang mga kalakip para maipadala ang mensahe mo.",
       "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang Ipadala para subukang muli.",
       "discardAttachmentsMessage": "Buburahin ang mga na-upload na file na hindi pa nagagamit.",
@@ -2777,7 +2774,6 @@
         "void": "Walang bisa",
         "uncollectible": "Hindi masingil"
       },
-      "loadMoreFailed": "Hindi ma-load ang iba pa.",
       "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan."
     },
     "lowBalanceAlert": {

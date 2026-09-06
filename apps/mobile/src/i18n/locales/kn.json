@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ಇತರ ಸಾಧನಗಳನ್ನು ಪರಿಶೀಲಿಸಿ ಅವುಗಳಿಂದ ಸೈನ್ ಔಟ್ ಮಾಡಿ",
     "feedback": "ಅಭಿಪ್ರಾಯ ತಿಳಿಸಿ",
     "privacyChoices": "ಗೌಪ್ಯತೆ ಆಯ್ಕೆಗಳು",
-    "signOut": "ಸೈನ್ ಔಟ್ ಮಾಡಿ",
     "deleteAccount": "ಖಾತೆಯನ್ನು ಅಳಿಸಿ",
     "confirmationCode": "ದೃಢೀಕರಣ ಕೋಡ್",
     "confirmationCodePlaceholder": "6 ಅಂಕಿಗಳ ಕೋಡ್",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub ತೆರೆಯಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
     },
     "settingsSave": {
-      "keepEditing": "ಸಂಪಾದನೆಯನ್ನು ಮುಂದುವರಿಸಿ",
       "saveChanges": "ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಿ",
       "unsavedTitle": "ಉಳಿಸದ ಬದಲಾವಣೆಗಳು",
       "unsavedMessage": "ಈ ಪರದೆಯಿಂದ ಹೊರಹೋಗುವ ಮೊದಲು ನಿಮ್ಮ ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಬೇಕೇ?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "ಕಳುಹಿಸುವ ಮೊದಲು ಮಾದರಿಯನ್ನು ಆಯ್ಕೆಮಾಡಿ.",
       "preparingPlaceholder": "ಪರಿಸರ ಸಿದ್ಧವಾಗುತ್ತಿದೆ...",
       "finalizingPlaceholder": "ಮುಕ್ತಾಯಗೊಳಿಸುತ್ತಿದೆ...",
-      "messagePlaceholder": "ಸಂದೇಶ",
       "cannotReceiveFiles": "ಈ ಸೆಶನ್‌ನಲ್ಲಿ ಫೈಲ್‌ಗಳನ್ನು ಸ್ವೀಕರಿಸಲು ಸಾಧ್ಯವಿಲ್ಲ. ನಿಮ್ಮ ಸಂದೇಶವನ್ನು ಕಳುಹಿಸಲು ಲಗತ್ತುಗಳನ್ನು ತೆಗೆದುಹಾಕಿ.",
       "couldNotAttachFiles": "ಫೈಲ್‌ಗಳನ್ನು ಲಗತ್ತಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಕಳುಹಿಸಿ ಬಟನ್ ಟ್ಯಾಪ್ ಮಾಡಿ.",
       "discardAttachmentsMessage": "ಕಳುಹಿಸಿದ ಸಂದೇಶಗಳಿಗೆ ಲಗತ್ತಿಸದ ಅಪ್‌ಲೋಡ್‌ಗಳನ್ನು ಅಳಿಸಲಾಗುತ್ತದೆ.",
@@ -2777,7 +2774,6 @@
         "void": "ರದ್ದು",
         "uncollectible": "ವಸೂಲಿ ಮಾಡಲಾಗದ"
       },
-      "loadMoreFailed": "ಇನ್ನಷ್ಟು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "truncated": "ಹಳೆಯ ಇನ್‌ವಾಯ್ಸ್‌ಗಳು ಲಭ್ಯವಿವೆ."
     },
     "lowBalanceAlert": {

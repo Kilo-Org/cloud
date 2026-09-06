@@ -35,7 +35,10 @@ export function ScopeListScreen() {
         {isError && (
           <QueryError
             variant="server"
-            title={t('common.couldNotLoadOrganizations')}
+            title={t(
+              // i18n-dup-ok: 'common.couldNotLoadOrganizations' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.couldNotLoadOrganizations'
+            )}
             message={t('codeReviewer.scopeList.personalStillAvailable')}
             placement="top"
             className="pb-6 pt-0"
@@ -46,7 +49,10 @@ export function ScopeListScreen() {
         <ConfigureRow
           icon={User}
           title={t('common.personal')}
-          subtitle={t('common.yourOwnRepositories')}
+          subtitle={t(
+            // i18n-dup-ok: 'common.yourOwnRepositories' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+            'common.yourOwnRepositories'
+          )}
           onPress={() => {
             openScope(PERSONAL_SCOPE);
           }}

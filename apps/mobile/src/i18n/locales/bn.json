@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "অন্য ডিভাইসগুলো দেখুন ও সেগুলো থেকে সাইন আউট করুন",
     "feedback": "মতামত দিন",
     "privacyChoices": "গোপনীয়তার পছন্দসমূহ",
-    "signOut": "সাইন আউট করুন",
     "deleteAccount": "অ্যাকাউন্ট মুছুন",
     "confirmationCode": "নিশ্চিতকরণ কোড",
     "confirmationCodePlaceholder": "৬ অঙ্কের কোড",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub খোলা যায়নি। আবার চেষ্টা করুন।"
     },
     "settingsSave": {
-      "keepEditing": "সম্পাদনা চালিয়ে যান",
       "saveChanges": "পরিবর্তন সংরক্ষণ করুন",
       "unsavedTitle": "অসংরক্ষিত পরিবর্তন",
       "unsavedMessage": "এই স্ক্রিন ছাড়ার আগে পরিবর্তনগুলো সংরক্ষণ করবেন?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "পাঠানোর আগে একটি মডেল নির্বাচন করুন।",
       "preparingPlaceholder": "পরিবেশ প্রস্তুত হচ্ছে...",
       "finalizingPlaceholder": "কাজ শেষ করা হচ্ছে...",
-      "messagePlaceholder": "বার্তা",
       "cannotReceiveFiles": "এই সেশনটি ফাইল গ্রহণ করতে পারে না। আপনার বার্তা পাঠাতে সংযুক্তিগুলি সরান।",
       "couldNotAttachFiles": "ফাইল সংযুক্ত করা যায়নি। আবার চেষ্টা করতে ‘পাঠান’ বোতামে ট্যাপ করুন।",
       "discardAttachmentsMessage": "আপলোড করা কিন্তু কোনো বার্তায় ব্যবহার না করা ফাইলগুলো মুছে ফেলা হবে।",
@@ -2777,7 +2774,6 @@
         "void": "বাতিল",
         "uncollectible": "আদায়যোগ্য নয়"
       },
-      "loadMoreFailed": "আরও লোড করা যায়নি।",
       "truncated": "আরও পুরোনো ইনভয়েস দেখা যাবে।"
     },
     "lowBalanceAlert": {

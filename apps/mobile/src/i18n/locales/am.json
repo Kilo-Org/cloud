@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ሌሎች መሣሪያዎችን ይመልከቱና ከመለያዎ ያስወጡ",
     "feedback": "ግብረ-መልስ",
     "privacyChoices": "የግላዊነት ምርጫዎች",
-    "signOut": "ዘግተህ ውጣ",
     "deleteAccount": "መለያውን ሰርዝ",
     "confirmationCode": "የማረጋገጫ ኮድ",
     "confirmationCodePlaceholder": "ባለ 6 አሃዝ ኮድ",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHubን መክፈት አልተቻለም። እባክዎ እንደገና ይሞክሩ።"
     },
     "settingsSave": {
-      "keepEditing": "ማርትዕህን ቀጥል",
       "saveChanges": "ለውጦችን ያስቀምጡ",
       "unsavedTitle": "ያልተቀመጡ ለውጦች",
       "unsavedMessage": "ከዚህ ማያ ገጽ ከመውጣትዎ በፊት ለውጦችዎ ይቀመጡ?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "ከመላክዎ በፊት ሞዴል ይምረጡ።",
       "preparingPlaceholder": "የሥራ አካባቢውን በማዘጋጀት ላይ...",
       "finalizingPlaceholder": "በማጠናቀቅ ላይ...",
-      "messagePlaceholder": "መልእክት",
       "cannotReceiveFiles": "ይህ ክፍለ ጊዜ ፋይሎችን መቀበል አይችልም። መልእክትዎን ለመላክ አባሪዎቹን ያስወግዱ።",
       "couldNotAttachFiles": "ፋይሎችን ማያያዝ አልተቻለም። እንደገና ለመሞከር የመላኪያ አዝራሩን ይንኩ።",
       "discardAttachmentsMessage": "ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
@@ -2777,7 +2774,6 @@
         "void": "ተሰርዟል",
         "uncollectible": "ሊሰበሰብ የማይችል"
       },
-      "loadMoreFailed": "ተጨማሪ መጫን አልተቻለም።",
       "truncated": "የቆዩ ደረሰኞች ይገኛሉ።"
     },
     "lowBalanceAlert": {

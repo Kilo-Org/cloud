@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Egzamine lòt aparèy yo epi dekonekte yo",
     "feedback": "Kòmantè",
     "privacyChoices": "Chwa konfidansyalite",
-    "signOut": "Dekonekte",
     "deleteAccount": "Efase kont lan",
     "confirmationCode": "Kòd konfimasyon",
     "confirmationCodePlaceholder": "kòd ki gen 6 chif",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Nou pa t ka louvri GitHub. Tanpri eseye ankò."
     },
     "settingsSave": {
-      "keepEditing": "Kontinye modifye",
       "saveChanges": "Anrejistre chanjman yo",
       "unsavedTitle": "Chanjman ki pa anrejistre",
       "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Chwazi yon modèl anvan ou voye mesaj la.",
       "preparingPlaceholder": "Ap prepare anviwònman an...",
       "finalizingPlaceholder": "Ap fini...",
-      "messagePlaceholder": "Mesaj",
       "cannotReceiveFiles": "Sesyon sa a pa ka resevwa fichye. Retire fichye atache yo pou voye mesaj ou a.",
       "couldNotAttachFiles": "Nou pa t ka atache fichye yo. Peze Voye pou eseye ankò.",
       "discardAttachmentsMessage": "Tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
@@ -2777,7 +2774,6 @@
         "void": "Anile",
         "uncollectible": "Pa ka rekipere"
       },
-      "loadMoreFailed": "Nou pa t kapab chaje plis.",
       "truncated": "Gen fakti ki pi ansyen ki disponib."
     },
     "lowBalanceAlert": {

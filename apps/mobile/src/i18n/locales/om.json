@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Meeshaalee biroo sakatta'iitii herrega keessaa baasi",
     "feedback": "Yaada",
     "privacyChoices": "Filannoo iccitii",
-    "signOut": "Ba'i",
     "deleteAccount": "Herrega balleessi",
     "confirmationCode": "Koodii mirkaneessuu",
     "confirmationCodePlaceholder": "koodii dijiitii 6",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub banuun hin danda'amne. Irra deebi'ii yaali."
     },
     "settingsSave": {
-      "keepEditing": "Gulaaluu itti fufi",
       "saveChanges": "Jijjiiramoota olkaa'i",
       "unsavedTitle": "Jijjiiramoota hin olkaa'amne",
       "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Erguun dura moodela filadhu.",
       "preparingPlaceholder": "Naannoo qopheessaa jira...",
       "finalizingPlaceholder": "Xumuraa jira...",
-      "messagePlaceholder": "Ergaa",
       "cannotReceiveFiles": "Turtiin kun faayiloota fudhachuu hin danda'u. Ergaa kee erguuf faayiloota qabachiifaman baasi.",
       "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'amne. Deebi'anii yaaluuf Ergi tuqi.",
       "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
@@ -2777,7 +2774,6 @@
         "void": "Haqame",
         "uncollectible": "Sassaabamuu hin danda'u"
       },
-      "loadMoreFailed": "Dabalata fe'uun hin danda'amne.",
       "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu."
     },
     "lowBalanceAlert": {

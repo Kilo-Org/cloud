@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "他のデバイスを確認してサインアウト",
     "feedback": "フィードバック",
     "privacyChoices": "プライバシー設定",
-    "signOut": "サインアウト",
     "deleteAccount": "アカウントを削除",
     "confirmationCode": "確認コード",
     "confirmationCodePlaceholder": "6桁のコード",
@@ -1300,7 +1299,6 @@
       "selectRepositoriesSubtitle": "セキュリティエージェントが監視するリポジトリを選択"
     },
     "settingsSave": {
-      "keepEditing": "編集を続ける",
       "saveChanges": "変更を保存",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
       "unsavedTitle": "未保存の変更"
@@ -1920,7 +1918,6 @@
       "selectModelBeforeSending": "送信前にモデルを選択してください。",
       "preparingPlaceholder": "環境を準備中…",
       "finalizingPlaceholder": "終了処理中…",
-      "messagePlaceholder": "メッセージ",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
       "couldNotAttachFiles": "ファイルを添付できませんでした。「送信」をタップして、もう一度お試しください。",
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
@@ -2776,7 +2773,6 @@
         "void": "無効",
         "uncollectible": "回収不能"
       },
-      "loadMoreFailed": "続きを読み込めませんでした。",
       "truncated": "これより前の請求書も確認できます。"
     },
     "lowBalanceAlert": {

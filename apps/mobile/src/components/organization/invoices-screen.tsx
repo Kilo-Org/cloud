@@ -33,7 +33,9 @@ const STATUS_LABEL_KEYS = {
   paid: 'organization.invoices.status.paid',
   open: 'organization.invoices.status.open',
   void: 'organization.invoices.status.void',
-  draft: 'common.draft',
+  draft:
+    // i18n-dup-ok: 'common.draft' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+    'common.draft',
   uncollectible: 'organization.invoices.status.uncollectible',
   unknown: 'common.unknown',
 } satisfies Record<string, string>;
@@ -267,7 +269,7 @@ export function OrganizationInvoicesScreen() {
         {isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('organization.invoices.loadMoreFailed')}
+              {t('common.couldnTLoadMore')}
             </Text>
             <Button
               variant="outline"

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Consulter et déconnecter les autres appareils",
     "feedback": "Donner un avis",
     "privacyChoices": "Préférences de confidentialité",
-    "signOut": "Se déconnecter",
     "deleteAccount": "Supprimer le compte",
     "confirmationCode": "Code de confirmation",
     "confirmationCodePlaceholder": "code à 6 chiffres",
@@ -1286,7 +1285,6 @@
       "repositoriesCount_many": "{{displayCount}} dépôts sélectionnés"
     },
     "settingsSave": {
-      "keepEditing": "Continuer à modifier",
       "saveChanges": "Enregistrer les modifications",
       "unsavedMessage": "Enregistrer vos modifications avant de quitter cet écran ?",
       "unsavedTitle": "Modifications non enregistrées"
@@ -1851,7 +1849,6 @@
       "selectModelBeforeSending": "Sélectionnez un modèle avant d'envoyer le message.",
       "preparingPlaceholder": "Configuration de l'environnement…",
       "finalizingPlaceholder": "Finalisation…",
-      "messagePlaceholder": "Votre message",
       "cannotReceiveFiles": "Cette session ne peut pas recevoir de fichiers. Retirez les pièces jointes pour envoyer votre message.",
       "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer.",
       "discardAttachmentsMessage": "Les fichiers transférés qui ne sont liés à aucun message envoyé seront supprimés.",
@@ -2797,7 +2794,6 @@
         "void": "Annulée",
         "uncollectible": "Irrecouvrable"
       },
-      "loadMoreFailed": "Impossible de charger la suite.",
       "truncated": "Des factures plus anciennes sont disponibles."
     },
     "lowBalanceAlert": {

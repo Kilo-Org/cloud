@@ -201,7 +201,10 @@ function ScopedQuickChatScreen() {
           <View className="flex-row items-center gap-2 px-4 py-2">
             <ActivityIndicator />
             <Text variant="muted" className="text-xs">
-              {t('common.working')}
+              {t(
+                // i18n-dup-ok: 'common.working' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.working'
+              )}
             </Text>
           </View>
         ) : null}

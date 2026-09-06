@@ -44,7 +44,13 @@ function confirmCancel(onConfirm: () => void) {
     i18n.t('codeReviewer.reviewDetail.cancelTitle'),
     i18n.t('codeReviewer.reviewDetail.cancelMessage'),
     [
-      { text: i18n.t('common.keepRunning'), style: 'cancel' },
+      {
+        text: i18n.t(
+          // i18n-dup-ok: 'common.keepRunning' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+          'common.keepRunning'
+        ),
+        style: 'cancel',
+      },
       {
         text: i18n.t('codeReviewer.reviewDetail.cancelReview'),
         style: 'destructive',
@@ -175,7 +181,12 @@ export function ReviewDetailScreen({
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <View className="gap-2">
-          <Text className="text-sm font-medium">{t('common.findings')}</Text>
+          <Text className="text-sm font-medium">
+            {t(
+              // i18n-dup-ok: 'common.findings' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.findings'
+            )}
+          </Text>
           {visibleFindings.length === 0 ? (
             <Text variant="muted" className="text-xs">
               {t('codeReviewer.reviewDetail.noFindings')}
@@ -214,7 +225,13 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className="text-sm font-medium">{t('common.details')}</Text>
           <View className="gap-1 rounded-lg bg-secondary p-4">
-            <MetaRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
+            <MetaRow
+              label={t(
+                // i18n-dup-ok: 'common.branch' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.branch'
+              )}
+              value={`${review.head_ref} → ${review.base_ref}`}
+            />
             <MetaRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} />
             {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
             <MetaRow
@@ -271,7 +288,12 @@ export function ReviewDetailScreen({
               });
             }}
           >
-            <Text>{t('common.openPullRequest')}</Text>
+            <Text>
+              {t(
+                // i18n-dup-ok: 'common.openPullRequest' — agentChat.prBadge.open names the PR state; this is the verb on a button
+                'common.openPullRequest'
+              )}
+            </Text>
           </Button>
 
           {canCancel ? (

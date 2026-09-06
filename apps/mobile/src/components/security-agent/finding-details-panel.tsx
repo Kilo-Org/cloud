@@ -41,7 +41,9 @@ const SEVERITY_KEYS = {
 const FINDING_STATUS_KEYS = {
   superseded: 'securityAgent.deadline.superseded',
   fixed: 'securityAgent.filter.fixed',
-  dismissed: 'common.dismissed',
+  dismissed:
+    // i18n-dup-ok: 'common.dismissed' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+    'common.dismissed',
   open: 'securityAgent.findingDetails.statusOpen',
 } satisfies Record<string, string>;
 

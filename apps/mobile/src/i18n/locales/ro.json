@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Verifică și deconectează alte dispozitive",
     "feedback": "Trimite păreri",
     "privacyChoices": "Opțiuni de confidențialitate",
-    "signOut": "Deconectează-te",
     "deleteAccount": "Șterge contul",
     "confirmationCode": "Cod de confirmare",
     "confirmationCodePlaceholder": "cod din 6 cifre",
@@ -1712,7 +1711,6 @@
       "couldNotOpenGithub": "Nu s-a putut deschide GitHub. Încearcă din nou."
     },
     "settingsSave": {
-      "keepEditing": "Continuă editarea",
       "saveChanges": "Salvează modificările",
       "unsavedTitle": "Modificări nesalvate",
       "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?"
@@ -2371,7 +2369,6 @@
       "selectModelBeforeSending": "Selectează un model înainte de a trimite mesajul.",
       "preparingPlaceholder": "Se configurează mediul...",
       "finalizingPlaceholder": "Se finalizează...",
-      "messagePlaceholder": "Mesaj",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
       "couldNotAttachFiles": "Nu s-au putut atașa fișierele. Atinge butonul de trimitere pentru a încerca din nou.",
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
@@ -2798,7 +2795,6 @@
         "void": "Anulată",
         "uncollectible": "Neîncasabilă"
       },
-      "loadMoreFailed": "Nu s-au putut încărca mai multe elemente.",
       "truncated": "Sunt disponibile facturi mai vechi."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Tinjau sesi dan keluar dari perangkat lain",
     "feedback": "Umpan balik",
     "privacyChoices": "Pilihan privasi",
-    "signOut": "Keluar",
     "deleteAccount": "Hapus akun",
     "confirmationCode": "Kode konfirmasi",
     "confirmationCodePlaceholder": "kode 6 digit",
@@ -1300,7 +1299,6 @@
       "selectRepositoriesSubtitle": "Pilih repositori yang dipantau Agen keamanan"
     },
     "settingsSave": {
-      "keepEditing": "Lanjutkan menyunting",
       "saveChanges": "Simpan perubahan",
       "unsavedMessage": "Simpan perubahan sebelum meninggalkan layar ini?",
       "unsavedTitle": "Perubahan belum disimpan"
@@ -1920,7 +1918,6 @@
       "selectModelBeforeSending": "Pilih model sebelum mengirim pesan.",
       "preparingPlaceholder": "Menyiapkan lingkungan...",
       "finalizingPlaceholder": "Menyelesaikan...",
-      "messagePlaceholder": "Pesan",
       "cannotReceiveFiles": "Sesi ini tidak dapat menerima berkas. Hapus lampiran untuk mengirim pesanmu.",
       "couldNotAttachFiles": "Tidak dapat melampirkan berkas. Ketuk Kirim untuk mencoba lagi.",
       "discardAttachmentsMessage": "Unggahan yang belum dilampirkan ke pesan terkirim akan dihapus.",
@@ -2776,7 +2773,6 @@
         "void": "Batal",
         "uncollectible": "Tidak tertagih"
       },
-      "loadMoreFailed": "Tidak dapat memuat lebih banyak data.",
       "truncated": "Masih ada faktur sebelumnya."
     },
     "lowBalanceAlert": {

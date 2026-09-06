@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Andere Geräte prüfen und abmelden",
     "feedback": "Feedback geben",
     "privacyChoices": "Datenschutzoptionen",
-    "signOut": "Abmelden",
     "deleteAccount": "Konto löschen",
     "confirmationCode": "Bestätigungscode",
     "confirmationCodePlaceholder": "6-stelliger Code",
@@ -1300,7 +1299,6 @@
       "selectRepositoriesSubtitle": "Wähle aus, welche Repositories Security Agent überwacht"
     },
     "settingsSave": {
-      "keepEditing": "Weiter bearbeiten",
       "saveChanges": "Änderungen speichern",
       "unsavedMessage": "Möchtest du deine Änderungen speichern, bevor du diesen Bildschirm verlässt?",
       "unsavedTitle": "Ungespeicherte Änderungen"
@@ -1920,7 +1918,6 @@
       "selectModelBeforeSending": "Wähle vor dem Senden ein Modell aus.",
       "preparingPlaceholder": "Umgebung wird eingerichtet…",
       "finalizingPlaceholder": "Wird abgeschlossen…",
-      "messagePlaceholder": "Nachricht",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
       "couldNotAttachFiles": "Die Dateien konnten nicht angehängt werden. Tippe auf „Senden“, um es erneut zu versuchen.",
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
@@ -2776,7 +2773,6 @@
         "void": "Storniert",
         "uncollectible": "Uneinbringlich"
       },
-      "loadMoreFailed": "Weitere Einträge konnten nicht geladen werden.",
       "truncated": "Ältere Rechnungen sind verfügbar."
     },
     "lowBalanceAlert": {

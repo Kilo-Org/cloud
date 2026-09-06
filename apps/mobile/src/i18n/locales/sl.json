@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Preglej in odjavi druge naprave",
     "feedback": "Povratne informacije",
     "privacyChoices": "Možnosti zasebnosti",
-    "signOut": "Odjavi se",
     "deleteAccount": "Izbriši račun",
     "confirmationCode": "Potrditvena koda",
     "confirmationCodePlaceholder": "6-mestna koda",
@@ -1723,7 +1722,6 @@
       "couldNotOpenGithub": "Platforme GitHub ni bilo mogoče odpreti. Poskusi znova."
     },
     "settingsSave": {
-      "keepEditing": "Nadaljuj urejanje",
       "saveChanges": "Shrani spremembe",
       "unsavedTitle": "Neshranjene spremembe",
       "unsavedMessage": "Želiš shraniti spremembe, preden zapustiš ta zaslon?"
@@ -2391,7 +2389,6 @@
       "selectModelBeforeSending": "Pred pošiljanjem izberi model.",
       "preparingPlaceholder": "Priprava okolja…",
       "finalizingPlaceholder": "Zaključevanje...",
-      "messagePlaceholder": "Sporočilo",
       "cannotReceiveFiles": "Ta seja ne more prejemati datotek. Odstrani priponke, da lahko pošlješ sporočilo.",
       "couldNotAttachFiles": "Datotek ni bilo mogoče priložiti. Za ponovni poskus tapni gumb za pošiljanje.",
       "discardAttachmentsMessage": "Naložene datoteke, ki niso priložene poslanim sporočilom, bodo izbrisane.",
@@ -2819,7 +2816,6 @@
         "void": "Razveljavljeno",
         "uncollectible": "Neizterljivo"
       },
-      "loadMoreFailed": "Dodatnih podatkov ni bilo mogoče naložiti.",
       "truncated": "Starejši računi so na voljo."
     },
     "lowBalanceAlert": {

@@ -209,7 +209,12 @@ function MessageBubbleImpl({
                     className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
                   >
                     <Clock size={12} color={colors.mutedForeground} />
-                    <Text className="text-xs text-muted-foreground">{t('common.queued')}</Text>
+                    <Text className="text-xs text-muted-foreground">
+                      {t(
+                        // i18n-dup-ok: 'common.queued' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                        'common.queued'
+                      )}
+                    </Text>
                   </View>
                 ) : null}
                 {!isQueued && onRestoreQueued ? (

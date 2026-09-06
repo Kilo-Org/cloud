@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Праглядаць сеансы і завяршаць іх на іншых прыладах",
     "feedback": "Водгук",
     "privacyChoices": "Налады прыватнасці",
-    "signOut": "Выйсці",
     "deleteAccount": "Выдаліць уліковы запіс",
     "confirmationCode": "Код пацвярджэння",
     "confirmationCodePlaceholder": "6-значны код",
@@ -1723,7 +1722,6 @@
       "couldNotOpenGithub": "Не атрымалася адкрыць GitHub. Паспрабуйце яшчэ раз."
     },
     "settingsSave": {
-      "keepEditing": "Працягнуць рэдагаванне",
       "saveChanges": "Захаваць змены",
       "unsavedTitle": "Незахаваныя змены",
       "unsavedMessage": "Захаваць змены перад выхадам з гэтага экрана?"
@@ -2391,7 +2389,6 @@
       "selectModelBeforeSending": "Выберыце мадэль перад адпраўкай.",
       "preparingPlaceholder": "Наладжванне асяроддзя…",
       "finalizingPlaceholder": "Завяршэнне…",
-      "messagePlaceholder": "Паведамленне",
       "cannotReceiveFiles": "У гэты сеанс нельга адпраўляць файлы. Прыбярыце ўкладанні, каб адправіць паведамленне.",
       "couldNotAttachFiles": "Не ўдалося прымацаваць файлы. Націсніце кнопку адпраўкі, каб паспрабаваць яшчэ раз.",
       "discardAttachmentsMessage": "Загружаныя файлы, не прымацаваныя да адпраўленых паведамленняў, будуць выдаленыя.",
@@ -2819,7 +2816,6 @@
         "void": "Ануляваны",
         "uncollectible": "Безнадзейны"
       },
-      "loadMoreFailed": "Не атрымалася загрузіць наступныя запісы.",
       "truncated": "Даступныя ранейшыя рахункі."
     },
     "lowBalanceAlert": {

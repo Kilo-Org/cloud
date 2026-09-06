@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "پێداچوونەوە بە ئامێرەکانی تر و دەرکردنیان لە هەژمار",
     "feedback": "بۆچوون",
     "privacyChoices": "بژاردەکانی پاراستنی تایبەتی",
-    "signOut": "دەرچوون",
     "deleteAccount": "سڕینەوەی هەژمار",
     "confirmationCode": "کۆدی پشتڕاستکردنەوە",
     "confirmationCodePlaceholder": "کۆدی ٦ ژمارەیی",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "نەتوانرا GitHub بکرێتەوە. تکایە دووبارە هەوڵ بدە."
     },
     "settingsSave": {
-      "keepEditing": "بەردەوامبوون لە دەستکاری",
       "saveChanges": "گۆڕانکارییەکان پاشەکەوت بکە",
       "unsavedTitle": "گۆڕانکارییە پاشەکەوتنەکراوەکان",
       "unsavedMessage": "پێش جێهێشتنی ئەم شاشەیە، گۆڕانکارییەکانت پاشەکەوت بکرێن؟"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "پێش ناردن مۆدێلێک هەڵبژێرە.",
       "preparingPlaceholder": "ئامادەکردنی ژینگە...",
       "finalizingPlaceholder": "تەواوکردنی کار...",
-      "messagePlaceholder": "نامە",
       "cannotReceiveFiles": "ئەم سێشنە ناتوانێت پەڕگە وەربگرێت. بۆ ناردنی پەیامەکەت، هاوپێچەکان لاببە.",
       "couldNotAttachFiles": "نەتوانرا پەڕگەکان هاوپێچ بکرێن. بۆ دووبارە هەوڵدانەوە، لە «ناردن» بدە.",
       "discardAttachmentsMessage": "ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە.",
@@ -2777,7 +2774,6 @@
         "void": "پووچەڵ",
         "uncollectible": "نەشیاوی وەرگرتن"
       },
-      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت.",
       "truncated": "فاکتۆرە کۆنەکان بەردەستن."
     },
     "lowBalanceAlert": {

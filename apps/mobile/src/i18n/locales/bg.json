@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Преглеждай другите устройства и прекратявай сесиите им",
     "feedback": "Обратна връзка",
     "privacyChoices": "Настройки за поверителност",
-    "signOut": "Излез",
     "deleteAccount": "Изтрий акаунта",
     "confirmationCode": "Код за потвърждение",
     "confirmationCodePlaceholder": "6-цифрен код",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Не може да се отвори GitHub. Моля, опитай отново."
     },
     "settingsSave": {
-      "keepEditing": "Продължи редактирането",
       "saveChanges": "Запази промените",
       "unsavedTitle": "Незапазени промени",
       "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Избери модел, преди да изпратиш съобщение.",
       "preparingPlaceholder": "Настройване на средата...",
       "finalizingPlaceholder": "Приключване...",
-      "messagePlaceholder": "Съобщение",
       "cannotReceiveFiles": "Тази сесия не може да получава файлове. Премахни прикачените файлове, за да изпратиш съобщението си.",
       "couldNotAttachFiles": "Не успяхме да прикачим файловете. Докосни бутона за изпращане, за да опиташ отново.",
       "discardAttachmentsMessage": "Качените файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
@@ -2777,7 +2774,6 @@
         "void": "Анулирана",
         "uncollectible": "Несъбираема"
       },
-      "loadMoreFailed": "Не успяхме да заредим още резултати.",
       "truncated": "Налични са по-стари фактури."
     },
     "lowBalanceAlert": {

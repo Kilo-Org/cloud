@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ตรวจสอบและออกจากระบบบนอุปกรณ์อื่น",
     "feedback": "ส่งข้อเสนอแนะ",
     "privacyChoices": "ตัวเลือกความเป็นส่วนตัว",
-    "signOut": "ออกจากระบบ",
     "deleteAccount": "ลบบัญชี",
     "confirmationCode": "รหัสยืนยัน",
     "confirmationCodePlaceholder": "รหัส 6 หลัก",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "ไม่สามารถเปิด GitHub ได้ กรุณาลองอีกครั้ง"
     },
     "settingsSave": {
-      "keepEditing": "แก้ไขต่อ",
       "saveChanges": "บันทึกการเปลี่ยนแปลง",
       "unsavedTitle": "การเปลี่ยนแปลงที่ยังไม่บันทึก",
       "unsavedMessage": "บันทึกการเปลี่ยนแปลงก่อนออกจากหน้าจอนี้หรือไม่?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "เลือกโมเดลก่อนส่ง",
       "preparingPlaceholder": "กำลังตั้งค่าสภาพแวดล้อม...",
       "finalizingPlaceholder": "กำลังทำงานขั้นสุดท้าย...",
-      "messagePlaceholder": "ข้อความ",
       "cannotReceiveFiles": "เซสชันนี้ไม่สามารถรับไฟล์ได้ นำไฟล์แนบออกเพื่อส่งข้อความของคุณ",
       "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง",
       "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",
@@ -2777,7 +2774,6 @@
         "void": "เป็นโมฆะ",
         "uncollectible": "เรียกเก็บไม่ได้"
       },
-      "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
       "truncated": "ยังมีใบแจ้งหนี้ก่อนหน้านี้ให้ดู"
     },
     "lowBalanceAlert": {

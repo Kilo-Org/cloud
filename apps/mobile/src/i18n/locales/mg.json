@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Diniho ny fitaovana hafa ary ampivoahy amin'ny kaonty",
     "feedback": "Fanehoan-kevitra",
     "privacyChoices": "Safidy momba ny fiainana manokana",
-    "signOut": "Mivoaha",
     "deleteAccount": "Fafao ny kaonty",
     "confirmationCode": "Kaody fanamarinana",
     "confirmationCodePlaceholder": "kaody misy tarehimarika 6",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Tsy nety nosokafana ny GitHub. Andramo indray azafady."
     },
     "settingsSave": {
-      "keepEditing": "Tohizo ny fanovana",
       "saveChanges": "Tehirizo ny fiovana",
       "unsavedTitle": "Fiovana tsy voatahiry",
       "unsavedMessage": "Hotehirizina ve ny fanovanao alohan'ny hialana amin'ity efijery ity?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Misafidiana modely alohan'ny handefasana.",
       "preparingPlaceholder": "Manomana ny tontolo fiasana...",
       "finalizingPlaceholder": "Mamita...",
-      "messagePlaceholder": "Hafatra",
       "cannotReceiveFiles": "Tsy afaka mandray rakitra ity fotoam-piasana ity. Esory ny rakitra ampiarahina mba handefasana ny hafatrao.",
       "couldNotAttachFiles": "Tsy nahomby ny fampiarahana ny rakitra. Tsindrio ny bokotra fandefasana hanandramana indray.",
       "discardAttachmentsMessage": "Hofafana ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
@@ -2777,7 +2774,6 @@
         "void": "Nofoanana",
         "uncollectible": "Tsy azo takina"
       },
-      "loadMoreFailed": "Tsy tafiditra ny manaraka.",
       "truncated": "Misy ny faktiora taloha kokoa."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Peržiūrėti kitus įrenginius ir juose atsijungti",
     "feedback": "Atsiliepimai",
     "privacyChoices": "Privatumo nuostatos",
-    "signOut": "Atsijungti",
     "deleteAccount": "Ištrinti paskyrą",
     "confirmationCode": "Patvirtinimo kodas",
     "confirmationCodePlaceholder": "6 skaitmenų kodas",
@@ -1723,7 +1722,6 @@
       "couldNotOpenGithub": "Nepavyko atidaryti GitHub. Bandyk dar kartą."
     },
     "settingsSave": {
-      "keepEditing": "Tęsti redagavimą",
       "saveChanges": "Išsaugoti pakeitimus",
       "unsavedTitle": "Neišsaugoti pakeitimai",
       "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?"
@@ -2391,7 +2389,6 @@
       "selectModelBeforeSending": "Prieš siųsdami pasirinkite modelį.",
       "preparingPlaceholder": "Rengiama aplinka…",
       "finalizingPlaceholder": "Baigiama…",
-      "messagePlaceholder": "Žinutė",
       "cannotReceiveFiles": "Šioje sesijoje negalima gauti failų. Pašalinkite priedus, kad galėtumėte išsiųsti žinutę.",
       "couldNotAttachFiles": "Nepavyko pridėti failų. Bakstelėkite siuntimo mygtuką ir bandykite dar kartą.",
       "discardAttachmentsMessage": "Prie išsiųstų žinučių nepridėti įkelti failai bus ištrinti.",
@@ -2819,7 +2816,6 @@
         "void": "Anuliuota",
         "uncollectible": "Beviltiška skola"
       },
-      "loadMoreFailed": "Nepavyko įkelti daugiau.",
       "truncated": "Galite peržiūrėti ankstesnes sąskaitas."
     },
     "lowBalanceAlert": {

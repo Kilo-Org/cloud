@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Se andre enheder og log dem ud",
     "feedback": "Giv feedback",
     "privacyChoices": "Privatlivsindstillinger",
-    "signOut": "Log ud",
     "deleteAccount": "Slet konto",
     "confirmationCode": "Bekræftelseskode",
     "confirmationCodePlaceholder": "6-cifret kode",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub kunne ikke åbnes. Prøv igen."
     },
     "settingsSave": {
-      "keepEditing": "Fortsæt med at redigere",
       "saveChanges": "Gem ændringer",
       "unsavedTitle": "Ugemte ændringer",
       "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Vælg en model, før du sender.",
       "preparingPlaceholder": "Forbereder miljøet...",
       "finalizingPlaceholder": "Afslutter...",
-      "messagePlaceholder": "Besked",
       "cannotReceiveFiles": "Denne session kan ikke modtage filer. Fjern de vedhæftede filer for at sende din besked.",
       "couldNotAttachFiles": "Kunne ikke vedhæfte filerne. Tryk på sendeknappen for at prøve igen.",
       "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
@@ -2777,7 +2774,6 @@
         "void": "Annulleret",
         "uncollectible": "Uinddrivelig"
       },
-      "loadMoreFailed": "Det lykkedes ikke at indlæse flere.",
       "truncated": "Ældre fakturaer er tilgængelige."
     },
     "lowBalanceAlert": {

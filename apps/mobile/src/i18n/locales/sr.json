@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Pregledaj i odjavi druge uređaje",
     "feedback": "Povratne informacije",
     "privacyChoices": "Podešavanja privatnosti",
-    "signOut": "Odjavi se",
     "deleteAccount": "Obriši nalog",
     "confirmationCode": "Kod za potvrdu",
     "confirmationCodePlaceholder": "kod od 6 cifara",
@@ -1712,7 +1711,6 @@
       "couldNotOpenGithub": "GitHub se ne može otvoriti. Pokušaj ponovo."
     },
     "settingsSave": {
-      "keepEditing": "Nastavi uređivanje",
       "saveChanges": "Sačuvaj promene",
       "unsavedTitle": "Nesačuvane promene",
       "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?"
@@ -2371,7 +2369,6 @@
       "selectModelBeforeSending": "Izaberi model pre slanja.",
       "preparingPlaceholder": "Priprema okruženja...",
       "finalizingPlaceholder": "Završavanje...",
-      "messagePlaceholder": "Poruka",
       "cannotReceiveFiles": "Ova sesija ne može da prima fajlove. Ukloni priloge da pošalješ poruku.",
       "couldNotAttachFiles": "Prilaganje fajlova nije uspelo. Dodirni dugme za slanje da pokušaš ponovo.",
       "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
@@ -2798,7 +2795,6 @@
         "void": "Stornirano",
         "uncollectible": "Nenaplativo"
       },
-      "loadMoreFailed": "Učitavanje dodatnih stavki nije uspelo.",
       "truncated": "Starije fakture su dostupne."
     },
     "lowBalanceAlert": {

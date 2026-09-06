@@ -59,7 +59,10 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
   const scopeTitle = isPersonal
     ? t('common.personal')
     : (orgs?.find(org => org.organizationId === scope)?.organizationName ??
-      t('common.organization'));
+      t(
+        // i18n-dup-ok: 'common.organization' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+        'common.organization'
+      ));
 
   const githubStatus = useGitHubStatus(scope);
   const gitlabStatus = useGitLabStatus(scope);

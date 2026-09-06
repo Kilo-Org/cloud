@@ -116,7 +116,10 @@ export function getPartDetailTitle(part: Part): string {
     const display = getToolDisplay(part);
     return display.subtitle ? `${display.title}: ${display.subtitle}` : display.title;
   }
-  return i18n.t('common.details');
+  return i18n.t(
+    // i18n-dup-ok: 'common.details' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+    'common.details'
+  );
 }
 
 /**

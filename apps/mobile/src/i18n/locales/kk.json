@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Басқа құрылғыларды көру және олардағы сессияларды аяқтау",
     "feedback": "Кері байланыс",
     "privacyChoices": "Құпиялылық баптаулары",
-    "signOut": "Шығу",
     "deleteAccount": "Аккаунтты жою",
     "confirmationCode": "Растау коды",
     "confirmationCodePlaceholder": "6 цифрлы код",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub-ты ашу мүмкін болмады. Қайталап көріңіз."
     },
     "settingsSave": {
-      "keepEditing": "Өңдеуді жалғастыру",
       "saveChanges": "Өзгерістерді сақтау",
       "unsavedTitle": "Сақталмаған өзгерістер",
       "unsavedMessage": "Осы экраннан шықпас бұрын өзгерістеріңізді сақтайсыз ба?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Жібермес бұрын модельді таңдаңыз.",
       "preparingPlaceholder": "Орта дайындалуда...",
       "finalizingPlaceholder": "Аяқталуда...",
-      "messagePlaceholder": "Хабарлама",
       "cannotReceiveFiles": "Бұл сессия файл қабылдай алмайды. Хабарлама жіберу үшін тіркемелерді алып тастаңыз.",
       "couldNotAttachFiles": "Файлдарды тіркеу мүмкін болмады. Қайталап көру үшін жіберу түймесін түртіңіз.",
       "discardAttachmentsMessage": "Ешбір хабарламаға тіркелмеген жүктелген файлдар жойылады.",
@@ -2777,7 +2774,6 @@
         "void": "Күші жойылған",
         "uncollectible": "Өндірілмейтін"
       },
-      "loadMoreFailed": "Қосымша деректерді жүктеу мүмкін болмады.",
       "truncated": "Бұрынғы шоттарды да көруге болады."
     },
     "lowBalanceAlert": {

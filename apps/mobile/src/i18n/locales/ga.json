@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Féach ar ghléasanna eile agus sínigh amach astu",
     "feedback": "Aiseolas",
     "privacyChoices": "Roghanna príobháideachta",
-    "signOut": "Sínigh amach",
     "deleteAccount": "Scrios an cuntas",
     "confirmationCode": "Cód deimhnithe",
     "confirmationCodePlaceholder": "cód 6 dhigit",
@@ -1734,7 +1733,6 @@
       "couldNotOpenGithub": "Níorbh fhéidir GitHub a oscailt. Bain triail as arís le do thoil."
     },
     "settingsSave": {
-      "keepEditing": "Lean den eagarthóireacht",
       "saveChanges": "Sábháil athruithe",
       "unsavedTitle": "Athruithe gan sábháil",
       "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?"
@@ -2411,7 +2409,6 @@
       "selectModelBeforeSending": "Roghnaigh samhail sula seolfaidh tú an teachtaireacht.",
       "preparingPlaceholder": "Ag socrú na timpeallachta...",
       "finalizingPlaceholder": "Ag críochnú...",
-      "messagePlaceholder": "Teachtaireacht",
       "cannotReceiveFiles": "Ní féidir leis an seisiún seo comhaid a fháil. Bain na ceangaltáin le do theachtaireacht a sheoladh.",
       "couldNotAttachFiles": "Níorbh fhéidir na comhaid a cheangal. Tapáil Seol chun triail eile a bhaint as.",
       "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",
@@ -2840,7 +2837,6 @@
         "void": "Ar neamhní",
         "uncollectible": "Dobhailithe"
       },
-      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
       "truncated": "Tá sonraisc níos sine ar fáil."
     },
     "lowBalanceAlert": {

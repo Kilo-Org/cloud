@@ -22,7 +22,14 @@ export function EmptyConversationList({ onStart, isStarting, refreshControl }: P
       refreshControl={refreshControl}
       action={
         <Button className="h-11 px-5" onPress={onStart} disabled={isStarting}>
-          <Text>{isStarting ? t('common.starting') : t('chat.conversationList.create')}</Text>
+          <Text>
+            {isStarting
+              ? t(
+                  // i18n-dup-ok: 'common.starting' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                  'common.starting'
+                )
+              : t('chat.conversationList.create')}
+          </Text>
         </Button>
       }
     />

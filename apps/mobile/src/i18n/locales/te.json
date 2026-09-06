@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ఇతర పరికరాలను సమీక్షించి వాటి నుండి సైన్ అవుట్ చేయండి",
     "feedback": "అభిప్రాయం పంపండి",
     "privacyChoices": "గోప్యతా ఎంపికలు",
-    "signOut": "సైన్ అవుట్ చేయండి",
     "deleteAccount": "ఖాతాను తొలగించండి",
     "confirmationCode": "నిర్ధారణ కోడ్",
     "confirmationCodePlaceholder": "6 అంకెల కోడ్",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHubను తెరవలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి."
     },
     "settingsSave": {
-      "keepEditing": "సవరించడం కొనసాగించండి",
       "saveChanges": "మార్పులను సేవ్ చేయండి",
       "unsavedTitle": "సేవ్ చేయని మార్పులు",
       "unsavedMessage": "ఈ స్క్రీన్ నుంచి వెళ్లే ముందు మీ మార్పులను సేవ్ చేయాలా?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "పంపడానికి ముందు మోడల్‌ను ఎంచుకోండి.",
       "preparingPlaceholder": "పని వాతావరణాన్ని సిద్ధం చేస్తోంది...",
       "finalizingPlaceholder": "ముగిస్తోంది...",
-      "messagePlaceholder": "సందేశం",
       "cannotReceiveFiles": "ఈ సెషన్ ఫైళ్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి జోడింపులను తీసివేయండి.",
       "couldNotAttachFiles": "ఫైళ్లను జోడించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపే బటన్‌ను నొక్కండి.",
       "discardAttachmentsMessage": "అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు తొలగిపోతాయి.",
@@ -2777,7 +2774,6 @@
         "void": "రద్దు",
         "uncollectible": "వసూలు చేయలేనిది"
       },
-      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాం.",
       "truncated": "పాత ఇన్వాయిస్‌లు అందుబాటులో ఉన్నాయి."
     },
     "lowBalanceAlert": {

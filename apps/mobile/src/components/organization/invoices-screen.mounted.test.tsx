@@ -331,7 +331,7 @@ describe('OrganizationInvoicesScreen pagination', () => {
     const texts = await renderScreen();
 
     expect(texts).toContain('INV-0001');
-    expect(texts).toContain("Couldn't load more.");
+    expect(texts).toContain("Couldn't load more");
     expect(texts).not.toContain('Older invoices are available.');
 
     const retry = buttons.rendered.find(button => button.accessibilityLabel === 'Retry');
@@ -370,7 +370,7 @@ describe('OrganizationInvoicesScreen pagination', () => {
 
     expect(texts).toContain('INV-0001');
     expect(texts).toContain('Older invoices are available.');
-    expect(texts).not.toContain("Couldn't load more.");
+    expect(texts).not.toContain("Couldn't load more");
     expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
   });
 });

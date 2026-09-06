@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "სხვა მოწყობილობების ნახვა და მათზე ანგარიშიდან გასვლა",
     "feedback": "გამოხმაურება",
     "privacyChoices": "კონფიდენციალურობის პარამეტრები",
-    "signOut": "გამოსვლა",
     "deleteAccount": "ანგარიშის წაშლა",
     "confirmationCode": "დადასტურების კოდი",
     "confirmationCodePlaceholder": "6-ნიშნა კოდი",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub-ის გახსნა ვერ მოხერხდა. სცადე ხელახლა."
     },
     "settingsSave": {
-      "keepEditing": "რედაქტირების გაგრძელება",
       "saveChanges": "ცვლილებების შენახვა",
       "unsavedTitle": "შეუნახავი ცვლილებები",
       "unsavedMessage": "შეინახოს ცვლილებები ამ ეკრანიდან გასვლამდე?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "გაგზავნამდე აირჩიეთ მოდელი.",
       "preparingPlaceholder": "გარემოს მომზადება...",
       "finalizingPlaceholder": "დასრულება...",
-      "messagePlaceholder": "შეტყობინება",
       "cannotReceiveFiles": "ამ სესიას ფაილების მიღება არ შეუძლია. შეტყობინების გასაგზავნად ამოიღეთ დანართები.",
       "couldNotAttachFiles": "ფაილების მიმაგრება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ გაგზავნის ღილაკს.",
       "discardAttachmentsMessage": "ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
@@ -2777,7 +2774,6 @@
         "void": "ბათილია",
         "uncollectible": "უიმედო დავალიანება"
       },
-      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა.",
       "truncated": "უფრო ძველი ინვოისები ხელმისაწვდომია."
     },
     "lowBalanceAlert": {

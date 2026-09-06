@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Έλεγχος και αποσύνδεση άλλων συσκευών",
     "feedback": "Σχόλια",
     "privacyChoices": "Επιλογές απορρήτου",
-    "signOut": "Αποσύνδεση",
     "deleteAccount": "Διαγραφή λογαριασμού",
     "confirmationCode": "Κωδικός επιβεβαίωσης",
     "confirmationCodePlaceholder": "κωδικός 6 ψηφίων",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Δεν ήταν δυνατό το άνοιγμα του GitHub. Δοκίμασε ξανά."
     },
     "settingsSave": {
-      "keepEditing": "Συνέχιση επεξεργασίας",
       "saveChanges": "Αποθήκευση αλλαγών",
       "unsavedTitle": "Μη αποθηκευμένες αλλαγές",
       "unsavedMessage": "Να αποθηκευτούν οι αλλαγές σου πριν φύγεις από αυτή την οθόνη;"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Επίλεξε ένα μοντέλο πριν από την αποστολή.",
       "preparingPlaceholder": "Ρύθμιση περιβάλλοντος...",
       "finalizingPlaceholder": "Ολοκλήρωση...",
-      "messagePlaceholder": "Μήνυμα",
       "cannotReceiveFiles": "Αυτή η συνεδρία δεν μπορεί να λάβει αρχεία. Αφαίρεσε τα συνημμένα για να στείλεις το μήνυμά σου.",
       "couldNotAttachFiles": "Δεν ήταν δυνατή η επισύναψη αρχείων. Πάτησε αποστολή για να δοκιμάσεις ξανά.",
       "discardAttachmentsMessage": "Τα αρχεία που ανέβασες χωρίς να τα στείλεις θα διαγραφούν.",
@@ -2777,7 +2774,6 @@
         "void": "Ακυρωμένο",
         "uncollectible": "Μη εισπράξιμο"
       },
-      "loadMoreFailed": "Δεν ήταν δυνατή η φόρτωση περισσότερων στοιχείων.",
       "truncated": "Υπάρχουν παλαιότερα τιμολόγια."
     },
     "lowBalanceAlert": {

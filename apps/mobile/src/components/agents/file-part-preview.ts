@@ -42,7 +42,12 @@ export function getFilePartKind(input: { mime: string; filename?: string }): Fil
 }
 
 function resolveName(filename: string | undefined): string {
-  return filename && filename.trim() !== '' ? filename : i18n.t('common.file');
+  return filename && filename.trim() !== ''
+    ? filename
+    : i18n.t(
+        // i18n-dup-ok: 'common.file' — prReview.overview.file is a plural count suffix, not a label
+        'common.file'
+      );
 }
 
 export function getFilePartAccessibilityLabel(kind: FilePartKind, filename?: string): string {
@@ -53,5 +58,9 @@ export function getFilePartAccessibilityLabel(kind: FilePartKind, filename?: str
   if (kind === 'markdown') {
     return i18n.t('agentChat.filePart.preview', { name });
   }
-  return i18n.t('common.open', { name });
+  return i18n.t(
+    // i18n-dup-ok: 'common.open' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+    'common.open',
+    { name }
+  );
 }

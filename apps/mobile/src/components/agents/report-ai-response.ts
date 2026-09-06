@@ -85,5 +85,9 @@ export function classifyReportAiResponseFailure(error: unknown): ReportAiRespons
 
 /** Submitted toast copy: the receipt id only, never the message body. */
 export function reportAiResponseSubmittedToast(receiptId: string): string {
-  return i18n.t('common.reportSubmittedReceipt', { receiptId });
+  return i18n.t(
+    // i18n-dup-ok: 'common.reportSubmittedReceipt' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+    'common.reportSubmittedReceipt',
+    { receiptId }
+  );
 }

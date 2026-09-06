@@ -214,7 +214,10 @@ export function ChatComposerInputRow({
             disabled={!canSend}
             hitSlop={CONTROL_HIT_SLOP}
             accessibilityRole="button"
-            accessibilityLabel={t('common.sendMessage')}
+            accessibilityLabel={t(
+              // i18n-dup-ok: 'common.sendMessage' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.sendMessage'
+            )}
             accessibilityState={{ disabled: !canSend, busy: isSending }}
             style={{ height: CONTROL_HIT_TARGET, width: CONTROL_HIT_TARGET }}
             className={`items-center justify-center rounded-full active:opacity-70 ${

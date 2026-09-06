@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ກວດສອບອຸປະກອນອື່ນ ແລະ ອອກຈາກລະບົບໃນອຸປະກອນເຫຼົ່ານັ້ນ",
     "feedback": "ຄຳຕິຊົມ",
     "privacyChoices": "ຕົວເລືອກຄວາມເປັນສ່ວນຕົວ",
-    "signOut": "ອອກຈາກລະບົບ",
     "deleteAccount": "ລຶບບັນຊີ",
     "confirmationCode": "ລະຫັດຢືນຢັນ",
     "confirmationCodePlaceholder": "ລະຫັດ 6 ຫຼັກ",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "ບໍ່ສາມາດເປີດ GitHub. ກະລຸນາລອງໃໝ່."
     },
     "settingsSave": {
-      "keepEditing": "ແກ້ໄຂຕໍ່",
       "saveChanges": "ບັນທຶກການປ່ຽນແປງ",
       "unsavedTitle": "ການປ່ຽນແປງທີ່ຍັງບໍ່ທັນບັນທຶກ",
       "unsavedMessage": "ບັນທຶກການປ່ຽນແປງກ່ອນອອກຈາກໜ້າຈໍນີ້ບໍ?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "ເລືອກໂມເດວກ່ອນສົ່ງ.",
       "preparingPlaceholder": "ກຳລັງຕັ້ງຄ່າສະພາບແວດລ້ອມ…",
       "finalizingPlaceholder": "ກຳລັງເຮັດຂັ້ນຕອນສຸດທ້າຍ…",
-      "messagePlaceholder": "ຂໍ້ຄວາມ",
       "cannotReceiveFiles": "ເຊດຊັນນີ້ຮັບໄຟລ໌ບໍ່ໄດ້. ເອົາໄຟລ໌ແນບອອກເພື່ອສົ່ງຂໍ້ຄວາມ.",
       "couldNotAttachFiles": "ບໍ່ສາມາດແນບໄຟລ໌ໄດ້. ແຕະປຸ່ມສົ່ງເພື່ອລອງໃໝ່.",
       "discardAttachmentsMessage": "ໄຟລ໌ທີ່ອັບໂຫຼດໄວ້ແຕ່ຍັງບໍ່ໄດ້ໃຊ້ຈະຖືກລຶບ.",
@@ -2777,7 +2774,6 @@
         "void": "ຍົກເລີກແລ້ວ",
         "uncollectible": "ເກັບເງິນບໍ່ໄດ້"
       },
-      "loadMoreFailed": "ບໍ່ສາມາດໂຫຼດເພີ່ມເຕີມໄດ້.",
       "truncated": "ຍັງມີໃບແຈ້ງໜີ້ກ່ອນໜ້ານີ້ໃຫ້ເບິ່ງ."
     },
     "lowBalanceAlert": {

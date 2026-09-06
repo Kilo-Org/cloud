@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "වෙනත් උපාංග පරීක්ෂා කර ඒවායේ ගිණුමෙන් පිටවන්න",
     "feedback": "ප්‍රතිපෝෂණය",
     "privacyChoices": "රහස්‍යතා තේරීම්",
-    "signOut": "පිටවන්න",
     "deleteAccount": "ගිණුම මකන්න",
     "confirmationCode": "තහවුරු කිරීමේ කේතය",
     "confirmationCodePlaceholder": "ඉලක්කම් 6 ක කේතය",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub විවෘත කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
     },
     "settingsSave": {
-      "keepEditing": "දිගටම සංස්කරණය කරන්න",
       "saveChanges": "වෙනස්කම් සුරකින්න",
       "unsavedTitle": "සුරැකී නැති වෙනස්කම්",
       "unsavedMessage": "මෙම තිරයෙන් ඉවත්වීමට පෙර ඔබේ වෙනස්කම් සුරකින්නද?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "යැවීමට පෙර මාදිලියක් තෝරන්න.",
       "preparingPlaceholder": "පරිසරය සකසමින්...",
       "finalizingPlaceholder": "අවසන් කරමින්...",
-      "messagePlaceholder": "පණිවිඩය",
       "cannotReceiveFiles": "මෙම සැසියට ගොනු ලැබිය නොහැක. ඔබේ පණිවිඩය යැවීමට ඇමුණුම් ඉවත් කරන්න.",
       "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීමේ බොත්තම තට්ටු කරන්න.",
       "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
@@ -2777,7 +2774,6 @@
         "void": "අවලංගු",
         "uncollectible": "අයකරගත නොහැකි"
       },
-      "loadMoreFailed": "තවත් පූරණය කළ නොහැකි විය.",
       "truncated": "පෙර ඉන්වොයිසි ද බැලිය හැක."
     },
     "lowBalanceAlert": {

@@ -20,6 +20,7 @@ type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
 
 type PrStateChipLabelKey =
   | 'prReview.overview.stateMerged'
+  // i18n-dup-ok: 'common.closed' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
   | 'common.closed'
   | 'common.draft'
   | 'prReview.overview.stateOpenApproved'

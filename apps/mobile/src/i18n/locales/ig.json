@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Nyochaa ma pụọ na ngwaọrụ ndị ọzọ",
     "feedback": "Nzaghachi",
     "privacyChoices": "Nhọrọ nzuzo",
-    "signOut": "Pụọ",
     "deleteAccount": "Hichapụ akaụntụ",
     "confirmationCode": "Koodu nkwenye",
     "confirmationCodePlaceholder": "koodu nwere ọnụọgụ 6",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Enweghị ike imeghe GitHub. Biko nwaa ọzọ."
     },
     "settingsSave": {
-      "keepEditing": "Nọgide na-edezi",
       "saveChanges": "Chekwaa mgbanwe",
       "unsavedTitle": "Mgbanwe echekwaghị",
       "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Họrọ ihe nlereanya tupu ị ziga ozi.",
       "preparingPlaceholder": "Na-akwadebe ebe ọrụ...",
       "finalizingPlaceholder": "Na-emecha...",
-      "messagePlaceholder": "Ozi",
       "cannotReceiveFiles": "Nnọkọ a enweghị ike ịnata faịlụ. Wepụ faịlụ mgbakwunye ka ị nwee ike iziga ozi gị.",
       "couldNotAttachFiles": "Enweghị ike itinye faịlụ mgbakwunye. Pịa Ziga ka ị nwaa ọzọ.",
       "discardAttachmentsMessage": "A ga-ehichapụ faịlụ ebugotere ndị a na-ejikọtaghị na ozi ezigara.",
@@ -2777,7 +2774,6 @@
         "void": "Akagbuola",
         "uncollectible": "A pụghị ịnakọta ụgwọ"
       },
-      "loadMoreFailed": "Enweghị ike ibudata ọzọ.",
       "truncated": "Akwụkwọ ịgba ụgwọ gara aga dị."
     },
     "lowBalanceAlert": {

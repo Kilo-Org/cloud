@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Sprawdzaj inne urządzenia i wylogowuj je",
     "feedback": "Prześlij opinię",
     "privacyChoices": "Ustawienia prywatności",
-    "signOut": "Wyloguj się",
     "deleteAccount": "Usuń konto",
     "confirmationCode": "Kod potwierdzający",
     "confirmationCodePlaceholder": "6-cyfrowy kod",
@@ -1308,7 +1307,6 @@
       "repositoriesCount_many": "Wybrano {{displayCount}} repozytoriów"
     },
     "settingsSave": {
-      "keepEditing": "Kontynuuj edycję",
       "saveChanges": "Zapisz zmiany",
       "unsavedMessage": "Zapisać zmiany przed opuszczeniem tego ekranu?",
       "unsavedTitle": "Niezapisane zmiany"
@@ -1946,7 +1944,6 @@
       "selectModelBeforeSending": "Wybierz model przed wysłaniem wiadomości.",
       "preparingPlaceholder": "Konfigurowanie środowiska…",
       "finalizingPlaceholder": "Kończenie…",
-      "messagePlaceholder": "Wiadomość",
       "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
       "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij „Wyślij”, aby spróbować ponownie.",
       "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
@@ -2818,7 +2815,6 @@
         "void": "Unieważniona",
         "uncollectible": "Nieściągalna"
       },
-      "loadMoreFailed": "Nie udało się wczytać kolejnych wyników.",
       "truncated": "Dostępne są starsze faktury."
     },
     "lowBalanceAlert": {

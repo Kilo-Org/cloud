@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Andere apparaten bekijken en afmelden",
     "feedback": "Feedback geven",
     "privacyChoices": "Privacykeuzes",
-    "signOut": "Afmelden",
     "deleteAccount": "Account verwijderen",
     "confirmationCode": "Bevestigingscode",
     "confirmationCodePlaceholder": "code van 6 cijfers",
@@ -1300,7 +1299,6 @@
       "selectRepositoriesSubtitle": "Kies welke repositories Security Agent bewaakt"
     },
     "settingsSave": {
-      "keepEditing": "Verder bewerken",
       "saveChanges": "Wijzigingen opslaan",
       "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
       "unsavedTitle": "Niet-opgeslagen wijzigingen"
@@ -1920,7 +1918,6 @@
       "selectModelBeforeSending": "Selecteer een model voordat je het bericht verzendt.",
       "preparingPlaceholder": "Omgeving voorbereiden…",
       "finalizingPlaceholder": "Afronden…",
-      "messagePlaceholder": "Bericht",
       "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
       "couldNotAttachFiles": "De bestanden konden niet worden bijgevoegd. Tik op Verzenden om het opnieuw te proberen.",
       "discardAttachmentsMessage": "Uploads die nog niet zijn gebruikt, worden verwijderd.",
@@ -2776,7 +2773,6 @@
         "void": "Vervallen",
         "uncollectible": "Oninbaar"
       },
-      "loadMoreFailed": "Meer laden is mislukt.",
       "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {

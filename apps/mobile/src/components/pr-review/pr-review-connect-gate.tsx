@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { PlugZap, RefreshCcw, ShieldAlert } from '@/components/ui/icons';
+import { PlugZap, ShieldAlert } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, Platform, View } from 'react-native';
@@ -7,6 +7,7 @@ import { CenteredState } from '@/components/centered-state';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { GitHubIcon } from '@/components/icons/github-icon';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -155,11 +156,13 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
                 void handleConnect();
               }}
             >
-              {connecting ? (
-                <ActivityIndicator size="small" color={colors.primaryForeground} />
-              ) : (
-                <RefreshCcw size={16} color={colors.primaryForeground} />
-              )}
+              <View className="size-4 items-center justify-center">
+                {connecting ? (
+                  <ActivityIndicator size="small" color={colors.primaryForeground} />
+                ) : (
+                  <GitHubIcon size={16} color={colors.primaryForeground} />
+                )}
+              </View>
               <Text>
                 {revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
               </Text>

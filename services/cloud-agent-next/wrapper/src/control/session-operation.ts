@@ -554,7 +554,6 @@ export class SessionOperation {
         runtime.kiloClient !== kiloClient ||
         Date.now() >= this.executionDeadlineAt ||
         (submitting && this.deps.getRuntime() !== runtime) ||
-        (submitting && this.deps.prepareForNewWork?.() === false) ||
         (submitting && this.authorization && Date.now() >= this.authorization.dispatchDeadlineAt)
       )
         throw new Error('Operation execution authority expired');

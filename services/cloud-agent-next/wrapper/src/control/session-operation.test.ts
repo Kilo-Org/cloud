@@ -679,4 +679,30 @@ describe('operation results and delivery', () => {
       })
     );
   });
+
+  it('does not fail an admitted prompt when feed recovery starts before submit', async () => {
+    const handlerDeps = deps({
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    let allow = true;
+    runtimes.prepareForNewWork = () => {
+      const current = allow;
+      allow = false;
+      return current;
+    };
+
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      operationAuthorization()
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+    expect(record.snapshot().outcome?.status).toBe('completed');
+  });
 });

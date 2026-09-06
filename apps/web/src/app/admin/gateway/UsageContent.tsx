@@ -2,11 +2,9 @@
 
 import { useState, type FormEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import type { inferRouterInputs } from '@trpc/server';
 import { Copy, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useTRPC } from '@/lib/trpc/utils';
-import type { RootRouter } from '@/routers/root-router';
+import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,53 +17,63 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { MONTHLY_USAGE_COLUMNS, monthlyUsageToTsv } from './monthly-usage-export';
+import {
+  GATEWAY_USAGE_COLUMNS,
+  GatewayUsageRangeSchema,
+  gatewayUsageToTsv,
+  queryGatewayUsageRange,
+  type GatewayUsageProgress,
+  type GatewayUsageRangeInput,
+} from './gateway-usage-report';
 
-type MonthlyUsageInput = inferRouterInputs<RootRouter>['admin']['gatewayUsage']['getMonthlyUsage'];
-
-export function MonthlyUsageContent() {
+export function UsageContent() {
   const trpc = useTRPC();
-  const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const client = useRawTRPCClient();
+  const [startDate, setStartDate] = useState(() => `${new Date().toISOString().slice(0, 7)}-01`);
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [model, setModel] = useState('');
-  const [submitted, setSubmitted] = useState<MonthlyUsageInput | null>(null);
+  const [submitted, setSubmitted] = useState<GatewayUsageRangeInput | null>(null);
+  const [progress, setProgress] = useState<GatewayUsageProgress | null>(null);
   const [copying, setCopying] = useState(false);
   const models = useQuery(trpc.models.list.queryOptions());
-  const report = useQuery(
-    trpc.admin.gatewayUsage.getMonthlyUsage.queryOptions(
-      submitted ?? { year: 2000, month: 1, model: '' },
-      {
-        enabled: submitted !== null,
-        staleTime: 0,
-        retry: false,
-        refetchOnWindowFocus: false,
-        refetchOnReconnect: false,
-        refetchOnMount: false,
-        trpc: { context: { skipBatch: true } },
-      }
-    )
-  );
-  const tsv = report.data ? monthlyUsageToTsv(report.data) : '';
+  const report = useQuery({
+    queryKey: ['admin-gateway-usage-range', submitted],
+    queryFn: ({ signal }) => {
+      if (!submitted) throw new Error('Choose a date range and model ID.');
+      return queryGatewayUsageRange(submitted, {
+        signal,
+        onProgress: setProgress,
+        fetchDay: (input, signal) =>
+          client.admin.gatewayUsage.getDailyUsage.query(input, {
+            signal,
+            context: { skipBatch: true },
+          }),
+      });
+    },
+    enabled: submitted !== null,
+    staleTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+  });
+  const tsv = report.data ? gatewayUsageToTsv(report.data) : '';
 
   function runReport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (report.isFetching) return;
-    const [year, monthNumber] = month.split('-').map(Number);
-    const input = { year, month: monthNumber, model: model.trim() };
-    if (
-      !Number.isInteger(year) ||
-      year < 2000 ||
-      year > 9999 ||
-      !Number.isInteger(monthNumber) ||
-      monthNumber < 1 ||
-      monthNumber > 12 ||
-      !input.model
-    ) {
-      toast.error('Enter a valid year, month, and model ID.');
+    const parsed = GatewayUsageRangeSchema.safeParse({ startDate, endDate, model });
+    if (!parsed.success) {
+      toast.error(
+        'Enter valid start and end dates, with the end on or after the start, and a model ID.'
+      );
       return;
     }
+    const input = parsed.data;
+    setProgress(null);
     if (
-      submitted?.year === input.year &&
-      submitted.month === input.month &&
+      submitted?.startDate === input.startDate &&
+      submitted.endDate === input.endDate &&
       submitted.model === input.model
     ) {
       void report.refetch();
@@ -89,24 +97,37 @@ export function MonthlyUsageContent() {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div>
-        <h3 className="text-lg font-semibold">Monthly model usage</h3>
+        <h3 className="text-lg font-semibold">Model usage</h3>
         <p className="text-muted-foreground text-sm">
-          PostgreSQL read-replica usage grouped by provider and gateway BYOK. Excludes user BYOK and
-          counts logged-in users separately from anonymous users. Queries can take up to 10 minutes,
-          or longer if the configured timeout is higher.
+          PostgreSQL read-replica usage grouped by date, provider, and gateway BYOK. Excludes user
+          BYOK and counts logged-in users separately from anonymous users. Each UTC day is queried
+          separately, with a 10-minute timeout per day. Both selected dates are included.
         </p>
       </div>
       <form onSubmit={runReport} className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">
-          <Label htmlFor="gateway-usage-month">Year / month (UTC)</Label>
+          <Label htmlFor="gateway-usage-start-date">Start date (UTC)</Label>
           <Input
-            id="gateway-usage-month"
-            type="month"
-            min="2000-01"
-            max="9999-12"
+            id="gateway-usage-start-date"
+            type="date"
+            min="2000-01-01"
+            max={endDate || '9999-12-31'}
             required
-            value={month}
-            onChange={event => setMonth(event.target.value)}
+            value={startDate}
+            onChange={event => setStartDate(event.target.value)}
+            disabled={report.isFetching}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="gateway-usage-end-date">End date (UTC, inclusive)</Label>
+          <Input
+            id="gateway-usage-end-date"
+            type="date"
+            min={startDate || '2000-01-01'}
+            max="9999-12-31"
+            required
+            value={endDate}
+            onChange={event => setEndDate(event.target.value)}
             disabled={report.isFetching}
           />
         </div>
@@ -129,7 +150,10 @@ export function MonthlyUsageContent() {
             ))}
           </datalist>
         </div>
-        <Button type="submit" disabled={report.isFetching || !model.trim() || !month}>
+        <Button
+          type="submit"
+          disabled={report.isFetching || !model.trim() || !startDate || !endDate}
+        >
           {report.isFetching && <Loader2 className="size-4 animate-spin" aria-hidden="true" />}
           {report.isFetching ? 'Running report…' : 'Run report'}
         </Button>
@@ -139,7 +163,10 @@ export function MonthlyUsageContent() {
       </p>
       {report.isFetching && (
         <p role="status" className="text-muted-foreground text-sm">
-          Querying the PostgreSQL read replica. Keep this tab open while the report runs.
+          {progress
+            ? `Querying ${progress.date}. ${progress.completedDays} of ${progress.totalDays} days completed. `
+            : 'Starting daily queries. '}
+          Keep this tab open while the report runs.
         </p>
       )}
       {report.error && (
@@ -148,16 +175,16 @@ export function MonthlyUsageContent() {
         </p>
       )}
       {submitted && report.data && !report.isFetching && !report.error && (
-        <section className="min-w-0 space-y-4" aria-label="Monthly usage results">
+        <section className="min-w-0 space-y-4" aria-label="Daily usage results">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <p className="text-sm font-medium">
-                {submitted.year}-{String(submitted.month).padStart(2, '0')} · {submitted.model}
+                {submitted.startDate} through {submitted.endDate} (UTC) · {submitted.model}
               </p>
               <p className="text-muted-foreground text-xs">
                 Costs are in microdollars (1 USD = 1,000,000 microdollars). Null values are shown as
-                NULL and copied as empty cells. User counts are distinct within each row, not
-                additive.
+                NULL and copied as empty cells. User counts are distinct within each daily row and
+                must not be summed across days or providers.
               </p>
             </div>
             <Button
@@ -171,7 +198,7 @@ export function MonthlyUsageContent() {
           </div>
           {report.data.length === 0 ? (
             <p role="status" className="text-muted-foreground py-4 text-sm">
-              No usage found for this model and month.
+              No usage found for this model and date range.
             </p>
           ) : (
             <>
@@ -179,15 +206,15 @@ export function MonthlyUsageContent() {
                 <Table className="font-mono text-xs whitespace-nowrap">
                   <TableHeader>
                     <TableRow>
-                      {MONTHLY_USAGE_COLUMNS.map(column => (
+                      {GATEWAY_USAGE_COLUMNS.map(column => (
                         <TableHead key={column}>{column}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {report.data.map(row => (
-                      <TableRow key={JSON.stringify([row.provider, row.is_byok])}>
-                        {MONTHLY_USAGE_COLUMNS.map(column => (
+                      <TableRow key={JSON.stringify([row.date, row.provider, row.is_byok])}>
+                        {GATEWAY_USAGE_COLUMNS.map(column => (
                           <TableCell key={column} className="tabular-nums">
                             {row[column] === null ? 'NULL' : String(row[column])}
                           </TableCell>

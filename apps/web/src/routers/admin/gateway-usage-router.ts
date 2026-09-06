@@ -3,7 +3,6 @@ import 'server-only';
 import { TRPCError } from '@trpc/server';
 import { sql } from 'drizzle-orm';
 import * as z from 'zod';
-import { getEnvVariable } from '@/lib/dotenvx';
 import { readDb, usesSeparateReplica } from '@/lib/drizzle';
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { timedUsageQuery } from '@/lib/usage-query';
@@ -16,7 +15,14 @@ const NullableTokenSumSchema = z
   .nullable();
 const NullableCostSumSchema = DecimalStringSchema.nullable();
 
-const MonthlyUsageSchema = z.object({
+const UsageDateSchema = z.iso
+  .date()
+  .length(10)
+  .refine(date => date >= '2000-01-01' && date <= '9999-12-31', {
+    message: 'Date must be between 2000-01-01 and 9999-12-31',
+  });
+
+const UsageAggregatesSchema = z.object({
   provider: z.string().nullable(),
   is_byok: z.boolean().nullable(),
   users: NonnegativeIntegerStringSchema,
@@ -29,25 +35,15 @@ const MonthlyUsageSchema = z.object({
   market_cost: NullableCostSumSchema,
 });
 
-function monthlyUsageTimeoutMs(): number {
-  const configured = Number(getEnvVariable('USAGE_QUERY_TIMEOUT_ADMIN_MS'));
-  const adminTimeoutMs =
-    Number.isInteger(configured) && configured >= 0 && configured <= 2_147_483_647
-      ? configured
-      : 20_000;
-  return Math.max(600_000, adminTimeoutMs);
-}
-
 export const adminGatewayUsageRouter = createTRPCRouter({
-  getMonthlyUsage: adminProcedure
+  getDailyUsage: adminProcedure
     .input(
       z.object({
-        year: z.number().int().min(2000).max(9999),
-        month: z.number().int().min(1).max(12),
+        date: UsageDateSchema,
         model: z.string().trim().min(1).max(256),
       })
     )
-    .output(z.array(MonthlyUsageSchema))
+    .output(z.array(UsageAggregatesSchema.extend({ date: UsageDateSchema })))
     .query(async ({ input, signal }) => {
       try {
         signal?.throwIfAborted();
@@ -55,19 +51,14 @@ export const adminGatewayUsageRouter = createTRPCRouter({
           throw new Error('Gateway usage requires a read replica');
         }
 
-        const period = `${input.year}-${String(input.month).padStart(2, '0')}`;
-        const startDate = `${period}-01 00:00:00+00`;
-        const endYear = input.month === 12 ? input.year + 1 : input.year;
-        const endMonth = input.month === 12 ? 1 : input.month + 1;
-        const endDate = `${endYear}-${String(endMonth).padStart(2, '0')}-01 00:00:00+00`;
         const rows = await timedUsageQuery(
           {
             db: readDb,
-            route: 'admin.gatewayUsage.getMonthlyUsage',
-            queryLabel: 'monthly_model_usage',
+            route: 'admin.gatewayUsage.getDailyUsage',
+            queryLabel: 'daily_model_usage',
             scope: 'admin',
-            period,
-            timeoutMs: monthlyUsageTimeoutMs(),
+            period: input.date,
+            timeoutMs: 600_000,
           },
           async tx => {
             const result = await tx.execute(sql`
@@ -87,15 +78,18 @@ export const adminGatewayUsageRouter = createTRPCRouter({
               WHERE mu.requested_model = ${input.model}
                 AND meta.is_user_byok = false
                 AND mu.input_tokens > 0
-                AND mu.created_at >= ${startDate}::timestamptz
-                AND mu.created_at < ${endDate}::timestamptz
+                AND mu.created_at >= (${input.date}::date::timestamp AT TIME ZONE 'UTC')
+                AND mu.created_at < ((${input.date}::date + 1)::timestamp AT TIME ZONE 'UTC')
               GROUP BY mu.provider, meta.is_byok
               ORDER BY mu.provider, meta.is_byok
             `);
             return result.rows;
           }
         );
-        return z.array(MonthlyUsageSchema).parse(rows);
+        return z
+          .array(UsageAggregatesSchema)
+          .parse(rows)
+          .map(row => ({ ...row, date: input.date }));
       } catch {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

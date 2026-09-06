@@ -38,16 +38,21 @@ export type ExpoPushToken = { token: string; locale: string | null };
  * Update eligible activities or end zero-count activities. Never start empty work.
  * A push-to-start token is used only when no activity target remains, avoiding
  * duplicate activities while allowing fresh work after terminal target retirement.
+ *
+ * `startable` is the narrower rule the iOS sink starts on: an agent working or
+ * waiting on the user. Idle work keeps a card alive but must never raise one,
+ * or a push-to-start resurrects the card the sink just retired for idleness.
  */
 export function apnsSendsForTokens(
   tokens: readonly IosActivityToken[],
-  eligible: boolean
+  eligible: boolean,
+  startable: boolean
 ): { token: string; event: LiveActivityEvent }[] {
   const activityTokens = tokens.filter(token => token.kind === 'ios_activity');
   if (activityTokens.length > 0) {
     return activityTokens.map(({ token }) => ({ token, event: eligible ? 'update' : 'end' }));
   }
-  return eligible
+  return startable
     ? tokens
         .filter(token => token.kind === 'ios_push_to_start')
         .map(({ token }) => ({ token, event: 'start' }))
@@ -156,7 +161,11 @@ export async function deliverGlanceableSnapshot(
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
-  const iosSends = apnsSendsForTokens(iosTokens, eligible);
+  const iosSends = apnsSendsForTokens(
+    iosTokens,
+    eligible,
+    snapshot.running + snapshot.needsInput > 0
+  );
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,

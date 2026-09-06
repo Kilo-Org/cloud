@@ -1,4 +1,10 @@
 import type { NextRequest } from 'next/server';
+import { captureException, captureMessage } from '@sentry/nextjs';
+
+jest.mock('@sentry/nextjs', () => ({
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
 
 const mockVerifyGitHubWebhookSignature = jest.fn(
   (_payload: string, _signature: string, _appType: string) => true
@@ -399,6 +405,107 @@ describe('handleGitHubWebhook', () => {
     expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 
+  it.each(['standard', 'lite'] as const)(
+    'ignores installation.deleted with a null installation for the %s app',
+    async appType => {
+      const request = signedGitHubRequest('installation', {
+        action: 'deleted',
+        installation: null,
+        sender: { id: 111, login: 'alice' },
+        organization: { id: 222, login: 'acme' },
+        repositories: [{ id: 333, full_name: 'acme/widgets' }],
+      });
+      request.headers.set('x-github-hook-id', '444');
+      request.headers.set('x-github-hook-installation-target-id', '555');
+      request.headers.set('x-github-hook-installation-target-type', 'integration');
+
+      const response = await handleGitHubWebhook(request, appType);
+
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({
+        message: 'Event ignored: missing installation ID',
+      });
+      expect(mockVerifyGitHubWebhookSignature).toHaveBeenCalledWith(
+        expect.any(String),
+        'sha256=test',
+        appType
+      );
+      expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+      expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+      expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+      expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+      expect(captureMessage).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    }
+  );
+
+  it('rejects installation.deleted with a null installation when signature verification fails', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue(false);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', { action: 'deleted', installation: null }),
+      'standard'
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, {}, { id: '98765' }])(
+    'still rejects malformed installation.deleted installation %j',
+    async installation => {
+      const response = await handleGitHubWebhook(
+        signedGitHubRequest('installation', { action: 'deleted', installation }),
+        'standard'
+      );
+
+      expect(response.status).toBe(400);
+      expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+      expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+      expect(captureMessage).toHaveBeenCalledWith(
+        'Invalid GitHub webhook payload structure',
+        expect.objectContaining({
+          level: 'error',
+          tags: { source: 'github_webhook_validation', event: 'installation.deleted' },
+        })
+      );
+    }
+  );
+
+  it('preserves duplicate installation.deleted handling', async () => {
+    mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: true });
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', { action: 'deleted', installation: { id: 98765 } }),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ message: 'Duplicate event' });
+    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
+    expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+    expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('routes installation.deleted with a known ID even when no integration is found', async () => {
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+    mockFindIntegrationByInstallationId.mockResolvedValue(null);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(payload, 'standard');
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
   it('routes installation.deleted to the handler with the webhook app type', async () => {
     const payload = { action: 'deleted', installation: { id: 98765 } };
 
@@ -412,6 +519,10 @@ describe('handleGitHubWebhook', () => {
     expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'lite'
+    );
+    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
+      'we_1',
+      expect.objectContaining({ processed: true, handlers_triggered: ['installation_deleted'] })
     );
   });
 

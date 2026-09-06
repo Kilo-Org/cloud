@@ -138,7 +138,7 @@ export function PrReviewOverview({
         <EmptyState
           refreshControl={refreshControl}
           icon={GitPullRequest}
-          title={t('prReview.connectionExpired')}
+          title={t('prReview.reconnectNotice.title')}
           description={t('prReview.reconnectNotice.message')}
           action={
             <Button

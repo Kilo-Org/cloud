@@ -16,7 +16,7 @@ import type { AbortLike, FetchLike } from '../src/core/fetch.js';
 import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { kilo, models, room } from './setup.js';
-import { fail, passed, under } from './report.js';
+import { fail, passed, under, wrongIf } from './report.js';
 import { webFetch } from '../src/plugins/fetch/web.js';
 
 const system = 'You do exactly what you are told, at length, with no preamble.';
@@ -118,6 +118,9 @@ const program = (model: string) =>
     };
   });
 
+/** The models whose answer ran long enough to walk away from. The floor is one. */
+const cancelled: string[] = [];
+
 for (const model of models) {
   under(model);
 
@@ -133,9 +136,17 @@ for (const model of models) {
   );
   if (got._tag === 'Left') {
     console.log('model         ', model, 'FAILED', JSON.stringify(String(got.left)));
-    fail(`the run failed: ${String(got.left)}`);
+    /* A minute with fewer than ten pieces is a model too slow to walk away
+       from, not a cancellation that failed: `minimax/minimax-m3` streams
+       nothing for over a minute on 2026-09-06. There is no mid-stream here to
+       leave. A package that stopped streaming would put every model here, which
+       is what the floor below catches. */
+    if (!String(got.left).includes('never reached')) {
+      fail(`the run failed: ${String(got.left)}`);
+    }
     continue;
   }
+  cancelled.push(model);
   const result = got.right;
 
   const roles = result.history.map(turn => turn.role);
@@ -186,5 +197,9 @@ for (const model of models) {
     fail(`the abort left ${String(loose.length)} unhandled rejection(s): ${String(loose[0])}`);
   }
 }
+
+under('');
+console.log(`\nanswered long enough to cancel: ${String(cancelled.length)} of ${String(models.length)} models`);
+wrongIf(cancelled.length === 0, 'not one answer ran long enough to walk away from');
 
 passed('the call stopped when the caller did, and the session survived it.');

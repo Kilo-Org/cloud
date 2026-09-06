@@ -283,6 +283,15 @@ const runWanted = async (model: string): Promise<boolean> => {
   if (first.includes('kestrel')) {
     return false;
   }
+  /* Read from the tool and not from the answer. `xiaomi/mimo-v2.5` and
+     `minimax/minimax-m3` both said they had asked about Oslo on 2026-09-06 and
+     called nothing at all: the words of a model that never called and the words
+     of one that walked away from a call are the same words, and only this tells
+     them apart. Nothing was sent away, so no late round is owed. */
+  if (ran.length === 0) {
+    console.log('the model said it had asked and never called the tool');
+    return false;
+  }
   wrongIf(
     !told.includes('kestrel'),
     'the model set wait to false and the call it walked away from never came back'

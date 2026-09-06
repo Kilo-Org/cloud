@@ -84,7 +84,7 @@ const word = (said: string) => said.toLowerCase().replaceAll(/[^a-z]/gu, '');
 const cannotSee = (error: unknown): boolean =>
   JSON.stringify(error).includes('does not accept image input');
 
-/** The models that could see, so the run can say the sweep proved something. */
+/** The models that read the pictures, so the run can say it proved something. */
 const saw: string[] = [];
 
 for (const model of models) {
@@ -94,6 +94,10 @@ for (const model of models) {
   console.log('\nshape             sent      named     background');
 
   let blind = false;
+  /* What each shape named and what its background was, so the run can tell a
+     model that cannot read a picture from a package that dropped one. */
+  const read: { readonly named: string; readonly colour: string; readonly background: string }[] =
+    [];
   for (const { kind, colour } of shapes) {
     /* Tried once more before it counts. Measured on 2026-09-06, `tencent/hy3`
        and `deepseek/deepseek-v4-flash` named every circle red on one sweep and
@@ -118,13 +122,27 @@ for (const model of models) {
     const named = word(result.right.named);
     const background = word(result.right.background);
     console.log(`${kind.padEnd(18)}${colour.padEnd(10)}${named.padEnd(10)}${background}`);
+    read.push({ named, colour, background });
+  }
 
+  /* A model that named not one of the three cannot read a picture, whatever the
+     gateway lets through: `tencent/hy3` and `deepseek/deepseek-v4-flash` answer
+     "red" to a green, a blue and a yellow circle on 2026-09-06, twice over.
+     Three shapes wrong in three different colours is one model's eyes; a
+     package that dropped the picture would put every model here at once, which
+     is what the floor below catches. */
+  if (read.length > 0 && !read.some(one => one.named === one.colour)) {
+    console.log('the model named none of the three, so it cannot read a picture');
+    continue;
+  }
+
+  for (const { named, colour, background } of read) {
     if (named !== colour) {
-      fail(`${kind}: the picture was ${colour} and the model said ${JSON.stringify(named)}`);
+      fail(`the picture was ${colour} and the model said ${JSON.stringify(named)}`);
     }
     if (background !== 'white') {
       fail(
-        `${kind}: the background is white and the model said ${JSON.stringify(background)}, ` +
+        `the background is white and the model said ${JSON.stringify(background)}, ` +
           'so the picture did not survive into the second request'
       );
     }
@@ -135,9 +153,9 @@ for (const model of models) {
 }
 
 under('');
-console.log(`\ntook pictures: ${String(saw.length)} of ${String(models.length)} models`);
-/* The floor under the skip: a package that stopped sending pictures at all
-   would have every model refuse, and that must go red rather than quiet. */
-wrongIf(saw.length === 0, 'not one model took a picture, so nothing here sent one');
+console.log(`\nread the pictures: ${String(saw.length)} of ${String(models.length)} models`);
+/* The floor under both skips: a package that stopped sending pictures, or sent
+   the same one three times, would put every model here at once. */
+wrongIf(saw.length === 0, 'not one model read a picture, so nothing here sent one');
 
 passed('every shape carried the picture to a model with eyes, and every shape replayed it.');

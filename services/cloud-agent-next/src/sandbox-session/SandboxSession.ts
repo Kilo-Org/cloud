@@ -8,6 +8,12 @@ import { withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import { diagnosticSyncStatus } from '../shared/control-diagnostics.js';
 import {
+  controlSessionStateSchema,
+  controlStopRequestSchema,
+  type ControlSessionState,
+  type ControlStopReceipt,
+} from '../shared/control-plane-session.js';
+import {
   cloudAgentWorktreeIdSchema,
   cloudAgentWorktreeLocationSchema,
   type CloudAgentWorktreeId,
@@ -142,6 +148,8 @@ import {
   withDeliveryDeadline,
 } from './control-dispatch.js';
 import { acceptedAlarmDecision } from './accepted-overdue.js';
+import { createSessionStopLifecycle } from './session-stop-lifecycle.js';
+import { progressSessionStop } from './session-stop-progress.js';
 import { bootPreparingStep, provisionPreparingStep } from './preparing-steps.js';
 import { createSandboxTerminalBridge, type SandboxTerminalRecord } from './terminal-bridge.js';
 import {
@@ -219,6 +227,8 @@ export class SandboxSession extends DurableObject<Env> {
   private ingestPublicationChain: Promise<void> = Promise.resolve();
   private deletedWorktreeId: CloudAgentWorktreeId | undefined;
   private readonly activeOperations = new Set<Promise<unknown>>();
+  private readonly stopProgresses = new Map<string, Promise<void>>();
+  private readonly stopLifecycle: ReturnType<typeof createSessionStopLifecycle>;
   private deletionCompletion: Promise<void> | undefined;
   private readonly worktreeChanges: ReturnType<typeof createWorktreeChanges>;
   private readonly interactionRefresh: InteractionRefresh;
@@ -305,6 +315,18 @@ export class SandboxSession extends DurableObject<Env> {
           'captureWorktreeChanges'
         ),
       waitUntil: promise => this.ctx.waitUntil(promise),
+    });
+    this.stopLifecycle = createSessionStopLifecycle({
+      list: () => ctx.storage.kv.list<unknown>({ prefix: 'session_stop/' }),
+      readLegacy: () => ctx.storage.kv.get<unknown>('session_stops'),
+      put: (key, value) => ctx.storage.kv.put(key, value),
+      delete: key => {
+        ctx.storage.kv.delete(key);
+      },
+      deleteLegacy: () => {
+        ctx.storage.kv.delete('session_stops');
+      },
+      transaction: callback => ctx.storage.transactionSync(callback),
     });
     this.interactionRefresh = createInteractionRefresh({
       captureScope: () => this.captureInteractionScope(),
@@ -855,7 +877,56 @@ export class SandboxSession extends DurableObject<Env> {
     return;
   }
 
-  async interruptExecution(): Promise<{ success: boolean; message?: string }> {
+  async getControlState(): Promise<ControlSessionState | null> {
+    return this.controlSessionState();
+  }
+
+  private controlSessionState(): ControlSessionState | null {
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (!metadata || !sandboxId || this.terminalLifecycle.captureEpoch() === null) return null;
+    const targets = this.loadMessages()
+      .filter(
+        message =>
+          (message.state === 'queued' || message.state === 'accepted') &&
+          message.cancellation === undefined
+      )
+      .map(message => ({
+        messageId: message.messageId,
+        ...(message.wrapperInstanceId ? { wrapperInstanceId: message.wrapperInstanceId } : {}),
+        ...(message.executionDeadlineAt
+          ? { executionDeadlineAt: message.executionDeadlineAt }
+          : {}),
+      }));
+    if (targets.length === 0) return null;
+    return controlSessionStateSchema.parse({
+      version: 1,
+      scope: {
+        sandboxId,
+        ...(this.terminalLifecycle.getAttachedWrapperInstanceId()
+          ? { wrapperInstanceId: this.terminalLifecycle.getAttachedWrapperInstanceId() }
+          : {}),
+      },
+      targets,
+    });
+  }
+
+  async interruptExecution(): Promise<{ success: boolean; message?: string }>;
+  async interruptExecution(input: unknown): Promise<ControlStopReceipt>;
+  async interruptExecution(
+    input?: unknown
+  ): Promise<{ success: boolean; message?: string } | ControlStopReceipt> {
+    if (input === undefined) return this.interruptLegacyExecution();
+    const request = controlStopRequestSchema.parse(input);
+    const receipt = await this.admitControlStop(request);
+    if (receipt.state === 'accepted') {
+      await this.armQueueRetry(Math.min(receipt.cleanupDeadlineAt, Date.now() + QUEUE_RETRY_MS));
+      void this.scheduleStopProgress(receipt.operationId);
+    }
+    return receipt;
+  }
+
+  private async interruptLegacyExecution(): Promise<{ success: boolean; message?: string }> {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return { success: false, message: 'Session not found' };
     const before = this.loadMessages();
@@ -934,6 +1005,116 @@ export class SandboxSession extends DurableObject<Env> {
       await this.failDelivery(accepted.messageId, 'runtime_unhealthy', accepted.wrapperInstanceId);
       return { success: false, message: 'The session runtime could not be interrupted' };
     }
+  }
+
+  async getInterruptResult(operationId: string): Promise<ControlStopReceipt | null> {
+    return this.stopLifecycle.receipt(operationId);
+  }
+
+  private async admitControlStop(
+    request: ReturnType<typeof controlStopRequestSchema.parse>
+  ): Promise<ControlStopReceipt> {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const receipt = this.stopLifecycle.admit({
+      messages: this.loadMessages(),
+      request,
+      currentSandboxId: metadata?.workspace?.sandboxId,
+      currentWrapperInstanceId: this.terminalLifecycle.getAttachedWrapperInstanceId(),
+      now: Date.now(),
+      commit: (messages, stop) =>
+        epoch !== null &&
+        metadata !== undefined &&
+        this.saveMessages(messages, epoch, 'coordinator', undefined, () => {
+          this.stopLifecycle.persist(stop);
+        }),
+    });
+    const interrupted = this.loadMessages().some(
+      message =>
+        message.state === 'accepted' && message.cancellation?.operationId === request.operationId
+    );
+    if (interrupted && metadata)
+      this.worktreeChanges.markInterrupted(this.worktreeContext(metadata));
+    return receipt;
+  }
+
+  private scheduleStopProgress(operationId: string): Promise<void> {
+    const current = this.stopProgresses.get(operationId);
+    if (current) return current;
+    const pending = this.trackOperation(this.runStopProgress(operationId)).finally(() => {
+      this.stopProgresses.delete(operationId);
+    });
+    this.stopProgresses.set(operationId, pending);
+    this.ctx.waitUntil(pending);
+    return pending;
+  }
+
+  private async runStopProgress(operationId: string): Promise<void> {
+    const stop = this.stopLifecycle.get(operationId);
+    const epoch = this.terminalLifecycle.captureEpoch();
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    const kiloSessionId = metadata?.auth.kiloSessionId;
+    if (!stop || stop.state !== 'accepted') return;
+    const updated = await progressSessionStop({
+      stop,
+      now: Date.now,
+      readMessages: () => this.loadMessages(),
+      saveMessages: messages => epoch !== null && this.saveMessages(messages, epoch),
+      abort: async target => {
+        if (
+          epoch === null ||
+          !metadata ||
+          !sandboxId ||
+          sandboxId !== stop.request.scope.sandboxId ||
+          !kiloSessionId
+        )
+          throw new Error('Stop runtime is unavailable');
+        const expected = stop.request.targets.find(item => item.messageId === target.messageId);
+        if (!expected?.wrapperInstanceId) {
+          return { status: 'unconfirmed', quiescent: false };
+        }
+        const response = await withDeliveryDeadline(
+          () =>
+            sandboxControlRpc(this.env, sandboxId).request({
+              operation: 'session.abort',
+              session: {
+                sessionId: metadata.identity.sessionId,
+                kiloSessionId,
+                directory: this.directory(metadata),
+              },
+              payload: {
+                messageId: target.messageId,
+                operationId: stop.request.operationId,
+                cleanupDeadlineAt: stop.request.cleanupDeadlineAt,
+              },
+              expectedWrapperInstanceId: expected.wrapperInstanceId,
+            }),
+          stop.request.cleanupDeadlineAt
+        );
+        if (!response.ok) throw new Error('Session abort failed');
+        return sessionAbortResultSchema.parse(response.result);
+      },
+      applyDelivery: async delivery => {
+        if (!delivery) return undefined;
+        return this.applySandboxOperationResult({
+          session: delivery.authorization.session,
+          wrapperInstanceId: delivery.authorization.wrapperInstanceId,
+          delivery,
+        });
+      },
+    });
+    if (!this.stopLifecycle.replace(stop, updated)) return;
+    if (updated.state === 'accepted')
+      await this.armQueueRetry(
+        Math.min(updated.request.cleanupDeadlineAt, Date.now() + QUEUE_RETRY_MS)
+      );
+    else if (
+      epoch !== null &&
+      this.terminalLifecycle.isCurrent(epoch) &&
+      nextQueuedMessageId(this.loadMessages())
+    )
+      await this.armQueueRetry();
   }
 
   async answerPermission(input: {
@@ -1411,12 +1592,16 @@ export class SandboxSession extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
+    for (const stop of this.stopLifecycle.pending())
+      void this.scheduleStopProgress(stop.request.operationId);
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null || this.deletedWorktreeId) return;
     const now = Date.now();
     const messages = this.loadMessages();
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
-    const accepted = messages.find(message => message.state === 'accepted');
+    const accepted = messages.find(
+      message => message.state === 'accepted' && message.cancellation === undefined
+    );
     if (accepted) {
       const decision = acceptedAlarmDecision(
         accepted.acceptedAt ?? 0,
@@ -2268,11 +2453,13 @@ export class SandboxSession extends DurableObject<Env> {
 
   private async armQueueRetry(when = Date.now() + QUEUE_RETRY_MS): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
-    if (epoch === null && !this.pendingRuntimeCleanup()) return;
+    const hasPendingStop = this.stopLifecycle.pending().length > 0;
+    if (epoch === null && !this.pendingRuntimeCleanup() && !hasPendingStop) return;
     const existing = await this.ctx.storage.getAlarm();
     if (
       (epoch === null || !this.terminalLifecycle.isCurrent(epoch)) &&
-      !this.pendingRuntimeCleanup()
+      !this.pendingRuntimeCleanup() &&
+      !hasPendingStop
     )
       return;
     if (existing === null || existing > when) await this.ctx.storage.setAlarm(when);
@@ -2733,7 +2920,8 @@ export class SandboxSession extends DurableObject<Env> {
     messages: MessageRecord[],
     epoch?: number,
     source: 'coordinator' | 'wrapper_outcome' | 'operation_result' = 'coordinator',
-    deferredNotifications?: StoredEvent[]
+    deferredNotifications?: StoredEvent[],
+    onPersist?: () => void
   ): boolean {
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
     if (
@@ -2813,6 +3001,7 @@ export class SandboxSession extends DurableObject<Env> {
         return terminal;
       });
       this.ctx.storage.kv.put(MESSAGES_KEY, next);
+      onPersist?.();
     });
     for (const fields of committed) {
       logControlDiagnostic('session_message_committed', {

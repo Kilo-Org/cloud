@@ -25,6 +25,7 @@ import {
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
+import { createControlStopRequest } from '../shared/control-plane-session.js';
 import type {
   AcceptedCommandTurn,
   AcceptedPromptTurn,
@@ -3714,6 +3715,93 @@ describe('SandboxSession orchestration', () => {
     await fixture.fireAlarm();
     expect(fixture.record('a')?.state).toBe('cancelled');
     expect(fixture.record('b')?.state).toBe('accepted');
+  });
+});
+
+describe('SandboxSession durable Stop wiring', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    orchestrationMocks.broadcast.mockClear();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function stopRequest(fixture: ReturnType<typeof sessionFixture>, operationId: string) {
+    const state = await fixture.session.getControlState();
+    if (!state) throw new Error('Missing control state');
+    return createControlStopRequest(state, Date.now(), operationId);
+  }
+
+  it('keeps the Stop receipt absent when the paired message transaction fails', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const request = await stopRequest(fixture, '33333333-3333-4333-8333-333333333333');
+    const before = fixture.record('a');
+    vi.spyOn(fixture.storage, 'transactionSync').mockImplementationOnce(() => {
+      throw new Error('transaction failed');
+    });
+
+    await expect(fixture.session.interruptExecution(request)).rejects.toThrow('transaction failed');
+
+    expect(fixture.record('a')).toEqual(before);
+    expect(fixture.values.get(`session_stop/${request.operationId}`)).toBeUndefined();
+  });
+
+  it('repairs an admitted receipt with its original cleanup bound after alarm scheduling fails and reloads', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const request = await stopRequest(fixture, '33333333-3333-4333-8333-333333333334');
+    await fixture.storage.deleteAlarm();
+    vi.spyOn(fixture.storage, 'setAlarm').mockRejectedValueOnce(new Error('alarm unavailable'));
+
+    await expect(fixture.session.interruptExecution(request)).rejects.toThrow('alarm unavailable');
+    expect(await fixture.session.getInterruptResult(request.operationId)).toMatchObject({
+      state: 'accepted',
+      cleanupDeadlineAt: request.cleanupDeadlineAt,
+    });
+
+    fixture.reload();
+    await expect(fixture.session.interruptExecution(request)).resolves.toMatchObject({
+      state: 'accepted',
+      cleanupDeadlineAt: request.cleanupDeadlineAt,
+    });
+    await fixture.flush();
+
+    const abort = fixture.control.request.mock.calls
+      .map(([input]) => input)
+      .find(input => input.operation === 'session.abort');
+    expect(abort).toMatchObject({
+      payload: {
+        messageId: 'a',
+        operationId: request.operationId,
+        cleanupDeadlineAt: request.cleanupDeadlineAt,
+      },
+    });
+  });
+
+  it('marks an unrecoverable Stop unconfirmed after its bound when the terminal epoch disappears', async () => {
+    const fixture = sessionFixture();
+    await fixture.admit('a');
+    await fixture.flush();
+    const request = await stopRequest(fixture, '33333333-3333-4333-8333-333333333335');
+
+    await expect(fixture.session.interruptExecution(request)).resolves.toMatchObject({
+      state: 'accepted',
+    });
+    await fixture.flush();
+    fixture.values.delete('session_metadata');
+    vi.setSystemTime(request.cleanupDeadlineAt);
+    await fixture.fireAlarm();
+    await fixture.flush();
+
+    expect(fixture.values.get(`session_stop/${request.operationId}`)).toMatchObject({
+      state: 'unconfirmed',
+      request: { cleanupDeadlineAt: request.cleanupDeadlineAt },
+    });
   });
 });
 

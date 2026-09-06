@@ -304,7 +304,7 @@ describe('createSandboxControlClient', () => {
         protocolVersion: number;
         wrapperVersion: string;
         providerInstanceId: string;
-        capabilities?: { sessionOperationResults?: boolean };
+        capabilities?: { sessionOperationResults?: boolean; scopedStopAbort?: boolean };
       };
     };
     expect(hello.operation).toBe('sandbox.hello');
@@ -312,7 +312,7 @@ describe('createSandboxControlClient', () => {
       protocolVersion: 1,
       wrapperVersion: '2.4.0',
       providerInstanceId: 'inst_1',
-      capabilities: { sessionOperationResults: true },
+      capabilities: { sessionOperationResults: true, scopedStopAbort: true },
     });
     fake.respond(
       JSON.stringify({

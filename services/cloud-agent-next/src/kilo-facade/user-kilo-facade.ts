@@ -28,6 +28,8 @@ import type { CloudAgentSession } from '../persistence/CloudAgentSession.js';
 import type { Env } from '../types.js';
 import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
+import { sessionPlaneFromId } from '../session-plane.js';
+import { interruptControlSession } from '../router/control-plane-session.js';
 import { preflightAndAdmitPromptMessage } from '../session/queue-message.js';
 import { parseBasicKiloPrompt } from './basic-prompt.js';
 import {
@@ -881,6 +883,19 @@ async function defaultInterruptPrompt(params: {
   userId: string;
   cloudAgentSessionId: string;
 }): Promise<Awaited<ReturnType<CloudAgentSession['interruptExecution']>>> {
+  if (sessionPlaneFromId(params.cloudAgentSessionId) === 'control') {
+    const receipt = await interruptControlSession({
+      env: params.env,
+      ownerId: params.userId,
+      sessionId: params.cloudAgentSessionId,
+    });
+    return receipt?.state === 'rejected'
+      ? { success: false, message: receipt.message }
+      : {
+          success: receipt !== undefined,
+          ...(receipt ? {} : { message: 'No session work to interrupt' }),
+        };
+  }
   return withDORetry<
     DurableObjectStub<CloudAgentSession>,
     Awaited<ReturnType<CloudAgentSession['interruptExecution']>>

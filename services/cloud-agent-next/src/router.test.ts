@@ -907,9 +907,20 @@ describe('router sessionId validation', () => {
 
       it('routes workspace_ interrupts to SANDBOX_SESSION', async () => {
         const sessionId: SessionId = 'workspace_12345678-1234-1234-1234-123456789abc';
+        const controlStub = {
+          ...mockSessionStub,
+          getControlState: vi.fn().mockResolvedValue({
+            version: 1,
+            scope: { sandboxId: 'sandbox_1' },
+            targets: [{ messageId: 'message_1' }],
+          }),
+          interruptExecution: vi
+            .fn()
+            .mockImplementation(request => Promise.resolve({ ...request, state: 'confirmed' })),
+        };
         const sandboxSession = {
           idFromName: vi.fn((id: string) => ({ id })),
-          get: vi.fn(() => mockSessionStub),
+          get: vi.fn(() => controlStub),
         };
         mockContext.env.SANDBOX_SESSION =
           sandboxSession as unknown as TRPCContext['env']['SANDBOX_SESSION'];
@@ -927,7 +938,9 @@ describe('router sessionId validation', () => {
         expect(result.success).toBe(true);
         expect(sandboxSession.idFromName).toHaveBeenCalledWith(`test-user-123:${sessionId}`);
         expect(cloudAgentSession.idFromName).not.toHaveBeenCalled();
-        expect(mockSessionStub.interruptExecution).toHaveBeenCalled();
+        expect(controlStub.interruptExecution).toHaveBeenCalledWith(
+          expect.objectContaining({ targets: [{ messageId: 'message_1' }] })
+        );
       });
     });
 

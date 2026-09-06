@@ -63,6 +63,26 @@ export function stripToFixedPoint(value: string, re: RegExp): string {
   }
 }
 
+/**
+ * width/height attributes → clamped preview aspect ratio, but only when both
+ * parse as positive finite numbers; otherwise `undefined` so the renderer can
+ * adopt the intrinsic ratio measured on load.
+ */
+export function resolveHtmlImageAspectRatio(
+  width: string | undefined,
+  height: string | undefined
+): number | undefined {
+  if (width === undefined || height === undefined) {
+    return undefined;
+  }
+  const w = Number(width);
+  const h = Number(height);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0) {
+    return undefined;
+  }
+  return resolveImagePreviewAspectRatio(w, h);
+}
+
 function imgTagToImage(tag: string): HtmlImage | null {
   const srcRaw = attrValue(tag, ATTR_SRC);
   if (srcRaw === undefined) {
@@ -76,18 +96,14 @@ function imgTagToImage(tag: string): HtmlImage | null {
   const altRaw = attrValue(tag, ATTR_ALT);
   const alt = altRaw !== undefined ? decodeEntities(altRaw) : '';
 
-  let aspectRatio: number | undefined = undefined;
-  const widthRaw = attrValue(tag, ATTR_WIDTH);
-  const heightRaw = attrValue(tag, ATTR_HEIGHT);
-  if (widthRaw !== undefined && heightRaw !== undefined) {
-    const w = Number(widthRaw);
-    const h = Number(heightRaw);
-    if (Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0) {
-      aspectRatio = resolveImagePreviewAspectRatio(w, h);
-    }
-  }
-
-  return { src, alt, aspectRatio };
+  return {
+    src,
+    alt,
+    aspectRatio: resolveHtmlImageAspectRatio(
+      attrValue(tag, ATTR_WIDTH),
+      attrValue(tag, ATTR_HEIGHT)
+    ),
+  };
 }
 
 /**

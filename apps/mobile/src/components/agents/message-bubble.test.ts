@@ -205,6 +205,15 @@ function assistantMessageWithError(id: string, errorName: string): StoredMessage
 }
 
 describe('MessageBubble failure footer', () => {
+  it('wraps the failed bubble and delivery row in one measurable list item', async () => {
+    const tree = await renderBubbleWithHandlers(userMessage('m-measured'), {
+      deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+      onRetryMessage: vi.fn<(message: StoredMessage) => void>(),
+    });
+
+    expect((tree as { type?: unknown }).type).toBe('View');
+  });
+
   it('renders the failed-delivery footer with Retry and Copy to composer', async () => {
     const tree = await renderBubbleWithHandlers(userMessage('m-fail'), {
       deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
@@ -225,6 +234,34 @@ describe('MessageBubble failure footer', () => {
     );
     expect(copy).not.toBeNull();
     expect(copy?.props.accessibilityRole).toBe('button');
+  });
+
+  it('renders only the failure footer when the user text sanitizes to empty', async () => {
+    const actual = await vi.importActual<typeof PartTypes>('./part-types');
+    const { isTextPart } = await import('./part-types');
+    vi.mocked(isTextPart).mockImplementation(actual.isTextPart);
+    const { Bubble: MockBubble } = await import('@/components/ui/bubble');
+    const message = userMessage('m-sanitized');
+    const textPart = message.parts[0];
+    if (textPart?.type !== 'text') {
+      throw new Error('expected text part');
+    }
+    textPart.text = '<script>hidden</script>';
+
+    try {
+      const tree = await renderBubbleWithHandlers(message, {
+        deliveryState: { status: 'failed', error: 'nope', reason: 'exhausted' },
+        onRetryMessage: vi.fn<(value: StoredMessage) => void>(),
+      });
+
+      expect(findElementByTypeFn(tree, MockBubble)).toBeNull();
+      expect(findText(tree, text => text === 'Failed to deliver')).toBe(true);
+      expect(
+        findElementByType(tree, 'Button', props => props.accessibilityLabel === 'Retry')
+      ).not.toBeNull();
+    } finally {
+      vi.mocked(isTextPart).mockReturnValue(false);
+    }
   });
 
   it('renders the assistant failure footer with Retry and no Copy to composer', async () => {

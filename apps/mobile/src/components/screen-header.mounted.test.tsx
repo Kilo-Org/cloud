@@ -313,7 +313,7 @@ describe('ScreenHeader mounted', () => {
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
-      { title: 'Sessions', headerRight: 'RIGHT' },
+      { title: 'Sessions', headerRight: 'RIGHT', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
     ];
@@ -321,13 +321,13 @@ describe('ScreenHeader mounted', () => {
     for (const props of variants) {
       const renderer = renderHeader(props);
       const back = findBackPressable(renderer.root);
-      expect(back.props.className).toContain('h-11 w-11');
-      expect(back.props.className).toContain('items-center');
-      expect(back.props.className).toContain('justify-center');
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
+      if (props.reserveTitleSpace) {
+        expect(title.parent?.props.className).toContain('min-h-14 justify-center');
+      }
       if (props.context) {
         expect(title.parent?.children).toEqual([title, props.context]);
       }

@@ -199,7 +199,9 @@ for (const model of models) {
 }
 
 under('');
-console.log(`\nanswered long enough to cancel: ${String(cancelled.length)} of ${String(models.length)} models`);
+console.log(
+  `\nanswered long enough to cancel: ${String(cancelled.length)} of ${String(models.length)} models`
+);
 wrongIf(cancelled.length === 0, 'not one answer ran long enough to walk away from');
 
 passed('the call stopped when the caller did, and the session survived it.');

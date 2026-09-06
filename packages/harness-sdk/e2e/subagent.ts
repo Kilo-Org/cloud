@@ -234,10 +234,7 @@ for (const model of models) {
 
 under('');
 console.log(`\nhanded the lookup down: ${String(down.length)} of ${String(models.length)} models`);
-wrongIf(
-  down.length === 0,
-  'not one model handed the lookup down, so no subagent ever ran'
-);
+wrongIf(down.length === 0, 'not one model handed the lookup down, so no subagent ever ran');
 console.log(`sent away in time: ${String(away.length)} of ${String(models.length)} models`);
 wrongIf(
   away.length === 0,

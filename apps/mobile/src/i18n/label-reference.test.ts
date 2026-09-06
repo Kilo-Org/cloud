@@ -14,7 +14,6 @@ import sr from './locales/sr.json';
  */
 const MESSAGE_KEYS = [
   'authErrors.differentOauth',
-  'authErrors.differentOauth',
   'authErrors.ssoError',
   'authErrors.admissionRequired',
 ] as const;

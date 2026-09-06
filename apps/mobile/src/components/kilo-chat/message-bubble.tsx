@@ -27,7 +27,11 @@ import {
   SWIPE_REPLY_DISTANCE,
   SWIPE_REPLY_MAX_TRANSLATE,
 } from './message-gesture-state';
-import { isMessageEdited, type ReplyPreviewSource } from './message-presentation';
+import {
+  isMessageEdited,
+  messageRendersBubble,
+  type ReplyPreviewSource,
+} from './message-presentation';
 import { MessageReactionPills } from './message-reaction-pills';
 
 type Props = {
@@ -176,6 +180,13 @@ function MessageBubbleComponent({
   const longPressHighlightStyle = useAnimatedStyle(() => ({
     opacity: longPressHighlight.value,
   }));
+
+  // A message whose text is entirely removed by HTML sanitization renders no
+  // ink; wrapping nothing would leave a tiny empty bubble (spot-check defect
+  // e9). Drop the whole row, matching the agent transcript's content gate.
+  if (!messageRendersBubble(message, { hasReplyPreview: replyToMessage != null })) {
+    return null;
+  }
 
   return (
     <GestureDetector gesture={swipeGesture}>

@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Ap travay",
-    "composer": {
-      "placeholder": "Mesaj"
-    },
     "empty": {
       "title": "Kòmanse yon chat",
       "description": "Voye yon mesaj pou pale ak yon modèl."
     },
     "list": {
-      "untitled": "San tit",
-      "delete": "Efase",
       "loadFailed": "Pa t ka chaje istwa chat la.",
-      "modelsFailed": "Pa t ka chaje modèl yo",
       "new": "Nouvo chat",
       "openHint": "Louvri chat la. Peze lontan pou efase.",
       "deleteTitle": "Efase chat sa a?"

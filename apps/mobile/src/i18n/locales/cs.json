@@ -2962,20 +2962,12 @@
     "activityKitDisabledBody": "V nastavení zapni živé aktivity, aby se aktivní agenti zobrazovali na zamknuté obrazovce."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Pracuji",
-    "composer": {
-      "placeholder": "Zpráva"
-    },
     "empty": {
       "title": "Začněte chatovat",
       "description": "Pošlete zprávu, abyste si popovídali s modelem."
     },
     "list": {
-      "untitled": "Bez názvu",
-      "delete": "Smazat",
       "loadFailed": "Historie chatu se nepodařila načíst.",
-      "modelsFailed": "Modely se nepodařilo načíst",
       "new": "Nový chat",
       "openHint": "Otevře chat. Dlouhým stisknutím smažete.",
       "deleteTitle": "Smazat tento chat?"

@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
   },
   "modelChat": {
-    "title": "Nkata",
-    "working": "Na-arụ ọrụ",
-    "composer": {
-      "placeholder": "Ozi"
-    },
     "empty": {
       "title": "Malite nkata",
       "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."
     },
     "list": {
-      "untitled": "Enweghị aha",
-      "delete": "Hichapụ",
       "loadFailed": "Enweghị ike ibutu akụkọ nkata.",
-      "modelsFailed": "Enweghị ike ibunye ụdị",
       "new": "Nkata ọhụrụ",
       "openHint": "Na-emeghe nkata ahụ. Pịgide iji hichapụ.",
       "deleteTitle": "Hichapụ nkata a?"

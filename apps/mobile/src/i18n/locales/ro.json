@@ -2940,20 +2940,12 @@
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Se procesează",
-    "composer": {
-      "placeholder": "Mesaj"
-    },
     "empty": {
       "title": "Începe un chat",
       "description": "Trimite un mesaj pentru a vorbi cu un model."
     },
     "list": {
-      "untitled": "Fără titlu",
-      "delete": "Șterge",
       "loadFailed": "Nu s-a putut încărca istoricul de chat.",
-      "modelsFailed": "Modelele nu au putut fi încărcate",
       "new": "Chat nou",
       "openHint": "Deschide chatul. Apasă lung pentru a șterge.",
       "deleteTitle": "Ștergi acest chat?"

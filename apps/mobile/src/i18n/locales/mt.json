@@ -2984,20 +2984,12 @@
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Qed jaħdem",
-    "composer": {
-      "placeholder": "Messaġġ"
-    },
     "empty": {
       "title": "Ibda chat",
       "description": "Ibgħat messaġġ biex tikkellem ma' mudell."
     },
     "list": {
-      "untitled": "Mingħajr titlu",
-      "delete": "Ħassar",
       "loadFailed": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
-      "modelsFailed": "Ma setgħux jittellgħu l-mudelli",
       "new": "Chat ġdid",
       "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tħassar.",
       "deleteTitle": "Tħassar dan iċ-chat?"

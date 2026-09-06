@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "ロック画面にアクティブなエージェントを表示するには、設定でライブアクティビティをオンにしてください。"
   },
   "modelChat": {
-    "title": "チャット",
-    "working": "作業中",
-    "composer": {
-      "placeholder": "メッセージ"
-    },
     "empty": {
       "title": "チャットを開始",
       "description": "モデルと話すにはメッセージを送信してください。"
     },
     "list": {
-      "untitled": "無題",
-      "delete": "削除",
       "loadFailed": "チャット履歴を読み込めませんでした。",
-      "modelsFailed": "モデルを読み込めませんでした",
       "new": "新しいチャット",
       "openHint": "チャットを開きます。長押しで削除します。",
       "deleteTitle": "このチャットを削除しますか？"

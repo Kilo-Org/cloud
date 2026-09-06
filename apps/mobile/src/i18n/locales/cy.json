@@ -3006,20 +3006,12 @@
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
   },
   "modelChat": {
-    "title": "Sgwrs",
-    "working": "Yn gweithio",
-    "composer": {
-      "placeholder": "Neges"
-    },
     "empty": {
       "title": "Dechrau sgwrs",
       "description": "Anfonwch neges i siarad â model."
     },
     "list": {
-      "untitled": "Heb deitl",
-      "delete": "Dileu",
       "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
-      "modelsFailed": "Methodd llwytho modelau",
       "new": "Sgwrs newydd",
       "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
       "deleteTitle": "Dileu'r sgwrs hon?"

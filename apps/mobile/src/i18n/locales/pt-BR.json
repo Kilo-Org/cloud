@@ -2940,20 +2940,12 @@
     "activityKitDisabledBody": "Ative as Atividades ao Vivo nos Ajustes para ver os agentes ativos na tela bloqueada."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Trabalhando",
-    "composer": {
-      "placeholder": "Mensagem"
-    },
     "empty": {
       "title": "Iniciar um chat",
       "description": "Envie uma mensagem para conversar com um modelo."
     },
     "list": {
-      "untitled": "Sem título",
-      "delete": "Excluir",
       "loadFailed": "Não foi possível carregar o histórico do chat.",
-      "modelsFailed": "Não foi possível carregar os modelos",
       "new": "Nova conversa",
       "openHint": "Abre a conversa. Toque e segure para excluir.",
       "deleteTitle": "Excluir esta conversa?"

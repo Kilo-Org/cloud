@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Washa shughuli za wakati halisi kwenye mipangilio ili uone mawakala wanaofanya kazi kwenye skrini iliyofungwa."
   },
   "modelChat": {
-    "title": "Mazungumzo",
-    "working": "Inafanya kazi",
-    "composer": {
-      "placeholder": "Ujumbe"
-    },
     "empty": {
       "title": "Anza mazungumzo",
       "description": "Tuma ujumbe ili uongee na mfano."
     },
     "list": {
-      "untitled": "Bila jina",
-      "delete": "Futa",
       "loadFailed": "Haikuweza kupakia historia ya mazungumzo.",
-      "modelsFailed": "Imeshindwa kupakia miundo",
       "new": "Gumzo jipya",
       "openHint": "Hufungua gumzo. Bonyeza kwa muda mrefu ili kufuta.",
       "deleteTitle": "Futa gumzo hili?"

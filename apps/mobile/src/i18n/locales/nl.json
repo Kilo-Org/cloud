@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Bezig",
-    "composer": {
-      "placeholder": "Bericht"
-    },
     "empty": {
       "title": "Start een chat",
       "description": "Stuur een bericht om met een model te praten."
     },
     "list": {
-      "untitled": "Naamloos",
-      "delete": "Verwijderen",
       "loadFailed": "Kon de chatgeschiedenis niet laden.",
-      "modelsFailed": "Kon modellen niet laden",
       "new": "Nieuwe chat",
       "openHint": "Opent de chat. Lang indrukken om te verwijderen.",
       "deleteTitle": "Deze chat verwijderen?"

@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Slå liveaktiviteter til i Indstillinger for at se aktive agenter på låseskærmen."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Arbejder",
-    "composer": {
-      "placeholder": "Besked"
-    },
     "empty": {
       "title": "Start en chat",
       "description": "Send en besked for at tale med en model."
     },
     "list": {
-      "untitled": "Uden titel",
-      "delete": "Slet",
       "loadFailed": "Kunne ikke indlæse chathistorik.",
-      "modelsFailed": "Kunne ikke indlæse modeller",
       "new": "Ny chat",
       "openHint": "Åbner chatten. Tryk og hold for at slette.",
       "deleteTitle": "Slet denne chat?"

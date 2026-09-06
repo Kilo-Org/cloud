@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Lülita seadetes reaalajas tegevused sisse, et näha lukustuskuval aktiivseid agente."
   },
   "modelChat": {
-    "title": "Vestlus",
-    "working": "Töötamine",
-    "composer": {
-      "placeholder": "Sõnum"
-    },
     "empty": {
       "title": "Alusta vestlust",
       "description": "Mudeliga vestlemiseks saada sõnum."
     },
     "list": {
-      "untitled": "Pealkirjata",
-      "delete": "Kustuta",
       "loadFailed": "Vestluse ajaloo laadimine ei õnnestunud.",
-      "modelsFailed": "Mudeleid ei õnnestunud laadida",
       "new": "Uus vestlus",
       "openHint": "Avab vestluse. Kustutamiseks hoia all.",
       "deleteTitle": "Kas kustutada see vestlus?"

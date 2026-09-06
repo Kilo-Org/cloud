@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Qulflangan ekranda faol agentlarni ko'rish uchun sozlamalarda jonli faoliyatlarni yoqing."
   },
   "modelChat": {
-    "title": "Suhbat",
-    "working": "Ishlamoqda",
-    "composer": {
-      "placeholder": "Xabar"
-    },
     "empty": {
       "title": "Suhbatni boshlang",
       "description": "Model bilan gaplashish uchun xabar yuboring."
     },
     "list": {
-      "untitled": "Nomsiz",
-      "delete": "O'chirish",
       "loadFailed": "Suhbat tarixini yuklab bo'lmadi.",
-      "modelsFailed": "Modellarni yuklab bo'lmadi",
       "new": "Yangi chat",
       "openHint": "Chatni ochadi. Oʻchirish uchun bosib turing.",
       "deleteTitle": "Bu chat oʻchirilsinmi?"

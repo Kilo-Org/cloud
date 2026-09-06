@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "잠금 화면에서 활성 에이전트를 보려면 설정에서 실시간 현황을 켜세요."
   },
   "modelChat": {
-    "title": "채팅",
-    "working": "작업 중",
-    "composer": {
-      "placeholder": "메시지"
-    },
     "empty": {
       "title": "채팅 시작하기",
       "description": "모델과 대화하려면 메시지를 보내세요."
     },
     "list": {
-      "untitled": "제목 없음",
-      "delete": "삭제",
       "loadFailed": "채팅 기록을 불러올 수 없습니다.",
-      "modelsFailed": "모델을 불러올 수 없습니다",
       "new": "새 채팅",
       "openHint": "채팅을 엽니다. 길게 눌러 삭제합니다.",
       "deleteTitle": "이 채팅을 삭제할까요?"

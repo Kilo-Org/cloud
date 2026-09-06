@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "请在设置中开启实时活动，在锁定屏幕上查看运行中的智能体。"
   },
   "modelChat": {
-    "title": "聊天",
-    "working": "工作中",
-    "composer": {
-      "placeholder": "消息"
-    },
     "empty": {
       "title": "开始聊天",
       "description": "发送消息以与模型对话。"
     },
     "list": {
-      "untitled": "无标题",
-      "delete": "删除",
       "loadFailed": "无法加载聊天历史。",
-      "modelsFailed": "无法加载模型",
       "new": "新对话",
       "openHint": "打开对话。长按可删除。",
       "deleteTitle": "删除这个对话？"

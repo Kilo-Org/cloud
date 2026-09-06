@@ -2940,20 +2940,12 @@
     "activityKitDisabledBody": "Iestatījumos ieslēdz tiešraides aktivitātes, lai bloķēšanas ekrānā redzētu aktīvos aģentus."
   },
   "modelChat": {
-    "title": "Tērzēšana",
-    "working": "Apstrādā",
-    "composer": {
-      "placeholder": "Ziņojums"
-    },
     "empty": {
       "title": "Sākt tērzēšanu",
       "description": "Nosūti ziņojumu, lai sarunātos ar modeli."
     },
     "list": {
-      "untitled": "Bez nosaukuma",
-      "delete": "Dzēst",
       "loadFailed": "Neizdevās ielādēt tērzēšanas vēsturi.",
-      "modelsFailed": "Neizdevās ielādēt modeļus",
       "new": "Jauna tērzēšana",
       "openHint": "Atver tērzēšanu. Turiet nospiestu, lai dzēstu.",
       "deleteTitle": "Vai dzēst šo tērzēšanu?"

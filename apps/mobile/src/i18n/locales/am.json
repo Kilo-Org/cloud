@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "ንቁ ወኪሎችን በተቆለፈው ማያ ገጽ ላይ ለማየት በቅንብሮች ውስጥ የቀጥታ እንቅስቃሴዎችን አንቃ።"
   },
   "modelChat": {
-    "title": "ውይይት",
-    "working": "በመስራት ላይ",
-    "composer": {
-      "placeholder": "መልእክት"
-    },
     "empty": {
       "title": "ውይይት ጀምር",
       "description": "ከሞዴል ጋር ለመወያየት መልእክት ይላኩ።"
     },
     "list": {
-      "untitled": "ርዕስ የሌለው",
-      "delete": "ሰርዝ",
       "loadFailed": "የውይይት ታሪክ መጫን አልተቻለም።",
-      "modelsFailed": "ሞዴሎችን መጫን አልተቻለም",
       "new": "አዲስ ውይይት",
       "openHint": "ውይይቱን ይከፍታል። ለመሰረዝ ተጭነው ይያዙ።",
       "deleteTitle": "ይህ ውይይት ይሰረዝ?"

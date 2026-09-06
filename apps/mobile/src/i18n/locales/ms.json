@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Dayakan Aktiviti Langsung dalam Tetapan untuk melihat ejen aktif pada Skrin Kunci."
   },
   "modelChat": {
-    "title": "Sembang",
-    "working": "Memproses…",
-    "composer": {
-      "placeholder": "Mesej"
-    },
     "empty": {
       "title": "Mulakan sembang",
       "description": "Hantar mesej untuk bercakap dengan model."
     },
     "list": {
-      "untitled": "Tiada tajuk",
-      "delete": "Padam",
       "loadFailed": "Tidak dapat memuatkan sejarah sembang.",
-      "modelsFailed": "Tidak dapat memuatkan model",
       "new": "Sembang baharu",
       "openHint": "Membuka sembang. Tekan lama untuk memadam.",
       "deleteTitle": "Padam sembang ini?"

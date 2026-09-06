@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
   },
   "modelChat": {
-    "title": "Wada sheekaysi",
-    "working": "Waa shaqaynayaa",
-    "composer": {
-      "placeholder": "Fariin"
-    },
     "empty": {
       "title": "Bilow wada sheekaysi",
       "description": "Dir fariin si aad ula hadasho model."
     },
     "list": {
-      "untitled": "Bilaa cinwaan",
-      "delete": "Tirtir",
       "loadFailed": "Taariikhda wada sheekaysiga lama soo gelin karin.",
-      "modelsFailed": "Moodeelada lama soo dejin karin",
       "new": "Wada sheekaysi cusub",
       "openHint": "Wada sheekaysiga ayuu furayaa. Si aad u tirtirto si dheer u taabo.",
       "deleteTitle": "Ma tirtiraa wada sheekaysigan?"

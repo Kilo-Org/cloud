@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Jobber",
-    "composer": {
-      "placeholder": "Melding"
-    },
     "empty": {
       "title": "Start en chat",
       "description": "Send en melding for å snakke med en modell."
     },
     "list": {
-      "untitled": "Uten tittel",
-      "delete": "Slett",
       "loadFailed": "Kunne ikke laste inn chathistorikken.",
-      "modelsFailed": "Kunne ikke laste modeller",
       "new": "Ny chat",
       "openHint": "Åpner chatten. Trykk og hold for å slette.",
       "deleteTitle": "Slette denne chatten?"

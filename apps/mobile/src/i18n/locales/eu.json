@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Aktibatu zuzeneko jarduerak ezarpenetan, agente aktiboak blokeo-pantailan ikusteko."
   },
   "modelChat": {
-    "title": "Txata",
-    "working": "Lanean",
-    "composer": {
-      "placeholder": "Mezua"
-    },
     "empty": {
       "title": "Hasi txat bat",
       "description": "Bidali mezu bat modelo batekin hitz egiteko."
     },
     "list": {
-      "untitled": "Izenik gabe",
-      "delete": "Ezabatu",
       "loadFailed": "Ezin izan da txat-historia kargatu.",
-      "modelsFailed": "Modeloak ezin izan dira kargatu",
       "new": "Txat berria",
       "openHint": "Txata irekitzen du. Ezabatzeko, sakatu luze.",
       "deleteTitle": "Txat hau ezabatu?"

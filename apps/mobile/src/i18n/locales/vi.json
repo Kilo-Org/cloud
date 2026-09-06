@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
   },
   "modelChat": {
-    "title": "Trò chuyện",
-    "working": "Đang xử lý",
-    "composer": {
-      "placeholder": "Tin nhắn"
-    },
     "empty": {
       "title": "Bắt đầu trò chuyện",
       "description": "Gửi tin nhắn để trò chuyện với mô hình."
     },
     "list": {
-      "untitled": "Không có tiêu đề",
-      "delete": "Xóa",
       "loadFailed": "Không thể tải lịch sử trò chuyện.",
-      "modelsFailed": "Không thể tải các mô hình",
       "new": "Cuộc trò chuyện mới",
       "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
       "deleteTitle": "Xóa cuộc trò chuyện này?"

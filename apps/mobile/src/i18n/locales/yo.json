@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa."
   },
   "modelChat": {
-    "title": "Iwiregbe",
-    "working": "Nṣiṣẹ́",
-    "composer": {
-      "placeholder": "Ifiranṣẹ"
-    },
     "empty": {
       "title": "Bẹ̀rẹ̀ iwiregbe kan",
       "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."
     },
     "list": {
-      "untitled": "Ko ni akọle",
-      "delete": "Pa",
       "loadFailed": "Kò lè ṣagbewọ ìtàn iwiregbe.",
-      "modelsFailed": "Kò lè gbé àwọn àwoṣe",
       "new": "Ìjíròrò tuntun",
       "openHint": "Ṣí ìjíròrò náà. Tẹ̀ mọ́lẹ̀ láti pa á rẹ́.",
       "deleteTitle": "Pa ìjíròrò yìí rẹ́?"

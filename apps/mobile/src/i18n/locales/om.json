@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Eejentoota hojii irra jiran iskiriinii qulfii irratti ilaaluuf, qindaa'ina keessatti sochiiwwan yeroo ammaa hojii irra oolchi."
   },
   "modelChat": {
-    "title": "Chaat",
-    "working": "Hojachaa jira",
-    "composer": {
-      "placeholder": "Ergaa"
-    },
     "empty": {
       "title": "Chaat jalqabi",
       "description": "Modeelii wajjin haasa'uuf ergaa ergi."
     },
     "list": {
-      "untitled": "Matawaan hin qabu",
-      "delete": "Balleessi",
       "loadFailed": "Seenaa chaat fudhachuu hin dandeenye.",
-      "modelsFailed": "Modeeloota fe'achuu hin dandeenye",
       "new": "Marii haaraa",
       "openHint": "Marii ni bana. Haquuf cuqaasii dheeraa godhi.",
       "deleteTitle": "Marii kana haquuf?"

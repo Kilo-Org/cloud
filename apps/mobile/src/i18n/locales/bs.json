@@ -2940,20 +2940,12 @@
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama da vidiš aktivne agente na zaključanom ekranu."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "U toku",
-    "composer": {
-      "placeholder": "Poruka"
-    },
     "empty": {
       "title": "Započni razgovor",
       "description": "Pošalji poruku za razgovor s modelom."
     },
     "list": {
-      "untitled": "Bez naslova",
-      "delete": "Obriši",
       "loadFailed": "Nije moguće učitati istoriju razgovora.",
-      "modelsFailed": "Nije moguće učitati modele",
       "new": "Novi razgovor",
       "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
       "deleteTitle": "Izbrisati ovaj razgovor?"

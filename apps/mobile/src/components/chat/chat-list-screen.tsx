@@ -149,7 +149,7 @@ function ScopedChatListScreen() {
       return (
         <QueryError
           variant="server"
-          title={t('modelChat.list.modelsFailed')}
+          title={t('common.couldNotLoadModels')}
           onRetry={() => {
             void refetchModels();
           }}
@@ -198,14 +198,14 @@ function ScopedChatListScreen() {
     <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t('modelChat.title')}
+          title={t('common.chat')}
           titleContent={
             <View className="flex-row items-center gap-2">
               <Text
                 className="text-[30px] font-semibold leading-9 text-foreground"
                 numberOfLines={1}
               >
-                {t('modelChat.title')}
+                {t('common.chat')}
               </Text>
               <BetaPill />
             </View>

@@ -2962,20 +2962,12 @@
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
   },
   "modelChat": {
-    "title": "Czat",
-    "working": "Pracuję",
-    "composer": {
-      "placeholder": "Wiadomość"
-    },
     "empty": {
       "title": "Rozpocznij czat",
       "description": "Wyślij wiadomość, aby porozmawiać z modelem."
     },
     "list": {
-      "untitled": "Bez tytułu",
-      "delete": "Usuń",
       "loadFailed": "Nie udało się wczytać historii czatu.",
-      "modelsFailed": "Nie można załadować modeli",
       "new": "Nowy czat",
       "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby usunąć.",
       "deleteTitle": "Usunąć ten czat?"

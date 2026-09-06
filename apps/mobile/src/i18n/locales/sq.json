@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
   },
   "modelChat": {
-    "title": "Bisedë",
-    "working": "Duke punuar",
-    "composer": {
-      "placeholder": "Mesazh"
-    },
     "empty": {
       "title": "Filloni një bisedë",
       "description": "Dërgo një mesazh për të biseduar me një model."
     },
     "list": {
-      "untitled": "Pa titull",
-      "delete": "Fshi",
       "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
-      "modelsFailed": "Nuk u ngarkuan modelet",
       "new": "Bisedë e re",
       "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
       "deleteTitle": "Ta fshini këtë bisedë?"

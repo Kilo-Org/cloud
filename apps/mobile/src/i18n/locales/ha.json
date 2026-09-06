@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Kunna ayyukan kai tsaye a saituna don ganin wakilan da ke aiki a allon kulle."
   },
   "modelChat": {
-    "title": "Tattaunawa",
-    "working": "Yana aiki",
-    "composer": {
-      "placeholder": "Saƙo"
-    },
     "empty": {
       "title": "Fara tattaunawa",
       "description": "Aika saƙo don tattaunawa da samfurin."
     },
     "list": {
-      "untitled": "Ba tare da suna ba",
-      "delete": "Share",
       "loadFailed": "Ba a iya loda tarihin tattaunawa.",
-      "modelsFailed": "An kasa ɗora samfuran",
       "new": "Sabuwar tattaunawa",
       "openHint": "Yana buɗe tattaunawar. Danna sosai don sharewa.",
       "deleteTitle": "A share wannan tattaunawar?"

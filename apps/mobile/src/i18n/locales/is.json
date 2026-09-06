@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
   },
   "modelChat": {
-    "title": "Spjall",
-    "working": "Vinnur",
-    "composer": {
-      "placeholder": "Skilaboð"
-    },
     "empty": {
       "title": "Byrjaðu spjall",
       "description": "Sendu skilaboð til að tala við líkan."
     },
     "list": {
-      "untitled": "Án titils",
-      "delete": "Eyða",
       "loadFailed": "Ekki tókst að hlaða samtalsferilinn.",
-      "modelsFailed": "Ekki tókst að hlaða líkön",
       "new": "Nýtt spjall",
       "openHint": "Opnar spjallið. Haltu inni til að eyða.",
       "deleteTitle": "Eyða þessu spjalli?"

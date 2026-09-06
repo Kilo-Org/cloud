@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Kilid ekranında aktiv agentləri görmək üçün parametrlərdə canlı fəaliyyətləri aktivləşdir."
   },
   "modelChat": {
-    "title": "Söhbət",
-    "working": "İşlənir",
-    "composer": {
-      "placeholder": "Mesaj"
-    },
     "empty": {
       "title": "Söhbətə başlayın",
       "description": "Bir modellə danışmaq üçün mesaj göndərin."
     },
     "list": {
-      "untitled": "Adsız",
-      "delete": "Sil",
       "loadFailed": "Söhbət tarixçəsi yüklənə bilmədi.",
-      "modelsFailed": "Modellər yüklənə bilmədi",
       "new": "Yeni söhbət",
       "openHint": "Söhbəti açır. Silmək üçün basıb saxlayın.",
       "deleteTitle": "Bu söhbət silinsin?"

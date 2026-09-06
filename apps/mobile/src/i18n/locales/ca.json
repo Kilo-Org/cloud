@@ -2940,20 +2940,12 @@
     "activityKitDisabledBody": "Activa les activitats en directe a la configuració del dispositiu per veure els agents actius a la pantalla de bloqueig."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Treballant",
-    "composer": {
-      "placeholder": "Missatge"
-    },
     "empty": {
       "title": "Comença un xat",
       "description": "Envia un missatge per parlar amb un model."
     },
     "list": {
-      "untitled": "Sense títol",
-      "delete": "Elimina",
       "loadFailed": "No s'ha pogut carregar l'historial del xat.",
-      "modelsFailed": "No s'han pogut carregar els models",
       "new": "Xat nou",
       "openHint": "Obre el xat. Mantén premut per suprimir.",
       "deleteTitle": "Vols suprimir aquest xat?"

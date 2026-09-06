@@ -2940,20 +2940,12 @@
     "activityKitDisabledBody": "הפעל פעילויות בזמן אמת בהגדרות כדי לראות סוכנים פעילים במסך הנעילה."
   },
   "modelChat": {
-    "title": "שיחה",
-    "working": "עובד",
-    "composer": {
-      "placeholder": "הודעה"
-    },
     "empty": {
       "title": "התחל שיחה",
       "description": "שלח הודעה כדי לשוחח עם מודל."
     },
     "list": {
-      "untitled": "ללא כותרת",
-      "delete": "מחק",
       "loadFailed": "לא ניתן היה לטעון את היסטוריית השיחה.",
-      "modelsFailed": "לא ניתן לטעון דגמים",
       "new": "צ'אט חדש",
       "openHint": "פותח את הצ'אט. לחיצה ארוכה למחיקה.",
       "deleteTitle": "למחוק את הצ'אט הזה?"

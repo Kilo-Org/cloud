@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
   },
   "modelChat": {
-    "title": "聊天",
-    "working": "處理中",
-    "composer": {
-      "placeholder": "訊息"
-    },
     "empty": {
       "title": "開始聊天",
       "description": "傳送訊息以與模型對話。"
     },
     "list": {
-      "untitled": "無標題",
-      "delete": "刪除",
       "loadFailed": "無法載入聊天記錄。",
-      "modelsFailed": "無法載入模型",
       "new": "新對話",
       "openHint": "開啟對話。長按可刪除。",
       "deleteTitle": "刪除這個對話？"

@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Aktifkan Aktivitas Langsung di pengaturan untuk melihat agen aktif di layar terkunci."
   },
   "modelChat": {
-    "title": "Obrolan",
-    "working": "Mengerjakan",
-    "composer": {
-      "placeholder": "Pesan"
-    },
     "empty": {
       "title": "Mulai obrolan",
       "description": "Kirim pesan untuk berbicara dengan model."
     },
     "list": {
-      "untitled": "Tanpa judul",
-      "delete": "Hapus",
       "loadFailed": "Tidak dapat memuat riwayat obrolan.",
-      "modelsFailed": "Tidak dapat memuat model",
       "new": "Obrolan baru",
       "openHint": "Membuka obrolan. Tekan lama untuk menghapus.",
       "deleteTitle": "Hapus obrolan ini?"

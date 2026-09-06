@@ -2962,20 +2962,12 @@
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
   },
   "modelChat": {
-    "title": "Sporočila klepeta",
-    "working": "Delam",
-    "composer": {
-      "placeholder": "Sporočilo"
-    },
     "empty": {
       "title": "Začni klepet",
       "description": "Pošlji sporočilo za pogovor z modelom."
     },
     "list": {
-      "untitled": "Brez naslova",
-      "delete": "Izbriši",
       "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
-      "modelsFailed": "Nalaganje modelov ni uspelo",
       "new": "Nov klepet",
       "openHint": "Odpre klepet. Pridržite za brisanje.",
       "deleteTitle": "Izbrišem ta klepet?"

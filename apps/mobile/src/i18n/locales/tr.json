@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
   },
   "modelChat": {
-    "title": "Sohbet",
-    "working": "Çalışıyor",
-    "composer": {
-      "placeholder": "Mesaj"
-    },
     "empty": {
       "title": "Bir sohbet başlat",
       "description": "Bir modelle konuşmak için mesaj gönder."
     },
     "list": {
-      "untitled": "Başlıksız",
-      "delete": "Sil",
       "loadFailed": "Sohbet geçmişi yüklenemedi.",
-      "modelsFailed": "Modeller yüklenemedi",
       "new": "Yeni sohbet",
       "openHint": "Sohbeti açar. Silmek için uzun basın.",
       "deleteTitle": "Bu sohbet silinsin mi?"

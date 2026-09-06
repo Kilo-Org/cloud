@@ -34,15 +34,15 @@ export function ChatRow({ chat, modelName, last, onPress, onDelete }: Readonly<C
   const working = useChatStatus(chat.sessionId) === 'working';
   const { bottom } = useSafeAreaInsets();
   const { showActionSheetWithOptions } = useActionSheet();
-  const title = chat.title === '' ? t('modelChat.list.untitled') : chat.title;
-  const label = modelName === '' ? t('modelChat.title') : modelName;
+  const title = chat.title === '' ? t('chat.conversation.untitled') : chat.title;
+  const label = modelName === '' ? t('common.chat') : modelName;
 
   function confirmDelete() {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(t('modelChat.list.deleteTitle'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('modelChat.list.delete'),
+        text: t('common.delete'),
         style: 'destructive',
         onPress: () => {
           onDelete(chat.sessionId);
@@ -56,7 +56,7 @@ export function ChatRow({ chat, modelName, last, onPress, onDelete }: Readonly<C
     showActionSheetWithOptions(
       {
         title,
-        options: [t('modelChat.list.delete'), t('common.cancel')],
+        options: [t('common.delete'), t('common.cancel')],
         cancelButtonIndex: 1,
         destructiveButtonIndex: 0,
         containerStyle: { paddingBottom: bottom },

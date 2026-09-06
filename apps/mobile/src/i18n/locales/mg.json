@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Alefaso ao amin'ny fikirana ny hetsika mivantana mba hahitana ny mpanatanteraka mandeha eo amin'ny efijery mihidy."
   },
   "modelChat": {
-    "title": "Resaka",
-    "working": "Miasa",
-    "composer": {
-      "placeholder": "Hafatra"
-    },
     "empty": {
       "title": "Atombohy resaka",
       "description": "Mandefasa hafatra mba hiresaka amin'ny Modely."
     },
     "list": {
-      "untitled": "Tsy misy lohateny",
-      "delete": "Fafao",
       "loadFailed": "Tsy afaka nampidirina ny tantaran'ny resaka.",
-      "modelsFailed": "Tsy afaka namaky ny modely",
       "new": "Resaka vaovao",
       "openHint": "Manokatra ny resaka. Tsindrio ela mba hamafana.",
       "deleteTitle": "Hamafa ity resaka ity?"

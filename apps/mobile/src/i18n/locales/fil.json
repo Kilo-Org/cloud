@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Paganahin ang mga live na aktibidad sa mga setting para makita ang mga aktibong agent sa naka-lock na screen."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Gumagawa",
-    "composer": {
-      "placeholder": "Mensahe"
-    },
     "empty": {
       "title": "Magsimula ng chat",
       "description": "Magpadala ng mensahe para makipag-usap sa isang modelo."
     },
     "list": {
-      "untitled": "Walang pamagat",
-      "delete": "I-delete",
       "loadFailed": "Hindi ma-load ang kasaysayan ng chat.",
-      "modelsFailed": "Hindi maload ang mga modelo",
       "new": "Bagong chat",
       "openHint": "Binubuksan ang chat. Pindutin nang matagal para burahin.",
       "deleteTitle": "Burahin ang chat na ito?"

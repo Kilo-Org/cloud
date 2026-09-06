@@ -180,7 +180,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
           <View className="flex-row items-center gap-2 px-4 py-2">
             <ActivityIndicator />
             <Text variant="muted" className="text-xs">
-              {t('modelChat.working')}
+              {t('common.working')}
             </Text>
           </View>
         ) : null}
@@ -194,7 +194,7 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
             onExitSession={noSessionExit}
             onStop={handleStop}
             isStreaming={state.status === 'working'}
-            placeholder={t('modelChat.composer.placeholder')}
+            placeholder={t('common.message')}
             mode="ask"
             onModeChange={() => {
               // A chat is only ever an ask.
@@ -219,11 +219,11 @@ export function ChatScreen({ opened }: Readonly<ChatScreenProps>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('modelChat.title')}
+        title={t('common.chat')}
         titleContent={
           <View className="flex-row items-center gap-2">
             <Text className="text-lg font-semibold text-foreground" numberOfLines={1}>
-              {t('modelChat.title')}
+              {t('common.chat')}
             </Text>
             <BetaPill />
           </View>

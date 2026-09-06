@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
   },
   "modelChat": {
-    "title": "Ingxoxo",
-    "working": "Iyasebenza",
-    "composer": {
-      "placeholder": "Umlayezo"
-    },
     "empty": {
       "title": "Qala ingxoxo",
       "description": "Thumela umlayezo ukuze uxoxe nomodeli."
     },
     "list": {
-      "untitled": "Akunasihloko",
-      "delete": "Susa",
       "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
-      "modelsFailed": "Akukwazanga ukulayisha amamodeli",
       "new": "Ingxoxo entsha",
       "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze usule.",
       "deleteTitle": "Susa le ngxoxo?"

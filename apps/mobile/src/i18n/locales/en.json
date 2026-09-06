@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "Working",
-    "composer": {
-      "placeholder": "Message"
-    },
     "empty": {
       "title": "Start a chat",
       "description": "Send a message to talk to a model."
     },
     "list": {
-      "untitled": "Untitled",
-      "delete": "Delete",
       "loadFailed": "Could not load chat history.",
-      "modelsFailed": "Could not load models",
       "new": "New chat",
       "openHint": "Opens the chat. Long press to delete.",
       "deleteTitle": "Delete this chat?"

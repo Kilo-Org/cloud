@@ -2940,20 +2940,12 @@
     "activityKitDisabledBody": "Attiva le attività in tempo reale nelle impostazioni per vedere gli agenti attivi nella schermata di blocco."
   },
   "modelChat": {
-    "title": "Chat",
-    "working": "In corso",
-    "composer": {
-      "placeholder": "Messaggio"
-    },
     "empty": {
       "title": "Avvia una chat",
       "description": "Invia un messaggio per parlare con un modello."
     },
     "list": {
-      "untitled": "Senza titolo",
-      "delete": "Elimina",
       "loadFailed": "Impossibile caricare la cronologia della chat.",
-      "modelsFailed": "Impossibile caricare i modelli",
       "new": "Nuova chat",
       "openHint": "Apre la chat. Tieni premuto per eliminare.",
       "deleteTitle": "Eliminare questa chat?"

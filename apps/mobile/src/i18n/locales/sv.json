@@ -2918,20 +2918,12 @@
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
   },
   "modelChat": {
-    "title": "Chatt",
-    "working": "Arbetar",
-    "composer": {
-      "placeholder": "Meddelande"
-    },
     "empty": {
       "title": "Starta en chatt",
       "description": "Skicka ett meddelande för att prata med en modell."
     },
     "list": {
-      "untitled": "Utan titel",
-      "delete": "Ta bort",
       "loadFailed": "Det gick inte att läsa in chatthistoriken.",
-      "modelsFailed": "Kunde inte läsa in modeller",
       "new": "Ny chatt",
       "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
       "deleteTitle": "Ta bort den här chatten?"

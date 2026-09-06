@@ -85,14 +85,38 @@ const withTools = (kind: ApiKind, tools: readonly Tool[]) =>
   Layer.merge(kilo({ apiKinds: [kind] }), Layer.succeed(ToolRegistry, { tools }));
 
 /**
+ * One phase, tried once more before its miss counts.
+ *
+ * A phase says `undefined` when the round never happened, which is a relay
+ * having a bad minute rather than a finding. Nothing is recorded on the first
+ * attempt: `fail` writes for the life of the run, so a phase that recorded its
+ * own miss would make the retry a no-op. Only a round that failed twice is
+ * recorded, and only here.
+ */
+const twice = async (
+  what: string,
+  once: () => Promise<boolean | undefined>
+): Promise<boolean> => {
+  const first = await once();
+  if (first === true) {
+    return true;
+  }
+  const second = await once();
+  if (first === undefined && second === undefined) {
+    fail(`${what}: the round failed twice`);
+  }
+  return second === true;
+};
+
+/**
  * One round on one shape: the model calls, reads, and answers with the word.
  *
- * Says whether the model called on this shape. Whether it calls is its own —
- * `minimax/minimax-m3` skipped `messages` on 2026-09-06 and carried it on the
- * next run — and a round that failed is tried once more before it counts.
- * Calling on none of the three is the shape failing, and the caller asserts it.
+ * Says whether the model called on this shape, or `undefined` if the round
+ * never happened. Whether it calls is its own — `minimax/minimax-m3` skipped
+ * `messages` on 2026-09-06 and carried it on the next run. Calling on none of
+ * the three is the shape failing, and the caller asserts it.
  */
-const runShape = async (model: string, kind: ApiKind): Promise<boolean> => {
+const runShape = async (model: string, kind: ApiKind): Promise<boolean | undefined> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: room, tools: ['weather'] });
@@ -104,8 +128,7 @@ const runShape = async (model: string, kind: ApiKind): Promise<boolean> => {
 
   if (answer._tag === 'Left') {
     console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(answer.left)}`);
-    fail(`${kind}: the round failed`);
-    return false;
+    return undefined;
   }
   console.log(`${kind.padEnd(18)}${String(ran.length).padEnd(10)}${JSON.stringify(answer.right)}`);
   if (ran.length === 0) {
@@ -127,15 +150,21 @@ const runShape = async (model: string, kind: ApiKind): Promise<boolean> => {
  * Says whether this model sent them together. Whether it does is its own; that
  * the package runs them together when it does is the floor.
  */
-const runTogether = async (model: string): Promise<boolean> => {
+const runTogether = async (model: string): Promise<boolean | undefined> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: room, tools: ['weather'] });
     return yield* said(session.ask('What is the weather in Oslo and in Lisbon?'));
   });
-  await Effect.runPromise(
-    Effect.scoped(Effect.provide(program, withTools('messages', [weather('600 millis')])))
+  const got = await Effect.runPromise(
+    Effect.either(
+      Effect.scoped(Effect.provide(program, withTools('messages', [weather('600 millis')])))
+    )
   );
+  if (got._tag === 'Left') {
+    console.log(`\ntwo calls in one turn FAILED ${JSON.stringify(got.left)}`);
+    return undefined;
+  }
 
   const [first, second] = [...ran].sort((one, other) => one.at - other.at);
   if (first === undefined || second === undefined) {
@@ -154,7 +183,7 @@ const runTogether = async (model: string): Promise<boolean> => {
  * are asked. The model must be told the question is out, answer without it, and
  * then be asked again on its own when the answer lands.
  */
-const runBackgrounded = async (model: string): Promise<boolean> => {
+const runBackgrounded = async (model: string): Promise<boolean | undefined> => {
   const asker: Asker = questions =>
     Effect.as(
       Effect.sleep('3 seconds'),
@@ -201,8 +230,7 @@ const runBackgrounded = async (model: string): Promise<boolean> => {
 
   if (got._tag === 'Left') {
     console.log(`\nbackgrounded      FAILED    ${JSON.stringify(got.left)}`);
-    fail('the backgrounded round failed');
-    return false;
+    return undefined;
   }
 
   const { first, later } = got.right;
@@ -233,7 +261,7 @@ const runBackgrounded = async (model: string): Promise<boolean> => {
  * the model's own `wait: false` moves it on — and the answer still arrives, in
  * a round of its own, exactly as a deadline's would.
  */
-const runWanted = async (model: string): Promise<boolean> => {
+const runWanted = async (model: string): Promise<boolean | undefined> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({
@@ -269,8 +297,7 @@ const runWanted = async (model: string): Promise<boolean> => {
 
   if (got._tag === 'Left') {
     console.log(`\nwait: false       FAILED    ${JSON.stringify(got.left)}`);
-    fail('the round the model chose not to wait for failed');
-    return false;
+    return undefined;
   }
 
   const { first, later } = got.right;
@@ -310,7 +337,7 @@ for (const model of models) {
   const shapes = ['messages', 'responses', 'chat_completions'] as const;
   const called: ApiKind[] = [];
   for (const kind of shapes) {
-    if ((await runShape(model, kind)) || (await runShape(model, kind))) {
+    if (await twice(kind, () => runShape(model, kind))) {
       called.push(kind);
     }
   }
@@ -318,12 +345,10 @@ for (const model of models) {
     called.length === 0,
     'the model called the tool on none of the three shapes, which is the shape failing rather than one bad round'
   );
-  /* Tried once more before it counts: measured on 2026-09-06, one model refused
-     a round on one sweep and carried it on the next. Twice is a finding. */
   const made = {
-    together: (await runTogether(model)) || (await runTogether(model)),
-    backgrounded: (await runBackgrounded(model)) || (await runBackgrounded(model)),
-    wanted: (await runWanted(model)) || (await runWanted(model)),
+    together: await twice('two calls in one turn', () => runTogether(model)),
+    backgrounded: await twice('the backgrounded round', () => runBackgrounded(model)),
+    wanted: await twice('the round the model chose not to wait for', () => runWanted(model)),
   };
   for (const [phase, held] of Object.entries(chose)) {
     if (made[phase as keyof typeof made]) {

@@ -120,13 +120,15 @@ const program = (model: string) =>
     };
   });
 
-/** One whole run of the model, on a store of its own. */
+/** One whole run of the model, on a store of its own, or the reason it failed. */
 const attempt = (model: string) =>
   Effect.runPromise(
-    Effect.scoped(
-      Effect.provide(
-        program(model),
-        Layer.merge(kilo(), layerNodeStore(new DatabaseSync(':memory:')))
+    Effect.either(
+      Effect.scoped(
+        Effect.provide(
+          program(model),
+          Layer.merge(kilo(), layerNodeStore(new DatabaseSync(':memory:')))
+        )
       )
     )
   );
@@ -144,7 +146,15 @@ for (const model of models) {
      each and stored all six turns, and said nothing at all in the second: the
      line worked and the model went quiet. Twice is a finding. */
   const first = await attempt(model);
-  const got = spoke(first.rounds) ? first : await attempt(model);
+  const tried = first._tag === 'Right' && spoke(first.right.rounds) ? first : await attempt(model);
+  if (tried._tag === 'Left') {
+    /* Nothing was recorded for the first attempt, so a relay having a bad
+       minute costs a retry and not the run. Twice is a finding. */
+    console.log('model', model, 'FAILED', JSON.stringify(String(tried.left)));
+    fail(`the run failed twice: ${String(tried.left)}`);
+    continue;
+  }
+  const got = tried.right;
 
   const { handed } = got;
   const rounds = got.rounds;

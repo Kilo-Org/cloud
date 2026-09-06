@@ -25,6 +25,7 @@
     "./cf-access": "./src/cf-access.ts",
     "./cloud-agent-next-client": "./src/cloud-agent-next-client.ts",
     "./cloud-agent-session-access": "./src/cloud-agent-session-access.ts",
+    "./cloud-agent-worktree-changes": "./src/cloud-agent-worktree-changes.ts",
     "./kilo-model-id": "./src/kilo-model-id.ts",
     "./extract-bearer-token": "./src/extract-bearer-token.ts",
     "./cloud-agent-queue-report": "./src/cloud-agent-queue-report.ts",

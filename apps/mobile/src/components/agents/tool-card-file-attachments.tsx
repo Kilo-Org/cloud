@@ -98,7 +98,7 @@ export function ToolCardFileAttachments({ part }: Readonly<{ part: ToolPart }>) 
     return null;
   }
 
-  const label = first.filename ?? t('agentChat.filePart.defaultName');
+  const label = first.filename ?? t('common.file');
 
   return (
     <View className="gap-2">

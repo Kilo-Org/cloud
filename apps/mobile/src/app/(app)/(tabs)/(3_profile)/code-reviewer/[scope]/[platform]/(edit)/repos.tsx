@@ -121,7 +121,7 @@ export default function ReposRoute() {
       <QueryError
         variant="server"
         placement={fullBodyState ? 'center' : 'top'}
-        title={t('codeReviewer.repos.couldNotLoad')}
+        title={t('common.couldNotLoadRepositories')}
         onRetry={refetchRepos}
         isRetrying={reposFetching}
       />
@@ -138,7 +138,7 @@ export default function ReposRoute() {
             size="sm"
             onPress={() => {
               void openExternalUrl(getBitbucketIntegrationUrl(WEB_BASE_URL, scope), {
-                label: t('codeReviewer.repos.bitbucketSetup'),
+                label: t('codeReviewer.bitbucket.setup'),
               });
             }}
           >
@@ -171,7 +171,7 @@ export default function ReposRoute() {
                         { label: t('codeReviewer.repos.repositoryAccess') }
                       );
                     } catch {
-                      toast.error(t('codeReviewer.repos.couldNotOpenGithubSettings'));
+                      toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
                     }
                   } else if (platform === 'gitlab') {
                     await openExternalUrl(getGitLabIntegrationUrl(WEB_BASE_URL, orgScope), {
@@ -191,20 +191,20 @@ export default function ReposRoute() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.repos.title')} />
+      <ScreenHeader title={t('common.repositories')} />
       {fullBodyState ? (
         repoState
       ) : (
         <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
           {capabilities.selectionModePicker && (
-            <RadioGroup label={t('codeReviewer.repos.title')}>
+            <RadioGroup label={t('common.repositories')}>
               {(['all', 'selected'] as const).map(option => (
                 <ChoiceRow
                   key={option}
                   label={
                     option === 'all'
-                      ? t('codeReviewer.repos.allRepositories')
-                      : t('codeReviewer.repos.selectedRepositories')
+                      ? t('common.allRepositories')
+                      : t('common.selectedRepositories')
                   }
                   selected={mode === option}
                   disabled={configDisabled}
@@ -220,7 +220,7 @@ export default function ReposRoute() {
           {(!capabilities.selectionModePicker || mode === 'selected') && (
             <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>
               <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-                {t('codeReviewer.repos.title')}
+                {t('common.repositories')}
               </Text>
               {reposLoading && (
                 <View className="gap-3 pt-2">

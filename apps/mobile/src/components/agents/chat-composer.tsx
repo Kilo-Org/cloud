@@ -222,7 +222,7 @@ export function ChatComposer({
   onStop,
   disabled = false,
   isStreaming = false,
-  placeholder = i18n.t('agentChat.composer.sendMessage'),
+  placeholder = i18n.t('common.sendMessage'),
   mode,
   onModeChange,
   model,
@@ -349,9 +349,9 @@ export function ChatComposer({
       i18n.t('agentChat.composer.discardAttachmentsTitle'),
       i18n.t('agentChat.composer.discardAttachmentsMessage'),
       [
-        { text: i18n.t('agentChat.newSession.keepEditing'), style: 'cancel' },
+        { text: i18n.t('common.keepEditing'), style: 'cancel' },
         {
-          text: i18n.t('agentChat.newSession.discard'),
+          text: i18n.t('common.discard'),
           style: 'destructive',
           onPress: () => {
             releaseUnclaimedRef.current();

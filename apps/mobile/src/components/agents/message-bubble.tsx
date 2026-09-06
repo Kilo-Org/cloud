@@ -209,9 +209,7 @@ function MessageBubbleImpl({
                     className={`flex-row items-center gap-1 self-end pr-1 ${isQueued ? 'opacity-100' : 'opacity-0'}`}
                   >
                     <Clock size={12} color={colors.mutedForeground} />
-                    <Text className="text-xs text-muted-foreground">
-                      {t('agentChat.messageBubble.queued')}
-                    </Text>
+                    <Text className="text-xs text-muted-foreground">{t('common.queued')}</Text>
                   </View>
                 ) : null}
                 {!isQueued && onRestoreQueued ? (

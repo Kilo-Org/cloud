@@ -12,19 +12,19 @@ test('tab layout derives accessibility labels from the visible tab count', () =>
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.kiloclaw'\),\s*tabBarPosition\('kiloclaw', tabFlags\) \?\? 2,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('common\.kiloclaw'\),\s*tabBarPosition\('kiloclaw', tabFlags\) \?\? 2,\s*tabCount\s*\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*needsInputBadge\s*\?\s*`\$\{t\('tabs\.agents'\)\}, \$\{needsInputBadge\} \$\{t\('agents\.sessionRow\.needsInput'\)\}`\s*:\s*t\('tabs\.agents'\),\s*tabBarPosition\('agents', tabFlags\) \?\? 2,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*needsInputBadge\s*\?\s*`\$\{t\('common\.agents'\)\}, \$\{needsInputBadge\} \$\{t\('agents\.sessionRow\.needsInput'\)\}`\s*:\s*t\('common\.agents'\),\s*tabBarPosition\('agents', tabFlags\) \?\? 2,\s*tabCount\s*\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('tabs\.chat'\),\s*tabBarPosition\('chat', tabFlags\) \?\? 3,\s*tabCount\s*\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('common\.chat'\),\s*tabBarPosition\('chat', tabFlags\) \?\? 3,\s*tabCount\s*\)/
   );
   assert.match(
     layout,
-    /tabBarAccessibilityLabel: tabAccessibilityLabel\(t\('tabs\.profile'\), tabCount, tabCount\)/
+    /tabBarAccessibilityLabel: tabAccessibilityLabel\(\s*t\('common\.profile'\),\s*tabCount,\s*tabCount\s*\)/
   );
 });
 

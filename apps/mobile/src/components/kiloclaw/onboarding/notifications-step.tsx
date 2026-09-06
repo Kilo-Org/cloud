@@ -169,7 +169,7 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
     >
       <View className="gap-2">
         <Text variant="eyebrow" className="text-xs">
-          {t('notifications.title')}
+          {t('common.notifications')}
         </Text>
         <Text className="text-2xl font-semibold">
           {t('kiloclaw.onboarding.notifications.stayInTheLoop')}

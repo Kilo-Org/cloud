@@ -53,7 +53,7 @@ export function buildMessageBubbleAccessibilityProps(
 
   const actions: AccessibilityActionInfo[] = [];
   if (input.canSwipeReply) {
-    actions.push({ name: 'reply', label: i18n.t('chat.messageActions.reply') });
+    actions.push({ name: 'reply', label: i18n.t('common.reply') });
   }
   if (input.canLongPress) {
     actions.push({ name: 'more-actions', label: i18n.t('chat.messageBubble.moreActions') });

@@ -112,7 +112,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
 const CATEGORY_META = [
   {
     key: 'chatMessages',
-    titleKey: 'notifications.category.chatMessagesTitle',
+    titleKey: 'notifications.channel.chat',
     subtitleKey: 'notifications.category.chatMessagesSubtitle',
     icon: MessageSquare,
   },
@@ -136,19 +136,19 @@ const CATEGORY_META = [
   },
   {
     key: 'kiloclawActivity',
-    titleKey: 'notifications.category.kiloclawActivityTitle',
+    titleKey: 'notifications.channel.kiloclaw',
     subtitleKey: 'notifications.category.kiloclawActivitySubtitle',
     icon: Sparkles,
   },
   {
     key: 'balanceAlerts',
-    titleKey: 'notifications.category.balanceAlertsTitle',
+    titleKey: 'notifications.channel.balance',
     subtitleKey: 'notifications.category.balanceAlertsSubtitle',
     icon: Wallet,
   },
   {
     key: 'securityFindings',
-    titleKey: 'notifications.category.securityFindingsTitle',
+    titleKey: 'notifications.channel.security',
     subtitleKey: 'notifications.category.securityFindingsSubtitle',
     icon: ShieldAlert,
   },
@@ -484,7 +484,7 @@ export function NotificationsScreen() {
     if (currentStatus === 'denied') {
       Alert.alert(t('notifications.disabledTitle'), t('notifications.disabledMessage'), [
         { text: t('common.cancel'), style: 'cancel' },
-        { text: t('notifications.openSettings'), onPress: () => void Linking.openSettings() },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
       ]);
       return;
     }
@@ -541,7 +541,7 @@ export function NotificationsScreen() {
   const handleDisableNotifications = useCallback(() => {
     Alert.alert(t('notifications.disableTitle'), t('notifications.disableMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('notifications.openSettings'), onPress: () => void Linking.openSettings() },
+      { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
     ]);
   }, [t]);
 
@@ -571,7 +571,7 @@ export function NotificationsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('notifications.title')} />
+      <ScreenHeader title={t('common.notifications')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-6 pt-4"

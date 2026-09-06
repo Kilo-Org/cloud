@@ -27,9 +27,9 @@ type ToolPatchPreviewProps = {
 export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewProps>) {
   const { t } = useTranslation();
   const operationLabel = {
-    add: t('agentChat.toolPatch.operationAdded'),
-    delete: t('agentChat.toolPatch.operationDeleted'),
-    update: t('agentChat.toolPatch.operationUpdated'),
+    add: t('common.added'),
+    delete: t('common.deleted'),
+    update: t('common.updated'),
   } satisfies Record<ToolPatchFile['operation'], string>;
 
   return (
@@ -52,10 +52,10 @@ export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewPro
       ))}
       {model.truncated ? (
         <Text
-          accessibilityLabel={t('monoScrollBlock.contentTruncated')}
+          accessibilityLabel={t('common.contentTruncated')}
           className="mt-1 text-xs text-muted-foreground"
         >
-          {t('monoScrollBlock.truncated')}
+          {t('common.truncated')}
         </Text>
       ) : null}
     </View>

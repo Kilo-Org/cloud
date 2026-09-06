@@ -212,7 +212,10 @@ describe('sandbox control socket handler', () => {
     );
 
     expect(validateHandshake).toHaveBeenCalledWith('inst_stale');
-    expect(incoming.serializeAttachment).not.toHaveBeenCalled();
+    expect(incoming.deserializeAttachment()).toMatchObject({
+      handshakeComplete: false,
+      kiloReady: false,
+    });
     expect(incoming.close).toHaveBeenCalledWith(1008, 'invalid_provider_instance');
     expect(incoming.send).toHaveBeenCalledWith(
       JSON.stringify({
@@ -304,6 +307,7 @@ describe('sandbox control socket handler', () => {
 
     expect(incoming.serializeAttachment).toHaveBeenCalledWith({
       handshakeComplete: true,
+      kiloReady: false,
       acceptedAt: expect.any(Number),
       connectionId: expect.any(String),
       protocolVersion: 1,
@@ -491,6 +495,7 @@ describe('sandbox control socket handler', () => {
 
     expect(superseded.deserializeAttachment()).toEqual({
       handshakeComplete: false,
+      kiloReady: false,
       acceptedAt: expect.any(Number),
     });
     expect(superseded.close).toHaveBeenCalledWith(1008, 'handshake_required');
@@ -1261,6 +1266,177 @@ describe('sandbox control socket handler', () => {
     ).rejects.toThrow('session identity is required');
     expect(ws.send).not.toHaveBeenCalled();
   });
+
+  it('requires readiness on the selected socket only for worktree captures', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      providerInstanceId: 'inst_1',
+    });
+    const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
+    const capture = {
+      operation: 'session.git.summary' as const,
+      session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+      payload: { revision: 1 },
+    };
+    await expect(handler.sendRequest(capture)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+    expect(ws.send).not.toHaveBeenCalled();
+    expect(handler.getReadySocket()).toBeNull();
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    expect(handler.getReadySocket()).toBe(ws);
+    const pending = handler.sendRequest(capture);
+    const sent = JSON.parse(ws.send.mock.calls[0]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    await expect(pending).resolves.toMatchObject({ ok: true });
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.heartbeat',
+        payload: { state: 'idle', kilo: { ready: false }, sessions: [] },
+      })
+    );
+    expect(handler.getReadySocket()).toBeNull();
+    await expect(handler.sendRequest(capture)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+    const status = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const statusSent = JSON.parse(ws.send.mock.calls[1]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({ type: 'response', requestId: statusSent.requestId, ok: true })
+    );
+    await expect(status).resolves.toMatchObject({ ok: true });
+  });
+
+  it('does not accept a response from a provisional or replaced socket', async () => {
+    const current = createFakeWebSocket({
+      handshakeComplete: true,
+      kiloReady: true,
+      acceptedAt: 1,
+      providerInstanceId: 'inst_1',
+    });
+    const provisional = createFakeWebSocket({ handshakeComplete: false, acceptedAt: Date.now() });
+    const sockets = [current, provisional];
+    const waiters = createControlRequestWaiters();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState(sockets),
+      'sbx_test',
+      waiters
+    );
+    const request = {
+      operation: 'session.git.summary' as const,
+      session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+      payload: { revision: 1 },
+    };
+    const pending = handler.sendRequest(request);
+    const sent = JSON.parse(current.send.mock.calls[0]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(provisional),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    expect(waiters.pendingCount()).toBe(1);
+    expect(provisional.close).toHaveBeenCalledWith(1008, 'handshake_required');
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    await expect(pending).resolves.toMatchObject({ ok: true });
+
+    const replacement = createFakeWebSocket({ handshakeComplete: false, acceptedAt: Date.now() });
+    sockets.push(replacement);
+    await handler.handleMessage(
+      asWs(replacement),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'hello_new',
+        operation: 'sandbox.hello',
+        payload: { protocolVersion: 1, providerInstanceId: 'inst_2' },
+      })
+    );
+    expect(handler.getReadySocket()).toBeNull();
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    expect(handler.getReadySocket()).toBeNull();
+    await expect(handler.sendRequest(request)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+
+    await handler.handleMessage(
+      asWs(replacement),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    const replacementPending = handler.sendRequest(request);
+    const replacementSent = JSON.parse(replacement.send.mock.calls.at(-1)?.[0] as string) as {
+      requestId: string;
+    };
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({ type: 'response', requestId: replacementSent.requestId, ok: true })
+    );
+    expect(waiters.pendingCount()).toBe(1);
+    await handler.handleMessage(
+      asWs(replacement),
+      JSON.stringify({ type: 'response', requestId: replacementSent.requestId, ok: true })
+    );
+    await expect(replacementPending).resolves.toMatchObject({ ok: true });
+  });
+
+  it('rejects a capture if readiness changes before its response is accepted', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      kiloReady: true,
+      acceptedAt: Date.now(),
+      providerInstanceId: 'inst_1',
+    });
+    const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
+    const pending = handler.sendRequest({
+      operation: 'session.git.summary',
+      session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+      payload: { revision: 1 },
+    });
+    const sent = JSON.parse(ws.send.mock.calls[0]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.heartbeat',
+        payload: { state: 'idle', kilo: { ready: false }, sessions: [] },
+      })
+    );
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    await expect(pending).rejects.toThrow('Worktree capture connection changed');
+  });
 });
 
 const now = 1_000_000;
@@ -1392,6 +1568,57 @@ describe('connection-local sandbox observations', () => {
     expect(attachmentOf(replacement)).toEqual(beforeDuplicate);
     expect(replacement.send).toHaveBeenLastCalledWith(expect.stringContaining('protocol_error'));
   });
+
+  it.each(['unhealthy', 'closed', 'replaced'] as const)(
+    'keeps capture readiness fenced when a delayed heartbeat is overtaken by %s',
+    async change => {
+      vi.useFakeTimers({ now });
+      const ws = createFakeWebSocket({ ...handshaken, wrapperInstanceId: WRAPPER_INSTANCE_ID });
+      const sockets = [ws];
+      const state = createFakeState(sockets);
+      const firstHook = Promise.withResolvers<void>();
+      const handler = createSandboxControlSocketHandler(state, 'sbx_test', undefined, {
+        onHeartbeat: vi.fn().mockImplementationOnce(() => firstHook.promise),
+      });
+      await handler.handleMessage(asWs(ws), readyFrame);
+      const identity = handler.getConnectionIdentity();
+      const earlier = handler.handleMessage(asWs(ws), heartbeatFrame());
+      expect(handler.getReadySocket()).toBe(ws);
+      expect(attachmentOf(ws)).toMatchObject({ ...identity, kiloReady: true });
+      const pending = handler.sendRequest({
+        operation: 'session.git.summary',
+        session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+        payload: { revision: 1 },
+      });
+      const rejected = expect(pending).rejects.toThrow();
+      const sent = JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string) as { requestId: string };
+      if (change === 'unhealthy') {
+        await handler.handleMessage(
+          asWs(ws),
+          heartbeatFrame({
+            ...idleHeartbeat,
+            kilo: { ready: false, reason: 'credential_refresh_failed' },
+          })
+        );
+      } else if (change === 'closed') {
+        handler.closeAll('runtime closed');
+      } else {
+        const replacement = createFakeWebSocket({ handshakeComplete: false, acceptedAt: now });
+        sockets.push(replacement);
+        await handler.handleMessage(asWs(replacement), helloFrame('inst_1', WRAPPER_INSTANCE_ID));
+      }
+      const fencedAttachment = attachmentOf(ws);
+      firstHook.resolve();
+      await earlier;
+      expect(attachmentOf(ws)).toEqual(fencedAttachment);
+      expect(handler.getReadySocket()).toBeNull();
+      await handler.handleMessage(
+        asWs(ws),
+        JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+      );
+      await rejected;
+    }
+  );
 
   it('does not overwrite newer false evidence when an earlier idle hook completes late', async () => {
     vi.useFakeTimers({ now });

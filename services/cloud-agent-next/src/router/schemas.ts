@@ -1009,6 +1009,13 @@ export const GetSandboxStatusInput = z
   })
   .strict();
 
+export const WorktreeChangesInput = z.object({ cloudAgentSessionId: sessionIdSchema }).strict();
+
+export {
+  getWorktreeChangesOutputSchema as GetWorktreeChangesOutput,
+  refreshWorktreeChangesOutputSchema as RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+
 /** Customer-safe, no-wake compute billing status for an existing session. */
 export const GetComputeBillingStatusOutput = z.object({
   payer: z.object({ type: z.enum(['user', 'org']), id: z.string() }),

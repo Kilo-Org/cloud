@@ -33,9 +33,9 @@ const STATUS_LABEL_KEYS = {
   paid: 'organization.invoices.status.paid',
   open: 'organization.invoices.status.open',
   void: 'organization.invoices.status.void',
-  draft: 'organization.invoices.status.draft',
+  draft: 'common.draft',
   uncollectible: 'organization.invoices.status.uncollectible',
-  unknown: 'organization.invoices.status.unknown',
+  unknown: 'common.unknown',
 } satisfies Record<string, string>;
 
 const STATUS_META = {
@@ -258,9 +258,9 @@ export function OrganizationInvoicesScreen() {
               size="sm"
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
-              accessibilityLabel={t('organization.invoices.loadMore')}
+              accessibilityLabel={t('common.loadMore')}
             >
-              <Text>{t('organization.invoices.loadMore')}</Text>
+              <Text>{t('common.loadMore')}</Text>
             </Button>
           </View>
         )}

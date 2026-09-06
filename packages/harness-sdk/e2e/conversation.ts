@@ -567,7 +567,9 @@ for (const { model, got } of rows) {
 }
 
 under('');
-console.log(`\nsent a subagent for the codename: ${String(fetched.length)} of ${String(models.length)} models`);
+console.log(
+  `\nsent a subagent for the codename: ${String(fetched.length)} of ${String(models.length)} models`
+);
 /* The floor under the count: a subagent that never came back with what it was
    sent for, on any model, is the package and not eleven models each deciding. */
 wrongIf(

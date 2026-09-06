@@ -28,7 +28,7 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
             router.replace(backTo);
           }}
         >
-          <Text>{t('invalidRoute.goBack')}</Text>
+          <Text>{t('common.goBack')}</Text>
         </Button>
       }
     />

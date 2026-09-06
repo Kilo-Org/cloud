@@ -4,7 +4,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubWebhookSignature } from '@/lib/integrations/platforms/github/adapter';
 import {
   InstallationCreatedPayloadSchema,
-  InstallationDeletedPayloadSchema,
+  InstallationDeletedWebhookPayloadSchema,
   InstallationSuspendPayloadSchema,
   InstallationUnsuspendPayloadSchema,
   InstallationTargetRenamedPayloadSchema,
@@ -177,7 +177,7 @@ export async function handleGitHubWebhook(
       }
 
       if (action === GITHUB_ACTION.DELETED) {
-        const parseResult = InstallationDeletedPayloadSchema.safeParse(payload);
+        const parseResult = InstallationDeletedWebhookPayloadSchema.safeParse(payload);
         if (!parseResult.success) {
           logExceptInTest(`Invalid installation.deleted payload${logSuffix}:`, parseResult.error);
           captureMessage('Invalid GitHub webhook payload structure', {
@@ -188,8 +188,18 @@ export async function handleGitHubWebhook(
           return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
 
+        const { installation } = parseResult.data;
+        if (installation === null) {
+          logExceptInTest(`Ignoring installation.deleted without an installation ID${logSuffix}`);
+          return NextResponse.json(
+            { message: 'Event ignored: missing installation ID' },
+            { status: 200 }
+          );
+        }
+        const deletedPayload = { ...parseResult.data, installation };
+
         // Get integration before deletion to log the event
-        const installationId = parseResult.data.installation.id.toString();
+        const installationId = installation.id.toString();
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
@@ -202,7 +212,7 @@ export async function handleGitHubWebhook(
             return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
           }
 
-          const result = await handleInstallationDeleted(parseResult.data, appType);
+          const result = await handleInstallationDeleted(deletedPayload, appType);
 
           // Mark webhook event as processed
           if (logResult.webhookEventId) {
@@ -221,7 +231,7 @@ export async function handleGitHubWebhook(
           return result;
         }
 
-        return await handleInstallationDeleted(parseResult.data, appType);
+        return await handleInstallationDeleted(deletedPayload, appType);
       }
 
       if (action === GITHUB_ACTION.SUSPEND) {

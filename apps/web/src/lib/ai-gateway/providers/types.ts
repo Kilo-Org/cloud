@@ -17,7 +17,6 @@ export type ProviderId =
   | 'longcat'
   | 'martian'
   | 'mistral'
-  | 'friendli'
   | 'perplexity'
   | 'streamlake'
   | 'vercel'

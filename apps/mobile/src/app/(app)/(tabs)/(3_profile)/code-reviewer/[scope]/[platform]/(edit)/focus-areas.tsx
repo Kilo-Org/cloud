@@ -23,7 +23,7 @@ export default function FocusAreasRoute() {
   const { t } = useTranslation();
   const areaLabels = {
     security: 'codeReviewer.focusArea.security',
-    performance: 'codeReviewer.focusArea.performance',
+    performance: 'common.performance',
     bugs: 'codeReviewer.focusArea.bugs',
     style: 'codeReviewer.focusArea.style',
     testing: 'codeReviewer.focusArea.testing',

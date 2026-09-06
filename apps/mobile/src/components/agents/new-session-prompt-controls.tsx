@@ -49,7 +49,7 @@ export function NewSessionPromptControls({
             paperclipDisabled && 'opacity-50'
           )}
           accessibilityRole="button"
-          accessibilityLabel={t('agentChat.newSession.addAttachment')}
+          accessibilityLabel={t('agentChat.composer.addAttachment')}
           accessibilityState={{ disabled: paperclipDisabled }}
         >
           <Paperclip size={18} color={colors.mutedForeground} />

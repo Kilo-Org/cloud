@@ -63,6 +63,7 @@ import { extendClawTrialRouter } from '@/routers/admin/extend-claw-trial-router'
 import { adminCustomLlmRouter } from '@/routers/admin/custom-llm-router';
 import { adminModelExperimentsRouter } from '@/routers/admin/model-experiments-router';
 import { adminGatewayConfigRouter } from '@/routers/admin/gateway-config-router';
+import { adminGatewayUsageRouter } from '@/routers/admin/gateway-usage-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
@@ -97,7 +98,12 @@ import {
   min,
 } from 'drizzle-orm';
 import type { InferColumnsDataTypes } from 'drizzle-orm';
-import { findUsersByIds, findUserById } from '@/lib/user';
+import {
+  findUsersByIds,
+  findUserById,
+  getCrossAccountEmailConflicts,
+  inferRowlessAuthProviders,
+} from '@/lib/user';
 import { blockUser } from '@/lib/user/block';
 import { reportEvents } from '@/lib/ai-gateway/abuse-service';
 import { getBlobContent } from '@/lib/r2/cli-sessions';
@@ -119,11 +125,12 @@ import { sum } from 'drizzle-orm';
 import { CRON_SECRET } from '@/lib/config.server';
 import { APP_URL } from '@/lib/constants';
 import { revalidatePath } from 'next/cache';
+import { invalidateModelStatsCache } from '@/lib/model-stats/model-stats-cache';
 import { recomputeUserBalances } from '@/lib/user/recompute-balances';
 import { getStripeInvoices } from '@/lib/stripe';
 import { client as stripeClient } from '@/lib/stripe-client';
 import { resolveSsoAuthorityForDomain } from '@/lib/organizations/organization-sso-policy';
-import { getLowerDomainFromEmail } from '@/lib/utils';
+import { getLowerDomainFromEmail, normalizeEmail } from '@/lib/utils';
 import { cancelAndRefundKiloPassForUser } from '@/lib/kilo-pass/cancel-and-refund';
 import { KILOCLAW_EARLYBIRD_EXPIRY_DATE } from '@/lib/kiloclaw/constants';
 import {
@@ -142,6 +149,10 @@ import {
   getKilocodeRepoRecentlyMergedExternalPRs,
   ALL_REPO_IDS,
 } from '@/lib/github/open-pull-request-counts';
+import { GitHubOrganizationInstallationLookupInputSchema } from '@/lib/admin/github-installation-lookup-input';
+import { lookupGitHubOrganizationInstallation } from '@/lib/admin/github-installation-lookup';
+import { GitHubInstallationUninstallInputSchema } from '@/lib/admin/github-installation-uninstall-input';
+import { uninstallGitHubOrganizationInstallation } from '@/lib/admin/github-installation-uninstall';
 
 const SyncResponseSchema = z.object({
   success: z.boolean(),
@@ -312,6 +323,13 @@ const CheckKiloPassSchema = z.object({
 const ResetToMagicLinkLoginSchema = z.object({
   userId: z.string(),
 });
+
+const ReleaseEmailAddressSchema = z.object({
+  userId: z.string().min(1),
+  expectedEmail: z.string().min(1),
+});
+
+const RELEASED_EMAIL_DOMAIN = 'released.invalid';
 
 const UpdateUserBlockStatusSchema = z.object({
   userId: z.string(),
@@ -508,6 +526,30 @@ export const adminRouter = createTRPCRouter({
   impactReferrals: adminImpactReferralsRouter,
   webhookTriggers: adminWebhookTriggersRouter,
   github: createTRPCRouter({
+    lookupOrganizationInstallation: adminProcedure
+      .input(GitHubOrganizationInstallationLookupInputSchema)
+      .mutation(async ({ input }) => {
+        try {
+          return await lookupGitHubOrganizationInstallation(input.organization);
+        } catch {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'GitHub installation lookup failed',
+          });
+        }
+      }),
+    uninstallOrganizationInstallation: adminProcedure
+      .input(GitHubInstallationUninstallInputSchema)
+      .mutation(async ({ ctx, input }) => {
+        return uninstallGitHubOrganizationInstallation({
+          input,
+          actor: {
+            id: ctx.user.id,
+            email: ctx.user.google_user_email,
+            name: ctx.user.google_user_name,
+          },
+        });
+      }),
     getKilocodeOpenPullRequestCounts: adminProcedure.query(async () => {
       return getKilocodeRepoOpenPullRequestCounts({ ttlMs: 2 * 60_000 });
     }),
@@ -645,6 +687,151 @@ export const adminRouter = createTRPCRouter({
         await db
           .delete(user_auth_provider)
           .where(eq(user_auth_provider.kilo_user_id, input.userId));
+
+        return successResult();
+      }),
+
+    releaseEmailAddress: adminProcedure
+      .input(ReleaseEmailAddressSchema)
+      .mutation(async ({ input, ctx }) => {
+        if (input.userId === ctx.user.id) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Administrators cannot release their own email address',
+          });
+        }
+
+        await db.transaction(async tx => {
+          await tx.execute(
+            sql`SELECT pg_advisory_xact_lock(hashtextextended(${`release-email:${normalizeEmail(input.expectedEmail)}`}, 0))`
+          );
+
+          const [user] = await tx
+            .select({
+              id: kilocode_users.id,
+              googleUserEmail: kilocode_users.google_user_email,
+              emailDomain: kilocode_users.email_domain,
+              hostedDomain: kilocode_users.hosted_domain,
+              blockedReason: kilocode_users.blocked_reason,
+            })
+            .from(kilocode_users)
+            .where(eq(kilocode_users.id, input.userId))
+            .for('update')
+            .limit(1);
+
+          if (!user) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'User not found' });
+          }
+          if (user.googleUserEmail !== input.expectedEmail) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'Email address changed. Reload the user before releasing it.',
+            });
+          }
+          if (isGoneOrDeletingBlockedReason(user.blockedReason)) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an email address for a deleted or deleting user',
+            });
+          }
+          if (
+            user.emailDomain === RELEASED_EMAIL_DOMAIN ||
+            user.googleUserEmail.toLowerCase().endsWith(`@${RELEASED_EMAIL_DOMAIN}`)
+          ) {
+            throw new TRPCError({ code: 'CONFLICT', message: 'Email address is already released' });
+          }
+
+          const [linkedProvider] = await tx
+            .select({ provider: user_auth_provider.provider })
+            .from(user_auth_provider)
+            .where(eq(user_auth_provider.kilo_user_id, user.id))
+            .limit(1);
+          if (linkedProvider) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an email address from an account with a linked provider',
+            });
+          }
+          const inferredProviders = inferRowlessAuthProviders({
+            id: user.id,
+            hosted_domain: user.hostedDomain,
+          });
+          if (inferredProviders.length !== 1 || inferredProviders[0] !== 'email') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an account without inferred email authentication',
+            });
+          }
+
+          const domain = getLowerDomainFromEmail(user.googleUserEmail);
+          if (!domain) {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an account without an email-based identity',
+            });
+          }
+          const ssoAuthority = await resolveSsoAuthorityForDomain(domain, tx);
+          if (ssoAuthority.status !== 'not_required') {
+            throw new TRPCError({
+              code: 'FORBIDDEN',
+              message: 'Cannot release an email address managed by organization SSO',
+            });
+          }
+
+          const conflicts = await getCrossAccountEmailConflicts(
+            [user.googleUserEmail],
+            user.id,
+            tx
+          );
+          if (!conflicts.get(user.googleUserEmail)) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Email address does not conflict with another account',
+            });
+          }
+
+          const [released] = await tx
+            .update(kilocode_users)
+            .set({
+              google_user_email: `${crypto.randomUUID()}@${RELEASED_EMAIL_DOMAIN}`,
+              normalized_email: null,
+              email_domain: RELEASED_EMAIL_DOMAIN,
+              updated_at: new Date().toISOString(),
+            })
+            .where(
+              and(
+                eq(kilocode_users.id, user.id),
+                eq(kilocode_users.google_user_email, input.expectedEmail),
+                sql`NOT EXISTS (
+                  SELECT 1 FROM ${user_auth_provider}
+                  WHERE ${user_auth_provider.kilo_user_id} = ${kilocode_users.id}
+                )`,
+                sql`EXISTS (
+                  SELECT 1 FROM ${user_auth_provider} AS conflicting_provider
+                  WHERE lower(conflicting_provider.email) = lower(${user.googleUserEmail})
+                    AND conflicting_provider.kilo_user_id <> ${user.id}
+                  UNION ALL
+                  SELECT 1 FROM ${kilocode_users} AS conflicting_user
+                  WHERE conflicting_user.id <> ${user.id}
+                    AND (
+                      conflicting_user.normalized_email = ${normalizeEmail(user.googleUserEmail)}
+                      OR (
+                        conflicting_user.normalized_email IS NULL
+                        AND lower(conflicting_user.google_user_email) = lower(${user.googleUserEmail})
+                      )
+                    )
+                )`
+              )
+            )
+            .returning({ id: kilocode_users.id });
+
+          if (!released) {
+            throw new TRPCError({
+              code: 'CONFLICT',
+              message: 'Account changed while releasing the email address. Reload and try again.',
+            });
+          }
+        });
 
         return successResult();
       }),
@@ -2049,6 +2236,7 @@ export const adminRouter = createTRPCRouter({
         })
         .returning();
 
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
 
       return newModel;
@@ -2070,6 +2258,7 @@ export const adminRouter = createTRPCRouter({
         });
       }
 
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
 
       return updatedModel;
@@ -2097,6 +2286,7 @@ export const adminRouter = createTRPCRouter({
     }),
 
     bustCache: adminProcedure.mutation(() => {
+      invalidateModelStatsCache();
       revalidatePath('/api/models/stats');
       revalidatePath('/api/models/stats/[slug]', 'page');
       return { success: true, message: 'Cache busted successfully' };
@@ -2412,6 +2602,7 @@ export const adminRouter = createTRPCRouter({
   customLlm: adminCustomLlmRouter,
   modelExperiments: adminModelExperimentsRouter,
   gatewayConfig: adminGatewayConfigRouter,
+  gatewayUsage: adminGatewayUsageRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
   bulkBlock: adminBulkBlockRouter,

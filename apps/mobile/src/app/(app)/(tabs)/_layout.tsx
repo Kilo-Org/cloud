@@ -164,9 +164,9 @@ export default function TabsLayout() {
           name="(1_kiloclaw)"
           options={{
             href: showKiloClawTab ? undefined : null,
-            title: t('tabs.kiloclaw'),
+            title: t('common.kiloclaw'),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
-              t('tabs.kiloclaw'),
+              t('common.kiloclaw'),
               tabBarPosition('kiloclaw', tabFlags) ?? 2,
               tabCount
             ),
@@ -175,7 +175,7 @@ export default function TabsLayout() {
                 label={
                   fontScale > TAB_LABEL_WRAP_FONT_SCALE
                     ? t('tabs.kiloclawWrapped')
-                    : t('tabs.kiloclaw')
+                    : t('common.kiloclaw')
                 }
                 focused={focused}
               />
@@ -195,16 +195,16 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="(2_agents)"
           options={{
-            title: t('tabs.agents'),
+            title: t('common.agents'),
             tabBarBadge: needsInputBadge,
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               needsInputBadge
-                ? `${t('tabs.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
-                : t('tabs.agents'),
+                ? `${t('common.agents')}, ${needsInputBadge} ${t('agents.sessionRow.needsInput')}`
+                : t('common.agents'),
               tabBarPosition('agents', tabFlags) ?? 2,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.agents')} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabLabel label={t('common.agents')} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <Bot size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -219,13 +219,13 @@ export default function TabsLayout() {
           name="(4_chat)"
           options={{
             href: showChatTab ? undefined : null,
-            title: t('tabs.chat'),
+            title: t('common.chat'),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
-              t('tabs.chat'),
+              t('common.chat'),
               tabBarPosition('chat', tabFlags) ?? 3,
               tabCount
             ),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.chat')} focused={focused} />,
+            tabBarLabel: ({ focused }) => <TabLabel label={t('common.chat')} focused={focused} />,
             tabBarIcon: ({ color, focused }) => (
               <MessageCircle size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),
@@ -239,9 +239,15 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="(3_profile)"
           options={{
-            title: t('tabs.profile'),
-            tabBarAccessibilityLabel: tabAccessibilityLabel(t('tabs.profile'), tabCount, tabCount),
-            tabBarLabel: ({ focused }) => <TabLabel label={t('tabs.profile')} focused={focused} />,
+            title: t('common.profile'),
+            tabBarAccessibilityLabel: tabAccessibilityLabel(
+              t('common.profile'),
+              tabCount,
+              tabCount
+            ),
+            tabBarLabel: ({ focused }) => (
+              <TabLabel label={t('common.profile')} focused={focused} />
+            ),
             tabBarIcon: ({ color, focused }) => (
               <UserRound size={tabIconSize} color={color} strokeWidth={focused ? 2 : 1.5} />
             ),

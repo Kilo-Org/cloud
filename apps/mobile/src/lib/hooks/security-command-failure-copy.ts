@@ -6,7 +6,7 @@ import { type SecurityCommand } from '@/lib/security-agent';
 // so mobile maps each code to a catalog key and translates at toast time.
 const FAILURE_MESSAGE_KEY_BY_RESULT_CODE = {
   OWNER_CAP_REACHED: 'securityAgent.commandFailure.ownerCapReached',
-  GITHUB_TOKEN_UNAVAILABLE: 'securityAgent.commandFailure.githubTokenUnavailable',
+  GITHUB_TOKEN_UNAVAILABLE: 'securityAgent.commandFailure.githubAuthInvalid',
   GITHUB_AUTH_INVALID: 'securityAgent.commandFailure.githubAuthInvalid',
   FINDING_UNAVAILABLE: 'securityAgent.commandFailure.findingUnavailable',
   REPOSITORY_UNAVAILABLE: 'securityAgent.commandFailure.repositoryUnavailable',

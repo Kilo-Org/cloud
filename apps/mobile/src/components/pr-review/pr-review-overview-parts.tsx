@@ -20,8 +20,8 @@ type PrStateChipTone = 'good' | 'warn' | 'muted' | 'destructive';
 
 type PrStateChipLabelKey =
   | 'prReview.overview.stateMerged'
-  | 'prReview.overview.stateClosed'
-  | 'prReview.overview.stateDraft'
+  | 'common.closed'
+  | 'common.draft'
   | 'prReview.overview.stateOpenApproved'
   | 'prReview.overview.stateOpenChangesRequested'
   | 'prReview.overview.stateOpenReviewRequired'
@@ -42,10 +42,10 @@ export function describePrState(args: {
     return { labelKey: 'prReview.overview.stateMerged', tone: 'muted', icon: GitMerge };
   }
   if (args.state === 'closed') {
-    return { labelKey: 'prReview.overview.stateClosed', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'common.closed', tone: 'muted', icon: GitPullRequest };
   }
   if (args.draft) {
-    return { labelKey: 'prReview.overview.stateDraft', tone: 'muted', icon: GitPullRequest };
+    return { labelKey: 'common.draft', tone: 'muted', icon: GitPullRequest };
   }
   // state === 'open'
   if (args.reviewDecision === 'APPROVED') {
@@ -102,6 +102,25 @@ export function PrStateChip({ descriptor }: Readonly<{ descriptor: PrStateChipDe
   );
 }
 
+/**
+ * A GitHub account's avatar at the size every PR-review row uses. Falls back
+ * to the muted circle when GitHub reports no avatar, so the row never jumps.
+ */
+export function PrAvatar({ avatarUrl }: Readonly<{ avatarUrl: string | null }>) {
+  if (!avatarUrl) {
+    return <View className="size-6 rounded-full bg-muted" />;
+  }
+  return (
+    <Image
+      source={{ uri: avatarUrl }}
+      className="size-6 rounded-full"
+      transition={0}
+      cachePolicy="memory"
+      accessibilityIgnoresInvertColors
+    />
+  );
+}
+
 export function PrAuthorRow({
   author,
 }: Readonly<{ author: { login: string; avatarUrl: string | null } | null }>) {
@@ -109,7 +128,7 @@ export function PrAuthorRow({
   if (!author) {
     return (
       <View className="flex-row items-center gap-2">
-        <View className="size-6 rounded-full bg-muted" />
+        <PrAvatar avatarUrl={null} />
         <Text variant="muted" className="text-sm">
           {t('prReview.overview.unknownAuthor')}
         </Text>
@@ -118,17 +137,7 @@ export function PrAuthorRow({
   }
   return (
     <View className="flex-row items-center gap-2">
-      {author.avatarUrl ? (
-        <Image
-          source={{ uri: author.avatarUrl }}
-          className="size-6 rounded-full"
-          transition={0}
-          cachePolicy="memory"
-          accessibilityIgnoresInvertColors
-        />
-      ) : (
-        <View className="size-6 rounded-full bg-muted" />
-      )}
+      <PrAvatar avatarUrl={author.avatarUrl} />
       <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
         {author.login}
       </Text>

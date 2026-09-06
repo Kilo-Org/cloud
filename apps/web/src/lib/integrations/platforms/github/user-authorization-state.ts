@@ -5,7 +5,8 @@ import { z } from 'zod';
 import {
   createOAuthState,
   OAUTH_STATE_TTL_SECONDS,
-  verifyOAuthState,
+  verifyOAuthStateDetailed,
+  type OAuthStateVerificationFailureReason,
 } from '@/lib/integrations/oauth-state';
 import { redisClient } from '@/lib/redis';
 import { githubUserAuthorizationPkceRedisKey } from '@/lib/redis-keys';
@@ -42,27 +43,52 @@ export async function createGitHubUserAuthorizationState(
   return { state, codeChallenge };
 }
 
+export type GitHubUserAuthorizationStateResult =
+  | { status: 'consumed'; codeVerifier: string }
+  | {
+      status: 'invalid';
+      reason:
+        | OAuthStateVerificationFailureReason
+        | 'user_mismatch'
+        | 'flow_mismatch'
+        | 'payload_invalid'
+        | 'verifier_missing';
+    }
+  | { status: 'storage_error'; reason: 'storage_unavailable' };
+
 export async function consumeGitHubUserAuthorizationState(
   state: string | null,
   sessionUserId: string
-): Promise<{ codeVerifier: string } | null> {
-  const verified = verifyOAuthState(state);
-  if (!verified || verified.userId !== sessionUserId || !verified.owner.startsWith(STATE_PREFIX)) {
-    return null;
+): Promise<GitHubUserAuthorizationStateResult> {
+  const verified = verifyOAuthStateDetailed(state);
+  if (verified.status === 'invalid') return verified;
+  if (verified.state.userId !== sessionUserId) {
+    return { status: 'invalid', reason: 'user_mismatch' };
+  }
+  if (!verified.state.owner.startsWith(STATE_PREFIX)) {
+    return { status: 'invalid', reason: 'flow_mismatch' };
   }
 
-  const encodedPayload = verified.owner.slice(STATE_PREFIX.length);
+  const encodedPayload = verified.state.owner.slice(STATE_PREFIX.length);
+  let verifierRef: string;
   try {
     const parsed = StatePayloadSchema.safeParse(
       JSON.parse(Buffer.from(encodedPayload, 'base64url').toString('utf8'))
     );
-    if (!parsed.success) return null;
-
-    const codeVerifier = await redisClient.getdel<string>(
-      githubUserAuthorizationPkceRedisKey(parsed.data.verifierRef)
-    );
-    return codeVerifier ? { codeVerifier } : null;
+    if (!parsed.success) return { status: 'invalid', reason: 'payload_invalid' };
+    verifierRef = parsed.data.verifierRef;
   } catch {
-    return null;
+    return { status: 'invalid', reason: 'payload_invalid' };
+  }
+
+  try {
+    const codeVerifier = await redisClient.getdel<string>(
+      githubUserAuthorizationPkceRedisKey(verifierRef)
+    );
+    return codeVerifier
+      ? { status: 'consumed', codeVerifier }
+      : { status: 'invalid', reason: 'verifier_missing' };
+  } catch {
+    return { status: 'storage_error', reason: 'storage_unavailable' };
   }
 }

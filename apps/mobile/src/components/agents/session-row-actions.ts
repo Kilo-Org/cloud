@@ -10,7 +10,7 @@ export function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   Alert.alert(i18n.t('agents.sessionRow.deleteTitle'), i18n.t('agents.sessionRow.deleteMessage'), [
     { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('agents.sessionRow.delete'), style: 'destructive', onPress: onDelete },
+    { text: i18n.t('common.delete'), style: 'destructive', onPress: onDelete },
   ]);
 }
 
@@ -22,7 +22,7 @@ export function showRenamePrompt(currentTitle: string, onRename: (newTitle: stri
     [
       { text: i18n.t('common.cancel'), style: 'cancel' },
       {
-        text: i18n.t('agents.sessionRow.rename'),
+        text: i18n.t('common.rename'),
         onPress: (newName: string | undefined) => {
           if (newName?.trim()) {
             onRename(newName.trim());
@@ -84,7 +84,7 @@ export function showSessionActionMenu(opts: SessionActionMenuOptions): void {
   const handlers: (() => void)[] = [onCopySessionId];
 
   if (onRename) {
-    options.push(i18n.t('agents.sessionRow.rename'));
+    options.push(i18n.t('common.rename'));
     handlers.push(onRename);
   }
   if (onExit) {

@@ -201,6 +201,9 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         lifecycleHooks: config.lifecycleHooks,
         websocketHeaders: config.websocketHeaders,
         onEvent: raw => {
+          if (expectedGeneration !== lifecycleGeneration || raw.sessionId !== config.sessionId) {
+            return;
+          }
           // Track high-water mark for reconnect fromId only. Do not filter
           // by eventId: the DO entity-upserts tool/message parts under a
           // stable row id and rebroadcasts that same (or older) id with a

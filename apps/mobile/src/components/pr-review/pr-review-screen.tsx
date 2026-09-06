@@ -226,18 +226,22 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
               <Button
                 size="sm"
                 onPress={openReviewSubmit}
-                accessibilityLabel={t('prReview.submit.title')}
+                accessibilityLabel={t('prReview.submit.submitReview')}
                 className={cn('px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
-                <Text>{t('prReview.submit.title')}</Text>
+                <Text>{t('prReview.submit.submitReview')}</Text>
               </Button>
             ) : null}
           </View>
         }
       />
       <View className="px-4 pb-2 pt-3">
-        <PrReviewTabSelector activeTab={tab} onChange={setTab} />
+        <PrReviewTabSelector
+          activeTab={tab}
+          onChange={setTab}
+          discussionCount={pr.data?.commentCount}
+        />
       </View>
       {body}
     </View>

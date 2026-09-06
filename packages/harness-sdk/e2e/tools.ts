@@ -93,10 +93,7 @@ const withTools = (kind: ApiKind, tools: readonly Tool[]) =>
  * own miss would make the retry a no-op. Only a round that failed twice is
  * recorded, and only here.
  */
-const twice = async (
-  what: string,
-  once: () => Promise<boolean | undefined>
-): Promise<boolean> => {
+const twice = async (what: string, once: () => Promise<boolean | undefined>): Promise<boolean> => {
   const first = await once();
   if (first === true) {
     return true;

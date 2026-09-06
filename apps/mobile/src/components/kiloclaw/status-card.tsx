@@ -85,13 +85,7 @@ export function StatusCard({
         <KvRow icon={Globe} label={t('kiloclaw.status.uptime')} value={uptimeLabel} />
         <KvRow icon={RotateCcw} label={t('kiloclaw.status.restarts')} value={restartsLabel} />
         <KvRow icon={Server} label={t('kiloclaw.status.lastExit')} value={lastExitLabel} />
-        <KvRow
-          icon={Sparkles}
-          label={t('kiloclaw.status.model')}
-          value={modelLabel}
-          valueTone="good"
-          last
-        />
+        <KvRow icon={Sparkles} label={t('common.model')} value={modelLabel} valueTone="good" last />
       </View>
 
       <View className="overflow-hidden rounded-2xl border border-border bg-card px-4 pb-1 pt-3">

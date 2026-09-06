@@ -472,7 +472,7 @@ export function IdentityStep({
           <ActivityIndicator size="small" color={colors.primaryForeground} />
         ) : (
           <>
-            <Text className="text-base">{t('kiloclaw.onboarding.identity.continue')}</Text>
+            <Text className="text-base">{t('common.continue')}</Text>
             <DirectionalChevronRight size={16} color={colors.primaryForeground} />
           </>
         )}

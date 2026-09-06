@@ -49,10 +49,10 @@ const PROVIDER_LABEL_KEYS = {
   anaconda: 'profile.providerAnaconda',
   apple: 'profile.providerApple',
   discord: 'profile.providerDiscord',
-  email: 'profile.providerEmail',
+  email: 'common.email',
   'fake-login': 'profile.providerTestAccount',
-  github: 'profile.providerGithub',
-  gitlab: 'profile.providerGitlab',
+  github: 'common.github',
+  gitlab: 'common.gitlab',
   google: 'profile.providerGoogle',
   linkedin: 'profile.providerLinkedin',
   workos: 'profile.providerEnterpriseSso',
@@ -131,7 +131,7 @@ export function ProfileScreen() {
     Alert.alert(t('profile.signOutTitle'), t('profile.signOutMessage'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('profile.signOutConfirm'),
+        text: t('common.signOut'),
         style: 'destructive',
         onPress: () => {
           void signOut();
@@ -146,7 +146,7 @@ export function ProfileScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('profile.title')} size="large" showBackButton={false} />
+      <ScreenHeader title={t('common.profile')} size="large" showBackButton={false} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 pt-4"
@@ -158,11 +158,11 @@ export function ProfileScreen() {
         {/* Code Reviewer */}
         <View className="mt-6 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('profile.agents')}
+            {t('common.agents')}
           </Text>
           <ConfigureRow
             icon={GitPullRequest}
-            title={t('profile.codeReviewer')}
+            title={t('common.codeReviewer')}
             subtitle={t('profile.codeReviewerSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
@@ -174,7 +174,7 @@ export function ProfileScreen() {
           />
           <ConfigureRow
             icon={ShieldCheck}
-            title={t('profile.securityAgent')}
+            title={t('common.securityAgent')}
             subtitle={t('profile.securityAgentSubtitle')}
             className="rounded-lg bg-secondary px-3"
             disabled={!agentScope}
@@ -195,7 +195,7 @@ export function ProfileScreen() {
             </Text>
             <ConfigureRow
               icon={GitMerge}
-              title={t('profile.prReview')}
+              title={t('common.prReview')}
               subtitle={t('profile.prReviewSubtitle')}
               className="rounded-lg bg-secondary px-3"
               last
@@ -210,7 +210,7 @@ export function ProfileScreen() {
         {organizationId != null && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profile.organization')}
+              {t('common.organization')}
             </Text>
             {organizationsError ? (
               <QueryError
@@ -292,7 +292,7 @@ export function ProfileScreen() {
           </Text>
           <ConfigureRow
             icon={SlidersHorizontal}
-            title={t('profile.preferences')}
+            title={t('common.preferences')}
             subtitle={t('profile.preferencesSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last

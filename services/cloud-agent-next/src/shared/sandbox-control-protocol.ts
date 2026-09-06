@@ -1,6 +1,17 @@
 import { z } from 'zod';
 import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
 
+export {
+  MAX_WORKTREE_CHANGES_BYTES,
+  MAX_WORKTREE_CHANGES_FILES,
+  worktreeChangesFileSchema,
+  sessionGitSummaryPayloadSchema,
+  sessionGitSummaryResultSchema,
+  type WorktreeChangesFile,
+  type SessionGitSummaryPayload,
+  type SessionGitSummaryResult,
+} from './worktree-changes-wire.js';
+
 export const SANDBOX_CONTROL_PROTOCOL_VERSION = 1;
 
 export const MAX_SANDBOX_CONTROL_FRAME_BYTES = 1 * 1024 * 1024;
@@ -34,6 +45,7 @@ export const SESSION_OPERATIONS = [
   'session.question.resolve',
   'session.abort',
   'session.sync',
+  'session.git.summary',
   'session.detach',
   'session.terminal.create',
   'session.terminal.resize',
@@ -599,6 +611,7 @@ export type SandboxControlObservation = z.infer<typeof sandboxControlObservation
 
 export const sandboxControlSocketAttachmentSchema = z.object({
   handshakeComplete: z.boolean(),
+  kiloReady: z.boolean().optional(),
   acceptedAt: z.number().int().nonnegative(),
   connectionId: z.string().uuid().optional(),
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION).optional(),

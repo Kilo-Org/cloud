@@ -89,7 +89,7 @@ export function OrganizationBoundary({
       content = (
         <EmptyState
           icon={Building2}
-          title={t('organization.boundary.accessDeniedTitle')}
+          title={t('common.accessDenied')}
           description={t('organization.boundary.accessDeniedDescription')}
           action={backToProfileAction}
         />

@@ -14,7 +14,7 @@ export function formatTypingIndicatorText({
 
   const names = typingMemberIds.map(memberId =>
     memberId.startsWith('bot:')
-      ? (botName ?? i18n.t('kiloclaw.title'))
+      ? (botName ?? i18n.t('common.kiloclaw'))
       : i18n.t('chat.typingIndicator.someone')
   );
   return i18n.t('chat.typingIndicator.typing', {

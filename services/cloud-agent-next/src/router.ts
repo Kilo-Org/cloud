@@ -14,6 +14,7 @@ import { createSessionStartHandlers } from './router/handlers/session-start.js';
 import { createSessionSendHandlers } from './router/handlers/session-send.js';
 import { createSessionWorktreeHandlers } from './router/handlers/session-worktree.js';
 import { deleteWorktree } from './router/handlers/worktree-deletion.js';
+import { createSessionWorktreeChangesHandlers } from './router/handlers/session-worktree-changes.js';
 
 export const appRouter = router({
   deleteWorktree,
@@ -25,6 +26,7 @@ export const appRouter = router({
   ...createSessionStartHandlers(),
   ...createSessionSendHandlers(),
   ...createSessionWorktreeHandlers(),
+  ...createSessionWorktreeChangesHandlers(),
 });
 
 export type AppRouter = typeof appRouter;

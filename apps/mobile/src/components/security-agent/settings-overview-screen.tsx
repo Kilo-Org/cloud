@@ -37,7 +37,7 @@ function SettingsOverviewSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.settingsOverview.title')} />
+      <ScreenHeader title={t('securityAgent.dashboard.settings')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -111,12 +111,12 @@ export function SettingsOverviewScreen({
   } else if (capabilityUnavailable || permissionError || capability.isError) {
     recoveryError = t('securityAgent.settingsOverview.couldNotLoadPermissions');
   } else if (repositoriesError) {
-    recoveryError = t('securityAgent.settingsOverview.couldNotLoadRepositories');
+    recoveryError = t('common.couldNotLoadRepositories');
   }
   if (configUnavailable || capabilityUnavailable) {
     return (
       <PlatformErrorScreen
-        title={t('securityAgent.settingsOverview.title')}
+        title={t('securityAgent.dashboard.settings')}
         variant={configUnavailable ? 'offline' : 'server'}
         message={recoveryError}
         onRetry={() => void recovery.retry()}
@@ -151,7 +151,7 @@ export function SettingsOverviewScreen({
     displayCount: formatNumber(data.selectedRepositoryIds.length, i18n.language),
   });
   if (data.repositorySelectionMode === 'all') {
-    repoCountLabel = t('securityAgent.settingsOverview.allRepositories');
+    repoCountLabel = t('common.allRepositories');
   }
   const automationEnabledCount = [
     data.autoAnalysisEnabled,
@@ -229,30 +229,26 @@ export function SettingsOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.settingsOverview.title')} headerRight={auditAction} />
+      <ScreenHeader title={t('securityAgent.dashboard.settings')} headerRight={auditAction} />
       <Body className="flex-1">
         <View className="gap-6 px-6 py-4">
           <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
             <View className="flex-1 pr-3">
-              <Text className="text-sm font-medium">
-                {t('securityAgent.settingsOverview.securityAgent')}
-              </Text>
+              <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
               <Text variant="muted" className="text-xs">
-                {data.isEnabled ? repoCountLabel : t('securityAgent.settingsOverview.disabled')}
+                {data.isEnabled ? repoCountLabel : t('common.disabled')}
               </Text>
             </View>
             {capability.canManage ? (
               <Switch
-                accessibilityLabel={t('securityAgent.settingsOverview.securityAgent')}
+                accessibilityLabel={t('common.securityAgent')}
                 value={data.isEnabled}
                 disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
                 onValueChange={handleToggle}
               />
             ) : (
               <Text variant="muted" className="text-xs">
-                {data.isEnabled
-                  ? t('securityAgent.settingsOverview.enabled')
-                  : t('securityAgent.settingsOverview.disabled')}
+                {data.isEnabled ? t('common.enabled') : t('common.disabled')}
               </Text>
             )}
           </View>
@@ -263,7 +259,7 @@ export function SettingsOverviewScreen({
               {showRepoCta ? (
                 <ConfigureRow
                   icon={FolderGit2}
-                  title={t('securityAgent.settingsOverview.selectRepositories')}
+                  title={t('common.selectRepositories')}
                   subtitle={t('securityAgent.settingsOverview.selectRepositoriesSubtitle')}
                   onPress={() => {
                     router.push(getSecurityAgentPath(scope, 'settings/repositories'));
@@ -277,7 +273,7 @@ export function SettingsOverviewScreen({
             <View>
               <ConfigureRow
                 icon={FolderGit2}
-                title={t('securityAgent.settingsOverview.repositories')}
+                title={t('common.repositories')}
                 subtitle={repoCountLabel}
                 onPress={() => {
                   router.push(getSecurityAgentPath(scope, 'settings/repositories'));
@@ -285,7 +281,7 @@ export function SettingsOverviewScreen({
               />
               <ConfigureRow
                 icon={Cpu}
-                title={t('securityAgent.settingsOverview.modelsAndAnalysis')}
+                title={t('securityAgent.analysisSettings.title')}
                 subtitle={t('securityAgent.settingsOverview.analysisModeSubtitle', {
                   mode: analysisModeLabel,
                 })}
@@ -295,7 +291,7 @@ export function SettingsOverviewScreen({
               />
               <ConfigureRow
                 icon={Zap}
-                title={t('securityAgent.settingsOverview.automation')}
+                title={t('securityAgent.automation.title')}
                 subtitle={
                   automationEnabledCount === 0
                     ? t('securityAgent.settingsOverview.automationAllOff')
@@ -310,10 +306,10 @@ export function SettingsOverviewScreen({
               />
               <ConfigureRow
                 icon={Bell}
-                title={t('securityAgent.settingsOverview.notifications')}
+                title={t('common.notifications')}
                 subtitle={
                   notificationsEnabledCount === 0
-                    ? t('securityAgent.settingsOverview.off')
+                    ? t('common.off')
                     : t('securityAgent.settingsOverview.notificationsCount', {
                         count: notificationsEnabledCount,
                         displayCount: formatNumber(notificationsEnabledCount, i18n.language),
@@ -325,11 +321,9 @@ export function SettingsOverviewScreen({
               />
               <ConfigureRow
                 icon={Clock}
-                title={t('securityAgent.settingsOverview.slaPolicy')}
+                title={t('securityAgent.sla.title')}
                 subtitle={
-                  data.slaEnabled
-                    ? t('securityAgent.settingsOverview.on')
-                    : t('securityAgent.settingsOverview.off')
+                  data.slaEnabled ? t('securityAgent.settingsOverview.on') : t('common.off')
                 }
                 last
                 onPress={() => {

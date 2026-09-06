@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { createStreamHandler, formatStreamEvent } from './stream.js';
+import { parseStreamFilters } from './filters.js';
+import { WORKTREE_CHANGES_READY_EVENT } from '../shared/worktree-changes-wire.js';
 import type { StoredEvent, StreamFilters } from './types.js';
 import type { SessionId, EventId } from '../types/ids.js';
 import type { EventQueries, EventQueryFilters } from '../session/queries/index.js';
@@ -246,6 +248,59 @@ describe('stream handler replayEvents', () => {
       expect(prevFromId).toBeGreaterThan(0);
     }
   });
+});
+
+describe('worktree changes ready streaming', () => {
+  const readyEvents: StoredEvent[] = [5, 7].map((id, index) => ({
+    ...makeEvent(id, JSON.stringify({ revision: index + 1 })),
+    execution_id: '',
+    stream_event_type: WORKTREE_CHANGES_READY_EVENT,
+  }));
+
+  it.each([
+    { query: '', replayIds: [5, 7], live: true },
+    {
+      query: 'fromId=5&eventTypes=cloud.worktree.changes.ready',
+      replayIds: [7],
+      live: true,
+    },
+    { query: 'eventTypes=kilocode', replayIds: [], live: false },
+    { query: 'executionIds=exec_1', replayIds: [], live: false },
+    { query: 'startTime=1007&endTime=1007', replayIds: [7], live: true },
+    { query: 'endTime=1006', replayIds: [5], live: false },
+  ])(
+    'applies stream filters to replay and live delivery: $query',
+    async ({ query, replayIds, live }) => {
+      const state = makeFakeState();
+      const handler = createStreamHandler(state, makeFakeEventQueries(readyEvents), SESSION_ID);
+      const filters = parseStreamFilters(
+        new URL(`https://example.com/stream?${query}`),
+        SESSION_ID
+      );
+      const replaySocket = makeFakeWebSocket();
+      await handler.replayEvents(replaySocket, filters);
+      const replay = parseSentMessages(replaySocket);
+      expect(replay.map(event => event.eventId)).toEqual(replayIds);
+      for (const event of replay) {
+        expect(event).toEqual({
+          eventId: event.eventId,
+          sessionId: SESSION_ID,
+          streamEventType: 'cloud.worktree.changes.ready',
+          timestamp: new Date(1000 + event.eventId).toISOString(),
+          data: { revision: event.eventId === 5 ? 1 : 2 },
+        });
+      }
+
+      const liveSocket = Object.assign(makeFakeWebSocket(), {
+        deserializeAttachment: () => ({ filters, connectedAt: 0 }),
+      });
+      vi.spyOn(state, 'getWebSockets').mockReturnValue([liveSocket]);
+      handler.broadcastEvent(readyEvents[1]);
+      expect(parseSentMessages(liveSocket)).toEqual(
+        live ? [formatStreamEvent(readyEvents[1], SESSION_ID)] : []
+      );
+    }
+  );
 });
 
 describe('stream handler handleStreamRequest', () => {

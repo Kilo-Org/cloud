@@ -132,6 +132,10 @@ export class GlanceablePublisher {
         // First eligible emit starts the activity immediately, no coalesce wait.
         this.emit(snapshot, ctx);
         this.activityStarted = true;
+      } else if (snapshot.needsInput !== this.current?.needsInput) {
+        // Badge changes are actionable and must reach the launcher immediately.
+        this.cancelCoalesce();
+        this.emit(snapshot, ctx);
       } else {
         this.scheduleCoalesced(snapshot, ctx);
       }

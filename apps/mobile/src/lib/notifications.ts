@@ -25,6 +25,7 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { captureEvent } from '@/lib/analytics/posthog';
+import { refreshActiveSessionsFromPush } from '@/lib/active-sessions-live-sync';
 import { currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { getTerminalBlankEpoch } from '@/lib/glanceable/cleanup';
 import {
@@ -33,7 +34,12 @@ import {
   persistGlanceableSink,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
-import { getGlanceableSinks, registerGlanceableSink } from '@/lib/glanceable/sink-registry';
+import {
+  getGlanceableSinks,
+  type GlanceableSink,
+  registerGlanceableSink,
+} from '@/lib/glanceable/sink-registry';
+import { chainSave } from '@/lib/hooks/save-chain';
 import { ACTIVE_USER_ID_KEY, ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 import { i18n } from '@/i18n';
 import { setPendingDeepLink } from './deep-link-launch';
@@ -55,6 +61,57 @@ function getProjectId(): string {
 // A module-level variable (not React state) because the notification handler
 // is registered once and must always read the latest value without stale closures.
 let activeChatLocation: { sandboxId: string; conversationId: string } | null = null;
+
+let appBadgeWrite: Promise<void> | null = null;
+
+// The count the last successful native write put on the launcher badge. The
+// badge is shared with iOS itself: a visible push that carries its own badge
+// moves the icon through the shouldSetBadge path without the app writing.
+let badgeWrittenCount: number | null = null;
+
+async function setAppBadge(count: number): Promise<void> {
+  try {
+    await chainSave('glanceable-app-badge', async () => {
+      await Notifications.setBadgeCountAsync(count);
+    });
+    badgeWrittenCount = count;
+  } catch (error) {
+    Sentry.captureException(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'set_glanceable_badge',
+      },
+    });
+  }
+}
+
+function syncAppBadge(count: number): void {
+  // Only a change of the needs-input count owns a badge write. Re-asserting
+  // an unchanged count would undo a badge iOS applied from a visible push
+  // payload (e7: foreground push badge 2 was clobbered back to needsInput 1
+  // before the app was terminated).
+  if (count === badgeWrittenCount) {
+    return;
+  }
+  appBadgeWrite = setAppBadge(count);
+}
+
+const appBadgeSink: GlanceableSink = {
+  publish(snapshot) {
+    syncAppBadge(snapshot.needsInput);
+  },
+  async waitForNativeTerminal() {
+    if (appBadgeWrite) {
+      await appBadgeWrite;
+    }
+  },
+  endImmediate() {
+    // A terminal snapshot already published zero.
+  },
+  startOrUpdate() {
+    // The publish operation owns every badge write.
+  },
+};
 
 export function setActiveChatLocation(
   location: { sandboxId: string; conversationId: string } | null
@@ -179,6 +236,9 @@ export async function applyGlanceablePushData(
     // Keep the existing fallback for other sinks; widgets retain their timeline.
     scheduleGlanceableTerminalEnd();
   }
+  if (appBadgeWrite) {
+    await appBadgeWrite;
+  }
   // Do not finish a background task before ActivityKit accepts the native end.
   // All publication happens before this await, so it cannot restore an old scope.
   if (!eligible) {
@@ -237,8 +297,20 @@ export function setupNotificationHandler() {
         // The aggregate glanceable push is a data carrier for the ongoing
         // notification/widgets, never a visible banner: the local ongoing owns
         // the display. Apply it to the sinks regardless of the discard outcome.
-        await applyGlanceablePushData(data);
-        return suppressed;
+        const applied = await applyGlanceablePushData(data);
+        if (applied) {
+          refreshActiveSessionsFromPush();
+        }
+        if (!applied) {
+          setTimeout(() => {
+            // A discarded push carries no new count, so the local truth is
+            // unchanged. Re-asserting it here would undo a badge iOS applied
+            // from a later visible push (the same e7 clobber as an unchanged
+            // re-publication), so it goes through the guarded write too.
+            syncAppBadge(getLastGlanceableSnapshot()?.needsInput ?? 0);
+          }, 0);
+        }
+        return { ...suppressed, shouldSetBadge: applied };
       }
 
       if (
@@ -274,6 +346,7 @@ export function _setGlanceableSinksLoaderForTests(loader: (() => void) | null): 
  * sinks must be registered here before `applyGlanceablePushData` runs.
  */
 function ensureGlanceableSinksLoaded(): void {
+  registerGlanceableSink(appBadgeSink);
   if (glanceableSinksLoaderForTests) {
     glanceableSinksLoaderForTests();
     return;

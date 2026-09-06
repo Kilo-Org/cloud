@@ -13,7 +13,6 @@ import {
   filterClearedBadgeBucket,
   markReadConversation,
 } from './hooks/mark-read-operation';
-import { reconcileHydratedBadgeCount, totalBadgeCount } from '@/lib/badge-hydration';
 
 type UpdateBadgeRows = (
   queryKey: readonly ['badges', string],
@@ -105,116 +104,28 @@ describe('markReadConversation', () => {
     ).toEqual([{ badgeBucket: 'bucket-1', badgeCount: 2 }]);
   });
 
-  it('does not update badge cache or OS badge count when badgeClear is null', () => {
+  it('does not update the badge cache when badgeClear is null', () => {
     const updateBadgeRows = createUpdateBadgeRowsMock();
-    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
-      const result = await Promise.resolve(true);
-      return result;
-    });
 
-    const applied = applyBadgeClearResult({
+    applyBadgeClearResult({
       badgeClear: null,
-      startBadgeFreshnessEpoch: 0,
-      currentBadgeFreshnessEpoch: 0,
       userId: 'user-1',
       updateBadgeRows,
-      setBadgeCount,
     });
 
-    expect(applied).toBe(false);
     expect(updateBadgeRows).not.toHaveBeenCalled();
-    expect(setBadgeCount).not.toHaveBeenCalled();
   });
 
-  it('updates badge cache and OS badge count when badgeClear includes a count with unchanged freshness', () => {
+  it('updates the badge cache when badgeClear contains a cleared row', () => {
     const updateBadgeRows = createUpdateBadgeRowsMock();
-    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
-      const result = await Promise.resolve(true);
-      return result;
-    });
 
-    const applied = applyBadgeClearResult({
+    applyBadgeClearResult({
       badgeClear: { badgeBucket: 'server-bucket', badgeCount: 3 },
-      startBadgeFreshnessEpoch: 4,
-      currentBadgeFreshnessEpoch: 4,
       userId: 'user-1',
       updateBadgeRows,
-      setBadgeCount,
     });
 
-    expect(applied).toBe(true);
     expect(updateBadgeRows).toHaveBeenCalledOnce();
     expect(updateBadgeRows).toHaveBeenCalledWith(['badges', 'user-1'], expect.any(Function));
-    expect(setBadgeCount).toHaveBeenCalledWith(3);
-  });
-
-  it('keeps badge cache updates but skips stale OS badge counts when freshness advanced', () => {
-    const updateBadgeRows = createUpdateBadgeRowsMock();
-    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
-      const result = await Promise.resolve(true);
-      return result;
-    });
-
-    const applied = applyBadgeClearResult({
-      badgeClear: { badgeBucket: 'server-bucket', badgeCount: 0 },
-      startBadgeFreshnessEpoch: 8,
-      currentBadgeFreshnessEpoch: 9,
-      userId: 'user-1',
-      updateBadgeRows,
-      setBadgeCount,
-    });
-
-    expect(applied).toBe(false);
-    expect(updateBadgeRows).toHaveBeenCalledOnce();
-    expect(updateBadgeRows).toHaveBeenCalledWith(['badges', 'user-1'], expect.any(Function));
-    expect(setBadgeCount).not.toHaveBeenCalled();
-  });
-});
-
-describe('badge hydration reconciliation', () => {
-  it('totals all hydrated badge buckets for the native OS badge', () => {
-    expect(
-      totalBadgeCount([
-        { badgeBucket: 'kiloclaw:sandbox-1', badgeCount: 2 },
-        { badgeBucket: 'kiloclaw:sandbox-1:conversation-1', badgeCount: 3 },
-      ])
-    ).toBe(5);
-  });
-
-  it('updates the native OS badge when hydration is still fresh', () => {
-    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
-      const result = await Promise.resolve(true);
-      return result;
-    });
-
-    const applied = reconcileHydratedBadgeCount({
-      badgeRows: [
-        { badgeBucket: 'kiloclaw:sandbox-1', badgeCount: 2 },
-        { badgeBucket: 'kiloclaw:sandbox-1:conversation-1', badgeCount: 3 },
-      ],
-      startBadgeFreshnessEpoch: 10,
-      currentBadgeFreshnessEpoch: 10,
-      setBadgeCount,
-    });
-
-    expect(applied).toBe(true);
-    expect(setBadgeCount).toHaveBeenCalledWith(5);
-  });
-
-  it('does not overwrite a newer native OS badge update from stale hydration', () => {
-    const setBadgeCount = vi.fn<(badgeCount: number) => Promise<boolean>>(async () => {
-      const result = await Promise.resolve(true);
-      return result;
-    });
-
-    const applied = reconcileHydratedBadgeCount({
-      badgeRows: [{ badgeBucket: 'kiloclaw:sandbox-1', badgeCount: 4 }],
-      startBadgeFreshnessEpoch: 10,
-      currentBadgeFreshnessEpoch: 11,
-      setBadgeCount,
-    });
-
-    expect(applied).toBe(false);
-    expect(setBadgeCount).not.toHaveBeenCalled();
   });
 });

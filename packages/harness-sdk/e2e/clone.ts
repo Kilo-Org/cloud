@@ -19,7 +19,7 @@ import { openSession } from '../src/core/run.js';
 import type { SessionHandle } from '../src/core/handle.js';
 import { layerNodeStore } from '../src/plugins/store/node.js';
 import { cachedSystem as system, kilo, models, room } from './setup.js';
-import { fail, passed, under } from './report.js';
+import { fail, passed, under, wrongIf } from './report.js';
 
 /** One database, two runs, as a second start of an application would have. */
 const database = new DatabaseSync(':memory:');
@@ -70,6 +70,9 @@ const show = (name: string, usage: ModelUsage | undefined): void => {
   );
 };
 
+/** The models whose provider made the prefix readable. The floor is that one did. */
+const cached: string[] = [];
+
 for (const model of models) {
   under(model);
 
@@ -99,8 +102,16 @@ for (const model of models) {
     fail(`the clone holds ${String(cloned.turns.length)} turns where it should hold 6`);
   }
   if ((first.second?.cacheReadTokens ?? 0) === 0) {
-    fail('the source never cached anything, so this run cannot measure a clone');
+    /* The provider never made an entry readable, so there is no prefix here to
+       measure a clone against. Read from the source rather than a list of names
+       here: `nvidia/nemotron-3.5-lightning` reads zero on every call on
+       2026-09-06, and which providers cache changes without warning. What the
+       clone is — its own identifier, six turns, an answer — is checked above on
+       every model regardless. */
+    console.log('the provider cached nothing, so there is no prefix to measure');
+    continue;
   }
+  cached.push(model);
   if (read === 0) {
     fail('the clone read nothing from the cache, so it paid for the prefix again');
   }
@@ -120,4 +131,10 @@ for (const model of models) {
   }
 }
 
-passed('every clone read its prefix from the cache and wrote next to nothing');
+under('');
+console.log(`\ncached the prefix: ${String(cached.length)} of ${String(models.length)} models`);
+/* The floor under the skip: a clone that stopped sending the source's prompt
+   would read nothing anywhere, and that must go red rather than quiet. */
+wrongIf(cached.length === 0, 'not one provider cached the prefix, so no clone was measured');
+
+passed('every clone the provider cached for read its prefix and wrote next to nothing');

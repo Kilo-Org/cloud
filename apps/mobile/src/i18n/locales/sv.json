@@ -2905,14 +2905,6 @@
     "revoke": "Sluta lita på {{host}}",
     "backToPreferences": "Tillbaka till inställningarna"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Starta en chatt",
-      "description": "Skicka ett meddelande för att prata med en modell."
-    },
-    "historyRetry": "Kunde inte läsa in chatthistoriken.",
-    "sendError": "Kunde inte skicka meddelandet. Försök igen."
-  },
   "glanceable": {
     "waiting": "Uppdaterar agenter",
     "empty": "Inget arbete pågår",
@@ -2924,5 +2916,18 @@
     "needsInput": "Väntar på svar",
     "channelName": "Aktiva agenter",
     "activityKitDisabledBody": "Aktivera liveaktiviteter i Inställningar för att se aktiva agenter på låsskärmen."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Starta en chatt",
+      "description": "Skicka ett meddelande för att prata med en modell."
+    },
+    "list": {
+      "loadFailed": "Det gick inte att läsa in chatthistoriken.",
+      "new": "Ny chatt",
+      "openHint": "Öppnar chatten. Tryck länge för att ta bort.",
+      "deleteTitle": "Ta bort den här chatten?"
+    },
+    "beta": "Beta"
   }
 }

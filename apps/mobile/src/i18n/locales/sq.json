@@ -2905,14 +2905,6 @@
     "revoke": "Hiq besimin për {{host}}",
     "backToPreferences": "Kthehu te preferencat"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Fillo një bisedë",
-      "description": "Dërgo një mesazh për të biseduar me një model."
-    },
-    "historyRetry": "Nuk u ngarkua historiku i bisedës.",
-    "sendError": "Nuk u dërgua mesazhi. Provo përsëri."
-  },
   "glanceable": {
     "waiting": "Po përditësohen agjentët",
     "empty": "Nuk ka punë në vazhdim",
@@ -2924,5 +2916,18 @@
     "needsInput": "Pret përgjigje",
     "channelName": "Agjentët aktivë",
     "activityKitDisabledBody": "Aktivizo aktivitetet në kohë reale në cilësimet e pajisjes për të parë agjentët aktivë në ekranin e kyçjes."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Filloni një bisedë",
+      "description": "Dërgo një mesazh për të biseduar me një model."
+    },
+    "list": {
+      "loadFailed": "Nuk u arrit të ngarkohej historia e bisedës.",
+      "new": "Bisedë e re",
+      "openHint": "Hap bisedën. Shtypni gjatë për ta fshirë.",
+      "deleteTitle": "Ta fshini këtë bisedë?"
+    },
+    "beta": "Beta"
   }
 }

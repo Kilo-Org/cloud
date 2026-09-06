@@ -2905,14 +2905,6 @@
     "revoke": "撤銷對 {{host}} 的信任",
     "backToPreferences": "返回偏好設定"
   },
-  "quickChat": {
-    "empty": {
-      "title": "開始聊天",
-      "description": "傳送訊息，即可與模型對話。"
-    },
-    "historyRetry": "無法載入聊天記錄。",
-    "sendError": "無法傳送訊息。請再試一次。"
-  },
   "glanceable": {
     "waiting": "正在更新代理程式狀態",
     "empty": "沒有進行中的工作",
@@ -2924,5 +2916,18 @@
     "needsInput": "等待輸入",
     "channelName": "執行中的代理程式",
     "activityKitDisabledBody": "請在「設定」中開啟「即時動態」，即可在鎖定畫面查看執行中的代理程式。"
+  },
+  "modelChat": {
+    "empty": {
+      "title": "開始聊天",
+      "description": "傳送訊息以與模型對話。"
+    },
+    "list": {
+      "loadFailed": "無法載入聊天記錄。",
+      "new": "新對話",
+      "openHint": "開啟對話。長按可刪除。",
+      "deleteTitle": "刪除這個對話？"
+    },
+    "beta": "測試版"
   }
 }

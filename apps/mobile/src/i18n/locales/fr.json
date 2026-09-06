@@ -2927,14 +2927,6 @@
     "revoke": "Retirer {{host}} des sites de confiance",
     "backToPreferences": "Retour aux préférences"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Démarrer une discussion",
-      "description": "Envoyez un message pour discuter avec un modèle."
-    },
-    "historyRetry": "Impossible de charger l'historique de la conversation.",
-    "sendError": "Impossible d'envoyer le message. Réessayez."
-  },
   "glanceable": {
     "waiting": "Actualisation des agents",
     "empty": "Aucun travail en cours",
@@ -2946,5 +2938,18 @@
     "needsInput": "Intervention requise",
     "channelName": "Agents actifs",
     "activityKitDisabledBody": "Activez les activités en direct dans les paramètres pour voir les agents actifs sur l'écran verrouillé."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Démarrer une discussion",
+      "description": "Envoyez un message pour discuter avec un modèle."
+    },
+    "list": {
+      "loadFailed": "Impossible de charger l'historique de la conversation.",
+      "new": "Nouvelle discussion",
+      "openHint": "Ouvre la discussion. Appui long pour supprimer.",
+      "deleteTitle": "Supprimer cette discussion ?"
+    },
+    "beta": "Bêta"
   }
 }

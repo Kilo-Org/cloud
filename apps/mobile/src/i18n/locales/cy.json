@@ -2993,14 +2993,6 @@
     "revoke": "Dirymu ymddiriedaeth yn {{host}}",
     "backToPreferences": "Yn ôl i'r dewisiadau"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Dechrau sgwrs",
-      "description": "Anfonwch neges i siarad â model."
-    },
-    "historyRetry": "Ni ellid llwytho hanes y sgwrs.",
-    "sendError": "Ni ellid anfon y neges. Ceisiwch eto."
-  },
   "glanceable": {
     "waiting": "Yn diweddaru asiantau",
     "empty": "Dim gwaith ar y gweill",
@@ -3012,5 +3004,18 @@
     "needsInput": "Angen mewnbwn",
     "channelName": "Asiantau gweithredol",
     "activityKitDisabledBody": "Trowch weithgareddau byw ymlaen yn y gosodiadau i weld asiantau gweithredol ar y sgrin glo."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Dechrau sgwrs",
+      "description": "Anfonwch neges i siarad â model."
+    },
+    "list": {
+      "loadFailed": "Ni ellid llwytho hanes y sgwrs.",
+      "new": "Sgwrs newydd",
+      "openHint": "Yn agor y sgwrs. Pwyswch yn hir i ddileu.",
+      "deleteTitle": "Dileu'r sgwrs hon?"
+    },
+    "beta": "Beta"
   }
 }

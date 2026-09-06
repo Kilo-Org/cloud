@@ -260,6 +260,11 @@ vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 
+vi.mock('@/lib/chat/sign-out', () => ({
+  clearChatsForSignOut: vi.fn().mockResolvedValue(undefined),
+  releaseChatsForAccountSwitch: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock('@/lib/pr-review/recent-prs', () => ({
   clearRecentPrs: vi.fn().mockResolvedValue(undefined),
 }));
@@ -543,6 +548,25 @@ describe('sign-out teardown ordering', () => {
     unmount();
   });
 
+  it('ends the prior account chats on sign-in, and signs in even when that fails', async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { releaseChatsForAccountSwitch } = await import('@/lib/chat/sign-out');
+    const { queryClient: queryClientMock } = await import('@/lib/query-client');
+    const release = vi.mocked(releaseChatsForAccountSwitch);
+    release.mockRejectedValueOnce(new Error('the store is locked'));
+
+    await act(async () => {
+      await ctx.signIn(makeToken({ kiloUserId: 'user-2' }));
+    });
+
+    expect(release).toHaveBeenCalledTimes(1);
+    // The rest of the switch ran: a chat that would not close cannot stop the
+    // prior account's cache being cleared.
+    expect(vi.mocked(queryClientMock.clear)).toHaveBeenCalled();
+
+    unmount();
+  });
+
   it('clears the trusted hosts and image confirmations on sign-in', async () => {
     const { ctx, unmount } = await mountAndGetContext();
     const trustedHosts = await import('@/lib/hooks/use-trusted-hosts');
@@ -652,6 +676,22 @@ describe('sign-out teardown ordering', () => {
     expect(deleteIndex).toBeGreaterThanOrEqual(0);
     const deleteOrder = secureStore.deleteItemAsync.mock.invocationCallOrder[deleteIndex];
     expect(deleteOrder).toBeGreaterThan(secureStore.setItemAsync.mock.invocationCallOrder[0]);
+
+    unmount();
+  });
+
+  it("takes the account's chats off the device, and survives a wipe that fails", async () => {
+    const { ctx, unmount } = await mountAndGetContext();
+    const { clearChatsForSignOut } = await import('@/lib/chat/sign-out');
+    const wipe = vi.mocked(clearChatsForSignOut);
+    wipe.mockRejectedValueOnce(new Error('database locked'));
+
+    await act(async () => {
+      await ctx.signOut();
+    });
+
+    expect(wipe).toHaveBeenCalledWith(null);
+    expect(hoisted.secureStore.deleteItemAsync).toHaveBeenCalledWith('active-user-id');
 
     unmount();
   });

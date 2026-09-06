@@ -2905,14 +2905,6 @@
     "revoke": "Bỏ tin cậy {{host}}",
     "backToPreferences": "Quay lại cài đặt"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bắt đầu trò chuyện",
-      "description": "Gửi tin nhắn để trò chuyện với mô hình AI."
-    },
-    "historyRetry": "Không thể tải lịch sử trò chuyện.",
-    "sendError": "Không thể gửi tin nhắn. Vui lòng thử lại."
-  },
   "glanceable": {
     "waiting": "Đang cập nhật tác nhân",
     "empty": "Không có tác vụ đang chạy",
@@ -2924,5 +2916,18 @@
     "needsInput": "Cần phản hồi",
     "channelName": "Tác nhân đang hoạt động",
     "activityKitDisabledBody": "Bật Hoạt động trực tiếp trong Cài đặt để xem các tác nhân đang hoạt động trên màn hình khóa."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bắt đầu trò chuyện",
+      "description": "Gửi tin nhắn để trò chuyện với mô hình."
+    },
+    "list": {
+      "loadFailed": "Không thể tải lịch sử trò chuyện.",
+      "new": "Cuộc trò chuyện mới",
+      "openHint": "Mở cuộc trò chuyện. Nhấn giữ để xóa.",
+      "deleteTitle": "Xóa cuộc trò chuyện này?"
+    },
+    "beta": "Beta"
   }
 }

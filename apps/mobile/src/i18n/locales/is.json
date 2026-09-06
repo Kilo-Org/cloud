@@ -2905,14 +2905,6 @@
     "revoke": "Afturkalla traust á {{host}}",
     "backToPreferences": "Til baka í stillingar"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Byrjaðu spjall",
-      "description": "Sendu skilaboð til að spjalla við líkan."
-    },
-    "historyRetry": "Ekki tókst að sækja spjallferilinn.",
-    "sendError": "Ekki tókst að senda skilaboðin. Reyndu aftur."
-  },
   "glanceable": {
     "waiting": "Uppfæri fulltrúa",
     "empty": "Engin vinna í gangi",
@@ -2924,5 +2916,18 @@
     "needsInput": "Bíður eftir svari",
     "channelName": "Virkir fulltrúar",
     "activityKitDisabledBody": "Kveiktu á rauntímavirkni í stillingum til að sjá virka fulltrúa á lásskjánum."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Byrjaðu spjall",
+      "description": "Sendu skilaboð til að tala við líkan."
+    },
+    "list": {
+      "loadFailed": "Ekki tókst að hlaða samtalsferilinn.",
+      "new": "Nýtt spjall",
+      "openHint": "Opnar spjallið. Haltu inni til að eyða.",
+      "deleteTitle": "Eyða þessu spjalli?"
+    },
+    "beta": "Beta"
   }
 }

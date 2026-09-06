@@ -2971,14 +2971,6 @@
     "revoke": "Irtira l-fiduċja f'{{host}}",
     "backToPreferences": "Lura għall-preferenzi"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Ibda chat",
-      "description": "Ibgħat messaġġ biex titkellem ma' mudell."
-    },
-    "historyRetry": "Ma setgħetx titgħabba l-istorja taċ-chat.",
-    "sendError": "Ma setax jintbagħat il-messaġġ. Erġa' pprova."
-  },
   "glanceable": {
     "waiting": "Qed jiġu aġġornati l-aġenti",
     "empty": "L-ebda xogħol għaddej",
@@ -2990,5 +2982,18 @@
     "needsInput": "Jistenna tweġiba",
     "channelName": "Aġenti attivi",
     "activityKitDisabledBody": "Attiva l-attivitajiet diretti fl-issettjar biex tara l-aġenti attivi fuq l-iskrin imsakkar."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Ibda chat",
+      "description": "Ibgħat messaġġ biex tikkellem ma' mudell."
+    },
+    "list": {
+      "loadFailed": "Ma setgħux jitgħabbew l-istorja taċ-chat.",
+      "new": "Chat ġdid",
+      "openHint": "Jiftaħ iċ-chat. Agħfas fit-tul biex tħassar.",
+      "deleteTitle": "Tħassar dan iċ-chat?"
+    },
+    "beta": "Beta"
   }
 }

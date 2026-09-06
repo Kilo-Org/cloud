@@ -2905,14 +2905,6 @@
     "revoke": "Fagilé ìgbẹ́kẹ̀lé {{host}}",
     "backToPreferences": "Padà sí àwọn ààyò"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bẹ̀rẹ̀ ìjíròrò",
-      "description": "Fi ìfiránṣẹ́ ránṣẹ́ láti bá àwòṣe kan sọ̀rọ̀."
-    },
-    "historyRetry": "A kò lè gbé ìtàn ìjíròrò wọlé.",
-    "sendError": "A kò lè fi ìfiránṣẹ́ náà ránṣẹ́. Gbìyànjú lẹ́ẹ̀kan sí i."
-  },
   "glanceable": {
     "waiting": "Ń ṣe ìmúdójúìwọ̀n àwọn aṣojú",
     "empty": "Kò sí iṣẹ́ tó ń lọ",
@@ -2924,5 +2916,18 @@
     "needsInput": "Nílò èsì rẹ",
     "channelName": "Àwọn aṣojú tó ń ṣiṣẹ́",
     "activityKitDisabledBody": "Tan àwọn ìgbòkègbodò ìsinsìnyí nínú àwọn ètò láti rí àwọn aṣojú tó ń ṣiṣẹ́ lórí ojú ìwé títìpa."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bẹ̀rẹ̀ iwiregbe kan",
+      "description": "Fi ifiranṣẹ ranṣẹ láti bá awoṣe kan sọ̀rọ̀."
+    },
+    "list": {
+      "loadFailed": "Kò lè ṣagbewọ ìtàn iwiregbe.",
+      "new": "Ìjíròrò tuntun",
+      "openHint": "Ṣí ìjíròrò náà. Tẹ̀ mọ́lẹ̀ láti pa á rẹ́.",
+      "deleteTitle": "Pa ìjíròrò yìí rẹ́?"
+    },
+    "beta": "Beta"
   }
 }

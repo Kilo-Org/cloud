@@ -2949,14 +2949,6 @@
     "revoke": "Prekliči zaupanje gostitelju {{host}}",
     "backToPreferences": "Nazaj na nastavitve"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Začni klepet",
-      "description": "Pošlji sporočilo za pogovor z modelom."
-    },
-    "historyRetry": "Zgodovine klepeta ni bilo mogoče naložiti.",
-    "sendError": "Sporočila ni bilo mogoče poslati. Poskusi znova."
-  },
   "glanceable": {
     "waiting": "Posodabljanje agentov",
     "empty": "Trenutno ni aktivnih nalog",
@@ -2968,5 +2960,18 @@
     "needsInput": "Čaka na vnos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "V nastavitvah vklopi dejavnosti v živo, da se aktivni agenti prikažejo na zaklenjenem zaslonu."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Začni klepet",
+      "description": "Pošlji sporočilo za pogovor z modelom."
+    },
+    "list": {
+      "loadFailed": "Zgodovine klepeta ni bilo mogoče naložiti.",
+      "new": "Nov klepet",
+      "openHint": "Odpre klepet. Pridržite za brisanje.",
+      "deleteTitle": "Izbrišem ta klepet?"
+    },
+    "beta": "Beta"
   }
 }

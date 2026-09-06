@@ -2905,14 +2905,6 @@
     "revoke": "Hoxisa ukwethenjwa kuka-{{host}}",
     "backToPreferences": "Buyela ezilungiselelweni"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Qala ingxoxo",
-      "description": "Thumela umlayezo ukuze uxoxe nemodeli."
-    },
-    "historyRetry": "Asikwazanga ukulayisha umlando wengxoxo.",
-    "sendError": "Asikwazanga ukuthumela umlayezo. Zama futhi."
-  },
   "glanceable": {
     "waiting": "Kubuyekezwa ama-ejenti",
     "empty": "Awukho umsebenzi oqhubekayo",
@@ -2924,5 +2916,18 @@
     "needsInput": "Kudinga impendulo",
     "channelName": "Ama-ejenti asebenzayo",
     "activityKitDisabledBody": "Vula imisebenzi ebukhoma kuzilungiselelo ukuze ubone ama-ejenti asebenzayo esikrinini esikhiyiwe."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Qala ingxoxo",
+      "description": "Thumela umlayezo ukuze uxoxe nomodeli."
+    },
+    "list": {
+      "loadFailed": "Asikwazanga ukulayisha umlando wengxoxo.",
+      "new": "Ingxoxo entsha",
+      "openHint": "Ivula ingxoxo. Cindezela isikhathi eside ukuze usule.",
+      "deleteTitle": "Susa le ngxoxo?"
+    },
+    "beta": "Beta"
   }
 }

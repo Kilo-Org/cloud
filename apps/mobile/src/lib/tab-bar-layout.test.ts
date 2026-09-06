@@ -123,14 +123,26 @@ describe('shouldShowTabLabel', () => {
 
 describe('shouldHideTabBar', () => {
   it('hides tabs for full-screen nested routes', () => {
-    expect(shouldHideTabBar('/chat/sandbox-1/instance-picker')).toBe(true);
-    expect(shouldHideTabBar('/security-agent/personal/filter')).toBe(true);
-    expect(shouldHideTabBar('/security-agent/org-1/filter')).toBe(true);
+    expect(shouldHideTabBar('/chat/sandbox-1/instance-picker', [])).toBe(true);
+    expect(shouldHideTabBar('/security-agent/personal/filter', [])).toBe(true);
+    expect(shouldHideTabBar('/security-agent/org-1/filter', [])).toBe(true);
   });
 
   it('keeps tabs on normal tab screens', () => {
-    expect(shouldHideTabBar('/security-agent/personal')).toBe(false);
-    expect(shouldHideTabBar('/security-agent/personal/findings')).toBe(false);
+    expect(shouldHideTabBar('/security-agent/personal', [])).toBe(false);
+    expect(shouldHideTabBar('/security-agent/personal/findings', [])).toBe(false);
+  });
+
+  it('hides tabs inside a chat, whose composer sits where the bar would be', () => {
+    expect(shouldHideTabBar('/abc123', ['(app)', '(tabs)', '(4_chat)', '[id]'])).toBe(true);
+  });
+
+  it('keeps tabs on the chat list', () => {
+    expect(shouldHideTabBar('/', ['(app)', '(tabs)', '(4_chat)', 'index'])).toBe(false);
+  });
+
+  it('keeps tabs on a one-segment route outside the chat tab', () => {
+    expect(shouldHideTabBar('/abc123', ['(app)', '(tabs)', '(2_agents)', '[id]'])).toBe(false);
   });
 });
 
@@ -163,10 +175,10 @@ describe('visibleTabCount', () => {
 });
 
 describe('tabBarPosition', () => {
-  const noFlags = { showKiloClaw: false, showQuickChat: false };
-  const kiloclawOnly = { showKiloClaw: true, showQuickChat: false };
-  const chatOnly = { showKiloClaw: false, showQuickChat: true };
-  const both = { showKiloClaw: true, showQuickChat: true };
+  const noFlags = { showKiloClaw: false, showChat: false };
+  const kiloclawOnly = { showKiloClaw: true, showChat: false };
+  const chatOnly = { showKiloClaw: false, showChat: true };
+  const both = { showKiloClaw: true, showChat: true };
 
   it('positions Home at 1 in every combination', () => {
     expect(tabBarPosition('home', noFlags)).toBe(1);

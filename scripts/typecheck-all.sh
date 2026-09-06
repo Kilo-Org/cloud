@@ -42,6 +42,19 @@ else
   pnpm --filter @kilocode/trpc run build
 fi
 
+# 1b. Build the harness SDK, which apps/mobile typechecks against (same rule as trpc)
+if $changes_only; then
+  harness_changed=$(git diff --name-only "$base" -- 'packages/harness-sdk/src/**' 'packages/harness-sdk/tsconfig.json' 'packages/harness-sdk/package.json' | head -1 || true)
+  if [ -n "$harness_changed" ]; then
+    echo "[typecheck] harness-sdk source changed, rebuilding"
+    pnpm --filter @kilocode/harness-sdk run build
+  else
+    echo "[typecheck] harness-sdk source unchanged, skipping build"
+  fi
+else
+  pnpm --filter @kilocode/harness-sdk run build
+fi
+
 # 2. Root typechecks (always — they are fast with incremental tsgo)
 tsgo --noEmit -p apps/web/tsconfig.json
 tsgo --noEmit -p scripts/web-env/tsconfig.json
@@ -59,6 +72,7 @@ fi
 if git diff --name-only "$base" -- pnpm-workspace.yaml | grep -q .; then
   echo "[typecheck] pnpm-workspace.yaml changed, rebuilding trpc and running full workspace typecheck"
   pnpm --filter @kilocode/trpc run build
+  pnpm --filter @kilocode/harness-sdk run build
   pnpm -r "${workspace_typecheck_filters[@]}" run typecheck
   exit 0
 fi

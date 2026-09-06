@@ -2927,14 +2927,6 @@
     "revoke": "Dejar de confiar en {{host}}",
     "backToPreferences": "Volver a preferencias"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Inicia un chat",
-      "description": "Envía un mensaje para hablar con un modelo."
-    },
-    "historyRetry": "No se pudo cargar el historial del chat.",
-    "sendError": "No se pudo enviar el mensaje. Inténtalo de nuevo."
-  },
   "glanceable": {
     "waiting": "Actualizando el estado de los agentes",
     "empty": "No hay trabajo en curso",
@@ -2946,5 +2938,18 @@
     "needsInput": "En espera de respuesta",
     "channelName": "Agentes activos",
     "activityKitDisabledBody": "Activa las actividades en directo en Ajustes para ver los agentes activos en la pantalla de bloqueo."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Inicia un chat",
+      "description": "Envía un mensaje para hablar con un modelo."
+    },
+    "list": {
+      "loadFailed": "No se pudo cargar el historial del chat.",
+      "new": "Chat nuevo",
+      "openHint": "Abre el chat. Mantén pulsado para eliminar.",
+      "deleteTitle": "¿Eliminar este chat?"
+    },
+    "beta": "Beta"
   }
 }

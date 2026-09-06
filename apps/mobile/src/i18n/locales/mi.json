@@ -2905,14 +2905,6 @@
     "revoke": "Whakakorea te whirinaki ki {{host}}",
     "backToPreferences": "Hoki ki ngā manakohanga"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Tīmatahia he kōrerorero",
-      "description": "Tukuna he karere hei kōrero ki tētahi tauira."
-    },
-    "historyRetry": "Kāore i taea te uta i te hītori kōrerorero.",
-    "sendError": "Kāore i taea te tuku i te karere. Whakamātau anō."
-  },
   "glanceable": {
     "waiting": "Kei te whakahou i ngā māngai",
     "empty": "Kāore he mahi e haere ana",
@@ -2924,5 +2916,18 @@
     "needsInput": "Me whai urupare",
     "channelName": "Ngā māngai e mahi ana",
     "activityKitDisabledBody": "Whakakāngia ngā mahi wā-tūturu i ngā tautuhinga kia kite ai i ngā māngai e mahi ana i te mata maukati."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Tīmata he kōrero",
+      "description": "Tukuna he karere hei kōrero ki tētahi tauira."
+    },
+    "list": {
+      "loadFailed": "Kāore i taea te uta te hītori kōrero.",
+      "new": "Kōrero hou",
+      "openHint": "Ka whakatuwhera i te kōrero. Pēhia roa hei muku.",
+      "deleteTitle": "Muku i tēnei kōrero?"
+    },
+    "beta": "Beta"
   }
 }

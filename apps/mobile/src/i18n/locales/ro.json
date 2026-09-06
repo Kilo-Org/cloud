@@ -2927,14 +2927,6 @@
     "revoke": "Retrage încrederea acordată gazdei {{host}}",
     "backToPreferences": "Înapoi la preferințe"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Începe o conversație",
-      "description": "Trimite un mesaj pentru a vorbi cu un model."
-    },
-    "historyRetry": "Nu s-a putut încărca istoricul conversației.",
-    "sendError": "Nu s-a putut trimite mesajul. Încearcă din nou."
-  },
   "glanceable": {
     "waiting": "Se actualizează agenții",
     "empty": "Nicio sarcină în curs",
@@ -2946,5 +2938,18 @@
     "needsInput": "Așteaptă un răspuns",
     "channelName": "Agenți activi",
     "activityKitDisabledBody": "Activează activitățile live din setări pentru a vedea agenții activi pe ecranul de blocare."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Începe un chat",
+      "description": "Trimite un mesaj pentru a vorbi cu un model."
+    },
+    "list": {
+      "loadFailed": "Nu s-a putut încărca istoricul de chat.",
+      "new": "Chat nou",
+      "openHint": "Deschide chatul. Apasă lung pentru a șterge.",
+      "deleteTitle": "Ștergi acest chat?"
+    },
+    "beta": "Beta"
   }
 }

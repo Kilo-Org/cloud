@@ -2927,14 +2927,6 @@
     "revoke": "Ukloni {{host}} iz pouzdanih hostova",
     "backToPreferences": "Nazad na podešavanja"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Započni ćaskanje",
-      "description": "Pošalji poruku da razgovaraš sa modelom."
-    },
-    "historyRetry": "Nije moguće učitati istoriju ćaskanja.",
-    "sendError": "Slanje poruke nije uspelo. Pokušaj ponovo."
-  },
   "glanceable": {
     "waiting": "Ažuriranje agenata",
     "empty": "Nema zadataka u toku",
@@ -2946,5 +2938,18 @@
     "needsInput": "Čeka unos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u podešavanjima da vidiš aktivne agente na zaključanom ekranu."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Započnite ćaskanje",
+      "description": "Pošaljite poruku da razgovarate sa modelom."
+    },
+    "list": {
+      "loadFailed": "Nije moguće učitati istoriju ćaskanja.",
+      "new": "Novo ćaskanje",
+      "openHint": "Otvara ćaskanje. Dugo pritisnite za brisanje.",
+      "deleteTitle": "Izbrisati ovo ćaskanje?"
+    },
+    "beta": "Beta"
   }
 }

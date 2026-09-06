@@ -2927,14 +2927,6 @@
     "revoke": "Opozovi povjerenje za {{host}}",
     "backToPreferences": "Natrag na postavke"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Započni razgovor",
-      "description": "Pošalji poruku za razgovor s modelom."
-    },
-    "historyRetry": "Nije moguće učitati povijest razgovora.",
-    "sendError": "Nije moguće poslati poruku. Pokušaj ponovno."
-  },
   "glanceable": {
     "waiting": "Ažuriranje agenata",
     "empty": "Nema zadataka u tijeku",
@@ -2946,5 +2938,18 @@
     "needsInput": "Čeka unos",
     "channelName": "Aktivni agenti",
     "activityKitDisabledBody": "Uključi aktivnosti uživo u postavkama za prikaz aktivnih agenata na zaključanom zaslonu."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Započnite chat",
+      "description": "Pošaljite poruku za razgovor s modelom."
+    },
+    "list": {
+      "loadFailed": "Nije moguće učitati povijest razgovora.",
+      "new": "Novi razgovor",
+      "openHint": "Otvara razgovor. Dugo pritisnite za brisanje.",
+      "deleteTitle": "Izbrisati ovaj razgovor?"
+    },
+    "beta": "Beta"
   }
 }

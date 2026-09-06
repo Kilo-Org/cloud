@@ -2905,14 +2905,6 @@
     "revoke": "Ka noqo aaminaadda {{host}}",
     "backToPreferences": "Ku noqo doorashooyinka"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bilow wada sheekaysi",
-      "description": "Dir fariin si aad ula hadasho moodeel."
-    },
-    "historyRetry": "Taariikhda wada sheekaysiga lama soo dejin karin.",
-    "sendError": "Fariinta lama diri karin. Mar kale isku day."
-  },
   "glanceable": {
     "waiting": "Wakiillada ayaa la cusboonaysiinayaa",
     "empty": "Ma jirto hawl socota",
@@ -2924,5 +2916,18 @@
     "needsInput": "Jawaab sugaya",
     "channelName": "Wakiillada firfircoon",
     "activityKitDisabledBody": "Ka daar hawlaha tooska ah dejinta si aad wakiillada firfircoon ugu aragto shaashadda qufulka."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bilow wada sheekaysi",
+      "description": "Dir fariin si aad ula hadasho model."
+    },
+    "list": {
+      "loadFailed": "Taariikhda wada sheekaysiga lama soo gelin karin.",
+      "new": "Wada sheekaysi cusub",
+      "openHint": "Wada sheekaysiga ayuu furayaa. Si aad u tirtirto si dheer u taabo.",
+      "deleteTitle": "Ma tirtiraa wada sheekaysigan?"
+    },
+    "beta": "Beta"
   }
 }

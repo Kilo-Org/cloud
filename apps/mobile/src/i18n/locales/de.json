@@ -2905,14 +2905,6 @@
     "revoke": "Vertrauen in {{host}} widerrufen",
     "backToPreferences": "Zurück zu den Einstellungen"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Chat starten",
-      "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
-    },
-    "historyRetry": "Der Chatverlauf konnte nicht geladen werden.",
-    "sendError": "Die Nachricht konnte nicht gesendet werden. Versuche es erneut."
-  },
   "glanceable": {
     "waiting": "Agenten werden aktualisiert",
     "empty": "Keine laufenden Aufgaben",
@@ -2924,5 +2916,18 @@
     "needsInput": "Eingabe erforderlich",
     "channelName": "Aktive Agenten",
     "activityKitDisabledBody": "Aktiviere Live-Aktivitäten in den Einstellungen, um aktive Agenten auf dem Sperrbildschirm zu sehen."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Chat starten",
+      "description": "Sende eine Nachricht, um mit einem Modell zu sprechen."
+    },
+    "list": {
+      "loadFailed": "Chatverlauf konnte nicht geladen werden.",
+      "new": "Neuer Chat",
+      "openHint": "Öffnet den Chat. Zum Löschen lange drücken.",
+      "deleteTitle": "Diesen Chat löschen?"
+    },
+    "beta": "Beta"
   }
 }

@@ -48,7 +48,6 @@ import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
-import { quickChatRouter } from '@/routers/quick-chat-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -98,7 +97,6 @@ export const rootRouter = createTRPCRouter({
   githubPrReview: githubPrReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
-  quickChat: quickChatRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

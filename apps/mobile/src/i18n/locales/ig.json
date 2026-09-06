@@ -2905,14 +2905,6 @@
     "revoke": "Kagbuo ntụkwasị obi na {{host}}",
     "backToPreferences": "Laghachi na nhọrọ"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Malite mkparịta ụka",
-      "description": "Ziga ozi ka ị kparịta ụka na ụdị AI."
-    },
-    "historyRetry": "Enweghị ike ibudata ndekọ mkparịta ụka.",
-    "sendError": "Enweghị ike iziga ozi ahụ. Nwaa ọzọ."
-  },
   "glanceable": {
     "waiting": "Na-emelite ndị nnọchi anya",
     "empty": "Enweghị ọrụ na-aga n'ihu",
@@ -2924,5 +2916,18 @@
     "needsInput": "Chọrọ nzaghachi",
     "channelName": "Ndị nnọchi anya na-arụ ọrụ",
     "activityKitDisabledBody": "Gbanye ihe omume na-emelite ozugbo n'ime ntọala ka ị hụ ndị nnọchi anya na-arụ ọrụ n'ihuenyo mkpọchi."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Malite nkata",
+      "description": "Ziga ozi ka ị soro ihe nlereanya kparịta ụka."
+    },
+    "list": {
+      "loadFailed": "Enweghị ike ibutu akụkọ nkata.",
+      "new": "Nkata ọhụrụ",
+      "openHint": "Na-emeghe nkata ahụ. Pịgide iji hichapụ.",
+      "deleteTitle": "Hichapụ nkata a?"
+    },
+    "beta": "Beta"
   }
 }

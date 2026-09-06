@@ -2905,14 +2905,6 @@
     "revoke": "A megbízható jelölés visszavonása: {{host}}",
     "backToPreferences": "Vissza a beállításokhoz"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Csevegés indítása",
-      "description": "Küldj egy üzenetet, hogy beszélgethess egy modellel."
-    },
-    "historyRetry": "Nem sikerült betölteni a csevegés előzményeit.",
-    "sendError": "Nem sikerült elküldeni az üzenetet. Próbáld újra."
-  },
   "glanceable": {
     "waiting": "Ügynökök frissítése",
     "empty": "Nincs folyamatban lévő munka",
@@ -2924,5 +2916,18 @@
     "needsInput": "Válaszra vár",
     "channelName": "Aktív ügynökök",
     "activityKitDisabledBody": "Kapcsold be az Élő tevékenységek funkciót a Beállításokban, hogy az aktív ügynökök megjelenjenek a zárolási képernyőn."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Kezdjen csevegést",
+      "description": "Küldjön egy üzenetet, hogy beszélgessen egy modellel."
+    },
+    "list": {
+      "loadFailed": "Nem sikerült betölteni a csevegés előzményeit.",
+      "new": "Új csevegés",
+      "openHint": "Megnyitja a csevegést. Hosszan nyomja meg a törléshez.",
+      "deleteTitle": "Törli ezt a csevegést?"
+    },
+    "beta": "Béta"
   }
 }

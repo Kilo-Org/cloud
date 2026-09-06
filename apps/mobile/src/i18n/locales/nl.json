@@ -2905,14 +2905,6 @@
     "revoke": "Vertrouwen in {{host}} intrekken",
     "backToPreferences": "Terug naar voorkeuren"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start een chat",
-      "description": "Stuur een bericht om met een model te praten."
-    },
-    "historyRetry": "De chatgeschiedenis kon niet worden geladen.",
-    "sendError": "Het bericht kon niet worden verzonden. Probeer het opnieuw."
-  },
   "glanceable": {
     "waiting": "Agents bijwerken",
     "empty": "Geen lopende taken",
@@ -2924,5 +2916,18 @@
     "needsInput": "Invoer nodig",
     "channelName": "Actieve agents",
     "activityKitDisabledBody": "Schakel liveactiviteiten in via de instellingen om actieve agents op het toegangsscherm te zien."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start een chat",
+      "description": "Stuur een bericht om met een model te praten."
+    },
+    "list": {
+      "loadFailed": "Kon de chatgeschiedenis niet laden.",
+      "new": "Nieuwe chat",
+      "openHint": "Opent de chat. Lang indrukken om te verwijderen.",
+      "deleteTitle": "Deze chat verwijderen?"
+    },
+    "beta": "Bèta"
   }
 }

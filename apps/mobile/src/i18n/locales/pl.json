@@ -2949,14 +2949,6 @@
     "revoke": "Cofnij zaufanie do {{host}}",
     "backToPreferences": "Wróć do preferencji"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Rozpocznij czat",
-      "description": "Wyślij wiadomość, aby porozmawiać z modelem."
-    },
-    "historyRetry": "Nie udało się wczytać historii czatu.",
-    "sendError": "Nie udało się wysłać wiadomości. Spróbuj ponownie."
-  },
   "glanceable": {
     "waiting": "Aktualizowanie stanu agentów",
     "empty": "Brak zadań w toku",
@@ -2968,5 +2960,18 @@
     "needsInput": "Czeka na odpowiedź",
     "channelName": "Aktywni agenci",
     "activityKitDisabledBody": "Włącz aktywności na żywo w ustawieniach, aby widzieć aktywnych agentów na ekranie blokady."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Rozpocznij czat",
+      "description": "Wyślij wiadomość, aby porozmawiać z modelem."
+    },
+    "list": {
+      "loadFailed": "Nie udało się wczytać historii czatu.",
+      "new": "Nowy czat",
+      "openHint": "Otwiera czat. Naciśnij i przytrzymaj, aby usunąć.",
+      "deleteTitle": "Usunąć ten czat?"
+    },
+    "beta": "Beta"
   }
 }

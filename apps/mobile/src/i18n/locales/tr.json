@@ -2905,14 +2905,6 @@
     "revoke": "{{host}} sunucusuna verilen güveni kaldır",
     "backToPreferences": "Tercihlere dön"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Bir sohbet başlat",
-      "description": "Bir modelle konuşmak için mesaj gönder."
-    },
-    "historyRetry": "Sohbet geçmişi yüklenemedi.",
-    "sendError": "Mesaj gönderilemedi. Tekrar dene."
-  },
   "glanceable": {
     "waiting": "Ajanlar güncelleniyor",
     "empty": "Devam eden iş yok",
@@ -2924,5 +2916,18 @@
     "needsInput": "Yanıt bekliyor",
     "channelName": "Etkin ajanlar",
     "activityKitDisabledBody": "Etkin ajanları kilit ekranında görmek için ayarlardan Canlı Etkinlikler özelliğini aç."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Bir sohbet başlat",
+      "description": "Bir modelle konuşmak için mesaj gönder."
+    },
+    "list": {
+      "loadFailed": "Sohbet geçmişi yüklenemedi.",
+      "new": "Yeni sohbet",
+      "openHint": "Sohbeti açar. Silmek için uzun basın.",
+      "deleteTitle": "Bu sohbet silinsin mi?"
+    },
+    "beta": "Beta"
   }
 }

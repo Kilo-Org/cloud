@@ -2905,14 +2905,6 @@
     "revoke": "Trekk tilbake godkjenningen av {{host}}",
     "backToPreferences": "Tilbake til innstillinger"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Start en chat",
-      "description": "Send en melding for å snakke med en modell."
-    },
-    "historyRetry": "Kunne ikke laste inn chathistorikken.",
-    "sendError": "Kunne ikke sende meldingen. Prøv igjen."
-  },
   "glanceable": {
     "waiting": "Oppdaterer agenter",
     "empty": "Ingen oppgaver pågår",
@@ -2924,5 +2916,18 @@
     "needsInput": "Venter på svar",
     "channelName": "Aktive agenter",
     "activityKitDisabledBody": "Slå på oppdateringer i sanntid i innstillingene for å se aktive agenter på låseskjermen."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Start en chat",
+      "description": "Send en melding for å snakke med en modell."
+    },
+    "list": {
+      "loadFailed": "Kunne ikke laste inn chathistorikken.",
+      "new": "Ny chat",
+      "openHint": "Åpner chatten. Trykk og hold for å slette.",
+      "deleteTitle": "Slette denne chatten?"
+    },
+    "beta": "Beta"
   }
 }

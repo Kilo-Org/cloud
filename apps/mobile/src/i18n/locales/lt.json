@@ -2949,14 +2949,6 @@
     "revoke": "Atšaukti pasitikėjimą svetaine {{host}}",
     "backToPreferences": "Grįžti į nuostatas"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Pradėk pokalbį",
-      "description": "Parašyk žinutę ir pradėk pokalbį su modeliu."
-    },
-    "historyRetry": "Nepavyko įkelti pokalbio istorijos.",
-    "sendError": "Nepavyko išsiųsti žinutės. Bandyk dar kartą."
-  },
   "glanceable": {
     "waiting": "Atnaujinami agentai",
     "empty": "Nėra vykdomų darbų",
@@ -2968,5 +2960,18 @@
     "needsInput": "Laukia atsakymo",
     "channelName": "Aktyvūs agentai",
     "activityKitDisabledBody": "Nustatymuose įjunk tiesiogines veiklas, kad užrakinimo ekrane matytum aktyvius agentus."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Pradėti pokalbį",
+      "description": "Siųskite žinutę, kad pakalbėtumėte su modeliu."
+    },
+    "list": {
+      "loadFailed": "Nepavyko įkelti pokalbio istorijos.",
+      "new": "Naujas pokalbis",
+      "openHint": "Atidaro pokalbį. Palaikykite, kad ištrintumėte.",
+      "deleteTitle": "Ištrinti šį pokalbį?"
+    },
+    "beta": "Beta"
   }
 }

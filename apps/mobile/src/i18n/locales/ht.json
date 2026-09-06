@@ -2905,14 +2905,6 @@
     "revoke": "Retire {{host}}",
     "backToPreferences": "Tounen nan preferans yo"
   },
-  "quickChat": {
-    "empty": {
-      "title": "Kòmanse yon konvèsasyon",
-      "description": "Voye yon mesaj pou pale ak yon modèl."
-    },
-    "historyRetry": "Nou pa t ka chaje istwa konvèsasyon an.",
-    "sendError": "Nou pa t ka voye mesaj la. Eseye ankò."
-  },
   "glanceable": {
     "waiting": "Ap mete ajan yo ajou",
     "empty": "Pa gen travay k ap fèt",
@@ -2924,5 +2916,18 @@
     "needsInput": "Bezwen repons",
     "channelName": "Ajan aktif",
     "activityKitDisabledBody": "Nan paramèt yo, aktive aktivite an dirèk yo pou wè ajan aktif yo sou ekran fèmen an."
+  },
+  "modelChat": {
+    "empty": {
+      "title": "Kòmanse yon chat",
+      "description": "Voye yon mesaj pou pale ak yon modèl."
+    },
+    "list": {
+      "loadFailed": "Pa t ka chaje istwa chat la.",
+      "new": "Nouvo chat",
+      "openHint": "Louvri chat la. Peze lontan pou efase.",
+      "deleteTitle": "Efase chat sa a?"
+    },
+    "beta": "Beta"
   }
 }

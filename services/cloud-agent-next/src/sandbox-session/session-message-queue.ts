@@ -43,6 +43,7 @@ export type SessionOperationProof = {
   result?: SessionOperationDelivery['result'];
   resultHash?: string;
   completedAt?: number;
+  attachmentEpoch?: number;
   decision?: SessionOperationAck['decision'];
 };
 
@@ -492,6 +493,11 @@ export function applySessionOperationResult(
     state: resultMessage.state,
     at: resultMessage.terminalAt ?? delivery.completedAt,
   };
+  const attachmentEpoch =
+    kind === 'attach'
+      ? (proof.attachmentEpoch ??
+        Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1)
+      : undefined;
   return {
     messages: applied.map(item =>
       item.messageId === message.messageId
@@ -505,6 +511,7 @@ export function applySessionOperationResult(
                 resultHash,
                 completedAt: delivery.completedAt,
                 decision,
+                ...(attachmentEpoch !== undefined ? { attachmentEpoch } : {}),
               },
             },
           }
@@ -581,6 +588,9 @@ export function completeSessionOperationAttachment(
     nextQueuedMessageId(messages) !== message.messageId
   )
     return undefined;
+  const attachmentEpoch =
+    proof.attachmentEpoch ??
+    Math.max(0, ...messages.map(item => item.operations?.attach?.attachmentEpoch ?? 0)) + 1;
   return messages.map(item =>
     item.messageId === message.messageId
       ? {
@@ -588,7 +598,7 @@ export function completeSessionOperationAttachment(
           unresolvedDispatch: undefined,
           operations: {
             ...item.operations,
-            attach: { ...proof, completedAt: proof.completedAt ?? Date.now() },
+            attach: { ...proof, completedAt: proof.completedAt ?? Date.now(), attachmentEpoch },
           },
         }
       : item

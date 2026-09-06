@@ -163,6 +163,7 @@ export const sandboxHelloPayloadSchema = z.object({
     .object({
       sessionOperationResults: z.boolean().optional(),
       scopedStopAbort: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
 });
@@ -175,6 +176,7 @@ export const sandboxHelloResultSchema = z.object({
       kiloVersionHeartbeat: z.boolean().optional(),
       sessionOperationResults: z.boolean().optional(),
       scopedStopAbort: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
 });
@@ -275,6 +277,7 @@ export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
 
 export const sessionAttachPayloadSchema = z
   .object({
+    captureNativeRuntimeId: z.literal(true).optional(),
     snapshotIdentity: z.string().min(1).max(512).optional(),
     directory: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
@@ -326,6 +329,7 @@ export const sessionAttachPayloadSchema = z
 export const sessionAttachResultSchema = z
   .object({
     attached: z.literal(true),
+    nativeRuntimeId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -453,6 +457,7 @@ export const sessionAbortPayloadSchema = z
     reason: z.string().min(1).max(256).optional(),
     operationId: z.string().uuid().optional(),
     cleanupDeadlineAt: z.number().int().positive().optional(),
+    nativeRuntimeId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -468,7 +473,23 @@ export const sessionAbortResultSchema = z
   .object({
     status: z.enum(['aborted', 'already_idle', 'unconfirmed']),
     quiescent: z.boolean().optional(),
+    runtimeRetired: z.boolean().optional(),
+    nativeRuntimeId: z.string().uuid().optional(),
     delivery: z.lazy(() => sessionOperationDeliverySchema).optional(),
+  })
+  .strict();
+
+export const sessionNativeRuntimeRetirementPayloadSchema = z
+  .object({
+    directory: z.string().min(1),
+    nativeRuntimeId: z.string().uuid(),
+    reason: z.string().min(1).max(256),
+  })
+  .strict();
+
+export const sessionNativeRuntimeRetirementResultSchema = z
+  .object({
+    retired: z.literal(true),
   })
   .strict();
 
@@ -602,6 +623,9 @@ export type SessionAttachPayload = z.infer<typeof sessionAttachPayloadSchema>;
 export type SessionAttachResult = z.infer<typeof sessionAttachResultSchema>;
 export type SessionPromptPayload = z.infer<typeof sessionPromptPayloadSchema>;
 export type SessionPromptResult = z.infer<typeof sessionPromptResultSchema>;
+export type SessionNativeRuntimeRetirementPayload = z.infer<
+  typeof sessionNativeRuntimeRetirementPayloadSchema
+>;
 export type SessionPermissionResolvePayload = z.infer<typeof sessionPermissionResolvePayloadSchema>;
 export type SessionPermissionResolveResult = z.infer<typeof sessionPermissionResolveResultSchema>;
 export type SessionQuestionResolvePayload = z.infer<typeof sessionQuestionResolvePayloadSchema>;
@@ -795,6 +819,7 @@ export const sandboxControlSocketAttachmentSchema = z.object({
     .object({
       sessionOperationResults: z.boolean().optional(),
       scopedStopAbort: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
     })
     .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),

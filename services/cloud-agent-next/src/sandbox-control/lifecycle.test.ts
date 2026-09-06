@@ -286,6 +286,7 @@ async function harness(
     receiveSandboxControlPreparing: vi.fn().mockResolvedValue({ applied: true }),
     failWaitingMessages: vi.fn().mockResolvedValue(undefined),
     invalidateTerminalRuntime: vi.fn().mockResolvedValue(undefined),
+    recordNativeRuntime: vi.fn().mockResolvedValue(undefined),
   };
   mocks.session.mockReturnValue(session);
   let hooks: SandboxControlSocketHooks = {};
@@ -303,6 +304,8 @@ async function harness(
       connection = null;
     }),
     closeProvisionalSockets: vi.fn(),
+    supportsOperationResults: () => true,
+    supportsNativeRuntimeRetirement: () => true,
     sendRequest,
   } as unknown as SandboxControlSocketHandler;
   mocks.socket.mockImplementation(
@@ -725,7 +728,10 @@ describe('SandboxControl lifecycle boundaries', () => {
           })
         ).resolves.toMatchObject({ ok: true });
         expect(h.sendRequest).toHaveBeenCalledWith(
-          expect.objectContaining({ operation: 'session.attach', payload })
+          expect.objectContaining({
+            operation: 'session.attach',
+            payload: { ...payload, captureNativeRuntimeId: true },
+          })
         );
         await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
         if (!contained) {
@@ -1418,7 +1424,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       const requestFor = (expectedWrapperInstanceId?: string): SandboxControlOutboundRequest => ({
         operation,
         session: ROUTE,
-        payload: operation === 'session.prompt' ? PROMPT : {},
+        payload: operation === 'session.prompt' ? PROMPT : { captureNativeRuntimeId: true },
         expectedWrapperInstanceId,
       });
 
@@ -2303,6 +2309,623 @@ describe('SandboxControl lifecycle boundaries', () => {
       })
     ).rejects.toThrow('Invalid sandbox quarantine request');
     expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+  });
+
+  it('records the exact native runtime returned by a successful attachment', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    h.sendRequest.mockResolvedValueOnce({
+      type: 'response',
+      requestId: 'attach_1',
+      ok: true,
+      result: { attached: true, nativeRuntimeId },
+    });
+
+    await expect(
+      h.control.request({
+        operation: 'session.attach',
+        session: {
+          sessionId: ROUTE.sessionId,
+          kiloSessionId: ROUTE.kiloSessionId,
+          directory: ROUTE.directory,
+        },
+        payload: {},
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ sessionId: ROUTE.sessionId, nativeRuntimeId }),
+    ]);
+  });
+
+  it('does not add native runtime capture to an older wrapper attachment', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    h.socket.supportsNativeRuntimeRetirement = () => false;
+
+    await expect(
+      h.control.request({
+        operation: 'session.attach',
+        session: ROUTE,
+        payload: {},
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(h.sendRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({ operation: 'session.attach', payload: {} })
+    );
+  });
+
+  it('records the original native runtime from a lost attachment response lookup', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const authorization = {
+      operation: 'session.attach' as const,
+      operationId: 'prepare_1',
+      messageId: 'message_1',
+      session: {
+        sessionId: ROUTE.sessionId,
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: ROUTE.directory,
+      },
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      dispatchDeadlineAt: Date.now() + 1_000,
+    };
+    h.sendRequest.mockResolvedValueOnce({
+      type: 'response',
+      requestId: 'lookup_1',
+      ok: true,
+      result: {
+        state: 'completed',
+        delivery: {
+          version: 2,
+          authorization,
+          completedAt: Date.now(),
+          result: { ok: true, result: { attached: true, nativeRuntimeId } },
+          events: [],
+          preparing: [],
+        },
+      },
+    });
+
+    await expect(
+      h.control.request({
+        operation: 'session.operation.get',
+        session: ROUTE,
+        payload: authorization,
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId }),
+    ]);
+    expect(h.session.recordNativeRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({ nativeRuntimeId, wrapperInstanceId: identity.wrapperInstanceId })
+    );
+  });
+
+  it('invalidates only routes on the retired native incarnation', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [
+      { ...route, nativeRuntimeId },
+      {
+        ...route,
+        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        nativeRuntimeId,
+      },
+      {
+        ...route,
+        sessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+        kiloSessionId: 'ses_33333333333333333333333333',
+        directory: '/workspace/m',
+        nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
+      },
+      {
+        ...route,
+        sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
+        kiloSessionId: 'ses_44444444444444444444444444',
+        directory: '/workspace/c',
+        nativeRuntimeId: '44444444-4444-4444-8444-444444444444',
+      },
+    ]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    const response = {
+      type: 'response' as const,
+      requestId: 'stop_1',
+      ok: true as const,
+      result: {
+        status: 'aborted' as const,
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId,
+      },
+    };
+    h.sendRequest.mockResolvedValueOnce(response);
+
+    await expect(
+      h.control.request({
+        operation: 'session.abort',
+        session: {
+          sessionId: ROUTE.sessionId,
+          kiloSessionId: ROUTE.kiloSessionId,
+          directory: ROUTE.directory,
+        },
+        payload: {
+          messageId: 'message_1',
+          operationId: '55555555-5555-4555-8555-555555555555',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toEqual(response);
+
+    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledTimes(2);
+    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({ wrapperInstanceId: identity.wrapperInstanceId, confirmed: true })
+    );
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.objectContaining({ directory: '/workspace/m' }),
+      expect.objectContaining({ directory: '/workspace/c' }),
+    ]);
+  });
+
+  it('does not invalidate a replacement when an old scoped Stop reply arrives late', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    const reply = deferred<{
+      type: 'response';
+      requestId: string;
+      ok: true;
+      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
+    }>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+    const stop = h.control.request({
+      operation: 'session.abort',
+      session: {
+        sessionId: ROUTE.sessionId,
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: ROUTE.directory,
+      },
+      payload: {
+        messageId: 'message_1',
+        operationId: '55555555-5555-4555-8555-555555555555',
+        cleanupDeadlineAt: Date.now() + 1_000,
+      },
+      expectedWrapperInstanceId: identity.wrapperInstanceId,
+    });
+    await sent.promise;
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    reply.resolve({
+      type: 'response',
+      requestId: 'stop_1',
+      ok: true,
+      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
+    });
+
+    await expect(stop).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+  });
+
+  it('retains a native retirement fence across a lost scoped Stop reply', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    h.sendRequest.mockRejectedValueOnce(new Error('lost Stop reply'));
+
+    await expect(
+      h.control.request({
+        operation: 'session.abort',
+        session: {
+          sessionId: ROUTE.sessionId,
+          kiloSessionId: ROUTE.kiloSessionId,
+          directory: ROUTE.directory,
+        },
+        payload: {
+          messageId: 'message_1',
+          operationId: '55555555-5555-4555-8555-555555555555',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).rejects.toThrow('lost Stop reply');
+    await h.evict();
+
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
+    ]);
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+  });
+
+  it('keeps an operation-only Stop replay from blocking or changing a fresh native retirement', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const operationA = '33333333-3333-4333-8333-333333333333';
+    const operationB = '44444444-4444-4444-8444-444444444444';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    const stop = (messageId: string, operationId: string, cleanupDeadlineAt: number) =>
+      h.control.request({
+        operation: 'session.abort',
+        session: {
+          sessionId: route.sessionId,
+          kiloSessionId: route.kiloSessionId,
+          directory: route.directory,
+        },
+        payload: { messageId, operationId, cleanupDeadlineAt },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      });
+    const firstDeadline = Date.now() + 1_000;
+    const operationOnly = {
+      type: 'response' as const,
+      requestId: 'stop_a',
+      ok: true as const,
+      result: { status: 'aborted' as const, quiescent: true },
+    };
+    h.sendRequest.mockResolvedValueOnce(operationOnly);
+
+    await expect(stop('message_a', operationA, firstDeadline)).resolves.toEqual(operationOnly);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({
+        operationId: operationA,
+        cleanupDeadlineAt: firstDeadline,
+        state: 'released',
+        disposition: 'operation_only',
+      }),
+    ]);
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId }),
+    ]);
+
+    const reply = deferred<{
+      type: 'response';
+      requestId: string;
+      ok: true;
+      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
+    }>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+    const stopB = stop('message_b', operationB, Date.now() + 2_000);
+    await sent.promise;
+
+    await expect(stop('message_a', operationA, Date.now() + 3_000)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+    expect(h.sendRequest).toHaveBeenCalledTimes(2);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({
+        operationId: operationA,
+        cleanupDeadlineAt: firstDeadline,
+        state: 'released',
+      }),
+      expect.objectContaining({ operationId: operationB, attempts: 1, state: 'pending' }),
+    ]);
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
+    ]);
+
+    const retired = {
+      type: 'response' as const,
+      requestId: 'stop_b',
+      ok: true as const,
+      result: {
+        status: 'aborted' as const,
+        quiescent: true as const,
+        runtimeRetired: true as const,
+        nativeRuntimeId,
+      },
+    };
+    reply.resolve(retired);
+    await expect(stopB).resolves.toEqual(retired);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({ operationId: operationA, state: 'released' }),
+      expect.objectContaining({
+        operationId: operationB,
+        state: 'completed',
+        notificationState: 'delivered',
+      }),
+    ]);
+
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    h.session.invalidateTerminalRuntime.mockClear();
+    h.session.failWaitingMessages.mockClear();
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        { directory: route.directory, nativeRuntimeId, reason: 'process_exited' },
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+  });
+
+  it('does not physically stop when completed native proof wins a stale escalation', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    const reply = deferred<never>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+
+    const quarantine = h.control.quarantineRuntime({
+      ownerId: OWNER,
+      sessionId: route.sessionId,
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      reason: 'native_cleanup_unavailable',
+    });
+    await sent.promise;
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        { directory: route.directory, nativeRuntimeId, reason: 'process_exited' },
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+    vi.setSystemTime(Date.now() + DEADLINE_MS.stopAttempt);
+    reply.reject(new Error('late lost reply'));
+
+    await expect(quarantine).resolves.toEqual({ quarantined: true });
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      stopTombstone: null,
+    });
+  });
+
+  it('coalesces concurrent native retirement commands for one runtime', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    const reply = deferred<{
+      type: 'response';
+      requestId: string;
+      ok: true;
+      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
+    }>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+    const first = h.control.quarantineRuntime({
+      ownerId: OWNER,
+      sessionId: route.sessionId,
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      reason: 'native_cleanup_unavailable',
+    });
+    await sent.promise;
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: route.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'native_cleanup_unavailable',
+      })
+    ).resolves.toEqual({ quarantined: true });
+    expect(h.sendRequest).toHaveBeenCalledOnce();
+    reply.resolve({
+      type: 'response',
+      requestId: 'abort_1',
+      ok: true,
+      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
+    });
+    await expect(first).resolves.toEqual({ quarantined: true });
+  });
+
+  it('retains an exhausted notification fence without escalating a completed retirement', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.session.failWaitingMessages.mockRejectedValue(new Error('session unavailable'));
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        { directory: route.directory, nativeRuntimeId, reason: 'process_exited' },
+        identity
+      )
+    ).resolves.toBeUndefined();
+    for (let attempt = 1; attempt < DEADLINE_MS.nativeRetirementMaxAttempts; attempt++) {
+      await h.fireAlarm();
+    }
+
+    expect(h.session.failWaitingMessages).toHaveBeenCalledTimes(
+      DEADLINE_MS.nativeRetirementMaxAttempts
+    );
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      stopTombstone: null,
+    });
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
+    ]);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({ state: 'completed', notificationState: 'exhausted' }),
+    ]);
+  });
+
+  it('persists an automatic native retirement before failing only affected routes', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [
+      { ...route, nativeRuntimeId },
+      {
+        ...route,
+        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        nativeRuntimeId,
+      },
+      {
+        ...route,
+        sessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+        kiloSessionId: 'ses_33333333333333333333333333',
+        directory: '/workspace/m',
+        nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
+      },
+      {
+        ...route,
+        sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
+        kiloSessionId: 'ses_44444444444444444444444444',
+        directory: '/workspace/c',
+        nativeRuntimeId: '44444444-4444-4444-8444-444444444444',
+      },
+    ]);
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        { directory: ROUTE.directory, nativeRuntimeId, reason: 'process_exited' },
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+
+    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledTimes(2);
+    expect(h.session.failWaitingMessages).toHaveBeenCalledTimes(2);
+    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+      'process_exited',
+      identity.wrapperInstanceId,
+      nativeRuntimeId
+    );
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.objectContaining({ directory: '/workspace/m' }),
+      expect.objectContaining({ directory: '/workspace/c' }),
+    ]);
+  });
+
+  it('replays a completed native retirement after reconstruction without touching N2', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        { directory: ROUTE.directory, nativeRuntimeId, reason: 'process_exited' },
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+    h.session.invalidateTerminalRuntime.mockClear();
+    h.session.failWaitingMessages.mockClear();
+    await h.evict();
+    await h.flush();
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    h.session.invalidateTerminalRuntime.mockClear();
+    h.session.failWaitingMessages.mockClear();
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        { directory: ROUTE.directory, nativeRuntimeId, reason: 'process_exited' },
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+  });
+
+  it('falls back to physical containment when targeted native cleanup is unavailable', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => false;
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'native_cleanup_unavailable',
+      })
+    ).resolves.toEqual({ quarantined: true });
+
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'stopping',
+      stopTombstone: { reason: 'native_cleanup_unavailable' },
+    });
   });
 
   it('performs all five stop attempts, never reactivates the tombstone, and eventually releases by observation', async () => {

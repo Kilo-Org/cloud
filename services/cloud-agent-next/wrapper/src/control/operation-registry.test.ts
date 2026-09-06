@@ -137,8 +137,8 @@ describe('operation admission and lookup', () => {
     ).toMatchObject({
       ok: true,
       result: {
-        status: 'unconfirmed',
-        quiescent: false,
+        status: 'aborted',
+        quiescent: true,
         delivery: { authorization },
       },
     });

@@ -21,6 +21,7 @@ import {
   type ResponseFrame,
   type SessionAttachPayload,
   type SessionMessageOutcome,
+  type SessionOperationAuthorization,
 } from '../shared/sandbox-control-protocol.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
@@ -2561,6 +2562,85 @@ describe('SandboxSession orchestration', () => {
         .filter(([input]) => input.operation === 'session.prompt')
         .map(([input]) => sessionPromptPayloadSchema.parse(input.payload).messageId)
     ).toEqual(['b']);
+  });
+
+  it('does not let a late N1 attachment record replace the current N2 fence', async () => {
+    const fixture = sessionFixture();
+    const kiloSessionId = fixture.metadata.auth.kiloSessionId;
+    if (!kiloSessionId) throw new Error('Missing Kilo session ID');
+    const authorization = (messageId: string, operationId: string, deadline: number) =>
+      ({
+        operation: 'session.attach',
+        operationId,
+        messageId,
+        session: {
+          sessionId: SESSION_ID,
+          kiloSessionId,
+          directory: DIRECTORY,
+        },
+        wrapperInstanceId: RUNTIME_ID,
+        dispatchDeadlineAt: deadline,
+      }) satisfies SessionOperationAuthorization;
+    const oldAuthorization = authorization(
+      'old',
+      '11111111-1111-4111-8111-111111111111',
+      Date.now() + 1_000
+    );
+    const nextAuthorization = authorization(
+      'next',
+      '22222222-2222-4222-8222-222222222222',
+      Date.now() + 2_000
+    );
+    fixture.values.set('session_messages', [
+      {
+        messageId: 'old',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: {
+          attach: {
+            authorization: oldAuthorization,
+            dispatched: true,
+            completedAt: Date.now(),
+            attachmentEpoch: 1,
+          },
+        },
+      } as SessionMessageRecord,
+      {
+        messageId: 'next',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: {
+          attach: {
+            authorization: nextAuthorization,
+            dispatched: true,
+            completedAt: Date.now(),
+            attachmentEpoch: 2,
+          },
+        },
+      } as SessionMessageRecord,
+    ]);
+
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+      authorization: nextAuthorization,
+    });
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+      authorization: oldAuthorization,
+    });
+
+    await fixture.session.failWaitingMessages(
+      'late_old_native_failure',
+      RUNTIME_ID,
+      '11111111-1111-4111-8111-111111111111'
+    );
+
+    expect(fixture.record('old')?.state).toBe('accepted');
+    expect(fixture.record('next')?.state).toBe('accepted');
   });
 
   it('retains the original head deadline after awaited cancel cannot transfer quarantine', async () => {

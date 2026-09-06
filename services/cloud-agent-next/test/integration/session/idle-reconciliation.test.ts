@@ -1,5 +1,5 @@
 import { env, listDurableObjectIds, runInDurableObject } from 'cloudflare:test';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import {
   allocateWrapperRuntimeState,
   getWrapperRuntimeState,
@@ -9,6 +9,40 @@ import {
   putSessionMessageState,
 } from '../../../src/session/session-message-state.js';
 import { registerReadySession } from '../../helpers/session-setup.js';
+
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
 
 describe('idle lifecycle integration', () => {
   beforeEach(async () => {
@@ -25,9 +59,7 @@ describe('idle lifecycle integration', () => {
   it('persists raw root idle without using it as a success boundary', async () => {
     const userId = 'user_idle_no_fallback';
     const sessionId = 'agent_idle_no_fallback';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {

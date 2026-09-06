@@ -1,6 +1,6 @@
 import { env, runInDurableObject, SELF } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
@@ -23,8 +23,7 @@ const BATCH_REPRESENTATIVE_MESSAGE_ID = 'msg_018f1e2d3c4bBatchNewestMsg';
 
 async function createSession(userId: string) {
   const sessionId = `agent_${crypto.randomUUID()}`;
-  const id = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-  return { sessionId, stub: env.CLOUD_AGENT_SESSION.get(id) };
+  return { sessionId, stub: sessionStub(userId, sessionId) };
 }
 
 async function getNotificationJobs(): Promise<unknown> {
@@ -116,6 +115,40 @@ async function seedAssistantText(
     entityId: `part/${assistantMessageId}/part_push_response_0001`,
   });
 }
+
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
 
 describe('CloudAgentSession push notification producer', () => {
   beforeEach(async () => {

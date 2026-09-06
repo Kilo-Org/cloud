@@ -1,5 +1,5 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import type { AgentSandboxLifecycle } from '../../../src/agent-sandbox/protocol.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
@@ -23,13 +23,45 @@ async function establishOwnedWrapper(
     stopStatus === 'absent' ? { status: 'absent' } : { status: 'still-present', observed: [] };
 }
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('session deletion physical cleanup', () => {
   it('erases Durable Object state after explicit deletion confirms wrapper absence', async () => {
     const userId = 'user_delete_complete';
     const sessionId = 'agent_delete_complete';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -62,9 +94,7 @@ describe('session deletion physical cleanup', () => {
   it('does not erase Durable Object state when explicit deletion cannot confirm wrapper absence', async () => {
     const userId = 'user_delete_pending';
     const sessionId = 'agent_delete_pending';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -102,9 +132,7 @@ describe('session deletion physical cleanup', () => {
   it('deletes quarantined session state without probing its sandbox again', async () => {
     const userId = 'user_delete_quarantined';
     const sessionId = 'agent_delete_quarantined';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -158,9 +186,7 @@ describe('session deletion physical cleanup', () => {
     const userId = 'user_delete_pending_failover';
     const sessionId = 'agent_delete_pending_failover';
     const routeKey = 'usr-000000000000000000000000000000000000000000000000';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -204,9 +230,7 @@ describe('session deletion physical cleanup', () => {
   it('retains physical cleanup backoff while explicit deletion is pending', async () => {
     const userId = 'user_delete_backoff';
     const sessionId = 'agent_delete_backoff';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -236,9 +260,7 @@ describe('session deletion physical cleanup', () => {
   it('rejects new message admission while explicit deletion is pending', async () => {
     const userId = 'user_delete_reject_admission';
     const sessionId = 'agent_delete_reject_admission';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -304,9 +326,7 @@ describe('session deletion physical cleanup', () => {
   it('finishes pending explicit deletion from an alarm after wrapper absence is confirmed', async () => {
     const userId = 'user_delete_alarm_complete';
     const sessionId = 'agent_delete_alarm_complete';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -356,9 +376,7 @@ describe('session deletion physical cleanup', () => {
   it('postpones retention deletion while physical wrapper cleanup remains unresolved', async () => {
     const userId = 'user_ttl_pending';
     const sessionId = 'agent_ttl_pending';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -394,9 +412,7 @@ describe('session deletion physical cleanup', () => {
   it('retains physical cleanup backoff while retention deletion is already pending', async () => {
     const userId = 'user_ttl_backoff';
     const sessionId = 'agent_ttl_backoff';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -435,9 +451,7 @@ describe('session deletion physical cleanup', () => {
   it('retains provider deferred-deletion entries through the payload purge', async () => {
     const userId = 'user_delete_deferred';
     const sessionId = 'agent_delete_deferred';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -476,9 +490,7 @@ describe('session deletion physical cleanup', () => {
   it('writes the deletion fence before provider deletion planning', async () => {
     const userId = 'user_delete_fence';
     const sessionId = 'agent_delete_fence';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const intentDuringPlanning = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {

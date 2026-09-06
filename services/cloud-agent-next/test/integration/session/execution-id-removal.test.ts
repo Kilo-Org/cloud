@@ -11,7 +11,7 @@
 
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import {
   listNonTerminalAcceptedMessages,
@@ -25,6 +25,40 @@ import {
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { queueUserMessageInput, registerReadySession } from '../../helpers/session-setup.js';
+
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
 
 describe('execution-id removal - queue and start response', () => {
   beforeEach(async () => {
@@ -41,8 +75,7 @@ describe('execution-id removal - queue and start response', () => {
   it('new-path admission result omits executionId', async () => {
     const userId = 'user_noexec_start';
     const sessionId = 'agent_noexec_start';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -78,8 +111,7 @@ describe('execution-id removal - queue and start response', () => {
   it('new-path pending message persists canonical V2 intent without executionId', async () => {
     const userId = 'user_noexec_pending';
     const sessionId = 'agent_noexec_pending';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -136,8 +168,7 @@ describe('execution-id removal - flush does not create execution rows', () => {
   it('new-path flush does not insert an execution metadata row', async () => {
     const userId = 'user_noexec_flush';
     const sessionId = 'agent_noexec_flush';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let capturedPlan: FencedWrapperDispatchRequest | null = null;
@@ -195,9 +226,7 @@ describe('execution-id removal - flush does not create execution rows', () => {
   it('repairs accepted pending residue with one sent event and no wrapper redispatch', async () => {
     const userId = 'user_noexec_sent_repair';
     const sessionId = 'agent_noexec_sent_repair';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       let dispatches = 0;
@@ -254,9 +283,7 @@ describe('execution-id removal - flush does not create execution rows', () => {
   it('retries sent-event repair from accepted pending residue without wrapper redispatch', async () => {
     const userId = 'user_noexec_sent_retry';
     const sessionId = 'agent_noexec_sent_retry';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       let dispatches = 0;
@@ -321,8 +348,7 @@ describe('execution-id removal - flush does not create execution rows', () => {
   it('new-path flush delivers message and emits queued and sent events without executionId', async () => {
     const userId = 'user_noexec_result';
     const sessionId = 'agent_noexec_result';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       (instance as any).orchestrator = {
@@ -409,8 +435,7 @@ describe('execution-id removal - stream events do not expose fake executionIds',
   it('new-path message queued event payload does not contain executionId', async () => {
     const userId = 'user_stream_noexec';
     const sessionId = 'agent_stream_noexec';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       await registerReadySession(instance, {
@@ -452,8 +477,7 @@ describe('execution-id removal - stream events do not expose fake executionIds',
   it('new-path message terminal events do not expose executionId in payload', async () => {
     const userId = 'user_term_noexec';
     const sessionId = 'agent_term_noexec';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       await registerReadySession(instance, {
@@ -508,8 +532,7 @@ describe('execution-id removal - stream events do not expose fake executionIds',
   it('new-path pending message interrupted event does not expose executionId when absent', async () => {
     const userId = 'user_intrpt_noex';
     const sessionId = 'agent_intrpt_noex';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       await registerReadySession(instance, {
@@ -574,8 +597,7 @@ describe('execution-id removal - ingest does not alias wrapperRunId as execution
   it('new-path ingest events do not use wrapperRunId as execution_id in StoredEvent', async () => {
     const userId = 'user_ingest_noexec';
     const sessionId = 'agent_ingest_noexec';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, doState) => {
       await registerReadySession(instance, {

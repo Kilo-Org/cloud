@@ -13,6 +13,7 @@ import { ActivityIndicator, Switch, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockFeedback } from '@/components/app-unlock-screen';
+import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -187,6 +188,9 @@ export function PreferencesScreen() {
             onChange={setThemePreference}
           />
         </View>
+
+        {/* Feature flags — debug surface: which flags this build applies and why. */}
+        <FeatureFlagsSection />
 
         {/* Account */}
         <View className="mt-3 gap-3">

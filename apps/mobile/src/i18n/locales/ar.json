@@ -240,7 +240,12 @@
     "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
     "returnSendsMessageSubtitle": "عند تعطيل هذا الخيار، يُدرج مفتاح الإدخال سطرًا جديدًا في حقول رسائل الوكلاء.",
     "biometricUnlock": "فتح القفل بالقياسات الحيوية",
-    "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق."
+    "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق.",
+    "featureFlags": "أعلام الميزات",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "الأنشطة المباشرة",

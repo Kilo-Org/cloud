@@ -240,7 +240,12 @@
     "returnSendsMessage": "Ka tukuna te karere mā te pātuhi tāuru",
     "returnSendsMessageSubtitle": "Ina weto, ka whakaurua he rārangi hōu mā te pātuhi tāuru ki ngā pouaka karere māngai.",
     "biometricUnlock": "Wetekina mā te tautuhi koiora",
-    "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri."
+    "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri.",
+    "featureFlags": "Kāreti āhuatanga",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono kume",

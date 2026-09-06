@@ -242,6 +242,13 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
 }));
 vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
+// The preferences screen mounts the feature-flag debug surface, which reads
+// PostHog flag statuses; the real module pulls in expo-application's native
+// chain, which no mounted test loads. An empty registry keeps the section
+// out of these scenes.
+vi.mock('@/lib/analytics/posthog', () => ({
+  useFeatureFlagStatuses: () => [],
+}));
 
 function Draft() {
   const [value, onChange] = useState('saved draft');

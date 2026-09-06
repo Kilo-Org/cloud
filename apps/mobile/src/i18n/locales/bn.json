@@ -240,7 +240,12 @@
     "returnSendsMessage": "রিটার্ন কী বার্তা পাঠায়",
     "returnSendsMessageSubtitle": "বন্ধ থাকলে, রিটার্ন কী এজেন্টের বার্তা লেখার ঘরে নতুন লাইন যোগ করে।",
     "biometricUnlock": "বায়োমেট্রিক আনলক",
-    "biometricUnlockSubtitle": "অ্যাপ চালু করার সময় এবং ব্যাকগ্রাউন্ডে পাঁচ মিনিট থাকার পর আনলক করতে হবে।"
+    "biometricUnlockSubtitle": "অ্যাপ চালু করার সময় এবং ব্যাকগ্রাউন্ডে পাঁচ মিনিট থাকার পর আনলক করতে হবে।",
+    "featureFlags": "ফিচার ফ্ল্যাগ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট পাওয়া যাচ্ছে না",

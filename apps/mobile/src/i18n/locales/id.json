@@ -240,7 +240,12 @@
     "returnSendsMessage": "Tombol Enter mengirim pesan",
     "returnSendsMessageSubtitle": "Saat nonaktif, Enter menyisipkan baris baru di kolom pesan agen.",
     "biometricUnlock": "Buka kunci dengan biometrik",
-    "biometricUnlockSubtitle": "Minta autentikasi biometrik saat aplikasi dibuka dan setelah lima menit di latar belakang."
+    "biometricUnlockSubtitle": "Minta autentikasi biometrik saat aplikasi dibuka dan setelah lima menit di latar belakang.",
+    "featureFlags": "Bendera fitur",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Aktivitas langsung",

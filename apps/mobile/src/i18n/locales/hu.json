@@ -240,7 +240,12 @@
     "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
     "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe.",
     "biometricUnlock": "Feloldás biometrikus azonosítással",
-    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges."
+    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges.",
+    "featureFlags": "Funkciójelzők",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "A módosítási kérelem nem érhető el",

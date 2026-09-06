@@ -240,7 +240,12 @@
     "returnSendsMessage": "리턴 키로 메시지 보내기",
     "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다.",
     "biometricUnlock": "생체 인증으로 잠금 해제",
-    "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다."
+    "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다.",
+    "featureFlags": "기능 플래그",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "실시간 활동",

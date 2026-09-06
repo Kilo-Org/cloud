@@ -240,7 +240,12 @@
     "returnSendsMessage": "Копчето за нов ред испраќа порака",
     "returnSendsMessageSubtitle": "Кога е исклучено, копчето за нов ред вметнува нов ред во полињата за внес на пораки на агентите.",
     "biometricUnlock": "Отклучување со биометрија",
-    "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина."
+    "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина.",
+    "featureFlags": "Знаменца на функции",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за спојување е недостапно",

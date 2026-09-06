@@ -2046,7 +2046,12 @@
     "returnSendsMessage": "A tecla Enter envia a mensagem",
     "returnSendsMessageSubtitle": "Quando essa opção está desativada, a tecla Enter insere uma quebra de linha nos campos de mensagem dos agentes.",
     "biometricUnlock": "Desbloqueio por biometria",
-    "biometricUnlockSubtitle": "Exigir o desbloqueio ao abrir o app e após cinco minutos em segundo plano."
+    "biometricUnlockSubtitle": "Exigir o desbloqueio ao abrir o app e após cinco minutos em segundo plano.",
+    "featureFlags": "Sinalizadores de recursos",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "addCredits": {
     "cta": "Adicionar créditos",

@@ -240,7 +240,12 @@
     "returnSendsMessage": "रिटर्न की दबाने पर संदेश भेजें",
     "returnSendsMessageSubtitle": "यह विकल्प बंद होने पर रिटर्न की दबाने से एजेंट के संदेश लिखने के बॉक्स में नई पंक्ति जुड़ती है।",
     "biometricUnlock": "बायोमेट्रिक्स से अनलॉक करें",
-    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।"
+    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।",
+    "featureFlags": "फ़ीचर फ़्लैग",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "लाइव गतिविधियाँ",

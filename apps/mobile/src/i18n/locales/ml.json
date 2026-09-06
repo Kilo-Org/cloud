@@ -240,7 +240,12 @@
     "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
     "returnSendsMessageSubtitle": "ഇത് ഓഫായിരിക്കുമ്പോൾ റിട്ടേൺ കീ ഏജന്റിന്റെ സന്ദേശ ബോക്സിൽ പുതിയ വരി ചേർക്കും.",
     "biometricUnlock": "ബയോമെട്രിക് അൺലോക്ക്",
-    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം."
+    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം.",
+    "featureFlags": "ഫീച്ചർ ഫ്ലാഗുകൾ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",

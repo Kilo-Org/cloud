@@ -240,7 +240,12 @@
     "returnSendsMessage": "Igodo nloghachi na-eziga ozi",
     "returnSendsMessageSubtitle": "Mgbe agbanyụrụ ya, igodo nloghachi na-etinye ahịrị ọhụrụ n'ebe ide ozi ndị nnọchi anya.",
     "biometricUnlock": "Mepee mkpọchi site na njirimara ahụ",
-    "biometricUnlockSubtitle": "Wepụ mkpọchi mgbe ngwa malitere na mgbe ọ nọrọ nkeji ise n'azụ."
+    "biometricUnlockSubtitle": "Wepụ mkpọchi mgbe ngwa malitere na mgbe ọ nọrọ nkeji ise n'azụ.",
+    "featureFlags": "Ọkọ atụmatụ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Arịrịọ njikọta adịghị",

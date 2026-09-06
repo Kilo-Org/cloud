@@ -240,7 +240,12 @@
     "returnSendsMessage": "គ្រាប់ចុចបញ្ចូលប្រើសម្រាប់ផ្ញើសារ",
     "returnSendsMessageSubtitle": "នៅពេលបិទ គ្រាប់ចុចបញ្ចូលនឹងបញ្ចូលបន្ទាត់ថ្មីក្នុងប្រអប់សរសេរសារទៅភ្នាក់ងារ។",
     "biometricUnlock": "ដោះសោដោយប្រើជីវមាត្រ",
-    "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។"
+    "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។",
+    "featureFlags": "ទង់លក្ខណៈពិសេស",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",

@@ -240,7 +240,12 @@
     "returnSendsMessage": "Отправлять сообщение клавишей ввода",
     "returnSendsMessageSubtitle": "Если отключено, клавиша ввода добавляет перенос строки в поле ввода сообщения агенту.",
     "biometricUnlock": "Разблокировка по биометрии",
-    "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме."
+    "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме.",
+    "featureFlags": "Флаги функций",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Эфир активности",

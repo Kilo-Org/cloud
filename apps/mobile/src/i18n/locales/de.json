@@ -240,7 +240,12 @@
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
     "returnSendsMessageSubtitle": "Ist diese Option deaktiviert, fügt die Eingabetaste im Eingabefeld für Agenten einen Zeilenumbruch ein.",
     "biometricUnlock": "Mit Biometrie entsperren",
-    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich."
+    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich.",
+    "featureFlags": "Feature-Flags",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",

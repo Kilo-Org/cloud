@@ -79,6 +79,13 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   'profile.providerAnaconda',
   'profile.providerApple',
   'profile.providerDiscord',
+  // Feature-flag debug surface (Preferences): version comparisons and the
+  // source of a row's value are notation — flag keys, versions and the
+  // remote/default markers are technical tokens, not translatable prose.
+  'preferences.featureFlagsBuild',
+  'preferences.featureFlagApplied',
+  'preferences.featureFlagSkipped',
+  'preferences.featureFlagNotLoaded',
   'common.github',
   'common.gitlab',
   'profile.providerGoogle',

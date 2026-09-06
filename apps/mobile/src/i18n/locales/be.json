@@ -240,7 +240,12 @@
     "returnSendsMessage": "Клавіша ўводу адпраўляе паведамленне",
     "returnSendsMessageSubtitle": "Калі налада выключаная, клавіша ўводу ўстаўляе новы радок у палі ўводу паведамленняў агентам.",
     "biometricUnlock": "Біяметрычная разблакіроўка",
-    "biometricUnlockSubtitle": "Разблакіроўка патрабуецца пры запуску праграмы і пасля пяці хвілін у фонавым рэжыме."
+    "biometricUnlockSubtitle": "Разблакіроўка патрабуецца пры запуску праграмы і пасля пяці хвілін у фонавым рэжыме.",
+    "featureFlags": "Сцягі функцый",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Запыт на зліццё недаступны",

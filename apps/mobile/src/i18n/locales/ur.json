@@ -240,7 +240,12 @@
     "returnSendsMessage": "ریٹرن کی دبانے سے پیغام بھیجیں",
     "returnSendsMessageSubtitle": "اگر یہ ترتیب بند ہو تو ریٹرن کی دبانے سے ایجنٹ کو پیغام لکھنے کے خانے میں نئی سطر شامل ہوتی ہے۔",
     "biometricUnlock": "بایومیٹرکس سے انلاک کریں",
-    "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔"
+    "biometricUnlockSubtitle": "ایپ شروع کرنے پر اور پس منظر میں پانچ منٹ رہنے کے بعد انلاک کرنا ضروری ہے۔",
+    "featureFlags": "فیچر فلیگز",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "پل ریکویسٹ دستیاب نہیں",

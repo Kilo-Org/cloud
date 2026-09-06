@@ -240,7 +240,12 @@
     "returnSendsMessage": "Αποστολή μηνύματος με το πλήκτρο Enter",
     "returnSendsMessageSubtitle": "Όταν η επιλογή είναι ανενεργή, το πλήκτρο Enter εισάγει νέα γραμμή στα πεδία μηνυμάτων των πρακτόρων.",
     "biometricUnlock": "Ξεκλείδωμα με βιομετρικά στοιχεία",
-    "biometricUnlockSubtitle": "Απαιτείται ξεκλείδωμα κατά την εκκίνηση της εφαρμογής και αφού παραμείνει στο παρασκήνιο για πέντε λεπτά."
+    "biometricUnlockSubtitle": "Απαιτείται ξεκλείδωμα κατά την εκκίνηση της εφαρμογής και αφού παραμείνει στο παρασκήνιο για πέντε λεπτά.",
+    "featureFlags": "Σημαίες λειτουργιών",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Μη διαθέσιμο αίτημα ενσωμάτωσης",

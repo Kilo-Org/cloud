@@ -240,7 +240,12 @@
     "returnSendsMessage": "එන්ටර් යතුරෙන් පණිවිඩය යවයි",
     "returnSendsMessageSubtitle": "මෙය අක්‍රීය කළ විට එන්ටර් යතුරෙන් නියෝජිත පණිවිඩ කොටුවල නව පේළියක් ඇතුළත් කරයි.",
     "biometricUnlock": "ජෛවමිතික දත්ත භාවිතයෙන් අගුළු හරින්න",
-    "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ."
+    "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ.",
+    "featureFlags": "විශේෂාංග ධ්වජ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "පුල් ඉල්ලීම ලබා ගත නොහැක",

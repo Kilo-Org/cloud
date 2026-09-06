@@ -240,7 +240,12 @@
     "returnSendsMessage": "Enter tuşu mesaj gönderir",
     "returnSendsMessageSubtitle": "Kapalıyken Enter tuşu, ajanla konuşurken mesaj alanına yeni satır ekler.",
     "biometricUnlock": "Biyometrik doğrulama ile kilit açma",
-    "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir."
+    "biometricUnlockSubtitle": "Uygulama başlatıldığında ve arka planda beş dakika kaldıktan sonra kilidin açılması gerekir.",
+    "featureFlags": "Özellik bayrakları",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Canlı etkinlikler",

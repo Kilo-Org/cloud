@@ -240,7 +240,12 @@
     "returnSendsMessage": "Bouton retou a voye mesaj",
     "returnSendsMessageSubtitle": "Lè opsyon sa a dezaktive, bouton retou a ajoute yon nouvo liy nan chan mesaj ajan yo.",
     "biometricUnlock": "Debloke ak byometri",
-    "biometricUnlockSubtitle": "Debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan."
+    "biometricUnlockSubtitle": "Debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan.",
+    "featureFlags": "Drapo fonksyon",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Demann fizyon an pa disponib",

@@ -240,7 +240,12 @@
     "returnSendsMessage": "A tecla de retorno envia a mensagem",
     "returnSendsMessageSubtitle": "Quando desativado, a tecla de retorno insere uma nova linha nos campos de mensagem dos agentes.",
     "biometricUnlock": "Desbloquear com biometria",
-    "biometricUnlockSubtitle": "É necessário desbloquear ao iniciar e após cinco minutos em segundo plano."
+    "biometricUnlockSubtitle": "É necessário desbloquear ao iniciar e após cinco minutos em segundo plano.",
+    "featureFlags": "Sinalizadores de recursos",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponível",

@@ -1388,7 +1388,10 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(h.records.has('wrapper_credential_hash')).toBe(false);
       expect(h.records.has('active_wrapper_runtime')).toBe(false);
       vi.setSystemTime(Date.now() + 1_000);
-      await expect(h.control.quarantineRuntime(quarantine)).resolves.toEqual({ quarantined: true });
+      await expect(h.control.quarantineRuntime(quarantine)).resolves.toEqual({
+        quarantined: true,
+        disposition: 'physical_stopping',
+      });
       expect(await loadDeadlines(h.storage)).toEqual(repaired);
       expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(0);
       await h.fireAlarm();
@@ -2208,9 +2211,15 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
     await expect(
       h.control.quarantineRuntime({ ...request, wrapperInstanceId: 'stale' })
-    ).resolves.toEqual({ quarantined: false });
-    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({ quarantined: true });
-    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
+    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({
+      quarantined: true,
+      disposition: 'physical_stopping',
+    });
+    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({
+      quarantined: true,
+      disposition: 'physical_stopping',
+    });
     await expect(observed.promise).resolves.toEqual({ attempts: 1, alarmAt: expect.any(Number) });
     expect(await h.control.getPhysicalRecord()).toMatchObject({
       state: 'stopping',
@@ -2255,8 +2264,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.control.detachSession(ROUTE.sessionId);
     await expect(
       h.control.quarantineRuntime({ ...input, wrapperInstanceId: 'stale' })
-    ).resolves.toEqual({ quarantined: false });
-    await expect(transfer(input)).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
+    await expect(transfer(input)).resolves.toEqual({
+      quarantined: true,
+      disposition: 'physical_stopping',
+    });
     await h.flush();
     expect(await h.control.getPhysicalRecord()).toMatchObject({
       state: 'stopping',
@@ -2268,7 +2280,10 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.fireAlarm();
     expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
     expect(h.runtime(identity.providerInstanceId)?.destroy).toHaveBeenCalledTimes(2);
-    await expect(h.control.quarantineRuntime(input)).resolves.toEqual({ quarantined: false });
+    await expect(h.control.quarantineRuntime(input)).resolves.toEqual({
+      quarantined: false,
+      disposition: 'physical_stopped',
+    });
     expect((await h.control.getPhysicalRecord()).providerRef).toBeNull();
   });
 
@@ -2723,11 +2738,80 @@ describe('SandboxControl lifecycle boundaries', () => {
     vi.setSystemTime(Date.now() + DEADLINE_MS.stopAttempt);
     reply.reject(new Error('late lost reply'));
 
-    await expect(quarantine).resolves.toEqual({ quarantined: true });
+    await expect(quarantine).resolves.toEqual({ quarantined: true, disposition: 'native_pending' });
     await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
       state: 'running',
       stopTombstone: null,
     });
+  });
+
+  it('replays a completed native quarantine after its response is lost without selecting N2', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    const authorization = {
+      operation: 'session.attach' as const,
+      operationId: '33333333-3333-4333-8333-333333333333',
+      messageId: 'message_1',
+      session: {
+        sessionId: route.sessionId,
+        kiloSessionId: route.kiloSessionId,
+        directory: route.directory,
+      },
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      dispatchDeadlineAt: Date.now() + 1_000,
+    };
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.sendRequest.mockResolvedValueOnce({
+      type: 'response',
+      requestId: 'retire_n1',
+      ok: true,
+      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
+    });
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: route.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'runtime_unhealthy',
+        nativeRuntimeId,
+        authorization,
+      })
+    ).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
+
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    const beforeRetry = {
+      deadlines: await loadDeadlines(h.storage),
+      alarmAt: await h.storage.getAlarm(),
+    };
+    h.sendRequest.mockClear();
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: route.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'runtime_unhealthy',
+        nativeRuntimeId,
+        authorization,
+      })
+    ).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
+
+    expect(h.sendRequest).not.toHaveBeenCalled();
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      stopTombstone: null,
+    });
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+    expect(await loadDeadlines(h.storage)).toEqual(beforeRetry.deadlines);
+    expect(await h.storage.getAlarm()).toBe(beforeRetry.alarmAt);
   });
 
   it('coalesces concurrent native retirement commands for one runtime', async () => {
@@ -2764,7 +2848,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         wrapperInstanceId: identity.wrapperInstanceId ?? '',
         reason: 'native_cleanup_unavailable',
       })
-    ).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: true, disposition: 'native_pending' });
     expect(h.sendRequest).toHaveBeenCalledOnce();
     reply.resolve({
       type: 'response',
@@ -2772,7 +2856,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       ok: true,
       result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
     });
-    await expect(first).resolves.toEqual({ quarantined: true });
+    await expect(first).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
   });
 
   it('retains an exhausted notification fence without escalating a completed retirement', async () => {
@@ -2920,7 +3004,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         wrapperInstanceId: identity.wrapperInstanceId ?? '',
         reason: 'native_cleanup_unavailable',
       })
-    ).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
 
     await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
       state: 'stopping',
@@ -3113,7 +3197,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         wrapperInstanceId: identity.wrapperInstanceId ?? '',
         reason: 'late_failure',
       })
-    ).resolves.toEqual({ quarantined: false });
+    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
   });
 
   it('retains a known allocation through a hanging launch and cleans it without a background replacement', async () => {

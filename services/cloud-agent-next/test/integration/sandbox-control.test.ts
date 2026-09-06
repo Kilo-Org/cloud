@@ -353,6 +353,7 @@ function sendHello(
     providerInstanceId?: string;
     wrapperInstanceId?: string;
     sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
   } = {}
 ): void {
   ws.send(
@@ -367,6 +368,14 @@ function sendHello(
         ...(identity.sessionOperationResults
           ? { capabilities: { sessionOperationResults: true } }
           : {}),
+        ...(identity.nativeRuntimeRetirement
+          ? {
+              capabilities: {
+                sessionOperationResults: true,
+                nativeRuntimeRetirement: true,
+              },
+            }
+          : {}),
         ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
       },
     })
@@ -380,6 +389,7 @@ async function completeHello(
     providerInstanceId?: string;
     wrapperInstanceId?: string;
     sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
   } = {}
 ): Promise<void> {
   sendHello(ws, requestId, identity);
@@ -391,7 +401,12 @@ async function completeHello(
       result: {
         protocolVersion: 1,
         handshakeComplete: true,
-        capabilities: { kiloVersionHeartbeat: true, sessionOperationResults: true, scopedStopAbort: true },
+        capabilities: {
+          kiloVersionHeartbeat: true,
+          sessionOperationResults: true,
+          scopedStopAbort: true,
+          ...(identity.nativeRuntimeRetirement ? { nativeRuntimeRetirement: true } : {}),
+        },
       },
     })
   );
@@ -418,7 +433,10 @@ type TerminalRuntimeFixture = {
   wrapperInstanceId?: string;
 };
 
-async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
+async function initializeTerminalRuntime(
+  fixture: TerminalRuntimeFixture,
+  capabilities: { sessionOperationResults?: boolean; nativeRuntimeRetirement?: boolean } = {}
+) {
   const credential = generateSandboxCredential();
   await seedCredential(credential, fixture.sandboxId);
   const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
@@ -446,6 +464,7 @@ async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
   await completeHello(socket, `hello_${fixture.sandboxId}`, {
     providerInstanceId: providerRef,
     ...(fixture.wrapperInstanceId ? { wrapperInstanceId: fixture.wrapperInstanceId } : {}),
+    ...capabilities,
   });
   return { control, credential, socket, providerRef, ...provider };
 }
@@ -4907,7 +4926,7 @@ describe('SandboxControl recovery watchdogs', () => {
         wrapperInstanceId,
         reason: 'preparation_interrupted',
       })
-    ).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
     await runInDurableObject(control, async (_instance, state) => {
       expect(await state.storage.getAlarm()).toBe(repairedAt);
     });
@@ -8409,7 +8428,7 @@ describe('SandboxSession control-plane regressions', () => {
           wrapperInstanceId: fixture.wrapperInstanceId,
           reason: 'late_cancelled_runtime_cleanup',
         })
-      ).resolves.toEqual({ quarantined: false });
+      ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
       expect((await admissionState(session)).messages).toMatchObject([
         { messageId: 'msg_ffffffffffff00000000000001', state: 'cancelled' },
         {
@@ -8442,6 +8461,193 @@ describe('SandboxSession control-plane regressions', () => {
       stream?.close();
       socket.close();
       replacement?.close();
+    }
+  });
+
+  it('retries a lost completed native cleanup after Session reload without selecting N2', async () => {
+    const { fixture, session: originalSession } = messageFixture();
+    let session = originalSession;
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const { control, socket, provider } = await initializeTerminalRuntime(fixture, {
+      nativeRuntimeRetirement: true,
+    });
+    let dropCleanupResponse = true;
+    const requests: RequestFrame[] = [];
+    socket.addEventListener('message', event => {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      requests.push(request);
+      let result: unknown;
+      switch (request.operation) {
+        case 'session.attach':
+          result = {
+            attached: true,
+            nativeRuntimeId:
+              requests.filter(candidate => candidate.operation === 'session.attach').length === 1
+                ? nativeRuntimeId
+                : replacementRuntimeId,
+          };
+          break;
+        case 'session.prompt':
+          result = {
+            messageId: sessionPromptPayloadSchema.parse(request.payload).messageId,
+            status: 'accepted',
+          };
+          break;
+        case 'session.operation.get':
+          result = { state: 'missing' };
+          break;
+        case 'session.sync':
+          result = { status: { type: 'idle' }, questions: [], permissions: [] };
+          break;
+        case 'session.abort':
+          result = {
+            status: 'aborted',
+            quiescent: true,
+            runtimeRetired: true,
+            nativeRuntimeId,
+          };
+          break;
+        default:
+          throw new Error(`Unexpected control request: ${request.operation}`);
+      }
+      socket.send(
+        JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result })
+      );
+    });
+    await runInDurableObject(control, instance => {
+      const prototype = Object.getPrototypeOf(instance) as typeof instance;
+      const quarantine = instance.quarantineRuntime.bind(instance);
+      vi.spyOn(prototype, 'quarantineRuntime').mockImplementation(async input => {
+        const result = await quarantine(input);
+        if (dropCleanupResponse) throw new Error('lost cleanup response');
+        return result;
+      });
+    });
+    try {
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      await session.createSessionWithInitialAdmission({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+        agent: agentA,
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+        message: {
+          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'A' },
+        },
+      });
+      await waitForAccepted(session, INITIAL_MESSAGE_ID);
+      const attached = sessionOperationAuthorizationSchema.parse({
+        operation: 'session.attach',
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: INITIAL_MESSAGE_ID,
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId,
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        state.storage.kv.put('native_runtime_fence', {
+          sandboxId: fixture.sandboxId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+          nativeRuntimeId,
+          attachmentEpoch: 1,
+          authorization: attached,
+        });
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId }),
+      ]);
+      await runInDurableObject(session, (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        state.storage.kv.put(
+          'session_messages',
+          messages.map(message =>
+            message.messageId === INITIAL_MESSAGE_ID
+              ? {
+                  ...message,
+                  acceptedAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                  lastActivityAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                }
+              : message
+          )
+        );
+      });
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await vi.waitFor(async () => {
+        await expect(control.listRoutes()).resolves.toEqual([
+          expect.not.objectContaining({ nativeRuntimeId }),
+        ]);
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toMatchObject({
+          nativeRuntimeId,
+          authorization: attached,
+        });
+      });
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+
+      const replacementAuthorization = {
+        operation: 'session.attach' as const,
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMo',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      };
+      await expect(
+        control.request({
+          operation: 'session.attach',
+          authorization: replacementAuthorization,
+          session: replacementAuthorization.session,
+          expectedWrapperInstanceId: fixture.wrapperInstanceId,
+          payload: {},
+        })
+      ).resolves.toMatchObject({ ok: true, result: { nativeRuntimeId: replacementRuntimeId } });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      const beforeRetry = await runInDurableObject(control, async (_instance, state) => ({
+        deadlines: await loadDeadlines(state.storage),
+        alarmAt: await state.storage.getAlarm(),
+      }));
+
+      await expect(
+        runInDurableObject(session, (_instance, state) => state.abort('reload after lost cleanup'))
+      ).rejects.toThrow('reload after lost cleanup');
+      session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
+      dropCleanupResponse = false;
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+      expect(provider.stop).not.toHaveBeenCalled();
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadDeadlines(state.storage)).toEqual(beforeRetry.deadlines);
+        expect(await state.storage.getAlarm()).toBe(beforeRetry.alarmAt);
+      });
+    } finally {
+      socket.close();
     }
   });
 

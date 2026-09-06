@@ -16,12 +16,14 @@ export const SESSION_DELIVERY_TIMEOUT_MS =
 export class ControlRequestError extends Error {
   readonly code: string;
   readonly retryable: boolean;
+  readonly admission: ControlError['admission'];
 
   constructor(error: ControlError) {
     super(error.message);
     this.name = 'ControlRequestError';
     this.code = error.code;
     this.retryable = error.retryable;
+    this.admission = error.admission;
   }
 }
 

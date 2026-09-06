@@ -178,7 +178,11 @@ import {
   type ControlSessionMessageInput,
   type SessionMessageRecord,
 } from './session-message-queue.js';
-import { commitSessionOperationResult, dispatchSessionOperation } from './session-operation.js';
+import {
+  commitSessionOperationResult,
+  dispatchSessionOperation,
+  operationDispatchError,
+} from './session-operation.js';
 
 const METADATA_KEY = SANDBOX_SESSION_METADATA_KEY;
 const MESSAGES_KEY = 'session_messages';
@@ -206,6 +210,8 @@ const pendingRuntimeCleanupSchema = z.object({
   sandboxId: z.string().min(1),
   wrapperInstanceId: wrapperInstanceIdSchema,
   reason: z.string(),
+  nativeRuntimeId: z.string().uuid().optional(),
+  authorization: sessionOperationAuthorizationSchema.optional(),
 });
 
 type MessageRecord = SessionMessageRecord;
@@ -1644,25 +1650,39 @@ export class SandboxSession extends DurableObject<Env> {
         commit: messages => this.saveMessages(messages, epoch, 'operation_result'),
       },
       {
-        request: input => sandboxControlRpc(this.env, sandboxId).request(input),
+        request: (input, scope) => sandboxControlRpc(this.env, sandboxId, scope).request(input),
         persistResult: delivery =>
           this.applySandboxOperationResult({
             session: authorization.data.session,
             wrapperInstanceId: authorization.data.wrapperInstanceId,
             delivery,
           }),
-        isDispatchCurrent: () => false,
-        isMaintenanceCurrent: () => {
+        assertAdmission: () => {
           const current = this.loadMessages().find(item => item.messageId === message.messageId);
-          return (
+          if (
+            this.terminalLifecycle.isCurrent(epoch) &&
+            current?.wrapperInstanceId === authorization.data.wrapperInstanceId
+          )
+            return;
+          throw new Error('Original operation scope is unavailable');
+        },
+        assertScope: () => {
+          const current = this.loadMessages().find(item => item.messageId === message.messageId);
+          if (
             this.terminalLifecycle.isCurrent(epoch) &&
             current?.wrapperInstanceId === authorization.data.wrapperInstanceId &&
             current.operations?.prompt?.dispatched === true
-          );
+          )
+            return;
+          throw new Error('Original operation scope is unavailable');
         },
+        defer: pending => this.ctx.waitUntil(pending),
+        isCurrent: () => false,
       }
     );
-    return dispatched.state;
+    return dispatched.state === 'running' || dispatched.state === 'completed'
+      ? dispatched.state
+      : undefined;
   }
 
   async alarm(): Promise<void> {
@@ -2042,25 +2062,41 @@ export class SandboxSession extends DurableObject<Env> {
           commit: messages => this.saveMessages(messages, epoch, 'wrapper_outcome'),
         },
         {
-          request: input => control.request(input),
+          request: (input, scope) => sandboxControlRpc(this.env, sandboxId, scope).request(input),
           persistResult: delivery =>
             this.applySandboxOperationResult({
               session: authorization.session,
               wrapperInstanceId: authorization.wrapperInstanceId,
               delivery,
             }),
-          isDispatchCurrent: isCurrent,
-          isMaintenanceCurrent: () => {
-            if (!this.terminalLifecycle.isCurrent(epoch)) return false;
+          assertAdmission: () => {
+            if (!this.terminalLifecycle.isCurrent(epoch))
+              throw new Error('Session operation scope changed');
             const current = this.loadMessages().find(message => message.messageId === messageId);
-            if (!current || current.wrapperInstanceId !== wrapperInstanceId) return false;
-            return (
+            if (!current || current.wrapperInstanceId !== wrapperInstanceId)
+              throw new Error('Session operation scope changed');
+          },
+          assertScope: () => {
+            if (!this.terminalLifecycle.isCurrent(epoch))
+              throw new Error('Session operation scope changed');
+            const current = this.loadMessages().find(message => message.messageId === messageId);
+            if (!current || current.wrapperInstanceId !== wrapperInstanceId)
+              throw new Error('Session operation scope changed');
+            if (
               current.operations?.[operation === 'session.attach' ? 'attach' : 'prompt']
                 ?.dispatched === true
-            );
+            )
+              return;
+            throw new Error('Session operation scope changed');
           },
+          defer: pending => this.ctx.waitUntil(pending),
+          isCurrent,
         }
       );
+      if (dispatched.state !== 'response' && dispatched.state !== 'completed') {
+        if (dispatched.state === 'running' && operation === 'session.prompt') return dispatched;
+        throw operationDispatchError(dispatched);
+      }
       return dispatched;
     };
     await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
@@ -2074,7 +2110,7 @@ export class SandboxSession extends DurableObject<Env> {
       );
       return;
     }
-    if (this.pendingRuntimeCleanup()) return;
+    if (this.pendingRuntimeCleanup() && !(await this.transferRuntimeCleanup())) return;
     const intent = queued.intent;
     const model = dispatchedKilocodeModelId(intent?.agent.model);
     const control = sandboxControlRpc(this.env, sandboxId);
@@ -2432,13 +2468,27 @@ export class SandboxSession extends DurableObject<Env> {
     const sandboxId = metadata.workspace?.sandboxId;
     if (!sandboxId) return;
     const pending = this.pendingRuntimeCleanup();
-    if (pending && pending.wrapperInstanceId !== wrapperInstanceId) return;
+    // The first retained fence names the runtime that caused this cleanup. Never retarget it.
+    if (pending) return;
+    const nativeRuntime = nativeRuntimeFenceSchema.safeParse(
+      this.ctx.storage.kv.get<unknown>(NATIVE_RUNTIME_FENCE_KEY)
+    );
+    const target =
+      nativeRuntime.success &&
+      nativeRuntime.data.sandboxId === sandboxId &&
+      nativeRuntime.data.wrapperInstanceId === wrapperInstanceId
+        ? {
+            nativeRuntimeId: nativeRuntime.data.nativeRuntimeId,
+            authorization: nativeRuntime.data.authorization,
+          }
+        : {};
     this.ctx.storage.kv.put(PENDING_RUNTIME_CLEANUP_KEY, {
       ownerId: metadata.identity.userId,
       sessionId: metadata.identity.sessionId,
       sandboxId,
       wrapperInstanceId,
       reason,
+      ...target,
     });
     this.terminalLifecycle.invalidateRuntime({ sandboxId, wrapperInstanceId, confirmed: false });
   }
@@ -2462,6 +2512,12 @@ export class SandboxSession extends DurableObject<Env> {
               sessionId: pending.sessionId,
               wrapperInstanceId: pending.wrapperInstanceId,
               reason: pending.reason,
+              ...(pending.nativeRuntimeId
+                ? {
+                    nativeRuntimeId: pending.nativeRuntimeId,
+                    authorization: pending.authorization,
+                  }
+                : {}),
             }),
           'quarantineRuntime'
         ),
@@ -2470,10 +2526,24 @@ export class SandboxSession extends DurableObject<Env> {
       );
       if (typeof response?.quarantined !== 'boolean')
         throw new Error('Invalid quarantine response');
-      if (this.pendingRuntimeCleanup()?.wrapperInstanceId === pending.wrapperInstanceId) {
-        this.ctx.storage.kv.delete(PENDING_RUNTIME_CLEANUP_KEY);
+      if (
+        response.disposition === 'native_retired' ||
+        response.disposition === 'physical_stopped' ||
+        response.disposition === 'wrapper_replaced'
+      ) {
+        if (this.pendingRuntimeCleanup()?.wrapperInstanceId === pending.wrapperInstanceId)
+          this.ctx.storage.kv.delete(PENDING_RUNTIME_CLEANUP_KEY);
+        return this.pendingRuntimeCleanup() === undefined;
       }
-      return this.pendingRuntimeCleanup() === undefined;
+      if (
+        response.disposition === 'native_pending' ||
+        response.disposition === 'physical_stopping' ||
+        response.disposition === 'unconfirmed'
+      ) {
+        await this.armQueueRetry(Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+        return false;
+      }
+      throw new Error('Invalid quarantine disposition');
     } catch {
       logger.withFields({ sessionId: this.sessionId }).warn('Runtime quarantine transfer failed');
       await this.armQueueRetry(Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
@@ -2529,7 +2599,12 @@ export class SandboxSession extends DurableObject<Env> {
     if (epoch === null) return;
     const before = this.loadMessages();
     if (!this.terminalLifecycle.isCurrent(epoch)) return;
-    const { messages, failedIds } = applyFailWaitingMessages(before, reason, wrapperInstanceId);
+    const { messages, failedIds } = applyFailWaitingMessages(
+      before,
+      reason,
+      wrapperInstanceId,
+      false
+    );
     if (failedIds.length === 0 || !this.saveMessages(messages, epoch)) return;
     if (this.pendingRuntimeCleanup() || nextQueuedMessageId(this.loadMessages()))
       await this.armQueueRetry();

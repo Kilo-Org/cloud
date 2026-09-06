@@ -114,6 +114,7 @@ export const controlErrorSchema = z.object({
   code: z.string().min(1),
   message: z.string(),
   retryable: z.boolean(),
+  admission: z.literal('not-admitted').optional(),
 });
 
 export const requestFrameSchema = z.object({

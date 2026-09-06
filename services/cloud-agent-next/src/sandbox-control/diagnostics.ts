@@ -1,4 +1,4 @@
-import { withDORetry } from '@kilocode/worker-utils';
+import { withDORetry, type DORetryConfig } from '@kilocode/worker-utils';
 import { logger } from '../logger.js';
 
 export type ControlDiagnosticFields = Record<string, string | number | boolean | null | undefined>;
@@ -126,7 +126,8 @@ export function diagnosticConnection(
 export function withControlDORetry<TStub, TResult>(
   getStub: () => TStub,
   operation: (stub: TStub) => Promise<TResult>,
-  operationName: string
+  operationName: string,
+  config?: DORetryConfig
 ): Promise<TResult> {
   const logRetry = (_message: unknown, fields: unknown) => {
     try {
@@ -169,7 +170,7 @@ export function withControlDORetry<TStub, TResult>(
       return;
     }
   };
-  return withDORetry(getStub, operation, operationName, undefined, {
+  return withDORetry(getStub, operation, operationName, config, {
     warn: logRetry,
     error: logRetry,
   });

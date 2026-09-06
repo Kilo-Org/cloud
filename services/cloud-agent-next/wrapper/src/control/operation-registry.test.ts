@@ -186,7 +186,10 @@ describe('operation admission and lookup', () => {
     ).toMatchObject({ ok: true, result: { state: 'completed' } });
     expect(
       await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, first)
-    ).toMatchObject({ ok: false, error: { code: 'session_busy' } });
+    ).toMatchObject({
+      ok: false,
+      error: { code: 'session_busy', admission: 'not-admitted' },
+    });
     setSystemTime(first.dispatchDeadlineAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS + 1);
     pruneControlOperations(handlerDeps);
     expect(handlerDeps.operations.counts().retained).toBe(0);

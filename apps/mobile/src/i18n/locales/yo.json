@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Ènìyàn gbọ́dọ̀ ṣe àtúnyẹ̀wò ètò ìwọlé àkọ́kọ́ rẹ kí o tó lè lò ó lórí fóònù.",
       "iosTitle": "KiloClaw kò sí lórí iOS",
       "iosBody": "Fún àkọọ́lẹ̀ yìí, a ń ṣàkóso àyè sí KiloClaw ní òde ìṣàfilọ́lẹ̀ iOS.",
-      "iosContact": "Ṣé o ní ìbéèrè? Kàn sí hi@kilo.ai."
+      "iosContact": "Ṣé o ní ìbéèrè? Kàn sí hi@kilo.ai.",
+      "quarantinedCta": "Firánṣẹ́ ímeèlì sí ẹgbẹ́ wa",
+      "nonCanonicalEarlybirdCta": "Ṣàyẹ̀wò ètò rẹ lórí kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} nílò àfiyèsí: {{label}}",

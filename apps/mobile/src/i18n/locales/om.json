@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Karoorri kee kan dursanii fayyadamuu bilbila irratti hojiirra ooluu dura gamaaggama namaatiin godhamu barbaada.",
       "iosTitle": "KiloClaw iOS keessatti hin argamu",
       "iosBody": "Herrega kanaaf hayyamni KiloClaw fayyadamuu appii iOS ala bulfama.",
-      "iosContact": "Gaaffii qabdaa? hi@kilo.ai qunnami."
+      "iosContact": "Gaaffii qabdaa? hi@kilo.ai qunnami.",
+      "quarantinedCta": "Imeelii garee keenyaa ergi",
+      "nonCanonicalEarlybirdCta": "Karoorra kee kilo.ai irratti ilaali"
     },
     "instanceCard": {
       "needsAttention": "{{name}} xiyyeeffannoo barbaada: {{label}}",

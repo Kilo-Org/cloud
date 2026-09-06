@@ -1189,7 +1189,9 @@
       "nonCanonicalEarlybirdBody": "Kad galėtum naudoti ankstyvosios prieigos planą mobiliajame įrenginyje, jį pirmiausia turi peržiūrėti specialistai.",
       "iosTitle": "KiloClaw nepasiekiamas iOS programėlėje",
       "iosBody": "Šios paskyros KiloClaw prieiga tvarkoma ne iOS programėlėje.",
-      "iosContact": "Turi klausimų? Parašyk adresu hi@kilo.ai."
+      "iosContact": "Turi klausimų? Parašyk adresu hi@kilo.ai.",
+      "quarantinedCta": "Rašyti mūsų komandai el. paštu",
+      "nonCanonicalEarlybirdCta": "Peržiūrėti savo planą svetainėje kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Reikia patikrinti {{name}}: {{label}}",

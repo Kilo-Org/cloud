@@ -57,6 +57,7 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
   setAccountMetadata: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   Platform: { OS: 'ios' },
   AppState: { addEventListener: () => ({ remove: () => undefined }) },

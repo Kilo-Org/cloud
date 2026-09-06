@@ -42,6 +42,8 @@ export function getFilePartKind(input: { mime: string; filename?: string }): Fil
 }
 
 function resolveName(filename: string | undefined): string {
+  // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
+  // languages inflect by number; this key is the standalone noun label.
   return filename && filename.trim() !== '' ? filename : i18n.t('common.file');
 }
 

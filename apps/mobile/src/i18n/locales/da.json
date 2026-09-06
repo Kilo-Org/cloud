@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Dit abonnement med tidlig adgang kræver en manuel gennemgang, før det kan bruges på mobilen.",
       "iosTitle": "KiloClaw er ikke tilgængelig på iOS",
       "iosBody": "Adgangen til KiloClaw for denne konto administreres uden for iOS-appen.",
-      "iosContact": "Spørgsmål? Kontakt hi@kilo.ai."
+      "iosContact": "Spørgsmål? Kontakt hi@kilo.ai.",
+      "quarantinedCta": "Send en e-mail til vores team",
+      "nonCanonicalEarlybirdCta": "Se din plan igennem på kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} kræver opmærksomhed: {{label}}",

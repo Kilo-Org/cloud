@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Mmadụ ga-enyocharịrị atụmatụ nnweta mbụ gị tupu i nwee ike iji ya na ekwentị.",
       "iosTitle": "KiloClaw adịghị na iOS",
       "iosBody": "A na-ahụ maka ohere KiloClaw na mpụga ngwa iOS maka akaụntụ a.",
-      "iosContact": "Ajụjụ? Kpọtụrụ hi@kilo.ai."
+      "iosContact": "Ajụjụ? Kpọtụrụ hi@kilo.ai.",
+      "quarantinedCta": "Zipu email nye ìgwè anyị",
+      "nonCanonicalEarlybirdCta": "Lelee atụmatụ gị na kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} chọrọ nlebara anya: {{label}}",

@@ -111,7 +111,10 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
-  useReducedMotion: () => false,
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  selectReducedMotionEntrance: <T>(_reduced: boolean, entrance: T) => entrance,
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({

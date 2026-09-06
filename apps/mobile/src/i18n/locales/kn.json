@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "ನಿಮ್ಮ ಆರಂಭಿಕ ಪ್ರವೇಶ ಯೋಜನೆಯನ್ನು ಮೊಬೈಲ್‌ನಲ್ಲಿ ಬಳಸುವ ಮೊದಲು ಸಿಬ್ಬಂದಿ ಪರಿಶೀಲಿಸಬೇಕು.",
       "iosTitle": "IOSನಲ್ಲಿ KiloClaw ಲಭ್ಯವಿಲ್ಲ",
       "iosBody": "ಈ ಖಾತೆಯ KiloClaw ಪ್ರವೇಶವನ್ನು iOS ಆ್ಯಪ್‌ನ ಹೊರಗೆ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
-      "iosContact": "ಪ್ರಶ್ನೆಗಳಿವೆಯೇ? hi@kilo.aiಗೆ ಇಮೇಲ್ ಮಾಡಿ."
+      "iosContact": "ಪ್ರಶ್ನೆಗಳಿವೆಯೇ? hi@kilo.aiಗೆ ಇಮೇಲ್ ಮಾಡಿ.",
+      "quarantinedCta": "ನಮ್ಮ ತಂಡಕ್ಕೆ ಇಮೇಲ್ ಮಾಡಿ",
+      "nonCanonicalEarlybirdCta": "ನಿಮ್ಮ ಯೋಜನೆಯನ್ನು Kilo.ai ನಲ್ಲಿ ಪರಿಶೀಲಿಸಿ"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ಬಗ್ಗೆ ಗಮನಹರಿಸಬೇಕು: {{label}}",

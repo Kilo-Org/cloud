@@ -55,6 +55,10 @@ vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
 }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/centered-state-surface', () => ({
   StateSurfaceInsets: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
@@ -430,10 +434,8 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
         false
       );
-      press('New coding task');
-    } else {
-      press('New session');
     }
+    press('New session');
     expect(state.destination).toBe('/(app)/agent-chat/new');
   });
 
@@ -460,7 +462,7 @@ describe('AgentSessionListScreen live presentation', () => {
     state.tabBarHeight = 84;
     await renderScreen();
     expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(84);
-    const createAction = action('New coding task');
+    const createAction = action('New session');
     const label = createAction.findByType(Text);
     expect(createAction.props.className).toContain('max-w-full');
     expect(createAction.props.className).toContain('min-h-[44px]');
@@ -1290,7 +1292,7 @@ describe('Live list admission and lifecycle', () => {
     await renderScreen();
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(text()).toContain('Nothing running right now');
-    press('New coding task');
+    press('New session');
     expect(state.destination).toBe('/(app)/agent-chat/new?organizationId=org-1');
     expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
     expect(state.refetch).not.toHaveBeenCalled();
@@ -1302,7 +1304,7 @@ describe('Live list admission and lifecycle', () => {
     expect(header().props.eyebrow).toBeUndefined();
   });
 
-  it('refreshes live sessions on focus and preserves foreground tray invalidation', async () => {
+  it('refreshes live sessions once on focus and foreground', async () => {
     state.refetch.mockImplementationOnce(async () => {
       await Promise.resolve();
       state.live.activeSessions = [row];
@@ -1328,7 +1330,7 @@ describe('Live list admission and lifecycle', () => {
       title: 'Foreground result',
     });
     expect(state.refetch).toHaveBeenCalledTimes(2);
-    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [['activeSessions']] });
+    expect(state.invalidate).not.toHaveBeenCalled();
   });
 
   it.each([false, true])(

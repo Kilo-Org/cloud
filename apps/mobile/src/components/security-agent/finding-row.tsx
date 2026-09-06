@@ -5,7 +5,8 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink } from '@/components/ui/icons';
-import { ActivityIndicator, Linking, Pressable, View } from 'react-native';
+import { Linking, Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import {

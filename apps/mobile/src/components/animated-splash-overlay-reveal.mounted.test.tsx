@@ -27,7 +27,6 @@ vi.mock('react-native-reanimated', () => ({
       },
     };
   },
-  useReducedMotion: () => false,
   withTiming: (value: unknown) => value,
   withDelay: (_delay: number, value: unknown) => value,
   withSequence: (...values: unknown[]) => {
@@ -36,6 +35,9 @@ vi.mock('react-native-reanimated', () => ({
   },
   makeMutable: (value: unknown) => ({ value }),
   Easing: { out: (v: unknown) => v, in: (v: unknown) => v, quad: 0, cubic: 0 },
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
 }));
 vi.mock('react-native-worklets', () => ({ scheduleOnRN: vi.fn() }));
 vi.mock('expo-splash-screen', () => ({

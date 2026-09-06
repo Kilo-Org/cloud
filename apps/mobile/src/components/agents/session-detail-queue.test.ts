@@ -109,6 +109,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 // ── react-native / native bridges ──────────────────────────────────────────
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },

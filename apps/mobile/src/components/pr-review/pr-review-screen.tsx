@@ -3,7 +3,8 @@ import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Check, Share as ShareIcon } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';

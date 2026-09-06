@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 

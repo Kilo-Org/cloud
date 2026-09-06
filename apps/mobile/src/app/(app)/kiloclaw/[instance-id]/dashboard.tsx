@@ -1,7 +1,8 @@
 import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
 import { CreditCard, Newspaper, Pencil } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
-import { Alert, Linking, Platform, Pressable, RefreshControl, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 

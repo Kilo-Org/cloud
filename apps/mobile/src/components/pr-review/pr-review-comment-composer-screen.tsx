@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert } from 'react-native';
+import { Alert } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
 

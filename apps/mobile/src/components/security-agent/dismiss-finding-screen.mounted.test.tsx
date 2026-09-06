@@ -63,6 +63,7 @@ const dismissDraft = vi.hoisted(() => ({
   clear: vi.fn(),
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',

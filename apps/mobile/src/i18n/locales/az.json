@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Erkən giriş planından mobil cihazda istifadə etməzdən əvvəl plan mütəxəssis tərəfindən yoxlanmalıdır.",
       "iosTitle": "KiloClaw iOS-da əlçatan deyil",
       "iosBody": "Bu hesab üçün KiloClaw girişi iOS tətbiqindən kənarda idarə olunur.",
-      "iosContact": "Sualın var? hi@kilo.ai ünvanına yaz."
+      "iosContact": "Sualın var? hi@kilo.ai ünvanına yaz.",
+      "quarantinedCta": "Komandamıza e-poçt göndər",
+      "nonCanonicalEarlybirdCta": "Planını kilo.ai saytında nəzərdən keçir"
     },
     "instanceCard": {
       "needsAttention": "{{name}} diqqət tələb edir: {{label}}",

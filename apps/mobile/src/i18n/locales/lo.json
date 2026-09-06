@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "ແພັກເກດສຳລັບຜູ້ໃຊ້ຊ່ວງແຮກຂອງທ່ານຕ້ອງໃຫ້ທີມງານກວດສອບກ່ອນ ຈຶ່ງຈະໃຊ້ໃນມືຖືໄດ້.",
       "iosTitle": "ໃຊ້ KiloClaw ໃນ iOS ບໍ່ໄດ້",
       "iosBody": "ສຳລັບບັນຊີນີ້, ຕ້ອງຈັດການສິດເຂົ້າໃຊ້ KiloClaw ນອກແອັບ iOS.",
-      "iosContact": "ມີຄຳຖາມບໍ? ຕິດຕໍ່ hi@kilo.ai."
+      "iosContact": "ມີຄຳຖາມບໍ? ຕິດຕໍ່ hi@kilo.ai.",
+      "quarantinedCta": "ສົ່ງອີເມລໄປຫາທີມງານພວກເຮົາ",
+      "nonCanonicalEarlybirdCta": "ກວດສອບແພັກເກດຂອງທ່ານທີ່ kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ຕ້ອງໄດ້ຮັບການກວດສອບ: {{label}}",

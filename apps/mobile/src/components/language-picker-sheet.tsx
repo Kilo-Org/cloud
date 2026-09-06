@@ -2,7 +2,8 @@ import { reloadAppAsync } from 'expo';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, I18nManager, TextInput, View } from 'react-native';
+import { FlatList, I18nManager, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 

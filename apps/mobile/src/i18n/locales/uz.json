@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Erta foydalanish tarifingizni mobil qurilmada ishlatishdan oldin mutaxassis tekshirishi kerak.",
       "iosTitle": "KiloClaw iOSda mavjud emas",
       "iosBody": "Bu hisobning KiloClawdan foydalanish huquqi iOS ilovasidan tashqarida boshqariladi.",
-      "iosContact": "Savollaringiz bormi? hi@kilo.ai ga murojaat qiling."
+      "iosContact": "Savollaringiz bormi? hi@kilo.ai ga murojaat qiling.",
+      "quarantinedCta": "Jamoamizga xat yuborish",
+      "nonCanonicalEarlybirdCta": "Tarifingizni kilo.ai'da ko'rib chiqish"
     },
     "instanceCard": {
       "needsAttention": "{{name}} e'tibor talab qiladi: {{label}}",

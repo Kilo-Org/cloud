@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "ستاسو د لومړني لاسرسي پلان په موبایل کې له کارولو مخکې لاسي بیاکتنې ته اړتیا لري.",
       "iosTitle": "KiloClaw په iOS کې نشته",
       "iosBody": "د دې حساب لپاره KiloClaw ته لاسرسی د iOS له اپلیکیشن څخه بهر اداره کېږي.",
-      "iosContact": "پوښتنې لرئ؟ له hi@kilo.ai سره اړیکه ونیسئ."
+      "iosContact": "پوښتنې لرئ؟ له hi@kilo.ai سره اړیکه ونیسئ.",
+      "quarantinedCta": "زموږ ټیم ته ایمیل واستوئ",
+      "nonCanonicalEarlybirdCta": "خپل پلان په kilo.ai کې وڅېړئ"
     },
     "instanceCard": {
       "needsAttention": "{{name}} پاملرنې ته اړتیا لري: {{label}}",

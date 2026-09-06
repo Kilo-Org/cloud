@@ -24,14 +24,8 @@ import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  TextInput,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { Platform, Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CenteredState } from '@/components/centered-state';

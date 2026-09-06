@@ -101,7 +101,7 @@ describe('ActiveSessionsLiveSync — publication fences', () => {
     setSignOutActive(true);
     try {
       network.resolve({ sessions: [makeCached({ title: 'Late result' })] });
-      expect(await pending).toEqual({ accepted: false });
+      expect(await pending).toEqual({ accepted: false, canceled: true });
       expect(qc.getQueryData(QUERY_KEY)).toEqual(cached);
       expect(getActiveSessionsQueryMetadata(query).acceptedRevision).toBe(0);
     } finally {

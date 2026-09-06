@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "ମୋବାଇଲ୍‌ରେ ବ୍ୟବହାର କରିବା ପୂର୍ବରୁ ଆପଣଙ୍କ ପ୍ରାରମ୍ଭିକ ସୁବିଧା ଯୋଜନାକୁ ଜଣେ ସମୀକ୍ଷକ ଯାଞ୍ଚ କରିବା ଆବଶ୍ୟକ।",
       "iosTitle": "IOS ରେ KiloClaw ଉପଲବ୍ଧ ନାହିଁ",
       "iosBody": "ଏହି ଆକାଉଣ୍ଟ ପାଇଁ KiloClaw ବ୍ୟବହାରର ଅନୁମତି iOS ଆପ୍ ବାହାରେ ପରିଚାଳନା କରାଯାଏ।",
-      "iosContact": "କିଛି ପ୍ରଶ୍ନ ଅଛି? hi@kilo.ai ରେ ଯୋଗାଯୋଗ କରନ୍ତୁ।"
+      "iosContact": "କିଛି ପ୍ରଶ୍ନ ଅଛି? hi@kilo.ai ରେ ଯୋଗାଯୋଗ କରନ୍ତୁ।",
+      "quarantinedCta": "ଆମ ଦଳକୁ ଇମେଲ୍ କରନ୍ତୁ",
+      "nonCanonicalEarlybirdCta": "ଆପଣଙ୍କ ଯୋଜନାକୁ Kilo.ai ରେ ପରୀକ୍ଷା କରନ୍ତୁ"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ପ୍ରତି ଧ୍ୟାନ ଦେବା ଆବଶ୍ୟକ: {{label}}",

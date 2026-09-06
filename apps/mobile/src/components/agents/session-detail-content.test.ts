@@ -38,6 +38,8 @@ import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({
   useSessionManager: () => {
     if (!managerSlot.current) {

@@ -1189,7 +1189,9 @@
       "nonCanonicalEarlybirdBody": "Pred uporabo v mobilni aplikaciji je treba ročno pregledati tvoj paket za zgodnji dostop.",
       "iosTitle": "KiloClaw ni na voljo v sistemu iOS",
       "iosBody": "Dostop do KiloClaw za ta račun se upravlja zunaj aplikacije za iOS.",
-      "iosContact": "Imaš vprašanja? Piši na hi@kilo.ai."
+      "iosContact": "Imaš vprašanja? Piši na hi@kilo.ai.",
+      "quarantinedCta": "Pošlji e-pošto naši ekipi",
+      "nonCanonicalEarlybirdCta": "Preglej svoj paket na kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Pri primerku {{name}} je treba ukrepati: {{label}}",

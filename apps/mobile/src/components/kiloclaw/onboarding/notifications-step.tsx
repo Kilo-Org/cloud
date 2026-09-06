@@ -3,7 +3,8 @@ import * as SecureStore from 'expo-secure-store';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Linking, ScrollView, View } from 'react-native';
+import { Alert, Linking, ScrollView, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';

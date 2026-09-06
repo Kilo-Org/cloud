@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "Đăng ký gói trên trang web",
       "subscriptionPastDueBody": "Đã xảy ra sự cố với khoản thanh toán gần nhất của bạn. Truy cập kilo.ai/claw bằng trình duyệt để cập nhật thông tin thanh toán. Bạn không thể quản lý thanh toán trong ứng dụng.",
       "subscriptionPastDueTitle": "Cập nhật thông tin thanh toán trên web",
-      "trialExpiredBody": "Để tiếp tục sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng."
+      "trialExpiredBody": "Để tiếp tục sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng.",
+      "quarantinedCta": "Gửi email cho đội ngũ của chúng tôi",
+      "nonCanonicalEarlybirdCta": "Xem xét gói của bạn trên kilo.ai"
     },
     "controls": {
       "redeploying": "Đang triển khai lại…",

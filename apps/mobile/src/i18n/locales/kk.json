@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Ерте қолжетімділік тарифіңізді телефонда пайдалану үшін оны алдымен маман тексеруі керек.",
       "iosTitle": "KiloClaw iOS-та қолжетімсіз",
       "iosBody": "Бұл тіркелгінің KiloClaw қызметіне қол жеткізуі iOS қолданбасынан тыс басқарылады.",
-      "iosContact": "Сұрақтар бар ма? hi@kilo.ai мекенжайына хабарласыңыз."
+      "iosContact": "Сұрақтар бар ма? hi@kilo.ai мекенжайына хабарласыңыз.",
+      "quarantinedCta": "Командамызға хат жіберу",
+      "nonCanonicalEarlybirdCta": "Тарифіңізді kilo.ai сайтында қарап шығу"
     },
     "instanceCard": {
       "needsAttention": "{{name}} данасын тексеру қажет: {{label}}",

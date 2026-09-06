@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { type StoredMessage } from '@kilocode/cloud-agent-sdk';
 
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatDuration } from '@/lib/format';

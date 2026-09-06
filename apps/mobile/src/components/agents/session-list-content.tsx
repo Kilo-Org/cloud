@@ -1,14 +1,10 @@
 /* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
 import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  RefreshControl,
-  SectionList,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Platform, SectionList, useWindowDimensions, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -162,6 +158,7 @@ export function AgentSessionListContent({
       }
     })();
   }, [refetch]);
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />;
 
   const renderItem = useCallback(
     ({ item }: { item: StoredSession }) => (
@@ -208,7 +205,7 @@ export function AgentSessionListContent({
         <QueryError
           message={t('common.couldNotLoadSessions')}
           onRetry={onRetry}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={refreshControl}
         />
       </Animated.View>
     );
@@ -226,7 +223,7 @@ export function AgentSessionListContent({
           isSearching={isSearching}
           clearQueryAction={clearQueryAction}
           onRetry={onRetry}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={refreshControl}
         />
       </Animated.View>
     );
@@ -257,7 +254,7 @@ export function AgentSessionListContent({
           }
           clearQueryAction={clearQueryAction}
           onRetry={onRetry}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={refreshControl}
         />
       </Animated.View>
     );
@@ -272,7 +269,7 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
-        ListHeaderComponent={null}
+        ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (
@@ -285,7 +282,7 @@ export function AgentSessionListContent({
         keyboardDismissMode="on-drag"
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={refreshControl}
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
           autoscrollToTopThreshold: 10,

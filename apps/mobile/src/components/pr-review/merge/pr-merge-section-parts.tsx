@@ -3,7 +3,8 @@
 // repo's 300-line limit.
 
 import { type LucideIcon, RefreshCw } from '@/components/ui/icons';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';

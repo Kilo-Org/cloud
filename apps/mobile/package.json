@@ -61,6 +61,7 @@
     "expo": "~57.0.15",
     "expo-apple-authentication": "~57.0.1",
     "expo-application": "~57.0.2",
+    "expo-battery": "~57.0.2",
     "expo-blur": "~57.0.2",
     "expo-build-properties": "~57.0.13",
     "expo-clipboard": "~57.0.1",

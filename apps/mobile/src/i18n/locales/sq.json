@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Plani yt i qasjes së hershme kërkon rishikim manual përpara se ta përdorësh në telefon.",
       "iosTitle": "KiloClaw i padisponueshëm në iOS",
       "iosBody": "Qasja te KiloClaw menaxhohet jashtë aplikacionit iOS për këtë llogari.",
-      "iosContact": "Ke pyetje? Shkruaj në hi@kilo.ai."
+      "iosContact": "Ke pyetje? Shkruaj në hi@kilo.ai.",
+      "quarantinedCta": "Dërgo email për ekipin tonë",
+      "nonCanonicalEarlybirdCta": "Shqyrto planin tënd në kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} kërkon vëmendje: {{label}}",

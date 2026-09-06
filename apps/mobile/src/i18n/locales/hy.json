@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Նախքան վաղ հասանելիության քո սակագինը հեռախոսով օգտագործելը մասնագետը պետք է ստուգի այն։",
       "iosTitle": "KiloClaw-ը հասանելի չէ iOS-ում",
       "iosBody": "Այս հաշվի համար KiloClaw-ի հասանելիությունը կառավարվում է iOS հավելվածից դուրս։",
-      "iosContact": "Հարցե՞ր ունես։ Գրիր hi@kilo.ai հասցեին։"
+      "iosContact": "Հարցե՞ր ունես։ Գրիր hi@kilo.ai հասցեին։",
+      "quarantinedCta": "Գրել մեր թիմին",
+      "nonCanonicalEarlybirdCta": "Ստուգել Ձեր սակագինեը kilo.ai-ում"
     },
     "instanceCard": {
       "needsAttention": "{{name}}-ն ուշադրության կարիք ունի՝ {{label}}",

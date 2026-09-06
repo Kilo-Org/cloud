@@ -1189,7 +1189,9 @@
       "nonCanonicalEarlybirdBody": "Než budeš moci svůj tarif s předběžným přístupem používat na mobilu, musí ho náš tým ručně zkontrolovat.",
       "iosTitle": "KiloClaw není v iOS dostupný",
       "iosBody": "Přístup ke KiloClaw se u tohoto účtu spravuje mimo aplikaci pro iOS.",
-      "iosContact": "Máš otázky? Napiš na hi@kilo.ai."
+      "iosContact": "Máš otázky? Napiš na hi@kilo.ai.",
+      "quarantinedCta": "Napsat našemu týmu",
+      "nonCanonicalEarlybirdCta": "Zkontrolovat svůj tarif na kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} vyžaduje pozornost: {{label}}",

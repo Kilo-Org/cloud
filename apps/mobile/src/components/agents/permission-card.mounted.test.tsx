@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PermissionCard } from './permission-card';
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   ScrollView: 'ScrollView',

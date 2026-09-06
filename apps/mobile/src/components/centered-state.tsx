@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { useStateSurface } from '@/components/centered-state-surface';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { getCenteredStateLayout, type StateFrame } from '@/lib/centered-state-layout';
 import { cn } from '@/lib/utils';
 
@@ -124,6 +125,7 @@ export function CenteredState({
         accessibilityElementsHidden={!ready}
         importantForAccessibility={ready ? 'auto' : 'no-hide-descendants'}
       >
+        {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
         {children}
       </View>
     </ScrollView>

@@ -23,7 +23,8 @@ import {
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Linking, Platform, Pressable, Switch, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, Switch, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';

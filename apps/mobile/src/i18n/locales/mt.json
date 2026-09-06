@@ -1197,7 +1197,9 @@
       "nonCanonicalEarlybirdBody": "Il-pjan ta' aċċess bikri tiegħek jeħtieġ reviżjoni manwali qabel ma jintuża fuq il-mowbajl.",
       "iosTitle": "KiloClaw mhux disponibbli fuq iOS",
       "iosBody": "Għal dan il-kont, l-aċċess għal KiloClaw jiġi mmaniġġjat barra mill-app ta' iOS.",
-      "iosContact": "Mistoqsijiet? Ikkuntattja hi@kilo.ai."
+      "iosContact": "Mistoqsijiet? Ikkuntattja hi@kilo.ai.",
+      "quarantinedCta": "Ibgħat email lit-tim tagħna",
+      "nonCanonicalEarlybirdCta": "Irrevedi l-pjan tiegħek fuq kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} jeħtieġ attenzjoni: {{label}}",

@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "Abonneren via de website",
       "subscriptionPastDueBody": "Er was een probleem met je laatste betaling. Ga in je browser naar kilo.ai/claw om je betaalgegevens bij te werken. Je kunt de facturering niet in de app beheren.",
       "subscriptionPastDueTitle": "Betaalgegevens via de website bijwerken",
-      "trialExpiredBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te blijven gebruiken. Je kunt je niet in de app abonneren."
+      "trialExpiredBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te blijven gebruiken. Je kunt je niet in de app abonneren.",
+      "quarantinedCta": "Ons team een e-mail sturen",
+      "nonCanonicalEarlybirdCta": "Je plan bekijken op kilo.ai"
     },
     "controls": {
       "redeploying": "Opnieuw uitrollen…",

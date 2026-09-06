@@ -1,6 +1,7 @@
 import { ShieldCheck } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 

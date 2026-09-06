@@ -450,6 +450,16 @@ describe('handleControlRequest', () => {
     expect(result).toEqual({ ok: true, result: { attached: true } });
   });
 
+  it('attaches while Kilo is not ready', async () => {
+    const result = await handleControlRequest(
+      'session.attach',
+      session,
+      { kilo },
+      deps({ kiloReady: false })
+    );
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+  });
+
   it('registers terminal eligibility only after successful session attachment', async () => {
     const attached: unknown[] = [];
     const terminalRuntime = fakeTerminalRuntime({
@@ -666,7 +676,7 @@ describe('handleControlRequest', () => {
     expect(answered).toEqual([{ permissionId: 'perm_1', response: 'once' }]);
   });
 
-  it('fences new work during feed recovery while preserving pending input replies and Stop', async () => {
+  it('fences prompts during feed recovery while allowing attachments and pending input replies', async () => {
     const kiloClient = fakeKilo({
       getPermissions: async () => [
         {
@@ -694,6 +704,10 @@ describe('handleControlRequest', () => {
         retryable: true,
         admission: 'not-admitted',
       },
+    });
+    expect(await handleControlRequest('session.attach', session, { kilo }, handlerDeps)).toEqual({
+      ok: true,
+      result: { attached: true },
     });
     expect(
       await handleControlRequest(
@@ -3380,11 +3394,6 @@ describe('control cancellation and attachments', () => {
     expect(signals).toHaveLength(2);
     expect(signals.every(signal => signal.aborted)).toBe(true);
     expect(terminalStopped).toBe(true);
-    expect(
-      await handleControlRequest('session.attach', session, { kilo }, handlerDeps)
-    ).toMatchObject({
-      ok: false,
-    });
     running.resolve(completion());
   });
 

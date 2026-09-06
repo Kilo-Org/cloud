@@ -175,6 +175,7 @@ import {
   matchesSessionMessageReplay,
   nextQueuedMessageId,
   recordAcceptedMessageActivity,
+  releaseCompletedRetryableAttach,
   releaseUnadmittedWaitingMessages,
   resolveSessionMessageIntent,
   streamCloudStatus,
@@ -2362,6 +2363,19 @@ export class SandboxSession extends DurableObject<Env> {
     const queued = assigned.messages.find(message => message.messageId === messageId);
     const deadlineAt = queued?.deliveryDeadlineAt;
     if (!queued || deadlineAt === undefined) return;
+    if (Date.now() >= deadlineAt && !queued.operations?.prompt?.dispatched) {
+      await this.failDelivery(
+        messageId,
+        'preparation_timeout',
+        queued.wrapperInstanceId,
+        queued.deliveryRetryScope
+      );
+      return;
+    }
+    if (queued.retryNotBefore !== undefined && queued.retryNotBefore > Date.now()) {
+      await this.armQueueRetry(Math.min(deadlineAt, queued.retryNotBefore));
+      return;
+    }
     const provider = getSandboxProvider(metadata);
     const acquisition =
       provider === 'cloudflare' ? { id: assigned.attemptId, deadlineAt } : undefined;
@@ -2478,6 +2492,12 @@ export class SandboxSession extends DurableObject<Env> {
               if (
                 current.operations?.[operation === 'session.attach' ? 'attach' : 'prompt']
                   ?.dispatched === true
+              )
+                return;
+              if (
+                operation === 'session.attach' &&
+                current.operations?.retiredAttach &&
+                sameSessionOperation(current.operations.retiredAttach.authorization, authorization)
               )
                 return;
               throw new Error('Session operation scope changed');
@@ -2685,7 +2705,7 @@ export class SandboxSession extends DurableObject<Env> {
             ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
             : {}),
         };
-        phase = 'attach';
+        phase = needsPreparation ? 'preparing' : 'attach';
         await wait(() =>
           control.attachSession({
             ...(metadata.workspace?.worktreeId
@@ -2862,21 +2882,41 @@ export class SandboxSession extends DurableObject<Env> {
     const message = this.queuedMessage(messageId, epoch, wrapperInstanceId);
     if (!message) return;
     const rejection = error instanceof ControlRequestError && error.code !== 'runtime_unhealthy';
-    const scope = rejection && !message.unresolvedDispatch ? 'message' : 'runtime';
+    const completedAttachFailure =
+      message.operations?.attach?.dispatched === true &&
+      message.operations.attach.result?.ok === false;
+    const retryableCompletedAttach =
+      phase !== 'prompt' && rejection && isRetryableDeliveryError(error) && completedAttachFailure;
+    const scope =
+      phase === 'attach'
+        ? retryableCompletedAttach
+          ? 'message'
+          : 'runtime'
+        : rejection && !message.unresolvedDispatch
+          ? 'message'
+          : 'runtime';
     if (Date.now() >= deadlineAt) {
       await this.failDelivery(messageId, 'preparation_timeout', wrapperInstanceId, scope);
       return;
     }
     const busy = rejection && error.code === 'session_busy';
+    const retryNotBefore = Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS);
+    const released = retryableCompletedAttach
+      ? releaseCompletedRetryableAttach(this.loadMessages(), messageId, retryNotBefore)
+      : this.loadMessages();
     const updated =
       phase === 'preparing' || busy
         ? undefined
-        : incrementDeliveryFailure(this.loadMessages(), messageId, phase);
-    const messages = (updated?.messages ?? this.loadMessages()).map(
+        : incrementDeliveryFailure(released, messageId, phase);
+    const messages = (updated?.messages ?? released).map(
       (message): MessageRecord =>
         message.messageId === messageId ? { ...message, deliveryRetryScope: scope } : message
     );
     if (!this.saveMessages(messages, epoch)) return;
+    if (retryableCompletedAttach && !updated?.exhausted) {
+      await this.armQueueRetry(retryNotBefore);
+      return;
+    }
     if (isRetryableDeliveryError(error) && !updated?.exhausted) {
       await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
       return;

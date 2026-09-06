@@ -1812,9 +1812,32 @@ describe('normalize', () => {
       });
     });
 
-    it('defaults error when missing', () => {
+    it('uses attach_exhausted as the error when error is missing', () => {
       const result = normalize(
-        createRaw('cloud.message.failed', { messageId: 'msg', delivery: 'sent' })
+        createRaw('cloud.message.failed', {
+          messageId: 'msg',
+          delivery: 'sent',
+          reason: 'attach_exhausted',
+        })
+      );
+      expect(result).toEqual({
+        type: 'cloud.message.failed',
+        messageId: 'msg',
+        executionId: undefined,
+        delivery: 'sent',
+        error: 'attach_exhausted',
+        reason: 'execution',
+        attempts: undefined,
+      });
+    });
+
+    it('defaults error for internal disconnect reasons when error is missing', () => {
+      const result = normalize(
+        createRaw('cloud.message.failed', {
+          messageId: 'msg',
+          delivery: 'sent',
+          reason: 'control_disconnected',
+        })
       );
       expect(result).toEqual({
         type: 'cloud.message.failed',

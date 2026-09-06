@@ -72,6 +72,7 @@ export function deliveryErrorLogFields(error: unknown) {
       error instanceof ControlRequestError
         ? (controlErrorCodes.find(code => code === error.code) ?? 'unknown_control_error')
         : 'transport_or_internal_error',
+    ...(error instanceof ControlRequestError ? { errorMessage: error.message } : {}),
     retryable: isRetryableDeliveryError(error),
   };
 }

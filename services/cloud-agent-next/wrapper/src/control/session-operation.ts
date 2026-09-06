@@ -431,8 +431,6 @@ export class SessionOperation {
     work: Extract<SessionOperationWork, { operation: 'session.attach' }>
   ): Promise<ControlHandlerResult> {
     this.assertCurrent();
-    if (this.deps.prepareForNewWork?.() === false)
-      return fail('Native feed recovery is in progress', true);
     const result = await work.apply(this.session, work.payload, {
       signal: this.signal,
       assertCurrent: () => this.assertCurrent(),

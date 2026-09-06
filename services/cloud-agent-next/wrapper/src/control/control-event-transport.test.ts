@@ -21,6 +21,42 @@ const session = {
 const payload = { type: 'session.idle', properties: {} };
 
 describe('native-scoped control event failures', () => {
+  it.each([
+    ['session.preparing', false],
+    ['session.event', true],
+  ] as const)(
+    'retires the runtime after an expired %s only when required',
+    async (event, retires) => {
+      const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+      const runtime = { runtimeId: crypto.randomUUID() };
+      const retired = mock();
+      const handleFailure = createControlEventFailureHandler({
+        getRuntime: () => runtime,
+        onFailure: retired,
+      });
+      const reported = mock((failure: ControlEventOutboxFailure) => handleFailure(failure));
+      const transport = createControlEventTransport({
+        supportsReceipts: () => true,
+        prepare: input => input,
+        publish: async () => {},
+        sendLegacy: () => false,
+        onFailure: reported,
+      });
+      try {
+        expect(
+          transport.enqueue(event, payload, { ...session, nativeRuntimeId: runtime.runtimeId })
+        ).toBe(true);
+        clock.mockReturnValue(31_000);
+        expect(await transport.resume()).toBe(true);
+        expect(reported).toHaveBeenCalledTimes(1);
+        expect(retired).toHaveBeenCalledTimes(retires ? 1 : 0);
+      } finally {
+        transport.close();
+        clock.mockRestore();
+      }
+    }
+  );
+
   it.each(['expired', 'rejected'] as const)(
     'reports an immutable N1 %s publication without retiring or blocking N2',
     async reason => {

@@ -1024,6 +1024,19 @@ export class SandboxControl extends DurableObject<Env> {
       !matchesRoute(route) ||
       !socket
     ) {
+      const guard =
+        physical.state !== 'running'
+          ? 'physical_not_running'
+          : physical.stopTombstone
+            ? 'physical_stopping'
+            : !runtime
+              ? 'runtime_not_ready'
+              : physical.providerRef !== runtime.providerInstanceId
+                ? 'provider_mismatch'
+                : !matchesRoute(route)
+                  ? 'route_mismatch'
+                  : 'socket_not_ready';
+      logControlDiagnostic('worktree_changes_not_ready', { guard }, 'warn');
       return errorResponse(crypto.randomUUID(), 'not_ready', 'Worktree is not attached and ready');
     }
     if (

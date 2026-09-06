@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  OWNED_PROCESS_CLEANUP_UNREAPED,
+  type ControlDiagnosticFields,
+} from '../../../src/shared/control-diagnostics';
+import {
   SANDBOX_CONTROL_OPERATION_LIMIT,
   SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   sessionOperationLookupResultSchema,
@@ -17,6 +21,7 @@ import {
   completion,
   createHandlerFixture,
   fakeKilo,
+  kilo,
   operationAuthorization,
   promptPayload,
   session,
@@ -204,5 +209,118 @@ describe('operation admission and lookup', () => {
       )
     ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: false } });
     expect(handlerDeps.operations.counts().active).toBe(0);
+  });
+});
+
+describe('completed receipt prune', () => {
+  it('does not retire the wrapper when a completed receipt still has leftover occupancy', async () => {
+    const retired: string[] = [];
+    const diagnostics: Array<{ event: string; fields: ControlDiagnosticFields }> = [];
+    const handlerDeps = deps({
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+      retireRuntime: reason => {
+        retired.push(reason);
+      },
+      onDiagnostic: (event, fields) => diagnostics.push({ event, fields }),
+    });
+    const nativeRuntime = handlerDeps.kiloRuntimes;
+    if (!nativeRuntime) throw new Error('Missing native runtime');
+    const nativeRetire = spyOn(nativeRuntime, 'retireRuntime').mockResolvedValue('unconfirmed');
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+    const authorization = operationAuthorization();
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      promptPayload,
+      handlerDeps,
+      authorization
+    );
+    const record = onlyOperation(handlerDeps);
+    await record.done;
+    await record.waitForDelivery();
+
+    const release = spyOn(record, 'releaseProcessOwnership').mockReturnValue(false);
+    const cleaned = Promise.withResolvers<void>();
+    const cleanup = spyOn(record, 'cleanupOwnedWork').mockImplementation(async () => {
+      cleaned.resolve();
+      return false;
+    });
+    const requestRetirement = spyOn(record, 'requestRetirement');
+    const logged = spyOn(console, 'error').mockImplementation(() => {});
+    const runtime = nativeRuntime.get(session.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const attachStarted = Promise.withResolvers<void>();
+    const attachRelease = Promise.withResolvers<void>();
+    let attachAborted = false;
+    const attaching = handleControlRequest(
+      'session.attach',
+      session,
+      { kilo },
+      {
+        ...handlerDeps,
+        applyAttach: async (_identity, _payload, hooks) => {
+          if (!hooks.onRuntime) throw new Error('Missing attach runtime hook');
+          hooks.onRuntime(runtime);
+          const signal = hooks.signal;
+          if (signal) {
+            signal.addEventListener(
+              'abort',
+              () => {
+                attachAborted = true;
+              },
+              { once: true }
+            );
+          }
+          attachStarted.resolve();
+          await attachRelease.promise;
+          if (signal?.aborted) {
+            return {
+              ok: false,
+              error: {
+                code: 'not_ready',
+                message: 'Session attachment cancelled',
+                retryable: true,
+              },
+            };
+          }
+          return { ok: true, result: { attached: true } };
+        },
+      }
+    );
+    try {
+      await attachStarted.promise;
+      setSystemTime(authorization.dispatchDeadlineAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS + 1);
+      pruneControlOperations(handlerDeps);
+      await cleaned.promise;
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(requestRetirement).not.toHaveBeenCalled();
+      expect(retired).toEqual([]);
+      expect(attachAborted).toBe(false);
+      expect(handlerDeps.operations.retained()).not.toContain(record);
+      expect(
+        diagnostics.some(
+          diagnostic =>
+            diagnostic.event === 'session.task' &&
+            diagnostic.fields.stage === 'process_cleanup' &&
+            diagnostic.fields.phase === 'failed' &&
+            diagnostic.fields.ok === false &&
+            diagnostic.fields.messageId === authorization.messageId &&
+            String(diagnostic.fields.detail ?? '').startsWith('owned_process_unreaped ')
+        )
+      ).toBe(true);
+      expect(logged.mock.calls.some(args => args[0] === OWNED_PROCESS_CLEANUP_UNREAPED)).toBe(true);
+
+      attachRelease.resolve();
+      expect(await attaching).toMatchObject({ ok: true });
+    } finally {
+      attachRelease.resolve();
+      release.mockRestore();
+      cleanup.mockRestore();
+      requestRetirement.mockRestore();
+      nativeRetire.mockRestore();
+      logged.mockRestore();
+    }
   });
 });

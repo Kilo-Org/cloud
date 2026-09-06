@@ -1,6 +1,7 @@
 import { spawn } from 'child_process';
 import { appendFileSync } from 'fs';
-import { currentOwnedProcessScope } from './control/owned-processes.js';
+import { setTimeout as delay } from 'node:timers/promises';
+import { currentOwnedProcessScope, type OwnedProcessScope } from './control/owned-processes.js';
 
 export type ExecResult = {
   stdout: string;
@@ -45,6 +46,17 @@ const EXEC_HARD_TIMEOUT_MESSAGE = 'exec hard timeout reached';
 const EXEC_ABORTED_MESSAGE = 'exec aborted';
 const DEFAULT_MAX_OUTPUT_BYTES = 64 * 1_024;
 const TRUNCATION_MARKER = 'output truncated';
+const OWNED_TREE_OBSERVATION_MS = 1_000;
+
+async function waitForOwnedTree(scope: OwnedProcessScope, deadlineAt: number): Promise<void> {
+  if (process.platform !== 'linux' || Date.now() >= deadlineAt) return;
+  while (Date.now() < deadlineAt) {
+    if (await scope.verify(false, deadlineAt)) return;
+    const remaining = deadlineAt - Date.now();
+    if (remaining <= 0) return;
+    await delay(Math.min(25, remaining));
+  }
+}
 
 export type TerminationReason = 'timeout' | 'inactivity_timeout' | 'hard_timeout' | 'abort';
 
@@ -128,8 +140,9 @@ export function runProcess(
           ? { env: { ...process.env, ...opts.env } }
           : {}),
     };
+    const owned = currentOwnedProcessScope();
     const proc =
-      currentOwnedProcessScope()?.spawn(command, args, options) ??
+      owned?.spawn(command, args, options) ??
       spawn(command, args, {
         ...options,
         detached: true,
@@ -276,31 +289,45 @@ export function runProcess(
         opts.signal.addEventListener('abort', abortHandler, { once: true });
       }
     }
+    let finishing = false;
     proc.on('close', (code, signal) => {
-      if (settled) return;
+      if (settled || finishing) return;
       if (terminationReason !== null) {
         waitForTerminatedGroup();
         return;
       }
+      finishing = true;
+      clearTimers();
+      removeAbortHandler();
+      const exitCode = code ?? (signal === null ? 0 : 1);
+      const complete = (): void => {
+        if (settled) return;
+        settled = true;
+        resolve({
+          stdout,
+          stderr,
+          exitCode,
+          elapsedMs: Date.now() - startedAt,
+          ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
+          ...(stderrTruncated ? { stderrTruncated: true } : {}),
+        });
+      };
+      if (!owned || process.platform !== 'linux') {
+        complete();
+        return;
+      }
+      const remainingMs =
+        opts?.timeoutMs !== undefined
+          ? Math.max(0, opts.timeoutMs - (Date.now() - startedAt))
+          : OWNED_TREE_OBSERVATION_MS;
+      void waitForOwnedTree(owned, Date.now() + remainingMs).then(complete, complete);
+    });
+    proc.on('error', err => {
+      if (settled || finishing) return;
       settled = true;
       clearTimers();
       removeAbortHandler();
-      resolve({
-        stdout,
-        stderr,
-        exitCode: code ?? (signal === null ? 0 : 1),
-        elapsedMs: Date.now() - startedAt,
-        ...(stdoutTruncated ? { stdoutTruncated: true } : {}),
-        ...(stderrTruncated ? { stderrTruncated: true } : {}),
-      });
-    });
-    proc.on('error', err => {
-      if (!settled) {
-        settled = true;
-        clearTimers();
-        removeAbortHandler();
-        reject(err);
-      }
+      reject(err);
     });
   });
 }

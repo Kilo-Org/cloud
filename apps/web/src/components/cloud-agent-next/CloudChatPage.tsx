@@ -1207,6 +1207,7 @@ export default function CloudChatPage({
                             <SessionContinuationPanel
                               sessionId={sessionIdFromParams}
                               organizationId={organizationId}
+                              canForkToCloud={fetchedSessionData.cloudAgentSessionId !== null}
                             />
                           ) : null
                         ) : (

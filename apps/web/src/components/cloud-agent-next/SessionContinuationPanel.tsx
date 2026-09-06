@@ -10,9 +10,15 @@ type SessionContinuationPanelProps = {
   sessionId: string;
   /** Organization context the panel renders in; omitted for personal sessions. */
   organizationId?: string;
+  /** Whether the source session is a Cloud Agent session that can be forked. */
+  canForkToCloud?: boolean;
 };
 
-function SessionContinuationPanel({ sessionId, organizationId }: SessionContinuationPanelProps) {
+function SessionContinuationPanel({
+  sessionId,
+  organizationId,
+  canForkToCloud = true,
+}: SessionContinuationPanelProps) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
@@ -46,22 +52,24 @@ function SessionContinuationPanel({ sessionId, organizationId }: SessionContinua
 
       {expanded && (
         <div className="space-y-3 px-[max(1rem,calc(50%_-_27rem))] pb-4">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full gap-2"
-            disabled={isForking}
-            onClick={() => void handleForkToCloud()}
-          >
-            {isForking ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Cloud className="h-4 w-4" />
-            )}
-            {isForking
-              ? 'Starting a new Cloud Agent session...'
-              : 'Continue in a new Cloud Agent session'}
-          </Button>
+          {canForkToCloud && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              disabled={isForking}
+              onClick={() => void handleForkToCloud()}
+            >
+              {isForking ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Cloud className="h-4 w-4" />
+              )}
+              {isForking
+                ? 'Starting a new Cloud Agent session...'
+                : 'Continue in a new Cloud Agent session'}
+            </Button>
+          )}
 
           <OpenInEditorButton sessionId={sessionId} pathOverride={`/s/${sessionId}`} />
 

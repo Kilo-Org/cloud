@@ -60,7 +60,10 @@ export function SessionsPageContent() {
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
   const [sessionFilter, setSessionFilter] = useState<SessionFilterValue>('all');
   const [pendingSessionIds, setPendingSessionIds] = useState(() => new Set<string>());
-  type SessionWithSource = SessionsListItem & { source: 'v2' };
+  type SessionWithSource = SessionsListItem & {
+    source: 'v2';
+    cloudAgentSessionId?: string | null;
+  };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -186,6 +189,7 @@ export function SessionsPageContent() {
     return {
       createdAt: session.created_at,
       createdOnPlatform: session.created_on_platform,
+      cloudAgentSessionId: session.cloud_agent_session_id,
       prompt,
       repository,
       sessionId: session.session_id,
@@ -363,27 +367,30 @@ export function SessionsPageContent() {
               <div className="space-y-3">
                 <h3 className="text-sm font-medium">Fork Session</h3>
                 <p className="text-muted-foreground text-xs">
-                  Fork this session to continue working on it in your editor, CLI, or a new Cloud
-                  Agent session
+                  {selectedSession.cloudAgentSessionId
+                    ? 'Fork this session to continue working on it in your editor, CLI, or a new Cloud Agent session'
+                    : 'Fork this session to continue working on it in your editor or CLI'}
                 </p>
 
                 {/* Fork into a new Cloud Agent session */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2"
-                  disabled={forkingSessionId === selectedSession.sessionId}
-                  onClick={() => void handleForkToCloud()}
-                >
-                  {forkingSessionId === selectedSession.sessionId ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Cloud className="h-4 w-4" />
-                  )}
-                  {forkingSessionId === selectedSession.sessionId
-                    ? 'Forking to a new Cloud Agent session...'
-                    : 'Fork to a new Cloud Agent session'}
-                </Button>
+                {selectedSession.cloudAgentSessionId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    disabled={forkingSessionId === selectedSession.sessionId}
+                    onClick={() => void handleForkToCloud()}
+                  >
+                    {forkingSessionId === selectedSession.sessionId ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Cloud className="h-4 w-4" />
+                    )}
+                    {forkingSessionId === selectedSession.sessionId
+                      ? 'Forking to a new Cloud Agent session...'
+                      : 'Fork to a new Cloud Agent session'}
+                  </Button>
+                )}
 
                 {/* Open in Editor */}
                 <div className="flex justify-center">

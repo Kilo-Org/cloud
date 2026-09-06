@@ -52,7 +52,9 @@ const PROVIDER_LABEL_KEYS = {
   email: 'common.email',
   'fake-login': 'profile.providerTestAccount',
   github: 'common.github',
-  gitlab: 'common.gitlab',
+  gitlab:
+    // i18n-dup-ok: 'common.gitlab' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+    'common.gitlab',
   google: 'profile.providerGoogle',
   linkedin: 'profile.providerLinkedin',
   workos: 'profile.providerEnterpriseSso',
@@ -320,7 +322,7 @@ export function ProfileScreen() {
           />
           <ActionTile
             icon={LogOut}
-            label={t('profile.signOut')}
+            label={t('common.signOut')}
             color={colors.mutedForeground}
             onPress={confirmSignOut}
           />

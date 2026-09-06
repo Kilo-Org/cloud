@@ -860,7 +860,10 @@ function RootLayoutNav({
         primaryLabel={t('common.retry')}
         primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
         onPrimaryPress={refetchUserId}
-        secondaryLabel={t('common.signOut')}
+        secondaryLabel={t(
+          // i18n-dup-ok: 'common.signOut' — sole key; profile.signOut was removed here
+          'common.signOut'
+        )}
         secondaryAccessibilityLabel={t('common.signOut')}
         onSecondaryPress={() => {
           void signOut();

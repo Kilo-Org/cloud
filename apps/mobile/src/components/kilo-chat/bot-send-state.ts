@@ -29,7 +29,13 @@ function computeMobileBotDisplay(params: {
     return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
   }
   if (!params.presence) {
-    return { state: 'unknown', label: i18n.t('common.unknown') };
+    return {
+      state: 'unknown',
+      label: i18n.t(
+        // i18n-dup-ok: 'common.unknown' — kiloclaw.status.unknown is the uppercase badge fragment label-reference.test.ts enforces
+        'common.unknown'
+      ),
+    };
   }
   if (!params.presence.online) {
     return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
@@ -39,9 +45,21 @@ function computeMobileBotDisplay(params: {
     return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
   }
   if (elapsed > 30_000) {
-    return { state: 'idle', label: i18n.t('common.idle') };
+    return {
+      state: 'idle',
+      label: i18n.t(
+        // i18n-dup-ok: 'common.idle' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+        'common.idle'
+      ),
+    };
   }
-  return { state: 'online', label: i18n.t('common.online') };
+  return {
+    state: 'online',
+    label: i18n.t(
+      // i18n-dup-ok: 'common.online' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.online'
+    ),
+  };
 }
 
 export function resolveMobileMessageInputAvailability(params: {

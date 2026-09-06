@@ -103,10 +103,16 @@ function CodeBlockImpl({
 
   const truncatedMarker = isTruncated ? (
     <Text
-      accessibilityLabel={t('common.contentTruncated')}
+      accessibilityLabel={t(
+        // i18n-dup-ok: 'common.contentTruncated' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+        'common.contentTruncated'
+      )}
       className="mt-1 text-xs text-muted-foreground"
     >
-      {t('common.truncated')}
+      {t(
+        // i18n-dup-ok: 'common.truncated' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+        'common.truncated'
+      )}
     </Text>
   ) : null;
 

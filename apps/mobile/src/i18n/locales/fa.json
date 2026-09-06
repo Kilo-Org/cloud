@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "بررسی دستگاه‌های دیگر و خروج از حساب در آن‌ها",
     "feedback": "بازخورد",
     "privacyChoices": "تنظیمات حریم خصوصی",
-    "signOut": "خروج",
     "deleteAccount": "حذف حساب",
     "confirmationCode": "کد تأیید",
     "confirmationCodePlaceholder": "کد ۶ رقمی",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "باز کردن GitHub ممکن نشد. لطفاً دوباره تلاش کنید."
     },
     "settingsSave": {
-      "keepEditing": "ادامه ویرایش",
       "saveChanges": "ذخیره تغییرات",
       "unsavedTitle": "تغییرات ذخیره‌نشده",
       "unsavedMessage": "تغییرات شما پیش از خروج از این صفحه ذخیره شوند؟"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "قبل از ارسال، یک مدل انتخاب کنید.",
       "preparingPlaceholder": "در حال آماده‌سازی محیط…",
       "finalizingPlaceholder": "در حال اتمام کار…",
-      "messagePlaceholder": "پیام",
       "cannotReceiveFiles": "این نشست نمی‌تواند فایل دریافت کند. برای ارسال پیام، پیوست‌ها را حذف کنید.",
       "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش دوباره، روی «ارسال» بزنید.",
       "discardAttachmentsMessage": "فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
@@ -2777,7 +2774,6 @@
         "void": "باطل",
         "uncollectible": "وصول‌نشدنی"
       },
-      "loadMoreFailed": "بارگذاری موارد بیشتر ناموفق بود.",
       "truncated": "فاکتورهای قدیمی‌تر در دسترس هستند."
     },
     "lowBalanceAlert": {

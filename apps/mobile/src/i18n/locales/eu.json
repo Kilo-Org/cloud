@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Berrikusi beste gailuetako saioak eta itxi",
     "feedback": "Bidali iritzia",
     "privacyChoices": "Pribatutasun-aukerak",
-    "signOut": "Amaitu saioa",
     "deleteAccount": "Ezabatu kontua",
     "confirmationCode": "Berrespen-kodea",
     "confirmationCodePlaceholder": "6 digituko kodea",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Ezin izan da GitHub ireki. Saiatu berriro."
     },
     "settingsSave": {
-      "keepEditing": "Jarraitu editatzen",
       "saveChanges": "Gorde aldaketak",
       "unsavedTitle": "Gorde gabeko aldaketak",
       "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Hautatu modelo bat bidali aurretik.",
       "preparingPlaceholder": "Ingurunea prestatzen…",
       "finalizingPlaceholder": "Amaitzen…",
-      "messagePlaceholder": "Mezua",
       "cannotReceiveFiles": "Saio honek ezin du fitxategirik jaso. Kendu eranskinak zure mezua bidaltzeko.",
       "couldNotAttachFiles": "Ezin izan dira fitxategiak erantsi. Sakatu Bidali berriro saiatzeko.",
       "discardAttachmentsMessage": "Igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
@@ -2777,7 +2774,6 @@
         "void": "Baliogabetuta",
         "uncollectible": "Kobratu ezina"
       },
-      "loadMoreFailed": "Ezin izan dira gehiago kargatu.",
       "truncated": "Aurreko fakturak eskuragarri daude."
     },
     "lowBalanceAlert": {

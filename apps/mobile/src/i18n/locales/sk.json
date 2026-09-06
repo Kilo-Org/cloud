@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Skontrolovať a odhlásiť iné zariadenia",
     "feedback": "Spätná väzba",
     "privacyChoices": "Nastavenia súkromia",
-    "signOut": "Odhlásiť sa",
     "deleteAccount": "Odstrániť účet",
     "confirmationCode": "Potvrdzovací kód",
     "confirmationCodePlaceholder": "6-miestny kód",
@@ -1723,7 +1722,6 @@
       "couldNotOpenGithub": "GitHub sa nepodarilo otvoriť. Skúste to znova."
     },
     "settingsSave": {
-      "keepEditing": "Pokračovať v úpravách",
       "saveChanges": "Uložiť zmeny",
       "unsavedTitle": "Neuložené zmeny",
       "unsavedMessage": "Uložiť zmeny pred opustením tejto obrazovky?"
@@ -2391,7 +2389,6 @@
       "selectModelBeforeSending": "Pred odoslaním vyber model.",
       "preparingPlaceholder": "Pripravuje sa prostredie…",
       "finalizingPlaceholder": "Dokončuje sa…",
-      "messagePlaceholder": "Správa",
       "cannotReceiveFiles": "Táto relácia nemôže prijímať súbory. Ak chceš odoslať správu, odstráň prílohy.",
       "couldNotAttachFiles": "Súbory sa nepodarilo priložiť. Klepnutím na Odoslať to skús znova.",
       "discardAttachmentsMessage": "Nahrané súbory nepriložené k odoslaným správam sa odstránia.",
@@ -2819,7 +2816,6 @@
         "void": "Stornovaná",
         "uncollectible": "Nevymožiteľná"
       },
-      "loadMoreFailed": "Nepodarilo sa načítať ďalšie položky.",
       "truncated": "Staršie faktúry sú k dispozícii."
     },
     "lowBalanceAlert": {

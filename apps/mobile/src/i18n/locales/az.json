@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Digər cihazlara bax və onlardakı hesabından çıx",
     "feedback": "Rəy",
     "privacyChoices": "Məxfilik seçimləri",
-    "signOut": "Çıxış et",
     "deleteAccount": "Hesabı sil",
     "confirmationCode": "Təsdiq kodu",
     "confirmationCodePlaceholder": "6 rəqəmli kod",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub-u açmaq mümkün olmadı. Yenidən cəhd et."
     },
     "settingsSave": {
-      "keepEditing": "Redaktəyə davam et",
       "saveChanges": "Dəyişiklikləri yadda saxla",
       "unsavedTitle": "Yadda saxlanılmamış dəyişikliklər",
       "unsavedMessage": "Bu ekrandan çıxmazdan əvvəl dəyişikliklər yadda saxlanılsın?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Göndərməzdən əvvəl model seç.",
       "preparingPlaceholder": "Mühit qurulur...",
       "finalizingPlaceholder": "Tamamlanır...",
-      "messagePlaceholder": "Mesaj",
       "cannotReceiveFiles": "Bu sessiya fayl qəbul edə bilmir. Mesajını göndərmək üçün əlavələri sil.",
       "couldNotAttachFiles": "Faylları əlavə etmək mümkün olmadı. Yenidən cəhd etmək üçün «Göndər» düyməsinə toxun.",
       "discardAttachmentsMessage": "Heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
@@ -2777,7 +2774,6 @@
         "void": "Ləğv edilib",
         "uncollectible": "Alınmaz borc"
       },
-      "loadMoreFailed": "Daha çox məlumat yükləmək mümkün olmadı.",
       "truncated": "Əvvəlki hesab-fakturalara da baxmaq olar."
     },
     "lowBalanceAlert": {

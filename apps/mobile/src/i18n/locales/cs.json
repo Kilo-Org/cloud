@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Zkontrolovat a odhlásit ostatní zařízení",
     "feedback": "Zpětná vazba",
     "privacyChoices": "Nastavení soukromí",
-    "signOut": "Odhlásit se",
     "deleteAccount": "Smazat účet",
     "confirmationCode": "Potvrzovací kód",
     "confirmationCodePlaceholder": "6místný kód",
@@ -1723,7 +1722,6 @@
       "couldNotOpenGithub": "GitHub se nepodařilo otevřít. Zkuste to znovu."
     },
     "settingsSave": {
-      "keepEditing": "Pokračovat v úpravách",
       "saveChanges": "Uložit změny",
       "unsavedTitle": "Neuložené změny",
       "unsavedMessage": "Uložit změny před opuštěním této obrazovky?"
@@ -2391,7 +2389,6 @@
       "selectModelBeforeSending": "Před odesláním vyberte model.",
       "preparingPlaceholder": "Příprava prostředí…",
       "finalizingPlaceholder": "Dokončování…",
-      "messagePlaceholder": "Zpráva",
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
       "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na tlačítko pro odeslání to zkuste znovu.",
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
@@ -2819,7 +2816,6 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "loadMoreFailed": "Další položky se nepodařilo načíst.",
       "truncated": "Starší faktury jsou k dispozici."
     },
     "lowBalanceAlert": {

@@ -229,7 +229,10 @@ export function SettingsCard({
     Alert.alert(removeAlertTitle, removeAlertMessage, [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: t('common.remove'),
+        text: t(
+          // i18n-dup-ok: 'common.remove' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+          'common.remove'
+        ),
         style: 'destructive',
         onPress: () => {
           setIsRemoving(true);

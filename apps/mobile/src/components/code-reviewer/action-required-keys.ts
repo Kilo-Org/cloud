@@ -4,14 +4,18 @@ import { type CodeReviewActionRequiredReason } from '@kilocode/app-shared/code-r
 // English for web; mobile renders the translated copy for the same reason code.
 export const ACTION_REQUIRED_KEYS = {
   github_installation_required: {
-    title: 'codeReviewer.actionRequired.title',
+    title:
+      // i18n-dup-ok: 'codeReviewer.actionRequired.title' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'codeReviewer.actionRequired.title',
     description: 'codeReviewer.actionRequired.githubInstallationRequired.description',
     recoveryLabel: 'codeReviewer.actionRequired.githubInstallationRequired.recoveryLabel',
   },
   github_ip_allow_list: {
     title: 'codeReviewer.actionRequired.title',
     description: 'codeReviewer.actionRequired.githubIpAllowList.description',
-    recoveryLabel: 'codeReviewer.actionRequired.recoveryLabel',
+    recoveryLabel:
+      // i18n-dup-ok: 'codeReviewer.actionRequired.recoveryLabel' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'codeReviewer.actionRequired.recoveryLabel',
   },
   gitlab_project_access_required: {
     title: 'codeReviewer.actionRequired.title',

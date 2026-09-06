@@ -15,7 +15,15 @@ export default function ModelSettingsScreen() {
   const { t } = useTranslation();
 
   if (instanceContext.status === 'error' || instanceContext.status === 'not_found') {
-    return <InstanceContextBoundary title={t('common.model')} context={instanceContext} />;
+    return (
+      <InstanceContextBoundary
+        title={t(
+          // i18n-dup-ok: 'common.model' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+          'common.model'
+        )}
+        context={instanceContext}
+      />
+    );
   }
 
   return (

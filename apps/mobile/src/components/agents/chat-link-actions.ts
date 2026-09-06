@@ -11,9 +11,25 @@ type ChatLinkActionOption = { kind: ChatLinkAction | 'cancel'; label: string };
 
 export function buildChatLinkActionSheet({ isPrLink = false }: { isPrLink?: boolean } = {}) {
   const actions: ChatLinkActionOption[] = [
-    ...(isPrLink ? ([{ kind: 'review-pr', label: i18n.t('common.reviewPr') }] as const) : []),
+    ...(isPrLink
+      ? ([
+          {
+            kind: 'review-pr',
+            label: i18n.t(
+              // i18n-dup-ok: 'common.reviewPr' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.reviewPr'
+            ),
+          },
+        ] as const)
+      : []),
     { kind: 'open', label: i18n.t('agentChat.chatLink.openLink') },
-    { kind: 'copy', label: i18n.t('common.copyLink') },
+    {
+      kind: 'copy',
+      label: i18n.t(
+        // i18n-dup-ok: 'common.copyLink' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+        'common.copyLink'
+      ),
+    },
     { kind: 'share', label: i18n.t('agentChat.chatLink.shareLink') },
     { kind: 'cancel', label: i18n.t('common.cancel') },
   ];

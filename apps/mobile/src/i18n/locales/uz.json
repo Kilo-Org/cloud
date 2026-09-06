@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Boshqa qurilmalarni ko'rish va ulardagi sessiyalarni tugatish",
     "feedback": "Fikr-mulohaza",
     "privacyChoices": "Maxfiylik sozlamalari",
-    "signOut": "Tizimdan chiqish",
     "deleteAccount": "Hisobni o‘chirish",
     "confirmationCode": "Tasdiqlash kodi",
     "confirmationCodePlaceholder": "6 xonali kod",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHubni ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "settingsSave": {
-      "keepEditing": "Tahrirlashni davom ettirish",
       "saveChanges": "O'zgarishlarni saqlash",
       "unsavedTitle": "Saqlanmagan o'zgarishlar",
       "unsavedMessage": "Bu ekrandan chiqishdan oldin o'zgarishlar saqlansinmi?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Yuborishdan oldin modelni tanlang.",
       "preparingPlaceholder": "Muhit sozlanmoqda...",
       "finalizingPlaceholder": "Yakunlanmoqda...",
-      "messagePlaceholder": "Xabar",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirilgan fayllarni olib tashlang.",
       "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborish tugmasini bosing.",
       "discardAttachmentsMessage": "Hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
@@ -2777,7 +2774,6 @@
         "void": "Bekor qilingan",
         "uncollectible": "Undirib bo'lmaydi"
       },
-      "loadMoreFailed": "Qolganlarini yuklab bo‘lmadi.",
       "truncated": "Oldingi hisob-fakturalar ham mavjud."
     },
     "lowBalanceAlert": {

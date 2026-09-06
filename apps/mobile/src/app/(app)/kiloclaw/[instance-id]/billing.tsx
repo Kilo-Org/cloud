@@ -27,7 +27,9 @@ import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 const SUBSCRIPTION_PLAN_KEYS = {
-  commit: 'kiloclaw.billing.commit',
+  commit:
+    // i18n-dup-ok: 'kiloclaw.billing.commit' — prReview.overview.commit is a plural count suffix, not a plan name
+    'kiloclaw.billing.commit',
   standard: 'kiloclaw.billing.planName.standard',
 } satisfies Record<string, string>;
 
@@ -164,7 +166,13 @@ function PlanDetails({
       <View>
         <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.freeTrial')} />
         <View className="h-px bg-border" />
-        <DetailRow label={t('common.remaining')} value={daysText} />
+        <DetailRow
+          label={t(
+            // i18n-dup-ok: 'common.remaining' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+            'common.remaining'
+          )}
+          value={daysText}
+        />
         <View className="h-px bg-border" />
         <DetailRow
           label={t('kiloclaw.billing.ends')}

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ពិនិត្យ និងចេញពីគណនីលើឧបករណ៍ផ្សេងទៀត",
     "feedback": "មតិកែលម្អ",
     "privacyChoices": "ជម្រើសឯកជនភាព",
-    "signOut": "ចាកចេញ",
     "deleteAccount": "លុបគណនី",
     "confirmationCode": "លេខកូដបញ្ជាក់",
     "confirmationCodePlaceholder": "លេខកូដ 6 ខ្ទង់",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "មិនអាចបើក GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
     "settingsSave": {
-      "keepEditing": "បន្តកែសម្រួល",
       "saveChanges": "រក្សាទុកការផ្លាស់ប្តូរ",
       "unsavedTitle": "ការផ្លាស់ប្តូរដែលមិនទាន់រក្សាទុក",
       "unsavedMessage": "រក្សាទុកការផ្លាស់ប្តូររបស់អ្នក មុនពេលចាកចេញពីអេក្រង់នេះ?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "សូមជ្រើសរើសម៉ូដែលមុនពេលផ្ញើ។",
       "preparingPlaceholder": "កំពុងរៀបចំបរិស្ថានដំណើរការ...",
       "finalizingPlaceholder": "កំពុងបញ្ចប់...",
-      "messagePlaceholder": "សារ",
       "cannotReceiveFiles": "វគ្គនេះមិនអាចទទួលឯកសារបានទេ។ ដកឯកសារភ្ជាប់ចេញដើម្បីផ្ញើសាររបស់អ្នក។",
       "couldNotAttachFiles": "មិនអាចភ្ជាប់ឯកសារបានទេ។ ប៉ះ ផ្ញើ ដើម្បីព្យាយាមម្តងទៀត។",
       "discardAttachmentsMessage": "ឯកសារដែលបានផ្ទុកឡើង តែមិនទាន់ភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវលុប។",
@@ -2777,7 +2774,6 @@
         "void": "បានលុបចោល",
         "uncollectible": "មិនអាចទារបាន"
       },
-      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ។",
       "truncated": "អ្នកអាចមើលវិក្កយបត្រមុនៗបាន។"
     },
     "lowBalanceAlert": {

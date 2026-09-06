@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Semak sesi dan log keluar daripada peranti lain",
     "feedback": "Maklum balas",
     "privacyChoices": "Pilihan privasi",
-    "signOut": "Log keluar",
     "deleteAccount": "Padam akaun",
     "confirmationCode": "Kod pengesahan",
     "confirmationCodePlaceholder": "kod 6 digit",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Tidak dapat membuka GitHub. Sila cuba lagi."
     },
     "settingsSave": {
-      "keepEditing": "Teruskan menyunting",
       "saveChanges": "Simpan perubahan",
       "unsavedTitle": "Perubahan belum disimpan",
       "unsavedMessage": "Simpan perubahan anda sebelum meninggalkan skrin ini?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Pilih model sebelum menghantar mesej.",
       "preparingPlaceholder": "Menyediakan persekitaran...",
       "finalizingPlaceholder": "Menyelesaikan tugasan...",
-      "messagePlaceholder": "Mesej",
       "cannotReceiveFiles": "Sesi ini tidak boleh menerima fail. Buang lampiran untuk menghantar mesej anda.",
       "couldNotAttachFiles": "Tidak dapat melampirkan fail. Ketik hantar untuk mencuba semula.",
       "discardAttachmentsMessage": "Fail yang dimuat naik tetapi tidak dilampirkan pada mesej yang dihantar akan dipadam.",
@@ -2777,7 +2774,6 @@
         "void": "Dibatalkan",
         "uncollectible": "Tidak dapat dikutip"
       },
-      "loadMoreFailed": "Tidak dapat memuatkan lebih banyak item.",
       "truncated": "Invois terdahulu tersedia."
     },
     "lowBalanceAlert": {

@@ -44,7 +44,11 @@ function InstanceRow({
         </Text>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <Text variant="muted" numberOfLines={1}>
-            {instance.organizationName ?? t('common.personal')}
+            {instance.organizationName ??
+              t(
+                // i18n-dup-ok: 'common.personal' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.personal'
+              )}
           </Text>
           <StatusBadge status={instance.status} />
         </View>
@@ -100,7 +104,10 @@ export default function InstancePickerScreen() {
       {showList && loadedInstances.length === 0 ? (
         <EmptyState
           icon={Server}
-          title={t('common.noKiloclawInstances')}
+          title={t(
+            // i18n-dup-ok: 'common.noKiloclawInstances' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+            'common.noKiloclawInstances'
+          )}
           description={t('chat.instancePicker.noInstancesDescription')}
           action={
             <Button

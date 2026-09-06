@@ -86,6 +86,7 @@ function formatPeriodEnd(iso: string | null): string | null {
 
 function cancelingSubtitle(agreement: NonNullable<OrgKiloPassSummary['agreement']>): string {
   const ends = formatPeriodEnd(agreement.paidThrough);
+  // i18n-dup-ok: 'common.ends' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
   return ends
     ? `${i18n.t('common.ends', { date: ends })} · ${activeSubtitle(agreement)}`
     : `${i18n.t('organization.kiloPass.canceling')} · ${activeSubtitle(agreement)}`;

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Review and sign out other devices",
     "feedback": "Feedback",
     "privacyChoices": "Privacy choices",
-    "signOut": "Sign Out",
     "deleteAccount": "Delete Account",
     "confirmationCode": "Confirmation code",
     "confirmationCodePlaceholder": "6-digit code",
@@ -1709,7 +1708,6 @@
       "couldNotOpenGithub": "Could not open GitHub. Please try again."
     },
     "settingsSave": {
-      "keepEditing": "Keep Editing",
       "saveChanges": "Save changes",
       "unsavedTitle": "Unsaved changes",
       "unsavedMessage": "Save your changes before leaving this screen?"
@@ -2379,7 +2377,6 @@
       "selectModelBeforeSending": "Select a model before sending",
       "preparingPlaceholder": "Setting up environment...",
       "finalizingPlaceholder": "Wrapping up...",
-      "messagePlaceholder": "Message...",
       "cannotReceiveFiles": "This session can't receive files. Remove the attachments to send your message.",
       "couldNotAttachFiles": "Couldn't attach files. Tap send to try again."
     },
@@ -2784,7 +2781,6 @@
       "emptyDescription": "Invoices are generated automatically each billing cycle and will appear here once your organization is billed.",
       "emptyTitle": "No invoices",
       "invoiceFallback": "Invoice",
-      "loadMoreFailed": "Couldn't load more.",
       "truncated": "Older invoices are available.",
       "title": "Invoices",
       "downloadFailed": "Couldn't download invoice. Check your connection and try again.",

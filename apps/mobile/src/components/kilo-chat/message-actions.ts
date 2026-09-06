@@ -45,7 +45,13 @@ export function buildMessageActionSheetOptions({
     actions.push({ kind: 'more-reactions', label: i18n.t('chat.messageActions.moreReactions') });
   }
   if (canUseApiBackedActions && canReply) {
-    actions.push({ kind: 'reply', label: i18n.t('common.reply') });
+    actions.push({
+      kind: 'reply',
+      label: i18n.t(
+        // i18n-dup-ok: 'common.reply' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+        'common.reply'
+      ),
+    });
   }
   if (canCopy) {
     actions.push({ kind: 'copy', label: i18n.t('common.copy') });

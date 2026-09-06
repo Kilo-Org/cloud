@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "نورې وسیلې وګورئ او حساب ترې وباسئ",
     "feedback": "نظر ورکړئ",
     "privacyChoices": "د محرمیت انتخابونه",
-    "signOut": "ووځئ",
     "deleteAccount": "حساب ړنګ کړئ",
     "confirmationCode": "د تایید کوډ",
     "confirmationCodePlaceholder": "شپږ رقمي کوډ",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub پرانیستل نه شو. مهرباني وکړئ بیا هڅه وکړئ."
     },
     "settingsSave": {
-      "keepEditing": "سمون ته دوام ورکړئ",
       "saveChanges": "بدلونونه خوندي کړئ",
       "unsavedTitle": "خوندي نه شوي بدلونونه",
       "unsavedMessage": "له دې پردې څخه تر وتلو مخکې مو بدلونونه خوندي شي؟"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "تر لېږلو مخکې یو ماډل غوره کړئ.",
       "preparingPlaceholder": "چاپېریال چمتو کېږي...",
       "finalizingPlaceholder": "بشپړېږي...",
-      "messagePlaceholder": "پیغام",
       "cannotReceiveFiles": "دا ناسته فایلونه نه شي ترلاسه کولی. د خپل پیغام د لېږلو لپاره ضمیمې لرې کړئ.",
       "couldNotAttachFiles": "فایلونه ضمیمه نه شول. د بیا هڅې لپاره د لېږلو تڼۍ ووهئ.",
       "discardAttachmentsMessage": "هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
@@ -2777,7 +2774,6 @@
         "void": "لغوه شوی",
         "uncollectible": "نه وصولېدونکی"
       },
-      "loadMoreFailed": "نور توکي بار نه شول.",
       "truncated": "پخواني بلونه هم شته."
     },
     "lowBalanceAlert": {

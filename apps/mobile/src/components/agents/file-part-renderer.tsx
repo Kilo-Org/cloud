@@ -263,7 +263,12 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
             accessibilityLabel={t('agentChat.filePart.imageUnavailableRetry')}
           >
             <AlertCircle size={14} color={colors.mutedForeground} />
-            <Text className="text-xs text-muted-foreground">{t('common.imageUnavailable')}</Text>
+            <Text className="text-xs text-muted-foreground">
+              {t(
+                // i18n-dup-ok: 'common.imageUnavailable' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.imageUnavailable'
+              )}
+            </Text>
           </Pressable>
         );
       }

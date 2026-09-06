@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ଅନ୍ୟ ଡିଭାଇସ୍ ଯାଞ୍ଚ କରି ସେଗୁଡ଼ିକରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "feedback": "ମତାମତ",
     "privacyChoices": "ଗୋପନୀୟତା ପସନ୍ଦ",
-    "signOut": "ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "deleteAccount": "ଆକାଉଣ୍ଟ୍ ବିଲୋପ କରନ୍ତୁ",
     "confirmationCode": "ନିଶ୍ଚିତକରଣ କୋଡ୍",
     "confirmationCodePlaceholder": "6 ଅଙ୍କର କୋଡ୍",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "settingsSave": {
-      "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "saveChanges": "ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରନ୍ତୁ",
       "unsavedTitle": "ସଂରକ୍ଷିତ ହୋଇନଥିବା ପରିବର୍ତ୍ତନ",
       "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "ପଠାଇବା ପୂର୍ବରୁ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
       "preparingPlaceholder": "ପରିବେଶ ପ୍ରସ୍ତୁତ ହେଉଛି...",
       "finalizingPlaceholder": "ସମାପ୍ତ ହେଉଛି...",
-      "messagePlaceholder": "ସନ୍ଦେଶ",
       "cannotReceiveFiles": "ଏହି ସେସନ୍ ଫାଇଲ୍ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ବାର୍ତ୍ତା ପଠାଇବାକୁ ଯୋଡ଼ା ହୋଇଥିବା ଫାଇଲ୍ ହଟାନ୍ତୁ।",
       "couldNotAttachFiles": "ଫାଇଲ୍ ଯୋଡ଼ି ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ “ପଠାନ୍ତୁ” ଟାପ୍ କରନ୍ତୁ।",
       "discardAttachmentsMessage": "କୌଣସି ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ଯୋଡ଼ା ହୋଇନଥିବା ଅପଲୋଡ୍ ଫାଇଲ୍ ହଟିଯିବ।",
@@ -2777,7 +2774,6 @@
         "void": "ବାତିଲ",
         "uncollectible": "ଅନାଦାୟ"
       },
-      "loadMoreFailed": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "truncated": "ପୁରୁଣା ଇନଭଏସ୍ ଉପଲବ୍ଧ ଅଛି।"
     },
     "lowBalanceAlert": {

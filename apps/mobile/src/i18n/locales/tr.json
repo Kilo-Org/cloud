@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Diğer cihazları incele ve oturumlarını kapat",
     "feedback": "Geri bildirim",
     "privacyChoices": "Gizlilik tercihleri",
-    "signOut": "Oturumu kapat",
     "deleteAccount": "Hesabı sil",
     "confirmationCode": "Onay kodu",
     "confirmationCodePlaceholder": "6 haneli kod",
@@ -1300,7 +1299,6 @@
       "selectRepositoriesSubtitle": "Güvenlik ajanının izleyeceği depoları seç"
     },
     "settingsSave": {
-      "keepEditing": "Düzenlemeye devam et",
       "saveChanges": "Değişiklikleri kaydet",
       "unsavedMessage": "Bu ekrandan ayrılmadan önce değişikliklerini kaydetmek ister misin?",
       "unsavedTitle": "Kaydedilmemiş değişiklikler"
@@ -1920,7 +1918,6 @@
       "selectModelBeforeSending": "Göndermeden önce bir model seç.",
       "preparingPlaceholder": "Ortam hazırlanıyor...",
       "finalizingPlaceholder": "Tamamlanıyor...",
-      "messagePlaceholder": "Mesaj",
       "cannotReceiveFiles": "Bu oturum dosya alamıyor. Mesajını göndermek için ekleri kaldır.",
       "couldNotAttachFiles": "Dosyalar eklenemedi. Tekrar denemek için gönder düğmesine dokun.",
       "discardAttachmentsMessage": "Henüz bir mesaja eklenmemiş yüklemeler silinecek.",
@@ -2776,7 +2773,6 @@
         "void": "İptal edildi",
         "uncollectible": "Tahsil edilemez"
       },
-      "loadMoreFailed": "Daha fazlası yüklenemedi.",
       "truncated": "Daha eski faturalar mevcut."
     },
     "lowBalanceAlert": {

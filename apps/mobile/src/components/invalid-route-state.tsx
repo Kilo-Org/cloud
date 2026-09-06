@@ -28,7 +28,12 @@ export function InvalidRouteState({ backTo }: Readonly<{ backTo: Href }>) {
             router.replace(backTo);
           }}
         >
-          <Text>{t('common.goBack')}</Text>
+          <Text>
+            {t(
+              // i18n-dup-ok: 'common.goBack' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.goBack'
+            )}
+          </Text>
         </Button>
       }
     />

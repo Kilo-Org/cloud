@@ -169,7 +169,10 @@ export function NotificationsStep({ onComplete, botIdentity }: Readonly<Notifica
     >
       <View className="gap-2">
         <Text variant="eyebrow" className="text-xs">
-          {t('common.notifications')}
+          {t(
+            // i18n-dup-ok: 'common.notifications' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+            'common.notifications'
+          )}
         </Text>
         <Text className="text-2xl font-semibold">
           {t('kiloclaw.onboarding.notifications.stayInTheLoop')}

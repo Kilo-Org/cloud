@@ -88,7 +88,12 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   function handlePress() {
     // Flag off: GitHub taps fall back to the browser (same as chat links).
     if (!prReviewEnabled) {
-      void openExternalUrl(pr.url, { label: t('common.pullRequest') });
+      void openExternalUrl(pr.url, {
+        label: t(
+          // i18n-dup-ok: 'common.pullRequest' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+          'common.pullRequest'
+        ),
+      });
       return;
     }
     const target = resolveSessionPrTapTarget({

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Перегляд пристроїв і завершення сеансів на них",
     "feedback": "Зворотний зв'язок",
     "privacyChoices": "Налаштування конфіденційності",
-    "signOut": "Вийти",
     "deleteAccount": "Видалити обліковий запис",
     "confirmationCode": "Код підтвердження",
     "confirmationCodePlaceholder": "6-значний код",
@@ -1308,7 +1307,6 @@
       "repositoriesCount_many": "вибрано {{displayCount}} репозиторіїв"
     },
     "settingsSave": {
-      "keepEditing": "Продовжити редагування",
       "saveChanges": "Зберегти зміни",
       "unsavedMessage": "Зберегти зміни, перш ніж закрити цей екран?",
       "unsavedTitle": "Незбережені зміни"
@@ -1946,7 +1944,6 @@
       "selectModelBeforeSending": "Виберіть модель перед надсиланням.",
       "preparingPlaceholder": "Налаштування середовища…",
       "finalizingPlaceholder": "Завершення…",
-      "messagePlaceholder": "Повідомлення",
       "cannotReceiveFiles": "Цей сеанс не підтримує отримання файлів. Видаліть вкладення, щоб надіслати повідомлення.",
       "couldNotAttachFiles": "Не вдалося прикріпити файли. Торкніться «Надіслати», щоб спробувати ще раз.",
       "discardAttachmentsMessage": "Завантажені файли, не прикріплені до надісланих повідомлень, буде видалено.",
@@ -2818,7 +2815,6 @@
         "void": "Анульовано",
         "uncollectible": "Безнадійний борг"
       },
-      "loadMoreFailed": "Не вдалося завантажити більше даних.",
       "truncated": "Доступні попередні рахунки."
     },
     "lowBalanceAlert": {

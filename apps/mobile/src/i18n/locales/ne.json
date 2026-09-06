@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "अन्य यन्त्रहरू जाँचेर तिनबाट साइन आउट गर्नुहोस्",
     "feedback": "प्रतिक्रिया",
     "privacyChoices": "गोपनीयता विकल्पहरू",
-    "signOut": "साइन आउट गर्नुहोस्",
     "deleteAccount": "खाता मेट्नुहोस्",
     "confirmationCode": "पुष्टिकरण कोड",
     "confirmationCodePlaceholder": "६ अङ्कको कोड",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub खोल्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
     "settingsSave": {
-      "keepEditing": "सम्पादन जारी राख्नुहोस्",
       "saveChanges": "परिवर्तनहरू सेभ गर्नुहोस्",
       "unsavedTitle": "सेभ नगरिएका परिवर्तनहरू",
       "unsavedMessage": "यो स्क्रिन छोड्नुअघि परिवर्तनहरू सेभ गर्ने?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "पठाउनुअघि एउटा मोडेल चयन गर्नुहोस्।",
       "preparingPlaceholder": "वातावरण तयार गर्दै...",
       "finalizingPlaceholder": "समाप्त गर्दै...",
-      "messagePlaceholder": "सन्देश",
       "cannotReceiveFiles": "यो सत्रले फाइलहरू लिन सक्दैन। आफ्नो सन्देश पठाउन संलग्न फाइलहरू हटाउनुहोस्।",
       "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न ‘पठाउनुहोस्’ मा ट्याप गर्नुहोस्।",
       "discardAttachmentsMessage": "कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
@@ -2777,7 +2774,6 @@
         "void": "रद्द",
         "uncollectible": "असुली नहुने"
       },
-      "loadMoreFailed": "थप लोड गर्न सकिएन।",
       "truncated": "पुराना बिलहरू उपलब्ध छन्।"
     },
     "lowBalanceAlert": {

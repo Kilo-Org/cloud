@@ -62,9 +62,18 @@ export function useNewSessionDiscardGuard({
           : 'agentChat.newSession.discardDraftMessage'
       ),
       [
-        { text: i18n.t('common.keepEditing'), style: 'cancel' },
         {
-          text: i18n.t('common.discard'),
+          text: i18n.t(
+            // i18n-dup-ok: 'common.keepEditing' — sole key; securityAgent.settingsSave.keepEditing was removed here
+            'common.keepEditing'
+          ),
+          style: 'cancel',
+        },
+        {
+          text: i18n.t(
+            // i18n-dup-ok: 'common.discard' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+            'common.discard'
+          ),
           style: 'destructive',
           onPress: () => {
             void (async () => {

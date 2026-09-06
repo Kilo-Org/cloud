@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Revisar e pechar as sesións doutros dispositivos",
     "feedback": "Comentarios",
     "privacyChoices": "Opcións de privacidade",
-    "signOut": "Pechar sesión",
     "deleteAccount": "Eliminar a conta",
     "confirmationCode": "Código de confirmación",
     "confirmationCodePlaceholder": "código de 6 díxitos",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Non se puido abrir GitHub. Téntao de novo."
     },
     "settingsSave": {
-      "keepEditing": "Seguir editando",
       "saveChanges": "Gardar cambios",
       "unsavedTitle": "Cambios sen gardar",
       "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Selecciona un modelo antes de enviar a mensaxe.",
       "preparingPlaceholder": "Preparando o contorno...",
       "finalizingPlaceholder": "Rematando...",
-      "messagePlaceholder": "Mensaxe",
       "cannotReceiveFiles": "Esta sesión non pode recibir ficheiros. Elimina os anexos para enviar a túa mensaxe.",
       "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca Enviar para tentalo de novo.",
       "discardAttachmentsMessage": "Eliminaranse os ficheiros subidos que aínda non se enviaron nunha mensaxe.",
@@ -2777,7 +2774,6 @@
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
-      "loadMoreFailed": "Non se puideron cargar máis resultados.",
       "truncated": "Hai facturas máis antigas dispoñibles."
     },
     "lowBalanceAlert": {

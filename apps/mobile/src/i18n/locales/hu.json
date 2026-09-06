@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Más eszközök áttekintése és kijelentkeztetése",
     "feedback": "Visszajelzés",
     "privacyChoices": "Adatvédelmi beállítások",
-    "signOut": "Kijelentkezés",
     "deleteAccount": "Fiók törlése",
     "confirmationCode": "Megerősítő kód",
     "confirmationCodePlaceholder": "6 jegyű kód",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Nem sikerült megnyitni a GitHubot. Próbáld újra."
     },
     "settingsSave": {
-      "keepEditing": "Szerkesztés folytatása",
       "saveChanges": "Változtatások mentése",
       "unsavedTitle": "El nem mentett változtatások",
       "unsavedMessage": "Mented a változtatásokat, mielőtt elhagyod ezt a képernyőt?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Küldés előtt válassz modellt.",
       "preparingPlaceholder": "Környezet előkészítése…",
       "finalizingPlaceholder": "Befejezés…",
-      "messagePlaceholder": "Üzenet",
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
       "couldNotAttachFiles": "Nem sikerült csatolni a fájlokat. Az újrapróbáláshoz koppints a küldés gombjára.",
       "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
@@ -2777,7 +2774,6 @@
         "void": "Érvénytelen",
         "uncollectible": "Behajthatatlan"
       },
-      "loadMoreFailed": "Nem sikerült betölteni a további elemeket.",
       "truncated": "Korábbi számlák érhetők el."
     },
     "lowBalanceAlert": {

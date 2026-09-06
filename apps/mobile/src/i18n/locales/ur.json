@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "دیگر ڈیوائسز کا جائزہ لیں اور ان سے سائن آؤٹ کریں",
     "feedback": "رائے",
     "privacyChoices": "رازداری کے انتخاب",
-    "signOut": "سائن آؤٹ کریں",
     "deleteAccount": "اکاؤنٹ حذف کریں",
     "confirmationCode": "تصدیقی کوڈ",
     "confirmationCodePlaceholder": "6 ہندسوں کا کوڈ",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub نہیں کھل سکا۔ براہ کرم دوبارہ کوشش کریں۔"
     },
     "settingsSave": {
-      "keepEditing": "ترمیم جاری رکھیں",
       "saveChanges": "تبدیلیاں محفوظ کریں",
       "unsavedTitle": "محفوظ نہ کی گئی تبدیلیاں",
       "unsavedMessage": "اس اسکرین سے جانے سے پہلے اپنی تبدیلیاں محفوظ کریں؟"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "پیغام بھیجنے سے پہلے ماڈل منتخب کریں۔",
       "preparingPlaceholder": "ماحول تیار ہو رہا ہے...",
       "finalizingPlaceholder": "کام مکمل ہو رہا ہے...",
-      "messagePlaceholder": "پیغام",
       "cannotReceiveFiles": "یہ سیشن فائلیں وصول نہیں کر سکتا۔ اپنا پیغام بھیجنے کے لیے منسلک فائلیں ہٹائیں۔",
       "couldNotAttachFiles": "فائلیں منسلک نہیں ہو سکیں۔ دوبارہ کوشش کرنے کے لیے بھیجنے کے بٹن پر ٹیپ کریں۔",
       "discardAttachmentsMessage": "اپ لوڈ کی گئی وہ فائلیں حذف ہو جائیں گی جو کسی بھیجے گئے پیغام سے منسلک نہیں ہیں۔",
@@ -2777,7 +2774,6 @@
         "void": "منسوخ",
         "uncollectible": "ناقابل وصول"
       },
-      "loadMoreFailed": "مزید لوڈ نہیں ہو سکا۔",
       "truncated": "پرانی انوائسیں دستیاب ہیں۔"
     },
     "lowBalanceAlert": {

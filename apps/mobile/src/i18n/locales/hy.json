@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Դիտել մյուս սարքերը և դուրս գալ դրանց հաշիվներից",
     "feedback": "Հետադարձ կապ",
     "privacyChoices": "Գաղտնիության կարգավորումներ",
-    "signOut": "Դուրս գալ",
     "deleteAccount": "Ջնջել հաշիվը",
     "confirmationCode": "Հաստատման կոդ",
     "confirmationCodePlaceholder": "6-նիշանոց կոդ",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Չհաջողվեց բացել GitHub-ը։ Կրկին փորձիր։"
     },
     "settingsSave": {
-      "keepEditing": "Շարունակել խմբագրել",
       "saveChanges": "Պահպանել փոփոխությունները",
       "unsavedTitle": "Չպահպանված փոփոխություններ",
       "unsavedMessage": "Պահպանե՞լ փոփոխությունները՝ այս էկրանից դուրս գալուց առաջ։"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Ուղարկելուց առաջ ընտրեք մոդել։",
       "preparingPlaceholder": "Միջավայրը նախապատրաստվում է…",
       "finalizingPlaceholder": "Աշխատանքն ավարտվում է…",
-      "messagePlaceholder": "Հաղորդագրություն",
       "cannotReceiveFiles": "Այս նիստը չի կարող ընդունել ֆայլեր։ Հեռացրեք կցումները՝ հաղորդագրությունն ուղարկելու համար։",
       "couldNotAttachFiles": "Չհաջողվեց կցել ֆայլերը։ Հպեք ուղարկելու կոճակին՝ կրկին փորձելու համար։",
       "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
@@ -2777,7 +2774,6 @@
         "void": "Չեղարկված",
         "uncollectible": "Անհավաքագրելի"
       },
-      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին։",
       "truncated": "Հասանելի են նաև նախորդ հաշիվ-ապրանքագրերը։"
     },
     "lowBalanceAlert": {

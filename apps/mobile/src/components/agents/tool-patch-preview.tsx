@@ -27,9 +27,18 @@ type ToolPatchPreviewProps = {
 export function ToolPatchPreview({ model, partId }: Readonly<ToolPatchPreviewProps>) {
   const { t } = useTranslation();
   const operationLabel = {
-    add: t('common.added'),
-    delete: t('common.deleted'),
-    update: t('common.updated'),
+    add: t(
+      // i18n-dup-ok: 'common.added' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.added'
+    ),
+    delete: t(
+      // i18n-dup-ok: 'common.deleted' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.deleted'
+    ),
+    update: t(
+      // i18n-dup-ok: 'common.updated' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.updated'
+    ),
   } satisfies Record<ToolPatchFile['operation'], string>;
 
   return (

@@ -195,7 +195,10 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="(2_agents)"
           options={{
-            title: t('common.agents'),
+            title: t(
+              // i18n-dup-ok: 'common.agents' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.agents'
+            ),
             tabBarBadge: needsInputBadge,
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               needsInputBadge
@@ -219,7 +222,10 @@ export default function TabsLayout() {
           name="(4_chat)"
           options={{
             href: showQuickChatTab ? undefined : null,
-            title: t('common.chat'),
+            title: t(
+              // i18n-dup-ok: 'common.chat' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.chat'
+            ),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               t('common.chat'),
               tabBarPosition('chat', tabFlags) ?? 3,
@@ -239,7 +245,10 @@ export default function TabsLayout() {
         <Tabs.Screen
           name="(3_profile)"
           options={{
-            title: t('common.profile'),
+            title: t(
+              // i18n-dup-ok: 'common.profile' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.profile'
+            ),
             tabBarAccessibilityLabel: tabAccessibilityLabel(
               t('common.profile'),
               tabCount,

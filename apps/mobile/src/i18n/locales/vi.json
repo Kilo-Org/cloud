@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Xem và đăng xuất khỏi các thiết bị khác",
     "feedback": "Gửi góp ý",
     "privacyChoices": "Tùy chọn quyền riêng tư",
-    "signOut": "Đăng xuất",
     "deleteAccount": "Xóa tài khoản",
     "confirmationCode": "Mã xác nhận",
     "confirmationCodePlaceholder": "mã 6 chữ số",
@@ -1300,7 +1299,6 @@
       "selectRepositoriesSubtitle": "Chọn các kho lưu trữ để Trợ lý bảo mật giám sát"
     },
     "settingsSave": {
-      "keepEditing": "Tiếp tục chỉnh sửa",
       "saveChanges": "Lưu thay đổi",
       "unsavedMessage": "Bạn có muốn lưu thay đổi trước khi rời màn hình này không?",
       "unsavedTitle": "Thay đổi chưa lưu"
@@ -1920,7 +1918,6 @@
       "selectModelBeforeSending": "Hãy chọn mô hình trước khi gửi.",
       "preparingPlaceholder": "Đang thiết lập môi trường...",
       "finalizingPlaceholder": "Đang hoàn tất...",
-      "messagePlaceholder": "Tin nhắn",
       "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
       "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại.",
       "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
@@ -2776,7 +2773,6 @@
         "void": "Đã hủy",
         "uncollectible": "Không thể thu tiền"
       },
-      "loadMoreFailed": "Không thể tải thêm.",
       "truncated": "Còn các hóa đơn trước đó để xem."
     },
     "lowBalanceAlert": {

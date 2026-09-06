@@ -29,7 +29,9 @@ type NewSessionRepositorySectionProps = {
 
 const PROVIDER_COPY = {
   github: {
-    connectTitle: 'common.connectGithub',
+    connectTitle:
+      // i18n-dup-ok: 'common.connectGithub' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.connectGithub',
     connectDescription: 'agentChat.newSession.connectGithubDescription',
     openLabel: 'agentChat.newSession.openGithub',
     connectedTitle: 'agentChat.newSession.githubConnected',
@@ -37,7 +39,9 @@ const PROVIDER_COPY = {
     emptyDescription: 'agentChat.newSession.noRepositoriesVisible',
   },
   gitlab: {
-    connectTitle: 'common.connectGitlab',
+    connectTitle:
+      // i18n-dup-ok: 'common.connectGitlab' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.connectGitlab',
     connectDescription: 'agentChat.newSession.connectGitlabDescription',
     openLabel: 'agentChat.newSession.openGitlab',
     connectedTitle: 'agentChat.newSession.gitlabConnected',
@@ -45,10 +49,14 @@ const PROVIDER_COPY = {
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleGitlab',
   },
   bitbucket: {
-    connectTitle: 'common.connectBitbucket',
+    connectTitle:
+      // i18n-dup-ok: 'common.connectBitbucket' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.connectBitbucket',
     connectDescription: 'agentChat.newSession.connectBitbucketDescription',
     openLabel: 'agentChat.newSession.openBitbucket',
-    connectedTitle: 'common.bitbucketConnected',
+    connectedTitle:
+      // i18n-dup-ok: 'common.bitbucketConnected' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.bitbucketConnected',
     errorTitle: 'agentChat.newSession.couldNotLoadBitbucketRepositories',
     emptyDescription: 'agentChat.newSession.noRepositoriesVisibleBitbucket',
   },
@@ -89,7 +97,10 @@ export function NewSessionRepositorySection({
   return (
     <View className="mt-5">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">
-        {t('common.repository')}
+        {t(
+          // i18n-dup-ok: 'common.repository' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+          'common.repository'
+        )}
       </Text>
 
       {(hasRepos || anyLoading) && (

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Adolygu dyfeisiau eraill a'u hallgofnodi",
     "feedback": "Adborth",
     "privacyChoices": "Dewisiadau preifatrwydd",
-    "signOut": "Allgofnodi",
     "deleteAccount": "Dileu cyfrif",
     "confirmationCode": "Cod cadarnhau",
     "confirmationCodePlaceholder": "cod 6 digid",
@@ -1745,7 +1744,6 @@
       "couldNotOpenGithub": "Ni ellid agor GitHub. Ceisiwch eto."
     },
     "settingsSave": {
-      "keepEditing": "Parhau i olygu",
       "saveChanges": "Cadw newidiadau",
       "unsavedTitle": "Newidiadau heb eu cadw",
       "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?"
@@ -2431,7 +2429,6 @@
       "selectModelBeforeSending": "Dewiswch fodel cyn anfon.",
       "preparingPlaceholder": "Yn paratoi'r amgylchedd...",
       "finalizingPlaceholder": "Yn gorffen...",
-      "messagePlaceholder": "Neges",
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Tynnwch yr atodiadau i anfon eich neges.",
       "couldNotAttachFiles": "Methu atodi'r ffeiliau. Tapiwch Anfon i geisio eto.",
       "discardAttachmentsMessage": "Bydd ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
@@ -2861,7 +2858,6 @@
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },
-      "loadMoreFailed": "Doedd dim modd llwytho mwy.",
       "truncated": "Mae anfonebau cynharach ar gael."
     },
     "lowBalanceAlert": {

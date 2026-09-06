@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "צפייה במכשירים אחרים וניתוקם מהחשבון",
     "feedback": "משוב",
     "privacyChoices": "אפשרויות פרטיות",
-    "signOut": "התנתקות",
     "deleteAccount": "מחיקת החשבון",
     "confirmationCode": "קוד אישור",
     "confirmationCodePlaceholder": "קוד בן 6 ספרות",
@@ -1304,7 +1303,6 @@
       "repositoriesCount_two": "{{displayCount}} מאגרים נבחרו"
     },
     "settingsSave": {
-      "keepEditing": "המשך עריכה",
       "saveChanges": "שמירת שינויים",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
       "unsavedTitle": "שינויים שלא נשמרו"
@@ -1933,7 +1931,6 @@
       "selectModelBeforeSending": "בחר מודל לפני השליחה.",
       "preparingPlaceholder": "מכין את הסביבה...",
       "finalizingPlaceholder": "מסיים...",
-      "messagePlaceholder": "הודעה",
       "cannotReceiveFiles": "הסשן הזה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה שלך.",
       "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
@@ -2797,7 +2794,6 @@
         "void": "בוטלה",
         "uncollectible": "לא ניתנת לגבייה"
       },
-      "loadMoreFailed": "לא הצלחנו לטעון פריטים נוספים.",
       "truncated": "קיימות חשבוניות ישנות יותר."
     },
     "lowBalanceAlert": {

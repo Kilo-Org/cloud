@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Прегледај ги и одјави ги другите уреди",
     "feedback": "Испрати повратни информации",
     "privacyChoices": "Поставки за приватност",
-    "signOut": "Одјави се",
     "deleteAccount": "Избриши ја сметката",
     "confirmationCode": "Код за потврда",
     "confirmationCodePlaceholder": "код од 6 цифри",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Не можеше да се отвори GitHub. Обиди се повторно."
     },
     "settingsSave": {
-      "keepEditing": "Продолжи со уредување",
       "saveChanges": "Зачувај ги промените",
       "unsavedTitle": "Незачувани промени",
       "unsavedMessage": "Да се зачуваат промените пред да го напуштиш овој екран?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Избери модел пред да испратиш порака.",
       "preparingPlaceholder": "Подготовка на околината...",
       "finalizingPlaceholder": "Завршување...",
-      "messagePlaceholder": "Порака",
       "cannotReceiveFiles": "Оваа сесија не може да прима датотеки. Отстрани ги прилозите за да ја испратиш пораката.",
       "couldNotAttachFiles": "Не успеа прикачувањето на датотеките. Допри го копчето за испраќање за да се обидеш повторно.",
       "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
@@ -2777,7 +2774,6 @@
         "void": "Поништено",
         "uncollectible": "Ненаплатливо"
       },
-      "loadMoreFailed": "Не се вчитаа дополнителни ставки.",
       "truncated": "Достапни се и постари фактури."
     },
     "lowBalanceAlert": {

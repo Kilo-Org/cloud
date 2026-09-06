@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Shiko pajisjet e tjera dhe mbyll seancat e tyre",
     "feedback": "Përshtypjet",
     "privacyChoices": "Zgjedhjet e privatësisë",
-    "signOut": "Dil",
     "deleteAccount": "Fshi llogarinë",
     "confirmationCode": "Kodi i konfirmimit",
     "confirmationCodePlaceholder": "kod me 6 shifra",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Nuk u hap GitHub. Provo përsëri."
     },
     "settingsSave": {
-      "keepEditing": "Vazhdo redaktimin",
       "saveChanges": "Ruaj ndryshimet",
       "unsavedTitle": "Ndryshime të paruajtura",
       "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Zgjidh një model para se të dërgosh mesazhin.",
       "preparingPlaceholder": "Duke konfiguruar mjedisin...",
       "finalizingPlaceholder": "Duke përfunduar...",
-      "messagePlaceholder": "Mesazh",
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiq bashkëngjitjet për të dërguar mesazhin tënd.",
       "couldNotAttachFiles": "Nuk u bashkëngjitën skedarët. Prek butonin e dërgimit për të provuar përsëri.",
       "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
@@ -2777,7 +2774,6 @@
         "void": "E anuluar",
         "uncollectible": "E paarkëtueshme"
       },
-      "loadMoreFailed": "Nuk u ngarkuan më shumë të dhëna.",
       "truncated": "Faturat më të vjetra janë të disponueshme."
     },
     "lowBalanceAlert": {

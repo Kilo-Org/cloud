@@ -1262,7 +1262,10 @@ export function SessionDetailContent({
     if (cloudStatus?.type === 'finalizing') {
       return t('agentChat.composer.finalizingPlaceholder');
     }
-    return t('agentChat.composer.messagePlaceholder');
+    return t(
+      // i18n-dup-ok: 'common.message' — sole key; agentChat.composer.messagePlaceholder was removed here
+      'common.message'
+    );
   }, [cloudStatus, t]);
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 

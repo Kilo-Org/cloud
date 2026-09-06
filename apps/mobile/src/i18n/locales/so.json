@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Dib u eeg aaladaha kale oo ka saar akoonka",
     "feedback": "Jawaab-celin",
     "privacyChoices": "Xulashooyinka asturnaanta",
-    "signOut": "Ka bax",
     "deleteAccount": "Tirtir akoonka",
     "confirmationCode": "Koodhka xaqiijinta",
     "confirmationCodePlaceholder": "koodh ka kooban 6 lambar",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "Lama furi karin GitHub. Fadlan mar kale isku day."
     },
     "settingsSave": {
-      "keepEditing": "Sii wad wax ka beddelka",
       "saveChanges": "Kaydi isbeddellada",
       "unsavedTitle": "Isbeddello aan la kaydin",
       "unsavedMessage": "Ma kaydinaysaa isbeddelladaada ka hor intaadan ka bixin shaashaddan?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "Dooro moodeel ka hor intaadan dirin.",
       "preparingPlaceholder": "Deegaanka waa la diyaarinayaa...",
       "finalizingPlaceholder": "Waa la dhammaystirayaa...",
-      "messagePlaceholder": "Fariin",
       "cannotReceiveFiles": "Kalfadhigan ma qaabili karo faylal. Ka saar lifaaqyada si aad u dirto farriintaada.",
       "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo Dir si aad mar kale isku daydo.",
       "discardAttachmentsMessage": "Faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
@@ -2777,7 +2774,6 @@
         "void": "La buriyay",
         "uncollectible": "Lama soo xareyn karo"
       },
-      "loadMoreFailed": "Kuwo kale lama soo rari karin.",
       "truncated": "Qaansheegyada hore waa la heli karaa."
     },
     "lowBalanceAlert": {

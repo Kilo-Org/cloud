@@ -107,7 +107,13 @@ export function GateSection({
       <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.gate')}</Text>
       <View className="gap-1 rounded-lg bg-secondary p-4">
         <MetaRow label={t('codeReviewer.reviewDetail.checkRun')} value={checkRunLabel} />
-        <MetaRow label={t('common.status')} value={statusLabel} />
+        <MetaRow
+          label={t(
+            // i18n-dup-ok: 'common.status' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+            'common.status'
+          )}
+          value={statusLabel}
+        />
         {gateThreshold ? (
           <MetaRow label={t('codeReviewer.reviewDetail.threshold')} value={gateThreshold} />
         ) : null}

@@ -225,7 +225,10 @@ export function OrganizationCreditActivityScreen() {
               size="sm"
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
-              accessibilityLabel={t('common.loadMore')}
+              accessibilityLabel={t(
+                // i18n-dup-ok: 'common.loadMore' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.loadMore'
+              )}
             >
               <Text>{t('common.loadMore')}</Text>
             </Button>
@@ -234,7 +237,7 @@ export function OrganizationCreditActivityScreen() {
         {isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('organization.invoices.loadMoreFailed')}
+              {t('common.couldnTLoadMore')}
             </Text>
             <Button
               variant="outline"

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ਹੋਰ ਡਿਵਾਈਸਾਂ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਉਨ੍ਹਾਂ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
     "feedback": "ਫੀਡਬੈਕ ਦਿਓ",
     "privacyChoices": "ਗੋਪਨੀਯਤਾ ਦੀਆਂ ਚੋਣਾਂ",
-    "signOut": "ਸਾਈਨ ਆਊਟ ਕਰੋ",
     "deleteAccount": "ਖਾਤਾ ਮਿਟਾਓ",
     "confirmationCode": "ਪੁਸ਼ਟੀਕਰਨ ਕੋਡ",
     "confirmationCodePlaceholder": "6 ਅੰਕਾਂ ਵਾਲਾ ਕੋਡ",
@@ -1701,7 +1700,6 @@
       "couldNotOpenGithub": "GitHub ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "settingsSave": {
-      "keepEditing": "ਸੋਧਣਾ ਜਾਰੀ ਰੱਖੋ",
       "saveChanges": "ਤਬਦੀਲੀਆਂ ਸੇਵ ਕਰੋ",
       "unsavedTitle": "ਸੇਵ ਨਾ ਕੀਤੀਆਂ ਤਬਦੀਲੀਆਂ",
       "unsavedMessage": "ਇਸ ਸਕ੍ਰੀਨ ਤੋਂ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਤਬਦੀਲੀਆਂ ਸੇਵ ਕਰਨੀਆਂ ਹਨ?"
@@ -2351,7 +2349,6 @@
       "selectModelBeforeSending": "ਭੇਜਣ ਤੋਂ ਪਹਿਲਾਂ ਇੱਕ ਮਾਡਲ ਚੁਣੋ।",
       "preparingPlaceholder": "ਵਾਤਾਵਰਣ ਤਿਆਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
       "finalizingPlaceholder": "ਮੁਕੰਮਲ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
-      "messagePlaceholder": "ਸੁਨੇਹਾ",
       "cannotReceiveFiles": "ਇਹ ਸੈਸ਼ਨ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਆਪਣਾ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ ਅਟੈਚਮੈਂਟਾਂ ਹਟਾਓ।",
       "couldNotAttachFiles": "ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ‘ਭੇਜੋ’ 'ਤੇ ਟੈਪ ਕਰੋ।",
       "discardAttachmentsMessage": "ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।",
@@ -2777,7 +2774,6 @@
         "void": "ਰੱਦ",
         "uncollectible": "ਵਸੂਲੀ ਅਸੰਭਵ"
       },
-      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "truncated": "ਪੁਰਾਣੇ ਇਨਵੌਇਸ ਉਪਲਬਧ ਹਨ।"
     },
     "lowBalanceAlert": {

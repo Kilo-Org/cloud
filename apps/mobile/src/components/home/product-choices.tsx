@@ -41,7 +41,10 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
             />
             <ConfigureRow
               icon={ShieldCheck}
-              title={t('common.securityAgent')}
+              title={t(
+                // i18n-dup-ok: 'common.securityAgent' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+                'common.securityAgent'
+              )}
               subtitle={t('profile.securityAgentSubtitle')}
               className="rounded-lg bg-secondary px-3"
               last={!prReviewEnabled}
@@ -54,7 +57,10 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
         {prReviewEnabled ? (
           <ConfigureRow
             icon={GitMerge}
-            title={t('common.prReview')}
+            title={t(
+              // i18n-dup-ok: 'common.prReview' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+              'common.prReview'
+            )}
             subtitle={t('profile.prReviewSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last

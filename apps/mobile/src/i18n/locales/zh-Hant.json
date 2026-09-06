@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "檢視並登出其他裝置",
     "feedback": "意見回饋",
     "privacyChoices": "隱私選項",
-    "signOut": "登出",
     "deleteAccount": "刪除帳戶",
     "confirmationCode": "確認代碼",
     "confirmationCodePlaceholder": "6 位數代碼",
@@ -1300,7 +1299,6 @@
       "selectRepositoriesSubtitle": "選取要由資安代理監控的存放庫"
     },
     "settingsSave": {
-      "keepEditing": "繼續編輯",
       "saveChanges": "儲存變更",
       "unsavedMessage": "離開此畫面前，要儲存變更嗎？",
       "unsavedTitle": "未儲存的變更"
@@ -1920,7 +1918,6 @@
       "selectModelBeforeSending": "傳送前請先選取模型。",
       "preparingPlaceholder": "設定環境中…",
       "finalizingPlaceholder": "收尾中…",
-      "messagePlaceholder": "訊息",
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
       "couldNotAttachFiles": "無法附加檔案。請點一下「傳送」再試一次。",
       "discardAttachmentsMessage": "尚未附加至已傳送訊息的上傳檔案都會刪除。",
@@ -2776,7 +2773,6 @@
         "void": "已作廢",
         "uncollectible": "無法收款"
       },
-      "loadMoreFailed": "無法載入更多內容。",
       "truncated": "還有更早的發票可供查看。"
     },
     "lowBalanceAlert": {

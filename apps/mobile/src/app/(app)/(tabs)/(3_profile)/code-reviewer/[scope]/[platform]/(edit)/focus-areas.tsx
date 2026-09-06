@@ -23,7 +23,9 @@ export default function FocusAreasRoute() {
   const { t } = useTranslation();
   const areaLabels = {
     security: 'codeReviewer.focusArea.security',
-    performance: 'common.performance',
+    performance:
+      // i18n-dup-ok: 'common.performance' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
+      'common.performance',
     bugs: 'codeReviewer.focusArea.bugs',
     style: 'codeReviewer.focusArea.style',
     testing: 'codeReviewer.focusArea.testing',

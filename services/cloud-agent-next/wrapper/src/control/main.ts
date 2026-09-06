@@ -12,7 +12,6 @@ import {
   createSessionActivityRegistry,
   refreshHeartbeatPayload,
   handleControlRequest,
-  type HandlerDeps,
 } from './sandbox-control-handlers';
 import { eventKiloSessionId, sessionEventIdentity, updateSessionSnapshots } from './feed';
 import { createControlTerminalRuntime } from './terminal-runtime';
@@ -20,6 +19,7 @@ import { createWorktreeKiloRuntimes } from './worktree-runtime';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
 import { controlLogWrapperIdSchema } from '../../../src/shared/control-diagnostics.js';
 import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
+import { createControlEventFailureHandler } from './control-event-transport';
 
 const retirementCauses = new Map([
   ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
@@ -56,7 +56,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
   let heartbeatReason: SandboxHeartbeatPayload['kilo']['reason'];
   const kiloRuntimes = createWorktreeKiloRuntimes({
     onDiagnostic: diagnostics.onDiagnostic,
-    onEvent: (runtime, event) => {
+    onEvent: async (runtime, event) => {
       mutationNotifications.observe(runtime, event);
       const identity = sessionEventIdentity({
         ...event,
@@ -72,32 +72,50 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         event.properties
       );
       if (
-        !control?.sendEvent?.(
-          'session.event',
+        !control?.publishSessionEvent ||
+        !(await control.publishSessionEvent(
           { type: event.type, properties: event.properties },
           identity
-        )
+        ))
       ) {
-        throw new Error('Sandbox control event delivery failed');
+        try {
+          await deps.operations.retireDirectory(
+            runtime.directory,
+            'Session event delivery failed',
+            Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS,
+            { runtimeId: runtime.runtimeId, client: runtime.kiloClient }
+          );
+        } catch {
+          diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
+        }
+        return;
       }
     },
     onUnexpectedClose: failure => {
       logToFile(`Kilo worktree retired reason=${failure.reason} directory=${failure.directory}`);
+      const stillCurrent = () => {
+        const current = kiloRuntimes.get(failure.directory);
+        return current === undefined || current.runtimeId === failure.runtimeId;
+      };
       if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) {
-        shutdown(1, failure.reason);
+        if (stillCurrent()) shutdown(1, failure.reason);
         return;
       }
       void control
         .reportNativeRuntimeRetirement({
+          retirementId: failure.retirementId,
           directory: failure.directory,
           nativeRuntimeId: failure.runtimeId,
           reason: failure.reason,
+          cleanupDeadlineAt: failure.cleanupDeadlineAt,
         })
         .then(
           retired => {
-            if (!retired) shutdown(1, failure.reason);
+            if (!retired && stillCurrent()) shutdown(1, failure.reason);
           },
-          () => shutdown(1, failure.reason)
+          () => {
+            if (stillCurrent()) shutdown(1, failure.reason);
+          }
         );
     },
   });
@@ -108,7 +126,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         getKiloRuntime: directory => kiloRuntimes.get(directory),
       })
     : undefined;
-  const deps: HandlerDeps = createControlHandlerDeps({
+  const deps = createControlHandlerDeps({
     onDiagnostic: diagnostics.onDiagnostic,
     kiloRuntimes,
     version: WRAPPER_VERSION,
@@ -124,21 +142,18 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         throw new Error('Sandbox control operation result delivery unavailable');
       return control.sendOperationResult(session, delivery, signal, deadlineAt);
     },
-    emitSessionEvent: (session, payload, options) => {
-      if (
-        !control?.sendEvent?.(
-          'session.event',
-          payload,
-          {
-            directory: session.directory,
-            kiloSessionId: session.kiloSessionId,
-            rootKiloSessionId: session.kiloSessionId,
-          },
-          options?.retained ? { preserveConnectionOnFailure: true } : undefined
-        )
-      )
-        throw new Error('Sandbox control event delivery failed');
-    },
+    emitSessionEvent: (session, payload, options) =>
+      control?.sendEvent?.(
+        'session.event',
+        payload,
+        {
+          directory: session.directory,
+          kiloSessionId: session.kiloSessionId,
+          rootKiloSessionId: session.kiloSessionId,
+          ...(options?.nativeRuntimeId ? { nativeRuntimeId: options.nativeRuntimeId } : {}),
+        },
+        options?.retained ? { preserveConnectionOnFailure: true } : undefined
+      ) === true,
     retireRuntime: reason => shutdown(1, reason),
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
   });
@@ -223,9 +238,28 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
     wrapperVersion: WRAPPER_VERSION,
     isReady: () => deps.kiloReady,
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
+    onEventReceiptFailure: createControlEventFailureHandler({
+      getRuntime: directory => kiloRuntimes.get(directory),
+      onFailure: (failure, runtime) => {
+        void deps.operations
+          .retireDirectory(
+            failure.publication.session.directory,
+            `Session event delivery ${failure.reason}`,
+            Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS,
+            { runtimeId: runtime.runtimeId, client: runtime.kiloClient }
+          )
+          .catch(() => {
+            diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
+          });
+      },
+    }),
     onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected'),
-    onRequest: (operation, session, payload, authorization) =>
-      handleControlRequest(
+    onReconcile: async (_phase, deadlineAt) => {
+      if (Date.now() >= deadlineAt) throw new Error('Control recovery deadline expired');
+      await deps.operations.drainDelivery(deadlineAt);
+    },
+    onRequest: (operation, session, payload, authorization) => {
+      return handleControlRequest(
         operation,
         session,
         payload,
@@ -241,6 +275,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
                   directory: session.directory,
                   kiloSessionId: session.kiloSessionId,
                   rootKiloSessionId: session.kiloSessionId,
+                  ...(options?.nativeRuntimeId ? { nativeRuntimeId: options.nativeRuntimeId } : {}),
                 },
                 options?.retained ? { preserveConnectionOnFailure: true } : undefined
               )
@@ -249,7 +284,8 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
           },
         },
         authorization
-      ),
+      );
+    },
     getHeartbeatPayload: () => withHeartbeatReason(buildHeartbeatPayload(deps)),
     sampleHeartbeat: signal => refreshHeartbeatPayload(deps, signal).then(() => undefined),
   });

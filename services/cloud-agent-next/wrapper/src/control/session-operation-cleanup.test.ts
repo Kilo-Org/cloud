@@ -439,7 +439,10 @@ describe('SessionOperation cleanup', () => {
         handlerDeps,
         authorization
       )
-    ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'existing' } });
+    ).toEqual({
+      ok: true,
+      result: { messageId: 'msg_1', status: 'existing', executionDeadlineAt: expect.any(Number) },
+    });
     expect(submissions).toBe(1);
 
     original.resolve(completion());

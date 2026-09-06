@@ -54,6 +54,63 @@ function onlyOperation(handlerDeps: HandlerDeps) {
 }
 
 describe('operation results and delivery', () => {
+  it('keeps native-tagged live events separate from sealed result delivery after replacement', async () => {
+    const releaseDelivery = Promise.withResolvers<void>();
+    const sending = Promise.withResolvers<void>();
+    const emitted: Array<Parameters<HandlerDeps['emitSessionEvent']>[2]> = [];
+    const handlerDeps = deps({
+      runAutoCommit: async options => {
+        options.onEvent({
+          streamEventType: 'autocommit_completed',
+          data: { success: true, messageId: options.messageId, commitHash: 'original' },
+          timestamp: new Date().toISOString(),
+        });
+        return { success: true };
+      },
+      emitSessionEvent: (_session, _event, options) => emitted.push(options),
+      sendOperationResult: async (_session, delivery) => {
+        sending.resolve();
+        await releaseDelivery.promise;
+        return acknowledgeOperation(delivery);
+      },
+    });
+    const runtimes = handlerDeps.kiloRuntimes;
+    const original = runtimes?.get(session.directory);
+    if (!runtimes || !original) throw new Error('Missing original runtime');
+    const authorization = operationAuthorization();
+    await handleControlRequest(
+      'session.prompt',
+      session,
+      { ...promptPayload, finalization: { autoCommit: true } },
+      handlerDeps,
+      authorization
+    );
+    const record = onlyOperation(handlerDeps);
+    try {
+      await record.done;
+      await sending.promise;
+      const sealed = record.deliveryResult();
+      expect(emitted).toEqual([{ retained: true, nativeRuntimeId: original.runtimeId }]);
+      const replacement = { ...original, runtimeId: crypto.randomUUID(), kiloClient: fakeKilo() };
+      runtimes.get = () => replacement;
+      expect(
+        await handleControlRequest('session.operation.get', session, authorization, handlerDeps)
+      ).toEqual({
+        ok: true,
+        result: { state: 'completed', delivery: sealed },
+      });
+      releaseDelivery.resolve();
+      await record.waitForDelivery();
+      expect(record.deliveryResult()).toEqual(sealed);
+      expect(record.snapshot().delivery?.state).toBe('acknowledged');
+      expect(sealed?.events).toHaveLength(1);
+      expect(sealed).not.toHaveProperty('nativeRuntimeId');
+    } finally {
+      releaseDelivery.resolve();
+      await record.waitForDelivery();
+    }
+  });
+
   it.each([{ data: undefined }, { data: null }, { data: [] }, { data: 'invalid' }, { data: 1 }])(
     'rejects malformed finalization notification data without changing the producer result: %j',
     async ({ data }) => {
@@ -538,7 +595,10 @@ describe('operation results and delivery', () => {
         handlerDeps,
         authorization
       )
-    ).toEqual({ ok: true, result: { messageId: 'msg_1', status: 'existing' } });
+    ).toEqual({
+      ok: true,
+      result: { messageId: 'msg_1', status: 'existing', executionDeadlineAt: expect.any(Number) },
+    });
     expect(finalizations).toBe(1);
   });
 

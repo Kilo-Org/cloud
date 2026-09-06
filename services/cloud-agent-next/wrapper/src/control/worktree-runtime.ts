@@ -26,15 +26,17 @@ import type { NativeOperationTarget, NativeRetirement } from './session-operatio
 import { retireWorktreeRuntime } from './worktree-runtime-cleanup.js';
 import { forgetAttachedRoot, rememberAttachedRoot } from './session-directories.js';
 import { withKiloRequestDeadline, type KiloEventFeedError } from './sandbox-control-runtime.js';
-import { createWorktreeFeed, type WorktreeFeed } from './worktree-feed.js';
+import { createWorktreeFeed, type KiloFeedEvent, type WorktreeFeed } from './worktree-feed.js';
 
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
 
 type WorktreeKiloFailure = {
+  retirementId: string;
   directory: string;
   reason: KiloEventFeedError['reason'] | 'process_exited' | 'credential_refresh_failed';
   runtimeId: string;
   cleanup: 'confirmed' | 'unconfirmed';
+  cleanupDeadlineAt: number;
 };
 
 export type WorktreeKiloRuntime = {
@@ -83,11 +85,7 @@ export type WorktreeKiloRuntimes = {
   shutdown(): void;
 };
 
-type WorktreeKiloEvent = {
-  type: string;
-  properties: Record<string, unknown>;
-  directory?: string;
-};
+type WorktreeKiloEvent = KiloFeedEvent;
 
 type ServerOptions = {
   directory: string;
@@ -332,7 +330,7 @@ export function createWorktreeKiloRuntimes(options: {
   homeRoot?: string;
   inheritedEnv?: NodeJS.ProcessEnv;
   startServer?: (options: ServerOptions) => Promise<WorktreeKiloServerHandle>;
-  onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => void;
+  onEvent?: (runtime: WorktreeKiloRuntime, event: WorktreeKiloEvent) => unknown;
   onDiagnostic?: ControlDiagnosticReporter;
   onUnexpectedClose: (failure: WorktreeKiloFailure) => void;
 }): WorktreeKiloRuntimes {
@@ -421,10 +419,12 @@ export function createWorktreeKiloRuntimes(options: {
     void retire(entry, deadlineAt).then(result => {
       if (result === 'unconfirmed') failedDirectories.add(entry.directory);
       options.onUnexpectedClose({
+        retirementId: crypto.randomUUID(),
         directory: entry.directory,
         reason,
         runtimeId,
         cleanup: result === 'unconfirmed' ? 'unconfirmed' : 'confirmed',
+        cleanupDeadlineAt: deadlineAt,
       });
     });
   }

@@ -225,8 +225,8 @@ export type HandlerDeps = {
   emitSessionEvent: (
     session: SessionRequestIdentity,
     payload: SessionEventPayload,
-    options?: { retained?: true }
-  ) => void;
+    options?: { retained?: true; nativeRuntimeId?: string }
+  ) => unknown;
   retireRuntime: (reason: string) => void;
   onShutdown?: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -257,8 +257,10 @@ function operationEffects(session: SessionRequestIdentity, deps: HandlerDeps) {
   return {
     signal: deps.signal,
     onDiagnostic: deps.onDiagnostic,
-    emitSessionEvent: (event: SessionEventPayload, options?: { retained?: true }) =>
-      deps.emitSessionEvent(session, event, options),
+    emitSessionEvent: (
+      event: SessionEventPayload,
+      options?: { retained?: true; nativeRuntimeId?: string }
+    ) => deps.emitSessionEvent(session, event, options),
     sendOperationResult: send
       ? (delivery: SessionOperationDelivery, signal: AbortSignal, deadlineAt: number) =>
           send(session, delivery, signal, deadlineAt)
@@ -866,11 +868,15 @@ function handlePrompt(
       existing.messageId === request.messageId &&
       !existing.signal.aborted
     ) {
-      return ok({ messageId: request.messageId, status: 'existing' });
+      return ok({
+        messageId: request.messageId,
+        status: 'existing',
+        ...(authorization ? { executionDeadlineAt: existing.executionDeadlineAt } : {}),
+      });
     }
     return rejectBeforeAdmission('session_busy', 'Session has work in progress', true);
   }
-  deps.operations.start(
+  const operation = deps.operations.start(
     session,
     authorization,
     {
@@ -882,7 +888,11 @@ function handlePrompt(
     },
     operationEffects(session, deps)
   );
-  return ok({ messageId: request.messageId, status: 'accepted' });
+  return ok({
+    messageId: request.messageId,
+    status: 'accepted',
+    ...(authorization ? { executionDeadlineAt: operation.executionDeadlineAt } : {}),
+  });
 }
 
 async function abortKiloSession(

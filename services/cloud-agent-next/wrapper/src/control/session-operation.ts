@@ -105,7 +105,10 @@ export type SessionOperationDependencies = {
   prepareForNewWork?: () => boolean;
   verifyQuiescence: (target: NativeOperationTarget, deadlineAt: number) => Promise<boolean>;
   retireRuntime: (reason: string, deadlineAt: number, target?: NativeOperationTarget) => void;
-  emitSessionEvent: (payload: SessionEventPayload, options?: { retained?: true }) => void;
+  emitSessionEvent: (
+    payload: SessionEventPayload,
+    options?: { retained?: true; nativeRuntimeId?: string }
+  ) => unknown;
   sendOperationResult?: OperationResultSender;
   onLocalCompletion: (retain: boolean) => void;
   onCleanupConfirmed: () => void;
@@ -423,10 +426,7 @@ export class SessionOperation {
             : undefined;
         if (this.authorization && isRetainedOperationPreparing(event) && !retained) return;
         try {
-          work.emitPreparing?.(
-            retained ?? event,
-            this.authorization ? { retained: true } : undefined
-          );
+          work.emitPreparing?.(retained ?? event, this.eventOptions());
         } catch {
           if (!this.authorization) throw new Error('Preparation event delivery failed');
         }
@@ -454,6 +454,13 @@ export class SessionOperation {
     };
   }
 
+  private eventOptions(): { retained?: true; nativeRuntimeId?: string } {
+    return {
+      ...(this.authorization ? { retained: true } : {}),
+      ...(this.target ? { nativeRuntimeId: this.target.runtimeId } : {}),
+    };
+  }
+
   private emitFinalizationEvent(event: IngestEvent): void {
     const payload = sessionEventPayloadSchema.safeParse({
       type: event.streamEventType,
@@ -469,10 +476,9 @@ export class SessionOperation {
         : undefined;
     if (this.authorization && requiresRetention && !retained) return;
     try {
-      this.deps.emitSessionEvent(
-        retained ?? payload.data,
-        this.authorization ? { retained: true } : undefined
-      );
+      const delivered = this.deps.emitSessionEvent(retained ?? payload.data, this.eventOptions());
+      if (delivered === false && !this.authorization)
+        throw new Error('Finalization event delivery failed');
     } catch {
       if (!this.authorization) throw new Error('Finalization event delivery failed');
     }
@@ -771,7 +777,16 @@ export class SessionOperation {
     if (!this.authorization) {
       try {
         diagnostic('outcome_sending', outcome.status);
-        this.deps.emitSessionEvent({ type: 'session.message.outcome', properties: this.outcome });
+        if (
+          this.deps.emitSessionEvent(
+            {
+              type: 'session.message.outcome',
+              properties: this.outcome,
+            },
+            this.eventOptions()
+          ) === false
+        )
+          throw new Error('Session outcome delivery failed');
         diagnostic('outcome_sent', outcome.status);
       } catch {
         diagnostic('outcome_failed', outcome.status);

@@ -28,6 +28,7 @@ import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-e
 import {
   buildHeartbeatPayload,
   cancelControlTasks,
+  createControlHandlerDeps,
   createSessionActivityRegistry,
   handleControlRequest,
   refreshHeartbeatPayload,
@@ -133,7 +134,7 @@ function deps(
         signal: new AbortController().signal,
       }
     : undefined;
-  return {
+  return createControlHandlerDeps({
     kiloRuntimes: runtime
       ? ({
           attach: () => ({
@@ -158,7 +159,7 @@ function deps(
     applyAttach: (session, payload, deps) =>
       applySessionAttach(session, payload, { ...deps, sessionExists: async () => true }),
     ...rest,
-  };
+  });
 }
 
 function runtimeDeps(kiloClient: WrapperKiloClient) {
@@ -3605,6 +3606,98 @@ describe('control interactions and sync', () => {
     expect(resolved).toEqual([]);
   });
 
+  it.each(['question', 'permission'] as const)(
+    'keeps unresolved %s ancestry unknown regardless of claimed root and permits only proven replies',
+    async kind => {
+      rememberAttachedRoot('foreign', session.directory);
+      rememberChildSession({
+        childId: 'owned_child',
+        parentId: session.kiloSessionId,
+        directory: session.directory,
+      });
+      const replied: string[] = [];
+      for (const claimedRoot of [undefined, 'foreign', session.kiloSessionId]) {
+        const template = { ...question, ...permission };
+        const unknown = {
+          ...template,
+          id: 'unknown',
+          sessionID: 'unresolved_child',
+          rootKiloSessionId: claimedRoot,
+        };
+        const owned = {
+          ...template,
+          id: 'owned',
+          sessionID: 'owned_child',
+          rootKiloSessionId: 'foreign',
+        };
+        const foreign = {
+          ...template,
+          id: 'foreign',
+          sessionID: 'foreign',
+          rootKiloSessionId: session.kiloSessionId,
+        };
+        let requests = [unknown];
+        const handlerDeps = deps({
+          kiloClient: fakeKilo({
+            ...(kind === 'question'
+              ? { getQuestions: async () => requests }
+              : { getPermissions: async () => requests }),
+            answerQuestion: async id => {
+              replied.push(id);
+              return true;
+            },
+            answerPermission: async id => {
+              replied.push(id);
+              return true;
+            },
+          }),
+        });
+        expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+          ok: false,
+        });
+        requests = [unknown, owned, foreign];
+        for (const id of ['owned', 'unknown', 'foreign', 'missing']) {
+          const result = await handleControlRequest(
+            kind === 'question' ? 'session.question.resolve' : 'session.permission.resolve',
+            session,
+            kind === 'question'
+              ? { action: 'answer', questionId: id, answers: [['yes']] }
+              : { permissionId: id, response: 'once' },
+            handlerDeps
+          );
+          expect(result).toMatchObject(
+            id === 'owned' ? { ok: true } : { ok: false, error: { code: 'unauthorized' } }
+          );
+        }
+        expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+          ok: false,
+        });
+        requests = [foreign];
+        expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toEqual({
+          ok: true,
+          result: { status: { type: 'idle' }, questions: [], permissions: [] },
+        });
+      }
+      expect(replied).toEqual(['owned', 'owned', 'owned']);
+    }
+  );
+
+  it('replaces forged root metadata on positively owned root requests', async () => {
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        getQuestions: async () => [{ ...question, rootKiloSessionId: 'foreign' }],
+        getPermissions: async () => [{ ...permission, rootKiloSessionId: 'foreign' }],
+      }),
+    });
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+      ok: true,
+      result: {
+        questions: [{ ...question, rootKiloSessionId: session.kiloSessionId }],
+        permissions: [{ ...permission, rootKiloSessionId: session.kiloSessionId }],
+      },
+    });
+  });
+
   it('stamps verified child-question snapshots for reconnect without trusting sibling root claims', async () => {
     const syncSession = {
       sessionId: 'workspace_sync_a',
@@ -3613,6 +3706,11 @@ describe('control interactions and sync', () => {
     };
     rememberAttachedRoot('kilo_sync_a', syncSession.directory);
     rememberAttachedRoot('kilo_sync_b', syncSession.directory);
+    rememberChildSession({
+      childId: 'unmapped_child',
+      parentId: 'kilo_sync_b',
+      directory: syncSession.directory,
+    });
     rememberChildSession({
       childId: 'kilo_sync_child',
       parentId: 'kilo_sync_a',
@@ -3682,6 +3780,11 @@ describe('control interactions and sync', () => {
     });
     rememberChildSession({ childId: 'grandchild', parentId: 'child', directory: childDirectory });
     rememberAttachedRoot('sibling', session.directory);
+    rememberChildSession({
+      childId: 'unmapped',
+      parentId: 'sibling',
+      directory: session.directory,
+    });
     const replies: unknown[] = [];
     const queried = new Set<string>();
     const handlerDeps = deps({
@@ -3805,6 +3908,7 @@ describe('control interactions and sync', () => {
   });
 
   it('uses fresh directory-scoped reads and preserves the complete pending interaction shape', async () => {
+    rememberAttachedRoot('other', session.directory);
     const directories: unknown[] = [];
     let calls = 0;
     const handlerDeps = deps({
@@ -3971,6 +4075,22 @@ describe('control interactions and sync', () => {
   });
 });
 
+describe('control handler dependency construction', () => {
+  it('preserves live readiness getters instead of freezing their initial value', () => {
+    let ready = true;
+    const input = {
+      ...deps(),
+      get kiloReady() {
+        return ready;
+      },
+    };
+    const handlers = createControlHandlerDeps(input);
+    expect(buildHeartbeatPayload(handlers).kilo.ready).toBe(true);
+    ready = false;
+    expect(buildHeartbeatPayload(handlers).kilo.ready).toBe(false);
+  });
+});
+
 describe('control wrapper heartbeat source policy', () => {
   const source = fs
     .readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
@@ -3990,7 +4110,7 @@ describe('control wrapper heartbeat source policy', () => {
       'if (!payload.kilo.ready && heartbeatReason) payload.kilo.reason = heartbeatReason;'
     );
     expect(source).toContain(
-      'getHeartbeatPayload: async () => withHeartbeatReason(await refreshHeartbeatPayload(deps))'
+      'getHeartbeatPayload: () => withHeartbeatReason(buildHeartbeatPayload(deps))'
     );
   });
 

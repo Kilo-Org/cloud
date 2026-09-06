@@ -900,6 +900,34 @@ describe('stream handler handleStreamRequest', () => {
     }
   });
 
+  it('awaits the legacy async input getter before deriving the remaining connection state', async () => {
+    const serverWs = makeFakeWebSocket();
+    mockWebSocketPair(serverWs);
+    const pending = Promise.withResolvers<{ questions: unknown[]; permissions: unknown[] }>();
+    const reading = Promise.withResolvers<void>();
+    const status = vi.fn(async () => ({ type: 'busy' as const }));
+    const handler = createStreamHandler(makeFakeState(), makeFakeEventQueries([]), SESSION_ID, {
+      derivePendingInteractions: () => {
+        reading.resolve();
+        return pending.promise;
+      },
+      deriveSessionStatus: status,
+    });
+    const connecting = handler.handleStreamRequest(
+      new Request('https://example.com/stream?replay=false', { headers: { Upgrade: 'websocket' } })
+    );
+    await reading.promise;
+    expect(status).not.toHaveBeenCalled();
+    expect(serverWs.sentMessages).toEqual([]);
+    pending.resolve({ questions: [{ id: 'legacy-question', questions: [] }], permissions: [] });
+    await connecting;
+    expect(status).toHaveBeenCalledOnce();
+    expect(parseSentMessages(serverWs).map(frame => frame.streamEventType)).toEqual([
+      'connected',
+      'kilocode',
+    ]);
+  });
+
   it.each([undefined, { questions: [], permissions: [] }])(
     'distinguishes unknown interactions from an authoritative empty snapshot: %j',
     async pendingInteractions => {

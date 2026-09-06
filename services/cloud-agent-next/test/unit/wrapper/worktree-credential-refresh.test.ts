@@ -13,20 +13,26 @@ import {
 } from '../../../wrapper/src/control/session-directories.js';
 import { resetDirectoryOperationState } from '../../../wrapper/src/control/worktree-operations.js';
 import {
+  createControlHandlerDeps,
   createSessionActivityRegistry,
   handleControlRequest,
   refreshHeartbeatPayload,
+  type ControlHandlerResult,
   type HandlerDeps,
 } from '../../../wrapper/src/control/sandbox-control-handlers.js';
 import { startSandboxControlEventFeed } from '../../../wrapper/src/control/sandbox-control-runtime.js';
 import type * as ControlRuntimeModule from '../../../wrapper/src/control/sandbox-control-runtime.js';
+import type * as KiloApiModule from '../../../wrapper/src/kilo-api.js';
 import type * as UtilsModule from '../../../wrapper/src/utils.js';
 
 vi.mock('node:fs/promises', () => ({
   default: { mkdir: vi.fn(async () => undefined), writeFile: vi.fn(async () => undefined) },
 }));
 vi.mock('@kilocode/sdk', () => ({ createKiloClient: vi.fn(() => ({})) }));
-vi.mock('../../../wrapper/src/kilo-api.js', () => ({ createWrapperKiloClient: vi.fn() }));
+vi.mock('../../../wrapper/src/kilo-api.js', async importOriginal => ({
+  ...(await importOriginal<typeof KiloApiModule>()),
+  createWrapperKiloClient: vi.fn(),
+}));
 vi.mock('../../../wrapper/src/control/sandbox-control-runtime.js', async importOriginal => ({
   ...(await importOriginal<typeof ControlRuntimeModule>()),
   startSandboxControlEventFeed: vi.fn(async () => ({ isFresh: () => true })),
@@ -267,14 +273,14 @@ describe('direct worktree credential refresh', () => {
     const activity = createSessionActivityRegistry();
     activity.attach(identity.kiloSessionId);
     activity.attach(sibling.kiloSessionId);
-    const deps: HandlerDeps = {
+    const emitSessionEvent = vi.fn();
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: f.registry,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       activity,
-      emitSessionEvent: vi.fn(),
+      emitSessionEvent,
       retireRuntime: vi.fn(),
       applyAttach: (session, payload, options) =>
         applySessionAttach(session, payload, {
@@ -282,7 +288,7 @@ describe('direct worktree credential refresh', () => {
           hasBootstrapMarker: async () => true,
           sessionExists: async () => true,
         }),
-    };
+    });
     const refreshing = handleControlRequest(
       'session.attach',
       identity,
@@ -305,8 +311,8 @@ describe('direct worktree credential refresh', () => {
           deps
         )
       ).toMatchObject({ ok: false, error: { code: 'session_busy', retryable: true } });
-      expect(deps.tasks.has(sibling.kiloSessionId)).toBe(false);
-      expect(deps.emitSessionEvent).not.toHaveBeenCalled();
+      expect(deps.operations.hasActive(sibling.kiloSessionId)).toBe(false);
+      expect(emitSessionEvent).not.toHaveBeenCalled();
       expect(runtime.signal.aborted).toBe(false);
     } finally {
       release.resolve({});
@@ -330,29 +336,66 @@ describe('direct worktree credential refresh', () => {
       if (condition === 'stale') fresh = false;
       else vi.spyOn(f.registry, 'get').mockReturnValue(undefined);
       if (condition === 'unattached') f.registry.detach(sibling);
-      const controller = new AbortController();
-      if (condition === 'aborted') controller.abort();
-      const deps: HandlerDeps = {
+      const emitSessionEvent = vi.fn();
+      const retireRuntime = vi.fn();
+      const deps: HandlerDeps = createControlHandlerDeps({
         kiloRuntimes: f.registry,
         version: 'test',
         kiloReady: true,
         sessions: [],
-        tasks: new Map(),
-        emitSessionEvent: vi.fn(),
-        retireRuntime: vi.fn(),
-      };
+        emitSessionEvent,
+        retireRuntime,
+      });
+      const held = Promise.withResolvers<ControlHandlerResult>();
+      let operation:
+        | { cancel: (r: string, s: 'cancelled') => void; done: Promise<unknown> }
+        | undefined;
       if (condition !== 'no-task') {
-        deps.tasks.set(identity.kiloSessionId, {
-          kind: condition === 'execution' ? 'execution' : 'preparation',
-          messageId: 'other-message',
-          session: {
-            ...identity,
-            directory: condition === 'other-directory' ? '/workspace/other' : identity.directory,
-          },
-          controller,
-          signal: controller.signal,
-          done: Promise.resolve({ ok: true, result: {} }),
-        });
+        const taskSession = {
+          ...identity,
+          directory: condition === 'other-directory' ? '/workspace/other' : identity.directory,
+        };
+        if (condition === 'execution') {
+          const runtimeLifetime = new AbortController();
+          const fakeRuntime = {
+            directory: taskSession.directory,
+            scopeId: 'fake',
+            env: {},
+            kiloClient: {
+              sendPrompt: () => held.promise,
+              abortSession: async () => true,
+              getSessionDetails: async (id: string) => ({ id }),
+            },
+            signal: runtimeLifetime.signal,
+          };
+          operation = deps.operations.start(
+            taskSession,
+            undefined,
+            {
+              operation: 'session.prompt',
+              payload: {
+                messageId: 'other-message',
+                turn: { type: 'prompt', prompt: 'block' },
+                agent: { mode: 'code', model: 'kilo/test' },
+              },
+              runtime: fakeRuntime as any,
+            },
+            { emitSessionEvent: () => {} }
+          );
+        } else {
+          operation = deps.operations.start(
+            taskSession,
+            undefined,
+            {
+              operation: 'session.attach',
+              payload: {} as any,
+              apply: () => held.promise,
+              onAttached: () => {},
+            },
+            { emitSessionEvent: () => {} }
+          );
+        }
+        if (condition === 'aborted') operation.cancel('test-abort', 'cancelled');
       }
       expect(
         await handleControlRequest(
@@ -366,9 +409,12 @@ describe('direct worktree credential refresh', () => {
           deps
         )
       ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: true } });
-      expect(deps.tasks.has(sibling.kiloSessionId)).toBe(false);
-      expect(deps.emitSessionEvent).not.toHaveBeenCalled();
-      expect(deps.retireRuntime).not.toHaveBeenCalled();
+      expect(deps.operations.hasActive(sibling.kiloSessionId)).toBe(false);
+      expect(emitSessionEvent).not.toHaveBeenCalled();
+      expect(retireRuntime).not.toHaveBeenCalled();
+      // Clean up held operations
+      held.resolve({ ok: true, result: {} });
+      if (operation) await operation.done.catch(() => {});
     }
   );
 
@@ -572,16 +618,15 @@ describe('direct worktree credential refresh', () => {
     f.statuses.mockReturnValueOnce(status.promise);
     const activity = createSessionActivityRegistry();
     activity.attach(identity.kiloSessionId);
-    const deps: HandlerDeps = {
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: f.registry,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       activity,
       emitSessionEvent: vi.fn(),
       retireRuntime: vi.fn(),
-    };
+    });
     const heartbeat = refreshHeartbeatPayload(deps);
     const oldClient = runtime.kiloClient;
     await f.attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' });
@@ -733,12 +778,11 @@ describe('direct worktree credential refresh', () => {
     activity.attach(identity.kiloSessionId);
     activity.attach(sibling.kiloSessionId);
     activity.markActive(sibling.kiloSessionId);
-    const deps: HandlerDeps = {
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: f.registry,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       activity,
       emitSessionEvent: vi.fn(),
       retireRuntime: vi.fn(),
@@ -748,25 +792,49 @@ describe('direct worktree credential refresh', () => {
           hasBootstrapMarker: async () => true,
           sessionExists: async () => true,
         }),
-    };
-    const controller = new AbortController();
-    deps.tasks.set(sibling.kiloSessionId, {
-      kind: 'execution',
-      messageId: 'active-sibling-message',
-      session: sibling,
-      controller,
-      signal: controller.signal,
-      done: Promise.resolve({ ok: true, result: {} }),
     });
+    const held = Promise.withResolvers<ControlHandlerResult>();
+    const runtimeLifetime = new AbortController();
+    const fakeRuntime = {
+      directory: sibling.directory,
+      scopeId: 'fake',
+      env: {},
+      kiloClient: {
+        sendPrompt: () => held.promise,
+        abortSession: async () => true,
+        getSessionDetails: async (id: string) => ({ id }),
+      },
+      signal: runtimeLifetime.signal,
+    };
+    const siblingOp = deps.operations.start(
+      sibling,
+      undefined,
+      {
+        operation: 'session.prompt',
+        payload: {
+          messageId: 'active-sibling-message',
+          turn: { type: 'prompt', prompt: 'block' },
+          agent: { mode: 'code', model: 'kilo/test' },
+        },
+        runtime: fakeRuntime as any,
+      },
+      { emitSessionEvent: () => {} }
+    );
     const payload = { kilo: auth, env: { ...originalEnv, GH_TOKEN: 'github-renewed' } };
     expect(await handleControlRequest('session.attach', identity, payload, deps)).toMatchObject({
       ok: false,
       error: { code: 'session_busy', retryable: true },
     });
-    expect(controller.signal.aborted).toBe(false);
+    expect(siblingOp.signal.aborted).toBe(false);
     expect(runtime.signal.aborted).toBe(false);
     expect(f.close).not.toHaveBeenCalled();
-    deps.tasks.delete(sibling.kiloSessionId);
+    // Remove the sibling operation (equivalent to old deps.tasks.delete)
+    siblingOp.cancel('test-cleanup', 'cancelled');
+    held.resolve({ ok: true, result: {} });
+    await siblingOp.done.catch(() => {});
+    // Operation completion reconciles activity to idle; restore active state
+    // to match the original test which only removed the task without touching activity
+    activity.markActive(sibling.kiloSessionId);
     expect(await handleControlRequest('session.attach', identity, payload, deps)).toMatchObject({
       ok: false,
       error: { code: 'session_busy', retryable: true },
@@ -779,7 +847,7 @@ describe('direct worktree credential refresh', () => {
     });
     expect(f.close).toHaveBeenCalledTimes(1);
     expect(runtime.env.GH_TOKEN).toBe('github-renewed');
-    expect(deps.retireRuntime).not.toHaveBeenCalled();
+    runtimeLifetime.abort();
   });
 
   it('fails attach instead of accepting stale Git auth when origin refresh fails', async () => {

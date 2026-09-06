@@ -102,16 +102,24 @@ import {
 } from '../session/preparation-history.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   controlErrorCodes,
   sessionAttachResultSchema,
   sessionMessageOutcomeSchema,
+  sessionOperationAuthorizationSchema,
+  sessionOperationDeliverySchema,
+  sessionOperationExpiresAt,
+  sessionOperationResultHash,
   sessionPromptResultSchema,
   sessionSyncResultSchema,
   sessionPermissionResolveResultSchema,
   sessionQuestionResolveResultSchema,
   sessionAbortResultSchema,
   wrapperInstanceIdSchema,
+  type SessionOperationAck,
+  type SessionOperationAuthorization,
+  type SessionRequestIdentity,
   type SessionSyncResult,
   type SessionEventIdentity,
   type SessionPreparingPayload,
@@ -161,6 +169,7 @@ import {
   type ControlSessionMessageInput,
   type SessionMessageRecord,
 } from './session-message-queue.js';
+import { commitSessionOperationResult, dispatchSessionOperation } from './session-operation.js';
 
 const METADATA_KEY = SANDBOX_SESSION_METADATA_KEY;
 const MESSAGES_KEY = 'session_messages';
@@ -440,6 +449,13 @@ export class SandboxSession extends DurableObject<Env> {
         fromState: existing?.state,
         outcome: outcome.data.status,
       };
+      const proof = existing?.operations?.prompt ?? existing?.operations?.attach;
+      if (proof?.dispatched)
+        return result(
+          false,
+          proof.resultHash === undefined ? 'operation_result_pending' : 'operation_result_required',
+          diagnostic
+        );
       if (
         existing?.wrapperInstanceId === input.wrapperInstanceId &&
         existing.state === outcome.data.status
@@ -630,6 +646,88 @@ export class SandboxSession extends DurableObject<Env> {
       broadcast: event => this.broadcastStoredEvent(event),
     });
     return result(true, 'processed');
+  }
+
+  receiveSandboxOperationResult(input: {
+    session: SessionRequestIdentity;
+    wrapperInstanceId: string;
+    delivery: unknown;
+  }): Promise<SessionOperationAck | undefined> {
+    return this.trackOperation(this.applySandboxOperationResult(input));
+  }
+
+  private async applySandboxOperationResult(input: {
+    session: SessionRequestIdentity;
+    wrapperInstanceId: string;
+    delivery: unknown;
+  }): Promise<SessionOperationAck | undefined> {
+    const parsed = sessionOperationDeliverySchema.safeParse(input.delivery);
+    if (!parsed.success) return undefined;
+    const delivery = parsed.data;
+    const authorization = delivery.authorization;
+    const deadlineAt = Math.min(
+      sessionOperationExpiresAt(authorization),
+      delivery.completedAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS
+    );
+    if (
+      delivery.completedAt > Date.now() + SANDBOX_CONTROL_REQUEST_TIMEOUT_MS ||
+      authorization.wrapperInstanceId !== input.wrapperInstanceId ||
+      authorization.session.sessionId !== input.session.sessionId ||
+      authorization.session.kiloSessionId !== input.session.kiloSessionId ||
+      authorization.session.directory !== input.session.directory ||
+      Date.now() >= sessionOperationExpiresAt(authorization)
+    )
+      return undefined;
+    const metadata = await this.getMetadata();
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (
+      !metadata ||
+      epoch === null ||
+      input.session.sessionId !== this.sessionId ||
+      input.session.kiloSessionId !== metadata.auth.kiloSessionId ||
+      input.session.directory !== this.directory(metadata)
+    )
+      return undefined;
+    const hash = await sessionOperationResultHash(delivery);
+    const notifications: StoredEvent[] = [];
+    const ack = commitSessionOperationResult({
+      storage: this.ctx.storage,
+      delivery,
+      hash,
+      deadlineAt,
+      isCurrent: () => {
+        const current = this.terminalLifecycle.getStoredMetadata();
+        return (
+          this.terminalLifecycle.isCurrent(epoch) &&
+          current !== null &&
+          input.session.sessionId === this.sessionId &&
+          input.session.kiloSessionId === current.auth.kiloSessionId &&
+          input.session.directory === this.directory(current)
+        );
+      },
+      messages: {
+        read: () => this.loadMessages(),
+        commit: messages => this.saveMessages(messages, epoch, 'operation_result', notifications),
+      },
+      eventQueries: this.eventQueries,
+      notifications,
+    });
+    if (!ack) return undefined;
+    for (const notification of notifications) this.broadcastStoredEvent(notification);
+    if (ack.disposition === 'applied' && delivery.outcome) {
+      if (this.isCurrentEventRuntime(input.wrapperInstanceId))
+        this.worktreeChanges.onEvent(
+          this.worktreeContext(metadata),
+          metadata.auth.kiloSessionId,
+          'session.message.outcome',
+          delivery.outcome
+        );
+      await this.armQueueRetry();
+      const nextId = nextQueuedMessageId(this.loadMessages());
+      if (nextId && this.terminalLifecycle.isCurrent(epoch))
+        this.ctx.waitUntil(this.dispatchQueued(nextId));
+    }
+    return ack;
   }
 
   async closeOrgStreams(organizationId: string): Promise<number> {
@@ -1272,6 +1370,45 @@ export class SandboxSession extends DurableObject<Env> {
     return { success: false, code: 'BAD_REQUEST', error: 'Prepared admission is legacy-only' };
   }
 
+  private async observeAcceptedOperation(
+    message: MessageRecord,
+    epoch: number
+  ): Promise<'running' | 'completed' | 'response' | undefined> {
+    const authorization = sessionOperationAuthorizationSchema.safeParse(
+      message.operations?.prompt?.authorization
+    );
+    if (!authorization.success || !message.operations?.prompt?.dispatched) return undefined;
+    const metadata = await this.getMetadata();
+    const sandboxId = metadata?.workspace?.sandboxId;
+    if (!metadata || !sandboxId) throw new Error('Accepted runtime is unavailable');
+    const dispatched = await dispatchSessionOperation(
+      { authorization: authorization.data, payload: undefined },
+      {
+        read: () => this.loadMessages(),
+        commit: messages => this.saveMessages(messages, epoch, 'operation_result'),
+      },
+      {
+        request: input => sandboxControlRpc(this.env, sandboxId).request(input),
+        persistResult: delivery =>
+          this.applySandboxOperationResult({
+            session: authorization.data.session,
+            wrapperInstanceId: authorization.data.wrapperInstanceId,
+            delivery,
+          }),
+        isDispatchCurrent: () => false,
+        isMaintenanceCurrent: () => {
+          const current = this.loadMessages().find(item => item.messageId === message.messageId);
+          return (
+            this.terminalLifecycle.isCurrent(epoch) &&
+            current?.wrapperInstanceId === authorization.data.wrapperInstanceId &&
+            current.operations?.prompt?.dispatched === true
+          );
+        },
+      }
+    );
+    return dispatched.state;
+  }
+
   async alarm(): Promise<void> {
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
     const epoch = this.terminalLifecycle.captureEpoch();
@@ -1309,6 +1446,14 @@ export class SandboxSession extends DurableObject<Env> {
           );
         logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
         try {
+          if (accepted.operations?.prompt?.dispatched) {
+            diagnostic.stage = 'operation_receipt';
+            const observed = await this.observeAcceptedOperation(accepted, epoch);
+            if (observed === 'running' || observed === 'completed') {
+              report('healthy');
+              return;
+            }
+          }
           const snapshot = await this.interactionRefresh.refresh(scope, 'accepted_alarm');
           if (
             !snapshot ||
@@ -1561,6 +1706,13 @@ export class SandboxSession extends DurableObject<Env> {
     const recordRuntime = (identity: string | undefined) => {
       const runtime = wrapperInstanceIdSchema.safeParse(identity);
       if (!runtime.success) return;
+      const current = this.loadMessages().find(message => message.messageId === messageId);
+      if (
+        current?.wrapperInstanceId !== undefined &&
+        current.wrapperInstanceId !== runtime.data &&
+        (current.operations?.attach?.dispatched || current.operations?.prompt?.dispatched)
+      )
+        return;
       wrapperInstanceId = runtime.data;
       this.saveMessages(
         this.loadMessages().map(message =>
@@ -1610,9 +1762,50 @@ export class SandboxSession extends DurableObject<Env> {
         throw error;
       }
     };
+    const dispatchAuthorized = async (
+      operation: SessionOperationAuthorization['operation'],
+      payload: unknown
+    ) => {
+      if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
+      const authorization: SessionOperationAuthorization = {
+        operation,
+        operationId: operation === 'session.attach' ? assigned.attemptId : messageId,
+        messageId,
+        session: { sessionId, kiloSessionId, directory: this.directory(metadata) },
+        wrapperInstanceId,
+        dispatchDeadlineAt: deadlineAt,
+      };
+      const dispatched = await dispatchSessionOperation(
+        { authorization, payload },
+        {
+          read: () => this.loadMessages(),
+          commit: messages => this.saveMessages(messages, epoch, 'wrapper_outcome'),
+        },
+        {
+          request: input => control.request(input),
+          persistResult: delivery =>
+            this.applySandboxOperationResult({
+              session: authorization.session,
+              wrapperInstanceId: authorization.wrapperInstanceId,
+              delivery,
+            }),
+          isDispatchCurrent: isCurrent,
+          isMaintenanceCurrent: () => {
+            if (!this.terminalLifecycle.isCurrent(epoch)) return false;
+            const current = this.loadMessages().find(message => message.messageId === messageId);
+            if (!current || current.wrapperInstanceId !== wrapperInstanceId) return false;
+            return (
+              current.operations?.[operation === 'session.attach' ? 'attach' : 'prompt']
+                ?.dispatched === true
+            );
+          },
+        }
+      );
+      return dispatched;
+    };
     await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
     if (!isCurrent()) return;
-    if (Date.now() >= deadlineAt) {
+    if (Date.now() >= deadlineAt && !queued.operations?.prompt?.dispatched) {
       await this.failDelivery(
         messageId,
         'preparation_timeout',
@@ -1741,6 +1934,16 @@ export class SandboxSession extends DurableObject<Env> {
         return;
       }
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
+      const operationResults = status.operationResults === true;
+      const proofBacked =
+        queued.operations?.attach?.dispatched === true ||
+        queued.operations?.prompt?.dispatched === true;
+      if (proofBacked && !operationResults)
+        throw new ControlRequestError({
+          code: 'runtime_unhealthy',
+          message: 'Wrapper operation receipt capability is unavailable',
+          retryable: false,
+        });
       const needsPreparation =
         this.terminalLifecycle.getAttachedWrapperInstanceId() !== wrapperInstanceId;
       if (needsPreparation || status.attachment?.kilo?.containmentEnabled === false) {
@@ -1770,23 +1973,30 @@ export class SandboxSession extends DurableObject<Env> {
             await this.compensateSessionAttachment(metadata);
           return;
         }
-        await dispatch('attach', () =>
-          wait(
-            async () =>
-              sessionAttachResultSchema.parse(
-                controlRequestResult(
-                  await control.request({
-                    operation: 'session.attach',
-                    session,
-                    expectedWrapperInstanceId: wrapperInstanceId,
-                    payload: attachPayload,
-                    timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
-                  })
-                )
-              ),
-            SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
-          )
-        );
+        if (operationResults) {
+          if ((await dispatchAuthorized('session.attach', attachPayload)).state === 'running') {
+            await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
+            return;
+          }
+        } else {
+          await dispatch('attach', () =>
+            wait(
+              async () =>
+                sessionAttachResultSchema.parse(
+                  controlRequestResult(
+                    await control.request({
+                      operation: 'session.attach',
+                      session,
+                      expectedWrapperInstanceId: wrapperInstanceId,
+                      payload: attachPayload,
+                      timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+                    })
+                  )
+                ),
+              SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+            )
+          );
+        }
         if (!isCurrent()) {
           if (!this.terminalLifecycle.isCurrent(epoch))
             await this.compensateSessionAttachment(metadata);
@@ -1805,45 +2015,58 @@ export class SandboxSession extends DurableObject<Env> {
       recorder.finalize({ status: 'completed' });
       this.worktreeChanges.attached(preparationGeneration, this.worktreeContext(metadata));
       phase = 'prompt';
-      await dispatch('prompt', async () => {
-        const prompt = await wait(async () =>
-          controlRequestResult(
-            await control.request({
-              operation: 'session.prompt',
-              session,
-              expectedWrapperInstanceId: wrapperInstanceId,
-              payload: {
-                messageId,
-                turn:
-                  intent.turn.type === 'command'
-                    ? {
-                        type: 'command',
-                        command: intent.turn.command,
-                        arguments: intent.turn.arguments,
-                      }
-                    : { type: 'prompt', prompt: intent.turn.prompt },
-                agent: {
-                  mode: intent.agent.mode,
-                  ...(model !== undefined ? { model } : {}),
-                  ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
-                },
-                ...(intent.finalization ? { finalization: intent.finalization } : {}),
-                ...(attachments.length ? { attachments } : {}),
-              },
-            })
-          )
-        );
-        const result = sessionPromptResultSchema.parse(prompt);
-        if (result.messageId !== messageId)
-          throw new Error('Prompt response message identity mismatch');
-      });
+      const promptPayload = {
+        messageId,
+        turn:
+          intent.turn.type === 'command'
+            ? {
+                type: 'command' as const,
+                command: intent.turn.command,
+                arguments: intent.turn.arguments,
+              }
+            : { type: 'prompt' as const, prompt: intent.turn.prompt },
+        agent: {
+          mode: intent.agent.mode,
+          ...(model !== undefined ? { model } : {}),
+          ...(intent.agent.variant !== undefined ? { variant: intent.agent.variant } : {}),
+        },
+        ...(intent.finalization ? { finalization: intent.finalization } : {}),
+        ...(attachments.length ? { attachments } : {}),
+      };
+      if (operationResults) {
+        const dispatched = await dispatchAuthorized('session.prompt', promptPayload);
+        if (dispatched.state === 'completed') return;
+        if (dispatched.state === 'running') {
+          const accepted = acceptQueuedMessage(this.loadMessages(), messageId, Date.now());
+          if (!accepted || !this.saveMessages(accepted, epoch)) return;
+          await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
+          return;
+        }
+      } else {
+        await dispatch('prompt', async () => {
+          const prompt = await wait(async () =>
+            controlRequestResult(
+              await control.request({
+                operation: 'session.prompt',
+                session,
+                expectedWrapperInstanceId: wrapperInstanceId,
+                payload: promptPayload,
+              })
+            )
+          );
+          const result = sessionPromptResultSchema.parse(prompt);
+          if (result.messageId !== messageId)
+            throw new Error('Prompt response message identity mismatch');
+        });
+      }
       if (!isCurrent()) {
         if (!this.terminalLifecycle.isCurrent(epoch))
           await this.compensateSessionAttachment(metadata);
         return;
       }
       const accepted = acceptQueuedMessage(this.loadMessages(), messageId, Date.now());
-      if (!accepted || !this.saveMessages(accepted, epoch)) return;
+      if (!accepted) return;
+      if (!this.saveMessages(accepted, epoch)) return;
       await this.armQueueRetry(Date.now() + DEADLINE_MS.acceptedAlarmCap);
     } catch (error) {
       if (!isCurrent()) {
@@ -2509,7 +2732,8 @@ export class SandboxSession extends DurableObject<Env> {
   private saveMessages(
     messages: MessageRecord[],
     epoch?: number,
-    source: 'coordinator' | 'wrapper_outcome' = 'coordinator'
+    source: 'coordinator' | 'wrapper_outcome' | 'operation_result' = 'coordinator',
+    deferredNotifications?: StoredEvent[]
   ): boolean {
     const currentEpoch = epoch ?? this.terminalLifecycle.captureEpoch();
     if (
@@ -2544,7 +2768,11 @@ export class SandboxSession extends DurableObject<Env> {
           }
           return message;
         }
-        const terminal = { ...message, terminalAt: message.terminalAt ?? now };
+        const terminal = {
+          ...message,
+          terminalAt: message.terminalAt ?? now,
+          terminalSource: message.terminalSource ?? source,
+        };
         if (previous?.state === 'accepted' || queuedHeadId === message.messageId) {
           const interactions = this.readPendingInteractions();
           this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
@@ -2593,7 +2821,8 @@ export class SandboxSession extends DurableObject<Env> {
         ...fields,
       });
     }
-    for (const event of events) this.broadcastStoredEvent(event);
+    if (deferredNotifications) deferredNotifications.push(...events);
+    else for (const event of events) this.broadcastStoredEvent(event);
     return true;
   }
 

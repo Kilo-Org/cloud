@@ -14,6 +14,8 @@ import {
   SANDBOX_HELLO_DEADLINE_MS,
   sandboxControlSocketAttachmentSchema,
   sandboxControlObservationSchema,
+  sessionOperationAuthorizationSchema,
+  sessionOperationDeliverySchema,
   type SandboxControlObservation,
   sessionRequestIdentitySchema,
   type ControlOperation,
@@ -23,6 +25,9 @@ import {
   type SandboxHeartbeatPayload,
   type SessionEventIdentity,
   type SessionEventPayload,
+  type SessionOperationAck,
+  type SessionOperationAuthorization,
+  type SessionOperationDelivery,
   type SessionPreparingPayload,
   type SessionRequestIdentity,
 } from '../shared/sandbox-control-protocol.js';
@@ -51,8 +56,10 @@ export type SandboxControlOutboundRequest = {
   operation: Exclude<ControlOperation, 'sandbox.hello'>;
   session?: SessionRequestIdentity;
   payload: unknown;
+  authorization?: SessionOperationAuthorization;
   timeoutMs?: number;
   expectedWrapperInstanceId?: string;
+  deadlineAt?: number;
 };
 
 export type SandboxControlConnectionIdentity = {
@@ -82,6 +89,11 @@ export type SandboxControlSocketHooks = {
     payload: SessionPreparingPayload,
     identity: SandboxControlConnectionIdentity
   ): void | Promise<void>;
+  onOperationResult?(
+    session: SessionRequestIdentity,
+    delivery: SessionOperationDelivery,
+    identity: SandboxControlConnectionIdentity
+  ): Promise<SessionOperationAck | undefined> | SessionOperationAck | undefined;
   onSocketClosed?(
     handshakeComplete: boolean,
     identity?: SandboxControlConnectionIdentity
@@ -96,6 +108,7 @@ export type SandboxControlSocketHandler = {
   closeHandshakenSockets(code: number, reason: string): void;
   sendRequest(input: SandboxControlOutboundRequest): Promise<ResponseFrame>;
   hasHandshakenSocket(): boolean;
+  supportsOperationResults(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
   closeProvisionalSockets(): void;
@@ -316,6 +329,14 @@ export function createSandboxControlSocketHandler(
       return currentHandshakenSocket(state) !== null;
     },
 
+    supportsOperationResults(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null &&
+        readAttachment(current.socket)?.capabilities?.sessionOperationResults === true
+      );
+    },
+
     getConnectionIdentity(): SandboxControlConnectionIdentity | null {
       return currentHandshakenSocket(state)?.identity ?? null;
     },
@@ -478,6 +499,7 @@ export function createSandboxControlSocketHandler(
           connectionId: identity.connectionId,
           protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
           providerInstanceId: identity.providerInstanceId,
+          ...(payload.capabilities ? { capabilities: payload.capabilities } : {}),
           ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
         };
         const superseded: WebSocket[] = [];
@@ -616,6 +638,66 @@ export function createSandboxControlSocketHandler(
         return;
       }
 
+      if (frame.operation === 'session.operation.result') {
+        let parsedSession: SessionRequestIdentity;
+        let parsedDelivery: SessionOperationDelivery;
+        try {
+          parsedSession = sessionRequestIdentitySchema.parse(frame.session);
+          parsedDelivery = sessionOperationDeliverySchema.parse(frame.payload);
+        } catch {
+          sendJson(
+            ws,
+            errorResponse(
+              frame.requestId,
+              'protocol_error',
+              'Invalid operation result payload',
+              false
+            )
+          );
+          return;
+        }
+        if (parsedDelivery.authorization.wrapperInstanceId !== identity.wrapperInstanceId) {
+          sendJson(
+            ws,
+            errorResponse(frame.requestId, 'unauthorized', 'Operation source mismatch', false)
+          );
+          return;
+        }
+        try {
+          const ack = await hooks.onOperationResult?.(parsedSession, parsedDelivery, identity);
+          if (!isCurrentConnection(state, ws, identity)) return;
+          sendJson(
+            ws,
+            ack
+              ? okResponse(frame.requestId, ack)
+              : errorResponse(
+                  frame.requestId,
+                  'not_ready',
+                  'Operation result was not acknowledged',
+                  true
+                )
+          );
+        } catch (error) {
+          if (isCurrentConnection(state, ws, identity)) {
+            const permanent = error instanceof SandboxControlConnectionError && !error.retryable;
+            try {
+              sendJson(
+                ws,
+                errorResponse(
+                  frame.requestId,
+                  permanent ? 'unauthorized' : 'not_ready',
+                  'Operation result delivery failed',
+                  !permanent
+                )
+              );
+            } catch {
+              return;
+            }
+          }
+        }
+        return;
+      }
+
       if (!isControlOperation(frame.operation)) {
         sendJson(ws, errorResponse(frame.requestId, 'unknown_operation', 'Unknown operation'));
         return;
@@ -683,6 +765,24 @@ export function createSandboxControlSocketHandler(
       if (!payload.ok) {
         throw new Error(payload.error.message);
       }
+      const authorization = input.authorization
+        ? sessionOperationAuthorizationSchema.safeParse(input.authorization)
+        : undefined;
+      if (
+        authorization &&
+        (!authorization.success ||
+          (input.operation !== 'session.attach' && input.operation !== 'session.prompt') ||
+          authorization.data.operation !== input.operation ||
+          !input.session ||
+          authorization.data.session.sessionId !== input.session.sessionId ||
+          authorization.data.session.kiloSessionId !== input.session.kiloSessionId ||
+          authorization.data.session.directory !== input.session.directory ||
+          (input.expectedWrapperInstanceId !== undefined &&
+            authorization.data.wrapperInstanceId !== input.expectedWrapperInstanceId) ||
+          Date.now() >= authorization.data.dispatchDeadlineAt)
+      ) {
+        throw new SandboxControlConnectionError('Invalid session operation authorization', false);
+      }
       if (
         isSessionOperation(input.operation) &&
         !sessionRequestIdentitySchema.safeParse(input.session).success
@@ -710,8 +810,16 @@ export function createSandboxControlSocketHandler(
         operation: input.operation,
         payload: payload.payload,
         ...(input.session ? { session: input.session } : {}),
+        ...(input.authorization ? { authorization: input.authorization } : {}),
       };
-      const pending = waiters.wait(requestId, input.timeoutMs);
+      const authorizationTimeout = authorization?.success
+        ? authorization.data.dispatchDeadlineAt - Date.now()
+        : undefined;
+      const timeoutMs =
+        authorizationTimeout === undefined
+          ? input.timeoutMs
+          : Math.max(1, Math.min(input.timeoutMs ?? authorizationTimeout, authorizationTimeout));
+      const pending = waiters.wait(requestId, timeoutMs);
       log('socket_request_sent', {
         ...diagnosticConnection(current.identity),
         requestId,

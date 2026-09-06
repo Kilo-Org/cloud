@@ -104,7 +104,7 @@ export function useMergePullRequestMutation(ref: PrRef) {
       const message =
         gate.kind === 'partial'
           ? i18n.t('prReview.merge.partialSuccessBanner.accessibility', { reason: gate.reason })
-          : i18n.t('prReview.merge.partialSuccessBanner.title');
+          : i18n.t('prReview.overview.stateMerged');
       announceForA11y(message);
     },
     onError: (error: { message: string }) => {

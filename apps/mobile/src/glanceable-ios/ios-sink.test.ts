@@ -462,9 +462,11 @@ describe('iosSink end', () => {
       expect(mockState.started[0]?.ended).toBe(true);
     });
 
+    // The replacement waits behind the older card's dismissal, so it opens on
+    // the newest counts instead of raising the stale ones and updating after.
     expect(mockState.started).toMatchObject([
       { ended: true, props: { status: 'empty', running: 0, needsInput: 0 } },
-      { ended: false, props: { status: 'happy', running: 0, needsInput: 1 } },
+      { ended: false, props: { status: 'happy', running: 0, needsInput: 2 } },
     ]);
 
     // The older end must not reset the new revision or forget its pending update.
@@ -565,25 +567,6 @@ describe('iosSink end', () => {
     ]);
     expect(subscriptions).toEqual(new Set(['scope']));
     publisher.dispose();
-  });
-
-  it('ends the activity when a needs-input session resolved to idle without being opened', async () => {
-    // e23: the question is answered elsewhere and the session lands in `idle`.
-    // The badge and the Agents list clear on that transition, so the island
-    // must resolve too — it must not update on to show the same count the
-    // user just resolved. The idle count survives in the terminal content.
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-    iosSink.startOrUpdate(snapshotFor([{ status: 'question' }]), CTX);
-    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
-    await iosSink.waitForNativeTerminal?.();
-
-    expect(mockState.updated).toHaveLength(0);
-    expect(mockState.started[0]).toMatchObject({
-      ended: true,
-      dismissAt: NOW + 8000,
-      props: { status: 'empty', running: 0, needsInput: 0, idle: 1 },
-    });
   });
 
   it('keeps the full native terminal window after a delayed update', async () => {
@@ -810,12 +793,6 @@ describe('iosSink widget publish', () => {
       boolean,
     ][] = [
       ['empty', [], 'No work in progress', 0, false],
-      // e23: the last needs-input session resolved to `idle` without being
-      // opened. The idle count survives on the snapshot, but an idle-only
-      // snapshot carries `empty` and must not draw a primary number — the
-      // compact surfaces would otherwise keep showing the count the user
-      // just resolved beside the cleared badge.
-      ['empty', [{ status: 'idle' }], 'No work in progress', 0, false],
       // Stale draws rows, and all three draw whenever rows draw, so the
       // surface never reflows as work moves between states.
       ['stale', [{ status: 'busy' }], "Can't update now", 3, true],
@@ -953,30 +930,9 @@ describe('buildGlanceableViewProps', () => {
     expect(props.primaryCount).toBe(1);
     expect(props.countLines.map(line => line.label)).toEqual([
       'glanceable.needsInput',
-      'glanceable.running',
-      'glanceable.idle',
+      'common.working',
+      'common.idle',
     ]);
-  });
-
-  it('drops the compact primary fields when an idle-only snapshot carries empty', () => {
-    // e23: idle is not work. The snapshot keeps the idle count so ranked rows
-    // hold their grid while real work lives, but with `empty` no surface draws
-    // rows — and the compact fields must agree, or accessoryCircular/inline
-    // keep a "1" the badge and the Agents list already cleared.
-    const props = buildGlanceableViewProps(
-      snapshotFor([{ status: 'idle' }, { status: 'idle' }], 1),
-      {},
-      key => key
-    );
-    expect(props.statusLine).toBe('glanceable.empty');
-    expect(props.countLines).toEqual([]);
-    expect(props.primaryLabel).toBeNull();
-    expect(props.primaryKind).toBeNull();
-    expect(props.primaryCount).toBe(0);
-    expect(props.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');
-
-    // An idle-only snapshot must not survive the UserDefaults-safe form either.
-    expect(toWidgetProps(props)).not.toHaveProperty('primaryKind');
   });
 
   it('carries no title, organization name, or raw id into the widget JSON', () => {
@@ -1037,11 +993,11 @@ describe('buildGlanceableViewProps', () => {
       key => key
     );
     expect(stale.accessibilityLabel).toBe(
-      'glanceable.stale, 1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+      'glanceable.stale, 1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
 
     const happy = buildGlanceableViewProps(snapshotFor([{ status: 'busy' }], 0), {}, key => key);
-    expect(happy.accessibilityLabel).toBe('1 glanceable.running, glanceable.openAgents');
+    expect(happy.accessibilityLabel).toBe('1 common.working, glanceable.openAgents');
 
     const empty = buildGlanceableViewProps(snapshotFor([], 1, 'empty'), {}, key => key);
     expect(empty.accessibilityLabel).toBe('glanceable.empty, glanceable.openAgents');

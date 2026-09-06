@@ -112,10 +112,10 @@ export function DeviceSessionsScreen() {
     if (session.isCurrent) {
       // The current device signs out through the normal signOut() flow so the
       // full local teardown (tokens, metadata, cache) stays truthful.
-      Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('deviceSessions.signOutMessage'), [
+      Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('profile.signOutMessage'), [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('deviceSessions.signOutConfirm'),
+          text: t('common.signOut'),
           style: 'destructive',
           onPress: () => {
             void signOut();
@@ -132,7 +132,7 @@ export function DeviceSessionsScreen() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('deviceSessions.signOutConfirm'),
+          text: t('common.signOut'),
           style: 'destructive',
           onPress: () => {
             revokeSession.mutate({ sessionId: session.id });
@@ -147,7 +147,7 @@ export function DeviceSessionsScreen() {
     body = (
       <QueryError
         variant="server"
-        title={t('deviceSessions.couldNotLoad')}
+        title={t('common.couldNotLoadSessions')}
         message={t('deviceSessions.couldNotLoadDescription')}
         onRetry={() => void refetch()}
         isRetrying={isFetching}
@@ -217,7 +217,7 @@ export function DeviceSessionsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('deviceSessions.title')} />
+      <ScreenHeader title={t('common.deviceSessions')} />
       {body}
     </View>
   );

@@ -111,7 +111,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('prReview.screenTitle')} />
+        <ScreenHeader title={t('common.prReview')} />
         <QueryError
           variant="server"
           title={t('prReview.connect.checkFailedTitle')}
@@ -128,7 +128,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('prReview.screenTitle')} />
+        <ScreenHeader title={t('common.prReview')} />
         <CenteredState>
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </CenteredState>
@@ -140,10 +140,10 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
     const revoked = view === 'reconnect';
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('prReview.screenTitle')} />
+        <ScreenHeader title={t('common.prReview')} />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
-          title={revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
+          title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
           description={
             revoked ? t('prReview.connect.reconnectDescription') : t('prReview.connect.description')
           }
@@ -161,7 +161,7 @@ export function PrReviewConnectGate({ children }: PrReviewConnectGateProps) {
                 <RefreshCcw size={16} color={colors.primaryForeground} />
               )}
               <Text>
-                {revoked ? t('prReview.connect.reconnectTitle') : t('prReview.connect.title')}
+                {revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
               </Text>
             </Button>
           }

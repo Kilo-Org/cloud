@@ -18,7 +18,7 @@ export const GLANCEABLE_STATUS_COPY_KEY = {
   privacy: 'glanceable.privacy',
 } as const satisfies Record<Exclude<GlanceableStatus, 'happy'>, string>;
 
-export type GlanceableCountKey = 'glanceable.running' | 'glanceable.needsInput' | 'glanceable.idle';
+export type GlanceableCountKey = 'common.working' | 'glanceable.needsInput' | 'common.idle';
 
 /** The state a count line stands for. Surfaces map it to a glyph and a color. */
 export type GlanceableCountKind = 'needsInput' | 'running' | 'idle';
@@ -36,8 +36,8 @@ export type GlanceableCountLine = {
  */
 const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind }[] = [
   { key: 'glanceable.needsInput', kind: 'needsInput' },
-  { key: 'glanceable.running', kind: 'running' },
-  { key: 'glanceable.idle', kind: 'idle' },
+  { key: 'common.working', kind: 'running' },
+  { key: 'common.idle', kind: 'idle' },
 ];
 
 /**
@@ -45,9 +45,8 @@ const COUNT_ORDER: readonly { key: GlanceableCountKey; kind: GlanceableCountKind
  *
  * A zero row still draws: dropping it would move every remaining row as work
  * changes state, and a surface the user only glances at must not reflow. The
- * surfaces show these rows only while some work exists — a snapshot without a
- * running or needs-input session (idle alone included) carries the `empty`
- * status and draws its status line instead.
+ * surfaces show these rows only while some work exists — a snapshot with three
+ * zeros carries the `empty` status and draws its status line instead.
  */
 export function glanceableCountLines(snapshot: GlanceableAgentsSnapshot): GlanceableCountLine[] {
   return COUNT_ORDER.map(({ key, kind }) => ({ key, kind, count: snapshot[kind] }));

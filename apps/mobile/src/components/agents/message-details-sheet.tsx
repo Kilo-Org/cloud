@@ -232,7 +232,7 @@ export function MessageDetailsSheet({
               ) : null}
 
               <View className="gap-4">
-                <Row label={t('agentChat.messageDetails.role')}>
+                <Row label={t('common.role')}>
                   <Text className="text-base font-medium text-foreground">{content.roleLabel}</Text>
                 </Row>
 
@@ -245,7 +245,7 @@ export function MessageDetailsSheet({
                 ) : null}
 
                 {content.modelLabel ? (
-                  <Row label={t('agentChat.messageDetails.model')}>
+                  <Row label={t('common.model')}>
                     <Text className="text-base font-medium text-foreground">
                       {content.modelLabel}
                     </Text>
@@ -258,7 +258,7 @@ export function MessageDetailsSheet({
                   <Text className="text-sm font-semibold text-foreground">
                     {t('agentChat.messageDetails.costAndTokens')}
                   </Text>
-                  <Row label={t('agentChat.messageDetails.cost')}>
+                  <Row label={t('common.cost')}>
                     <Text className="text-base font-medium text-foreground tabular-nums">
                       {content.costLabel}
                     </Text>

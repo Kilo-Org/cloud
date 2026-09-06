@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersContent';
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
-import { MonthlyUsageContent } from '@/app/admin/gateway/MonthlyUsageContent';
+import { UsageContent } from '@/app/admin/gateway/UsageContent';
 import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
 import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
@@ -90,7 +90,7 @@ export default function AdminGatewayPage() {
               Routing
             </TabsTrigger>
             <TabsTrigger value="monthly-usage" className={tabTriggerClass}>
-              Monthly Usage
+              Model Usage
             </TabsTrigger>
             <TabsTrigger value="model-experiments" className={tabTriggerClass}>
               Model Experiments
@@ -115,7 +115,7 @@ export default function AdminGatewayPage() {
             <RoutingContent />
           </TabsContent>
           <TabsContent value="monthly-usage" className="mt-4">
-            <MonthlyUsageContent />
+            <UsageContent />
           </TabsContent>
           <TabsContent value="model-experiments" className="mt-4">
             <ModelExperimentsContent />

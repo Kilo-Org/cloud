@@ -33,7 +33,7 @@ export function SessionListHeaderActions({
           // 16px gap; left slop makes up the difference to a 44pt-wide target
           hitSlop={{ top: 11, bottom: 11, left: 14, right: 8 }}
           accessibilityRole="button"
-          accessibilityLabel={t('agentChat.newSession.title')}
+          accessibilityLabel={t('common.newSession')}
           className="active:opacity-70"
         >
           <Plus size={22} color={colors.foreground} />

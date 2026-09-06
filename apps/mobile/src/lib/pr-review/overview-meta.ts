@@ -13,7 +13,7 @@ const REVIEWER_STATE_LABEL_KEYS = {
   APPROVED: 'prReview.overview.reviewApproved',
   CHANGES_REQUESTED: 'prReview.overview.reviewChangesRequested',
   COMMENTED: 'prReview.overview.reviewCommented',
-  DISMISSED: 'prReview.overview.reviewDismissed',
+  DISMISSED: 'common.dismissed',
   PENDING: 'prReview.overview.reviewPending',
 } satisfies Record<PrReviewerState, string>;
 

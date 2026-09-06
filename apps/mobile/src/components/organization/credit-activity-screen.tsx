@@ -225,16 +225,16 @@ export function OrganizationCreditActivityScreen() {
               size="sm"
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
-              accessibilityLabel={t('organization.creditActivity.loadMore')}
+              accessibilityLabel={t('common.loadMore')}
             >
-              <Text>{t('organization.creditActivity.loadMore')}</Text>
+              <Text>{t('common.loadMore')}</Text>
             </Button>
           </View>
         )}
         {isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('organization.creditActivity.loadMoreFailed')}
+              {t('organization.invoices.loadMoreFailed')}
             </Text>
             <Button
               variant="outline"

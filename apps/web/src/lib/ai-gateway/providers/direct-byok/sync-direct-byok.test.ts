@@ -407,7 +407,9 @@ describe('syncDirectByokModels database snapshots', () => {
   }
 
   function expectCachedModels(models: DirectByokModel[]) {
-    const cachedModels = redisSet.mock.calls.find(([key]) => key === providerKey)?.[1];
+    const cachedWrite = redisSet.mock.calls.find(([key]) => key === providerKey);
+    expect(cachedWrite?.[2]).toEqual({ ex: 604_800 });
+    const cachedModels = cachedWrite?.[1];
     if (typeof cachedModels !== 'string') {
       throw new Error('Expected a Redis SET with a serialized model list');
     }
@@ -447,6 +449,10 @@ describe('syncDirectByokModels database snapshots', () => {
       normalizedModels.length
     );
     expectCachedModels(normalizedModels);
+    expect(redisSet).toHaveBeenCalledTimes(Object.keys(counts).length);
+    for (const [, , options] of redisSet.mock.calls) {
+      expect(options).toEqual({ ex: 604_800 });
+    }
 
     const snapshots = await db.select().from(direct_byok_model_lists);
     expect(snapshots.map(row => row.provider_id).sort()).toEqual(Object.keys(counts).sort());
@@ -501,7 +507,7 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(snapshot.models).toStrictEqual([]);
     expect(new Date(snapshot.synced_at).toISOString()).not.toBe(oldSyncedAt);
     expect(counts[providerId]).toBe(0);
-    expect(redisSet).toHaveBeenCalledWith(providerKey, '[]');
+    expect(redisSet).toHaveBeenCalledWith(providerKey, '[]', { ex: 604_800 });
   });
 
   test('rejects an upstream failure without replacing the last successful snapshot', async () => {

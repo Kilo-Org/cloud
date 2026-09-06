@@ -111,7 +111,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.findingList.title')}
+        title={t('common.findings')}
         headerRight={
           <Pressable
             onPress={() => {
@@ -180,7 +180,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
                   setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
                 }}
               >
-                <Text>{t('securityAgent.findingList.clearFilters')}</Text>
+                <Text>{t('common.clearFilters')}</Text>
               </Button>
             ) : undefined
           }

@@ -98,7 +98,7 @@ describe('SessionFilterModal', () => {
       i18n.t('agentChat.sessionFilter.platformExtension'),
       i18n.t('agentChat.sessionFilter.platformCli'),
       i18n.t('agentChat.sessionFilter.platformSlack'),
-      i18n.t('agentChat.sessionFilter.platformGithub'),
+      i18n.t('common.github'),
       i18n.t('agentChat.sessionFilter.platformLinear'),
       i18n.t('agentChat.sessionFilter.platformOther'),
       firstProject.displayName,

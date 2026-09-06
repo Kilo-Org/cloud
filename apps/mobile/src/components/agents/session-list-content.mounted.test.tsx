@@ -279,7 +279,7 @@ describe('AgentSessionListContent liveness', () => {
       })
     );
     expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
-      i18n.t(isSearching ? 'agents.sessionList.couldNotSearch' : 'agents.sessionList.couldNotLoad')
+      i18n.t(isSearching ? 'agents.sessionList.couldNotSearch' : 'common.couldNotLoadSessions')
     );
     const retry = renderer.root.find(
       node => isHost(node, 'Button') && node.props.accessibilityLabel === 'Retry'

@@ -35,21 +35,24 @@ export type IosActivityToken = { token: string; kind: 'ios_activity' | 'ios_push
 export type ExpoPushToken = { token: string; locale: string | null };
 
 /**
- * Update eligible activities or end activities whose work has resolved (no
- * running or needs-input session; idle alone resolves too). Never start empty
- * work. A push-to-start token is used only when no activity target remains,
- * avoiding duplicate activities while allowing fresh work after terminal
- * target retirement.
+ * Update eligible activities or end zero-count activities. Never start empty work.
+ * A push-to-start token is used only when no activity target remains, avoiding
+ * duplicate activities while allowing fresh work after terminal target retirement.
+ *
+ * `startable` is the narrower rule the iOS sink starts on: an agent working or
+ * waiting on the user. Idle work keeps a card alive but must never raise one,
+ * or a push-to-start resurrects the card the sink just retired for idleness.
  */
 export function apnsSendsForTokens(
   tokens: readonly IosActivityToken[],
-  eligible: boolean
+  eligible: boolean,
+  startable: boolean
 ): { token: string; event: LiveActivityEvent }[] {
   const activityTokens = tokens.filter(token => token.kind === 'ios_activity');
   if (activityTokens.length > 0) {
     return activityTokens.map(({ token }) => ({ token, event: eligible ? 'update' : 'end' }));
   }
-  return eligible
+  return startable
     ? tokens
         .filter(token => token.kind === 'ios_push_to_start')
         .map(({ token }) => ({ token, event: 'start' }))
@@ -74,28 +77,25 @@ export function toGlanceableContentState(
 
 export function buildGlanceableExpoMessages(
   tokens: readonly ExpoPushToken[],
-  snapshot: ActiveAgentsGlanceable,
-  platform: 'ios' | 'android'
+  snapshot: ActiveAgentsGlanceable
 ): ExpoPushMessage[] {
   return tokens.map(
     ({ token }) =>
       ({
         to: token,
         data: snapshot,
-        badge: snapshot.needsInput,
-        // `_contentAvailable` wakes the background task. The badge stays on this
-        // same ordered snapshot, while no title, body, or sound interrupts the user.
+        // Data-only wake: `_contentAvailable` makes the OS deliver the message to
+        // the background task while the app is backgrounded/killed, and omitting
+        // title/body keeps it from becoming a visible FCM notification that skips
+        // the task. The ongoing notification and widget content come from the local
+        // `applyGlanceablePushData` path, so the push never rings or interrupts.
         _contentAvailable: true,
-        ...(platform === 'ios'
-          ? { priority: 'high' as const }
-          : {
-              sound: null,
-              priority: 'default' as const,
-              channelId: 'active-agents',
-              tag: snapshot.scopeKey,
-            }),
-        // One opaque scope key keeps each platform's badge and snapshot ordered together.
-        collapseId: snapshot.scopeKey,
+        sound: null,
+        priority: 'default',
+        channelId: 'active-agents',
+        // Android collapse key = the opaque scope key, so every aggregate update
+        // for one user+org collapses into the same ongoing notification.
+        tag: snapshot.scopeKey,
       }) satisfies ExpoPushMessage
   );
 }
@@ -154,14 +154,18 @@ export async function deliverGlanceableSnapshot(
 
   // Read the iOS Expo rows first: they carry the only per-user locale on this
   // path, and APNs requires a localized alert on a push-to-start. The
-  // background update below reuses the same rows, so this costs no extra query.
+  // data-only wake below reuses the same rows, so this costs no extra query.
   const iosExpoTokens = await deps.listIosExpoTokens(params.userId, params.organizationId);
   const locale = iosExpoTokens.find(row => row.locale !== null)?.locale ?? null;
 
   const iosTokens = await deps.listIosActivityTokens(params.userId, params.organizationId);
   if (deps.isCurrent && !(await deps.isCurrent())) return;
-  const eligible = snapshot.running + snapshot.needsInput > 0;
-  const iosSends = apnsSendsForTokens(iosTokens, eligible);
+  const eligible = snapshot.running + snapshot.needsInput + snapshot.idle > 0;
+  const iosSends = apnsSendsForTokens(
+    iosTokens,
+    eligible,
+    snapshot.running + snapshot.needsInput > 0
+  );
   if (iosSends.length > 0) {
     await deps.sendIosLiveActivity(
       iosSends,
@@ -182,23 +186,18 @@ export async function deliverGlanceableSnapshot(
     );
   }
 
-  // The iOS badge and data share one update so neither can arrive or collapse alone.
+  // iOS Expo tokens always need the data-only wake: it drives the widget
+  // timeline through the background task while the app is not foregrounded.
   if (deps.isCurrent && !(await deps.isCurrent())) return;
   if (iosExpoTokens.length > 0) {
-    await deps.sendExpoPush(
-      buildGlanceableExpoMessages(iosExpoTokens, snapshot, 'ios'),
-      deps.isCurrent
-    );
+    await deps.sendExpoPush(buildGlanceableExpoMessages(iosExpoTokens, snapshot), deps.isCurrent);
   }
 
   if (await deps.hasAndroidOngoingToken(params.userId, params.organizationId)) {
     const expoTokens = await deps.listAndroidExpoTokens(params.userId, params.organizationId);
     if (deps.isCurrent && !(await deps.isCurrent())) return;
     if (expoTokens.length > 0) {
-      await deps.sendExpoPush(
-        buildGlanceableExpoMessages(expoTokens, snapshot, 'android'),
-        deps.isCurrent
-      );
+      await deps.sendExpoPush(buildGlanceableExpoMessages(expoTokens, snapshot), deps.isCurrent);
     }
   }
 }

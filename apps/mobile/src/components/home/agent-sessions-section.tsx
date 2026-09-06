@@ -51,7 +51,7 @@ export function useLiveSessionContext() {
     !isResolving &&
     (organizationId === null || (!isError && boundary.org?.organizationId === organizationId));
   const contextLabel =
-    organizationId === null ? t('profile.personal') : boundary.org?.organizationName;
+    organizationId === null ? t('common.personal') : boundary.org?.organizationName;
   const label = isReady ? contextLabel : undefined;
   return {
     organizationId,
@@ -240,7 +240,7 @@ export function LiveSessionFeedback({
         )}
       </View>
       <AccessibleStatus
-        message={content === 'pending' ? t('agentChat.instancePicker.loading') : null}
+        message={content === 'pending' ? t('common.loading') : null}
         tone="status"
         className="absolute size-px overflow-hidden"
       />

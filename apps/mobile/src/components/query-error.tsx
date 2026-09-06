@@ -26,14 +26,14 @@ const VARIANT_ICONS = {
 } satisfies Record<QueryErrorVariant, LucideIcon>;
 
 const VARIANT_META_KEYS = {
-  neutral: { title: 'queryError.neutralTitle', description: 'queryError.neutralDescription' },
-  offline: { title: 'queryError.offlineTitle', description: 'queryError.offlineDescription' },
+  neutral: { title: 'common.somethingWentWrong', description: 'queryError.neutralDescription' },
+  offline: { title: 'queryError.offlineTitle', description: 'common.somethingWentWrong' },
   permission: {
-    title: 'queryError.permissionTitle',
+    title: 'common.accessDenied',
     description: 'queryError.permissionDescription',
   },
   'not-found': {
-    title: 'queryError.notFoundTitle',
+    title: 'common.notFound',
     description: 'queryError.notFoundDescription',
   },
   server: { title: 'queryError.serverTitle', description: 'queryError.serverDescription' },

@@ -70,21 +70,21 @@ describe('primary rank and locked copy keys', () => {
 
     const noInput = snapshot({ sessions: [{ status: 'busy' }, { status: 'idle' }] });
     expect(primaryGlanceableCount(noInput)).toEqual({
-      key: 'glanceable.running',
+      key: 'common.working',
       kind: 'running',
       count: 1,
     });
 
     const onlyIdle = snapshot({ sessions: [{ status: 'idle' }] });
     expect(primaryGlanceableCount(onlyIdle)).toEqual({
-      key: 'glanceable.idle',
+      key: 'common.idle',
       kind: 'idle',
       count: 1,
     });
 
     const onlyRunning = snapshot({ sessions: [{ status: 'busy' }, { status: 'busy' }] });
     expect(primaryGlanceableCount(onlyRunning)).toEqual({
-      key: 'glanceable.running',
+      key: 'common.working',
       kind: 'running',
       count: 2,
     });
@@ -110,7 +110,7 @@ describe('spoken label shape', () => {
     const happy = snapshot({ sessions: [{ status: 'busy' }, { status: 'question' }] });
     expect(glanceableSpokenLabelKeys(happy)).toEqual([
       'glanceable.needsInput',
-      'glanceable.running',
+      'common.working',
       'glanceable.openAgents',
     ]);
     expect(glanceableSpokenLabelKeys(happy).join(' ')).not.toContain('u1');
@@ -133,14 +133,14 @@ describe('numeric spoken label', () => {
       sessions: [{ status: 'busy' }, { status: 'busy' }, { status: 'question' }],
     });
     expect(glanceableSpokenLabel(happy, {}, key => key)).toBe(
-      '1 glanceable.needsInput, 2 glanceable.running, glanceable.openAgents'
+      '1 glanceable.needsInput, 2 common.working, glanceable.openAgents'
     );
   });
 
   it('speaks the status word, numeric counts, then Open agents for stale', () => {
     const stale = snapshot({ sessions: [{ status: 'busy' }], status: 'stale' });
     expect(glanceableSpokenLabel(stale, {}, key => key)).toBe(
-      'glanceable.stale, 1 glanceable.running, glanceable.openAgents'
+      'glanceable.stale, 1 common.working, glanceable.openAgents'
     );
   });
 
@@ -163,8 +163,8 @@ describe('numeric spoken label', () => {
 describe('numeric spoken label', () => {
   const copy: Record<string, string> = {
     'glanceable.needsInput': 'Needs input',
-    'glanceable.idle': 'Idle',
-    'glanceable.running': 'Working',
+    'common.idle': 'Idle',
+    'common.working': 'Working',
     'glanceable.waiting': 'Waiting for agents',
     'glanceable.empty': 'No work in progress',
     'glanceable.stale': 'Updates delayed',

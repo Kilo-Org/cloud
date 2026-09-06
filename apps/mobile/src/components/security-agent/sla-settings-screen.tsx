@@ -47,7 +47,7 @@ type SlaSeverity = 'critical' | 'high' | 'medium' | 'low';
 const SLA_ROWS = [
   {
     key: 'critical',
-    labelKey: 'securityAgent.sla.critical',
+    labelKey: 'common.critical',
     descriptionKey: 'securityAgent.sla.criticalDescription',
   },
   {

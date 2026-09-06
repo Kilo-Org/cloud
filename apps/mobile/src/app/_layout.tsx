@@ -856,12 +856,12 @@ function RootLayoutNav({
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
-        description={t('bootstrap.couldNotLoadAccountDescription')}
+        description={t('organization.boundary.loadErrorMessage')}
         primaryLabel={t('common.retry')}
         primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
         onPrimaryPress={refetchUserId}
-        secondaryLabel={t('bootstrap.signOut')}
-        secondaryAccessibilityLabel={t('bootstrap.signOut')}
+        secondaryLabel={t('common.signOut')}
+        secondaryAccessibilityLabel={t('common.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}
@@ -880,8 +880,8 @@ function RootLayoutNav({
           setConsentCheckError(null);
           setConsentCheckRetryKey(key => key + 1);
         }}
-        secondaryLabel={t('bootstrap.signOut')}
-        secondaryAccessibilityLabel={t('bootstrap.signOut')}
+        secondaryLabel={t('common.signOut')}
+        secondaryAccessibilityLabel={t('common.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}

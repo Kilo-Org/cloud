@@ -1,5 +1,6 @@
 import 'server-only';
 import crypto from 'node:crypto';
+import { z } from 'zod';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
@@ -80,10 +81,34 @@ export type VerifiedOAuthState = {
  * invalid, or the token has expired.
  */
 export function verifyOAuthState(state: string | null): VerifiedOAuthState | null {
-  if (!state) return null;
+  const result = verifyOAuthStateDetailed(state);
+  return result.status === 'valid' ? result.state : null;
+}
+
+export type OAuthStateVerificationFailureReason =
+  | 'state_missing'
+  | 'state_malformed'
+  | 'signature_invalid'
+  | 'state_expired'
+  | 'state_from_future';
+
+export type OAuthStateVerificationResult =
+  | { status: 'valid'; state: VerifiedOAuthState }
+  | { status: 'invalid'; reason: OAuthStateVerificationFailureReason };
+
+const OAuthStatePayloadSchema = z.object({
+  owner: z.string(),
+  uid: z.string(),
+  iat: z.number().finite(),
+  nonce: z.string().min(1),
+  returnTo: z.unknown().optional(),
+});
+
+export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerificationResult {
+  if (!state) return { status: 'invalid', reason: 'state_missing' };
 
   const dotIndex = state.indexOf('.');
-  if (dotIndex === -1) return null;
+  if (dotIndex === -1) return { status: 'invalid', reason: 'state_malformed' };
 
   const payload = state.slice(0, dotIndex);
   const providedSig = state.slice(dotIndex + 1);
@@ -96,31 +121,29 @@ export function verifyOAuthState(state: string | null): VerifiedOAuthState | nul
     providedSigBytes.length !== expectedSigBytes.length ||
     !crypto.timingSafeEqual(providedSigBytes, expectedSigBytes)
   ) {
-    return null;
+    return { status: 'invalid', reason: 'signature_invalid' };
   }
 
+  let data: z.infer<typeof OAuthStatePayloadSchema>;
   try {
-    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-      owner?: string;
-      uid?: string;
-      iat?: number;
-      nonce?: string;
-      returnTo?: string;
-    };
-    if (typeof data.owner !== 'string' || typeof data.uid !== 'string') return null;
-
-    // Enforce TTL: reject tokens that are too old or have no timestamp
-    if (typeof data.iat !== 'number') return null;
-    const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
-    if (ageSeconds < 0 || ageSeconds > OAUTH_STATE_TTL_SECONDS) return null;
-
-    // Require nonce to be present (guards against old-format tokens)
-    if (typeof data.nonce !== 'string' || data.nonce.length === 0) return null;
-
-    const returnTo = typeof data.returnTo === 'string' ? validateReturnPath(data.returnTo) : null;
-
-    return { owner: data.owner, userId: data.uid, ...(returnTo ? { returnTo } : {}) };
+    const parsed = OAuthStatePayloadSchema.safeParse(
+      JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+    );
+    if (!parsed.success) return { status: 'invalid', reason: 'state_malformed' };
+    data = parsed.data;
   } catch {
-    return null;
+    return { status: 'invalid', reason: 'state_malformed' };
   }
+
+  const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
+  if (ageSeconds < 0) return { status: 'invalid', reason: 'state_from_future' };
+  if (ageSeconds > OAUTH_STATE_TTL_SECONDS) {
+    return { status: 'invalid', reason: 'state_expired' };
+  }
+
+  const returnTo = typeof data.returnTo === 'string' ? validateReturnPath(data.returnTo) : null;
+  return {
+    status: 'valid',
+    state: { owner: data.owner, userId: data.uid, ...(returnTo ? { returnTo } : {}) },
+  };
 }

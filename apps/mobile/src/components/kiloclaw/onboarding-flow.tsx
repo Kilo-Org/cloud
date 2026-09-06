@@ -346,7 +346,7 @@ export function OnboardingFlow() {
     <Pressable
       onPress={onDismiss}
       hitSlop={12}
-      accessibilityLabel={t('kiloclaw.onboarding.flow.close')}
+      accessibilityLabel={t('common.close')}
       accessibilityRole="button"
       className="active:opacity-70"
     >

@@ -19,6 +19,7 @@ import { UserAdminOrganizations } from './UserAdminOrganizations';
 import { UserAdminKiloPass } from './UserAdminKiloPass';
 import { UserAdminKiloClaw } from './UserAdminKiloClaw';
 import { UserAdminGastown } from './UserAdminGastown';
+import { ReleaseEmailAddressButton } from './ReleaseEmailAddressButton';
 
 const VALID_TABS = ['billing', 'organizations', 'kiloclaw', 'gastown', 'admin-tools'] as const;
 type Tab = (typeof VALID_TABS)[number];
@@ -108,6 +109,7 @@ export function UserAdminTabbedSections(
             <UserAdminNotes {...user} />
             <UserAdminStytchFingerprints {...user} />
             <UserAdminReferrals kilo_user_id={user.id} />
+            <ReleaseEmailAddressButton userId={user.id} email={user.google_user_email} />
             <UserAdminGdprRemoval {...user} />
           </div>
         </TabsContent>

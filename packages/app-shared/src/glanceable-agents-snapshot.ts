@@ -18,6 +18,19 @@ export const GLANCEABLE_SNAPSHOT_EXPIRY_MS = 28_800_000;
 export const GLANCEABLE_COALESCE_MS = 1000;
 /** Terminal empty lasts at most this long before the activity ends. */
 export const GLANCEABLE_TERMINAL_MS = 8000;
+/**
+ * Idle-only work holds the Live Activity for at most this long. A connected
+ * agent that is doing nothing is worth a glance for a few minutes, not for the
+ * whole 8 hour lifetime, so the surface retires itself. The widget keeps
+ * showing idle work: placing one is the user asking for exactly that.
+ */
+export const GLANCEABLE_IDLE_ONLY_MS = 600_000;
+/**
+ * A Live Activity that has taken no update for this long reads as unknown, not
+ * as current: ActivityKit dims stale content. Every real transition pushes an
+ * update well inside the window, and an idle card is already gone by then.
+ */
+export const GLANCEABLE_STALE_MS = 1_800_000;
 
 export type GlanceableAgentsSnapshotStatus =
   | 'waiting'
@@ -192,11 +205,9 @@ export function buildGlanceableSnapshot(
   input: BuildGlanceableSnapshotInput
 ): GlanceableAgentsSnapshot {
   const counts = countGlanceableSessions(input.sessions);
-  // Idle is not work: when the last needs-input session resolves without being
-  // opened it lands in `idle`, and every glanceable surface must clear with the
-  // badge and the Agents list. Idle counts stay on the snapshot so ranked rows
-  // keep showing them while working or waiting sessions hold a surface alive.
-  const eligible = counts.running + counts.needsInput > 0;
+  // Idle counts: a connected agent doing nothing is still something the user
+  // wants on the Lock Screen, and the Dynamic Island ranks it last.
+  const eligible = counts.running + counts.needsInput + counts.idle > 0;
   const now = input.now;
   const updatedAt = new Date(now).toISOString();
 
@@ -216,12 +227,24 @@ export function buildGlanceableSnapshot(
   };
 }
 
-/**
- * True when any agent is working or waits on the user. Idle agents stay on the
- * snapshot's counts but never keep a glanceable surface alive.
- */
+/** True when any agent is connected, whether working, waiting, or idle. */
 export function isEligibleGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
+  return snapshot.running + snapshot.needsInput + snapshot.idle > 0;
+}
+
+/**
+ * True when an agent is working or waiting on the user. Only this may raise a
+ * Live Activity: idle work is worth keeping one alive, never worth interrupting
+ * the Lock Screen for. The client sink and the APNs push-to-start share the
+ * rule, so neither can resurrect a surface the other retired.
+ */
+export function isStartableGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
   return snapshot.running + snapshot.needsInput > 0;
+}
+
+/** True when every connected agent is idle: eligible work, but nothing happening. */
+export function isIdleOnlyGlanceableWork(snapshot: GlanceableAgentsSnapshot): boolean {
+  return isEligibleGlanceableWork(snapshot) && !isStartableGlanceableWork(snapshot);
 }
 
 /**

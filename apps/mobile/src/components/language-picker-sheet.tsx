@@ -177,7 +177,7 @@ export function LanguagePickerSheet({
   if (restarting) {
     return (
       <PickerSheet
-        title={t('language.title')}
+        title={t('common.language')}
         onDone={() => {
           // Restarting: the native reload replaces this sheet.
         }}
@@ -201,7 +201,7 @@ export function LanguagePickerSheet({
   }
   return (
     <PickerSheet
-      title={t('language.title')}
+      title={t('common.language')}
       onDone={() => {
         void handleDone();
       }}

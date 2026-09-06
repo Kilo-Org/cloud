@@ -534,9 +534,9 @@ function pressHeaderBack(renderer: ReactTestRenderer) {
 
 describe('SessionDetailContent display scope', () => {
   it.each([
-    { organizationId: null, isResolved: true, label: i18n.t('profile.personal') },
+    { organizationId: null, isResolved: true, label: i18n.t('common.personal') },
     { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
-    { organizationId: 'missing-org', isResolved: true, label: i18n.t('profile.organization') },
+    { organizationId: 'missing-org', isResolved: true, label: i18n.t('common.organization') },
     { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
   ])('omits the $label context label and preserves header actions', async state => {
     const { renderer } = await mountDetails([], undefined, {
@@ -553,7 +553,7 @@ describe('SessionDetailContent display scope', () => {
     expect(
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
-    expect(header.findByProps({ accessibilityLabel: i18n.t('screenHeader.goBack') })).toBeDefined();
+    expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
     const { onPress } = header.findByProps({
       accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
         title: `Root ${ROOT_ID}`,

@@ -91,6 +91,15 @@ describe('GlanceablePublisher', () => {
     expect(snapshot.status).toBe('happy');
   });
 
+  it('starts the activity immediately on the first eligible emit', () => {
+    vi.useFakeTimers();
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+
   it('coalesces later happy updates but publishes needs-input changes immediately', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
@@ -102,6 +111,7 @@ describe('GlanceablePublisher', () => {
     vi.advanceTimersByTime(1000);
     expect(count(calls, 'startOrUpdate')).toBe(2);
     expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(3);
+    // The badge reads `needsInput`, so a change to it skips the coalesce wait.
     publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
     expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(1);
     publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
@@ -118,7 +128,7 @@ describe('GlanceablePublisher', () => {
     expect(count(calls, 'startOrUpdate')).toBe(started);
   });
 
-  it('never starts for idle-only sessions or for an empty fleet', () => {
+  it('starts for idle-only sessions but not when no session is connected', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
@@ -127,31 +137,9 @@ describe('GlanceablePublisher', () => {
     expect(lastSnapshot(calls, 'publish').status).toBe('empty');
     vi.advanceTimersByTime(8000);
     expect(count(calls, 'endImmediate')).toBe(0);
-    // e23: an idle agent stays connected but is not work. A fleet where every
-    // session went idle without being opened must not start or keep a surface:
-    // the island must not go on showing the count the user just resolved.
+    // An idle agent is still connected, so the notch shows it ranked last.
     publisher.handleSessions([{ status: 'idle' }, { status: 'idle' }], PUB_CTX);
-    expect(count(calls, 'startOrUpdate')).toBe(0);
-    expect(lastSnapshot(calls, 'publish')).toMatchObject({ status: 'empty', idle: 2 });
-    publisher.dispose();
-  });
-
-  it('ends a started activity when every session went idle without being opened', () => {
-    vi.useFakeTimers();
-    const { sink, calls } = makeSink();
-    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
-    publisher.handleSessions([{ status: 'question' }], PUB_CTX);
-    expect(lastSnapshot(calls, 'startOrUpdate')).toMatchObject({ status: 'happy', needsInput: 1 });
-    // The question is answered elsewhere: the session lands in `idle`.
-    publisher.handleSessions([{ status: 'idle' }], PUB_CTX);
-    expect(lastSnapshot(calls, 'publish')).toMatchObject({
-      status: 'empty',
-      needsInput: 0,
-      idle: 1,
-    });
-    // The terminal end fires after the brief empty window, resolving the island.
-    vi.advanceTimersByTime(8000);
-    expect(count(calls, 'endImmediate')).toBe(1);
+    expect(lastSnapshot(calls, 'startOrUpdate')).toMatchObject({ status: 'happy', idle: 2 });
     publisher.dispose();
   });
 

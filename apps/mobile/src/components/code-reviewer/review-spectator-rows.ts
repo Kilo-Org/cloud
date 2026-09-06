@@ -213,7 +213,7 @@ function toRowFromKilocode(
   }
 
   if (type === 'session.error') {
-    const error = asString(properties.error) ?? t('codeReviewer.reviewDetail.unknownError');
+    const error = asString(properties.error) ?? t('codeReviewer.unknownError');
     return {
       timestamp,
       message: t('codeReviewer.reviewDetail.sessionError', { error }),

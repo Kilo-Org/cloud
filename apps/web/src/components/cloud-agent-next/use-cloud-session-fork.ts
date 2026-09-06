@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -24,12 +24,28 @@ export function useCloudSessionFork(organizationId?: string) {
   const trpc = useTRPC();
   const trpcClient = useRawTRPCClient();
   const [forkingSessionId, setForkingSessionId] = useState<string | null>(null);
+  // Reuse one `operationKey` per (context, session) while an attempt may have
+  // committed server-side: after an ambiguous failure a retry with the same
+  // key replays the settled create instead of minting a second session. The
+  // key rotates once the fork settles (success or a definite rejection).
+  const pendingOperationRef = useRef<{ fingerprint: string; operationKey: string } | null>(null);
 
   const forkSessionToNewCloudSession = useCallback(
     async (sessionId: string): Promise<boolean> => {
       setForkingSessionId(sessionId);
+      const fingerprint = `${organizationId ?? 'personal'}:${sessionId}`;
+      const pending = pendingOperationRef.current;
+      const operationKey =
+        pending?.fingerprint === fingerprint ? pending.operationKey : crypto.randomUUID();
+      pendingOperationRef.current = { fingerprint, operationKey };
+
+      const rotateOperationKey = () => {
+        if (pendingOperationRef.current?.fingerprint === fingerprint) {
+          pendingOperationRef.current = null;
+        }
+      };
+
       try {
-        const operationKey = crypto.randomUUID();
         const createSession = organizationId
           ? (input: CloudSessionForkCreateInput) =>
               trpcClient.organizations.cloudAgentNext.prepareSession.mutate({
@@ -39,7 +55,7 @@ export function useCloudSessionFork(organizationId?: string) {
           : (input: CloudSessionForkCreateInput) =>
               trpcClient.cloudAgentNext.prepareSession.mutate(input);
 
-        return await runCloudForkFlow({
+        const settled = await runCloudForkFlow({
           sessionId,
           organizationId,
           operationKey,
@@ -64,12 +80,17 @@ export function useCloudSessionFork(organizationId?: string) {
             notifyError: message => toast.error(message),
           },
         });
+        if (settled) {
+          rotateOperationKey();
+        }
+        return settled;
       } catch (error) {
-        const message =
-          error instanceof Error && error.message
-            ? error.message
-            : 'Failed to fork the session into a new Cloud Agent session';
-        toast.error(message);
+        // The error is ambiguous: the server may have committed the create but
+        // the response was lost. Keep the operation key so a user retry replays
+        // the same intent instead of duplicating the session. Show a generic
+        // message rather than leaking internal zod/worker error text.
+        console.error('Failed to fork session into a new Cloud Agent session:', error);
+        toast.error('Failed to fork the session into a new Cloud Agent session. Please try again.');
         return false;
       } finally {
         setForkingSessionId(null);

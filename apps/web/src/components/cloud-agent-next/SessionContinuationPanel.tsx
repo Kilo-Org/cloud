@@ -17,7 +17,7 @@ type SessionContinuationPanelProps = {
 function SessionContinuationPanel({
   sessionId,
   organizationId,
-  canForkToCloud = true,
+  canForkToCloud = false,
 }: SessionContinuationPanelProps) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);

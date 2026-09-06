@@ -18,6 +18,14 @@ export type CloudRuntimeConfig = {
   model?: string;
   variant?: string;
   autoCommit?: boolean;
+  runtimeAgents?: Array<{ slug: string; name: string; model?: string; variant?: string }>;
+};
+
+/** Runtime agent in the shape the `prepareSession` schema expects. */
+export type CloudRuntimeAgentInput = {
+  slug: string;
+  name: string;
+  config: { model?: string; variant?: string };
 };
 
 export type CloudForkRejectionReason =
@@ -27,8 +35,8 @@ export type CloudForkRejectionReason =
   | 'missing-mode'
   | 'invalid-mode'
   | 'missing-repository'
-  | 'unsupported-platform'
   | 'unparseable-repository'
+  | 'unsupported-platform'
   | 'organization-mismatch';
 
 export type CloudForkRepository =
@@ -41,6 +49,7 @@ export type CloudForkFields = {
   variant?: string;
   autoCommit: boolean;
   repository: CloudForkRepository;
+  runtimeAgents?: CloudRuntimeAgentInput[];
 };
 
 export type DeriveCloudSessionForkResult =
@@ -48,6 +57,8 @@ export type DeriveCloudSessionForkResult =
   | { ok: false; reason: CloudForkRejectionReason };
 
 const MODE_SLUG_PATTERN = /^[a-z][a-z0-9-]*$/;
+const VARIANT_PATTERN = /^[a-zA-Z]+$/;
+const GITHUB_REPO_PATTERN = /^[a-zA-Z0-9_.-]+\/[a-zA-Z0-9_.-]+$/;
 const GITLAB_PROJECT_PATTERN = /^[a-zA-Z0-9_.-]+(?:\/[a-zA-Z0-9_.-]+)+$/;
 
 export function deriveCloudSessionForkFields(input: {
@@ -86,22 +97,57 @@ export function deriveCloudSessionForkFields(input: {
     fields: {
       mode,
       model: runtime.model,
-      ...(runtime.variant ? { variant: runtime.variant } : {}),
+      // `variant` is optional and model-specific; a runtime variant that does
+      // not fit the prepare schema charset would reject the whole fork at the
+      // zod boundary, so drop malformed variants instead of failing the fork.
+      ...(isValidVariant(runtime.variant) ? { variant: runtime.variant } : {}),
       autoCommit: runtime.autoCommit ?? false,
       repository: repository.fields,
+      ...(runtime.runtimeAgents && runtime.runtimeAgents.length > 0
+        ? { runtimeAgents: toPrepareRuntimeAgents(runtime.runtimeAgents) }
+        : {}),
     },
   };
+}
+
+/** Map the flat runtime-agent shape into the nested `prepareSession` input shape. */
+function toPrepareRuntimeAgents(
+  agents: Array<{ slug: string; name: string; model?: string; variant?: string }>
+): CloudRuntimeAgentInput[] {
+  return agents.map(agent => {
+    const config: CloudRuntimeAgentInput['config'] = {};
+    if (agent.model) {
+      config.model = agent.model;
+    }
+    // A variant is model-specific; only forward it alongside its model.
+    if (agent.model && agent.variant) {
+      config.variant = agent.variant;
+    }
+    return { slug: agent.slug, name: agent.name, config };
+  });
+}
+
+function isValidVariant(variant: string | undefined): variant is string {
+  return typeof variant === 'string' && variant.length <= 50 && VARIANT_PATTERN.test(variant);
 }
 
 function deriveRepository(
   runtime: CloudRuntimeConfig
 ): { ok: true; fields: CloudForkRepository } | { ok: false; reason: CloudForkRejectionReason } {
-  switch (runtime.platform) {
+  const platform = resolvePlatform(runtime);
+
+  switch (platform) {
     case 'github': {
-      if (!runtime.githubRepo) {
+      const fullName =
+        runtime.githubRepo ??
+        (runtime.gitUrl ? parseGitHubRepoFromGitUrl(runtime.gitUrl) : undefined);
+      if (!fullName) {
         return { ok: false, reason: 'missing-repository' };
       }
-      return { ok: true, fields: { kind: 'github', fullName: runtime.githubRepo } };
+      if (!GITHUB_REPO_PATTERN.test(fullName)) {
+        return { ok: false, reason: 'unparseable-repository' };
+      }
+      return { ok: true, fields: { kind: 'github', fullName } };
     }
     case 'gitlab': {
       if (!runtime.gitUrl) {
@@ -118,6 +164,74 @@ function deriveRepository(
     default:
       return { ok: false, reason: 'unsupported-platform' };
   }
+}
+
+function resolvePlatform(
+  runtime: CloudRuntimeConfig
+): 'github' | 'gitlab' | 'bitbucket' | undefined {
+  const platform = runtime.platform;
+  if (platform === 'github') return 'github';
+  if (platform === 'gitlab') return 'gitlab';
+  if (platform === 'bitbucket') return 'bitbucket';
+  if (runtime.githubRepo) {
+    return 'github';
+  }
+  if (!runtime.gitUrl) {
+    return undefined;
+  }
+  const host = gitHostOf(runtime.gitUrl);
+  if (host === 'github.com') return 'github';
+  if (host === 'bitbucket.org') return 'bitbucket';
+  if (host !== null && (host === 'gitlab.com' || host.endsWith('.gitlab.com'))) return 'gitlab';
+  return undefined;
+}
+
+function gitHostOf(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const scpStyle = /^[^@/]+@([^:]+):.+$/.exec(trimmed);
+  if (scpStyle) {
+    return scpStyle[1].toLowerCase();
+  }
+  try {
+    return new URL(trimmed).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract the `owner/repo` path from a GitHub clone URL. Accepts https and
+ * SCP-style URLs and strips a trailing `.git` or slash. Returns `null` when
+ * the path is not exactly two segments.
+ */
+export function parseGitHubRepoFromGitUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  let path: string;
+  const scpStyle = /^[^@/]+@[^:]+:(.+)$/.exec(trimmed);
+  if (scpStyle) {
+    path = scpStyle[1];
+  } else {
+    let parsed: URL;
+    try {
+      parsed = new URL(trimmed);
+    } catch {
+      return null;
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:' && parsed.protocol !== 'ssh:') {
+      return null;
+    }
+    path = parsed.pathname.replace(/^\/+/, '');
+  }
+
+  const repo = path.replace(/\.git$/i, '').replace(/\/+$/, '');
+  return GITHUB_REPO_PATTERN.test(repo) ? repo : null;
 }
 
 /**
@@ -167,7 +281,7 @@ export function cloudForkRejectionMessage(reason: CloudForkRejectionReason): str
     case 'missing-repository':
       return 'This session has no repository to copy.';
     case 'unsupported-platform':
-      return 'Forking Bitbucket sessions to a new Cloud Agent session is not supported yet.';
+      return "Forking this session's repository to a new Cloud Agent session is not supported yet.";
     case 'unparseable-repository':
       return "This session's repository cannot be reused.";
     case 'organization-mismatch':
@@ -197,6 +311,7 @@ export type CloudSessionForkCreateInput = {
   organizationId?: string;
   githubRepo?: string;
   gitlabProject?: string;
+  runtimeAgents?: CloudRuntimeAgentInput[];
 };
 
 export type CloudSessionForkDeps = {
@@ -210,6 +325,10 @@ export type CloudForkFlowDeps = CloudSessionForkDeps & {
   navigateToSession: (kiloSessionId: string) => void;
   notifyError: (message: string) => void;
 };
+
+export type ContinueInNewCloudSessionResult =
+  | { ok: true; kiloSessionId: string }
+  | { ok: false; reason: CloudForkRejectionReason };
 
 /**
  * Run a cloud-to-cloud fork and drive the success UI. Returns `true` when the
@@ -241,14 +360,10 @@ export async function runCloudForkFlow(params: {
   return true;
 }
 
-export type ContinueInNewCloudSessionResult =
-  | { ok: true; kiloSessionId: string }
-  | { ok: false; reason: CloudForkRejectionReason };
-
 /**
  * Fork a source session into a brand-new Cloud Agent session and return the
  * new session id. The destination is cloned from the source transcript and
- * inherits the source runtime's repository, model, and mode.
+ * inherits the source runtime's repository, model, mode, and custom agents.
  *
  * `organizationId` describes the context the user is acting from: a personal
  * listing passes nothing, an organization listing passes the organization id.
@@ -284,6 +399,7 @@ export async function continueInNewCloudSession(params: {
     model: fields.model,
     ...(fields.variant ? { variant: fields.variant } : {}),
     autoCommit: fields.autoCommit,
+    ...(fields.runtimeAgents ? { runtimeAgents: fields.runtimeAgents } : {}),
     cloneFromKiloSessionId: sessionId,
     autoInitiate: true,
     operationKey,

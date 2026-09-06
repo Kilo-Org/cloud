@@ -64,6 +64,104 @@ describe('deriveCloudSessionForkFields', () => {
     });
   });
 
+  it('derives a GitHub fork from the runtime git URL when githubRepo is absent', () => {
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({
+        githubRepo: undefined,
+        gitUrl: 'https://github.com/kilocode/kilo.git',
+      }),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      fields: {
+        mode: 'code',
+        model: 'kilocode/claude-sonnet-4',
+        variant: undefined,
+        autoCommit: false,
+        repository: { kind: 'github', fullName: 'kilocode/kilo' },
+      },
+    });
+  });
+
+  it('infers a GitHub platform from a GitHub git URL when platform is missing', () => {
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({
+        platform: undefined,
+        githubRepo: undefined,
+        gitUrl: 'https://github.com/kilocode/kilo.git',
+      }),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      fields: {
+        mode: 'code',
+        model: 'kilocode/claude-sonnet-4',
+        variant: undefined,
+        autoCommit: false,
+        repository: { kind: 'github', fullName: 'kilocode/kilo' },
+      },
+    });
+  });
+
+  it('drops a malformed runtime variant instead of failing the fork', () => {
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({ variant: 'thinking-v2' }),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      fields: {
+        mode: 'code',
+        model: 'kilocode/claude-sonnet-4',
+        variant: undefined,
+        autoCommit: false,
+        repository: { kind: 'github', fullName: 'kilocode/kilo' },
+      },
+    });
+  });
+
+  it('forwards runtime agents so custom agent modes remain forkable', () => {
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({
+        mode: 'security-review',
+        runtimeAgents: [
+          {
+            slug: 'security-review',
+            name: 'Security Review',
+            model: 'a-model',
+            variant: 'thinking',
+          },
+          { slug: 'plain-agent', name: 'Plain Agent' },
+        ],
+      }),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      fields: {
+        mode: 'security-review',
+        model: 'kilocode/claude-sonnet-4',
+        variant: undefined,
+        autoCommit: false,
+        runtimeAgents: [
+          {
+            slug: 'security-review',
+            name: 'Security Review',
+            config: { model: 'a-model', variant: 'thinking' },
+          },
+          { slug: 'plain-agent', name: 'Plain Agent', config: {} },
+        ],
+        repository: { kind: 'github', fullName: 'kilocode/kilo' },
+      },
+    });
+  });
+
   it('carries the runtime variant and default autoCommit to false when unset', () => {
     const result = deriveCloudSessionForkFields({
       session: CLOUD_SESSION,
@@ -220,7 +318,7 @@ describe('cloudForkRejectionMessage', () => {
     'invalid-mode': "This session's agent mode cannot be reused.",
     'missing-repository': 'This session has no repository to copy.',
     'unsupported-platform':
-      'Forking Bitbucket sessions to a new Cloud Agent session is not supported yet.',
+      "Forking this session's repository to a new Cloud Agent session is not supported yet.",
     'unparseable-repository': "This session's repository cannot be reused.",
     'organization-mismatch': 'You can only fork this session inside its own organization.',
   };
@@ -476,5 +574,69 @@ describe('runCloudForkFlow', () => {
 
     expect(ok).toBe(true);
     expect(deps.navigateToSession).toHaveBeenCalledWith('ses_bbbbbbbbbbbbbbbbbbbbbbbb');
+  });
+});
+
+describe('continueInNewCloudSession configuration forwarding', () => {
+  const depsFor = (runtimeState: CloudRuntimeConfig) => {
+    const getRuntimeState = jest.fn().mockResolvedValue({
+      session: CLOUD_SESSION,
+      runtimeState,
+    });
+    const createSession = jest
+      .fn()
+      .mockResolvedValue({ kiloSessionId: 'ses_cccccccccccccccccccccccc' });
+    return { getRuntimeState, createSession };
+  };
+
+  it('forwards runtime agents so a custom agent mode stays forkable', async () => {
+    const { getRuntimeState, createSession } = depsFor(
+      runtime({
+        mode: 'security-review',
+        runtimeAgents: [
+          {
+            slug: 'security-review',
+            name: 'Security Review',
+            model: 'a-model',
+            variant: 'thinking',
+          },
+        ],
+      })
+    );
+
+    const result = await continueInNewCloudSession({
+      sessionId: CLOUD_SESSION.session_id,
+      operationKey: '6b2c3e10-0000-4000-8000-000000000000',
+      deps: { getRuntimeState, createSession },
+    });
+
+    expect(result).toEqual({ ok: true, kiloSessionId: 'ses_cccccccccccccccccccccccc' });
+    expect(createSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'security-review',
+        runtimeAgents: [
+          {
+            slug: 'security-review',
+            name: 'Security Review',
+            config: { model: 'a-model', variant: 'thinking' },
+          },
+        ],
+      })
+    );
+  });
+
+  it('omits a malformed runtime variant from the create request', async () => {
+    const { getRuntimeState, createSession } = depsFor(runtime({ variant: 'thinking-v2' }));
+
+    const result = await continueInNewCloudSession({
+      sessionId: CLOUD_SESSION.session_id,
+      operationKey: '6b2c3e10-0000-4000-8000-000000000000',
+      deps: { getRuntimeState, createSession },
+    });
+
+    expect(result).toEqual({ ok: true, kiloSessionId: 'ses_cccccccccccccccccccccccc' });
+    expect(createSession).not.toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'thinking-v2' })
+    );
   });
 });

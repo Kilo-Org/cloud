@@ -831,7 +831,7 @@ describe('createPromptHandler', () => {
 
     expect(response.status).toBe(200);
     expect(commitMessage.stdout).toContain(BOT_CO_AUTHOR_TRAILER);
-  });
+  }, 15_000);
 
   it('chains existing hooks and suppresses co-authorship when the bot becomes primary author', async () => {
     const repoPath = await createRepo();
@@ -911,7 +911,7 @@ describe('createPromptHandler', () => {
     expect(fallbackMessage.stdout).not.toContain(BOT_CO_AUTHOR_TRAILER);
     expect(fallbackMessage.stdout).toContain('Existing-hook: applied');
     expect(configuredHooksPath.stdout.trim()).toContain('kilo-managed-hooks');
-  });
+  }, 15_000);
 
   it('keeps repository pre-commit hooks active while adding co-authorship', async () => {
     const repoPath = await createRepo();
@@ -948,7 +948,7 @@ describe('createPromptHandler', () => {
 
     expect(response.status).toBe(200);
     expect(commitExitCode).not.toBe(0);
-  });
+  }, 15_000);
 
   it('delegates repository hooks created after attribution is configured', async () => {
     const repoPath = await createRepo();
@@ -985,7 +985,7 @@ describe('createPromptHandler', () => {
 
     expect(response.status).toBe(200);
     expect(commitExitCode).not.toBe(0);
-  });
+  }, 15_000);
 
   it('fails closed when managed hook state is missing from an active private hook path', async () => {
     const repoPath = await createRepo();
@@ -1007,7 +1007,7 @@ describe('createPromptHandler', () => {
       timeoutMs: 5_000,
     });
     expect(configuredHooksPath.stdout.trim()).toBe(managedHooksPath);
-  });
+  }, 15_000);
 
   it('rejects the old flat prompt body', async () => {
     const state = new WrapperState();

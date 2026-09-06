@@ -1,6 +1,6 @@
 import { env, listDurableObjectIds, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import {
@@ -102,6 +102,40 @@ function completedEvents(state: DurableObjectState) {
   });
 }
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('tool-loop terminalization replay', () => {
   beforeEach(resetSessions);
 
@@ -115,9 +149,7 @@ describe('tool-loop terminalization replay', () => {
   for (const fixture of reconstructedToolLoopTurnFixtures) {
     it(`settles ${fixture.label} to the final assistant only after wrapper completion`, async () => {
       const sessionId = `agent_synthetic_${fixture.label}`;
-      const stub = env.CLOUD_AGENT_SESSION.get(
-        env.CLOUD_AGENT_SESSION.idFromName(`user_${fixture.label}:${sessionId}`)
-      );
+      const stub = sessionStub(`user_${fixture.label}`, sessionId);
 
       const result = await runInDurableObject(stub, async (instance, state) => {
         const wrapperState = await seedAcceptedTurn(instance, fixture, sessionId);
@@ -183,9 +215,7 @@ describe('tool-loop terminalization replay', () => {
     const fixture = reconstructedToolLoopTurnFixtures[0];
     if (!fixture) throw new Error('Expected a reconstructed tool-loop fixture');
     const sessionId = 'agent_synthetic_bare_complete';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`user_synthetic_bare_complete:${sessionId}`)
-    );
+    const stub = sessionStub('user_synthetic_bare_complete', sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       const wrapperState = await seedAcceptedTurn(instance, fixture, sessionId);
@@ -219,9 +249,7 @@ describe('tool-loop terminalization replay', () => {
     const fixture = reconstructedToolLoopTurnFixtures[0];
     if (!fixture) throw new Error('Expected a reconstructed tool-loop fixture');
     const sessionId = 'agent_synthetic_legacy_complete_race';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`user_synthetic_legacy_complete_race:${sessionId}`)
-    );
+    const stub = sessionStub('user_synthetic_legacy_complete_race', sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -287,9 +315,7 @@ describe('tool-loop terminalization replay', () => {
     const fixture = reconstructedToolLoopTurnFixtures[1];
     if (!fixture) throw new Error('Expected a reconstructed tool-loop fixture');
     const sessionId = 'agent_synthetic_no_idle_fallback';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`user_synthetic_no_idle_fallback:${sessionId}`)
-    );
+    const stub = sessionStub('user_synthetic_no_idle_fallback', sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       const wrapperState = await seedAcceptedTurn(instance, fixture, sessionId);

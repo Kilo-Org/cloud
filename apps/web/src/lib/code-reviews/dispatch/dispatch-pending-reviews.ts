@@ -107,6 +107,29 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * True when a worker call failed because nothing was listening at the worker
+ * URL (TCP connection refused). undici wraps that as a `fetch failed`
+ * TypeError whose cause carries the ECONNREFUSED code. Unlike a timeout, a
+ * refusal is unambiguous: the request never reached the orchestrator, so no
+ * Durable Object can have accepted the review.
+ */
+function isWorkerConnectionRefused(error: unknown): boolean {
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    if (
+      (current as Error & { code?: unknown }).code === 'ECONNREFUSED' ||
+      current.message.includes('ECONNREFUSED')
+    ) {
+      return true;
+    }
+    current = (current as Error & { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 function getActionRequiredReasonFromError(error: unknown): CodeReviewActionRequiredReason | null {
   if (error instanceof CodeReviewActionRequiredDispatchError) {
     return error.reason;
@@ -608,7 +631,7 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       skipBalanceCheck: true,
     });
   } catch (dispatchError) {
-    errorExceptInTest('[dispatchReview] Worker dispatch failed, leaving review queued', {
+    errorExceptInTest('[dispatchReview] Worker dispatch failed', {
       reviewId: review.id,
       error: dispatchError,
     });
@@ -616,7 +639,13 @@ async function dispatchReservedReview(reservation: ReservedReview, owner: Owner)
       tags: { operation: 'dispatch-review-worker-call' },
       extra: { reviewId: review.id, owner },
     });
-    return handleAmbiguousDispatchFailure(review, owner, attempt.id, dispatchReservationId);
+    return handleAmbiguousDispatchFailure(
+      review,
+      owner,
+      attempt.id,
+      dispatchReservationId,
+      dispatchError
+    );
   }
 
   try {
@@ -652,7 +681,8 @@ async function handleAmbiguousDispatchFailure(
   review: CloudAgentCodeReview,
   owner: Owner,
   attemptId: string,
-  dispatchReservationId: string
+  dispatchReservationId: string,
+  dispatchError: unknown
 ): Promise<boolean> {
   try {
     const workerStatus = await codeReviewWorkerClient.getReviewStatus(review.id, attemptId);
@@ -736,6 +766,45 @@ async function handleAmbiguousDispatchFailure(
     });
     return true;
   } catch (statusError) {
+    if (
+      getManualCodeReviewConfig(review) !== null &&
+      isWorkerConnectionRefused(dispatchError) &&
+      isWorkerConnectionRefused(statusError)
+    ) {
+      // The worker refused the dispatch and then refused the status probe, so
+      // it never accepted this review. A manual review is started by a user
+      // who is watching the detail screen; leaving it `queued` there would
+      // strand them on "Queued" with the transcript sheet stuck on "Waiting
+      // for the review transcript" and no way out. Surface a retryable
+      // failure instead. Webhook reviews keep the stale-queued cron recovery.
+      const errorMessage =
+        'Dispatch failed: could not reach the code review service. ' +
+        'It may be offline — retry the review once it is running.';
+      await updateCodeReviewAttemptForCallback({
+        codeReviewId: review.id,
+        attemptId,
+        status: 'failed',
+        errorMessage,
+        terminalReason: 'upstream_error',
+        completedAt: new Date(),
+      });
+      await failReservedQueuedReview(
+        review.id,
+        dispatchReservationId,
+        errorMessage,
+        'upstream_error'
+      );
+      errorExceptInTest(
+        '[dispatchReview] Worker refused dispatch and status probe, failing manual review',
+        {
+          reviewId: review.id,
+          attemptId,
+          error: dispatchError,
+        }
+      );
+      return false;
+    }
+
     errorExceptInTest('[dispatchReview] Worker status probe failed, leaving review queued', {
       reviewId: review.id,
       error: statusError,

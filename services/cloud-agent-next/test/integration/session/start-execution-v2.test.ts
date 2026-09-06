@@ -4,7 +4,7 @@
 
 import { env, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import {
   createPendingSessionMessage,
   listPendingSessionMessages,
@@ -21,13 +21,44 @@ import {
   registerReadySession,
 } from '../../helpers/session-setup.js';
 
+// Registered sessions leave dispatch and alarm work in the session DO. Interrupt
+// every session a test touched and clear its alarm, or that work wakes after
+// this file closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('CloudAgentSession message admission', () => {
   it('persists a readable default branch before preparation and retains it on registration retry', async () => {
     const userId = 'user_readable_branch';
     const sessionId = 'agent_readable_branch';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const input = groupedRegisterSessionInput({
       sessionId,
       userId,
@@ -56,9 +87,7 @@ describe('CloudAgentSession message admission', () => {
     async branch => {
       const userId = 'user_explicit_branch';
       const sessionId = `agent_explicit_branch_${branch.replaceAll('/', '_')}`;
-      const stub = env.CLOUD_AGENT_SESSION.get(
-        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-      );
+      const stub = sessionStub(userId, sessionId);
 
       const result = await stub.registerSession(
         groupedRegisterSessionInput({
@@ -83,8 +112,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_grouped_start' as const;
     const sessionId = 'agent_grouped_start' as const;
     const messageId = 'msg_018f1e2d3c4bInitMsgAbCdEfG';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const admitted = await instance.createSessionWithInitialAdmission({
@@ -130,9 +158,7 @@ describe('CloudAgentSession message admission', () => {
       path: '123e4567-e89b-12d3-a456-426614174000',
       files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
     };
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const admitted = await instance.createSessionWithInitialAdmission({
@@ -164,9 +190,7 @@ describe('CloudAgentSession message admission', () => {
   it('rejects registration metadata with an untyped repository', async () => {
     const userId = 'user_untyped_repository' as const;
     const sessionId = 'agent_untyped_repository' as const;
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const registration = await instance.registerSession({
@@ -199,8 +223,7 @@ describe('CloudAgentSession message admission', () => {
   it('persists Vercel provider selection without obsolete ownership control state', async () => {
     const userId = 'user_vercel_selection' as const;
     const sessionId = 'agent_vercel_selection' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const registration = await instance.registerSession({
@@ -231,9 +254,7 @@ describe('CloudAgentSession message admission', () => {
   it('finalizes inert Vercel deletion because disabled runtime integration could not create a resource', async () => {
     const userId = 'user_vercel_inert_delete' as const;
     const sessionId = 'agent_vercel_inert_delete' as const;
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -258,9 +279,7 @@ describe('CloudAgentSession message admission', () => {
   });
 
   it('purges large Vercel payloads in bounded batches before exact-session stop', async () => {
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_vercel_purge:agent_vercel_purge')
-    );
+    const stub = sessionStub('user_vercel_purge', 'agent_vercel_purge');
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -380,9 +399,7 @@ describe('CloudAgentSession message admission', () => {
   });
 
   it('settles a lost exact-session stop response through terminal inspection', async () => {
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_vercel_stop_loss:agent_vercel_stop_loss')
-    );
+    const stub = sessionStub('user_vercel_stop_loss', 'agent_vercel_stop_loss');
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -429,9 +446,7 @@ describe('CloudAgentSession message admission', () => {
   });
 
   it('adopts a matching late create and stops only its exact session', async () => {
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_vercel_late_create:agent_vercel_late_create')
-    );
+    const stub = sessionStub('user_vercel_late_create', 'agent_vercel_late_create');
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -485,12 +500,8 @@ describe('CloudAgentSession message admission', () => {
   });
 
   it('routes explicit and retention Cloudflare deletion through the DO sandbox lifecycle owner', async () => {
-    const explicitStub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_cf_explicit_delete:agent_cf_explicit_delete')
-    );
-    const retentionStub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_cf_retention_delete:agent_cf_retention_delete')
-    );
+    const explicitStub = sessionStub('user_cf_explicit_delete', 'agent_cf_explicit_delete');
+    const retentionStub = sessionStub('user_cf_retention_delete', 'agent_cf_retention_delete');
 
     const reasons = await runInDurableObject(explicitStub, async instance => {
       await instance.registerSession(
@@ -539,9 +550,7 @@ describe('CloudAgentSession message admission', () => {
   });
 
   it('reconciles committed Cloudflare deletion intent and retains it until cleanup succeeds', async () => {
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_cf_intent_recovery:agent_cf_intent_recovery')
-    );
+    const stub = sessionStub('user_cf_intent_recovery', 'agent_cf_intent_recovery');
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -587,8 +596,7 @@ describe('CloudAgentSession message admission', () => {
   it('keeps Cloudflare registration free of Vercel runtime state', async () => {
     const userId = 'user_cloudflare_selection' as const;
     const sessionId = 'agent_cloudflare_selection' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const workspace = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -614,8 +622,7 @@ describe('CloudAgentSession message admission', () => {
   it('surfaces initial admission failure after retaining registered DO metadata', async () => {
     const userId = 'user_grouped_start_failure' as const;
     const sessionId = 'agent_grouped_start_failure' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       for (let index = 0; index < 10; index++) {
@@ -662,8 +669,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_grouped_start_retry' as const;
     const sessionId = 'agent_grouped_start_retry' as const;
     const messageId = 'msg_018f1e2d3c4bBoundMsgAbCdEf';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
     const input = {
       ...groupedRegisterSessionInput({
         sessionId,
@@ -708,8 +714,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_provider_replay' as const;
     const sessionId = 'agent_provider_replay' as const;
     const messageId = 'msg_018f1e2d3c4bBoundMsgAbCdEf';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const initialInput = {
@@ -753,8 +758,7 @@ describe('CloudAgentSession message admission', () => {
   it('rejects metadata updates that attempt to change a registered sandbox provider', async () => {
     const userId = 'user_provider_update' as const;
     const sessionId = 'agent_provider_update' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -792,9 +796,7 @@ describe('CloudAgentSession message admission', () => {
   });
 
   it('rejects metadata updates that replace sandbox name or persisted Vercel session ID', async () => {
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_runtime_identity:agent_runtime_identity')
-    );
+    const stub = sessionStub('user_runtime_identity', 'agent_runtime_identity');
 
     const result = await runInDurableObject(stub, async instance => {
       await instance.registerSession({
@@ -847,8 +849,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_grouped_start_mismatch' as const;
     const sessionId = 'agent_grouped_start_mismatch' as const;
     const messageId = 'msg_018f1e2d3c4bMismatAbCdEfGh';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const original = {
@@ -889,9 +890,7 @@ describe('CloudAgentSession message admission', () => {
     const messageId = 'msg_018f1e2d3c4bRouteMAbCdEfGh';
     const routeKey = 'usr-000000000000000000000000000000000000000000000000' as const;
     const sandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df' as const;
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const base = groupedRegisterSessionInput({
       sessionId,
       userId,
@@ -943,9 +942,7 @@ describe('CloudAgentSession message admission', () => {
     const sessionId = 'agent_shared_route_ready_mismatch' as const;
     const routeKey = 'usr-000000000000000000000000000000000000000000000000' as const;
     const sandboxId = 'usr-b4593afcaf2e9e1dfb1611150b786cfe8aeba3c77352a3df' as const;
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       const registration = await instance.registerSession({
@@ -989,9 +986,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_invalid_shared_route' as const;
     const sessionId = 'agent_invalid_shared_route' as const;
     const routeKey = 'usr-000000000000000000000000000000000000000000000000' as const;
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, instance =>
       instance.registerSession({
@@ -1024,8 +1019,7 @@ describe('CloudAgentSession message admission', () => {
   it('persists repaired DIND devcontainer workspace readiness metadata', async () => {
     const userId = 'user_devcontainer_ready' as const;
     const sessionId = 'agent_devcontainer_ready' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
     const devcontainer = {
       workspacePath: '/workspace/user/sessions/agent_devcontainer_ready',
       innerWorkspaceFolder: '/workspaces/repo',
@@ -1066,8 +1060,7 @@ describe('CloudAgentSession message admission', () => {
   it('drains prepared devcontainer sessions with their persisted DIND workspace plan', async () => {
     const userId = 'user_devcontainer_plan' as const;
     const sessionId = 'agent_devcontainer_plan' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let capturedPlan: any = null;
@@ -1120,8 +1113,7 @@ describe('CloudAgentSession message admission', () => {
   it('queues initiate when direct wrapper acceptance is unavailable', async () => {
     const userId = 'user_exec_plan' as const;
     const sessionId = 'agent_exec_plan' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let capturedPlan: any = null;
@@ -1168,8 +1160,7 @@ describe('CloudAgentSession message admission', () => {
   it('queues follow-up without calling orchestrator inline', async () => {
     const userId = 'user_exec_followup' as const;
     const sessionId = 'agent_exec_followup' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let capturedPlan: any = null;
@@ -1221,8 +1212,7 @@ describe('CloudAgentSession message admission', () => {
   it('flushes queued follow-up using the originally queued execution options', async () => {
     const userId = 'user_exec_followup_options' as const;
     const sessionId = 'agent_exec_followup_options' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let capturedPlan: any = null;
@@ -1313,8 +1303,7 @@ describe('CloudAgentSession message admission', () => {
   it('returns BAD_REQUEST for invalid direct messageId', async () => {
     const userId = 'user_exec_bad_message_id' as const;
     const sessionId = 'agent_exec_bad_message_id' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let capturedPlan: any = null;
@@ -1358,8 +1347,7 @@ describe('CloudAgentSession message admission', () => {
   it('uses the boundary-generated messageId for follow-up execution', async () => {
     const userId = 'user_exec_fallback' as const;
     const sessionId = 'agent_exec_fallback' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let capturedPlan: any = null;
@@ -1405,8 +1393,7 @@ describe('CloudAgentSession message admission', () => {
   it('enforces the pending queue limit without storing an eleventh message', async () => {
     const userId = 'user_exec_queue_full' as const;
     const sessionId = 'agent_exec_queue_full' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1470,8 +1457,7 @@ describe('CloudAgentSession message admission', () => {
   it('queues a prepared-session message without tripping on stale runtime state', async () => {
     const userId = 'user_exec_prepared_stale_active' as const;
     const sessionId = 'agent_exec_prepared_stale_active' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let callCount = 0;
@@ -1519,8 +1505,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_exec_prepared_initial_id' as const;
     const sessionId = 'agent_exec_prepared_initial_id' as const;
     const initialMessageId = 'msg_018f1e2d3c4bPrepInitAbCdEF';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1561,8 +1546,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_exec_prepared_id_wins' as const;
     const sessionId = 'agent_exec_prepared_id_wins' as const;
     const initialMessageId = 'msg_018f1e2d3c4bPrepWinsAbCdEF';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1595,8 +1579,7 @@ describe('CloudAgentSession message admission', () => {
     const userId = 'user_exec_prepared_command' as const;
     const sessionId = 'agent_exec_prepared_command' as const;
     const initialMessageId = 'msg_018f1e2d3c4bPrepCmdXAbCdEF';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -1644,8 +1627,7 @@ describe('CloudAgentSession message admission', () => {
   it('queues follow-up for later drain while current fenced wrapper work exists', async () => {
     const userId = 'user_exec_active_followup' as const;
     const sessionId = 'agent_exec_active_followup' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let callCount = 0;
@@ -1694,8 +1676,7 @@ describe('CloudAgentSession message admission', () => {
   it('returns durable admission idempotently when retrying an accepted messageId', async () => {
     const userId = 'user_exec_active_retry' as const;
     const sessionId = 'agent_exec_active_retry' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       let callCount = 0;
@@ -1746,8 +1727,7 @@ describe('CloudAgentSession message admission', () => {
   it('does not persist token overrides when model validation fails', async () => {
     const userId = 'user_exec_invalid_model' as const;
     const sessionId = 'agent_exec_invalid_model' as const;
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {

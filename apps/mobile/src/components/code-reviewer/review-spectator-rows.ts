@@ -183,10 +183,10 @@ function toRowFromKilocode(
     }
 
     if (partType === 'text') {
-      const status = partStateStatus(part.state);
-      if (!isCompletedStatus(status)) {
-        return null;
-      }
+      // Canonical stream text parts carry no `state` field while the review
+      // runs (only `time`), so gating on a completed status dropped every
+      // assistant-text row from the live transcript. Render the text and let
+      // the part id replace it in place as it grows (mirrors web #5781).
       const text = asString(part.text);
       const trimmed = text?.trim();
       if (trimmed) {

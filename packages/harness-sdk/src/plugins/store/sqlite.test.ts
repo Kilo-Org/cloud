@@ -1,0 +1,296 @@
+import { DatabaseSync } from 'node:sqlite';
+import { Effect, Layer, Option } from 'effect';
+import { expect, it } from 'vitest';
+import { SessionStore, type SessionStoreService } from '../../core/storage.js';
+import { migrations } from './migrations.js';
+import { layerNodeStore } from './node.js';
+import { textOf } from '../../core/turn.js';
+
+const database = (): DatabaseSync => new DatabaseSync(':memory:');
+
+const use = <A, E>(
+  db: DatabaseSync,
+  run: (store: SessionStoreService) => Effect.Effect<A, E>
+): Promise<A> =>
+  Effect.runPromise(Effect.provide(Effect.flatMap(SessionStore, run), layerNodeStore(db)));
+
+const session = { id: 'ses_1', system: 'sys', model: 'claude-opus-5' };
+
+/**
+ * A database as an earlier build of this package left it: the migrations up to
+ * that version applied, and `user_version` saying so.
+ *
+ * It is always one behind, whatever the newest migration is, so this test
+ * covers the migration being added rather than one that was added once.
+ */
+const oneVersionBehind = (): { readonly db: DatabaseSync; readonly version: number } => {
+  const db = database();
+  const version = migrations.length - 1;
+  for (const statement of migrations.slice(0, version).flat()) {
+    db.prepare(statement).run();
+  }
+  db.prepare(`PRAGMA user_version = ${String(version)}`).run();
+  return { db, version };
+};
+
+/**
+ * The migration that matters is the one applied to a database that already
+ * holds something. `check:migrations` proves the SQL matches the schema; only
+ * this proves the SQL can be applied to a conversation somebody already had.
+ */
+it('migrates a database that already holds a conversation, and keeps it', async () => {
+  const { db, version } = oneVersionBehind();
+  db.prepare('INSERT INTO sessions (id, system, model) VALUES (?, ?, ?)').run(
+    'ses_1',
+    'sys',
+    'claude-opus-5'
+  );
+  db.prepare('INSERT INTO turns (id, session_id, role) VALUES (?, ?, ?)').run(
+    'trn_1',
+    'ses_1',
+    'user'
+  );
+  db.prepare('INSERT INTO parts (id, turn_id, session_id, kind, body) VALUES (?, ?, ?, ?, ?)').run(
+    'prt_1',
+    'trn_1',
+    'ses_1',
+    'text',
+    'hello'
+  );
+
+  const read = await use(db, store =>
+    Effect.all({ options: store.read('ses_1'), turns: store.load('ses_1') })
+  );
+
+  expect(version).toBeLessThan(migrations.length);
+  expect(db.prepare('PRAGMA user_version').all()).toEqual([{ user_version: migrations.length }]);
+  expect(read.turns.map(textOf)).toEqual(['hello']);
+  /* Whatever the newest migration added, an older row has no value for it, and
+     absent is what the session was doing before the column existed. */
+  expect(Option.getOrThrow(read.options)).toEqual({
+    id: 'ses_1',
+    system: 'sys',
+    model: 'claude-opus-5',
+  });
+});
+
+it('writes the columns the migration added to a session written before it', async () => {
+  const { db } = oneVersionBehind();
+  db.prepare('INSERT INTO sessions (id, system, model) VALUES (?, ?, ?)').run(
+    'ses_1',
+    'sys',
+    'claude-opus-5'
+  );
+
+  const read = await use(db, store =>
+    Effect.zipRight(
+      store.append({
+        sessionId: 'ses_1',
+        turns: [
+          {
+            id: 'trn_1',
+            sessionId: 'ses_1',
+            role: 'user',
+            parts: [{ id: 'prt_1', kind: 'text', body: 'hello' }],
+          },
+        ],
+        prompted: 12,
+      }),
+      store.read('ses_1')
+    )
+  );
+
+  expect(Option.getOrThrow(read)).toMatchObject({ prompted: 12 });
+});
+
+it('leaves an already migrated database alone when it is opened again', async () => {
+  const db = database();
+  await use(db, () => Effect.void);
+  await use(db, () => Effect.void);
+
+  /* Every migration, applied once. A second open that re-ran them would throw
+     on the first CREATE TABLE. */
+  const versions = db.prepare('PRAGMA user_version').all();
+  expect(versions).toEqual([{ user_version: migrations.length }]);
+  expect(migrations.length).toBeGreaterThan(1);
+});
+
+it('reads the turns back in the order they were appended', async () => {
+  const db = database();
+  const loaded = await use(db, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      for (const [index, role] of (['user', 'assistant', 'user'] as const).entries()) {
+        yield* store.append({
+          sessionId: session.id,
+          turns: [
+            {
+              id: `trn_${String(index)}`,
+              sessionId: session.id,
+              role,
+              parts: [
+                {
+                  id: `prt_${String(`message ${String(index)}`)}`,
+                  kind: 'text',
+                  body: `message ${String(index)}`,
+                },
+              ],
+            },
+          ],
+          prompted: 0,
+        });
+      }
+      return yield* store.load(session.id);
+    })
+  );
+
+  expect(loaded.map(textOf)).toEqual(['message 0', 'message 1', 'message 2']);
+});
+
+it('reads the parts of a turn back in the order they were written', async () => {
+  /* The provider refuses a turn whose thinking blocks come back rearranged, so
+     a store that reordered them would undo the ordering the session keeps. The
+     read sorts on the part identifier, which is a ULID and so rises with the
+     order the parts were made in. */
+  const written = [
+    { id: 'prt_0', kind: 'reasoning', body: 'before', signature: 'sig_one' },
+    { id: 'prt_1', kind: 'redacted', body: 'ENCRYPTED' },
+    { id: 'prt_2', kind: 'reasoning', body: 'after', signature: 'sig_two' },
+    { id: 'prt_3', kind: 'text', body: 'said' },
+  ] as const;
+  const db = database();
+  const loaded = await use(db, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      yield* store.append({
+        sessionId: session.id,
+        turns: [{ id: 'trn_0', sessionId: session.id, role: 'assistant', parts: written }],
+        prompted: 0,
+      });
+      return yield* store.load(session.id);
+    })
+  );
+
+  expect(loaded[0]?.parts).toEqual(written);
+});
+
+it('gives back the options a session was opened with, absent ones included', async () => {
+  const db = database();
+  const read = await use(db, store =>
+    Effect.gen(function* () {
+      yield* store.create({ ...session, effort: 'high' });
+      return yield* store.read(session.id);
+    })
+  );
+
+  expect(Option.getOrThrow(read)).toEqual({
+    id: 'ses_1',
+    system: 'sys',
+    model: 'claude-opus-5',
+    effort: 'high',
+  });
+});
+
+it('answers with nothing for a session it has never heard of', async () => {
+  const read = await use(database(), store => store.read('ses_missing'));
+
+  expect(Option.isNone(read)).toBe(true);
+});
+
+it('refuses a turn whose session was never created', async () => {
+  const failed = await use(database(), store =>
+    store
+      .append({
+        sessionId: 'ses_missing',
+        turns: [
+          {
+            id: 'trn_1',
+            sessionId: 'ses_missing',
+            role: 'user',
+            parts: [{ id: `prt_${String('hello')}`, kind: 'text', body: 'hello' }],
+          },
+        ],
+        prompted: 0,
+      })
+      .pipe(Effect.flip)
+  );
+
+  expect(failed).toMatchObject({ operation: 'append' });
+});
+
+it('refuses a row the schema cannot explain rather than handing it back', async () => {
+  const db = database();
+  await use(db, store =>
+    Effect.zipRight(
+      store.create(session),
+      store.append({
+        sessionId: session.id,
+        turns: [{ id: 'trn_1', sessionId: session.id, role: 'user', parts: [] }],
+        prompted: 0,
+      })
+    )
+  );
+  db.prepare('INSERT INTO parts (id, turn_id, session_id, kind, body) VALUES (?, ?, ?, ?, ?)').run(
+    'prt_1',
+    'trn_1',
+    session.id,
+    'banana',
+    'hello'
+  );
+
+  const failed = await use(db, store => Effect.flip(store.load(session.id)));
+
+  /* The cause is named, so a validator that has silently stopped running
+     cannot pass this test by failing for some other reason. */
+  expect(failed).toMatchObject({ operation: 'load' });
+  expect(String(failed.cause)).toContain('invalid type on $input[0].kind');
+});
+
+it('keeps two sessions apart', async () => {
+  const db = database();
+  const loaded = await use(db, store =>
+    Effect.gen(function* () {
+      yield* store.create(session);
+      yield* store.create({ ...session, id: 'ses_2' });
+      yield* store.append({
+        sessionId: 'ses_1',
+        turns: [
+          {
+            id: 'trn_1',
+            sessionId: 'ses_1',
+            role: 'user',
+            parts: [{ id: `prt_${String('first')}`, kind: 'text', body: 'first' }],
+          },
+        ],
+        prompted: 0,
+      });
+      yield* store.append({
+        sessionId: 'ses_2',
+        turns: [
+          {
+            id: 'trn_2',
+            sessionId: 'ses_2',
+            role: 'user',
+            parts: [{ id: `prt_${String('second')}`, kind: 'text', body: 'second' }],
+          },
+        ],
+        prompted: 0,
+      });
+      return yield* store.load('ses_2');
+    })
+  );
+
+  expect(loaded.map(textOf)).toEqual(['second']);
+});
+
+/** The layer builds the store once, so a driver that cannot migrate fails there. */
+it('fails when the layer is built, not when a question is asked', async () => {
+  const db = database();
+  db.exec('CREATE TABLE sessions (wrong text)');
+
+  const failed = await Effect.runPromise(
+    Effect.flip(Effect.scoped(Layer.build(layerNodeStore(db))))
+  );
+
+  expect(failed).toMatchObject({ operation: 'create' });
+});

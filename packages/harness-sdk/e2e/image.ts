@@ -1,0 +1,170 @@
+/**
+ * Proves an image reaches the model, in every shape, and survives the replay.
+ *
+ * The three shapes render an image three different ways, and until this run
+ * each had only ever been checked against a fake `fetch`. Every shape is given
+ * a different colour, so a model that never saw the picture would have to guess
+ * three specific words to pass.
+ *
+ * The second question is the one that matters. It asks about the background,
+ * which the first answer never mentioned, so it can only be answered from the
+ * picture itself. An assembler that dropped the image from the second request
+ * would leave the model with its own earlier word and nothing else.
+ */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { Effect } from 'effect';
+import type { ApiKind } from '../src/core/catalog.js';
+import { said } from '../src/core/model.js';
+import { openSession } from '../src/core/run.js';
+import type { PartDraft } from '../src/core/turn.js';
+import type { SessionHandle } from '../src/core/handle.js';
+import { kilo, models, room } from './setup.js';
+import { fail, passed, under, wrongIf } from './report.js';
+
+const system =
+  'You look at pictures and answer about them. ' +
+  'Answer with one lowercase word and nothing else. ' +
+  'Do not explain. Do not add punctuation. Never say you cannot see an image.';
+
+/** A different colour per shape, so one lucky guess cannot pass the run. */
+const shapes: readonly { readonly kind: ApiKind; readonly colour: string }[] = [
+  { kind: 'messages', colour: 'green' },
+  { kind: 'responses', colour: 'blue' },
+  { kind: 'chat_completions', colour: 'yellow' },
+];
+
+/** A caller holds a file, not base64. This is the line every caller writes. */
+const pictureOf = async (colour: string): Promise<PartDraft> => ({
+  kind: 'image',
+  media: 'image/png',
+  body: (await readFile(join(import.meta.dirname, 'images', `${colour}-circle.png`))).toString(
+    'base64'
+  ),
+});
+
+const say = (session: SessionHandle, input: string | readonly PartDraft[]) =>
+  said(session.ask(input));
+
+const runShape = async (model: string, kind: ApiKind, colour: string) => {
+  const layers = kilo({ apiKinds: [kind] });
+
+  const picture = await pictureOf(colour);
+
+  const program = Effect.gen(function* () {
+    /* Room to spare. A reasoning model spends its thinking out of this, and a
+       tight ceiling starved the second answer to nothing on two shapes. The
+       ceiling is what `stop.ts` tests; this run tests the picture. */
+    const session = yield* openSession({ system, model, maxTokens: room });
+    const named = yield* say(session, [
+      { kind: 'text', body: 'What colour is the circle in this picture?' },
+      picture,
+    ]);
+    /* Nothing said so far names the background, so this needs the picture. */
+    const background = yield* say(
+      session,
+      'Is the background of that picture white or black? Answer white or black.'
+    );
+    return { named, background };
+  });
+
+  return Effect.runPromise(Effect.either(Effect.scoped(Effect.provide(program, layers))));
+};
+
+const word = (said: string) => said.toLowerCase().replaceAll(/[^a-z]/gu, '');
+
+/**
+ * Whether the gateway refused the call because the model has no eyes.
+ *
+ * Read from the refusal rather than a list of names: the model list changes and
+ * a list of blind ones written here would rot silently, passing the run by
+ * asking a model nothing at all. Measured on 2026-09-06,
+ * `nvidia/nemotron-3.5-lightning` refuses every shape with a 405 saying so.
+ */
+const cannotSee = (error: unknown): boolean =>
+  JSON.stringify(error).includes('does not accept image input');
+
+/** The models that read the pictures, so the run can say it proved something. */
+const saw: string[] = [];
+
+for (const model of models) {
+  under(model);
+
+  console.log('model', model);
+  console.log('\nshape             sent      named     background');
+
+  let blind = false;
+  /* What each shape named and what its background was, so the run can tell a
+     model that cannot read a picture from a package that dropped one. */
+  const read: { readonly named: string; readonly colour: string; readonly background: string }[] =
+    [];
+  for (const { kind, colour } of shapes) {
+    /* Tried once more before it counts. Measured on 2026-09-06, `tencent/hy3`
+       and `deepseek/deepseek-v4-flash` named every circle red on one sweep and
+       named all three right on the next, with nothing here changed between
+       them: that is a relay having a bad minute. Twice is a finding. */
+    const first = await runShape(model, kind, colour);
+    const result =
+      first._tag === 'Right' && word(first.right.named) === colour
+        ? first
+        : await runShape(model, kind, colour);
+    if (result._tag === 'Left') {
+      if (cannotSee(result.left)) {
+        console.log(`${kind.padEnd(18)}${colour.padEnd(10)}the model takes no pictures`);
+        blind = true;
+        continue;
+      }
+      console.log(`${kind.padEnd(18)}${colour.padEnd(10)}FAILED    ${JSON.stringify(result.left)}`);
+      fail(`${kind}: the call failed`);
+      continue;
+    }
+
+    const named = word(result.right.named);
+    const background = word(result.right.background);
+    console.log(`${kind.padEnd(18)}${colour.padEnd(10)}${named.padEnd(10)}${background}`);
+    read.push({ named, colour, background });
+  }
+
+  /* A model that named not one of the three cannot read a picture, whatever the
+     gateway lets through: `tencent/hy3` and `deepseek/deepseek-v4-flash` answer
+     "red" to a green, a blue and a yellow circle on 2026-09-06, twice over.
+     Three shapes wrong in three different colours is one model's eyes; a
+     package that dropped the picture would put every model here at once, which
+     is what the floor below catches. */
+  if (read.length > 0 && !read.some(one => one.named === one.colour)) {
+    console.log('the model named none of the three, so it cannot read a picture');
+    continue;
+  }
+
+  for (const { named, colour, background } of read) {
+    if (named !== colour) {
+      fail(`the picture was ${colour} and the model said ${JSON.stringify(named)}`);
+    }
+    if (background === '') {
+      /* It said nothing, which says nothing about the picture. A request that
+         lost the picture leaves the model with its own earlier word and it says
+         so — measured, `i don't see any image attached to your message`, which
+         is caught below. `minimax/minimax-m3` spends the whole answer thinking
+         and says nothing at all on 2026-09-06. */
+      console.log('the model said nothing about the background');
+      continue;
+    }
+    if (background !== 'white') {
+      fail(
+        `the background is white and the model said ${JSON.stringify(background)}, ` +
+          'so the picture did not survive into the second request'
+      );
+    }
+  }
+  if (!blind) {
+    saw.push(model);
+  }
+}
+
+under('');
+console.log(`\nread the pictures: ${String(saw.length)} of ${String(models.length)} models`);
+/* The floor under both skips: a package that stopped sending pictures, or sent
+   the same one three times, would put every model here at once. */
+wrongIf(saw.length === 0, 'not one model read a picture, so nothing here sent one');
+
+passed('every shape carried the picture to a model with eyes, and every shape replayed it.');

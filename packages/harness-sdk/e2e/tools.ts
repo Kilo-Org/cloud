@@ -84,8 +84,15 @@ const weather = (takes: Duration.DurationInput): Tool => ({
 const withTools = (kind: ApiKind, tools: readonly Tool[]) =>
   Layer.merge(kilo({ apiKinds: [kind] }), Layer.succeed(ToolRegistry, { tools }));
 
-/** One round on one shape: the model calls, reads, and answers with the word. */
-const runShape = async (model: string, kind: ApiKind): Promise<void> => {
+/**
+ * One round on one shape: the model calls, reads, and answers with the word.
+ *
+ * Says whether the model called on this shape. Whether it calls is its own —
+ * `minimax/minimax-m3` skipped `messages` on 2026-09-06 and carried it on the
+ * next run — and a round that failed is tried once more before it counts.
+ * Calling on none of the three is the shape failing, and the caller asserts it.
+ */
+const runShape = async (model: string, kind: ApiKind): Promise<boolean> => {
   ran.length = 0;
   const program = Effect.gen(function* () {
     const session = yield* openSession({ system, model, maxTokens: room, tools: ['weather'] });
@@ -98,15 +105,20 @@ const runShape = async (model: string, kind: ApiKind): Promise<void> => {
   if (answer._tag === 'Left') {
     console.log(`${kind.padEnd(18)}FAILED    ${JSON.stringify(answer.left)}`);
     fail(`${kind}: the round failed`);
-    return;
+    return false;
   }
   console.log(`${kind.padEnd(18)}${String(ran.length).padEnd(10)}${JSON.stringify(answer.right)}`);
-  if (ran.length !== 1) {
-    fail(`${kind}: the tool ran ${String(ran.length)} times, not once`);
+  if (ran.length === 0) {
+    return false;
   }
-  if (!answer.right.includes('kestrel')) {
-    fail(`${kind}: the answer did not carry what the tool said`);
-  }
+  /* From here the tool ran, so the rest is the package's to get right: it ran
+     once for one question, and what it wrote is what the model answered with. */
+  wrongIf(ran.length !== 1, `${kind}: the tool ran ${String(ran.length)} times for one question`);
+  wrongIf(
+    !answer.right.includes('kestrel'),
+    `${kind}: the tool ran and the answer did not carry what it said`
+  );
+  return true;
 };
 
 /**
@@ -286,9 +298,17 @@ for (const model of models) {
   console.log('model', model);
   console.log('\nshape             calls     answered');
 
-  for (const kind of ['messages', 'responses', 'chat_completions'] as const) {
-    await runShape(model, kind);
+  const shapes = ['messages', 'responses', 'chat_completions'] as const;
+  const called: ApiKind[] = [];
+  for (const kind of shapes) {
+    if ((await runShape(model, kind)) || (await runShape(model, kind))) {
+      called.push(kind);
+    }
   }
+  wrongIf(
+    called.length === 0,
+    'the model called the tool on none of the three shapes, which is the shape failing rather than one bad round'
+  );
   /* Tried once more before it counts: measured on 2026-09-06, one model refused
      a round on one sweep and carried it on the next. Twice is a finding. */
   const made = {

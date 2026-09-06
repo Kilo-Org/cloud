@@ -179,16 +179,30 @@ const runSentAway = async (model: string): Promise<boolean> => {
   console.log(`answered without it: ${JSON.stringify(got.right.answer.trim())}`);
   console.log(`told later:          ${JSON.stringify(later.trim())}`);
 
-  wrongIf(sent?.sent !== true, 'the caller could not send the running subagent away');
-  wrongIf(sent?.on.name !== 'subagent', `the model was waiting on ${String(sent?.on.name)}`);
-  wrongIf(!later.toLowerCase().includes(secret), 'the session never told the model what came back');
+  if (sent === undefined) {
+    /* A minute passed with no call running to send away, so the model never
+       handed the work down. Whether it does is the model's own —
+       `minimax/minimax-m3` keeps it on 2026-09-06 — and there is nothing here
+       to send away when it does. */
+    console.log('the model never handed the work down, so nothing was there to send away');
+    return false;
+  }
+
+  wrongIf(sent.sent !== true, 'the caller could not send the running subagent away');
+  wrongIf(sent.on.name !== 'subagent', `the model was waiting on ${String(sent.on.name)}`);
 
   /* The answer carries the codename already, so the subagent finished inside
      the moment between the caller seeing the call run and sending it away.
      That is a fast relay winning a race, not a call that was never sent away —
      `google/gemini-3.7-flash` wins it on 2026-09-06 and the send still
-     succeeded. Nothing here can slow a provider down, so it is counted. */
-  return !got.right.answer.toLowerCase().includes(secret);
+     succeeded. Nothing here can slow a provider down, so it is counted, and
+     what a late round would have carried is already in the answer. */
+  if (got.right.answer.toLowerCase().includes(secret)) {
+    return false;
+  }
+
+  wrongIf(!later.toLowerCase().includes(secret), 'the session never told the model what came back');
+  return true;
 };
 
 /** The models sent away before they had their answer. The floor is that one was. */

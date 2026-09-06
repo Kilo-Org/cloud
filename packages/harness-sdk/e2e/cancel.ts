@@ -71,7 +71,12 @@ const until = (said: Ref.Ref<number>, target: number) =>
     Effect.delay(Duration.millis(20)),
     Effect.repeat({ until: (held: number) => held >= target }),
     Effect.timeoutFail({
-      duration: Duration.seconds(30),
+      /* A minute, because this waits on a model and not on the package. Half of
+         it was not enough for `minimax/minimax-m3` on 2026-09-06, which streams
+         nothing at all — not even thinking — for a long time before its first
+         word, and a run that gave up then reported a cancellation that never
+         happened. */
+      duration: Duration.seconds(60),
       onTimeout: () => new Error(`the answer never reached ${String(target)} pieces`),
     })
   );

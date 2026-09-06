@@ -95,7 +95,15 @@ for (const model of models) {
 
   let blind = false;
   for (const { kind, colour } of shapes) {
-    const result = await runShape(model, kind, colour);
+    /* Tried once more before it counts. Measured on 2026-09-06, `tencent/hy3`
+       and `deepseek/deepseek-v4-flash` named every circle red on one sweep and
+       named all three right on the next, with nothing here changed between
+       them: that is a relay having a bad minute. Twice is a finding. */
+    const first = await runShape(model, kind, colour);
+    const result =
+      first._tag === 'Right' && word(first.right.named) === colour
+        ? first
+        : await runShape(model, kind, colour);
     if (result._tag === 'Left') {
       if (cannotSee(result.left)) {
         console.log(`${kind.padEnd(18)}${colour.padEnd(10)}the model takes no pictures`);

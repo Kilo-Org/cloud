@@ -25,6 +25,7 @@ type OperationRegistryDependencies = {
     getRetained(
       directory: string
     ): WorktreeKiloRuntimes['get'] extends (directory: string) => infer Runtime ? Runtime : never;
+    prepareForNewWork?(directory: string): boolean;
     retireRuntime(
       directory: string,
       deadlineAt: number,
@@ -206,6 +207,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       ...effects,
       isCurrent: () => active.get(identity.kiloSessionId) === operation,
       getRuntime: () => deps.native.get(identity.directory),
+      prepareForNewWork: () => deps.native.prepareForNewWork?.(identity.directory) ?? true,
       verifyQuiescence: (target, deadlineAt) =>
         deps.native.verifyQuiescence(identity.directory, target, deadlineAt),
       retireRuntime: (reason, deadlineAt, target) => {

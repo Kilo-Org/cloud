@@ -3,6 +3,7 @@ import {
   KILO_FEED_FRESHNESS_TIMEOUT_MS,
   SANDBOX_CONTROL_REPORT_INTERVAL_MS,
   maybeStartSandboxControlClient,
+  observeKiloFeedResponse,
   startSandboxControlEventFeed,
 } from './sandbox-control-runtime';
 import type { SandboxControlClient, SandboxControlClientOptions } from './sandbox-control-client';
@@ -596,6 +597,31 @@ describe('maybeStartSandboxControlClient', () => {
 });
 
 describe('startSandboxControlEventFeed', () => {
+  it('counts raw SSE activity without requiring a parsed application event', async () => {
+    const abort = new AbortController();
+    const encoder = new TextEncoder();
+    let activity = 0;
+    const response = observeKiloFeedResponse(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode(': heartbeat\n\n'));
+            controller.close();
+          },
+        })
+      ),
+      abort.signal,
+      () => {
+        activity++;
+      }
+    );
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('Missing feed body');
+    let done = false;
+    while (!done) done = (await reader.read()).done;
+    expect(activity).toBe(1);
+  });
+
   it('waits for a real first event before startup and forwards that event', async () => {
     const abort = new AbortController();
     const firstEvent = Promise.withResolvers<void>();
@@ -671,6 +697,77 @@ describe('startSandboxControlEventFeed', () => {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
     expect(closed).toBe(true);
     expect(failures).toEqual([]);
+  });
+
+  it('cancels a stalled iterator without waiting for failed disposal or late chunks', async () => {
+    const abort = new AbortController();
+    const next = Promise.withResolvers<IteratorResult<unknown>>();
+    const reading = Promise.withResolvers<void>();
+    const received: unknown[] = [];
+    const failures: unknown[] = [];
+    let first = true;
+    let returned = 0;
+    const stream = {
+      [Symbol.asyncIterator](): AsyncIterator<unknown> {
+        return {
+          next: () => {
+            if (first) {
+              first = false;
+              return Promise.resolve({ value: { payload: { type: 'server.connected' } } });
+            }
+            reading.resolve();
+            return next.promise;
+          },
+          return: () => {
+            returned += 1;
+            return Promise.reject(new Error('iterator disposal failed'));
+          },
+        };
+      },
+    };
+    const feed = await startSandboxControlEventFeed({
+      signal: abort.signal,
+      open: async () => ({ stream }),
+      consume: async events => {
+        for await (const event of events) received.push(event);
+      },
+      onUnexpectedClose: error => failures.push(error),
+    });
+    await reading.promise;
+    feed.close();
+    await feed.settled;
+    expect(abort.signal.aborted).toBe(false);
+    expect(returned).toBe(1);
+    next.resolve({ value: { payload: { type: 'session.updated' } } });
+    await flushAsyncWork();
+    expect(received).toEqual([{ payload: { type: 'server.connected' } }]);
+    expect(failures).toEqual([]);
+  });
+
+  it('aborts the transformed response reader when a subscription closes', async () => {
+    const abort = new AbortController();
+    const encoder = new TextEncoder();
+    let cancelled = false;
+    const response = observeKiloFeedResponse(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode(': heartbeat\n\n'));
+          },
+          cancel() {
+            cancelled = true;
+          },
+        })
+      ),
+      abort.signal,
+      () => {}
+    );
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error('Missing feed body');
+    await reader.read();
+    abort.abort();
+    await reader.closed.catch(() => undefined);
+    expect(cancelled).toBe(true);
   });
 
   it('rejects when the global feed subscription fails', async () => {

@@ -114,17 +114,24 @@ export function deriveCloudSessionForkFields(input: {
 function toPrepareRuntimeAgents(
   agents: Array<{ slug: string; name: string; model?: string; variant?: string }>
 ): CloudRuntimeAgentInput[] {
-  return agents.map(agent => {
+  const prepared: CloudRuntimeAgentInput[] = [];
+  for (const agent of agents) {
+    if (!/^[a-z][a-z0-9-]*$/.test(agent.slug) || agent.slug.length > 50) continue;
+    if (!agent.name || agent.name.length > 100) continue;
     const config: CloudRuntimeAgentInput['config'] = {};
-    if (agent.model) {
+    if (agent.model && agent.model.length <= 200) {
       config.model = agent.model;
+      // A variant is model-specific; only forward it alongside its model.
+      if (isValidVariant(agent.variant)) {
+        config.variant = agent.variant;
+      }
     }
-    // A variant is model-specific; only forward it alongside its model.
-    if (agent.model && agent.variant) {
-      config.variant = agent.variant;
+    prepared.push({ slug: agent.slug, name: agent.name, config });
+    if (prepared.length === 20) {
+      break;
     }
-    return { slug: agent.slug, name: agent.name, config };
-  });
+  }
+  return prepared;
 }
 
 function isValidVariant(variant: string | undefined): variant is string {

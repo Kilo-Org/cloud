@@ -285,6 +285,46 @@ describe('deriveCloudSessionForkFields', () => {
 
     expect(result).toEqual({ ok: false, reason: 'unsupported-platform' });
   });
+
+  it('caps forwarded runtime agents at the prepare schema limit', () => {
+    const manyAgents = Array.from({ length: 25 }, (_, index) => ({
+      slug: `agent-${index}`,
+      name: `Agent ${index}`,
+    }));
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({ runtimeAgents: manyAgents }),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      fields: expect.objectContaining({
+        runtimeAgents: manyAgents.slice(0, 20).map(agent => ({
+          ...agent,
+          config: {},
+        })),
+      }),
+    });
+  });
+
+  it('skips runtime agents whose slug cannot round trip through the prepare schema', () => {
+    const result = deriveCloudSessionForkFields({
+      session: CLOUD_SESSION,
+      runtime: runtime({
+        runtimeAgents: [
+          { slug: 'Invalid Slug!', name: 'Bad' },
+          { slug: 'good-agent', name: 'Good' },
+        ],
+      }),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      fields: expect.objectContaining({
+        runtimeAgents: [{ slug: 'good-agent', name: 'Good', config: {} }],
+      }),
+    });
+  });
 });
 
 describe('parseGitLabProjectPath', () => {

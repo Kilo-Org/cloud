@@ -31,13 +31,13 @@ export function LiveSessionListEmptyState({
         <Button
           variant="outline"
           className="max-w-full"
-          accessibilityLabel={t('home.newCodingTask')}
+          accessibilityLabel={t('common.newSession')}
           onPress={() => {
             router.push(getNewAgentSessionPath(organizationId) as Href);
           }}
         >
           <Plus size={16} color={colors.foreground} />
-          <Text className="shrink text-center">{t('home.newCodingTask')}</Text>
+          <Text className="shrink text-center">{t('common.newSession')}</Text>
         </Button>
       }
     />

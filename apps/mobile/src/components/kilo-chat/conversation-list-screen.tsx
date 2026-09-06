@@ -5,15 +5,10 @@ import { getCalendars } from 'expo-localization';
 import { type Href, useRouter } from 'expo-router';
 import { Plus, Settings2 } from '@/components/ui/icons';
 import { useCallback, useMemo } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  RefreshControl,
-  useWindowDimensions,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { Platform, Pressable, useWindowDimensions, View, type ViewStyle } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -277,6 +272,7 @@ export function ConversationListScreen({ sandboxId, sandboxLabel }: Props) {
                 </View>
               )
             }
+            ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
             ListFooterComponent={
               isFetchingNextPage ? (
                 <View className="pb-6 pt-1">

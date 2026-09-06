@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "നിങ്ങളുടെ മുൻകൂർ പ്രവേശന പ്ലാൻ മൊബൈലിൽ ഉപയോഗിക്കുന്നതിന് മുമ്പ് നേരിട്ടുള്ള അവലോകനം ആവശ്യമാണ്.",
       "iosTitle": "IOS-ൽ KiloClaw ലഭ്യമല്ല",
       "iosBody": "ഈ അക്കൗണ്ടിന്റെ KiloClaw ഉപയോഗാനുമതി കൈകാര്യം ചെയ്യുന്നത് iOS ആപ്പിന് പുറത്താണ്.",
-      "iosContact": "ചോദ്യങ്ങളുണ്ടോ? hi@kilo.ai-യുമായി ബന്ധപ്പെടുക."
+      "iosContact": "ചോദ്യങ്ങളുണ്ടോ? hi@kilo.ai-യുമായി ബന്ധപ്പെടുക.",
+      "quarantinedCta": "ഞങ്ങളുടെ ടീമിന് ഇമെയിൽ അയയ്ക്കുക",
+      "nonCanonicalEarlybirdCta": "നിങ്ങളുടെ പ്ലാൻ Kilo.ai-ൽ പരിശോധിക്കുക"
     },
     "instanceCard": {
       "needsAttention": "{{name}}-ന് ശ്രദ്ധ ആവശ്യമാണ്: {{label}}",

@@ -51,6 +51,7 @@ import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
 import { QueryError } from '@/components/query-error';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
@@ -971,19 +972,21 @@ function RootLayout() {
   }, []);
 
   return (
-    <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
-      <ThemeProvider value={navigationTheme}>
-        <AppRootProviders languageReady={languageReady}>
-          <StatusBar style="auto" />
-          <AppContentReveal>
-            <StateSurface className="flex-1">
-              <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
-            </StateSurface>
-          </AppContentReveal>
-          <AnimatedSplashOverlay />
-        </AppRootProviders>
-      </ThemeProvider>
-    </ShareIntentProvider>
+    <MotionProvider>
+      <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
+        <ThemeProvider value={navigationTheme}>
+          <AppRootProviders languageReady={languageReady}>
+            <StatusBar style="auto" />
+            <AppContentReveal>
+              <StateSurface className="flex-1">
+                <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
+              </StateSurface>
+            </AppContentReveal>
+            <AnimatedSplashOverlay />
+          </AppRootProviders>
+        </ThemeProvider>
+      </ShareIntentProvider>
+    </MotionProvider>
   );
 }
 

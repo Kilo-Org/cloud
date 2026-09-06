@@ -7,7 +7,8 @@ import {
   type UserMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type ComponentProps, createElement, type ReactElement } from 'react';
-import { ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
+import { Alert, Modal, ScrollView } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -55,6 +56,9 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));

@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "웹에서 구독",
       "subscriptionPastDueBody": "최근 결제에 문제가 발생했습니다. 브라우저에서 kilo.ai/claw로 이동해 결제 정보를 업데이트하세요. 앱에서는 결제를 관리할 수 없습니다.",
       "subscriptionPastDueTitle": "웹에서 결제 정보 업데이트",
-      "trialExpiredBody": "KiloClaw를 계속 사용하려면 브라우저에서 kilo.ai/claw로 이동하세요. 앱에서는 구독할 수 없습니다."
+      "trialExpiredBody": "KiloClaw를 계속 사용하려면 브라우저에서 kilo.ai/claw로 이동하세요. 앱에서는 구독할 수 없습니다.",
+      "quarantinedCta": "지원팀에게 이메일 보내기",
+      "nonCanonicalEarlybirdCta": "요금제를 Kilo.ai에서 검토하기"
     },
     "controls": {
       "redeploying": "다시 배포 중…",

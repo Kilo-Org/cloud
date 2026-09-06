@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "پێش بەکارهێنان لە مۆبایلدا، دەبێت پێداچوونەوەی دەستی بە پلانی دەستگەیشتنی پێشوەختەکەت بکرێت.",
       "iosTitle": "KiloClaw لە iOS بەردەست نییە",
       "iosBody": "بۆ ئەم هەژمارە، دەستگەیشتن بە KiloClaw لە دەرەوەی ئەپی iOS بەڕێوە دەبرێت.",
-      "iosContact": "پرسیارت هەیە؟ پەیوەندی بە hi@kilo.ai بکە."
+      "iosContact": "پرسیارت هەیە؟ پەیوەندی بە hi@kilo.ai بکە.",
+      "quarantinedCta": "ناردنی ئیمەیڵ بۆ تیمەکەمان",
+      "nonCanonicalEarlybirdCta": "پێداچوونەوە بە پلانەکەتدا لەسەر kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} پێویستی بە سەرنجە: {{label}}",

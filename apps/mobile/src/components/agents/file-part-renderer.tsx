@@ -3,7 +3,8 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
@@ -304,6 +305,8 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
             <ImageViewerModal
               visible={viewerVisible}
               uri={url}
+              // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+              // which languages inflect by number; this key is the standalone noun label.
               filename={part.filename ?? t('common.file')}
               onShare={() => {
                 void handleShare();
@@ -370,6 +373,8 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
           <FileIcon size={14} color={colors.mutedForeground} />
         )}
         <Text className="text-sm text-muted-foreground" numberOfLines={1}>
+          {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+              which languages inflect by number; this key is the standalone noun label. */}
           {part.filename ?? t('common.file')}
         </Text>
       </Pressable>
@@ -501,6 +506,8 @@ function FilePreviewModal({
   return (
     <SessionPageSheet visible onClose={onClose}>
       <SheetHeader
+        // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+        // which languages inflect by number; this key is the standalone noun label.
         title={part.filename ?? t('common.file')}
         titleEllipsis="middle"
         onDone={onClose}

@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest. */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the child-session suites share this mounted native fixture. */
 import { type ComponentProps, createElement, type ReactNode } from 'react';
 import { type FlashListProps } from '@shopify/flash-list';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -30,6 +30,10 @@ const safeAreaMock = vi.hoisted(() => ({
 }));
 export { reactNativeMock, safeAreaMock };
 
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: false, scrollAnimated: true }),
+}));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Modal: 'Modal',
   View: 'View',
@@ -43,7 +47,6 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: () => ({}) },
   FadeIn: { duration: () => ({}) },
   FadeOut: { duration: () => ({}) },
-  useReducedMotion: () => false,
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,

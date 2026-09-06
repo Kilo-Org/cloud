@@ -271,6 +271,8 @@ export function ReviewDetailScreen({
               });
             }}
           >
+            {/* i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
+                this key is the verb CTA — cs/pl/be translate the two apart. */}
             <Text>{t('common.openPullRequest')}</Text>
           </Button>
 

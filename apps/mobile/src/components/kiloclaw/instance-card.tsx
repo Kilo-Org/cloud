@@ -161,7 +161,9 @@ export function KiloClawCard({
             </View>
             <View className="mt-1 flex-row items-center gap-1.5">
               <StatusDot tone={tone} />
-              <Text className="shrink text-[12px] font-medium text-muted-foreground">{label}</Text>
+              <Text className="shrink text-[12px] font-medium text-muted-foreground uppercase">
+                {label}
+              </Text>
             </View>
           </View>
         </Pressable>

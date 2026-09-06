@@ -86,6 +86,9 @@ vi.mock('react-native-marked', () => ({
   Renderer: class Renderer {},
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },

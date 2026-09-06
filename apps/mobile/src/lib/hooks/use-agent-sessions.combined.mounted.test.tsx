@@ -169,12 +169,12 @@ describe('combined and live refresh callers', () => {
     expect(client.getQueryData(otherKey)).toEqual(other);
   });
 
-  it('does not start a live fallback loop after a handled owner failure', async () => {
+  it('uses the live fallback after a handled owner failure', async () => {
     attach(QUERY_KEY);
     await render();
     state.active.mockRejectedValue(new Error('offline'));
     expect(await refreshLive()).toBe(false);
-    expect(state.active.mock.calls).toHaveLength(1);
+    expect(state.active.mock.calls).toHaveLength(2);
     expect(owner?.getPendingReasons()).toContain('manual');
     expect(live?.terminalError?.kind).toBe('retryable');
     expect(live?.activeSessions.map(row => row.id)).toEqual(['a1']);

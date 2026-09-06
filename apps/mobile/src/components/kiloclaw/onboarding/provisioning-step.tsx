@@ -15,7 +15,6 @@ import Animated, {
   FadeIn,
   FadeOut,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -30,6 +29,7 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 
 import { DEFAULT_BOT_IDENTITY } from './state';
 
@@ -105,10 +105,12 @@ export function ProvisioningStep({
   // Gentle breathing pulse on the avatar tile — signals "actively working"
   // without the spinner-in-the-middle-of-nowhere look. Static tile when
   // Reduce Motion is on, same as Skeleton/SpinningIcon.
-  const reducedMotion = useReducedMotion();
+  const { reducedMotion } = useMotionPolicy();
   const pulse = useSharedValue(1);
   useEffect(() => {
     if (reducedMotion) {
+      cancelAnimation(pulse);
+      pulse.value = 1;
       return undefined;
     }
     pulse.value = withRepeat(

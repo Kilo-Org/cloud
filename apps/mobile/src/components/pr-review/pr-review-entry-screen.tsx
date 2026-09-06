@@ -4,7 +4,8 @@ import { Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/i
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
@@ -305,6 +306,8 @@ export function PrReviewEntryScreen() {
         <Button
           disabled={!hasInput}
           onPress={handleSubmit}
+          // i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
+          // this key is the verb CTA — cs/pl/be translate the two apart.
           accessibilityLabel={t('common.openPullRequest')}
         >
           <Text>{t('prReview.entry.open')}</Text>

@@ -84,6 +84,8 @@ export function MessageReactionPickerSheet({
               accessibilityRole="header"
               className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
             >
+              {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
+                  ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
               {t('common.reactions')}
             </Text>
             <Pressable

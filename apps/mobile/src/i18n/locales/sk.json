@@ -1189,7 +1189,9 @@
       "nonCanonicalEarlybirdBody": "Pred používaním v mobile musí tvoj program prednostného prístupu prejsť ručnou kontrolou.",
       "iosTitle": "KiloClaw nie je dostupný v systéme iOS",
       "iosBody": "Prístup k službe KiloClaw sa pre tento účet spravuje mimo aplikácie pre iOS.",
-      "iosContact": "Máš otázky? Napíš na hi@kilo.ai."
+      "iosContact": "Máš otázky? Napíš na hi@kilo.ai.",
+      "quarantinedCta": "Napísať nášmu tímu",
+      "nonCanonicalEarlybirdCta": "Skontrolovať svoj program na kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} si vyžaduje pozornosť: {{label}}",

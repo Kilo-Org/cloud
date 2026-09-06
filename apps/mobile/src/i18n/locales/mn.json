@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Таны эрт бүртгүүлсний багцыг гар утсанд ашиглахаас өмнө ажилтан шалгах шаардлагатай.",
       "iosTitle": "KiloClaw-ыг iOS дээр ашиглах боломжгүй",
       "iosBody": "Энэ бүртгэлийн KiloClaw ашиглах эрхийг iOS аппын гадна удирдана.",
-      "iosContact": "Асуух зүйл байна уу? hi@kilo.ai хаяг руу имэйл илгээнэ үү."
+      "iosContact": "Асуух зүйл байна уу? hi@kilo.ai хаяг руу имэйл илгээнэ үү.",
+      "quarantinedCta": "Манай багт имэйл илгээх",
+      "nonCanonicalEarlybirdCta": "Багцаа Kilo.ai дээр шалгах"
     },
     "instanceCard": {
       "needsAttention": "{{name}} анхаарал шаардаж байна: {{label}}",

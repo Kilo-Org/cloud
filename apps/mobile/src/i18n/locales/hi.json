@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "वेब पर सदस्यता लें",
       "subscriptionPastDueBody": "आपके सबसे हाल के भुगतान में समस्या आई। इसे अपडेट करने के लिए अपने ब्राउज़र से kilo.ai/claw पर जाएँ। आप ऐप में बिलिंग प्रबंधित नहीं कर सकते।",
       "subscriptionPastDueTitle": "वेब पर भुगतान की जानकारी अपडेट करें",
-      "trialExpiredBody": "KiloClaw का उपयोग जारी रखने के लिए, अपने ब्राउज़र से kilo.ai/claw पर जाएँ। आप ऐप में सदस्यता नहीं ले सकते।"
+      "trialExpiredBody": "KiloClaw का उपयोग जारी रखने के लिए, अपने ब्राउज़र से kilo.ai/claw पर जाएँ। आप ऐप में सदस्यता नहीं ले सकते।",
+      "quarantinedCta": "हमारी टीम को ईमेल करें",
+      "nonCanonicalEarlybirdCta": "अपना प्लान Kilo.ai पर समीक्षा करें"
     },
     "controls": {
       "redeploying": "फिर से तैनात किया जा रहा है…",

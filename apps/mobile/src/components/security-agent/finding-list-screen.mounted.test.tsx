@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   bridge: vi.fn(),
   toastError: vi.fn(),
 }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',

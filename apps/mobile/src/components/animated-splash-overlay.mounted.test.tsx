@@ -20,8 +20,9 @@ vi.mock('react-native-reanimated', () => ({
   makeMutable: (v: unknown) => ({ value: v }),
   Easing: { out: (v: unknown) => v, in: (v: unknown) => v, quad: 0, cubic: 0 },
   useFrameCallback: () => ({ setActive: () => undefined }),
-  // Reduced motion keeps animation callbacks out of the test.
-  useReducedMotion: () => true,
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  useMotionPolicy: () => ({ reducedMotion: true, scrollAnimated: false }),
 }));
 vi.mock('react-native-worklets', () => ({
   scheduleOnRN: vi.fn(),

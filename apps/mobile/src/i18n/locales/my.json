@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "သင့်ကြိုတင်အသုံးပြုခွင့် အစီအစဉ်ကို ဖုန်းပေါ်တွင် မသုံးမီ လူကိုယ်တိုင် စစ်ဆေးရန်လိုပါသည်။",
       "iosTitle": "KiloClaw ကို iOS တွင် မရရှိနိုင်ပါ",
       "iosBody": "ဤအကောင့်အတွက် KiloClaw အသုံးပြုခွင့်ကို iOS အက်ပ်ပြင်ပတွင် စီမံပါသည်။",
-      "iosContact": "မေးခွန်းများရှိလား။ hi@kilo.ai သို့ ဆက်သွယ်ပါ။"
+      "iosContact": "မေးခွန်းများရှိလား။ hi@kilo.ai သို့ ဆက်သွယ်ပါ။",
+      "quarantinedCta": "ကျွန်ုပ်တို့အဖွဲ့ကို အီးမေးလ်ပို့ပါ",
+      "nonCanonicalEarlybirdCta": "သင့်အစီအစဉ်ကို Kilo.ai တွင် ပြန်လည်သုံးသပ်ပါ"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ကို စစ်ဆေးရန်လိုသည်: {{label}}",

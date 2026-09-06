@@ -4,13 +4,13 @@ import Animated, {
   cancelAnimation,
   Easing,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
 import { cn } from '@/lib/utils';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 
 export type StatusDotTone = 'good' | 'warn' | 'danger' | 'muted';
 
@@ -41,7 +41,7 @@ const PULSE_DURATION_MS = 1100;
  * 7px inner dot centered inside a 13px halo.
  *
  * When `pulse` is true, the entire dot+halo softly breathes via opacity —
- * never a hard on/off blink. Respects `useReducedMotion()` and renders
+ * never a hard on/off blink. Respects the shared motion policy and renders
  * statically (fully visible) when motion is reduced.
  */
 export function StatusDot({ tone = 'good', className, pulse = false }: Readonly<StatusDotProps>) {
@@ -49,7 +49,7 @@ export function StatusDot({ tone = 'good', className, pulse = false }: Readonly<
 
   // Animated branch: opacity breathe on the wrapper so the inner dot and
   // halo fade together. Static when reduced motion is on.
-  const reducedMotion = useReducedMotion();
+  const { reducedMotion } = useMotionPolicy();
   const opacity = useSharedValue(1);
   useEffect(() => {
     // Only the pulsing branch animates. Non-pulsing dots (every existing

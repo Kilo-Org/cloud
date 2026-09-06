@@ -244,6 +244,8 @@ function ThreadHeader({
           <Badge tone="good" icon={CheckCheck} label={t('prReview.discussion.resolved')} />
         ) : null}
         {outdated ? <Badge tone="muted" label={t('prReview.discussion.outdated')} /> : null}
+        {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
+            languages inflect by number; this key is the standalone noun label. */}
         {fileLevel && !resolved ? <Badge tone="muted" label={t('common.file')} /> : null}
         <Text variant="muted" className="text-xs">
           {t('prReview.discussion.comment', {

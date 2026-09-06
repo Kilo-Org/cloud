@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer mounts RN trees without a DOM. */
+/* eslint-disable max-lines, typescript-eslint/no-deprecated -- the mounted settings states share one native test fixture. */
 import { type MobileRouter } from '@kilocode/trpc/mobile';
 import { onlineManager, QueryClient } from '@tanstack/react-query';
 import { act, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
@@ -45,6 +45,7 @@ vi.mock('@/components/security-agent/dashboard-screen', () => ({
 vi.mock('@/components/security-agent/security-agent-setup', () => ({
   SecurityAgentSetup: 'SecurityAgentSetup',
 }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Switch: 'Switch',

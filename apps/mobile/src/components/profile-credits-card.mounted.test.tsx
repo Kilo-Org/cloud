@@ -95,6 +95,7 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: vi.fn() },
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },

@@ -10,7 +10,9 @@ import {
 import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
@@ -107,6 +109,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       }
     })();
   };
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />;
 
   return (
     <View className="flex-1 bg-background">
@@ -154,14 +157,14 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         <QueryError
           message={t('securityAgent.findingList.couldNotLoad')}
           onRetry={() => void findings.refetch()}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={refreshControl}
         />
       )}
 
       {!findings.isLoading && !findings.isError && !hasListContent && (
         <EmptyState
           icon={ShieldCheck}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          refreshControl={refreshControl}
           title={
             filtersActive
               ? t('securityAgent.findingList.noMatchesTitle')
@@ -200,7 +203,8 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             />
           )}
           contentContainerClassName="grow gap-3 px-6 pt-4"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
+          refreshControl={refreshControl}
           onEndReached={() => {
             if (findings.hasNextPage && !findings.isFetchingNextPage) {
               void findings.fetchNextPage();

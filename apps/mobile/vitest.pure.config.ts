@@ -28,6 +28,7 @@ export default defineProject({
       'src/lib/apple-iap/**/*.test.ts',
       'src/lib/apple-iap/**/*.test.tsx',
       'src/lib/glanceable/**/*.test.ts',
+      'src/lib/kiloclaw/**/*.test.ts',
       'src/glanceable-ios/**/*.test.ts',
       'src/glanceable-android/**/*.test.ts',
       'src/lib/hooks/**/*.test.ts',

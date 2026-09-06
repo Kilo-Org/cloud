@@ -1181,7 +1181,9 @@
       "nonCanonicalEarlybirdBody": "O teu plano de acesso antecipado precisa de uma revisão manual antes de o poderes usar no telemóvel.",
       "iosTitle": "KiloClaw indisponível no iOS",
       "iosBody": "O acesso ao KiloClaw é gerido fora da aplicação iOS para esta conta.",
-      "iosContact": "Tens dúvidas? Envia um email para hi@kilo.ai."
+      "iosContact": "Tens dúvidas? Envia um email para hi@kilo.ai.",
+      "quarantinedCta": "Enviar um e-mail à nossa equipa",
+      "nonCanonicalEarlybirdCta": "Rever o teu plano em kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} necessita de atenção: {{label}}",

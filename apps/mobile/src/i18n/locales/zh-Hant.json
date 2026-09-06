@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "前往網頁版訂閱",
       "subscriptionPastDueBody": "你最近一次付款出了問題。請透過瀏覽器前往 kilo.ai/claw 更新付款方式。應用程式內無法管理帳單。",
       "subscriptionPastDueTitle": "在網頁上更新付款方式",
-      "trialExpiredBody": "若要繼續使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。"
+      "trialExpiredBody": "若要繼續使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。",
+      "quarantinedCta": "寄電子郵件給我們的團隊",
+      "nonCanonicalEarlybirdCta": "前往 kilo.ai 檢視您的方案"
     },
     "controls": {
       "redeploying": "正在重新部署…",

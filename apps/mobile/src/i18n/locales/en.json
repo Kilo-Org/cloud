@@ -1181,7 +1181,9 @@
       "nonCanonicalEarlybirdBody": "Your early-access plan needs a manual review before it can be used on mobile.",
       "iosTitle": "KiloClaw unavailable in iOS",
       "iosBody": "KiloClaw access is managed outside the iOS app for this account.",
-      "iosContact": "Questions? Contact hi@kilo.ai."
+      "iosContact": "Questions? Contact hi@kilo.ai.",
+      "quarantinedCta": "Email our team",
+      "nonCanonicalEarlybirdCta": "Review your plan on kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} needs attention: {{label}}",

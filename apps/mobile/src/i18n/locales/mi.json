@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Me arotake tō mahere uru moata e te tangata i mua i tō whakamahi i te taupānga pūkoro.",
       "iosTitle": "Kāore a KiloClaw e wātea ana i iOS",
       "iosBody": "Mō tēnei pūkete, kei waho i te taupānga iOS te whakahaere i te uru ki KiloClaw.",
-      "iosContact": "He pātai? Whakapā ki hi@kilo.ai."
+      "iosContact": "He pātai? Whakapā ki hi@kilo.ai.",
+      "quarantinedCta": "Tukua he īmēra ki tā mātou rōpū",
+      "nonCanonicalEarlybirdCta": "Arotakehia tō mahere i kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Me aro atu ki a {{name}}: {{label}}",

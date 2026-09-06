@@ -80,6 +80,7 @@ export function StatusCard({
           icon={Activity}
           label={t('kiloclaw.status.state')}
           value={gatewayLabel}
+          valueClassName="uppercase"
           valueTone={gatewayState === 'running' ? 'good' : 'default'}
         />
         <KvRow icon={Globe} label={t('kiloclaw.status.uptime')} value={uptimeLabel} />

@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "የቅድሚያ መዳረሻ ዕቅድህን በሞባይል ላይ ከመጠቀምህ በፊት በሰው መገምገም ያስፈልጋል።",
       "iosTitle": "KiloClaw በiOS አይገኝም",
       "iosBody": "ለዚህ መለያ የKiloClaw መዳረሻ ከiOS መተግበሪያ ውጭ ነው የሚተዳደረው።",
-      "iosContact": "ጥያቄ አለህ? ወደ hi@kilo.ai ጻፍ።"
+      "iosContact": "ጥያቄ አለህ? ወደ hi@kilo.ai ጻፍ።",
+      "quarantinedCta": "ለቡድናችን ኢሜይል ላክ",
+      "nonCanonicalEarlybirdCta": "ዕቅድህን በkilo.ai ላይ ገምግም"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ትኩረት ይፈልጋል፡ {{label}}",

@@ -96,6 +96,7 @@ const retryCards = vi.hoisted(() => ({
   }[],
 }));
 
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',

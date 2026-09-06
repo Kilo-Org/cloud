@@ -97,6 +97,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn() },
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',

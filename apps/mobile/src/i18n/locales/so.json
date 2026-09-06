@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Qorshahaaga helitaanka hore wuxuu u baahan yahay dib-u-eegis qof sameeyo ka hor inta aan taleefanka lagu isticmaali karin.",
       "iosTitle": "KiloClaw lagama heli karo iOS",
       "iosBody": "Helitaanka KiloClaw ee akoonkan waxaa laga maamulaa meel ka baxsan abka iOS.",
-      "iosContact": "Su'aalo? La xiriir hi@kilo.ai."
+      "iosContact": "Su'aalo? La xiriir hi@kilo.ai.",
+      "quarantinedCta": "U dir iimayl kooxdayada",
+      "nonCanonicalEarlybirdCta": "Dib u eeg qorshahaaga kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} wuxuu u baahan yahay fiiro: {{label}}",

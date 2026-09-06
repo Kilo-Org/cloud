@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "Web sitesinden abone ol",
       "subscriptionPastDueBody": "Son ödemende sorun yaşadık. Ödeme bilgilerini güncellemek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden faturalandırmayı yönetemezsin.",
       "subscriptionPastDueTitle": "Ödeme bilgilerini web üzerinden güncelle",
-      "trialExpiredBody": "KiloClaw'ı kullanmaya devam etmek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın."
+      "trialExpiredBody": "KiloClaw'ı kullanmaya devam etmek için tarayıcından kilo.ai/claw adresine git. Uygulama içinden abone olamazsın.",
+      "quarantinedCta": "Ekibimize e-posta gönder",
+      "nonCanonicalEarlybirdCta": "Planını kilo.ai'de incele"
     },
     "controls": {
       "redeploying": "Yeniden dağıtılıyor…",

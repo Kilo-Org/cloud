@@ -33,6 +33,7 @@ vi.mock('@/components/centered-state-surface', () => ({
   StateSurface: 'StateSurface',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Switch: 'Switch',
   View: 'View',

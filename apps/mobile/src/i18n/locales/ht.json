@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Yon moun dwe revize plan aksè bonè ou a anvan ou ka itilize li sou mobil.",
       "iosTitle": "KiloClaw pa disponib sou iOS",
       "iosBody": "Pou kont sa a, jesyon aksè KiloClaw la fèt deyò aplikasyon iOS la.",
-      "iosContact": "Kesyon? Kontakte hi@kilo.ai."
+      "iosContact": "Kesyon? Kontakte hi@kilo.ai.",
+      "quarantinedCta": "Voye imel pou ekip nou an",
+      "nonCanonicalEarlybirdCta": "Gade plan ou sou kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} bezwen atansyon: {{label}}",

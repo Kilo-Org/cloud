@@ -10,6 +10,7 @@ const a11yMocks = vi.hoisted(() => ({
   moveA11yFocus: vi.fn<() => boolean>(() => true),
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },

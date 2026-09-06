@@ -4,7 +4,8 @@ import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
 import postcss from 'postcss';
 import { createElement, type ReactElement, useState } from 'react';
-import { ActivityIndicator, Text as NativeText, Pressable } from 'react-native';
+import { Text as NativeText, Pressable } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +20,9 @@ vi.mock('react-native', () => ({
   Text: 'Text',
 }));
 vi.mock('@rn-primitives/slot', () => ({ Text: 'Slot.Text' }));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({
     foreground: '#123456',

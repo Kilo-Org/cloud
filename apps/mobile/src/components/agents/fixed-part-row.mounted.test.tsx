@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { FixedPartRow } from './fixed-part-row';
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },

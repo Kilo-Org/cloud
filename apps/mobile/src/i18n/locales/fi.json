@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "Ennakkokäyttötilauksesi on tarkistettava manuaalisesti, ennen kuin voit käyttää sitä mobiililaitteella.",
       "iosTitle": "KiloClaw ei ole käytettävissä iOS:ssä",
       "iosBody": "Tämän tilin KiloClaw-käyttöoikeutta hallinnoidaan iOS-sovelluksen ulkopuolella.",
-      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen hi@kilo.ai."
+      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen hi@kilo.ai.",
+      "quarantinedCta": "Lähetä sähköpostia tiimillemme",
+      "nonCanonicalEarlybirdCta": "Tarkista tilauksesi osoitteessa kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} vaatii huomiota: {{label}}",

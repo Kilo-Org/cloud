@@ -604,7 +604,9 @@
       "subscriptionCanceledTitle": "الاشتراك عبر الموقع",
       "subscriptionPastDueBody": "واجهنا مشكلة في دفعتك الأخيرة. انتقل إلى kilo.ai/claw من متصفحك لتحديث بيانات الدفع. لا يمكنك إدارة الفوترة داخل التطبيق.",
       "subscriptionPastDueTitle": "تحديث بيانات الدفع عبر الويب",
-      "trialExpiredBody": "لمواصلة استخدام KiloClaw، انتقل إلى kilo.ai/claw من متصفحك. لا يمكنك الاشتراك داخل التطبيق."
+      "trialExpiredBody": "لمواصلة استخدام KiloClaw، انتقل إلى kilo.ai/claw من متصفحك. لا يمكنك الاشتراك داخل التطبيق.",
+      "quarantinedCta": "مراسلة فريقنا عبر البريد",
+      "nonCanonicalEarlybirdCta": "مراجعة خطتك على kilo.ai"
     },
     "controls": {
       "redeploying": "جارٍ إعادة النشر…",

@@ -1173,7 +1173,9 @@
       "nonCanonicalEarlybirdBody": "A korai hozzáférést biztosító csomagodat előbb kézzel felül kell vizsgálnunk, hogy mobilon is használhasd.",
       "iosTitle": "A KiloClaw nem érhető el iOS-en",
       "iosBody": "Ennél a fióknál a KiloClaw-hozzáférést az iOS-alkalmazáson kívül lehet kezelni.",
-      "iosContact": "Kérdésed van? Írj a hi@kilo.ai címre."
+      "iosContact": "Kérdésed van? Írj a hi@kilo.ai címre.",
+      "quarantinedCta": "E-mail küldése a csapatunknak",
+      "nonCanonicalEarlybirdCta": "Csomag áttekintése a kilo.ai oldalon"
     },
     "instanceCard": {
       "needsAttention": "{{name}} beavatkozást igényel: {{label}}",

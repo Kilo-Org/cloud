@@ -600,7 +600,9 @@
       "subscriptionCanceledTitle": "ウェブでプランを契約",
       "subscriptionPastDueBody": "直近のお支払いに問題がありました。ブラウザーからkilo.ai/clawにアクセスし、お支払い情報を更新してください。アプリ内では請求に関する設定を変更できません。",
       "subscriptionPastDueTitle": "ウェブでお支払い情報を更新",
-      "trialExpiredBody": "KiloClawを使い続けるには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではプランを契約できません。"
+      "trialExpiredBody": "KiloClawを使い続けるには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではプランを契約できません。",
+      "quarantinedCta": "サポートチームにメールする",
+      "nonCanonicalEarlybirdCta": "プランをKilo.aiで確認する"
     },
     "controls": {
       "redeploying": "再デプロイ中…",

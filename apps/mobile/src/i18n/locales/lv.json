@@ -1181,7 +1181,9 @@
       "nonCanonicalEarlybirdBody": "Pirms tavu agrīnās piekļuves plānu var izmantot mobilajā ierīcē, speciālistam tas jāpārbauda.",
       "iosTitle": "KiloClaw nav pieejams iOS",
       "iosBody": "KiloClaw piekļuve šim kontam tiek pārvaldīta ārpus iOS lietotnes.",
-      "iosContact": "Ir jautājumi? Raksti uz hi@kilo.ai."
+      "iosContact": "Ir jautājumi? Raksti uz hi@kilo.ai.",
+      "quarantinedCta": "Rakstīt mūsu komandai",
+      "nonCanonicalEarlybirdCta": "Pārskatīt savu plānu vietnē kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ir nepieciešama uzmanība: {{label}}",

@@ -29,6 +29,7 @@ vi.mock('@/lib/trpc', () => ({
     },
   }),
 }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'android' },

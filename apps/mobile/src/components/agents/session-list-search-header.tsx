@@ -1,6 +1,7 @@
 import { Search, X } from '@/components/ui/icons';
 import { type RefObject } from 'react';
-import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
+import { Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';

@@ -72,7 +72,7 @@ export function useActiveSessions(options?: UseAgentSessionsOptions) {
     if (!isCurrentScope() || !refresh.isCurrent()) {
       return false;
     }
-    if (handled === false) {
+    if (handled === false || (!handled.accepted && !handled.canceled)) {
       await active.refetch();
     }
     return (

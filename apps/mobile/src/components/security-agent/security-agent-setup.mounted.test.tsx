@@ -7,6 +7,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 import { SecurityAgentSetup } from './security-agent-setup';
 
 const authorization = vi.hoisted(() => vi.fn());
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',

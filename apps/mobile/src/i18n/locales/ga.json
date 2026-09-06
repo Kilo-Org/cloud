@@ -1197,7 +1197,9 @@
       "nonCanonicalEarlybirdBody": "Tá athbhreithniú daonna de dhíth ar do phlean luathrochtana sular féidir é a úsáid ar do ghuthán.",
       "iosTitle": "Níl KiloClaw ar fáil in iOS",
       "iosBody": "Bainistítear rochtain ar KiloClaw don chuntas seo taobh amuigh den aip iOS.",
-      "iosContact": "Ceisteanna? Déan teagmháil le hi@kilo.ai."
+      "iosContact": "Ceisteanna? Déan teagmháil le hi@kilo.ai.",
+      "quarantinedCta": "Seol ríomhphost chuig ár bhfoireann",
+      "nonCanonicalEarlybirdCta": "Athbhreithnigh do phlean ar kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Teastaíonn aird ar {{name}}: {{label}}",

@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Cloud, Terminal, Puzzle, Bot, Workflow } from 'lucide-react';
+import { Search, Cloud, Terminal, Puzzle, Bot, Workflow, Loader2 } from 'lucide-react';
 import { SetPageTitle } from '@/components/SetPageTitle';
 import type { SessionsListItem } from '@/components/cloud-agent/SessionsList';
 import { SessionsList } from '@/components/cloud-agent/SessionsList';
@@ -31,6 +31,7 @@ import Link from 'next/link';
 import { PageContainer } from '@/components/layouts/PageContainer';
 import { toast } from 'sonner';
 import { useConfirm } from '@/components/ui/confirm';
+import { useCloudSessionFork } from '@/components/cloud-agent-next/use-cloud-session-fork';
 
 /** Platform filter options matching the badge logic in SessionsList */
 const PLATFORM_OPTIONS: readonly {
@@ -59,7 +60,10 @@ export function SessionsPageContent() {
   const [platformFilter, setPlatformFilter] = useState<PlatformFilterValue>('all');
   const [sessionFilter, setSessionFilter] = useState<SessionFilterValue>('all');
   const [pendingSessionIds, setPendingSessionIds] = useState(() => new Set<string>());
-  type SessionWithSource = SessionsListItem & { source: 'v2' };
+  type SessionWithSource = SessionsListItem & {
+    source: 'v2';
+    cloudAgentSessionId?: string | null;
+  };
   const [selectedSession, setSelectedSession] = useState<SessionWithSource | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -73,6 +77,8 @@ export function SessionsPageContent() {
 
   // Determine if we're in an organization context
   const organizationId = pathname.match(/^\/organizations\/([^/]+)/)?.[1];
+
+  const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
 
   // When in organization context, OrganizationTrialWrapper already provides PageContainer
   const shouldUsePageContainer = !organizationId;
@@ -183,6 +189,7 @@ export function SessionsPageContent() {
     return {
       createdAt: session.created_at,
       createdOnPlatform: session.created_on_platform,
+      cloudAgentSessionId: session.cloud_agent_session_id,
       prompt,
       repository,
       sessionId: session.session_id,
@@ -201,6 +208,14 @@ export function SessionsPageContent() {
   const handleSessionClick = (session: SessionWithSource) => {
     setSelectedSession(session);
     setIsDialogOpen(true);
+  };
+
+  const handleForkToCloud = async () => {
+    if (!selectedSession) return;
+    const forked = await forkSessionToNewCloudSession(selectedSession.sessionId);
+    if (forked) {
+      setIsDialogOpen(false);
+    }
   };
 
   const content = (
@@ -352,8 +367,30 @@ export function SessionsPageContent() {
               <div className="space-y-3">
                 <h3 className="text-sm font-medium">Fork Session</h3>
                 <p className="text-muted-foreground text-xs">
-                  Fork this session to continue working on it in your editor or CLI
+                  {selectedSession.cloudAgentSessionId
+                    ? 'Fork this session to continue working on it in your editor, CLI, or a new Cloud Agent session'
+                    : 'Fork this session to continue working on it in your editor or CLI'}
                 </p>
+
+                {/* Fork into a new Cloud Agent session */}
+                {selectedSession.cloudAgentSessionId && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full gap-2"
+                    disabled={forkingSessionId === selectedSession.sessionId}
+                    onClick={() => void handleForkToCloud()}
+                  >
+                    {forkingSessionId === selectedSession.sessionId ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Cloud className="h-4 w-4" />
+                    )}
+                    {forkingSessionId === selectedSession.sessionId
+                      ? 'Forking to a new Cloud Agent session...'
+                      : 'Fork to a new Cloud Agent session'}
+                  </Button>
+                )}
 
                 {/* Open in Editor */}
                 <div className="flex justify-center">

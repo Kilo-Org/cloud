@@ -1,24 +1,43 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Copy, Check, Terminal, ChevronUp } from 'lucide-react';
+import { Copy, Check, Terminal, ChevronUp, Cloud, Loader2 } from 'lucide-react';
 import { OpenInEditorButton } from '@/app/share/[shareId]/open-in-editor-button';
+import { Button } from '@/components/ui/button';
+import { useCloudSessionFork } from './use-cloud-session-fork';
 
 type SessionContinuationPanelProps = {
   sessionId: string;
+  /** Organization context the panel renders in; omitted for personal sessions. */
+  organizationId?: string;
+  /** Whether the source session is a Cloud Agent session that can be forked. */
+  canForkToCloud?: boolean;
 };
 
-function SessionContinuationPanel({ sessionId }: SessionContinuationPanelProps) {
+function SessionContinuationPanel({
+  sessionId,
+  organizationId,
+  canForkToCloud = false,
+}: SessionContinuationPanelProps) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const { forkSessionToNewCloudSession, forkingSessionId } = useCloudSessionFork(organizationId);
 
   const cliCommand = `kilo --session ${sessionId} --cloud-fork`;
+  const isForking = forkingSessionId === sessionId;
 
   const handleCopy = useCallback(() => {
     void navigator.clipboard.writeText(cliCommand);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }, [cliCommand]);
+
+  const handleForkToCloud = useCallback(async () => {
+    const forked = await forkSessionToNewCloudSession(sessionId);
+    if (forked) {
+      setExpanded(false);
+    }
+  }, [forkSessionToNewCloudSession, sessionId]);
 
   return (
     <div className="border-border bg-muted/30 border-t">
@@ -33,6 +52,25 @@ function SessionContinuationPanel({ sessionId }: SessionContinuationPanelProps) 
 
       {expanded && (
         <div className="space-y-3 px-[max(1rem,calc(50%_-_27rem))] pb-4">
+          {canForkToCloud && (
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2"
+              disabled={isForking}
+              onClick={() => void handleForkToCloud()}
+            >
+              {isForking ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Cloud className="h-4 w-4" />
+              )}
+              {isForking
+                ? 'Starting a new Cloud Agent session...'
+                : 'Continue in a new Cloud Agent session'}
+            </Button>
+          )}
+
           <OpenInEditorButton sessionId={sessionId} pathOverride={`/s/${sessionId}`} />
 
           <div className="space-y-1.5">
@@ -56,10 +94,6 @@ function SessionContinuationPanel({ sessionId }: SessionContinuationPanelProps) 
               </button>
             </div>
           </div>
-
-          <p className="text-muted-foreground text-xs italic">
-            Continue in Cloud Agent coming soon
-          </p>
         </div>
       )}
     </div>

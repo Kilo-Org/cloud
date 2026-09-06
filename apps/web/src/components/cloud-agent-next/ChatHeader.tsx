@@ -130,6 +130,7 @@ export function ChatHeader({
         kiloSessionId={kiloSessionId}
         sessionTitle={sessionTitle}
         repository={repository}
+        organizationId={organizationId}
       />
       <div className="flex min-w-0 items-center gap-1">
         {sandboxStatusEligible && (

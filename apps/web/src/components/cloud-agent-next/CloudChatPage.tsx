@@ -1204,7 +1204,11 @@ export default function CloudChatPage({
                       <>
                         {isReadOnly ? (
                           !isLoading && sessionIdFromParams && fetchedSessionData ? (
-                            <SessionContinuationPanel sessionId={sessionIdFromParams} />
+                            <SessionContinuationPanel
+                              sessionId={sessionIdFromParams}
+                              organizationId={organizationId}
+                              canForkToCloud={fetchedSessionData.cloudAgentSessionId !== null}
+                            />
                           ) : null
                         ) : (
                           <>

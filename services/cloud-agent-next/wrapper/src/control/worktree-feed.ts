@@ -1,6 +1,7 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import { createKiloClient as createKiloEventClient } from '@kilocode/sdk/v2/client';
 import {
+  diagnosticDetail,
   emitControlDiagnostic,
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
@@ -173,11 +174,24 @@ export function createWorktreeFeed(options: {
     }
   }
 
+  function feedDiagnostic(
+    phase: 'retry_scheduled' | 'failed',
+    reason: KiloEventFeedError['reason']
+  ): void {
+    const detail = diagnosticDetail(reason);
+    emitControlDiagnostic(options.onDiagnostic, 'control.feed', {
+      phase,
+      scopeId,
+      ...(detail ? { detail } : {}),
+    });
+  }
+
   function unavailable(current: Recovery): void {
     if (!isCurrent() || recovery !== current) return;
     recovery = undefined;
     state = 'unavailable';
     options.onStateChange?.();
+    feedDiagnostic('failed', current.reason);
     options.onFailure(current.reason);
   }
 
@@ -220,6 +234,7 @@ export function createWorktreeFeed(options: {
     state = 'recovering';
     closeActive();
     options.onStateChange?.();
+    feedDiagnostic('retry_scheduled', reason);
     void retry(current);
   }
 

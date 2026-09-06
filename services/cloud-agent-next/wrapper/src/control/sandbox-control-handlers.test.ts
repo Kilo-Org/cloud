@@ -84,6 +84,7 @@ function completion(error?: Completion['info']['error']): Completion {
 function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient {
   return {
     getSession: async id => ({ id }),
+    getSessionDetails: async (id, directory) => ({ id, directory }),
     ensureSession: async () => undefined,
     sendPrompt: async () => completion(),
     sendPromptAsync: async () => {},
@@ -1870,7 +1871,8 @@ describe('production worktree deletion routes', () => {
             item.event.properties.status === 'cancelled'
         )
       ).toBe(true);
-      expect(lookups).toEqual([directory]);
+      expect(lookups.length).toBeGreaterThan(0);
+      expect(lookups.every(value => value === directory)).toBe(true);
       expect(http.requests.every(request => request.directory === directory)).toBe(true);
       expect(http.requests).toContainEqual({
         method: 'POST',
@@ -4324,6 +4326,7 @@ describe('control wrapper heartbeat source policy', () => {
     expect(source).toContain(
       "onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected')"
     );
+    expect(source).toContain('shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason))');
     expect(source).toContain(
       'if (!payload.kilo.ready && heartbeatReason) payload.kilo.reason = heartbeatReason;'
     );

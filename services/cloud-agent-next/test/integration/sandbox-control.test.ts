@@ -405,7 +405,7 @@ async function completeHello(
           kiloVersionHeartbeat: true,
           sessionOperationResults: true,
           scopedStopAbort: true,
-          ...(identity.nativeRuntimeRetirement ? { nativeRuntimeRetirement: true } : {}),
+          nativeRuntimeRetirement: true,
         },
       },
     })
@@ -8386,9 +8386,12 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: cloudflareRef(fixture.sandboxId),
       });
       await runInDurableObject(session, (_instance, state) => {
-        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toEqual(cleanup);
       });
-      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
+      expect((await admissionState(session)).messages[1]).toEqual(b);
+      expect(acquisitions.map(input => input.acquisition?.id)).toEqual([
+        preparing.preparationAttemptId,
+      ]);
       expect(provider.create).not.toHaveBeenCalled();
       await runInDurableObject(control, async (_instance, state) => {
         expect(await state.storage.get('acquisition_receipts')).toEqual([
@@ -8403,6 +8406,10 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: null,
       });
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
       expect(provider.launch).toHaveBeenCalledTimes(1);
       const launch = provider.launch.mock.calls[0];
       if (!launch) throw new Error('Expected one replacement launch for B');
@@ -8438,12 +8445,8 @@ describe('SandboxSession control-plane regressions', () => {
         },
       ]);
       const continuations = acquisitions.filter(input => input.acquisition?.id === acquisitionB.id);
-      expect(continuations).toHaveLength(3);
-      expect(continuations.map(input => input.acquisition)).toEqual([
-        acquisitionB,
-        acquisitionB,
-        acquisitionB,
-      ]);
+      expect(continuations).toHaveLength(2);
+      expect(continuations.map(input => input.acquisition)).toEqual([acquisitionB, acquisitionB]);
       expect(continuations.every(input => input.allowCreate === undefined)).toBe(true);
       expect(
         replacementRequests

@@ -66,6 +66,7 @@ function fixture(rejectReconnections = false) {
   const attempts: ReturnType<typeof nativeFeed>[] = [];
   const failures: string[] = [];
   const events: KiloFeedEvent[] = [];
+  const diagnostics: Array<{ phase?: string; detail?: string }> = [];
   const start = spyOn(controlRuntime, 'startSandboxControlEventFeed').mockImplementation(
     async options => {
       if (rejectReconnections && attempts.length > 0) throw new Error('Feed unavailable');
@@ -80,8 +81,13 @@ function fixture(rejectReconnections = false) {
       runtimeId === source.runtimeId && kiloClient === source.kiloClient,
     onEvent: event => events.push(event),
     onFailure: reason => failures.push(reason),
+    onDiagnostic: (_event, fields) =>
+      diagnostics.push({
+        phase: typeof fields.phase === 'string' ? fields.phase : undefined,
+        detail: typeof fields.detail === 'string' ? fields.detail : undefined,
+      }),
   });
-  return { attempts, events, failures, feed, source, start };
+  return { attempts, diagnostics, events, failures, feed, source, start };
 }
 
 const cleanups: Array<() => void> = [];
@@ -312,6 +318,12 @@ describe('createWorktreeFeed', () => {
     await waitFor(() => h.failures.length === 1);
     expect(h.start).toHaveBeenCalledTimes(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
     expect(h.failures).toEqual(['feed_ended']);
+    expect(h.diagnostics).toEqual(
+      expect.arrayContaining([
+        { phase: 'retry_scheduled', detail: 'feed_ended' },
+        { phase: 'failed', detail: 'feed_ended' },
+      ])
+    );
     expect(h.source.signal.aborted).toBe(false);
     expect(h.feed.prepareForNewWork()).toBe(false);
   });

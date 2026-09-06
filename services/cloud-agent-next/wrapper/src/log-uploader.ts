@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { basename, dirname } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { logToFile, withTimeoutAndAbort } from './utils.js';
 
@@ -36,20 +36,24 @@ export function createLogArchiveId(wrapperRunId: string): string {
   return `${wrapperRunId}--${randomUUID()}`;
 }
 
+export type TarArchiveEntry = { directory: string; name: string };
+
 type TarStream = {
   stream: ReadableStream<Uint8Array>;
   kill: () => void;
 };
 
-function createTarStream(paths: Array<string>): TarStream | undefined {
-  const existing = paths.filter(f => existsSync(f));
+export function createTarStream(paths: Array<string | TarArchiveEntry>): TarStream | undefined {
+  const existing = paths
+    .map(path =>
+      typeof path === 'string' ? { directory: dirname(path), name: basename(path) } : path
+    )
+    .filter(entry => existsSync(join(entry.directory, entry.name)));
   if (existing.length === 0) return undefined;
 
-  // Use -C parent basename for each path so the archive contains relative names, not full paths.
-  // Works for both files and directories.
   const tarArgs = ['czf', '-'];
-  for (const f of existing) {
-    tarArgs.push('-C', dirname(f), basename(f));
+  for (const entry of existing) {
+    tarArgs.push('-C', entry.directory, entry.name);
   }
   const proc = spawn('tar', tarArgs, { stdio: ['ignore', 'pipe', 'pipe'] });
   const { stdout, stderr: stderrStream } = proc;

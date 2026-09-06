@@ -366,8 +366,10 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
       })
       .info('AgentRuntime delivering pending message to wrapper');
 
+    const deliveryPlan = { ...plan };
+    if (!allocatedPhysicalInstance) delete deliveryPlan.preparation;
     const fencedPlan: FencedWrapperDispatchRequest = {
-      ...plan,
+      ...deliveryPlan,
       wrapper: {
         ...plan.wrapper,
         fence: {
@@ -382,7 +384,7 @@ export function createAgentRuntime(dependencies: AgentRuntimeDependencies): Agen
     try {
       await getOrchestrator().execute(fencedPlan, {
         ...(leasedInstance ? { leasedInstance } : {}),
-        onProgress: hooks.onProgress,
+        ...(allocatedPhysicalInstance && hooks.onProgress ? { onProgress: hooks.onProgress } : {}),
         onWorkspaceReady: async ready => {
           const readyAt = Date.now();
           const readyDeadlineAt = readyAt + READY_ONLY_IDLE_MS;

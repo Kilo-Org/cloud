@@ -286,7 +286,10 @@ export function createSessionManagementHandlers() {
           });
 
           try {
-            const getStub = () => resolveSessionStub(env, userId, sessionId);
+            const getStub = () =>
+              sessionPlaneFromId(sessionId) === 'control'
+                ? getSandboxSessionStub(env, userId, sessionId)
+                : resolveSessionStub(env, userId, sessionId);
             return await withDORetry(
               getStub,
               stub => stub.cancelQueuedMessage(input.messageId),

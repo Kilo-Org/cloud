@@ -127,7 +127,7 @@ describe('SessionOperation cleanup', () => {
     await operation.done;
   });
 
-  it('does not treat an abort acknowledgement or missing status as quiescence', async () => {
+  it('does not treat acknowledged abort and native empty-map idle as owned-process proof', async () => {
     let aborts = 0;
     const client = fakeKilo({
       sendPrompt: async () => completion(),
@@ -302,11 +302,10 @@ describe('SessionOperation cleanup', () => {
       result: {
         status: 'aborted',
         quiescent: true,
-        runtimeRetired: true,
-        nativeRuntimeId: 'native_1',
       },
     });
-    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBeUndefined();
+    expect(handlerDeps.kiloRuntimes?.get(session.directory)?.runtimeId).toBe('native_1');
+    expect(operationB?.snapshot().local?.result).toEqual({ ok: true, result: {} });
   });
 
   it('keeps a failed local attachment unconfirmed when its captured cleanup cannot prove retirement', async () => {

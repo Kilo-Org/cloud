@@ -298,6 +298,15 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
       config.onError?.(message);
     }
 
+    async function runMutation<T>(mutation: () => Promise<T>): Promise<T> {
+      const expectedGeneration = lifecycleGeneration;
+      const result = await mutation();
+      if (expectedGeneration === lifecycleGeneration) {
+        connection?.recoverAfterSuccessfulMutation();
+      }
+      return result;
+    }
+
     return {
       connect() {
         closeConnection('destroy');
@@ -325,25 +334,32 @@ function createCloudAgentTransport(config: CloudAgentTransportConfig): Transport
         closeConnection('destroy');
       },
 
-      send: async input =>
-        config.api.send({
-          sessionId: config.sessionId,
-          payload: normalizeCloudAgentPayload(input.payload),
-          ...(input.messageId ? { messageId: input.messageId } : {}),
-          ...(input.attachments ? { attachments: input.attachments } : {}),
-          ...(input.images ? { images: input.images } : {}),
-        }),
-      interrupt: () => config.api.interrupt({ sessionId: config.sessionId }),
+      send: input =>
+        runMutation(() =>
+          config.api.send({
+            sessionId: config.sessionId,
+            payload: normalizeCloudAgentPayload(input.payload),
+            ...(input.messageId ? { messageId: input.messageId } : {}),
+            ...(input.attachments ? { attachments: input.attachments } : {}),
+            ...(input.images ? { images: input.images } : {}),
+          })
+        ),
+      interrupt: () => runMutation(() => config.api.interrupt({ sessionId: config.sessionId })),
       dropQueuedMessage: async messageId => {
-        if (!config.api.cancelQueuedMessage) {
+        const cancelQueuedMessage = config.api.cancelQueuedMessage;
+        if (!cancelQueuedMessage) {
           throw new Error('Cloud Agent cancel queued message is not configured');
         }
-        return config.api.cancelQueuedMessage({ sessionId: config.sessionId, messageId });
+        return runMutation(() => cancelQueuedMessage({ sessionId: config.sessionId, messageId }));
       },
-      answer: payload => config.api.answer({ sessionId: config.sessionId, ...payload }),
-      reject: payload => config.api.reject({ sessionId: config.sessionId, ...payload }),
+      answer: payload =>
+        runMutation(() => config.api.answer({ sessionId: config.sessionId, ...payload })),
+      reject: payload =>
+        runMutation(() => config.api.reject({ sessionId: config.sessionId, ...payload })),
       respondToPermission: payload =>
-        config.api.respondToPermission({ sessionId: config.sessionId, ...payload }),
+        runMutation(() =>
+          config.api.respondToPermission({ sessionId: config.sessionId, ...payload })
+        ),
     };
   };
 }

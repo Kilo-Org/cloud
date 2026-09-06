@@ -1,4 +1,7 @@
-import type { SandboxHeartbeatPayload } from '../../../src/shared/sandbox-control-protocol.js';
+import {
+  heartbeatReasonFrom,
+  type SandboxHeartbeatPayload,
+} from '../../../src/shared/sandbox-control-protocol.js';
 import { WRAPPER_VERSION } from '../../../src/shared/wrapper-version.js';
 import { logToFile } from '../utils.js';
 import {
@@ -17,30 +20,20 @@ import { eventKiloSessionId, sessionEventIdentity, updateSessionSnapshots } from
 import { createControlTerminalRuntime } from './terminal-runtime';
 import { createWorktreeKiloRuntimes } from './worktree-runtime';
 import { createControlDiagnostics, type ControlDiagnostics } from './diagnostics';
-import { controlLogWrapperIdSchema } from '../../../src/shared/control-diagnostics.js';
+import { createControlFileLogUploader, type ControlFileLogUploader } from './file-log-uploader';
+import {
+  classifyRetirementCause,
+  controlLogWrapperIdSchema,
+  diagnosticDetail,
+} from '../../../src/shared/control-diagnostics.js';
 import { createWorktreeMutationNotifications } from './worktree-mutation-notifications';
 import { createControlEventFailureHandler } from './control-event-transport';
 
-const retirementCauses = new Map([
-  ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
-  ['process_exited', 'process_exited'],
-  ['credential_refresh_failed', 'credential_refresh_failed'],
-  ['Sandbox control connection lost', 'control_disconnected'],
-  ['Preparation event delivery failed', 'preparation_delivery_failed'],
-  ['Sandbox shutting down', 'requested_shutdown'],
-  ['Wrapper received SIGTERM', 'sigterm'],
-  ['Wrapper received SIGINT', 'sigint'],
-  ['Wrapper uncaught exception', 'uncaught_exception'],
-  ['Wrapper unhandled rejection', 'unhandled_rejection'],
-  ['Kilo cancellation failed', 'cancellation_failed'],
-  ['Kilo cancellation was not confirmed', 'cancellation_failed'],
-  ['Native cancellation did not settle', 'cancellation_failed'],
-  ['Session outcome delivery failed', 'outcome_delivery_failed'],
-  ['Execution exceeded the 60 minute limit', 'execution_deadline'],
-  ['Session preparation timed out', 'preparation_deadline'],
-]);
-
-function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void {
+function main(
+  diagnostics: ControlDiagnostics,
+  fileLogs: ControlFileLogUploader,
+  wrapperInstanceId: string
+): void {
   const controlConfig = {
     SANDBOX_CONTROL_URL: process.env.SANDBOX_CONTROL_URL,
     SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
@@ -98,7 +91,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         return current === undefined || current.runtimeId === failure.runtimeId;
       };
       if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) {
-        if (stillCurrent()) shutdown(1, failure.reason);
+        if (stillCurrent()) shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason));
         return;
       }
       void control
@@ -111,10 +104,11 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         })
         .then(
           retired => {
-            if (!retired && stillCurrent()) shutdown(1, failure.reason);
+            if (!retired && stillCurrent())
+              shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason));
           },
           () => {
-            if (stillCurrent()) shutdown(1, failure.reason);
+            if (stillCurrent()) shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason));
           }
         );
     },
@@ -154,7 +148,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         },
         options?.retained ? { preserveConnectionOnFailure: true } : undefined
       ) === true,
-    retireRuntime: reason => shutdown(1, reason),
+    retireRuntime: reason => shutdown(1, reason, heartbeatReasonFrom(reason)),
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
   });
 
@@ -191,16 +185,15 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
       }
     };
     const deadline = setTimeout(finish, KILO_CONTROL_REQUEST_TIMEOUT_MS);
+    const detail = diagnosticDetail(reason);
     diagnostics.onDiagnostic('wrapper.lifecycle', {
       phase: 'stopping',
       exitCode,
-      retirementCause:
-        retirementCauses.get(reason) ??
-        retirementCauses.get(diagnosticReason) ??
-        (diagnosticReason.startsWith('feed_') ? 'event_feed_unhealthy' : 'unknown'),
+      retirementCause: classifyRetirementCause(reason, diagnosticReason),
+      ...(detail ? { detail } : {}),
     });
     void diagnostics.flush();
-    logToFile(`control-plane wrapper retiring exitCode=${exitCode}`);
+    logToFile(`control-plane wrapper retiring exitCode=${exitCode} reason=${reason}`);
     const stopped = (async () => {
       try {
         control?.sendEvent?.('sandbox.heartbeat', withHeartbeatReason(buildHeartbeatPayload(deps)));
@@ -222,6 +215,8 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
       .then(async () => {
         const remaining = KILO_CONTROL_REQUEST_TIMEOUT_MS - (Date.now() - shutdownAt) - 100;
         await diagnostics.finalize(Math.max(1, Math.min(4000, remaining)));
+        const fileRemaining = KILO_CONTROL_REQUEST_TIMEOUT_MS - (Date.now() - shutdownAt) - 100;
+        await fileLogs.finalize(Math.max(1, Math.min(5000, fileRemaining)));
       })
       .finally(() => {
         clearTimeout(deadline);
@@ -300,20 +295,32 @@ const configuredWrapperId = controlLogWrapperIdSchema.safeParse(
 const wrapperInstanceId = configuredWrapperId.success
   ? configuredWrapperId.data
   : crypto.randomUUID();
+const uploadUrl = process.env.CONTROL_LOG_UPLOAD_URL;
+const uploadGrant = process.env.CONTROL_LOG_UPLOAD_GRANT;
 const diagnostics = createControlDiagnostics({
-  uploadUrl: process.env.CONTROL_LOG_UPLOAD_URL,
-  uploadGrant: process.env.CONTROL_LOG_UPLOAD_GRANT,
+  uploadUrl,
+  uploadGrant,
+});
+const fileLogs = createControlFileLogUploader({
+  uploadUrl,
+  uploadGrant,
+  wrapperLogPath: process.env.WRAPPER_LOG_PATH,
+  onDiagnostic: diagnostics.onDiagnostic,
 });
 delete process.env.CONTROL_LOG_UPLOAD_URL;
 delete process.env.CONTROL_LOG_UPLOAD_GRANT;
 delete process.env.CONTROL_WRAPPER_INSTANCE_ID;
 diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'starting' });
 diagnostics.start();
+fileLogs.start();
 
 try {
-  main(diagnostics, wrapperInstanceId);
+  main(diagnostics, fileLogs, wrapperInstanceId);
 } catch {
   diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'start_failed' });
   logToFile('control-plane wrapper failed');
-  void diagnostics.finalize().finally(() => process.exit(1));
+  void diagnostics
+    .finalize()
+    .then(() => fileLogs.finalize())
+    .finally(() => process.exit(1));
 }

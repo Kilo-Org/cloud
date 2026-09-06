@@ -198,17 +198,20 @@ describe('AgentRuntime', () => {
       },
     });
 
-    const result = await runtime.send(createPlan(), {
-      onProgress: (step, message) => {
-        progress.push({ step, message });
-      },
-      onWorkspaceReady: async workspace => {
-        workspaces.push(workspace);
-      },
-      onAccepted: async delivery => {
-        accepted.push(delivery);
-      },
-    });
+    const result = await runtime.send(
+      { ...createPlan(), preparation: { attemptId: 'prepare-cold' } },
+      {
+        onProgress: (step, message) => {
+          progress.push({ step, message });
+        },
+        onWorkspaceReady: async workspace => {
+          workspaces.push(workspace);
+        },
+        onAccepted: async delivery => {
+          accepted.push(delivery);
+        },
+      }
+    );
     const wrapperState = await getWrapperRuntimeState(storage);
     const physicalLease = await getWrapperLease(storage);
     const [deliveredPlan] = deliveredPlans;
@@ -231,6 +234,7 @@ describe('AgentRuntime', () => {
       wrapperGeneration: wrapperState.wrapperGeneration,
       wrapperConnectionId: wrapperState.wrapperConnectionId,
     });
+    expect(deliveredPlan?.preparation).toEqual({ attemptId: 'prepare-cold' });
     expect(progress).toEqual([{ step: 'kilo_server', message: 'Starting Kilo...' }]);
     expect(workspaces).toEqual([ready]);
     expect(accepted).toEqual([
@@ -246,6 +250,68 @@ describe('AgentRuntime', () => {
     if (acceptedAt === undefined) throw new Error('Expected accepted delivery timestamp');
     expect(wrapperState.noOutputDeadlineAt).toBe(acceptedAt + WRAPPER_NO_OUTPUT_TIMEOUT_MS);
     expect(wrapperState.nextPingAt).toBe(acceptedAt + 60_000);
+  });
+
+  it('omits preparation progress when reusing an existing physical wrapper', async () => {
+    const storage = createMemoryStorage([
+      [
+        'wrapper_runtime_state',
+        { wrapperGeneration: 3, wrapperConnectionId: 'conn_hot', wrapperRunId: 'wr_hot' },
+      ],
+      [
+        'wrapper_lease',
+        {
+          state: 'owns_wrapper',
+          nextInstanceGeneration: 2,
+          instance: { instanceId: 'instance_hot', instanceGeneration: 1 },
+        },
+      ],
+    ]);
+    const execute = vi.fn(
+      async (
+        plan: FencedWrapperDispatchRequest,
+        options?: {
+          onProgress?: (step: string, message: string) => void;
+          onWorkspaceReady?: (workspace: WorkspaceReady) => Promise<void>;
+        }
+      ) => {
+        expect(plan.preparation).toBeUndefined();
+        expect(options?.onProgress).toBeUndefined();
+        await options?.onWorkspaceReady?.(createWorkspaceReady());
+        return { kiloSessionId: 'kilo_runtime' };
+      }
+    );
+    const sandbox = {
+      discoverSessionWrappers: vi.fn().mockResolvedValue({
+        status: 'present',
+        observed: [
+          {
+            representation: 'process',
+            id: 'wrapper-hot',
+            port: 5_000,
+            instanceId: 'instance_hot',
+            instanceGeneration: 1,
+          },
+        ],
+      }),
+    } as unknown as AgentSandbox;
+    const onProgress = vi.fn();
+    const runtime = createAgentRuntime({
+      storage,
+      env: {} as Env,
+      getMetadata: async () => createMetadata(),
+      getOrchestratorOverride: () => ({ execute }),
+      getSessionIdForLogs: () => 'agent_runtime',
+      sendToWrapper: () => false,
+      createAgentSandbox: () => sandbox,
+    });
+
+    await expect(
+      runtime.send({ ...createPlan(), preparation: { attemptId: 'prepare-hot' } }, { onProgress })
+    ).resolves.toMatchObject({ success: true, outcome: 'accepted' });
+
+    expect(execute).toHaveBeenCalledOnce();
+    expect(onProgress).not.toHaveBeenCalled();
   });
 
   it('fences the dispatching message until acceptance bookkeeping completes', async () => {

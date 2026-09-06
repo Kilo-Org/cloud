@@ -36,7 +36,13 @@ export type OwnedProcessScope = {
   stop(deadlineAt: number): Promise<boolean>;
 };
 
-type ProcessIdentity = { pid: number; parent: number; group: number; identity: string };
+type ProcessIdentity = {
+  pid: number;
+  parent: number;
+  group: number;
+  identity: string;
+  state: string;
+};
 type OwnedChild = {
   process: ChildProcessWithoutNullStreams;
   identity?: string;
@@ -138,10 +144,13 @@ function processIdentity(pid: number, value: string): ProcessIdentity {
     .slice(value.lastIndexOf(')') + 2)
     .trim()
     .split(/\s+/);
+  const state = fields[0];
   const startedAt = fields[19];
   const parent = Number(fields[1]);
   const group = Number(fields[2]);
   if (
+    !state ||
+    !/^[A-Za-z]$/.test(state) ||
     !startedAt ||
     !/^\d+$/.test(startedAt) ||
     !Number.isSafeInteger(parent) ||
@@ -151,7 +160,11 @@ function processIdentity(pid: number, value: string): ProcessIdentity {
   ) {
     throw new Error('Process identity unavailable');
   }
-  return { pid, parent, group, identity: `${pid}:${startedAt}` };
+  return { pid, parent, group, identity: `${pid}:${startedAt}`, state };
+}
+
+function isLiveProcessState(state: string): boolean {
+  return state !== 'Z' && state !== 'X' && state !== 'x';
 }
 
 function closeDescriptors(descriptors: number[]): void {
@@ -377,7 +390,14 @@ export function createOwnedProcessScope(): OwnedProcessScope {
       );
       await assertDirectory(group, deadline);
       if (populated === 0) return ![...children].some(live);
-      if (!allowBaseline || baseline.size === 0) return false;
+      if (!allowBaseline || baseline.size === 0) {
+        if (allowBaseline || [...children].some(live)) return false;
+        for (const pid of (await snapshotCgroup(group, deadline)).pids) {
+          const { state } = processIdentity(pid, await readText(`/proc/${pid}/stat`, deadline));
+          if (isLiveProcessState(state)) return false;
+        }
+        return true;
+      }
       const identities = new Set<string>();
       for (const pid of (await snapshotCgroup(group, deadline)).pids) {
         const { identity } = processIdentity(pid, await readText(`/proc/${pid}/stat`, deadline));

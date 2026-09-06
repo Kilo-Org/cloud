@@ -2825,6 +2825,12 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     expect(result.readyRequest.preparation?.attemptId).toBe('attempt-from-do');
   });
 
+  it('omits wrapper preparation metadata when the delivery plan does not need preparation', async () => {
+    const result = await buildPromptWrapperRequests(createMetadata());
+
+    expect(result.readyRequest).not.toHaveProperty('preparation');
+  });
+
   it('uses direct GitLab authentication for a resumed DIND session', async () => {
     const result = await buildPromptWrapperRequests({
       ...createMetadata({ preparedAt: 1 }),
@@ -2915,6 +2921,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
     const result = await service.buildWrapperSessionReadyAndPromptRequests({
       env,
       plan: {
+        preparation: { attemptId: 'prepare-payload' },
         scope: {
           sessionId: 'agent_test',
           userId: 'user_test',
@@ -2981,6 +2988,7 @@ describe('SessionService.buildWrapperSessionReadyAndPromptRequests', () => {
         setupCommands: ['pnpm install'],
       },
       preparation: {
+        attemptId: 'prepare-payload',
         triggerMessageId: 'msg_018f1e2d3c4bPayloadTestAAAA',
       },
     });

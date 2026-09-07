@@ -552,11 +552,14 @@ export async function completeStoreKiloPassPurchase(params: {
       if (subscription.kilo_user_id !== user.id)
         throw new Error('Store subscription already belongs to another user');
       if (replacement.deferred) {
-        const receipt = await findStorePurchaseByProviderTransaction(tx, purchase);
+        const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
+          where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),
+          orderBy: desc(kilo_pass_store_purchases.purchased_at),
+        });
         if (
           !receipt ||
           receipt.kilo_pass_subscription_id !== subscription.id ||
-          receipt.purchase_token !== replacement.orderPurchaseToken ||
+          replacement.orderPurchaseToken !== purchase.purchaseToken ||
           receipt.product_id !== purchase.productId
         ) {
           throw new Error('Google Play replacement does not match the paid receipt');

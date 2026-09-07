@@ -226,14 +226,17 @@ describe('decodeGooglePlaySubscriptionPurchase', () => {
         lineItems: reversed ? [future, current] : [current, future],
       });
       const decoded = decodeGooglePlaySubscriptionPurchase(data, 'new-token');
-      const mapped = mapGooglePlayKiloPassPurchase(decoded, order());
+      const mapped = mapGooglePlayKiloPassPurchase(
+        decoded,
+        order({ purchaseToken: 'new-token', lineItems: [{ productId: 'kilopass_tier49' }] })
+      );
       expect(mapped).toMatchObject({
         tier: 'tier_19',
         providerSubscriptionId: 'new-token',
         googlePlayReplacement: {
           linkedPurchaseToken: 'play-token-1',
           deferred: true,
-          orderPurchaseToken: 'play-token-1',
+          orderPurchaseToken: 'new-token',
         },
       });
     }

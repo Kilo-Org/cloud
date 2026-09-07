@@ -96,6 +96,16 @@ describe('mapGooglePlayKiloPassPurchase', () => {
     });
   });
 
+  it('accepts a paid period that starts before the subscription grant timestamp', () => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+    const purchase = mapGooglePlayKiloPassPurchase(
+      decoded({ startTimeMs: Date.parse('2026-06-01T09:00:00.232Z') }),
+      order()
+    );
+    expect(purchase.purchasedAtIso).toBe('2026-06-01T09:00:00.000Z');
+    expect(purchase.subscriptionStartedAtIso).toBe('2026-06-01T09:00:00.232Z');
+  });
+
   it.each([
     { orderId: 'another-order' },
     { purchaseToken: 'another-token' },
@@ -109,28 +119,25 @@ describe('mapGooglePlayKiloPassPurchase', () => {
     );
   });
 
-  it.each(['invalid', '2026-04-01T00:00:00Z', '2100-01-01T00:00:00Z'])(
-    'rejects invalid paid period start %s',
-    start => {
-      const { mapGooglePlayKiloPassPurchase } = loadVerifier();
-      expect(() =>
-        mapGooglePlayKiloPassPurchase(
-          decoded(),
-          order({
-            lineItems: [
-              {
-                productId: 'kilopass_tier19',
-                subscriptionDetails: {
-                  servicePeriodStartTime: start,
-                  servicePeriodEndTime: '2026-07-01T00:00:00Z',
-                },
+  it.each(['invalid', '2100-01-01T00:00:00Z'])('rejects invalid paid period start %s', start => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+    expect(() =>
+      mapGooglePlayKiloPassPurchase(
+        decoded(),
+        order({
+          lineItems: [
+            {
+              productId: 'kilopass_tier19',
+              subscriptionDetails: {
+                servicePeriodStartTime: start,
+                servicePeriodEndTime: '2026-07-01T00:00:00Z',
               },
-            ],
-          })
-        )
-      ).toThrow('Google Play order has invalid');
-    }
-  );
+            },
+          ],
+        })
+      )
+    ).toThrow('Google Play order has invalid');
+  });
 
   it('rejects an empty latest order id', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();

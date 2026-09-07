@@ -142,14 +142,16 @@ export function PrReviewMergeScreen() {
   );
   const mergeStateQuery = useQuery(mergeStateOptions);
 
-  // The sheet mounts only once its reads settle, so its content never shifts:
-  // loading → content happens in the screen body, not inside the sheet.
+  // The sheet mounts only once its reads SUCCEED, so its content never shifts
+  // and a doomed submit is never offered: loading → content happens in the
+  // screen body, not inside the sheet, and an errored provider read keeps the
+  // sheet unmounted rather than losing the restrictions list (getMergeState)
+  // or the capability banner (getCapabilities).
   const isProviderArm = scope.ref.platform !== 'github';
-  const mergeStateSettled =
-    !isProviderArm || (!mergeStateQuery.isLoading && !mergeStateQuery.isPending);
-  const capabilitiesSettled = !needsAutoMergeCapability || !capabilitiesQuery.isPending;
+  const mergeStateReady = !isProviderArm || mergeStateQuery.isSuccess;
+  const capabilitiesReady = !needsAutoMergeCapability || capabilitiesQuery.isSuccess;
 
-  if (pr.data && mergeStateSettled && capabilitiesSettled) {
+  if (pr.data && mergeStateReady && capabilitiesReady) {
     return (
       <PrMergeSheet
         owner={owner}
@@ -192,9 +194,23 @@ export function PrReviewMergeScreen() {
         variant="server"
         title={t('prReview.merge.loadFailedTitle')}
         onRetry={() => {
-          void pr.refetch();
+          // Retry recovers every read the screen is waiting on: the overview
+          // and, on the provider arms, the errored merge gate / capability
+          // read — a Retry that refetched only the overview could never
+          // clear the failure that kept the sheet from mounting.
+          void Promise.all([
+            pr.refetch(),
+            ...(isProviderArm && mergeStateQuery.isError ? [mergeStateQuery.refetch()] : []),
+            ...(needsAutoMergeCapability && capabilitiesQuery.isError
+              ? [capabilitiesQuery.refetch()]
+              : []),
+          ]);
         }}
-        isRetrying={pr.isFetching}
+        isRetrying={
+          pr.isFetching ||
+          (isProviderArm && mergeStateQuery.isFetching) ||
+          (needsAutoMergeCapability && capabilitiesQuery.isFetching)
+        }
       />
     );
 

@@ -210,6 +210,30 @@ describe('RepositoryBranchSelector', () => {
     expect(renderer.root.findAllByType('Button' as never)).toHaveLength(0);
   });
 
+  it('sizes a note row to its full message instead of clipping it', () => {
+    // The permanent-failure copy runs past two lines at phone width, so the
+    // row must grow with the text: no line cap, and a minimum height rather
+    // than the fixed trigger height.
+    const renderer = mountSelector(githubRow, branchesState({ isPermanentError: true }));
+    const message = i18n.t('agentChat.newSession.branchUnavailable');
+
+    const note = renderer.root.findAll(
+      node => node.type === ('Text' as never) && node.children.includes(message)
+    )[0];
+    if (note === undefined) {
+      throw new Error('the permanent-failure note did not render');
+    }
+    expect(note.props.numberOfLines).toBeUndefined();
+
+    const row = note.parent;
+    if (row === null) {
+      throw new Error('the permanent-failure note rendered without a row');
+    }
+    const classes = (row.props.className as string).split(' ');
+    expect(classes).toContain('min-h-12');
+    expect(classes).not.toContain('h-12');
+  });
+
   it('explains the organizations-only restriction for a personal Bitbucket row', () => {
     const renderer = mountSelector(
       bitbucketRow,

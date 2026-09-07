@@ -27,13 +27,21 @@ type RepositoryBranchSelectorProps = {
 const ROW_HEIGHT = 'h-12';
 
 /**
+ * Note rows carry full sentences, so they start at the trigger height and
+ * grow with their text instead of clipping it — the same guidance must fit
+ * in every language, not just English.
+ */
+const NOTE_MIN_HEIGHT = 'min-h-12';
+
+/**
  * Branch row under the repository selector. The provider's default branch is
  * preselected and marked; picking another one records a checkout override for
  * exactly this repository (see `setSelectedBranchOverride`), which
  * `useNewSessionCreator` sends as `upstreamBranch`.
  *
- * Every state renders at the same height as the trigger row, so the section
- * below never jumps between loading, branches, an error, and an empty list.
+ * The interactive states render at the same height as the trigger row, so the
+ * section below never jumps between loading, branches, and a retryable error.
+ * A note row is at least that tall and grows to show its whole message.
  */
 export function RepositoryBranchSelector({
   repository,
@@ -120,11 +128,12 @@ export function RepositoryBranchSelector({
   function renderNote(message: string) {
     return (
       <View
-        className={cn(ROW_HEIGHT, 'justify-center rounded-lg border border-border bg-card px-3')}
+        className={cn(
+          NOTE_MIN_HEIGHT,
+          'justify-center rounded-lg border border-border bg-card px-3 py-2'
+        )}
       >
-        <Text className="text-sm text-muted-foreground" numberOfLines={2}>
-          {message}
-        </Text>
+        <Text className="text-sm text-muted-foreground">{message}</Text>
       </View>
     );
   }

@@ -17,6 +17,7 @@ import {
   completion,
   createHandlerFixture,
   fakeKilo,
+  kilo,
   operationAuthorization,
   promptPayload,
   session,
@@ -123,6 +124,25 @@ describe('operation admission and lookup', () => {
     expect(record.snapshot().native.completion).toEqual(completion().info);
     expect(record.snapshot().local?.result.ok).toBe(true);
     expect(record.snapshot().delivery?.state).toBe('acknowledged');
+    expect(
+      await handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: authorization.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        handlerDeps
+      )
+    ).toMatchObject({
+      ok: true,
+      result: {
+        status: 'unconfirmed',
+        quiescent: false,
+        delivery: { authorization },
+      },
+    });
     expect(handlerDeps.operations.counts().active).toBe(0);
     expect(
       await handleControlRequest('session.operation.get', session, authorization, handlerDeps)
@@ -181,5 +201,26 @@ describe('operation admission and lookup', () => {
       )
     ).toMatchObject({ ok: false, error: { code: 'not_ready', retryable: false } });
     expect(handlerDeps.operations.counts().active).toBe(0);
+  });
+
+  it('aborts a retained prompt instead of a same-message attach', async () => {
+    const handlerDeps = deps({
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    const attachAuth = operationAuthorization('session.attach');
+    await handleControlRequest('session.attach', session, { kilo }, handlerDeps, attachAuth);
+    const attached = handlerDeps.operations.retained()[0];
+    if (!attached) throw new Error('Missing attach');
+    await attached.done;
+    await attached.waitForDelivery();
+    const promptAuth = operationAuthorization();
+    await handleControlRequest('session.prompt', session, promptPayload, handlerDeps, promptAuth);
+    const prompt = handlerDeps.operations
+      .retained()
+      .find(operation => operation.kind !== 'preparation');
+    if (!prompt) throw new Error('Missing prompt');
+    await prompt.done;
+    await prompt.waitForDelivery();
+    expect(handlerDeps.operations.abortTarget(session, 'msg_1')).toBe(prompt);
   });
 });

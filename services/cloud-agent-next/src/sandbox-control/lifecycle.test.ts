@@ -2266,6 +2266,30 @@ describe('SandboxControl lifecycle boundaries', () => {
     expect((await h.control.getPhysicalRecord()).providerRef).toBeNull();
   });
 
+  it.each([
+    { messageId: 'message_1', operationId: 'not-a-uuid', cleanupDeadlineAt: Date.now() + 1_000 },
+    {
+      messageId: 'message_1',
+      operationId: '33333333-3333-4333-8333-333333333333',
+      cleanupDeadlineAt: Date.now(),
+    },
+  ])('rejects invalid scoped Stop requests without forwarding them', async payload => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+
+    await expect(
+      h.control.request({
+        operation: 'session.abort',
+        session: ROUTE,
+        payload,
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).rejects.toThrow('Invalid scoped Stop maintenance request');
+
+    expect(h.sendRequest).not.toHaveBeenCalled();
+  });
+
   it('rejects malformed cleanup transfers rather than acknowledging a stale runtime', async () => {
     const h = await harness();
     await h.create();

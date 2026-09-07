@@ -159,7 +159,12 @@ export const sandboxHelloPayloadSchema = z.object({
   providerInstanceId: z.string().min(1).max(256),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
   wrapperVersion: z.string().min(1).max(128).optional(),
-  capabilities: z.object({ sessionOperationResults: z.boolean().optional() }).optional(),
+  capabilities: z
+    .object({
+      sessionOperationResults: z.boolean().optional(),
+      scopedStopAbort: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export const sandboxHelloResultSchema = z.object({
@@ -169,6 +174,7 @@ export const sandboxHelloResultSchema = z.object({
     .object({
       kiloVersionHeartbeat: z.boolean().optional(),
       sessionOperationResults: z.boolean().optional(),
+      scopedStopAbort: z.boolean().optional(),
     })
     .optional(),
 });
@@ -445,12 +451,24 @@ export const sessionAbortPayloadSchema = z
   .object({
     messageId: z.string().min(1).max(128).optional(),
     reason: z.string().min(1).max(256).optional(),
+    operationId: z.string().uuid().optional(),
+    cleanupDeadlineAt: z.number().int().positive().optional(),
+  })
+  .strict();
+
+export const sessionScopedStopAbortPayloadSchema = z
+  .object({
+    messageId: z.string().min(1).max(128),
+    operationId: z.string().uuid(),
+    cleanupDeadlineAt: z.number().int().positive(),
   })
   .strict();
 
 export const sessionAbortResultSchema = z
   .object({
-    status: z.enum(['aborted', 'already_idle']),
+    status: z.enum(['aborted', 'already_idle', 'unconfirmed']),
+    quiescent: z.boolean().optional(),
+    delivery: z.lazy(() => sessionOperationDeliverySchema).optional(),
   })
   .strict();
 
@@ -773,7 +791,12 @@ export const sandboxControlSocketAttachmentSchema = z.object({
   acceptedAt: z.number().int().nonnegative(),
   connectionId: z.string().uuid().optional(),
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION).optional(),
-  capabilities: z.object({ sessionOperationResults: z.boolean().optional() }).optional(),
+  capabilities: z
+    .object({
+      sessionOperationResults: z.boolean().optional(),
+      scopedStopAbort: z.boolean().optional(),
+    })
+    .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
   observation: sandboxControlObservationSchema.optional(),

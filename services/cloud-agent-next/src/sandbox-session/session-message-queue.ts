@@ -11,6 +11,7 @@ import {
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
 import type { CloudMessageFailedPayload } from '../session/message-settlement-outbox.js';
 import {
+  SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   sessionOperationAuthorizationSchema,
   sameSessionOperation,
   type SessionMessageOutcome,
@@ -38,6 +39,7 @@ export type ControlSessionMessageInput = Pick<SessionMessageIntent, 'turn' | 'fi
 export type SessionOperationProof = {
   authorization: SessionOperationAuthorization;
   dispatched: boolean;
+  executionDeadlineAt?: number;
   result?: SessionOperationDelivery['result'];
   resultHash?: string;
   completedAt?: number;
@@ -59,6 +61,8 @@ type SessionMessageLifecycle = {
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
+  executionDeadlineAt?: number;
+  cancellation?: { operationId: string; deadlineAt: number };
   operations?: {
     attach?: SessionOperationProof;
     prompt?: SessionOperationProof;
@@ -521,6 +525,7 @@ export function recordSessionOperationDispatch(
   const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
   if (
     !message ||
+    message.cancellation ||
     nextQueuedMessageId(messages) !== message.messageId ||
     message.wrapperInstanceId !== authorization.wrapperInstanceId ||
     (proof &&
@@ -539,8 +544,22 @@ export function recordSessionOperationDispatch(
             [kind]: {
               authorization: structuredClone(authorization),
               dispatched: true,
+              ...(kind === 'prompt'
+                ? {
+                    executionDeadlineAt:
+                      item.executionDeadlineAt ??
+                      authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+                  }
+                : {}),
             },
           },
+          ...(kind === 'prompt'
+            ? {
+                executionDeadlineAt:
+                  item.executionDeadlineAt ??
+                  authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+              }
+            : {}),
         }
       : item
   );

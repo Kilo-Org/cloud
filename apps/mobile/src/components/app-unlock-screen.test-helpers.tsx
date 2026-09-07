@@ -60,6 +60,9 @@ export { announcements, catalogs, lifecycle, native, platform, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
@@ -112,6 +115,12 @@ vi.mock('@/components/ui/icons', () => ({
   TriangleAlert: 'Icon',
   XCircle: 'Icon',
 }));
+// The organization and security-agent layouts reach real expo-image through
+// the privacy cover's splash logo; the native module cannot load in this
+// DOM-free harness (its expo root import needs __DEV__ and a native binding).
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+// No Vitest project transforms .png.
+vi.mock('@/../assets/images/logo-mark.png', () => ({ default: 1 }));
 vi.mock('expo-router', () => ({
   // One mounted descriptor per navigator exercises its production callback.
   Stack: Object.assign(

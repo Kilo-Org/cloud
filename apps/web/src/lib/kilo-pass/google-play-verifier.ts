@@ -3,7 +3,10 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import type { ValidatedStoreKiloPassPurchase } from './store-subscription-completion';
 import { KiloPassPaymentProvider } from './enums';
 import { getMobileStoreKiloPassProductByGoogleProductId } from './mobile-store-products';
-import { getGooglePlaySubscriptionPurchase } from './google-play-sdk';
+import {
+  getGooglePlaySubscriptionOrder,
+  getGooglePlaySubscriptionPurchase,
+} from './google-play-sdk';
 
 export type GooglePlayEnvironment = 'Sandbox' | 'Production';
 
@@ -31,9 +34,14 @@ const ENTITLED_GOOGLE_PLAY_SUBSCRIPTION_STATES = new Set([
   'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
 ]);
 
+export type VerifiedGooglePlayKiloPassPurchase = ValidatedStoreKiloPassPurchase & {
+  subscriptionState: string;
+};
+
 export function mapGooglePlayKiloPassPurchase(
-  decoded: GooglePlayDecodedPurchase
-): ValidatedStoreKiloPassPurchase {
+  decoded: GooglePlayDecodedPurchase,
+  order: androidpublisher_v3.Schema$Order
+): VerifiedGooglePlayKiloPassPurchase {
   if (!decoded.purchaseToken || !decoded.productId || !decoded.latestOrderId) {
     throw new Error('Google Play purchase payload missing required identifiers');
   }
@@ -56,6 +64,28 @@ export function mapGooglePlayKiloPassPurchase(
     throw new Error('Google Play Kilo Pass product is not enabled');
   }
 
+  const orderItems = order.lineItems?.filter(item => item.productId === decoded.productId) ?? [];
+  if (
+    order.orderId !== decoded.latestOrderId ||
+    order.purchaseToken !== decoded.purchaseToken ||
+    orderItems.length !== 1 ||
+    !['PROCESSED', 'PENDING_REFUND', 'PARTIALLY_REFUNDED'].includes(order.state ?? '')
+  ) {
+    throw new Error('Google Play order does not match the paid subscription');
+  }
+  const period = orderItems[0].subscriptionDetails;
+  const periodStart = Date.parse(period?.servicePeriodStartTime ?? '');
+  const periodEnd = Date.parse(period?.servicePeriodEndTime ?? '');
+  if (
+    !Number.isFinite(periodStart) ||
+    !Number.isFinite(periodEnd) ||
+    periodStart < decoded.startTimeMs ||
+    periodEnd <= periodStart ||
+    periodStart > Date.now()
+  ) {
+    throw new Error('Google Play order has invalid service period timestamps');
+  }
+
   return {
     paymentProvider: KiloPassPaymentProvider.GooglePlay,
     productId: decoded.productId,
@@ -65,7 +95,9 @@ export function mapGooglePlayKiloPassPurchase(
     appAccountToken: decoded.obfuscatedExternalAccountId ?? null,
     purchaseToken: decoded.purchaseToken,
     environment: decoded.environment,
-    purchasedAtIso: new Date(decoded.startTimeMs).toISOString(),
+    purchasedAtIso: new Date(periodStart).toISOString(),
+    subscriptionStartedAtIso: new Date(decoded.startTimeMs).toISOString(),
+    subscriptionState: decoded.subscriptionState,
     expiresAtIso: new Date(decoded.expiryTimeMs).toISOString(),
     tier: product.tier,
     cadence: product.cadence,
@@ -105,11 +137,18 @@ export function decodeGooglePlaySubscriptionPurchase(
   };
 }
 
+export async function getGooglePlayKiloPassPurchase(
+  decoded: GooglePlayDecodedPurchase
+): Promise<VerifiedGooglePlayKiloPassPurchase> {
+  const order = await getGooglePlaySubscriptionOrder(decoded.latestOrderId);
+  return mapGooglePlayKiloPassPurchase(decoded, order);
+}
+
 export async function verifyGooglePlayKiloPassPurchase(
   purchaseToken: string
-): Promise<ValidatedStoreKiloPassPurchase> {
+): Promise<VerifiedGooglePlayKiloPassPurchase> {
   const apiData = await getGooglePlaySubscriptionPurchase(purchaseToken);
-  return mapGooglePlayKiloPassPurchase(
+  return getGooglePlayKiloPassPurchase(
     decodeGooglePlaySubscriptionPurchase(apiData, purchaseToken)
   );
 }

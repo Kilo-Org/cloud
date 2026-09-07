@@ -17,7 +17,7 @@ import {
   type SandboxWorktreeCleanupInput,
 } from '../sandbox-control/worktree-deletion.js';
 import { getSandbox } from '@cloudflare/sandbox';
-import { withTimeout } from '@kilocode/worker-utils';
+import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { z } from 'zod';
 import type { Env } from '../types.js';
 import { resolveSecret } from '../auth.js';
@@ -296,6 +296,10 @@ export type SandboxControlStatus = {
   wrapperInstanceId?: string;
   operationResults?: true;
 };
+
+export type RuntimeQuarantineResult =
+  | { quarantined: true; disposition: 'native_retired' | 'native_pending' | 'physical_stopping' }
+  | { quarantined: false; disposition: 'physical_stopped' | 'wrapper_replaced' | 'unconfirmed' };
 
 export class SandboxControl extends DurableObject<Env> {
   readonly sandboxId: string;
@@ -941,8 +945,18 @@ export class SandboxControl extends DurableObject<Env> {
     sessionId: string;
     wrapperInstanceId: string;
     reason: string;
-  }): Promise<{ quarantined: boolean }> {
+    nativeRuntimeId?: string;
+    authorization?: SessionOperationAuthorization;
+  }): Promise<RuntimeQuarantineResult> {
     await this.ensureOperationalInitialized();
+    const nativeRuntimeId =
+      input.nativeRuntimeId === undefined
+        ? undefined
+        : z.string().uuid().safeParse(input.nativeRuntimeId);
+    const authorization =
+      input.authorization === undefined
+        ? undefined
+        : sessionOperationAuthorizationSchema.safeParse(input.authorization);
     if (
       typeof input.ownerId !== 'string' ||
       !input.ownerId ||
@@ -952,7 +966,14 @@ export class SandboxControl extends DurableObject<Env> {
       !input.wrapperInstanceId ||
       typeof input.reason !== 'string' ||
       !input.reason ||
-      input.reason.length > 256
+      input.reason.length > 256 ||
+      (nativeRuntimeId !== undefined &&
+        (!nativeRuntimeId.success ||
+          !authorization?.success ||
+          authorization.data.operation !== 'session.attach' ||
+          authorization.data.session.sessionId !== input.sessionId ||
+          authorization.data.wrapperInstanceId !== input.wrapperInstanceId)) ||
+      (nativeRuntimeId === undefined && authorization !== undefined)
     ) {
       throw new Error('Invalid sandbox quarantine request');
     }
@@ -961,28 +982,65 @@ export class SandboxControl extends DurableObject<Env> {
       loadPhysicalRecord(this.ctx.storage),
     ]);
     if (ownerId !== input.ownerId) throw new Error('Sandbox owner mismatch');
-    if (physical.state === 'stopped') return { quarantined: false };
-    const connection = this.activeConnection;
+    if (nativeRuntimeId?.success && authorization?.success) {
+      const retired = (await loadNativeRuntimeRetirements(this.ctx.storage)).some(
+        receipt =>
+          receipt.state === 'completed' &&
+          receipt.disposition === 'retired' &&
+          receipt.nativeRuntimeId === nativeRuntimeId.data &&
+          receipt.connection.wrapperInstanceId === input.wrapperInstanceId &&
+          receipt.recipients.some(
+            recipient =>
+              recipient.ownerId === input.ownerId &&
+              recipient.sessionId === authorization.data.session.sessionId &&
+              recipient.kiloSessionId === authorization.data.session.kiloSessionId &&
+              recipient.directory === authorization.data.session.directory &&
+              recipient.nativeRuntimeId === nativeRuntimeId.data
+          )
+      );
+      if (retired) return { quarantined: true, disposition: 'native_retired' };
+    }
+    if (physical.state === 'stopped')
+      return { quarantined: false, disposition: 'physical_stopped' };
+    const connection = this.activeConnection ?? this.socketHandler.getConnectionIdentity();
+    if (connection?.wrapperInstanceId && connection.wrapperInstanceId !== input.wrapperInstanceId) {
+      return { quarantined: false, disposition: 'wrapper_replaced' };
+    }
     const retirementConnection = this.nativeRetirementConnection(connection);
     const wrapperInstanceId =
       physical.stopTombstone?.wrapperInstanceId ?? connection?.wrapperInstanceId;
-    if (wrapperInstanceId !== input.wrapperInstanceId) return { quarantined: false };
+    if (wrapperInstanceId !== input.wrapperInstanceId)
+      return { quarantined: false, disposition: 'unconfirmed' };
     const route = (await loadRouteTable(this.ctx.storage)).get(input.sessionId);
+    const targetRoute =
+      nativeRuntimeId?.success && authorization?.success
+        ? route &&
+          route.ownerId === input.ownerId &&
+          route.kiloSessionId === authorization.data.session.kiloSessionId &&
+          route.directory === authorization.data.session.directory &&
+          route.nativeRuntimeId === nativeRuntimeId.data
+          ? route
+          : undefined
+        : route;
+    if (nativeRuntimeId?.success && !targetRoute)
+      return { quarantined: false, disposition: 'unconfirmed' };
     if (
-      route &&
-      route.ownerId === input.ownerId &&
+      targetRoute &&
+      targetRoute.ownerId === input.ownerId &&
       retirementConnection &&
-      route.nativeRuntimeId !== undefined &&
+      targetRoute.nativeRuntimeId !== undefined &&
       !physical.stopTombstone
     ) {
       const retirement = await this.nativeRuntimeRetirement.retire({
         connection: retirementConnection,
         physical,
-        route,
+        route: targetRoute,
         reason: input.reason,
       });
-      if (retirement !== 'unavailable') return { quarantined: true };
+      if (retirement === 'retired') return { quarantined: true, disposition: 'native_retired' };
+      if (retirement === 'pending') return { quarantined: true, disposition: 'native_pending' };
     }
+    if (nativeRuntimeId?.success) return { quarantined: false, disposition: 'unconfirmed' };
     if (!physical.stopTombstone) {
       const next = beginStop(physical, input.reason, Date.now(), wrapperInstanceId);
       await this.persistPhysical(physical, next, input.reason);
@@ -990,7 +1048,7 @@ export class SandboxControl extends DurableObject<Env> {
     } else {
       await this.repairLifecycleScheduling(physical);
     }
-    return { quarantined: true };
+    return { quarantined: true, disposition: 'physical_stopping' };
   }
 
   async prepareSessionCredentials(input: {
@@ -3295,26 +3353,35 @@ export class SandboxControl extends DurableObject<Env> {
               throw new SandboxControlConnectionError('Operation result fence changed', false);
           };
           let attempts = 0;
-          const ack = await withTimeout(
-            withDORetry(
-              () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
-              async stub => {
-                await assertCurrent();
-                attempts++;
-                const result = await stub.receiveSandboxOperationResult({
-                  session,
-                  wrapperInstanceId,
-                  delivery,
-                });
-                await assertCurrent();
-                if (!result)
-                  throw new SandboxControlConnectionError('Operation result was not acknowledged');
-                return result;
+          const ack = await withDORetry(
+            () => getSandboxSessionStub(this.env, route.ownerId, route.sessionId),
+            async stub => {
+              await assertCurrent();
+              attempts++;
+              const result = await stub.receiveSandboxOperationResult({
+                session,
+                wrapperInstanceId,
+                delivery,
+              });
+              await assertCurrent();
+              if (!result)
+                throw new SandboxControlConnectionError('Operation result was not acknowledged');
+              return result;
+            },
+            'receiveSandboxOperationResult',
+            {
+              ...DEFAULT_DO_RETRY_CONFIG,
+              scope: {
+                deadlineAt: forwardDeadlineAt,
+                assertCurrent: () => {
+                  if (!current())
+                    throw new SandboxControlConnectionError(
+                      'Operation result forwarding expired',
+                      false
+                    );
+                },
               },
-              'receiveSandboxOperationResult'
-            ),
-            Math.max(1, forwardDeadlineAt - Date.now()),
-            'Operation result forwarding timed out'
+            }
           );
           if (!current())
             throw new SandboxControlConnectionError('Operation result expired', false);

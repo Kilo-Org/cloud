@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   sessionOperationResultHash,
   type ResponseFrame,
   type SessionOperationAuthorization,
@@ -78,8 +79,10 @@ describe('dispatchSessionOperation', () => {
         {
           request,
           persistResult: async () => undefined,
-          isDispatchCurrent: () => true,
-          isMaintenanceCurrent: () => true,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
         }
       )
     ).resolves.toEqual({
@@ -90,35 +93,39 @@ describe('dispatchSessionOperation', () => {
   });
 
   it('uses the retained result and exact acknowledgement after a lost prompt response', async () => {
-    const dispatched = recordSessionOperationDispatch(messages(), authorization);
+    const lateAuthorization = { ...authorization, dispatchDeadlineAt: Date.now() - 1_000 };
+    const dispatched = recordSessionOperationDispatch(messages(), lateAuthorization);
     if (!dispatched) throw new Error('Failed to create dispatch proof');
     let stored = dispatched;
     const delivery: SessionOperationDelivery = {
       version: 2,
-      authorization,
+      authorization: lateAuthorization,
       completedAt: Date.now(),
-      result: { ok: true, result: { messageId: authorization.messageId, status: 'accepted' } },
-      outcome: { messageId: authorization.messageId, status: 'completed' },
+      result: { ok: true, result: { messageId: lateAuthorization.messageId, status: 'accepted' } },
+      outcome: { messageId: lateAuthorization.messageId, status: 'completed' },
       events: [],
       preparing: [],
     };
     const ack = {
       version: 2 as const,
-      authorization,
+      authorization: lateAuthorization,
       resultHash: await sessionOperationResultHash(delivery),
       disposition: 'applied' as const,
       decision: { state: 'completed' as const, at: delivery.completedAt },
     };
     const request = vi.fn(async (input: SandboxControlOutboundRequest) => {
-      if (input.operation === 'session.operation.get')
+      if (input.operation === 'session.operation.get') {
+        expect(input.deadlineAt).toBeGreaterThan(Date.now());
         return response({ state: 'completed', delivery });
+      }
       expect(input).toMatchObject({ operation: 'session.operation.ack', payload: ack });
+      expect(input.deadlineAt).toBe(delivery.completedAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS);
       return response({ acknowledged: true });
     });
 
     await expect(
       dispatchSessionOperation(
-        { authorization, payload },
+        { authorization: lateAuthorization, payload },
         {
           read: () => stored,
           commit: next => {
@@ -129,11 +136,13 @@ describe('dispatchSessionOperation', () => {
         {
           request,
           persistResult: async () => ack,
-          isDispatchCurrent: () => false,
-          isMaintenanceCurrent: () => true,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => false,
         }
       )
-    ).resolves.toEqual({ state: 'completed' });
+    ).resolves.toMatchObject({ state: 'completed' });
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual([
       'session.operation.get',
       'session.operation.ack',
@@ -157,11 +166,13 @@ describe('dispatchSessionOperation', () => {
         {
           request,
           persistResult: async () => undefined,
-          isDispatchCurrent: () => false,
-          isMaintenanceCurrent: () => true,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => false,
         }
       )
-    ).resolves.toEqual({ state: 'running' });
+    ).resolves.toMatchObject({ state: 'running' });
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
   });
 
@@ -179,12 +190,175 @@ describe('dispatchSessionOperation', () => {
         {
           request,
           persistResult: async () => undefined,
-          isDispatchCurrent: () => true,
-          isMaintenanceCurrent: () => true,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
         }
       )
-    ).rejects.toThrow('Original session operation is missing');
+    ).resolves.toEqual({ state: 'uncertain', reason: 'missing' });
     expect(request.mock.calls.map(([input]) => input.operation)).toEqual(['session.operation.get']);
+  });
+
+  it('does not replay a prompt after its admission response is lost before application', async () => {
+    let stored = messages();
+    const request = vi.fn(async (input: SandboxControlOutboundRequest) => {
+      if (input.operation === 'session.prompt')
+        throw Object.assign(new Error('Prompt admission response was lost'), { retryable: true });
+      if (input.operation === 'session.operation.get') return response({ state: 'missing' });
+      throw new Error(`Unexpected operation ${input.operation}`);
+    });
+    const effects = {
+      request,
+      persistResult: async () => undefined,
+      assertAdmission: () => undefined,
+      assertScope: () => undefined,
+      defer: (pending: Promise<void>) => void pending,
+      isCurrent: () => true,
+    };
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization, payload },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        effects
+      )
+    ).resolves.toEqual({ state: 'uncertain', reason: 'transport', error: expect.any(Error) });
+    await expect(
+      dispatchSessionOperation(
+        { authorization, payload },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        effects
+      )
+    ).resolves.toEqual({ state: 'uncertain', reason: 'missing' });
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual([
+      'session.prompt',
+      'session.operation.get',
+    ]);
+  });
+
+  it('keeps dispatch proof after an unmarked busy rejection', async () => {
+    let stored = messages();
+    const request = vi.fn(
+      async (): Promise<ResponseFrame> => ({
+        type: 'response',
+        requestId: crypto.randomUUID(),
+        ok: false,
+        error: { code: 'session_busy', message: 'busy after admission', retryable: true },
+      })
+    );
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization, payload },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toMatchObject({ state: 'rejected', error: { code: 'session_busy' } });
+    expect(stored[0]?.operations?.prompt?.dispatched).toBe(true);
+  });
+
+  it('clears dispatch proof only after an explicit before-admission rejection', async () => {
+    let stored = messages();
+    const request = vi.fn(
+      async (): Promise<ResponseFrame> => ({
+        type: 'response',
+        requestId: crypto.randomUUID(),
+        ok: false,
+        error: {
+          code: 'session_busy',
+          message: 'receipt capacity is unavailable',
+          retryable: true,
+          admission: 'not-admitted',
+        },
+      })
+    );
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization, payload },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async () => undefined,
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toMatchObject({ state: 'rejected', error: { code: 'session_busy' } });
+    expect(stored[0]).toMatchObject({
+      unresolvedDispatch: undefined,
+      operations: { prompt: { authorization, dispatched: false } },
+    });
+  });
+
+  it('persists a recovered result before its acknowledgement can be retried', async () => {
+    const dispatched = recordSessionOperationDispatch(messages(), authorization);
+    if (!dispatched) throw new Error('Failed to create dispatch proof');
+    let stored = dispatched;
+    const delivery: SessionOperationDelivery = {
+      version: 2,
+      authorization,
+      completedAt: Date.now(),
+      result: { ok: true, result: { messageId: authorization.messageId, status: 'accepted' } },
+      outcome: { messageId: authorization.messageId, status: 'completed' },
+      events: [],
+      preparing: [],
+    };
+    const ack = {
+      version: 2 as const,
+      authorization,
+      resultHash: await sessionOperationResultHash(delivery),
+      disposition: 'applied' as const,
+      decision: { state: 'completed' as const, at: delivery.completedAt },
+    };
+    const request = vi.fn(async (input: SandboxControlOutboundRequest) => {
+      if (input.operation === 'session.operation.get')
+        return response({ state: 'completed', delivery });
+      if (input.operation === 'session.operation.ack')
+        throw Object.assign(new Error('Acknowledgement response was lost'), { retryable: true });
+      throw new Error(`Unexpected operation ${input.operation}`);
+    });
+
+    await expect(
+      dispatchSessionOperation(
+        { authorization, payload },
+        { read: () => stored, commit: next => ((stored = next), true) },
+        {
+          request,
+          persistResult: async receipt => {
+            const applied = applySessionOperationResult(
+              stored,
+              receipt,
+              await sessionOperationResultHash(receipt),
+              Date.now()
+            );
+            if (!applied) return undefined;
+            stored = applied.messages;
+            return ack;
+          },
+          assertAdmission: () => undefined,
+          assertScope: () => undefined,
+          defer: pending => void pending,
+          isCurrent: () => true,
+        }
+      )
+    ).resolves.toMatchObject({ state: 'completed' });
+    await Promise.resolve();
+    expect(stored).toMatchObject([{ state: 'completed', terminalSource: 'operation_result' }]);
+    expect(request.mock.calls.map(([input]) => input.operation)).toEqual([
+      'session.operation.get',
+      'session.operation.ack',
+    ]);
   });
 
   it('keeps the first canonical result through duplicates and conflicts', async () => {

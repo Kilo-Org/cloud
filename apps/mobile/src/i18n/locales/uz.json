@@ -2556,6 +2556,10 @@
     "stopped": "Ovozli kiritish to'xtatildi. Qayta urinish uchun mikrofonni bosing.",
     "unavailableDevice": "Ovozli kiritish bu qurilmada mavjud emas.",
     "unavailableLanguage": "Qurilmada tanlangan til uchun ovozli kiritish mavjud emas.",
+    "languageNotInstalledTitle": "{{language}} uchun ovozli kiritish hali tayyor emas",
+    "languageNotInstalledMessage": "{{language}} tilining oflayn nutq fayllari bu telefonda o'rnatilmagan. Ularni yuklab oling, so'ngra ovozli kiritishni qayta sinab ko'ring.",
+    "downloadOfflineModel": "Yuklab olish",
+    "offlineModelDownloadScheduled": "Oflayn nutq fayllari fonda yuklab olinadi. Ovozli kiritishni keyinroq qayta sinab ko'ring.",
     "listeningStopped": "Tinglash to'xtatildi."
   },
   "share": {

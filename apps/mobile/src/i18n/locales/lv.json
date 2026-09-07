@@ -2577,6 +2577,10 @@
     "stopped": "Balss ievade ir apturēta. Pieskaries mikrofonam, lai mēģinātu vēlreiz.",
     "unavailableDevice": "Balss ievade šajā ierīcē nav pieejama.",
     "unavailableLanguage": "Balss ievade nav pieejama ierīcē izvēlētajā valodā.",
+    "languageNotInstalledTitle": "Balss ievade valodai {{language}} vēl nav gatava",
+    "languageNotInstalledMessage": "{{language}} valodas bezsauses runas faili šajā tālrunī nav instalēti. Lejupielādē tos un pēc tam mēģini balss ievadi vēlreiz.",
+    "downloadOfflineModel": "Lejupielādēt",
+    "offlineModelDownloadScheduled": "Bezsauses runas faili tiks lejupielādēti fonā. Vēlāk mēģini balss ievadi vēlreiz.",
     "listeningStopped": "Klausīšanās apturēta."
   },
   "share": {

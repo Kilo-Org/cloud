@@ -2556,6 +2556,10 @@
     "stopped": "Uingizaji kwa sauti umesimama. Gusa maikrofoni ili kujaribu tena.",
     "unavailableDevice": "Uingizaji kwa sauti haupatikani kwenye kifaa hiki.",
     "unavailableLanguage": "Uingizaji kwa sauti haupatikani kwa lugha ya kifaa hiki.",
+    "languageNotInstalledTitle": "Uingizaji kwa sauti kwa {{language}} hauko tayari bado",
+    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajasakinishwa kwenye simu hii. Pakua mafaili hayo, kisha ujaribu tena uingizaji kwa sauti.",
+    "downloadOfflineModel": "Pakua",
+    "offlineModelDownloadScheduled": "Mafaili ya sauti ya nje ya mtandao yatapakuliwa nyuma ya pazia. Jaribu tena uingizaji kwa sauti baadaye.",
     "listeningStopped": "Usikilizaji umesimama."
   },
   "share": {

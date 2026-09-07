@@ -1,5 +1,6 @@
 import { AccessibilityInfo, Alert, Linking, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
@@ -12,7 +13,12 @@ import {
   resolveVoiceInputFeedbackPresentation,
   shouldAnnounceListeningTransition,
 } from './voice-input-feedback';
-import { resolveVoiceInputStartLanguageTag } from './voice-input-language';
+import {
+  invalidateVoiceRecognitionLocalesCache,
+  isVoiceInputLanguageInstalledOnDevice,
+  resolveVoiceInputStartLanguageTag,
+  voiceInputLanguageDisplayName,
+} from './voice-input-language';
 import {
   shouldAbortVoiceInput,
   type VoiceInputFeedback,
@@ -122,15 +128,23 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
       return;
     }
 
-    const supportsOnDevice = controller.supportsOnDevice();
+    const supportsOnDeviceByService = controller.supportsOnDevice();
     const userId = getUserId();
     const consent = userId ? await readVoiceNetworkConsent(userId) : 'unset';
+    const languageTag = await resolveVoiceInputStartLanguageTag(i18n.language);
+    // The service-level check alone is not enough: on-device recognition also
+    // needs the offline model for the resolved language. `requiresOnDeviceRecognition`
+    // without it fails on every attempt (`language-not-supported`) — that is
+    // the German-locale bug — so the mode gate refines the service check with
+    // the per-language installation state.
+    const supportsOnDevice =
+      supportsOnDeviceByService && (await isVoiceInputLanguageInstalledOnDevice(languageTag));
     const mode = resolveVoiceInputRecognitionMode(supportsOnDevice, consent);
 
     const startWith = async (requiresOnDeviceRecognition: boolean): Promise<void> => {
       const startOptions: VoiceInputStartOptions = {
         baseDraft: getDraft(),
-        languageTag: await resolveVoiceInputStartLanguageTag(i18n.language),
+        languageTag,
         onDraftChange: getOnDraftChange(),
         onFeedback: showFeedback,
         owner,
@@ -149,6 +163,46 @@ export function createVoiceInputActions(config: VoiceInputActionsConfig): VoiceI
     }
     // mode === 'blocked'
     if (consent === 'declined') {
+      if (supportsOnDeviceByService) {
+        // The device can recognize on-device, but the offline model for the
+        // resolved language is missing. Say what is wrong and offer the
+        // download instead of a bare error; the user declined network
+        // transcription, so do not re-raise that disclosure.
+        const languageName = voiceInputLanguageDisplayName(languageTag);
+        Alert.alert(
+          i18n.t('voiceInput.languageNotInstalledTitle', { language: languageName }),
+          i18n.t('voiceInput.languageNotInstalledMessage', { language: languageName }),
+          [
+            { text: i18n.t('common.notNow'), style: 'cancel' },
+            {
+              text: i18n.t('voiceInput.downloadOfflineModel'),
+              onPress: () => {
+                void (async () => {
+                  try {
+                    const result =
+                      await ExpoSpeechRecognitionModule.androidTriggerOfflineModelDownload({
+                        locale: languageTag,
+                      });
+                    // The gate memoizes the installed-locale list; drop it so
+                    // the next toggle re-queries the service instead of
+                    // re-offering a download that already ran.
+                    invalidateVoiceRecognitionLocalesCache();
+                    if (result.status === 'download_scheduled') {
+                      // A scheduled download is the accepted outcome of the
+                      // user's tap, not a failure — render it as one.
+                      toast.success(i18n.t('voiceInput.offlineModelDownloadScheduled'));
+                    }
+                  } catch {
+                    invalidateVoiceRecognitionLocalesCache();
+                    toast.error(i18n.t('voiceInput.unavailableLanguage'));
+                  }
+                })();
+              },
+            },
+          ]
+        );
+        return;
+      }
       toast.error(i18n.t('voiceInput.staysOff'));
       return;
     }

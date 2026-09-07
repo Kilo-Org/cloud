@@ -2139,6 +2139,10 @@
     "stopped": "A digitação por voz foi interrompida. Toque no microfone para tentar novamente.",
     "unavailableDevice": "A digitação por voz não está disponível neste dispositivo.",
     "unavailableLanguage": "A digitação por voz não está disponível no idioma do dispositivo.",
+    "languageNotInstalledTitle": "A digitação por voz para {{language}} ainda não está pronta",
+    "languageNotInstalledMessage": "Os arquivos de fala off-line de {{language}} não estão instalados neste celular. Baixe-os e tente a digitação por voz novamente.",
+    "downloadOfflineModel": "Baixar",
+    "offlineModelDownloadScheduled": "Os arquivos de fala off-line serão baixados em segundo plano. Tente a digitação por voz novamente mais tarde.",
     "listeningStopped": "A captação de voz foi interrompida."
   },
   "share": {

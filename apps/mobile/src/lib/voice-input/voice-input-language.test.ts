@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   __resetVoiceInputLanguageTagCacheForTests,
+  isVoiceInputLanguageInstalledOnDevice,
   pickSupportedVoiceInputLanguageTag,
   resolveVoiceInputStartLanguageTag,
+  voiceInputLanguageDisplayName,
 } from './voice-input-language';
 
 const localizationMock = vi.hoisted(() => ({
@@ -206,5 +208,61 @@ describe('resolveVoiceInputStartLanguageTag', () => {
     });
 
     expect(await resolveVoiceInputStartLanguageTag('zh-Hant')).toBe('zh-Hant');
+  });
+});
+
+describe('isVoiceInputLanguageInstalledOnDevice', () => {
+  beforeEach(() => {
+    __resetVoiceInputLanguageTagCacheForTests();
+    vi.clearAllMocks();
+  });
+
+  it('is false when the service reports the language supported online but not installed (German device bug)', async () => {
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['de-DE', 'en-US'],
+      installedLocales: ['en-US'],
+    });
+
+    expect(await isVoiceInputLanguageInstalledOnDevice('de-DE')).toBe(false);
+  });
+
+  it('is true when the language is installed on device', async () => {
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['de-DE', 'en-US'],
+      installedLocales: ['en-US'],
+    });
+
+    expect(await isVoiceInputLanguageInstalledOnDevice('en-US')).toBe(true);
+  });
+
+  it('is true when the service reports no per-language data at all (older Android, other service packages)', async () => {
+    getSupportedLocalesMock.mockResolvedValue({ locales: [], installedLocales: [] });
+
+    expect(await isVoiceInputLanguageInstalledOnDevice('de-DE')).toBe(true);
+  });
+
+  it('is true when the supported list cannot be fetched, so a possible start is never blocked', async () => {
+    getSupportedLocalesMock.mockRejectedValue(new Error('package not found'));
+
+    expect(await isVoiceInputLanguageInstalledOnDevice('de-DE')).toBe(true);
+  });
+
+  it('is true when the language is unknown to the service, leaving the honest start error in place', async () => {
+    getSupportedLocalesMock.mockResolvedValue({
+      locales: ['en-US'],
+      installedLocales: ['en-US'],
+    });
+
+    expect(await isVoiceInputLanguageInstalledOnDevice('fil-PH')).toBe(true);
+  });
+});
+
+describe('voiceInputLanguageDisplayName', () => {
+  it('names a supported recognition language by its endonym', () => {
+    expect(voiceInputLanguageDisplayName('de-DE')).toBe('Deutsch');
+  });
+
+  it('returns the raw tag for a language the app does not ship', () => {
+    expect(voiceInputLanguageDisplayName('xx-LOL')).toBe('xx-LOL');
   });
 });

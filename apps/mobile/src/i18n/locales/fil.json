@@ -2556,6 +2556,10 @@
     "stopped": "Huminto ang pagdikta. I-tap ang mikropono para subukang muli.",
     "unavailableDevice": "Hindi magagamit ang pagdikta sa device na ito.",
     "unavailableLanguage": "Hindi magagamit ang pagdikta sa wikang nakatakda sa device na ito.",
+    "languageNotInstalledTitle": "Hindi pa handa ang pagdikta para sa {{language}}",
+    "languageNotInstalledMessage": "Hindi naka-install ang mga offline na speech file para sa {{language}} sa teleponong ito. I-download muna ang mga ito, pagkatapos ay subukang muli ang pagdikta.",
+    "downloadOfflineModel": "I-download",
+    "offlineModelDownloadScheduled": "Ida-download sa background ang mga offline na speech file. Subukang muli ang pagdikta mamaya.",
     "listeningStopped": "Huminto ang pakikinig."
   },
   "share": {

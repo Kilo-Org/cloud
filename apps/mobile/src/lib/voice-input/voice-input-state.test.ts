@@ -242,7 +242,8 @@ describe('classifyVoiceInputError', () => {
     expect(classifyVoiceInputError('language-not-supported')).toEqual({
       action: 'none',
       availability: 'available',
-      message: "Voice input isn't available for this device language.",
+      message:
+        "Voice input isn't available for this device language. Install its offline speech files or use another app language.",
       retryable: false,
     });
   });

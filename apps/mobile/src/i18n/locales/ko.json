@@ -2125,6 +2125,10 @@
     "stopped": "음성 입력이 중지되었습니다. 마이크를 탭하여 다시 시도하세요.",
     "unavailableDevice": "이 기기에서는 음성 입력을 사용할 수 없습니다.",
     "unavailableLanguage": "현재 기기에 설정된 언어는 음성 입력을 지원하지 않습니다.",
+    "languageNotInstalledTitle": "{{language}} 언어의 음성 입력이 아직 준비되지 않았습니다",
+    "languageNotInstalledMessage": "이 휴대전화에 {{language}} 오프라인 음성 파일이 설치되어 있지 않습니다. 파일을 다운로드한 후 음성 입력을 다시 시도하세요.",
+    "downloadOfflineModel": "다운로드",
+    "offlineModelDownloadScheduled": "오프라인 음성 파일이 백그라운드에서 다운로드됩니다. 나중에 음성 입력을 다시 시도하세요.",
     "listeningStopped": "음성 입력이 중지되었습니다."
   },
   "share": {

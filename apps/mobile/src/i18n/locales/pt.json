@@ -2577,6 +2577,10 @@
     "stopped": "O ditado foi interrompido. Toca no microfone para tentar novamente.",
     "unavailableDevice": "O ditado não está disponível neste dispositivo.",
     "unavailableLanguage": "O ditado não está disponível para o idioma deste dispositivo.",
+    "languageNotInstalledTitle": "O ditado para {{language}} ainda não está pronto",
+    "languageNotInstalledMessage": "Os ficheiros de voz offline de {{language}} não estão instalados neste telemóvel. Descarrega-os e tenta o ditado novamente.",
+    "downloadOfflineModel": "Descarregar",
+    "offlineModelDownloadScheduled": "Os ficheiros de voz offline serão descarregados em segundo plano. Tenta o ditado novamente mais tarde.",
     "listeningStopped": "O ditado foi interrompido."
   },
   "share": {

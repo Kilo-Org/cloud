@@ -2619,6 +2619,10 @@
     "stopped": "Id-dħul bil-vuċi waqaf. Tektek il-mikrofonu biex terġa' tipprova.",
     "unavailableDevice": "Id-dħul bil-vuċi mhux disponibbli fuq dan l-apparat.",
     "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal-lingwa ta' dan l-apparat.",
+    "languageNotInstalledTitle": "Id-dħul bil-vuċi għal {{language}} għadux lest",
+    "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati fuq dan it-telefon. Niżżelhom, imbagħad erġa' pprova d-dħul bil-vuċi.",
+    "downloadOfflineModel": "Niżżel",
+    "offlineModelDownloadScheduled": "Il-fajls tad-diskors offline se jinżżlu fl-isfond. Erġa' pprova d-dħul bil-vuċi iktar 'il quddiem.",
     "listeningStopped": "Is-smigħ waqaf."
   },
   "share": {

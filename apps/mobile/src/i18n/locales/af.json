@@ -2556,6 +2556,10 @@
     "stopped": "Steminvoer het gestop. Tik op die mikrofoon om weer te probeer.",
     "unavailableDevice": "Steminvoer is nie op hierdie toestel beskikbaar nie.",
     "unavailableLanguage": "Steminvoer is nie vir die toestel se taal beskikbaar nie.",
+    "languageNotInstalledTitle": "Steminvoer vir {{language}} is nog nie gereed nie",
+    "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie op hierdie foon geïnstalleer nie. Laai hulle af en probeer steminvoer weer.",
+    "downloadOfflineModel": "Laai af",
+    "offlineModelDownloadScheduled": "Die vanlyn-spraaklêers sal op die agtergrond afgelaai word. Probeer steminvoer later weer.",
     "listeningStopped": "Die toestel luister nie meer nie."
   },
   "share": {

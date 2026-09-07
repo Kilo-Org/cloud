@@ -2556,6 +2556,10 @@
     "stopped": "વૉઇસ ઇનપુટ બંધ થયું. ફરી પ્રયાસ કરવા માઇક્રોફોન પર ટેપ કરો.",
     "unavailableDevice": "આ ઉપકરણ પર વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
     "unavailableLanguage": "આ ઉપકરણની ભાષા માટે વૉઇસ ઇનપુટ ઉપલબ્ધ નથી.",
+    "languageNotInstalledTitle": "{{language}} માટે વૉઇસ ઇનપુટ હજી તૈયાર નથી",
+    "languageNotInstalledMessage": "{{language}} માટેની ઓફલાઇન સ્પીચ ફાઇલો આ ફોન પર ઇન્સ્ટોલ કરેલી નથી. તેમને ડાઉનલોડ કરો, પછી વૉઇસ ઇનપુટ ફરી અજમાવો.",
+    "downloadOfflineModel": "ડાઉનલોડ",
+    "offlineModelDownloadScheduled": "ઓફલાઇન સ્પીચ ફાઇલો બેકગ્રાઉન્ડમાં ડાઉનલોડ થશે. પછી વૉઇસ ઇનપુટ ફરી અજમાવો.",
     "listeningStopped": "સાંભળવાનું બંધ થયું."
   },
   "share": {

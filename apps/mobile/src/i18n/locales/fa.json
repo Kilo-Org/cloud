@@ -2556,6 +2556,10 @@
     "stopped": "ورودی صوتی متوقف شد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
     "unavailableDevice": "ورودی صوتی در این دستگاه در دسترس نیست.",
     "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست.",
+    "languageNotInstalledTitle": "ورودی صوتی برای {{language}} هنوز آماده نیست",
+    "languageNotInstalledMessage": "فایل‌های گفتار آفلاین برای {{language}} روی این گوشی نصب نشده‌اند. آن‌ها را دانلود کنید، سپس دوباره ورودی صوتی را امتحان کنید.",
+    "downloadOfflineModel": "دانلود",
+    "offlineModelDownloadScheduled": "فایل‌های گفتار آفلاین در پس‌زمینه دانلود می‌شوند. بعداً دوباره ورودی صوتی را امتحان کنید.",
     "listeningStopped": "گوش دادن متوقف شد."
   },
   "share": {

@@ -2556,6 +2556,10 @@
     "stopped": "Sagaleen galchuun dhaabbateera. Irra deebi'anii yaaluuf maayikirofoonii tuqi.",
     "unavailableDevice": "Meeshaa kana irratti sagaleen galchuun hin danda'amu.",
     "unavailableLanguage": "Afaan meeshaa kanaatiin sagaleen galchuun hin danda'amu.",
+    "languageNotInstalledTitle": "Sagaleen galchuu afaan {{language}} tiif hin qophaa'i",
+    "languageNotInstalledMessage": "Faayiloota sagalee offlaayinii afaan {{language}} tiif bilbilaa kana irratti hin dhaabbatamin. Isaan buufadhu, ergasii sagaleen galchuu irra deebi'ii yaali.",
+    "downloadOfflineModel": "Buufadhu",
+    "offlineModelDownloadScheduled": "Faayiloota sagalee offlaayinii duubatti buufamu. Sagaleen galchuu booda irra deebi'ii yaali.",
     "listeningStopped": "Dhaggeeffachuun dhaabbateera."
   },
   "share": {

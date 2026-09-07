@@ -2556,6 +2556,10 @@
     "stopped": "Dikte a sispann. Peze mikwofòn nan pou eseye ankò.",
     "unavailableDevice": "Dikte a pa disponib sou aparèy sa a.",
     "unavailableLanguage": "Dikte a pa disponib nan lang aparèy sa a.",
+    "languageNotInstalledTitle": "Dikte pou {{language}} poko pare",
+    "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} pa enstale sou telefòn sa a. Telechaje yo, epi eseye dikte ankò.",
+    "downloadOfflineModel": "Telechaje",
+    "offlineModelDownloadScheduled": "Fichye lapawòl offline yo ap telechaje nan background la. Eseye dikte ankò pita.",
     "listeningStopped": "Sistèm nan sispann koute."
   },
   "share": {

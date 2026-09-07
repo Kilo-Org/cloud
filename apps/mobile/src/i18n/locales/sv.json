@@ -2556,6 +2556,10 @@
     "stopped": "Röstinmatningen stoppades. Tryck på mikrofonen för att försöka igen.",
     "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
     "unavailableLanguage": "Röstinmatning stöds inte för det språk som är valt på enheten.",
+    "languageNotInstalledTitle": "Röstinmatning för {{language}} är inte klar ännu",
+    "languageNotInstalledMessage": "De offlinebaserade talfilerna för {{language}} är inte installerade på den här telefonen. Ladda ned dem och prova röstinmatning igen.",
+    "downloadOfflineModel": "Ladda ned",
+    "offlineModelDownloadScheduled": "De offlinebaserade talfilerna laddas ned i bakgrunden. Prova röstinmatning igen senare.",
     "listeningStopped": "Lyssningen stoppades."
   },
   "share": {

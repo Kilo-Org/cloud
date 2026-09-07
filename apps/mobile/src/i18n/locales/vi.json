@@ -2125,6 +2125,10 @@
     "stopped": "Đã dừng nhập bằng giọng nói. Chạm vào micrô để thử lại.",
     "unavailableDevice": "Thiết bị này không hỗ trợ nhập bằng giọng nói.",
     "unavailableLanguage": "Tính năng nhập bằng giọng nói không hỗ trợ ngôn ngữ hiện tại của thiết bị.",
+    "languageNotInstalledTitle": "Nhập bằng giọng nói cho {{language}} chưa sẵn sàng",
+    "languageNotInstalledMessage": "Các tệp giọng nói ngoại tuyến cho {{language}} chưa được cài đặt trên điện thoại này. Hãy tải các tệp đó xuống, rồi thử nhập bằng giọng nói lại.",
+    "downloadOfflineModel": "Tải xuống",
+    "offlineModelDownloadScheduled": "Các tệp giọng nói ngoại tuyến sẽ được tải xuống trong nền. Hãy thử nhập bằng giọng nói lại sau.",
     "listeningStopped": "Đã dừng nghe."
   },
   "share": {

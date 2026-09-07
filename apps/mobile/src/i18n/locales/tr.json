@@ -2125,6 +2125,10 @@
     "stopped": "Sesli giriş durdu. Tekrar denemek için mikrofona dokun.",
     "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
     "unavailableLanguage": "Cihazın seçili dilinde sesli giriş kullanılamıyor.",
+    "languageNotInstalledTitle": "{{language}} için sesli giriş henüz hazır değil",
+    "languageNotInstalledMessage": "{{language}} dilinin çevrimdışı konuşma dosyaları bu telefonda yüklü değil. Dosyaları indir, ardından sesli girişi tekrar dene.",
+    "downloadOfflineModel": "İndir",
+    "offlineModelDownloadScheduled": "Çevrimdışı konuşma dosyaları arka planda indirilecek. Sesli girişi daha sonra tekrar dene.",
     "listeningStopped": "Dinleme durdu."
   },
   "share": {

@@ -8,11 +8,11 @@
  * difference never leaks past its mapper.
  */
 
-export type ProviderPrPlatform = 'github' | 'gitlab' | 'bitbucket';
+export type ProviderPrPlatform = "github" | "gitlab" | "bitbucket";
 
 /** A GitHub pull request: the `owner/repo#number` triple the mobile tree already routes on. */
 export type GitHubPrRef = {
-  platform: 'github';
+  platform: "github";
   owner: string;
   repo: string;
   number: number;
@@ -25,7 +25,7 @@ export type GitHubPrRef = {
  * MUST never be used as an API base.
  */
 export type GitLabMrRef = {
-  platform: 'gitlab';
+  platform: "gitlab";
   projectPath: string;
   mrIid: number;
   instanceHint?: string;
@@ -33,7 +33,7 @@ export type GitLabMrRef = {
 
 /** A Bitbucket Cloud pull request: `workspace/repoSlug` plus the numeric `prId`. */
 export type BitbucketPrRef = {
-  platform: 'bitbucket';
+  platform: "bitbucket";
   workspace: string;
   repoSlug: string;
   prId: number;
@@ -57,17 +57,22 @@ export type ProviderPrRef = GitHubPrRef | GitLabMrRef | BitbucketPrRef;
  */
 export function providerPrRefKey(ref: ProviderPrRef): string {
   switch (ref.platform) {
-    case 'github':
-      return JSON.stringify(['github', ref.owner, ref.repo, ref.number]);
-    case 'gitlab':
+    case "github":
+      return JSON.stringify(["github", ref.owner, ref.repo, ref.number]);
+    case "gitlab":
       return JSON.stringify([
-        'gitlab',
+        "gitlab",
         gitlabInstanceOrigin(ref.instanceHint),
         ref.projectPath,
         ref.mrIid,
       ]);
-    case 'bitbucket':
-      return JSON.stringify(['bitbucket', ref.workspace, ref.repoSlug, ref.prId]);
+    case "bitbucket":
+      return JSON.stringify([
+        "bitbucket",
+        ref.workspace,
+        ref.repoSlug,
+        ref.prId,
+      ]);
   }
 }
 
@@ -79,11 +84,11 @@ export function providerPrRefKey(ref: ProviderPrRef): string {
  * a hint can never collide with one pinned to the SaaS host.
  */
 export function gitlabInstanceOrigin(instanceHint?: string): string {
-  if (!instanceHint) return '';
+  if (!instanceHint) return "";
   let rest = instanceHint.trim().toLowerCase();
   const scheme = rest.match(/^[a-z][a-z0-9+.-]*:\/\//);
   if (scheme) rest = rest.slice(scheme[0].length);
-  return (rest.split('/')[0] ?? '').split('?')[0] ?? '';
+  return (rest.split("/")[0] ?? "").split("?")[0] ?? "";
 }
 
 /** An author or reviewer identity. `login` is the provider username. */
@@ -93,10 +98,10 @@ export type ProviderPrAuthor = {
 };
 
 /** The lifecycle state every provider maps onto. */
-export type ProviderPrState = 'open' | 'closed' | 'merged';
+export type ProviderPrState = "open" | "closed" | "merged";
 
 /** Which side of a diff a comment or thread anchors to. */
-export type ProviderPrDiffSide = 'LEFT' | 'RIGHT';
+export type ProviderPrDiffSide = "LEFT" | "RIGHT";
 
 /**
  * The diff position one inline review comment anchors to. `line` is the
@@ -112,7 +117,9 @@ export type ProviderReviewInlineAnchor = {
 };
 
 /** One inline comment inside a review submission batch. */
-export type ProviderReviewInlineComment = ProviderReviewInlineAnchor & { body: string };
+export type ProviderReviewInlineComment = ProviderReviewInlineAnchor & {
+  body: string;
+};
 
 /**
  * One PR/MR as the review screen renders it. Field shapes mirror what the
@@ -215,13 +222,13 @@ export type ProviderPrChecksResult = {
  */
 export type ProviderPrMergeBlockedReason = {
   code:
-    | 'conflicts'
-    | 'required_approvals'
-    | 'failing_pipeline'
-    | 'pending_pipeline'
-    | 'draft'
-    | 'permission'
-    | 'other';
+    | "conflicts"
+    | "required_approvals"
+    | "failing_pipeline"
+    | "pending_pipeline"
+    | "draft"
+    | "permission"
+    | "other";
   message: string;
 };
 

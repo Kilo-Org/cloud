@@ -35,10 +35,7 @@ import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
-import {
-  formatPendingCommentBody,
-  useCreateReviewCommentMutation,
-} from '@/lib/pr-review/use-pr-review-mutations';
+import { useCreateReviewCommentMutation } from '@/lib/pr-review/use-pr-review-mutations';
 import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 type CommentComposerMode =
@@ -51,10 +48,10 @@ type PrReviewCommentComposerProps = Readonly<{
   number: number;
   /**
    * The provider ref (s6). Present on the GitLab/Bitbucket surface: the
-   * comment posts through `providerReview.addComment` with the location
-   * anchored in the body, and the durable comment draft key folds the ref
-   * identity so a same-numbered GitHub PR never shares this sheet's draft.
-   * Absent on GitHub, which keeps the exact pre-s6 write path.
+   * comment posts through `providerReview.addComment` with the tapped diff
+   * position as a real anchor (c3), and the durable comment draft key folds
+   * the ref identity so a same-numbered GitHub PR never shares this sheet's
+   * draft. Absent on GitHub, which keeps the exact pre-s6 write path.
    */
   prRef?: ProviderPrRef;
   mode: CommentComposerMode;
@@ -217,11 +214,20 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       return;
     }
     try {
-      // Provider arms post body-only: the inline position rides in the
-      // text, because the provider APIs have no comment position.
+      // Provider arms post the real diff position (c3): the sheet's
+      // path/side/line selection rides the `anchor` the provider router
+      // turns into an inline discussion / inline comment.
       await createComment.mutateAsync(
         prRef
-          ? { body: formatPendingCommentBody({ path, line, startLine, body }) }
+          ? {
+              body,
+              anchor: {
+                path,
+                side,
+                line,
+                ...(startLine !== undefined ? { startLine } : {}),
+              },
+            }
           : {
               owner,
               repo,

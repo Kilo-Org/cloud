@@ -27,6 +27,14 @@ vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
 }));
 
+// The capability banner fades in as conditional content (AGENTS.md); the
+// DOM-free renderer only needs the animated host as a string component.
+vi.mock('react-native-reanimated', () => ({
+  default: { View: 'Animated.View' },
+  FadeIn: { duration: () => ({}) },
+  FadeOut: { duration: () => ({}) },
+}));
+
 vi.mock('@/components/ui/icons', () => ({
   AlertTriangle: 'AlertTriangle',
   GitBranch: 'GitBranch',
@@ -94,6 +102,21 @@ function findButton(renderer: TestRenderer.ReactTestRenderer, label: string) {
   return (button.props as { onPress?: () => void }).onPress;
 }
 
+function findBanner(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(
+    node =>
+      typeof node.type === 'function' &&
+      (node.type as { name?: string }).name === 'PrReviewCapabilityBanner'
+  );
+}
+
+function textsOf(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => String(node.type) === 'Text')
+    .map(node => (node.props as { children?: unknown }).children)
+    .filter((child): child is string => typeof child === 'string');
+}
+
 describe('PrMergeSectionProvider (s6)', () => {
   beforeEach(() => {
     routerPush.mockClear();
@@ -103,24 +126,39 @@ describe('PrMergeSectionProvider (s6)', () => {
     const renderer = await mount(GITLAB_REF, 'open');
     expect(findButtons(renderer, 'Merge merge request')).toBe(1);
     expect(findButtons(renderer, 'Enable auto-merge')).toBe(1);
+    // Happy state: a supported capability renders no banner and no
+    // unavailable copy — the enable CTA is the affordance.
+    expect(findBanner(renderer)).toHaveLength(0);
+    expect(textsOf(renderer)).not.toContain('Auto-merge is not available');
     renderer.unmount();
   });
 
-  it('offers merge with the explicit capability banner on Bitbucket (auto-merge unsupported)', async () => {
+  it('offers merge with the localized capability banner on Bitbucket (auto-merge unsupported)', async () => {
     const renderer = await mount(BITBUCKET_REF, 'open');
     expect(findButtons(renderer, 'Merge pull request')).toBe(1);
+    // Non-retryable unhappy state: the banner explains, and carries no CTA.
     expect(findButtons(renderer, 'Enable auto-merge')).toBe(0);
-    const banner = renderer.root.find(
-      node =>
-        typeof node.type === 'function' &&
-        (node.type as { name?: string }).name === 'PrReviewCapabilityBanner'
-    );
+    const [banner] = findBanner(renderer);
+    // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- guard the one-banner invariant with a readable failure
+    if (!banner) {
+      throw new Error('the Bitbucket arm renders no capability banner');
+    }
     expect(
       (banner.props as { capability: { supported: boolean; reason: string } }).capability
     ).toEqual({
       supported: false,
       reason: 'Bitbucket Cloud does not expose auto-merge in its API',
     });
+    // The section hands catalog copy, not the shared English constant.
+    expect(
+      (banner.props as { title?: string; reason?: string }).title
+    ).toBe('Auto-merge is not available');
+    expect(
+      (banner.props as { title?: string; reason?: string }).reason
+    ).toBe('Bitbucket Cloud does not expose auto-merge in its API');
+    const texts = textsOf(renderer);
+    expect(texts).toContain('Auto-merge is not available');
+    expect(texts).toContain('Bitbucket Cloud does not expose auto-merge in its API');
     renderer.unmount();
   });
 

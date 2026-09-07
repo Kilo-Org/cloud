@@ -9,23 +9,27 @@
  * through the operation ledger without a duplicate effect. `operationKey` is
  * accepted for that ledger; this layer performs no ledger writes itself.
  */
-import 'server-only';
+import "server-only";
 
-import { z } from 'zod';
+import { z } from "zod";
 import type {
   ProviderReviewCapabilities,
   ProviderReviewInlineAnchor,
   ProviderReviewInlineComment,
-} from '@kilocode/app-shared/provider-review';
-import { BITBUCKET_REVIEW_CAPABILITIES } from '@kilocode/app-shared/provider-review';
+} from "@kilocode/app-shared/provider-review";
+import { BITBUCKET_REVIEW_CAPABILITIES } from "@kilocode/app-shared/provider-review";
 import {
   authorizeRepository,
   classifyBitbucketError,
   BitbucketReviewError,
   type BitbucketRepositoryAccess,
   type BitbucketReviewOwner,
-} from './bitbucket-authorization';
-import { fetchPage, requestBitbucketJson, repositoryPathGuard } from './bitbucket-read';
+} from "./bitbucket-authorization";
+import {
+  fetchPage,
+  requestBitbucketJson,
+  repositoryPathGuard,
+} from "./bitbucket-read";
 
 /**
  * The Bitbucket capability list for review surfaces. It reuses the shared
@@ -51,14 +55,14 @@ export const BITBUCKET_REACTIONS_UNSUPPORTED_REASON =
  * Bitbucket Cloud only exposes resolution through comment tasks.
  */
 export const BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON =
-  'Bitbucket Cloud does not expose thread resolution for inline threads without tasks';
+  "Bitbucket Cloud does not expose thread resolution for inline threads without tasks";
 
 /**
  * The stale-head fence reason, shared with classifyBitbucketStatus so a
  * locally detected moved head and a provider 409 read identically on mobile.
  */
 export const BITBUCKET_STALE_HEAD_REASON =
-  'The pull request changed since it was loaded. Reload the pull request and try again.';
+  "The pull request changed since it was loaded. Reload the pull request and try again.";
 
 /** The PR a write acts on. */
 export type BitbucketPrTarget = {
@@ -81,7 +85,7 @@ const BitbucketCurrentUserSchema = z.object({ uuid: z.string().min(1) });
 
 const BitbucketPullRequestWriteSchema = z.object({
   id: z.number(),
-  state: z.enum(['OPEN', 'MERGED', 'DECLINED', 'SUPERSEDED']),
+  state: z.enum(["OPEN", "MERGED", "DECLINED", "SUPERSEDED"]),
   source: z
     .object({
       commit: z
@@ -114,7 +118,9 @@ function prPath(access: BitbucketRepositoryAccess, prId: number): string {
   return `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(access.repository.slug)}/pullrequests/${prId}`;
 }
 
-async function targetAccess(target: BitbucketPrTarget): Promise<BitbucketRepositoryAccess> {
+async function targetAccess(
+  target: BitbucketPrTarget,
+): Promise<BitbucketRepositoryAccess> {
   return authorizeRepository(target.owner, target.workspace, target.repoSlug);
 }
 
@@ -123,9 +129,11 @@ async function targetAccess(target: BitbucketPrTarget): Promise<BitbucketReposit
  * review states against. Resolved from the workspace access token itself, so
  * it is always the identity the provider will act as.
  */
-async function ownAccountId(access: BitbucketRepositoryAccess): Promise<string> {
+async function ownAccountId(
+  access: BitbucketRepositoryAccess,
+): Promise<string> {
   const user = BitbucketCurrentUserSchema.parse(
-    await requestBitbucketJson<unknown>(access, '/2.0/user')
+    await requestBitbucketJson<unknown>(access, "/2.0/user"),
   );
   return user.uuid;
 }
@@ -135,11 +143,13 @@ async function ownAccountId(access: BitbucketRepositoryAccess): Promise<string> 
  * line (`to`), LEFT the source line (`from`); a `startLine` range spans
  * `from: startLine` to `to: line`.
  */
-function buildInlinePosition(anchor: ProviderReviewInlineAnchor): Record<string, unknown> {
+function buildInlinePosition(
+  anchor: ProviderReviewInlineAnchor,
+): Record<string, unknown> {
   if (anchor.startLine !== undefined) {
     return { path: anchor.path, from: anchor.startLine, to: anchor.line };
   }
-  return anchor.side === 'RIGHT'
+  return anchor.side === "RIGHT"
     ? { path: anchor.path, to: anchor.line }
     : { path: anchor.path, from: anchor.line };
 }
@@ -153,17 +163,23 @@ export async function addComment(
   target: BitbucketPrTarget & {
     body: string;
     anchor?: ProviderReviewInlineAnchor;
-  } & BitbucketMutationInput
+  } & BitbucketMutationInput,
 ): Promise<BitbucketMutationResult> {
   const access = await targetAccess(target);
   try {
-    await requestBitbucketJson(access, `${prPath(access, target.prId)}/comments`, {
-      method: 'POST',
-      body: {
-        content: { raw: target.body },
-        ...(target.anchor ? { inline: buildInlinePosition(target.anchor) } : {}),
+    await requestBitbucketJson(
+      access,
+      `${prPath(access, target.prId)}/comments`,
+      {
+        method: "POST",
+        body: {
+          content: { raw: target.body },
+          ...(target.anchor
+            ? { inline: buildInlinePosition(target.anchor) }
+            : {}),
+        },
       },
-    });
+    );
     return { done: true, replayed: false };
   } catch (error) {
     throw classifyBitbucketError(error);
@@ -172,18 +188,28 @@ export async function addComment(
 
 /** Reply inside an existing comment thread. */
 export async function replyToComment(
-  target: BitbucketPrTarget & { commentId: string; body: string } & BitbucketMutationInput
+  target: BitbucketPrTarget & {
+    commentId: string;
+    body: string;
+  } & BitbucketMutationInput,
 ): Promise<BitbucketMutationResult> {
   const parentId = Number(target.commentId);
   if (!Number.isInteger(parentId) || parentId <= 0) {
-    throw new BitbucketReviewError('bad_request', 'The comment to reply to could not be found.');
+    throw new BitbucketReviewError(
+      "bad_request",
+      "The comment to reply to could not be found.",
+    );
   }
   const access = await targetAccess(target);
   try {
-    await requestBitbucketJson(access, `${prPath(access, target.prId)}/comments`, {
-      method: 'POST',
-      body: { content: { raw: target.body }, parent: { id: parentId } },
-    });
+    await requestBitbucketJson(
+      access,
+      `${prPath(access, target.prId)}/comments`,
+      {
+        method: "POST",
+        body: { content: { raw: target.body }, parent: { id: parentId } },
+      },
+    );
     return { done: true, replayed: false };
   } catch (error) {
     throw classifyBitbucketError(error);
@@ -202,42 +228,53 @@ export async function replyToComment(
  */
 export async function submitReview(
   target: BitbucketPrTarget & {
-    event: 'approve' | 'request_changes' | 'comment';
+    event: "approve" | "request_changes" | "comment";
     body?: string;
     comments?: ProviderReviewInlineComment[];
-  } & BitbucketMutationInput
+  } & BitbucketMutationInput,
 ): Promise<BitbucketMutationResult> {
-  if (target.event === 'comment' && !target.body && !target.comments?.length) {
-    throw new BitbucketReviewError('bad_request', 'A comment review needs a body.');
+  if (target.event === "comment" && !target.body && !target.comments?.length) {
+    throw new BitbucketReviewError(
+      "bad_request",
+      "A comment review needs a body.",
+    );
   }
   const access = await targetAccess(target);
   try {
     for (const comment of target.comments ?? []) {
-      await requestBitbucketJson(access, `${prPath(access, target.prId)}/comments`, {
-        method: 'POST',
-        body: {
-          content: { raw: comment.body },
-          inline: buildInlinePosition(comment),
+      await requestBitbucketJson(
+        access,
+        `${prPath(access, target.prId)}/comments`,
+        {
+          method: "POST",
+          body: {
+            content: { raw: comment.body },
+            inline: buildInlinePosition(comment),
+          },
         },
-      });
+      );
     }
     const accountId = await ownAccountId(access);
     const state =
-      target.event === 'approve'
-        ? 'approved'
-        : target.event === 'request_changes'
-          ? 'changes_requested'
+      target.event === "approve"
+        ? "approved"
+        : target.event === "request_changes"
+          ? "changes_requested"
           : null;
     await requestBitbucketJson(
       access,
       `${prPath(access, target.prId)}/participants/${encodeURIComponent(accountId)}`,
-      { method: 'PUT', body: { state } }
+      { method: "PUT", body: { state } },
     );
     if (target.body) {
-      await requestBitbucketJson(access, `${prPath(access, target.prId)}/comments`, {
-        method: 'POST',
-        body: { content: { raw: target.body } },
-      });
+      await requestBitbucketJson(
+        access,
+        `${prPath(access, target.prId)}/comments`,
+        {
+          method: "POST",
+          body: { content: { raw: target.body } },
+        },
+      );
     }
     return { done: true, replayed: false };
   } catch (error) {
@@ -258,7 +295,7 @@ async function findCommentTask(
   access: BitbucketRepositoryAccess,
   prId: number,
   commentId: number,
-  predicate: (task: z.infer<typeof BitbucketTaskWriteSchema>) => boolean
+  predicate: (task: z.infer<typeof BitbucketTaskWriteSchema>) => boolean,
 ): Promise<{
   task: z.infer<typeof BitbucketTaskWriteSchema> | null;
   sawTaskForComment: boolean;
@@ -269,14 +306,18 @@ async function findCommentTask(
   let cursor: string | undefined = undefined;
   let exhausted = true;
   try {
-    for (let pageIndex = 0; pageIndex < MAX_TASK_COLLECTION_PAGES; pageIndex++) {
+    for (
+      let pageIndex = 0;
+      pageIndex < MAX_TASK_COLLECTION_PAGES;
+      pageIndex++
+    ) {
       const page = await fetchPage(
         access,
         `${prPath(access, prId)}/tasks`,
         `bitbucket-tasks:${access.repository.fullName}#${prId}`,
         cursor,
         repositoryPathGuard(access),
-        { pagelen: 100 }
+        { pagelen: 100 },
       );
       for (const value of page.values) {
         const parsed = BitbucketTaskWriteSchema.safeParse(value);
@@ -297,8 +338,11 @@ async function findCommentTask(
       cursor = page.nextCursor;
     }
   } catch (error) {
-    if (error instanceof BitbucketReviewError && error.kind === 'not_found') {
-      throw new BitbucketReviewError('bad_request', BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON);
+    if (error instanceof BitbucketReviewError && error.kind === "not_found") {
+      throw new BitbucketReviewError(
+        "bad_request",
+        BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON,
+      );
     }
     throw error;
   }
@@ -313,11 +357,14 @@ async function findCommentTask(
  * the explicit capability reason — never a silent fallback.
  */
 export async function resolveThread(
-  target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput
+  target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput,
 ): Promise<BitbucketMutationResult> {
   const commentId = Number(target.threadId);
   if (!Number.isInteger(commentId) || commentId <= 0) {
-    throw new BitbucketReviewError('not_found', 'This discussion thread could not be found.');
+    throw new BitbucketReviewError(
+      "not_found",
+      "This discussion thread could not be found.",
+    );
   }
   const access = await targetAccess(target);
   try {
@@ -326,15 +373,15 @@ export async function resolveThread(
     BitbucketCommentWriteSchema.parse(
       await requestBitbucketJson<unknown>(
         access,
-        `${prPath(access, target.prId)}/comments/${commentId}`
-      )
+        `${prPath(access, target.prId)}/comments/${commentId}`,
+      ),
     );
 
     const { task, sawTaskForComment, exhausted } = await findCommentTask(
       access,
       target.prId,
       commentId,
-      candidate => candidate.resolved_on == null
+      (candidate) => candidate.resolved_on == null,
     );
     if (!task) {
       if (!exhausted) {
@@ -342,8 +389,8 @@ export async function resolveThread(
         // the comment's unresolved task: report a retryable failure instead
         // of claiming an unverified state.
         throw new BitbucketReviewError(
-          'retryable',
-          'The Bitbucket task list is too large to resolve this thread. Try again.'
+          "retryable",
+          "The Bitbucket task list is too large to resolve this thread. Try again.",
         );
       }
       if (sawTaskForComment) {
@@ -353,12 +400,19 @@ export async function resolveThread(
       }
       // No task exists for this comment, so the provider exposes no
       // resolution affordance at all.
-      throw new BitbucketReviewError('bad_request', BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON);
+      throw new BitbucketReviewError(
+        "bad_request",
+        BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON,
+      );
     }
-    await requestBitbucketJson(access, `${prPath(access, target.prId)}/tasks/${task.id}`, {
-      method: 'PUT',
-      body: { resolved: true },
-    });
+    await requestBitbucketJson(
+      access,
+      `${prPath(access, target.prId)}/tasks/${task.id}`,
+      {
+        method: "PUT",
+        body: { resolved: true },
+      },
+    );
     return { done: true, replayed: false };
   } catch (error) {
     throw classifyBitbucketError(error);
@@ -372,44 +426,54 @@ export async function resolveThread(
  * refused with the explicit capability reason.
  */
 export async function unresolveThread(
-  target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput
+  target: BitbucketPrTarget & { threadId: string } & BitbucketMutationInput,
 ): Promise<BitbucketMutationResult> {
   const commentId = Number(target.threadId);
   if (!Number.isInteger(commentId) || commentId <= 0) {
-    throw new BitbucketReviewError('not_found', 'This discussion thread could not be found.');
+    throw new BitbucketReviewError(
+      "not_found",
+      "This discussion thread could not be found.",
+    );
   }
   const access = await targetAccess(target);
   try {
     BitbucketCommentWriteSchema.parse(
       await requestBitbucketJson<unknown>(
         access,
-        `${prPath(access, target.prId)}/comments/${commentId}`
-      )
+        `${prPath(access, target.prId)}/comments/${commentId}`,
+      ),
     );
 
     const { task, sawTaskForComment, exhausted } = await findCommentTask(
       access,
       target.prId,
       commentId,
-      candidate => candidate.resolved_on != null
+      (candidate) => candidate.resolved_on != null,
     );
     if (!task) {
       if (!exhausted) {
         throw new BitbucketReviewError(
-          'retryable',
-          'The Bitbucket task list is too large to reopen this thread. Try again.'
+          "retryable",
+          "The Bitbucket task list is too large to reopen this thread. Try again.",
         );
       }
       if (sawTaskForComment) {
         // No task of the comment is resolved: the target state already holds.
         return { done: true, replayed: true };
       }
-      throw new BitbucketReviewError('bad_request', BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON);
+      throw new BitbucketReviewError(
+        "bad_request",
+        BITBUCKET_THREAD_RESOLUTION_UNSUPPORTED_REASON,
+      );
     }
-    await requestBitbucketJson(access, `${prPath(access, target.prId)}/tasks/${task.id}`, {
-      method: 'PUT',
-      body: { resolved: false },
-    });
+    await requestBitbucketJson(
+      access,
+      `${prPath(access, target.prId)}/tasks/${task.id}`,
+      {
+        method: "PUT",
+        body: { resolved: false },
+      },
+    );
     return { done: true, replayed: false };
   } catch (error) {
     throw classifyBitbucketError(error);
@@ -423,11 +487,11 @@ export async function unresolveThread(
  */
 function requireHeadShaFence(
   pr: z.infer<typeof BitbucketPullRequestWriteSchema>,
-  expectedHeadSha: string
+  expectedHeadSha: string,
 ): void {
-  const currentHead = pr.source?.commit?.hash ?? '';
+  const currentHead = pr.source?.commit?.hash ?? "";
   if (currentHead !== expectedHeadSha) {
-    throw new BitbucketReviewError('stale_head', BITBUCKET_STALE_HEAD_REASON);
+    throw new BitbucketReviewError("stale_head", BITBUCKET_STALE_HEAD_REASON);
   }
 }
 
@@ -441,26 +505,31 @@ export async function mergePullRequest(
     expectedHeadSha: string;
     closeSourceBranch?: boolean;
     commitMessage?: string;
-  } & BitbucketMutationInput
+  } & BitbucketMutationInput,
 ): Promise<BitbucketMutationResult> {
   const access = await targetAccess(target);
   try {
     const pr = BitbucketPullRequestWriteSchema.parse(
-      await requestBitbucketJson<unknown>(access, prPath(access, target.prId))
+      await requestBitbucketJson<unknown>(access, prPath(access, target.prId)),
     );
-    if (pr.state === 'MERGED') {
+    if (pr.state === "MERGED") {
       // The target state already holds: report the replay, run no effect.
       return { done: true, replayed: true };
     }
     requireHeadShaFence(pr, target.expectedHeadSha);
-    if (pr.state !== 'OPEN') {
-      throw new BitbucketReviewError('bad_request', 'The pull request is closed.');
+    if (pr.state !== "OPEN") {
+      throw new BitbucketReviewError(
+        "bad_request",
+        "The pull request is closed.",
+      );
     }
     await requestBitbucketJson(access, `${prPath(access, target.prId)}/merge`, {
-      method: 'POST',
+      method: "POST",
       body: {
         close_source_branch: target.closeSourceBranch ?? false,
-        ...(target.commitMessage ? { commit_message: target.commitMessage } : {}),
+        ...(target.commitMessage
+          ? { commit_message: target.commitMessage }
+          : {}),
       },
     });
     return { done: true, replayed: false };

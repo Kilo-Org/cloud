@@ -55,7 +55,7 @@ import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
 import {
-  buildProviderSubmitBody,
+  buildProviderSubmitInput,
   type ProviderReviewEventOption,
   useSubmitReviewMutation,
 } from '@/lib/pr-review/use-pr-review-mutations';
@@ -159,9 +159,10 @@ type PrReviewSubmitProps = Readonly<{
   eyebrow: string;
   /**
    * The provider ref (s6). Present on the GitLab/Bitbucket surface: the
-   * submit posts one `providerReview.submitReview` event with the pending
-   * comments folded into the body, and the pending-comment edit route is
-   * the ref's own. Absent on GitHub, which keeps the exact pre-s6 path.
+   * submit posts one `providerReview.submitReview` event whose fresh pending
+   * comments ride the real inline `comments` batch (c3), and the
+   * pending-comment edit route is the ref's own. Absent on GitHub, which
+   * keeps the exact pre-s6 path.
    */
   prRef?: ProviderPrRef;
   /**
@@ -291,13 +292,17 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     }
     try {
       const body = bodyRef.current.trim();
-      // Provider arms post one event; the summary and every fresh pending
-      // comment fold into the body (the provider event has no batch).
+      // Provider arms post one event with a real inline batch (c3): every
+      // fresh pending comment rides `comments` anchored at its tapped diff
+      // position, and the summary stays the review body. An item without an
+      // anchor keeps the text-anchored body fallback.
+      const provider = buildProviderSubmitInput(body, fresh);
       await submitReview.mutateAsync(
         prRef
           ? {
               event: EVENT_TO_PROVIDER[event],
-              body: buildProviderSubmitBody(body, fresh),
+              ...(provider.body.length > 0 ? { body: provider.body } : {}),
+              ...(provider.comments.length > 0 ? { comments: provider.comments } : {}),
             }
           : buildSubmitReviewInput({
               owner,

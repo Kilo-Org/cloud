@@ -27,6 +27,40 @@ vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
     isPending: false,
     error: submitMutationMock.error,
   }),
+  // Mirrors the real mapper (pure field routing, tested in
+  // use-pr-review-mutations.test.ts): anchored items ride the `comments`
+  // batch, an item without a side keeps the text-anchored body fallback.
+  buildProviderSubmitInput: (
+    summary: string,
+    items: readonly {
+      path: string;
+      side?: 'LEFT' | 'RIGHT';
+      line: number;
+      startLine?: number;
+      body: string;
+    }[]
+  ) => {
+    const comments: {
+      path: string;
+      side: 'LEFT' | 'RIGHT';
+      line: number;
+      startLine?: number;
+      body: string;
+    }[] = [];
+    const folded: string[] = [];
+    for (const item of items) {
+      if (item.side === undefined) {
+        folded.push(`${item.path}:L${item.line}\n\n${item.body}`);
+      } else {
+        const { path, side, line, startLine, body } = item;
+        comments.push({ path, side, line, startLine, body });
+      }
+    }
+    return {
+      body: [summary.trim(), ...folded].filter(part => part.length > 0).join('\n\n'),
+      comments,
+    };
+  },
 }));
 
 const footerPreferenceMock = vi.hoisted(() => ({
@@ -318,6 +352,96 @@ describe('PrReviewSubmit footer preference', () => {
     // No prefilled footer and no queued comments: the comment review is
     // blocked, so the submit button is disabled.
     expect(findSubmitButton(renderer).disabled).toBe(true);
+  });
+});
+
+// ── c3: provider arm submits anchored comments ───────────────────────
+
+describe('PrReviewSubmit provider arm (c3)', () => {
+  const ITEM_FRESH_RANGE: PendingReviewItem = {
+    id: 'fresh-r',
+    path: 'src/r.ts',
+    side: 'LEFT',
+    line: 8,
+    startLine: 5,
+    body: 'R',
+    commitSha: 'head-1',
+  };
+
+  it('submits fresh pending items as a real anchored comments batch', async () => {
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_A);
+      addCommentFn?.(ITEM_FRESH_B);
+      addCommentFn?.(ITEM_STALE);
+    });
+    act(() => {
+      submitOnPress(renderer)();
+    });
+    await flush();
+
+    // The tapped positions ride the `comments` batch (event + items, no
+    // summary typed); stale items are never sent and stay queued.
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      comments: [
+        { path: 'src/a.ts', side: 'RIGHT', line: 1, body: 'A' },
+        { path: 'src/b.ts', side: 'RIGHT', line: 2, body: 'B' },
+      ],
+    });
+    expect(latestItems.map(item => item.id)).toEqual(['stale-c']);
+  });
+
+  it('carries a multi-line range into the comment item', async () => {
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_RANGE);
+    });
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      comments: [{ path: 'src/r.ts', side: 'LEFT', line: 8, startLine: 5, body: 'R' }],
+    });
+  });
+
+  it('posts the summary alone when nothing is queued (empty state, no comments key)', async () => {
+    footerPreferenceMock.prReviewFooter = true;
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      body: '---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
+    });
+  });
+
+  it('keeps the summary as the review body beside the anchored batch', async () => {
+    footerPreferenceMock.prReviewFooter = true;
+    const renderer = mount(GITLAB_REF);
+
+    act(() => {
+      addCommentFn?.(ITEM_FRESH_A);
+    });
+    act(() => {
+      submitOnPress(renderer, 'Submit review')();
+    });
+    await flush();
+
+    expect(submitMutationMock.mutateAsync).toHaveBeenCalledWith({
+      event: 'comment',
+      body: '---\nReviewed via the [Kilo iOS app](https://apps.apple.com/app/id6761193135)',
+      comments: [{ path: 'src/a.ts', side: 'RIGHT', line: 1, body: 'A' }],
+    });
   });
 });
 

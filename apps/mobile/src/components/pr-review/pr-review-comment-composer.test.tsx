@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the composer suite covers the draft clear rules and the provider-arm anchored post in one cohesive file */
 // Clear-rule coverage for the comment composer's durable draft. The composer
 // clears its draft on three committed outcomes — comment post, add-to-review,
 // and a confirmed discard — and keeps it on a dismissed-without-confirmation
@@ -154,18 +155,6 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
 }));
 
 vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
-  formatPendingCommentBody: (item: {
-    path: string;
-    line: number;
-    startLine?: number;
-    body: string;
-  }) => {
-    const location =
-      item.startLine !== undefined && item.startLine !== item.line
-        ? `${item.path}:L${item.startLine}–L${item.line}`
-        : `${item.path}:L${item.line}`;
-    return `${location}\n\n${item.body}`;
-  },
   useCreateReviewCommentMutation: () => ({
     mutateAsync: createCommentMocks.mutateAsync,
     isPending: createCommentMocks.isPending,
@@ -269,6 +258,18 @@ describe('PrReviewCommentComposer draft clear rules', () => {
     footerProp(element, 'onCommentNow')?.();
     await flushMicrotasks();
 
+    // The GitHub arm keeps its exact pre-s6 variables: the position rides
+    // the flat input fields, never the provider `anchor` shape (c3).
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 1,
+      body: 'hello',
+      path: 'src/a.ts',
+      line: 10,
+      side: 'RIGHT',
+      commitSha: 'a'.repeat(40),
+    });
     expect(clearDraft).toHaveBeenCalledWith('u1', 'pr-comment:key');
   });
 
@@ -303,7 +304,7 @@ describe('PrReviewCommentComposer draft clear rules', () => {
 
 describe('PrReviewCommentComposer provider arm (s6)', () => {
   // A GitLab MR with the same owner/repo/number triple as the GitHub
-  // fixtures: the folded draft key and the body-only post must differ from
+  // fixtures: the folded draft key and the anchored post must differ from
   // the GitHub arm in both bytes.
   const gitlabRef = { platform: 'gitlab' as const, projectPath: 'octocat/hello', mrIid: 1 };
   const providerProps = { ...baseProps, prRef: gitlabRef };
@@ -320,7 +321,7 @@ describe('PrReviewCommentComposer provider arm (s6)', () => {
     vi.clearAllMocks();
   });
 
-  it('posts body-only through the provider arm, with the location anchored in the text', async () => {
+  it('posts the tapped diff position as the real anchor through the provider arm (c3)', async () => {
     createCommentMocks.mutateAsync.mockResolvedValueOnce({});
     const element = mountProviderComposer();
     typeBody(element, 'hello');
@@ -328,7 +329,25 @@ describe('PrReviewCommentComposer provider arm (s6)', () => {
     await flushMicrotasks();
 
     expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
-      body: 'src/a.ts:L10\n\nhello',
+      body: 'hello',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 10 },
+    });
+  });
+
+  it('carries a multi-line range into the anchor (c3)', async () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    // eslint-disable-next-line new-cap
+    const element = PrReviewCommentComposer({
+      ...providerProps,
+      startLine: 8,
+    });
+    typeBody(element, 'hello');
+    footerProp(element, 'onCommentNow')?.();
+    await flushMicrotasks();
+
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      body: 'hello',
+      anchor: { path: 'src/a.ts', side: 'RIGHT', line: 10, startLine: 8 },
     });
   });
 

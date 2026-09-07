@@ -16,12 +16,12 @@
 // uses the LATEST head SHA (per the S3 contract) regardless of what
 // SHA each item was queued under; a per-item 422 surfaces inline.
 //
-// Provider arms (s6): a GitLab MR or Bitbucket PR posts through
-// `providerReview.addComment` / `providerReview.submitReview`. Those
-// procedures carry NO inline position and NO comment batch — the
-// provider APIs have none — so the composer anchors the position in
-// the body text and the submit sheet folds the queued comments into
-// the review summary (see `formatPendingCommentBody`). The GitHub arms
+// Provider arms (s6, anchored by c3): a GitLab MR or Bitbucket PR posts
+// through `providerReview.addComment` / `providerReview.submitReview` with
+// the REAL diff position (`anchor: { path, side, line, startLine? }`) and a
+// real `comments` batch, so an inline comment lands on the line the user
+// tapped. `formatPendingCommentBody` stays as the no-anchor fallback: a
+// position-less body keeps the `path:L10–L20` text anchor. The GitHub arms
 // stay byte-identical: same procedures, same inputs, same fingerprints.
 //
 // P1-A-08c: both hooks hoist one operation key per intent, so retries of the
@@ -181,15 +181,26 @@ type CreateReviewCommentInput = RouterInputs['githubPrReview']['createReviewComm
 export type SubmitReviewInput = RouterInputs['githubPrReview']['submitReview'];
 export type SubmitReviewComment = NonNullable<SubmitReviewInput['comments']>[number];
 
-/** The provider arms accept a body only — no inline position, no batch. */
-type ProviderCommentBody = { body: string };
+/**
+ * The real diff position a provider comment anchors to (c3): the line the
+ * user tapped, with `startLine` marking the first line of a multi-line
+ * range ending at `line`. Absent, the comment is a top-level note.
+ */
+export type ProviderCommentAnchor = {
+  path: string;
+  side: 'LEFT' | 'RIGHT';
+  line: number;
+  startLine?: number;
+};
+
+/** The provider arms accept a body plus the optional real diff anchor. */
+type ProviderCommentBody = { body: string; anchor?: ProviderCommentAnchor };
 export type CreateReviewCommentVars = CreateReviewCommentInput | ProviderCommentBody;
 
 /**
- * The body a provider comment carries: GitLab and Bitbucket have no inline
- * comment position, so the composer (direct post) and the submit sheet
- * (pending comments folded into the review summary) anchor the location in
- * the text itself, in the same `path:L10–L20` format the pending list shows.
+ * The no-anchor fallback body: when the composer has no real diff position,
+ * the location rides in the text itself, in the same `path:L10–L20` format
+ * the pending list shows.
  */
 export function formatPendingCommentBody(item: {
   path: string;
@@ -204,24 +215,41 @@ export function formatPendingCommentBody(item: {
   return `${location}\n\n${item.body}`;
 }
 
+/** One anchored item in a provider `submitReview` batch (c3). */
+export type ProviderSubmitReviewComment = ProviderCommentAnchor & { body: string };
+
 /**
- * The body a provider `submitReview` carries: the summary, then every fresh
- * pending comment anchored in the text (the provider event has no comment
- * batch). Empty parts are dropped, so an approve with a summary alone posts
- * exactly the summary and an approve with neither posts nothing.
+ * The provider `submitReview` intent the submit sheet builds: every pending
+ * item with a side rides the real `comments` batch; an item without one
+ * keeps the text-anchored body (the no-anchor fallback). Empty body parts
+ * are dropped, so an approve with a summary alone posts exactly the summary
+ * and an approve with neither posts nothing. Comment items keep the router's
+ * field order (path, side, line, startLine, body): the server hashes the
+ * parsed batch into the `submit_review` fingerprint, and a key drift rotates
+ * the dedupe identity.
  */
-export function buildProviderSubmitBody(
+export function buildProviderSubmitInput(
   summary: string,
   items: readonly {
     path: string;
+    side?: 'LEFT' | 'RIGHT';
     line: number;
     startLine?: number;
     body: string;
   }[]
-): string {
-  return [summary.trim(), ...items.map(item => formatPendingCommentBody(item))]
-    .filter(part => part.length > 0)
-    .join('\n\n');
+) {
+  const comments: ProviderSubmitReviewComment[] = [];
+  const folded: string[] = [];
+  for (const item of items) {
+    if (item.side === undefined) {
+      folded.push(formatPendingCommentBody(item));
+    } else {
+      const { path, side, line, startLine, body } = item;
+      comments.push({ path, side, line, ...(startLine !== undefined ? { startLine } : {}), body });
+    }
+  }
+  const body = [summary.trim(), ...folded].filter(part => part.length > 0).join('\n\n');
+  return { body, comments };
 }
 
 /** The events the `providerReview.submitReview` input accepts. */
@@ -229,6 +257,7 @@ export type ProviderReviewEventOption = 'approve' | 'request_changes' | 'comment
 type ProviderSubmitReviewVars = {
   event: ProviderReviewEventOption;
   body?: string;
+  comments?: ProviderSubmitReviewComment[];
 };
 export type SubmitReviewVars = SubmitReviewInput | ProviderSubmitReviewVars;
 
@@ -251,16 +280,26 @@ export function useCreateReviewCommentMutation(ref: ReviewWriteRef) {
           return result;
         }
         const vars = input as ProviderCommentBody;
-        const result = await trpcClient.providerReview.addComment.mutate({
+        // The anchor rides the input AND the fingerprint: path/line/side/
+        // startLine are s1 create_review_comment fields, so a retried
+        // anchored comment dedupes and a moved position starts a fresh
+        // intent. The anchor keys are exactly the fingerprint field names,
+        // so the spread folds them FLAT the way the server's
+        // gitlabFingerprintInput / bitbucketFingerprintInput does. Hoisted
+        // off the call so the extra fields compile against the router input
+        // type the client is typed against (provider-review-router.ts).
+        const addCommentInput = {
           ...providerWriteIdentity(scope),
           body: vars.body,
+          ...(vars.anchor ? { anchor: vars.anchor } : {}),
           operationKey: getKey(
             prIntentFingerprint(
               'create_review_comment',
-              providerFingerprintInput(scope.ref, { body: vars.body })
+              providerFingerprintInput(scope.ref, { body: vars.body, ...vars.anchor })
             )
           ),
-        });
+        };
+        const result = await trpcClient.providerReview.addComment.mutate(addCommentInput);
         rotateKey();
         return result;
       } catch (error) {
@@ -304,17 +343,26 @@ export function useSubmitReviewMutation(ref: ReviewWriteRef) {
           return result;
         }
         const vars = input as ProviderSubmitReviewVars;
-        const result = await trpcClient.providerReview.submitReview.mutate({
+        // An empty batch is no batch: the key and the input omit `comments`
+        // together, so an event-only review keeps its pre-c3 bytes. The
+        // batch rides the fingerprint exactly as the server folds the parsed
+        // `comments` into the submit_review fingerprint. Hoisted off the
+        // call so the batch compiles against the router input type the
+        // client is typed against (provider-review-router.ts).
+        const comments = vars.comments?.length ? vars.comments : undefined;
+        const submitReviewInput = {
           ...providerWriteIdentity(scope),
           event: vars.event,
           ...(vars.body !== undefined && vars.body.length > 0 ? { body: vars.body } : {}),
+          ...(comments ? { comments } : {}),
           operationKey: getKey(
             prIntentFingerprint(
               'submit_review',
-              providerFingerprintInput(scope.ref, { event: vars.event, body: vars.body })
+              providerFingerprintInput(scope.ref, { event: vars.event, body: vars.body, comments })
             )
           ),
-        });
+        };
+        const result = await trpcClient.providerReview.submitReview.mutate(submitReviewInput);
         rotateKey();
         return result;
       } catch (error) {

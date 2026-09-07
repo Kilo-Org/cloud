@@ -1021,10 +1021,10 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
       id: 'other',
       transactionId: 'other-order',
     });
-    const completePlayPurchase = vi.fn(async ({ purchaseToken }) => {
-      if (purchaseToken === 'other-token') throw new Error('google_play_account_token_mismatch');
-      return { alreadyProcessed: true };
-    });
+    const completePlayPurchase = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('google_play_account_token_mismatch'))
+      .mockResolvedValue({ alreadyProcessed: true });
     const finishTransaction = vi.fn();
     const invalidateAfterCompletion = vi.fn();
     const actions = createActions({

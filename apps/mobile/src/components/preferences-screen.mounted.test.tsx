@@ -8,8 +8,21 @@ import { PreferencesScreen } from '@/components/preferences-screen';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { renderWithProviders } from '@/test/render-with-providers';
 
+vi.hoisted(() => {
+  vi.stubGlobal('__DEV__', false);
+});
 const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+// The screen mounts the feature-flag debug surface, which reads PostHog flag
+// statuses; seed an empty registry so the section stays out of these tests'
+// snapshots. The debug surface itself is covered in
+// preferences-screen.feature-flags.mounted.test.tsx.
+const posthog = vi.hoisted(() => ({
+  statuses: [] as Record<string, unknown>[],
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  useFeatureFlagStatuses: () => posthog.statuses,
+}));
 const native = vi.hoisted(() => ({
   hasHardwareAsync: vi.fn(),
   isEnrolledAsync: vi.fn(),
@@ -137,7 +150,9 @@ async function mountPreferences(raw: string | null = null): Promise<ReactTestRen
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', false);
   vi.resetAllMocks();
+  posthog.statuses = [];
   storage.setItemAsync.mockImplementation(async (_key: string, value: string) => {
     await Promise.resolve();
     storage.value = value;

@@ -283,20 +283,18 @@ describe('processGooglePlayKiloPassNotification', () => {
       });
       await processGooglePlayKiloPassNotification({
         pubsubMessage: {
-          message: {
-            messageId: crypto.randomUUID(),
-            data: Buffer.from(
-              JSON.stringify({
-                packageName: 'com.kilocode.kiloapp',
-                voidedPurchaseNotification: {
-                  purchaseToken: oldToken,
-                  orderId: oldOrder,
-                  productType: 1,
-                  refundType: 1,
-                },
-              })
-            ).toString('base64'),
-          },
+          messageId: crypto.randomUUID(),
+          data: Buffer.from(
+            JSON.stringify({
+              packageName: 'com.kilocode.kiloapp',
+              voidedPurchaseNotification: {
+                purchaseToken: oldToken,
+                orderId: oldOrder,
+                productType: 1,
+                refundType: 1,
+              },
+            })
+          ).toString('base64'),
         },
       });
       const refunded = await db.query.kilocode_users.findFirst({

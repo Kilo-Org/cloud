@@ -12,7 +12,11 @@
  */
 import 'server-only';
 
-import type { ProviderReviewCapabilities } from '@kilocode/app-shared/provider-review';
+import type {
+  ProviderReviewCapabilities,
+  ProviderReviewInlineAnchor,
+  ProviderReviewInlineComment,
+} from '@kilocode/app-shared/provider-review';
 import {
   createMRNote,
   fetchGitLabMergeRequest,
@@ -121,19 +125,101 @@ function mrPath(access: GitLabProjectAccess, mrIid: number): string {
   return `/api/v4/projects/${encodeURIComponent(access.projectPath)}/merge_requests/${mrIid}`;
 }
 
-/** Post a top-level comment (project note) on the merge request. */
+/**
+ * The MR's diff refs, fetched server-side through the authorized access. A
+ * diff discussion positions against base/start/head, so an anchored comment
+ * can only be built from the revision the provider reports right now.
+ */
+type GitLabDiffRefs = { base_sha: string; head_sha: string; start_sha: string };
+
+async function fetchMrDiffRefs(
+  access: GitLabProjectAccess,
+  mrIid: number
+): Promise<GitLabDiffRefs> {
+  const mr = (await fetchGitLabMergeRequest({
+    accessToken: access.accessToken,
+    projectId: access.projectPath,
+    mrIid,
+    instanceUrl: access.instanceUrl,
+  })) as GitLabMergeRequestDetail;
+  const refs = mr.diff_refs;
+  if (!refs?.base_sha || !refs.head_sha || !refs.start_sha) {
+    throw new GitLabReviewError(
+      'bad_request',
+      'The merge request has no diff positions to anchor a comment to.'
+    );
+  }
+  return refs;
+}
+
+/**
+ * The GitLab text position for one anchor: the current diff refs plus the
+ * anchored path/line. RIGHT anchors the new side (`new_line`), LEFT the old
+ * side (`old_line`); a `startLine` range adds `old_line` to a RIGHT anchor.
+ */
+function buildTextPosition(
+  refs: GitLabDiffRefs,
+  anchor: ProviderReviewInlineAnchor
+): Record<string, unknown> {
+  const position: Record<string, unknown> = {
+    position_type: 'text',
+    base_sha: refs.base_sha,
+    start_sha: refs.start_sha,
+    head_sha: refs.head_sha,
+    new_path: anchor.path,
+    old_path: anchor.path,
+  };
+  if (anchor.side === 'RIGHT') {
+    position.new_line = anchor.line;
+    if (anchor.startLine !== undefined) position.old_line = anchor.startLine;
+  } else {
+    position.old_line = anchor.line;
+  }
+  return position;
+}
+
+/**
+ * Create one diff discussion per anchored comment on the merge request.
+ * GitLab rejects a position outside the diff (400), which classifyGitLabError
+ * surfaces as a non-retryable bad_request through the existing taxonomy.
+ */
+async function createInlineDiscussions(
+  access: GitLabProjectAccess,
+  mrIid: number,
+  anchored: Array<{ anchor: ProviderReviewInlineAnchor; body: string }>
+): Promise<void> {
+  const refs = await fetchMrDiffRefs(access, mrIid);
+  for (const item of anchored) {
+    await requestGitLabJson(access, `${mrPath(access, mrIid)}/discussions`, {
+      method: 'POST',
+      body: { body: item.body, position: buildTextPosition(refs, item.anchor) },
+    });
+  }
+}
+
+/**
+ * Post a comment on the merge request. With an `anchor` this creates a real
+ * diff discussion positioned in the MR's current diff; without one it posts
+ * a top-level project note, byte-identical to the previous behavior.
+ */
 export async function addComment(
-  target: GitLabMrTarget & { body: string } & GitLabMutationInput
+  target: GitLabMrTarget & { body: string; anchor?: ProviderReviewInlineAnchor } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
-    await createMRNote(
-      access.accessToken,
-      access.projectPath,
-      target.mrIid,
-      target.body,
-      access.instanceUrl
-    );
+    if (target.anchor) {
+      await createInlineDiscussions(access, target.mrIid, [
+        { anchor: target.anchor, body: target.body },
+      ]);
+    } else {
+      await createMRNote(
+        access.accessToken,
+        access.projectPath,
+        target.mrIid,
+        target.body,
+        access.instanceUrl
+      );
+    }
     return { done: true, replayed: false };
   } catch (error) {
     throw classifyGitLabError(error);
@@ -160,12 +246,17 @@ export async function replyToDiscussion(
 /**
  * Submit a review. `approve` → POST /approve plus an optional summary note;
  * `comment` → note; `request_changes` is not a GitLab concept and is refused
- * with the exact reason — never a silent fallback to another event.
+ * with the exact reason — never a silent fallback to another event. An
+ * optional `comments` batch posts real inline diff discussions BEFORE the
+ * approval/summary note, so a review carries GitHub-parity inline threads; a
+ * mid-batch failure throws the classified error and the router's
+ * reconcile-ambiguous handling keeps the ledger from replaying a duplicate.
  */
 export async function submitReview(
   target: GitLabMrTarget & {
     event: 'approve' | 'comment' | 'request_changes';
     body?: string;
+    comments?: ProviderReviewInlineComment[];
   } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   if (target.event === 'request_changes') {
@@ -173,6 +264,13 @@ export async function submitReview(
   }
   const access = await targetAccess(target);
   try {
+    if (target.comments?.length) {
+      await createInlineDiscussions(
+        access,
+        target.mrIid,
+        target.comments.map(comment => ({ anchor: comment, body: comment.body }))
+      );
+    }
     if (target.event === 'approve') {
       await requestGitLabJson(access, `${mrPath(access, target.mrIid)}/approve`, {
         method: 'POST',
@@ -194,7 +292,7 @@ export async function submitReview(
         target.body,
         access.instanceUrl
       );
-    } else {
+    } else if (!target.comments?.length) {
       throw new GitLabReviewError('bad_request', 'A comment review needs a body.');
     }
     return { done: true, replayed: false };

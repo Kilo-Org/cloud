@@ -99,6 +99,22 @@ export type ProviderPrState = 'open' | 'closed' | 'merged';
 export type ProviderPrDiffSide = 'LEFT' | 'RIGHT';
 
 /**
+ * The diff position one inline review comment anchors to. `line` is the
+ * anchor line on `side`; `startLine` marks the first line of a multi-line
+ * range (GitHub parity: GitLab diff discussions and Bitbucket inline
+ * comments both accept this shape).
+ */
+export type ProviderReviewInlineAnchor = {
+  path: string;
+  side: ProviderPrDiffSide;
+  line: number;
+  startLine?: number;
+};
+
+/** One inline comment inside a review submission batch. */
+export type ProviderReviewInlineComment = ProviderReviewInlineAnchor & { body: string };
+
+/**
  * One PR/MR as the review screen renders it. Field shapes mirror what the
  * mobile tree consumes today from `githubPrReview` (title, author, state,
  * head/target refs, headSha, changedFiles, additions, deletions, body,

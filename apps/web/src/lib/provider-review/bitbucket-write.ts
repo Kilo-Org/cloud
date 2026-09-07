@@ -12,7 +12,11 @@
 import 'server-only';
 
 import { z } from 'zod';
-import type { ProviderReviewCapabilities } from '@kilocode/app-shared/provider-review';
+import type {
+  ProviderReviewCapabilities,
+  ProviderReviewInlineAnchor,
+  ProviderReviewInlineComment,
+} from '@kilocode/app-shared/provider-review';
 import { BITBUCKET_REVIEW_CAPABILITIES } from '@kilocode/app-shared/provider-review';
 import {
   authorizeRepository,
@@ -126,15 +130,39 @@ async function ownAccountId(access: BitbucketRepositoryAccess): Promise<string> 
   return user.uuid;
 }
 
-/** Post a top-level comment on the pull request. */
+/**
+ * The Bitbucket `inline` block for one anchor: RIGHT anchors the destination
+ * line (`to`), LEFT the source line (`from`); a `startLine` range spans
+ * `from: startLine` to `to: line`.
+ */
+function buildInlinePosition(anchor: ProviderReviewInlineAnchor): Record<string, unknown> {
+  if (anchor.startLine !== undefined) {
+    return { path: anchor.path, from: anchor.startLine, to: anchor.line };
+  }
+  return anchor.side === 'RIGHT'
+    ? { path: anchor.path, to: anchor.line }
+    : { path: anchor.path, from: anchor.line };
+}
+
+/**
+ * Post a comment on the pull request. With an `anchor` this creates a real
+ * inline comment on the diff position; without one it posts a top-level
+ * comment, byte-identical to the previous behavior.
+ */
 export async function addComment(
-  target: BitbucketPrTarget & { body: string } & BitbucketMutationInput
+  target: BitbucketPrTarget & {
+    body: string;
+    anchor?: ProviderReviewInlineAnchor;
+  } & BitbucketMutationInput
 ): Promise<BitbucketMutationResult> {
   const access = await targetAccess(target);
   try {
     await requestBitbucketJson(access, `${prPath(access, target.prId)}/comments`, {
       method: 'POST',
-      body: { content: { raw: target.body } },
+      body: {
+        content: { raw: target.body },
+        ...(target.anchor ? { inline: buildInlinePosition(target.anchor) } : {}),
+      },
     });
     return { done: true, replayed: false };
   } catch (error) {
@@ -166,19 +194,33 @@ export async function replyToComment(
  * Submit a review. `approve` → PUT participants/{account_id} with
  * `state: 'approved'`; `request_changes` → `state: 'changes_requested'`;
  * `comment` → clear the caller's own approval state. An optional body is
- * posted as a comment alongside the review state.
+ * posted as a comment alongside the review state. An optional `comments`
+ * batch posts real inline comments on the diff BEFORE the review state and
+ * the summary comment, so a review carries GitHub-parity inline threads; a
+ * mid-batch failure throws the classified error and the router's
+ * reconcile-ambiguous handling keeps the ledger from replaying a duplicate.
  */
 export async function submitReview(
   target: BitbucketPrTarget & {
     event: 'approve' | 'request_changes' | 'comment';
     body?: string;
+    comments?: ProviderReviewInlineComment[];
   } & BitbucketMutationInput
 ): Promise<BitbucketMutationResult> {
-  if (target.event === 'comment' && !target.body) {
+  if (target.event === 'comment' && !target.body && !target.comments?.length) {
     throw new BitbucketReviewError('bad_request', 'A comment review needs a body.');
   }
   const access = await targetAccess(target);
   try {
+    for (const comment of target.comments ?? []) {
+      await requestBitbucketJson(access, `${prPath(access, target.prId)}/comments`, {
+        method: 'POST',
+        body: {
+          content: { raw: comment.body },
+          inline: buildInlinePosition(comment),
+        },
+      });
+    }
     const accountId = await ownAccountId(access);
     const state =
       target.event === 'approve'

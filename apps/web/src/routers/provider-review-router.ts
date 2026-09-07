@@ -92,6 +92,31 @@ const pageCursor = z.string().min(1).max(2048).optional();
 // becomes retry-safe; when absent, the write runs unledgered (older clients).
 const operationKeySchema = z.string().min(1).max(128).optional();
 
+// The diff position an inline comment anchors to — the same shape the
+// GitHub createReviewComment input carries (minus startSide/commitSha, which
+// GitLab positions and Bitbucket inline blocks do not use). A `startLine`
+// marks the first line of a multi-line range ending at `line`.
+const inlineAnchorShape = {
+  path: z.string().min(1).max(1024),
+  side: z.enum(['LEFT', 'RIGHT']),
+  line: z.number().int().positive(),
+  startLine: z.number().int().positive().optional(),
+};
+const startLineOrderIssue = {
+  message: 'startLine must be <= line',
+  path: ['startLine'],
+} as const;
+
+const providerInlineAnchorInput = z
+  .object(inlineAnchorShape)
+  .strict()
+  .refine(value => value.startLine === undefined || value.startLine <= value.line, startLineOrderIssue);
+
+const providerInlineCommentInput = z
+  .object({ ...inlineAnchorShape, body: z.string().min(1).max(65_535) })
+  .strict()
+  .refine(value => value.startLine === undefined || value.startLine <= value.line, startLineOrderIssue);
+
 const gitlabIdentityShape = {
   platform: z.literal('gitlab'),
   organizationId: z.uuid().optional(),
@@ -176,6 +201,12 @@ const GetFileLinesInput = providerRefInput({
 
 const AddCommentInput = providerRefInput({
   body: z.string().min(1).max(65_535),
+  // An optional diff anchor turns the comment into a real inline discussion
+  // (GitLab) / inline comment (Bitbucket); without it the write stays a
+  // top-level note. s1's create_review_comment fingerprint already folds
+  // path/line/side/startLine, so an anchored and an unanchored comment can
+  // never share a ledger key.
+  anchor: providerInlineAnchorInput.optional(),
   operationKey: operationKeySchema,
 });
 
@@ -203,6 +234,10 @@ const ReplyToCommentInput = z.discriminatedUnion('platform', [
 const SubmitReviewInput = providerRefInput({
   event: z.enum(['approve', 'request_changes', 'comment']),
   body: z.string().min(1).max(65_535).optional(),
+  // The inline batch a review submits BEFORE the summary note/approval. s1's
+  // submit_review fingerprint already folds `comments`, so a review with a
+  // different batch can never replay under the same key.
+  comments: z.array(providerInlineCommentInput).max(100).optional(),
   operationKey: operationKeySchema,
 });
 

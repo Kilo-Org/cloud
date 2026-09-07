@@ -298,7 +298,8 @@ describe('processGooglePlayKiloPassNotification', () => {
 
   it('sets cancel_at_period_end for a canceled notification', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
-    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));
+    const orderId = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId, orderId));
 
     await processGooglePlayKiloPassNotification({
       pubsubMessage: pubsubMessage({
@@ -309,7 +310,7 @@ describe('processGooglePlayKiloPassNotification', () => {
     });
 
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
-      apiDataForUser(obfsAccountId, undefined, {
+      apiDataForUser(obfsAccountId, orderId, {
         subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
       })
     );
@@ -334,37 +335,48 @@ describe('processGooglePlayKiloPassNotification', () => {
     expect(subscription?.status).toBe('active');
   });
 
-  it('ignores a stale cancellation when Play reports the subscription as active', async () => {
-    const { obfsAccountId } = await insertGooglePlayUser();
-    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));
+  it.each(['SUBSCRIPTION_STATE_ACTIVE', 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD'])(
+    'reconciles stale cancellation against current state %s',
+    async subscriptionState => {
+      const { obfsAccountId } = await insertGooglePlayUser();
+      const orderId = crypto.randomUUID();
+      const token = crypto.randomUUID();
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId)
+      );
 
-    await processGooglePlayKiloPassNotification({
-      pubsubMessage: pubsubMessage({
-        notificationType: 4,
-        purchaseToken: 'purchase-token-cancel-stale',
-        messageId: 'cancel-stale-initial',
-      }),
-    });
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({
+          notificationType: 4,
+          purchaseToken: token,
+          messageId: crypto.randomUUID(),
+        }),
+      });
 
-    const result = await processGooglePlayKiloPassNotification({
-      pubsubMessage: pubsubMessage({
-        notificationType: 3,
-        purchaseToken: 'purchase-token-cancel-stale',
-        messageId: 'cancel-stale-1',
-      }),
-    });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId, { subscriptionState })
+      );
 
-    expect(result).toEqual({ processed: true });
+      const result = await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({
+          notificationType: 3,
+          purchaseToken: token,
+          messageId: crypto.randomUUID(),
+        }),
+      });
 
-    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
-      where: and(
-        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
-        eq(kilo_pass_subscriptions.provider_subscription_id, 'purchase-token-cancel-stale')
-      ),
-    });
-    expect(subscription?.cancel_at_period_end).toBe(false);
-    expect(subscription?.status).toBe('active');
-  });
+      expect(result).toEqual({ processed: true });
+
+      const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+        where: and(
+          eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
+          eq(kilo_pass_subscriptions.provider_subscription_id, token)
+        ),
+      });
+      expect(subscription?.cancel_at_period_end).toBe(false);
+      expect(subscription?.status).toBe('active');
+    }
+  );
 
   it('ends the subscription for an expired notification', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
@@ -639,6 +651,16 @@ describe('processGooglePlayKiloPassNotification', () => {
       };
       await processGooglePlayKiloPassNotification({ pubsubMessage: message });
       await issue();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken: token,
+        state: 'REFUNDED',
+      });
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({ purchaseToken: token, messageId: crypto.randomUUID() }),
+        })
+      ).resolves.toEqual({ processed: true });
       mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
         orderId,
         purchaseToken: token,

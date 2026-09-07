@@ -10,7 +10,7 @@ const mockSubscriptionsV2Get = jest.fn().mockImplementation(() => ({
   data: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' },
 }));
 
-const mockAcknowledge = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const mockAcknowledge = jest.fn<(request: unknown) => Promise<void>>().mockResolvedValue(undefined);
 
 const mockOrdersGet = jest.fn().mockImplementation(() => ({ data: { orderId: 'paid-order' } }));
 

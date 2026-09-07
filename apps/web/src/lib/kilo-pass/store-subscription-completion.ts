@@ -605,7 +605,31 @@ export async function completeStoreKiloPassPurchase(params: {
       !isStripeSubscriptionEnded(activeSubscription.status) &&
       activeSubscription.provider_subscription_id !== purchase.providerSubscriptionId
     ) {
-      throw new Error('You already have an active Kilo Pass subscription');
+      const previous =
+        activeSubscription.payment_provider === KiloPassPaymentProvider.Stripe
+          ? undefined
+          : await tx.query.kilo_pass_store_purchases.findFirst({
+              where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, activeSubscription.id),
+              orderBy: desc(kilo_pass_store_purchases.purchased_at),
+            });
+      const previousExpiry = previous?.expires_at ? dayjs(previous.expires_at).valueOf() : NaN;
+      if (
+        !Number.isFinite(previousExpiry) ||
+        previousExpiry > Date.now() ||
+        previousExpiry > Date.parse(purchase.purchasedAtIso)
+      ) {
+        throw new Error('You already have an active Kilo Pass subscription');
+      }
+      // State reads already treat this receipt as expired. Reconcile it here
+      // when a new paid subscription arrives before the expiry notification.
+      await tx
+        .update(kilo_pass_subscriptions)
+        .set({
+          status: 'canceled',
+          cancel_at_period_end: false,
+          ended_at: new Date(previousExpiry).toISOString(),
+        })
+        .where(eq(kilo_pass_subscriptions.id, activeSubscription.id));
     }
 
     const previousStorePurchase =

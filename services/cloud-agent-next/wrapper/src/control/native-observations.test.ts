@@ -37,6 +37,7 @@ function fakeRuntime(
 ): WorktreeKiloRuntime {
   return {
     scopeId: 'scope_1',
+    runtimeId: 'native_1',
     directory,
     env: {},
     kiloClient,

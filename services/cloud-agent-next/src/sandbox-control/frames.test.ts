@@ -47,6 +47,7 @@ describe('sandbox control frames', () => {
         kiloVersionHeartbeat: true,
         sessionOperationResults: true,
         scopedStopAbort: true,
+        nativeRuntimeRetirement: true,
       },
     });
     const previous = { protocolVersion: 1, handshakeComplete: true };

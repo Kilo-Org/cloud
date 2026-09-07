@@ -9,7 +9,7 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import * as z from 'zod';
 import { createEventQueries } from '../../../src/session/queries/events.js';
@@ -25,10 +25,43 @@ const messageUpdatedPayloadSchema = z.object({
   }),
 });
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('Event Storage', () => {
   it('should insert event with RETURNING id', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_1');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_1');
 
     // Access the DO directly and call queries on its sql storage
     // The DO auto-runs migrations in constructor via blockConcurrencyWhile
@@ -52,8 +85,7 @@ describe('Event Storage', () => {
   });
 
   it('should find events by filters with various combinations', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_2');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_2');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -139,8 +171,7 @@ describe('Event Storage', () => {
   });
 
   it('should delete events older than timestamp', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_3');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_3');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -186,8 +217,7 @@ describe('Event Storage', () => {
   });
 
   it('should maintain sequential event ordering (IDs always increase)', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_4');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_4');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -233,8 +263,7 @@ describe('Event Storage', () => {
   });
 
   it('should upsert: insert on first call, update payload on conflict', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_5');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_5');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -285,7 +314,7 @@ describe('Event Storage', () => {
   });
 
   it('repairs offline entity mutations below the replay cursor without replaying old execution state', async () => {
-    const stub = env.CLOUD_AGENT_SESSION.getByName('user_1:sess_materialized');
+    const stub = sessionStub('user_1', 'sess_materialized');
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const events = createEventQueries(drizzle(state.storage), state.storage.sql);
       const sessionId = 'sess_materialized' as SessionId;
@@ -433,8 +462,7 @@ describe('Event Storage', () => {
   });
 
   it('should upsert: different entityIds create separate rows', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_6');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_6');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -489,8 +517,7 @@ describe('Event Storage', () => {
   });
 
   it('should return latest assistant message by sortable message ID with current parts', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_7');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_7');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -600,8 +627,7 @@ describe('Event Storage', () => {
   });
 
   it('should require root-session assistant messages', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_8');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_8');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });
@@ -644,8 +670,7 @@ describe('Event Storage', () => {
   });
 
   it('should select and hydrate an assistant without time.completed', async () => {
-    const id = env.CLOUD_AGENT_SESSION.idFromName('user_1:sess_9');
-    const stub = env.CLOUD_AGENT_SESSION.get(id);
+    const stub = sessionStub('user_1', 'sess_9');
 
     const result = await runInDurableObject(stub, async (_instance, state) => {
       const db = drizzle(state.storage, { logger: false });

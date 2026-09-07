@@ -15,6 +15,8 @@ type ScreenHeaderProps = {
   title?: string;
   titleContent?: React.ReactNode;
   titleNumberOfLines?: number;
+  /** Reserve two title lines so state changes do not move the screen body. */
+  reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
   reserveEyebrow?: boolean;
@@ -47,6 +49,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 2,
+  reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
   size = 'default',
@@ -101,6 +104,13 @@ export function ScreenHeader({
         {title}
       </Text>
     );
+    const titleLayout = reserveTitleSpace ? (
+      <View className={cn(size === 'large' ? 'min-h-[72px]' : 'min-h-14', 'justify-center')}>
+        {titleText}
+      </View>
+    ) : (
+      titleText
+    );
     // Title caret removed: rename stays available via the pressable title
     // itself. The backIcon === 'close' ChevronDown on the back control is
     // unrelated and stays.
@@ -115,10 +125,10 @@ export function ScreenHeader({
         }
         className="active:opacity-70"
       >
-        {titleText}
+        {titleLayout}
       </Pressable>
     ) : (
-      titleText
+      titleLayout
     );
   }
 
@@ -158,7 +168,7 @@ export function ScreenHeader({
               }}
               accessibilityRole="button"
               accessibilityLabel={
-                resolvedBackIcon === 'close' ? t('screenHeader.close') : t('screenHeader.goBack')
+                resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')
               }
               className={`${I18nManager.isRTL ? '-mr-4' : '-ml-4'} h-11 w-11 shrink-0 items-center justify-center active:opacity-70`}
             >

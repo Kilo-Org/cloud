@@ -7,7 +7,7 @@ import {
   getIntegrationForOwner,
   getPrimaryGitHubIntegrationForOrganization,
 } from '@/lib/integrations/db/platform-integrations';
-import { getInstallation, isInstallationGoneError } from './github-apps-service';
+import { getInstallation, isInstallationGoneError, updateModel } from './github-apps-service';
 
 describe('getInstallation', () => {
   it('prefers a healthy installation when the owner has multiple GitHub rows', async () => {
@@ -118,6 +118,81 @@ describe('getInstallation', () => {
       expect(visibleIntegration?.id).toBe(row.id);
       expect(primaryIntegration).toBeNull();
       expect(ownerIntegration).toBeNull();
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+});
+
+describe('updateModel', () => {
+  it('updates only the targeted installation when integrationId is provided', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub model ${crypto.randomUUID()}` })
+      .returning();
+    const rows = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: crypto.randomUUID(),
+          integration_status: 'active',
+          repository_access: 'all',
+        },
+      ])
+      .returning();
+
+    try {
+      const result = await updateModel(
+        { type: 'org', id: organization.id },
+        'anthropic/claude-sonnet-5',
+        rows[1].id
+      );
+
+      expect(result).toEqual({ success: true });
+
+      const [updated] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, rows[1].id));
+      const [untouched] = await db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, rows[0].id));
+
+      expect((updated?.metadata as Record<string, unknown> | null)?.model_slug).toBe(
+        'anthropic/claude-sonnet-5'
+      );
+      expect(untouched?.metadata).toBeNull();
+    } finally {
+      await db.delete(organizations).where(eq(organizations.id, organization.id));
+    }
+  });
+
+  it('returns an error when no installation matches the owner and integrationId', async () => {
+    const [organization] = await db
+      .insert(organizations)
+      .values({ name: `GitHub model missing ${crypto.randomUUID()}` })
+      .returning();
+
+    try {
+      const result = await updateModel(
+        { type: 'org', id: organization.id },
+        'anthropic/claude-sonnet-5',
+        crypto.randomUUID()
+      );
+
+      expect(result).toEqual({ success: false, error: 'No GitHub App installation found' });
     } finally {
       await db.delete(organizations).where(eq(organizations.id, organization.id));
     }

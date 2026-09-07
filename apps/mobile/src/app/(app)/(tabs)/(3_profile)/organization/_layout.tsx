@@ -4,8 +4,8 @@ import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { privacyScreenLayout } from '@/components/privacy-cover-overlay';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 
-const screenLayout: typeof privacyScreenLayout = props =>
-  appUnlockScreenLayout({ children: privacyScreenLayout(props) });
+const screenLayout: typeof appUnlockScreenLayout = props =>
+  appUnlockScreenLayout({ ...props, children: privacyScreenLayout(props) });
 
 export default function OrganizationLayout() {
   const { fullSheetDetent } = useFormSheetDetents();

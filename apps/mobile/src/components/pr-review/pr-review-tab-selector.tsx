@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { i18n } from '@/i18n';
+import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 export type PrReviewTabId = 'overview' | 'files' | 'discussion';
@@ -16,6 +18,12 @@ const TABS = [
 type PrReviewTabSelectorProps = {
   activeTab: PrReviewTabId;
   onChange: (tab: PrReviewTabId) => void;
+  /**
+   * Conversation plus review comments. Rendered as a badge on the Discussion
+   * tab so an empty discussion is visible without opening it; omitted (or 0)
+   * while the PR query is still loading, which draws no badge.
+   */
+  discussionCount?: number;
 };
 
 /**
@@ -24,12 +32,20 @@ type PrReviewTabSelectorProps = {
  * S6b (Files body) and S7b (Discussion body) only ever render their
  * respective tab bodies — the parent screen owns the tab state.
  */
-export function PrReviewTabSelector({ activeTab, onChange }: PrReviewTabSelectorProps) {
+export function PrReviewTabSelector({
+  activeTab,
+  onChange,
+  discussionCount,
+}: PrReviewTabSelectorProps) {
   const { t } = useTranslation();
   return (
     <View accessibilityRole="tablist" className="flex-row gap-1 rounded-lg bg-secondary p-1">
       {TABS.map(tab => {
         const active = tab.id === activeTab;
+        const badge =
+          tab.id === 'discussion' && discussionCount && discussionCount > 0
+            ? formatNumber(discussionCount, i18n.language)
+            : null;
         return (
           <Pressable
             key={tab.id}
@@ -47,14 +63,21 @@ export function PrReviewTabSelector({ activeTab, onChange }: PrReviewTabSelector
               active && 'bg-card shadow-sm shadow-[#0000000D]'
             )}
           >
-            <Text
-              className={cn(
-                'text-sm',
-                active ? 'font-semibold text-foreground' : 'text-muted-foreground'
-              )}
-            >
-              {t(tab.labelKey)}
-            </Text>
+            <View className="flex-row items-center gap-1.5">
+              <Text
+                className={cn(
+                  'text-sm',
+                  active ? 'font-semibold text-foreground' : 'text-muted-foreground'
+                )}
+              >
+                {t(tab.labelKey)}
+              </Text>
+              {badge ? (
+                <View className="min-w-5 rounded-full bg-muted px-1.5 py-0.5">
+                  <Text className="text-center text-[11px] text-muted-foreground">{badge}</Text>
+                </View>
+              ) : null}
+            </View>
           </Pressable>
         );
       })}

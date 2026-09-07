@@ -7,7 +7,8 @@
       "instanceLifecycle": "A példányod frissítést kapott",
       "scheduledAction": "Egy ütemezett művelet frissítést kapott",
       "lowBalance": "Az egyenleged figyelmet igényel",
-      "securityFinding": "Egy biztonsági észlelés figyelmet igényel"
+      "securityFinding": "Egy biztonsági észlelés figyelmet igényel",
+      "activeAgentsGlanceable": "Az aktív ügynökök frissítést kaptak"
     }
   },
   "cloudAgentSession": {

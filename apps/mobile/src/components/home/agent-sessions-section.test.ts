@@ -17,6 +17,7 @@ const queryClient = new ReactQuery.QueryClient();
 vi.mock('expo-router', () => ({
   useRouter: () => ({ navigate: navigateSpy, dismissTo: dismissToSpy }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({ View: 'View', Pressable: 'Pressable', Platform: { OS: 'ios' } }));
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({ bottom: 0 }) }));
 vi.mock('@expo/react-native-action-sheet', () => ({
@@ -62,7 +63,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn(), success: vi.fn() },
 }));
 vi.mock('@/components/ui/agent-badge', () => ({ AgentBadge: 'AgentBadge' }));
-vi.mock('@/components/ui/status-dot', () => ({ StatusDot: 'StatusDot' }));
+vi.mock('@/components/ui/session-status-icon', () => ({ SessionStatusIcon: 'SessionStatusIcon' }));
 vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronRight: 'ChevronRight' }));
 vi.mock('@/components/home/section-header', () => ({ SectionHeader: 'SectionHeader' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -189,18 +190,19 @@ describe('Home live section', () => {
   });
 
   it.each([
-    ['running', 'good', false],
-    ['question', 'warn', true],
+    ['running', 'running', false],
+    ['idle', 'idle', false],
+    ['question', 'needsInput', true],
   ] as const)(
     'keeps the real %s badge when the phone disconnects',
-    async (status, tone, needsInput) => {
+    async (status, kind, needsInput) => {
       const sessions = { ...settled, activeSessions: [{ ...session('a1'), status }] };
       await render(sessions);
       const row = node('RemoteSessionRow');
       connectivity.offline = true;
       await render(sessions);
       expect(node('RemoteSessionRow')).toBe(row);
-      expect(node('StatusDot').props.tone).toBe(tone);
+      expect(node('SessionStatusIcon').props.kind).toBe(kind);
       expect(nodes('Text').some(text => text.children.includes('NEEDS INPUT'))).toBe(needsInput);
       expect(nodes('Text').some(text => text.children.includes('No internet connection'))).toBe(
         true

@@ -1,29 +1,21 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import {
-  AppState,
-  FlatList,
-  Platform,
-  Pressable,
-  RefreshControl,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AppState, FlatList, Platform, Pressable, useWindowDimensions, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Bot, Plus } from '@/components/ui/icons';
 
+import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
-import {
-  liveSessionContent,
-  LiveSessionFeedback,
-  useLiveSessionContext,
-} from '@/components/home/agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
+import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
@@ -44,7 +36,6 @@ const SKELETON_ROW_COUNT = 8;
 export function AgentSessionListScreen() {
   const router = useRouter();
   const navigation = useNavigation();
-  const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { bottom } = useSafeAreaInsets();
@@ -56,25 +47,55 @@ export function AgentSessionListScreen() {
   );
 
   const context = useLiveSessionContext();
-  const { organizationId } = context;
+  const { organizationId, isError: isContextError, refetch: refetchContext } = context;
   const sessions = useLiveAgentSessions({ organizationId, enabled: context.isReady });
   const { activeSessions, refetch } = sessions;
   const content = liveSessionContent(context, sessions);
   const hasLiveRows = content === 'rows';
+  const showFab = context.isReady && content !== 'empty';
 
   const query = useLiveSessionQuery(activeSessions);
   const { visibleSessions, isSearching } = query;
   const [showFilterModal, setShowFilterModal] = useState(false);
-  const hasVisibleRows = visibleSessions.length > 0;
 
   const refetchRef = useRef(refetch);
   useEffect(() => {
     refetchRef.current = refetch;
   }, [refetch]);
+
+  // The wrapped live refetch resolves `false` when the refresh did not land an
+  // accepted result; the context path reports through its own error state.
+  const refetchRequest = useCallback(async () => {
+    if (isContextError) {
+      await refetchContext();
+      return true;
+    }
+    return refetch();
+  }, [isContextError, refetchContext, refetch]);
+  // The pull owns only gesture feedback: past the budget the spinner stops and
+  // the reserved status line carries "Couldn't refresh" + Retry, so a hung
+  // fetch cannot pin the spinner with no next action.
+  const pull = usePullRefresh(refetchRequest);
+  const handleRefresh = pull.startPull;
+  const { markSettled } = pull;
+  const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
+
+  // Focus return and app-foreground refreshes run outside the pull lifecycle.
+  // A failed pull leaves the reserved line on "Couldn't refresh" + Retry; when
+  // one of these refreshes lands an accepted result the list is up to date, so
+  // the stale failure line retires exactly as the query-driven error did.
+  const runForegroundRefresh = useCallback(() => {
+    void (async () => {
+      const accepted = await refetchRef.current();
+      if (accepted) {
+        markSettled();
+      }
+    })();
+  }, [markSettled]);
   useFocusEffect(
     useCallback(() => {
-      void refetchRef.current();
-    }, [])
+      runForegroundRefresh();
+    }, [runForegroundRefresh])
   );
 
   const listRef = useRef<FlatList<ActiveSession>>(null);
@@ -94,18 +115,17 @@ export function AgentSessionListScreen() {
     }, [])
   );
 
-  // Preserve the focused foreground refresh and the active-sessions tray invalidation.
+  // Refresh the focused list through the live-sync owner.
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active' && navigation.isFocused()) {
-        void refetchRef.current();
-        void queryClient.invalidateQueries({ queryKey: [['activeSessions']] });
+        runForegroundRefresh();
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [queryClient, navigation]);
+  }, [navigation, runForegroundRefresh]);
 
   const navigateToSession = useAgentSessionNavigator();
 
@@ -139,19 +159,6 @@ export function AgentSessionListScreen() {
     </View>
   );
 
-  const [refreshing, setRefreshing] = useState(false);
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setRefreshing(true);
-      try {
-        // LiveSessionFeedback retains and announces failures without a duplicate toast.
-        await refetch();
-      } finally {
-        setRefreshing(false);
-      }
-    })();
-  }, [refetch]);
-
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
       <RemoteSessionRow
@@ -163,8 +170,6 @@ export function AgentSessionListScreen() {
     ),
     [navigateToSession, organizationId]
   );
-
-  const keyExtractor = useCallback((item: ActiveSession) => item.id, []);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it. The FAB adds its own inset when it shows so the last row
@@ -198,11 +203,12 @@ export function AgentSessionListScreen() {
         ))}
       </View>
     );
-  } else if (hasLiveRows && !hasVisibleRows) {
+  } else if (hasLiveRows && visibleSessions.length === 0) {
     body = (
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
+        refreshControl={refreshControl}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')
@@ -213,16 +219,14 @@ export function AgentSessionListScreen() {
             variant="outline"
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
           >
-            <Text>
-              {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
-            </Text>
+            <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
           </Button>
         }
       />
     );
   } else if (content === 'empty') {
     body = (
-      <LiveSessionListEmptyState organizationId={organizationId} tabBarHeight={tabBarHeight} />
+      <LiveSessionListEmptyState organizationId={organizationId} refreshControl={refreshControl} />
     );
   } else if (hasLiveRows) {
     body = (
@@ -230,75 +234,84 @@ export function AgentSessionListScreen() {
         ref={listRef}
         data={visibleSessions}
         renderItem={renderItem}
-        keyExtractor={keyExtractor}
+        keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
+        refreshControl={refreshControl}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
     );
   }
 
   return (
-    <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('tabs.agents')}
-        eyebrow={
-          !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
-            ? t('agents.liveCount', { count: activeSessions.length })
-            : undefined
-        }
-        reserveEyebrow
-        size="large"
-        showBackButton={false}
-        className="px-[22px] pb-1"
-        headerRight={headerRight}
-      />
-      <View className="px-[22px]">
-        <LiveSessionFeedback
-          context={context}
-          sessions={sessions}
-          failureLabel={t('agents.sessionList.couldNotLoadActive')}
+    <StateSurfaceInsets bottomInset={tabBarHeight + (showFab ? FAB_SIZE + FAB_MARGIN : 0)}>
+      <View className="flex-1 bg-background">
+        <ScreenHeader
+          title={t('common.agents')}
+          eyebrow={
+            !sessions.isLoading && !sessions.isError && (hasLiveRows || content === 'empty')
+              ? t('agents.liveCount', { count: activeSessions.length })
+              : undefined
+          }
+          reserveEyebrow
+          size="large"
+          showBackButton={false}
+          className="px-[22px] pb-1"
+          headerRight={headerRight}
         />
+        {hasLiveRows || isSearching ? (
+          <SessionListSearchHeader
+            inputRef={query.searchInputRef}
+            hasText={query.searchQuery.length > 0}
+            showSearchBusy={false}
+            onChangeText={query.handleSearchChange}
+            onClearSearch={query.handleClearSearch}
+          />
+        ) : null}
+        <View className={query.hasLoaded && content === 'error' ? 'flex-1' : 'px-[22px]'}>
+          <LiveSessionFeedback
+            context={context}
+            sessions={sessions}
+            failureLabel={t('agents.sessionList.couldNotLoadActive')}
+            centered={query.hasLoaded && content === 'error'}
+            refresh={{
+              busy: pull.refreshing || pull.busy,
+              failed: pull.failed,
+              onRetry: pull.startRetry,
+            }}
+            refreshControl={refreshControl}
+          />
+        </View>
+        {body}
+        {/* Empty content owns its creation action; other admitted states keep the FAB. */}
+        {showFab && (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.newSession')}
+            testID="agents-new-session-fab"
+            onPress={() => {
+              router.push(getNewAgentSessionPath(organizationId) as Href);
+            }}
+            className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
+            style={fabStyle}
+          >
+            <Plus size={24} color={colors.primaryForeground} />
+          </Pressable>
+        )}
+        {showFilterModal && (
+          <SessionFilterModal
+            selectedPlatforms={query.platformFilter}
+            selectedProjects={query.projectFilter}
+            projectOptions={query.options.projectOptions}
+            platformOptions={query.options.platformOptions}
+            onClose={() => {
+              setShowFilterModal(false);
+            }}
+            onApply={query.handleApplyFilters}
+          />
+        )}
       </View>
-      {hasLiveRows || isSearching ? (
-        <SessionListSearchHeader
-          inputRef={query.searchInputRef}
-          hasText={query.searchQuery.length > 0}
-          showSearchBusy={false}
-          showInlineError={false}
-          onChangeText={query.handleSearchChange}
-          onClearSearch={query.handleClearSearch}
-        />
-      ) : null}
-      {body}
-      {/* Empty content owns its creation action; other admitted states keep the FAB. */}
-      {context.isReady && content !== 'empty' && (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('agentChat.newSession.title')}
-          testID="agents-new-session-fab"
-          onPress={() => {
-            router.push(getNewAgentSessionPath(organizationId) as Href);
-          }}
-          className="absolute items-center justify-center rounded-full bg-primary shadow-lg shadow-[#00000040] active:opacity-80"
-          style={fabStyle}
-        >
-          <Plus size={24} color={colors.primaryForeground} />
-        </Pressable>
-      )}
-      {showFilterModal && (
-        <SessionFilterModal
-          selectedPlatforms={query.platformFilter}
-          selectedProjects={query.projectFilter}
-          projectOptions={query.options.projectOptions}
-          platformOptions={query.options.platformOptions}
-          onClose={() => {
-            setShowFilterModal(false);
-          }}
-          onApply={query.handleApplyFilters}
-        />
-      )}
-    </View>
+    </StateSurfaceInsets>
   );
 }

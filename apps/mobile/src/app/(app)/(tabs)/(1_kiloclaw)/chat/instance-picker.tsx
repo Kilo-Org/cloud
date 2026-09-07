@@ -44,7 +44,7 @@ function InstanceRow({
         </Text>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <Text variant="muted" numberOfLines={1}>
-            {instance.organizationName ?? t('chat.instancePicker.personal')}
+            {instance.organizationName ?? t('common.personal')}
           </Text>
           <StatusBadge status={instance.status} />
         </View>
@@ -76,6 +76,7 @@ export default function InstancePickerScreen() {
 
   return (
     <PickerSheet
+      scrollable={instancesQuery.isPending || (showList && loadedInstances.length > 0)}
       title={t('chat.instancePicker.switchInstance')}
       onDone={() => {
         router.back();
@@ -90,7 +91,6 @@ export default function InstancePickerScreen() {
       ) : null}
       {instancesQuery.isError ? (
         <QueryError
-          className="py-12"
           message={t('chat.instancePicker.couldNotLoadInstances')}
           onRetry={() => {
             void instancesQuery.refetch();
@@ -99,9 +99,8 @@ export default function InstancePickerScreen() {
       ) : null}
       {showList && loadedInstances.length === 0 ? (
         <EmptyState
-          className="py-12"
           icon={Server}
-          title={t('chat.instancePicker.noInstances')}
+          title={t('common.noKiloclawInstances')}
           description={t('chat.instancePicker.noInstancesDescription')}
           action={
             <Button
@@ -115,7 +114,7 @@ export default function InstancePickerScreen() {
           }
         />
       ) : null}
-      {showList ? (
+      {showList && loadedInstances.length > 0 ? (
         <Animated.View entering={FadeIn.duration(200)}>
           {loadedInstances.map(instance => (
             <InstanceRow

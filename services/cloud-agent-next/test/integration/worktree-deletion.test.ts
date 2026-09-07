@@ -1,7 +1,7 @@
 import { env, runInDurableObject } from 'cloudflare:test';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { getWorktreeWorkspacePath } from '../../src/workspace';
 import { events } from '../../src/db/sqlite-schema';
 import {
@@ -155,7 +155,8 @@ function createDeletionProvider(sandboxId: string) {
   } satisfies ProviderAdapter;
 }
 
-function installDeletionProvider(instance: SandboxControl, provider: ProviderAdapter) {
+async function installDeletionProvider(instance: SandboxControl, provider: ProviderAdapter) {
+  await instance.getStatus();
   Object.assign(instance, {
     env: {
       ...instance['env'],
@@ -309,6 +310,40 @@ function reply(socket: WebSocket, frame: RequestFrame, result: unknown, ok = tru
   );
 }
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('worktree deletion in Durable Objects', () => {
   it('retains never-run child lineage for cold deletion when scoped publication fails', async () => {
     const sessionId = cloudId();
@@ -394,7 +429,7 @@ describe('worktree deletion in Durable Objects', () => {
       const sandboxId = `usr-${crypto.randomUUID().replaceAll('-', '').padEnd(48, '0')}`;
       const otherSandboxId = `usr-${'d'.repeat(48)}`;
       const legacyId = `agent_${crypto.randomUUID()}`;
-      const legacy = env.CLOUD_AGENT_SESSION.getByName(`${userId}:${legacyId}`);
+      const legacy = sessionStub(userId, legacyId);
       await runInDurableObject(legacy, async (instance, state) => {
         await state.storage.put({
           metadata: {
@@ -601,7 +636,7 @@ describe('worktree deletion in Durable Objects', () => {
           }),
         },
       });
-      installDeletionProvider(instance, provider);
+      await installDeletionProvider(instance, provider);
       Object.assign(instance, {
         socketHandler: {
           hasHandshakenSocket: () => true,
@@ -783,7 +818,7 @@ describe('worktree deletion in Durable Objects', () => {
           }),
         },
       });
-      installDeletionProvider(instance, provider);
+      await installDeletionProvider(instance, provider);
       Object.assign(instance, {
         socketHandler: {
           hasHandshakenSocket: () => true,
@@ -858,7 +893,7 @@ describe('worktree deletion in Durable Objects', () => {
       if (!('providerRef' in created)) throw new Error('Missing native fixture allocation');
       const stop = vi.fn<ProviderAdapter['stop']>(async () => 'retryable');
       const observe = vi.fn(native.observe.bind(native));
-      installDeletionProvider(instance, { ...native, stop, observe });
+      await installDeletionProvider(instance, { ...native, stop, observe });
       const original = instance['env'].SESSION_INGEST;
       Object.assign(instance['env'], {
         SESSION_INGEST: {
@@ -998,7 +1033,7 @@ describe('worktree deletion in Durable Objects', () => {
     await runInDurableObject(control, async (instance, state) => {
       const provider = createDeletionProvider(sandboxId);
       const create = vi.fn(provider.create.bind(provider));
-      installDeletionProvider(instance, { ...provider, create });
+      await installDeletionProvider(instance, { ...provider, create });
       const original = instance['env'].SESSION_INGEST;
       Object.assign(instance['env'], {
         SESSION_INGEST: {
@@ -1527,7 +1562,7 @@ describe('worktree deletion in Durable Objects', () => {
           ...memory,
           stop: ref => (mayStop ? memory.stop(ref) : Promise.resolve('retryable')),
         };
-        installDeletionProvider(instance, provider);
+        await installDeletionProvider(instance, provider);
         const original = instance['env'].SESSION_INGEST;
         Object.assign(instance['env'], {
           SESSION_INGEST: {
@@ -1667,7 +1702,7 @@ describe('worktree deletion in Durable Objects', () => {
           return memory.stop(ref);
         },
       };
-      installDeletionProvider(instance, provider);
+      await installDeletionProvider(instance, provider);
       const original = instance['env'].SESSION_INGEST;
       const workerUrl = instance['env'].WORKER_URL;
       Object.assign(instance['env'], {

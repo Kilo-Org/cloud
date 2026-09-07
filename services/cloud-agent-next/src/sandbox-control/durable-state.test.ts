@@ -3,6 +3,10 @@ import {
   eraseSandboxRecord,
   loadDeadlines,
   loadPhysicalRecord,
+  initialRuntimeMetadata,
+  loadRuntimeMetadata,
+  saveRuntimeMetadata,
+  readSandboxControlState,
   loadRouteTable,
   loadSessionCredentialGrants,
   loadTransitionLog,
@@ -76,6 +80,60 @@ function credentialGrant(): SessionCredentialGrant {
 }
 
 describe('sandbox control durable state', () => {
+  it.each([
+    ['usr-abcd', 'shared'],
+    ['org-abcd', 'shared'],
+    ['legacy__shared', 'shared'],
+    ['ses-abcd', 'isolated-small'],
+    ['istd-abcd', 'isolated-standard'],
+    ['crv-abcd', 'code-review'],
+    ['dind-abcd', 'devcontainer'],
+    ['private-invalid', 'unknown'],
+  ])(
+    'derives only the authoritative allocation classification for %s',
+    (sandboxId, sandboxType) => {
+      expect(initialRuntimeMetadata(sandboxId)).toEqual({
+        sandboxType,
+        kiloCliVersion: null,
+        wrapperVersion: null,
+        startedAt: null,
+        stoppedAt: null,
+      });
+    }
+  );
+
+  it('round-trips metadata independently of physical lifecycle writes and erases it on deletion', async () => {
+    const storage = memoryStorage();
+    expect(await loadRuntimeMetadata(storage)).toBeUndefined();
+    const runtime = {
+      ...initialRuntimeMetadata('istd-abcd'),
+      wrapperVersion: '2.4.0',
+      kiloCliVersion: '7.4.20',
+    };
+    await saveRuntimeMetadata(storage, runtime);
+    await savePhysicalRecord(storage, initialPhysicalRecord(false));
+    expect(await loadRuntimeMetadata(storage)).toEqual(runtime);
+    expect((await readSandboxControlState(storage)).runtime).toEqual(runtime);
+    await eraseSandboxRecord(storage);
+    expect(await loadRuntimeMetadata(storage)).toBeUndefined();
+  });
+
+  it('does not backfill or reflect malformed stored runtime metadata', async () => {
+    const storage = memoryStorage();
+    await savePhysicalRecord(storage, initialPhysicalRecord(false));
+    for (const runtime of [
+      undefined,
+      {},
+      { ...initialRuntimeMetadata('ses-abcd'), wrapperVersion: 'private-error' },
+    ]) {
+      await storage.put('runtime_metadata', runtime);
+      expect(await loadRuntimeMetadata(storage)).toBeUndefined();
+      expect((await readSandboxControlState(storage)).physical?.state).toBe('stopped');
+      expect((await readSandboxControlState(storage)).runtime).toBeUndefined();
+      expect(await storage.get('runtime_metadata')).toEqual(runtime);
+    }
+  });
+
   it('loads no credential grants from a pre-worktree record', async () => {
     expect(await loadSessionCredentialGrants(memoryStorage())).toEqual([]);
   });

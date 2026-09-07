@@ -16,7 +16,7 @@ export function consentModeForSearchParam(mode: string | string[] | undefined): 
 export function getConsentActions(mode: ConsentMode): ConsentActions {
   if (mode === 'review') {
     return {
-      primaryLabel: i18n.t('consent.back'),
+      primaryLabel: i18n.t('common.back'),
       secondaryLabel: i18n.t('consent.revokeConsent'),
       destructiveLabel: i18n.t('consent.revokeConsent'),
       destructiveTitle: i18n.t('consent.revokeConsentTitle'),

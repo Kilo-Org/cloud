@@ -1,5 +1,6 @@
 import { ShieldCheck, Zap } from '@/components/ui/icons';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useLocalSearchParams } from 'expo-router';
@@ -85,14 +86,12 @@ export default function ExecPolicyScreen() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('kiloclaw.execPolicy.title')} />
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.execPolicy.couldNotLoad')}
-            onRetry={() => {
-              void statusQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.execPolicy.couldNotLoad')}
+          onRetry={() => {
+            void statusQuery.refetch();
+          }}
+        />
       </View>
     );
   }

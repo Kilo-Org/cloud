@@ -4,6 +4,11 @@ import { HomeScreen } from '@/components/home/home-screen';
 
 vi.mock('@/../assets/images/logo.png', () => ({ default: 1 }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+vi.mock('@/lib/analytics/posthog', () => ({
+  FEATURE_FLAG_PR_REVIEW: 'pr-review',
+  useFeatureFlag: () => true,
+}));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
@@ -15,6 +20,19 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('@/components/home/agent-sessions-section', () => ({
   AgentSessionsSection: () => null,
+  LiveSessionFeedback: () => null,
+}));
+vi.mock('@/components/home/live-session-state', () => ({
+  useLiveSessionContext: () => ({
+    organizationId: null,
+    accountReady: true,
+    isReady: true,
+    isResolving: false,
+    isError: false,
+    label: undefined,
+    refetch: vi.fn(),
+  }),
+  liveSessionContent: () => 'pending',
 }));
 vi.mock('@/components/home/agents-promo-card', () => ({
   AgentsPromoCard: () => null,

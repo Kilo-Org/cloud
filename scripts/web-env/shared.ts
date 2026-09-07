@@ -534,8 +534,9 @@ export async function setVaultValue(
       ],
       sections: [],
     };
-    const created = parseJson(
-      await runOpWithTemplate(
+    let createdOutput: string;
+    try {
+      createdOutput = await runOpWithTemplate(
         [
           'item',
           'create',
@@ -547,9 +548,18 @@ export async function setVaultValue(
           '--format=json',
         ],
         JSON.stringify(item)
-      ),
-      `Create ${name}`
-    );
+      );
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('Password item requires ps value')) {
+        throw new Error(
+          `${error.message}\n\n` +
+            `Try running with --only production first, to create the initial secret. \n` +
+            `Then you can run the original command again and it should work`
+        );
+      }
+      throw error;
+    }
+    const created = parseJson(createdOutput, `Create ${name}`);
     const createdPassword = findVaultPasswordField(records(created.fields), environment);
     const createdNotes = records(created.fields).find(field => field.id === 'notesPlain');
     if (createdPassword?.value !== value || createdNotes?.value !== note) {

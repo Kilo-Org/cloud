@@ -81,7 +81,7 @@ export async function exitRemoteSessionFromList({
         return;
       }
 
-      announcingToast.success(i18n.t('agents.sessionExited'));
+      announcingToast.success(i18n.t('common.sessionExited'));
       try {
         await refreshActiveList();
       } catch {

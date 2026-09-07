@@ -9,6 +9,7 @@ import {
   magic_link_tokens,
   organization_memberships,
   organizations,
+  user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
@@ -1257,6 +1258,110 @@ describe('user router - register push token', () => {
       .from(user_push_tokens)
       .where(eq(user_push_tokens.user_id, tokenUser.id));
     expect(tokensAfterUnregister).toHaveLength(0);
+  });
+});
+
+describe('user router - register activity token', () => {
+  let tokenUser: User;
+  let otherUser: User;
+
+  beforeAll(async () => {
+    tokenUser = await insertTestUser({
+      google_user_email: 'activity-token-register@example.com',
+      google_user_name: 'Activity Token Register',
+    });
+    otherUser = await insertTestUser({
+      google_user_email: 'activity-token-other@example.com',
+      google_user_name: 'Activity Token Other',
+    });
+  });
+
+  afterEach(async () => {
+    await db
+      .delete(user_activity_tokens)
+      .where(inArray(user_activity_tokens.user_id, [tokenUser.id, otherUser.id]));
+  });
+
+  afterAll(async () => {
+    await db.delete(kilocode_users).where(inArray(kilocode_users.id, [tokenUser.id, otherUser.id]));
+  });
+
+  it('upserts the single row when the same token re-registers with a different kind, platform, and organizationId', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'activity-token-upsert';
+
+    await expect(
+      caller.user.registerActivityToken({
+        token,
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      })
+    ).resolves.toEqual({ success: true });
+
+    await expect(
+      caller.user.registerActivityToken({
+        token,
+        kind: 'ios_push_to_start',
+        platform: 'ios',
+        organizationId: 'org-1',
+      })
+    ).resolves.toEqual({ success: true });
+
+    const rows = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBe(tokenUser.id);
+    expect(rows[0]?.kind).toBe('ios_push_to_start');
+    expect(rows[0]?.platform).toBe('ios');
+    expect(rows[0]?.organization_id).toBe('org-1');
+  });
+
+  it('unregisterActivityToken deletes only the authenticated user matching token', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+    const ownToken = 'activity-token-own';
+    const otherToken = 'activity-token-other';
+
+    await caller.user.registerActivityToken({
+      token: ownToken,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+    await otherCaller.user.registerActivityToken({
+      token: otherToken,
+      kind: 'ios_activity',
+      platform: 'ios',
+      organizationId: null,
+    });
+
+    // The authenticated user cannot delete another user's token.
+    await caller.user.unregisterActivityToken({ token: otherToken });
+
+    const otherRows = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.user_id, otherUser.id));
+    expect(otherRows).toHaveLength(1);
+    expect(otherRows[0]?.token).toBe(otherToken);
+
+    // The user's own token is untouched by the cross-user delete attempt.
+    const ownRows = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.user_id, tokenUser.id));
+    expect(ownRows).toHaveLength(1);
+
+    // Deleting the own token removes only that row.
+    await caller.user.unregisterActivityToken({ token: ownToken });
+    const afterOwn = await db
+      .select()
+      .from(user_activity_tokens)
+      .where(eq(user_activity_tokens.user_id, tokenUser.id));
+    expect(afterOwn).toHaveLength(0);
   });
 });
 

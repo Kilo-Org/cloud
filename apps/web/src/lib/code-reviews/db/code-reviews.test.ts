@@ -36,6 +36,8 @@ import {
   findPreviousCompletedReview,
   updateCodeReviewStatus,
   resetCodeReviewForRetry,
+  failReservedQueuedReview,
+  updatePreviousReviewSummary,
 } from './code-reviews';
 
 const REPO = `test-org/session-continuation-${Date.now()}`;
@@ -1969,6 +1971,49 @@ describe('resetCodeReviewForRetry', () => {
       where: eq(cloud_agent_code_reviews.id, reviewId),
     });
     expect(stored?.status).toBe('pending');
+  });
+
+  it('persists sanitized previous summaries while preserving null and valid markdown', async () => {
+    const reviewId = await insertReview('pending');
+
+    await updatePreviousReviewSummary(reviewId, {
+      body: '## Summary\nactual\0NUL, literal \\u0000, and 😀',
+      headSha: 'previous-head-sha',
+    });
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.previous_summary_body).toBe(
+      '## Summary\nactual\ufffdNUL, literal \\u0000, and 😀'
+    );
+    expect(stored?.previous_summary_head_sha).toBe('previous-head-sha');
+
+    await updatePreviousReviewSummary(reviewId, { body: null, headSha: null });
+
+    const cleared = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(cleared?.previous_summary_body).toBeNull();
+    expect(cleared?.previous_summary_head_sha).toBeNull();
+  });
+
+  it('marks a reserved review failed when its dispatch error contains a NUL character', async () => {
+    const reservationId = crypto.randomUUID();
+    const reviewId = await insertReview('queued', {
+      dispatch_reservation_id: reservationId,
+    });
+
+    await expect(
+      failReservedQueuedReview(reviewId, reservationId, 'Dispatch failed: actual\0NUL')
+    ).resolves.toBe(true);
+
+    const stored = await db.query.cloud_agent_code_reviews.findFirst({
+      where: eq(cloud_agent_code_reviews.id, reviewId),
+    });
+    expect(stored?.status).toBe('failed');
+    expect(stored?.dispatch_reservation_id).toBeNull();
+    expect(stored?.error_message).toBe('Dispatch failed: actual\ufffdNUL');
   });
 });
 

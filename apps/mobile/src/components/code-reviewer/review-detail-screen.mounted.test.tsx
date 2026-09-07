@@ -111,6 +111,8 @@ vi.mock('@/components/code-reviewer/review-list-screen', () => ({
     className: 'text-good',
   }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/query-error', () => ({
   QueryError: (props: {
     variant?: string;
@@ -360,6 +362,33 @@ describe('ReviewDetailScreen outcome-first order', () => {
 
     expect(texts).toContain('review crashed');
     expect(texts.indexOf('Completed')).toBeLessThan(texts.indexOf('review crashed'));
+  });
+
+  it('clamps a multi-kilobyte failure dump so the retry action stays mounted', () => {
+    // A failed admission stores the raw upstream error (a serialized TRPC
+    // stack) in `error_message`. Rendered unclamped it filled the screen and
+    // pushed "Retry review" below the fold (e1-review-status.png), leaving no
+    // visible way out. The failure block must keep a bounded height.
+    statusHelpers.retriggerable = true;
+    const dump = `Dispatch failed: ${'at Object.<anonymous> (worker.js:1:1234)\n'.repeat(60)}`;
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed', error_message: dump }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
+    expect(texts).toContain('Retry review');
+
+    const errorNode = renderer.root.findAll(
+      node =>
+        (node.type as string) === 'Text' &&
+        collectText([node.props.children]).some(text => text.includes('Dispatch failed:'))
+    )[0];
+    expect(errorNode).toBeDefined();
+    expect(typeof errorNode?.props.numberOfLines).toBe('number');
+    expect(errorNode?.props.numberOfLines).toBeLessThanOrEqual(4);
   });
 });
 
@@ -666,6 +695,23 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(texts).toContain('No transcript for this review.');
   });
 
+  it('shows empty copy, not waiting copy, for a failed review without a session', () => {
+    // The dispatch worker refused the review: the server failed it. The sheet
+    // must leave the "Waiting for the review transcript" state once the status
+    // is terminal, or the user is stranded on an eternal spinner copy.
+    spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'failed' });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'failed' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen(true);
+
+    expect(texts).toContain('No transcript for this review.');
+    expect(texts).not.toContain('Waiting for the review transcript.');
+  });
+
   it('shows empty copy when a completed non-v2 review has stale stream info', () => {
     spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'running', agentVersion: 'v1' });
     detail.data = {
@@ -695,7 +741,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     );
     expect(spectatorError).toBeDefined();
     expect(spectatorError?.onRetry).toBeDefined();
-    expect(spectatorError?.placement).toBe('top');
+    expect(spectatorError?.placement).toBeUndefined();
   });
 
   it('fills the sheet with the transcript and clears the bottom safe area', () => {
@@ -729,6 +775,31 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(sessionListRenders.list[0]?.contentBottomInset).toBe(34);
   });
 
+  it.each([false, true])(
+    'keeps cached history after stream info fails with cached metadata %s',
+    hasMetadata => {
+      spectatorQueries.streamInfo.data = hasMetadata
+        ? makeStreamInfo({ status: 'completed' })
+        : { success: false, error: 'failed' };
+      spectatorQueries.streamInfo.isError = hasMetadata;
+      spectatorQueries.sessionMessages.data = {
+        success: true,
+        entries: [{ timestamp: 't1', message: 'Saved transcript', eventType: 'text' }],
+      };
+      detail.data = {
+        success: true,
+        review: makeReview({ status: 'completed' }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+
+      renderScreen(true);
+
+      const items = sessionListRenders.list.at(-1)?.items as { message: string }[];
+      expect(items).toEqual([expect.objectContaining({ message: 'Saved transcript' })]);
+      expect(queryErrors.errors).toHaveLength(0);
+    }
+  );
+
   it('shows QueryError plus Retry when the session snapshot fails', () => {
     spectatorQueries.streamInfo.data = makeStreamInfo({ status: 'completed' });
     spectatorQueries.sessionMessages.data = { success: false };
@@ -745,7 +816,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     );
     expect(snapshotError).toBeDefined();
     expect(snapshotError?.onRetry).toBeDefined();
-    expect(snapshotError?.placement).toBe('top');
+    expect(snapshotError?.placement).toBeUndefined();
 
     act(() => {
       snapshotError?.onRetry?.();
@@ -812,6 +883,61 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(afterDropItems?.[0]?.message).toBe('Execution started');
   });
 
+  it('renders streamed assistant text while the review is running', async () => {
+    const captured: { onEvent?: (event: unknown) => void } = {};
+    spectatorStream.createReviewSpectatorStream.mockImplementation(
+      (input: { onEvent: (event: unknown) => void }) => {
+        captured.onEvent = input.onEvent;
+        return {
+          connect: vi.fn(),
+          disconnect: vi.fn(),
+          retryReconnect: vi.fn(),
+          destroy: vi.fn(),
+        };
+      }
+    );
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+    });
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen(true);
+
+    expect(captured.onEvent).toBeDefined();
+    await act(async () => {
+      captured.onEvent?.({
+        eventId: 1,
+        sessionId: 'agent-1',
+        streamEventType: 'kilocode',
+        timestamp: 't1',
+        data: {
+          type: 'message.part.updated',
+          properties: {
+            part: {
+              id: 'prt_text',
+              sessionID: 'agent-1',
+              messageID: 'msg-1',
+              type: 'text',
+              text: 'Looking at the diff now.',
+              time: { start: 1_787_054_400_000 },
+            },
+          },
+        },
+      });
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
+      });
+    });
+
+    const items = sessionListRenders.list.at(-1)?.items as { message?: string }[] | undefined;
+    expect(items?.map(item => item.message)).toContain('Looking at the diff now.');
+  });
+
   it('keeps a streamed row when the review turns terminal (no skeleton or empty copy)', async () => {
     const captured: { onEvent?: (event: unknown) => void } = {};
     spectatorStream.createReviewSpectatorStream.mockImplementation(
@@ -868,7 +994,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
     expect(collectText(renderer.toJSON())).not.toContain('No transcript for this review.');
   });
 
-  it('shows a top-aligned QueryError when the live stream errors before any row', () => {
+  it('shows a centered QueryError when the live stream errors before any row', () => {
     const captured: { onError?: () => void } = {};
     spectatorStream.createReviewSpectatorStream.mockImplementation(
       (input: { onError: () => void }) => {
@@ -902,7 +1028,7 @@ describe('ReviewDetailScreen spectator transcript', () => {
       error => error.title === 'Could not load the review transcript.'
     );
     expect(liveErrorState).toBeDefined();
-    expect(liveErrorState?.placement).toBe('top');
+    expect(liveErrorState?.placement).toBeUndefined();
     expect(liveErrorState?.onRetry).toBeDefined();
   });
 });

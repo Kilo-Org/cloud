@@ -1,6 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
-import { SANDBOX_CONTROL_PROTOCOL_VERSION } from '../shared/sandbox-control-protocol.js';
-import { createSandboxControlSocketHandler } from './socket.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  SANDBOX_CONTROL_PROTOCOL_VERSION,
+  sandboxControlSocketAttachmentSchema,
+  sandboxHeartbeatPayloadSchema,
+  type SandboxHeartbeatPayload,
+} from '../shared/sandbox-control-protocol.js';
+import { createSandboxControlSocketHandler, readSandboxControlConnection } from './socket.js';
 import { createControlRequestWaiters } from './waiters.js';
 
 vi.mock('../logger.js', () => {
@@ -16,9 +21,9 @@ vi.mock('../logger.js', () => {
 
 type FakeWebSocket = {
   deserializeAttachment: () => unknown;
-  serializeAttachment: ReturnType<typeof vi.fn>;
-  send: ReturnType<typeof vi.fn>;
-  close: ReturnType<typeof vi.fn>;
+  serializeAttachment: ReturnType<typeof vi.fn<(attachment: unknown) => void>>;
+  send: ReturnType<typeof vi.fn<(message: string) => void>>;
+  close: ReturnType<typeof vi.fn<(code: number, reason: string) => void>>;
   readyState: number;
 };
 
@@ -57,7 +62,8 @@ function asWs(ws: FakeWebSocket): WebSocket {
 function helloFrame(
   providerInstanceId: string,
   wrapperInstanceId?: string,
-  requestId = 'req_hello'
+  requestId = 'req_hello',
+  capabilities?: { nativeRuntimeRetirement?: boolean }
 ): string {
   return JSON.stringify({
     type: 'request',
@@ -67,6 +73,7 @@ function helloFrame(
       protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
       providerInstanceId,
       ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
+      ...(capabilities ? { capabilities } : {}),
     },
   });
 }
@@ -75,6 +82,70 @@ const WRAPPER_INSTANCE_ID = '11111111-1111-4111-8111-111111111111';
 const REPLACEMENT_WRAPPER_INSTANCE_ID = '22222222-2222-4222-8222-222222222222';
 
 describe('sandbox control socket handler', () => {
+  it('accepts old heartbeats and ignores invalid optional versions without rejecting readiness', () => {
+    const heartbeat = { state: 'idle', kilo: { ready: true }, sessions: [] };
+    expect(sandboxHeartbeatPayloadSchema.parse(heartbeat)).toEqual(heartbeat);
+    for (const version of ['7.4.20', null]) {
+      expect(
+        sandboxHeartbeatPayloadSchema.parse({ ...heartbeat, kilo: { ready: true, version } }).kilo
+      ).toEqual({ ready: true, version });
+    }
+    for (const version of ['private-error', '7.4.20\n', { token: 'private' }]) {
+      const parsed = sandboxHeartbeatPayloadSchema.parse({
+        ...heartbeat,
+        kilo: { ready: true, version },
+      });
+      expect(parsed.kilo.ready).toBe(true);
+      expect(parsed.kilo.version).toBeUndefined();
+      expect(JSON.stringify(parsed)).not.toContain('private');
+    }
+  });
+  it.each([
+    ['2.4.0', '2.4.0'],
+    [undefined, null],
+    ['https://private.invalid/error', null],
+    ['2.4.0-private-instance', null],
+  ])('retains only safe hello wrapper metadata: %s', async (wrapperVersion, expected) => {
+    const incoming = createFakeWebSocket();
+    const onHandshakeComplete = vi.fn();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([incoming]),
+      'sbx_test',
+      undefined,
+      {
+        validateHandshake: () => true,
+        onHandshakeComplete,
+      }
+    );
+    await handler.handleMessage(
+      asWs(incoming),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'hello_metadata',
+        operation: 'sandbox.hello',
+        payload: {
+          protocolVersion: 1,
+          providerInstanceId: 'inst_1',
+          wrapperInstanceId: WRAPPER_INSTANCE_ID,
+          wrapperVersion,
+        },
+      })
+    );
+    expect(onHandshakeComplete).toHaveBeenCalledWith(handler.getConnectionIdentity(), {
+      wrapperVersion: expected,
+    });
+    await handler.handleMessage(
+      asWs(incoming),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'replayed_metadata',
+        operation: 'sandbox.hello',
+        payload: { protocolVersion: 1, providerInstanceId: 'inst_1', wrapperVersion: '9.9.9' },
+      })
+    );
+    expect(onHandshakeComplete).toHaveBeenCalledTimes(1);
+  });
+
   it('does not replace the current socket until sandbox.hello succeeds', async () => {
     const current = createFakeWebSocket({
       handshakeComplete: true,
@@ -143,7 +214,10 @@ describe('sandbox control socket handler', () => {
     );
 
     expect(validateHandshake).toHaveBeenCalledWith('inst_stale');
-    expect(incoming.serializeAttachment).not.toHaveBeenCalled();
+    expect(incoming.deserializeAttachment()).toMatchObject({
+      handshakeComplete: false,
+      kiloReady: false,
+    });
     expect(incoming.close).toHaveBeenCalledWith(1008, 'invalid_provider_instance');
     expect(incoming.send).toHaveBeenCalledWith(
       JSON.stringify({
@@ -235,6 +309,7 @@ describe('sandbox control socket handler', () => {
 
     expect(incoming.serializeAttachment).toHaveBeenCalledWith({
       handshakeComplete: true,
+      kiloReady: false,
       acceptedAt: expect.any(Number),
       connectionId: expect.any(String),
       protocolVersion: 1,
@@ -246,7 +321,16 @@ describe('sandbox control socket handler', () => {
         type: 'response',
         requestId: 'req_hello',
         ok: true,
-        result: { protocolVersion: 1, handshakeComplete: true },
+        result: {
+          protocolVersion: 1,
+          handshakeComplete: true,
+          capabilities: {
+            kiloVersionHeartbeat: true,
+            sessionOperationResults: true,
+            scopedStopAbort: true,
+            nativeRuntimeRetirement: true,
+          },
+        },
       })
     );
     const statusFrame = JSON.parse(incoming.send.mock.calls[1]?.[0] as string) as {
@@ -278,7 +362,23 @@ describe('sandbox control socket handler', () => {
       handshakeComplete: true,
       ...identity,
     });
-    expect(onHandshakeComplete).toHaveBeenCalledWith(handler.getConnectionIdentity());
+    expect(onHandshakeComplete).toHaveBeenCalledWith(handler.getConnectionIdentity(), {
+      wrapperVersion: null,
+    });
+  });
+
+  it('reads the native runtime retirement capability from the wrapper handshake', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_native_retirement', {
+        nativeRuntimeRetirement: true,
+      })
+    );
+
+    expect(handler.supportsNativeRuntimeRetirement()).toBe(true);
   });
 
   it('rejects duplicate hellos without replacing the current connection', async () => {
@@ -416,6 +516,7 @@ describe('sandbox control socket handler', () => {
 
     expect(superseded.deserializeAttachment()).toEqual({
       handshakeComplete: false,
+      kiloReady: false,
       acceptedAt: expect.any(Number),
     });
     expect(superseded.close).toHaveBeenCalledWith(1008, 'handshake_required');
@@ -452,7 +553,9 @@ describe('sandbox control socket handler', () => {
       helloFrame('inst_1', WRAPPER_INSTANCE_ID)
     );
 
-    expect(onHandshakeComplete).toHaveBeenCalledWith(handler.getConnectionIdentity());
+    expect(onHandshakeComplete).toHaveBeenCalledWith(handler.getConnectionIdentity(), {
+      wrapperVersion: null,
+    });
     expect(incoming.send).not.toHaveBeenCalled();
 
     await handler.handleMessage(
@@ -904,6 +1007,144 @@ describe('sandbox control socket handler', () => {
     );
   });
 
+  it('returns an exact receipt only after a session event is applied', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+    const receiptId = '123e4567-e89b-42d3-a456-426614174099';
+    const receiptHash = 'a'.repeat(64);
+    const onSessionEvent = vi.fn().mockResolvedValue({ applied: true });
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      { onSessionEvent }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'event-receipt',
+        operation: 'sandbox.event.publish',
+        payload: {
+          event: 'session.event',
+          receiptId,
+          receiptHash,
+          sequence: 1,
+          session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+          payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+        },
+      })
+    );
+
+    expect(onSessionEvent).toHaveBeenCalledWith(
+      { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+      { type: 'message.updated', properties: { id: 'msg_1' } },
+      handler.getConnectionIdentity(),
+      receiptId,
+      receiptHash,
+      1
+    );
+    expect(JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string)).toEqual({
+      type: 'response',
+      requestId: 'event-receipt',
+      ok: true,
+      result: { receiptId, applied: true },
+    });
+  });
+
+  it.each([false, true, undefined, 'transport_error'] as const)(
+    'returns rejection retryability %s without ACKing, then accepts the next receipt',
+    async retryable => {
+      const ws = createFakeWebSocket({
+        handshakeComplete: true,
+        acceptedAt: Date.now(),
+        protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+        providerInstanceId: 'inst_1',
+        wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      });
+      const onSessionEvent = vi.fn().mockResolvedValue({ applied: true });
+      if (retryable === 'transport_error')
+        onSessionEvent.mockRejectedValueOnce(new Error('Session transport unavailable'));
+      else onSessionEvent.mockResolvedValueOnce({ applied: false, retryable });
+      const handler = createSandboxControlSocketHandler(
+        createFakeState([ws]),
+        'sbx_test',
+        undefined,
+        { onSessionEvent }
+      );
+      const publication = {
+        type: 'request',
+        requestId: 'rejected-event',
+        operation: 'sandbox.event.publish',
+        payload: {
+          event: 'session.event',
+          receiptId: '123e4567-e89b-42d3-a456-426614174099',
+          receiptHash: 'a'.repeat(64),
+          sequence: 1,
+          session: {
+            directory: '/workspace/a',
+            kiloSessionId: 'kilo_1',
+            nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+          },
+          payload: { type: 'session.updated', properties: { info: { id: 'kilo_1' } } },
+        },
+      };
+
+      await handler.handleMessage(asWs(ws), JSON.stringify(publication));
+      expect(ws.send).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: publication.requestId,
+          ok: false,
+          error: {
+            code: retryable === false ? 'event_rejected' : 'not_ready',
+            message:
+              retryable === 'transport_error'
+                ? 'Sandbox event publication failed'
+                : 'Sandbox event publication was not applied',
+            retryable: retryable !== false,
+          },
+        })
+      );
+      expect(ws.close).not.toHaveBeenCalled();
+
+      const receiptId = '123e4567-e89b-42d3-a456-426614174100';
+      await handler.handleMessage(
+        asWs(ws),
+        JSON.stringify({
+          ...publication,
+          requestId: 'next-event',
+          payload: {
+            ...publication.payload,
+            receiptId,
+            sequence: 2,
+            session: {
+              ...publication.payload.session,
+              nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+            },
+          },
+        })
+      );
+      expect(onSessionEvent).toHaveBeenCalledTimes(2);
+      expect(ws.send).toHaveBeenCalledTimes(2);
+      expect(ws.send).toHaveBeenLastCalledWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: 'next-event',
+          ok: true,
+          result: { receiptId, applied: true },
+        })
+      );
+      expect(ws.close).not.toHaveBeenCalled();
+    }
+  );
+
   it('does not dispatch a session.event with an invalid payload', async () => {
     const ws = createFakeWebSocket({
       handshakeComplete: true,
@@ -1025,7 +1266,7 @@ describe('sandbox control socket handler', () => {
       wrapperInstanceId: WRAPPER_INSTANCE_ID,
     });
     expect(currentIdentity?.connectionId).not.toBe(previousIdentity?.connectionId);
-    expect(onHandshakeComplete).toHaveBeenCalledWith(currentIdentity);
+    expect(onHandshakeComplete).toHaveBeenCalledWith(currentIdentity, { wrapperVersion: null });
 
     const pending = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
     const request = JSON.parse(incoming.send.mock.calls[2]?.[0] as string) as { requestId: string };
@@ -1183,5 +1424,641 @@ describe('sandbox control socket handler', () => {
       })
     ).rejects.toThrow('session identity is required');
     expect(ws.send).not.toHaveBeenCalled();
+  });
+
+  it('requires readiness on the selected socket only for worktree captures', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      providerInstanceId: 'inst_1',
+    });
+    const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
+    const capture = {
+      operation: 'session.git.summary' as const,
+      session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+      payload: { revision: 1 },
+    };
+    await expect(handler.sendRequest(capture)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+    expect(ws.send).not.toHaveBeenCalled();
+    expect(handler.getReadySocket()).toBeNull();
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    expect(handler.getReadySocket()).toBe(ws);
+    const pending = handler.sendRequest(capture);
+    const sent = JSON.parse(ws.send.mock.calls[0]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    await expect(pending).resolves.toMatchObject({ ok: true });
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.heartbeat',
+        payload: { state: 'idle', kilo: { ready: false }, sessions: [] },
+      })
+    );
+    expect(handler.getReadySocket()).toBeNull();
+    await expect(handler.sendRequest(capture)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+    const status = handler.sendRequest({ operation: 'sandbox.status', payload: {} });
+    const statusSent = JSON.parse(ws.send.mock.calls[1]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({ type: 'response', requestId: statusSent.requestId, ok: true })
+    );
+    await expect(status).resolves.toMatchObject({ ok: true });
+  });
+
+  it('does not accept a response from a provisional or replaced socket', async () => {
+    const current = createFakeWebSocket({
+      handshakeComplete: true,
+      kiloReady: true,
+      acceptedAt: 1,
+      providerInstanceId: 'inst_1',
+    });
+    const provisional = createFakeWebSocket({ handshakeComplete: false, acceptedAt: Date.now() });
+    const sockets = [current, provisional];
+    const waiters = createControlRequestWaiters();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState(sockets),
+      'sbx_test',
+      waiters
+    );
+    const request = {
+      operation: 'session.git.summary' as const,
+      session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+      payload: { revision: 1 },
+    };
+    const pending = handler.sendRequest(request);
+    const sent = JSON.parse(current.send.mock.calls[0]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(provisional),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    expect(waiters.pendingCount()).toBe(1);
+    expect(provisional.close).toHaveBeenCalledWith(1008, 'handshake_required');
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    await expect(pending).resolves.toMatchObject({ ok: true });
+
+    const replacement = createFakeWebSocket({ handshakeComplete: false, acceptedAt: Date.now() });
+    sockets.push(replacement);
+    await handler.handleMessage(
+      asWs(replacement),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'hello_new',
+        operation: 'sandbox.hello',
+        payload: { protocolVersion: 1, providerInstanceId: 'inst_2' },
+      })
+    );
+    expect(handler.getReadySocket()).toBeNull();
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    expect(handler.getReadySocket()).toBeNull();
+    await expect(handler.sendRequest(request)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready' },
+    });
+
+    await handler.handleMessage(
+      asWs(replacement),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+    const replacementPending = handler.sendRequest(request);
+    const replacementSent = JSON.parse(replacement.send.mock.calls.at(-1)?.[0] as string) as {
+      requestId: string;
+    };
+    await handler.handleMessage(
+      asWs(current),
+      JSON.stringify({ type: 'response', requestId: replacementSent.requestId, ok: true })
+    );
+    expect(waiters.pendingCount()).toBe(1);
+    await handler.handleMessage(
+      asWs(replacement),
+      JSON.stringify({ type: 'response', requestId: replacementSent.requestId, ok: true })
+    );
+    await expect(replacementPending).resolves.toMatchObject({ ok: true });
+  });
+
+  it('rejects a capture if readiness changes before its response is accepted', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      kiloReady: true,
+      acceptedAt: Date.now(),
+      providerInstanceId: 'inst_1',
+    });
+    const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
+    const pending = handler.sendRequest({
+      operation: 'session.git.summary',
+      session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+      payload: { revision: 1 },
+    });
+    const sent = JSON.parse(ws.send.mock.calls[0]?.[0] as string) as { requestId: string };
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.heartbeat',
+        payload: { state: 'idle', kilo: { ready: false }, sessions: [] },
+      })
+    );
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+    );
+    await expect(pending).rejects.toThrow('Worktree capture connection changed');
+  });
+});
+
+const now = 1_000_000;
+const handshaken = {
+  handshakeComplete: true,
+  acceptedAt: now - 1_000,
+  protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+  providerInstanceId: 'inst_1',
+};
+const idleHeartbeat: SandboxHeartbeatPayload = {
+  state: 'idle',
+  pendingMessages: 0,
+  kilo: { ready: true },
+  sessions: [{ kiloSessionId: 'kilo_1', state: 'idle', idleForMs: 0 }],
+};
+const readyFrame = JSON.stringify({
+  type: 'event',
+  event: 'sandbox.ready',
+  payload: { kiloReady: true, globalFeedAttached: true },
+});
+const busyFrame = JSON.stringify({
+  type: 'event',
+  event: 'session.event',
+  session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+  payload: {
+    type: 'session.status',
+    properties: { sessionID: 'kilo_1', status: { type: 'busy' } },
+  },
+});
+function heartbeatFrame(payload: SandboxHeartbeatPayload = idleHeartbeat) {
+  return JSON.stringify({ type: 'event', event: 'sandbox.heartbeat', payload });
+}
+function statusHelloFrame() {
+  return JSON.stringify({
+    type: 'request',
+    requestId: 'hello-observation',
+    operation: 'sandbox.hello',
+    payload: { protocolVersion: 1, providerInstanceId: 'inst_1' },
+  });
+}
+
+function readTestConnection(
+  state: Pick<DurableObjectState, 'getWebSockets'>,
+  providerRef: string | null
+) {
+  const socket = state.getWebSockets().find(ws => {
+    const parsed = sandboxControlSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
+    return ws.readyState === 1 && parsed.success && parsed.data.handshakeComplete;
+  });
+  const parsed = sandboxControlSocketAttachmentSchema.safeParse(socket?.deserializeAttachment());
+  return readSandboxControlConnection(
+    state,
+    providerRef,
+    parsed.success ? { ...parsed.data, readyConnectionId: parsed.data.connectionId } : null
+  );
+}
+
+function attachmentOf(ws: FakeWebSocket) {
+  return sandboxControlSocketAttachmentSchema.parse(ws.deserializeAttachment());
+}
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.useRealTimers();
+});
+
+describe('connection-local sandbox observations', () => {
+  it('records ready and explicit false heartbeats across handler reconstruction without frames', async () => {
+    vi.useFakeTimers({ now });
+    const ws = createFakeWebSocket(handshaken);
+    const state = createFakeState([ws]);
+    const onReady = vi.fn();
+    const onHeartbeat = vi.fn();
+    const handler = createSandboxControlSocketHandler(state, 'sbx_test', undefined, {
+      onReady,
+      onHeartbeat,
+    });
+    await handler.handleMessage(asWs(ws), readyFrame);
+    expect(attachmentOf(ws).observation).toEqual({ ready: true, receivedAt: now, idle: null });
+    await handler.handleMessage(asWs(ws), heartbeatFrame());
+    expect(attachmentOf(ws).observation).toEqual({
+      ready: true,
+      receivedAt: now,
+      idle: { sessionCount: 1, sessionIdsHash: expect.stringMatching(/^[0-9a-f]{64}$/) },
+    });
+    vi.advanceTimersByTime(5);
+    const notReady = { ...idleHeartbeat, kilo: { ready: false } };
+    await handler.handleMessage(asWs(ws), heartbeatFrame(notReady));
+    createSandboxControlSocketHandler(state, 'sbx_test');
+    expect(readTestConnection(state, 'inst_1')).toEqual({
+      state: 'connected',
+      acceptedAt: handshaken.acceptedAt,
+      observation: { ready: false, receivedAt: now + 5, idle: null },
+    });
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(onHeartbeat.mock.calls.map(call => call[0])).toEqual([idleHeartbeat, notReady]);
+    expect(ws.send).not.toHaveBeenCalled();
+  });
+
+  it('resets observation on every handshake and ignores late replaced-socket readiness', async () => {
+    vi.useFakeTimers({ now });
+    const previous = createFakeWebSocket(handshaken);
+    const replacement = createFakeWebSocket({ handshakeComplete: false, acceptedAt: now });
+    const sockets = [previous, replacement];
+    const state = createFakeState(sockets);
+    const handler = createSandboxControlSocketHandler(state, 'sbx_test');
+    await handler.handleMessage(asWs(previous), heartbeatFrame());
+    await handler.handleMessage(asWs(replacement), statusHelloFrame());
+    previous.readyState = 2;
+    expect(attachmentOf(replacement).observation).toBeUndefined();
+    await handler.handleMessage(asWs(previous), readyFrame);
+    await handler.handleMessage(asWs(previous), heartbeatFrame());
+    expect(readTestConnection(state, 'inst_1')).toEqual({ state: 'unknown' });
+    await handler.handleMessage(
+      asWs(replacement),
+      heartbeatFrame({ ...idleHeartbeat, kilo: { ready: false } })
+    );
+    expect(readTestConnection(state, 'inst_1')).toMatchObject({
+      state: 'connected',
+      observation: { ready: false, idle: null },
+    });
+    await handler.handleMessage(asWs(replacement), readyFrame);
+    expect(readTestConnection(state, 'inst_1')).toMatchObject({
+      state: 'connected',
+      observation: { ready: true, idle: null },
+    });
+    const beforeDuplicate = attachmentOf(replacement);
+    await handler.handleMessage(asWs(replacement), statusHelloFrame());
+    expect(attachmentOf(replacement)).toEqual(beforeDuplicate);
+    expect(replacement.send).toHaveBeenLastCalledWith(expect.stringContaining('protocol_error'));
+  });
+
+  it.each(['unhealthy', 'closed', 'replaced'] as const)(
+    'keeps capture readiness fenced when a delayed heartbeat is overtaken by %s',
+    async change => {
+      vi.useFakeTimers({ now });
+      const ws = createFakeWebSocket({ ...handshaken, wrapperInstanceId: WRAPPER_INSTANCE_ID });
+      const sockets = [ws];
+      const state = createFakeState(sockets);
+      const firstHook = Promise.withResolvers<void>();
+      const handler = createSandboxControlSocketHandler(state, 'sbx_test', undefined, {
+        onHeartbeat: vi.fn().mockImplementationOnce(() => firstHook.promise),
+      });
+      await handler.handleMessage(asWs(ws), readyFrame);
+      const identity = handler.getConnectionIdentity();
+      const earlier = handler.handleMessage(asWs(ws), heartbeatFrame());
+      expect(handler.getReadySocket()).toBe(ws);
+      expect(attachmentOf(ws)).toMatchObject({ ...identity, kiloReady: true });
+      const pending = handler.sendRequest({
+        operation: 'session.git.summary',
+        session: { sessionId: 'workspace_1', kiloSessionId: 'kilo_1', directory: '/workspace' },
+        payload: { revision: 1 },
+      });
+      const rejected = expect(pending).rejects.toThrow();
+      const sent = JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string) as { requestId: string };
+      if (change === 'unhealthy') {
+        await handler.handleMessage(
+          asWs(ws),
+          heartbeatFrame({
+            ...idleHeartbeat,
+            kilo: { ready: false, reason: 'credential_refresh_failed' },
+          })
+        );
+      } else if (change === 'closed') {
+        handler.closeAll('runtime closed');
+      } else {
+        const replacement = createFakeWebSocket({ handshakeComplete: false, acceptedAt: now });
+        sockets.push(replacement);
+        await handler.handleMessage(asWs(replacement), helloFrame('inst_1', WRAPPER_INSTANCE_ID));
+      }
+      const fencedAttachment = attachmentOf(ws);
+      firstHook.resolve();
+      await earlier;
+      expect(attachmentOf(ws)).toEqual(fencedAttachment);
+      expect(handler.getReadySocket()).toBeNull();
+      await handler.handleMessage(
+        asWs(ws),
+        JSON.stringify({ type: 'response', requestId: sent.requestId, ok: true })
+      );
+      await rejected;
+    }
+  );
+
+  it('does not overwrite newer false evidence when an earlier idle hook completes late', async () => {
+    vi.useFakeTimers({ now });
+    const ws = createFakeWebSocket(handshaken);
+    const firstHook = Promise.withResolvers<void>();
+    const onHeartbeat = vi.fn().mockImplementationOnce(() => firstHook.promise);
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onHeartbeat,
+      }
+    );
+    const earlier = handler.handleMessage(asWs(ws), heartbeatFrame());
+    await handler.handleMessage(
+      asWs(ws),
+      heartbeatFrame({ ...idleHeartbeat, kilo: { ready: false } })
+    );
+    firstHook.resolve();
+    await earlier;
+    expect(attachmentOf(ws).observation).toEqual({ ready: false, receivedAt: now, idle: null });
+  });
+
+  it.each([
+    ['busy', busyFrame],
+    [
+      'message',
+      JSON.stringify({
+        type: 'event',
+        event: 'session.event',
+        session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+        payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+      }),
+    ],
+    [
+      'preparing',
+      JSON.stringify({
+        type: 'event',
+        event: 'session.preparing',
+        session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+        payload: {
+          version: 2,
+          attemptId: 'att_1',
+          triggerMessageId: 'msg_1',
+          revision: 1,
+          timestamp: now,
+          step: 'cloning',
+          message: 'Cloning repository',
+          action: 'step_started',
+        },
+      }),
+    ],
+  ])(
+    'invalidates persisted idle evidence on a newer %s event without refreshing readiness',
+    async (_name, frame) => {
+      vi.useFakeTimers({ now });
+      const ws = createFakeWebSocket(handshaken);
+      const state = createFakeState([ws]);
+      await createSandboxControlSocketHandler(state, 'sbx_test').handleMessage(
+        asWs(ws),
+        heartbeatFrame()
+      );
+      expect(attachmentOf(ws).observation?.idle).toMatchObject({ sessionCount: 1 });
+      vi.advanceTimersByTime(5);
+      const handler = createSandboxControlSocketHandler(state, 'sbx_test');
+      await handler.handleMessage(asWs(ws), frame);
+      expect(attachmentOf(ws).observation).toEqual({ ready: true, receivedAt: now, idle: null });
+      expect(ws.send).not.toHaveBeenCalled();
+      await handler.handleMessage(asWs(ws), heartbeatFrame());
+      expect(attachmentOf(ws).observation).toMatchObject({
+        ready: true,
+        receivedAt: now + 5,
+        idle: { sessionCount: 1 },
+      });
+    }
+  );
+
+  it('fences an in-flight idle heartbeat before forwarding a newer busy event in the same millisecond', async () => {
+    vi.useFakeTimers({ now });
+    const ws = createFakeWebSocket(handshaken);
+    const heartbeatHook = Promise.withResolvers<void>();
+    const eventHook = Promise.withResolvers<void>();
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      {
+        onHeartbeat: () => heartbeatHook.promise,
+        onSessionEvent: () => eventHook.promise,
+      }
+    );
+    const heartbeat = handler.handleMessage(asWs(ws), heartbeatFrame());
+    const event = handler.handleMessage(asWs(ws), busyFrame);
+    heartbeatHook.resolve();
+    try {
+      await heartbeat;
+      expect(attachmentOf(ws).observation).toEqual({ ready: true, receivedAt: now, idle: null });
+    } finally {
+      eventHook.resolve();
+      await event;
+    }
+  });
+
+  it('ignores replaced-socket activity without invalidating current idle evidence', async () => {
+    vi.useFakeTimers({ now });
+    const previous = createFakeWebSocket(handshaken);
+    const replacement = createFakeWebSocket({ ...handshaken, acceptedAt: now });
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([previous, replacement]),
+      'sbx_test'
+    );
+    previous.readyState = 2;
+    await handler.handleMessage(asWs(replacement), heartbeatFrame());
+    const attachment = attachmentOf(replacement);
+    await handler.handleMessage(asWs(previous), busyFrame);
+    expect(attachmentOf(replacement)).toEqual(attachment);
+    expect(attachment.observation?.idle).toMatchObject({ sessionCount: 1 });
+    expect(previous.serializeAttachment).not.toHaveBeenCalled();
+  });
+
+  it('does not expose readiness during activation or under another persisted runtime identity', async () => {
+    vi.useFakeTimers({ now });
+    const previous = createFakeWebSocket({ ...handshaken, wrapperInstanceId: WRAPPER_INSTANCE_ID });
+    const replacement = createFakeWebSocket({ handshakeComplete: false, acceptedAt: now });
+    const state = createFakeState([previous, replacement]);
+    const activation = Promise.withResolvers<void>();
+    const onReady = vi.fn();
+    const handler = createSandboxControlSocketHandler(state, 'sbx_test', undefined, {
+      onHandshakeComplete: () => activation.promise,
+      onReady,
+    });
+    const oldRuntime = attachmentOf(previous);
+    const handshake = handler.handleMessage(
+      asWs(replacement),
+      helloFrame('inst_1', REPLACEMENT_WRAPPER_INSTANCE_ID)
+    );
+    await handler.handleMessage(asWs(replacement), readyFrame);
+    expect(onReady).not.toHaveBeenCalled();
+    expect(attachmentOf(replacement).observation).toBeUndefined();
+    activation.resolve();
+    await handshake;
+    await handler.handleMessage(asWs(replacement), readyFrame);
+    const current = attachmentOf(replacement);
+    expect(onReady).toHaveBeenCalledWith({
+      connectionId: current.connectionId,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: REPLACEMENT_WRAPPER_INSTANCE_ID,
+    });
+    const runtime = { ...current, readyConnectionId: current.connectionId };
+    for (const stale of [
+      undefined,
+      oldRuntime,
+      { ...runtime, readyConnectionId: oldRuntime.connectionId },
+      { ...runtime, wrapperInstanceId: WRAPPER_INSTANCE_ID },
+    ]) {
+      expect(readSandboxControlConnection(state, 'inst_1', stale)).toEqual({ state: 'unknown' });
+    }
+    const serialize = replacement.serializeAttachment.mock.calls.length;
+    expect(readSandboxControlConnection(state, 'inst_1', runtime)).toMatchObject({
+      state: 'connected',
+      observation: { ready: true, receivedAt: now },
+    });
+    expect(replacement.serializeAttachment).toHaveBeenCalledTimes(serialize);
+  });
+
+  it('does not let an in-flight heartbeat populate a same-provider replacement', async () => {
+    vi.useFakeTimers({ now });
+    const previous = createFakeWebSocket(handshaken);
+    const replacement = createFakeWebSocket({ handshakeComplete: false, acceptedAt: now });
+    const state = createFakeState([previous, replacement]);
+    const hook = Promise.withResolvers<void>();
+    const handler = createSandboxControlSocketHandler(state, 'sbx_test', undefined, {
+      onHeartbeat: () => hook.promise,
+    });
+    const heartbeat = handler.handleMessage(asWs(previous), heartbeatFrame());
+    await handler.handleMessage(asWs(replacement), statusHelloFrame());
+    previous.readyState = 2;
+    hook.resolve();
+    await heartbeat;
+    expect(attachmentOf(replacement).observation).toBeUndefined();
+    expect(readTestConnection(state, 'inst_1')).toEqual({ state: 'unknown' });
+  });
+
+  it('retains no unbounded session payload in attachments', async () => {
+    vi.useFakeTimers({ now });
+    const ws = createFakeWebSocket(handshaken);
+    const payload: SandboxHeartbeatPayload = {
+      ...idleHeartbeat,
+      sessions: Array.from({ length: 2_000 }, (_, index) => ({
+        kiloSessionId: `kilo_${index}`,
+        state: 'idle',
+        idleForMs: 0,
+      })),
+    };
+    const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
+    await handler.handleMessage(asWs(ws), heartbeatFrame(payload));
+    expect(attachmentOf(ws).observation?.idle?.sessionCount).toBe(2_000);
+    const serialized = JSON.stringify(ws.deserializeAttachment());
+    expect(serialized.length).toBeLessThan(512);
+    expect(serialized).not.toContain('kilo_1999');
+  });
+
+  it.each([
+    { event: 'sandbox.ready', payload: { kiloReady: false, globalFeedAttached: true } },
+    { event: 'sandbox.ready', payload: { kiloReady: true } },
+    { event: 'sandbox.heartbeat', payload: { ...idleHeartbeat, kilo: { ready: 'true' } } },
+    { event: 'sandbox.heartbeat', payload: { ...idleHeartbeat, sessions: undefined } },
+    { event: 'unknown', payload: idleHeartbeat },
+  ])('does not record invalid or unrelated $event evidence', async frame => {
+    const ws = createFakeWebSocket(handshaken);
+    const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
+    await handler.handleMessage(asWs(ws), JSON.stringify({ type: 'event', ...frame }));
+    expect(ws.serializeAttachment).not.toHaveBeenCalled();
+  });
+
+  it('does not derive readiness from an operational sandbox.status response', async () => {
+    const ws = createFakeWebSocket(handshaken);
+    const handler = createSandboxControlSocketHandler(createFakeState([ws]), 'sbx_test');
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'response',
+        requestId: 'probe',
+        ok: true,
+        result: { healthy: true, kiloReady: true, state: 'idle', version: 'test' },
+      })
+    );
+    expect(ws.serializeAttachment).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    null,
+    handshaken,
+    { ...handshaken, observation: { ready: true, receivedAt: NaN, idle: null } },
+    { ...handshaken, observation: { ready: true, receivedAt: now, idle: { sessionCount: 1 } } },
+    { ...handshaken, observation: { ready: true, receivedAt: now - 2_000, idle: null } },
+    {
+      ...handshaken,
+      protocolVersion: undefined,
+      observation: { ready: true, receivedAt: now, idle: null },
+    },
+  ])('treats old or invalid attachments as unknown without rewriting them: %j', attachment => {
+    const ws = createFakeWebSocket(attachment);
+    const state = createFakeState([ws]);
+    expect(readTestConnection(state, 'inst_1')).toEqual({ state: 'unknown' });
+    expect(ws.serializeAttachment).not.toHaveBeenCalled();
+    expect(ws.send).not.toHaveBeenCalled();
+    expect(ws.close).not.toHaveBeenCalled();
+  });
+
+  it('requires one matching open handshaken socket, without choosing by acceptance time', () => {
+    const attachment = { ...handshaken, observation: { ready: true, receivedAt: now, idle: null } };
+    const older = createFakeWebSocket(attachment);
+    const newer = createFakeWebSocket({ ...attachment, acceptedAt: now });
+    expect(readTestConnection(createFakeState([older, newer]), 'inst_1')).toEqual({
+      state: 'unknown',
+    });
+    expect(readTestConnection(createFakeState([older]), 'different')).toEqual({
+      state: 'unknown',
+    });
+    older.readyState = 2;
+    expect(readTestConnection(createFakeState([older]), 'inst_1')).toEqual({
+      state: 'disconnected',
+    });
+    const provisional = createFakeWebSocket({ handshakeComplete: false, acceptedAt: now });
+    expect(readTestConnection(createFakeState([provisional]), 'inst_1')).toEqual({
+      state: 'disconnected',
+    });
+    expect(
+      readTestConnection(createFakeState([older, newer, provisional]), 'inst_1')
+    ).toMatchObject({ state: 'connected' });
+  });
+
+  it('keeps operational dispatch usable when only the optional observation is invalid', async () => {
+    const ws = createFakeWebSocket({ ...handshaken, observation: { ready: 'invalid' } });
+    const state = createFakeState([ws]);
+    const handler = createSandboxControlSocketHandler(state, 'sbx_test');
+    expect(handler.hasHandshakenSocket()).toBe(true);
+    expect(readTestConnection(state, 'inst_1')).toEqual({ state: 'unknown' });
+    await handler.handleMessage(asWs(ws), readyFrame);
+    expect(attachmentOf(ws).observation?.ready).toBe(true);
   });
 });

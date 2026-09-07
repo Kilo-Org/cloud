@@ -9,7 +9,7 @@ export function errorMessage(status: string, fallback: string | undefined): stri
       return i18n.t('login.accessDenied');
     }
     default: {
-      return fallback ?? i18n.t('login.somethingWentWrong');
+      return fallback ?? i18n.t('authErrors.default');
     }
   }
 }

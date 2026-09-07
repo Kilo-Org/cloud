@@ -74,7 +74,7 @@ export function ReactionPickerSheet({
       <View className="flex-1 justify-end bg-[#00000066]">
         <Pressable
           className="flex-1"
-          accessibilityLabel={t('prReview.discussion.closeReactions')}
+          accessibilityLabel={t('common.closeReactions')}
           onPress={onClose}
         />
         <View
@@ -89,11 +89,13 @@ export function ReactionPickerSheet({
               accessibilityRole="header"
               className="min-w-0 flex-1 text-center text-base font-semibold text-foreground"
             >
-              {t('prReview.discussion.reactionsTitle')}
+              {/* i18n-dup-ok: prReview.discussion.reaction* is a numeral count label
+                  ('3 reactions'); this key is the picker's title — cs/pl/uk differ. */}
+              {t('common.reactions')}
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t('prReview.discussion.closeReactions')}
+              accessibilityLabel={t('common.closeReactions')}
               className="size-11 shrink-0 items-center justify-center rounded-full active:bg-muted"
               onPress={onClose}
             >

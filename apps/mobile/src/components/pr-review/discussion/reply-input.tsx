@@ -214,7 +214,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
         const message =
           reply.error instanceof Error
             ? reply.error.message
-            : t('prReview.discussion.couldNotReply');
+            : t('prReview.operation.couldNotReply');
         setInlineError(message);
         setInlineErrorKind('retryable');
       }
@@ -298,7 +298,7 @@ export function ReplyInput({ owner, repo, number, commentId, reply }: Readonly<R
           }}
           accessibilityLabel={t('prReview.discussion.submitReply')}
         >
-          <Text>{t('prReview.discussion.reply')}</Text>
+          <Text>{t('common.reply')}</Text>
         </Button>
       </View>
     </View>

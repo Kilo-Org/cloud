@@ -128,7 +128,7 @@ export function startDeviceAuthPoll(params: {
         case 'expired': {
           cleanup();
           setState(previous =>
-            errorDeviceAuthState(code, i18n.t('authErrors.signInFailed'), previous.verificationUrl)
+            errorDeviceAuthState(code, i18n.t('authErrors.invalidToken'), previous.verificationUrl)
           );
           return;
         }

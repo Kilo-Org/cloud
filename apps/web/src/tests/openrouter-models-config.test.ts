@@ -7,7 +7,6 @@ import {
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import { tencent_hy3_free_model } from '@/lib/ai-gateway/providers/tencent';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
@@ -28,7 +27,8 @@ describe('OpenRouter Models Config', () => {
       'stealth/qwen3.6-plus',
       QWEN37_PLUS_MODEL_ID,
       'deepseek/deepseek-v4-pro',
-      tencent_hy3_free_model.public_id,
+      'tencent/hy3:free',
+      'meituan/longcat-2.0-free',
     ];
 
     supersededModels.forEach(model => {

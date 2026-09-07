@@ -9,10 +9,12 @@ import {
   Shield,
   Smartphone,
 } from '@/components/ui/icons';
-import { ActivityIndicator, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { AppUnlockFeedback } from '@/components/app-unlock-screen';
+import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -120,7 +122,7 @@ export function PreferencesScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('preferences.title')} />
+      <ScreenHeader title={t('common.preferences')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-3 pt-4"
@@ -188,6 +190,8 @@ export function PreferencesScreen() {
           />
         </View>
 
+        {__DEV__ ? <FeatureFlagsSection /> : null}
+
         {/* Account */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
@@ -221,7 +225,7 @@ export function PreferencesScreen() {
           />
           <ConfigureRow
             icon={Smartphone}
-            title={t('profile.deviceSessions')}
+            title={t('common.deviceSessions')}
             subtitle={t('profile.deviceSessionsSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last
@@ -234,11 +238,11 @@ export function PreferencesScreen() {
         {/* Notifications */}
         <View className="mt-3 gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('preferences.notifications')}
+            {t('common.notifications')}
           </Text>
           <ConfigureRow
             icon={Bell}
-            title={t('preferences.notifications')}
+            title={t('common.notifications')}
             subtitle={t('preferences.notificationsSubtitle')}
             className="rounded-lg bg-secondary px-3"
             last

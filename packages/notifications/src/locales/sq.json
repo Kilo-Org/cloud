@@ -7,7 +7,8 @@
       "instanceLifecycle": "Instanca juaj ka një përditësim",
       "scheduledAction": "Një veprim i planifikuar ka një përditësim",
       "lowBalance": "Bilanci juaj ka nevojë për vëmendje",
-      "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje"
+      "securityFinding": "Një gjetje sigurie ka nevojë për vëmendje",
+      "activeAgentsGlanceable": "Agjentët aktivë kanë një përditësim"
     }
   },
   "cloudAgentSession": {

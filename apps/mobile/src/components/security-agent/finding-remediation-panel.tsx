@@ -3,9 +3,12 @@ import { getRemediationStatusPresentation } from '@kilocode/app-shared/security-
 import { Wrench } from '@/components/ui/icons';
 import { useRouter } from 'expo-router';
 import { type TFunction } from 'i18next';
-import { ActivityIndicator, Alert, View } from 'react-native';
+import { Alert, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
+import { CenteredState } from '@/components/centered-state';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -42,11 +45,11 @@ type FindingRemediationPanelProps = {
 // action values (same labels as the web audit report ACTION_LABELS).
 const REMEDIATION_TIMELINE_LABELS = {
   'security.remediation.queued': 'securityAgent.remediation.timeline.queued',
-  'security.remediation.pr_opened': 'securityAgent.remediation.timeline.prOpened',
+  'security.remediation.pr_opened': 'securityAgent.remediationStatus.prOpened',
   'security.remediation.failed': 'securityAgent.remediation.timeline.failed',
   'security.remediation.blocked': 'securityAgent.remediation.timeline.blocked',
-  'security.remediation.no_changes_needed': 'securityAgent.remediation.timeline.noChangesNeeded',
-  'security.remediation.cancelled': 'securityAgent.remediation.timeline.cancelled',
+  'security.remediation.no_changes_needed': 'securityAgent.remediationStatus.noChangesNeeded',
+  'security.remediation.cancelled': 'common.cancelled',
 } as const satisfies Record<string, string>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -59,17 +62,17 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 // plus the PR-draft flag decides the key; icon, tone, and spinning still come
 // from app-shared.
 const REMEDIATION_STATUS_KEYS = {
-  cancellationRequested: 'securityAgent.remediationStatus.cancellationRequested',
+  cancellationRequested: 'securityAgent.remediation.cancellationRequested',
   notStarted: 'securityAgent.remediationStatus.notStarted',
-  queued: 'securityAgent.remediationStatus.queued',
+  queued: 'common.queued',
   starting: 'securityAgent.remediationStatus.starting',
   inProgress: 'securityAgent.remediationStatus.inProgress',
   draftPrOpened: 'securityAgent.remediationStatus.draftPrOpened',
   prOpened: 'securityAgent.remediationStatus.prOpened',
   blocked: 'securityAgent.remediationStatus.blocked',
-  failed: 'securityAgent.remediationStatus.failed',
+  failed: 'common.failed',
   noChangesNeeded: 'securityAgent.remediationStatus.noChangesNeeded',
-  cancelled: 'securityAgent.remediationStatus.cancelled',
+  cancelled: 'common.cancelled',
 } as const satisfies Record<string, string>;
 
 function getRemediationStatusKey(
@@ -136,7 +139,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   finding_not_open: 'securityAgent.remediationUnavailable.findingNotOpen',
   repo_not_in_scope: 'securityAgent.remediationUnavailable.repoNotInScope',
   analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
-  sandbox_analysis_required: 'securityAgent.remediationUnavailable.sandboxAnalysisRequired',
+  sandbox_analysis_required: 'securityAgent.remediationUnavailable.analysisRequired',
   stale_analysis: 'securityAgent.remediationUnavailable.staleAnalysis',
   not_exploitable: 'securityAgent.remediationUnavailable.notExploitable',
   exploitability_unknown: 'securityAgent.remediationUnavailable.exploitabilityUnknown',
@@ -155,7 +158,7 @@ const REMEDIATION_UNAVAILABLE_KEYS = {
   before_enablement: 'securityAgent.remediationUnavailable.beforeEnablement',
 } as const satisfies Record<string, string>;
 
-const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediationUnavailable.generic';
+const REMEDIATION_UNAVAILABLE_GENERIC_KEY = 'securityAgent.remediation.unavailable';
 
 function getRemediationUnavailableKey(reason: string | null | undefined): string | null {
   if (!reason || reason === 'eligible') {
@@ -221,12 +224,12 @@ export function FindingRemediationPanel({
       router.push(getPrReviewPath(destination.owner, destination.repo, destination.number));
       return;
     }
-    void openExternalUrl(url, { label: t('securityAgent.remediation.pullRequest') });
+    void openExternalUrl(url, { label: t('common.pullRequest') });
   };
 
   if (isLoading && !analysis) {
     return (
-      <View className="gap-3">
+      <View className="gap-3 px-6 pt-2">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-32 w-full rounded-lg" />
       </View>
@@ -234,20 +237,15 @@ export function FindingRemediationPanel({
   }
 
   if (isError && !analysis) {
-    return (
-      <View className="items-center justify-center py-8">
-        <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />
-      </View>
-    );
+    return <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />;
   }
 
   if (!analysis) {
     return (
       <EmptyState
         icon={Wrench}
-        placement="top"
-        title={t('securityAgent.remediation.noAnalysisTitle')}
-        description={t('securityAgent.remediation.noAnalysisDescription')}
+        title={t('securityAgent.analysis.noAnalysisYet')}
+        description={t('securityAgent.analysis.noAnalysisYetDescription')}
       />
     );
   }
@@ -281,8 +279,12 @@ export function FindingRemediationPanel({
       ? getRemediationUnavailableKey(remediationCapability.retryReason)
       : null;
 
-  return (
-    <View className="gap-4">
+  const hasContent =
+    Boolean(remediationSummary) || remediationAttempts.length > 0 || remediationTimeline.length > 0;
+  const Body = hasContent ? TabScreenScrollView : CenteredState;
+
+  const content = (
+    <View className="gap-4 px-6 py-2">
       <View className="gap-1 rounded-lg bg-secondary p-3">
         <FindingStatusBadge
           icon={presentation.icon}
@@ -349,7 +351,7 @@ export function FindingRemediationPanel({
               t('securityAgent.remediation.cancelTitle'),
               t('securityAgent.remediation.cancelMessage'),
               [
-                { text: t('securityAgent.remediation.keepRunning'), style: 'cancel' },
+                { text: t('common.keepRunning'), style: 'cancel' },
                 {
                   text: t('securityAgent.remediation.cancelRemediation'),
                   style: 'destructive',
@@ -469,16 +471,11 @@ export function FindingRemediationPanel({
                     value={originKey ? t(originKey) : attempt.origin.replaceAll('_', ' ')}
                   />
                   <KvRow
-                    label={t('securityAgent.remediation.model')}
+                    label={t('common.model')}
                     value={attempt.remediationModelSlug}
                     selectable
                   />
-                  <KvRow
-                    label={t('securityAgent.remediation.branch')}
-                    value={attempt.branchName}
-                    last
-                    selectable
-                  />
+                  <KvRow label={t('common.branch')} value={attempt.branchName} last selectable />
                   {outcome ? (
                     <Text variant="muted" className="text-xs" selectable>
                       {outcome}
@@ -521,4 +518,6 @@ export function FindingRemediationPanel({
       ) : null}
     </View>
   );
+
+  return <Body className="flex-1">{content}</Body>;
 }

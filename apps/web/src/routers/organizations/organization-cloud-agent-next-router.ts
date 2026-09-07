@@ -1,5 +1,5 @@
 import 'server-only';
-import { createTRPCRouter } from '@/lib/trpc/init';
+import { baseProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
@@ -11,6 +11,7 @@ import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { generateCloudAgentToken } from '@/lib/tokens';
 import { isFeatureFlagEnabledOrDevelopment } from '@/lib/posthog-feature-flags';
 import {
+  ensureOrganizationAccess,
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@/routers/organizations/utils';
@@ -37,6 +38,9 @@ import {
   baseCancelQueuedMessageNextSchema,
   baseGetSessionNextSchema,
   baseGetSessionNextOutputSchema,
+  baseGetSandboxStatusNextSchema,
+  baseGetSandboxStatusNextOutputSchema,
+  baseWorktreeChangesNextSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
@@ -68,6 +72,10 @@ import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForOrganizationUser } from '@/lib/organizations/organization-usage';
 import { isMobileClient } from '@/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
+import {
+  getWorktreeChangesOutputSchema,
+  refreshWorktreeChangesOutputSchema,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
 function buildTerminalUrl(params: {
   cloudAgentSessionId: string;
@@ -171,6 +179,14 @@ const ReleasePendingUploadsInput = cloudAgentReleasePendingUploadsSchema.extend(
 });
 
 const GetSessionInput = baseGetSessionNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const GetSandboxStatusInput = baseGetSandboxStatusNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorktreeChangesInput = baseWorktreeChangesNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -451,6 +467,32 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       }
     }),
 
+  getWorktreeChanges: organizationMemberProcedure
+    .input(WorktreeChangesInput)
+    .output(getWorktreeChangesOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      return await client.getWorktreeChanges(input.cloudAgentSessionId);
+    }),
+
+  refreshWorktreeChanges: organizationMemberProcedure
+    .input(WorktreeChangesInput)
+    .output(refreshWorktreeChangesOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
+    }),
+
   createTerminal: organizationMemberMutationProcedure
     .input(CreateTerminalInput)
     .output(baseCreateTerminalNextOutputSchema)
@@ -723,6 +765,31 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       const client = createCloudAgentNextClient(authToken);
 
       return await client.getSession(input.cloudAgentSessionId);
+    }),
+
+  getSandboxStatus: baseProcedure
+    .input(GetSandboxStatusInput)
+    .output(baseGetSandboxStatusNextOutputSchema)
+    .query(async ({ ctx, input }) => {
+      try {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+        await assertOrganizationOwnsSession({
+          organizationId: input.organizationId,
+          userId: ctx.user.id,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+        });
+      } catch (error) {
+        throw new TRPCError({
+          code:
+            error instanceof TRPCError && error.code === 'UNAUTHORIZED'
+              ? 'UNAUTHORIZED'
+              : 'FORBIDDEN',
+          message: 'Session not found or access denied',
+        });
+      }
+      return await createCloudAgentNextClient(generateCloudAgentToken(ctx.user)).getSandboxStatus(
+        input.cloudAgentSessionId
+      );
     }),
 
   getComputeBillingStatus: organizationMemberProcedure

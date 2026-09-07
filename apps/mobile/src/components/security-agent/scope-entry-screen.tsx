@@ -7,6 +7,7 @@ import { View } from 'react-native';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardScreen } from '@/components/security-agent/dashboard-screen';
 import { SecurityAgentSetup } from '@/components/security-agent/security-agent-setup';
@@ -28,7 +29,7 @@ function ScopeEntrySkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.title')} />
+      <ScreenHeader title={t('common.securityAgent')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-10 w-full rounded-lg" />
         <View className="flex-row flex-wrap gap-3">
@@ -135,7 +136,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   ) {
     return (
       <PlatformErrorScreen
-        title={t('securityAgent.title')}
+        title={t('common.securityAgent')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
         onRetry={() => void recovery.retry()}
         isRetrying={recovery.isRetrying}
@@ -158,9 +159,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (mintFailed) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
-            <PlatformErrorScreen
-              title={t('securityAgent.title')}
+            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+            <QueryError
               variant="offline"
               message={t('securityAgent.scopeEntry.setupFailed')}
               onRetry={() => void performMint()}
@@ -171,7 +171,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (!connectUrl) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
+            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
@@ -181,7 +181,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       }
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
+          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
           <SecurityAgentSetup
             title={t('securityAgent.scopeEntry.connectTitle')}
             description={t('securityAgent.scopeEntry.connectDescription')}
@@ -196,9 +196,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (!reauthUrl && mintFailed) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
-            <PlatformErrorScreen
-              title={t('securityAgent.title')}
+            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
+            <QueryError
               variant="offline"
               message={t('securityAgent.scopeEntry.reauthorizeFailed')}
               onRetry={() => void performMint()}
@@ -209,7 +208,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       if (!reauthUrl && !connectUrl) {
         return (
           <View className="flex-1 bg-background">
-            <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
+            <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
             <View className="gap-3 px-6 pt-4">
               <Skeleton className="h-10 w-full rounded-lg" />
               <Skeleton className="h-32 w-full rounded-lg" />
@@ -223,7 +222,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
       }
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('securityAgent.title')} headerRight={auditAction} />
+          <ScreenHeader title={t('common.securityAgent')} headerRight={auditAction} />
           <SecurityAgentSetup
             title={t('securityAgent.scopeEntry.reauthorizeTitle')}
             description={t('securityAgent.scopeEntry.reauthorizeDescription')}

@@ -13,6 +13,8 @@ import {
 import { useAuth } from '@/lib/auth/auth-context';
 import { deleteAccountMetadata, setAccountMetadata } from '@/lib/auth/account-metadata-write';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
+import { unregisterActivityTokensAndTombstone } from '@/lib/auth/logout-cleanup';
+import { writePrivacySnapshotAndEnd } from '@/lib/glanceable/cleanup';
 import { ORGANIZATION_STORAGE_KEY } from '@/lib/storage-keys';
 
 type OrganizationContextValue = {
@@ -107,6 +109,20 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
 
   const setOrganizationId = useCallback(
     (id: string | null) => {
+      // A same-value selection is a no-op: blanking it would bump the terminal
+      // epoch and permanently gate the publisher, because React bails out of the
+      // state update and no effect re-runs to rebuild it.
+      if (id === state.organizationId) {
+        return;
+      }
+      // Blank the current surface before the selection changes so the prior
+      // org's counts are never shown under the next org.
+      writePrivacySnapshotAndEnd();
+      // Unregister the prior org's activity tokens (Live Activity /
+      // push-to-start) so APNs stops targeting this device for the old scope.
+      // Same-account switch: never revokes the device session or unregisters
+      // the Expo push token (logout-only).
+      void unregisterActivityTokensAndTombstone();
       activeId.current = id;
       setState(current => ({
         token,
@@ -117,7 +133,7 @@ export function OrganizationProvider({ children }: { readonly children: ReactNod
       }));
       void persist(id);
     },
-    [token, persist]
+    [token, persist, state.organizationId]
   );
 
   const retry = useCallback(() => {

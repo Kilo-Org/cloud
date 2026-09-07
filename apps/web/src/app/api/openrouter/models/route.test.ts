@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import { NextRequest } from 'next/server';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { GET } from './route';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -100,6 +101,10 @@ describe('GET /api/openrouter/models', () => {
     expect(mockedAddUserByokAvailability).not.toHaveBeenCalled();
     expect(mockedGetCachedRoutingTable).not.toHaveBeenCalled();
     expect(mockedGetAutoFreeCandidates).not.toHaveBeenCalled();
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
   });
 
   test('returns BYOK availability for regular and direct authenticated models', async () => {

@@ -43,6 +43,7 @@ vi.mock('expo-secure-store', () => ({
 
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
+  E2E_SECURE_STORE_FAULT_MS: 0,
 }));
 
 vi.mock('@/lib/analytics/posthog', () => ({

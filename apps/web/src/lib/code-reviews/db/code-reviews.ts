@@ -32,6 +32,7 @@ import {
 } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { logExceptInTest } from '@/lib/utils.server';
+import { sanitizePostgresString } from '@/lib/sanitize-jsonb';
 import { CreateReviewParamsSchema } from '../core';
 import { assertCouncilCreationAllowed } from '../core/council-entitlement';
 import { codeReviewLedgerIntent, settleCodeReviewLedgerRow } from '../code-review-ledger';
@@ -1213,7 +1214,7 @@ export async function failReservedQueuedReview(
   try {
     const updateData: Partial<typeof cloud_agent_code_reviews.$inferInsert> = {
       status: 'failed',
-      error_message: errorMessage,
+      error_message: sanitizePostgresString(errorMessage),
       dispatch_reservation_id: null,
       completed_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -1363,7 +1364,7 @@ export async function updatePreviousReviewSummary(
     await db
       .update(cloud_agent_code_reviews)
       .set({
-        previous_summary_body: summary.body,
+        previous_summary_body: summary.body === null ? null : sanitizePostgresString(summary.body),
         previous_summary_head_sha: summary.headSha,
         updated_at: new Date().toISOString(),
       })

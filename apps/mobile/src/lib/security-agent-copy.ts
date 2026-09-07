@@ -13,30 +13,30 @@ const LABEL_KEYS = {
   queued: 'securityAgent.analysisState.queued',
   analyzing: 'securityAgent.analysisState.analyzing',
   failed: 'securityAgent.analysisState.failed',
-  'extraction-failed': 'securityAgent.analysisState.extractionFailed',
-  exploitable: 'securityAgent.analysisState.exploitable',
+  'extraction-failed': 'securityAgent.analysisState.unknown',
+  exploitable: 'securityAgent.analysis.exploitable',
   'not-exploitable': 'securityAgent.analysisState.notExploitable',
   unknown: 'securityAgent.analysisState.unknown',
   'safe-to-dismiss': 'securityAgent.analysisState.safeToDismiss',
-  'manual-review': 'securityAgent.analysisState.manualReview',
+  'manual-review': 'securityAgent.analysisState.unknown',
   'analysis-required': 'securityAgent.analysisState.analysisRequired',
-  completed: 'securityAgent.analysisState.completed',
+  completed: 'securityAgent.analysis.analyzed',
   'not-analyzed': 'securityAgent.analysisState.notAnalyzed',
 } satisfies Record<SecurityFindingAnalysisState, string>;
 
 const TITLE_KEYS = {
-  queued: 'securityAgent.analysisState.queuedTitle',
-  analyzing: 'securityAgent.analysisState.analyzingTitle',
-  failed: 'securityAgent.analysisState.failedTitle',
-  'extraction-failed': 'securityAgent.analysisState.extractionFailedTitle',
-  exploitable: 'securityAgent.analysisState.exploitableTitle',
-  'not-exploitable': 'securityAgent.analysisState.notExploitableTitle',
-  unknown: 'securityAgent.analysisState.unknownTitle',
-  'safe-to-dismiss': 'securityAgent.analysisState.safeToDismissTitle',
+  queued: 'securityAgent.analysisState.queued',
+  analyzing: 'securityAgent.analysisState.analyzing',
+  failed: 'securityAgent.analysisState.failed',
+  'extraction-failed': 'securityAgent.analysisState.unknown',
+  exploitable: 'securityAgent.analysis.exploitable',
+  'not-exploitable': 'securityAgent.analysisState.notExploitable',
+  unknown: 'securityAgent.analysisState.unknown',
+  'safe-to-dismiss': 'securityAgent.analysisState.safeToDismiss',
   'manual-review': 'securityAgent.analysisState.manualReviewTitle',
   'analysis-required': 'securityAgent.analysisState.analysisRequiredTitle',
-  completed: 'securityAgent.analysisState.completedTitle',
-  'not-analyzed': 'securityAgent.analysisState.notAnalyzedTitle',
+  completed: 'securityAgent.analysis.analyzed',
+  'not-analyzed': 'securityAgent.analysisState.notAnalyzed',
 } satisfies Record<SecurityFindingAnalysisState, string>;
 
 const DESCRIPTION_KEYS = {
@@ -101,7 +101,7 @@ export function getDeadlineCopy(state: FindingDeadlineState): DeadlineCopy {
     case 'fixed': {
       const label = state.beforeDeadline
         ? i18n.t('securityAgent.deadline.fixedBeforeDeadline')
-        : i18n.t('securityAgent.deadline.fixed');
+        : i18n.t('securityAgent.filter.fixed');
       const detail = state.fixedAt
         ? i18n.t('securityAgent.deadline.fixedOn', {
             date: formatDate(state.fixedAt, i18n.language),
@@ -112,7 +112,7 @@ export function getDeadlineCopy(state: FindingDeadlineState): DeadlineCopy {
     case 'closed': {
       const status = state.superseded
         ? i18n.t('securityAgent.deadline.superseded')
-        : i18n.t('securityAgent.deadline.dismissed');
+        : i18n.t('common.dismissed');
       return {
         label: status,
         detail: i18n.t('securityAgent.deadline.closedOn', {

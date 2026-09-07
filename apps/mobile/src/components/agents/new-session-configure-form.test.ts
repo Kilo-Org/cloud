@@ -42,6 +42,7 @@ vi.mock('react', async () => {
 });
 
 // ── react-native ───────────────────────────────────────────────────
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   ScrollView: 'ScrollView',

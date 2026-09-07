@@ -7,7 +7,8 @@
       "instanceLifecycle": "Instanța ta are o actualizare",
       "scheduledAction": "O acțiune programată are o actualizare",
       "lowBalance": "Soldul tău necesită atenție",
-      "securityFinding": "O constatare de securitate necesită atenție"
+      "securityFinding": "O constatare de securitate necesită atenție",
+      "activeAgentsGlanceable": "Agenții activi au o actualizare"
     }
   },
   "cloudAgentSession": {

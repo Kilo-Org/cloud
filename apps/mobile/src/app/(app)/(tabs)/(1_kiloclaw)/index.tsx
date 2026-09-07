@@ -1,8 +1,7 @@
 import { type Href, useRouter } from 'expo-router';
-import { Platform, useWindowDimensions, View } from 'react-native';
+import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   EmptyStateContent,
@@ -20,14 +19,11 @@ import { useManualRefresh } from '@/lib/hooks/use-manual-refresh';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useUnreadCounts } from '@/lib/hooks/use-unread-counts';
 import { chatSandboxPath } from '@/lib/kilo-chat-routes';
-import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 export default function KiloClawTab() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { bottom } = useSafeAreaInsets();
-  const { fontScale } = useWindowDimensions();
   const instancesQuery = useAllKiloClawInstances();
   const { data: instances } = instancesQuery;
   const { byBadgeBucket: unreadByBadgeBucket } = useUnreadCounts();
@@ -37,19 +33,15 @@ export default function KiloClawTab() {
   // billing/access issue is still surfaced as a card annotation when the
   // list is non-empty — see `personalAccessIssue` below.
   const onboardingQuery = useKiloClawMobileOnboardingState();
-  const personalAccessIssue = onboardingQuery.data
-    ? resolveAccessRequiredSubcase(onboardingQuery.data)
+  // Read the nullable state once into a local binding: `tsgo` does not narrow
+  // repeated `onboardingQuery.data` property accesses, only local variables.
+  const onboardingState = onboardingQuery.data;
+  const personalAccessIssue = onboardingState
+    ? resolveAccessRequiredSubcase(onboardingState)
     : null;
   useForegroundInvalidateKiloclawState();
 
   const showInstanceSkeleton = entryDecision.kind === 'loading' || onboardingQuery.isPending;
-  const emptyStateContainerStyle = {
-    paddingBottom: getEffectiveTabBarHeight({
-      bottomInset: bottom,
-      platform: Platform.OS,
-      fontScale,
-    }),
-  };
 
   const [manualRefreshing, handleRefresh] = useManualRefresh(
     refetchInstances,
@@ -66,18 +58,13 @@ export default function KiloClawTab() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t('kiloclaw.title')}
+          title={t('common.kiloclaw')}
           size="large"
           showBackButton={false}
           className="px-[22px]"
         />
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          className="flex-1"
-          style={emptyStateContainerStyle}
-        >
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           <QueryError
-            className="flex-1"
             message={t('kiloclaw.couldNotLoadInstances')}
             onRetry={() => {
               if (instancesQuery.isError) {
@@ -117,27 +104,23 @@ export default function KiloClawTab() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('kiloclaw.title')}
+        title={t('common.kiloclaw')}
         size="large"
         showBackButton={false}
         className="px-[22px]"
       />
       <Animated.View layout={LinearTransition} className="flex-1 px-4">
-        {showInstanceSkeleton || onboardingQuery.data === undefined ? (
+        {showInstanceSkeleton || onboardingState === undefined ? (
           <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 pt-5">
             <Skeleton className="h-[72px] w-full rounded-2xl" />
             <Skeleton className="h-[72px] w-full rounded-2xl" />
             <Skeleton className="h-[72px] w-full rounded-2xl" />
           </Animated.View>
         ) : (
-          <Animated.View
-            entering={FadeIn.duration(200)}
-            className="flex-1 items-center justify-center"
-            style={emptyStateContainerStyle}
-          >
+          <Animated.View entering={FadeIn.duration(200)} className="flex-1">
             <EmptyStateContent
               foregroundColor={colors.foreground}
-              state={onboardingQuery.data}
+              state={onboardingState}
               onCreate={() => {
                 router.push('/(app)/onboarding' as Href);
               }}

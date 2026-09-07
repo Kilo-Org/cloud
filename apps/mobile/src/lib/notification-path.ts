@@ -29,6 +29,11 @@ export function notificationPathForData(data: PushData): string {
     case 'scheduled-action': {
       return chatSandboxRoute(data.sandboxId);
     }
+    case 'active_agents_glanceable': {
+      // The aggregate glanceable payload never opens a session chat; it lands
+      // on the agents tab.
+      return '/(app)/(tabs)/(2_agents)';
+    }
     default: {
       // Exhaustiveness: new PushData variants must be handled above.
       const _exhaustive: never = data;

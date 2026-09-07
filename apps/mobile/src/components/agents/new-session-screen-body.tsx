@@ -618,9 +618,7 @@ export function NewSessionScreenBody() {
   return (
     <View className="flex-1 bg-background">
       {!isCloneEntry ? <AndroidPendingPickerRecovery addCandidates={addCandidates} /> : null}
-      <ScreenHeader
-        title={isCloneEntry ? t('agentChat.session.continue') : t('agentChat.newSession.title')}
-      />
+      <ScreenHeader title={isCloneEntry ? t('common.continue') : t('common.newSession')} />
       {isCloneEntry ? (
         <View className="px-4 pt-4">
           <Text className="text-sm text-muted-foreground">

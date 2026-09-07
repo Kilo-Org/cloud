@@ -4,7 +4,8 @@ import { Clipboard as ClipboardIcon, Link2, SearchX, X } from '@/components/ui/i
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-native';
+import { Alert, Pressable, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { EmptyState } from '@/components/empty-state';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
@@ -116,7 +117,7 @@ export function PrReviewEntryScreen() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('prReview.entry.remove'),
+          text: t('common.remove'),
           style: 'destructive',
           onPress: () => {
             void (async () => {
@@ -210,7 +211,7 @@ export function PrReviewEntryScreen() {
                     }}
                     accessibilityLabel={removeLabel}
                   >
-                    <Text>{t('prReview.entry.remove')}</Text>
+                    <Text>{t('common.remove')}</Text>
                   </Button>
                 </View>
               </View>
@@ -305,7 +306,9 @@ export function PrReviewEntryScreen() {
         <Button
           disabled={!hasInput}
           onPress={handleSubmit}
-          accessibilityLabel={t('prReview.entry.openPullRequest')}
+          // i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
+          // this key is the verb CTA — cs/pl/be translate the two apart.
+          accessibilityLabel={t('common.openPullRequest')}
         >
           <Text>{t('prReview.entry.open')}</Text>
         </Button>
@@ -315,7 +318,7 @@ export function PrReviewEntryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('prReview.entry.title')} eyebrow={t('prReview.entry.eyebrow')} />
+      <ScreenHeader title={t('common.prReview')} eyebrow={t('prReview.entry.eyebrow')} />
       <PrReviewInboxList header={pasteBlock} recents={recentsBody} />
     </View>
   );

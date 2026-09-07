@@ -1,6 +1,7 @@
 import {
   credit_transactions,
   kilo_pass_issuance_items,
+  kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
@@ -457,6 +458,7 @@ const OPERATION_KEY_REUSE_MISMATCH_MESSAGE = 'operation_key_reuse_mismatch';
 
 /** Provider/user mismatch messages that settle `failed` and never retry. */
 const STORE_PURCHASE_MISMATCH_MESSAGES = [
+  'Store purchase has been refunded',
   'Store transaction already belongs to another user',
   'Store subscription already belongs to another user',
   'You already have an active Kilo Pass subscription',
@@ -554,6 +556,18 @@ export async function completeStoreKiloPassPurchase(params: {
 
   const run = async (tx: DrizzleTransaction): Promise<CompleteStoreKiloPassPurchaseResult> => {
     await lockUserForStoreCompletion(tx, user.id);
+
+    if (purchase.paymentProvider === KiloPassPaymentProvider.GooglePlay) {
+      const refund = await tx.query.kilo_pass_store_events.findFirst({
+        columns: { id: true },
+        where: and(
+          eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+          eq(kilo_pass_store_events.provider_transaction_id, purchase.providerTransactionId),
+          sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN ('12', 'voided_purchase')`
+        ),
+      });
+      if (refund) throw new Error('Store purchase has been refunded');
+    }
 
     const existingPurchase = await findStorePurchaseByProviderTransaction(tx, purchase);
 

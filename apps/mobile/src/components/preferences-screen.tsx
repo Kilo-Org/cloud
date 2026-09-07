@@ -189,8 +189,7 @@ export function PreferencesScreen() {
           />
         </View>
 
-        {/* Feature flags — debug surface: which flags this build applies and why. */}
-        <FeatureFlagsSection />
+        {__DEV__ ? <FeatureFlagsSection /> : null}
 
         {/* Account */}
         <View className="mt-3 gap-3">

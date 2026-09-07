@@ -41,6 +41,7 @@ function textLines(tree: ReactTestRenderer): string[] {
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', true);
   posthog.statuses = [];
 });
 afterEach(() => {
@@ -126,6 +127,14 @@ describe('FeatureFlagsSection', () => {
 
   it('renders nothing when the registry is empty', async () => {
     posthog.statuses = [];
+    const tree = await mount();
+
+    expect(textLines(tree)).toEqual([]);
+  });
+
+  it('renders nothing outside development', async () => {
+    vi.stubGlobal('__DEV__', false);
+    posthog.statuses = [applied];
     const tree = await mount();
 
     expect(textLines(tree)).toEqual([]);

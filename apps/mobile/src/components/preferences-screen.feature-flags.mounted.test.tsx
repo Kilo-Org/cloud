@@ -140,6 +140,7 @@ async function mountPreferences(): Promise<ReactTestRenderer> {
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', true);
   vi.resetAllMocks();
   posthog.statuses = [];
   native.hasHardwareAsync.mockResolvedValue(true);
@@ -154,6 +155,29 @@ afterEach(() => {
 });
 
 describe('PreferencesScreen feature-flag debug surface', () => {
+  it('hides the section outside development', async () => {
+    vi.stubGlobal('__DEV__', false);
+    posthog.statuses = [
+      {
+        key: 'mobile-pr-review',
+        minAppVersion: '1.0.4',
+        defaultValue: true,
+        appVersion: '1.0.5',
+        applied: true,
+        value: true,
+        reason: 'applied',
+        loaded: true,
+      },
+    ];
+    const renderer = await mountPreferences();
+
+    const lines = renderer.root
+      .findAll(node => typeof node.type === 'string' && (node.type as string) === 'Text')
+      .map(node => [node.props.children].flat().join(''));
+    expect(lines).not.toContain('Feature flags');
+    expect(lines).not.toContain('mobile-pr-review');
+  });
+
   it('lists which flags the build applies and which it skips, with reasons', async () => {
     posthog.statuses = [
       {

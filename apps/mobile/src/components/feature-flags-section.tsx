@@ -5,10 +5,11 @@ import { Text } from '@/components/ui/text';
 import { type FeatureFlagStatus, useFeatureFlagStatuses } from '@/lib/analytics/posthog';
 
 /**
- * Debug surface for feature flags (Preferences). Lists every registered flag
- * with what this build resolved it to and why, so a tester can see which
- * flags the build applies and which it skips because the build predates the
- * flag's minimum app version. Read-only: flags are controlled in PostHog.
+ * Development-only debug surface for feature flags (Preferences). Lists every
+ * registered flag with what this build resolved it to and why, so a tester
+ * can see which flags the build applies and which it skips because the build
+ * predates the flag's minimum app version. Read-only: flags are controlled in
+ * PostHog. Renders nothing when `__DEV__` is false.
  *
  * Each row reads `<value> · <source> · <version relation>`, e.g.
  * `Enabled · remote · ≥ 1.0.4`: the value the UI acts on, whether it came
@@ -40,7 +41,7 @@ function FlagRow({ status }: { status: FeatureFlagStatus }) {
 export function FeatureFlagsSection() {
   const { t } = useTranslation();
   const statuses = useFeatureFlagStatuses();
-  if (statuses.length === 0) {
+  if (!__DEV__ || statuses.length === 0) {
     return null;
   }
   return (

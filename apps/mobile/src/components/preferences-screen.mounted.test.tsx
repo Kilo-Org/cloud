@@ -144,6 +144,7 @@ async function mountPreferences(raw: string | null = null): Promise<ReactTestRen
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', false);
   vi.resetAllMocks();
   posthog.statuses = [];
   storage.setItemAsync.mockImplementation(async (_key: string, value: string) => {

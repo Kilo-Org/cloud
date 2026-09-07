@@ -85,6 +85,12 @@ function getDO(name = 'user-1') {
   return env.NOTIFICATION_CHANNEL_DO.get(id);
 }
 
+afterEach(() => {
+  for (const [messages] of vi.mocked(sendPushNotifications).mock.calls) {
+    for (const message of messages) expect(message).not.toHaveProperty('badge');
+  }
+});
+
 describe('NotificationChannelDO.dispatchPush', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -241,8 +247,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
 
     expect(result.kind).toBe('delivered');
     expect(sendPushNotifications).toHaveBeenCalledOnce();
-    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].badge).toBe(1);
 
     // Bucket persisted to DO storage.
     const stored = await runInDurableObject(stub, async (_inst, state) => ({
@@ -276,8 +280,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
 
     expect(result.outcome.kind).toBe('delivered');
     expect(result.totalReads).toBe(1);
-    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].badge).toBe(1);
   });
 
   it('returns failed and avoids delivered idempotency for non-stale Expo ticket errors', async () => {
@@ -445,7 +447,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(sendPushNotifications).toHaveBeenCalledOnce();
     const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
     expect(messages.map(message => message.to)).toEqual(['tok-accepted', 'tok-rate-limited']);
-    expect(messages.map(message => message.badge)).toEqual([1, 1]);
     expect(receiptSpy).toHaveBeenCalledWith(
       { ticketTokenPairs: [{ ticketId: 'ticket-accepted', token: 'tok-accepted' }] },
       { delaySeconds: 900 }
@@ -489,10 +490,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
     });
     expect(second).toEqual({ kind: 'delivered', tokenCount: 1 });
     expect(sendPushNotifications).toHaveBeenCalledTimes(2);
-    const [firstMessages] = vi.mocked(sendPushNotifications).mock.calls[0];
-    const [secondMessages] = vi.mocked(sendPushNotifications).mock.calls[1];
-    expect(firstMessages[0].badge).toBe(1);
-    expect(secondMessages[0].badge).toBe(1);
 
     const stored = await runInDurableObject(stub, async (_inst, state) =>
       state.storage.get<{ stage: string; ts: number }>('idem:k-retry-ticket-error')
@@ -500,7 +497,7 @@ describe('NotificationChannelDO.dispatchPush', () => {
     expect(stored).toMatchObject({ stage: 'delivered' });
   });
 
-  it('accumulates bucket counts across deliveries and exposes total via badge', async () => {
+  it('accumulates bucket counts across deliveries', async () => {
     installDbMock({ tokens: [{ user_id: 'u', token: 'tok1' }] });
     vi.spyOn(env.EVENT_SERVICE, 'isUserInContext').mockResolvedValue(false);
     const stub = getDO('user-accumulate');
@@ -513,11 +510,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
         badge: { badgeBucket: 'conv2', delta: 1 },
       })
     );
-
-    const calls = vi.mocked(sendPushNotifications).mock.calls;
-    expect(calls[0]?.[0][0].badge).toBe(1);
-    expect(calls[1]?.[0][0].badge).toBe(2);
-    expect(calls[2]?.[0][0].badge).toBe(3);
 
     const buckets = await runInDurableObject(stub, async (_inst, state) => {
       const entries = await state.storage.list<number>({ prefix: 'bucket:' });
@@ -678,8 +670,20 @@ describe('NotificationChannelDO.dispatchPush', () => {
     );
     expect(afterFail).toBe(1);
 
-    const second = await stub.dispatchPush(input);
-    expect(second.kind).toBe('delivered');
+    const retry = await runInDurableObject(stub, async (instance, state) => {
+      const originalGet = state.storage.get.bind(state.storage);
+      let totalReads = 0;
+      state.storage.get = (<T = unknown>(key: string | string[]) => {
+        if (Array.isArray(key)) return originalGet<T>(key);
+        if (key === 'total') totalReads++;
+        return originalGet<T>(key);
+      }) as typeof state.storage.get;
+
+      const outcome = await instance.dispatchPush(input);
+      return { outcome, totalReads };
+    });
+    expect(retry.outcome.kind).toBe('delivered');
+    expect(retry.totalReads).toBe(0);
 
     // Bucket must not be incremented twice across the retry — the first
     // attempt's `pending` marker gates the second increment out.
@@ -687,9 +691,6 @@ describe('NotificationChannelDO.dispatchPush', () => {
       state.storage.get<number>('bucket:conv1')
     );
     expect(afterRetry).toBe(1);
-
-    const [[messages]] = vi.mocked(sendPushNotifications).mock.calls;
-    expect(messages[0].badge).toBe(1);
   });
 
   it('schedules cleanup when writing the pending marker (failed send)', async () => {

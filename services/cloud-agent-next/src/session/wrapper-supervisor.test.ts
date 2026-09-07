@@ -2498,6 +2498,194 @@ describe('WrapperSupervisor', () => {
     }
   );
 
+  const OUTPUT_LIMIT_NOTICE_TEXT =
+    'The model hit its output limit while reasoning and produced no actionable output';
+
+  it('fails a code review whose reply only reports the model output limit', async () => {
+    const assistantMessageId = 'ase_output_limit_notice';
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      metadata: {
+        ...createMetadata(),
+        identity: { ...createMetadata().identity, createdOnPlatform: 'code-review' },
+      },
+      getAssistantMessageForUserMessage: () => ({
+        eventId: 1,
+        timestamp: 2_500,
+        info: {
+          id: assistantMessageId,
+          role: 'assistant',
+          time: { created: 90_000, completed: 90_500 },
+        },
+        parts: [
+          {
+            id: 'part_output_limit_notice',
+            messageID: assistantMessageId,
+            type: 'text',
+            text: OUTPUT_LIMIT_NOTICE_TEXT,
+          },
+        ],
+      }),
+    });
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/output-limit-notice' },
+    });
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+      messageIds: [MESSAGE_ID],
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      completionSource: 'idle_reconciliation',
+      assistantMessageId,
+      assistantFailureReason: 'output_limit',
+      safeFailureMessage: 'The model output limit was reached',
+    });
+    expect(harness.callbackJobs).toHaveLength(1);
+    expect(harness.callbackJobs[0].payload).toMatchObject({
+      messageId: MESSAGE_ID,
+      status: 'failed',
+      errorMessage: 'The model output limit was reached',
+      failure: expect.objectContaining({
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: 'output_limit',
+      }),
+    });
+  });
+
+  it('reconciles a dead wrapper code review with an output-limit notice as failed', async () => {
+    const assistantMessageId = 'ase_dead_wrapper_output_limit';
+    const harness = createHarness(
+      [
+        liveRuntimeState({
+          pingDeadlineAt: 92_000,
+          noOutputDeadlineAt: 332_000,
+          finalizingWrapperRunId: WRAPPER_RUN_ID,
+        }),
+        OWNED_WRAPPER_LEASE,
+      ],
+      {
+        metadata: {
+          ...createMetadata(),
+          identity: { ...createMetadata().identity, createdOnPlatform: 'code-review' },
+        },
+        getAssistantMessageForUserMessage: () => ({
+          eventId: 1,
+          timestamp: 2_500,
+          info: {
+            id: assistantMessageId,
+            role: 'assistant',
+            time: { created: 90_000, completed: 90_500 },
+          },
+          parts: [
+            {
+              id: 'part_dead_wrapper_output_limit',
+              messageID: assistantMessageId,
+              type: 'text',
+              text: OUTPUT_LIMIT_NOTICE_TEXT,
+            },
+          ],
+        }),
+      }
+    );
+    await putSessionMessageState(harness.storage, {
+      ...acceptedMessage(),
+      callbackRequired: true,
+      callbackTarget: { url: 'https://example.com/dead-wrapper-output-limit' },
+    });
+
+    await harness.supervisor.runMaintenance(92_000);
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'failed',
+      failureReason: 'assistant_error',
+      completionSource: 'idle_reconciliation',
+      assistantMessageId,
+      assistantFailureReason: 'output_limit',
+    });
+    expect(harness.callbackJobs[0].payload).toMatchObject({ status: 'failed' });
+  });
+
+  it('still completes a code review whose reply is a real review summary', async () => {
+    const assistantMessageId = 'ase_real_review';
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      metadata: {
+        ...createMetadata(),
+        identity: { ...createMetadata().identity, createdOnPlatform: 'code-review' },
+      },
+      getAssistantMessageForUserMessage: () => ({
+        eventId: 1,
+        timestamp: 2_500,
+        info: {
+          id: assistantMessageId,
+          role: 'assistant',
+          time: { created: 90_000, completed: 90_500 },
+        },
+        parts: [
+          {
+            id: 'part_real_review',
+            messageID: assistantMessageId,
+            type: 'text',
+            text: '## Code Review Summary\n\nNo blocking issues found.',
+          },
+        ],
+      }),
+    });
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+      messageIds: [MESSAGE_ID],
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'completed',
+      assistantMessageId,
+    });
+  });
+
+  it('keeps non-code-review sessions completing on an output-limit notice', async () => {
+    const assistantMessageId = 'ase_chat_output_limit';
+    const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {
+      getAssistantMessageForUserMessage: () => ({
+        eventId: 1,
+        timestamp: 2_500,
+        info: {
+          id: assistantMessageId,
+          role: 'assistant',
+          time: { created: 90_000, completed: 90_500 },
+        },
+        parts: [
+          {
+            id: 'part_chat_output_limit',
+            messageID: assistantMessageId,
+            type: 'text',
+            text: OUTPUT_LIMIT_NOTICE_TEXT,
+          },
+        ],
+      }),
+    });
+    await putSessionMessageState(harness.storage, acceptedMessage());
+
+    await harness.supervisor.onTerminalEvent({
+      wrapperRunId: WRAPPER_RUN_ID,
+      status: 'completed',
+      messageIds: [MESSAGE_ID],
+    });
+
+    await expect(getSessionMessageState(harness.storage, MESSAGE_ID)).resolves.toMatchObject({
+      status: 'completed',
+      assistantMessageId,
+    });
+  });
+
   it('includes the gate result when wrapper completion releases a reconciled callback', async () => {
     const assistantMessageId = 'ase_complete_gate';
     const harness = createHarness([liveRuntimeState(), OWNED_WRAPPER_LEASE], {

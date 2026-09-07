@@ -175,6 +175,7 @@ import {
   matchesSessionMessageReplay,
   nextQueuedMessageId,
   recordAcceptedMessageActivity,
+  releaseUnadmittedWaitingMessages,
   resolveSessionMessageIntent,
   streamCloudStatus,
   streamQueuedSnapshots,
@@ -3024,7 +3025,7 @@ export class SandboxSession extends DurableObject<Env> {
       return;
     }
     if (wrapperInstanceId) this.retainRuntimeCleanup(metadata, wrapperInstanceId, reason);
-    await this.failWaitingMessages(reason, wrapperInstanceId);
+    await this.failDeliveryWaitingMessages(reason, wrapperInstanceId);
     if (this.pendingRuntimeCleanup()) await this.transferRuntimeCleanup();
   }
 
@@ -3044,6 +3045,34 @@ export class SandboxSession extends DurableObject<Env> {
       )
         return;
     }
+    const epoch = this.terminalLifecycle.captureEpoch();
+    if (epoch === null) return;
+    let before = this.loadMessages();
+    if (!this.terminalLifecycle.isCurrent(epoch)) return;
+    let released = false;
+    if (wrapperInstanceId) {
+      const result = releaseUnadmittedWaitingMessages(before, wrapperInstanceId);
+      if (result.releasedIds.length > 0) {
+        before = result.messages;
+        released = true;
+      }
+    }
+    const { messages, failedIds } = applyFailWaitingMessages(
+      before,
+      reason,
+      wrapperInstanceId,
+      false
+    );
+    if (failedIds.length === 0 && !released) return;
+    if (!this.saveMessages(messages, epoch)) return;
+    if (this.pendingRuntimeCleanup() || nextQueuedMessageId(this.loadMessages()))
+      await this.armQueueRetry();
+  }
+
+  private async failDeliveryWaitingMessages(
+    reason: string,
+    wrapperInstanceId?: string
+  ): Promise<void> {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return;
     const before = this.loadMessages();

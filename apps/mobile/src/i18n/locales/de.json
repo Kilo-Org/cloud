@@ -1447,6 +1447,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Die aktiven Sitzungen konnten nicht geladen werden.",
+      "couldNotRefresh": "Konnte nicht aktualisiert werden",
       "noSessionsYetDescription": "Starte eine Programmieraufgabe auf deinem Handy. Deine Sitzungen erscheinen hier.",
       "noMatches": "Keine Sitzungen gefunden",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",

@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Enweghị ike ibudata nnọkọ na-arụ ọrụ.",
+      "couldNotRefresh": "Enweghị ike ibugharịa",
       "noSessionsYetDescription": "Malite ọrụ ide koodu site na ekwentị gị. Nnọkọ gị ga-apụta ebe a.",
       "noMatches": "Enweghị nnọkọ dabara",
       "tryDifferentSearch": "Nwaa okwu ọchụchọ dị iche.",

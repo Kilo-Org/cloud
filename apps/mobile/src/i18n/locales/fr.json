@@ -2244,6 +2244,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Impossible de charger les sessions actives.",
+      "couldNotRefresh": "Impossible d'actualiser",
       "noSessionsYetDescription": "Lancez une tâche de programmation depuis votre téléphone. Vos sessions apparaîtront ici.",
       "noMatches": "Aucune session ne correspond aux critères",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",

@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "ບໍ່ສາມາດໂຫຼດເຊດຊັນທີ່ກຳລັງໃຊ້ງານໄດ້.",
+      "couldNotRefresh": "ບໍ່ສາມາດໂຫຼດໃໝ່ໄດ້",
       "noSessionsYetDescription": "ເລີ່ມວຽກຂຽນໂຄ້ດຈາກໂທລະສັບຂອງທ່ານ. ເຊດຊັນຂອງທ່ານຈະປາກົດຢູ່ນີ້.",
       "noMatches": "ບໍ່ພົບເຊດຊັນທີ່ກົງກັບເງື່ອນໄຂ",
       "tryDifferentSearch": "ລອງໃຊ້ຄຳຄົ້ນຫາອື່ນ.",

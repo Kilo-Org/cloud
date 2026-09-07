@@ -1448,6 +1448,7 @@
     "sessionList": {
       "completedWillAppear": "पूरे हो चुके सत्र यहाँ दिखाई देंगे।",
       "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके।",
+      "couldNotRefresh": "रीफ़्रेश नहीं हो सका",
       "couldNotSearch": "सत्र खोजे नहीं जा सके।",
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछला सत्र नहीं",

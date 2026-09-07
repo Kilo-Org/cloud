@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Tidak dapat memuatkan sesi aktif.",
+      "couldNotRefresh": "Tidak dapat memuat semula",
       "noSessionsYetDescription": "Mulakan tugasan pengekodan dari telefon anda. Sesi anda akan muncul di sini.",
       "noMatches": "Tiada sesi yang sepadan",
       "tryDifferentSearch": "Cuba kata carian lain.",

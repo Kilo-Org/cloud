@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Ekki tókst að hlaða virkum lotum.",
+      "couldNotRefresh": "Ekki tókst að endurnýja",
       "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum. Loturnar þínar birtast hér.",
       "noMatches": "Engar lotur samsvara leitinni",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",

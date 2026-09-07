@@ -1891,6 +1891,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nu s-au putut încărca sesiunile active.",
+      "couldNotRefresh": "Nu s-a putut reîmprospăta",
       "noSessionsYetDescription": "Începe o sarcină de programare de pe telefon. Sesiunile tale vor apărea aici.",
       "noMatches": "Nicio sesiune nu corespunde filtrelor",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",

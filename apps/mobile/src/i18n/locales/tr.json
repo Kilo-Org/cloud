@@ -1447,6 +1447,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Etkin oturumlar yüklenemedi.",
+      "couldNotRefresh": "Yenilenemedi",
       "noSessionsYetDescription": "Telefonundan bir kodlama görevi başlat. Oturumların burada görünecek.",
       "noMatches": "Eşleşen oturum yok",
       "tryDifferentSearch": "Farklı bir arama terimi dene.",

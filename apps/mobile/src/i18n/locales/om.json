@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Turtiiwwan hojii irra jiran fe'uu hin danda'amne.",
+      "couldNotRefresh": "Haaromsuun hin danda'amne",
       "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi. Turtiiwwan kee asitti mul'atu.",
       "noMatches": "Turtiin walsimu hin jiru",
       "tryDifferentSearch": "Jecha biraatiin barbaadi.",

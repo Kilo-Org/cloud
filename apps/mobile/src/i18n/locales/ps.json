@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "فعالې ناستې بار نه شوې.",
+      "couldNotRefresh": "تازه نه شو",
       "noSessionsYetDescription": "له خپل تلیفون څخه د کوډ کولو دنده پیل کړئ. ستاسو ناستې به دلته ښکاره شي.",
       "noMatches": "هېڅ ناسته سمون نه خوري",
       "tryDifferentSearch": "د لټون لپاره بله کلیمه وکاروئ.",

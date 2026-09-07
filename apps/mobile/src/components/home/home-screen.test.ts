@@ -19,6 +19,19 @@ vi.mock('react-native-reanimated', () => ({
 }));
 vi.mock('@/components/home/agent-sessions-section', () => ({
   AgentSessionsSection: () => null,
+  LiveSessionFeedback: () => null,
+}));
+vi.mock('@/components/home/live-session-state', () => ({
+  useLiveSessionContext: () => ({
+    organizationId: null,
+    accountReady: true,
+    isReady: true,
+    isResolving: false,
+    isError: false,
+    label: undefined,
+    refetch: vi.fn(),
+  }),
+  liveSessionContent: () => 'pending',
 }));
 vi.mock('@/components/home/agents-promo-card', () => ({
   AgentsPromoCard: () => null,

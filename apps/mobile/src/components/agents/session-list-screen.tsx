@@ -15,16 +15,14 @@ import { Bot, Plus } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
-import {
-  liveSessionContent,
-  LiveSessionFeedback,
-  useLiveSessionContext,
-} from '@/components/home/agent-sessions-section';
+import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
+import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
+import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { getNewAgentSessionPath } from '@/components/agents/session-list-routes';
 import { RemoteSessionRow } from '@/components/agents/remote-session-row';
 import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
@@ -72,10 +70,39 @@ export function AgentSessionListScreen() {
   useEffect(() => {
     refetchRef.current = refetch;
   }, [refetch]);
+
+  // The wrapped live refetch resolves `false` when the refresh did not land an
+  // accepted result; the context path reports through its own error state.
+  const refetchRequest = useCallback(async () => {
+    if (isContextError) {
+      await refetchContext();
+      return true;
+    }
+    return refetch();
+  }, [isContextError, refetchContext, refetch]);
+  // The pull owns only gesture feedback: past the budget the spinner stops and
+  // the reserved status line carries "Couldn't refresh" + Retry, so a hung
+  // fetch cannot pin the spinner with no next action.
+  const pull = usePullRefresh(refetchRequest);
+  const handleRefresh = pull.startPull;
+  const { markSettled } = pull;
+
+  // Focus return and app-foreground refreshes run outside the pull lifecycle.
+  // A failed pull leaves the reserved line on "Couldn't refresh" + Retry; when
+  // one of these refreshes lands an accepted result the list is up to date, so
+  // the stale failure line retires exactly as the query-driven error did.
+  const runForegroundRefresh = useCallback(() => {
+    void (async () => {
+      const accepted = await refetchRef.current();
+      if (accepted) {
+        markSettled();
+      }
+    })();
+  }, [markSettled]);
   useFocusEffect(
     useCallback(() => {
-      void refetchRef.current();
-    }, [])
+      runForegroundRefresh();
+    }, [runForegroundRefresh])
   );
 
   const listRef = useRef<FlatList<ActiveSession>>(null);
@@ -99,14 +126,14 @@ export function AgentSessionListScreen() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
       if (nextState === 'active' && navigation.isFocused()) {
-        void refetchRef.current();
+        runForegroundRefresh();
         void queryClient.invalidateQueries({ queryKey: [['activeSessions']] });
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [queryClient, navigation]);
+  }, [queryClient, navigation, runForegroundRefresh]);
 
   const navigateToSession = useAgentSessionNavigator();
 
@@ -139,19 +166,6 @@ export function AgentSessionListScreen() {
       ) : null}
     </View>
   );
-
-  const [refreshing, setRefreshing] = useState(false);
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setRefreshing(true);
-      try {
-        // LiveSessionFeedback retains and announces failures without a duplicate toast.
-        await (isContextError ? refetchContext() : refetch());
-      } finally {
-        setRefreshing(false);
-      }
-    })();
-  }, [isContextError, refetchContext, refetch]);
 
   const renderItem = useCallback(
     ({ item }: { item: ActiveSession }) => (
@@ -202,7 +216,7 @@ export function AgentSessionListScreen() {
       <EmptyState
         icon={Bot}
         title={t('agents.sessionList.noMatches')}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />}
         description={
           isSearching
             ? t('agents.sessionList.tryDifferentSearch')
@@ -222,7 +236,7 @@ export function AgentSessionListScreen() {
     body = (
       <LiveSessionListEmptyState
         organizationId={organizationId}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />}
       />
     );
   } else if (hasLiveRows) {
@@ -234,7 +248,7 @@ export function AgentSessionListScreen() {
         keyExtractor={item => item.id}
         extraData={attentionFocusRevision}
         contentContainerStyle={listPadding}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={<RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />}
         maintainVisibleContentPosition={{ minIndexForVisible: 0, autoscrollToTopThreshold: 10 }}
       />
     );
@@ -261,7 +275,6 @@ export function AgentSessionListScreen() {
             inputRef={query.searchInputRef}
             hasText={query.searchQuery.length > 0}
             showSearchBusy={false}
-            showInlineError={false}
             onChangeText={query.handleSearchChange}
             onClearSearch={query.handleClearSearch}
           />
@@ -272,7 +285,14 @@ export function AgentSessionListScreen() {
             sessions={sessions}
             failureLabel={t('agents.sessionList.couldNotLoadActive')}
             centered={query.hasLoaded && content === 'error'}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+            refresh={{
+              busy: pull.refreshing || pull.busy,
+              failed: pull.failed,
+              onRetry: pull.startRetry,
+            }}
+            refreshControl={
+              <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />
+            }
           />
         </View>
         {body}

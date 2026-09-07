@@ -1453,6 +1453,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "לא ניתן היה לטעון את השיחות הפעילות.",
+      "couldNotRefresh": "לא ניתן היה לרענן",
       "noSessionsYetDescription": "התחל משימת תכנות מהטלפון שלך. השיחות שלך יופיעו כאן.",
       "noMatches": "אין שיחות תואמות",
       "tryDifferentSearch": "כדאי לנסות מונח חיפוש אחר.",

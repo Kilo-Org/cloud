@@ -1471,6 +1471,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "تعذّر تحميل الجلسات النشطة.",
+      "couldNotRefresh": "تعذّر التحديث",
       "noSessionsYetDescription": "ابدأ مهمة برمجة من هاتفك. ستظهر جلساتك هنا.",
       "noMatches": "لا توجد جلسات مطابقة",
       "tryDifferentSearch": "جرّب كلمة بحث أخرى.",

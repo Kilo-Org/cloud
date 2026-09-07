@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Չհաջողվեց բեռնել ակտիվ նիստերը։",
+      "couldNotRefresh": "Չհաջողվեց թարմացնել",
       "noSessionsYetDescription": "Հեռախոսիցդ սկսիր ծրագրավորման առաջադրանք։ Քո նիստերը կհայտնվեն այստեղ։",
       "noMatches": "Համապատասխան նիստեր չկան",
       "tryDifferentSearch": "Փորձիր որոնել այլ բառով։",

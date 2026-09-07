@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata.",
+      "couldNotRefresh": "Päivitys epäonnistui",
       "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
       "noMatches": "Ei hakua vastaavia istuntoja",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",

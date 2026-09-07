@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি।",
+      "couldNotRefresh": "রিফ্রেশ করা যায়নি",
       "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন। আপনার সেশনগুলো এখানে দেখা যাবে।",
       "noMatches": "মিলে যায় এমন কোনো সেশন নেই",
       "tryDifferentSearch": "অন্য শব্দ দিয়ে খুঁজে দেখুন।",

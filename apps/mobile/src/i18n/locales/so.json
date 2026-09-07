@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Kalfadhiyada firfircoon lama soo rari karin.",
+      "couldNotRefresh": "Lama cusboonaysiin karin",
       "noSessionsYetDescription": "Taleefankaaga ka bilow hawl koodh-qoris ah. Kalfadhiyadaada ayaa halkan ka soo muuqan doona.",
       "noMatches": "Ma jiraan kalfadhiyo u dhigma",
       "tryDifferentSearch": "Isku day erey kale oo raadinta ah.",

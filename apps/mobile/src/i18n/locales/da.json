@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "De aktive sessioner kunne ikke indlæses.",
+      "couldNotRefresh": "Kunne ikke opdatere",
       "noSessionsYetDescription": "Start en kodeopgave fra din telefon. Dine sessioner vises her.",
       "noMatches": "Ingen sessioner fundet",
       "tryDifferentSearch": "Prøv et andet søgeord.",

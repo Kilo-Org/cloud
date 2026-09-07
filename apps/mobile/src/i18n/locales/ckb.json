@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "نەتوانرا سێشنە چالاکەکان بار بکرێن.",
+      "couldNotRefresh": "نەتوانرا نوێ بکرێتەوە",
       "noSessionsYetDescription": "لە مۆبایلەکەتەوە ئەرکێکی کۆدنووسین دەست پێ بکە. سێشنەکانت لێرە دەردەکەون.",
       "noMatches": "هیچ سێشنێک ناگونجێت",
       "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقی بکەرەوە.",

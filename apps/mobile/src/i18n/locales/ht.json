@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Pa t ka chaje sesyon aktif yo.",
+      "couldNotRefresh": "Pa t ka rafrechi",
       "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou. Sesyon ou yo ap parèt isit la.",
       "noMatches": "Pa gen sesyon ki koresponn",
       "tryDifferentSearch": "Eseye yon lòt mo pou rechèch la.",

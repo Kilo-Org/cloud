@@ -1459,6 +1459,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nie udało się wczytać aktywnych sesji.",
+      "couldNotRefresh": "Nie udało się odświeżyć",
       "noSessionsYetDescription": "Rozpocznij zadanie programistyczne na telefonie. Twoje sesje pojawią się tutaj.",
       "noMatches": "Brak pasujących sesji",
       "tryDifferentSearch": "Wpisz inne hasło wyszukiwania.",

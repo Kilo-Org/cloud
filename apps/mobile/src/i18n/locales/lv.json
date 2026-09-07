@@ -1891,6 +1891,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Neizdevās ielādēt aktīvās sesijas.",
+      "couldNotRefresh": "Neizdevās atsvaidzināt",
       "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī. Tavas sesijas parādīsies šeit.",
       "noMatches": "Nav atbilstošu sesiju",
       "tryDifferentSearch": "Izmēģini citu meklēšanas frāzi.",

@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive.",
+      "couldNotRefresh": "Rifreskimi dështoi",
       "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt. Seancat e tua do të shfaqen këtu.",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provo një term tjetër kërkimi.",

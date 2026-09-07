@@ -1447,6 +1447,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "De actieve sessies konden niet worden geladen.",
+      "couldNotRefresh": "Het vernieuwen is mislukt",
       "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon. Je sessies verschijnen hier.",
       "noMatches": "Geen sessies gevonden",
       "tryDifferentSearch": "Probeer een andere zoekterm.",

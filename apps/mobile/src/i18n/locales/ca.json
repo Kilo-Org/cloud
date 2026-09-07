@@ -1891,6 +1891,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives.",
+      "couldNotRefresh": "No s'ha pogut actualitzar",
       "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil. Les teves sessions apareixeran aquí.",
       "noMatches": "Cap sessió coincideix amb la cerca",
       "tryDifferentSearch": "Prova un altre terme de cerca.",

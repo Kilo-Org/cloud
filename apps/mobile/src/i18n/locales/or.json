@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "couldNotRefresh": "ରିଫ୍ରେସ୍ କରିହେଲା ନାହିଁ",
       "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ। ଆପଣଙ୍କ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noMatches": "କୌଣସି ସେସନ୍ ମେଳ ଖାଉନାହିଁ",
       "tryDifferentSearch": "ଅନ୍ୟ ଏକ ଶବ୍ଦ ଦେଇ ଖୋଜନ୍ତୁ।",

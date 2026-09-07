@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन।",
+      "couldNotRefresh": "रिफ्रेस गर्न सकिएन",
       "noSessionsYetDescription": "आफ्नो फोनबाट कोडिङको काम सुरु गर्नुहोस्। तपाईंका सत्रहरू यहाँ देखिनेछन्।",
       "noMatches": "मिल्ने कुनै सत्र छैन",
       "tryDifferentSearch": "अर्को शब्द राखेर खोज्नुहोस्।",

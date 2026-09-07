@@ -1447,6 +1447,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Tidak dapat memuat sesi aktif.",
+      "couldNotRefresh": "Tidak dapat memuat ulang",
       "noSessionsYetDescription": "Mulai tugas pemrograman dari ponselmu. Sesimu akan muncul di sini.",
       "noMatches": "Tidak ada sesi yang cocok",
       "tryDifferentSearch": "Coba kata kunci lain.",

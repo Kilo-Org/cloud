@@ -561,6 +561,104 @@ describe('processGooglePlayKiloPassNotification', () => {
     expect(endedSubscription?.cancel_at_period_end).toBe(false);
   });
 
+  it('does not claw back a different order when the revoked order was never granted', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, 'paid-order')
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({ purchaseToken: token, messageId: crypto.randomUUID() }),
+    });
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, 'ungranted-order', {
+        subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+      })
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        purchaseToken: token,
+        notificationType: 12,
+        messageId: crypto.randomUUID(),
+      }),
+    });
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired).toBe(
+      user.total_microdollars_acquired + toMicrodollars(19)
+    );
+  });
+
+  it.each([false, true])(
+    'reverses a refund-only order once and blocks later bonus (bonusIssued=%s)',
+    async bonusIssued => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      const token = crypto.randomUUID();
+      const orderId = crypto.randomUUID();
+      const now = new Date();
+      dateNowSpy.mockReturnValue(now.valueOf());
+      const purchase = apiDataForUser(obfsAccountId, orderId, { startTime: now.toISOString() });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(purchase);
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({ purchaseToken: token, messageId: crypto.randomUUID() }),
+      });
+      const paid = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: paid!.kilo_pass_threshold! })
+        .where(eq(kilocode_users.id, user.id));
+      const { maybeIssueKiloPassBonusFromUsageThreshold } = await import('./usage-triggered-bonus');
+      const issue = () =>
+        maybeIssueKiloPassBonusFromUsageThreshold({
+          kiloUserId: user.id,
+          nowIso: now.toISOString(),
+        });
+      if (bonusIssued) await issue();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken: token,
+        state: 'REFUNDED',
+      });
+      const message = {
+        messageId: crypto.randomUUID(),
+        data: Buffer.from(
+          JSON.stringify({
+            packageName: 'com.kilocode.kiloapp',
+            eventTimeMillis: String(now.valueOf()),
+            voidedPurchaseNotification: {
+              purchaseToken: token,
+              orderId,
+              productType: 1,
+              refundType: 1,
+            },
+          })
+        ).toString('base64'),
+      };
+      await processGooglePlayKiloPassNotification({ pubsubMessage: message });
+      await issue();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken: token,
+        state: 'REFUNDED',
+      });
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: { ...message, messageId: crypto.randomUUID() },
+      });
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
+      expect(after!.kilo_pass_threshold).toBeNull();
+      const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.provider_subscription_id, token),
+      });
+      expect(subscription!.status).toBe('active');
+    }
+  );
+
   it('returns already_processed for a duplicate messageId', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));

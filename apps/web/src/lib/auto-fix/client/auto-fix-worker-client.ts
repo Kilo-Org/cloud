@@ -1,36 +1,13 @@
 import 'server-only';
 
 import type { DispatchFixRequest } from '../core/schemas';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 const AUTO_FIX_URL = process.env.AUTO_FIX_URL;
 const AUTO_FIX_AUTH_TOKEN = process.env.AUTO_FIX_AUTH_TOKEN;
 
-/**
- * Fetch with timeout support
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs: number = 30000 // 30 second default timeout
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeoutMs}ms`);
-    }
-    throw error;
-  }
-}
+// 30 second default timeout
+const FETCH_TIMEOUT_MS = 30_000;
 
 // Types for API responses
 export interface DispatchFixResponse {
@@ -71,13 +48,17 @@ class AutoFixWorkerClient {
    * Creates an AutoFixOrchestrator Durable Object and starts the fix
    */
   async dispatchFix(payload: DispatchFixRequest): Promise<DispatchFixResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/fix/dispatch`, {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(payload),
-    });
+    const response = await fetchWithTimeout(
+      `${this.baseUrl}/fix/dispatch`,
+      {
+        method: 'POST',
+        headers: this.getHeaders({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(payload),
+      },
+      FETCH_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

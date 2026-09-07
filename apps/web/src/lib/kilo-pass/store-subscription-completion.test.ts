@@ -970,6 +970,40 @@ describe('completeStoreKiloPassPurchase', () => {
     ).rejects.toThrow('You already have an active Kilo Pass subscription');
   });
 
+  it.each([
+    [KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.AppStore],
+    [KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay],
+    [KiloPassPaymentProvider.GooglePlay, KiloPassPaymentProvider.AppStore],
+    [KiloPassPaymentProvider.GooglePlay, KiloPassPaymentProvider.GooglePlay],
+  ])(
+    'accepts a new %s pass after the old %s receipt expires before its notification',
+    async (oldProvider, newProvider) => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0 });
+      const original = await completeStoreKiloPassPurchase({
+        user,
+        purchase: applePurchase({ paymentProvider: oldProvider }),
+      });
+      const replacement = await completeStoreKiloPassPurchase({
+        user,
+        purchase: applePurchase({
+          paymentProvider: newProvider,
+          purchasedAtIso: '2026-06-01T12:00:00.000Z',
+          expiresAtIso: '2026-07-01T12:00:00.000Z',
+        }),
+      });
+      expect(replacement.alreadyProcessed).toBe(false);
+      const old = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, original.subscriptionId),
+      });
+      expect(old!.status).toBe('canceled');
+      expect(old!.ended_at).not.toBeNull();
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired).toBe(98_000_000);
+    }
+  );
+
   it('settles the purchase ledger row completed with the canonical result', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const purchase = applePurchase();

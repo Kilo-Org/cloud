@@ -81,7 +81,9 @@ export async function acknowledgeGooglePlaySubscriptionPurchase(
       packageName: GOOGLE_PLAY_PACKAGE_NAME,
       subscriptionId: productId,
       token: purchaseToken,
-      requestBody: appAccountToken ? { externalAccountIds: { obfuscatedAccountId: appAccountToken } } : {},
+      requestBody: appAccountToken
+        ? { externalAccountIds: { obfuscatedAccountId: appAccountToken } }
+        : {},
     });
   } catch (error) {
     // The app can acknowledge concurrently, or the response can be lost.

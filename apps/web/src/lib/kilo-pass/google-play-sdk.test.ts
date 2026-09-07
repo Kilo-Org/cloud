@@ -112,7 +112,11 @@ describe('google-play-sdk', () => {
       requestBody: {},
     });
     await acknowledgeGooglePlaySubscriptionPurchase('kilopass_tier19', 'test-token', 'account-id');
-    expect(mockAcknowledge).toHaveBeenLastCalledWith(expect.objectContaining({ requestBody: { externalAccountIds: { obfuscatedAccountId: 'account-id' } } }));
+    expect(mockAcknowledge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requestBody: { externalAccountIds: { obfuscatedAccountId: 'account-id' } },
+      })
+    );
     mockAcknowledge.mockRejectedValueOnce(new Error('response lost'));
     mockSubscriptionsV2Get.mockReturnValueOnce({
       data: { acknowledgementState: 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED' },

@@ -36,6 +36,7 @@
     "cost": "Gharama",
     "discard": "Tupa",
     "findings": "Matokeo",
+    "mergeRequest": "ombi la kuunganisha",
     "notConnected": "Haijaunganishwa",
     "notifications": "Arifa",
     "pullRequest": "ombi la kuunganisha",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "Safu mlalo tupu ya tofauti za msimbo"
     },
     "connectionExpired": "Muda wa muunganisho wa GitHub umeisha.",
+    "capabilities": {
+      "banner": {
+        "title": "Haipatikani kwa mtoa huduma huyu",
+        "accessibility": "Haipatikani kwa mtoa huduma huyu: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Uunganishaji",
       "mergeNow": "Unganisha sasa",
       "mergePullRequest": "Kuunganisha ombi",
+      "mergeTermTitle": "Unganisha {{term}}",
       "enableAutoMerge": "Washa muunganisho wa kiotomatiki",
       "disableAutoMerge": "Zima muunganisho wa kiotomatiki",
       "autoMergeOn": "Muunganisho wa kiotomatiki umewashwa",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "Futa tawi baada ya kuunganisha",
       "noEnabledMethods": "Hakuna mbinu ya kuunganisha iliyowezeshwa kwenye hazina hii ya msimbo. Mwombe msimamizi wa hazina awezeshe kuunganisha kwa rekodi ya kuunganisha, kwa rekodi moja, au kwa kuweka upya msingi.",
       "confirmTitle": "Ungependa kuunganisha ombi?",
+      "confirmTitleTerm": "Ungependa kuunganisha {{term}}?",
       "confirmMessage": "Hii itaunganisha mabadiliko yako kwenye tawi la msingi.",
       "enableAutoMergeConfirmTitle": "Ungependa kuwasha muunganisho wa kiotomatiki?",
       "enableAutoMergeConfirmMessage": "GitHub itaunganisha ombi hili kiotomatiki vipimo vyote vinavyohitajika vikifaulu.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} litaunganishwa kiotomatiki pipeline yake inapofaulu.",
+      "enableAutoMergeDescriptionTerm": "GitLab litaunganisha {{term}} hili kiotomatiki pipeline yake inapofaulu.",
       "forbidden": "Huna ruhusa ya kuunganisha ombi hili.",
       "cannotMerge": "Ombi hili la kuunganisha haliwezi kuunganishwa lilivyo sasa.",
       "couldNotMerge": "Imeshindikana kuunganisha ombi.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "Tayari limeunganishwa",
-        "closed": "Ombi hili la kuunganisha limefungwa"
+        "closed": "Ombi hili la kuunganisha limefungwa",
+        "closedMergeRequest": "Ombi hili la kuunganisha limefungwa"
       },
       "partialSuccessBanner": {
         "body": "Imeshindikana kufuta tawi: {{reason}}.",
@@ -393,6 +405,18 @@
         "behindDetail": "Tawi lenye mabadiliko halina mabadiliko ya karibuni ya tawi la msingi. Weka upya msingi wake au lisasishe kabla ya kuunganisha.",
         "notMergeableTitle": "Ombi hili bado haliwezi kuunganishwa",
         "notMergeableDetail": "GitHub imeripoti hali ya kuunganisha kuwa {{state}}."
+      },
+      "restrictions": {
+        "title": "Vikwazo vya kuunganisha",
+        "approvalsRequired_one": "Idhini {{displayCount}} inahitajika",
+        "approvalsRequired_other": "Idhini {{displayCount}} zinahitajika",
+        "pipelineMustSucceed": "Pipeline lazima ifaulu kabla ya kuunganisha."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline inashindwa kwenye hifadhi ya mabadiliko ya mwisho.",
+        "pendingPipeline": "Pipeline bado inaendelea kwenye hifadhi ya mabadiliko ya mwisho.",
+        "permission": "Huna ruhusa ya kuunganisha {{term}}.",
+        "draft": "Weka alama kuwa {{term}} liko tayari kukaguliwa kabla ya kuunganisha."
       },
       "methodLabels": {
         "merge": "Unda rekodi ya kuunganisha",
@@ -441,6 +465,7 @@
       "acceptTerms": "Kubali",
       "replyBadRequest": "Jibu hili haliwezi kuchapishwa. Mada huenda imebadilika.",
       "replyForbidden": "Huna ruhusa ya kujibu ombi hili la kuunganisha.",
+      "replyForbiddenTerm": "Huna ruhusa ya kujibu {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Maoni haya hayawezi kuripotiwa.",
@@ -501,16 +526,18 @@
     "reviewPullRequest": "Kagua ombi la kuunganisha",
     "headLine": "{{counts}} · rekodi ya mwisho {{sha}}",
     "entry": {
-      "eyebrow": "Fungua ombi la kuunganisha kwa kutumia URL.",
-      "pastePrLink": "Bandika kiungo cha PR",
-      "noRecentPrs": "Hakuna PR za hivi karibuni",
-      "noRecentPrsDescription": "Bandika kiungo cha PR hapo juu ili uanze ukaguzi — PR hiyo itaonekana hapa wakati ujao.",
+      "eyebrow": "Fungua ombi la kuunganisha kwa URL",
+      "pastePrLink": "Bandika kiungo cha ombi la kuunganisha",
+      "noRecentPrs": "Hakuna ukaguzi wa hivi karibuni",
+      "noRecentPrsDescription": "Bandika kiungo hapo juu kuanza ukaguzi — kitaonekana hapa mara ijayo.",
       "couldNotLoad": "Imeshindikana kupakia.",
       "removeFromRecentsTitle": "Ungependa kuondoa kwenye orodha ya hivi karibuni?",
-      "removeFromRecentsMessage": "Ombi hili la kuunganisha litaondolewa kwenye orodha yako ya hivi karibuni.",
+      "removeFromRecentsMessage": "Ukaguzi huu utaondolewa kwenye orodha yako ya hivi karibuni.",
       "removeRecentAccessibility": "Ondoa {{repo}} kwenye orodha ya hivi karibuni",
-      "urlAccessibility": "URL ya ombi la kuunganisha la GitHub",
-      "clearLink": "Ondoa kiungo cha ombi la kuunganisha",
+      "urlAccessibility": "Weka URL ya ombi la kuunganisha",
+      "urlPlaceholder": "URL ya ombi la kuunganisha",
+      "openAccessibility": "Fungua ombi la kuunganisha",
+      "clearLink": "Futa kiungo",
       "pasteLink": "Bandika kiungo cha ombi la kuunganisha",
       "open": "Wazi"
     },
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "Imeshindikana kuangalia muunganisho wa GitHub.",
       "checkFailedMessage": "Hali ya kuingia haipatikani hadi upakiaji huu ukamilike.",
+      "checkFailedTitleGitLab": "Imeshindikana kuangalia muunganisho wa GitLab.",
+      "checkFailedTitleBitbucket": "Imeshindikana kuangalia muunganisho wa Bitbucket.",
+      "providerCheckFailedMessage": "Hali ya muunganisho haipatikani hadi hii ipakie.",
       "reconnectTitle": "Unganisha GitHub tena",
       "reconnectDescription": "Ruhusa ya muunganisho wako wa GitHub imebatilishwa. Unganisha tena ili uendelee kukagua maombi ya kuunganisha kwenye simu.",
-      "description": "Unganisha akaunti yako ya GitHub ili ukague maombi ya kuunganisha kwenye simu."
+      "description": "Unganisha akaunti yako ya GitHub ili ukague maombi ya kuunganisha kwenye simu.",
+      "gitlabDescription": "Unganisha akaunti yako ya GitLab ili kukagua maombi ya kuunganisha kwenye simu.",
+      "bitbucketDescription": "Unganisha Bitbucket na shirika hili ili kukagua maombi ya kuunganisha kwenye simu.",
+      "bitbucketOrgOnlyDescription": "Chagua shirika kwenye wasifu wako ili kukagua maombi ya kuunganisha ya Bitbucket yake."
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "Muda wa muunganisho wa GitHub umeisha.",
-      "message": "Muunganisho wako wa GitHub si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika."
+      "message": "Muunganisho wako wa GitHub si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika.",
+      "gitlabTitle": "Muda wa muunganisho wa GitLab umeisha.",
+      "bitbucketTitle": "Muda wa muunganisho wa Bitbucket umeisha.",
+      "providerMessage": "Muunganisho wako wa {{provider}} si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika."
     },
     "eventChips": {
       "comment": "Toa maoni",
@@ -636,6 +672,21 @@
       "files": "Faili",
       "discussion": "Mazungumzo"
     },
+    "terms": {
+      "pullRequest": "Ombi la kuunganisha",
+      "mergeRequest": "Ombi la kuunganisha",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Shiriki ombi la kuunganisha",
+      "viewOnProvider": "Tazama kwenye {{provider}}",
+      "mergeRequestUnavailable": "Ombi la kuunganisha halipatikani",
+      "unavailableDescription": "Huenda kimefutwa, au huenda huna ruhusa ya kukionoa.",
+      "accessDeniedMergeRequest": "Huna ruhusa ya kuona ombi hili la kuunganisha.",
+      "couldNotLoadMergeRequest": "Imeshindikana kupakia ombi la kuunganisha.",
+      "discussionAccessDenied": "Huna ruhusa ya kuangalia mazungumzo ya ombi hili la kuunganisha.",
+      "discussionUnavailableMessage": "Huenda ombi hili la kuunganisha limeondolewa.",
+      "noDiscussionDescription": "Hakuna mada za ukaguzi wala maoni ya mazungumzo kwenye ombi hili la kuunganisha.",
+      "noFilesChangedDescription": "Ombi hili la kuunganisha halina mabadiliko ya faili."
+    },
     "fileStatus": {
       "modified": "Imebadilishwa",
       "renamed": "Jina limebadilishwa",
@@ -652,7 +703,7 @@
       "emptyLine": "(tupu)"
     },
     "linkPasteClipboardEmpty": "Ubao wa kunakili ni tupu.",
-    "linkPasteNotAPullRequest": "Hiki si kiungo cha ombi la kuunganisha la GitHub.",
+    "linkPasteNotAPullRequest": "Sio kiungo cha ombi la kuunganisha",
     "announce": {
       "commentPosted": "Maoni yamechapishwa",
       "reviewSubmitted": "Ukaguzi umewasilishwa",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "Maoni haya hayawezi kuchapishwa. Mstari uliochaguliwa huenda umebadilika, au PR huenda imesasishwa.",
       "reviewNotSubmitted": "Ukaguzi huu hauwezi kuwasilishwa ulivyo sasa. Huenda PR imebadilika, au huwezi kukagua ombi lako mwenyewe la kuunganisha.",
+      "reviewNotSubmittedTerm": "Ukaguzi huu hauwezi kutumwa kama ulivyo. Huenda {{term}} limebadilika, au huwezi kukagua {{term}} wako mwenyewe.",
       "couldNotPostComment": "Imeshindikana kuchapisha maoni.",
       "couldNotSubmitReview": "Imeshindikana kuwasilisha ukaguzi. Angalia muunganisho wako kisha ujaribu tena."
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "Imeshindikana kutuma jibu.",
       "couldNotCompleteAction": "Imeshindikana kukamilisha kitendo hiki.",
       "mergeResultDefaultError": "GitHub haikukamilisha muunganisho.",
+      "mergeResultNotCompleted": "{{term}} haikuunganishwa. Angalia hali yake na ujaribu tena.",
       "ambiguous": "Imeshindikana kuthibitisha matokeo — angalia PR kabla ya kujaribu tena.",
       "persistenceFailed": "Hatukuweza kurekodi kitendo hiki. Tafadhali jaribu tena baadaye.",
       "forbidden": "Kitendo hiki hakiruhusiwi."
@@ -1979,11 +2032,31 @@
       "retryConnection": "Jaribu kuunganisha tena"
     },
     "newSession": {
+      "recentlyUsed": "Zilizotumika hivi karibuni",
+      "couldNotLoadGithubRepositories": "Imeshindikana kupakia hazina za GitHub.",
+      "couldNotLoadGitlabRepositories": "Imeshindikana kupakia hazina za GitLab.",
+      "couldNotLoadBitbucketRepositories": "Imeshindikana kupakia hazina za Bitbucket.",
       "connectGithubDescription": "Unganisha GitHub kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
+      "connectGitlabDescription": "Unganisha GitLab kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
+      "connectBitbucketDescription": "Unganisha Bitbucket kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
       "openGithub": "Fungua GitHub",
+      "openGitlab": "Fungua GitLab",
+      "openBitbucket": "Fungua Bitbucket",
       "refreshRepositories": "Pakia upya hazina",
       "githubConnected": "GitHub imeunganishwa",
+      "gitlabConnected": "GitLab imeunganishwa",
       "noRepositoriesVisible": "Hakuna hazina zinazoonekana. Angalia ruhusa za programu ya Kilo kwenye GitHub kufikia hazina, kisha pakia upya orodha.",
+      "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye GitLab, kisha pakia upya orodha.",
+      "noRepositoriesVisibleBitbucket": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye Bitbucket, kisha pakia upya orodha.",
+      "bitbucketOrganizationsOnly": "Bitbucket inapatikana kwa mashirika pekee.",
+      "branchPickerTitle": "Chagua tawi",
+      "branchDefault": "Chaguomsingi",
+      "branchAccessibility": "Tawi: {{label}}",
+      "branchLoading": "Inapakia matawi",
+      "branchLoadError": "Imeshindikana kupakia matawi",
+      "branchUnavailable": "Matawi hayapatikani kwa hazina hii. Angalia ruhusa yako kwa mtoa huduma, kisha chagua hazina nyingine.",
+      "branchEmpty": "Hakuna matawi yanayopatikana",
+      "branchPlaceholder": "Chagua tawi",
       "runOnWithTarget": "Endesha kwenye: {{target}}",
       "environment": "Mazingira",
       "couldNotLoadEnvironment": "Imeshindikana kupakia mazingira yako.",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "Imeshindikana kupakia upya hazina. Tafadhali jaribu tena.",
       "discardDraftTitle": "Ungependa kufuta rasimu?",
       "discardDraftMessage": "Maagizo yako yatapotea.",
+      "discardWithUploadsMessage": "Maagizo yako na faili zozote zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
       "discardFailed": "Imeshindikana kufuta rasimu. Tafadhali jaribu tena.",
       "remoteHint": "Endesha `kilo remote` kwenye kompyuta yako, au `/remote` kwenye kikao cha CLI kinachoendelea, ili kudhibiti mchakato wa kilo kwenye kompyuta yako.",
-      "connectBitbucketDescription": "Unganisha Bitbucket kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
-      "connectGitlabDescription": "Unganisha GitLab kwenye kivinjari chako, kisha rudi hapa kuchagua hazina.",
-      "couldNotLoadBitbucketRepositories": "Imeshindikana kupakia hazina za Bitbucket.",
-      "couldNotLoadGithubRepositories": "Imeshindikana kupakia hazina za GitHub.",
-      "couldNotLoadGitlabRepositories": "Imeshindikana kupakia hazina za GitLab.",
-      "gitlabConnected": "GitLab imeunganishwa",
-      "noRepositoriesVisibleBitbucket": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye Bitbucket, kisha pakia upya orodha.",
-      "noRepositoriesVisibleGitlab": "Hakuna hazina zinazoonekana. Angalia ruhusa za kufikia hazina kwenye GitLab, kisha pakia upya orodha.",
-      "openBitbucket": "Fungua Bitbucket",
-      "openGitlab": "Fungua GitLab",
-      "recentlyUsed": "Zilizotumika hivi karibuni",
-      "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
       "continueFrom": "Kikao {{title}} kinaendelea.",
-      "importFailed": "Imeshindikana kuingiza kikao hiki.",
       "importingSession": "Inaingiza kikao",
-      "discardWithUploadsMessage": "Maagizo yako na faili zozote zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa."
+      "cliCannotContinue": "CLI hii haiwezi kuendelea na kikao. Chagua Cloud Agent au CLI nyingine.",
+      "importFailed": "Imeshindikana kuingiza kikao hiki."
     },
     "partRenderer": {
       "updatedFileCount_one": "Faili {{displayCount}} imesasishwa.",

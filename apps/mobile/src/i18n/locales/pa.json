@@ -36,6 +36,7 @@
     "cost": "ਲਾਗਤ",
     "discard": "ਰੱਦ ਕਰੋ",
     "findings": "ਜਾਂਚ ਦੇ ਨਤੀਜੇ",
+    "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
     "notConnected": "ਜੁੜਿਆ ਨਹੀਂ",
     "notifications": "ਸੂਚਨਾਵਾਂ",
     "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "ਡਿਫ਼ ਦੀ ਖਾਲੀ ਕਤਾਰ"
     },
     "connectionExpired": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
+    "capabilities": {
+      "banner": {
+        "title": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ",
+        "accessibility": "ਇਸ ਪ੍ਰਦਾਤਾ ਉੱਤੇ ਉਪਲਬਧ ਨਹੀਂ: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "ਮਰਜ",
       "mergeNow": "ਹੁਣੇ ਮਰਜ ਕਰੋ",
       "mergePullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਕਰਨਾ",
+      "mergeTermTitle": "{{term}} ਮਰਜ ਕਰਨਾ",
       "enableAutoMerge": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਕਰੋ",
       "disableAutoMerge": "ਆਟੋ-ਮਰਜ ਬੰਦ ਕਰੋ",
       "autoMergeOn": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਹੈ",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "ਮਰਜ ਤੋਂ ਬਾਅਦ ਬ੍ਰਾਂਚ ਮਿਟਾਓ",
       "noEnabledMethods": "ਇਸ ਰਿਪੋਜ਼ਿਟਰੀ ਵਿੱਚ ਮਰਜ ਕਰਨ ਦੀ ਕੋਈ ਵਿਧੀ ਚਾਲੂ ਨਹੀਂ ਹੈ। ਰਿਪੋਜ਼ਿਟਰੀ ਦੇ ਪ੍ਰਸ਼ਾਸਕ ਨੂੰ ਮਰਜ, ਸਕੁਐਸ਼ ਜਾਂ ਰੀਬੇਸ ਵਿਧੀ ਚਾਲੂ ਕਰਨ ਲਈ ਕਹੋ।",
       "confirmTitle": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਕਰੀਏ?",
+      "confirmTitleTerm": "{{term}} ਮਰਜ ਕਰੀਏ?",
       "confirmMessage": "ਇਸ ਨਾਲ ਤੁਹਾਡੇ ਬਦਲਾਅ ਬੇਸ ਬ੍ਰਾਂਚ ਵਿੱਚ ਮਰਜ ਹੋ ਜਾਣਗੇ।",
       "enableAutoMergeConfirmTitle": "ਆਟੋ-ਮਰਜ ਚਾਲੂ ਕਰੀਏ?",
       "enableAutoMergeConfirmMessage": "ਸਾਰੀਆਂ ਲੋੜੀਂਦੀਆਂ ਜਾਂਚਾਂ ਸਫਲ ਹੋਣ 'ਤੇ GitHub ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਆਪਣੇ ਆਪ ਮਰਜ ਕਰੇਗਾ।",
+      "enableAutoMergeConfirmMessageTerm": "ਪਾਈਪਲਾਈਨ ਸਫ਼ਲ ਹੁੰਦਿਆਂ ਹੀ {{term}} ਆਪਣੇ ਆਪ ਮਰਜ਼ ਹੋ ਜਾਵੇਗੀ।",
+      "enableAutoMergeDescriptionTerm": "ਪਾਈਪਲਾਈਨ ਸਫ਼ਲ ਹੁੰਦਿਆਂ ਹੀ GitLab ਇਸ {{term}} ਨੂੰ ਆਪਣੇ ਆਪ ਮਰਜ਼ ਕਰ ਦਿੰਦਾ ਹੈ।",
       "forbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਮਰਜ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "cannotMerge": "ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ ਨੂੰ ਇਸ ਦੀ ਮੌਜੂਦਾ ਸਥਿਤੀ ਵਿੱਚ ਮਰਜ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ।",
       "couldNotMerge": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਮਰਜ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "ਪਹਿਲਾਂ ਹੀ ਮਰਜ ਹੋ ਗਈ",
-        "closed": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ"
+        "closed": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ",
+        "closedMergeRequest": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਬੰਦ ਹੈ"
       },
       "partialSuccessBanner": {
         "body": "ਬ੍ਰਾਂਚ ਮਿਟਾਈ ਨਹੀਂ ਜਾ ਸਕੀ: {{reason}}।",
@@ -393,6 +405,18 @@
         "behindDetail": "ਹੈੱਡ ਬ੍ਰਾਂਚ ਬੇਸ ਬ੍ਰਾਂਚ ਤੋਂ ਪਿੱਛੇ ਹੈ। ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਬ੍ਰਾਂਚ ਨੂੰ ਰੀਬੇਸ ਜਾਂ ਅੱਪਡੇਟ ਕਰੋ।",
         "notMergeableTitle": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਅਜੇ ਮਰਜ ਨਹੀਂ ਹੋ ਸਕਦੀ",
         "notMergeableDetail": "GitHub ਮੁਤਾਬਕ ਮਰਜ ਦੀ ਸਥਿਤੀ {{state}} ਹੈ।"
+      },
+      "restrictions": {
+        "title": "ਮਰਜ਼ ਪਾਬੰਦੀਆਂ",
+        "approvalsRequired_one": "{{displayCount}} ਮਨਜ਼ੂਰੀ ਚਾਹੀਦੀ",
+        "approvalsRequired_other": "{{displayCount}} ਮਨਜ਼ੂਰੀਆਂ ਚਾਹੀਦੀਆਂ",
+        "pipelineMustSucceed": "ਮਰਜ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਪਾਈਪਲਾਈਨ ਦਾ ਸਫ਼ਲ ਹੋਣਾ ਜ਼ਰੂਰੀ ਹੈ।"
+      },
+      "providerBlocked": {
+        "failingPipeline": "ਸਭ ਤੋਂ ਨਵੇਂ ਕਮਿਟ ਉੱਤੇ ਪਾਈਪਲਾਈਨ ਫੇਲ੍ਹ ਹੋ ਰਹੀ ਹੈ।",
+        "pendingPipeline": "ਸਭ ਤੋਂ ਨਵੇਂ ਕਮਿਟ ਉੱਤੇ ਪਾਈਪਲਾਈਨ ਹਾਲੇ ਵੀ ਚੱਲ ਰਹੀ ਹੈ।",
+        "permission": "ਤੁਹਾਨੂੰ ਇਸ {{term}} ਨੂੰ ਮਰਜ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+        "draft": "ਮਰਜ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ {{term}} ਨੂੰ ਸਮੀਖਿਆ ਲਈ ਤਿਆਰ ਵਜੋਂ ਚਿੰਨ੍ਹਿਤ ਕਰੋ।"
       },
       "methodLabels": {
         "merge": "ਮਰਜ ਕਮਿਟ ਬਣਾਓ",
@@ -441,6 +465,7 @@
       "acceptTerms": "ਸਵੀਕਾਰ ਕਰੋ",
       "replyBadRequest": "ਇਹ ਜਵਾਬ ਪੋਸਟ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਥ੍ਰੈਡ ਬਦਲਿਆ ਹੋ ਸਕਦਾ ਹੈ।",
       "replyForbidden": "ਤੁਹਾਨੂੰ ਇਸ ਪੁੱਲ ਰਿਕਵੈਸਟ 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "replyForbiddenTerm": "ਤੁਹਾਨੂੰ ਇਸ {{term}} 'ਤੇ ਜਵਾਬ ਦੇਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
       "moderation": {
         "reportContent": {
           "terminal": "ਇਸ ਟਿੱਪਣੀ ਦੀ ਰਿਪੋਰਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦੀ ਸਮੀਖਿਆ ਕਰੋ",
     "headLine": "{{counts}} · ਹੈੱਡ {{sha}}",
     "entry": {
-      "eyebrow": "URL ਰਾਹੀਂ ਪੁੱਲ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ।",
-      "pastePrLink": "PR ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
-      "noRecentPrs": "ਹਾਲ ਹੀ ਦੀ ਕੋਈ PR ਨਹੀਂ",
-      "noRecentPrsDescription": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਉੱਪਰ PR ਲਿੰਕ ਪੇਸਟ ਕਰੋ — ਇਹ ਅਗਲੀ ਵਾਰ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
+      "eyebrow": "URL ਰਾਹੀਂ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
+      "pastePrLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
+      "noRecentPrs": "ਕੋਈ ਹਾਲੀਆ ਸਮੀਖਿਆ ਨਹੀਂ",
+      "noRecentPrsDescription": "ਸਮੀਖਿਆ ਸ਼ੁਰੂ ਕਰਨ ਲਈ ਉੱਤੇ ਲਿੰਕ ਪੇਸਟ ਕਰੋ — ਅਗਲੀ ਵਾਰ ਇਹ ਇੱਥੇ ਦਿਖਾਈ ਦੇਵੇਗੀ।",
       "couldNotLoad": "ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "removeFromRecentsTitle": "ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਈਏ?",
-      "removeFromRecentsMessage": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਤੁਹਾਡੀ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
+      "removeFromRecentsMessage": "ਇਹ ਸਮੀਖਿਆ ਤੁਹਾਡੀ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾ ਦਿੱਤੀ ਜਾਵੇਗੀ।",
       "removeRecentAccessibility": "{{repo}} ਨੂੰ ਹਾਲੀਆ ਸੂਚੀ ਵਿੱਚੋਂ ਹਟਾਓ",
-      "urlAccessibility": "GitHub ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ URL",
-      "clearLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਹਟਾਓ",
-      "pasteLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
+      "urlAccessibility": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ URL ਦਰਜ ਕਰੋ",
+      "urlPlaceholder": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ URL",
+      "openAccessibility": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਖੋਲ੍ਹੋ",
+      "clearLink": "ਲਿੰਕ ਹਟਾਓ",
+      "pasteLink": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਪੇਸਟ ਕਰੋ",
       "open": "ਖੋਲ੍ਹੋ"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
       "checkFailedMessage": "ਇਹ ਲੋਡ ਹੋਣ ਤੱਕ ਸਾਈਨ-ਇਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੋਵੇਗੀ।",
+      "checkFailedTitleGitLab": "GitLab ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "checkFailedTitleBitbucket": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "providerCheckFailedMessage": "ਇਸ ਦੇ ਲੋਡ ਹੋਣ ਤੱਕ ਕਨੈਕਸ਼ਨ ਦੀ ਸਥਿਤੀ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "reconnectTitle": "GitHub ਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ",
       "reconnectDescription": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਰੱਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ। ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਜਾਰੀ ਰੱਖਣ ਲਈ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰੋ।",
-      "description": "ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitHub ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।"
+      "description": "ਮੋਬਾਈਲ 'ਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitHub ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
+      "gitlabDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitLab ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
+      "bitbucketDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਇਸ ਸੰਗਠਨ ਨੂੰ Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
+      "bitbucketOrgOnlyDescription": "ਆਪਣੀ ਪ੍ਰੋਫਾਈਲ ਵਿੱਚ ਕੋਈ ਸੰਗਠਨ ਚੁਣੋ ਤਾਂ ਜੋ ਉਸ ਦੀਆਂ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕੇ।"
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "message": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।"
+      "message": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।",
+      "gitlabTitle": "GitLab ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
+      "bitbucketTitle": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
+      "providerMessage": "ਤੁਹਾਡਾ {{provider}} ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।"
     },
     "eventChips": {
       "comment": "ਟਿੱਪਣੀ",
@@ -636,6 +672,21 @@
       "files": "ਫਾਈਲਾਂ",
       "discussion": "ਚਰਚਾ"
     },
+    "terms": {
+      "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
+      "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
+      "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
+      "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
+      "unavailableDescription": "ਹੋ ਸਕਦਾ ਹੈ ਇਹ ਹਟਾ ਦਿੱਤੀ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਹਾਡੇ ਕੋਲ ਇਸ ਦੀ ਪਹੁੰਚ ਨਾ ਹੋਵੇ।",
+      "accessDeniedMergeRequest": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਨੂੰ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "couldNotLoadMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੀ।",
+      "discussionAccessDenied": "ਤੁਹਾਨੂੰ ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦੀ ਚਰਚਾ ਵੇਖਣ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।",
+      "discussionUnavailableMessage": "ਇਹ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਹਟਾਈ ਗਈ ਹੋ ਸਕਦੀ ਹੈ।",
+      "noDiscussionDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ 'ਤੇ ਸਮੀਖਿਆ ਦਾ ਕੋਈ ਥ੍ਰੈਡ ਜਾਂ ਗੱਲਬਾਤ ਦੀ ਕੋਈ ਟਿੱਪਣੀ ਨਹੀਂ ਹੈ।",
+      "noFilesChangedDescription": "ਇਸ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਵਿੱਚ ਕਿਸੇ ਫਾਈਲ ਵਿੱਚ ਬਦਲਾਅ ਨਹੀਂ ਕੀਤਾ ਗਿਆ।"
+    },
     "fileStatus": {
       "modified": "ਸੋਧੀ ਗਈ",
       "renamed": "ਨਾਮ ਬਦਲਿਆ",
@@ -652,7 +703,7 @@
       "emptyLine": "(ਖਾਲੀ)"
     },
     "linkPasteClipboardEmpty": "ਕਲਿੱਪਬੋਰਡ ਖਾਲੀ ਹੈ।",
-    "linkPasteNotAPullRequest": "ਇਹ GitHub ਪੁੱਲ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ।",
+    "linkPasteNotAPullRequest": "ਇਹ ਪੁੱਲ ਰਿਕਵੈਸਟ ਜਾਂ ਮਰਜ਼ ਰਿਕਵੈਸਟ ਦਾ ਲਿੰਕ ਨਹੀਂ ਹੈ",
     "announce": {
       "commentPosted": "ਟਿੱਪਣੀ ਪੋਸਟ ਹੋ ਗਈ",
       "reviewSubmitted": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਹੋ ਗਈ",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "ਇਹ ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਚੁਣੀ ਲਾਈਨ ਬਦਲ ਗਈ ਹੋਵੇ ਜਾਂ PR ਅੱਪਡੇਟ ਹੋ ਗਈ ਹੋਵੇ।",
       "reviewNotSubmitted": "ਇਸ ਸਮੀਖਿਆ ਨੂੰ ਇਸ ਦੇ ਮੌਜੂਦਾ ਰੂਪ ਵਿੱਚ ਜਮ੍ਹਾਂ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ। ਹੋ ਸਕਦਾ ਹੈ ਕਿ PR ਬਦਲ ਗਈ ਹੋਵੇ ਜਾਂ ਇਹ ਤੁਹਾਡੀ ਆਪਣੀ ਪੁੱਲ ਰਿਕਵੈਸਟ ਹੋਵੇ, ਜਿਸ ਦੀ ਸਮੀਖਿਆ ਤੁਸੀਂ ਨਹੀਂ ਕਰ ਸਕਦੇ।",
+      "reviewNotSubmittedTerm": "ਇਹ ਸਮੀਖਿਆ ਇਵੇਂ ਸਬਮਿਟ ਨਹੀਂ ਹੋ ਸਕਦੀ। ਹੋ ਸਕਦਾ ਹੈ {{term}} ਬਦਲ ਗਈ ਹੋਵੇ, ਜਾਂ ਤੁਸੀਂ ਆਪਣੀ ਖ਼ੁਦ ਦੀ {{term}} ਦੀ ਸਮੀਖਿਆ ਨਹੀਂ ਕਰ ਸਕਦੇ।",
       "couldNotPostComment": "ਟਿੱਪਣੀ ਪੋਸਟ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
       "couldNotSubmitReview": "ਸਮੀਖਿਆ ਜਮ੍ਹਾਂ ਨਹੀਂ ਹੋ ਸਕੀ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ ਜਾ ਸਕਿਆ।",
       "couldNotCompleteAction": "ਇਹ ਕਾਰਵਾਈ ਪੂਰੀ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕੀ।",
       "mergeResultDefaultError": "GitHub ਨੇ ਮਰਜ ਪੂਰਾ ਨਹੀਂ ਕੀਤਾ।",
+      "mergeResultNotCompleted": "{{term}} ਮਰਜ਼ ਨਹੀਂ ਹੋਈ। ਇਸ ਦੀ ਸਥਿਤੀ ਜਾਂਚੋ ਅਤੇ ਫਿਰ ਤੋਂ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "ambiguous": "ਪੁਸ਼ਟੀ ਨਹੀਂ ਹੋ ਸਕੀ — ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ PR ਦੀ ਜਾਂਚ ਕਰੋ।",
       "persistenceFailed": "ਅਸੀਂ ਇਹ ਕਾਰਵਾਈ ਰਿਕਾਰਡ ਨਹੀਂ ਕਰ ਸਕੇ। ਕਿਰਪਾ ਕਰਕੇ ਬਾਅਦ ਵਿੱਚ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "forbidden": "ਇਸ ਦੀ ਇਜਾਜ਼ਤ ਨਹੀਂ ਹੈ।"
@@ -1979,11 +2032,31 @@
       "retryConnection": "ਮੁੜ ਕਨੈਕਟ ਕਰਨ ਦੀ ਕੋਸ਼ਿਸ਼ ਕਰੋ"
     },
     "newSession": {
+      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
+      "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
+      "couldNotLoadGitlabRepositories": "GitLab ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
       "connectGithubDescription": "ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ GitHub ਨੂੰ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
+      "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
       "openGithub": "GitHub ਖੋਲ੍ਹੋ",
+      "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
+      "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
       "refreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਕਰੋ",
       "githubConnected": "GitHub ਕਨੈਕਟ ਹੈ",
+      "gitlabConnected": "GitLab ਕਨੈਕਟ ਹੈ",
       "noRepositoriesVisible": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। ਜਾਂਚੋ ਕਿ Kilo GitHub ਐਪ ਨੂੰ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਹੈ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
+      "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
+      "noRepositoriesVisibleBitbucket": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Bitbucket ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
+      "bitbucketOrganizationsOnly": "Bitbucket ਸਿਰਫ਼ ਸੰਗਠਨਾਂ ਲਈ ਉਪਲਬਧ ਹੈ।",
+      "branchPickerTitle": "ਬ੍ਰਾਂਚ ਚੁਣੋ",
+      "branchDefault": "ਡਿਫ਼ੌਲਟ",
+      "branchAccessibility": "ਬ੍ਰਾਂਚ: {{label}}",
+      "branchLoading": "ਬ੍ਰਾਂਚ ਲੋਡ ਹੋ ਰਹੇ ਹਨ",
+      "branchLoadError": "ਬ੍ਰਾਂਚ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ",
+      "branchUnavailable": "ਇਸ ਰਿਪੋਜ਼ਟਰੀ ਲਈ ਬ੍ਰਾਂਚ ਉਪਲਬਧ ਨਹੀਂ ਹਨ। ਪ੍ਰਦਾਤਾ ਕੋਲ ਆਪਣੀ ਪਹੁੰਚ ਜਾਂਚੋ, ਫਿਰ ਕੋਈ ਹੋਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣੋ।",
+      "branchEmpty": "ਕੋਈ ਬ੍ਰਾਂਚ ਉਪਲਬਧ ਨਹੀਂ",
+      "branchPlaceholder": "ਇੱਕ ਬ੍ਰਾਂਚ ਚੁਣੋ",
       "runOnWithTarget": "{{target}} 'ਤੇ ਚਲਾਓ",
       "environment": "ਵਾਤਾਵਰਣ",
       "couldNotLoadEnvironment": "ਤੁਹਾਡਾ ਵਾਤਾਵਰਣ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "ਰਿਪੋਜ਼ਟਰੀਆਂ ਰਿਫਰੈਸ਼ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "discardDraftTitle": "ਕੀ ਡਰਾਫਟ ਰੱਦ ਕਰਨਾ ਹੈ?",
       "discardDraftMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਮਿਟ ਜਾਵੇਗਾ।",
+      "discardWithUploadsMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਅਤੇ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।",
       "discardFailed": "ਡਰਾਫਟ ਰੱਦ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
       "remoteHint": "ਆਪਣੇ ਕੰਪਿਊਟਰ 'ਤੇ ਚੱਲ ਰਹੀ kilo ਪ੍ਰਕਿਰਿਆ ਨੂੰ ਕੰਟਰੋਲ ਕਰਨ ਲਈ `kilo remote` ਚਲਾਓ ਜਾਂ ਚੱਲ ਰਹੇ CLI ਸੈਸ਼ਨ ਵਿੱਚ `/remote` ਚਲਾਓ।",
-      "connectBitbucketDescription": "Bitbucket ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "connectGitlabDescription": "GitLab ਨੂੰ ਆਪਣੇ ਬ੍ਰਾਊਜ਼ਰ ਵਿੱਚ ਕਨੈਕਟ ਕਰੋ, ਫਿਰ ਰਿਪੋਜ਼ਟਰੀ ਚੁਣਨ ਲਈ ਇੱਥੇ ਵਾਪਸ ਆਓ।",
-      "couldNotLoadBitbucketRepositories": "Bitbucket ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
-      "couldNotLoadGithubRepositories": "GitHub ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
-      "couldNotLoadGitlabRepositories": "GitLab ਰਿਪੋਜ਼ਟਰੀਆਂ ਲੋਡ ਨਹੀਂ ਕੀਤੀਆਂ ਜਾ ਸਕੀਆਂ।",
-      "gitlabConnected": "GitLab ਕਨੈਕਟ ਹੈ",
-      "noRepositoriesVisibleBitbucket": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। Bitbucket ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
-      "noRepositoriesVisibleGitlab": "ਕੋਈ ਰਿਪੋਜ਼ਟਰੀ ਦਿਖਾਈ ਨਹੀਂ ਦੇ ਰਹੀ। GitLab ਲਈ ਰਿਪੋਜ਼ਟਰੀਆਂ ਤੱਕ ਪਹੁੰਚ ਦੀ ਜਾਂਚ ਕਰੋ, ਫਿਰ ਰਿਫਰੈਸ਼ ਕਰੋ।",
-      "openBitbucket": "Bitbucket ਖੋਲ੍ਹੋ",
-      "openGitlab": "GitLab ਖੋਲ੍ਹੋ",
-      "recentlyUsed": "ਹਾਲ ਹੀ ਵਿੱਚ ਵਰਤੇ ਗਏ",
-      "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। Cloud Agent ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
       "continueFrom": "{{title}} ਨੂੰ ਜਾਰੀ ਰੱਖਿਆ ਜਾ ਰਿਹਾ ਹੈ।",
-      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "importingSession": "ਸੈਸ਼ਨ ਆਯਾਤ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ",
-      "discardWithUploadsMessage": "ਤੁਹਾਡਾ ਪ੍ਰੌਂਪਟ ਅਤੇ ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।"
+      "cliCannotContinue": "ਇਹ CLI ਸੈਸ਼ਨ ਜਾਰੀ ਨਹੀਂ ਰੱਖ ਸਕਦਾ। Cloud Agent ਜਾਂ ਕੋਈ ਹੋਰ CLI ਚੁਣੋ।",
+      "importFailed": "ਇਸ ਸੈਸ਼ਨ ਨੂੰ ਆਯਾਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ਫਾਈਲ ਅੱਪਡੇਟ ਕੀਤੀ ਗਈ ਹੈ।",

@@ -36,6 +36,7 @@
     "cost": "Custo",
     "discard": "Descartar",
     "findings": "Ocorrências",
+    "mergeRequest": "merge request",
     "notConnected": "Sem ligação",
     "notifications": "Notificações",
     "pullRequest": "pR",
@@ -335,10 +336,17 @@
       "emptyDiffRow": "Linha de diferenças vazia"
     },
     "connectionExpired": "A ligação ao GitHub expirou.",
+    "capabilities": {
+      "banner": {
+        "title": "Não disponível neste fornecedor",
+        "accessibility": "Não disponível neste fornecedor: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Fusão",
       "mergeNow": "Integrar agora",
       "mergePullRequest": "Integrar PR",
+      "mergeTermTitle": "Integrar {{term}}",
       "enableAutoMerge": "Ativar integração automática",
       "disableAutoMerge": "Desativar integração automática",
       "autoMergeOn": "Integração automática ativa",
@@ -357,9 +365,12 @@
       "deleteBranchAfterMerge": "Eliminar o ramo após a integração",
       "noEnabledMethods": "Este repositório não tem métodos de integração ativos. Pede a um administrador do repositório para ativar a integração com um commit, a combinação de commits ou a reaplicação de commits.",
       "confirmTitle": "Integrar PR?",
+      "confirmTitleTerm": "Integrar {{term}}?",
       "confirmMessage": "As tuas alterações serão integradas no ramo base.",
       "enableAutoMergeConfirmTitle": "Ativar integração automática?",
       "enableAutoMergeConfirmMessage": "O GitHub vai integrar este PR automaticamente quando todas as verificações obrigatórias forem concluídas com êxito.",
+      "enableAutoMergeConfirmMessageTerm": "O {{term}} será integrado automaticamente quando o pipeline for bem-sucedido.",
+      "enableAutoMergeDescriptionTerm": "O GitLab integra este {{term}} automaticamente quando o pipeline for bem-sucedido.",
       "forbidden": "Não tens permissão para integrar este PR.",
       "cannotMerge": "Não é possível integrar este PR no estado atual.",
       "couldNotMerge": "Não foi possível integrar o PR.",
@@ -370,7 +381,8 @@
       },
       "terminal": {
         "alreadyMerged": "Já integrado",
-        "closed": "Este PR está fechado"
+        "closed": "Este PR está fechado",
+        "closedMergeRequest": "Este merge request está fechado"
       },
       "partialSuccessBanner": {
         "body": "Não foi possível eliminar o ramo: {{reason}}.",
@@ -395,6 +407,19 @@
         "behindDetail": "O ramo de origem não inclui as alterações mais recentes do ramo base. Reaplica os commits ou atualiza o ramo antes de o integrar.",
         "notMergeableTitle": "Ainda não é possível integrar este PR",
         "notMergeableDetail": "O GitHub indicou o estado de integração {{state}}."
+      },
+      "restrictions": {
+        "title": "Restrições à integração",
+        "approvalsRequired_one": "É necessária {{displayCount}} aprovação",
+        "approvalsRequired_other": "São necessárias {{displayCount}} aprovações",
+        "pipelineMustSucceed": "O pipeline tem de ser bem-sucedido antes da integração.",
+        "approvalsRequired_many": "São necessárias {{displayCount}} aprovações"
+      },
+      "providerBlocked": {
+        "failingPipeline": "O pipeline está a falhar no último commit.",
+        "pendingPipeline": "O pipeline ainda está a ser executado no último commit.",
+        "permission": "Não tens permissão para integrar este {{term}}.",
+        "draft": "Marca o {{term}} como pronto para revisão antes de o integrar."
       },
       "methodLabels": {
         "merge": "Criar um commit de integração",
@@ -443,6 +468,7 @@
       "acceptTerms": "Aceitar",
       "replyBadRequest": "Esta resposta não pode ser publicada. A conversa pode ter mudado.",
       "replyForbidden": "Não tens permissão para responder a este PR.",
+      "replyForbiddenTerm": "Não tens permissão para responder a este {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Este comentário não pode ser denunciado.",
@@ -474,8 +500,6 @@
       "termsAcceptRequired": "Tens de aceitar os termos de serviço para publicar.",
       "termsOutdatedCopy": "Os termos de serviço foram alterados. Volta a abrir este ecrã para aceitar a versão mais recente.",
       "termsCheckRetryCopy": "Não foi possível verificar os termos de serviço. Verifica a tua ligação e tenta novamente.",
-      "comment_many": "{{displayCount}} comentários",
-      "reaction_many": "reações",
       "reactions": {
         "thumbsUp": "Polegar para cima",
         "thumbsDown": "Polegar para baixo",
@@ -493,7 +517,9 @@
         "outdatedOnLines": "Desatualizado em {{lines}}",
         "outdatedOnPath": "Desatualizado em {{path}}"
       },
-      "deletedUser": "utilizador eliminado"
+      "deletedUser": "utilizador eliminado",
+      "comment_many": "{{displayCount}} comentários",
+      "reaction_many": "reações"
     },
     "couldNotOpenGitHubAppSettings": "Não foi possível abrir as definições da aplicação GitHub.",
     "installKiloGitHubApp": "Instalar a aplicação do Kilo para o GitHub",
@@ -505,17 +531,19 @@
     "reviewPullRequest": "Rever PR",
     "headLine": "{{counts}} · commit mais recente: {{sha}}",
     "entry": {
-      "eyebrow": "Abre um PR através do URL.",
-      "pastePrLink": "Colar uma ligação de PR",
-      "noRecentPrs": "Sem PRs recentes",
-      "noRecentPrsDescription": "Cola uma ligação de PR acima para iniciar uma revisão. O PR aparecerá aqui na próxima vez.",
+      "eyebrow": "Abre um PR ou um merge request através do URL",
+      "pastePrLink": "Colar uma ligação de PR ou de merge request",
+      "noRecentPrs": "Sem revisões recentes",
+      "noRecentPrsDescription": "Cola uma ligação acima para iniciar uma revisão — aparecerá aqui na próxima vez.",
       "couldNotLoad": "Não foi possível carregar os dados.",
       "removeFromRecentsTitle": "Remover dos recentes?",
-      "removeFromRecentsMessage": "Este PR será removido da tua lista de recentes.",
+      "removeFromRecentsMessage": "Esta revisão será removida da tua lista de recentes.",
       "removeRecentAccessibility": "Remover {{repo}} dos recentes",
-      "urlAccessibility": "URL do PR no GitHub",
-      "clearLink": "Limpar a ligação do PR",
-      "pasteLink": "Colar a ligação do PR",
+      "urlAccessibility": "Introduz um URL de PR ou de merge request",
+      "urlPlaceholder": "URL de PR ou de merge request",
+      "openAccessibility": "Abrir PR ou merge request",
+      "clearLink": "Limpar a ligação",
+      "pasteLink": "Colar a ligação de PR ou de merge request",
       "open": "Abrir"
     },
     "checks": {
@@ -564,9 +592,15 @@
     "connect": {
       "checkFailedTitle": "Não foi possível verificar a ligação ao GitHub.",
       "checkFailedMessage": "O estado da sessão só fica disponível quando o carregamento terminar.",
+      "checkFailedTitleGitLab": "Não foi possível verificar a ligação ao GitLab.",
+      "checkFailedTitleBitbucket": "Não foi possível verificar a ligação ao Bitbucket.",
+      "providerCheckFailedMessage": "O estado da ligação só fica disponível quando o carregamento terminar.",
       "reconnectTitle": "Voltar a ligar o GitHub",
       "reconnectDescription": "A tua ligação ao GitHub foi revogada. Volta a ligar a conta para continuar a rever PRs no telemóvel.",
-      "description": "Liga a tua conta do GitHub para rever PRs no telemóvel."
+      "description": "Liga a tua conta do GitHub para rever PRs no telemóvel.",
+      "gitlabDescription": "Liga a tua conta do GitLab para rever merge requests no telemóvel.",
+      "bitbucketDescription": "Liga o Bitbucket a esta organização para rever PRs no telemóvel.",
+      "bitbucketOrgOnlyDescription": "Seleciona uma organização no teu perfil para rever os PRs dessa organização no Bitbucket."
     },
     "screen": {
       "title": "#{{number}}",
@@ -589,7 +623,10 @@
     },
     "reconnectNotice": {
       "title": "A ligação ao GitHub expirou.",
-      "message": "A tua ligação ao GitHub já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
+      "message": "A tua ligação ao GitHub já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta.",
+      "gitlabTitle": "A ligação ao GitLab expirou.",
+      "bitbucketTitle": "A ligação ao Bitbucket expirou.",
+      "providerMessage": "A tua ligação ao {{provider}} já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
     },
     "eventChips": {
       "comment": "Comentar",
@@ -643,6 +680,21 @@
       "files": "Ficheiros",
       "discussion": "Discussão"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Partilhar merge request",
+      "viewOnProvider": "Ver em {{provider}}",
+      "mergeRequestUnavailable": "Merge request indisponível",
+      "unavailableDescription": "Pode ter sido eliminado, ou não tens acesso a ele.",
+      "accessDeniedMergeRequest": "Não tens permissão para ver este merge request.",
+      "couldNotLoadMergeRequest": "Não foi possível carregar o merge request.",
+      "discussionAccessDenied": "Não tens permissão para ver a discussão deste merge request.",
+      "discussionUnavailableMessage": "Este merge request pode ter sido removido.",
+      "noDiscussionDescription": "Este merge request ainda não tem conversas de revisão nem comentários na discussão.",
+      "noFilesChangedDescription": "Este merge request não tem alterações nos ficheiros."
+    },
     "fileStatus": {
       "modified": "Modificado",
       "renamed": "Renomeado",
@@ -659,7 +711,7 @@
       "emptyLine": "(vazio)"
     },
     "linkPasteClipboardEmpty": "A área de transferência está vazia.",
-    "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR do GitHub.",
+    "linkPasteNotAPullRequest": "Esta ligação não corresponde a um PR ou merge request",
     "announce": {
       "commentPosted": "Comentário publicado",
       "reviewSubmitted": "Revisão enviada",
@@ -668,6 +720,7 @@
     "mutationError": {
       "commentNotPosted": "Não é possível publicar este comentário. A linha selecionada pode ter mudado ou o PR pode ter sido atualizado.",
       "reviewNotSubmitted": "Não é possível enviar esta revisão no estado atual. O PR pode ter mudado ou podes estar a tentar rever o teu próprio PR.",
+      "reviewNotSubmittedTerm": "Não é possível enviar esta revisão no estado atual. O {{term}} pode ter mudado ou não podes rever o teu próprio {{term}}.",
       "couldNotPostComment": "Não foi possível publicar o comentário.",
       "couldNotSubmitReview": "Não foi possível enviar a revisão. Verifica a tua ligação e tenta novamente."
     },
@@ -675,6 +728,7 @@
       "couldNotReply": "Não foi possível responder.",
       "couldNotCompleteAction": "Não foi possível concluir esta ação.",
       "mergeResultDefaultError": "O GitHub não concluiu a integração.",
+      "mergeResultNotCompleted": "O {{term}} não foi integrado. Verifica o estado e tenta novamente.",
       "ambiguous": "Não foi possível confirmar o resultado. Verifica o PR antes de tentar novamente.",
       "persistenceFailed": "Não foi possível registar esta ação. Tenta novamente mais tarde.",
       "forbidden": "Não tens permissão para executar esta ação."
@@ -1995,11 +2049,31 @@
       "retryConnection": "Tentar ligar novamente"
     },
     "newSession": {
+      "recentlyUsed": "Usados recentemente",
+      "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",
+      "couldNotLoadGitlabRepositories": "Não foi possível carregar os repositórios do GitLab.",
+      "couldNotLoadBitbucketRepositories": "Não foi possível carregar os repositórios do Bitbucket.",
       "connectGithubDescription": "Ligue a sua conta do GitHub no navegador e volte aqui para escolher um repositório.",
+      "connectGitlabDescription": "Ligue a sua conta do GitLab no navegador e volte aqui para escolher um repositório.",
+      "connectBitbucketDescription": "Ligue a sua conta do Bitbucket no navegador e volte aqui para escolher um repositório.",
       "openGithub": "Abrir o GitHub",
+      "openGitlab": "Abrir o GitLab",
+      "openBitbucket": "Abrir o Bitbucket",
       "refreshRepositories": "Atualizar repositórios",
       "githubConnected": "GitHub ligado",
+      "gitlabConnected": "GitLab ligado",
       "noRepositoriesVisible": "Não há repositórios visíveis. Verifique as permissões de acesso da aplicação Kilo para GitHub e atualize a lista.",
+      "noRepositoriesVisibleGitlab": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do GitLab e atualize a lista.",
+      "noRepositoriesVisibleBitbucket": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do Bitbucket e atualize a lista.",
+      "bitbucketOrganizationsOnly": "O Bitbucket está disponível apenas para organizações.",
+      "branchPickerTitle": "Selecionar ramo",
+      "branchDefault": "Predefinido",
+      "branchAccessibility": "Ramo: {{label}}",
+      "branchLoading": "A carregar ramos",
+      "branchLoadError": "Não foi possível carregar os ramos",
+      "branchUnavailable": "Não há ramos disponíveis para este repositório. Verifica o teu acesso junto do fornecedor e escolhe outro repositório.",
+      "branchEmpty": "Nenhum ramo disponível",
+      "branchPlaceholder": "Selecionar um ramo",
       "runOnWithTarget": "Executar em: {{target}}",
       "environment": "Ambiente",
       "couldNotLoadEnvironment": "Não foi possível carregar o seu ambiente.",
@@ -2020,24 +2094,13 @@
       "couldNotRefreshRepositories": "Não foi possível atualizar os repositórios. Tente novamente.",
       "discardDraftTitle": "Eliminar rascunho?",
       "discardDraftMessage": "O seu pedido será eliminado.",
+      "discardWithUploadsMessage": "O seu pedido e os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
       "discardFailed": "Não foi possível eliminar o rascunho. Tente novamente.",
       "remoteHint": "Execute `kilo remote` no seu computador ou `/remote` numa sessão CLI em execução para controlar um processo local do kilo.",
-      "connectBitbucketDescription": "Ligue a sua conta do Bitbucket no navegador e volte aqui para escolher um repositório.",
-      "connectGitlabDescription": "Ligue a sua conta do GitLab no navegador e volte aqui para escolher um repositório.",
-      "couldNotLoadBitbucketRepositories": "Não foi possível carregar os repositórios do Bitbucket.",
-      "couldNotLoadGithubRepositories": "Não foi possível carregar os repositórios do GitHub.",
-      "couldNotLoadGitlabRepositories": "Não foi possível carregar os repositórios do GitLab.",
-      "gitlabConnected": "GitLab ligado",
-      "noRepositoriesVisibleBitbucket": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do Bitbucket e atualize a lista.",
-      "noRepositoriesVisibleGitlab": "Não há repositórios visíveis. Verifique as permissões de acesso aos repositórios do GitLab e atualize a lista.",
-      "openBitbucket": "Abrir o Bitbucket",
-      "openGitlab": "Abrir o GitLab",
-      "recentlyUsed": "Usados recentemente",
       "continueFrom": "A sessão {{title}} está a ser retomada.",
       "importingSession": "A importar a sessão",
       "cliCannotContinue": "Esta CLI não permite continuar uma sessão. Escolha o Cloud Agent ou outra CLI.",
-      "importFailed": "Não foi possível importar esta sessão.",
-      "discardWithUploadsMessage": "O seu pedido e os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados."
+      "importFailed": "Não foi possível importar esta sessão."
     },
     "partRenderer": {
       "updatedFileCount_one": "Foi atualizado {{displayCount}} ficheiro.",

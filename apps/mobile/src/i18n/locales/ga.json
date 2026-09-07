@@ -36,6 +36,7 @@
     "cost": "Costas",
     "discard": "Caith uait",
     "findings": "Torthaí",
+    "mergeRequest": "iarratas cumaisc",
     "notConnected": "Gan nasc",
     "notifications": "Fógraí",
     "pullRequest": "iarratas tarraingthe",
@@ -339,10 +340,17 @@
       "emptyDiffRow": "Ró folamh sa chomparáid athruithe"
     },
     "connectionExpired": "Tá an nasc GitHub imithe in éag.",
+    "capabilities": {
+      "banner": {
+        "title": "Níl ar fáil leis an soláthraí seo",
+        "accessibility": "Níl ar fáil leis an soláthraí seo: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Cumasc",
       "mergeNow": "Cumasc anois",
       "mergePullRequest": "Cumasc iarratais tarraingthe",
+      "mergeTermTitle": "Cumasc {{term}}",
       "enableAutoMerge": "Cumasaigh cumasc uathoibríoch",
       "disableAutoMerge": "Díchumasaigh cumasc uathoibríoch",
       "autoMergeOn": "Cumasc uathoibríoch ar siúl",
@@ -361,9 +369,12 @@
       "deleteBranchAfterMerge": "Scrios an brainse tar éis an chumaisc",
       "noEnabledMethods": "Níl aon mhodh cumaisc cumasaithe sa stór seo. Iarr ar riarthóir an stóir cumasc, comhdhlúthú nó athbhunú a chumasú.",
       "confirmTitle": "An gcumascfar an t-iarratas tarraingthe?",
+      "confirmTitleTerm": "An gcumascfar an t-{{term}}?",
       "confirmMessage": "Cumascfar do chuid athruithe isteach sa bhunbrainse.",
       "enableAutoMergeConfirmTitle": "An gcumasófar cumasc uathoibríoch?",
       "enableAutoMergeConfirmMessage": "Cumascfaidh GitHub an t-iarratas tarraingthe seo go huathoibríoch nuair a éireoidh leis na seiceálacha riachtanacha go léir.",
+      "enableAutoMergeConfirmMessageTerm": "Cumar an {{term}} go huathoibríoch nuair a éireoidh leis an bpíblíne.",
+      "enableAutoMergeDescriptionTerm": "Cumann GitLab an {{term}} seo go huathoibríoch nuair a éireoidh leis an bpíblíne.",
       "forbidden": "Níl cead agat an t-iarratas tarraingthe seo a chumasc.",
       "cannotMerge": "Ní féidir an t-iarratas tarraingthe seo a chumasc mar atá sé.",
       "couldNotMerge": "Níorbh fhéidir an t-iarratas tarraingthe a chumasc.",
@@ -374,7 +385,8 @@
       },
       "terminal": {
         "alreadyMerged": "Cumaiscthe cheana",
-        "closed": "Tá an t-iarratas tarraingthe seo dúnta"
+        "closed": "Tá an t-iarratas tarraingthe seo dúnta",
+        "closedMergeRequest": "Tá an t-iarratas cumaisc seo dúnta"
       },
       "partialSuccessBanner": {
         "body": "Níorbh fhéidir an brainse a scriosadh: {{reason}}.",
@@ -399,6 +411,21 @@
         "behindDetail": "Tá an brainse foinseach taobh thiar den bhunbrainse. Athbhunaigh nó nuashonraigh é sula ndéanfaidh tú an cumasc.",
         "notMergeableTitle": "Ní féidir an t-iarratas tarraingthe seo a chumasc go fóill",
         "notMergeableDetail": "Thuairiscigh GitHub an stádas cumaisc seo: {{state}}."
+      },
+      "restrictions": {
+        "title": "Srianta cumaisc",
+        "approvalsRequired_one": "Tá {{displayCount}} ceadú de dhíth",
+        "approvalsRequired_other": "Tá {{displayCount}} ceadú de dhíth",
+        "pipelineMustSucceed": "Ní mór don bpíblíne éireacht sula ndéanfar an cumasc.",
+        "approvalsRequired_many": "Tá {{displayCount}} ceadú de dhíth",
+        "approvalsRequired_few": "Tá {{displayCount}} ceadú de dhíth",
+        "approvalsRequired_two": "Tá {{displayCount}} ceadú de dhíth"
+      },
+      "providerBlocked": {
+        "failingPipeline": "Tá an bpíblíne ag teip ar an tiomnú is déanaí.",
+        "pendingPipeline": "Tá an bpíblíne fós ag rith ar an tiomnú is déanaí.",
+        "permission": "Níl cead agat an t-{{term}} seo a chumasc.",
+        "draft": "Marcáil an t-{{term}} mar réidh le hathbhreithniú sula ndéanfaidh tú an cumasc."
       },
       "methodLabels": {
         "merge": "Cruthaigh taifead athruithe don chumasc",
@@ -447,6 +474,7 @@
       "acceptTerms": "Glac",
       "replyBadRequest": "Ní féidir an freagra seo a phostáil. Seans gur athraíodh an snáithe.",
       "replyForbidden": "Níl cead agat freagra a thabhairt ar an iarratas tarraingthe seo.",
+      "replyForbiddenTerm": "Níl cead agat freagra a thabhairt ar an {{term}} seo.",
       "moderation": {
         "reportContent": {
           "terminal": "Ní féidir an trácht seo a thuairisciú.",
@@ -478,12 +506,6 @@
       "termsAcceptRequired": "Caithfidh tú glacadh leis na téarmaí seirbhíse chun postáil.",
       "termsOutdatedCopy": "Athraíodh na téarmaí seirbhíse. Oscail an scáileán seo arís chun glacadh leis an leagan is déanaí.",
       "termsCheckRetryCopy": "Níorbh fhéidir na téarmaí seirbhíse a sheiceáil. Seiceáil do nasc agus bain triail as arís.",
-      "comment_two": "{{displayCount}} thrácht",
-      "comment_few": "{{displayCount}} thrácht",
-      "comment_many": "{{displayCount}} dtrácht",
-      "reaction_two": "imoibriúchán",
-      "reaction_few": "imoibriúchán",
-      "reaction_many": "n-imoibriúchán",
       "reactions": {
         "thumbsUp": "Ordóg suas",
         "thumbsDown": "Ordóg síos",
@@ -501,7 +523,13 @@
         "outdatedOnLines": "As dáta ar {{lines}}",
         "outdatedOnPath": "As dáta ar {{path}}"
       },
-      "deletedUser": "úsáideoir scriosta"
+      "deletedUser": "úsáideoir scriosta",
+      "comment_two": "{{displayCount}} thrácht",
+      "comment_few": "{{displayCount}} thrácht",
+      "comment_many": "{{displayCount}} dtrácht",
+      "reaction_two": "imoibriúchán",
+      "reaction_few": "imoibriúchán",
+      "reaction_many": "n-imoibriúchán"
     },
     "couldNotOpenGitHubAppSettings": "Níorbh fhéidir socruithe na haipe GitHub a oscailt.",
     "installKiloGitHubApp": "Suiteáil aip GitHub Kilo",
@@ -513,17 +541,19 @@
     "reviewPullRequest": "Athbhreithnigh an t-iarratas tarraingthe",
     "headLine": "{{counts}} · taifead athruithe reatha {{sha}}",
     "entry": {
-      "eyebrow": "Oscail iarratas tarraingthe trí URL.",
-      "pastePrLink": "Greamaigh nasc PR",
-      "noRecentPrs": "Gan aon PR le déanaí",
-      "noRecentPrsDescription": "Greamaigh nasc PR thuas chun athbhreithniú a thosú — taispeánfar é anseo an chéad uair eile.",
+      "eyebrow": "Oscail iarratas tarraingthe nó iarratas cumaisc trí URL",
+      "pastePrLink": "Greamaigh nasc d’iarratas tarraingthe nó d’iarratas cumaisc",
+      "noRecentPrs": "Gan aon athbhreithniú le déanaí",
+      "noRecentPrsDescription": "Greamaigh nasc thuas chun athbhreithniú a thosú — taispeánfar é anseo an chéad uair eile.",
       "couldNotLoad": "Níorbh fhéidir an t-ábhar a lódáil.",
       "removeFromRecentsTitle": "An mbainfear den liosta le déanaí é?",
-      "removeFromRecentsMessage": "Bainfear an t-iarratas tarraingthe seo den liosta le déanaí.",
+      "removeFromRecentsMessage": "Bainfear an t-athbhreithniú seo den liosta le déanaí.",
       "removeRecentAccessibility": "Bain {{repo}} den liosta le déanaí",
-      "urlAccessibility": "URL iarratais tarraingthe GitHub",
-      "clearLink": "Glan nasc iarratais tarraingthe",
-      "pasteLink": "Greamaigh nasc iarratais tarraingthe",
+      "urlAccessibility": "Cuir isteach URL d’iarratas tarraingthe nó d’iarratas cumaisc",
+      "urlPlaceholder": "URL d’iarratas tarraingthe nó d’iarratas cumaisc",
+      "openAccessibility": "Oscail iarratas tarraingthe nó iarratas cumaisc",
+      "clearLink": "Glan an nasc",
+      "pasteLink": "Greamaigh nasc d’iarratas tarraingthe nó d’iarratas cumaisc",
       "open": "Oscailte"
     },
     "checks": {
@@ -572,9 +602,15 @@
     "connect": {
       "checkFailedTitle": "Níorbh fhéidir an nasc GitHub a sheiceáil.",
       "checkFailedMessage": "Níl stádas an tsínithe isteach ar fáil go dtí go lódáiltear é seo.",
+      "checkFailedTitleGitLab": "Níorbh fhéidir an nasc GitLab a sheiceáil.",
+      "checkFailedTitleBitbucket": "Níorbh fhéidir an nasc Bitbucket a sheiceáil.",
+      "providerCheckFailedMessage": "Níl stádas an naisc ar fáil go dtí go mbeidh sé lódáilte.",
       "reconnectTitle": "Athnasc GitHub",
       "reconnectDescription": "Cúlghaireadh do nasc GitHub. Athnasc chun leanúint d'athbhreithniú a dhéanamh ar iarratais tarraingthe ar do ghuthán.",
-      "description": "Nasc do chuntas GitHub chun iarratais tarraingthe a athbhreithniú ar do ghuthán."
+      "description": "Nasc do chuntas GitHub chun iarratais tarraingthe a athbhreithniú ar do ghuthán.",
+      "gitlabDescription": "Ceangail do chuntas GitLab chun iarratais chumaisc a athbhreithniú ar an ngléas soghluaiste.",
+      "bitbucketDescription": "Ceangail Bitbucket leis an eagraíocht seo chun iarratais tharraingthe a athbhreithniú ar an ngléas soghluaiste.",
+      "bitbucketOrgOnlyDescription": "Roghnaigh eagraíocht i do phróifíl chun a hiarratais tharraingthe Bitbucket a athbhreithniú."
     },
     "screen": {
       "title": "#{{number}}",
@@ -599,7 +635,10 @@
     },
     "reconnectNotice": {
       "title": "Tá an nasc GitHub imithe in éag.",
-      "message": "Níl do nasc GitHub bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá."
+      "message": "Níl do nasc GitHub bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá.",
+      "gitlabTitle": "Tá an nasc GitLab imithe in éag.",
+      "bitbucketTitle": "Tá an nasc Bitbucket imithe in éag.",
+      "providerMessage": "Níl do nasc {{provider}} bailí a thuilleadh. Seiceáil do nasc arís — iarrfar ort athnascadh más gá."
     },
     "eventChips": {
       "comment": "Trácht",
@@ -657,6 +696,21 @@
       "files": "Comhaid",
       "discussion": "Plé"
     },
+    "terms": {
+      "pullRequest": "Iarratas tarraingthe",
+      "mergeRequest": "Iarratas cumaisc",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Comhroinn iarratas cumaisc",
+      "viewOnProvider": "Amharc ar {{provider}}",
+      "mergeRequestUnavailable": "Iarratas cumaisc gan fáil",
+      "unavailableDescription": "B’fhéidir gur scriosadh é, nó b’fhéidir nach bhfuil rochtain agat air.",
+      "accessDeniedMergeRequest": "Níl cead agat an t-iarratas cumaisc seo a fheiceáil.",
+      "couldNotLoadMergeRequest": "Níorbh fhéidir an t-iarratas cumaisc a lódáil.",
+      "discussionAccessDenied": "Níl cead agat plé an iarratais chumaisc seo a fheiceáil.",
+      "discussionUnavailableMessage": "Seans gur baineadh an t-iarratas cumaisc seo.",
+      "noDiscussionDescription": "Níl aon snáithe athbhreithnithe ná trácht comhrá ar an iarratas cumaisc seo.",
+      "noFilesChangedDescription": "Níl aon athrú ar chomhaid san iarratas cumaisc seo."
+    },
     "fileStatus": {
       "modified": "Modhnaithe",
       "renamed": "Athainmnithe",
@@ -673,7 +727,7 @@
       "emptyLine": "(folamh)"
     },
     "linkPasteClipboardEmpty": "Tá an ghearrthaisce folamh.",
-    "linkPasteNotAPullRequest": "Ní nasc chuig iarratas tarraingthe GitHub é seo.",
+    "linkPasteNotAPullRequest": "Ní nasc d’iarratas tarraingthe ná d’iarratas cumaisc é seo",
     "announce": {
       "commentPosted": "Trácht postáilte",
       "reviewSubmitted": "Athbhreithniú seolta",
@@ -682,6 +736,7 @@
     "mutationError": {
       "commentNotPosted": "Ní féidir an trácht seo a phostáil. B'fhéidir gur athraíodh an líne roghnaithe, nó b'fhéidir gur nuashonraíodh an PR.",
       "reviewNotSubmitted": "Ní féidir an t-athbhreithniú seo a sheoladh mar atá sé. Seans gur athraíodh an PR, nó gur iarratas tarraingthe de do chuid féin é nach féidir leat a athbhreithniú.",
+      "reviewNotSubmittedTerm": "Ní féidir an t-athbhreithniú seo a chur isteach mar atá. B’fhéidir gur athraíodh an {{term}}, nó ní féidir leat do {{term}} féin a athbhreithniú.",
       "couldNotPostComment": "Níorbh fhéidir an trácht a phostáil.",
       "couldNotSubmitReview": "Níorbh fhéidir an t-athbhreithniú a sheoladh. Seiceáil do nasc agus bain triail as arís."
     },
@@ -689,6 +744,7 @@
       "couldNotReply": "Níorbh fhéidir freagra a thabhairt.",
       "couldNotCompleteAction": "Níorbh fhéidir an gníomh seo a chríochnú.",
       "mergeResultDefaultError": "Níor chríochnaigh GitHub an cumasc.",
+      "mergeResultNotCompleted": "Níor cumascadh an {{term}}. Seiceáil a stádas agus bain triail eile as.",
       "ambiguous": "Níorbh fhéidir an toradh a dheimhniú — seiceáil an PR sula mbainfidh tú triail as arís.",
       "persistenceFailed": "Níorbh fhéidir linn an gníomh seo a thaifeadadh. Bain triail as arís níos déanaí.",
       "forbidden": "Tá an gníomh seo toirmiscthe."
@@ -2027,11 +2083,31 @@
       "retryConnection": "Bain triail eile as nascadh"
     },
     "newSession": {
+      "recentlyUsed": "A úsáideadh le déanaí",
+      "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil.",
+      "couldNotLoadGitlabRepositories": "Níorbh fhéidir stórtha GitLab a lódáil.",
+      "couldNotLoadBitbucketRepositories": "Níorbh fhéidir stórtha Bitbucket a lódáil.",
       "connectGithubDescription": "Ceangail GitHub i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
+      "connectGitlabDescription": "Ceangail GitLab i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
+      "connectBitbucketDescription": "Ceangail Bitbucket i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
       "openGithub": "Oscail GitHub",
+      "openGitlab": "Oscail GitLab",
+      "openBitbucket": "Oscail Bitbucket",
       "refreshRepositories": "Athnuaigh stórtha",
       "githubConnected": "GitHub ceangailte",
+      "gitlabConnected": "GitLab ceangailte",
       "noRepositoriesVisible": "Níl aon stór le feiceáil. Seiceáil an rochtain atá ag aip GitHub Kilo ar na stórtha, ansin athnuaigh an liosta.",
+      "noRepositoriesVisibleGitlab": "Níl aon stór le feiceáil. Seiceáil an rochtain ar stórtha GitLab, ansin athnuaigh an liosta.",
+      "noRepositoriesVisibleBitbucket": "Níl aon stór le feiceáil. Seiceáil an rochtain ar stórtha Bitbucket, ansin athnuaigh an liosta.",
+      "bitbucketOrganizationsOnly": "Tá Bitbucket ar fáil d’eagraíochtaí amháin.",
+      "branchPickerTitle": "Roghnaigh brainse",
+      "branchDefault": "Réamhshocraithe",
+      "branchAccessibility": "Brainse: {{label}}",
+      "branchLoading": "Ag lódáil brainsí",
+      "branchLoadError": "Níorbh fhéidir na brainsí a lódáil",
+      "branchUnavailable": "Níl brainsí ar fáil don stór seo. Seiceáil do rochtain leis an soláthraí, ansin roghnaigh stór eile.",
+      "branchEmpty": "Níl aon bhrainse ar fáil",
+      "branchPlaceholder": "Roghnaigh brainse",
       "runOnWithTarget": "Rith ar: {{target}}",
       "environment": "Timpeallacht",
       "couldNotLoadEnvironment": "Níorbh fhéidir do thimpeallacht a lódáil.",
@@ -2052,24 +2128,13 @@
       "couldNotRefreshRepositories": "Níorbh fhéidir stórtha a athnuachan. Bain triail as arís le do thoil.",
       "discardDraftTitle": "An gcaithfear an dréacht ar lár?",
       "discardDraftMessage": "Caillfear do leid.",
+      "discardWithUploadsMessage": "Scriosfar do leid agus aon chomhad uaslódáilte nach bhfuil ceangailte le teachtaireacht sheolta.",
       "discardFailed": "Níorbh fhéidir an dréacht a chaitheamh ar lár. Bain triail as arís le do thoil.",
       "remoteHint": "Rith `kilo remote` ar do ríomhaire, nó `/remote` i seisiún CLI atá ar siúl, chun próiseas áitiúil kilo a rialú.",
-      "connectBitbucketDescription": "Ceangail Bitbucket i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
-      "connectGitlabDescription": "Ceangail GitLab i do bhrabhsálaí, ansin fill anseo chun stór a roghnú.",
-      "couldNotLoadBitbucketRepositories": "Níorbh fhéidir stórtha Bitbucket a lódáil.",
-      "couldNotLoadGithubRepositories": "Níorbh fhéidir stórtha GitHub a lódáil.",
-      "couldNotLoadGitlabRepositories": "Níorbh fhéidir stórtha GitLab a lódáil.",
-      "gitlabConnected": "GitLab ceangailte",
-      "noRepositoriesVisibleBitbucket": "Níl aon stór le feiceáil. Seiceáil an rochtain ar stórtha Bitbucket, ansin athnuaigh an liosta.",
-      "noRepositoriesVisibleGitlab": "Níl aon stór le feiceáil. Seiceáil an rochtain ar stórtha GitLab, ansin athnuaigh an liosta.",
-      "openBitbucket": "Oscail Bitbucket",
-      "openGitlab": "Oscail GitLab",
-      "recentlyUsed": "A úsáideadh le déanaí",
-      "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
       "continueFrom": "Táthar ag leanúint ar aghaidh le {{title}}.",
-      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil.",
       "importingSession": "Ag iompórtáil an tseisiúin",
-      "discardWithUploadsMessage": "Scriosfar do leid agus aon chomhad uaslódáilte nach bhfuil ceangailte le teachtaireacht sheolta."
+      "cliCannotContinue": "Ní féidir leis an CLI seo leanúint ar aghaidh le seisiún. Roghnaigh Cloud Agent nó CLI eile.",
+      "importFailed": "Níorbh fhéidir an seisiún seo a iompórtáil."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nuashonraíodh {{displayCount}} chomhad.",

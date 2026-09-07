@@ -49,7 +49,7 @@ export function githubPrRef(owner: string, repo: string, number: number): GitHub
  */
 export function providerPrTermKey(
   platform: ProviderPrPlatform
-): 'prReview.terms.mergeRequest' | 'prReview.terms.pullRequest' {
+): 'prReview.terms.mergeRequest' | 'prReview.terms.pullRequest' { // i18n-dup-ok: capitalized standalone label vs the mid-sentence lowercase common.* noun; languages case-decline them apart.
   return providerPrTerm(platform) === 'merge request'
     ? 'prReview.terms.mergeRequest'
     : 'prReview.terms.pullRequest';

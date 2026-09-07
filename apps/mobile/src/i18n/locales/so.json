@@ -36,6 +36,7 @@
     "cost": "Kharashka",
     "discard": "Tuur",
     "findings": "Natiijooyin",
+    "mergeRequest": "merge request",
     "notConnected": "Kuma xirna",
     "notifications": "Ogeysiisyada",
     "pullRequest": "codsi isku-darid",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "Saf madhan oo kala duwanaanshaha ah"
     },
     "connectionExpired": "Muddadii xiriirka GitHub way dhammaatay.",
+    "capabilities": {
+      "banner": {
+        "title": "Kuma jirto bixiyahan",
+        "accessibility": "Kuma jirto bixiyahan: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Isku-darid",
       "mergeNow": "Hadda isku dar",
       "mergePullRequest": "Isku-darka codsiga",
+      "mergeTermTitle": "Isku-dar {{term}}",
       "enableAutoMerge": "Daar isku-darka tooska ah",
       "disableAutoMerge": "Dami isku-darka tooska ah",
       "autoMergeOn": "Isku-darka tooska ah waa daaran yahay",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "Tirtir laanta isku-darka ka dib",
       "noEnabledMethods": "Kaydkan kama daarna hab isku-dar ah. Ka codso maamulaha kaydka inuu daaro isku-darka caadiga ah, isku-ururinta ama saldhig-beddelka.",
       "confirmTitle": "Ma la isku daraa codsiga?",
+      "confirmTitleTerm": "Ma la isku daraa {{term}}?",
       "confirmMessage": "Tani waxay isbeddelladaada ku dari doontaa laanta saldhigga.",
       "enableAutoMergeConfirmTitle": "Ma la daaraa isku-darka tooska ah?",
       "enableAutoMergeConfirmMessage": "GitHub wuxuu codsigan isku-darka si toos ah isugu dari doonaa marka dhammaan hubinnada loo baahan yahay ay gudbaan.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} waa la isku-daraya si otomaatig ah marka pipeline-ku guulaysto.",
+      "enableAutoMergeDescriptionTerm": "GitLab wuxuu si otomaatig ah u isku-darayaa {{term}} marka pipeline-ku guulaysto.",
       "forbidden": "Ma haysatid oggolaansho aad ku fuliso codsigan isku-darka.",
       "cannotMerge": "Codsigan isku-darka lama fulin karo sida uu hadda yahay.",
       "couldNotMerge": "Codsiga isku-darka lama fulin karin.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "Hore ayaa la isugu daray",
-        "closed": "Codsigan isku-darka waa xiran yahay"
+        "closed": "Codsigan isku-darka waa xiran yahay",
+        "closedMergeRequest": "Codsigan merge request waa xiran yahay"
       },
       "partialSuccessBanner": {
         "body": "Laanta lama tirtiri karin: {{reason}}.",
@@ -393,6 +405,18 @@
         "behindDetail": "Laanta isbeddelladu way ka dambaysaa laanta saldhigga. Samee saldhig-beddel ama cusboonaysii laanta ka hor intaadan isku darin.",
         "notMergeableTitle": "Codsigan isku-darka weli lama fulin karo",
         "notMergeableDetail": "GitHub wuxuu xaaladda suurtagalnimada isku-darka ku sheegay {{state}}."
+      },
+      "restrictions": {
+        "title": "Xaddidaadaha isku-darka",
+        "approvalsRequired_one": "{{displayCount}} ogolaansho ayaa loo baahan yahay",
+        "approvalsRequired_other": "{{displayCount}} ogolaansho ayaa loo baahan yahay",
+        "pipelineMustSucceed": "Pipeline-ku waa inuu guulaystaa ka hor inta aan la isku darin."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline-ku wuu ku fashilmay diiwaankii ugu dambeeyay.",
+        "pendingPipeline": "Pipeline-ku weli wuu ka socdaa diiwaankii ugu dambeeyay.",
+        "permission": "Ma haysatid oggolaansho aad ku isku-darto {{term}}.",
+        "draft": "Ku calaamadee {{term}} inuu diyaar u yahay dib-u-eegis ka hor intaadan isku darin."
       },
       "methodLabels": {
         "merge": "Abuur diiwaan isbeddel oo isku-dar ah",
@@ -441,6 +465,7 @@
       "acceptTerms": "Aqbal",
       "replyBadRequest": "Jawaabtan lama daabici karo. Waxaa laga yaabaa in dooddu isbeddeshay.",
       "replyForbidden": "Ma haysatid oggolaansho aad uga jawaabto codsigan isku-darka.",
+      "replyForbiddenTerm": "Ma haysatid oggolaansho aad uga jawaabto {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Faalladan lama soo sheegi karo.",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "Dib u eeg codsiga isku-darka",
     "headLine": "{{counts}} · diiwaanka isbeddelka ugu dambeeya {{sha}}",
     "entry": {
-      "eyebrow": "Ku fur codsi isku-dar ah URL-kiisa.",
-      "pastePrLink": "Ku dheji xiriiriye PR ah",
-      "noRecentPrs": "Ma jiraan PR-yo dhowaan la isticmaalay",
-      "noRecentPrsDescription": "Kor ku dheji xiriiriye PR ah si aad u bilowdo dib-u-eegis — marka xigta halkan ayuu ka soo muuqan doonaa.",
+      "eyebrow": "Ku fur PR ama merge request URL-ka",
+      "pastePrLink": "Ku dheji xiriiriye PR ama merge request ah",
+      "noRecentPrs": "Ma jiraan dib-u-eegisyo dhowaan la sameeyay",
+      "noRecentPrsDescription": "Kor ku dheji xiriiriye si aad u bilowdo dib-u-eegis — marka xigta halkan ayuu ka soo muuqan doonaa.",
       "couldNotLoad": "Lama soo rari karin.",
       "removeFromRecentsTitle": "Ma laga saaraa kuwii dhowaan la isticmaalay?",
-      "removeFromRecentsMessage": "Codsigan isku-darka waxaa laga saari doonaa liiska kuwii aad dhowaan isticmaashay.",
+      "removeFromRecentsMessage": "Dib-u-eegistan waxaa laga saari doonaa liiska kuwii aad dhowaan isticmaashay.",
       "removeRecentAccessibility": "Ka saar {{repo}} liiska kuwii dhowaan la isticmaalay",
-      "urlAccessibility": "URL-ka codsiga isku-darka ee GitHub",
-      "clearLink": "Ka saar xiriiriyaha codsiga isku-darka",
-      "pasteLink": "Ku dheji xiriiriyaha codsiga isku-darka",
+      "urlAccessibility": "Geli URL-ka PR ama merge request",
+      "urlPlaceholder": "URL-ka PR ama merge request",
+      "openAccessibility": "Fur PR ama merge request",
+      "clearLink": "Ka saar xiriiriyaha",
+      "pasteLink": "Ku dheji xiriiriyaha PR ama merge request",
       "open": "Furan"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "Xiriirka GitHub lama hubin karin.",
       "checkFailedMessage": "Xaaladda soo gelitaanka lama heli karo ilaa tan la soo raro.",
+      "checkFailedTitleGitLab": "Xiriirka GitLab lama hubin karin.",
+      "checkFailedTitleBitbucket": "Xiriirka Bitbucket lama hubin karin.",
+      "providerCheckFailedMessage": "Xaaladda xiriirka ma muuqato inta la soo dhacayo.",
       "reconnectTitle": "Dib u xir GitHub",
       "reconnectDescription": "Oggolaanshaha xiriirkaaga GitHub waa lagala noqday. Dib u xir si aad taleefanka uga sii waddo dib-u-eegista codsiyada isku-darka.",
-      "description": "Ku xir akoonkaaga GitHub si aad taleefanka uga eegto codsiyada isku-darka."
+      "description": "Ku xir akoonkaaga GitHub si aad taleefanka uga eegto codsiyada isku-darka.",
+      "gitlabDescription": "Ku xir xisaabtaada GitLab si aad mobilka ugu eegto merge request-yada.",
+      "bitbucketDescription": "Bitbucket ku xir hay'addan si aad mobilka ugu eegto PR-yada.",
+      "bitbucketOrgOnlyDescription": "Ka dooro hay'ad profile-kaaga si aad ugu eegto PR-yada Bitbucket ee hay'addaas."
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "Muddadii xiriirka GitHub way dhammaatay.",
-      "message": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo."
+      "message": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
+      "gitlabTitle": "Muddadii xiriirka GitLab way dhammaatay.",
+      "bitbucketTitle": "Muddadii xiriirka Bitbucket way dhammaatay.",
+      "providerMessage": "Xiriirkaaga {{provider}} hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo."
     },
     "eventChips": {
       "comment": "Faallo",
@@ -636,6 +672,21 @@
       "files": "Faylal",
       "discussion": "Dood"
     },
+    "terms": {
+      "pullRequest": "Codsi isku-darid",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "La wadaag merge request-ka",
+      "viewOnProvider": "Kasoo eeg {{provider}}",
+      "mergeRequestUnavailable": "Merge request-ka lama heli karo",
+      "unavailableDescription": "Waa laga yaabaa in la tirtiray, ama inadan helin ogolaansho.",
+      "accessDeniedMergeRequest": "Ma haysatid oggolaansho aad ku aragto merge request-kan.",
+      "couldNotLoadMergeRequest": "Merge request-ka lama soo rari karin.",
+      "discussionAccessDenied": "Ma haysatid oggolaansho aad ku aragto doodda merge request-kan.",
+      "discussionUnavailableMessage": "Waxaa laga yaabaa in merge request-kan la saaray.",
+      "noDiscussionDescription": "Merge request-kan kuma jiraan dooddo dib-u-eegis ama faallooyin wada hadal.",
+      "noFilesChangedDescription": "Merge request-kan kuma jiraan isbeddello faylal."
+    },
     "fileStatus": {
       "modified": "Waa la beddelay",
       "renamed": "Magaca ayaa la beddelay",
@@ -652,7 +703,7 @@
       "emptyLine": "(madhan)"
     },
     "linkPasteClipboardEmpty": "Sabuuradda nuqulladu waa madhan tahay.",
-    "linkPasteNotAPullRequest": "Kani ma aha xiriiriye codsi isku-dar oo GitHub ah.",
+    "linkPasteNotAPullRequest": "Kani ma aha xiriiriye PR ama merge request ah",
     "announce": {
       "commentPosted": "Faallada waa la daabacay",
       "reviewSubmitted": "Dib-u-eegista waa la gudbiyay",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "Faalladan lama daabici karo. Waxaa laga yaabaa in sadarka la doortay la beddelay ama PR-ka la cusboonaysiiyay.",
       "reviewNotSubmitted": "Dib-u-eegistan lama gudbin karo sida ay tahay. Waxaa laga yaabaa in PR-ka la beddelay ama inaadan dib u eegi karin codsigaaga isku-darka.",
+      "reviewNotSubmittedTerm": "Dib-u-eegistan laguma diri karo sida uu yahay. {{term}} waa la yaabaa inuu isbeddelay, ama ma dib-u-eegi kartid {{term}} kaa ah.",
       "couldNotPostComment": "Faallada lama daabici karin.",
       "couldNotSubmitReview": "Dib-u-eegista lama gudbin karin. Hubi xiriirkaaga oo mar kale isku day."
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "Lama jawaabi karin.",
       "couldNotCompleteAction": "Falkan lama dhammayn karin.",
       "mergeResultDefaultError": "GitHub ma dhammaystirin isku-darka.",
+      "mergeResultNotCompleted": "{{term}} lama isku darin. Xaaladdiisa hubi kadibna mar kale isku day.",
       "ambiguous": "Lama xaqiijin karin — hubi PR-ka ka hor intaadan mar kale isku dayin.",
       "persistenceFailed": "Falkan lama diiwaangelin karin. Fadlan mar kale isku day waqti dambe.",
       "forbidden": "Lama oggola."
@@ -1979,11 +2032,31 @@
       "retryConnection": "Mar kale isku day inaad ku xirmato"
     },
     "newSession": {
+      "recentlyUsed": "Dhawaan la isticmaalay",
+      "couldNotLoadGithubRepositories": "Kaydadka GitHub lama soo shubi karin.",
+      "couldNotLoadGitlabRepositories": "Kaydadka GitLab lama soo shubi karin.",
+      "couldNotLoadBitbucketRepositories": "Kaydadka Bitbucket lama soo shubi karin.",
       "connectGithubDescription": "GitHub ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
+      "connectGitlabDescription": "GitLab ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
+      "connectBitbucketDescription": "Bitbucket ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
       "openGithub": "Fur GitHub",
+      "openGitlab": "Fur GitLab",
+      "openBitbucket": "Fur Bitbucket",
       "refreshRepositories": "Cusboonaysii kaydadka",
       "githubConnected": "GitHub waa la xiriiriyay",
+      "gitlabConnected": "GitLab waa la xiriiriyay",
       "noRepositoriesVisible": "Ma jiraan kaydad muuqda. Hubi in barnaamijka Kilo GitHub uu geli karo kaydadka, ka dibna cusboonaysii.",
+      "noRepositoriesVisibleGitlab": "Ma jiraan kaydad muuqda. Hubi oggolaanshaha gelitaanka kaydadka GitLab, ka dibna cusboonaysii.",
+      "noRepositoriesVisibleBitbucket": "Ma jiraan kaydad muuqda. Hubi oggolaanshaha gelitaanka kaydadka Bitbucket, ka dibna cusboonaysii.",
+      "bitbucketOrganizationsOnly": "Bitbucket waxa uu u helan yahay hay'adaha oo keliya.",
+      "branchPickerTitle": "Dooro laan",
+      "branchDefault": "Aasaasi",
+      "branchAccessibility": "Laan: {{label}}",
+      "branchLoading": "Laamaha soo dhacaya",
+      "branchLoadError": "Laamaha lama soo dejin karin",
+      "branchUnavailable": "Laamo kuma jiraan kaydkan. Xiriirkaaga bixiyaha hubi, kadibna dooro kayd kale.",
+      "branchEmpty": "Laamo la heli karo ma jiraan",
+      "branchPlaceholder": "Dooro laan",
       "runOnWithTarget": "Ku socodsii: {{target}}",
       "environment": "Deegaanka",
       "couldNotLoadEnvironment": "Deegaankaaga lama soo shubi karin.",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "Kaydadka lama cusboonaysiin karin. Fadlan mar kale isku day.",
       "discardDraftTitle": "Ma tirtiraysaa qabyada?",
       "discardDraftMessage": "Tilmaantaadu way lumi doontaa.",
+      "discardWithUploadsMessage": "Tilmaantaada iyo faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
       "discardFailed": "Qabyada lama tirtiri karin. Fadlan mar kale isku day.",
       "remoteHint": "Ku socodsii `kilo remote` kombiyuutarkaaga, ama `/remote` kalfadhi CLI oo socda, si aad u maamusho hawl kilo oo kombiyuutarkaaga ka socota.",
-      "connectBitbucketDescription": "Bitbucket ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
-      "connectGitlabDescription": "GitLab ku xiriiri biraawsarkaaga, ka dibna halkan ku soo noqo si aad kayd u doorato.",
-      "couldNotLoadBitbucketRepositories": "Kaydadka Bitbucket lama soo shubi karin.",
-      "couldNotLoadGithubRepositories": "Kaydadka GitHub lama soo shubi karin.",
-      "couldNotLoadGitlabRepositories": "Kaydadka GitLab lama soo shubi karin.",
-      "gitlabConnected": "GitLab waa la xiriiriyay",
-      "noRepositoriesVisibleBitbucket": "Ma jiraan kaydad muuqda. Hubi oggolaanshaha gelitaanka kaydadka Bitbucket, ka dibna cusboonaysii.",
-      "noRepositoriesVisibleGitlab": "Ma jiraan kaydad muuqda. Hubi oggolaanshaha gelitaanka kaydadka GitLab, ka dibna cusboonaysii.",
-      "openBitbucket": "Fur Bitbucket",
-      "openGitlab": "Fur GitLab",
-      "recentlyUsed": "Dhawaan la isticmaalay",
       "continueFrom": "Waxaa la sii wadaa {{title}}.",
       "importingSession": "Kalfadhiga waa la soo gelinayaa",
       "cliCannotContinue": "CLI-kan ma sii wadi karo kalfadhi. Dooro Cloud Agent ama CLI kale.",
-      "importFailed": "Kalfadhigan lama soo gelin karin.",
-      "discardWithUploadsMessage": "Tilmaantaada iyo faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa."
+      "importFailed": "Kalfadhigan lama soo gelin karin."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl ayaa la cusboonaysiiyay.",

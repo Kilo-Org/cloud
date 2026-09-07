@@ -36,6 +36,7 @@
     "cost": "Sarany",
     "discard": "Ario",
     "findings": "Olana hita",
+    "mergeRequest": "fangatahana fampiraisana",
     "notConnected": "Tsy mifandray",
     "notifications": "Fampandrenesana",
     "pullRequest": "pR",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "Andalana fahasamihafana banga"
     },
     "connectionExpired": "Lany daty ny fifandraisana amin'ny GitHub.",
+    "capabilities": {
+      "banner": {
+        "title": "Tsy azo amin'ity mpanome tolotra ity",
+        "accessibility": "Tsy azo amin'ity mpanome tolotra ity: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Fampiraisana",
       "mergeNow": "Ampiraiso izao",
       "mergePullRequest": "Fampiraisana ny fangatahana",
+      "mergeTermTitle": "Fampiraisana ny {{term}}",
       "enableAutoMerge": "Alefaso ny fampiraisana mandeha ho azy",
       "disableAutoMerge": "Atsaharo ny fampiraisana mandeha ho azy",
       "autoMergeOn": "Miasa ny fampiraisana mandeha ho azy",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "Fafao ny sampana aorian'ny fampiraisana",
       "noEnabledMethods": "Tsy misy fomba fampiraisana navela ao amin'ity tahirin-kaody ity. Angataho ny mpitantana hamela ny fampiraisana tsotra, ny famintinana na ny famindrana fototra.",
       "confirmTitle": "Hampiraisina ve ny fangatahana fampiraisana?",
+      "confirmTitleTerm": "Hampiraisina ve ny {{term}}?",
       "confirmMessage": "Hampidirina ao amin'ny sampana fototra ny fanovana nataonao.",
       "enableAutoMergeConfirmTitle": "Havelanao ve ny fampiraisana mandeha ho azy?",
       "enableAutoMergeConfirmMessage": "Hampiraisin'ny GitHub ho azy ity fangatahana fampiraisana ity rehefa mahomby avokoa ny fanamarinana takina.",
+      "enableAutoMergeConfirmMessageTerm": "Hampiraisina ho azy ny {{term}} rehefa nahomby ny pipeline-ny.",
+      "enableAutoMergeDescriptionTerm": "Hampiraisinan'i GitLab ho azy ny {{term}} ity rehefa nahomby ny pipeline-ny.",
       "forbidden": "Tsy manana alalana hampiray ity fangatahana fampiraisana ity ianao.",
       "cannotMerge": "Tsy azo ampiraisina amin'izao toetrany izao ity fangatahana fampiraisana ity.",
       "couldNotMerge": "Tsy vita ny fampiraisana ny fangatahana.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "Efa nampiraisina",
-        "closed": "Nakatona ity fangatahana fampiraisana ity"
+        "closed": "Nakatona ity fangatahana fampiraisana ity",
+        "closedMergeRequest": "Nakatona ity fangatahana fampiraisana ity"
       },
       "partialSuccessBanner": {
         "body": "Tsy voafafa ny sampana: {{reason}}.",
@@ -393,6 +405,18 @@
         "behindDetail": "Tsy mbola ao amin'ny sampana niavian'ny fanovana ny fanovana farany ao amin'ny sampana fototra. Afindrao ny fotony na havaozy ilay sampana alohan'ny fampiraisana.",
         "notMergeableTitle": "Mbola tsy azo ampiraisina ity fangatahana fampiraisana ity",
         "notMergeableDetail": "Izao ny sata momba ny fampiraisana nambaran'ny GitHub: {{state}}."
+      },
+      "restrictions": {
+        "title": "Fepetra momba ny fampiraisana",
+        "approvalsRequired_one": "Mila fankatoavana {{displayCount}}",
+        "approvalsRequired_other": "Mila fankatoavana {{displayCount}}",
+        "pipelineMustSucceed": "Tsy maintsy nahomby ny pipeline alohan'ny fampiraisana."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Mirava ny pipeline amin'ny firaketana fanovana farany.",
+        "pendingPipeline": "Mbola mandeha ny pipeline amin'ny firaketana fanovana farany.",
+        "permission": "Tsy manana alalana hampiray ity {{term}} ity ianao.",
+        "draft": "Mariho ho vonona hodinihina ny {{term}} alohan'ny hampiraisana azy."
       },
       "methodLabels": {
         "merge": "Mamoròna firaketana fampiraisana",
@@ -441,6 +465,7 @@
       "acceptTerms": "Ekeo",
       "replyBadRequest": "Tsy azo avoaka ity valiny ity. Mety niova ny loha-dresaka.",
       "replyForbidden": "Tsy manana alalana hamaly ity fangatahana fampiraisana ity ianao.",
+      "replyForbiddenTerm": "Tsy manana alalana hamaly ity {{term}} ity ianao.",
       "moderation": {
         "reportContent": {
           "terminal": "Tsy azo taterina ity hevitra ity.",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "Diniho ny fangatahana fampiraisana",
     "headLine": "{{counts}} · firaketana farany {{sha}}",
     "entry": {
-      "eyebrow": "Sokafy amin'ny URL ny fangatahana fampiraisana.",
-      "pastePrLink": "Apetaho ny rohy PR",
-      "noRecentPrs": "Tsy misy PR nosokafana vao haingana",
-      "noRecentPrsDescription": "Apetaho etsy ambony ny rohy PR hanombohana fandinihana — hiseho eto izy amin'ny manaraka.",
+      "eyebrow": "Sokafy ny fangatahana fampiraisana amin'ny URL",
+      "pastePrLink": "Apetaho ny rohy fangatahana fampiraisana",
+      "noRecentPrs": "Tsy misy fandinihana vao haingana",
+      "noRecentPrsDescription": "Apetaho ny rohy ambony mba hanombohana fandinihana — hita eto izy amin'ny manaraka.",
       "couldNotLoad": "Tsy tafiditra ny angona.",
       "removeFromRecentsTitle": "Hesorina amin'ny lisitry ny nosokafana farany ve?",
-      "removeFromRecentsMessage": "Hesorina amin'ny lisitry ny nosokafanao farany ity fangatahana fampiraisana ity.",
+      "removeFromRecentsMessage": "Ho esorina ao amin'ny lisitry ny vao haingana ity fandinihana ity.",
       "removeRecentAccessibility": "Esory amin'ny lisitry ny nosokafana farany ny {{repo}}",
-      "urlAccessibility": "URL an'ny fangatahana fampiraisana ao amin'ny GitHub",
-      "clearLink": "Fafao ny rohin'ny fangatahana fampiraisana",
-      "pasteLink": "Apetaho ny rohin'ny fangatahana fampiraisana",
+      "urlAccessibility": "Ampidiro ny URL ny fangatahana fampiraisana",
+      "urlPlaceholder": "URL ny fangatahana fampiraisana",
+      "openAccessibility": "Sokafy ny fangatahana fampiraisana",
+      "clearLink": "Hamaro ny rohy",
+      "pasteLink": "Apetaho ny rohy fangatahana fampiraisana",
       "open": "Misokatra"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "Tsy voamarina ny fifandraisana amin'ny GitHub.",
       "checkFailedMessage": "Tsy fantatra ny satan'ny fidirana raha tsy tafiditra ity angona ity.",
+      "checkFailedTitleGitLab": "Tsy voamarina ny fifandraisana amin'ny GitLab.",
+      "checkFailedTitleBitbucket": "Tsy voamarina ny fifandraisana amin'ny Bitbucket.",
+      "providerCheckFailedMessage": "Tsy azo ny satan'ny fifandraisana raha tsy tafiditra izao.",
       "reconnectTitle": "Fampifandraisana indray amin'ny GitHub",
       "reconnectDescription": "Nofoanana ny fifandraisanao amin'ny GitHub. Ampifandraiso indray mba hanohizana ny fandinihana fangatahana fampiraisana amin'ny finday.",
-      "description": "Ampifandraiso ny kaontinao GitHub mba handinihana fangatahana fampiraisana amin'ny finday."
+      "description": "Ampifandraiso ny kaontinao GitHub mba handinihana fangatahana fampiraisana amin'ny finday.",
+      "gitlabDescription": "Ampifandraiso ny kaonty GitLab-nao mba hijerena ny fangatahana fampiraisana amin'ny finday.",
+      "bitbucketDescription": "Ampifandraiso amin'ity fikambanana ity ny Bitbucket mba hijerena ny fangatahana fampiraisana amin'ny finday.",
+      "bitbucketOrgOnlyDescription": "Safidio fikambanana ao amin'ny mombamomba-nao mba hijerena ny fangatahana fampiraisana Bitbucket-ny."
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "Lany daty ny fifandraisana amin'ny GitHub.",
-      "message": "Tsy manan-kery intsony ny fifandraisanao amin'ny GitHub. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina."
+      "message": "Tsy manan-kery intsony ny fifandraisanao amin'ny GitHub. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
+      "gitlabTitle": "Lany daty ny fifandraisana amin'ny GitLab.",
+      "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket.",
+      "providerMessage": "Tsy manan-kery intsony ny fifandraisanao amin'ny {{provider}}. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina."
     },
     "eventChips": {
       "comment": "Fanehoan-kevitra",
@@ -636,6 +672,21 @@
       "files": "Rakitra",
       "discussion": "Resaka"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Fangatahana fampiraisana",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Zarao ny fangatahana fampiraisana",
+      "viewOnProvider": "Jereo amin'ny {{provider}}",
+      "mergeRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",
+      "unavailableDescription": "Mety efa voafafa izany, na mety tsy manana alalana hiditra ianao.",
+      "accessDeniedMergeRequest": "Tsy manana alalana hijery ity fangatahana fampiraisana ity ianao.",
+      "couldNotLoadMergeRequest": "Tsy tafiditra ny fangatahana fampiraisana.",
+      "discussionAccessDenied": "Tsy manana alalana hijery ny resaka momba ity fangatahana fampiraisana ity ianao.",
+      "discussionUnavailableMessage": "Mety efa nesorina ity fangatahana fampiraisana ity.",
+      "noDiscussionDescription": "Tsy mbola misy loha-dresaka fandinihana na hevitra ao amin'ny resaka momba ity fangatahana fampiraisana ity.",
+      "noFilesChangedDescription": "Tsy misy rakitra novaina ao amin'ity fangatahana fampiraisana ity."
+    },
     "fileStatus": {
       "modified": "Novaina",
       "renamed": "Novana anarana",
@@ -652,7 +703,7 @@
       "emptyLine": "(foana)"
     },
     "linkPasteClipboardEmpty": "Foana ny fitahirizana vonjimaika.",
-    "linkPasteNotAPullRequest": "Tsy rohin'ny fangatahana fampiraisana ao amin'ny GitHub io.",
+    "linkPasteNotAPullRequest": "Tsy rohy fangatahana fampiraisana izany",
     "announce": {
       "commentPosted": "Navoaka ny hevitra",
       "reviewSubmitted": "Nalefa ny fandinihana",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "Tsy azo avoaka ity hevitra ity. Mety niova ny andalana voafidy, na nohavaozina ny PR.",
       "reviewNotSubmitted": "Tsy azo alefa amin'izao endriny izao ity fandinihana ity. Mety niova ny PR, na tsy azonao atao ny mandinika ny fangatahana fampiraisana nataonao.",
+      "reviewNotSubmittedTerm": "Tsy azo alefa toy izao ny fandinihana. Mety io {{term}} io, na tsy afaka mamandrika ny {{term}}-anao manokana ianao.",
       "couldNotPostComment": "Tsy navoaka ny hevitra.",
       "couldNotSubmitReview": "Tsy nalefa ny fandinihana. Jereo ny fifandraisanao ary andramo indray."
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "Tsy tafalefa ny valiny.",
       "couldNotCompleteAction": "Tsy vita ity hetsika ity.",
       "mergeResultDefaultError": "Tsy vitan'ny GitHub ny fampiraisana.",
+      "mergeResultNotCompleted": "Tsy nampidirina ny {{term}}. Jereo ny toerany ary andramo indray.",
       "ambiguous": "Tsy voamarina ny vokatra — jereo ny PR alohan'ny hanandramana indray.",
       "persistenceFailed": "Tsy vitanay ny nandrakitra ity hetsika ity. Andramo indray azafady any aoriana.",
       "forbidden": "Voarara izany."
@@ -1979,11 +2032,31 @@
       "retryConnection": "Andramo mifandray indray"
     },
     "newSession": {
+      "recentlyUsed": "Nampiasaina vao haingana",
+      "couldNotLoadGithubRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitHub.",
+      "couldNotLoadGitlabRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitLab.",
+      "couldNotLoadBitbucketRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny Bitbucket.",
       "connectGithubDescription": "Ampifandraiso ny GitHub ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
+      "connectGitlabDescription": "Ampifandraiso ny GitLab ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
+      "connectBitbucketDescription": "Ampifandraiso ny Bitbucket ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
       "openGithub": "Sokafy ny GitHub",
+      "openGitlab": "Sokafy ny GitLab",
+      "openBitbucket": "Sokafy ny Bitbucket",
       "refreshRepositories": "Havaozy ny lisitry ny tahirin-kaody",
       "githubConnected": "Voampifandraisina ny GitHub",
+      "gitlabConnected": "Voampifandraisina ny GitLab",
       "noRepositoriesVisible": "Tsy misy tahirin-kaody hita. Hamarino ny alalan'ny rindranasa Kilo ao amin'ny GitHub hiditra amin'ny tahirin-kaody, dia havaozy ny lisitra.",
+      "noRepositoriesVisibleGitlab": "Tsy misy tahirin-kaody hita. Hamarino ny alalana hiditra amin'ny tahirin-kaody ao amin'ny GitLab, dia havaozy ny lisitra.",
+      "noRepositoriesVisibleBitbucket": "Tsy misy tahirin-kaody hita. Hamarino ny alalana hiditra amin'ny tahirin-kaody ao amin'ny Bitbucket, dia havaozy ny lisitra.",
+      "bitbucketOrganizationsOnly": "Ho an'ny fikambanana ihany ny Bitbucket.",
+      "branchPickerTitle": "Safidio ny sampana",
+      "branchDefault": "Default",
+      "branchAccessibility": "Sampana: {{label}}",
+      "branchLoading": "Mampiditra ny sampana",
+      "branchLoadError": "Tsy tafiditra ny sampana",
+      "branchUnavailable": "Tsy azo ny sampana amin'ity tahirin-kaody ity. Hamarino ny alalana ananao amin'ny mpanome tolotra, dia safidio tahirin-kaody hafa.",
+      "branchEmpty": "Tsy misy sampana azo",
+      "branchPlaceholder": "Safidio sampana iray",
       "runOnWithTarget": "Ampandeho amin'ny: {{target}}",
       "environment": "Tontolo fiasana",
       "couldNotLoadEnvironment": "Tsy voaray ny tontolo fiasanao.",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "Tsy nahomby ny fanavaozana ny lisitry ny tahirin-kaody. Andramo indray azafady.",
       "discardDraftTitle": "Hariana ve ny volavola?",
       "discardDraftMessage": "Ho very ny toromarikanao.",
+      "discardWithUploadsMessage": "Hofafana ny toromarikanao sy ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa.",
       "discardFailed": "Tsy nahomby ny fanariana ny volavola. Andramo indray azafady.",
       "remoteHint": "Alefaso ny `kilo remote` amin'ny solosainao, na ny `/remote` ao amin'ny fotoam-piasana CLI mandeha, mba hifehezana ny kilo mandeha eo an-toerana.",
-      "connectBitbucketDescription": "Ampifandraiso ny Bitbucket ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
-      "connectGitlabDescription": "Ampifandraiso ny GitLab ao amin'ny mpitety tranonkalanao, dia miverena eto hisafidy tahirin-kaody.",
-      "couldNotLoadBitbucketRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny Bitbucket.",
-      "couldNotLoadGithubRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitHub.",
-      "couldNotLoadGitlabRepositories": "Tsy voaray ny tahirin-kaody ao amin'ny GitLab.",
-      "gitlabConnected": "Voampifandraisina ny GitLab",
-      "noRepositoriesVisibleBitbucket": "Tsy misy tahirin-kaody hita. Hamarino ny alalana hiditra amin'ny tahirin-kaody ao amin'ny Bitbucket, dia havaozy ny lisitra.",
-      "noRepositoriesVisibleGitlab": "Tsy misy tahirin-kaody hita. Hamarino ny alalana hiditra amin'ny tahirin-kaody ao amin'ny GitLab, dia havaozy ny lisitra.",
-      "openBitbucket": "Sokafy ny Bitbucket",
-      "openGitlab": "Sokafy ny GitLab",
-      "recentlyUsed": "Nampiasaina vao haingana",
       "continueFrom": "Mitohy ny {{title}}.",
       "importingSession": "Manafatra fotoam-piasana",
       "cliCannotContinue": "Tsy afaka manohy fotoam-piasana ity CLI ity. Safidio ny Cloud Agent na CLI hafa.",
-      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity.",
-      "discardWithUploadsMessage": "Hofafana ny toromarikanao sy ny rakitra nampakarina nefa mbola tsy nampiarahina tamin'ny hafatra nalefa."
+      "importFailed": "Tsy nahomby ny fanafarana ity fotoam-piasana ity."
     },
     "partRenderer": {
       "updatedFileCount_one": "Nohavaozina ny rakitra {{displayCount}}.",

@@ -36,6 +36,7 @@
     "cost": "ကုန်ကျစရိတ်",
     "discard": "ပယ်ဖျက်ပါ",
     "findings": "တွေ့ရှိချက်များ",
+    "mergeRequest": "merge request",
     "notConnected": "မချိတ်ဆက်ထား",
     "notifications": "အသိပေးချက်များ",
     "pullRequest": "pR",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "ကွာခြားချက် အတန်းအလွတ်"
     },
     "connectionExpired": "GitHub ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
+    "capabilities": {
+      "banner": {
+        "title": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ",
+        "accessibility": "ဤဝန်ဆောင်မှုပေးသူတွင် မရရှိနိုင်ပါ: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "ပေါင်းစည်းခြင်း",
       "mergeNow": "ယခု ပေါင်းစည်းပါ",
       "mergePullRequest": "PR ပေါင်းစည်းခြင်း",
+      "mergeTermTitle": "{{term}} ပေါင်းစည်းခြင်း",
       "enableAutoMerge": "အလိုအလျောက် ပေါင်းစည်းမှုကို ဖွင့်ပါ",
       "disableAutoMerge": "အလိုအလျောက် ပေါင်းစည်းမှုကို ပိတ်ပါ",
       "autoMergeOn": "အလိုအလျောက် ပေါင်းစည်းမှု ဖွင့်ထားသည်",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "ပေါင်းစည်းပြီးနောက် ဘရန်ချ်ကို ဖျက်ပါ",
       "noEnabledMethods": "ဒီကုဒ်သိုလှောင်ရာတွင် ပေါင်းစည်းနည်းတစ်ခုမျှ ဖွင့်မထားပါ။ ပေါင်းစည်းခြင်း၊ တစ်ခုတည်းချုံ့ခြင်း သို့မဟုတ် အခြေခံပြောင်းခြင်းနည်းကို ဖွင့်ပေးရန် ကုဒ်သိုလှောင်ရာ၏ စီမံခန့်ခွဲသူကို တောင်းဆိုပါ။",
       "confirmTitle": "PR ကို ပေါင်းစည်းမလား",
+      "confirmTitleTerm": "{{term}} ကို ပေါင်းစည်းမလား",
       "confirmMessage": "သင့်ပြောင်းလဲမှုများကို အခြေခံဘရန်ချ်ထဲသို့ ပေါင်းစည်းပါမည်။",
       "enableAutoMergeConfirmTitle": "အလိုအလျောက် ပေါင်းစည်းမှုကို ဖွင့်မလား",
       "enableAutoMergeConfirmMessage": "လိုအပ်သော စစ်ဆေးမှုအားလုံး အောင်မြင်လျှင် GitHub က ဒီ PR ကို အလိုအလျောက် ပေါင်းစည်းပါမည်။",
+      "enableAutoMergeConfirmMessageTerm": "ပိုက်လိုင်းအောင်မြင်ပါ {{term}} ကို အလိုအလျောက် ပေါင်းစည်းမည်။",
+      "enableAutoMergeDescriptionTerm": "ပိုက်လိုင်းအောင်မြင်ပါ GitLab က ဤ{{term}}ကို အလိုအလျောက် ပေါင်းစည်းမည်။",
       "forbidden": "ဒီ PR ကို ပေါင်းစည်းခွင့် မရှိပါ။",
       "cannotMerge": "ဒီ PR ကို လက်ရှိအတိုင်း ပေါင်းစည်း၍မရပါ။",
       "couldNotMerge": "PR ကို ပေါင်းစည်း၍မရပါ။",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "ပေါင်းစည်းပြီးပါပြီ",
-        "closed": "ဒီ PR ကို ပိတ်ထားသည်"
+        "closed": "ဒီ PR ကို ပိတ်ထားသည်",
+        "closedMergeRequest": "ဒီ merge request ကို ပိတ်ထားသည်"
       },
       "partialSuccessBanner": {
         "body": "ဘရန်ချ်ကို ဖျက်၍မရပါ: {{reason}}။",
@@ -393,6 +405,18 @@
         "behindDetail": "မူရင်းဘရန်ချ်တွင် အခြေခံဘရန်ချ်၏ နောက်ဆုံးပြောင်းလဲမှုများ မပါသေးပါ။ မပေါင်းစည်းမီ ဘရန်ချ်ကို အခြေခံပြောင်းပါ သို့မဟုတ် မွမ်းမံပါ။",
         "notMergeableTitle": "ဒီ PR ကို ပေါင်းစည်း၍မရသေးပါ",
         "notMergeableDetail": "GitHub က ပေါင်းစည်းနိုင်မှု အခြေအနေကို {{state}} ဟု ဖော်ပြထားပါသည်။"
+      },
+      "restrictions": {
+        "title": "ပေါင်းစည်းမှု ပိတ်ပင်တားမြစ်ချက်များ",
+        "approvalsRequired_one": "{{displayCount}} ခု အတည်ပြုချက် လိုအပ်သည်",
+        "approvalsRequired_other": "{{displayCount}} ခု အတည်ပြုချက်များ လိုအပ်သည်",
+        "pipelineMustSucceed": "ပေါင်းစည်းမီ ပိုက်လိုင်း အောင်မြင်ရမည်။"
+      },
+      "providerBlocked": {
+        "failingPipeline": "နောက်ဆုံးကွန်မစ်တွင် ပိုက်လိုင်း ရှုံးနိမ့်နေသည်။",
+        "pendingPipeline": "နောက်ဆုံးကွန်မစ်တွင် ပိုက်လိုင်း ဆက်လက်လည်ပတ်နေဆဲဖြစ်သည်။",
+        "permission": "ဒီ {{term}} ကို ပေါင်းစည်းခွင့် မရှိပါ။",
+        "draft": "မပေါင်းစည်းမီ {{term}} ကို သုံးသပ်ရန်အသင့်အဖြစ် မှတ်သားပါ။"
       },
       "methodLabels": {
         "merge": "ပေါင်းစည်းကွန်မစ်ကို ဖန်တီးပါ",
@@ -441,6 +465,7 @@
       "acceptTerms": "လက်ခံပါ",
       "replyBadRequest": "ဒီအကြောင်းပြန်စာကို တင်၍မရပါ။ ဆွေးနွေးချက်တွဲ ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်ပါသည်။",
       "replyForbidden": "ဒီ PR တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
+      "replyForbiddenTerm": "ဒီ {{term}} တွင် အကြောင်းပြန်ခွင့် မရှိပါ။",
       "moderation": {
         "reportContent": {
           "terminal": "ဒီမှတ်ချက်ကို တိုင်ကြား၍မရပါ။",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "PR ကို သုံးသပ်ပါ",
     "headLine": "{{counts}} · နောက်ဆုံးကွန်မစ် {{sha}}",
     "entry": {
-      "eyebrow": "URL ဖြင့် PR ကို ဖွင့်ပါ။",
-      "pastePrLink": "PR လင့်ခ်ကူးထည့်ပါ",
-      "noRecentPrs": "မကြာသေးမီက ကြည့်ထားသော PR မရှိပါ",
-      "noRecentPrsDescription": "သုံးသပ်မှုစတင်ရန် အပေါ်တွင် PR လင့်ခ်ကို ကူးထည့်ပါ။ နောက်တစ်ကြိမ်တွင် ဒီနေရာ၌ ပေါ်လာပါမည်။",
+      "eyebrow": "URL ဖြင့် PR သို့မဟုတ် merge request ကို ဖွင့်ပါ",
+      "pastePrLink": "PR သို့မဟုတ် merge request လင့်ခ်ကို ကူးထည့်ပါ",
+      "noRecentPrs": "မကြာသေးမီက သုံးသပ်ချက်များ မရှိပါ",
+      "noRecentPrsDescription": "သုံးသပ်မှုစရန် အပေါ်တွင် လင့်ခ်ကို ကူးထည့်ပါ — နောက်တစ်ကြိမ်တွင် ဤနေရာ၌ ပေါ်လာမည်။",
       "couldNotLoad": "ရယူ၍မရပါ။",
       "removeFromRecentsTitle": "မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားမလား",
-      "removeFromRecentsMessage": "ဒီ PR ကို မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားပါမည်။",
+      "removeFromRecentsMessage": "ဤသုံးသပ်ချက်ကို သင့်မကြာသေးမီက စာရင်းမှ ဖယ်ရှားပါမည်။",
       "removeRecentAccessibility": "{{repo}} ကို မကြာသေးမီက ကြည့်ထားသော စာရင်းမှ ဖယ်ရှားပါ",
-      "urlAccessibility": "GitHub PR ၏ URL",
-      "clearLink": "PR လင့်ခ်ကို ရှင်းပါ",
-      "pasteLink": "PR လင့်ခ်ကို ကူးထည့်ပါ",
+      "urlAccessibility": "PR သို့မဟုတ် merge request URL ကို ထည့်သွင်းပါ",
+      "urlPlaceholder": "PR သို့မဟုတ် merge request URL",
+      "openAccessibility": "PR သို့မဟုတ် merge request ကို ဖွင့်ရန်",
+      "clearLink": "လင့်ခ်ကို ရှင်းပါ",
+      "pasteLink": "PR သို့မဟုတ် merge request လင့်ခ်ကို ကူးထည့်ပါ",
       "open": "ဖွင့်"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
       "checkFailedMessage": "အချက်အလက် ရယူပြီးမှသာ အကောင့်ဝင်ထားခြင်း ရှိမရှိ သိနိုင်ပါမည်။",
+      "checkFailedTitleGitLab": "GitLab ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
+      "checkFailedTitleBitbucket": "Bitbucket ချိတ်ဆက်မှုကို စစ်ဆေး၍မရပါ။",
+      "providerCheckFailedMessage": "၎င်းတိုင် လိုက်ဒ်မဖြစ်မီ ချိတ်ဆက်မှုအခြေအနေ မရရှိနိုင်ပါ။",
       "reconnectTitle": "GitHub ပြန်ချိတ်ဆက်ခြင်း",
       "reconnectDescription": "သင့် GitHub ချိတ်ဆက်ခွင့်ကို ရုပ်သိမ်းထားပါသည်။ ဖုန်းပေါ်တွင် PR များကို ဆက်သုံးသပ်ရန် ပြန်ချိတ်ဆက်ပါ။",
-      "description": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် သင့် GitHub အကောင့်ကို ချိတ်ဆက်ပါ။"
+      "description": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် သင့် GitHub အကောင့်ကို ချိတ်ဆက်ပါ။",
+      "gitlabDescription": "ဖုန်းပေါ်တွင် merge request များကို သုံးသပ်ရန် သင့် GitLab အကောင့်ကို ချိတ်ဆက်ပါ။",
+      "bitbucketDescription": "ဖုန်းပေါ်တွင် PR များကို သုံးသပ်ရန် ဤအဖွဲ့ကို Bitbucket နှင့် ချိတ်ဆက်ပါ။",
+      "bitbucketOrgOnlyDescription": "၎င်း၏ Bitbucket PR များကို သုံးသပ်ရန် သင့်ပရိုဖိုင်တွင် အဖွဲ့တစ်ခုကို ရွေးချယ်ပါ။"
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
-      "message": "သင့် GitHub ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။"
+      "message": "သင့် GitHub ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။",
+      "gitlabTitle": "GitLab ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
+      "bitbucketTitle": "Bitbucket ချိတ်ဆက်မှု သက်တမ်းကုန်သွားပါပြီ။",
+      "providerMessage": "သင့် {{provider}} ချိတ်ဆက်မှုကို အသုံးပြု၍မရတော့ပါ။ ချိတ်ဆက်မှုကို ပြန်စစ်ဆေးပါ။ လိုအပ်လျှင် ပြန်ချိတ်ဆက်ရန် တောင်းဆိုပါမည်။"
     },
     "eventChips": {
       "comment": "မှတ်ချက်",
@@ -636,6 +672,21 @@
       "files": "ဖိုင်",
       "discussion": "ဆွေးနွေးချက်"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge request ကို မျှဝေပါ",
+      "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
+      "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",
+      "unavailableDescription": "၎င်းကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်တွင် ဝင်ရောက်ခွင့် မရှိနိုင်ပါ။",
+      "accessDeniedMergeRequest": "ဒီ merge request ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "couldNotLoadMergeRequest": "Merge request ကို ရယူ၍မရပါ။",
+      "discussionAccessDenied": "ဒီ merge request ၏ ဆွေးနွေးချက်ကို ကြည့်ရှုခွင့် မရှိပါ။",
+      "discussionUnavailableMessage": "ဒီ merge request ကို ဖယ်ရှားထားခြင်း ဖြစ်နိုင်ပါသည်။",
+      "noDiscussionDescription": "ဒီ merge request တွင် သုံးသပ်မှု ဆွေးနွေးချက်တွဲများ သို့မဟုတ် စကားဝိုင်းမှတ်ချက်များ မရှိပါ။",
+      "noFilesChangedDescription": "ဒီ merge request တွင် ဖိုင်ပြောင်းလဲမှု မရှိပါ။"
+    },
     "fileStatus": {
       "modified": "ပြုပြင်ပြီး",
       "renamed": "အမည်ပြောင်းပြီး",
@@ -652,7 +703,7 @@
       "emptyLine": "(ဗလာ)"
     },
     "linkPasteClipboardEmpty": "ကလစ်ဘုတ်တွင် ဘာမျှမရှိပါ။",
-    "linkPasteNotAPullRequest": "GitHub PR လင့်ခ် မဟုတ်ပါ။",
+    "linkPasteNotAPullRequest": "ဤသည် PR သို့မဟုတ် merge request လင့်ခ် မဟုတ်ပါ",
     "announce": {
       "commentPosted": "မှတ်ချက် တင်ပြီးပါပြီ",
       "reviewSubmitted": "သုံးသပ်မှု တင်သွင်းပြီးပါပြီ",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "ဒီမှတ်ချက်ကို တင်၍မရပါ။ ရွေးထားသော စာကြောင်း ပြောင်းလဲသွားခြင်း သို့မဟုတ် PR ကို မွမ်းမံထားခြင်း ဖြစ်နိုင်ပါသည်။",
       "reviewNotSubmitted": "ဒီသုံးသပ်မှုကို လက်ရှိအတိုင်း တင်၍မရပါ။ PR ပြောင်းလဲသွားခြင်း သို့မဟုတ် ကိုယ်ပိုင် PR ကို သုံးသပ်ခွင့်မရှိခြင်းကြောင့် ဖြစ်နိုင်ပါသည်။",
+      "reviewNotSubmittedTerm": "ဤသုံးသပ်ချက်ကို ဤအတိုင်း တင်သွင်း၍မရပါ။ {{term}} ပြောင်းလဲသွားခြင်း ဖြစ်နိုင်သည်၊ သို့မဟုတ် သင့်ကိုယ်ပိုင် {{term}} ကို သုံးသပ်၍မရပါ။",
       "couldNotPostComment": "မှတ်ချက်ကို တင်၍မရပါ။",
       "couldNotSubmitReview": "သုံးသပ်မှုကို တင်၍မရပါ။ အင်တာနက်ချိတ်ဆက်မှုကို စစ်ဆေးပြီး ထပ်စမ်းကြည့်ပါ။"
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "အကြောင်းမပြန်နိုင်ပါ။",
       "couldNotCompleteAction": "ဒီလုပ်ဆောင်ချက်ကို အပြီးသတ်၍မရပါ။",
       "mergeResultDefaultError": "GitHub က ပေါင်းစည်းမှုကို အပြီးမသတ်ခဲ့ပါ။",
+      "mergeResultNotCompleted": "{{term}} ပေါင်းစည်းခြင်း မဖြစ်ပါ။ ၎င်း၏အခြေအနေကို စစ်ဆေးပြီး ပြန်ကြိုးစားပါ။",
       "ambiguous": "လုပ်ဆောင်မှုရလဒ်ကို အတည်ပြု၍မရပါ။ ထပ်မစမ်းမီ PR ကို စစ်ဆေးပါ။",
       "persistenceFailed": "ဒီလုပ်ဆောင်ချက်ကို မှတ်တမ်းတင်၍မရပါ။ နောက်မှ ထပ်စမ်းကြည့်ပါ။",
       "forbidden": "လုပ်ဆောင်ခွင့် မရှိပါ။"
@@ -1979,11 +2032,31 @@
       "retryConnection": "ထပ်ချိတ်ဆက်ကြည့်ပါ"
     },
     "newSession": {
+      "recentlyUsed": "မကြာသေးမီက အသုံးပြုထားသည့်အရာများ",
+      "couldNotLoadGithubRepositories": "GitHub ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
+      "couldNotLoadGitlabRepositories": "GitLab ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
       "connectGithubDescription": "ဘရောက်ဆာတွင် GitHub ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectGitlabDescription": "ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
+      "connectBitbucketDescription": "ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
       "openGithub": "GitHub ဖွင့်ပါ",
+      "openGitlab": "GitLab ဖွင့်ပါ",
+      "openBitbucket": "Bitbucket ဖွင့်ပါ",
       "refreshRepositories": "ကုဒ်သိုလှောင်ခန်းစာရင်းကို ပြန်လည်ရယူပါ",
       "githubConnected": "GitHub ချိတ်ဆက်ပြီး",
+      "gitlabConnected": "GitLab ချိတ်ဆက်ပြီး",
       "noRepositoriesVisible": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ Kilo GitHub အက်ပ်၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
+      "noRepositoriesVisibleGitlab": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ GitLab ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
+      "noRepositoriesVisibleBitbucket": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ Bitbucket ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
+      "bitbucketOrganizationsOnly": "Bitbucket ကို အဖွဲ့များအတွက်သာ ရနိုင်ပါသည်။",
+      "branchPickerTitle": "ခွဲကို ရွေးချယ်ပါ",
+      "branchDefault": "ပုံသေ",
+      "branchAccessibility": "ခွဲ: {{label}}",
+      "branchLoading": "ခွဲများ လိုက်ဒ်တင်နေသည်",
+      "branchLoadError": "ခွဲများကို လိုက်ဒ်တင်၍မရပါ",
+      "branchUnavailable": "ဤရီပိုထရီအတွက် ခွဲများ မရရှိနိုင်ပါ။ ဝန်ဆောင်မှုပေးသူထံ သင့်ဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီးနောက် အခြားရီပိုထရီကို ရွေးချယ်ပါ။",
+      "branchEmpty": "ရရှိနိုင်သော ခွဲများ မရှိပါ",
+      "branchPlaceholder": "ခွဲတစ်ခုကို ရွေးချယ်ပါ",
       "runOnWithTarget": "လုပ်ဆောင်မည့်နေရာ- {{target}}",
       "environment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်",
       "couldNotLoadEnvironment": "သင့်လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ရယူ၍မရပါ။",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "ကုဒ်သိုလှောင်ခန်းစာရင်းကို ပြန်လည်ရယူ၍မရပါ။ ထပ်ကြိုးစားပါ။",
       "discardDraftTitle": "မူကြမ်းကို ပယ်ဖျက်မလား။",
       "discardDraftMessage": "သင့်ညွှန်ကြားချက် ပျောက်သွားပါမည်။",
+      "discardWithUploadsMessage": "သင့်ညွှန်ကြားချက်နှင့် မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
       "discardFailed": "မူကြမ်းကို ပယ်ဖျက်၍မရခဲ့ပါ။ ထပ်ကြိုးစားပါ။",
       "remoteHint": "သင့်ကွန်ပျူတာရှိ kilo လုပ်ငန်းစဉ်ကို ထိန်းချုပ်ရန် ကွန်ပျူတာတွင် `kilo remote` ကို လုပ်ဆောင်ပါ၊ သို့မဟုတ် လုပ်ဆောင်နေသော CLI စက်ရှင်တွင် `/remote` ကို သုံးပါ။",
-      "connectBitbucketDescription": "ဘရောက်ဆာတွင် Bitbucket ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
-      "connectGitlabDescription": "ဘရောက်ဆာတွင် GitLab ကို ချိတ်ဆက်ပါ။ ထို့နောက် ကုဒ်သိုလှောင်ခန်းတစ်ခု ရွေးရန် ဤနေရာသို့ ပြန်လာပါ။",
-      "couldNotLoadBitbucketRepositories": "Bitbucket ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
-      "couldNotLoadGithubRepositories": "GitHub ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
-      "couldNotLoadGitlabRepositories": "GitLab ကုဒ်သိုလှောင်ခန်းများကို ရယူ၍မရပါ။",
-      "gitlabConnected": "GitLab ချိတ်ဆက်ပြီး",
-      "noRepositoriesVisibleBitbucket": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ Bitbucket ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
-      "noRepositoriesVisibleGitlab": "ကုဒ်သိုလှောင်ခန်းများကို မတွေ့ရပါ။ GitLab ၏ ကုဒ်သိုလှောင်ခန်းဝင်ရောက်ခွင့်ကို စစ်ဆေးပြီး စာရင်းကို ပြန်လည်ရယူပါ။",
-      "openBitbucket": "Bitbucket ဖွင့်ပါ",
-      "openGitlab": "GitLab ဖွင့်ပါ",
-      "recentlyUsed": "မကြာသေးမီက အသုံးပြုထားသည့်အရာများ",
       "continueFrom": "{{title}} ကို ဆက်လုပ်နေပါသည်။",
       "importingSession": "စက်ရှင်ကို တင်သွင်းနေသည်",
       "cliCannotContinue": "ဤ CLI ဖြင့် စက်ရှင်ကို ဆက်လုပ်၍မရပါ။ Cloud Agent သို့မဟုတ် အခြား CLI တစ်ခုကို ရွေးပါ။",
-      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။",
-      "discardWithUploadsMessage": "သင့်ညွှန်ကြားချက်နှင့် မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။"
+      "importFailed": "ဤစက်ရှင်ကို တင်သွင်း၍မရပါ။"
     },
     "partRenderer": {
       "updatedFileCount_one": "ဖိုင် {{displayCount}} ခုကို ပြင်ဆင်ပြီးပါပြီ။",

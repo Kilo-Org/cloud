@@ -36,6 +36,7 @@
     "cost": "Xərc",
     "discard": "Ləğv et",
     "findings": "Aşkarlanan problemlər",
+    "mergeRequest": "merge sorğusu",
     "notConnected": "Qoşulmayıb",
     "notifications": "Bildirişlər",
     "pullRequest": "birləşdirmə sorğusu",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "Boş dəyişiklik sətri"
     },
     "connectionExpired": "GitHub bağlantısının müddəti bitdi.",
+    "capabilities": {
+      "banner": {
+        "title": "Bu provayderdə əlçatan deyil",
+        "accessibility": "Bu provayderdə əlçatan deyil: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Birləşdirmə",
       "mergeNow": "İndi birləşdir",
       "mergePullRequest": "Sorğunun birləşdirilməsi",
+      "mergeTermTitle": "{{term}}nun birləşdirilməsi",
       "enableAutoMerge": "Avtomatik birləşdirməni aktivləşdir",
       "disableAutoMerge": "Avtomatik birləşdirməni söndür",
       "autoMergeOn": "Avtomatik birləşdirmə aktivdir",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "Birləşdirmədən sonra budağı sil",
       "noEnabledMethods": "Bu repozitoriyada heç bir birləşdirmə üsulu aktiv deyil. Repozitoriyanın inzibatçısından adi birləşdirmə, sıxlaşdırma və ya bazanı dəyişmə üsulunu aktivləşdirməsini istə.",
       "confirmTitle": "Birləşdirmə sorğusu birləşdirilsin?",
+      "confirmTitleTerm": "{{term}} birləşdirilsin?",
       "confirmMessage": "Dəyişikliklərin əsas budağa birləşdiriləcək.",
       "enableAutoMergeConfirmTitle": "Avtomatik birləşdirmə aktivləşdirilsin?",
       "enableAutoMergeConfirmMessage": "Bütün məcburi yoxlamalar uğurla başa çatdıqda GitHub bu birləşdirmə sorğusunu avtomatik birləşdirəcək.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}}, pipeline uğurlu olduqda avtomatik olaraq birləşdiriləcək.",
+      "enableAutoMergeDescriptionTerm": "GitLab, pipeline uğurlu olduqda bu {{term}}nu avtomatik olaraq birləşdirir.",
       "forbidden": "Bu birləşdirmə sorğusunu birləşdirmək icazən yoxdur.",
       "cannotMerge": "Bu birləşdirmə sorğusunu indiki vəziyyətdə birləşdirmək mümkün deyil.",
       "couldNotMerge": "Birləşdirmə sorğusunu birləşdirmək mümkün olmadı.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "Artıq birləşdirilib",
-        "closed": "Bu birləşdirmə sorğusu bağlanıb"
+        "closed": "Bu birləşdirmə sorğusu bağlanıb",
+        "closedMergeRequest": "Bu merge sorğusu bağlanıb"
       },
       "partialSuccessBanner": {
         "body": "Budağı silmək mümkün olmadı. Səbəb: {{reason}}",
@@ -393,6 +405,18 @@
         "behindDetail": "Mənbə budaq əsas budaqdan geri qalır. Birləşdirmədən əvvəl budağın bazasını dəyiş və ya budağı yenilə.",
         "notMergeableTitle": "Bu birləşdirmə sorğusunu hələ birləşdirmək mümkün deyil",
         "notMergeableDetail": "GitHub birləşdirmə vəziyyətini {{state}} kimi bildirdi."
+      },
+      "restrictions": {
+        "title": "Birləşdirmə məhdudiyyətləri",
+        "approvalsRequired_one": "{{displayCount}} təsdiq tələb olunur",
+        "approvalsRequired_other": "{{displayCount}} təsdiq tələb olunur",
+        "pipelineMustSucceed": "Birləşdirmədən əvvəl pipeline uğurlu olmalıdır."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline ən son kommitdə uğursuz olur.",
+        "pendingPipeline": "Pipeline ən son kommitdə hələ işləyir.",
+        "permission": "Bu {{term}}nu birləşdirmək icazən yoxdur.",
+        "draft": "Birləşdirmədən əvvəl {{term}}nu kod baxışına hazır kimi işarələ."
       },
       "methodLabels": {
         "merge": "Birləşdirmə kommiti yarat",
@@ -441,6 +465,7 @@
       "acceptTerms": "Qəbul et",
       "replyBadRequest": "Bu cavabı göndərmək mümkün deyil. Müzakirə dəyişmiş ola bilər.",
       "replyForbidden": "Bu birləşdirmə sorğusuna cavab vermək icazən yoxdur.",
+      "replyForbiddenTerm": "Bu {{term}}na cavab vermək icazən yoxdur.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu şərhdən şikayət etmək mümkün deyil.",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "Birləşdirmə sorğusunu nəzərdən keçir",
     "headLine": "{{counts}} · son kommit: {{sha}}",
     "entry": {
-      "eyebrow": "Birləşdirmə sorğusunu URL ilə aç.",
-      "pastePrLink": "PR keçidini yapışdır",
-      "noRecentPrs": "Son baxılan PR yoxdur",
-      "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıdakı sahəyə PR keçidini yapışdır — növbəti dəfə burada görünəcək.",
+      "eyebrow": "Birləşdirmə sorğusunu və ya merge sorğusunu URL ilə aç",
+      "pastePrLink": "Birləşdirmə sorğusu və ya merge sorğusu keçidini yapışdır",
+      "noRecentPrs": "Son baxış yoxdur",
+      "noRecentPrsDescription": "Kod baxışına başlamaq üçün yuxarıya keçid yapışdır — növbəti dəfə burada görünəcək.",
       "couldNotLoad": "Yükləmək mümkün olmadı.",
       "removeFromRecentsTitle": "Son baxılanlardan silinsin?",
-      "removeFromRecentsMessage": "Bu birləşdirmə sorğusu son baxılanlar siyahından silinəcək.",
+      "removeFromRecentsMessage": "Bu baxış son baxılanlar siyahısından silinəcək.",
       "removeRecentAccessibility": "{{repo}} repozitoriyasını son baxılanlardan sil",
-      "urlAccessibility": "GitHub birləşdirmə sorğusunun URL-i",
-      "clearLink": "Birləşdirmə sorğusunun keçidini təmizlə",
-      "pasteLink": "Birləşdirmə sorğusunun keçidini yapışdır",
+      "urlAccessibility": "Birləşdirmə sorğusu və ya merge sorğusu URL-ni daxil et",
+      "urlPlaceholder": "Birləşdirmə sorğusu və ya merge sorğusu URL-i",
+      "openAccessibility": "Birləşdirmə sorğusu və ya merge sorğusu aç",
+      "clearLink": "Keçidi təmizlə",
+      "pasteLink": "Birləşdirmə sorğusunun və ya merge sorğusunun keçidini yapışdır",
       "open": "Açıq"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "GitHub bağlantısını yoxlamaq mümkün olmadı.",
       "checkFailedMessage": "Bu məlumat yüklənənədək giriş statusunu göstərmək mümkün deyil.",
+      "checkFailedTitleGitLab": "GitLab bağlantısını yoxlamaq mümkün olmadı.",
+      "checkFailedTitleBitbucket": "Bitbucket bağlantısını yoxlamaq mümkün olmadı.",
+      "providerCheckFailedMessage": "Yüklənənə qədər bağlantı statusu əlçatan deyil.",
       "reconnectTitle": "GitHub-a yenidən qoşul",
       "reconnectDescription": "GitHub bağlantın ləğv edilib. Mobil cihazda birləşdirmə sorğularını nəzərdən keçirməyə davam etmək üçün yenidən qoşul.",
-      "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş."
+      "description": "Mobil cihazda birləşdirmə sorğularını nəzərdən keçirmək üçün GitHub hesabını qoş.",
+      "gitlabDescription": "Mobil cihazda merge sorğularına baxış keçirmək üçün GitLab hesabını qoş.",
+      "bitbucketDescription": "Mobil cihazda birləşdirmə sorğularına baxış keçirmək üçün Bitbucket-ı bu təşkilata qoş.",
+      "bitbucketOrgOnlyDescription": "Profilində bir təşkilat seç və onun Bitbucket birləşdirmə sorğularına baxış keçir."
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub bağlantısının müddəti bitdi.",
-      "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
+      "message": "GitHub bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq.",
+      "gitlabTitle": "GitLab bağlantısının müddəti bitdi.",
+      "bitbucketTitle": "Bitbucket bağlantısının müddəti bitdi.",
+      "providerMessage": "{{provider}} bağlantın artıq etibarlı deyil. Bağlantını yenidən yoxla — lazım olsa, yenidən qoşulmaq təklif olunacaq."
     },
     "eventChips": {
       "comment": "Şərh",
@@ -636,6 +672,21 @@
       "files": "Fayl",
       "discussion": "Müzakirə"
     },
+    "terms": {
+      "pullRequest": "Birləşdirmə sorğusu",
+      "mergeRequest": "Merge sorğusu",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Merge sorğusunu paylaş",
+      "viewOnProvider": "{{provider}} üzərində bax",
+      "mergeRequestUnavailable": "Merge sorğusu əlçatan deyil",
+      "unavailableDescription": "Silinmiş ola bilər, yaxud ona giriş icazən olmaya bilər.",
+      "accessDeniedMergeRequest": "Bu merge sorğusuna baxmaq icazən yoxdur.",
+      "couldNotLoadMergeRequest": "Merge sorğusunu yükləmək mümkün olmadı.",
+      "discussionAccessDenied": "Bu merge sorğusunun müzakirəsinə baxmaq icazən yoxdur.",
+      "discussionUnavailableMessage": "Bu merge sorğusu silinmiş ola bilər.",
+      "noDiscussionDescription": "Bu merge sorğusunda kod baxışı müzakirələri və ya ümumi şərhlər yoxdur.",
+      "noFilesChangedDescription": "Bu merge sorğusunda fayl dəyişikliyi yoxdur."
+    },
     "fileStatus": {
       "modified": "Dəyişdirilib",
       "renamed": "Adı dəyişdirilib",
@@ -652,7 +703,7 @@
       "emptyLine": "(boş)"
     },
     "linkPasteClipboardEmpty": "Mübadilə buferi boşdur.",
-    "linkPasteNotAPullRequest": "Bu, GitHub birləşdirmə sorğusunun keçidi deyil.",
+    "linkPasteNotAPullRequest": "Bu, birləşdirmə sorğusu və ya merge sorğusu keçidi deyil",
     "announce": {
       "commentPosted": "Şərh göndərildi",
       "reviewSubmitted": "Kod baxışı göndərildi",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "Bu şərhi göndərmək mümkün deyil. Seçilmiş sətir dəyişmiş və ya PR yenilənmiş ola bilər.",
       "reviewNotSubmitted": "Bu kod baxışını indiki vəziyyətdə göndərmək mümkün deyil. PR dəyişmiş ola bilər və ya öz birləşdirmə sorğuna kod baxışı göndərməyə çalışırsan.",
+      "reviewNotSubmittedTerm": "Bu baxış olduğu kimi göndərilə bilmir. {{term}} dəyişmiş ola bilər və ya öz {{term}}na baxış keçirə bilməzsən.",
       "couldNotPostComment": "Şərhi göndərmək mümkün olmadı.",
       "couldNotSubmitReview": "Kod baxışını göndərmək mümkün olmadı. Bağlantını yoxla və yenidən cəhd et."
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "Cavab vermək mümkün olmadı.",
       "couldNotCompleteAction": "Bu əməliyyatı tamamlamaq mümkün olmadı.",
       "mergeResultDefaultError": "GitHub birləşdirməni tamamlamadı.",
+      "mergeResultNotCompleted": "{{term}} birləşdirilmədi. Vəziyyətini yoxla və yenidən cəhd et.",
       "ambiguous": "Nəticəni təsdiqləmək mümkün olmadı — yenidən cəhd etməzdən əvvəl PR-i yoxla.",
       "persistenceFailed": "Bu əməliyyatı qeydə almaq mümkün olmadı. Bir az sonra yenidən cəhd et.",
       "forbidden": "İcazə yoxdur."
@@ -1979,11 +2032,31 @@
       "retryConnection": "Yenidən qoşul"
     },
     "newSession": {
+      "recentlyUsed": "Son istifadə edilənlər",
+      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
+      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarını yükləmək mümkün olmadı.",
+      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
       "connectGithubDescription": "GitHub hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
+      "connectGitlabDescription": "GitLab hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
+      "connectBitbucketDescription": "Bitbucket hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
       "openGithub": "GitHub-u aç",
+      "openGitlab": "GitLab-ı aç",
+      "openBitbucket": "Bitbucket-ı aç",
       "refreshRepositories": "Repozitoriyaları yenilə",
       "githubConnected": "GitHub qoşulub",
+      "gitlabConnected": "GitLab qoşulub",
       "noRepositoriesVisible": "Heç bir repozitoriya görünmür. Kilo GitHub tətbiqinin repozitoriyalara giriş icazəsini yoxla, sonra siyahını yenilə.",
+      "noRepositoriesVisibleGitlab": "Heç bir repozitoriya görünmür. GitLab repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
+      "noRepositoriesVisibleBitbucket": "Heç bir repozitoriya görünmür. Bitbucket repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
+      "bitbucketOrganizationsOnly": "Bitbucket yalnız təşkilatlar üçün əlçatandır.",
+      "branchPickerTitle": "Budaq seç",
+      "branchDefault": "Defolt",
+      "branchAccessibility": "Budaq: {{label}}",
+      "branchLoading": "Budaqlar yüklənir",
+      "branchLoadError": "Budaqları yükləmək mümkün olmadı",
+      "branchUnavailable": "Bu repozitoriya üçün budaq əlçatan deyil. Provayderdəki icazələrini yoxla, sonra başqa repozitoriya seç.",
+      "branchEmpty": "Əlçatan budaq yoxdur",
+      "branchPlaceholder": "Budaq seç",
       "runOnWithTarget": "İcra mühiti: {{target}}",
       "environment": "Mühit",
       "couldNotLoadEnvironment": "Mühitini yükləmək mümkün olmadı.",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "Repozitoriyaları yeniləmək mümkün olmadı. Yenidən cəhd et.",
       "discardDraftTitle": "Qaralama silinsin?",
       "discardDraftMessage": "Sorğun silinəcək.",
+      "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək.",
       "discardFailed": "Qaralamanı silmək mümkün olmadı. Yenidən cəhd et.",
       "remoteHint": "Kompüterindəki kilo prosesini idarə etmək üçün kompüterdə `kilo remote` əmrini və ya işləyən CLI sessiyasında `/remote` əmrini işə sal.",
-      "connectBitbucketDescription": "Bitbucket hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
-      "connectGitlabDescription": "GitLab hesabını brauzerdə qoş, sonra repozitoriya seçmək üçün buraya qayıt.",
-      "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarını yükləmək mümkün olmadı.",
-      "couldNotLoadGithubRepositories": "GitHub repozitoriyalarını yükləmək mümkün olmadı.",
-      "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarını yükləmək mümkün olmadı.",
-      "gitlabConnected": "GitLab qoşulub",
-      "noRepositoriesVisibleBitbucket": "Heç bir repozitoriya görünmür. Bitbucket repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
-      "noRepositoriesVisibleGitlab": "Heç bir repozitoriya görünmür. GitLab repozitoriyalarına giriş icazəsini yoxla, sonra siyahını yenilə.",
-      "openBitbucket": "Bitbucket-ı aç",
-      "openGitlab": "GitLab-ı aç",
-      "recentlyUsed": "Son istifadə edilənlər",
       "continueFrom": "{{title}} davam etdirilir.",
       "importingSession": "Sessiya idxal olunur",
       "cliCannotContinue": "Bu CLI sessiyanı davam etdirə bilmir. Cloud Agent və ya başqa CLI seç.",
-      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı.",
-      "discardWithUploadsMessage": "Sorğun və heç bir mesaja əlavə edilməmiş yüklənən fayllar silinəcək."
+      "importFailed": "Bu sessiyanı idxal etmək mümkün olmadı."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fayl yeniləndi.",

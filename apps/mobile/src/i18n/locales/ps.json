@@ -36,6 +36,7 @@
     "cost": "لګښت",
     "discard": "لغوه کړئ",
     "findings": "موندنې",
+    "mergeRequest": "د یوځای کولو غوښتنه",
     "notConnected": "نه دی نښلول شوی",
     "notifications": "خبرتیاوې",
     "pullRequest": "پل ریکویسټ",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "د توپیر تشه کرښه"
     },
     "connectionExpired": "له GitHub سره د اړیکې موده پای ته ورسېده.",
+    "capabilities": {
+      "banner": {
+        "title": "پدې چمتو کوونکي کې شتون نلري",
+        "accessibility": "پدې چمتو کوونکي کې شتون نلري: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "یوځای کول",
       "mergeNow": "همدا اوس یوځای کړئ",
       "mergePullRequest": "د پل ریکویسټ یوځای کول",
+      "mergeTermTitle": "د {{term}} یوځای کول",
       "enableAutoMerge": "خپلکار یوځای کول فعال کړئ",
       "disableAutoMerge": "خپلکار یوځای کول غیر فعال کړئ",
       "autoMergeOn": "خپلکار یوځای کول فعال دي",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "له یوځای کولو وروسته څانګه ړنګ کړئ",
       "noEnabledMethods": "په دې زېرمتون کې د یوځای کولو هېڅ طریقه فعاله نه ده. د زېرمتون له مدیر څخه وغواړئ چې عادي یوځای کول، د کمېټونو یو کول، یا بیا بنسټول فعال کړي.",
       "confirmTitle": "پل ریکویسټ یوځای شي؟",
+      "confirmTitleTerm": "{{term}} یوځای شي؟",
       "confirmMessage": "دا به ستاسو بدلونونه په بنسټیزه څانګه کې یوځای کړي.",
       "enableAutoMergeConfirmTitle": "خپلکار یوځای کول فعال شي؟",
       "enableAutoMergeConfirmMessage": "کله چې ټولې اړینې ازموینې بریالۍ شي، GitHub به دا پل ریکویسټ په خپلکار ډول یوځای کړي.",
+      "enableAutoMergeConfirmMessageTerm": "کله چې پایپ‌لاین بریالی شي، {{term}} به په اتوماتیک ډول یوځای شي.",
+      "enableAutoMergeDescriptionTerm": "کله چې پایپ‌لاین بریالی شي، GitLab به دا {{term}} په اتوماتیک ډول یوځای کړي.",
       "forbidden": "تاسو د دې پل ریکویسټ د یوځای کولو اجازه نه لرئ.",
       "cannotMerge": "دا پل ریکویسټ په اوسني حالت کې نه شي یوځای کېدای.",
       "couldNotMerge": "پل ریکویسټ یوځای نه شو.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "مخکې یوځای شوی",
-        "closed": "دا پل ریکویسټ تړل شوی"
+        "closed": "دا پل ریکویسټ تړل شوی",
+        "closedMergeRequest": "دا د یوځای کولو غوښتنه تړل شوی"
       },
       "partialSuccessBanner": {
         "body": "څانګه ړنګه نه شوه: {{reason}}.",
@@ -393,6 +405,18 @@
         "behindDetail": "د بدلونونو څانګه له بنسټیزې څانګې وروسته پاتې ده. له یوځای کولو مخکې یې بیا بنسټ یا تازه کړئ.",
         "notMergeableTitle": "دا پل ریکویسټ لا نه شي یوځای کېدای",
         "notMergeableDetail": "GitHub د یوځای کولو حالت {{state}} ښودلی دی."
+      },
+      "restrictions": {
+        "title": "د یوځای کولو محدودیتونه",
+        "approvalsRequired_one": "{{displayCount}} تایید اړین دی",
+        "approvalsRequired_other": "{{displayCount}} تاییدونه اړین دي",
+        "pipelineMustSucceed": "له یوځای کولو مخکې باید پایپ‌لاین بریالی وي."
+      },
+      "providerBlocked": {
+        "failingPipeline": "په وروستي کمېټ کې پایپ‌لاین ناکامېږي.",
+        "pendingPipeline": "په وروستي کمېټ کې پایپ‌لاین لا هم روان دی.",
+        "permission": "تاسو د دې {{term}} د یوځای کولو اجازه نه لرئ.",
+        "draft": "له یوځای کولو مخکې {{term}} د بیاکتنې لپاره د چمتو په توګه په نښه کړئ."
       },
       "methodLabels": {
         "merge": "د یوځای کولو کمېټ جوړ کړئ",
@@ -441,6 +465,7 @@
       "acceptTerms": "ومنئ",
       "replyBadRequest": "دا ځواب نه شي خپرېدای. کېدای شي د بحث لړۍ بدله شوې وي.",
       "replyForbidden": "تاسو دې پل ریکویسټ ته د ځواب ورکولو اجازه نه لرئ.",
+      "replyForbiddenTerm": "تاسو دې {{term}} ته د ځواب ورکولو اجازه نه لرئ.",
       "moderation": {
         "reportContent": {
           "terminal": "د دې تبصرې راپور نه شي ورکول کېدای.",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "د پل ریکویسټ بیاکتنه وکړئ",
     "headLine": "{{counts}} · وروستی کمېټ {{sha}}",
     "entry": {
-      "eyebrow": "د URL له لارې پل ریکویسټ پرانیزئ.",
-      "pastePrLink": "د PR لینک ونښلوئ",
-      "noRecentPrs": "وروستي PR نشته",
-      "noRecentPrsDescription": "د بیاکتنې د پیلولو لپاره پورته د PR لینک ونښلوئ — بل ځل به دلته ښکاره شي.",
+      "eyebrow": "د URL له لارې پول ریکویسټ یا د یوځای کولو غوښتنه پرانیزئ",
+      "pastePrLink": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک ونښلوئ",
+      "noRecentPrs": "وروستۍ بیاکتنې نشته",
+      "noRecentPrsDescription": "د بیاکتنې پیلولو لپاره پورته لینک ونښلوئ — بل ځل به دلته ښکاره شي.",
       "couldNotLoad": "بار نه شو.",
       "removeFromRecentsTitle": "له وروستي لړلیک څخه لرې شي؟",
-      "removeFromRecentsMessage": "دا پل ریکویسټ به ستاسو له وروستي لړلیک څخه لرې شي.",
+      "removeFromRecentsMessage": "دا بیاکتنه به ستاسو له وروستي لړلیک څخه لرې شي.",
       "removeRecentAccessibility": "{{repo}} له وروستي لړلیک څخه لرې کړئ",
-      "urlAccessibility": "د GitHub پل ریکویسټ URL",
-      "clearLink": "د پل ریکویسټ لینک پاک کړئ",
-      "pasteLink": "د پل ریکویسټ لینک ونښلوئ",
+      "urlAccessibility": "د پول ریکویسټ یا د یوځای کولو غوښتنې URL ولیکئ",
+      "urlPlaceholder": "د پول ریکویسټ یا د یوځای کولو غوښتنې URL",
+      "openAccessibility": "پول ریکویسټ یا د یوځای کولو غوښتنه پرانیزئ",
+      "clearLink": "لینک پاک کړئ",
+      "pasteLink": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک ونښلوئ",
       "open": "خلاص"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "د GitHub اړیکه ونه کتل شوه.",
       "checkFailedMessage": "تر هغه چې دا بار نه شي، د ننوتلو حالت نه څرګندېږي.",
+      "checkFailedTitleGitLab": "د GitLab اړیکه ونه کتل شوه.",
+      "checkFailedTitleBitbucket": "د Bitbucket اړیکه ونه کتل شوه.",
+      "providerCheckFailedMessage": "تر څو چې دا نه وي بار شوی، د اړیکې حالت شتون نلري.",
       "reconnectTitle": "GitHub بیا ونښلئ",
       "reconnectDescription": "ستاسو د GitHub اړیکه لغوه شوې ده. په موبایل کې د پل ریکویسټونو د بیاکتنې د دوام لپاره بیا ونښلئ.",
-      "description": "په موبایل کې د پل ریکویسټونو د بیاکتنې لپاره خپل GitHub حساب ونښلوئ."
+      "description": "په موبایل کې د پل ریکویسټونو د بیاکتنې لپاره خپل GitHub حساب ونښلوئ.",
+      "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
+      "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
+      "bitbucketOrgOnlyDescription": "خپل پروفایل کې یو بنسټ وټاکئ ترڅو د هغه Bitbucket پول ریکویسټونه وبیایۍ."
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "له GitHub سره د اړیکې موده پای ته ورسېده.",
-      "message": "ستاسو د GitHub اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي."
+      "message": "ستاسو د GitHub اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي.",
+      "gitlabTitle": "له GitLab سره د اړیکې موده پای ته ورسېده.",
+      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده.",
+      "providerMessage": "ستاسو د {{provider}} اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي."
     },
     "eventChips": {
       "comment": "تبصره",
@@ -636,6 +672,21 @@
       "files": "فایلونه",
       "discussion": "بحث"
     },
+    "terms": {
+      "pullRequest": "پل ریکویسټ",
+      "mergeRequest": "د یوځای کولو غوښتنه",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "د یوځای کولو غوښتنه شریک کړئ",
+      "viewOnProvider": "په {{provider}} کې وګورئ",
+      "mergeRequestUnavailable": "د یوځای کولو غوښتنه نشته",
+      "unavailableDescription": "کېدای شي لرې شوی وي، یا تاسو ورسره لاسرسی نه لرئ.",
+      "accessDeniedMergeRequest": "تاسو د دې د یوځای کولو غوښتنه د لیدلو اجازه نه لرئ.",
+      "couldNotLoadMergeRequest": "د یوځای کولو غوښتنه بار نه شو.",
+      "discussionAccessDenied": "تاسو د دې د یوځای کولو غوښتنه د بحث د لیدلو اجازه نه لرئ.",
+      "discussionUnavailableMessage": "کېدای شي دا د یوځای کولو غوښتنه لرې شوی وي.",
+      "noDiscussionDescription": "په دې د یوځای کولو غوښتنه کې نه د بیاکتنې د بحث لړۍ شته او نه د خبرو تبصرې.",
+      "noFilesChangedDescription": "په دې د یوځای کولو غوښتنه کې هېڅ فایل نه دی بدل شوی."
+    },
     "fileStatus": {
       "modified": "بدل شوی",
       "renamed": "نوم بدل شوی",
@@ -652,7 +703,7 @@
       "emptyLine": "(خالي)"
     },
     "linkPasteClipboardEmpty": "کلیپبورډ تش دی.",
-    "linkPasteNotAPullRequest": "دا د GitHub د پل ریکویسټ لینک نه دی.",
+    "linkPasteNotAPullRequest": "د پول ریکویسټ یا د یوځای کولو غوښتنې لینک نه دی",
     "announce": {
       "commentPosted": "تبصره خپره شوه",
       "reviewSubmitted": "بیاکتنه وسپارل شوه",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "دا تبصره نه شي خپرېدای. کېدای شي ټاکل شوې کرښه بدله شوې وي، یا PR تازه شوی وي.",
       "reviewNotSubmitted": "دا بیاکتنه په اوسني حالت کې نه شي سپارل کېدای. کېدای شي PR بدل شوی وي، یا تاسو د خپل پل ریکویسټ د بیاکتنې اجازه نه لرئ.",
+      "reviewNotSubmittedTerm": "دا بیاکتنه په همدې بڼه نه شي کولای وسپارل شي. کېدای شي {{term}} بدل شوی وي، یا تاسو خپله {{term}} نشئ کولای وبيایۍ.",
       "couldNotPostComment": "تبصره خپره نه شوه.",
       "couldNotSubmitReview": "بیاکتنه ونه سپارل شوه. خپله اړیکه وګورئ او بیا هڅه وکړئ."
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "ځواب ونه لېږل شو.",
       "couldNotCompleteAction": "دا کړنه بشپړه نه شوه.",
       "mergeResultDefaultError": "GitHub یوځای کول بشپړ نه کړل.",
+      "mergeResultNotCompleted": "{{term}} و نه یوځای شو. حالت یې وګورئ او بیا هڅه وکړئ.",
       "ambiguous": "تایید نه شو — له بیا هڅې مخکې PR وګورئ.",
       "persistenceFailed": "موږ ونه شو کړای دا کړنه ثبت کړو. مهرباني وکړئ وروسته بیا هڅه وکړئ.",
       "forbidden": "اجازه نشته."
@@ -1979,11 +2032,31 @@
       "retryConnection": "بیا د نښلېدو هڅه وکړئ"
     },
     "newSession": {
+      "recentlyUsed": "په دې وروستیو کې کارول شوي",
+      "couldNotLoadGithubRepositories": "د GitHub زېرمتونونه بار نه شول.",
+      "couldNotLoadGitlabRepositories": "د GitLab زېرمتونونه بار نه شول.",
+      "couldNotLoadBitbucketRepositories": "د Bitbucket زېرمتونونه بار نه شول.",
       "connectGithubDescription": "په خپل براوزر کې GitHub ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
+      "connectGitlabDescription": "په خپل براوزر کې GitLab ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
+      "connectBitbucketDescription": "په خپل براوزر کې Bitbucket ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
       "openGithub": "GitHub پرانیزئ",
+      "openGitlab": "GitLab پرانیزئ",
+      "openBitbucket": "Bitbucket پرانیزئ",
       "refreshRepositories": "زېرمتونونه تازه کړئ",
       "githubConnected": "GitHub نښلول شوی",
+      "gitlabConnected": "GitLab نښلول شوی",
       "noRepositoriesVisible": "هېڅ زېرمتون نه ښکاري. وګورئ چې د Kilo GitHub اپلیکیشن زېرمتونونو ته لاسرسی لري، بیا لېست تازه کړئ.",
+      "noRepositoriesVisibleGitlab": "هېڅ زېرمتون نه ښکاري. د GitLab زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
+      "noRepositoriesVisibleBitbucket": "هېڅ زېرمتون نه ښکاري. د Bitbucket زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
+      "bitbucketOrganizationsOnly": "Bitbucket یوازې د بنسټونو لپاره شتون لري.",
+      "branchPickerTitle": "څانګه وټاکئ",
+      "branchDefault": "ډیفالټ",
+      "branchAccessibility": "څانګه: {{label}}",
+      "branchLoading": "څانګې بارېږي",
+      "branchLoadError": "څانګې بار نه شوې",
+      "branchUnavailable": "د دې زېرمتون لپاره څانګې شتون نلري. له چمتو کوونکي سره خپل لاسرسی وګورئ، بیا بل زېرمتون وټاکئ.",
+      "branchEmpty": "هېڅ څانګه شتون نلري",
+      "branchPlaceholder": "یوه څانګه وټاکئ",
       "runOnWithTarget": "د چلولو ځای: {{target}}",
       "environment": "چاپېریال",
       "couldNotLoadEnvironment": "ستاسو چاپېریال بار نه شو.",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "زېرمتونونه تازه نه شول. بیا هڅه وکړئ.",
       "discardDraftTitle": "مسوده ړنګه کړم؟",
       "discardDraftMessage": "ستاسو پرامپټ به له منځه ولاړ شي.",
+      "discardWithUploadsMessage": "ستاسو پرامپټ او هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي.",
       "discardFailed": "مسوده ړنګه نه شوه. بیا هڅه وکړئ.",
       "remoteHint": "د kilo د یوې ځايي پروسې د کنټرول لپاره په خپل کمپیوټر کې `kilo remote`، یا د CLI په روانه ناسته کې `/remote` وچلوئ.",
-      "connectBitbucketDescription": "په خپل براوزر کې Bitbucket ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
-      "connectGitlabDescription": "په خپل براوزر کې GitLab ونښلوئ، بیا دلته راشئ او یو زېرمتون غوره کړئ.",
-      "couldNotLoadBitbucketRepositories": "د Bitbucket زېرمتونونه بار نه شول.",
-      "couldNotLoadGithubRepositories": "د GitHub زېرمتونونه بار نه شول.",
-      "couldNotLoadGitlabRepositories": "د GitLab زېرمتونونه بار نه شول.",
-      "gitlabConnected": "GitLab نښلول شوی",
-      "noRepositoriesVisibleBitbucket": "هېڅ زېرمتون نه ښکاري. د Bitbucket زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
-      "noRepositoriesVisibleGitlab": "هېڅ زېرمتون نه ښکاري. د GitLab زېرمتونونو ته د لاسرسي اجازې وګورئ، بیا لېست تازه کړئ.",
-      "openBitbucket": "Bitbucket پرانیزئ",
-      "openGitlab": "GitLab پرانیزئ",
-      "recentlyUsed": "په دې وروستیو کې کارول شوي",
       "continueFrom": "د {{title}} ناستې دوام روان دی.",
       "importingSession": "ناسته واردېږي",
       "cliCannotContinue": "دا CLI ناستې ته دوام نه شي ورکولی. Cloud Agent یا بل CLI غوره کړئ.",
-      "importFailed": "دا ناسته وارده نه شوه.",
-      "discardWithUploadsMessage": "ستاسو پرامپټ او هغه پورته شوي فایلونه به ړنګ شي چې له لېږل شویو پیغامونو سره ضمیمه نه دي."
+      "importFailed": "دا ناسته وارده نه شوه."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} فایل تازه شو.",

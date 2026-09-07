@@ -36,6 +36,7 @@
     "cost": "ค่าใช้จ่าย",
     "discard": "ทิ้ง",
     "findings": "ข้อค้นพบ",
+    "mergeRequest": "merge request",
     "notConnected": "ยังไม่เชื่อมต่อ",
     "notifications": "การแจ้งเตือน",
     "pullRequest": "พูลรีเควสต์",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "แถวว่างในส่วนต่าง"
     },
     "connectionExpired": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
+    "capabilities": {
+      "banner": {
+        "title": "ไม่พร้อมใช้งานในผู้ให้บริการนี้",
+        "accessibility": "ไม่พร้อมใช้งานในผู้ให้บริการนี้: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "ผสาน",
       "mergeNow": "รวมตอนนี้",
       "mergePullRequest": "รวม PR",
+      "mergeTermTitle": "รวม {{term}}",
       "enableAutoMerge": "เปิดใช้งานการรวมอัตโนมัติ",
       "disableAutoMerge": "ปิดใช้งานการรวมอัตโนมัติ",
       "autoMergeOn": "เปิดการรวมอัตโนมัติแล้ว",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "ลบบรานช์หลังรวม",
       "noEnabledMethods": "รีโพซิทอรีนี้ยังไม่ได้เปิดใช้วิธีการรวมใดเลย ขอให้ผู้ดูแลรีโพซิทอรีเปิดใช้การรวมแบบปกติ สควอช หรือรีเบส",
       "confirmTitle": "รวม PR นี้หรือไม่?",
+      "confirmTitleTerm": "รวม {{term}} นี้หรือไม่?",
       "confirmMessage": "การดำเนินการนี้จะรวมการเปลี่ยนแปลงของคุณเข้ากับบรานช์ปลายทาง",
       "enableAutoMergeConfirmTitle": "เปิดการรวมอัตโนมัติหรือไม่?",
       "enableAutoMergeConfirmMessage": "GitHub จะรวม PR นี้โดยอัตโนมัติเมื่อผ่านการตรวจสอบที่บังคับทั้งหมด",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} จะถูกรวมโดยอัตโนมัติเมื่อไปป์ไลน์สำเร็จ",
+      "enableAutoMergeDescriptionTerm": "GitLab จะรวม {{term}} นี้โดยอัตโนมัติเมื่อไปป์ไลน์สำเร็จ",
       "forbidden": "คุณไม่มีสิทธิ์รวม PR นี้",
       "cannotMerge": "ยังรวม PR นี้ในสถานะปัจจุบันไม่ได้",
       "couldNotMerge": "ไม่สามารถรวม PR ได้",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "รวมแล้ว",
-        "closed": "PR นี้ปิดแล้ว"
+        "closed": "PR นี้ปิดแล้ว",
+        "closedMergeRequest": "Merge request นี้ปิดแล้ว"
       },
       "partialSuccessBanner": {
         "body": "ไม่สามารถลบบรานช์ได้: {{reason}}",
@@ -393,6 +405,18 @@
         "behindDetail": "บรานช์ต้นทางยังตามหลังบรานช์ปลายทาง ให้รีเบสหรืออัปเดตบรานช์ก่อนรวม",
         "notMergeableTitle": "ยังรวม PR นี้ไม่ได้",
         "notMergeableDetail": "GitHub รายงานสถานะการรวมเป็น {{state}}"
+      },
+      "restrictions": {
+        "title": "ข้อจำกัดการรวม",
+        "approvalsRequired_one": "ต้องมีการอนุมัติ {{displayCount}} ครั้ง",
+        "approvalsRequired_other": "ต้องมีการอนุมัติ {{displayCount}} ครั้ง",
+        "pipelineMustSucceed": "ไปป์ไลน์ต้องสำเร็จก่อนการรวม"
+      },
+      "providerBlocked": {
+        "failingPipeline": "ไปป์ไลน์ล้มเหลวในการคอมมิตล่าสุด",
+        "pendingPipeline": "ไปป์ไลน์ยังทำงานอยู่ในการคอมมิตล่าสุด",
+        "permission": "คุณไม่มีสิทธิ์รวม {{term}} นี้",
+        "draft": "ทำเครื่องหมาย {{term}} ว่าพร้อมรีวิวก่อนรวม"
       },
       "methodLabels": {
         "merge": "สร้างคอมมิตการรวม",
@@ -441,6 +465,7 @@
       "acceptTerms": "ยอมรับ",
       "replyBadRequest": "ไม่สามารถโพสต์การตอบกลับนี้ได้ เธรดอาจมีการเปลี่ยนแปลง",
       "replyForbidden": "คุณไม่มีสิทธิ์ตอบกลับใน PR นี้",
+      "replyForbiddenTerm": "คุณไม่มีสิทธิ์ตอบกลับใน {{term}} นี้",
       "moderation": {
         "reportContent": {
           "terminal": "ไม่สามารถรายงานความคิดเห็นนี้ได้",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "รีวิว PR",
     "headLine": "{{counts}} · คอมมิตล่าสุด {{sha}}",
     "entry": {
-      "eyebrow": "เปิด PR ด้วย URL",
-      "pastePrLink": "วางลิงก์ PR",
-      "noRecentPrs": "ยังไม่มี PR ที่เปิดล่าสุด",
-      "noRecentPrsDescription": "วางลิงก์ PR ด้านบนเพื่อเริ่มรีวิว ครั้งต่อไป PR นี้จะแสดงที่นี่",
+      "eyebrow": "เปิดพูลรีเควสต์หรือ merge request ด้วย URL",
+      "pastePrLink": "วางลิงก์พูลรีเควสต์หรือ merge request",
+      "noRecentPrs": "ยังไม่มีรีวิวล่าสุด",
+      "noRecentPrsDescription": "วางลิงก์ด้านบนเพื่อเริ่มรีวิว ครั้งต่อไปจะแสดงที่นี่",
       "couldNotLoad": "ไม่สามารถโหลดได้",
       "removeFromRecentsTitle": "ลบออกจากรายการล่าสุดหรือไม่?",
-      "removeFromRecentsMessage": "PR นี้จะถูกลบออกจากรายการล่าสุดของคุณ",
+      "removeFromRecentsMessage": "รีวิวนนี้จะถูกลบออกจากรายการล่าสุดของคุณ",
       "removeRecentAccessibility": "ลบ {{repo}} ออกจากรายการล่าสุด",
-      "urlAccessibility": "URL ของ PR บน GitHub",
-      "clearLink": "ล้างลิงก์ PR",
-      "pasteLink": "วางลิงก์ PR",
+      "urlAccessibility": "กรอก URL ของพูลรีเควสต์หรือ merge request",
+      "urlPlaceholder": "URL ของพูลรีเควสต์หรือ merge request",
+      "openAccessibility": "เปิดพูลรีเควสต์หรือ merge request",
+      "clearLink": "ล้างลิงก์",
+      "pasteLink": "วางลิงก์พูลรีเควสต์หรือ merge request",
       "open": "เปิด"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "ไม่สามารถตรวจสอบการเชื่อมต่อ GitHub ได้",
       "checkFailedMessage": "ยังตรวจสอบสถานะการเข้าสู่ระบบไม่ได้จนกว่าจะโหลดข้อมูลเสร็จ",
+      "checkFailedTitleGitLab": "ไม่สามารถตรวจสอบการเชื่อมต่อ GitLab ได้",
+      "checkFailedTitleBitbucket": "ไม่สามารถตรวจสอบการเชื่อมต่อ Bitbucket ได้",
+      "providerCheckFailedMessage": "สถานะการเชื่อมต่อไม่พร้อมใช้งานจนกว่าจะโหลดเสร็จ",
       "reconnectTitle": "เชื่อมต่อ GitHub ใหม่",
       "reconnectDescription": "การเชื่อมต่อ GitHub ของคุณถูกเพิกถอน เชื่อมต่อใหม่เพื่อรีวิว PR บนมือถือต่อ",
-      "description": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อรีวิว PR บนมือถือ"
+      "description": "เชื่อมต่อบัญชี GitHub ของคุณเพื่อรีวิว PR บนมือถือ",
+      "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
+      "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",
+      "bitbucketOrgOnlyDescription": "เลือกองค์กรในโปรไฟล์ของคุณเพื่อรีวิวพูลรีเควสต์ Bitbucket ขององค์กรนั้น"
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
-      "message": "การเชื่อมต่อ GitHub ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่"
+      "message": "การเชื่อมต่อ GitHub ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่",
+      "gitlabTitle": "การเชื่อมต่อ GitLab หมดอายุแล้ว",
+      "bitbucketTitle": "การเชื่อมต่อ Bitbucket หมดอายุแล้ว",
+      "providerMessage": "การเชื่อมต่อ {{provider}} ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่"
     },
     "eventChips": {
       "comment": "แสดงความคิดเห็น",
@@ -636,6 +672,21 @@
       "files": "ไฟล์",
       "discussion": "การสนทนา"
     },
+    "terms": {
+      "pullRequest": "พูลรีเควสต์",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "แชร์ merge request",
+      "viewOnProvider": "ดูบน {{provider}}",
+      "mergeRequestUnavailable": "เปิด merge request ไม่ได้",
+      "unavailableDescription": "อาจถูกลบไปแล้ว หรือคุณอาจไม่มีสิทธิ์เข้าถึง",
+      "accessDeniedMergeRequest": "คุณไม่มีสิทธิ์ดู merge request นี้",
+      "couldNotLoadMergeRequest": "ไม่สามารถโหลด merge request ได้",
+      "discussionAccessDenied": "คุณไม่มีสิทธิ์ดูการสนทนาของ merge request นี้",
+      "discussionUnavailableMessage": "Merge request นี้อาจถูกลบไปแล้ว",
+      "noDiscussionDescription": "Merge request นี้ยังไม่มีเธรดรีวิวหรือความคิดเห็นในการสนทนา",
+      "noFilesChangedDescription": "Merge request นี้ไม่มีการเปลี่ยนแปลงไฟล์"
+    },
     "fileStatus": {
       "modified": "แก้ไขแล้ว",
       "renamed": "เปลี่ยนชื่อแล้ว",
@@ -652,7 +703,7 @@
       "emptyLine": "(ว่าง)"
     },
     "linkPasteClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
-    "linkPasteNotAPullRequest": "ลิงก์นี้ไม่ใช่ PR บน GitHub",
+    "linkPasteNotAPullRequest": "ไม่ใช่ลิงก์พูลรีเควสต์หรือ merge request",
     "announce": {
       "commentPosted": "โพสต์ความคิดเห็นแล้ว",
       "reviewSubmitted": "ส่งรีวิวแล้ว",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "ไม่สามารถโพสต์ความคิดเห็นนี้ได้ บรรทัดที่เลือกอาจมีการเปลี่ยนแปลง หรือ PR อาจได้รับการอัปเดตแล้ว",
       "reviewNotSubmitted": "ยังส่งรีวิวนี้ไม่ได้ PR อาจมีการเปลี่ยนแปลง หรือเป็น PR ของคุณเองซึ่งคุณรีวิวไม่ได้",
+      "reviewNotSubmittedTerm": "ส่งรีวิวนี้ตามที่เป็นอยู่ไม่ได้ {{term}}อาจเปลี่ยนไปแล้ว หรือคุณรีวิว{{term}}ของตัวเองไม่ได้",
       "couldNotPostComment": "ไม่สามารถโพสต์ความคิดเห็นได้",
       "couldNotSubmitReview": "ไม่สามารถส่งรีวิวได้ ตรวจสอบการเชื่อมต่อของคุณแล้วลองอีกครั้ง"
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "ไม่สามารถตอบกลับได้",
       "couldNotCompleteAction": "ดำเนินการไม่สำเร็จ",
       "mergeResultDefaultError": "GitHub รวมไม่สำเร็จ",
+      "mergeResultNotCompleted": "{{term}} ยังไม่ถูกรวม ตรวจสอบสถานะแล้วลองอีกครั้ง",
       "ambiguous": "ยืนยันผลไม่ได้ — ตรวจสอบ PR ก่อนลองอีกครั้ง",
       "persistenceFailed": "เราไม่สามารถบันทึกการดำเนินการนี้ได้ โปรดลองอีกครั้งในภายหลัง",
       "forbidden": "ไม่มีสิทธิ์ดำเนินการ"
@@ -1979,11 +2032,31 @@
       "retryConnection": "ลองเชื่อมต่อใหม่"
     },
     "newSession": {
+      "recentlyUsed": "ที่ใช้ล่าสุด",
+      "couldNotLoadGithubRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitHub ได้",
+      "couldNotLoadGitlabRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitLab ได้",
+      "couldNotLoadBitbucketRepositories": "ไม่สามารถโหลดคลังโค้ดจาก Bitbucket ได้",
       "connectGithubDescription": "เชื่อมต่อ GitHub ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
+      "connectGitlabDescription": "เชื่อมต่อ GitLab ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
+      "connectBitbucketDescription": "เชื่อมต่อ Bitbucket ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
       "openGithub": "เปิด GitHub",
+      "openGitlab": "เปิด GitLab",
+      "openBitbucket": "เปิด Bitbucket",
       "refreshRepositories": "รีเฟรชรายการคลังโค้ด",
       "githubConnected": "เชื่อมต่อ GitHub แล้ว",
+      "gitlabConnected": "เชื่อมต่อ GitLab แล้ว",
       "noRepositoriesVisible": "ไม่พบคลังโค้ด ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดของแอป Kilo บน GitHub แล้วรีเฟรช",
+      "noRepositoriesVisibleGitlab": "ไม่พบคลังโค้ด ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดบน GitLab แล้วรีเฟรช",
+      "noRepositoriesVisibleBitbucket": "ไม่พบคลังโค้ด ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดบน Bitbucket แล้วรีเฟรช",
+      "bitbucketOrganizationsOnly": "Bitbucket พร้อมใช้งานสำหรับองค์กรเท่านั้น",
+      "branchPickerTitle": "เลือกบรานช์",
+      "branchDefault": "ค่าเริ่มต้น",
+      "branchAccessibility": "บรานช์: {{label}}",
+      "branchLoading": "กำลังโหลดบรานช์",
+      "branchLoadError": "โหลดบรานช์ไม่ได้",
+      "branchUnavailable": "ไม่มีบรานช์พร้อมใช้งานสำหรับคลังโค้ดนี้ ตรวจสอบสิทธิ์การเข้าถึงของคุณกับผู้ให้บริการ แล้วเลือกคลังโค้ดอื่น",
+      "branchEmpty": "ไม่มีบรานช์พร้อมใช้งาน",
+      "branchPlaceholder": "เลือกบรานช์หนึ่ง",
       "runOnWithTarget": "รันบน: {{target}}",
       "environment": "สภาพแวดล้อม",
       "couldNotLoadEnvironment": "ไม่สามารถโหลดสภาพแวดล้อมของคุณได้",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "ไม่สามารถรีเฟรชรายการคลังโค้ดได้ กรุณาลองอีกครั้ง",
       "discardDraftTitle": "ทิ้งฉบับร่างหรือไม่?",
       "discardDraftMessage": "พรอมต์ที่คุณเขียนไว้จะหายไป",
+      "discardWithUploadsMessage": "พรอมต์และไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",
       "discardFailed": "ไม่สามารถทิ้งฉบับร่างได้ กรุณาลองอีกครั้ง",
       "remoteHint": "รัน `kilo remote` บนคอมพิวเตอร์ หรือ `/remote` ในเซสชัน CLI ที่กำลังทำงาน เพื่อควบคุมโปรเซส kilo บนเครื่องนั้น",
-      "connectBitbucketDescription": "เชื่อมต่อ Bitbucket ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
-      "connectGitlabDescription": "เชื่อมต่อ GitLab ในเบราว์เซอร์ แล้วกลับมาเลือกคลังโค้ดที่นี่",
-      "couldNotLoadBitbucketRepositories": "ไม่สามารถโหลดคลังโค้ดจาก Bitbucket ได้",
-      "couldNotLoadGithubRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitHub ได้",
-      "couldNotLoadGitlabRepositories": "ไม่สามารถโหลดคลังโค้ดจาก GitLab ได้",
-      "gitlabConnected": "เชื่อมต่อ GitLab แล้ว",
-      "noRepositoriesVisibleBitbucket": "ไม่พบคลังโค้ด ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดบน Bitbucket แล้วรีเฟรช",
-      "noRepositoriesVisibleGitlab": "ไม่พบคลังโค้ด ตรวจสอบสิทธิ์เข้าถึงคลังโค้ดบน GitLab แล้วรีเฟรช",
-      "openBitbucket": "เปิด Bitbucket",
-      "openGitlab": "เปิด GitLab",
-      "recentlyUsed": "ที่ใช้ล่าสุด",
       "continueFrom": "กำลังทำงานต่อจาก {{title}}",
       "importingSession": "กำลังนำเข้าเซสชัน",
       "cliCannotContinue": "CLI นี้ไม่สามารถทำงานต่อจากเซสชันเดิมได้ เลือก Cloud Agent หรือ CLI อื่น",
-      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้",
-      "discardWithUploadsMessage": "พรอมต์และไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ"
+      "importFailed": "ไม่สามารถนำเข้าเซสชันนี้ได้"
     },
     "partRenderer": {
       "updatedFileCount_one": "อัปเดตไฟล์แล้ว {{displayCount}} ไฟล์",

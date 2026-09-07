@@ -409,7 +409,6 @@
       "restrictions": {
         "title": "Merge restrictions",
         "approvalsRequired_one": "{{displayCount}} approval required",
-        "approvalsRequired": "{{displayCount}} approvals required",
         "approvalsRequired_other": "{{displayCount}} approvals required",
         "pipelineMustSucceed": "The pipeline must succeed before merging."
       },

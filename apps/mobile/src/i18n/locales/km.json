@@ -36,6 +36,7 @@
     "cost": "ចំណាយ",
     "discard": "បោះបង់",
     "findings": "បញ្ហាដែលរកឃើញ",
+    "mergeRequest": "សំណើបញ្ចូល",
     "notConnected": "មិនទាន់ភ្ជាប់",
     "notifications": "ការជូនដំណឹង",
     "pullRequest": "សំណើបញ្ចូលកូដ",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "ជួរដេកទទេក្នុងការប្រៀបធៀបកូដ"
     },
     "connectionExpired": "ការតភ្ជាប់ទៅ GitHub បានផុតកំណត់ហើយ។",
+    "capabilities": {
+      "banner": {
+        "title": "មិនអាចប្រើបានលើអ្នកផ្តល់សេវានេះទេ",
+        "accessibility": "មិនអាចប្រើបានលើអ្នកផ្តល់សេវានេះទេ: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "បញ្ចូលគ្នា",
       "mergeNow": "បញ្ចូលឥឡូវនេះ",
       "mergePullRequest": "បញ្ចូលសំណើបញ្ចូលកូដ",
+      "mergeTermTitle": "បញ្ចូល{{term}}",
       "enableAutoMerge": "បើកការបញ្ចូលដោយស្វ័យប្រវត្តិ",
       "disableAutoMerge": "បិទការបញ្ចូលដោយស្វ័យប្រវត្តិ",
       "autoMergeOn": "ការបញ្ចូលដោយស្វ័យប្រវត្តិបានបើក",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "លុបសាខាបន្ទាប់ពីបញ្ចូល",
       "noEnabledMethods": "ឃ្លាំងកូដនេះមិនបានបើកវិធីសាស្ត្របញ្ចូលណាមួយទេ។ ស្នើឱ្យអ្នកគ្រប់គ្រងឃ្លាំងកូដបើកការបញ្ចូលធម្មតា ការបង្រួមកំណត់ត្រាកែប្រែ ឬការប្តូរមូលដ្ឋាន។",
       "confirmTitle": "បញ្ចូលសំណើបញ្ចូលកូដនេះ?",
+      "confirmTitleTerm": "បញ្ចូល{{term}}ទេ?",
       "confirmMessage": "សកម្មភាពនេះនឹងបញ្ចូលការកែប្រែរបស់អ្នកទៅក្នុងសាខាគោល។",
       "enableAutoMergeConfirmTitle": "បើកការបញ្ចូលដោយស្វ័យប្រវត្តិ?",
       "enableAutoMergeConfirmMessage": "GitHub នឹងបញ្ចូលសំណើបញ្ចូលកូដនេះដោយស្វ័យប្រវត្តិ នៅពេលការត្រួតពិនិត្យចាំបាច់ទាំងអស់ជោគជ័យ។",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} នឹងត្រូវបានបញ្ចូលដោយស្វ័យប្រវត្តិនៅពេលបំពង់ផ្សែងជោគជ័យ។",
+      "enableAutoMergeDescriptionTerm": "GitLab នឹងបញ្ចូល{{term}}នេះដោយស្វ័យប្រវត្តិនៅពេលបំពង់ផ្សែងជោគជ័យ។",
       "forbidden": "អ្នកគ្មានសិទ្ធិបញ្ចូលសំណើបញ្ចូលកូដនេះទេ។",
       "cannotMerge": "មិនអាចបញ្ចូលសំណើបញ្ចូលកូដនេះក្នុងស្ថានភាពបច្ចុប្បន្នបានទេ។",
       "couldNotMerge": "មិនអាចបញ្ចូលសំណើបញ្ចូលកូដបានទេ។",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "បានបញ្ចូលរួច",
-        "closed": "សំណើបញ្ចូលកូដនេះបានបិទ"
+        "closed": "សំណើបញ្ចូលកូដនេះបានបិទ",
+        "closedMergeRequest": "សំណើបញ្ចូលនេះបានបិទ"
       },
       "partialSuccessBanner": {
         "body": "មិនអាចលុបសាខាបានទេ៖ {{reason}}",
@@ -393,6 +405,18 @@
         "behindDetail": "សាខាប្រភពមិនទាន់មានការកែប្រែចុងក្រោយពីសាខាគោលទេ។ ប្តូរមូលដ្ឋាន ឬធ្វើបច្ចុប្បន្នភាពសាខាមុនពេលបញ្ចូល។",
         "notMergeableTitle": "មិនទាន់អាចបញ្ចូលសំណើបញ្ចូលកូដនេះបានទេ",
         "notMergeableDetail": "GitHub បានរាយការណ៍ថា ស្ថានភាពលទ្ធភាពបញ្ចូលគឺ {{state}}។"
+      },
+      "restrictions": {
+        "title": "ការកំណត់បញ្ចូល",
+        "approvalsRequired_one": "ត្រូវការការអនុម័ត {{displayCount}}",
+        "approvalsRequired_other": "ត្រូវការការអនុម័ត {{displayCount}}",
+        "pipelineMustSucceed": "បំពង់ផ្សែងត្រូវតែជោគជ័យមុនពេលបញ្ចូល។"
+      },
+      "providerBlocked": {
+        "failingPipeline": "បំពង់ផ្សែងកំពុងបរាជ័យលើកូមីតចុងក្រោយ។",
+        "pendingPipeline": "បំពង់ផ្សែងកំពុងដំណើរការនៅឡើយលើកូមីតចុងក្រោយ។",
+        "permission": "អ្នកគ្មានសិទ្ធិបញ្ចូល{{term}}នេះទេ។",
+        "draft": "សម្គាល់{{term}}ថារួចរាល់សម្រាប់ការពិនិត្យ មុនពេលបញ្ចូល។"
       },
       "methodLabels": {
         "merge": "បង្កើតកំណត់ត្រាកែប្រែសម្រាប់ការបញ្ចូល",
@@ -441,6 +465,7 @@
       "acceptTerms": "ទទួលយក",
       "replyBadRequest": "មិនអាចបង្ហោះការឆ្លើយតបនេះបានទេ។ ការពិភាក្សាអាចបានផ្លាស់ប្តូរ។",
       "replyForbidden": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើសំណើបញ្ចូលកូដនេះទេ។",
+      "replyForbiddenTerm": "អ្នកគ្មានសិទ្ធិឆ្លើយតបលើ{{term}}នេះទេ។",
       "moderation": {
         "reportContent": {
           "terminal": "មិនអាចរាយការណ៍មតិយោបល់នេះបានទេ។",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "ពិនិត្យសំណើបញ្ចូលកូដ",
     "headLine": "{{counts}} · កំណត់ត្រាកែប្រែចុងក្រោយ {{sha}}",
     "entry": {
-      "eyebrow": "បើកសំណើបញ្ចូលកូដតាម URL។",
-      "pastePrLink": "បិទភ្ជាប់តំណ PR",
-      "noRecentPrs": "គ្មាន PR ថ្មីៗទេ",
-      "noRecentPrsDescription": "បិទភ្ជាប់តំណ PR ខាងលើដើម្បីចាប់ផ្តើមការពិនិត្យ — វានឹងបង្ហាញនៅទីនេះលើកក្រោយ។",
+      "eyebrow": "បើកសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូលតាម URL",
+      "pastePrLink": "បិទភ្ជាប់តំណសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូល",
+      "noRecentPrs": "គ្មានការពិនិត្យថ្មីៗទេ",
+      "noRecentPrsDescription": "បិទភ្ជាប់តំណខាងលើដើម្បីចាប់ផ្តើមការពិនិត្យ — វានឹងបង្ហាញនៅទីនេះលើកក្រោយ។",
       "couldNotLoad": "មិនអាចផ្ទុកបានទេ។",
       "removeFromRecentsTitle": "ដកចេញពីបញ្ជីថ្មីៗ?",
-      "removeFromRecentsMessage": "សំណើបញ្ចូលកូដនេះនឹងត្រូវដកចេញពីបញ្ជីថ្មីៗរបស់អ្នក។",
+      "removeFromRecentsMessage": "ការពិនិត្យនេះនឹងត្រូវបានដកចេញពីបញ្ជីថ្មីៗរបស់អ្នក។",
       "removeRecentAccessibility": "ដក {{repo}} ចេញពីបញ្ជីថ្មីៗ",
-      "urlAccessibility": "URL សំណើបញ្ចូលកូដនៅលើ GitHub",
-      "clearLink": "លុបតំណសំណើបញ្ចូលកូដ",
-      "pasteLink": "បិទភ្ជាប់តំណសំណើបញ្ចូលកូដ",
+      "urlAccessibility": "បញ្ចូល URL សំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូល",
+      "urlPlaceholder": "URL សំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូល",
+      "openAccessibility": "បើកសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូល",
+      "clearLink": "លុបតំណ",
+      "pasteLink": "បិទភ្ជាប់តំណសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូល",
       "open": "បើក"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "មិនអាចពិនិត្យការតភ្ជាប់ GitHub បានទេ។",
       "checkFailedMessage": "មិនអាចបង្ហាញស្ថានភាពចូលគណនីបានទេ រហូតដល់ផ្ទុកទិន្នន័យនេះរួច។",
+      "checkFailedTitleGitLab": "មិនអាចពិនិត្យការតភ្ជាប់ GitLab បានទេ។",
+      "checkFailedTitleBitbucket": "មិនអាចពិនិត្យការតភ្ជាប់ Bitbucket បានទេ។",
+      "providerCheckFailedMessage": "ស្ថានភាពការតភ្ជាប់មិនអាចប្រើបានទេរហូតដល់បានផ្ទុករួច។",
       "reconnectTitle": "ភ្ជាប់ GitHub ឡើងវិញ",
       "reconnectDescription": "ការអនុញ្ញាតឱ្យភ្ជាប់ GitHub របស់អ្នកត្រូវបានដកហូត។ ភ្ជាប់ឡើងវិញ ដើម្បីបន្តពិនិត្យសំណើបញ្ចូលកូដនៅលើទូរស័ព្ទ។",
-      "description": "ភ្ជាប់គណនី GitHub របស់អ្នក ដើម្បីពិនិត្យសំណើបញ្ចូលកូដនៅលើទូរស័ព្ទ។"
+      "description": "ភ្ជាប់គណនី GitHub របស់អ្នក ដើម្បីពិនិត្យសំណើបញ្ចូលកូដនៅលើទូរស័ព្ទ។",
+      "gitlabDescription": "ភ្ជាប់គណនី GitLab របស់អ្នកដើម្បីពិនិត្យសំណើបញ្ចូលលើទូរស័ព្ទ។",
+      "bitbucketDescription": "ភ្ជាប់ Bitbucket ទៅអង្គភាពនេះដើម្បីពិនិត្យសំណើបញ្ចូលកូដលើទូរស័ព្ទ។",
+      "bitbucketOrgOnlyDescription": "ជ្រើសរើសអង្គភាពមួយក្នុងប្រវត្តិរូបរបស់អ្នកដើម្បីពិនិត្យសំណើបញ្ចូលកូដ Bitbucket របស់វា។"
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "ការតភ្ជាប់ទៅ GitHub បានផុតកំណត់ហើយ។",
-      "message": "ការតភ្ជាប់ GitHub របស់អ្នកលែងមានសុពលភាពហើយ។ ពិនិត្យការតភ្ជាប់ម្តងទៀត។ ប្រសិនបើចាំបាច់ កម្មវិធីនឹងស្នើឱ្យអ្នកភ្ជាប់ឡើងវិញ។"
+      "message": "ការតភ្ជាប់ GitHub របស់អ្នកលែងមានសុពលភាពហើយ។ ពិនិត្យការតភ្ជាប់ម្តងទៀត។ ប្រសិនបើចាំបាច់ កម្មវិធីនឹងស្នើឱ្យអ្នកភ្ជាប់ឡើងវិញ។",
+      "gitlabTitle": "ការតភ្ជាប់ទៅ GitLab បានផុតកំណត់ហើយ។",
+      "bitbucketTitle": "ការតភ្ជាប់ទៅ Bitbucket បានផុតកំណត់ហើយ។",
+      "providerMessage": "ការតភ្ជាប់ {{provider}} របស់អ្នកលែងមានសុពលភាពហើយ។ ពិនិត្យការតភ្ជាប់ម្តងទៀត។ ប្រសិនបើចាំបាច់ កម្មវិធីនឹងស្នើឱ្យអ្នកភ្ជាប់ឡើងវិញ។"
     },
     "eventChips": {
       "comment": "អត្ថាធិប្បាយ",
@@ -636,6 +672,21 @@
       "files": "ឯកសារ",
       "discussion": "ការពិភាក្សា"
     },
+    "terms": {
+      "pullRequest": "សំណើបញ្ចូលកូដ",
+      "mergeRequest": "សំណើបញ្ចូល",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ចែករំលែកសំណើបញ្ចូល",
+      "viewOnProvider": "មើលលើ {{provider}}",
+      "mergeRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលបាន",
+      "unavailableDescription": "វាអាចត្រូវបានលុបចោល ឬអ្នកអាចគ្មានសិទ្ធិចូលប្រើទេ។",
+      "accessDeniedMergeRequest": "អ្នកគ្មានសិទ្ធិមើលសំណើបញ្ចូលនេះទេ។",
+      "couldNotLoadMergeRequest": "មិនអាចផ្ទុកសំណើបញ្ចូលបានទេ។",
+      "discussionAccessDenied": "អ្នកគ្មានសិទ្ធិមើលការពិភាក្សារបស់ សំណើបញ្ចូល នេះទេ។",
+      "discussionUnavailableMessage": "សំណើបញ្ចូលនេះអាចត្រូវបានដកចេញ។",
+      "noDiscussionDescription": "មិនទាន់មានការពិភាក្សាពិនិត្យកូដ ឬមតិយោបល់លើសំណើបញ្ចូលនេះទេ។",
+      "noFilesChangedDescription": "សំណើបញ្ចូលនេះមិនមានការកែប្រែឯកសារទេ។"
+    },
     "fileStatus": {
       "modified": "បានកែប្រែ",
       "renamed": "បានប្តូរឈ្មោះ",
@@ -652,7 +703,7 @@
       "emptyLine": "(ទទេ)"
     },
     "linkPasteClipboardEmpty": "ក្ដារតម្បៀតខ្ទាស់ទទេ។",
-    "linkPasteNotAPullRequest": "នេះមិនមែនជាតំណសំណើបញ្ចូលកូដនៅលើ GitHub ទេ។",
+    "linkPasteNotAPullRequest": "មិនមែនជាតំណសំណើបញ្ចូលកូដ ឬ សំណើបញ្ចូលទេ",
     "announce": {
       "commentPosted": "បានបង្ហោះមតិយោបល់",
       "reviewSubmitted": "បានដាក់ស្នើការពិនិត្យ",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "មិនអាចបង្ហោះមតិយោបល់នេះបានទេ។ បន្ទាត់ដែលបានជ្រើសរើសអាចបានផ្លាស់ប្តូរ ឬ PR អាចបានធ្វើបច្ចុប្បន្នភាព។",
       "reviewNotSubmitted": "មិនអាចដាក់ស្នើការពិនិត្យនេះក្នុងស្ថានភាពបច្ចុប្បន្នបានទេ។ PR អាចបានផ្លាស់ប្តូរ ឬអ្នកកំពុងពិនិត្យសំណើបញ្ចូលកូដរបស់ខ្លួនឯង ដែលមិនត្រូវបានអនុញ្ញាត។",
+      "reviewNotSubmittedTerm": "មិនអាចដាក់សំណើការពិនិត្យនេះតាមរូបភាពបច្ចុប្បន្នបានទេ។ {{term}} អាចបានផ្លាស់ប្តូរ ឬអ្នកមិនអាចពិនិត្យ{{term}}របស់ខ្លួនឯងបានទេ។",
       "couldNotPostComment": "មិនអាចបង្ហោះមតិយោបល់បានទេ។",
       "couldNotSubmitReview": "មិនអាចដាក់ស្នើការពិនិត្យបានទេ។ ពិនិត្យការតភ្ជាប់របស់អ្នក ហើយព្យាយាមម្តងទៀត។"
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "មិនអាចឆ្លើយតបបានទេ។",
       "couldNotCompleteAction": "មិនអាចបញ្ចប់សកម្មភាពនេះបានទេ។",
       "mergeResultDefaultError": "GitHub មិនបានបញ្ចប់ការបញ្ចូលទេ។",
+      "mergeResultNotCompleted": "{{term}} មិនបានបញ្ចូលទេ។ ពិនិត្យស្ថានភាពរបស់វាហើយព្យាយាមម្តងទៀត។",
       "ambiguous": "មិនអាចបញ្ជាក់បានទេ — សូមពិនិត្យ PR មុនពេលព្យាយាមម្តងទៀត។",
       "persistenceFailed": "យើងមិនអាចកត់ត្រាសកម្មភាពនេះបានទេ។ សូមព្យាយាមម្តងទៀតនៅពេលក្រោយ។",
       "forbidden": "អ្នកគ្មានសិទ្ធិធ្វើសកម្មភាពនេះទេ។"
@@ -1979,11 +2032,31 @@
       "retryConnection": "ព្យាយាមភ្ជាប់ម្តងទៀត"
     },
     "newSession": {
+      "recentlyUsed": "បានប្រើថ្មីៗនេះ",
+      "couldNotLoadGithubRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី GitHub បានទេ។",
+      "couldNotLoadGitlabRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី GitLab បានទេ។",
+      "couldNotLoadBitbucketRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី Bitbucket បានទេ។",
       "connectGithubDescription": "ភ្ជាប់ GitHub ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
+      "connectGitlabDescription": "ភ្ជាប់ GitLab ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
+      "connectBitbucketDescription": "ភ្ជាប់ Bitbucket ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
       "openGithub": "បើក GitHub",
+      "openGitlab": "បើក GitLab",
+      "openBitbucket": "បើក Bitbucket",
       "refreshRepositories": "ផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញ",
       "githubConnected": "បានភ្ជាប់ GitHub",
+      "gitlabConnected": "បានភ្ជាប់ GitLab",
       "noRepositoriesVisible": "មិនឃើញឃ្លាំងកូដទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដរបស់កម្មវិធី Kilo សម្រាប់ GitHub រួចផ្ទុកបញ្ជីឡើងវិញ។",
+      "noRepositoriesVisibleGitlab": "មិនឃើញឃ្លាំងកូដទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដសម្រាប់ GitLab រួចផ្ទុកបញ្ជីឡើងវិញ។",
+      "noRepositoriesVisibleBitbucket": "មិនឃើញឃ្លាំងកូដទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដសម្រាប់ Bitbucket រួចផ្ទុកបញ្ជីឡើងវិញ។",
+      "bitbucketOrganizationsOnly": "Bitbucket អាចប្រើបានសម្រាប់តែអង្គភាពប៉ុណ្ណោះ។",
+      "branchPickerTitle": "ជ្រើសរើសសាខា",
+      "branchDefault": "លំនាំដើម",
+      "branchAccessibility": "សាខា: {{label}}",
+      "branchLoading": "កំពុងផ្ទុកសាខា",
+      "branchLoadError": "មិនអាចផ្ទុកសាខាបានទេ",
+      "branchUnavailable": "សាខាមិនអាចប្រើបានសម្រាប់ឃ្លាំងកូដនេះទេ។ ពិនិត្យសិទ្ធិចូលប្រើរបស់អ្នកជាមួយអ្នកផ្តល់សេវា បន្ទាប់មកជ្រើសរើសឃ្លាំងកូដផ្សេង។",
+      "branchEmpty": "គ្មានសាខាអាចប្រើបាន",
+      "branchPlaceholder": "ជ្រើសរើសសាខាមួយ",
       "runOnWithTarget": "ដំណើរការលើ: {{target}}",
       "environment": "បរិស្ថានដំណើរការ",
       "couldNotLoadEnvironment": "មិនអាចផ្ទុកបរិស្ថានដំណើរការរបស់អ្នកបានទេ។",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "មិនអាចផ្ទុកបញ្ជីឃ្លាំងកូដឡើងវិញបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "discardDraftTitle": "បោះបង់សេចក្តីព្រាង?",
       "discardDraftMessage": "សេចក្តីណែនាំដែលអ្នកបានសរសេរនឹងបាត់បង់។",
+      "discardWithUploadsMessage": "សេចក្តីណែនាំរបស់អ្នក និងឯកសារដែលបានផ្ទុកឡើង តែមិនទាន់ភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវលុប។",
       "discardFailed": "មិនអាចបោះបង់សេចក្តីព្រាងបានទេ។ សូមព្យាយាមម្តងទៀត។",
       "remoteHint": "ដំណើរការ `kilo remote` នៅលើកុំព្យូទ័ររបស់អ្នក ឬ `/remote` នៅក្នុងវគ្គ CLI ដែលកំពុងដំណើរការ ដើម្បីគ្រប់គ្រងដំណើរការ kilo ក្នុងមូលដ្ឋាន។",
-      "connectBitbucketDescription": "ភ្ជាប់ Bitbucket ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
-      "connectGitlabDescription": "ភ្ជាប់ GitLab ក្នុងកម្មវិធីរុករករបស់អ្នក បន្ទាប់មកត្រឡប់មកទីនេះ ដើម្បីជ្រើសរើសឃ្លាំងកូដ។",
-      "couldNotLoadBitbucketRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី Bitbucket បានទេ។",
-      "couldNotLoadGithubRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី GitHub បានទេ។",
-      "couldNotLoadGitlabRepositories": "មិនអាចផ្ទុកឃ្លាំងកូដពី GitLab បានទេ។",
-      "gitlabConnected": "បានភ្ជាប់ GitLab",
-      "noRepositoriesVisibleBitbucket": "មិនឃើញឃ្លាំងកូដទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដសម្រាប់ Bitbucket រួចផ្ទុកបញ្ជីឡើងវិញ។",
-      "noRepositoriesVisibleGitlab": "មិនឃើញឃ្លាំងកូដទេ។ ពិនិត្យសិទ្ធិចូលប្រើឃ្លាំងកូដសម្រាប់ GitLab រួចផ្ទុកបញ្ជីឡើងវិញ។",
-      "openBitbucket": "បើក Bitbucket",
-      "openGitlab": "បើក GitLab",
-      "recentlyUsed": "បានប្រើថ្មីៗនេះ",
       "continueFrom": "កំពុងបន្តវគ្គ {{title}}។",
       "importingSession": "កំពុងនាំចូលវគ្គ",
       "cliCannotContinue": "CLI នេះមិនអាចបន្តវគ្គបានទេ។ ជ្រើសរើស Cloud Agent ឬ CLI ផ្សេងទៀត។",
-      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។",
-      "discardWithUploadsMessage": "សេចក្តីណែនាំរបស់អ្នក និងឯកសារដែលបានផ្ទុកឡើង តែមិនទាន់ភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវលុប។"
+      "importFailed": "មិនអាចនាំចូលវគ្គនេះបានទេ។"
     },
     "partRenderer": {
       "updatedFileCount_one": "បានធ្វើបច្ចុប្បន្នភាពឯកសារចំនួន {{displayCount}}។",

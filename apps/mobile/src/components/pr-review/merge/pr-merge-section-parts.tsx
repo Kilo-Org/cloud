@@ -15,7 +15,9 @@ import {
   type PrOverviewDto,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 
-type TerminalNounKey = 'common.mergeRequest' | 'common.pullRequest';
+// Mid-sentence lowercase noun (common.*) vs the capitalized standalone
+// label (prReview.terms.*) — see providerPrTermKey.
+type TerminalNounKey = 'common.mergeRequest' | 'common.pullRequest'; // i18n-dup-ok: one copy, two senses: mid-sentence lowercase noun vs capitalized standalone label; languages case-decline them apart.
 
 function terminalLabelKey(
   state: PrOverviewDto['state'],

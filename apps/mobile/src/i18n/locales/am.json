@@ -36,6 +36,7 @@
     "cost": "ወጪ",
     "discard": "አስወግድ",
     "findings": "ግኝቶች",
+    "mergeRequest": "የማዋሃድ ጥያቄ",
     "notConnected": "አልተገናኘም",
     "notifications": "ማሳወቂያዎች",
     "pullRequest": "የማዋሃድ ጥያቄ",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "ባዶ የልዩነት ረድፍ"
     },
     "connectionExpired": "የGitHub ግንኙነት ጊዜው አልፏል።",
+    "capabilities": {
+      "banner": {
+        "title": "በዚህ አቅራቢ ላይ አይገኝም",
+        "accessibility": "በዚህ አቅራቢ ላይ አይገኝም፦ {{reason}}"
+      }
+    },
     "merge": {
       "merge": "ማዋሃድ",
       "mergeNow": "አሁን አዋህድ",
       "mergePullRequest": "የማዋሃድ ጥያቄን ማዋሃድ",
+      "mergeTermTitle": "{{term}}ን ማዋሃድ",
       "enableAutoMerge": "ራስ-ሰር ማዋሃድን አንቃ",
       "disableAutoMerge": "ራስ-ሰር ማዋሃድን አሰናክል",
       "autoMergeOn": "ራስ-ሰር ማዋሃድ ነቅቷል",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "ከውህደቱ በኋላ ቅርንጫፉን ሰርዝ",
       "noEnabledMethods": "በዚህ ማከማቻ ላይ የነቃ የውህደት ዘዴ የለም። የማከማቻውን አስተዳዳሪ በውህደት ኮሚት፣ በማጠቃለል ወይም መሠረት በመቀየር የማዋሃድ ዘዴን እንዲያነቃ ጠይቅ።",
       "confirmTitle": "የማዋሃድ ጥያቄው ይዋሃድ?",
+      "confirmTitleTerm": "{{term}}ው ይዋሃድ?",
       "confirmMessage": "ይህ ለውጦችህን ወደ መሠረት ቅርንጫፉ ያዋህዳል።",
       "enableAutoMergeConfirmTitle": "ራስ-ሰር ማዋሃድ ይንቃ?",
       "enableAutoMergeConfirmMessage": "ሁሉም አስፈላጊ ፍተሻዎች ሲያልፉ፣ GitHub ይህን የማዋሃድ ጥያቄ በራስ-ሰር ያዋህደዋል።",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} ፋይፕላይኑ ከሳካ በኋላ በራስ-ሰር ይዋሃዳል።",
+      "enableAutoMergeDescriptionTerm": "GitLab ይህን {{term}} ፋይፕላይኑ ከሳካ በኋላ በራስ-ሰር ያዋህደዋል።",
       "forbidden": "ይህን የማዋሃድ ጥያቄ ለማዋሃድ ፈቃድ የለህም።",
       "cannotMerge": "ይህን የማዋሃድ ጥያቄ ባለበት ሁኔታ ማዋሃድ አይቻልም።",
       "couldNotMerge": "የማዋሃድ ጥያቄውን ማዋሃድ አልተቻለም።",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "አስቀድሞ ተዋህዷል",
-        "closed": "ይህ የማዋሃድ ጥያቄ ተዘግቷል"
+        "closed": "ይህ የማዋሃድ ጥያቄ ተዘግቷል",
+        "closedMergeRequest": "ይህ የማዋሃድ ጥያቄ ተዘግቷል"
       },
       "partialSuccessBanner": {
         "body": "ቅርንጫፉን መሰረዝ አልተቻለም፦ {{reason}}።",
@@ -393,6 +405,18 @@
         "behindDetail": "የምንጭ ቅርንጫፉ ከመሠረት ቅርንጫፉ ወደ ኋላ ቀርቷል። ከማዋሃድህ በፊት መሠረቱን ቀይር ወይም ቅርንጫፉን አዘምን።",
         "notMergeableTitle": "ይህን የማዋሃድ ጥያቄ ገና ማዋሃድ አይቻልም",
         "notMergeableDetail": "GitHub የማዋሃድ ሁኔታው {{state}} እንደሆነ አሳውቋል።"
+      },
+      "restrictions": {
+        "title": "የማዋሃድ ገደቦች",
+        "approvalsRequired_one": "{{displayCount}} ማጽደቅ ያስፈልጋል",
+        "approvalsRequired_other": "{{displayCount}} ማጽደቆች ያስፈልጋሉ",
+        "pipelineMustSucceed": "ማዋሃድ ከመፈጸሙ በፊት ፋይፕላይኑ መሳካት አለበት።"
+      },
+      "providerBlocked": {
+        "failingPipeline": "ፋይፕላይኑ በቅርብ ጊዜው ኮሚት ላይ እየወደቀ ነው።",
+        "pendingPipeline": "ፋይፕላይኑ በቅርብ ጊዜው ኮሚት ላይ ገና እየሰራ ነው።",
+        "permission": "ይህን {{term}} ለማዋሃድ ፈቃድ የለህም።",
+        "draft": "ከማዋሃድህ በፊት {{term}}ው ለግምገማ ዝግጁ መሆኑን ምልክት አድርግ።"
       },
       "methodLabels": {
         "merge": "የውህደት ኮሚት ፍጠር",
@@ -441,6 +465,7 @@
       "acceptTerms": "ተቀበል",
       "replyBadRequest": "ይህን ምላሽ መለጠፍ አይቻልም። የውይይት ሰንሰለቱ ተለውጦ ሊሆን ይችላል።",
       "replyForbidden": "ለዚህ የማዋሃድ ጥያቄ ምላሽ ለመስጠት ፈቃድ የለህም።",
+      "replyForbiddenTerm": "ለዚህ {{term}} ምላሽ ለመስጠት ፈቃድ የለህም።",
       "moderation": {
         "reportContent": {
           "terminal": "ይህ አስተያየት ሪፖርት ሊደረግ አይችልም።",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "የማዋሃድ ጥያቄውን ገምግም",
     "headLine": "{{counts}} · የቅርንጫፉ የመጨረሻ ኮሚት {{sha}}",
     "entry": {
-      "eyebrow": "የማዋሃድ ጥያቄን በURL ክፈት።",
-      "pastePrLink": "የPR አገናኝ ለጥፍ",
-      "noRecentPrs": "የቅርብ ጊዜ PRዎች የሉም",
-      "noRecentPrsDescription": "ግምገማ ለመጀመር ከላይ የPR አገናኝ ለጥፍ — በሚቀጥለው ጊዜ እዚህ ይታያል።",
+      "eyebrow": "የማዋሃድ ጥያቄን በURL ይክፈቱ",
+      "pastePrLink": "የማዋሃድ ጥያቄ አገናኝ ያስገቡ",
+      "noRecentPrs": "የቅርብ ጊዜ ግምገማዎች የሉም",
+      "noRecentPrsDescription": "ግምገማ ለመጀመር ከላይ አገናኝ ያስገቡ — ለቀጣዩ ጊዜ እዚህ ይታያል።",
       "couldNotLoad": "መጫን አልተቻለም።",
       "removeFromRecentsTitle": "ከቅርብ ጊዜ ዝርዝሩ ይወገድ?",
-      "removeFromRecentsMessage": "ይህ የማዋሃድ ጥያቄ ከቅርብ ጊዜ ዝርዝርህ ይወገዳል።",
+      "removeFromRecentsMessage": "ይህ ግምገማ ከቅርብ ጊዜዎችዎ ውስጥ ይወገዳል።",
       "removeRecentAccessibility": "{{repo}}ን ከቅርብ ጊዜ ዝርዝሩ አስወግድ",
-      "urlAccessibility": "የGitHub ማዋሃድ ጥያቄ URL",
-      "clearLink": "የማዋሃድ ጥያቄውን አገናኝ አጽዳ",
-      "pasteLink": "የማዋሃድ ጥያቄ አገናኝ ለጥፍ",
+      "urlAccessibility": "የማዋሃድ ጥያቄ URL ያስገቡ",
+      "urlPlaceholder": "የማዋሃድ ጥያቄ URL",
+      "openAccessibility": "የማዋሃድ ጥያቄ ክፈት",
+      "clearLink": "አገናኙን ያጽዱ",
+      "pasteLink": "የማዋሃድ ጥያቄ አገናኝ ያስገቡ",
       "open": "ክፍት"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "የGitHub ግንኙነቱን መፈተሽ አልተቻለም።",
       "checkFailedMessage": "ይህ እስኪጫን ድረስ የመግቢያ ሁኔታውን ማወቅ አይቻልም።",
+      "checkFailedTitleGitLab": "የGitLab ግንኙነቱን መፈተሽ አልተቻለም።",
+      "checkFailedTitleBitbucket": "የBitbucket ግንኙነቱን መፈተሽ አልተቻለም።",
+      "providerCheckFailedMessage": "ይህ እስኪጫን ድረስ የግንኙነት ሁኔታ አይገኝም።",
       "reconnectTitle": "GitHubን እንደገና ማገናኘት",
       "reconnectDescription": "የGitHub ግንኙነትህ ፈቃድ ተሰርዟል። በሞባይል ላይ የማዋሃድ ጥያቄዎችን መገምገም ለመቀጠል እንደገና አገናኝ።",
-      "description": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitHub መለያህን አገናኝ።"
+      "description": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitHub መለያህን አገናኝ።",
+      "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
+      "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
+      "bitbucketOrgOnlyDescription": "የBitbucket የማዋሃድ ጥያቄዎቹን ለመገምገም በመገለጫዎ ውስጥ አንድ ድርጅት ይምረጡ።"
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "የGitHub ግንኙነት ጊዜው አልፏል።",
-      "message": "የGitHub ግንኙነትህ ከእንግዲህ አይሠራም። ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።"
+      "message": "የGitHub ግንኙነትህ ከእንግዲህ አይሠራም። ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።",
+      "gitlabTitle": "የGitLab ግንኙነት ጊዜው አልፏል።",
+      "bitbucketTitle": "የBitbucket ግንኙነት ጊዜው አልፏል።",
+      "providerMessage": "የ{{provider}} ግንኙነትህ ከእንግዲህ አይሠራም። ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።"
     },
     "eventChips": {
       "comment": "አስተያየት",
@@ -636,6 +672,21 @@
       "files": "ፋይሎች",
       "discussion": "ውይይት"
     },
+    "terms": {
+      "pullRequest": "የማዋሃድ ጥያቄ",
+      "mergeRequest": "የማዋሃድ ጥያቄ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "የማዋሃድ ጥያቄውን አጋራ",
+      "viewOnProvider": "በ{{provider}} ይመልከቱ",
+      "mergeRequestUnavailable": "የማዋሃድ ጥያቄው አይገኝም",
+      "unavailableDescription": "ተሰርዞ ሊሆን ይችላል፣ ወይም የመዳረስ ፈቃድ ላይኖርዎት ይችላል።",
+      "accessDeniedMergeRequest": "ይህን የማዋሃድ ጥያቄ ለማየት ፈቃድ የለህም።",
+      "couldNotLoadMergeRequest": "የማዋሃድ ጥያቄውን መጫን አልተቻለም።",
+      "discussionAccessDenied": "የዚህን የማዋሃድ ጥያቄ ውይይት ለማየት ፈቃድ የለህም።",
+      "discussionUnavailableMessage": "ይህ የማዋሃድ ጥያቄ ተወግዶ ሊሆን ይችላል።",
+      "noDiscussionDescription": "በዚህ የማዋሃድ ጥያቄ ላይ የግምገማ ውይይቶች ወይም አጠቃላይ አስተያየቶች የሉም።",
+      "noFilesChangedDescription": "ይህ የማዋሃድ ጥያቄ ምንም የፋይል ለውጥ አልያዘም።"
+    },
     "fileStatus": {
       "modified": "ተቀይሯል",
       "renamed": "ስሙ ተቀይሯል",
@@ -652,7 +703,7 @@
       "emptyLine": "(ባዶ)"
     },
     "linkPasteClipboardEmpty": "ቅንጥብ ሰሌዳው ባዶ ነው።",
-    "linkPasteNotAPullRequest": "ይህ የGitHub ማዋሃድ ጥያቄ አገናኝ አይደለም።",
+    "linkPasteNotAPullRequest": "የማዋሃድ ጥያቄ አገናኝ አይደለም",
     "announce": {
       "commentPosted": "አስተያየት ተለጥፏል",
       "reviewSubmitted": "ግምገማ ቀርቧል",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "ይህን አስተያየት መለጠፍ አይቻልም። የተመረጠው መስመር ተለውጦ ወይም PR ተዘምኖ ሊሆን ይችላል።",
       "reviewNotSubmitted": "ይህን ግምገማ ባለበት ሁኔታ መላክ አይቻልም። PR ተለውጦ ሊሆን ይችላል፣ ወይም የራስህን የማዋሃድ ጥያቄ እየገመገምክ ሊሆን ይችላል። የራስህን ጥያቄ መገምገም አይፈቀድም።",
+      "reviewNotSubmittedTerm": "ይህ ግምገማ እንዳለ ማስገባት አይቻልም። {{term}} ተቀይሮ ሊሆን ወይም የራስዎን {{term}} መገምገም አይችሉም።",
       "couldNotPostComment": "አስተያየት መለጠፍ አልተቻለም።",
       "couldNotSubmitReview": "ግምገማውን መላክ አልተቻለም። ግንኙነትህን ፈትሽና እንደገና ሞክር።"
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "መልስ መስጠት አልተቻለም።",
       "couldNotCompleteAction": "ይህን እርምጃ ማጠናቀቅ አልተቻለም።",
       "mergeResultDefaultError": "GitHub ውህደቱን አላጠናቀቀም።",
+      "mergeResultNotCompleted": "{{term}} አልተዋሃደም። ሁኔታውን ያረጋግጡ እና እንደገና ይሞክሩ።",
       "ambiguous": "ማረጋገጥ አልተቻለም — እንደገና ከመሞከርህ በፊት PRን ፈትሽ።",
       "persistenceFailed": "ይህን እርምጃ መመዝገብ አልቻልንም። በኋላ እንደገና ሞክር።",
       "forbidden": "ይህ እርምጃ አይፈቀድም።"
@@ -1979,11 +2032,31 @@
       "retryConnection": "እንደገና ለመገናኘት ይሞክሩ"
     },
     "newSession": {
+      "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ",
+      "couldNotLoadGithubRepositories": "የGitHub ማከማቻዎችን መጫን አልተቻለም።",
+      "couldNotLoadGitlabRepositories": "የGitLab ማከማቻዎችን መጫን አልተቻለም።",
+      "couldNotLoadBitbucketRepositories": "የBitbucket ማከማቻዎችን መጫን አልተቻለም።",
       "connectGithubDescription": "GitHubን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
+      "connectGitlabDescription": "GitLabን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
+      "connectBitbucketDescription": "Bitbucketን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
       "openGithub": "GitHubን ይክፈቱ",
+      "openGitlab": "GitLabን ይክፈቱ",
+      "openBitbucket": "Bitbucketን ይክፈቱ",
       "refreshRepositories": "ማከማቻዎችን ያድሱ",
       "githubConnected": "GitHub ተገናኝቷል",
+      "gitlabConnected": "GitLab ተገናኝቷል",
       "noRepositoriesVisible": "ምንም ማከማቻዎች አይታዩም። የKilo GitHub መተግበሪያ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለው ያረጋግጡ፣ ከዚያ ያድሱ።",
+      "noRepositoriesVisibleGitlab": "ምንም ማከማቻዎች አይታዩም። በGitLab ላይ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለ ያረጋግጡ፣ ከዚያ ያድሱ።",
+      "noRepositoriesVisibleBitbucket": "ምንም ማከማቻዎች አይታዩም። በBitbucket ላይ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለ ያረጋግጡ፣ ከዚያ ያድሱ።",
+      "bitbucketOrganizationsOnly": "Bitbucket ለድርጅቶች ብቻ ይገኛል።",
+      "branchPickerTitle": "ቅርንጫፍ ይምረጡ",
+      "branchDefault": "ነባሪ",
+      "branchAccessibility": "ቅርንጫፍ፦ {{label}}",
+      "branchLoading": "ቅርንጫፎች በመጫን ላይ",
+      "branchLoadError": "ቅርንጫፎችን መጫን አልተቻለም",
+      "branchUnavailable": "ለዚህ ማከማቻ ቅርንጫፎች አይገኙም። ከአቅራቢው ጋር ያለዎትን መዳረስ ያረጋግጡ፣ ከዚያ ሌላ ማከማቻ ይምረጡ።",
+      "branchEmpty": "ምንም ቅርንጫፎች አይገኙም",
+      "branchPlaceholder": "አንድ ቅርንጫፍ ይምረጡ",
       "runOnWithTarget": "ማስኬጃ፦ {{target}}",
       "environment": "የሥራ አካባቢ",
       "couldNotLoadEnvironment": "የሥራ አካባቢዎን መጫን አልተቻለም።",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "ማከማቻዎችን ማደስ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "discardDraftTitle": "ረቂቁን ማስወገድ ይፈልጋሉ?",
       "discardDraftMessage": "ጥያቄዎ ይጠፋል።",
+      "discardWithUploadsMessage": "ጥያቄዎና ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።",
       "discardFailed": "ረቂቁን ማስወገድ አልተቻለም። እባክዎ እንደገና ይሞክሩ።",
       "remoteHint": "በኮምፒውተርዎ ላይ ያለን የkilo ሂደት ለመቆጣጠር `kilo remote`ን በኮምፒውተርዎ ላይ ያስኪዱ፣ ወይም እየሠራ ባለ የCLI ክፍለ ጊዜ ውስጥ `/remote`ን ይጠቀሙ።",
-      "connectBitbucketDescription": "Bitbucketን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
-      "connectGitlabDescription": "GitLabን በአሳሽዎ ውስጥ ያገናኙ፣ ከዚያ ማከማቻ ለመምረጥ ወደዚህ ይመለሱ።",
-      "couldNotLoadBitbucketRepositories": "የBitbucket ማከማቻዎችን መጫን አልተቻለም።",
-      "couldNotLoadGithubRepositories": "የGitHub ማከማቻዎችን መጫን አልተቻለም።",
-      "couldNotLoadGitlabRepositories": "የGitLab ማከማቻዎችን መጫን አልተቻለም።",
-      "gitlabConnected": "GitLab ተገናኝቷል",
-      "noRepositoriesVisibleBitbucket": "ምንም ማከማቻዎች አይታዩም። በBitbucket ላይ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለ ያረጋግጡ፣ ከዚያ ያድሱ።",
-      "noRepositoriesVisibleGitlab": "ምንም ማከማቻዎች አይታዩም። በGitLab ላይ ማከማቻዎቹን የመድረስ ፈቃድ እንዳለ ያረጋግጡ፣ ከዚያ ያድሱ።",
-      "openBitbucket": "Bitbucketን ይክፈቱ",
-      "openGitlab": "GitLabን ይክፈቱ",
-      "recentlyUsed": "በቅርቡ ጥቅም ላይ የዋሉ",
-      "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
       "continueFrom": "{{title}} እየቀጠለ ነው።",
-      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።",
       "importingSession": "ክፍለ ጊዜውን በማስመጣት ላይ",
-      "discardWithUploadsMessage": "ጥያቄዎና ከተላኩ መልእክቶች ጋር ያልተያያዙ የተሰቀሉ ፋይሎች ይሰረዛሉ።"
+      "cliCannotContinue": "ይህ CLI ክፍለ ጊዜን መቀጠል አይችልም። Cloud Agent ወይም ሌላ CLI ይምረጡ።",
+      "importFailed": "ይህን ክፍለ ጊዜ ማስመጣት አልተቻለም።"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} ፋይል ተዘምኗል።",

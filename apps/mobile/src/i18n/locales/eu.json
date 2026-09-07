@@ -36,6 +36,7 @@
     "cost": "Kostua",
     "discard": "Baztertu",
     "findings": "Antzemandako arazoak",
+    "mergeRequest": "merge-eskaera",
     "notConnected": "Konektatu gabe",
     "notifications": "Jakinarazpenak",
     "pullRequest": "bateratze-eskaera",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "Diferentzien lerro hutsa"
     },
     "connectionExpired": "GitHub-erako konexioa iraungi da.",
+    "capabilities": {
+      "banner": {
+        "title": "Ez dago eskuragarri hornitzaile honetan",
+        "accessibility": "Ez dago eskuragarri hornitzaile honetan: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Bateratzea",
       "mergeNow": "Bateratu orain",
       "mergePullRequest": "Bateratze-eskaera bateratzea",
+      "mergeTermTitle": "{{term}} bateratzea",
       "enableAutoMerge": "Gaitu bateratze automatikoa",
       "disableAutoMerge": "Desgaitu bateratze automatikoa",
       "autoMergeOn": "Bateratze automatikoa gaituta",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "Ezabatu adarra bateratu ondoren",
       "noEnabledMethods": "Biltegi honek ez du bateratze-metodorik gaituta. Eskatu biltegiko administratzaile bati bateratze arrunta, egikaritzeak trinkotzea edo oinarria aldatzea gaitzeko.",
       "confirmTitle": "Bateratze-eskaera bateratu?",
+      "confirmTitleTerm": "{{term}} bateratu?",
       "confirmMessage": "Zure aldaketak oinarri-adarrean bateratuko dira.",
       "enableAutoMergeConfirmTitle": "Bateratze automatikoa gaitu?",
       "enableAutoMergeConfirmMessage": "GitHub-ek automatikoki bateratuko du bateratze-eskaera hau beharrezko egiaztapen guztiak gainditzen direnean.",
+      "enableAutoMergeConfirmMessageTerm": "{{term}} automatikoki bateratuko da bere pipeline-a arrakastaz osatu ondoren.",
+      "enableAutoMergeDescriptionTerm": "GitLab-ek automatikoki bateratzen du {{term}} hau, pipeline-a arrakastaz osatu ondoren.",
       "forbidden": "Ez duzu baimenik bateratze-eskaera hau bateratzeko.",
       "cannotMerge": "Bateratze-eskaera hau ezin da dagoen bezala bateratu.",
       "couldNotMerge": "Ezin izan da bateratze-eskaera bateratu.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "Dagoeneko bateratuta",
-        "closed": "Bateratze-eskaera hau itxita dago"
+        "closed": "Bateratze-eskaera hau itxita dago",
+        "closedMergeRequest": "Merge-eskaera hau itxita dago"
       },
       "partialSuccessBanner": {
         "body": "Ezin izan da adarra ezabatu: {{reason}}.",
@@ -393,6 +405,18 @@
         "behindDetail": "Jatorri-adarrak oinarri-adarreko aldaketak falta ditu. Aldatu adarraren oinarria edo eguneratu adarra bateratu aurretik.",
         "notMergeableTitle": "Bateratze-eskaera hau ezin da oraindik bateratu",
         "notMergeableDetail": "GitHub-ek bateratzeko egoera hau jakinarazi du: {{state}}."
+      },
+      "restrictions": {
+        "title": "Bateratze-murrizketak",
+        "approvalsRequired_one": "{{displayCount}} baiespen beharrezkoa",
+        "approvalsRequired_other": "{{displayCount}} baiespen beharrezkoak",
+        "pipelineMustSucceed": "Pipeline-a arrakastaz osatu behar da bateratu aurretik."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipeline-a huts egiten ari da azken egikaritzean.",
+        "pendingPipeline": "Pipeline-a oraindik martxan dago azken egikaritzean.",
+        "permission": "Ez duzu baimenik {{term}} hau bateratzeko.",
+        "draft": "Markatu {{term}} berrikusteko prest dagoela bateratu aurretik."
       },
       "methodLabels": {
         "merge": "Sortu bateratze-egikaritze bat",
@@ -441,6 +465,7 @@
       "acceptTerms": "Onartu",
       "replyBadRequest": "Erantzun hau ezin da argitaratu. Baliteke haria aldatu izana.",
       "replyForbidden": "Ez duzu baimenik bateratze-eskaera honi erantzuteko.",
+      "replyForbiddenTerm": "Ez duzu baimenik {{term}} honi erantzuteko.",
       "moderation": {
         "reportContent": {
           "terminal": "Iruzkin hau ezin da salatu.",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "Berrikusi bateratze-eskaera",
     "headLine": "{{counts}} · azken egikaritzea: {{sha}}",
     "entry": {
-      "eyebrow": "Ireki bateratze-eskaera bat URL bidez.",
-      "pastePrLink": "Itsatsi PR esteka bat",
-      "noRecentPrs": "Ez dago azkenaldiko PRrik",
-      "noRecentPrsDescription": "Itsatsi PR esteka bat goian berrikuspena hasteko — hemen agertuko da hurrengoan.",
+      "eyebrow": "Ireki bateratze-eskaera edo merge-eskaera bat URL bidez",
+      "pastePrLink": "Itsatsi bateratze-eskaera edo merge-eskaera baten esteka",
+      "noRecentPrs": "Ez dago azkenaldiko berrikuspenik",
+      "noRecentPrsDescription": "Itsatsi esteka bat goian berrikuspena hasteko — hemen agertuko da hurrengoan.",
       "couldNotLoad": "Ezin izan da kargatu.",
       "removeFromRecentsTitle": "Azkenaldikoen zerrendatik kendu?",
-      "removeFromRecentsMessage": "Bateratze-eskaera hau azkenaldikoen zerrendatik kenduko da.",
+      "removeFromRecentsMessage": "Berrikuspen hau azkenaldikoen zerrendatik kenduko da.",
       "removeRecentAccessibility": "Kendu {{repo}} azkenaldikoen zerrendatik",
-      "urlAccessibility": "GitHub-eko bateratze-eskaeraren URLa",
-      "clearLink": "Garbitu bateratze-eskaeraren esteka",
-      "pasteLink": "Itsatsi bateratze-eskaeraren esteka",
+      "urlAccessibility": "Sartu bateratze-eskaera edo merge-eskaera baten URLa",
+      "urlPlaceholder": "Bateratze-eskaeraren edo merge-eskaeraren URLa",
+      "openAccessibility": "Ireki bateratze-eskaera edo merge-eskaera",
+      "clearLink": "Garbitu esteka",
+      "pasteLink": "Itsatsi bateratze-eskaeraren edo merge-eskaeraren esteka",
       "open": "Ireki"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "Ezin izan da GitHub-ekiko konexioa egiaztatu.",
       "checkFailedMessage": "Ezin da jakin saioa hasita dagoen hau kargatu arte.",
+      "checkFailedTitleGitLab": "Ezin izan da GitLab-ekiko konexioa egiaztatu.",
+      "checkFailedTitleBitbucket": "Ezin izan da Bitbucket-ekiko konexioa egiaztatu.",
+      "providerCheckFailedMessage": "Konexio-egoera ez dago eskuragarri kargatu arte.",
       "reconnectTitle": "Konektatu GitHub berriro",
       "reconnectDescription": "GitHub-ekiko konexioa baliogabetu da. Konektatu berriro bateratze-eskaerak mugikorrean berrikusten jarraitzeko.",
-      "description": "Konektatu zure GitHub kontua bateratze-eskaerak mugikorrean berrikusteko."
+      "description": "Konektatu zure GitHub kontua bateratze-eskaerak mugikorrean berrikusteko.",
+      "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
+      "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
+      "bitbucketOrgOnlyDescription": "Hautatu erakunde bat zure profilean haren Bitbucket-eko bateratze-eskaerak berrikusteko."
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-erako konexioa iraungi da.",
-      "message": "GitHub-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu."
+      "message": "GitHub-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
+      "gitlabTitle": "GitLab-erako konexioa iraungi da.",
+      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da.",
+      "providerMessage": "{{provider}}-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu."
     },
     "eventChips": {
       "comment": "Egin iruzkina",
@@ -636,6 +672,21 @@
       "files": "Fitxategi",
       "discussion": "Eztabaida"
     },
+    "terms": {
+      "pullRequest": "Bateratze-eskaera",
+      "mergeRequest": "Merge-eskaera",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Partekatu merge-eskaera",
+      "viewOnProvider": "Ikusi {{provider}}(e)n",
+      "mergeRequestUnavailable": "Merge-eskaera ez dago eskuragarri",
+      "unavailableDescription": "Baliteke ezabatuta egotea, edo agian ez duzu sarbiderik.",
+      "accessDeniedMergeRequest": "Ez duzu baimenik merge-eskaera hau ikusteko.",
+      "couldNotLoadMergeRequest": "Ezin izan da merge-eskaera kargatu.",
+      "discussionAccessDenied": "Ez duzu baimenik merge-eskaera honen eztabaida ikusteko.",
+      "discussionUnavailableMessage": "Baliteke merge-eskaera hau kendu izana.",
+      "noDiscussionDescription": "Merge-eskaera honetan ez dago berrikuspen-haririk, ezta elkarrizketako iruzkinik ere.",
+      "noFilesChangedDescription": "Merge-eskaera honek ez du fitxategi-aldaketarik."
+    },
     "fileStatus": {
       "modified": "Aldatuta",
       "renamed": "Berrizendatuta",
@@ -652,7 +703,7 @@
       "emptyLine": "(hutsik)"
     },
     "linkPasteClipboardEmpty": "Arbela hutsik dago.",
-    "linkPasteNotAPullRequest": "Ez da GitHub-eko bateratze-eskaera baten esteka.",
+    "linkPasteNotAPullRequest": "Ez da bateratze-eskaera edo merge-eskaera baten esteka",
     "announce": {
       "commentPosted": "Iruzkina argitaratuta",
       "reviewSubmitted": "Berrikuspena bidalita",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "Iruzkin hau ezin da argitaratu. Baliteke hautatutako lerroa aldatu izana edo PR-a eguneratu izana.",
       "reviewNotSubmitted": "Berrikuspen hau ezin da dagoen bezala bidali. Baliteke PRa aldatu izana edo zure bateratze-eskaera berrikusten aritzea, eta hori ez dago baimenduta.",
+      "reviewNotSubmittedTerm": "Berrikuspen hau ezin da oraingo egoeran bidali. Baliteke {{term}} aldatu izana, edo ezin duzu zure {{term}} propioa berrikusi.",
       "couldNotPostComment": "Ezin izan da iruzkina argitaratu.",
       "couldNotSubmitReview": "Ezin izan da berrikuspena bidali. Egiaztatu konexioa eta saiatu berriro."
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "Ezin izan da erantzun.",
       "couldNotCompleteAction": "Ezin izan da ekintza hau amaitu.",
       "mergeResultDefaultError": "GitHub-ek ez du bateratzea amaitu.",
+      "mergeResultNotCompleted": "{{term}} ez da bateratu. Egiaztatu egoera eta saiatu berriro.",
       "ambiguous": "Ezin izan da berretsi — egiaztatu PR-a berriro saiatu aurretik.",
       "persistenceFailed": "Ezin izan dugu ekintza hau erregistratu. Saiatu berriro geroago.",
       "forbidden": "Ez dago baimenduta."
@@ -1979,11 +2032,31 @@
       "retryConnection": "Saiatu berriro konektatzen"
     },
     "newSession": {
+      "recentlyUsed": "Duela gutxi erabiliak",
+      "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu.",
+      "couldNotLoadGitlabRepositories": "Ezin izan dira GitLab-eko biltegiak kargatu.",
+      "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu.",
       "connectGithubDescription": "Konektatu GitHub zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "connectGitlabDescription": "Konektatu GitLab zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
+      "connectBitbucketDescription": "Konektatu Bitbucket zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
       "openGithub": "Ireki GitHub",
+      "openGitlab": "Ireki GitLab",
+      "openBitbucket": "Ireki Bitbucket",
       "refreshRepositories": "Freskatu biltegien zerrenda",
       "githubConnected": "GitHub konektatuta",
+      "gitlabConnected": "GitLab konektatuta",
       "noRepositoriesVisible": "Ez dago biltegirik ikusgai. Egiaztatu Kilo-ren GitHub aplikazioak biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
+      "noRepositoriesVisibleGitlab": "Ez dago biltegirik ikusgai. Egiaztatu GitLab-ek biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
+      "noRepositoriesVisibleBitbucket": "Ez dago biltegirik ikusgai. Egiaztatu Bitbucket-ek biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
+      "bitbucketOrganizationsOnly": "Bitbucket erakundeei bakarrik dago eskuragarri.",
+      "branchPickerTitle": "Hautatu adarra",
+      "branchDefault": "Lehenetsia",
+      "branchAccessibility": "Adarra: {{label}}",
+      "branchLoading": "Adarrak kargatzen",
+      "branchLoadError": "Ezin izan dira adarrak kargatu",
+      "branchUnavailable": "Ez dago adarrik eskuragarri biltegi honetarako. Egiaztatu hornitzailearekin duzun sarbidea eta hautatu beste biltegi bat.",
+      "branchEmpty": "Ez dago adarrik eskuragarri",
+      "branchPlaceholder": "Hautatu adar bat",
       "runOnWithTarget": "Exekutatu honetan: {{target}}",
       "environment": "Ingurunea",
       "couldNotLoadEnvironment": "Ezin izan da zure ingurunea kargatu.",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "Ezin izan da biltegien zerrenda freskatu. Saiatu berriro.",
       "discardDraftTitle": "Baztertu zirriborroa?",
       "discardDraftMessage": "Zure eskaera galduko da.",
+      "discardWithUploadsMessage": "Zure eskaera eta igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
       "discardFailed": "Ezin izan da zirriborroa baztertu. Saiatu berriro.",
       "remoteHint": "Exekutatu `kilo remote` zure ordenagailuan, edo `/remote` exekutatzen ari den CLI saio batean, tokiko kilo prozesu bat kontrolatzeko.",
-      "connectBitbucketDescription": "Konektatu Bitbucket zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
-      "connectGitlabDescription": "Konektatu GitLab zure nabigatzailean, eta gero itzuli hona biltegi bat aukeratzeko.",
-      "couldNotLoadBitbucketRepositories": "Ezin izan dira Bitbucket-eko biltegiak kargatu.",
-      "couldNotLoadGithubRepositories": "Ezin izan dira GitHub-eko biltegiak kargatu.",
-      "couldNotLoadGitlabRepositories": "Ezin izan dira GitLab-eko biltegiak kargatu.",
-      "gitlabConnected": "GitLab konektatuta",
-      "noRepositoriesVisibleBitbucket": "Ez dago biltegirik ikusgai. Egiaztatu Bitbucket-ek biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
-      "noRepositoriesVisibleGitlab": "Ez dago biltegirik ikusgai. Egiaztatu GitLab-ek biltegietarako sarbidea duela, eta gero freskatu zerrenda.",
-      "openBitbucket": "Ireki Bitbucket",
-      "openGitlab": "Ireki GitLab",
-      "recentlyUsed": "Duela gutxi erabiliak",
-      "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
       "continueFrom": "Saio honekin jarraitzen ari zara: {{title}}.",
-      "importFailed": "Ezin izan da saio hau inportatu.",
       "importingSession": "Saioa inportatzen",
-      "discardWithUploadsMessage": "Zure eskaera eta igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira."
+      "cliCannotContinue": "CLI honek ezin dio saio bati jarraitu. Aukeratu Cloud Agent edo beste CLI bat.",
+      "importFailed": "Ezin izan da saio hau inportatu."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fitxategi eguneratu da.",

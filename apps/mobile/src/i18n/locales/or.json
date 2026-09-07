@@ -36,6 +36,7 @@
     "cost": "ଖର୍ଚ୍ଚ",
     "discard": "ଛାଡ଼ିଦିଅନ୍ତୁ",
     "findings": "ଚିହ୍ନଟ ସମସ୍ୟା",
+    "mergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ",
     "notConnected": "ସଂଯୋଗ ହୋଇନାହିଁ",
     "notifications": "ବିଜ୍ଞପ୍ତି",
     "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "ପରିବର୍ତ୍ତନ ବିବରଣୀର ଖାଲି ଧାଡ଼ି"
     },
     "connectionExpired": "GitHub ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
+    "capabilities": {
+      "banner": {
+        "title": "ଏହି ପ୍ରଦାନକାରୀଙ୍କଠାରେ ଉପଲବ୍ଧ ନୁହେଁ",
+        "accessibility": "ଏହି ପ୍ରଦାନକାରୀଙ୍କଠାରେ ଉପଲବ୍ଧ ନୁହେଁ: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "ମର୍ଜ୍",
       "mergeNow": "ଏବେ ମର୍ଜ୍ କରନ୍ତୁ",
       "mergePullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ମର୍ଜ୍",
+      "mergeTermTitle": "{{term}} ମର୍ଜ୍",
       "enableAutoMerge": "ସ୍ୱୟଂଚାଳିତ ମର୍ଜ୍ ଚାଲୁ କରନ୍ତୁ",
       "disableAutoMerge": "ସ୍ୱୟଂଚାଳିତ ମର୍ଜ୍ ବନ୍ଦ କରନ୍ତୁ",
       "autoMergeOn": "ସ୍ୱୟଂଚାଳିତ ମର୍ଜ୍ ଚାଲୁ ଅଛି",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "ମର୍ଜ୍ ପରେ ଶାଖା ବିଲୋପ କରନ୍ତୁ",
       "noEnabledMethods": "ଏହି ରିପୋଜିଟୋରିରେ କୌଣସି ମର୍ଜ୍ ପଦ୍ଧତି ଚାଲୁ ନାହିଁ। ମର୍ଜ୍, ସ୍କ୍ୱାସ୍ କିମ୍ବା ରିବେସ୍ ପଦ୍ଧତି ଚାଲୁ କରିବାକୁ ରିପୋଜିଟୋରିର ଜଣେ ପ୍ରଶାସକଙ୍କୁ କୁହନ୍ତୁ।",
       "confirmTitle": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ମର୍ଜ୍ କରିବେ?",
+      "confirmTitleTerm": "{{term}} ମର୍ଜ୍ କରିବେ?",
       "confirmMessage": "ଏହା ଆପଣଙ୍କ ପରିବର୍ତ୍ତନଗୁଡ଼ିକୁ ବେସ୍ ଶାଖାରେ ମର୍ଜ୍ କରିବ।",
       "enableAutoMergeConfirmTitle": "ସ୍ୱୟଂଚାଳିତ ମର୍ଜ୍ ଚାଲୁ କରିବେ?",
       "enableAutoMergeConfirmMessage": "ସବୁ ଆବଶ୍ୟକ ଯାଞ୍ଚ ସଫଳ ହେଲେ GitHub ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟକୁ ସ୍ୱୟଂଚାଳିତ ଭାବେ ମର୍ଜ୍ କରିବ।",
+      "enableAutoMergeConfirmMessageTerm": "ପାଇପଲାଇନ୍ ସଫଳ ହେଲେ {{term}} ସ୍ୱୟଂଚାଳିତ ଭାବେ ମର୍ଜ୍ ହେବ।",
+      "enableAutoMergeDescriptionTerm": "ପାଇପଲାଇନ୍ ସଫଳ ହେଲେ GitLab ଏହି {{term}}କୁ ସ୍ୱୟଂଚାଳିତ ଭାବେ ମର୍ଜ୍ କରେ।",
       "forbidden": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ମର୍ଜ୍ କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "cannotMerge": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟକୁ ବର୍ତ୍ତମାନ ସ୍ଥିତିରେ ମର୍ଜ୍ କରିହେବ ନାହିଁ।",
       "couldNotMerge": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ମର୍ଜ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "ଆଗରୁ ମର୍ଜ୍ ହୋଇଛି",
-        "closed": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ବନ୍ଦ ଅଛି"
+        "closed": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ବନ୍ଦ ଅଛି",
+        "closedMergeRequest": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ବନ୍ଦ ଅଛି"
       },
       "partialSuccessBanner": {
         "body": "ଶାଖା ବିଲୋପ ହୋଇପାରିଲା ନାହିଁ: {{reason}}।",
@@ -393,6 +405,18 @@
         "behindDetail": "ହେଡ୍ ଶାଖାରେ ବେସ୍ ଶାଖାର ନୂଆ ପରିବର୍ତ୍ତନ ନାହିଁ। ମର୍ଜ୍ କରିବା ପୂର୍ବରୁ ଶାଖାକୁ ରିବେସ୍ କିମ୍ବା ଅପଡେଟ୍ କରନ୍ତୁ।",
         "notMergeableTitle": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟକୁ ଏବେ ମର୍ଜ୍ କରିହେବ ନାହିଁ",
         "notMergeableDetail": "GitHub ଅନୁସାରେ ମର୍ଜ୍ ସ୍ଥିତି ହେଉଛି {{state}}।"
+      },
+      "restrictions": {
+        "title": "ମର୍ଜ୍ ପ୍ରତିବନ୍ଧକ",
+        "approvalsRequired_one": "{{displayCount}} ଅନୁମୋଦନ ଆବଶ୍ୟକ",
+        "approvalsRequired_other": "{{displayCount}} ଅନୁମୋଦନ ଆବଶ୍ୟକ",
+        "pipelineMustSucceed": "ମର୍ଜ୍ କରିବା ପୂର୍ବରୁ ପାଇପଲାଇନ୍ ସଫଳ ହେବା ଆବଶ୍ୟକ।"
+      },
+      "providerBlocked": {
+        "failingPipeline": "ଶେଷ କମିଟ୍‌ରେ ପାଇପଲାଇନ୍ ଅସଫଳ ହେଉଛି।",
+        "pendingPipeline": "ଶେଷ କମିଟ୍‌ରେ ପାଇପଲାଇନ୍ ଏବେ ମଧ୍ୟ ଚାଲୁଛି।",
+        "permission": "ଏହି {{term}} ମର୍ଜ୍ କରିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+        "draft": "ମର୍ଜ୍ କରିବା ପୂର୍ବରୁ {{term}}କୁ ସମୀକ୍ଷା ପାଇଁ ପ୍ରସ୍ତୁତ ଭାବେ ଚିହ୍ନିତ କରନ୍ତୁ।"
       },
       "methodLabels": {
         "merge": "ଏକ ମର୍ଜ୍ କମିଟ୍ ସୃଷ୍ଟି କରନ୍ତୁ",
@@ -441,6 +465,7 @@
       "acceptTerms": "ଗ୍ରହଣ କରନ୍ତୁ",
       "replyBadRequest": "ଏହି ଉତ୍ତର ପୋଷ୍ଟ କରିହେବ ନାହିଁ। ଥ୍ରେଡ୍ ବଦଳିଥାଇପାରେ।",
       "replyForbidden": "ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+      "replyForbiddenTerm": "ଏହି {{term}}ରେ ଉତ୍ତର ଦେବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
       "moderation": {
         "reportContent": {
           "terminal": "ଏହି ମନ୍ତବ୍ୟ ବିଷୟରେ ରିପୋର୍ଟ କରିହେବ ନାହିଁ।",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରନ୍ତୁ",
     "headLine": "{{counts}} · ହେଡ୍ {{sha}}",
     "entry": {
-      "eyebrow": "URL ଦେଇ ଏକ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲନ୍ତୁ।",
-      "pastePrLink": "ଏକ PR ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ",
-      "noRecentPrs": "ନିକଟରେ ଖୋଲିଥିବା କୌଣସି PR ନାହିଁ",
-      "noRecentPrsDescription": "ସମୀକ୍ଷା ଆରମ୍ଭ କରିବାକୁ ଉପରେ ଏକ PR ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ — ପରବର୍ତ୍ତୀ ଥର ଏହା ଏଠାରେ ଦେଖାଯିବ।",
+      "eyebrow": "URL ମାଧ୍ୟମରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲନ୍ତୁ",
+      "pastePrLink": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ",
+      "noRecentPrs": "କୌଣସି ସାମ୍ପ୍ରତିକ ସମୀକ୍ଷା ନାହିଁ",
+      "noRecentPrsDescription": "ସମୀକ୍ଷା ଆରମ୍ଭ କରିବାକୁ ଉପରେ ଏକ ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ — ପରବର୍ତ୍ତୀ ସମୟରେ ଏହା ଏଠାରେ ଦେଖାଯିବ।",
       "couldNotLoad": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "removeFromRecentsTitle": "ନିକଟରେ ଖୋଲିଥିବା ତାଲିକାରୁ ହଟାଇବେ?",
-      "removeFromRecentsMessage": "ନିକଟରେ ଖୋଲିଥିବା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ତାଲିକାରୁ ଏହି ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ହଟାଯିବ।",
+      "removeFromRecentsMessage": "ଏହି ସମୀକ୍ଷା ଆପଣଙ୍କ ସାମ୍ପ୍ରତିକ ତାଲିକାରୁ ହଟାଯିବ।",
       "removeRecentAccessibility": "ନିକଟରେ ଖୋଲିଥିବା ତାଲିକାରୁ {{repo}}କୁ ହଟାନ୍ତୁ",
-      "urlAccessibility": "GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ URL",
-      "clearLink": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ହଟାନ୍ତୁ",
-      "pasteLink": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ",
+      "urlAccessibility": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ URL ଦିଅନ୍ତୁ",
+      "urlPlaceholder": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ URL",
+      "openAccessibility": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଖୋଲନ୍ତୁ",
+      "clearLink": "ଲିଙ୍କ୍ ହଟାନ୍ତୁ",
+      "pasteLink": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ପେଷ୍ଟ କରନ୍ତୁ",
       "open": "ଖୋଲା"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "GitHub ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
       "checkFailedMessage": "ଏହା ଲୋଡ୍ ହେବା ପରେ ହିଁ ସାଇନ୍ ଇନ୍ ସ୍ଥିତି ଜାଣିହେବ।",
+      "checkFailedTitleGitLab": "GitLab ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
+      "checkFailedTitleBitbucket": "Bitbucket ସଂଯୋଗ ଯାଞ୍ଚ କରିହେଲା ନାହିଁ।",
+      "providerCheckFailedMessage": "ଏହା ଲୋଡ୍ ହେବା ପର୍ଯ୍ୟନ୍ତ ସଂଯୋଗ ଅବସ୍ଥା ଉପଲବ୍ଧ ନୁହେଁ।",
       "reconnectTitle": "GitHub ସହ ପୁଣି ସଂଯୋଗ",
       "reconnectDescription": "ଆପଣଙ୍କ GitHub ସଂଯୋଗର ଅନୁମତି ପ୍ରତ୍ୟାହାର କରାଯାଇଛି। ମୋବାଇଲ୍‌ରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା ଜାରି ରଖିବାକୁ ପୁଣି ସଂଯୋଗ କରନ୍ତୁ।",
-      "description": "ମୋବାଇଲ୍‌ରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitHub ଆକାଉଣ୍ଟ ସଂଯୋଗ କରନ୍ତୁ।"
+      "description": "ମୋବାଇଲ୍‌ରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitHub ଆକାଉଣ୍ଟ ସଂଯୋଗ କରନ୍ତୁ।",
+      "gitlabDescription": "ମୋବାଇଲରେ ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ GitLab ଖାତା ସଂଯୋଗ କରନ୍ତୁ।",
+      "bitbucketDescription": "ମୋବାଇଲରେ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଏହି ସଂଗଠନକୁ Bitbucket ସହ ସଂଯୋଗ କରନ୍ତୁ।",
+      "bitbucketOrgOnlyDescription": "ଏହାର Bitbucket ପୁଲ୍ ରିକ୍ୱେଷ୍ଟଗୁଡ଼ିକୁ ସମୀକ୍ଷା କରିବାକୁ ଆପଣଙ୍କ ପ୍ରୋଫାଇଲରେ ଗୋଟିଏ ସଂଗଠନ ବାଛନ୍ତୁ।"
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
-      "message": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।"
+      "message": "ଆପଣଙ୍କ GitHub ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।",
+      "gitlabTitle": "GitLab ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
+      "bitbucketTitle": "Bitbucket ସଂଯୋଗର ଅବଧି ଶେଷ ହୋଇଛି।",
+      "providerMessage": "ଆପଣଙ୍କ {{provider}} ସଂଯୋଗ ଆଉ ବୈଧ ନୁହେଁ। ସଂଯୋଗ ପୁଣି ଯାଞ୍ଚ କରନ୍ତୁ — ଆବଶ୍ୟକ ହେଲେ ପୁଣି ସଂଯୋଗ କରିବାକୁ କୁହାଯିବ।"
     },
     "eventChips": {
       "comment": "ମନ୍ତବ୍ୟ",
@@ -636,6 +672,21 @@
       "files": "ଫାଇଲ୍",
       "discussion": "ଆଲୋଚନା"
     },
+    "terms": {
+      "pullRequest": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ",
+      "mergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ସେୟାର କରନ୍ତୁ",
+      "viewOnProvider": "{{provider}}ରେ ଦେଖନ୍ତୁ",
+      "mergeRequestUnavailable": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
+      "unavailableDescription": "ଏହା ଡିଲିଟ୍ କରାଯାଇଥିବ, କିମ୍ବା ଆପଣଙ୍କୁ ଏହାର ଆକ୍ସେସ୍ ମିଳିବ ନାହିଁ।",
+      "accessDeniedMergeRequest": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+      "couldNotLoadMergeRequest": "ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "discussionAccessDenied": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ର ଆଲୋଚନା ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
+      "discussionUnavailableMessage": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ହଟାଯାଇଥାଇ ପାରେ।",
+      "noDiscussionDescription": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟରେ କୌଣସି ସମୀକ୍ଷା ଥ୍ରେଡ୍ କିମ୍ବା ଆଲୋଚନା ମନ୍ତବ୍ୟ ନାହିଁ।",
+      "noFilesChangedDescription": "ଏହି ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟରେ କୌଣସି ଫାଇଲ୍ ପରିବର୍ତ୍ତନ ନାହିଁ।"
+    },
     "fileStatus": {
       "modified": "ପରିବର୍ତ୍ତିତ",
       "renamed": "ନାମ ବଦଳାଗଲା",
@@ -652,7 +703,7 @@
       "emptyLine": "(ଖାଲି)"
     },
     "linkPasteClipboardEmpty": "କ୍ଲିପବୋର୍ଡ ଖାଲି ଅଛି।",
-    "linkPasteNotAPullRequest": "ଏହା GitHub ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ।",
+    "linkPasteNotAPullRequest": "ଏହା ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ କିମ୍ବା ମର୍ଜ୍ ରିକ୍ୱେଷ୍ଟ ଲିଙ୍କ୍ ନୁହେଁ",
     "announce": {
       "commentPosted": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହେଲା",
       "reviewSubmitted": "ସମୀକ୍ଷା ଦାଖଲ ହେଲା",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "ଏହି ମନ୍ତବ୍ୟ ପୋଷ୍ଟ କରିହେବ ନାହିଁ। ବଛାଯାଇଥିବା ଧାଡ଼ି ବଦଳିଥାଇପାରେ କିମ୍ବା PR ଅପଡେଟ୍ ହୋଇଥାଇପାରେ।",
       "reviewNotSubmitted": "ଏହି ସମୀକ୍ଷାକୁ ବର୍ତ୍ତମାନ ସ୍ଥିତିରେ ଦାଖଲ କରିହେବ ନାହିଁ। PR ବଦଳିଥାଇପାରେ କିମ୍ବା ଏହା ଆପଣଙ୍କ ନିଜ ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ହୋଇଥିବାରୁ ଆପଣ ସମୀକ୍ଷା କରିପାରିବେ ନାହିଁ।",
+      "reviewNotSubmittedTerm": "ଏହି ସମୀକ୍ଷା ଯେମିତି ଅଛି ସେମିତି ଜମା ହୋଇପାରିବ ନାହିଁ। {{term}} ବଦଳିଯାଇଥିବ, କିମ୍ବା ଆପଣ ନିଜର {{term}}କୁ ସମୀକ୍ଷା କରିପାରିବେ ନାହିଁ।",
       "couldNotPostComment": "ମନ୍ତବ୍ୟ ପୋଷ୍ଟ ହୋଇପାରିଲା ନାହିଁ।",
       "couldNotSubmitReview": "ସମୀକ୍ଷା ଦାଖଲ ହୋଇପାରିଲା ନାହିଁ। ଆପଣଙ୍କ ସଂଯୋଗ ଯାଞ୍ଚ କରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "ଉତ୍ତର ଦିଆଯାଇପାରିଲା ନାହିଁ।",
       "couldNotCompleteAction": "ଏହି କାର୍ଯ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ ହୋଇପାରିଲା ନାହିଁ।",
       "mergeResultDefaultError": "GitHub ମର୍ଜ୍ ସମ୍ପୂର୍ଣ୍ଣ କଲା ନାହିଁ।",
+      "mergeResultNotCompleted": "{{term}} ମର୍ଜ୍ ହୋଇନାହିଁ। ଏହାର ଅବସ୍ଥା ଯାଞ୍ଚ କରନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "ambiguous": "କାର୍ଯ୍ୟ ସଫଳ ହୋଇଛି କି ନାହିଁ ନିଶ୍ଚିତ କରିହେଲା ନାହିଁ — ପୁଣି ଚେଷ୍ଟା କରିବା ପୂର୍ବରୁ PR ଯାଞ୍ଚ କରନ୍ତୁ।",
       "persistenceFailed": "ଏହି କାର୍ଯ୍ୟର ରେକର୍ଡ୍ ରଖିହେଲା ନାହିଁ। ପରେ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "forbidden": "ଏହି କାର୍ଯ୍ୟ ପାଇଁ ଅନୁମତି ନାହିଁ।"
@@ -1979,11 +2032,31 @@
       "retryConnection": "ପୁଣି ସଂଯୋଗ କରନ୍ତୁ"
     },
     "newSession": {
+      "recentlyUsed": "ନିକଟରେ ବ୍ୟବହୃତ",
+      "couldNotLoadGithubRepositories": "GitHub ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "couldNotLoadGitlabRepositories": "GitLab ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "couldNotLoadBitbucketRepositories": "Bitbucket ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "connectGithubDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitHub ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitLab ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
+      "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ Bitbucket ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
       "openGithub": "GitHub ଖୋଲନ୍ତୁ",
+      "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
+      "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
       "refreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ କରନ୍ତୁ",
       "githubConnected": "GitHub ସଂଯୋଜିତ",
+      "gitlabConnected": "GitLab ସଂଯୋଜିତ",
       "noRepositoriesVisible": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। Kilo GitHub ଆପ୍‌ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "noRepositoriesVisibleGitlab": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। GitLab ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "noRepositoriesVisibleBitbucket": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। Bitbucket ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
+      "bitbucketOrganizationsOnly": "Bitbucket କେବଳ ସଂଗଠନଗୁଡ଼ିକ ପାଇଁ ଉପଲବ୍ଧ।",
+      "branchPickerTitle": "ଶାଖା ବାଛନ୍ତୁ",
+      "branchDefault": "ପୂର୍ବନିର୍ଦ୍ଧାରିତ",
+      "branchAccessibility": "ଶାଖା: {{label}}",
+      "branchLoading": "ଶାଖା ଲୋଡ୍ ହେଉଛି",
+      "branchLoadError": "ଶାଖା ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ",
+      "branchUnavailable": "ଏହି ରିପୋଜିଟରୀ ପାଇଁ ଶାଖା ଉପଲବ୍ଧ ନୁହେଁ। ପ୍ରଦାନକାରୀଙ୍କଠାରେ ଆପଣଙ୍କ ଆକ୍ସେସ୍ ଯାଞ୍ଚ କରନ୍ତୁ, ପରେ ଅନ୍ୟ ରିପୋଜିଟରୀ ବାଛନ୍ତୁ।",
+      "branchEmpty": "କୌଣସି ଶାଖା ଉପଲବ୍ଧ ନାହିଁ",
+      "branchPlaceholder": "ଗୋଟିଏ ଶାଖା ବାଛନ୍ତୁ",
       "runOnWithTarget": "{{target}} ରେ ଚଲାନ୍ତୁ",
       "environment": "ପରିବେଶ",
       "couldNotLoadEnvironment": "ଆପଣଙ୍କ ପରିବେଶ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "ରିପୋଜିଟୋରୀ ତାଲିକା ରିଫ୍ରେସ୍ ହୋଇପାରିଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "discardDraftTitle": "ଡ୍ରାଫ୍ଟ ହଟାଇବେ?",
       "discardDraftMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ହଟିଯିବ।",
+      "discardWithUploadsMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଏବଂ କୌଣସି ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ଯୋଡ଼ା ହୋଇନଥିବା ଅପଲୋଡ୍ ଫାଇଲ୍ ହଟିଯିବ।",
       "discardFailed": "ଡ୍ରାଫ୍ଟ ହଟାଇ ହେଲା ନାହିଁ। ଦୟାକରି ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
       "remoteHint": "ସ୍ଥାନୀୟ kilo ପ୍ରକ୍ରିୟାକୁ ନିୟନ୍ତ୍ରଣ କରିବାକୁ ଆପଣଙ୍କ କମ୍ପ୍ୟୁଟରରେ `kilo remote` କିମ୍ବା ଚାଲୁଥିବା CLI ସେସନରେ `/remote` ଚଲାନ୍ତୁ।",
-      "connectBitbucketDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ Bitbucket ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
-      "connectGitlabDescription": "ଆପଣଙ୍କ ବ୍ରାଉଜରରେ GitLab ସଂଯୋଗ କରନ୍ତୁ, ତା'ପରେ ଏକ ରିପୋଜିଟୋରୀ ବାଛିବାକୁ ଏଠାକୁ ଫେରନ୍ତୁ।",
-      "couldNotLoadBitbucketRepositories": "Bitbucket ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "couldNotLoadGithubRepositories": "GitHub ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "couldNotLoadGitlabRepositories": "GitLab ରିପୋଜିଟୋରୀ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-      "gitlabConnected": "GitLab ସଂଯୋଜିତ",
-      "noRepositoriesVisibleBitbucket": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। Bitbucket ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
-      "noRepositoriesVisibleGitlab": "କୌଣସି ରିପୋଜିଟୋରୀ ଦେଖାଯାଉନାହିଁ। GitLab ର ରିପୋଜିଟୋରୀ ପ୍ରବେଶ ଅନୁମତି ଯାଞ୍ଚ କରି ରିଫ୍ରେସ୍ କରନ୍ତୁ।",
-      "openBitbucket": "Bitbucket ଖୋଲନ୍ତୁ",
-      "openGitlab": "GitLab ଖୋଲନ୍ତୁ",
-      "recentlyUsed": "ନିକଟରେ ବ୍ୟବହୃତ",
-      "cliCannotContinue": "ଏହି CLI ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ ଏକ CLI ବାଛନ୍ତୁ।",
       "continueFrom": "{{title}} ଜାରି ରଖାଯାଉଛି।",
-      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।",
       "importingSession": "ସେସନ୍ ଆମଦାନି ହେଉଛି",
-      "discardWithUploadsMessage": "ଆପଣଙ୍କ ପ୍ରମ୍ପ୍ଟ ଏବଂ କୌଣସି ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ଯୋଡ଼ା ହୋଇନଥିବା ଅପଲୋଡ୍ ଫାଇଲ୍ ହଟିଯିବ।"
+      "cliCannotContinue": "ଏହି CLI ସେସନ୍ ଜାରି ରଖିପାରିବ ନାହିଁ। Cloud Agent କିମ୍ବା ଅନ୍ୟ ଏକ CLI ବାଛନ୍ତୁ।",
+      "importFailed": "ଏହି ସେସନ୍ ଆମଦାନି ହୋଇପାରିଲା ନାହିଁ।"
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}}ଟି ଫାଇଲ୍ ଅଦ୍ୟତନ ହୋଇଛି।",

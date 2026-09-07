@@ -36,6 +36,7 @@
     "cost": "Kostnad",
     "discard": "Kassera",
     "findings": "Anmärkningar",
+    "mergeRequest": "merge request",
     "notConnected": "Inte ansluten",
     "notifications": "Aviseringar",
     "pullRequest": "pR",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "Tom diffrad"
     },
     "connectionExpired": "GitHub-anslutningen har upphört att gälla.",
+    "capabilities": {
+      "banner": {
+        "title": "Inte tillgänglig hos den här leverantören",
+        "accessibility": "Inte tillgänglig hos den här leverantören: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Sammanfogning",
       "mergeNow": "Slå samman nu",
       "mergePullRequest": "Slå samman PR",
+      "mergeTermTitle": "Slå samman {{term}}",
       "enableAutoMerge": "Aktivera automatisk sammanslagning",
       "disableAutoMerge": "Inaktivera automatisk sammanslagning",
       "autoMergeOn": "Automatisk sammanslagning är aktiverad",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "Ta bort grenen efter sammanslagning",
       "noEnabledMethods": "Det här kodarkivet har inga aktiverade sammanslagningsmetoder. Be en administratör för kodarkivet att aktivera sammanslagning med en separat incheckning, hopslagning av incheckningar eller ombasering.",
       "confirmTitle": "Slå samman PR:en?",
+      "confirmTitleTerm": "Slå samman {{term}}?",
       "confirmMessage": "Dina ändringar slås samman med basgrenen.",
       "enableAutoMergeConfirmTitle": "Aktivera automatisk sammanslagning?",
       "enableAutoMergeConfirmMessage": "GitHub slår samman den här PR:en automatiskt när alla obligatoriska kontroller har godkänts.",
+      "enableAutoMergeConfirmMessageTerm": "När pipelinen lyckats slås {{term}} samman automatiskt.",
+      "enableAutoMergeDescriptionTerm": "GitLab slår ihop den här {{term}} automatiskt när pipelinen lyckats.",
       "forbidden": "Du har inte behörighet att slå samman den här PR:en.",
       "cannotMerge": "Den här PR:en kan inte slås samman i sitt nuvarande skick.",
       "couldNotMerge": "Kunde inte slå samman PR:en.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "Redan sammanslagen",
-        "closed": "Den här PR:en är stängd"
+        "closed": "Den här PR:en är stängd",
+        "closedMergeRequest": "Den här merge requesten är stängd"
       },
       "partialSuccessBanner": {
         "body": "Kunde inte ta bort grenen. Orsak: {{reason}}",
@@ -393,6 +405,18 @@
         "behindDetail": "Källgrenen ligger efter basgrenen. Gör en ombasering eller uppdatera grenen före sammanslagningen.",
         "notMergeableTitle": "Den här PR:en kan inte slås samman ännu",
         "notMergeableDetail": "GitHub rapporterade följande status för sammanslagningen: {{state}}."
+      },
+      "restrictions": {
+        "title": "Sammanslagningsbegränsningar",
+        "approvalsRequired_one": "{{displayCount}} godkännande krävs",
+        "approvalsRequired_other": "{{displayCount}} godkännanden krävs",
+        "pipelineMustSucceed": "Pipelinen måste lyckas innan sammanslagning."
+      },
+      "providerBlocked": {
+        "failingPipeline": "Pipelinen misslyckas med den senaste commiten.",
+        "pendingPipeline": "Pipelinen körs fortfarande på den senaste commiten.",
+        "permission": "Du har inte behörighet att slå samman {{term}}.",
+        "draft": "Markera {{term}} som redo för granskning före sammanslagningen."
       },
       "methodLabels": {
         "merge": "Skapa en incheckning för sammanslagningen",
@@ -441,6 +465,7 @@
       "acceptTerms": "Godkänn",
       "replyBadRequest": "Det här svaret kan inte publiceras. Tråden kan ha ändrats.",
       "replyForbidden": "Du har inte behörighet att svara på den här PR:en.",
+      "replyForbiddenTerm": "Du har inte behörighet att svara på {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "Den här kommentaren kan inte anmälas.",
@@ -501,17 +526,19 @@
     "reviewPullRequest": "Granska PR",
     "headLine": "{{counts}} · senaste incheckning {{sha}}",
     "entry": {
-      "eyebrow": "Öppna en PR via en URL.",
-      "pastePrLink": "Klistra in en PR-länk",
-      "noRecentPrs": "Inga nyligen öppnade PR:er",
-      "noRecentPrsDescription": "Klistra in en PR-länk ovan för att börja granska. PR:en visas här nästa gång.",
+      "eyebrow": "Öppna en PR eller merge request via en URL",
+      "pastePrLink": "Klistra in en PR- eller merge request-länk",
+      "noRecentPrs": "Inga senaste granskningar",
+      "noRecentPrsDescription": "Klistra in en länk ovan för att börja granska — den visas här nästa gång.",
       "couldNotLoad": "Kunde inte läsa in innehållet.",
       "removeFromRecentsTitle": "Ta bort från senast öppnade?",
-      "removeFromRecentsMessage": "Den här PR:en tas bort från listan över senast öppnade PR:er.",
+      "removeFromRecentsMessage": "Den här granskningen tas bort från listan över senaste.",
       "removeRecentAccessibility": "Ta bort {{repo}} från senast öppnade",
-      "urlAccessibility": "URL till en PR på GitHub",
-      "clearLink": "Rensa PR-länken",
-      "pasteLink": "Klistra in PR-länk",
+      "urlAccessibility": "Ange en URL till en PR eller merge request",
+      "urlPlaceholder": "URL till PR eller merge request",
+      "openAccessibility": "Öppna PR eller merge request",
+      "clearLink": "Rensa länken",
+      "pasteLink": "Klistra in PR- eller merge request-länk",
       "open": "Öppna"
     },
     "checks": {
@@ -560,9 +587,15 @@
     "connect": {
       "checkFailedTitle": "Kunde inte kontrollera GitHub-anslutningen.",
       "checkFailedMessage": "Inloggningsstatusen kan inte visas förrän inläsningen är klar.",
+      "checkFailedTitleGitLab": "Kunde inte kontrollera GitLab-anslutningen.",
+      "checkFailedTitleBitbucket": "Kunde inte kontrollera Bitbucket-anslutningen.",
+      "providerCheckFailedMessage": "Anslutningsstatusen kan inte visas förrän inläsningen är klar.",
       "reconnectTitle": "Anslut GitHub igen",
       "reconnectDescription": "Åtkomsten via din GitHub-anslutning har återkallats. Anslut igen för att fortsätta granska PR:er i mobilen.",
-      "description": "Anslut ditt GitHub-konto för att granska PR:er i mobilen."
+      "description": "Anslut ditt GitHub-konto för att granska PR:er i mobilen.",
+      "gitlabDescription": "Anslut ditt GitLab-konto för att granska merge requests i mobilen.",
+      "bitbucketDescription": "Anslut Bitbucket till den här organisationen för att granska PR:er i mobilen.",
+      "bitbucketOrgOnlyDescription": "Välj en organisation i din profil för att granska dess Bitbucket-PR:er."
     },
     "screen": {
       "title": "#{{number}}",
@@ -584,7 +617,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub-anslutningen har upphört att gälla.",
-      "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
+      "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs.",
+      "gitlabTitle": "GitLab-anslutningen har upphört att gälla.",
+      "bitbucketTitle": "Bitbucket-anslutningen har upphört att gälla.",
+      "providerMessage": "Din {{provider}}-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
     },
     "eventChips": {
       "comment": "Kommentera",
@@ -636,6 +672,21 @@
       "files": "Filer",
       "discussion": "Diskussion"
     },
+    "terms": {
+      "pullRequest": "PR",
+      "mergeRequest": "Merge request",
+      "mergeRequestNumber": "!{{number}}",
+      "shareMergeRequest": "Dela merge request",
+      "viewOnProvider": "Visa på {{provider}}",
+      "mergeRequestUnavailable": "Merge requesten är inte tillgänglig",
+      "unavailableDescription": "Den kan ha tagits bort, eller så har du inte åtkomst.",
+      "accessDeniedMergeRequest": "Du har inte behörighet att se den här merge requesten.",
+      "couldNotLoadMergeRequest": "Kunde inte läsa in merge requesten.",
+      "discussionAccessDenied": "Du har inte behörighet att se diskussionen för den här merge requesten.",
+      "discussionUnavailableMessage": "Den här merge requesten kan ha tagits bort.",
+      "noDiscussionDescription": "Den här merge requesten har inga granskningstrådar eller kommentarer i diskussionen.",
+      "noFilesChangedDescription": "Den här merge requesten innehåller inga filändringar."
+    },
     "fileStatus": {
       "modified": "Ändrad",
       "renamed": "Namnändrad",
@@ -652,7 +703,7 @@
       "emptyLine": "(tom)"
     },
     "linkPasteClipboardEmpty": "Urklipp är tomt.",
-    "linkPasteNotAPullRequest": "Länken leder inte till en PR på GitHub.",
+    "linkPasteNotAPullRequest": "Länken leder inte till en PR eller merge request",
     "announce": {
       "commentPosted": "Kommentar publicerad",
       "reviewSubmitted": "Granskning skickad",
@@ -661,6 +712,7 @@
     "mutationError": {
       "commentNotPosted": "Den här kommentaren kan inte publiceras. Den markerade raden kan ha ändrats eller PR:en kan ha uppdaterats.",
       "reviewNotSubmitted": "Den här granskningen kan inte skickas i sitt nuvarande skick. PR:en kan ha ändrats, eller så gäller den din egen PR som du inte får granska.",
+      "reviewNotSubmittedTerm": "Den här granskningen kan inte skickas i sitt nuvarande skick. {{term}} kan ha ändrats, eller så kan du inte granska din egen {{term}}.",
       "couldNotPostComment": "Kunde inte publicera kommentaren.",
       "couldNotSubmitReview": "Kunde inte skicka granskningen. Kontrollera anslutningen och försök igen."
     },
@@ -668,6 +720,7 @@
       "couldNotReply": "Det gick inte att skicka svaret.",
       "couldNotCompleteAction": "Kunde inte slutföra den här åtgärden.",
       "mergeResultDefaultError": "GitHub slutförde inte sammanslagningen.",
+      "mergeResultNotCompleted": "{{term}} slogs inte samman. Kontrollera statusen och försök igen.",
       "ambiguous": "Kunde inte bekräfta resultatet. Kontrollera PR:en innan du försöker igen.",
       "persistenceFailed": "Vi kunde inte registrera den här åtgärden. Försök igen senare.",
       "forbidden": "Du saknar behörighet."
@@ -1979,11 +2032,31 @@
       "retryConnection": "Försök ansluta igen"
     },
     "newSession": {
+      "recentlyUsed": "Nyligen använda",
+      "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",
+      "couldNotLoadGitlabRepositories": "Det gick inte att läsa in kodarkiven från GitLab.",
+      "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in kodarkiven från Bitbucket.",
       "connectGithubDescription": "Anslut GitHub i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
+      "connectGitlabDescription": "Anslut GitLab i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
+      "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
       "openGithub": "Öppna GitHub",
+      "openGitlab": "Öppna GitLab",
+      "openBitbucket": "Öppna Bitbucket",
       "refreshRepositories": "Uppdatera kodarkiven",
       "githubConnected": "GitHub anslutet",
+      "gitlabConnected": "GitLab anslutet",
       "noRepositoriesVisible": "Inga kodarkiv visas. Kontrollera vilka kodarkiv Kilos GitHub-app har åtkomst till och uppdatera sedan listan.",
+      "noRepositoriesVisibleGitlab": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i GitLab och uppdatera sedan listan.",
+      "noRepositoriesVisibleBitbucket": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i Bitbucket och uppdatera sedan listan.",
+      "bitbucketOrganizationsOnly": "Bitbucket är bara tillgängligt för organisationer.",
+      "branchPickerTitle": "Välj gren",
+      "branchDefault": "Standard",
+      "branchAccessibility": "Gren: {{label}}",
+      "branchLoading": "Läser in grenar",
+      "branchLoadError": "Kunde inte läsa in grenar",
+      "branchUnavailable": "Inga grenar är tillgängliga för det här kodarkivet. Kontrollera din åtkomst hos leverantören och välj ett annat kodarkiv.",
+      "branchEmpty": "Inga grenar tillgängliga",
+      "branchPlaceholder": "Välj en gren",
       "runOnWithTarget": "Kör på: {{target}}",
       "environment": "Miljö",
       "couldNotLoadEnvironment": "Det gick inte att läsa in din miljö.",
@@ -2004,24 +2077,13 @@
       "couldNotRefreshRepositories": "Det gick inte att uppdatera kodarkiven. Försök igen.",
       "discardDraftTitle": "Ta bort utkastet?",
       "discardDraftMessage": "Din prompt går förlorad.",
+      "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
       "discardFailed": "Det gick inte att ta bort utkastet. Försök igen.",
       "remoteHint": "Kör `kilo remote` på din dator, eller `/remote` i en aktiv CLI-session, för att styra en lokal kilo-process.",
-      "connectBitbucketDescription": "Anslut Bitbucket i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
-      "connectGitlabDescription": "Anslut GitLab i webbläsaren och kom sedan tillbaka hit för att välja ett kodarkiv.",
-      "couldNotLoadBitbucketRepositories": "Det gick inte att läsa in kodarkiven från Bitbucket.",
-      "couldNotLoadGithubRepositories": "Det gick inte att läsa in kodarkiven från GitHub.",
-      "couldNotLoadGitlabRepositories": "Det gick inte att läsa in kodarkiven från GitLab.",
-      "gitlabConnected": "GitLab anslutet",
-      "noRepositoriesVisibleBitbucket": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i Bitbucket och uppdatera sedan listan.",
-      "noRepositoriesVisibleGitlab": "Inga kodarkiv visas. Kontrollera åtkomsten till kodarkiven i GitLab och uppdatera sedan listan.",
-      "openBitbucket": "Öppna Bitbucket",
-      "openGitlab": "Öppna GitLab",
-      "recentlyUsed": "Nyligen använda",
-      "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
       "continueFrom": "Sessionen {{title}} fortsätter.",
-      "importFailed": "Det gick inte att importera den här sessionen.",
       "importingSession": "Importerar sessionen",
-      "discardWithUploadsMessage": "Din prompt och uppladdade filer som inte har bifogats i skickade meddelanden tas bort."
+      "cliCannotContinue": "Den här CLI-versionen kan inte fortsätta en session. Välj Cloud Agent eller en annan CLI-instans.",
+      "importFailed": "Det gick inte att importera den här sessionen."
     },
     "partRenderer": {
       "updatedFileCount_one": "{{displayCount}} fil har uppdaterats.",

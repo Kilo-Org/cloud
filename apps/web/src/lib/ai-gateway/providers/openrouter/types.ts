@@ -57,16 +57,6 @@ export type OpenCodeSpecificProperties = {
   reasoningEffort?: string;
 };
 
-export type GatewayServiceTier =
-  | 'auto'
-  | 'default'
-  | 'flex'
-  | 'priority'
-  | 'fast'
-  | 'scale'
-  | 'standard_only'
-  | null;
-
 export type SharedGatewayRequestProperties = {
   // https://openrouter.ai/docs/features/provider-routing#requiring-providers-to-comply-with-data-policies
   provider?: OpenRouterProviderConfig;
@@ -75,9 +65,6 @@ export type SharedGatewayRequestProperties = {
   // OpenRouter specific field we do not support
   // https://openrouter.ai/docs/api/api-reference/chat/send-chat-completion-request#request.body.models
   models?: string[];
-
-  // Supported by OpenRouter's Chat Completions, Responses, and Messages APIs.
-  service_tier?: GatewayServiceTier;
 
   // Non-standard reasoning configuration
   enable_thinking?: boolean; // Alibaba
@@ -88,7 +75,7 @@ export type GatewayResponsesRequest = SharedGatewayRequestProperties &
   OpenAI.Responses.ResponseCreateParams;
 
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &
-  Omit<Anthropic.MessageCreateParams, 'service_tier'> & {
+  Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
   };

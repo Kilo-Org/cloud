@@ -79,7 +79,6 @@ export function mapGooglePlayKiloPassPurchase(
   if (
     !Number.isFinite(periodStart) ||
     !Number.isFinite(periodEnd) ||
-    periodStart < decoded.startTimeMs ||
     periodEnd <= periodStart ||
     periodStart > Date.now()
   ) {

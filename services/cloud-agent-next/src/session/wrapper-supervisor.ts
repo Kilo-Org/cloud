@@ -11,6 +11,7 @@ import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
 import {
+  assistantFailureMessage,
   classifyAssistantFailure,
   classifyAssistantFailureMessage,
   isAssistantInterrupt,
@@ -25,7 +26,7 @@ import {
   type TerminalizeParams,
 } from './session-message-state.js';
 import type { WrapperTerminalFailureCode } from '../shared/protocol.js';
-import type { LatestAssistantMessage } from './types.js';
+import type { AssistantMessagePart, LatestAssistantMessage } from './types.js';
 import type { SandboxId } from '../types.js';
 import {
   MODEL_NOT_FOUND_RUNTIME_DIAGNOSTIC_LOG_CHUNK_SIZE,
@@ -329,6 +330,49 @@ function hasAssistantCompletionMarker(info: LatestAssistantMessage['info']): boo
   return typeof time.completed === 'number';
 }
 
+function assistantTextFromParts(parts: AssistantMessagePart[]): string {
+  return parts
+    .filter(part => part.type === 'text')
+    .map(part => (typeof part.text === 'string' ? part.text : ''))
+    .join('\n');
+}
+
+/**
+ * The CLI ends a turn whose model hit its output limit mid-reasoning with a
+ * plain assistant text notice instead of a terminal error, so the wrapper
+ * reports the batch complete. A code review that ends with this notice produced
+ * no review content, yet it settled as completed and reported a successful
+ * GitHub check (Kilo-Org/cloud#5630). Matched as two independent fragments so
+ * small copy drift in either half still detects, while a review that merely
+ * discusses output limits cannot false-positive without the
+ * "no actionable output" half.
+ */
+function assistantReportsNoActionableOutput(assistantMessage: LatestAssistantMessage): boolean {
+  const text = assistantTextFromParts(assistantMessage.parts);
+  return /no actionable output/i.test(text) && /(?:output|token) limit/i.test(text);
+}
+
+/**
+ * Terminalize params for a turn whose only output is the model-output-limit
+ * notice. Classified like a terminal assistant error (output_limit) so the
+ * callback failure projects the safe message and the review is not completed.
+ */
+function noActionableAssistantOutputTerminalizeParams(
+  assistantMessageId: string
+): TerminalizeParams {
+  return {
+    kind: 'failed',
+    reason: 'assistant_error',
+    error: assistantFailureMessage('output_limit'),
+    completionSource: 'idle_reconciliation',
+    failureStage: 'agent_activity',
+    failureCode: 'assistant_error',
+    assistantFailureReason: 'output_limit',
+    safeFailureMessage: assistantFailureMessage('output_limit'),
+    assistantMessageId,
+  };
+}
+
 /**
  * Wrapper-death reconciliation needs positive terminal evidence: unlike the
  * sealed-batch path, no wrapper `complete` vouches for turn finality, so bare
@@ -337,13 +381,17 @@ function hasAssistantCompletionMarker(info: LatestAssistantMessage['info']): boo
  * isAssistantCompletionSignal): a completed timestamp or a terminal error.
  */
 function projectWrapperDeathReconciliation(
-  assistantMessage: LatestAssistantMessage | null
+  assistantMessage: LatestAssistantMessage | null,
+  codeReviewSession: boolean
 ): TerminalizeParams | null {
   if (!assistantMessage) return null;
   if (assistantMessage.info.error !== undefined && assistantMessage.info.error !== null) {
     return assistantErrorTerminalizeParams(assistantMessage.info);
   }
   if (!hasAssistantCompletionMarker(assistantMessage.info)) return null;
+  if (codeReviewSession && assistantReportsNoActionableOutput(assistantMessage)) {
+    return noActionableAssistantOutputTerminalizeParams(assistantMessage.info.id);
+  }
   return {
     kind: 'completed',
     assistantMessageId: assistantMessage.info.id,
@@ -906,6 +954,7 @@ export function createWrapperSupervisor(
   ): Promise<void> {
     const metadata = await getMetadata();
     const kiloSessionId = metadata?.auth.kiloSessionId;
+    const codeReviewSession = metadata?.identity.createdOnPlatform === 'code-review';
     let reconciledCount = 0;
     for (const message of acceptedMessages) {
       const reconciled =
@@ -915,7 +964,8 @@ export function createWrapperSupervisor(
                 metadata.identity.sessionId,
                 kiloSessionId,
                 message.messageId
-              )
+              ),
+              codeReviewSession
             )
           : null;
       if (reconciled) reconciledCount += 1;
@@ -1276,6 +1326,7 @@ export function createWrapperSupervisor(
     const metadata = await getMetadata();
     if (!metadata) return null;
     const kiloSessionId = metadata.auth.kiloSessionId;
+    const codeReviewSession = metadata.identity.createdOnPlatform === 'code-review';
     const projectedSettlements: ProjectedSealedBatchSettlement[] = [];
     for (const messageId of sealedMessageIds) {
       const message = wrapperRunMessagesById.get(messageId);
@@ -1298,11 +1349,14 @@ export function createWrapperSupervisor(
         projectedSettlements.push({
           message,
           observeCorrelatedActivity: true,
-          params: {
-            kind: 'completed',
-            assistantMessageId: assistantMessage.info.id,
-            completionSource: 'idle_reconciliation',
-          },
+          params:
+            codeReviewSession && assistantReportsNoActionableOutput(assistantMessage)
+              ? noActionableAssistantOutputTerminalizeParams(assistantMessage.info.id)
+              : {
+                  kind: 'completed',
+                  assistantMessageId: assistantMessage.info.id,
+                  completionSource: 'idle_reconciliation',
+                },
         });
       } else if (!isPromptMessage(message)) {
         projectedSettlements.push({

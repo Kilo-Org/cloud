@@ -2556,6 +2556,10 @@
     "stopped": "A hangbevitel leállt. Az újrapróbálkozáshoz koppints a mikrofonra.",
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
     "unavailableLanguage": "A hangbevitel nem érhető el az eszközön beállított nyelven.",
+    "languageNotInstalledTitle": "A hangbevitel {{language}} nyelven még nem áll készen",
+    "languageNotInstalledMessage": "A(z) {{language}} nyelv offline beszédfájljai nincsenek telepítve ezen a telefonon. Töltsd le őket, majd próbáld újra a hangbevitelt.",
+    "downloadOfflineModel": "Letöltés",
+    "offlineModelDownloadScheduled": "Az offline beszédfájlok a háttérben töltődnek le. Próbáld újra a hangbevitelt később.",
     "listeningStopped": "A beszéd figyelése leállt."
   },
   "share": {

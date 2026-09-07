@@ -2139,6 +2139,10 @@
     "stopped": "ההכתבה הופסקה. הקש על המיקרופון כדי לנסות שוב.",
     "unavailableDevice": "ההכתבה אינה זמינה במכשיר הזה.",
     "unavailableLanguage": "ההכתבה אינה זמינה בשפה שהוגדרה במכשיר הזה.",
+    "languageNotInstalledTitle": "ההכתבה עבור {{language}} עדיין לא מוכנה",
+    "languageNotInstalledMessage": "קובצי הדיבור הלא מקוונים עבור {{language}} לא מותקנים בטלפון הזה. הורד אותם ואז נסה שוב להשתמש בהכתבה.",
+    "downloadOfflineModel": "הורדה",
+    "offlineModelDownloadScheduled": "קובצי הדיבור הלא מקוונים יורדו ברקע. נסה שוב להשתמש בהכתבה מאוחר יותר.",
     "listeningStopped": "ההאזנה הופסקה."
   },
   "share": {

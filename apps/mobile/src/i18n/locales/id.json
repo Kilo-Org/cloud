@@ -2125,6 +2125,10 @@
     "stopped": "Masukan suara berhenti. Ketuk mikrofon untuk mencoba lagi.",
     "unavailableDevice": "Masukan suara tidak tersedia di perangkat ini.",
     "unavailableLanguage": "Masukan suara tidak tersedia untuk bahasa perangkat ini.",
+    "languageNotInstalledTitle": "Masukan suara untuk {{language}} belum siap",
+    "languageNotInstalledMessage": "File suara offline untuk {{language}} belum terinstal di ponsel ini. Unduh filenya, lalu coba masukan suara lagi.",
+    "downloadOfflineModel": "Unduh",
+    "offlineModelDownloadScheduled": "File suara offline akan diunduh di latar belakang. Coba masukan suara lagi nanti.",
     "listeningStopped": "Pendeteksian suara dihentikan."
   },
   "share": {

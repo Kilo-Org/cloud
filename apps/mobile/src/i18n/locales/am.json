@@ -2556,6 +2556,10 @@
     "stopped": "የድምፅ ግብዓት ቆሟል። እንደገና ለመሞከር ማይክሮፎኑን ይንኩ።",
     "unavailableDevice": "የድምፅ ግብዓት በዚህ መሣሪያ ላይ አይገኝም።",
     "unavailableLanguage": "የድምፅ ግብዓት መሣሪያው ለተዋቀረበት ቋንቋ አይገኝም።",
+    "languageNotInstalledTitle": "የ{{language}} የድምፅ ግብዓት እስካሁን አልተዘጋጀም",
+    "languageNotInstalledMessage": "የ{{language}} ከመስመር ውጭ ያሉ የንግግር ፋይሎች በዚህ ስልክ ላይ አልተጫኑም። ያውርዱዋቸው፣ ከዚያ የድምፅ ግብዓትን እንደገና ይሞክሩ።",
+    "downloadOfflineModel": "አውርድ",
+    "offlineModelDownloadScheduled": "ከመስመር ውጭ ያሉ የንግግር ፋይሎች በጀርባ ይወርዳሉ። የድምፅ ግብዓትን በኋላ እንደገና ይሞክሩ።",
     "listeningStopped": "ማዳመጥ ቆሟል።"
   },
   "share": {

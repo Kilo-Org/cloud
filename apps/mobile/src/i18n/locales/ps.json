@@ -2556,6 +2556,10 @@
     "stopped": "غږیز لیکل ودرېدل. د بیا هڅې لپاره پر مایکروفون ټک وکړئ.",
     "unavailableDevice": "په دې وسیله غږیز لیکل ممکن نه دي.",
     "unavailableLanguage": "د دې وسیلې په ژبه غږیز لیکل ممکن نه دي.",
+    "languageNotInstalledTitle": "د {{language}} لپاره غږیز لیکل تر اوسه چمتو نه دی",
+    "languageNotInstalledMessage": "د {{language}} آفلاین وینا فایلونه پر دې تلیفون نصب شوي نه دي. هغوی ښکته کړئ، بیا د غږیز لیکلو هڅه وکړئ.",
+    "downloadOfflineModel": "ښکته کول",
+    "offlineModelDownloadScheduled": "آفلاین وینا فایلونه به شالید کې ښکته شي. وروسته بیا د غږیز لیکلو هڅه وکړئ.",
     "listeningStopped": "اورېدل ودرېدل."
   },
   "share": {

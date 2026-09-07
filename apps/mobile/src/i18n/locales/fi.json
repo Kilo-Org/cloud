@@ -2556,6 +2556,10 @@
     "stopped": "Puheentunnistus keskeytyi. Yritä uudelleen napauttamalla mikrofonia.",
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
     "unavailableLanguage": "Puheentunnistus ei ole käytettävissä laitteen nykyisellä kielellä.",
+    "languageNotInstalledTitle": "Puheentunnistus ei ole vielä valmis kielelle {{language}}",
+    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
+    "downloadOfflineModel": "Lataa",
+    "offlineModelDownloadScheduled": "Offline-puhetiedostot ladataan taustalla. Kokeile puheentunnistusta myöhemmin uudelleen.",
     "listeningStopped": "Kuuntelu lopetettiin."
   },
   "share": {

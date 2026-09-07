@@ -2556,6 +2556,10 @@
     "stopped": "Diktimi u ndal. Prek mikrofonin për të provuar përsëri.",
     "unavailableDevice": "Diktimi nuk është i disponueshëm në këtë pajisje.",
     "unavailableLanguage": "Diktimi nuk është i disponueshëm për gjuhën e caktuar në këtë pajisje.",
+    "languageNotInstalledTitle": "Diktimi për {{language}} nuk është gati ende",
+    "languageNotInstalledMessage": "Skedarët e të folurit jashtë interneti për {{language}} nuk janë të instaluar në këtë telefon. Shkarkoji dhe pastaj provo diktimin përsëri.",
+    "downloadOfflineModel": "Shkarko",
+    "offlineModelDownloadScheduled": "Skedarët e të folurit jashtë interneti do të shkarkohen në sfond. Provo diktimin përsëri më vonë.",
     "listeningStopped": "Dëgjimi u ndal."
   },
   "share": {

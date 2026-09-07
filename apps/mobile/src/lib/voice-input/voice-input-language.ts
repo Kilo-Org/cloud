@@ -1,6 +1,8 @@
 import { getLocales } from 'expo-localization';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 
+import { isSupportedLanguage, LANGUAGE_ENDONYMS } from '@/i18n/languages';
+
 function normalizeLocale(tag: string): string {
   return tag.toLowerCase().replaceAll('_', '-');
 }
@@ -117,16 +119,25 @@ export function pickSupportedVoiceInputLanguageTag(
   return null;
 }
 
-let cachedSupportedTags: readonly string[] | null = null;
+let cachedVoiceRecognitionLocales: {
+  locales: readonly string[];
+  installedLocales: readonly string[];
+} | null = null;
 
-async function fetchSupportedLanguageTags(): Promise<readonly string[] | null> {
-  if (cachedSupportedTags) {
-    return cachedSupportedTags;
+async function fetchVoiceRecognitionLocales(): Promise<{
+  locales: readonly string[];
+  installedLocales: readonly string[];
+} | null> {
+  if (cachedVoiceRecognitionLocales) {
+    return cachedVoiceRecognitionLocales;
   }
   try {
     const result = await ExpoSpeechRecognitionModule.getSupportedLocales({});
-    cachedSupportedTags = result.locales;
-    return cachedSupportedTags;
+    cachedVoiceRecognitionLocales = {
+      locales: result.locales,
+      installedLocales: result.installedLocales,
+    };
+    return cachedVoiceRecognitionLocales;
   } catch {
     return null;
   }
@@ -155,15 +166,55 @@ export async function resolveVoiceInputStartLanguageTag(appLanguage: string): Pr
     ? [appLanguage, ...matchingDeviceTags]
     : [...matchingDeviceTags, appLanguage];
 
-  const supported = await fetchSupportedLanguageTags();
-  if (!supported || supported.length === 0) {
+  const supported = await fetchVoiceRecognitionLocales();
+  if (!supported || supported.locales.length === 0) {
     return appLanguage;
   }
 
-  return pickSupportedVoiceInputLanguageTag(preferredTags, supported) ?? appLanguage;
+  return pickSupportedVoiceInputLanguageTag(preferredTags, supported.locales) ?? appLanguage;
+}
+
+/**
+ * Whether the recognition service reports the language as installed for
+ * offline (on-device) recognition. Starting with
+ * `requiresOnDeviceRecognition` for a language that is only supported online
+ * fails on every attempt (`language-not-supported`) — that is the bug where
+ * voice input broke on devices whose locale has no offline speech model. The
+ * gate therefore returns `false` only for the positively-known-bad case
+ * ("supported but not installed"); when the service exposes no per-language
+ * data at all (older Android versions, non-Google service packages) it keeps
+ * the previous on-device behavior rather than blocking a start that may work.
+ */
+export async function isVoiceInputLanguageInstalledOnDevice(languageTag: string): Promise<boolean> {
+  const data = await fetchVoiceRecognitionLocales();
+  if (!data || pickSupportedVoiceInputLanguageTag([languageTag], data.locales) === null) {
+    return true;
+  }
+  return pickSupportedVoiceInputLanguageTag([languageTag], data.installedLocales) !== null;
+}
+
+/**
+ * Name a recognition language the way the language picker does — by its
+ * endonym (`de-DE` → "Deutsch") — so feedback about missing speech models
+ * reads like the rest of the app. Falls back to the raw tag for a language
+ * the app does not ship.
+ */
+export function voiceInputLanguageDisplayName(languageTag: string): string {
+  const language = normalizeLocale(languageTag).split('-')[0] ?? languageTag;
+  return isSupportedLanguage(language) ? LANGUAGE_ENDONYMS[language] : languageTag;
+}
+
+/**
+ * Drop the memoized supported/installed locale lists so the next gate
+ * re-queries the service. The download flow calls this after triggering a
+ * model download: without it a successful download would stay invisible to
+ * the gate for the rest of the session.
+ */
+export function invalidateVoiceRecognitionLocalesCache(): void {
+  cachedVoiceRecognitionLocales = null;
 }
 
 /** Clear the session-level supported-locale cache. For tests only. */
 export function __resetVoiceInputLanguageTagCacheForTests(): void {
-  cachedSupportedTags = null;
+  invalidateVoiceRecognitionLocalesCache();
 }

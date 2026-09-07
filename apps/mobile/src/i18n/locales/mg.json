@@ -2556,6 +2556,10 @@
     "stopped": "Nijanona ny fampidirana amin'ny feo. Tsindrio ny mikrô hanandrana indray.",
     "unavailableDevice": "Tsy azo ampiasaina amin'ity fitaovana ity ny fampidirana amin'ny feo.",
     "unavailableLanguage": "Tsy azo ampiasaina amin'ny fitenin'ity fitaovana ity ny fampidirana amin'ny feo.",
+    "languageNotInstalledTitle": "Mbola tsy vonona ny fampidirana amin'ny feo ho an'ny {{language}}",
+    "languageNotInstalledMessage": "Tsy napetraka amin'ity finday ity ny rakitra feo offline ho an'ny {{language}}. Sintomy aloha izy ireo, avy eo andramo indray ny fampidirana amin'ny feo.",
+    "downloadOfflineModel": "Sintomy",
+    "offlineModelDownloadScheduled": "Ho sintomy ao amin'ny background ny rakitra feo offline. Andramo indray ny fampidirana amin'ny feo raha vao ela.",
     "listeningStopped": "Nijanona ny fihainoana."
   },
   "share": {

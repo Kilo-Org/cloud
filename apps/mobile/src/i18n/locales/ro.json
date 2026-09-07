@@ -2577,6 +2577,10 @@
     "stopped": "Dictarea s-a oprit. Atinge microfonul pentru a încerca din nou.",
     "unavailableDevice": "Dictarea nu este disponibilă pe acest dispozitiv.",
     "unavailableLanguage": "Dictarea nu este disponibilă pentru limba dispozitivului.",
+    "languageNotInstalledTitle": "Dictarea pentru {{language}} nu este încă gata",
+    "languageNotInstalledMessage": "Fișierele vocale offline pentru {{language}} nu sunt instalate pe acest telefon. Descarcă-le, apoi încearcă dictarea din nou.",
+    "downloadOfflineModel": "Descarcă",
+    "offlineModelDownloadScheduled": "Fișierele vocale offline se vor descărca în fundal. Încearcă dictarea din nou mai târziu.",
     "listeningStopped": "Ascultarea s-a oprit."
   },
   "share": {

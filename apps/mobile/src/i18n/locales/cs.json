@@ -2598,6 +2598,10 @@
     "stopped": "Diktování se zastavilo. Klepněte na mikrofon a zkuste to znovu.",
     "unavailableDevice": "Diktování není na tomto zařízení k dispozici.",
     "unavailableLanguage": "Diktování není pro aktuální jazyk zařízení k dispozici.",
+    "languageNotInstalledTitle": "Diktování pro jazyk {{language}} zatím není připraveno",
+    "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou v tomto telefonu nainstalovány. Stáhněte je a poté zkuste diktování znovu.",
+    "downloadOfflineModel": "Stáhnout",
+    "offlineModelDownloadScheduled": "Offline soubory řeči se stáhnou na pozadí. Zkuste diktování znovu později.",
     "listeningStopped": "Poslech zastaven."
   },
   "share": {

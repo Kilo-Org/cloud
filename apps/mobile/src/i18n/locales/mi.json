@@ -2556,6 +2556,10 @@
     "stopped": "Kua mutu te tāuru reo. Patoa te hopuoro kia whakamātau anō.",
     "unavailableDevice": "Kāore e wātea ana te tāuru reo i tēnei pūrere.",
     "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere.",
+    "languageNotInstalledTitle": "Kāore anō te tāuru reo mō {{language}} kia rite",
+    "languageNotInstalledMessage": "Kāore ngā kōnae kōrero kore-ipurangi mō {{language}} kua tāutitia ki tēnei waea. Tikiake, kātahi ka whakamātau anō i te tāuru reo.",
+    "downloadOfflineModel": "Tikiake",
+    "offlineModelDownloadScheduled": "Ka tikiaketia ngā kōnae kōrero kore-ipurangi ki te papamuri. Whakamātau anō i te tāuru reo ā muri atu.",
     "listeningStopped": "Kua mutu te whakarongo."
   },
   "share": {

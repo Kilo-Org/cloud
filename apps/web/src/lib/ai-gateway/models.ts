@@ -80,6 +80,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
+  {
+    model: 'minimax/minimax-m2.7:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
 ];
 
 export function selectAutoFreeCandidate(

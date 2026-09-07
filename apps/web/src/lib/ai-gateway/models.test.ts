@@ -115,14 +115,14 @@ describe('isFreeModel', () => {
     );
 
     test('preserves MiniMax Auto Free and preferred model membership', () => {
-      expect(autoFreeModels).toContainEqual({
-        model: 'minimax/minimax-m3:free',
-        weight: 1,
-        reasoning: { enabled: true, effort: 'high' },
-      });
-      expect(preferredModels).toContain('minimax/minimax-m3:free');
-      expect(autoFreeModels.map(({ model }) => model)).not.toContain('minimax/minimax-m2.7:free');
-      expect(preferredModels).not.toContain('minimax/minimax-m2.7:free');
+      for (const model of ['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free']) {
+        expect(autoFreeModels).toContainEqual({
+          model,
+          weight: 1,
+          reasoning: { enabled: true, effort: 'high' },
+        });
+        expect(preferredModels).toContain(model);
+      }
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
@@ -216,6 +216,7 @@ describe('isFreeModel', () => {
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'minimax/minimax-m3:free': { enabled: true, effort: 'high' },
+        'minimax/minimax-m2.7:free': { enabled: true, effort: 'high' },
       });
     });
 
@@ -226,6 +227,7 @@ describe('isFreeModel', () => {
         'stepfun/step-3.7-flash:free': 3,
         'poolside/laguna-s-2.1:free': 1,
         'minimax/minimax-m3:free': 1,
+        'minimax/minimax-m2.7:free': 1,
       });
     });
 

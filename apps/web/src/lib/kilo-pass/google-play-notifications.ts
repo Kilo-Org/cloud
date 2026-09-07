@@ -804,7 +804,11 @@ export async function processGooglePlayKiloPassNotification(params: {
       return { processed: true };
     }
     if (purchase.rawPayload.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {
-      await acknowledgeGooglePlaySubscriptionPurchase(purchase.productId, purchaseToken);
+      await acknowledgeGooglePlaySubscriptionPurchase(
+        purchase.productId,
+        purchaseToken,
+        purchase.rawPayload.outOfAppPurchaseContext ? purchase.appAccountToken : undefined
+      );
     }
     await markGooglePlayStoreEventProcessed(eventId);
     // Post-commit only — never capture inside the transaction.

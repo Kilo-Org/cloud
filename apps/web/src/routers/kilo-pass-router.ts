@@ -99,6 +99,7 @@ import {
 } from '@kilocode/app-shared/commerce';
 import { verifyAppleKiloPassTransactionJws } from '@/lib/kilo-pass/apple-store-verifier';
 import { verifyGooglePlayKiloPassPurchase } from '@/lib/kilo-pass/google-play-verifier';
+import { acknowledgeGooglePlaySubscriptionPurchase } from '@/lib/kilo-pass/google-play-sdk';
 import { reconcileGooglePlaySubscriptionState } from '@/lib/kilo-pass/google-play-subscription-state';
 import { completeStoreKiloPassPurchase } from '@/lib/kilo-pass/store-subscription-completion';
 import { trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
@@ -1486,6 +1487,13 @@ export const kiloPassRouter = createTRPCRouter({
           purchase,
         });
         await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, purchase));
+        if (purchase.rawPayload.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {
+          await acknowledgeGooglePlaySubscriptionPurchase(
+            purchase.productId,
+            input.purchaseToken,
+            purchase.rawPayload.outOfAppPurchaseContext ? purchase.appAccountToken : undefined
+          );
+        }
         if (!result.alreadyProcessed) {
           trackKiloPassPurchaseCompleted({
             channel: 'google_play',

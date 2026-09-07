@@ -62,6 +62,9 @@ import type dayjsType from 'dayjs';
 import type utcType from 'dayjs/plugin/utc';
 import type * as Sentry from '@sentry/nextjs';
 
+const mockAcknowledgePlay = jest.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined);
+jest.mock('@/lib/kilo-pass/google-play-sdk', () => ({ acknowledgeGooglePlaySubscriptionPurchase: mockAcknowledgePlay }));
+
 const PROMO_OFFER_ACTIVE_TEST_TIME = '2026-05-06T12:00:00.000Z';
 const PROMO_OFFER_EXPIRED_TEST_TIME = '2026-05-07T00:00:00.000Z';
 
@@ -1048,6 +1051,30 @@ describe('kiloPassRouter', () => {
   });
 
   describe('completePlayPurchase', () => {
+    it.each([false, true])('retries server acknowledgement after credit completion (resubscription: %s)', async resubscription => {
+      const user = await insertTestUser();
+      const purchase = googlePlayPurchaseFixture({
+        appAccountToken: user.app_store_account_token,
+        rawPayload: {
+          acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+          ...(resubscription ? { outOfAppPurchaseContext: {} } : {}),
+        },
+      });
+      getGooglePlayVerifierMock().verifyGooglePlayKiloPassPurchase.mockResolvedValue(purchase);
+      getStoreCompletionMock().completeStoreKiloPassPurchase.mockResolvedValue({
+        subscriptionId: 'ack-retry', tier: KiloPassTier.Tier19,
+        cadence: KiloPassCadence.Monthly, alreadyProcessed: true,
+      });
+      mockAcknowledgePlay.mockClear();
+      mockAcknowledgePlay.mockRejectedValueOnce(new Error('temporary acknowledgement failure'));
+      const caller = await createCallerForUser(user.id);
+      const input = { purchaseToken: 'play-router-test-token', platform: 'android', storefront: 'play', product: 'kilo_pass' } as const;
+      await expect(caller.kiloPass.completePlayPurchase(input)).rejects.toThrow();
+      await expect(caller.kiloPass.completePlayPurchase(input)).resolves.toMatchObject({ alreadyProcessed: true });
+      expect(mockAcknowledgePlay).toHaveBeenCalledTimes(2);
+      expect(mockAcknowledgePlay).toHaveBeenLastCalledWith(purchase.productId, input.purchaseToken, resubscription ? user.app_store_account_token : undefined);
+    });
+
     it('completes a Google Play purchase and feeds GooglePlay to the completion service', async () => {
       const verifierMock = getGooglePlayVerifierMock();
       const completionMock = getStoreCompletionMock();

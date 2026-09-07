@@ -199,7 +199,6 @@
     "deviceSessionsSubtitle": "Hlola amanye amadivayisi bese uwakhipha ku-akhawunti",
     "feedback": "Thumela impendulo",
     "privacyChoices": "Izinqumo zobumfihlo",
-    "signOut": "Phuma",
     "deleteAccount": "Susa i-akhawunti",
     "confirmationCode": "Ikhodi yokuqinisekisa",
     "confirmationCodePlaceholder": "ikhodi enezinombolo eziyisi-6",
@@ -1754,7 +1753,6 @@
       "couldNotOpenGithub": "Asikwazanga ukuvula i-GitHub. Sicela uzame futhi."
     },
     "settingsSave": {
-      "keepEditing": "Qhubeka uhlela",
       "saveChanges": "Londoloza izinguquko",
       "unsavedTitle": "Izinguquko ezingalondoloziwe",
       "unsavedMessage": "Ulondoloze izinguquko zakho ngaphambi kokuphuma kulesi sikrini?"
@@ -2413,7 +2411,6 @@
       "selectModelBeforeSending": "Khetha imodeli ngaphambi kokuthumela.",
       "preparingPlaceholder": "Kusethwa indawo yokusebenza...",
       "finalizingPlaceholder": "Kuyaphethwa...",
-      "messagePlaceholder": "Umlayezo",
       "cannotReceiveFiles": "Le seshini ayikwazi ukwamukela amafayela. Susa okunamathiselwe ukuze uthumele umlayezo wakho.",
       "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha inkinobho yokuthumela ukuze uzame futhi.",
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
@@ -2839,7 +2836,6 @@
         "void": "Ikhanseliwe",
         "uncollectible": "Ayisakhokheleki"
       },
-      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe.",
       "truncated": "Ama-invoyisi amadala ayatholakala."
     },
     "lowBalanceAlert": {

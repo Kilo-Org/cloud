@@ -199,7 +199,6 @@
     "deviceSessionsSubtitle": "Se gjennom og logg ut andre enheter",
     "feedback": "Tilbakemelding",
     "privacyChoices": "Personvernvalg",
-    "signOut": "Logg ut",
     "deleteAccount": "Slett konto",
     "confirmationCode": "Bekreftelseskode",
     "confirmationCodePlaceholder": "6-sifret kode",
@@ -1754,7 +1753,6 @@
       "couldNotOpenGithub": "Kunne ikke åpne GitHub. Prøv igjen."
     },
     "settingsSave": {
-      "keepEditing": "Fortsett å redigere",
       "saveChanges": "Lagre endringer",
       "unsavedTitle": "Ulagrede endringer",
       "unsavedMessage": "Vil du lagre endringene før du går ut av dette skjermbildet?"
@@ -2413,7 +2411,6 @@
       "selectModelBeforeSending": "Velg en modell før du sender.",
       "preparingPlaceholder": "Klargjør miljøet…",
       "finalizingPlaceholder": "Avslutter…",
-      "messagePlaceholder": "Melding",
       "cannotReceiveFiles": "Denne økten kan ikke motta filer. Fjern vedleggene for å sende meldingen din.",
       "couldNotAttachFiles": "Kunne ikke legge ved filene. Trykk på sendeknappen for å prøve igjen.",
       "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
@@ -2839,7 +2836,6 @@
         "void": "Annullert",
         "uncollectible": "Uinnkrevbar"
       },
-      "loadMoreFailed": "Kunne ikke laste inn flere.",
       "truncated": "Tidligere fakturaer er tilgjengelige."
     },
     "lowBalanceAlert": {

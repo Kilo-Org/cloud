@@ -199,7 +199,6 @@
     "deviceSessionsSubtitle": "Tarkastele muita laitteita ja kirjaa ne ulos",
     "feedback": "Palaute",
     "privacyChoices": "Tietosuojavalinnat",
-    "signOut": "Kirjaudu ulos",
     "deleteAccount": "Poista tili",
     "confirmationCode": "Vahvistuskoodi",
     "confirmationCodePlaceholder": "6-numeroinen koodi",
@@ -1754,7 +1753,6 @@
       "couldNotOpenGithub": "GitHubia ei voitu avata. Yritä uudelleen."
     },
     "settingsSave": {
-      "keepEditing": "Jatka muokkausta",
       "saveChanges": "Tallenna muutokset",
       "unsavedTitle": "Tallentamattomia muutoksia",
       "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?"
@@ -2413,7 +2411,6 @@
       "selectModelBeforeSending": "Valitse malli ennen lähettämistä.",
       "preparingPlaceholder": "Valmistellaan ympäristöä…",
       "finalizingPlaceholder": "Viimeistellään…",
-      "messagePlaceholder": "Viesti",
       "cannotReceiveFiles": "Tämä istunto ei voi vastaanottaa tiedostoja. Poista liitteet, jotta voit lähettää viestisi.",
       "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Yritä uudelleen napauttamalla lähetyspainiketta.",
       "discardAttachmentsMessage": "Palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
@@ -2839,7 +2836,6 @@
         "void": "Mitätöity",
         "uncollectible": "Perimiskelvoton"
       },
-      "loadMoreFailed": "Lisätietojen lataaminen epäonnistui.",
       "truncated": "Vanhempia laskuja on saatavilla."
     },
     "lowBalanceAlert": {

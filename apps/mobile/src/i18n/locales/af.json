@@ -199,7 +199,6 @@
     "deviceSessionsSubtitle": "Bekyk ander toestelle en teken hulle uit",
     "feedback": "Terugvoer",
     "privacyChoices": "Privaatheidskeuses",
-    "signOut": "Meld af",
     "deleteAccount": "Skrap rekening",
     "confirmationCode": "Bevestigingskode",
     "confirmationCodePlaceholder": "6-syferkode",
@@ -1754,7 +1753,6 @@
       "couldNotOpenGithub": "Kon GitHub nie oopmaak nie. Probeer asseblief weer."
     },
     "settingsSave": {
-      "keepEditing": "Gaan voort met wysiging",
       "saveChanges": "Stoor veranderinge",
       "unsavedTitle": "Ongestoorde veranderinge",
       "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?"
@@ -2413,7 +2411,6 @@
       "selectModelBeforeSending": "Kies 'n model voordat jy 'n boodskap stuur.",
       "preparingPlaceholder": "Omgewing word opgestel...",
       "finalizingPlaceholder": "Besig om af te handel...",
-      "messagePlaceholder": "Boodskap",
       "cannotReceiveFiles": "Hierdie sessie kan nie lêers ontvang nie. Verwyder die aanhegsels om jou boodskap te stuur.",
       "couldNotAttachFiles": "Die lêers kon nie aangeheg word nie. Tik op Stuur om weer te probeer.",
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
@@ -2839,7 +2836,6 @@
         "void": "Nietig",
         "uncollectible": "Oninbaar"
       },
-      "loadMoreFailed": "Meer items kon nie gelaai word nie.",
       "truncated": "Ouer fakture is beskikbaar."
     },
     "lowBalanceAlert": {

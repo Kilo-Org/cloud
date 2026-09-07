@@ -100,11 +100,7 @@ function CheckRow({ run }: Readonly<{ run: CheckRun }>) {
 
   const body = (
     <View className={cn('flex-row items-center gap-3 px-4 py-3', 'min-h-11')}>
-      {tone === 'pending' ? (
-        <SpinningIcon icon={Icon} size={16} color={iconColor} />
-      ) : (
-        <Icon size={16} color={iconColor} />
-      )}
+      <SpinningIcon icon={Icon} size={16} color={iconColor} spinning={tone === 'pending'} />
       <View className="flex-1 gap-0.5">
         <Text className="text-sm font-medium" numberOfLines={1}>
           {run.name}

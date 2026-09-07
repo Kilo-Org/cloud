@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "مراجعة الأجهزة الأخرى وتسجيل الخروج منها",
     "feedback": "إرسال ملاحظات",
     "privacyChoices": "خيارات الخصوصية",
-    "signOut": "تسجيل الخروج",
     "deleteAccount": "حذف الحساب",
     "confirmationCode": "رمز التأكيد",
     "confirmationCodePlaceholder": "رمز من 6 أرقام",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "مفتاح الإدخال يرسل الرسالة",
     "returnSendsMessageSubtitle": "عند تعطيل هذا الخيار، يُدرج مفتاح الإدخال سطرًا جديدًا في حقول رسائل الوكلاء.",
     "biometricUnlock": "فتح القفل بالقياسات الحيوية",
-    "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق."
+    "biometricUnlockSubtitle": "يلزم فتح القفل عند تشغيل التطبيق وبعد بقائه في الخلفية لمدة خمس دقائق.",
+    "featureFlags": "أعلام الميزات",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "الأنشطة المباشرة",
@@ -1318,7 +1322,6 @@
       "repositoriesCount_many": "تم تحديد {{displayCount}} مستودعًا"
     },
     "settingsSave": {
-      "keepEditing": "متابعة التعديل",
       "saveChanges": "حفظ التغييرات",
       "unsavedMessage": "هل تريد حفظ تغييراتك قبل مغادرة هذه الشاشة؟",
       "unsavedTitle": "تغييرات غير محفوظة"
@@ -1974,7 +1977,6 @@
       "selectModelBeforeSending": "اختر نموذجًا قبل الإرسال.",
       "preparingPlaceholder": "جارٍ إعداد البيئة…",
       "finalizingPlaceholder": "جارٍ الإنهاء…",
-      "messagePlaceholder": "رسالة",
       "cannotReceiveFiles": "لا يمكن لهذه الجلسة استقبال الملفات. أزل المرفقات لإرسال رسالتك.",
       "couldNotAttachFiles": "تعذّر إرفاق الملفات. اضغط على إرسال للمحاولة مرة أخرى.",
       "discardAttachmentsMessage": "ستُحذف الملفات المرفوعة التي لم تُرفق برسائل مرسلة.",
@@ -2866,7 +2868,6 @@
         "void": "ملغاة",
         "uncollectible": "غير قابلة للتحصيل"
       },
-      "loadMoreFailed": "تعذّر تحميل المزيد.",
       "truncated": "تتوفر فواتير أقدم."
     },
     "lowBalanceAlert": {

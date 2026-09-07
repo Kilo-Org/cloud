@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Pregledaj i odjavi druge uređaje",
     "feedback": "Povratne informacije",
     "privacyChoices": "Podešavanja privatnosti",
-    "signOut": "Odjavi se",
     "deleteAccount": "Obriši nalog",
     "confirmationCode": "Kod za potvrdu",
     "confirmationCodePlaceholder": "kod od 6 cifara",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Taster za novi red šalje poruku",
     "returnSendsMessageSubtitle": "Kada je ova opcija isključena, taster za novi red umeće novi red u polje za poruku agentu.",
     "biometricUnlock": "Otključavanje biometrijom",
-    "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini."
+    "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini.",
+    "featureFlags": "Zastavice funkcija",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtev za spajanje nije dostupan",
@@ -1714,7 +1718,6 @@
       "couldNotOpenGithub": "GitHub se ne može otvoriti. Pokušaj ponovo."
     },
     "settingsSave": {
-      "keepEditing": "Nastavi uređivanje",
       "saveChanges": "Sačuvaj promene",
       "unsavedTitle": "Nesačuvane promene",
       "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?"
@@ -2373,7 +2376,6 @@
       "selectModelBeforeSending": "Izaberi model pre slanja.",
       "preparingPlaceholder": "Priprema okruženja...",
       "finalizingPlaceholder": "Završavanje...",
-      "messagePlaceholder": "Poruka",
       "cannotReceiveFiles": "Ova sesija ne može da prima fajlove. Ukloni priloge da pošalješ poruku.",
       "couldNotAttachFiles": "Prilaganje fajlova nije uspelo. Dodirni dugme za slanje da pokušaš ponovo.",
       "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
@@ -2804,7 +2806,6 @@
         "void": "Stornirano",
         "uncollectible": "Nenaplativo"
       },
-      "loadMoreFailed": "Učitavanje dodatnih stavki nije uspelo.",
       "truncated": "Starije fakture su dostupne."
     },
     "lowBalanceAlert": {

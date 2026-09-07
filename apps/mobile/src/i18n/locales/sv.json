@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Visa andra enheter och logga ut från dem",
     "feedback": "Skicka synpunkter",
     "privacyChoices": "Integritetsinställningar",
-    "signOut": "Logga ut",
     "deleteAccount": "Ta bort konto",
     "confirmationCode": "Bekräftelsekod",
     "confirmationCodePlaceholder": "6-siffrig kod",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Returtangenten skickar meddelanden",
     "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
     "biometricUnlock": "Lås upp med biometri",
-    "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden."
+    "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden.",
+    "featureFlags": "Funktionsflaggor",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "Kunde inte öppna GitHub. Försök igen."
     },
     "settingsSave": {
-      "keepEditing": "Fortsätt redigera",
       "saveChanges": "Spara ändringar",
       "unsavedTitle": "Osparade ändringar",
       "unsavedMessage": "Vill du spara ändringarna innan du lämnar den här vyn?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Välj en modell innan du skickar meddelandet.",
       "preparingPlaceholder": "Förbereder miljön…",
       "finalizingPlaceholder": "Avslutar…",
-      "messagePlaceholder": "Meddelande",
       "cannotReceiveFiles": "Den här sessionen kan inte ta emot filer. Ta bort bilagorna för att skicka ditt meddelande.",
       "couldNotAttachFiles": "Det gick inte att bifoga filerna. Tryck på Skicka för att försöka igen.",
       "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
@@ -2783,7 +2785,6 @@
         "void": "Makulerad",
         "uncollectible": "Oindrivbar"
       },
-      "loadMoreFailed": "Det gick inte att läsa in fler.",
       "truncated": "Äldre fakturor finns tillgängliga."
     },
     "lowBalanceAlert": {

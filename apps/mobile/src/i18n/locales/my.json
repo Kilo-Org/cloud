@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "အခြားစက်များကို စစ်ဆေးပြီး ထိုစက်များမှ အကောင့်ထွက်ပါ",
     "feedback": "အကြံပြုစာပို့ပါ",
     "privacyChoices": "ကိုယ်ရေးအချက်အလက်ဆိုင်ရာ ရွေးချယ်မှုများ",
-    "signOut": "အကောင့်မှ ထွက်ပါ",
     "deleteAccount": "အကောင့်ကို ဖျက်ပါ",
     "confirmationCode": "အတည်ပြုကုဒ်",
     "confirmationCodePlaceholder": "ဂဏန်း ၆ လုံးပါ ကုဒ်",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "စာကြောင်းပြန်ခလုတ်ဖြင့် မက်ဆေ့ခ်ျပို့ပါ",
     "returnSendsMessageSubtitle": "ပိတ်ထားပါက စာကြောင်းပြန်ခလုတ်သည် အေးဂျင့်ထံ စာရေးသည့်အကွက်တွင် စာကြောင်းအသစ် ထည့်ပေးပါသည်။",
     "biometricUnlock": "ဇီဝအချက်အလက်ဖြင့် သော့ဖွင့်ခြင်း",
-    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။"
+    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။",
+    "featureFlags": "လုပ်ဆောင်ချက်အလံများ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR မရနိုင်ပါ",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub ကို မဖွင့်နိုင်ခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
     },
     "settingsSave": {
-      "keepEditing": "ဆက်လက်တည်းဖြတ်ပါ",
       "saveChanges": "အပြောင်းအလဲများ သိမ်းရန်",
       "unsavedTitle": "မသိမ်းဆည်းရသေးသော အပြောင်းအလဲများ",
       "unsavedMessage": "ဤမျက်နှာပြင်မှ မထွက်မီ အပြောင်းအလဲများကို သိမ်းမလား။"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "မပို့မီ မော်ဒယ်တစ်ခု ရွေးပါ။",
       "preparingPlaceholder": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ပြင်ဆင်နေသည်...",
       "finalizingPlaceholder": "အပြီးသတ်နေသည်...",
-      "messagePlaceholder": "မက်ဆေ့ချ်",
       "cannotReceiveFiles": "ဤစက်ရှင်တွင် ဖိုင်များကို လက်ခံ၍မရပါ။ မက်ဆေ့ခ်ျပို့ရန် ပူးတွဲဖိုင်များကို ဖယ်ရှားပါ။",
       "couldNotAttachFiles": "ဖိုင်များကို ပူးတွဲ၍မရပါ။ ထပ်ကြိုးစားရန် ပို့သည့်ခလုတ်ကို နှိပ်ပါ။",
       "discardAttachmentsMessage": "မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
@@ -2783,7 +2785,6 @@
         "void": "ပယ်ဖျက်ပြီး",
         "uncollectible": "ကောက်ခံမရ"
       },
-      "loadMoreFailed": "နောက်ထပ် မရယူနိုင်ပါ။",
       "truncated": "ယခင်ငွေတောင်းခံလွှာများကို ကြည့်နိုင်ပါသည်။"
     },
     "lowBalanceAlert": {

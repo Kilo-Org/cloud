@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Դիտել մյուս սարքերը և դուրս գալ դրանց հաշիվներից",
     "feedback": "Հետադարձ կապ",
     "privacyChoices": "Գաղտնիության կարգավորումներ",
-    "signOut": "Դուրս գալ",
     "deleteAccount": "Ջնջել հաշիվը",
     "confirmationCode": "Հաստատման կոդ",
     "confirmationCodePlaceholder": "6-նիշանոց կոդ",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Մուտքի ստեղնն ուղարկում է հաղորդագրությունը",
     "returnSendsMessageSubtitle": "Երբ անջատված է, մուտքի ստեղնը նոր տող է ավելացնում գործակալների հաղորդագրության մուտքագրման դաշտերում։",
     "biometricUnlock": "Ապակողպել կենսաչափական տվյալներով",
-    "biometricUnlockSubtitle": "Հավելվածը գործարկելիս և ֆոնային ռեժիմում հինգ րոպե մնալուց հետո պահանջվում է ապակողպել այն։"
+    "biometricUnlockSubtitle": "Հավելվածը գործարկելիս և ֆոնային ռեժիմում հինգ րոպե մնալուց հետո պահանջվում է ապակողպել այն։",
+    "featureFlags": "Ֆունկցիաների դրոշներ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "Չհաջողվեց բացել GitHub-ը։ Կրկին փորձիր։"
     },
     "settingsSave": {
-      "keepEditing": "Շարունակել խմբագրել",
       "saveChanges": "Պահպանել փոփոխությունները",
       "unsavedTitle": "Չպահպանված փոփոխություններ",
       "unsavedMessage": "Պահպանե՞լ փոփոխությունները՝ այս էկրանից դուրս գալուց առաջ։"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Ուղարկելուց առաջ ընտրեք մոդել։",
       "preparingPlaceholder": "Միջավայրը նախապատրաստվում է…",
       "finalizingPlaceholder": "Աշխատանքն ավարտվում է…",
-      "messagePlaceholder": "Հաղորդագրություն",
       "cannotReceiveFiles": "Այս նիստը չի կարող ընդունել ֆայլեր։ Հեռացրեք կցումները՝ հաղորդագրությունն ուղարկելու համար։",
       "couldNotAttachFiles": "Չհաջողվեց կցել ֆայլերը։ Հպեք ուղարկելու կոճակին՝ կրկին փորձելու համար։",
       "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
@@ -2783,7 +2785,6 @@
         "void": "Չեղարկված",
         "uncollectible": "Անհավաքագրելի"
       },
-      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին։",
       "truncated": "Հասանելի են նաև նախորդ հաշիվ-ապրանքագրերը։"
     },
     "lowBalanceAlert": {

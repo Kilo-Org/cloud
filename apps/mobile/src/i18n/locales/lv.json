@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Skatīt citas ierīces un izrakstīties no tām",
     "feedback": "Atsauksmes",
     "privacyChoices": "Privātuma iestatījumi",
-    "signOut": "Izrakstīties",
     "deleteAccount": "Dzēst kontu",
     "confirmationCode": "Apstiprināšanas kods",
     "confirmationCodePlaceholder": "6 ciparu kods",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
     "returnSendsMessageSubtitle": "Ja šī opcija ir izslēgta, ievades taustiņš aģenta ziņojuma ievades laukā ievieto jaunu rindu.",
     "biometricUnlock": "Biometriskā atbloķēšana",
-    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm."
+    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm.",
+    "featureFlags": "Funkciju karodziņi",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
@@ -1714,7 +1718,6 @@
       "couldNotOpenGithub": "Neizdevās atvērt GitHub. Lūdzu, mēģini vēlreiz."
     },
     "settingsSave": {
-      "keepEditing": "Turpināt rediģēt",
       "saveChanges": "Saglabāt izmaiņas",
       "unsavedTitle": "Nesaglabātas izmaiņas",
       "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?"
@@ -2373,7 +2376,6 @@
       "selectModelBeforeSending": "Pirms nosūtīšanas izvēlies modeli.",
       "preparingPlaceholder": "Sagatavo vidi…",
       "finalizingPlaceholder": "Pabeidz darbu…",
-      "messagePlaceholder": "Ziņojums",
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
       "couldNotAttachFiles": "Neizdevās pievienot failus. Nospied nosūtīšanas pogu, lai mēģinātu vēlreiz.",
       "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
@@ -2804,7 +2806,6 @@
         "void": "Anulēts",
         "uncollectible": "Nepiedzenams"
       },
-      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
       "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {

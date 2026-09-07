@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "अन्य डिवाइस देखें और उनसे साइन आउट करें",
     "feedback": "प्रतिक्रिया",
     "privacyChoices": "गोपनीयता के विकल्प",
-    "signOut": "साइन आउट करें",
     "deleteAccount": "खाता हटाएँ",
     "confirmationCode": "पुष्टि का कोड",
     "confirmationCodePlaceholder": "6 अंकों का कोड",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "रिटर्न की दबाने पर संदेश भेजें",
     "returnSendsMessageSubtitle": "यह विकल्प बंद होने पर रिटर्न की दबाने से एजेंट के संदेश लिखने के बॉक्स में नई पंक्ति जुड़ती है।",
     "biometricUnlock": "बायोमेट्रिक्स से अनलॉक करें",
-    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।"
+    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।",
+    "featureFlags": "फ़ीचर फ़्लैग",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "लाइव गतिविधियाँ",
@@ -1302,7 +1306,6 @@
       "selectRepositoriesSubtitle": "चुनें कि सुरक्षा एजेंट किन रिपॉज़िटरी की निगरानी करे"
     },
     "settingsSave": {
-      "keepEditing": "संपादन जारी रखें",
       "saveChanges": "बदलाव सहेजें",
       "unsavedMessage": "इस स्क्रीन से जाने से पहले अपने बदलाव सहेजना चाहते हैं?",
       "unsavedTitle": "बिना सहेजे गए बदलाव"
@@ -1896,7 +1899,6 @@
       "selectModelBeforeSending": "भेजने से पहले एक मॉडल चुनें।",
       "preparingPlaceholder": "एनवायरनमेंट तैयार हो रहा है…",
       "finalizingPlaceholder": "काम पूरा किया जा रहा है…",
-      "messagePlaceholder": "संदेश",
       "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
       "couldNotAttachFiles": "फ़ाइलें जोड़ी नहीं जा सकीं। फिर से कोशिश करने के लिए ‘भेजें’ पर टैप करें।",
       "discardAttachmentsMessage": "अपलोड की गई ऐसी फ़ाइलें हटा दी जाएँगी जो किसी भेजे गए संदेश से जुड़ी नहीं हैं।",
@@ -2782,7 +2784,6 @@
         "void": "रद्द",
         "uncollectible": "वसूली असंभव"
       },
-      "loadMoreFailed": "और नतीजे लोड नहीं हो सके।",
       "truncated": "पुराने इनवॉइस उपलब्ध हैं।"
     },
     "lowBalanceAlert": {

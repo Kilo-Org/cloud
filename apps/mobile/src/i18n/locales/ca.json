@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Revisa les sessions d'altres dispositius i tanca-les",
     "feedback": "Envia comentaris",
     "privacyChoices": "Opcions de privadesa",
-    "signOut": "Tanca la sessió",
     "deleteAccount": "Elimina el compte",
     "confirmationCode": "Codi de confirmació",
     "confirmationCodePlaceholder": "codi de 6 dígits",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "La tecla de retorn envia el missatge",
     "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents.",
     "biometricUnlock": "Desbloqueja amb biometria",
-    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla."
+    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla.",
+    "featureFlags": "Indicadors de funcions",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",
@@ -1714,7 +1718,6 @@
       "couldNotOpenGithub": "No s'ha pogut obrir GitHub. Torna-ho a provar."
     },
     "settingsSave": {
-      "keepEditing": "Continua editant",
       "saveChanges": "Desa els canvis",
       "unsavedTitle": "Canvis sense desar",
       "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?"
@@ -2373,7 +2376,6 @@
       "selectModelBeforeSending": "Selecciona un model abans d'enviar el missatge.",
       "preparingPlaceholder": "Configurant l'entorn…",
       "finalizingPlaceholder": "Finalitzant…",
-      "messagePlaceholder": "Missatge",
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
       "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toca el botó d'enviament per tornar-ho a provar.",
       "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
@@ -2804,7 +2806,6 @@
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },
-      "loadMoreFailed": "No se n'han pogut carregar més.",
       "truncated": "Hi ha factures més antigues disponibles."
     },
     "lowBalanceAlert": {

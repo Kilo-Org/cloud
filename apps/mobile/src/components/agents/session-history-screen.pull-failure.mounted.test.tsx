@@ -113,6 +113,9 @@ vi.mock('@/components/ui/button', () => ({
   Button: (props: Record<string, unknown>): ReactNode => createElement('Pressable', props),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
 vi.mock('@/components/ui/text', async () => {
   const { createContext } = await import('react');
   return { Text: 'Text', TextClassContext: createContext('') };

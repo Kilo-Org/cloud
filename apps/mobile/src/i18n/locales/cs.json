@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Zkontrolovat a odhlásit ostatní zařízení",
     "feedback": "Zpětná vazba",
     "privacyChoices": "Nastavení soukromí",
-    "signOut": "Odhlásit se",
     "deleteAccount": "Smazat účet",
     "confirmationCode": "Potvrzovací kód",
     "confirmationCodePlaceholder": "6místný kód",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
     "returnSendsMessageSubtitle": "Při vypnutí této volby klávesa Enter vloží nový řádek do pole pro zprávu agentovi.",
     "biometricUnlock": "Biometrické odemykání",
-    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí."
+    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí.",
+    "featureFlags": "Příznaky funkcí",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -1725,7 +1729,6 @@
       "couldNotOpenGithub": "GitHub se nepodařilo otevřít. Zkuste to znovu."
     },
     "settingsSave": {
-      "keepEditing": "Pokračovat v úpravách",
       "saveChanges": "Uložit změny",
       "unsavedTitle": "Neuložené změny",
       "unsavedMessage": "Uložit změny před opuštěním této obrazovky?"
@@ -2393,7 +2396,6 @@
       "selectModelBeforeSending": "Před odesláním vyberte model.",
       "preparingPlaceholder": "Příprava prostředí…",
       "finalizingPlaceholder": "Dokončování…",
-      "messagePlaceholder": "Zpráva",
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
       "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na tlačítko pro odeslání to zkuste znovu.",
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
@@ -2825,7 +2827,6 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "loadMoreFailed": "Další položky se nepodařilo načíst.",
       "truncated": "Starší faktury jsou k dispozici."
     },
     "lowBalanceAlert": {

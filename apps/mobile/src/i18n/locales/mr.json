@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "इतर डिव्हाइस तपासा आणि त्यांमधून साइन आउट करा",
     "feedback": "अभिप्राय",
     "privacyChoices": "गोपनीयतेचे पर्याय",
-    "signOut": "साइन आउट करा",
     "deleteAccount": "खाते हटवा",
     "confirmationCode": "पुष्टीकरण कोड",
     "confirmationCodePlaceholder": "6-अंकी कोड",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "रिटर्न कळ संदेश पाठवते",
     "returnSendsMessageSubtitle": "हा पर्याय बंद असताना रिटर्न कळ दाबल्यास एजंटच्या संदेशपेटीत नवीन ओळ घातली जाते.",
     "biometricUnlock": "बायोमेट्रिक्स वापरून अनलॉक करा",
-    "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे."
+    "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे.",
+    "featureFlags": "वैशिष्ट्य ध्वज",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub उघडता आले नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "settingsSave": {
-      "keepEditing": "संपादन सुरू ठेवा",
       "saveChanges": "बदल जतन करा",
       "unsavedTitle": "जतन न केलेले बदल",
       "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "पाठवण्यापूर्वी मॉडेल निवडा.",
       "preparingPlaceholder": "कार्यपरिसर तयार होत आहे...",
       "finalizingPlaceholder": "पूर्ण होत आहे...",
-      "messagePlaceholder": "संदेश",
       "cannotReceiveFiles": "या सत्रात फाइल्स स्वीकारता येत नाहीत. संदेश पाठवण्यासाठी जोडलेल्या फाइल्स काढा.",
       "couldNotAttachFiles": "फाइल्स जोडता आल्या नाहीत. पुन्हा प्रयत्न करण्यासाठी पाठवा या बटणावर टॅप करा.",
       "discardAttachmentsMessage": "पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
@@ -2783,7 +2785,6 @@
         "void": "रद्द",
         "uncollectible": "वसूल करता न येणारे"
       },
-      "loadMoreFailed": "आणखी माहिती लोड करता आली नाही.",
       "truncated": "जुनी बिले उपलब्ध आहेत."
     },
     "lowBalanceAlert": {

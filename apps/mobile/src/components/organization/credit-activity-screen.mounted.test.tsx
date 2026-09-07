@@ -383,7 +383,7 @@ describe('OrganizationCreditActivityScreen pagination', () => {
 
     expect(texts).toContain('Top-up');
     expect(texts).toContain('Older credit activity is available.');
-    expect(texts).not.toContain("Couldn't load more.");
+    expect(texts).not.toContain("Couldn't load more");
     expect(buttons.rendered.some(button => button.accessibilityLabel === 'Load more')).toBe(true);
   });
 });

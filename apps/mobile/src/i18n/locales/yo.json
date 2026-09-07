@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Ṣe àyẹ̀wò àwọn ẹ̀rọ mìíràn kí o sì mú wọn jáde",
     "feedback": "Fi èrò ránṣẹ́",
     "privacyChoices": "Àwọn àṣàyàn àṣírí",
-    "signOut": "Jáde",
     "deleteAccount": "Pa àpamọ́ rẹ́",
     "confirmationCode": "Kóòdù ìmúdájú",
     "confirmationCodePlaceholder": "kóòdù oní nọ́ńbà mẹ́fà",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Bọ́tìnì ìpadàbọ̀ ń fi ìfiránṣẹ́ ránṣẹ́",
     "returnSendsMessageSubtitle": "Tí èyí bá wà ní pípa, bọ́tìnì ìpadàbọ̀ máa ń fi ìlà tuntun sí ààyè ìkọ̀wé sí aṣojú.",
     "biometricUnlock": "Ṣí títìpa pẹ̀lú ìdánimọ̀ àbùdá ara",
-    "biometricUnlockSubtitle": "Ṣí títìpa nígbà tí o bá ṣí ohun èlò àti lẹ́yìn ìṣẹ́jú márùn-ún tí kò sí níwájú iboju."
+    "biometricUnlockSubtitle": "Ṣí títìpa nígbà tí o bá ṣí ohun èlò àti lẹ́yìn ìṣẹ́jú márùn-ún tí kò sí níwájú iboju.",
+    "featureFlags": "Àṣì ẹ̀yà",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "A kò lè ṣí GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "settingsSave": {
-      "keepEditing": "Tẹ̀síwájú pẹ̀lú àtúnṣe",
       "saveChanges": "Fi àwọn àyípadà pamọ́",
       "unsavedTitle": "Àwọn àyípadà tí a kò tíì fi pamọ́",
       "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Yan àwòṣe kí o tó fi ránṣẹ́.",
       "preparingPlaceholder": "Ń ṣètò àyíká iṣẹ́...",
       "finalizingPlaceholder": "Ń parí...",
-      "messagePlaceholder": "Ìfiránṣẹ́",
       "cannotReceiveFiles": "Ìgbà iṣẹ́ yìí kò lè gba fáìlì. Yọ àwọn àsomọ́ kúrò láti fi ìfiránṣẹ́ rẹ ránṣẹ́.",
       "couldNotAttachFiles": "A kò lè so àwọn fáìlì mọ́ ìfiránṣẹ́. Tẹ Fíránṣẹ́ láti gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardAttachmentsMessage": "A ó pa àwọn fáìlì tí a ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
@@ -2783,7 +2785,6 @@
         "void": "A ti fagilé",
         "uncollectible": "Kò ṣeé gbà"
       },
-      "loadMoreFailed": "A kò lè gbé síi wọlé.",
       "truncated": "Àwọn ìwé ìbéèrè owó tó ṣáájú ṣì wà."
     },
     "lowBalanceAlert": {

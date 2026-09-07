@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Consultar outros dispositivos e terminar as respetivas sessões",
     "feedback": "Enviar comentários",
     "privacyChoices": "Opções de privacidade",
-    "signOut": "Terminar sessão",
     "deleteAccount": "Eliminar conta",
     "confirmationCode": "Código de confirmação",
     "confirmationCodePlaceholder": "código de 6 dígitos",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "A tecla de retorno envia a mensagem",
     "returnSendsMessageSubtitle": "Quando desativado, a tecla de retorno insere uma nova linha nos campos de mensagem dos agentes.",
     "biometricUnlock": "Desbloquear com biometria",
-    "biometricUnlockSubtitle": "É necessário desbloquear ao iniciar e após cinco minutos em segundo plano."
+    "biometricUnlockSubtitle": "É necessário desbloquear ao iniciar e após cinco minutos em segundo plano.",
+    "featureFlags": "Sinalizadores de recursos",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponível",
@@ -1714,7 +1718,6 @@
       "couldNotOpenGithub": "Não foi possível abrir o GitHub. Tenta novamente."
     },
     "settingsSave": {
-      "keepEditing": "Continuar a editar",
       "saveChanges": "Guardar alterações",
       "unsavedTitle": "Alterações não guardadas",
       "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?"
@@ -2373,7 +2376,6 @@
       "selectModelBeforeSending": "Selecione um modelo antes de enviar.",
       "preparingPlaceholder": "A configurar o ambiente…",
       "finalizingPlaceholder": "A concluir…",
-      "messagePlaceholder": "Mensagem",
       "cannotReceiveFiles": "Esta sessão não pode receber ficheiros. Remova os anexos para enviar a sua mensagem.",
       "couldNotAttachFiles": "Não foi possível anexar ficheiros. Toque em enviar para tentar novamente.",
       "discardAttachmentsMessage": "Os ficheiros carregados que não estejam associados a mensagens enviadas serão eliminados.",
@@ -2804,7 +2806,6 @@
         "void": "Anulada",
         "uncollectible": "Incobrável"
       },
-      "loadMoreFailed": "Não foi possível carregar mais.",
       "truncated": "Estão disponíveis faturas mais antigas."
     },
     "lowBalanceAlert": {

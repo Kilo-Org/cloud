@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Dib u eeg aaladaha kale oo ka saar akoonka",
     "feedback": "Jawaab-celin",
     "privacyChoices": "Xulashooyinka asturnaanta",
-    "signOut": "Ka bax",
     "deleteAccount": "Tirtir akoonka",
     "confirmationCode": "Koodhka xaqiijinta",
     "confirmationCodePlaceholder": "koodh ka kooban 6 lambar",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Furaha gelintu wuxuu diraa farriinta",
     "returnSendsMessageSubtitle": "Marka la damiyo, furaha gelintu wuxuu sadar cusub ku daraa goobaha farriimaha wakiilka lagu qoro.",
     "biometricUnlock": "Ku fur aqoonsiga astaamaha jirka",
-    "biometricUnlockSubtitle": "Fur marka barnaamijku bilaabmo iyo marka uu shan daqiiqo gadaal ka shaqaynayay."
+    "biometricUnlockSubtitle": "Fur marka barnaamijku bilaabmo iyo marka uu shan daqiiqo gadaal ka shaqaynayay.",
+    "featureFlags": "Calaamadaha sifooyinka",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Codsiga isku-darka lama heli karo",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "Lama furi karin GitHub. Fadlan mar kale isku day."
     },
     "settingsSave": {
-      "keepEditing": "Sii wad wax ka beddelka",
       "saveChanges": "Kaydi isbeddellada",
       "unsavedTitle": "Isbeddello aan la kaydin",
       "unsavedMessage": "Ma kaydinaysaa isbeddelladaada ka hor intaadan ka bixin shaashaddan?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Dooro moodeel ka hor intaadan dirin.",
       "preparingPlaceholder": "Deegaanka waa la diyaarinayaa...",
       "finalizingPlaceholder": "Waa la dhammaystirayaa...",
-      "messagePlaceholder": "Fariin",
       "cannotReceiveFiles": "Kalfadhigan ma qaabili karo faylal. Ka saar lifaaqyada si aad u dirto farriintaada.",
       "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo Dir si aad mar kale isku daydo.",
       "discardAttachmentsMessage": "Faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
@@ -2783,7 +2785,6 @@
         "void": "La buriyay",
         "uncollectible": "Lama soo xareyn karo"
       },
-      "loadMoreFailed": "Kuwo kale lama soo rari karin.",
       "truncated": "Qaansheegyada hore waa la heli karaa."
     },
     "lowBalanceAlert": {

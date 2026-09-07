@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "სხვა მოწყობილობების ნახვა და მათზე ანგარიშიდან გასვლა",
     "feedback": "გამოხმაურება",
     "privacyChoices": "კონფიდენციალურობის პარამეტრები",
-    "signOut": "გამოსვლა",
     "deleteAccount": "ანგარიშის წაშლა",
     "confirmationCode": "დადასტურების კოდი",
     "confirmationCodePlaceholder": "6-ნიშნა კოდი",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "შეყვანის კლავიშით შეტყობინების გაგზავნა",
     "returnSendsMessageSubtitle": "თუ გამორთულია, შეყვანის კლავიში აგენტის შეტყობინების ველში ახალ სტრიქონს ამატებს.",
     "biometricUnlock": "ბიომეტრიით განბლოკვა",
-    "biometricUnlockSubtitle": "განბლოკვა საჭიროა აპის გაშვებისას და ფონურ რეჟიმში ხუთი წუთის გასვლის შემდეგ."
+    "biometricUnlockSubtitle": "განბლოკვა საჭიროა აპის გაშვებისას და ფონურ რეჟიმში ხუთი წუთის გასვლის შემდეგ.",
+    "featureFlags": "ფუნქციების დროშები",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "შერწყმის მოთხოვნა მიუწვდომელია",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub-ის გახსნა ვერ მოხერხდა. სცადე ხელახლა."
     },
     "settingsSave": {
-      "keepEditing": "რედაქტირების გაგრძელება",
       "saveChanges": "ცვლილებების შენახვა",
       "unsavedTitle": "შეუნახავი ცვლილებები",
       "unsavedMessage": "შეინახოს ცვლილებები ამ ეკრანიდან გასვლამდე?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "გაგზავნამდე აირჩიეთ მოდელი.",
       "preparingPlaceholder": "გარემოს მომზადება...",
       "finalizingPlaceholder": "დასრულება...",
-      "messagePlaceholder": "შეტყობინება",
       "cannotReceiveFiles": "ამ სესიას ფაილების მიღება არ შეუძლია. შეტყობინების გასაგზავნად ამოიღეთ დანართები.",
       "couldNotAttachFiles": "ფაილების მიმაგრება ვერ მოხერხდა. ხელახლა საცდელად შეეხეთ გაგზავნის ღილაკს.",
       "discardAttachmentsMessage": "ატვირთული ფაილები, რომლებიც გაგზავნილ შეტყობინებებს არ ერთვის, წაიშლება.",
@@ -2783,7 +2785,6 @@
         "void": "ბათილია",
         "uncollectible": "უიმედო დავალიანება"
       },
-      "loadMoreFailed": "მეტის ჩატვირთვა ვერ მოხერხდა.",
       "truncated": "უფრო ძველი ინვოისები ხელმისაწვდომია."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "અન્ય ઉપકરણો તપાસો અને તેમાંથી સાઇન આઉટ કરો",
     "feedback": "પ્રતિસાદ",
     "privacyChoices": "ગોપનીયતાની પસંદગીઓ",
-    "signOut": "સાઇન આઉટ કરો",
     "deleteAccount": "એકાઉન્ટ કાઢી નાખો",
     "confirmationCode": "પુષ્ટિકરણ કોડ",
     "confirmationCodePlaceholder": "6 અંકનો કોડ",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "રિટર્ન કી સંદેશ મોકલે છે",
     "returnSendsMessageSubtitle": "આ બંધ હોય ત્યારે રિટર્ન કી એજન્ટના સંદેશના ખાનામાં નવી પંક્તિ ઉમેરે છે.",
     "biometricUnlock": "બાયોમેટ્રિક્સથી અનલૉક કરો",
-    "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે."
+    "biometricUnlockSubtitle": "એપ શરૂ કરતી વખતે અને પૃષ્ઠભૂમિમાં પાંચ મિનિટ રહ્યા પછી અનલૉક કરવું જરૂરી છે.",
+    "featureFlags": "ફીચર ફ્લેગ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "પુલ રિક્વેસ્ટ ઉપલબ્ધ નથી",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub ખોલી શકાયું નથી. કૃપા કરીને ફરી પ્રયાસ કરો."
     },
     "settingsSave": {
-      "keepEditing": "સંપાદન ચાલુ રાખો",
       "saveChanges": "ફેરફારો સાચવો",
       "unsavedTitle": "સાચવ્યા વગરના ફેરફારો",
       "unsavedMessage": "આ સ્ક્રીન છોડતાં પહેલાં તમારા ફેરફારો સાચવવા છે?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "સંદેશ મોકલતા પહેલાં મોડલ પસંદ કરો.",
       "preparingPlaceholder": "કાર્યપરિસર તૈયાર થઈ રહ્યું છે...",
       "finalizingPlaceholder": "પૂર્ણ થઈ રહ્યું છે...",
-      "messagePlaceholder": "સંદેશ",
       "cannotReceiveFiles": "આ સત્ર ફાઇલો સ્વીકારી શકતું નથી. તમારો સંદેશ મોકલવા માટે જોડેલી ફાઇલો દૂર કરો.",
       "couldNotAttachFiles": "ફાઇલો જોડી શકાઈ નહીં. ફરી પ્રયાસ કરવા “મોકલો” પર ટેપ કરો.",
       "discardAttachmentsMessage": "હજી કોઈ સંદેશમાં જોડાઈ ન હોય તેવી અપલોડ કરેલી ફાઇલો કાઢી નાખવામાં આવશે.",
@@ -2783,7 +2785,6 @@
         "void": "રદ",
         "uncollectible": "વસૂલ ન થઈ શકે"
       },
-      "loadMoreFailed": "વધુ લોડ કરી શકાયું નહીં.",
       "truncated": "જૂના ઇનવોઇસ ઉપલબ્ધ છે."
     },
     "lowBalanceAlert": {

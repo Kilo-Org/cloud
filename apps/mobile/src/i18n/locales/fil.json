@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Suriin at i-sign out ang ibang mga device",
     "feedback": "Magbigay ng puna",
     "privacyChoices": "Mga pagpipilian sa pagkapribado",
-    "signOut": "Mag-sign out",
     "deleteAccount": "Burahin ang account",
     "confirmationCode": "Code ng kumpirmasyon",
     "confirmationCodePlaceholder": "code na may 6 na numero",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Nagpapadala ng mensahe ang teklang Return",
     "returnSendsMessageSubtitle": "Kapag naka-off, naglalagay ang Return ng bagong linya sa mga sulatan ng mensahe para sa ahente.",
     "biometricUnlock": "I-unlock gamit ang biometriko",
-    "biometricUnlockSubtitle": "I-unlock ang app sa pagbukas at matapos ang limang minuto sa background."
+    "biometricUnlockSubtitle": "I-unlock ang app sa pagbukas at matapos ang limang minuto sa background.",
+    "featureFlags": "Mga feature flag",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Hindi mabuksan ang pull request",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "Hindi mabuksan ang GitHub. Pakisubukang muli."
     },
     "settingsSave": {
-      "keepEditing": "Ituloy ang pag-edit",
       "saveChanges": "I-save ang mga pagbabago",
       "unsavedTitle": "Mga hindi na-save na pagbabago",
       "unsavedMessage": "I-save ang mga pagbabago mo bago umalis sa screen na ito?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Pumili ng modelo bago magpadala.",
       "preparingPlaceholder": "Inihahanda ang kapaligiran...",
       "finalizingPlaceholder": "Tinatapos na…",
-      "messagePlaceholder": "Mensahe",
       "cannotReceiveFiles": "Hindi makakatanggap ng mga file ang sesyong ito. Alisin ang mga kalakip para maipadala ang mensahe mo.",
       "couldNotAttachFiles": "Hindi mailakip ang mga file. I-tap ang Ipadala para subukang muli.",
       "discardAttachmentsMessage": "Buburahin ang mga na-upload na file na hindi pa nagagamit.",
@@ -2783,7 +2785,6 @@
         "void": "Walang bisa",
         "uncollectible": "Hindi masingil"
       },
-      "loadMoreFailed": "Hindi ma-load ang iba pa.",
       "truncated": "May mas naunang mga talaan ng singil na maaaring tingnan."
     },
     "lowBalanceAlert": {

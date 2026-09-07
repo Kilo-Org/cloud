@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Бусад төхөөрөмжийн нэвтрэлтийг шалгаж, бүртгэлээс гаргах",
     "feedback": "Санал хүсэлт",
     "privacyChoices": "Нууцлалын сонголтууд",
-    "signOut": "Гарах",
     "deleteAccount": "Бүртгэлийг устгах",
     "confirmationCode": "Баталгаажуулах код",
     "confirmationCodePlaceholder": "6 оронтой код",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Мөр шилжүүлэх товч мессеж илгээнэ",
     "returnSendsMessageSubtitle": "Унтраалттай үед мөр шилжүүлэх товч агентын мессеж оруулах талбарт шинэ мөр оруулна.",
     "biometricUnlock": "Биометрээр түгжээ тайлах",
-    "biometricUnlockSubtitle": "Аппыг эхлүүлэхэд болон арын горимд таван минут байсны дараа түгжээг тайлах шаардлагатай."
+    "biometricUnlockSubtitle": "Аппыг эхлүүлэхэд болон арын горимд таван минут байсны дараа түгжээг тайлах шаардлагатай.",
+    "featureFlags": "Функцын флагууд",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub-ыг нээж чадсангүй. Дахин оролдоно уу."
     },
     "settingsSave": {
-      "keepEditing": "Үргэлжлүүлэн засварлах",
       "saveChanges": "Өөрчлөлтүүдийг хадгалах",
       "unsavedTitle": "Хадгалаагүй өөрчлөлтүүд",
       "unsavedMessage": "Энэ дэлгэцээс гарахаас өмнө өөрчлөлтүүдээ хадгалах уу?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Илгээхээс өмнө загвар сонгоно уу.",
       "preparingPlaceholder": "Орчныг тохируулж байна...",
       "finalizingPlaceholder": "Дуусгаж байна...",
-      "messagePlaceholder": "Мессеж",
       "cannotReceiveFiles": "Энэ сесс файл хүлээн авах боломжгүй. Мессежээ илгээхийн тулд хавсралтуудыг арилгана уу.",
       "couldNotAttachFiles": "Файлуудыг хавсаргаж чадсангүй. Дахин оролдохын тулд илгээх товчийг дарна уу.",
       "discardAttachmentsMessage": "Илгээсэн мессежид хавсаргаагүй файлууд устах болно.",
@@ -2783,7 +2785,6 @@
         "void": "Хүчингүй",
         "uncollectible": "Төлөгдөх боломжгүй"
       },
-      "loadMoreFailed": "Цааш ачаалж чадсангүй.",
       "truncated": "Өмнөх нэхэмжлэхүүдийг үзэх боломжтой."
     },
     "lowBalanceAlert": {

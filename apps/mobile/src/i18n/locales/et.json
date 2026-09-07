@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Vaata teised seadmed üle ja logi neist välja",
     "feedback": "Anna tagasisidet",
     "privacyChoices": "Privaatsusvalikud",
-    "signOut": "Logi välja",
     "deleteAccount": "Kustuta konto",
     "confirmationCode": "Kinnituskood",
     "confirmationCodePlaceholder": "6-kohaline kood",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Sisestusklahv saadab sõnumi",
     "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse.",
     "biometricUnlock": "Biomeetriline lukust avamine",
-    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist."
+    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist.",
+    "featureFlags": "Funktsioonilipud",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHubi ei õnnestunud avada. Proovi uuesti."
     },
     "settingsSave": {
-      "keepEditing": "Jätka muutmist",
       "saveChanges": "Salvesta muudatused",
       "unsavedTitle": "Salvestamata muudatused",
       "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Enne saatmist vali mudel.",
       "preparingPlaceholder": "Keskkonna seadistamine...",
       "finalizingPlaceholder": "Lõpetamine...",
-      "messagePlaceholder": "Sõnum",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemalda manused.",
       "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puuduta saatmisnuppu.",
       "discardAttachmentsMessage": "Üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
@@ -2783,7 +2785,6 @@
         "void": "Tühistatud",
         "uncollectible": "Sissenõudmatu"
       },
-      "loadMoreFailed": "Rohkem andmeid ei õnnestunud laadida.",
       "truncated": "Varasemad arved on saadaval."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Kagua vifaa vingine na uondoke kwenye akaunti kwenye vifaa hivyo",
     "feedback": "Maoni",
     "privacyChoices": "Chaguzi za faragha",
-    "signOut": "Toka",
     "deleteAccount": "Futa akaunti",
     "confirmationCode": "Msimbo wa uthibitisho",
     "confirmationCodePlaceholder": "msimbo wa tarakimu 6",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Kitufe cha kuingiza hutuma ujumbe",
     "returnSendsMessageSubtitle": "Kipengele hiki kikiwa kimezimwa, kitufe cha kuingiza huongeza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala.",
     "biometricUnlock": "Fungua kwa bayometriki",
-    "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano."
+    "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano.",
+    "featureFlags": "Alamu za vipengele",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "Imeshindikana kufungua GitHub. Tafadhali jaribu tena."
     },
     "settingsSave": {
-      "keepEditing": "Endelea kuhariri",
       "saveChanges": "Hifadhi mabadiliko",
       "unsavedTitle": "Mabadiliko ambayo hayajahifadhiwa",
       "unsavedMessage": "Ungependa kuhifadhi mabadiliko yako kabla ya kuondoka kwenye skrini hii?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Chagua modeli kabla ya kutuma.",
       "preparingPlaceholder": "Inatayarisha mazingira...",
       "finalizingPlaceholder": "Inahitimisha...",
-      "messagePlaceholder": "Ujumbe",
       "cannotReceiveFiles": "Kikao hiki hakiwezi kupokea faili. Ondoa viambatisho ili utume ujumbe wako.",
       "couldNotAttachFiles": "Imeshindikana kuambatisha faili. Gusa Tuma ili ujaribu tena.",
       "discardAttachmentsMessage": "Faili zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
@@ -2783,7 +2785,6 @@
         "void": "Imebatilishwa",
         "uncollectible": "Haiwezi kulipika"
       },
-      "loadMoreFailed": "Imeshindikana kupakia zaidi.",
       "truncated": "Ankara za zamani zinapatikana."
     },
     "lowBalanceAlert": {

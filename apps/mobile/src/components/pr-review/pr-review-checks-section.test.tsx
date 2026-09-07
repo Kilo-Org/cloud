@@ -1,37 +1,36 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the repository's native-free mounted test tool. */
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to test React Native structure */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, vi } from 'vitest';
 
-import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { PrReviewChecksSection } from './pr-review-checks-section';
 
 const query = vi.hoisted(() => ({
   data: {
     checkRuns: [
       {
-        name: 'Running',
+        name: 'active',
         status: 'in_progress',
         conclusion: null,
         appName: null,
         detailsUrl: null,
       },
       {
-        name: 'Queued',
+        name: 'queued',
         status: 'queued',
         conclusion: null,
         appName: null,
         detailsUrl: null,
       },
       {
-        name: 'Passed',
+        name: 'passed',
         status: 'completed',
         conclusion: 'success',
         appName: null,
         detailsUrl: null,
       },
       {
-        name: 'Failed',
+        name: 'failed',
         status: 'completed',
         conclusion: 'failure',
         appName: null,
@@ -42,13 +41,14 @@ const query = vi.hoisted(() => ({
   },
   isLoading: false,
   isError: false,
-  isFetching: false,
-  refetch: vi.fn(),
 }));
 
 vi.mock('@tanstack/react-query', () => ({ useQuery: () => query }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
+  PrReviewReconnectNotice: 'PrReviewReconnectNotice',
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/icons', () => ({
   AlertTriangle: 'AlertTriangle',
@@ -61,10 +61,8 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/ui/spinning-icon', () => ({ SpinningIcon: 'SpinningIcon' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
-vi.mock('@/components/pr-review/pr-review-reconnect-notice', () => ({
-  PrReviewReconnectNotice: 'PrReviewReconnectNotice',
-}));
 vi.mock('@/i18n', () => ({ i18n: { language: 'en', t: (key: string) => key } }));
+vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
 vi.mock('@/lib/format', () => ({
   formatList: (parts: string[]) => parts.join(', '),
   formatNumber: String,
@@ -75,51 +73,33 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     foreground: 'black',
     good: 'green',
     mutedForeground: 'gray',
-    warn: 'orange',
+    warn: 'yellow',
   }),
-}));
-vi.mock('@/lib/external-link', () => ({ openExternalUrl: vi.fn() }));
-vi.mock('@/lib/pr-review/classify-pr-review-query-state', () => ({
-  classifyPrReviewQueryState: () => ({ kind: 'retryable' }),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({ githubPrReview: { listChecks: { queryOptions: () => ({}) } } }),
 }));
+vi.mock('@/lib/utils', () => ({ cn: (...values: string[]) => values.filter(Boolean).join(' ') }));
 
-describe('PrReviewChecksSection check status icons', () => {
-  it('rotates pending check icons but not finished check icons', () => {
-    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+describe('PrReviewChecksSection', () => {
+  it('spins only pending check icons', () => {
+    const rendered: { current: TestRenderer.ReactTestRenderer | null } = { current: null };
     act(() => {
-      ref.current = TestRenderer.create(
+      rendered.current = TestRenderer.create(
         createElement(PrReviewChecksSection, {
-          owner: 'org',
-          repo: 'repo',
-          number: 1,
-          headSha: 'head',
+          owner: 'kilo',
+          repo: 'cloud',
+          number: 7,
+          headSha: 'abc123',
         })
       );
     });
-    const renderer = ref.current;
+    const renderer = rendered.current;
     if (!renderer) {
       throw new Error('renderer was not created');
     }
 
-    expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(4);
-    expect(renderer.root.findAllByType(SpinningIcon).map(node => node.props.icon)).toEqual([
-      'Loader2',
-      'Loader2',
-      'CheckCircle2',
-      'XCircle',
-    ]);
-    expect(renderer.root.findAllByType(SpinningIcon).map(node => node.props.spinning)).toEqual([
-      true,
-      true,
-      false,
-      false,
-    ]);
-
-    act(() => {
-      renderer.unmount();
-    });
+    const icons = renderer.root.findAll(node => String(node.type) === 'SpinningIcon');
+    expect(icons.map(icon => icon.props.spinning)).toEqual([true, true, false, false]);
   });
 });

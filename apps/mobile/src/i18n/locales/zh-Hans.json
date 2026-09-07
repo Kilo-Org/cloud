@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "查看其他设备并退出其登录",
     "feedback": "反馈",
     "privacyChoices": "隐私选项",
-    "signOut": "退出登录",
     "deleteAccount": "注销账号",
     "confirmationCode": "验证码",
     "confirmationCodePlaceholder": "6 位验证码",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "回车键发送消息",
     "returnSendsMessageSubtitle": "关闭后，按回车键会在智能体的消息输入框中换行。",
     "biometricUnlock": "使用生物识别解锁",
-    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。"
+    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。",
+    "featureFlags": "功能标志",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "实时活动",
@@ -1302,7 +1306,6 @@
       "selectRepositoriesSubtitle": "选择安全智能体监控的仓库"
     },
     "settingsSave": {
-      "keepEditing": "继续编辑",
       "saveChanges": "保存更改",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
       "unsavedTitle": "未保存的更改"
@@ -1922,7 +1925,6 @@
       "selectModelBeforeSending": "请先选择模型再发送消息。",
       "preparingPlaceholder": "正在准备环境……",
       "finalizingPlaceholder": "正在收尾……",
-      "messagePlaceholder": "消息",
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
       "couldNotAttachFiles": "无法添加附件。请点击“发送”重试。",
       "discardAttachmentsMessage": "已上传但尚未用于发送消息的文件将被删除。",
@@ -2782,7 +2784,6 @@
         "void": "已作废",
         "uncollectible": "无法收款"
       },
-      "loadMoreFailed": "无法加载更多内容。",
       "truncated": "可查看更早的发票。"
     },
     "lowBalanceAlert": {

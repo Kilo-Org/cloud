@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Se andre enheder og log dem ud",
     "feedback": "Giv feedback",
     "privacyChoices": "Privatlivsindstillinger",
-    "signOut": "Log ud",
     "deleteAccount": "Slet konto",
     "confirmationCode": "Bekræftelseskode",
     "confirmationCodePlaceholder": "6-cifret kode",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Returtasten sender beskeden",
     "returnSendsMessageSubtitle": "Når dette er slået fra, indsætter returtasten et linjeskift i agenternes beskedfelter.",
     "biometricUnlock": "Lås op med biometri",
-    "biometricUnlockSubtitle": "Lås op ved opstart, og når appen har været i baggrunden i fem minutter."
+    "biometricUnlockSubtitle": "Lås op ved opstart, og når appen har været i baggrunden i fem minutter.",
+    "featureFlags": "Funktionsflag",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request ikke tilgængelig",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub kunne ikke åbnes. Prøv igen."
     },
     "settingsSave": {
-      "keepEditing": "Fortsæt med at redigere",
       "saveChanges": "Gem ændringer",
       "unsavedTitle": "Ugemte ændringer",
       "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Vælg en model, før du sender.",
       "preparingPlaceholder": "Forbereder miljøet...",
       "finalizingPlaceholder": "Afslutter...",
-      "messagePlaceholder": "Besked",
       "cannotReceiveFiles": "Denne session kan ikke modtage filer. Fjern de vedhæftede filer for at sende din besked.",
       "couldNotAttachFiles": "Kunne ikke vedhæfte filerne. Tryk på sendeknappen for at prøve igen.",
       "discardAttachmentsMessage": "Uploadede filer, der ikke er vedhæftet sendte beskeder, bliver slettet.",
@@ -2783,7 +2785,6 @@
         "void": "Annulleret",
         "uncollectible": "Uinddrivelig"
       },
-      "loadMoreFailed": "Det lykkedes ikke at indlæse flere.",
       "truncated": "Ældre fakturaer er tilgængelige."
     },
     "lowBalanceAlert": {

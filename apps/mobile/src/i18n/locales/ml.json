@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "മറ്റ് ഉപകരണങ്ങൾ പരിശോധിച്ച് അവയിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
     "feedback": "ഫീഡ്ബാക്ക്",
     "privacyChoices": "സ്വകാര്യതാ തിരഞ്ഞെടുപ്പുകൾ",
-    "signOut": "സൈൻ ഔട്ട് ചെയ്യുക",
     "deleteAccount": "അക്കൗണ്ട് ഇല്ലാതാക്കുക",
     "confirmationCode": "സ്ഥിരീകരണ കോഡ്",
     "confirmationCodePlaceholder": "6 അക്കങ്ങളുള്ള കോഡ്",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
     "returnSendsMessageSubtitle": "ഇത് ഓഫായിരിക്കുമ്പോൾ റിട്ടേൺ കീ ഏജന്റിന്റെ സന്ദേശ ബോക്സിൽ പുതിയ വരി ചേർക്കും.",
     "biometricUnlock": "ബയോമെട്രിക് അൺലോക്ക്",
-    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം."
+    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം.",
+    "featureFlags": "ഫീച്ചർ ഫ്ലാഗുകൾ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
     "settingsSave": {
-      "keepEditing": "തിരുത്തുന്നത് തുടരുക",
       "saveChanges": "മാറ്റങ്ങൾ സംരക്ഷിക്കുക",
       "unsavedTitle": "സംരക്ഷിക്കാത്ത മാറ്റങ്ങൾ",
       "unsavedMessage": "ഈ സ്ക്രീനിൽ നിന്ന് പോകുന്നതിന് മുമ്പ് മാറ്റങ്ങൾ സംരക്ഷിക്കണോ?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "അയയ്ക്കുന്നതിന് മുമ്പ് ഒരു മോഡൽ തിരഞ്ഞെടുക്കുക.",
       "preparingPlaceholder": "പ്രവർത്തനാന്തരീക്ഷം സജ്ജമാക്കുന്നു...",
       "finalizingPlaceholder": "പൂർത്തിയാക്കുന്നു...",
-      "messagePlaceholder": "സന്ദേശം",
       "cannotReceiveFiles": "ഈ സെഷന് ഫയലുകൾ സ്വീകരിക്കാൻ കഴിയില്ല. നിങ്ങളുടെ സന്ദേശം അയയ്ക്കാൻ അറ്റാച്ച്മെന്റുകൾ നീക്കം ചെയ്യുക.",
       "couldNotAttachFiles": "ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ 'അയയ്ക്കുക' അമർത്തുക.",
       "discardAttachmentsMessage": "ഒരു സന്ദേശത്തിലും ചേർത്തിട്ടില്ലാത്ത അപ്‌ലോഡുകൾ ഇല്ലാതാക്കും.",
@@ -2783,7 +2785,6 @@
         "void": "റദ്ദാക്കിയത്",
         "uncollectible": "ഈടാക്കാനാവാത്തത്"
       },
-      "loadMoreFailed": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
       "truncated": "പഴയ ഇൻവോയ്സുകൾ ലഭ്യമാണ്."
     },
     "lowBalanceAlert": {

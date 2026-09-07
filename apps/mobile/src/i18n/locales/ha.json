@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Duba sauran na'urori ka fitar da su",
     "feedback": "Ra'ayi",
     "privacyChoices": "Zaɓuɓɓukan sirri",
-    "signOut": "Fita",
     "deleteAccount": "Share asusu",
     "confirmationCode": "Lambar tabbatarwa",
     "confirmationCodePlaceholder": "lamba mai lambobi 6",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Maɓallin sabon layi yana aika saƙo",
     "returnSendsMessageSubtitle": "Idan an kashe wannan, maɓallin sabon layi yana saka sabon layi a wuraren rubuta saƙo ga wakilai.",
     "biometricUnlock": "Buɗe kulle da bayanan halittar jiki",
-    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya."
+    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya.",
+    "featureFlags": "Tutocin sifofi",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -1703,7 +1707,6 @@
       "couldNotOpenGithub": "An kasa buɗe GitHub. Sake gwadawa."
     },
     "settingsSave": {
-      "keepEditing": "Ci gaba da gyarawa",
       "saveChanges": "Ajiye canje-canje",
       "unsavedTitle": "Canje-canjen da ba a ajiye ba",
       "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?"
@@ -2353,7 +2356,6 @@
       "selectModelBeforeSending": "Zaɓi samfuri kafin aikawa.",
       "preparingPlaceholder": "Ana shirya muhallin aiki...",
       "finalizingPlaceholder": "Ana gamawa...",
-      "messagePlaceholder": "Saƙo",
       "cannotReceiveFiles": "Wannan zaman ba zai iya karɓar fayiloli ba. Cire haɗe-haɗen don aika saƙonka.",
       "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna Aika don sake gwadawa.",
       "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
@@ -2783,7 +2785,6 @@
         "void": "An soke",
         "uncollectible": "Ba a iya karɓar kuɗin"
       },
-      "loadMoreFailed": "An kasa loda ƙari.",
       "truncated": "Ana samun takardun biyan kuɗi na baya."
     },
     "lowBalanceAlert": {

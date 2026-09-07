@@ -333,16 +333,13 @@ async function mirrorToRedis(values: {
     [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
     [GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds, getLanguageModelIds(values.openrouter)],
     [GATEWAY_METADATA_REDIS_KEYS.vercelModelIds, getLanguageModelIds(values.vercel)],
+    [GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders],
   ];
   await Promise.all([
     ...expiringEntries.map(([key, value]) => {
       const serializedValue = JSON.stringify(value);
       return redisClient.set(key, serializedValue, { ex: UNUSED_GATEWAY_METADATA_TTL_SECONDS });
     }),
-    redisClient.set(
-      GATEWAY_METADATA_REDIS_KEYS.openrouterProviders,
-      JSON.stringify(values.openrouterProviders)
-    ),
     mirrorVercelInferenceProvidersToRedis(values.vercel),
   ]);
 }

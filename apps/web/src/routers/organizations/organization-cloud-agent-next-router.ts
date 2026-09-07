@@ -27,6 +27,11 @@ import {
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
+  listProviderRepositoryBranches,
+  ProviderBranchListingSchema,
+  repositoryFullNameSchema,
+} from '@/lib/cloud-agent/provider-branch-listing';
+import {
   basePrepareSessionNextSchema,
   basePrepareSessionNextOutputSchema,
   baseCreateWorktreeChatNextSchema,
@@ -915,4 +920,31 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         }),
       };
     }),
+
+  /**
+   * List the branches of one repository for the new-session flow
+   * (organization context). All three providers run against the
+   * organization's own connection; the integration and credentials are
+   * resolved server-side, never supplied here. `organizationMemberProcedure`
+   * runs `ensureOrganizationAccess` before the resolver sees the input.
+   */
+  listRepositoryBranches: organizationMemberProcedure
+    .input(
+      z
+        .object({
+          organizationId: z.uuid(),
+          platform: z.enum(['github', 'gitlab', 'bitbucket']),
+          repository: z.object({ fullName: repositoryFullNameSchema }).strict(),
+        })
+        .strict()
+    )
+    .output(ProviderBranchListingSchema)
+    .query(async ({ ctx, input }) =>
+      listProviderRepositoryBranches({
+        platform: input.platform,
+        userId: ctx.user.id,
+        organizationId: input.organizationId,
+        repositoryFullName: input.repository.fullName,
+      })
+    ),
 });

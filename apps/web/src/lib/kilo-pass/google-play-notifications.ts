@@ -17,7 +17,7 @@ import { KiloPassIssuanceItemKind } from './enums';
 import { appendKiloPassAuditLog } from './issuance';
 import {
   decodeGooglePlaySubscriptionPurchase,
-  mapGooglePlayKiloPassPurchase,
+  getGooglePlayKiloPassPurchase,
 } from './google-play-verifier';
 import { GOOGLE_PLAY_PACKAGE_NAME, getGooglePlaySubscriptionPurchase } from './google-play-sdk';
 import {
@@ -28,6 +28,7 @@ import {
 import { runAfterResponse, trackKiloPassPurchaseCompleted } from '@/lib/kilo-pass/posthog-tracking';
 import { redactStoreAccountLinkedJson } from './store-payload-redaction';
 import { dayjs } from './dayjs';
+import { reconcileGooglePlaySubscriptionState } from './google-play-subscription-state';
 
 type DbOrTx = DrizzleTransaction | typeof db;
 
@@ -629,12 +630,12 @@ export async function processGooglePlayKiloPassNotification(params: {
       return { processed: true };
     }
 
-    const purchase = mapGooglePlayKiloPassPurchase(decoded);
+    const purchase = await getGooglePlayKiloPassPurchase(decoded);
 
     const terminalEvent = await findProcessedTerminalStoreEventForGooglePlayPurchase({
       purchaseToken,
       providerTransactionId: purchase.providerTransactionId,
-      purchasedAtMs: decoded.startTimeMs,
+      purchasedAtMs: Date.parse(purchase.purchasedAtIso),
     });
     if (terminalEvent) {
       await db.transaction(async tx => {
@@ -704,9 +705,7 @@ export async function processGooglePlayKiloPassNotification(params: {
       }
       // A restart can reuse a settled order. Reconcile the live Play state
       // even when the purchase ledger correctly skips credit issuance.
-      if (decoded.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE') {
-        await setGooglePlaySubscriptionCancelingAtPeriodEnd(tx, purchaseToken, false);
-      }
+      await reconcileGooglePlaySubscriptionState(tx, purchase);
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
         result: KiloPassAuditLogResult.Success,
@@ -833,8 +832,19 @@ export async function processGooglePlayKiloPassNotification(params: {
     return { processed: true };
   }
 
-  // Unknown subscription notification types (deferred, paused, price change, etc.):
-  // claim the event and mark it processed without acting.
+  // Reconcile entitlement-only changes without granting a paid month again.
+  if ([5, 6, 9, 10, 11].includes(notificationType)) {
+    await db.transaction(async tx => {
+      await reconcileGooglePlaySubscriptionState(tx, {
+        providerSubscriptionId: purchaseToken,
+        providerTransactionId: decoded.latestOrderId,
+        expiresAtIso: Number.isFinite(decoded.expiryTimeMs)
+          ? new Date(decoded.expiryTimeMs).toISOString()
+          : null,
+        subscriptionState: decoded.subscriptionState,
+      });
+    });
+  }
   await markGooglePlayStoreEventProcessed(eventId);
   return { processed: true };
 }

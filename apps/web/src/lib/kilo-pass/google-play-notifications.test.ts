@@ -20,8 +20,28 @@ import { toMicrodollars } from '@/lib/utils';
 const mockGetGooglePlaySubscriptionPurchase =
   jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
 
+const mockGetGooglePlaySubscriptionOrder = jest.fn(
+  async (orderId: string): Promise<androidpublisher_v3.Schema$Order> => {
+    const result = mockGetGooglePlaySubscriptionPurchase.mock.results.at(-1);
+    const purchase = result?.type === 'return' ? await result.value : undefined;
+    return {
+      orderId,
+      purchaseToken: mockGetGooglePlaySubscriptionPurchase.mock.calls.at(-1)?.[0],
+      state: 'PROCESSED',
+      lineItems: purchase?.lineItems?.map(item => ({
+        productId: item.productId,
+        subscriptionDetails: {
+          servicePeriodStartTime: purchase.startTime,
+          servicePeriodEndTime: item.expiryTime,
+        },
+      })),
+    };
+  }
+);
+
 jest.mock('./google-play-sdk', () => ({
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
+  getGooglePlaySubscriptionOrder: mockGetGooglePlaySubscriptionOrder,
   GOOGLE_PLAY_PACKAGE_NAME: 'com.kilocode.kiloapp',
 }));
 
@@ -135,6 +155,8 @@ describe('processGooglePlayKiloPassNotification', () => {
 
   beforeEach(() => {
     getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockClear();
+    dateNowSpy.mockReturnValue(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS);
+    mockGetGooglePlaySubscriptionOrder.mockClear();
     mockGetGooglePlaySubscriptionPurchase.mockReset();
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiData());
   });
@@ -687,5 +709,116 @@ describe('processGooglePlayKiloPassNotification', () => {
       .where(eq(credit_transactions.kilo_user_id, user.id));
     // Base + reversed base only: the delayed renewal issued nothing new.
     expect(userCreditTransactions.filter(row => row.amount_microdollars > 0)).toHaveLength(1);
+  });
+  it('issues new credits and advances streak for the next paid month', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = 'parity-review-token';
+    for (const [index, now, expiry] of [
+      [0, '2026-05-01T09:00:00.000Z', '2026-06-01T09:00:00.000Z'],
+      [1, '2026-06-01T09:00:00.000Z', '2026-07-01T09:00:00.000Z'],
+    ] as const) {
+      dateNowSpy.mockReturnValue(Date.parse(now));
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, `parity-order-${index}`, {
+          startTime: '2026-05-01T09:00:00.000Z',
+          lineItems: [
+            {
+              productId: 'kilopass_tier19',
+              expiryTime: expiry,
+              latestSuccessfulOrderId: `parity-order-${index}`,
+            },
+          ],
+        })
+      );
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId: `parity-order-${index}`,
+        purchaseToken: token,
+        state: 'PROCESSED',
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            subscriptionDetails: { servicePeriodStartTime: now, servicePeriodEndTime: expiry },
+          },
+        ],
+      });
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({
+          notificationType: index === 0 ? 4 : 2,
+          purchaseToken: token,
+          messageId: `parity-event-${index}`,
+          eventTimeMillis: String(Date.parse(now)),
+        }),
+      });
+    }
+    const sub = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+    });
+    const issuances = await db.query.kilo_pass_issuances.findMany({
+      where: eq(kilo_pass_issuances.kilo_pass_subscription_id, sub!.id),
+    });
+    const refreshed = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    console.log(
+      'PARITY_REVIEW',
+      JSON.stringify({
+        months: issuances.map(x => x.issue_month),
+        streak: sub?.current_streak_months,
+        credits: refreshed!.total_microdollars_acquired - user.total_microdollars_acquired,
+      })
+    );
+    expect(issuances).toHaveLength(2);
+    expect(sub?.current_streak_months).toBe(2);
+    expect(refreshed!.total_microdollars_acquired - user.total_microdollars_acquired).toBe(
+      toMicrodollars(38)
+    );
+  });
+  it('preserves the Play grace-period expiry for account state', async () => {
+    const { obfsAccountId } = await insertGooglePlayUser();
+    const token = 'parity-grace-token';
+    const order = 'parity-grace-order';
+    dateNowSpy.mockReturnValue(Date.parse('2026-05-01T09:00:00.000Z'));
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, order, {
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            latestSuccessfulOrderId: order,
+            expiryTime: '2026-06-01T09:00:00.000Z',
+          },
+        ],
+      })
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        purchaseToken: token,
+        messageId: 'parity-grace-initial',
+        notificationType: 4,
+      }),
+    });
+    dateNowSpy.mockReturnValue(Date.parse('2026-06-02T09:00:00.000Z'));
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, order, {
+        subscriptionState: 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            latestSuccessfulOrderId: order,
+            expiryTime: '2026-06-08T09:00:00.000Z',
+          },
+        ],
+      })
+    );
+    await processGooglePlayKiloPassNotification({
+      pubsubMessage: pubsubMessage({
+        purchaseToken: token,
+        messageId: 'parity-grace-event',
+        notificationType: 6,
+      }),
+    });
+    const purchase = await db.query.kilo_pass_store_purchases.findFirst({
+      where: eq(kilo_pass_store_purchases.provider_subscription_id, token),
+    });
+    expect(new Date(purchase!.expires_at!).toISOString()).toBe('2026-06-08T09:00:00.000Z');
   });
 });

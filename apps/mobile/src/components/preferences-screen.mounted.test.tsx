@@ -24,6 +24,9 @@ const storage = vi.hoisted(() => ({
 }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));

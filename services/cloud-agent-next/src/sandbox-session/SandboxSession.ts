@@ -1245,15 +1245,68 @@ export class SandboxSession extends DurableObject<Env> {
   }
 
   async replayPreparedInitialMessage(
-    _request: LegacyRegisteredInitialAdmissionRequest
+    request: LegacyRegisteredInitialAdmissionRequest
   ): Promise<SessionMessageAdmissionResult | undefined> {
-    return undefined;
+    const metadata = await this.getMetadata();
+    const messageId = metadata?.initialMessage?.id;
+    if (!messageId || !(await this.hasMessageAdmission(messageId))) {
+      return undefined;
+    }
+    return this.admitPreparedInitialMessage(request);
   }
 
+  /**
+   * Retained legacy two-step flow (prepareSession + initiateFromKilocodeSessionV2)
+   * on the control plane. The registration stores the canonical initial turn in
+   * metadata without admitting it; initiation resolves that stored turn and
+   * admits it through the same durable queue used by `admitSubmittedMessage`,
+   * mirroring `CloudAgentSession.admitPreparedInitialMessage`. Without this,
+   * every code review fails with 'Prepared admission is legacy-only' whenever
+   * the owner is control-plane enrolled (wrangler dev defaults it to `*`).
+   */
   async admitPreparedInitialMessage(
     _request: LegacyRegisteredInitialAdmissionRequest
   ): Promise<SessionMessageAdmissionResult> {
-    return { success: false, code: 'BAD_REQUEST', error: 'Prepared admission is legacy-only' };
+    const metadata = await this.getMetadata();
+    if (!metadata) return { success: false, code: 'NOT_FOUND', error: 'Session not found' };
+    const initialMessage = metadata.initialMessage;
+    if (!initialMessage?.id) {
+      return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };
+    }
+    const turn: AcceptedExecutionTurn | undefined =
+      initialMessage.turn?.type === 'command'
+        ? {
+            type: 'command',
+            messageId: initialMessage.id,
+            command: initialMessage.turn.command,
+            arguments: initialMessage.turn.arguments,
+          }
+        : initialMessage.turn?.type === 'prompt'
+          ? {
+              type: 'prompt',
+              messageId: initialMessage.id,
+              prompt: initialMessage.turn.prompt,
+              ...(initialMessage.turn.attachments
+                ? { attachments: initialMessage.turn.attachments }
+                : {}),
+            }
+          : initialMessage.prompt
+            ? {
+                type: 'prompt',
+                messageId: initialMessage.id,
+                prompt: initialMessage.prompt,
+                ...(initialMessage.attachments ? { attachments: initialMessage.attachments } : {}),
+              }
+            : undefined;
+    if (!turn) return { success: false, code: 'BAD_REQUEST', error: 'No prompt provided' };
+    return this.queueAndDispatch(
+      {
+        turn,
+        agent: metadata.agent,
+        finalization: metadata.finalization,
+      },
+      'initial'
+    );
   }
 
   async alarm(): Promise<void> {

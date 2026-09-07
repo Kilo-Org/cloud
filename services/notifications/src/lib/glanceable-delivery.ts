@@ -123,7 +123,8 @@ export type GlanceableDeliveryDeps = {
     timestampSeconds: number,
     isCurrent?: () => Promise<boolean>,
     beforeEnd?: (token: string) => Promise<boolean>,
-    onEndRejected?: (token: string) => Promise<void>
+    onEndRejected?: (token: string) => Promise<void>,
+    onStarted?: (token: string) => Promise<void>
   ) => Promise<void>;
   /** Reserved before reading; do not assign a new timestamp after a delayed send. */
   apnsTimestampSeconds?: number;
@@ -133,6 +134,8 @@ export type GlanceableDeliveryDeps = {
   beforeIosEnd?: (token: string) => Promise<boolean>;
   /** Release the current attempt only after an explicit transport rejection. */
   onIosEndRejected?: (token: string) => Promise<void>;
+  /** Record an accepted push-to-start so the same token cannot raise a second card. */
+  onIosStarted?: (token: string) => Promise<void>;
   listIosExpoTokens: (userId: string, organizationId: string | null) => Promise<ExpoPushToken[]>;
   listAndroidExpoTokens: (
     userId: string,
@@ -182,7 +185,8 @@ export async function deliverGlanceableSnapshot(
       deps.apnsTimestampSeconds ?? Math.floor(Date.parse(snapshot.updatedAt) / 1000),
       deps.isCurrent,
       deps.beforeIosEnd,
-      deps.onIosEndRejected
+      deps.onIosEndRejected,
+      deps.onIosStarted
     );
   }
 

@@ -9,8 +9,7 @@
  */
 
 import { env, runInDurableObject } from 'cloudflare:test';
-import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { listPendingSessionMessages } from '../../../src/session/pending-messages.js';
 import {
   createPendingSessionMessage,
@@ -31,12 +30,47 @@ import {
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
 import { registerReadySession } from '../../helpers/session-setup.js';
 
+// Wrapper-hold and drain scenarios leave alarm and delivery work in the session
+// DO. Interrupt every session a test touched and clear its alarm, or that work
+// wakes after this file closes and its logs race the vitest worker shutdown as
+// pending onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        // Fire-and-forget run-state publications continue past the test body;
+        // drain the chained tail so no facade RPC is pending when the worker
+        // closes (EnvironmentTeardownError).
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('hot delivery — DO integration', () => {
   it('holds a queued follow-up while the current wrapper run finalizes', async () => {
     const userId = 'user_hot_deliv';
     const sessionId = 'agent_hot_deliv';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const followUpMessageId = 'msg_018f1e2d3c4bHotDeliv0001Ab';
 
@@ -139,9 +173,7 @@ describe('hot delivery — DO integration', () => {
   it('normal wrapper completion releases the finalizing hold and drains one follow-up under a fresh run', async () => {
     const userId = 'user_complete_drain';
     const sessionId = 'agent_complete_drain';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const currentMessageId = 'msg_018f1e2d3c4bCmplteDrain001';
     const followUpMessageId = 'msg_018f1e2d3c4bCmplteDrain002';
 
@@ -244,9 +276,7 @@ describe('hot delivery — DO integration', () => {
   it('holds pending delivery through physical cleanup and drains after confirmed absence', async () => {
     const userId = 'user_cleanup_hold';
     const sessionId = 'agent_cleanup_hold';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const followUpMessageId = 'msg_018f1e2d3c4bCleanupHold001';
 
     const result = await runInDurableObject(stub, async instance => {

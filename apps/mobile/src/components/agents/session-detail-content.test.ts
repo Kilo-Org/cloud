@@ -545,9 +545,12 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
+    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
+      'min-h-14'
+    );
     expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     expect(
@@ -656,9 +659,12 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
+    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
+      'min-h-14'
+    );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
       hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']

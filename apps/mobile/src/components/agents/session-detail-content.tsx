@@ -760,8 +760,8 @@ export function SessionDetailContent({
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
   const transcript = useMemo(
-    () => mergeSessionTranscript(visibleMessages, preparationAttempts),
-    [visibleMessages, preparationAttempts]
+    () => mergeSessionTranscript(visibleMessages, preparationAttempts, pendingMessages),
+    [visibleMessages, preparationAttempts, pendingMessages]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -1391,7 +1391,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
-          titleNumberOfLines={1}
+          reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive

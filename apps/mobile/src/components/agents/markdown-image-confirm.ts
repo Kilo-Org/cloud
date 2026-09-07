@@ -5,15 +5,34 @@
  * sign-out so one account's confirmations never auto-load for another.
  */
 const confirmedUris = new Set<string>();
+const listeners = new Set<() => void>();
+
+export function subscribeMarkdownImageConfirmMemory(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 
 export function isMarkdownImageConfirmed(uri: string): boolean {
   return confirmedUris.has(uri);
 }
 
 export function confirmMarkdownImage(uri: string): void {
-  confirmedUris.add(uri);
+  if (!confirmedUris.has(uri)) {
+    confirmedUris.add(uri);
+    for (const listener of listeners) {
+      listener();
+    }
+  }
 }
 
 export function clearMarkdownImageConfirmMemory(): void {
+  if (confirmedUris.size === 0) {
+    return;
+  }
   confirmedUris.clear();
+  for (const listener of listeners) {
+    listener();
+  }
 }

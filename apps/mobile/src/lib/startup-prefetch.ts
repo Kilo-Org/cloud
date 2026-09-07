@@ -18,9 +18,16 @@ const trpcOptions = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, q
 // on the already-broken-token path.
 export function prefetchCurrentUser(): void {
   void (async () => {
-    const token = await preloadedAuthToken;
-    if (token != null) {
-      await queryClient.prefetchQuery(trpcOptions.user.getMe.queryOptions());
+    try {
+      const token = await preloadedAuthToken;
+      if (token != null) {
+        await queryClient.prefetchQuery(trpcOptions.user.getMe.queryOptions());
+      }
+    } catch {
+      // A rejected preload (keychain unavailable at process start) must not
+      // escape as an unhandled rejection. Skipping the prefetch costs nothing:
+      // AuthProvider's bootstrap read owns the restore, and the mounted
+      // useCurrentUserId fetches once a token is published.
     }
   })();
 }

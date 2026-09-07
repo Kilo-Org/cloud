@@ -34,7 +34,9 @@ type ResponseListener = (response: Response) => void;
 
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'android' as string },
+  setBadgeCountAsync: vi.fn(),
   setNotificationChannelAsync: vi.fn(),
+  setNotificationHandler: vi.fn(),
   getPermissionsAsync: vi.fn(),
   requestPermissionsAsync: vi.fn(),
   getExpoPushTokenAsync: vi.fn(),
@@ -49,6 +51,7 @@ const mocks = vi.hoisted(() => ({
   startTokenListeners: new Set<(event: { activityPushToStartToken: string }) => void>(),
   registerActivityToken: vi.fn(),
   unregisterActivityToken: vi.fn(),
+  refreshActiveSessionsFromPush: vi.fn(),
   defineTask: vi.fn(),
   registerTaskAsync: vi.fn(),
   captureEvent: vi.fn(),
@@ -59,11 +62,12 @@ vi.mock('react-native', () => ({
 }));
 
 vi.mock('expo-notifications', () => ({
+  setBadgeCountAsync: mocks.setBadgeCountAsync,
   setNotificationChannelAsync: mocks.setNotificationChannelAsync,
   getPermissionsAsync: mocks.getPermissionsAsync,
   requestPermissionsAsync: mocks.requestPermissionsAsync,
   getExpoPushTokenAsync: mocks.getExpoPushTokenAsync,
-  setNotificationHandler: vi.fn(),
+  setNotificationHandler: mocks.setNotificationHandler,
   addNotificationResponseReceivedListener: (listener: ResponseListener) => {
     mocks.listeners.add(listener);
     return { remove: () => mocks.listeners.delete(listener) };
@@ -139,6 +143,9 @@ vi.mock('@/lib/trpc', () => ({
   },
 }));
 vi.mock('@/lib/query-client', () => ({ queryClient: {} }));
+vi.mock('@/lib/active-sessions-live-sync', () => ({
+  refreshActiveSessionsFromPush: mocks.refreshActiveSessionsFromPush,
+}));
 vi.mock('@/lib/persist/read-cache', () => ({ readCachedUserId: () => null }));
 
 vi.mock('@kilocode/notifications', async importOriginal => ({
@@ -167,7 +174,12 @@ async function loadNotifications() {
     deleteItemAsync: vi.fn().mockResolvedValue(undefined),
     getItemAsync: vi.fn().mockResolvedValue(null),
   });
-  return { ...(await import('./notifications')), pending };
+  const [notifications, registry, persist] = await Promise.all([
+    import('./notifications'),
+    import('@/lib/glanceable/sink-registry'),
+    import('@/lib/glanceable/persist'),
+  ]);
+  return { ...notifications, pending, persist, registry };
 }
 
 function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -192,6 +204,7 @@ async function flushMicrotasks(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.platform.OS = 'android';
+  mocks.setBadgeCountAsync.mockResolvedValue(true);
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
   mocks.requestPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -512,6 +525,252 @@ const secureStoreMock = {
     return secureStore.get(key) ?? null;
   }),
 };
+
+describe('glanceable app badge sink', () => {
+  async function loadBadgeSink() {
+    const loaded = await loadNotifications();
+    loaded._setGlanceableSinksLoaderForTests(() => undefined);
+    loaded.setupNotificationBackgroundHandler();
+    const [sink] = loaded.registry.getGlanceableSinks();
+    if (!sink) {
+      throw new Error('The app badge sink was not registered');
+    }
+    return { loaded, sink };
+  }
+
+  it('sets the needs-input count for a local happy snapshot', async () => {
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 3 }));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(3);
+  });
+
+  it('keeps the stale count until a successful retry publishes a replacement', async () => {
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 3 }));
+    sink.publish(glanceableSnapshot({ status: 'stale', needsInput: 3 }));
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 1 }));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[3], [3], [1]]);
+  });
+
+  it('leaves a push-set launcher badge alone across re-publications of the same count', async () => {
+    const { sink } = await loadBadgeSink();
+
+    // e7 baseline: a needs-input session published count 1 to the launcher.
+    sink.publish(glanceableSnapshot({ needsInput: 1 }));
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[1]]);
+
+    // The OS then moves the launcher badge itself: a visible foreground push
+    // with badge 2 is applied through the shouldSetBadge: true path. Every
+    // tray refresh re-publishes the unchanged snapshot afterwards; none of
+    // those re-publications may undo the badge the push carried.
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 1 }));
+    sink.publish(glanceableSnapshot({ revision: 3, status: 'stale', needsInput: 1 }));
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[1]]);
+
+    // A real count change still reaches the launcher.
+    sink.publish(glanceableSnapshot({ revision: 4, needsInput: 2 }));
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[1], [2]]);
+  });
+
+  it.each([
+    ['busy-only', { status: 'happy', running: 2, needsInput: 0 }],
+    ['empty', { status: 'empty', running: 0, needsInput: 0, needsInputSince: null }],
+    ['waiting', { status: 'waiting', running: 0, needsInput: 0, needsInputSince: null }],
+    ['signed-out', { status: 'signed_out', running: 0, needsInput: 0, needsInputSince: null }],
+    ['privacy', { status: 'privacy', running: 0, needsInput: 0, needsInputSince: null }],
+  ] as const)('clears the badge for a %s snapshot', async (_label, overrides) => {
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot(overrides));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(0);
+  });
+
+  it('serializes native writes so the newest count finishes last', async () => {
+    const gate = deferred();
+    mocks.setBadgeCountAsync
+      .mockImplementationOnce(async () => {
+        await gate.promise;
+        return true;
+      })
+      .mockResolvedValue(true);
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 2 }));
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 7 }));
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2]]);
+
+    gate.resolve();
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [7]]);
+  });
+
+  it('captures a failed write and continues with the next count', async () => {
+    const error = new Error('badge write failed');
+    mocks.setBadgeCountAsync.mockRejectedValueOnce(error).mockResolvedValue(true);
+    const { sink } = await loadBadgeSink();
+
+    sink.publish(glanceableSnapshot({ needsInput: 2 }));
+    sink.publish(glanceableSnapshot({ revision: 2, needsInput: 5 }));
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [5]]);
+    expect(mocks.captureException).toHaveBeenCalledWith(error, {
+      tags: {
+        'error.subsystem': 'notifications',
+        'error.operation': 'set_glanceable_badge',
+      },
+    });
+  });
+
+  it('applies foreground glanceable counts and allows visible push badges', async () => {
+    const { loaded } = await loadBadgeSink();
+    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
+    mockSecureStoreKeys();
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: (notification: {
+        request: { content: { data: unknown } };
+      }) => Promise<{ shouldSetBadge: boolean }>;
+    };
+
+    const ordinary = await registration.handleNotification({
+      request: {
+        content: {
+          data: {
+            type: 'chat.message',
+            sandboxId: 'sandbox-1',
+            conversationId: 'conversation-1',
+            messageId: 'message-1',
+          },
+        },
+      },
+    });
+    expect(ordinary.shouldSetBadge).toBe(true);
+    expect(mocks.setBadgeCountAsync).not.toHaveBeenCalled();
+
+    const stale = await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2025-12-31T00:00:00.000Z',
+            needsInput: 9,
+          }),
+        },
+      },
+    });
+    expect(stale.shouldSetBadge).toBe(false);
+    expect(mocks.setBadgeCountAsync).not.toHaveBeenCalled();
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(2);
+    mocks.setBadgeCountAsync.mockClear();
+
+    const badgeWrite = deferred();
+    mocks.setBadgeCountAsync.mockImplementation(async () => {
+      await badgeWrite.promise;
+      return true;
+    });
+    const handling = registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2026-01-02T00:00:00.000Z',
+            needsInput: 4,
+          }),
+        },
+      },
+    });
+    await flushMicrotasks();
+    const completedBeforeWrite = await Promise.race([handling, Promise.resolve(null)]);
+    badgeWrite.resolve();
+    const glanceable = await handling;
+
+    expect(glanceable.shouldSetBadge).toBe(true);
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(4);
+    expect(mocks.refreshActiveSessionsFromPush).toHaveBeenCalledOnce();
+    expect(completedBeforeWrite).toBeNull();
+  });
+
+  it('does not re-assert the local count when a later glanceable push is discarded', async () => {
+    const { loaded } = await loadBadgeSink();
+    loaded.persist._setLastGlanceableSnapshotForTests(glanceableSnapshot({ needsInput: 2 }));
+    mockSecureStoreKeys();
+    loaded.setupNotificationHandler();
+    const registration = mocks.setNotificationHandler.mock.calls[0]?.[0] as {
+      handleNotification: (notification: {
+        request: { content: { data: unknown } };
+      }) => Promise<{ shouldSetBadge: boolean }>;
+    };
+
+    // A fresh glanceable push confirms count 2 on the launcher through the sink.
+    await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2026-01-02T00:00:00.000Z',
+            needsInput: 2,
+          }),
+        },
+      },
+    });
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2]]);
+
+    // A visible push then moves the launcher itself (badge 3, shouldSetBadge).
+    // A stale glanceable push is discarded: it carries no new count, so the
+    // fallback must NOT re-write the unchanged local truth — that would undo
+    // the badge the visible push carried (the e7 clobber).
+    await registration.handleNotification({
+      request: {
+        content: {
+          data: {
+            type: 'chat.message',
+            sandboxId: 'sandbox-1',
+            conversationId: 'conversation-1',
+            messageId: 'message-1',
+          },
+        },
+      },
+    });
+    const stale = await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2025-12-31T00:00:00.000Z',
+            needsInput: 9,
+          }),
+        },
+      },
+    });
+    expect(stale.shouldSetBadge).toBe(false);
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2]]);
+
+    // A real count change still reaches the launcher after the discard.
+    await registration.handleNotification({
+      request: {
+        content: {
+          data: activeGlanceablePush({
+            updatedAt: '2026-01-03T00:00:00.000Z',
+            needsInput: 3,
+          }),
+        },
+      },
+    });
+    await flushMicrotasks();
+    expect(mocks.setBadgeCountAsync.mock.calls).toEqual([[2], [3]]);
+  });
+});
 
 describe('applyGlanceablePushData', () => {
   beforeEach(() => {
@@ -947,6 +1206,7 @@ describe('setupNotificationBackgroundHandler', () => {
               scopeKey: SCOPE_KEY,
               updatedAt: '2026-01-02T00:00:00.000Z',
               organizationBound: true,
+              needsInput: 6,
             })
           ),
         },
@@ -965,8 +1225,65 @@ describe('setupNotificationBackgroundHandler', () => {
       userId: 'u1',
       organizationId: 'org-9',
     });
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(6);
 
     unregisterGlanceableSink(sink);
+  });
+
+  it('keeps the background task alive until a zero-count badge write finishes', async () => {
+    const persisted = glanceableSnapshot({
+      scopeKey: SCOPE_KEY,
+      revision: 1,
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      needsInput: 1,
+    });
+    secureStore.set('glanceable-snapshot', JSON.stringify(persisted));
+    secureStore.set('glanceable-scope-key', SCOPE_KEY);
+    _setGlanceableSinksLoaderForTests(() => undefined);
+    const badgeWrite = deferred();
+    mocks.setBadgeCountAsync.mockImplementation(async () => {
+      await badgeWrite.promise;
+      return true;
+    });
+
+    setupNotificationBackgroundHandler();
+    const executor = executorFor(mocks.defineTask);
+    let completed = false;
+    const apply = async () => {
+      const result = await executor({
+        data: {
+          notification: null,
+          data: {
+            dataString: JSON.stringify(
+              activeGlanceablePush({
+                scopeKey: SCOPE_KEY,
+                updatedAt: '2026-01-02T00:00:00.000Z',
+                status: 'empty',
+                running: 0,
+                needsInput: 0,
+                idle: 0,
+                needsInputSince: null,
+              })
+            ),
+          },
+        },
+        error: null,
+        executionInfo: {
+          eventId: 'e-clear',
+          taskName: 'active-agents-glanceable-background-task',
+        },
+      });
+      completed = true;
+      return result;
+    };
+    const applying = apply();
+    await flushMicrotasks();
+
+    expect(mocks.setBadgeCountAsync).toHaveBeenCalledWith(0);
+    expect(completed).toBe(false);
+
+    badgeWrite.resolve();
+    expect(await applying).toBe(0);
   });
 
   it('ignores a headless payload that is not a glanceable push', async () => {

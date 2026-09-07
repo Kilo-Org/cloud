@@ -111,12 +111,13 @@ const RAW_TEXT_EXEMPT = new Set([
   // component's base font classes, or the measurement stops matching the
   // input it mirrors.
   'apps/mobile/src/components/agents/use-text-height.tsx',
-  // These two build the agent's markdown surface with their own computed
+  // These three build the agent's markdown surface with their own computed
   // styles, and a `mobile-pure` test reaches them — importing the shared
   // component would pull @rn-primitives/slot's untransformed JSX into a node
-  // environment. Both apply `withRtlWritingDirection` from the same source.
+  // environment. All apply `withRtlWritingDirection` from the same source.
   'apps/mobile/src/components/agents/markdown-renderer.ts',
   'apps/mobile/src/components/agents/markdown-table.tsx',
+  'apps/mobile/src/components/agents/markdown-html.tsx',
 ]);
 
 function checkRawText(relative, text) {

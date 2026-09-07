@@ -23,5 +23,9 @@ export const OPTIONAL_ENV_KEYS = {
   e2eLatencySessionMs: 'E2E_LATENCY_SESSION_MS',
   e2eLatencyMessagesMs: 'E2E_LATENCY_MESSAGES_MS',
   e2eLatencyWsMs: 'E2E_LATENCY_WS_MS',
+  // E2E-only: milliseconds after bundle load during which every read
+  // through lib/auth/secure-store-read rejects, so the session-restore
+  // failure states are provable on a live build.
+  e2eSecureStoreFaultMs: 'E2E_SECURE_STORE_FAULT_MS',
   sentryEnvironment: 'EXPO_PUBLIC_SENTRY_ENVIRONMENT',
 };

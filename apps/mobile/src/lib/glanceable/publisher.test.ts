@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive publisher state-machine suite sharing the fake-sink harness */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -99,7 +100,7 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
-  it('coalesces later happy updates and emits only the latest', () => {
+  it('coalesces later happy updates but publishes needs-input changes immediately', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
@@ -110,6 +111,11 @@ describe('GlanceablePublisher', () => {
     vi.advanceTimersByTime(1000);
     expect(count(calls, 'startOrUpdate')).toBe(2);
     expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(3);
+    // The badge reads `needsInput`, so a change to it skips the coalesce wait.
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(1);
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(0);
     publisher.dispose();
   });
 

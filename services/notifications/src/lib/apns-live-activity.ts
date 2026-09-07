@@ -93,6 +93,11 @@ export function buildLiveActivityApnsRequest(
     credentials: ApnsCredentials;
     authorizationJwt: string;
     timestampSeconds: number;
+    /**
+     * Unix seconds after which iOS dims the card as out of date. A push-updated
+     * card must read as unknown once its updates stop, never as current.
+     */
+    staleDateSeconds?: number;
   } & (
     | { event: 'start'; startAlert: LiveActivityAlert }
     | { event: 'update' }
@@ -123,6 +128,9 @@ export function buildLiveActivityApnsRequest(
             }
           : {}),
         'content-state': params.contentState,
+        ...(params.event !== 'end' && params.staleDateSeconds !== undefined
+          ? { 'stale-date': params.staleDateSeconds }
+          : {}),
         ...(params.event === 'end' ? { 'dismissal-date': params.dismissalDateSeconds } : {}),
       },
     }),
@@ -145,12 +153,21 @@ export async function sendLiveActivityApns(params: {
   nowSeconds: number;
   /** Snapshot ordering time, independent of the provider token's signing time. */
   timestampSeconds?: number;
+  /** Unix seconds after which iOS dims a start or update as out of date. */
+  staleDateSeconds?: number;
   /** Recheck the durable generation after signing, before each request. */
   isCurrent?: () => Promise<boolean>;
   /** Persist terminal intent after signing, before the end can reach ActivityKit. */
   beforeEnd?: (token: string) => Promise<boolean>;
-  /** Retire successful ends by registration identity, even after a newer generation. */
+  /**
+   * Retire a token that can no longer reach a card: a successful end, or an
+   * APNs 410 on any event. A 410 means the target is gone, so leaving the row
+   * would keep every later update aimed at a card that no longer exists and
+   * would keep a push-to-start from raising a new one.
+   */
   onEnded?: (token: string) => Promise<void>;
+  /** Record an accepted start so the same token cannot raise a second card. */
+  onStarted?: (token: string) => Promise<void>;
   /** Release only an explicitly rejected end; a lost response leaves delivery uncertain. */
   onEndRejected?: (token: string) => Promise<void>;
   fetchFn?: typeof fetch;
@@ -177,6 +194,7 @@ export async function sendLiveActivityApns(params: {
         credentials: params.credentials,
         authorizationJwt,
         timestampSeconds: params.timestampSeconds ?? params.nowSeconds,
+        staleDateSeconds: params.staleDateSeconds,
       });
       const response = await fetchFn(request.url, {
         method: 'POST',
@@ -184,15 +202,17 @@ export async function sendLiveActivityApns(params: {
         body: request.body,
       });
       if (!response.ok) {
-        if (event === 'end') {
-          // A 410 confirms an inactive target, not a live activity that can recover.
-          if (response.status === 410) await params.onEnded?.(token);
-          else await params.onEndRejected?.(token);
-        }
+        // A 410 confirms an inactive target on every event, not a live activity
+        // that can recover. Retire it, or later updates keep missing and no
+        // start is ever allowed to replace the card they cannot reach.
+        if (response.status === 410) await params.onEnded?.(token);
+        else if (event === 'end') await params.onEndRejected?.(token);
         throw new Error(`APNs rejected the push with status ${response.status}`);
       }
       if (event === 'end') {
         await params.onEnded?.(token);
+      } else if (event === 'start') {
+        await params.onStarted?.(token);
       }
       return true;
     })

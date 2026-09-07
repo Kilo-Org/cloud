@@ -992,8 +992,9 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     );
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
-    expect(propOf(title, 'numberOfLines')).toBe(1);
+    expect(propOf(title, 'numberOfLines')).toBe(2);
     expect(propOf(title, 'ellipsizeMode')).toBe('tail');
+    expect(title.parent?.props.className).toContain('min-h-14');
     const back = findByType(header, 'Pressable').find(
       node => propOf(node, 'accessibilityLabel') === 'Go back'
     );

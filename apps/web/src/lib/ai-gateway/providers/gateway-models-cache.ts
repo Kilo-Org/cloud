@@ -114,18 +114,7 @@ export const getOpenRouterModelsFromRedis = createModelIdsFetcher(
   'OpenRouter'
 );
 
-// These are (undocumented?) aliases OpenRouter accepts and were in use around 2026-08-11
-// Preferably do not add entries here, instead have the user use the documented id from the /models catalog
-const legacyOpenRouterAliases: ReadonlySet<string> = new Set([
-  'gpt-5.6-luna-pro',
-  'openai/gpt-4o-mini-transcribe',
-  'openai/gpt-4o-transcribe',
-]);
-
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {
-  if (legacyOpenRouterAliases.has(modelId)) {
-    return true;
-  }
   const openRouterModelIds = await getOpenRouterModelsFromRedis();
   if (openRouterModelIds.size === 0) {
     warnExceptInTest(

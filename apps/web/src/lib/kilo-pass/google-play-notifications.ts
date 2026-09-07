@@ -339,7 +339,7 @@ async function reverseGooglePlayRefundCredits(
   const storePurchase = await tx.query.kilo_pass_store_purchases.findFirst({
     where: and(
       eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
-      eq(kilo_pass_store_purchases.provider_subscription_id, purchaseToken),
+      eq(kilo_pass_store_purchases.purchase_token, purchaseToken),
       eq(kilo_pass_store_purchases.provider_transaction_id, latestOrderId)
     ),
   });

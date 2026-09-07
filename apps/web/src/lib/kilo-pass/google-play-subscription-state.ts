@@ -62,7 +62,7 @@ export async function reconcileGooglePlaySubscriptionState(
   });
   if (
     !latest ||
-    (latest.provider_subscription_id === purchase.providerSubscriptionId &&
+    (latest.purchase_token === purchase.providerSubscriptionId &&
       latest.provider_transaction_id !== purchase.providerTransactionId)
   )
     return;

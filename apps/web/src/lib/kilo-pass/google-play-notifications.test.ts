@@ -270,6 +270,46 @@ describe('processGooglePlayKiloPassNotification', () => {
       expect(after!.total_microdollars_acquired).toBe(
         user.total_microdollars_acquired + toMicrodollars(68)
       );
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, oldOrder, {
+          subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+          lineItems: [oldItem],
+        })
+      );
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId: oldOrder,
+        purchaseToken: oldToken,
+        state: 'REFUNDED',
+      });
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: {
+          message: {
+            messageId: crypto.randomUUID(),
+            data: Buffer.from(
+              JSON.stringify({
+                packageName: 'com.kilocode.kiloapp',
+                voidedPurchaseNotification: {
+                  purchaseToken: oldToken,
+                  orderId: oldOrder,
+                  productType: 1,
+                  refundType: 1,
+                },
+              })
+            ).toString('base64'),
+          },
+        },
+      });
+      const refunded = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(refunded!.total_microdollars_acquired).toBe(
+        user.total_microdollars_acquired + toMicrodollars(49)
+      );
+      expect(
+        await db.query.kilo_pass_subscriptions.findFirst({
+          where: eq(kilo_pass_subscriptions.id, active!.id),
+        })
+      ).toMatchObject({ status: 'active', tier: KiloPassTier.Tier49 });
     }
   );
 

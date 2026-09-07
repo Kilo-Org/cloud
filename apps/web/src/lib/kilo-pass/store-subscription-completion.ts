@@ -55,6 +55,7 @@ export type ValidatedStoreKiloPassPurchase = {
   purchaseToken: string | null;
   environment: string;
   purchasedAtIso: string;
+  subscriptionStartedAtIso?: string;
   expiresAtIso: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
@@ -624,7 +625,7 @@ export async function completeStoreKiloPassPurchase(params: {
         cadence: purchase.cadence,
         status: 'active',
         cancel_at_period_end: false,
-        started_at: purchase.purchasedAtIso,
+        started_at: purchase.subscriptionStartedAtIso ?? purchase.purchasedAtIso,
         ended_at: null,
         current_streak_months: 1,
         next_yearly_issue_at: nextYearlyIssueAt,

@@ -56,3 +56,16 @@ export async function getGooglePlaySubscriptionPurchase(
   });
   return response.data;
 }
+
+export async function getGooglePlaySubscriptionOrder(
+  orderId: string
+): Promise<androidpublisher_v3.Schema$Order> {
+  const client = createGooglePlayAndroidPublisherClient();
+  const response = await client.orders.get({
+    packageName: GOOGLE_PLAY_PACKAGE_NAME,
+    orderId,
+    fields:
+      'orderId,purchaseToken,state,lineItems(productId,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+  });
+  return response.data;
+}

@@ -4,11 +4,14 @@ import type { androidpublisher_v3 } from '@googleapis/androidpublisher';
 import { KiloPassCadence, KiloPassPaymentProvider, KiloPassTier } from './enums';
 import type * as GooglePlayVerifier from './google-play-verifier';
 
+const mockGetGooglePlaySubscriptionOrder = jest.fn(async () => order());
+
 const mockGetGooglePlaySubscriptionPurchase =
   jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
 
 jest.mock('./google-play-sdk', () => ({
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
+  getGooglePlaySubscriptionOrder: mockGetGooglePlaySubscriptionOrder,
 }));
 
 function loadVerifier(): typeof GooglePlayVerifier {
@@ -28,6 +31,26 @@ function decoded(
     environment: 'Sandbox',
     subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE',
     rawPayload: { purchaseToken: 'play-token-1' },
+    ...overrides,
+  };
+}
+
+function order(
+  overrides: Partial<androidpublisher_v3.Schema$Order> = {}
+): androidpublisher_v3.Schema$Order {
+  return {
+    orderId: 'GPA.1234',
+    purchaseToken: 'play-token-1',
+    state: 'PROCESSED',
+    lineItems: [
+      {
+        productId: 'kilopass_tier19',
+        subscriptionDetails: {
+          servicePeriodStartTime: '2026-06-01T09:00:00.000Z',
+          servicePeriodEndTime: '2026-07-01T09:00:00.000Z',
+        },
+      },
+    ],
     ...overrides,
   };
 }
@@ -56,7 +79,7 @@ describe('mapGooglePlayKiloPassPurchase', () => {
   it('maps a valid Play subscription purchase to a validated Kilo Pass purchase', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
-    expect(mapGooglePlayKiloPassPurchase(decoded())).toMatchObject({
+    expect(mapGooglePlayKiloPassPurchase(decoded(), order())).toMatchObject({
       paymentProvider: KiloPassPaymentProvider.GooglePlay,
       productId: 'kilopass_tier19',
       providerTransactionId: 'GPA.1234',
@@ -65,16 +88,54 @@ describe('mapGooglePlayKiloPassPurchase', () => {
       appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
       purchaseToken: 'play-token-1',
       expiresAtIso: '2100-01-01T00:00:00.000Z',
+      purchasedAtIso: '2026-06-01T09:00:00.000Z',
+      subscriptionStartedAtIso: '2026-05-01T09:00:00.000Z',
       environment: 'Sandbox',
       tier: KiloPassTier.Tier19,
       cadence: KiloPassCadence.Monthly,
     });
   });
 
+  it.each([
+    { orderId: 'another-order' },
+    { purchaseToken: 'another-token' },
+    { state: 'PENDING' },
+    { state: 'REFUNDED' },
+    { lineItems: [] },
+  ])('rejects unrelated or unpaid order %j', overrides => {
+    const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+    expect(() => mapGooglePlayKiloPassPurchase(decoded(), order(overrides))).toThrow(
+      'Google Play order does not match'
+    );
+  });
+
+  it.each(['invalid', '2026-04-01T00:00:00Z', '2100-01-01T00:00:00Z'])(
+    'rejects invalid paid period start %s',
+    start => {
+      const { mapGooglePlayKiloPassPurchase } = loadVerifier();
+      expect(() =>
+        mapGooglePlayKiloPassPurchase(
+          decoded(),
+          order({
+            lineItems: [
+              {
+                productId: 'kilopass_tier19',
+                subscriptionDetails: {
+                  servicePeriodStartTime: start,
+                  servicePeriodEndTime: '2026-07-01T00:00:00Z',
+                },
+              },
+            ],
+          })
+        )
+      ).toThrow('Google Play order has invalid');
+    }
+  );
+
   it('rejects an empty latest order id', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
-    expect(() => mapGooglePlayKiloPassPurchase(decoded({ latestOrderId: '' }))).toThrow(
+    expect(() => mapGooglePlayKiloPassPurchase(decoded({ latestOrderId: '' }), order())).toThrow(
       'Google Play purchase payload missing required identifiers'
     );
   });
@@ -82,7 +143,7 @@ describe('mapGooglePlayKiloPassPurchase', () => {
   it('rejects a non-finite start time', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
-    expect(() => mapGooglePlayKiloPassPurchase(decoded({ startTimeMs: NaN }))).toThrow(
+    expect(() => mapGooglePlayKiloPassPurchase(decoded({ startTimeMs: NaN }), order())).toThrow(
       'Google Play subscription purchase has invalid timestamps'
     );
   });
@@ -90,7 +151,7 @@ describe('mapGooglePlayKiloPassPurchase', () => {
   it('rejects a non-finite expiry time', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
-    expect(() => mapGooglePlayKiloPassPurchase(decoded({ expiryTimeMs: NaN }))).toThrow(
+    expect(() => mapGooglePlayKiloPassPurchase(decoded({ expiryTimeMs: NaN }), order())).toThrow(
       'Google Play subscription purchase has invalid timestamps'
     );
   });
@@ -99,7 +160,7 @@ describe('mapGooglePlayKiloPassPurchase', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
     expect(() =>
-      mapGooglePlayKiloPassPurchase(decoded({ expiryTimeMs: Date.now() - 1_000 }))
+      mapGooglePlayKiloPassPurchase(decoded({ expiryTimeMs: Date.now() - 1_000 }), order())
     ).toThrow('Google Play subscription purchase has expired');
   });
 
@@ -114,9 +175,9 @@ describe('mapGooglePlayKiloPassPurchase', () => {
   ])('rejects the non-entitled state %s even with a future expiry', state => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
-    expect(() => mapGooglePlayKiloPassPurchase(decoded({ subscriptionState: state }))).toThrow(
-      'Google Play subscription purchase is not entitled'
-    );
+    expect(() =>
+      mapGooglePlayKiloPassPurchase(decoded({ subscriptionState: state }), order())
+    ).toThrow('Google Play subscription purchase is not entitled');
   });
 
   it.each(['SUBSCRIPTION_STATE_CANCELED', 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD'])(
@@ -124,7 +185,9 @@ describe('mapGooglePlayKiloPassPurchase', () => {
     state => {
       const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
-      expect(mapGooglePlayKiloPassPurchase(decoded({ subscriptionState: state }))).toMatchObject({
+      expect(
+        mapGooglePlayKiloPassPurchase(decoded({ subscriptionState: state }), order())
+      ).toMatchObject({
         productId: 'kilopass_tier19',
         tier: KiloPassTier.Tier19,
       });
@@ -134,7 +197,7 @@ describe('mapGooglePlayKiloPassPurchase', () => {
   it('rejects unknown products', () => {
     const { mapGooglePlayKiloPassPurchase } = loadVerifier();
 
-    expect(() => mapGooglePlayKiloPassPurchase(decoded({ productId: 'unknown' }))).toThrow(
+    expect(() => mapGooglePlayKiloPassPurchase(decoded({ productId: 'unknown' }), order())).toThrow(
       'Google Play Kilo Pass product is not enabled'
     );
   });

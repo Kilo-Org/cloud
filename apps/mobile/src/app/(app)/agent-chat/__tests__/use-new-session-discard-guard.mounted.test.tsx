@@ -3,7 +3,7 @@ import { createElement, type RefObject } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useNewSessionDiscardGuard } from '../use-new-session-discard-guard';
+import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 
 const alertMock = vi.hoisted(() => vi.fn());
 const dispatchMock = vi.hoisted(() => vi.fn());

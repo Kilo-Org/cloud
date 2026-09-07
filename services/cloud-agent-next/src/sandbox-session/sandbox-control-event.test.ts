@@ -88,6 +88,7 @@ describe('persistSandboxControlSessionEvent', () => {
           part: {
             type: 'text',
             id: 'part_1',
+            sessionID: 'kilo_1',
             messageID: 'msg_1',
             text: 'Assistant reply',
             metadata: { diff: 'large diff' },
@@ -106,7 +107,13 @@ describe('persistSandboxControlSessionEvent', () => {
       event: 'message.part.updated',
       properties: {
         sessionID: 'kilo_1',
-        part: { type: 'text', id: 'part_1', messageID: 'msg_1', text: 'Assistant reply' },
+        part: {
+          type: 'text',
+          id: 'part_1',
+          sessionID: 'kilo_1',
+          messageID: 'msg_1',
+          text: 'Assistant reply',
+        },
       },
     });
     expect(broadcast).toHaveBeenCalledWith(

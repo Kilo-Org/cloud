@@ -292,6 +292,7 @@ describe('createIngestHandler', () => {
         part: {
           type,
           id: `${type}_1`,
+          sessionID: 'kilo_1',
           messageID: 'asst_1',
           status: 'running',
           state: { status: 'running', metadata: { diff: 'large state diff' } },
@@ -311,6 +312,7 @@ describe('createIngestHandler', () => {
           part: {
             type,
             id: `${type}_1`,
+            sessionID: 'kilo_1',
             messageID: 'asst_1',
             status: 'running',
             state: { status: 'running' },

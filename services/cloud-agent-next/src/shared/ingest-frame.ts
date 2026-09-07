@@ -150,6 +150,20 @@ function compactTerminalData(streamEventType: StreamEventType, data: unknown): u
   }
 }
 
+function compactMessagePart(part: Record<string, unknown>): Record<string, unknown> {
+  const compactPart: Record<string, unknown> = {};
+  if (typeof part.type === 'string') compactPart.type = part.type;
+  if (typeof part.id === 'string') compactPart.id = part.id;
+  if (typeof part.sessionID === 'string') compactPart.sessionID = part.sessionID;
+  if (typeof part.messageID === 'string') compactPart.messageID = part.messageID;
+  if (typeof part.status === 'string') compactPart.status = part.status;
+  const state = part.state;
+  if (isRecord(state) && typeof state.status === 'string') {
+    compactPart.state = { status: state.status };
+  }
+  return compactPart;
+}
+
 function compactMessagePartUpdated(data: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { event: data.event, type: data.type };
   const properties = data.properties;
@@ -157,18 +171,7 @@ function compactMessagePartUpdated(data: Record<string, unknown>): Record<string
     const compactProps: Record<string, unknown> = {};
     if (typeof properties.sessionID === 'string') compactProps.sessionID = properties.sessionID;
     const part = properties.part;
-    if (isRecord(part)) {
-      const compactPart: Record<string, unknown> = {};
-      if (typeof part.type === 'string') compactPart.type = part.type;
-      if (typeof part.id === 'string') compactPart.id = part.id;
-      if (typeof part.messageID === 'string') compactPart.messageID = part.messageID;
-      if (typeof part.status === 'string') compactPart.status = part.status;
-      const state = part.state;
-      if (isRecord(state) && typeof state.status === 'string') {
-        compactPart.state = { status: state.status };
-      }
-      compactProps.part = compactPart;
-    }
+    if (isRecord(part)) compactProps.part = compactMessagePart(part);
     out.properties = compactProps;
   }
   return out;
@@ -215,17 +218,8 @@ export function slimPersistedKilocodeEvent(data: unknown): unknown {
 
   const part = properties.part;
   if (isRecord(part)) {
-    const compactPart: Record<string, unknown> = {};
-    if (typeof part.type === 'string') compactPart.type = part.type;
-    if (typeof part.id === 'string') compactPart.id = part.id;
-    if (typeof part.messageID === 'string') compactPart.messageID = part.messageID;
-    if (typeof part.status === 'string') compactPart.status = part.status;
+    const compactPart = compactMessagePart(part);
     if (part.type === 'text' && typeof part.text === 'string') compactPart.text = part.text;
-
-    const state = part.state;
-    if (isRecord(state) && typeof state.status === 'string') {
-      compactPart.state = { status: state.status };
-    }
     compactProperties.part = compactPart;
   }
   out.properties = compactProperties;

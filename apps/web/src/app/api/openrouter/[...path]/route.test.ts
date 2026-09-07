@@ -787,6 +787,8 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
   it.each(['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'])(
     'rejects the unavailable free model %s before upstream',
     async modelId => {
+      mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
+
       const { POST } = await import('./route');
       const response = await POST(makeRequest(makeBody(modelId)) as never);
 

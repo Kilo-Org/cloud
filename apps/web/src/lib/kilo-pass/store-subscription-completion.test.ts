@@ -119,7 +119,7 @@ describe('completeStoreKiloPassPurchase', () => {
     });
   });
 
-  it.each(['other-owner', 'wrong-product', 'refunded'])(
+  it.each(['other-owner', 'wrong-product', 'refunded', 'other-subscription'])(
     'rejects a deferred replacement with %s',
     async failure => {
       const user = await insertTestUser({ total_microdollars_acquired: 0 });
@@ -131,17 +131,22 @@ describe('completeStoreKiloPassPurchase', () => {
         purchaseToken: oldToken,
       });
       const initial = await completeStoreKiloPassPurchase({ user, purchase: original });
-      if (failure === 'refunded') {
+      if (failure === 'other-subscription') {
         await db
-          .insert(kilo_pass_store_events)
-          .values({
-            payment_provider: KiloPassPaymentProvider.GooglePlay,
-            event_id: crypto.randomUUID(),
-            provider_transaction_id: original.providerTransactionId,
-            product_id: original.productId,
-            environment: 'Sandbox',
-            payload_json: { notificationType: 12 },
-          });
+          .update(kilo_pass_subscriptions)
+          .set({ status: 'canceled', ended_at: new Date().toISOString() })
+          .where(eq(kilo_pass_subscriptions.id, initial.subscriptionId));
+        await completeStoreKiloPassPurchase({ user, purchase: applePurchase() });
+      }
+      if (failure === 'refunded') {
+        await db.insert(kilo_pass_store_events).values({
+          payment_provider: KiloPassPaymentProvider.GooglePlay,
+          event_id: crypto.randomUUID(),
+          provider_transaction_id: original.providerTransactionId,
+          product_id: original.productId,
+          environment: 'Sandbox',
+          payload_json: { notificationType: 12 },
+        });
       }
       const claimant = failure === 'other-owner' ? await insertTestUser() : user;
       await expect(

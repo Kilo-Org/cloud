@@ -72,7 +72,8 @@ export async function getGooglePlaySubscriptionOrder(
 
 export async function acknowledgeGooglePlaySubscriptionPurchase(
   productId: string,
-  purchaseToken: string
+  purchaseToken: string,
+  appAccountToken?: string | null
 ): Promise<void> {
   const client = createGooglePlayAndroidPublisherClient();
   try {
@@ -80,7 +81,7 @@ export async function acknowledgeGooglePlaySubscriptionPurchase(
       packageName: GOOGLE_PLAY_PACKAGE_NAME,
       subscriptionId: productId,
       token: purchaseToken,
-      requestBody: {},
+      requestBody: appAccountToken ? { externalAccountIds: { obfuscatedAccountId: appAccountToken } } : {},
     });
   } catch (error) {
     // The app can acknowledge concurrently, or the response can be lost.

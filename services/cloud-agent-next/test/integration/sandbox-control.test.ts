@@ -106,6 +106,9 @@ import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
   requestFrameSchema,
+  responseFrameSchema,
+  sessionOperationAckSchema,
+  sessionOperationAuthorizationSchema,
   sessionPromptPayloadSchema,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
@@ -113,6 +116,7 @@ import {
   type RequestFrame,
   type ResponseFrame,
   type SessionAttachPayload,
+  type SessionOperationDelivery,
   sandboxControlSocketAttachmentSchema,
   type SandboxHeartbeatPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
@@ -345,7 +349,11 @@ function persistedSessionEvents(state: DurableObjectState, eventTypes: string[])
 function sendHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+  } = {}
 ): void {
   ws.send(
     JSON.stringify({
@@ -356,6 +364,9 @@ function sendHello(
         protocolVersion: 1,
         providerInstanceId:
           identity.providerInstanceId ?? cloudflareRef(socketSandboxIds.get(ws) ?? sandboxId),
+        ...(identity.sessionOperationResults
+          ? { capabilities: { sessionOperationResults: true } }
+          : {}),
         ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
       },
     })
@@ -365,7 +376,11 @@ function sendHello(
 async function completeHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+  } = {}
 ): Promise<void> {
   sendHello(ws, requestId, identity);
   await expect(nextMessage(ws)).resolves.toBe(
@@ -376,7 +391,7 @@ async function completeHello(
       result: {
         protocolVersion: 1,
         handshakeComplete: true,
-        capabilities: { kiloVersionHeartbeat: true },
+        capabilities: { kiloVersionHeartbeat: true, sessionOperationResults: true },
       },
     })
   );
@@ -6427,7 +6442,7 @@ describe('SandboxControl passive status', () => {
             },
           })
         );
-        await Promise.all(fresh['sessionForwardChains'].values());
+        await Promise.all(fresh['sessionForwarding'].values());
         expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
           status: 'active',
           estimatedSleepAt: null,
@@ -6692,7 +6707,7 @@ const savedWorktreeSnapshot: WorktreeChangesSnapshot = {
   capturedAt: '2026-08-20T10:00:00.000Z',
 };
 
-async function worktreeFixture() {
+async function worktreeFixture(options: { sessionOperationResults?: boolean } = {}) {
   const suffix = crypto.randomUUID();
   const userId = `user_worktree_${suffix}`;
   const sessionId = `workspace_${suffix}` as const;
@@ -6779,18 +6794,32 @@ async function worktreeFixture() {
   await control.prepareSessionCredentials({ ownerId: userId, sessionId });
   await control.attachSession({ sessionId, kiloSessionId, directory, worktreeId, ownerId: userId });
   let ws = await connect(credential, sandboxId);
-  await completeHello(ws, `hello_${suffix}`, { wrapperInstanceId });
+  await completeHello(ws, `hello_${suffix}`, {
+    wrapperInstanceId,
+    sessionOperationResults: options.sessionOperationResults,
+  });
   const captures: RequestFrame[] = [];
   const inbox: RequestFrame[] = [];
   const captureWaiters: ((request: RequestFrame) => void)[] = [];
   const prompts: RequestFrame[] = [];
   const promptSeen = Promise.withResolvers<void>();
   const aborts: RequestFrame[] = [];
+  const resultWaiters = new Map<string, (response: ResponseFrame) => void>();
   let nextAttach: ((request: RequestFrame) => void) | undefined;
 
   function receive(client: WebSocket): void {
     client.addEventListener('message', event => {
-      const parsed = requestFrameSchema.safeParse(JSON.parse(String(event.data)));
+      const frame = JSON.parse(String(event.data));
+      const response = responseFrameSchema.safeParse(frame);
+      if (response.success) {
+        const resolve = resultWaiters.get(response.data.requestId);
+        if (resolve) {
+          resultWaiters.delete(response.data.requestId);
+          resolve(response.data);
+        }
+        return;
+      }
+      const parsed = requestFrameSchema.safeParse(frame);
       if (!parsed.success) return;
       const request = parsed.data;
       if (request.operation === 'session.git.summary') {
@@ -6882,6 +6911,20 @@ async function worktreeFixture() {
     reply(request: RequestFrame, result: unknown): void {
       ws.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result }));
     },
+    async sendOperationResult(delivery: SessionOperationDelivery): Promise<ResponseFrame> {
+      const requestId = crypto.randomUUID();
+      const response = new Promise<ResponseFrame>(resolve => resultWaiters.set(requestId, resolve));
+      ws.send(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'session.operation.result',
+          session: delivery.authorization.session,
+          payload: delivery,
+        })
+      );
+      return response;
+    },
     fail(
       request: RequestFrame,
       retryable = false,
@@ -6957,6 +7000,141 @@ async function worktreeFixture() {
 function captureRevision(request: RequestFrame): number {
   return (request.payload as { revision: number }).revision;
 }
+
+describe('SandboxSession operation authorization admission', () => {
+  it('persists dispatch proof before the capability-gated attach and prompt reach the wrapper socket', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_authorization';
+    try {
+      const attach = fixture.holdNextAttach();
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'persist before egress' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+
+      const attachRequest = await attach;
+      expect(attachRequest).toMatchObject({
+        operation: 'session.attach',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: fixture.kiloSessionId,
+          directory: fixture.directory,
+        },
+        authorization: {
+          operation: 'session.attach',
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'queued',
+            unresolvedDispatch: true,
+            operations: {
+              attach: {
+                dispatched: true,
+                authorization: {
+                  operation: 'session.attach',
+                  messageId,
+                  wrapperInstanceId: fixture.wrapperInstanceId,
+                },
+              },
+            },
+          },
+        ]);
+      });
+
+      fixture.reply(attachRequest, { attached: true });
+      await fixture.promptSeen;
+      expect(fixture.prompts).toHaveLength(1);
+      expect(fixture.prompts[0]).toMatchObject({
+        operation: 'session.prompt',
+        authorization: {
+          operation: 'session.prompt',
+          operationId: messageId,
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('returns the exact durable acknowledgement when the wrapper repeats a completed prompt result', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_result_ack';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'retain this completed result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+
+      const first = await fixture.sendOperationResult(delivery);
+      const second = await fixture.sendOperationResult(delivery);
+      const firstAck = sessionOperationAckSchema.parse(first.ok ? first.result : undefined);
+      expect(first).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'applied',
+          decision: { state: 'completed' },
+          resultHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+      });
+      expect(second).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'identical',
+          resultHash: firstAck.resultHash,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'completed',
+            terminalSource: 'operation_result',
+            operations: { prompt: { resultHash: firstAck.resultHash } },
+          },
+        ]);
+      });
+      expect(fixture.prompts).toHaveLength(1);
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+});
 
 describe('SandboxSession worktree changes persistence', () => {
   beforeEach(() => {
@@ -9296,6 +9474,7 @@ describe('SandboxSession control-plane regressions', () => {
         preparationAttemptId: expect.any(String),
         deliveryDeadlineAt: expect.any(Number),
         terminalAt: expect.any(Number),
+        terminalSource: 'coordinator',
       });
       expect(delivered.messages.slice(1)).toMatchObject([
         { messageId: 'msg_model_less', state: 'accepted' },

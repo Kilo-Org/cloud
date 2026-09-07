@@ -21,6 +21,7 @@ import {
   type ResponseFrame,
   type SessionAttachPayload,
   type SessionMessageOutcome,
+  type SessionOperationAuthorization,
 } from '../shared/sandbox-control-protocol.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
@@ -241,6 +242,7 @@ describe('createSessionMessageRecord', () => {
         lastActivityAt: 20,
         wrapperInstanceId: 'runtime',
         terminalAt: 30,
+        terminalSource: 'wrapper_outcome',
       },
     ]);
   });
@@ -2489,6 +2491,61 @@ describe('SandboxSession orchestration', () => {
     expect(
       fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.prompt')
     ).toHaveLength(0);
+  });
+
+  it('persists a retained operation result without nested transactionSync', async () => {
+    const fixture = sessionFixture();
+    const kiloSessionId = fixture.metadata.auth.kiloSessionId;
+    if (!kiloSessionId) throw new Error('Missing Kilo session ID');
+    const authorization = {
+      operation: 'session.prompt',
+      operationId: 'a',
+      messageId: 'a',
+      session: { sessionId: SESSION_ID, kiloSessionId, directory: DIRECTORY },
+      wrapperInstanceId: RUNTIME_ID,
+      dispatchDeadlineAt: Date.now() + 60_000,
+    } satisfies SessionOperationAuthorization;
+    fixture.values.set('session_messages', [
+      {
+        messageId: 'a',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: { prompt: { authorization, dispatched: true } },
+      } as SessionMessageRecord,
+    ]);
+    let depth = 0;
+    const transactionSync = fixture.storage.transactionSync.bind(fixture.storage);
+    fixture.storage.transactionSync = <T>(callback: () => T): T => {
+      if (depth > 0) throw new Error('nested transactionSync');
+      depth += 1;
+      try {
+        return transactionSync(callback);
+      } finally {
+        depth -= 1;
+      }
+    };
+    await expect(
+      fixture.session.receiveSandboxOperationResult({
+        session: authorization.session,
+        wrapperInstanceId: authorization.wrapperInstanceId,
+        delivery: {
+          version: 2,
+          authorization,
+          completedAt: Date.now(),
+          result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
+          outcome: { messageId: 'a', status: 'completed' },
+          events: [
+            {
+              type: 'autocommit_completed',
+              properties: { success: true, messageId: 'a' },
+              timestamp: new Date().toISOString(),
+            },
+          ],
+          preparing: [],
+        },
+      })
+    ).resolves.toMatchObject({ disposition: 'applied' });
+    expect(fixture.record('a')?.state).toBe('completed');
   });
 
   it('delivers a follow-up after awaited cancel, failed quarantine transfer, reset, and old-runtime cleanup', async () => {

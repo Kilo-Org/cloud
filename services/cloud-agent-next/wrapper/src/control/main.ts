@@ -101,20 +101,28 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
       return !shuttingDown && kiloRuntimes.isHealthy();
     },
     sessions: [],
-    tasks: new Map(),
     activity: createSessionActivityRegistry(),
     signal: abort.signal,
     ...(terminalRuntime ? { terminalRuntime } : {}),
-    emitSessionEvent: (session, payload) => {
+    sendOperationResult: (session, delivery, signal, deadlineAt) => {
+      if (!control?.sendOperationResult)
+        throw new Error('Sandbox control operation result delivery unavailable');
+      return control.sendOperationResult(session, delivery, signal, deadlineAt);
+    },
+    emitSessionEvent: (session, payload, options) => {
       if (
-        !control?.sendEvent?.('session.event', payload, {
-          directory: session.directory,
-          kiloSessionId: session.kiloSessionId,
-          rootKiloSessionId: session.kiloSessionId,
-        })
-      ) {
+        !control?.sendEvent?.(
+          'session.event',
+          payload,
+          {
+            directory: session.directory,
+            kiloSessionId: session.kiloSessionId,
+            rootKiloSessionId: session.kiloSessionId,
+          },
+          options?.retained ? { preserveConnectionOnFailure: true } : undefined
+        )
+      )
         throw new Error('Sandbox control event delivery failed');
-      }
     },
     retireRuntime: reason => shutdown(1, reason),
     onShutdown: () => shutdown(0, 'Sandbox shutting down'),
@@ -176,6 +184,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
         terminalRuntime?.shutdown();
       } finally {
         await tasks;
+        await deps.operations.drainDelivery(shutdownAt + KILO_CONTROL_REQUEST_TIMEOUT_MS);
       }
     })();
     void stopped
@@ -200,22 +209,32 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
     isReady: () => deps.kiloReady,
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
     onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected'),
-    onRequest: (operation, session, payload) =>
-      handleControlRequest(operation, session, payload, {
-        ...deps,
-        emitPreparing: event => {
-          if (!session) return;
-          if (
-            !control?.sendEvent?.('session.preparing', event, {
-              directory: session.directory,
-              kiloSessionId: session.kiloSessionId,
-              rootKiloSessionId: session.kiloSessionId,
-            })
-          ) {
-            shutdown(1, 'Preparation event delivery failed', 'control_disconnected');
-          }
+    onRequest: (operation, session, payload, authorization) =>
+      handleControlRequest(
+        operation,
+        session,
+        payload,
+        {
+          ...deps,
+          emitPreparing: (event, options) => {
+            if (!session) return;
+            if (
+              !control?.sendEvent?.(
+                'session.preparing',
+                event,
+                {
+                  directory: session.directory,
+                  kiloSessionId: session.kiloSessionId,
+                  rootKiloSessionId: session.kiloSessionId,
+                },
+                options?.retained ? { preserveConnectionOnFailure: true } : undefined
+              )
+            )
+              throw new Error('Preparation event delivery failed');
+          },
         },
-      }),
+        authorization
+      ),
     getHeartbeatPayload: () => withHeartbeatReason(buildHeartbeatPayload(deps)),
     sampleHeartbeat: signal => refreshHeartbeatPayload(deps, signal).then(() => undefined),
   });

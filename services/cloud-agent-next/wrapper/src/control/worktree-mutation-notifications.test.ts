@@ -14,8 +14,8 @@ import type { WrapperKiloClient } from '../kilo-api';
 import { eventKiloSessionId, sessionEventIdentity, unfilteredKiloEvents } from './feed';
 import {
   buildHeartbeatPayload,
+  createControlHandlerDeps,
   createSessionActivityRegistry,
-  type HandlerDeps,
   type HandlerSessionSnapshot,
 } from './sandbox-control-handlers';
 import {
@@ -596,12 +596,14 @@ describe('worktree mutation notifications', () => {
     const activity = createSessionActivityRegistry();
     activity.attach('root');
     activity.attach('sibling');
-    const deps = {
+    const deps = createControlHandlerDeps({
       sessions: h.sessions,
-      tasks: new Map(),
       activity,
+      version: 'test',
       kiloReady: true,
-    } as HandlerDeps;
+      emitSessionEvent: () => {},
+      retireRuntime: () => {},
+    });
     const snapshots = structuredClone(h.sessions);
     const heartbeat = buildHeartbeatPayload(deps);
     const routed = [];

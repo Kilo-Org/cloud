@@ -31,12 +31,14 @@ type SandboxControlRpc = {
     connection: ConnectionState;
     physical: PhysicalState;
     wrapperInstanceId?: string;
+    operationResults?: true;
     attachment?: SessionAttachPayload;
   }>;
   getStatus(): Promise<{
     connection: ConnectionState;
     physical: PhysicalState;
     wrapperInstanceId?: string;
+    operationResults?: true;
   }>;
   quarantineRuntime(input: {
     ownerId: string;

@@ -5,6 +5,8 @@ import { Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 
+import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { RenameModal } from '@/components/rename-modal';
 import { SessionRow } from '@/components/ui/session-row';
 import { type AgentSessionSortBy, getAgentSessionTimestamp } from '@/lib/agent-session-sort';
@@ -219,6 +221,7 @@ export function StoredSessionRow({
           subtitle={subtitle}
           meta={visibleMeta}
           live={live}
+          statusKind={session.status === null ? null : glanceableStatusKind(session.status)}
           metaWhileLive={metaWhileLive}
           needsInput={needsInput}
           platformIcon={platformIcon}

@@ -31,6 +31,7 @@ import {
   buildExpiredWidgetProps,
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
+  buildStaleWidgetProps,
   toWidgetProps,
 } from './view-props';
 
@@ -205,6 +206,25 @@ function endNow(
   return pending.length === 0 ? null : settleEnds(pending);
 }
 
+/**
+ * Adopt a card this process did not start and hand its update token to the
+ * server. A push-to-start raises the card with no JavaScript running, so
+ * nothing has read the native instance yet and the server has no way to update
+ * or end it. The native read also retires every instance except the adopted
+ * one, so duplicates an earlier process left behind go with it.
+ */
+export function adoptNativeActivity(
+  snapshot: GlanceableAgentsSnapshot,
+  ctx: GlanceableSinkContext
+): void {
+  if (!getLiveActivityEnabled() || activityKitDeniedState || !refreshActivity()) {
+    return;
+  }
+  if (activity !== null) {
+    getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
+  }
+}
+
 /** True once ActivityKit reported the surface unavailable (see slice psh for the alert). */
 export function getActivityKitDenied(): boolean {
   return activityKitDeniedState;
@@ -244,6 +264,23 @@ export function _resetIosSinkForTests(): void {
   pendingStartAt = 0;
 }
 
+/**
+ * The delayed frame, when there is a claim worth retracting. Counts only: an
+ * empty or waiting surface asserts nothing that can go out of date, and a
+ * `stale` frame after `expiresAt` would only undo the expiry frame behind it.
+ */
+function staleTimelineFrame(
+  snapshot: GlanceableAgentsSnapshot
+): { date: Date; props: Partial<ReturnType<typeof buildGlanceableViewProps>> }[] {
+  if (snapshot.status !== 'happy') {
+    return [];
+  }
+  const staleAt = Date.parse(snapshot.updatedAt) + GLANCEABLE_STALE_MS;
+  return staleAt >= Date.parse(snapshot.expiresAt)
+    ? []
+    : [{ date: new Date(staleAt), props: buildStaleWidgetProps(snapshot, translate) }];
+}
+
 export const iosSink: GlanceableSink = {
   async waitForNativeTerminal() {
     await Promise.all(
@@ -260,6 +297,12 @@ export const iosSink: GlanceableSink = {
     if (snapshot.status !== 'signed_out' && snapshot.status !== 'privacy') {
       ActiveAgentsWidget.updateTimeline([
         { date: new Date(), props },
+        // WidgetKit is the only clock the widget has while the app is not
+        // running: a background wake can be throttled or, after a force quit,
+        // never delivered at all. Hand it the frame that stops asserting the
+        // counts as current, so a widget nothing has refreshed reads as delayed
+        // rather than as fact.
+        ...staleTimelineFrame(snapshot),
         { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
       ]);
     }

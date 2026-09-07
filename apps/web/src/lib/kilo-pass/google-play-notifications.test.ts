@@ -722,13 +722,14 @@ describe('processGooglePlayKiloPassNotification', () => {
     }
   );
 
-  it('acknowledges after committed credits and retries acknowledgement without another grant', async () => {
+  it.each([false, true])('acknowledges committed credits and retries without another grant (resubscription: %s)', async resubscription => {
     const { user, obfsAccountId } = await insertGooglePlayUser();
     const token = crypto.randomUUID();
     const messageId = crypto.randomUUID();
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
       apiDataForUser(obfsAccountId, undefined, {
         acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+        ...(resubscription ? { externalAccountIdentifiers: undefined, outOfAppPurchaseContext: { expiredExternalAccountIdentifiers: { obfuscatedExternalAccountId: obfsAccountId } } } : {}),
       })
     );
     mockAcknowledge.mockImplementationOnce(async () => {
@@ -756,6 +757,7 @@ describe('processGooglePlayKiloPassNotification', () => {
       processGooglePlayKiloPassNotification({ pubsubMessage: message })
     ).resolves.toEqual({ processed: true });
     expect(mockAcknowledge).toHaveBeenCalledTimes(2);
+    expect(mockAcknowledge).toHaveBeenLastCalledWith('kilopass_tier19', token, resubscription ? obfsAccountId : undefined);
     const after = await db.query.kilocode_users.findFirst({
       where: eq(kilocode_users.id, user.id),
     });

@@ -1,6 +1,4 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test';
-import { createHash } from 'node:crypto';
-import { canonicalControlEventJson } from '../../../src/shared/control-event-canonical';
 import { ControlDeliveryError } from './sandbox-control-client';
 import { createControlEventOutbox, type ControlEventPublication } from './control-event-outbox';
 import {
@@ -15,7 +13,7 @@ const session = {
 };
 
 describe('control event outbox', () => {
-  it('snapshots native lifetime before replacement and binds it into the receipt hash', async () => {
+  it('snapshots native lifetime before replacement', async () => {
     const published: ControlEventPublication[] = [];
     const outbox = createControlEventOutbox({
       publish: async publication => {
@@ -42,17 +40,8 @@ describe('control event outbox', () => {
     expect(deadlineAt).toBeGreaterThan(Date.now());
     const parsed = sandboxEventPublicationPayloadSchema.parse(wire);
     expect(wire).toEqual(parsed);
-    const hash = (value: unknown) =>
-      createHash('sha256').update(canonicalControlEventJson(value)).digest('hex');
-    const content = {
-      event: parsed.event,
-      session: parsed.session,
-      payload: parsed.payload,
-      sequence: parsed.sequence,
-    };
-    expect(hash(content)).toBe(first.receiptHash);
-    expect(hash({ ...content, session: identity })).not.toBe(first.receiptHash);
-    expect(hash({ ...content, session })).not.toBe(first.receiptHash);
+    expect(wire).toEqual(expect.objectContaining({ receiptId: first.receiptId, sequence: 1 }));
+    expect(wire).not.toHaveProperty('receiptHash');
     expect(
       sandboxEventPublicationPayloadSchema.safeParse({
         ...wire,
@@ -80,18 +69,7 @@ describe('control event outbox', () => {
     expect(deadlineAt).toBeGreaterThan(Date.now());
     expect(wire).toEqual(sandboxEventPublicationPayloadSchema.parse(wire));
     expect(wire.session).toEqual(session);
-    expect(wire.receiptHash).toBe(
-      createHash('sha256')
-        .update(
-          canonicalControlEventJson({
-            event: wire.event,
-            session,
-            payload: wire.payload,
-            sequence: wire.sequence,
-          })
-        )
-        .digest('hex')
-    );
+    expect(wire).not.toHaveProperty('receiptHash');
   });
 
   it('autonomously retries one stable receipt without future events or resume calls', async () => {

@@ -968,6 +968,67 @@ describe('createSessionManager', () => {
       ).toBeNull();
     });
 
+    it('restores sending after a settled preparation failure without clearing its error', async () => {
+      let subscriptionCallback = (): void => {
+        throw new Error('Expected service state subscription callback');
+      };
+      let cloudStatus: CloudStatus | null = null;
+      mockSession.state.getCloudStatus.mockImplementation(() => cloudStatus);
+      mockSession.state.subscribe.mockImplementation(callback => {
+        subscriptionCallback = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'Failed preparation',
+          mode: 'code',
+          model: 'test-model',
+        },
+      });
+      const failedMessageId = mockSession.send.mock.calls[0]?.[0].messageId;
+
+      cloudStatus = { type: 'preparing', message: 'Setting up environment...' };
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+
+      cloudStatus = { type: 'finalizing', message: 'Wrapping up...' };
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+
+      cloudStatus = { type: 'error', message: 'Clone failed' };
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<CloudStatus | null>(config.store, mgr.atoms.cloudStatus)).toEqual(
+        cloudStatus
+      );
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(expect.objectContaining({ type: 'error', message: 'Clone failed' }));
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Retry preparation', mode: 'code', model: 'test-model' },
+      });
+      const retryMessageId = mockSession.send.mock.calls[1]?.[0].messageId;
+      expect(accepted).toBe(true);
+      expect(retryMessageId).toEqual(expect.stringMatching(/^msg_/));
+      expect(retryMessageId).not.toBe(failedMessageId);
+
+      mockSession.canSend = false;
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+
+      mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+    });
+
     it('exposes active session type and remote model state from the live transport', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);

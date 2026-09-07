@@ -30,7 +30,7 @@ export function createControlEventTransport(options: {
     event: EventKind;
     session: SessionEventIdentity;
     payload: unknown;
-  }) => Omit<ControlEventPublication, 'receiptId' | 'receiptHash' | 'sequence'>;
+  }) => Omit<ControlEventPublication, 'receiptId' | 'sequence'>;
   sendLegacy: (payload: unknown, session: SessionEventIdentity) => boolean;
   onFailure: (failure: ControlEventOutboxFailure) => void;
 }) {

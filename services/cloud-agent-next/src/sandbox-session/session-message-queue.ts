@@ -352,6 +352,37 @@ export function failQueuedMessage(
   );
 }
 
+export function cancelPendingMessage(
+  messages: readonly SessionMessageRecord[],
+  messageId: string
+): { dropped: boolean; messages?: SessionMessageRecord[] } {
+  const target = messages.find(message => message.messageId === messageId);
+  if (!target) return { dropped: false };
+  if (target.state === 'cancelled' && target.failedReason === 'queued_message_cancelled') {
+    return { dropped: true };
+  }
+  if (
+    target.state !== 'queued' ||
+    target.acceptedAt !== undefined ||
+    target.unresolvedDispatch ||
+    target.preparationAttemptId !== undefined ||
+    target.deliveryDeadlineAt !== undefined ||
+    target.wrapperInstanceId !== undefined ||
+    target.operations !== undefined ||
+    target.cancellation !== undefined
+  ) {
+    return { dropped: false };
+  }
+  return {
+    dropped: true,
+    messages: messages.map(message =>
+      message.messageId === messageId
+        ? { ...message, state: 'cancelled', failedReason: 'queued_message_cancelled' }
+        : message
+    ),
+  };
+}
+
 export function acceptQueuedMessage(
   messages: readonly SessionMessageRecord[],
   messageId: string,

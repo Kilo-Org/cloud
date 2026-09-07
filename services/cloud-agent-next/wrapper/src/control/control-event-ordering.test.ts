@@ -115,7 +115,6 @@ describe('control event publication ordering', () => {
       expect(older).toEqual(original);
       expect(published[8]).toMatchObject({
         receiptId: original.receiptId,
-        receiptHash: original.receiptHash,
         sequence: original.sequence,
         session: original.session,
         payload: original.payload,

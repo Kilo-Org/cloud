@@ -675,6 +675,153 @@ describe('createServiceState', () => {
       });
 
       expect(state.getCloudStatus()).toEqual({ type: 'error', message: 'Clone failed' });
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          triggerMessageId: 'message-1',
+          status: 'failed',
+          safeError: 'Clone failed',
+        }),
+      ]);
+
+      state.process({
+        type: 'preparing',
+        version: 2,
+        attemptId: 'attempt-2',
+        triggerMessageId: 'message-2',
+        revision: 1,
+        timestamp: 3_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      expect(state.getPreparationAttempts()).toEqual([
+        expect.objectContaining({
+          id: 'attempt-1',
+          triggerMessageId: 'message-1',
+          status: 'failed',
+          safeError: 'Clone failed',
+        }),
+        expect.objectContaining({
+          id: 'attempt-2',
+          triggerMessageId: 'message-2',
+          status: 'running',
+        }),
+      ]);
+    });
+
+    it.each([
+      {
+        terminalAction: 'attempt_completed' as const,
+        terminalStep: 'ready',
+        expectedStatus: 'completed' as const,
+        expectedCloudStatus: { type: 'ready' as const },
+      },
+      {
+        terminalAction: 'attempt_failed' as const,
+        terminalStep: 'failed',
+        expectedStatus: 'failed' as const,
+        expectedCloudStatus: { type: 'error' as const, message: 'Clone failed' },
+        safeError: 'Clone failed',
+      },
+    ])('does not restart a $expectedStatus attempt', terminal => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+      };
+
+      state.process({
+        ...base,
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      state.process({
+        ...base,
+        revision: 2,
+        timestamp: 2_000,
+        step: terminal.terminalStep,
+        message: 'Clone failed',
+        action: terminal.terminalAction,
+        ...(terminal.safeError === undefined ? {} : { safeError: terminal.safeError }),
+      });
+      state.process({
+        ...base,
+        revision: 3,
+        timestamp: 3_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+
+      expect(state.getPreparationAttempts()[0]).toMatchObject({
+        status: terminal.expectedStatus,
+        revision: 2,
+        ...(terminal.safeError === undefined ? {} : { safeError: terminal.safeError }),
+      });
+      expect(state.getCloudStatus()).toEqual(terminal.expectedCloudStatus);
+    });
+
+    it('retains late terminal step snapshots without returning to preparing', () => {
+      const state = createServiceState(makeConfig());
+      const base = {
+        type: 'preparing' as const,
+        version: 2 as const,
+        attemptId: 'attempt-1',
+        triggerMessageId: 'message-1',
+      };
+
+      state.process({
+        ...base,
+        revision: 1,
+        timestamp: 1_000,
+        step: 'workspace_setup',
+        message: 'Preparing environment',
+        action: 'attempt_started',
+      });
+      state.process({
+        ...base,
+        revision: 2,
+        timestamp: 2_000,
+        step: 'ready',
+        message: 'Preparation complete',
+        action: 'attempt_completed',
+      });
+      state.process({
+        ...base,
+        revision: 3,
+        timestamp: 3_000,
+        step: 'setup_commands',
+        message: 'Preparation snapshot',
+        action: 'step_snapshot',
+        stepId: 'command:install',
+        stepSnapshot: {
+          id: 'command:install',
+          key: 'setup_commands',
+          kind: 'setup_command',
+          label: 'Install dependencies',
+          status: 'completed',
+          startedAt: 2_500,
+          completedAt: 3_000,
+          revision: 3,
+          outputTail: 'Installed dependencies',
+        },
+      });
+
+      expect(state.getPreparationAttempts()[0]).toMatchObject({
+        status: 'completed',
+        revision: 3,
+        steps: [
+          expect.objectContaining({ id: 'command:install', outputTail: 'Installed dependencies' }),
+        ],
+      });
+      expect(state.getCloudStatus()).toEqual({ type: 'ready' });
     });
 
     it('replayed snapshots of a completed attempt leave cloudStatus ready', () => {
@@ -1755,6 +1902,11 @@ describe('createServiceState', () => {
       expect(state.getCloudStatus()).toEqual({
         type: 'error',
         message: 'Environment preparation failed',
+      });
+      expect(state.getPendingMessages().get('m1')).toEqual({
+        status: 'failed',
+        error: 'Environment preparation failed',
+        reason: 'exhausted',
       });
     });
 

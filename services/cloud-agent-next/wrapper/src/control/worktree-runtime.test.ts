@@ -185,7 +185,10 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
         return Response.json(completion);
       }
       if (request.method === 'GET' && url.pathname.startsWith('/session/')) {
-        return Response.json({ id: decodeURIComponent(url.pathname.slice('/session/'.length)) });
+        return Response.json({
+          id: decodeURIComponent(url.pathname.slice('/session/'.length)),
+          directory: url.searchParams.get('directory'),
+        });
       }
       if (request.method === 'POST' && url.pathname === '/pty') {
         return Response.json({

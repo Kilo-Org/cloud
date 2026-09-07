@@ -17,6 +17,8 @@ export type GooglePlayDecodedPurchase = {
   startTimeMs: number;
   expiryTimeMs: number;
   obfuscatedExternalAccountId?: string;
+  linkedPurchaseToken?: string;
+  deferredReplacement?: boolean;
   environment: GooglePlayEnvironment;
   subscriptionState: string;
   rawPayload: Record<string, unknown>;
@@ -67,7 +69,7 @@ export function mapGooglePlayKiloPassPurchase(
   const orderItems = order.lineItems?.filter(item => item.productId === decoded.productId) ?? [];
   if (
     order.orderId !== decoded.latestOrderId ||
-    order.purchaseToken !== decoded.purchaseToken ||
+    (order.purchaseToken !== decoded.purchaseToken && !decoded.deferredReplacement) ||
     orderItems.length !== 1 ||
     !['PROCESSED', 'PENDING_REFUND', 'PARTIALLY_REFUNDED'].includes(order.state ?? '')
   ) {
@@ -100,6 +102,13 @@ export function mapGooglePlayKiloPassPurchase(
     expiresAtIso: new Date(decoded.expiryTimeMs).toISOString(),
     tier: product.tier,
     cadence: product.cadence,
+    googlePlayReplacement: decoded.linkedPurchaseToken
+      ? {
+          linkedPurchaseToken: decoded.linkedPurchaseToken,
+          deferred: decoded.deferredReplacement ?? false,
+          orderPurchaseToken: order.purchaseToken ?? '',
+        }
+      : undefined,
     rawPayload: decoded.rawPayload,
   };
 }
@@ -112,7 +121,14 @@ export function decodeGooglePlaySubscriptionPurchase(
   if (lineItems.length === 0) {
     throw new Error('Google Play subscription purchase missing line items');
   }
-  const lineItem = lineItems[0];
+  // Deferred replacements contain both the current and future items, in any order.
+  const entitledItems = lineItems.filter(item => Date.parse(item.expiryTime ?? '') > Date.now());
+  if (entitledItems.length > 1) throw new Error('Google Play purchase has multiple active items');
+  const lineItem =
+    entitledItems[0] ??
+    [...lineItems].sort(
+      (a, b) => (Date.parse(b.expiryTime ?? '') || 0) - (Date.parse(a.expiryTime ?? '') || 0)
+    )[0];
 
   const latestOrderId =
     lineItem.latestSuccessfulOrderId ??
@@ -124,6 +140,8 @@ export function decodeGooglePlaySubscriptionPurchase(
 
   return {
     purchaseToken,
+    linkedPurchaseToken: apiData.linkedPurchaseToken ?? undefined,
+    deferredReplacement: Boolean(lineItem.deferredItemReplacement && apiData.linkedPurchaseToken),
     productId: lineItem.productId ?? '',
     latestOrderId,
     startTimeMs: Date.parse(apiData.startTime ?? ''),

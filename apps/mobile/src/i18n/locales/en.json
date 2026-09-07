@@ -338,9 +338,7 @@
       "banner": {
         "title": "Not available on this provider",
         "accessibility": "Not available on this provider: {{reason}}"
-      },
-      "autoMergeUnavailable": "Auto-merge is not available",
-      "autoMergeUnavailableReason": "Bitbucket Cloud does not expose auto-merge in its API"
+      }
     },
     "merge": {
       "merge": "Merge",

@@ -2619,6 +2619,198 @@ describe('SandboxSession orchestration', () => {
     ).toEqual(['b']);
   });
 
+  it('persists a retained operation result without nested transactionSync', async () => {
+    const fixture = sessionFixture();
+    const kiloSessionId = fixture.metadata.auth.kiloSessionId;
+    if (!kiloSessionId) throw new Error('Missing Kilo session ID');
+    const authorization = {
+      operation: 'session.prompt',
+      operationId: 'a',
+      messageId: 'a',
+      session: { sessionId: SESSION_ID, kiloSessionId, directory: DIRECTORY },
+      wrapperInstanceId: RUNTIME_ID,
+      dispatchDeadlineAt: Date.now() + 60_000,
+    } satisfies SessionOperationAuthorization;
+    fixture.values.set('session_messages', [
+      {
+        messageId: 'a',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: { prompt: { authorization, dispatched: true } },
+      } as SessionMessageRecord,
+    ]);
+    let depth = 0;
+    const transactionSync = fixture.storage.transactionSync.bind(fixture.storage);
+    fixture.storage.transactionSync = <T>(callback: () => T): T => {
+      if (depth > 0) throw new Error('nested transactionSync');
+      depth += 1;
+      try {
+        return transactionSync(callback);
+      } finally {
+        depth -= 1;
+      }
+    };
+    await expect(
+      fixture.session.receiveSandboxOperationResult({
+        session: authorization.session,
+        wrapperInstanceId: authorization.wrapperInstanceId,
+        delivery: {
+          version: 2,
+          authorization,
+          completedAt: Date.now(),
+          result: { ok: true, result: { messageId: 'a', status: 'accepted' } },
+          outcome: { messageId: 'a', status: 'completed' },
+          events: [
+            {
+              type: 'autocommit_completed',
+              properties: { success: true, messageId: 'a' },
+              timestamp: new Date().toISOString(),
+            },
+          ],
+          preparing: [],
+        },
+      })
+    ).resolves.toMatchObject({ disposition: 'applied' });
+    expect(fixture.record('a')?.state).toBe('completed');
+  });
+
+  it('records the native runtime fence after attach completion is persisted', async () => {
+    const fixture = sessionFixture();
+    const kiloSessionId = fixture.metadata.auth.kiloSessionId;
+    if (!kiloSessionId) throw new Error('Missing Kilo session ID');
+    const nativeRuntimeId = '44444444-4444-4444-8444-444444444444';
+    const authorization = {
+      operation: 'session.attach',
+      operationId: '11111111-1111-4111-8111-111111111111',
+      messageId: 'a',
+      session: { sessionId: SESSION_ID, kiloSessionId, directory: DIRECTORY },
+      wrapperInstanceId: RUNTIME_ID,
+      dispatchDeadlineAt: Date.now() + 60_000,
+    } satisfies SessionOperationAuthorization;
+    fixture.values.set('session_messages', [
+      {
+        messageId: 'a',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: { attach: { authorization, dispatched: true } },
+      } as SessionMessageRecord,
+    ]);
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId,
+      authorization,
+    });
+    expect(fixture.values.get('native_runtime_fence')).toBeUndefined();
+    fixture.values.set('session_messages', [
+      {
+        messageId: 'a',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: {
+          attach: {
+            authorization,
+            dispatched: true,
+            completedAt: Date.now(),
+            attachmentEpoch: 1,
+          },
+        },
+      } as SessionMessageRecord,
+    ]);
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId,
+      authorization,
+    });
+    expect(fixture.values.get('native_runtime_fence')).toEqual(
+      expect.objectContaining({
+        sandboxId: SANDBOX_ID,
+        wrapperInstanceId: RUNTIME_ID,
+        nativeRuntimeId,
+      })
+    );
+  });
+
+  it('does not let a late N1 attachment record replace the current N2 fence', async () => {
+    const fixture = sessionFixture();
+    const kiloSessionId = fixture.metadata.auth.kiloSessionId;
+    if (!kiloSessionId) throw new Error('Missing Kilo session ID');
+    const authorization = (messageId: string, operationId: string, deadline: number) =>
+      ({
+        operation: 'session.attach',
+        operationId,
+        messageId,
+        session: {
+          sessionId: SESSION_ID,
+          kiloSessionId,
+          directory: DIRECTORY,
+        },
+        wrapperInstanceId: RUNTIME_ID,
+        dispatchDeadlineAt: deadline,
+      }) satisfies SessionOperationAuthorization;
+    const oldAuthorization = authorization(
+      'old',
+      '11111111-1111-4111-8111-111111111111',
+      Date.now() + 1_000
+    );
+    const nextAuthorization = authorization(
+      'next',
+      '22222222-2222-4222-8222-222222222222',
+      Date.now() + 2_000
+    );
+    fixture.values.set('session_messages', [
+      {
+        messageId: 'old',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: {
+          attach: {
+            authorization: oldAuthorization,
+            dispatched: true,
+            completedAt: Date.now(),
+            attachmentEpoch: 1,
+          },
+        },
+      } as SessionMessageRecord,
+      {
+        messageId: 'next',
+        state: 'accepted',
+        wrapperInstanceId: RUNTIME_ID,
+        operations: {
+          attach: {
+            authorization: nextAuthorization,
+            dispatched: true,
+            completedAt: Date.now(),
+            attachmentEpoch: 2,
+          },
+        },
+      } as SessionMessageRecord,
+    ]);
+
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+      authorization: nextAuthorization,
+    });
+    await fixture.session.recordNativeRuntime({
+      sandboxId: SANDBOX_ID,
+      wrapperInstanceId: RUNTIME_ID,
+      nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+      authorization: oldAuthorization,
+    });
+
+    await fixture.session.failWaitingMessages(
+      'late_old_native_failure',
+      RUNTIME_ID,
+      '11111111-1111-4111-8111-111111111111'
+    );
+
+    expect(fixture.record('old')?.state).toBe('accepted');
+    expect(fixture.record('next')?.state).toBe('accepted');
+  });
+
   it('retains the original head deadline after awaited cancel cannot transfer quarantine', async () => {
     const fixture = sessionFixture();
     const attach = deferred<ResponseFrame>();

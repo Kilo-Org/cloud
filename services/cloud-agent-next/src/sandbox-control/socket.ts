@@ -14,6 +14,7 @@ import {
   SANDBOX_HELLO_DEADLINE_MS,
   sandboxControlSocketAttachmentSchema,
   sandboxControlObservationSchema,
+  sessionNativeRuntimeRetirementPayloadSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationDeliverySchema,
   type SandboxControlObservation,
@@ -25,6 +26,7 @@ import {
   type SandboxHeartbeatPayload,
   type SessionEventIdentity,
   type SessionEventPayload,
+  type SessionNativeRuntimeRetirementPayload,
   type SessionOperationAck,
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
@@ -94,6 +96,10 @@ export type SandboxControlSocketHooks = {
     delivery: SessionOperationDelivery,
     identity: SandboxControlConnectionIdentity
   ): Promise<SessionOperationAck | undefined> | SessionOperationAck | undefined;
+  onNativeRuntimeRetired?(
+    payload: SessionNativeRuntimeRetirementPayload,
+    identity: SandboxControlConnectionIdentity
+  ): Promise<{ retired: true } | undefined> | { retired: true } | undefined;
   onSocketClosed?(
     handshakeComplete: boolean,
     identity?: SandboxControlConnectionIdentity
@@ -110,6 +116,7 @@ export type SandboxControlSocketHandler = {
   hasHandshakenSocket(): boolean;
   supportsOperationResults(): boolean;
   supportsScopedStopAbort(): boolean;
+  supportsNativeRuntimeRetirement(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
   closeProvisionalSockets(): void;
@@ -342,6 +349,14 @@ export function createSandboxControlSocketHandler(
       const current = currentHandshakenSocket(state);
       return (
         current !== null && readAttachment(current.socket)?.capabilities?.scopedStopAbort === true
+      );
+    },
+
+    supportsNativeRuntimeRetirement(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null &&
+        readAttachment(current.socket)?.capabilities?.nativeRuntimeRetirement === true
       );
     },
 
@@ -641,6 +656,43 @@ export function createSandboxControlSocketHandler(
             frame.session,
             eventPayload.payload as SessionPreparingPayload,
             identity
+          );
+        }
+        return;
+      }
+
+      if (frame.operation === 'session.runtime.retired') {
+        const payload = sessionNativeRuntimeRetirementPayloadSchema.safeParse(frame.payload);
+        if (!payload.success) {
+          sendJson(
+            ws,
+            errorResponse(
+              frame.requestId,
+              'protocol_error',
+              'Invalid native runtime retirement payload'
+            )
+          );
+          return;
+        }
+        try {
+          const result = await hooks.onNativeRuntimeRetired?.(payload.data, identity);
+          if (!result)
+            throw new SandboxControlConnectionError(
+              'Native runtime retirement is not current',
+              true
+            );
+          if (!isCurrentConnection(state, ws, identity)) return;
+          sendJson(ws, okResponse(frame.requestId, result));
+        } catch (error) {
+          if (!isCurrentConnection(state, ws, identity)) return;
+          sendJson(
+            ws,
+            errorResponse(
+              frame.requestId,
+              'not_ready',
+              error instanceof Error ? error.message : 'Native runtime retirement failed',
+              true
+            )
           );
         }
         return;

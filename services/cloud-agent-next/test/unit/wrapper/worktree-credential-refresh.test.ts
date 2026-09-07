@@ -86,8 +86,15 @@ function fixture() {
   const close = vi.fn();
   const startServer = vi.fn<
     NonNullable<Parameters<typeof createWorktreeKiloRuntimes>[0]['startServer']>
-  >(async () => {
+  >(async options => {
     const stopped = Promise.withResolvers<void>();
+    options.onProcessScope?.({
+      stop: async () => {
+        stopped.resolve();
+        return true;
+      },
+      verify: async () => true,
+    } as never);
     return {
       url: `http://127.0.0.1:${10000 + clients.length}`,
       stopped: stopped.promise,
@@ -421,11 +428,10 @@ describe('direct worktree credential refresh', () => {
   it('waits for confirmed old process exit before launching the refreshed process', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
-    f.startServer.mockImplementationOnce(async () => ({
-      url: 'http://127.0.0.1:10000',
-      close: f.close,
-      stopped: stopped.promise,
-    }));
+    f.startServer.mockImplementationOnce(async options => {
+      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
+      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+    });
     const runtime = await f.attach();
     const attachment = f.registry.attach(
       identity,
@@ -449,11 +455,10 @@ describe('direct worktree credential refresh', () => {
       const f = fixture();
       const stopped = Promise.withResolvers<void>();
       if (failure === 'process-stop-timeout') {
-        f.startServer.mockImplementationOnce(async () => ({
-          url: 'http://127.0.0.1:10000',
-          close: f.close,
-          stopped: stopped.promise,
-        }));
+        f.startServer.mockImplementationOnce(async options => {
+          options.onProcessScope?.({ stop: async () => false, verify: async () => false } as never);
+          return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+        });
       }
       const runtime = await f.attach();
       await f.attach(auth, originalEnv, sibling);
@@ -474,10 +479,13 @@ describe('direct worktree credential refresh', () => {
       expect(await outcome).toMatchObject({ code: 'runtime_unhealthy', retryable: true });
       expect(runtime.signal.aborted).toBe(true);
       expect(f.registry.get(identity.directory)).toBeUndefined();
-      expect(f.registry.isHealthy()).toBe(false);
-      expect(f.onUnexpectedClose.mock.calls).toEqual([
-        [{ directory: identity.directory, reason: 'credential_refresh_failed' }],
-      ]);
+      await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
+      expect(f.registry.isHealthy()).toBe(failure !== 'process-stop-timeout');
+      expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
+        directory: identity.directory,
+        reason: 'credential_refresh_failed',
+        cleanup: failure === 'process-stop-timeout' ? 'unconfirmed' : 'confirmed',
+      });
       expect(f.startServer).toHaveBeenCalledTimes(failure === 'process-stop-timeout' ? 1 : 2);
       stopped.resolve();
       f.registry.shutdown();
@@ -492,11 +500,10 @@ describe('direct worktree credential refresh', () => {
   it('does not report intentional shutdown during a pending destructive refresh as unexpected', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
-    f.startServer.mockImplementationOnce(async () => ({
-      url: 'http://127.0.0.1:10000',
-      close: f.close,
-      stopped: stopped.promise,
-    }));
+    f.startServer.mockImplementationOnce(async options => {
+      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
+      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+    });
     await f.attach();
     const outcome = f
       .attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' })
@@ -522,20 +529,22 @@ describe('direct worktree credential refresh', () => {
   it('reports confirmed process exit immediately even if the feed still appears fresh', async () => {
     const f = fixture();
     const stopped = Promise.withResolvers<void>();
-    f.startServer.mockImplementationOnce(async () => ({
-      url: 'http://127.0.0.1:10000',
-      close: f.close,
-      stopped: stopped.promise,
-    }));
+    f.startServer.mockImplementationOnce(async options => {
+      options.onProcessScope?.({ stop: async () => true, verify: async () => true } as never);
+      return { url: 'http://127.0.0.1:10000', close: f.close, stopped: stopped.promise };
+    });
     const runtime = await f.attach();
     stopped.resolve();
     await stopped.promise;
     expect(runtime.signal.aborted).toBe(true);
     expect(f.registry.get(identity.directory)).toBeUndefined();
-    expect(f.registry.isHealthy()).toBe(false);
-    expect(f.onUnexpectedClose.mock.calls).toEqual([
-      [{ directory: identity.directory, reason: 'process_exited' }],
-    ]);
+    await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
+    expect(f.registry.isHealthy()).toBe(true);
+    expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
+      directory: identity.directory,
+      reason: 'process_exited',
+      cleanup: 'confirmed',
+    });
   });
 
   it.each(['connection', 'http'] as const)(
@@ -573,9 +582,12 @@ describe('direct worktree credential refresh', () => {
       ).toHaveLength(1);
       expect(runtime.signal.aborted).toBe(false);
       feed.onUnexpectedClose(error);
-      expect(f.onUnexpectedClose.mock.calls).toEqual([
-        [{ directory: identity.directory, reason: 'feed_failed' }],
-      ]);
+      await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
+      expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
+        directory: identity.directory,
+        reason: 'feed_failed',
+        cleanup: 'confirmed',
+      });
       expect(runtime.signal.aborted).toBe(true);
     }
   );
@@ -594,9 +606,12 @@ describe('direct worktree credential refresh', () => {
     expect(currentFeed).toBeDefined();
     currentFeed?.onUnexpectedClose(new Error('private-current-feed-credential'));
     currentFeed?.onUnexpectedClose(new Error('private-duplicate-feed-credential'));
-    expect(f.onUnexpectedClose.mock.calls).toEqual([
-      [{ directory: identity.directory, reason: 'feed_failed' }],
-    ]);
+    await vi.waitFor(() => expect(f.onUnexpectedClose).toHaveBeenCalledTimes(1));
+    expect(f.onUnexpectedClose.mock.calls[0]?.[0]).toMatchObject({
+      directory: identity.directory,
+      reason: 'feed_failed',
+      cleanup: 'confirmed',
+    });
     expect(runtime.signal.aborted).toBe(true);
   });
 
@@ -806,6 +821,9 @@ describe('direct worktree credential refresh', () => {
       },
       signal: runtimeLifetime.signal,
     };
+    const getRuntime = f.registry.get.bind(f.registry);
+    f.registry.get = directory =>
+      directory === sibling.directory ? (fakeRuntime as typeof runtime) : getRuntime(directory);
     const siblingOp = deps.operations.start(
       sibling,
       undefined,
@@ -832,6 +850,7 @@ describe('direct worktree credential refresh', () => {
     siblingOp.cancel('test-cleanup', 'cancelled');
     held.resolve({ ok: true, result: {} });
     await siblingOp.done.catch(() => {});
+    f.registry.get = getRuntime;
     // Operation completion reconciles activity to idle; restore active state
     // to match the original test which only removed the task without touching activity
     activity.markActive(sibling.kiloSessionId);

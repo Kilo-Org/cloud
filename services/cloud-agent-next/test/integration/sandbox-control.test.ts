@@ -395,6 +395,7 @@ async function completeHello(
           kiloVersionHeartbeat: true,
           sessionOperationResults: true,
           scopedStopAbort: true,
+          nativeRuntimeRetirement: true,
         },
       },
     })

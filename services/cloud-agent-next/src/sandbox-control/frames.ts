@@ -185,6 +185,7 @@ export function helloResult(): SandboxHelloResult {
       kiloVersionHeartbeat: true,
       sessionOperationResults: true,
       scopedStopAbort: true,
+      nativeRuntimeRetirement: true,
     },
   };
 }

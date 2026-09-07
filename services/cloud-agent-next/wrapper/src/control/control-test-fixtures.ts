@@ -58,7 +58,7 @@ export function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKil
     answerQuestion: async () => true,
     rejectQuestion: async () => true,
     getSessionDetails: async (id: string, directory = session.directory) => ({ id, directory }),
-    getSessionStatuses: async () => ({}),
+    getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
     getQuestions: async () => [],
     getPermissions: async () => [],
     ...overrides,
@@ -92,6 +92,7 @@ export function createHandlerFixture(
   const runtime: WorktreeKiloRuntime | undefined = client
     ? {
         scopeId: kilo.scopeId,
+        runtimeId: 'native_1',
         directory: identity.directory,
         env: buildWorktreeKiloEnvironment(
           identity.directory,
@@ -112,12 +113,30 @@ export function createHandlerFixture(
             return {
               ready: Promise.resolve(runtime),
               signal: runtime.signal,
+              cleanup: async () => 'retired',
               commit: () => {},
               release: () => {},
             };
           },
           detach: () => true,
           deleteDirectory: async () => {},
+          getRetained: directory => (directory === runtime.directory ? runtime : undefined),
+          retireRuntime: async (directory, _deadlineAt, target) => {
+            if (
+              directory !== runtime.directory ||
+              !target ||
+              target.runtimeId !== runtime.runtimeId ||
+              target.client !== runtime.kiloClient
+            )
+              return 'stale';
+            nativeLifetime.abort();
+            return 'retired';
+          },
+          verifyQuiescence: async (directory, target, deadlineAt) =>
+            directory === runtime.directory &&
+            target.client === runtime.kiloClient &&
+            !nativeLifetime.signal.aborted &&
+            Date.now() < deadlineAt,
           get: directory =>
             directory === runtime.directory && !nativeLifetime.signal.aborted ? runtime : undefined,
           isHealthy: () => true,

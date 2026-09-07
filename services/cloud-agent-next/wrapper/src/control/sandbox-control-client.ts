@@ -17,6 +17,8 @@ import {
   sandboxHelloResultSchema,
   sandboxHeartbeatPayloadSchema,
   sessionEventPayloadSchema,
+  sessionNativeRuntimeRetirementPayloadSchema,
+  sessionNativeRuntimeRetirementResultSchema,
   sessionOperationDeliverySchema,
   sessionOperationAckSchema,
   type ControlError,
@@ -88,6 +90,11 @@ export type SandboxControlClient = {
     signal: AbortSignal,
     deadlineAt: number
   ): Promise<SessionOperationAck>;
+  reportNativeRuntimeRetirement?(input: {
+    directory: string;
+    nativeRuntimeId: string;
+    reason: string;
+  }): Promise<boolean>;
 };
 
 type ClientState =
@@ -372,7 +379,11 @@ export function createSandboxControlClient(
           payload: {
             protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
             providerInstanceId: options.providerInstanceId,
-            capabilities: { sessionOperationResults: true, scopedStopAbort: true },
+            capabilities: {
+              sessionOperationResults: true,
+              scopedStopAbort: true,
+              nativeRuntimeRetirement: true,
+            },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),
           },
@@ -645,6 +656,60 @@ export function createSandboxControlClient(
       } finally {
         signal.removeEventListener('abort', onAbort);
       }
+    },
+
+    async reportNativeRuntimeRetirement(input): Promise<boolean> {
+      if (state.kind !== 'ready' || state.socket.readyState !== 1)
+        throw new ControlDeliveryError('Control transport unavailable', true);
+      const payload = sessionNativeRuntimeRetirementPayloadSchema.parse(input);
+      const { socket } = state;
+      const requestId = crypto.randomUUID();
+      const frame: RequestFrame = {
+        type: 'request',
+        requestId,
+        operation: 'session.runtime.retired',
+        payload,
+      };
+      const serialized = JSON.stringify(frame);
+      if (Buffer.byteLength(serialized) > MAX_SANDBOX_CONTROL_FRAME_BYTES)
+        throw new ControlDeliveryError('Native runtime retirement exceeds the frame budget', false);
+      const pending = new Promise<ResponseFrame>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          pendingRequests.delete(requestId);
+          reject(new ControlDeliveryError('Native runtime retirement timed out', true));
+        }, SANDBOX_CONTROL_REQUEST_TIMEOUT_MS);
+        timeout.unref();
+        pendingRequests.set(requestId, {
+          resolve: frame => {
+            clearTimeout(timeout);
+            resolve(frame);
+          },
+          reject: reason => {
+            clearTimeout(timeout);
+            reject(reason);
+          },
+        });
+      });
+      try {
+        socket.send(serialized);
+      } catch {
+        const waiter = pendingRequests.get(requestId);
+        if (waiter) {
+          pendingRequests.delete(requestId);
+          waiter.reject(
+            new ControlDeliveryError('Native runtime retirement publication failed', true)
+          );
+        }
+      }
+      const response = await pending;
+      if (
+        state.kind !== 'ready' ||
+        state.socket !== socket ||
+        socket.readyState !== 1 ||
+        !response.ok
+      )
+        return false;
+      return sessionNativeRuntimeRetirementResultSchema.safeParse(response.result).success;
     },
 
     sendEvent(

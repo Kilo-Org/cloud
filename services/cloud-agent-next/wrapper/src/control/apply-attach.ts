@@ -21,6 +21,7 @@ import {
   type ExecResult,
   type ProcessOutputStream,
 } from '../utils.js';
+import type { WrapperKiloClient } from '../kilo-api.js';
 import {
   directoryForSession,
   forgetAttachedRoot,
@@ -31,17 +32,18 @@ import { authenticatedGitUrl } from './git-url';
 import { createOutputRedactor, createSecretRedactor } from '../redact-output';
 import { stripAnsi } from '../event-parser';
 import type { ControlHandlerResult } from './sandbox-control-handlers';
-import type { WrapperKiloClient } from '../kilo-api.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { configureWorkspaceGitAuthor } from '../session-bootstrap.js';
 import { withKiloRequestDeadline } from './sandbox-control-runtime';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime.js';
 import {
   WorktreeKiloRuntimeError,
+  type WorktreeKiloRuntime,
   type WorktreeKiloAttachment,
   type WorktreeKiloRuntimes,
 } from './worktree-runtime.js';
 import { runDirectoryOperation } from './worktree-operations';
+import type { NativeRetirement } from './session-operation-cleanup.js';
 
 const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
 const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 4 * 60_000;
@@ -58,6 +60,11 @@ export type ApplyAttachDeps = {
   kiloRuntimes?: WorktreeKiloRuntimes;
   canRefreshCredentials?: () => boolean;
   signal?: AbortSignal;
+  assertCurrent?: () => void;
+  onMutation?: () => void;
+  onRuntime?: (runtime: WorktreeKiloRuntime) => void;
+  onError?: (error: unknown) => void;
+  onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void;
   terminalRuntime?: Pick<ControlTerminalRuntime, 'rememberAttachedSession'>;
   mkdir?: (directory: string) => Promise<void>;
   hasGit?: (directory: string) => Promise<boolean>;
@@ -317,16 +324,20 @@ async function executeSessionAttach(
       session,
       attach.kilo,
       attach.env,
-      deps.canRefreshCredentials
+      deps.canRefreshCredentials,
+      deps.onMutation,
+      deps.onCleanupTarget
     );
     const signal = AbortSignal.any([taskSignal, attachment.signal]);
-    const { kiloClient, env } = await withTimeoutAndAbort(attachment.ready, {
+    const runtime = await withTimeoutAndAbort(attachment.ready, {
       signal,
       timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
       timeoutMessage: 'Session attachment timed out',
       abortMessage: 'Session attachment cancelled',
     });
     signal.throwIfAborted();
+    const { kiloClient, env } = runtime;
+    deps.onRuntime?.(runtime);
     stage = 'workspace_prepare';
     const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
     const hasGit = deps.hasGit ?? defaultHasGit;
@@ -551,6 +562,7 @@ async function executeSessionAttach(
     diagnostic('completed');
     return ok();
   } catch (error) {
+    deps.onError?.(error);
     diagnostic('failed');
     if (error instanceof WorktreeKiloRuntimeError || error instanceof ControlTerminalRuntimeError) {
       return fail(error.code, error.message, error.retryable);

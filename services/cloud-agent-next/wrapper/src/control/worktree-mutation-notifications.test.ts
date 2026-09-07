@@ -257,6 +257,7 @@ function setup(deliver?: SendEvent, signal?: AbortSignal) {
     const controller = new AbortController();
     let client = {} as WrapperKiloClient;
     const runtime: WorktreeKiloRuntime = {
+      runtimeId: crypto.randomUUID(),
       directory,
       scopeId: directory,
       env: {},

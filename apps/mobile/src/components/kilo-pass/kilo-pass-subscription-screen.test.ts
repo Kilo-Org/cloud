@@ -314,7 +314,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.presentation.data = { kind: 'web_management', webUrl: null };
     mocks.presentation.isError = true;
     const renderer = await renderScreen();
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on the web.');
+    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
     expect(allText(renderer)).not.toContain("Couldn't load Kilo Pass.");
     renderer.unmount();
   });

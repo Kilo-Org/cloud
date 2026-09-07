@@ -194,6 +194,44 @@ function compactMessageUpdated(data: Record<string, unknown>): Record<string, un
   return out;
 }
 
+/**
+ * Reduces entity-upserted message events to the fields that the Durable Object
+ * coordinator needs for replay and assistant-message lookups. Live clients
+ * receive the separately trimmed, complete event payload.
+ */
+export function slimPersistedKilocodeEvent(data: unknown): unknown {
+  if (!isRecord(data)) return data;
+
+  const eventName = kiloEventNameOf(data);
+  if (eventName === 'message.updated') return compactMessageUpdated(data);
+  if (eventName !== 'message.part.updated') return data;
+
+  const out: Record<string, unknown> = { event: data.event, type: data.type };
+  const properties = data.properties;
+  if (!isRecord(properties)) return out;
+
+  const compactProperties: Record<string, unknown> = {};
+  if (typeof properties.sessionID === 'string') compactProperties.sessionID = properties.sessionID;
+
+  const part = properties.part;
+  if (isRecord(part)) {
+    const compactPart: Record<string, unknown> = {};
+    if (typeof part.type === 'string') compactPart.type = part.type;
+    if (typeof part.id === 'string') compactPart.id = part.id;
+    if (typeof part.messageID === 'string') compactPart.messageID = part.messageID;
+    if (typeof part.status === 'string') compactPart.status = part.status;
+    if (part.type === 'text' && typeof part.text === 'string') compactPart.text = part.text;
+
+    const state = part.state;
+    if (isRecord(state) && typeof state.status === 'string') {
+      compactPart.state = { status: state.status };
+    }
+    compactProperties.part = compactPart;
+  }
+  out.properties = compactProperties;
+  return out;
+}
+
 function compactCommandsAvailable(data: Record<string, unknown>): Record<string, unknown> {
   const commands = data.commands;
   if (!Array.isArray(commands)) return { commands: [] };

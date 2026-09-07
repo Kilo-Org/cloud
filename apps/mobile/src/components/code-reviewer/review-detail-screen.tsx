@@ -168,7 +168,14 @@ export function ReviewDetailScreen({
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
           {review.error_message ? (
             <View className="rounded-lg bg-danger-tile-bg p-3">
-              <Text className="text-xs text-destructive">{review.error_message}</Text>
+              {/* Upstream failures can persist a serialized stack dump here;
+                  unclamped it filled the screen and pushed the retry action
+                  below the fold (e1-review-status.png). Bound the block so
+                  the conclusion keeps a fixed footprint and the actions stay
+                  reachable. */}
+              <Text className="text-xs text-destructive" numberOfLines={4}>
+                {review.error_message}
+              </Text>
             </View>
           ) : null}
         </View>

@@ -7,7 +7,7 @@
  */
 
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { FencedWrapperDispatchRequest } from '../../../src/execution/types.js';
@@ -26,6 +26,40 @@ import {
 } from '../../../src/session/session-message-state.js';
 import { queueUserMessageInput, registerReadySession } from '../../helpers/session-setup.js';
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('executeDirectly failure handling', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
@@ -41,8 +75,7 @@ describe('executeDirectly failure handling', () => {
   it('wrapper heartbeat does not reset the no-output deadline', async () => {
     const userId = 'user_liveness_heartbeat';
     const sessionId = 'agent_liveness_heartbeat';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -102,8 +135,7 @@ describe('executeDirectly failure handling', () => {
   it('meaningful wrapper output pushes the no-output deadline forward', async () => {
     const userId = 'user_liveness_refresh';
     const sessionId = 'agent_liveness_refresh';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -170,9 +202,7 @@ describe('executeDirectly failure handling', () => {
   ) {
     const userId = `user_exec_direct_${keySuffix}`;
     const sessionId = `agent_exec_direct_${keySuffix}`;
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     return runInDurableObject(stub, async (instance, state) => {
       (instance as any).agentRuntime = {
@@ -288,8 +318,7 @@ describe('executeDirectly failure handling', () => {
   it('queued flush pre-start failure retries cleanly with the original execution and message ids', async () => {
     const userId = 'user_exec_direct_fail';
     const sessionId = 'agent_exec_direct_fail';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       let attemptCount = 0;
@@ -425,8 +454,7 @@ describe('handleWrapperTerminalEvent — new-path identity and message preservat
   it('wrapper complete reconciles still-accepted messages instead of stranding them', async () => {
     const userId = 'user_wrapper_complete_identity';
     const sessionId = 'agent_wrapper_complete_identity';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -503,8 +531,7 @@ describe('new-path liveness without executionId', () => {
   it('schedules liveness deadlines for accepted messages and fails them on no-output timeout', async () => {
     const userId = 'user_newpath_liveness';
     const sessionId = 'agent_newpath_liveness';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -590,8 +617,7 @@ describe('new-path liveness without executionId', () => {
   it('schedules liveness deadlines for accepted messages and fails them on ping timeout', async () => {
     const userId = 'user_newpath_ping';
     const sessionId = 'agent_newpath_ping';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -683,8 +709,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
   it('failed hot delivery does not clear wrapper identity for already accepted work', async () => {
     const userId = 'user_hot_fail_identity';
     const sessionId = 'agent_hot_fail_identity';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {
@@ -786,8 +811,7 @@ describe('hot delivery failure preserves existing wrapper identity', () => {
   it('failed cold delivery fences its run and retains physical cleanup responsibility', async () => {
     const userId = 'user_cold_fail_identity';
     const sessionId = 'agent_cold_fail_identity';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       (instance as any).orchestrator = {

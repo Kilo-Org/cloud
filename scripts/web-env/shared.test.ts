@@ -56,7 +56,21 @@ if (args[0] === 'account' && args[1] === 'list') {
     ],
     sections: []
   }));
-} else if (args[0] === 'item' && (args[1] === 'create' || args[1] === 'edit')) {
+} else if (args[0] === 'item' && args[1] === 'create') {
+  // Mirrors 1Password's real server-side validation for the PASSWORD category:
+  // an item cannot be created unless one of its fields carries a populated
+  // \`purpose: 'PASSWORD'\` value.
+  let item = {};
+  try { item = JSON.parse(templateInput); } catch {}
+  const fields = Array.isArray(item.fields) ? item.fields : [];
+  const hasPasswordPurpose = fields.some(field => field && field.purpose === 'PASSWORD' && field.value);
+  if (item.category === 'PASSWORD' && !hasPasswordPurpose) {
+    process.stderr.write('[ItemValidator] has found 1 errors, 0 warnings: \\nErrors:{1. Password item requires ps value}\\n');
+    process.exitCode = 1;
+  } else {
+    process.stdout.write(templateInput || stdin);
+  }
+} else if (args[0] === 'item' && args[1] === 'edit') {
   process.stdout.write(templateInput || stdin);
 } else {
   process.exitCode = 1;
@@ -239,25 +253,18 @@ void test('setVaultValue updates an item from a template without sending the sec
   assert.equal(item.fields?.find(field => field.id === 'password')?.value, 'new-production-value');
 });
 
-void test('setVaultValue creates a staging-only item without a production value', async () => {
-  const invocations = await captureOpInvocations('none', 'staging');
-  const create = invocations.find(invocation => invocation.args[1] === 'create');
-  assert.ok(create);
-  const item = JSON.parse(create.templateInput) as {
-    fields?: Array<{ id?: string; label?: string; type?: string; value?: string }>;
-  };
-  assert.deepEqual(
-    item.fields?.find(field => field.label === 'password (staging)'),
-    {
-      id: 'password-staging',
-      label: 'password (staging)',
-      type: 'CONCEALED',
-      value: 'new-staging-value',
+void test('setVaultValue surfaces a fix-it message when Staging creates a brand-new item', async () => {
+  await assert.rejects(
+    () => captureOpInvocations('none', 'staging'),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      // 1Password's real validator error, preserved so operators can still see it.
+      assert.match(error.message, /Password item requires ps value/);
+      // Our appended guidance on how to unblock the creation.
+      assert.match(error.message, /--only production/);
+      assert.match(error.message, /run the original command again/);
+      return true;
     }
-  );
-  assert.equal(
-    item.fields?.find(field => field.id === 'password'),
-    undefined
   );
 });
 

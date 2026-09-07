@@ -22,6 +22,8 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/lib/a11y/announce', () => ({
   announceForA11y: vi.fn(),
 }));
@@ -108,6 +110,8 @@ describe('ImageViewerModal mounted', () => {
 
     // The zoomable image is replaced by the fallback.
     expect(findByType(renderer.root, 'Image')).toHaveLength(0);
+    expect(findByType(renderer.root, 'StateSurface')).toHaveLength(1);
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(1);
     const alert = findByType(renderer.root, 'AlertCircle');
     expect(alert).toHaveLength(1);
     expect(alert[0]?.props.color).toBe('#ffffff');

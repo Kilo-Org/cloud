@@ -28,6 +28,11 @@ import { type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native'
 import { QueryError } from '@/components/query-error';
 import { i18n } from '@/i18n';
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+
 async function mountRecovery(messages = [makeAssistantMessage()]) {
   const fetchPage = vi
     .fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>()

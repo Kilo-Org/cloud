@@ -295,12 +295,20 @@ export async function listBranches(
 /**
  * Update the model for a GitHub App integration.
  * For organization-owned integrations, validates the model against org access policy.
+ *
+ * `integrationId` targets one specific installation — required for organizations that
+ * can have multiple GitHub installations, since `getInstallation` would otherwise just
+ * guess one. When omitted, falls back to the owner's single best installation, which
+ * covers the personal (single-installation) case.
  */
 export async function updateModel(
   owner: Owner,
-  modelSlug: string
+  modelSlug: string,
+  integrationId?: string
 ): Promise<{ success: boolean; error?: string }> {
-  const integration = await getInstallation(owner);
+  const integration = integrationId
+    ? await getGitHubIntegrationById(owner, integrationId)
+    : await getInstallation(owner);
 
   if (!integration) {
     return { success: false, error: 'No GitHub App installation found' };

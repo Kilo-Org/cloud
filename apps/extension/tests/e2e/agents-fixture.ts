@@ -761,7 +761,7 @@ const buildDefaultCloudAgentStream = (): Record<string, unknown>[] => {
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-1',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });
@@ -937,7 +937,7 @@ export const buildRunningCloudAgentStream = (
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-1',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });
@@ -978,7 +978,7 @@ export const buildQuestionCloudAgentStream = (
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-q',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });
@@ -1034,7 +1034,7 @@ export const buildPermissionCloudAgentStream = (
     data: eventData,
     eventId: ++_eventCounter,
     executionId: 'exec-stream-p',
-    sessionId,
+    sessionId: DEFAULT_CLOUD_SESSION.cloudAgentSessionId,
     streamEventType,
     timestamp: new Date().toISOString(),
   });

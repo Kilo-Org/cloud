@@ -24,6 +24,8 @@ type KvRowProps = {
   className?: string;
   /** Allow the value text to be selected/copied (e.g. identifiers, versions, paths). */
   selectable?: boolean;
+  /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
+  valueClassName?: string;
 };
 
 const VALUE_TONE = {
@@ -51,6 +53,7 @@ export function KvRow({
   last,
   className,
   selectable,
+  valueClassName,
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
   return (
@@ -73,7 +76,11 @@ export function KvRow({
         selectable={selectable}
         numberOfLines={1}
         ellipsizeMode="middle"
-        className={cn('min-w-0 shrink text-right text-[13px]', VALUE_TONE[valueTone])}
+        className={cn(
+          'min-w-0 shrink text-right text-[13px]',
+          VALUE_TONE[valueTone],
+          valueClassName
+        )}
       >
         {value}
       </Text>

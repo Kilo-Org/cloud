@@ -56,6 +56,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#888888' }),
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   View: 'View',
@@ -82,12 +83,18 @@ function boundaryState(overrides: Partial<BoundaryState> = {}): BoundaryState {
   };
 }
 
-const Boundary = OrganizationBoundary as ComponentType<{ organizationIdOverride?: string }>;
+const Boundary = OrganizationBoundary as ComponentType<{
+  organizationIdOverride?: string;
+  title?: string;
+}>;
 
-function mountBoundary(organizationIdOverride?: string): TestRenderer.ReactTestRenderer {
+function mountBoundary(
+  organizationIdOverride?: string,
+  title?: string
+): TestRenderer.ReactTestRenderer {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(Boundary, { organizationIdOverride }));
+    ref.current = TestRenderer.create(createElement(Boundary, { organizationIdOverride, title }));
   });
   if (!ref.current) {
     throw new Error('boundary did not render');
@@ -120,6 +127,21 @@ beforeEach(() => {
 });
 
 describe('OrganizationBoundary settled states', () => {
+  it.each([undefined, 'Organization'])(
+    'renders the state without a scroller for title %s',
+    title => {
+      useOrgBoundaryMock.mockReturnValue(boundaryState());
+      const renderer = mountBoundary(undefined, title);
+      const state = renderer.root.find(node => String(node.type) === 'EmptyStateMock');
+      expect(findByType(renderer.root, 'ScreenHeaderMock')).toHaveLength(title ? 1 : 0);
+      expect(findByType(renderer.root, 'View')).toHaveLength(title ? 1 : 0);
+      expect(state).toBeDefined();
+      act(() => {
+        renderer.unmount();
+      });
+    }
+  );
+
   it('renders a spinner while the org context is resolving', () => {
     useOrgBoundaryMock.mockReturnValue(boundaryState({ isResolving: true }));
 

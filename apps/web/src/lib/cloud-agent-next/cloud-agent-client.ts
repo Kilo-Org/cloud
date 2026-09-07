@@ -11,7 +11,17 @@ import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@/lib/config.server';
 import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
+import {
+  getWorktreeChangesOutputSchema,
+  refreshWorktreeChangesOutputSchema,
+  type GetWorktreeChangesOutput,
+  type RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
+import {
+  SandboxStatusSnapshotSchema,
+  type SandboxStatusSnapshot,
+} from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
 export type { SendMessagePayload } from './types.js';
 
 /**
@@ -25,6 +35,18 @@ export type { SendMessagePayload } from './types.js';
 
 // TODO: Update this URL when the new cloud-agent-next worker is deployed
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
+
+function isConnectionResetError(error: unknown): boolean {
+  const seen = new Set<object>();
+  while (typeof error === 'object' && error !== null && !seen.has(error)) {
+    seen.add(error);
+    if ('code' in error && error.code === 'ECONNRESET') {
+      return true;
+    }
+    error = 'cause' in error ? error.cause : undefined;
+  }
+  return false;
+}
 
 // MCP server config types — CLI-native local/remote format.
 // Each env/header value is either a plain string (passed through verbatim)
@@ -566,6 +588,15 @@ type CloudAgentNextTRPCClient = {
   getSession: {
     query: (input: GetSessionInput) => Promise<GetSessionOutput>;
   };
+  getSandboxStatus: {
+    query: (input: GetSessionInput) => Promise<unknown>;
+  };
+  getWorktreeChanges: {
+    query: (input: GetSessionInput) => Promise<unknown>;
+  };
+  refreshWorktreeChanges: {
+    mutate: (input: GetSessionInput) => Promise<unknown>;
+  };
   getComputeBillingStatus: {
     query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
   };
@@ -785,8 +816,66 @@ export class CloudAgentNextClient {
     }
   }
 
+  async getSandboxStatus(cloudAgentSessionId: string): Promise<SandboxStatusSnapshot> {
+    try {
+      return SandboxStatusSnapshotSchema.parse(
+        await this.client.getSandboxStatus.query({ cloudAgentSessionId })
+      );
+    } catch (error) {
+      if (error instanceof TRPCClientError) {
+        const code = error.data?.code ?? error.shape?.data?.code;
+        const httpStatus = error.data?.httpStatus ?? error.shape?.data?.httpStatus;
+        if (code === 'UNAUTHORIZED' || httpStatus === 401) {
+          throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Authentication required' });
+        }
+        if (
+          code === 'FORBIDDEN' ||
+          code === 'NOT_FOUND' ||
+          httpStatus === 403 ||
+          httpStatus === 404
+        ) {
+          throw new TRPCError({ code: 'FORBIDDEN', message: 'Session not found or access denied' });
+        }
+        if (code === 'SERVICE_UNAVAILABLE' || httpStatus === 503) {
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Sandbox status is temporarily unavailable',
+          });
+        }
+      }
+      return {
+        status: 'unknown',
+        provider: 'Unknown',
+        observedAt: Date.now(),
+        detailCode: 'status_unavailable',
+        inactivityTimeoutMs: null,
+        estimatedSleepAt: null,
+      };
+    }
+  }
+
+  async getWorktreeChanges(cloudAgentSessionId: string): Promise<GetWorktreeChangesOutput> {
+    return getWorktreeChangesOutputSchema.parse(
+      await this.client.getWorktreeChanges.query({ cloudAgentSessionId })
+    );
+  }
+
+  async refreshWorktreeChanges(cloudAgentSessionId: string): Promise<RefreshWorktreeChangesOutput> {
+    return refreshWorktreeChangesOutputSchema.parse(
+      await this.client.refreshWorktreeChanges.mutate({ cloudAgentSessionId })
+    );
+  }
+
   async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {
-    return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
+    try {
+      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
+    } catch (error) {
+      if (!isConnectionResetError(error)) {
+        throw error;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
+      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
+    }
   }
 
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {

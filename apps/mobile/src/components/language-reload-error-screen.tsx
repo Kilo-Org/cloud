@@ -15,7 +15,7 @@ export function LanguageReloadErrorScreen({
       title={t('language.couldNotRestart')}
       description={t('language.languageSaved')}
       primaryLabel={t('common.retry')}
-      primaryAccessibilityLabel={t('language.retry')}
+      primaryAccessibilityLabel={t('common.retry')}
       onPrimaryPress={onRetry}
       secondaryLabel={t('common.continue')}
       secondaryAccessibilityLabel={t('common.continue')}

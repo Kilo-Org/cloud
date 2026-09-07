@@ -306,7 +306,7 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
 
         {!canManage && (
           <Text className="text-center text-xs text-muted-foreground">
-            {t('securityAgent.automation.permissionNote')}
+            {t('securityAgent.sla.permissionNote')}
           </Text>
         )}
       </TabScreenScrollView>

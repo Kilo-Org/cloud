@@ -2,7 +2,7 @@ import 'server-only';
 
 import { z } from 'zod';
 import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
-import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { GITHUB_USER_ACCESS_TOKEN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 
 export const GitHubUserAccessTokenOpSchema = z.discriminatedUnion('op', [
@@ -133,7 +133,7 @@ async function callTokenService(
   if (!parsedBody.success) {
     return { status: 'temporarily_unavailable' };
   }
-  const serviceToken = generateInternalServiceToken(userId, {
+  const serviceToken = generateBoundedInternalServiceToken(userId, {
     expiresIn: TOKEN_EXPIRY.fiveMinutes,
     audience: GITHUB_USER_ACCESS_TOKEN_AUDIENCE,
   });

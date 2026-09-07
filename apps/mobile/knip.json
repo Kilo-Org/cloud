@@ -1,15 +1,23 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
-  "entry": ["src/app/**/*.{ts,tsx}"],
+  "entry": ["src/app/**/*.{ts,tsx}", "src/glanceable-android/register.ts"],
   "project": ["src/**/*.{ts,tsx}"],
   "ignoreDependencies": [
+    "@expo/plist",
     "expo-updates",
     "expo-system-ui",
+    "react-native-android-widget",
     "postcss",
     "eslint-plugin-sonarjs",
     "@sentry/cli"
   ],
   "ignoreBinaries": ["oxfmt", "oxlint"],
+  "ignore": ["src/lib/glanceable/open-agents.ts"],
+  "ignoreIssues": {
+    "src/lib/glanceable/presentation.ts": ["exports", "types"],
+    "src/lib/glanceable/publisher.ts": ["exports"],
+    "src/lib/glanceable/sink-registry.ts": ["exports", "types"]
+  },
   "postcss": {
     "config": ["postcss.config.mjs"]
   },

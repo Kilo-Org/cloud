@@ -8,12 +8,14 @@ itself, without reading logs. It does not prescribe implementation and it
 carries no test mechanics: stack setup, account provisioning, and the mapping
 from a rule to a wire event belong to the `test-cloud-agent` skill. Any backend
 serving this chat MUST satisfy this surface; the user MUST NOT be able to tell
-which implementation they are on.
+which implementation they are on beyond the bounded runtime-metadata exception
+specified under Sandbox Status. All other runtime and infrastructure privacy
+requirements remain in force.
 
 ## Status
 
-Draft -- created 2026-08-24, revised 2026-08-26 for worktree navigation, grouped
-browser-chat tabs, and their filesystem durability boundary.
+Draft -- created 2026-08-24, revised 2026-08-27 to define the passive sandbox
+status contract alongside shared worktree navigation and durability.
 
 ## Conventions
 
@@ -182,6 +184,110 @@ repository.
     Incomplete cleanup MUST remain recoverable, MUST NOT report success, and
     MUST NOT permit late creation or ingestion to resurrect the worktree.
 
+### Sandbox Status
+
+1. Eligible owned control-plane Cloud Agent web chats MUST show a compact,
+   icon-only sandbox lifecycle control in the header. A fixed box icon MUST
+   identify the sandbox, with a small bottom-right static badge for its state.
+   Badge shapes and accessible labels MUST distinguish states without relying
+   only on color or a loading spinner. Details MUST be available through
+   hover, keyboard focus, and touch/click, with visible focus and Escape
+   dismissal. Sandbox lifecycle MUST remain distinct from agent progress and
+   compute-billing phase; observing it MUST NOT change the composer, terminal,
+   or turn behavior.
+2. The public snapshot MUST contain only `status`, `provider`, `observedAt`,
+   `detailCode`, `inactivityTimeoutMs`, `estimatedSleepAt`, and an OPTIONAL
+   `runtime` object. Status MUST be one of `active`, `sleeping`, `starting`,
+   `stopping`, `error`, `unreachable`, or `unknown`. Provider MUST be exactly
+   `Cloudflare`, `Vercel`, or `Unknown`, derived from authoritative stored
+   provider information rather than an arbitrary provider string. When present,
+   `runtime` MUST contain only nullable `sandboxType`, `kiloCliVersion`,
+   `wrapperVersion`, `startedAt`, and `stoppedAt` fields. Sandbox types MUST be
+   bounded to shared, isolated-small, isolated-standard, code-review,
+   devcontainer, or unknown. Versions MUST be bounded, validated values reported
+   by the relevant runtime, not inferred from the current deployment. Runtime
+   identifiers, owner identifiers, infrastructure addresses or regions,
+   credentials, and raw backend errors MUST NOT appear in status responses or
+   details. Unknown response fields MUST NOT survive validation. Validation
+   errors MUST NOT be forwarded as raw backend diagnostics.
+3. Detail codes MUST be bounded and consistent with status. The safe meanings
+   are:
+
+   | Status | Detail code | Meaning |
+   |---|---|---|
+   | `active` | `sandbox_ready` | The sandbox is active. |
+   | `sleeping` | `sandbox_stopped` | The sandbox is sleeping; a message can resume it. |
+   | `starting` | `sandbox_starting` | The sandbox is starting. |
+   | `stopping` | `sandbox_stopping` | The sandbox is stopping. |
+   | `error` | `sandbox_failed` | The sandbox encountered an error; a message can retry. |
+   | `unreachable` | `connection_unavailable` | The sandbox connection is unavailable; its current state cannot be confirmed. |
+   | `unknown` | `insufficient_evidence` | There is not enough information to confirm the current state. |
+   | `unknown` | `status_unavailable` | Sandbox status is temporarily unavailable; this does not mean the sandbox failed. |
+
+   Loading a snapshot MUST use the static `unknown` presentation, never
+   authoritative `starting`. Failure of the observation service MUST use
+   `status_unavailable`, not
+   `sandbox_failed`, and MUST remain non-blocking. Failed, paused, unauthorized,
+   or stale observations MUST NOT retain current-looking active status or a
+   sleep estimate. A snapshot from another session or personal/organization
+   context MUST NOT be displayed.
+4. Observation MUST be passive, including first access after reconstruction
+   and repeated polling. It MUST NOT wake, start, probe, extend, keep alive,
+   bill, or otherwise mutate a sandbox. It MUST NOT trigger recovery, repair
+   lifecycle records, change alarms, request wrapper frames, or initialize
+   operational work indirectly. It MAY use validated stored state and evidence
+   already received on the current connection. Existing session authorization,
+   exact organization isolation, and billing rules MUST remain unchanged;
+   reading status MUST NOT require credits or admit paid work.
+5. Status observation MUST accept only valid control-plane `workspace_`
+   references. Legacy `agent_`, unresolved, demo, remote, unrelated, and
+   read-only sessions MUST NOT show the indicator or request its status.
+   Legacy and malformed references MUST be rejected before any legacy runtime
+   lookup. This does not change the Read-only rules for historical sessions.
+6. For control-plane `workspace_` sessions, confirmed stopped, creating,
+   stopping, failed, and unknown physical states correspond to `sleeping`,
+   `starting`, `stopping`, `error`, and `unknown`. A missing physical record MUST
+   yield `unknown`, not synthetic `sleeping`. Running requires fresh readiness
+   from the unique current open, handshaken connection to establish `active`;
+   explicit current not-ready evidence means `starting`, while a disconnected
+   or expired connection means `unreachable`. Historical readiness or provider
+   instance identity alone MUST NOT establish current readiness.
+7. `observedAt` MUST be the snapshot creation time in Unix epoch milliseconds,
+   not a claim that the sandbox was probed. Timestamps MUST be finite,
+   nonnegative whole milliseconds within the representable date range. The
+   applicable `inactivityTimeoutMs` MUST be a finite positive whole-millisecond
+   duration, or `null` when unknown. It MUST describe the real inactivity policy,
+   not wrapper retention or a provider's maximum lifetime. The current policy
+   is 5 minutes for control-plane idle stop; a policy MUST NOT be guessed for an
+   unsupported provider or session.
+8. `estimatedSleepAt` MUST be `null` unless an active sandbox has a known
+   inactivity policy, a valid future idle-stop deadline, and coherent fresh
+   sandbox-wide idle evidence. Busy, finalizing, stalled, incomplete, stale, or
+   mismatched activity evidence MUST suppress the estimate. A stored deadline
+   alone is insufficient. Supported estimates MUST be presented as approximate
+   remaining minutes, rounded up and conditional on continued inactivity, never
+   exact promises. The popup MUST reveal the estimate only after two minutes of
+   the confirmed idle window, derived from the returned deadline and inactivity
+   policy. This display delay MUST NOT change
+   the actual idle-stop policy. The toolbar MUST show `Sleeping soon` in the
+   final 60 seconds of a supported deadline. Expiry of an estimate MUST NOT
+   locally invent `sleeping`; new authoritative evidence is required.
+9. Details MUST group the current text status, runtime information, and known
+   lifecycle timing. Runtime information MUST identify the provider and bounded
+   sandbox type using plain-language labels. Hover, click, and touch MUST show
+   the same popup, including a Debug section collapsed by default with labeled
+   control-plane mode and reported CLI/wrapper versions. Hover MUST NOT move
+   keyboard focus. Moving into the popup MUST keep it open; clicking the trigger
+   or interacting inside MUST keep the same view open until dismissed. Compact
+   runtime codes MUST NOT be shown. Missing versions
+   MUST display Unknown rather than guessed values. Debug MUST NOT contain a
+   unique sandbox or provider identifier.
+   Known physical start/stop dates MUST use local display times; unknown dates
+   MUST be omitted. Creation requests, wrapper readiness, chat creation, and
+   billing intervals MUST NOT substitute for physical lifecycle dates. Retained
+   runtime metadata MUST be isolated to its allocation and MUST NOT carry into a
+   replacement. Status observation MUST NOT collect or persist new metadata.
+
 ### Persistence
 
 1. Refresh MUST restore the transcript, the preparation history that was shown,
@@ -215,9 +321,12 @@ repository.
 
 Cloud administration surfaces beyond the existing chat sidebar (MCP Gateway,
 triggers, webhooks), profile and organization administration, the mobile app,
-and the CLI. Also out of scope, and deliberately so: which sandbox provider
-runs the environment, the shape of session ids, and the streaming wire protocol.
-A tester MUST NOT be able to tell those apart from the chat.
+and the CLI.
+The bounded provider, sandbox type, debug metadata, and known lifecycle dates in
+Sandbox Status are a narrow exception to runtime opacity. They do not permit
+arbitrary provider names, runtime identifiers, infrastructure addresses,
+credentials, or raw errors. Session-id formats and the streaming wire protocol
+remain implementation details that MUST NOT be exposed in status details.
 
 ## Not Yet Implemented
 
@@ -234,6 +343,16 @@ The following use SHOULD and are not enforced today:
 
 ## Changelog
 
+### 2026-09-02 -- Structured sandbox details
+
+- Made the toolbar icon-only with a fixed sandbox icon, static status badges,
+  and a final-minute sleep warning.
+- Grouped details into status, runtime, and timing; kept bounded reported
+  versions in a collapsed Debug section instead of a compact runtime code.
+- Showed approximate remaining minutes if inactive after two minutes idle,
+  without changing the five-minute stop policy. Unknown lifecycle dates remain
+  omitted.
+
 ### 2026-09-01 -- Shared worktree auto-commit
 
 - Restored automatic commit and push for shared worktrees, enabled by default,
@@ -248,6 +367,15 @@ The following use SHOULD and are not enforced today:
   disabled auto-commit, and group deletion.
 - Defined transcript and group recovery separately from physical filesystem
   durability without changing terminal or permission requirements.
+
+### 2026-08-27 -- Sandbox status contract
+
+- Added a bounded passive lifecycle snapshot and distinct observation-failure
+  details for control-plane web sessions only.
+- Required supported inactivity policies and explicitly approximate optional
+  sleep times.
+- Allowed only a bounded human-readable provider label, preserving all other
+  runtime, infrastructure, credential, and error privacy guarantees.
 
 ### 2026-08-24 -- Audit revision
 

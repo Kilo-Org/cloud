@@ -6,13 +6,13 @@ import Animated, {
   Easing,
   makeMutable,
   useAnimatedStyle,
-  useReducedMotion,
   useSharedValue,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 
 import { cn } from '@/lib/utils';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 
 type SkeletonProps = {
   className?: string;
@@ -72,7 +72,7 @@ function releaseShimmerClock(): void {
 }
 
 export function Skeleton({ className }: Readonly<SkeletonProps>) {
-  const reducedMotion = useReducedMotion();
+  const { reducedMotion } = useMotionPolicy();
   const colorScheme = useColorScheme();
   const layoutWidth = useSharedValue(0);
   const pulse = useSharedValue(0.4);

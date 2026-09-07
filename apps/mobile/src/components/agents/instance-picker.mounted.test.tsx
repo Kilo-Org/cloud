@@ -24,6 +24,8 @@ type ListProps<T> = {
   ListEmptyComponent?: ReactNode;
 };
 
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   FlatList: <T,>(props: ListProps<T>) =>
     createElement(

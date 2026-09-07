@@ -18,7 +18,7 @@ jest.mock('@/lib/tokens', () => {
   return {
     ...actual,
     TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
-    generateInternalServiceToken: jest.fn(
+    generateBoundedInternalServiceToken: jest.fn(
       (userId: string, options?: { audience?: string; expiresIn?: number }) =>
         `internal-jwt(user=${userId},aud=${options?.audience ?? 'none'})`
     ),
@@ -78,9 +78,9 @@ describe('getGitHubUserAccessToken', () => {
 
     const generateMock = (
       jest.requireMock('@/lib/tokens') as {
-        generateInternalServiceToken: jest.Mock;
+        generateBoundedInternalServiceToken: jest.Mock;
       }
-    ).generateInternalServiceToken;
+    ).generateBoundedInternalServiceToken;
     expect(generateMock).toHaveBeenCalledWith('kilo-user-1', {
       expiresIn: 5 * 60,
       audience: 'git-token-service:github-user-access-token',

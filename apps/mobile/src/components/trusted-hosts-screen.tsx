@@ -21,67 +21,67 @@ export function TrustedHostsScreen() {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('trustedHosts.title')} />
-      <TabScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-3 px-6 pt-4"
-        showsVerticalScrollIndicator={false}
-      >
-        {!hasLoaded && (
-          <View className="gap-3">
-            {[0, 1].map(index => (
-              <View key={index} className="flex-row items-center gap-3 rounded-lg bg-secondary p-3">
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="ml-auto h-4 w-4 rounded" />
-              </View>
-            ))}
-          </View>
-        )}
-
-        {hasLoaded && trustedHosts.length === 0 && (
-          <EmptyState
-            icon={Shield}
-            placement="top"
-            title={t('trustedHosts.emptyTitle')}
-            description={t('trustedHosts.emptyDescription')}
-            action={
-              <Button
-                variant="outline"
-                onPress={() => {
-                  router.back();
-                }}
-              >
-                <Text>{t('trustedHosts.backToPreferences')}</Text>
-              </Button>
-            }
-          />
-        )}
-
-        {hasLoaded && trustedHosts.length > 0 && (
-          <View className="gap-3">
-            {trustedHosts.map(host => (
-              <View
-                key={host}
-                className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-3"
-              >
-                <Text className="min-w-0 flex-1 text-sm font-medium" numberOfLines={1}>
-                  {host}
-                </Text>
-                <Pressable
-                  onPress={() => {
-                    revokeHost(host);
-                  }}
-                  hitSlop={8}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('trustedHosts.revoke', { host })}
-                  className="min-h-11 min-w-11 shrink-0 items-center justify-center active:opacity-70"
+      {hasLoaded && trustedHosts.length === 0 ? (
+        <EmptyState
+          icon={Shield}
+          title={t('trustedHosts.emptyTitle')}
+          description={t('trustedHosts.emptyDescription')}
+          action={
+            <Button
+              variant="outline"
+              onPress={() => {
+                router.back();
+              }}
+            >
+              <Text>{t('trustedHosts.backToPreferences')}</Text>
+            </Button>
+          }
+        />
+      ) : (
+        <TabScreenScrollView
+          className="flex-1"
+          contentContainerClassName="gap-3 px-6 pt-4"
+          showsVerticalScrollIndicator={false}
+        >
+          {!hasLoaded ? (
+            <View className="gap-3">
+              {[0, 1].map(index => (
+                <View
+                  key={index}
+                  className="flex-row items-center gap-3 rounded-lg bg-secondary p-3"
                 >
-                  <X size={16} color={colors.destructive} />
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        )}
-      </TabScreenScrollView>
+                  <Skeleton className="h-5 w-40" />
+                  <Skeleton className="ml-auto h-4 w-4 rounded" />
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View className="gap-3">
+              {trustedHosts.map(host => (
+                <View
+                  key={host}
+                  className="flex-row items-center justify-between gap-3 rounded-lg bg-secondary p-3"
+                >
+                  <Text className="min-w-0 flex-1 text-sm font-medium" numberOfLines={1}>
+                    {host}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      revokeHost(host);
+                    }}
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('trustedHosts.revoke', { host })}
+                    className="min-h-11 min-w-11 shrink-0 items-center justify-center active:opacity-70"
+                  >
+                    <X size={16} color={colors.destructive} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          )}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

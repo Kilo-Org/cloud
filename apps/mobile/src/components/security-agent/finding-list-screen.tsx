@@ -10,7 +10,9 @@ import {
 import { useRouter } from 'expo-router';
 import { ShieldCheck, SlidersHorizontal } from '@/components/ui/icons';
 import { useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
@@ -50,7 +52,11 @@ function FindingsListFooter({
   }
   if (error) {
     return (
-      <QueryError message={t('securityAgent.findingList.couldNotLoadMore')} onRetry={onRetry} />
+      <QueryError
+        placement="top"
+        message={t('securityAgent.findingList.couldNotLoadMore')}
+        onRetry={onRetry}
+      />
     );
   }
   return null;
@@ -83,6 +89,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
     capacity.runningCount < capacity.concurrencyLimit;
   const filtersActive = hasActiveSecurityFindingFilters(filters);
   const items = findings.data?.pages.flatMap(page => page.findings) ?? [];
+  const hasListContent = items.length > 0 || findings.isFetchNextPageError;
   const scopedRepositories = getSecurityRepositoriesInScope(repositories.data ?? [], config.data);
   // Repos aren't known yet (still loading or the fetch failed) — the filter
   // stays disabled instead of silently offering a shrunken repository list.
@@ -102,11 +109,12 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
       }
     })();
   };
+  const refreshControl = <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />;
 
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.findingList.title')}
+        title={t('common.findings')}
         headerRight={
           <Pressable
             onPress={() => {
@@ -145,16 +153,44 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         </View>
       )}
 
-      {!findings.isLoading && findings.isError && !findings.data && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('securityAgent.findingList.couldNotLoad')}
-            onRetry={() => void findings.refetch()}
-          />
-        </View>
+      {!findings.isLoading && findings.isError && !hasListContent && (
+        <QueryError
+          message={t('securityAgent.findingList.couldNotLoad')}
+          onRetry={() => void findings.refetch()}
+          refreshControl={refreshControl}
+        />
       )}
 
-      {!findings.isLoading && (!findings.isError || findings.data) && (
+      {!findings.isLoading && !findings.isError && !hasListContent && (
+        <EmptyState
+          icon={ShieldCheck}
+          refreshControl={refreshControl}
+          title={
+            filtersActive
+              ? t('securityAgent.findingList.noMatchesTitle')
+              : t('securityAgent.findingList.emptyTitle')
+          }
+          description={
+            filtersActive
+              ? t('securityAgent.findingList.noMatchesDescription')
+              : t('securityAgent.findingList.emptyDescription')
+          }
+          action={
+            filtersActive ? (
+              <Button
+                variant="outline"
+                onPress={() => {
+                  setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
+                }}
+              >
+                <Text>{t('common.clearFilters')}</Text>
+              </Button>
+            ) : undefined
+          }
+        />
+      )}
+
+      {!findings.isLoading && hasListContent && (
         <FlatList
           data={items}
           keyExtractor={item => item.id}
@@ -167,7 +203,8 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
             />
           )}
           contentContainerClassName="grow gap-3 px-6 pt-4"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+          ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
+          refreshControl={refreshControl}
           onEndReached={() => {
             if (findings.hasNextPage && !findings.isFetchingNextPage) {
               void findings.fetchNextPage();
@@ -183,33 +220,6 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
               />
               <View style={{ height: paddingBottom }} pointerEvents="none" />
             </>
-          }
-          ListEmptyComponent={
-            <EmptyState
-              icon={ShieldCheck}
-              title={
-                filtersActive
-                  ? t('securityAgent.findingList.noMatchesTitle')
-                  : t('securityAgent.findingList.emptyTitle')
-              }
-              description={
-                filtersActive
-                  ? t('securityAgent.findingList.noMatchesDescription')
-                  : t('securityAgent.findingList.emptyDescription')
-              }
-              action={
-                filtersActive ? (
-                  <Button
-                    variant="outline"
-                    onPress={() => {
-                      setFilters(DEFAULT_SECURITY_FINDING_FILTERS);
-                    }}
-                  >
-                    <Text>{t('securityAgent.findingList.clearFilters')}</Text>
-                  </Button>
-                ) : undefined
-              }
-            />
           }
         />
       )}

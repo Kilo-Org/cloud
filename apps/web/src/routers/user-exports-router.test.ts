@@ -1,4 +1,9 @@
 import { TRPCError } from '@trpc/server';
+import { isCloudDataExportUIEnabled } from '@/lib/user-data-export-ui';
+
+jest.mock('@/lib/user-data-export-ui', () => ({
+  isCloudDataExportUIEnabled: jest.fn(async () => false),
+}));
 import { eq, sql } from 'drizzle-orm';
 import { DOWNLOAD_CODE_LENGTH } from '@/app/(app)/data-exports/data-export-contract';
 import { db } from '@/lib/drizzle';
@@ -10,7 +15,7 @@ import {
   type User,
 } from '@kilocode/db/schema';
 import { createCallerForUser } from '@/routers/test-utils';
-import { __test__ } from '@/routers/user-exports-router';
+import { __test__, userExportsRouter } from '@/routers/user-exports-router';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
@@ -122,6 +127,38 @@ async function requestCode(kiloUserId: string, exportId: string) {
   const { challengeId } = await caller.userExports.requestDownloadCode({ exportId });
   return { caller, challengeId, code: lastEmailedCode() };
 }
+
+describe('user export UI access', () => {
+  it('rejects token authentication before evaluating UI eligibility', async () => {
+    const caller = userExportsRouter.createCaller({ user: stranger, authViaToken: true });
+
+    await expect(caller.uiAccess()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(isCloudDataExportUIEnabled).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])(
+    'evaluates %s for the authenticated email, not the user ID',
+    async enabled => {
+      jest.mocked(isCloudDataExportUIEnabled).mockResolvedValueOnce(enabled);
+      const caller = await createCallerForUser(stranger.id);
+
+      await expect(caller.userExports.uiAccess()).resolves.toEqual({
+        enabled,
+        email: stranger.google_user_email,
+      });
+      expect(isCloudDataExportUIEnabled).toHaveBeenCalledWith(stranger.google_user_email);
+    }
+  );
+
+  it('keeps existing export APIs available when the UI flag is off', async () => {
+    const caller = await createCallerForUser(stranger.id);
+    await expect(caller.userExports.uiAccess()).resolves.toMatchObject({ enabled: false });
+    await expect(caller.userExports.request()).resolves.toMatchObject({
+      subjectType: 'user',
+      status: 'queued',
+    });
+  });
+});
 
 describe('user exports router guards and serialization', () => {
   it('rejects API-token authentication for data export procedures', () => {

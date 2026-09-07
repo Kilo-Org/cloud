@@ -11,6 +11,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Platform, View } from 'react-native';
 
+import { CenteredState } from '@/components/centered-state';
 import { Button, type ButtonProps } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { toneColor, type ToneKey } from '@/lib/agent-color';
@@ -19,8 +20,9 @@ import {
   type AccessRequiredSubcase,
 } from '@/lib/analytics/onboarding-events';
 import { trackEvent } from '@/lib/appsflyer';
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
+import { accessIssueTargetLabel, resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
 import { cn } from '@/lib/utils';
 
 export type { AccessRequiredSubcase };
@@ -39,10 +41,10 @@ type SubcaseContent = {
 const SUBCASE_CONTENT = {
   trial_expired: {
     bodyKey: 'kiloclaw.accessRequired.trialExpiredBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.trialExpiredCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionCanceledCta',
     ctaVariant: 'default',
     icon: Clock,
-    titleKey: 'kiloclaw.accessRequired.trialExpiredTitle',
+    titleKey: 'kiloclaw.accessRequired.subscriptionCanceledTitle',
     tone: 'warn',
   },
   subscription_canceled: {
@@ -55,7 +57,7 @@ const SUBCASE_CONTENT = {
   },
   subscription_past_due: {
     bodyKey: 'kiloclaw.accessRequired.subscriptionPastDueBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionPastDueCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionCanceledCta',
     ctaVariant: 'default',
     icon: AlertTriangle,
     titleKey: 'kiloclaw.accessRequired.subscriptionPastDueTitle',
@@ -74,7 +76,7 @@ const SUBCASE_CONTENT = {
     ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
     ctaVariant: 'outline',
     icon: AlertTriangle,
-    titleKey: 'kiloclaw.accessRequired.multipleCurrentConflictTitle',
+    titleKey: 'kiloclaw.list.accessIssue.multipleCurrentConflict',
     tone: 'warn',
   },
   non_canonical_earlybird: {
@@ -111,7 +113,14 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
   }, [subcase]);
 
   const onOpen = () => {
-    void Linking.openURL(resolveAccessIssueUrl(subcase));
+    const url = resolveAccessIssueUrl(subcase);
+    if (url.startsWith('mailto:')) {
+      // Mail clients are optional on both platforms; the failure toast names
+      // the address so the user can still reach the team.
+      void openExternalUrl(url, { label: accessIssueTargetLabel(url) });
+      return;
+    }
+    void Linking.openURL(url);
   };
 
   if (Platform.OS === 'ios') {
@@ -119,58 +128,62 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
     const iosIconColor = colors[iosTint.hueThemeKey];
 
     return (
-      <View className="w-full flex-1 items-center justify-center gap-6 px-6">
-        <View
-          className={cn(
-            'h-24 w-24 items-center justify-center rounded-3xl border',
-            iosTint.tileBgClass,
-            iosTint.tileBorderClass
-          )}
-        >
-          <AlertTriangle size={40} color={iosIconColor} />
+      <CenteredState>
+        <View className="w-full items-center gap-6 px-6">
+          <View
+            className={cn(
+              'h-24 w-24 items-center justify-center rounded-3xl border',
+              iosTint.tileBgClass,
+              iosTint.tileBorderClass
+            )}
+          >
+            <AlertTriangle size={40} color={iosIconColor} />
+          </View>
+          <View className="items-center gap-2">
+            <Text className="text-center text-2xl font-semibold">
+              {t('kiloclaw.accessRequired.iosTitle')}
+            </Text>
+            <Text variant="muted" className="text-center text-base">
+              {t('kiloclaw.accessRequired.iosBody')}
+            </Text>
+            <Text variant="muted" className="text-center text-base">
+              {t('kiloclaw.accessRequired.iosContact')}
+            </Text>
+          </View>
         </View>
-        <View className="items-center gap-2">
-          <Text className="text-center text-2xl font-semibold">
-            {t('kiloclaw.accessRequired.iosTitle')}
-          </Text>
-          <Text variant="muted" className="text-center text-base">
-            {t('kiloclaw.accessRequired.iosBody')}
-          </Text>
-          <Text variant="muted" className="text-center text-base">
-            {t('kiloclaw.accessRequired.iosContact')}
-          </Text>
-        </View>
-      </View>
+      </CenteredState>
     );
   }
 
   return (
-    <View className="w-full flex-1 items-center justify-center gap-6 px-6">
-      <View
-        className={cn(
-          'h-24 w-24 items-center justify-center rounded-3xl border',
-          tint.tileBgClass,
-          tint.tileBorderClass
-        )}
-      >
-        <Icon size={40} color={iconColor} />
+    <CenteredState>
+      <View className="w-full items-center gap-6 px-6">
+        <View
+          className={cn(
+            'h-24 w-24 items-center justify-center rounded-3xl border',
+            tint.tileBgClass,
+            tint.tileBorderClass
+          )}
+        >
+          <Icon size={40} color={iconColor} />
+        </View>
+        <View className="items-center gap-2">
+          <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
+          <Text variant="muted" className="text-center text-base">
+            {t(content.bodyKey)}
+          </Text>
+        </View>
+        <Button
+          variant={content.ctaVariant}
+          size="lg"
+          className="w-full"
+          onPress={onOpen}
+          accessibilityRole="link"
+        >
+          <Text className="text-base">{t(content.ctaLabelKey)}</Text>
+          <ExternalLink size={16} color={ctaIconColor} />
+        </Button>
       </View>
-      <View className="items-center gap-2">
-        <Text className="text-center text-2xl font-semibold">{t(content.titleKey)}</Text>
-        <Text variant="muted" className="text-center text-base">
-          {t(content.bodyKey)}
-        </Text>
-      </View>
-      <Button
-        variant={content.ctaVariant}
-        size="lg"
-        className="w-full"
-        onPress={onOpen}
-        accessibilityRole="link"
-      >
-        <Text className="text-base">{t(content.ctaLabelKey)}</Text>
-        <ExternalLink size={16} color={ctaIconColor} />
-      </Button>
-    </View>
+    </CenteredState>
   );
 }

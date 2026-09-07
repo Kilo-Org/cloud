@@ -7,7 +7,8 @@
       "instanceLifecycle": "თქვენს ინსტანსს განახლება აქვს",
       "scheduledAction": "დაგეგმილ მოქმედებას განახლება აქვს",
       "lowBalance": "თქვენი ბალანსი ყურადღებას საჭიროებს",
-      "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს"
+      "securityFinding": "უსაფრთხოების დასკვნა ყურადღებას საჭიროებს",
+      "activeAgentsGlanceable": "აქტიურ აგენტებს განახლება აქვთ"
     }
   },
   "cloudAgentSession": {

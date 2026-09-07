@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { SignJWT } from 'jose';
 import { validateKiloToken } from './jwt';
 import { KILO_TOKEN_VERSION } from '../config';
+import { KILOCLAW_AUDIENCE } from '@kilocode/worker-utils';
 
 const TEST_SECRET = 'test-secret-for-jwt-verification';
 
@@ -30,6 +31,56 @@ describe('validateKiloToken', () => {
 
     const result = await validateKiloToken(token, TEST_SECRET, 'development');
     expect(result).toEqual({
+      success: true,
+      userId: 'user_123',
+      token,
+      pepper: 'pepper_abc',
+    });
+  });
+
+  it('accepts the KiloClaw audience as a string or array member', async () => {
+    for (const aud of [KILOCLAW_AUDIENCE, ['another-resource', KILOCLAW_AUDIENCE]]) {
+      const token = await signToken({
+        kiloUserId: 'user_123',
+        apiTokenPepper: 'pepper_abc',
+        version: KILO_TOKEN_VERSION,
+        aud,
+      });
+
+      await expect(validateKiloToken(token, TEST_SECRET, undefined)).resolves.toMatchObject({
+        success: true,
+        userId: 'user_123',
+        token,
+        pepper: 'pepper_abc',
+      });
+    }
+  });
+
+  it('rejects wrong and malformed audiences', async () => {
+    for (const aud of ['another-resource', [], [' kiloclaw']]) {
+      const token = await signToken({
+        kiloUserId: 'user_123',
+        apiTokenPepper: 'pepper_abc',
+        version: KILO_TOKEN_VERSION,
+        aud,
+      });
+
+      await expect(validateKiloToken(token, TEST_SECRET, undefined)).resolves.toMatchObject({
+        success: false,
+      });
+    }
+  });
+
+  it('preserves legacy tokens without an audience or date claims', async () => {
+    const token = await new SignJWT({
+      kiloUserId: 'user_123',
+      apiTokenPepper: 'pepper_abc',
+      version: KILO_TOKEN_VERSION,
+    })
+      .setProtectedHeader({ alg: 'HS256' })
+      .sign(new TextEncoder().encode(TEST_SECRET));
+
+    await expect(validateKiloToken(token, TEST_SECRET, undefined)).resolves.toEqual({
       success: true,
       userId: 'user_123',
       token,

@@ -186,6 +186,40 @@ describe('CloudAgentTransport event routing', () => {
     transport.destroy();
   });
 
+  it('routes snapshot-ready events without executionId only to the service sink', async () => {
+    const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
+    transport.connect();
+    await flushPromises();
+    sendRaw({
+      eventId: 5,
+      sessionId: 'ses-1',
+      streamEventType: 'cloud.worktree.changes.ready',
+      timestamp: '2026-09-02T00:00:00.000Z',
+      data: { revision: 3 },
+    });
+    expect(serviceEvents.at(-1)).toEqual({
+      type: 'worktree.changes.ready',
+      cloudSessionId: 'ses-1',
+      revision: 3,
+    });
+    expect(chatEvents).toEqual([]);
+    transport.destroy();
+  });
+
+  it.each(['cloud.worktree.changes.ready', 'connected'])(
+    'drops %s envelopes for another Cloud session',
+    async streamEventType => {
+      const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
+      transport.connect();
+      await flushPromises();
+      const previousEvents = [...serviceEvents];
+      sendRaw(createEvent(streamEventType, { revision: 3 }, 'other-session'));
+      expect(serviceEvents).toEqual(previousEvents);
+      expect(chatEvents).toEqual([]);
+      transport.destroy();
+    }
+  );
+
   it('routes mixed events to correct sinks', async () => {
     const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
 
@@ -413,6 +447,26 @@ describe('CloudAgentTransport lifecycle', () => {
 
     expect(mockWs.close).toHaveBeenCalled();
   });
+
+  it.each(['disconnect', 'destroy'] as const)(
+    '%s rejects late ready and connected frames',
+    async stop => {
+      const { transport, chatEvents, serviceEvents } = createTransportWithSinks();
+      transport.connect();
+      await flushPromises();
+      const oldOnMessage = mockWs.onmessage;
+      const previousEvents = [...serviceEvents];
+      transport[stop]();
+      for (const streamEventType of ['cloud.worktree.changes.ready', 'connected']) {
+        oldOnMessage?.({
+          data: JSON.stringify(createEvent(streamEventType, { revision: 3 })),
+        } as MessageEvent);
+      }
+      expect(serviceEvents).toEqual(previousEvents);
+      expect(chatEvents).toEqual([]);
+      transport.destroy();
+    }
+  );
 
   it('stale generation after disconnect prevents connection creation', async () => {
     const resolveTicket: { resolve?: (value: string) => void } = {};

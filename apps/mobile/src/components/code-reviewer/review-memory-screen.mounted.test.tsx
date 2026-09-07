@@ -97,6 +97,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: { error: vi.fn() },
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
@@ -123,6 +124,8 @@ vi.mock('@shopify/flash-list', () => ({
     );
   },
 }));
+
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 
 vi.mock('@/components/empty-state', () => ({
   EmptyState: ({ title }: { title: string }) => `EMPTY:${title}`,
@@ -201,6 +204,7 @@ describe('ReviewMemoryScreen retryable errors', () => {
 
     renderScreen();
 
+    expect(flashList.onEndReached).toBeNull();
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
@@ -212,6 +216,7 @@ describe('ReviewMemoryScreen retryable errors', () => {
 
     renderScreen();
 
+    expect(flashList.onEndReached).toBeNull();
     expect(queryErrors.errors).toHaveLength(1);
     expect(queryErrors.errors[0]?.variant).toBe('server');
     expect(queryErrors.errors[0]?.onRetry).toBeDefined();
@@ -279,6 +284,7 @@ describe('ReviewMemoryScreen proposals', () => {
     const renderer = renderScreen();
 
     expect(collectText(renderer.toJSON())).toContain('EMPTY:No proposals');
+    expect(flashList.onEndReached).toBeNull();
   });
 
   it('renders the paginated proposal list', () => {

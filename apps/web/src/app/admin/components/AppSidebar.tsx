@@ -32,6 +32,7 @@ import {
   Route,
   Tags,
   Trash2,
+  Github,
 } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { usePathname } from 'next/navigation';
@@ -162,6 +163,11 @@ const financialItems: MenuItem[] = [
 ];
 
 const productEngineeringItems: MenuItem[] = [
+  {
+    title: () => 'Integrations',
+    url: '/admin/integrations',
+    icon: () => <Github />,
+  },
   {
     title: () => 'KiloClaw',
     url: '/admin/kiloclaw',

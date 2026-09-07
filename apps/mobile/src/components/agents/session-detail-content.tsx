@@ -33,6 +33,7 @@ import {
 import { createAndNavigateAgentSession } from '@/components/agents/create-and-navigate-agent-session';
 import { exitRemoteSessionWithFeedback } from '@/components/agents/exit-remote-session-with-feedback';
 import { restartAgentSession } from '@/components/agents/restart-agent-session';
+import { useStackSafeReplace } from '@/lib/navigation/stack-safe-replace';
 import { MessageBubble } from '@/components/agents/message-bubble';
 import { MessageDetailsSheet } from '@/components/agents/message-details-sheet';
 import { ModelPickerSelectionScopeProvider } from '@/components/agents/model-selector';
@@ -74,6 +75,7 @@ import {
 import { shouldKeepSessionAwake } from '@/components/agents/session-keep-awake';
 import { shouldRefetchOnFocus } from '@/components/agents/session-focus-refetch';
 import { TranscriptTimeMarker } from '@/components/agents/transcript-time-marker';
+import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
 import {
@@ -182,6 +184,9 @@ export function SessionDetailContent({
   const manager = useSessionManager();
   const { t } = useTranslation();
   const router = useRouter();
+  // Session-route navigation only: `replace` in one native-stack commit crashes
+  // Android Fabric (KILO-APP-25). Other `router` uses here are unaffected.
+  const sessionRouter = useStackSafeReplace();
   const [childSessionSheet, setChildSessionSheet] = useState<ChildSessionSheetMountState>({
     sheet: null,
     visible: false,
@@ -755,8 +760,8 @@ export function SessionDetailContent({
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
   const transcript = useMemo(
-    () => mergeSessionTranscript(visibleMessages, preparationAttempts),
-    [visibleMessages, preparationAttempts]
+    () => mergeSessionTranscript(visibleMessages, preparationAttempts, pendingMessages),
+    [visibleMessages, preparationAttempts, pendingMessages]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -1171,8 +1176,6 @@ export function SessionDetailContent({
     messageCount: messages.length,
   });
 
-  const emptyStateText = statusIndicator ? null : t('agentChat.session.emptyTitle');
-
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
   const serverTitle = isSessionLoaded ? (fetchedData.title ?? undefined) : undefined;
   const rename = useSessionDetailRename({
@@ -1259,7 +1262,7 @@ export function SessionDetailContent({
     if (cloudStatus?.type === 'finalizing') {
       return t('agentChat.composer.finalizingPlaceholder');
     }
-    return t('agentChat.composer.messagePlaceholder');
+    return t('common.message');
   }, [cloudStatus, t]);
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
@@ -1294,27 +1297,27 @@ export function SessionDetailContent({
     // tick, and the agents tab refetches on focus.
     const result = await createAndNavigateAgentSession({
       create: manager.createRemoteSession.bind(manager),
-      router,
+      router: sessionRouter,
       organizationId,
       onError: message => {
         toast.error(message);
       },
     });
     return result.success;
-  }, [manager, router, organizationId]);
+  }, [manager, sessionRouter, organizationId]);
 
   const handleRestartSession = useCallback(async () => {
     const result = await restartAgentSession({
       create: manager.createRemoteSession.bind(manager),
       exit: manager.exitRemoteSession.bind(manager),
-      router,
+      router: sessionRouter,
       organizationId,
       onError: message => {
         toast.error(message);
       },
     });
     return result.success;
-  }, [manager, router, organizationId]);
+  }, [manager, sessionRouter, organizationId]);
 
   const handleExitSession = useCallback(
     async (
@@ -1388,7 +1391,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
-          titleNumberOfLines={1}
+          reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive
@@ -1585,10 +1588,10 @@ export function SessionDetailContent({
             <Button
               variant="outline"
               size="sm"
-              accessibilityLabel={t('agentChat.session.continue')}
+              accessibilityLabel={t('common.continue')}
               onPress={handleContinueInNewSession}
             >
-              <Text>{t('agentChat.session.continue')}</Text>
+              <Text>{t('common.continue')}</Text>
             </Button>
           </View>
         ) : null}
@@ -1663,54 +1666,60 @@ export function SessionDetailContent({
         detail: terminalError.detail,
       });
       return (
-        <View className="flex-1 items-center justify-center gap-3 px-6">
-          <QueryError
-            variant={terminalError.variant}
-            placement="top"
-            className="px-0 pt-0"
-            title={terminalError.title}
-            message={terminalError.message}
-            onRetry={
-              terminalError.retryable
-                ? () => {
-                    void manager.switchSession(sessionId);
-                  }
-                : undefined
-            }
-            isRetrying={isLoading}
-          />
-          <View className="flex-row gap-3">
-            <Button
-              variant="ghost"
-              accessibilityLabel={t('agentChat.session.copyErrorDetails')}
-              onPress={() => {
-                void performCopy(copyText);
-              }}
-            >
-              <Text>{t('common.copy')}</Text>
-            </Button>
-            <Button variant="ghost" onPress={handleBackToSessions}>
-              <Text>{t('agentChat.session.backToSessions')}</Text>
-            </Button>
+        <CenteredState>
+          <View className="items-center gap-3 px-6">
+            <QueryError
+              variant={terminalError.variant}
+              placement="top"
+              className="px-0 pt-0"
+              title={terminalError.title}
+              message={terminalError.message}
+              onRetry={
+                terminalError.retryable
+                  ? () => {
+                      void manager.switchSession(sessionId);
+                    }
+                  : undefined
+              }
+              isRetrying={isLoading}
+            />
+            <View className="flex-row gap-3">
+              <Button
+                variant="ghost"
+                accessibilityLabel={t('agentChat.session.copyErrorDetails')}
+                onPress={() => {
+                  void performCopy(copyText);
+                }}
+              >
+                <Text>{t('common.copy')}</Text>
+              </Button>
+              <Button variant="ghost" onPress={handleBackToSessions}>
+                <Text>{t('agentChat.session.backToSessions')}</Text>
+              </Button>
+            </View>
           </View>
-        </View>
+        </CenteredState>
       );
     }
     if (shouldBlockMessages) {
       return <SessionSkeletonMessages sessionId={sessionId} />;
     }
     if (visibleMessages.length === 0) {
+      if (statusIndicator) {
+        return (
+          <CenteredState>
+            <View className="items-center px-6">
+              <SessionStatusIndicator indicator={statusIndicator} />
+            </View>
+          </CenteredState>
+        );
+      }
       return (
-        <View className="flex-1 items-center justify-center px-6">
-          {statusIndicator ? <SessionStatusIndicator indicator={statusIndicator} /> : null}
-          {emptyStateText ? (
-            <EmptyState
-              icon={MessageSquare}
-              title={emptyStateText}
-              description={t('agentChat.session.emptyDescription')}
-            />
-          ) : null}
-        </View>
+        <EmptyState
+          icon={MessageSquare}
+          title={t('agentChat.session.emptyTitle')}
+          description={t('agentChat.session.emptyDescription')}
+        />
       );
     }
     return (

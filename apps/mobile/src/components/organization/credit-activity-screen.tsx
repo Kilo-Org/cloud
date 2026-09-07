@@ -196,13 +196,21 @@ export function OrganizationCreditActivityScreen() {
     );
   } else if (isFirstPageError) {
     body = (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <QueryError
           variant={errorVariant}
           onRetry={isPermanentError ? undefined : () => void query.refetch()}
           isRetrying={query.isFetching}
         />
       </Animated.View>
+    );
+  } else if (transactions.length === 0 && !hasMore && !isLaterPageError) {
+    body = (
+      <EmptyState
+        icon={Receipt}
+        title={t('organization.creditActivity.emptyTitle')}
+        description={t('organization.creditActivity.emptyDescription')}
+      />
     );
   } else {
     const footer = (
@@ -217,16 +225,16 @@ export function OrganizationCreditActivityScreen() {
               size="sm"
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
-              accessibilityLabel={t('organization.creditActivity.loadMore')}
+              accessibilityLabel={t('common.loadMore')}
             >
-              <Text>{t('organization.creditActivity.loadMore')}</Text>
+              <Text>{t('common.loadMore')}</Text>
             </Button>
           </View>
         )}
         {isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('organization.creditActivity.loadMoreFailed')}
+              {t('common.couldnTLoadMore')}
             </Text>
             <Button
               variant="outline"
@@ -252,6 +260,7 @@ export function OrganizationCreditActivityScreen() {
           contentContainerClassName="grow gap-3 px-6 pt-4"
           ListEmptyComponent={
             <EmptyState
+              placement="top"
               icon={Receipt}
               title={t('organization.creditActivity.emptyTitle')}
               description={t('organization.creditActivity.emptyDescription')}

@@ -25,24 +25,8 @@ const mockFindIntegrationByInstallationId =
       appType: GitHubAppType
     ) => Promise<GitHubIntegrationRow | null>
   >();
-const mockDeleteIntegration =
-  jest.fn<
-    (
-      organizationId: string,
-      platform: string,
-      appType: GitHubAppType,
-      installationId?: string
-    ) => Promise<void>
-  >();
-const mockDeleteIntegrationForOwner =
-  jest.fn<
-    (
-      owner: GitHubOwner,
-      platform: string,
-      appType: GitHubAppType,
-      installationId?: string
-    ) => Promise<void>
-  >();
+const mockDeleteGitHubInstallationRecords =
+  jest.fn<(installationId: string, appType: GitHubAppType) => Promise<void>>();
 const mockSuspendIntegration =
   jest.fn<
     (
@@ -104,18 +88,8 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     appType: GitHubAppType
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
   autoCompleteInstallation: jest.fn(),
-  deleteIntegration: (
-    organizationId: string,
-    platform: string,
-    appType: GitHubAppType,
-    installationId?: string
-  ) => mockDeleteIntegration(organizationId, platform, appType, installationId),
-  deleteIntegrationForOwner: (
-    owner: GitHubOwner,
-    platform: string,
-    appType: GitHubAppType,
-    installationId?: string
-  ) => mockDeleteIntegrationForOwner(owner, platform, appType, installationId),
+  deleteGitHubInstallationRecords: (installationId: string, appType: GitHubAppType) =>
+    mockDeleteGitHubInstallationRecords(installationId, appType),
   suspendIntegration: (
     organizationId: string,
     platform: string,
@@ -219,39 +193,25 @@ describe('handleInstallationDeleted', () => {
     mockBotInitialize.mockResolvedValue(undefined);
     mockBotGetState.mockReturnValue({});
     mockUnlinkTeamKiloUsers.mockResolvedValue(0);
-    mockDeleteIntegration.mockResolvedValue(undefined);
-    mockDeleteIntegrationForOwner.mockResolvedValue(undefined);
+    mockDeleteGitHubInstallationRecords.mockResolvedValue(undefined);
   });
 
   it('standard app deletion unlinks bot identities and passes the app type', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(orgIntegration);
-
     const response = await handleInstallationDeleted(deletedPayload, 'standard');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
     expect(mockBotInitialize).toHaveBeenCalled();
     expect(mockUnlinkTeamKiloUsers).toHaveBeenCalledWith(expect.anything(), 'github', '98765');
-    expect(mockDeleteIntegration).toHaveBeenCalledWith('org_1', 'github', 'standard', '98765');
-    expect(mockDeleteIntegrationForOwner).not.toHaveBeenCalled();
+    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'standard');
   });
 
   it('lite app deletion does not unlink bot identities and passes the app type', async () => {
-    mockFindIntegrationByInstallationId.mockResolvedValue(userIntegration);
-
     const response = await handleInstallationDeleted(deletedPayload, 'lite');
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
     expect(mockBotInitialize).not.toHaveBeenCalled();
     expect(mockUnlinkTeamKiloUsers).not.toHaveBeenCalled();
-    expect(mockDeleteIntegrationForOwner).toHaveBeenCalledWith(
-      { type: 'user', id: 'user_1' },
-      'github',
-      'lite',
-      '98765'
-    );
-    expect(mockDeleteIntegration).not.toHaveBeenCalled();
+    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'lite');
   });
 });
 

@@ -5,7 +5,6 @@ import { ExternalLink, Globe } from '@/components/ui/icons';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
   AppState,
   I18nManager,
   Keyboard,
@@ -16,10 +15,12 @@ import {
   ScrollView,
   View,
 } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import logo from '@/../assets/images/logo.png';
+import { CenteredState } from '@/components/centered-state';
 import {
   resolveAppAwareKeyboardPadding,
   resolveKeyboardPaddingEventsForPlatform,
@@ -175,19 +176,21 @@ export function LoginScreen() {
   if (status === 'approved') {
     if (persistError) {
       return (
-        <View className="flex-1 items-center justify-center gap-3 bg-background px-6">
-          <Text className="text-center text-sm text-destructive">{persistError}</Text>
-          <Button
-            onPress={() => {
-              if (token) {
-                void persistToken(token, refreshToken, expiresIn);
-              }
-            }}
-            accessibilityLabel={t('login.retrySignIn')}
-          >
-            <Text>{t('common.retry')}</Text>
-          </Button>
-        </View>
+        <CenteredState className="bg-background">
+          <View className="items-center gap-3 px-6">
+            <Text className="text-center text-sm text-destructive">{persistError}</Text>
+            <Button
+              onPress={() => {
+                if (token) {
+                  void persistToken(token, refreshToken, expiresIn);
+                }
+              }}
+              accessibilityLabel={t('login.retrySignIn')}
+            >
+              <Text>{t('common.retry')}</Text>
+            </Button>
+          </View>
+        </CenteredState>
       );
     }
     return (
@@ -307,7 +310,7 @@ export function LoginScreen() {
                     }}
                     accessibilityLabel={t('login.copySignInLink')}
                   >
-                    <Text className="text-center">{t('login.copyLink')}</Text>
+                    <Text className="text-center">{t('common.copyLink')}</Text>
                   </Button>
                 </View>
                 <Button

@@ -7,6 +7,7 @@
  */
 
 import type {
+  RefreshGlanceableSessionsParams,
   SendAgentSessionNotificationParams,
   SendAgentSessionNotificationResult,
   SendCloudAgentSessionNotificationParams,
@@ -16,6 +17,7 @@ import type {
 } from '@kilocode/notifications';
 
 export type NotificationsBinding = Fetcher & {
+  refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void>;
   sendCloudAgentSessionNotification(
     params: SendCloudAgentSessionNotificationParams
   ): Promise<SendCloudAgentSessionNotificationResult>;

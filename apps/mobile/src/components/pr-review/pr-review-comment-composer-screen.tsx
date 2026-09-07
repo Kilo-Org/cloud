@@ -2,7 +2,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, ScrollView, View } from 'react-native';
+import { Alert } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
+
+import { CenteredState } from '@/components/centered-state';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { PrReviewCommentComposer } from '@/components/pr-review/pr-review-comment-composer';
@@ -120,9 +123,9 @@ export function PrReviewCommentComposerScreen() {
     body = null;
   } else if (pr.isLoading) {
     body = (
-      <View className="flex-1 items-center justify-center py-16">
+      <CenteredState>
         <ActivityIndicator size="small" color={colors.mutedForeground} />
-      </View>
+      </CenteredState>
     );
   } else {
     body = (
@@ -140,9 +143,7 @@ export function PrReviewCommentComposerScreen() {
   return (
     <>
       <PrFormSheetHeader title={title} eyebrow={eyebrow} onBack={dismiss} />
-      <ScrollView className="flex-1 bg-background" contentContainerClassName="grow">
-        {body}
-      </ScrollView>
+      {body}
     </>
   );
 }

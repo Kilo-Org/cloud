@@ -4,6 +4,7 @@ import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { getEnhancedOpenRouterModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getDirectByokModelsForUser } from '@/lib/ai-gateway/providers/direct-byok';
 import { getAvailableModelsForOrganization } from '@/lib/organizations/organization-models';
 import { listAvailableExperimentModels } from '@/lib/ai-gateway/experiments/list-available-experiment-models';
@@ -11,10 +12,22 @@ import { addUserByokAvailability, getUserByokProviderIds } from '@/lib/ai-gatewa
 import { readDb } from '@/lib/drizzle';
 import { addAutoRoutingModels } from '@/lib/ai-gateway/auto-routing-models';
 import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
+import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
+
+async function modelResponse(response: OpenRouterModelsResponse) {
+  const snapshot = await getEnkryptBenchmarks();
+  return NextResponse.json({
+    ...response,
+    data: publishEnkryptModels(response.data, snapshot),
+  });
+}
 
 async function tryGetUserFromAuth() {
   try {
-    return await getUserFromAuth({ adminOnly: false });
+    return await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
   } catch (e) {
     console.error('[tryGetUserFromAuth] failed to get user from auth', e);
     return { user: null, organizationId: null };
@@ -38,7 +51,7 @@ export async function GET(
           })
         : null;
     if (result) {
-      return NextResponse.json({
+      return await modelResponse({
         ...result,
         data: await addAutoRoutingModels(result.data),
       });
@@ -51,7 +64,7 @@ export async function GET(
     const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
       const experimentModels = await listAvailableExperimentModels();
-      return NextResponse.json({
+      return await modelResponse({
         data: appendLocalFakeDeterministicCatalogModels(models.concat(experimentModels)),
       });
     }
@@ -65,7 +78,7 @@ export async function GET(
       models,
       enabledByokProviderIds
     );
-    return NextResponse.json({
+    return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(
         modelsWithByokAvailability.concat(byokModels, experimentModels)
       ),

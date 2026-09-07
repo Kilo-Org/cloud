@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SyncProvidersContent } from '@/app/admin/sync-providers/SyncProvidersContent';
 import { CustomLlmsContent } from '@/app/admin/custom-llms/CustomLlmsContent';
 import { RoutingContent } from '@/app/admin/gateway/RoutingContent';
+import { UsageContent } from '@/app/admin/gateway/UsageContent';
 import { ModelExperimentsContent } from '@/app/admin/model-experiments/ModelExperimentsContent';
 import { ModelExperimentRequestsContent } from '@/app/admin/model-experiments/ModelExperimentRequestsContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
@@ -17,6 +18,7 @@ const VALID_TABS: readonly string[] = [
   'sync-providers',
   'custom-llms',
   'routing',
+  'monthly-usage',
   'model-experiments',
   'experiment-requests',
   'api-request-log',
@@ -26,6 +28,7 @@ type Tab =
   | 'sync-providers'
   | 'custom-llms'
   | 'routing'
+  | 'monthly-usage'
   | 'model-experiments'
   | 'experiment-requests'
   | 'api-request-log'
@@ -76,7 +79,7 @@ export default function AdminGatewayPage() {
       <div className="flex w-full flex-col gap-y-4">
         <h2 className="text-2xl font-bold">Gateway</h2>
         <Tabs value={activeTab} onValueChange={onTabChange}>
-          <TabsList className="h-auto w-full justify-start gap-6 rounded-none border-b bg-transparent p-0">
+          <TabsList className="h-auto w-full flex-wrap justify-start gap-x-6 rounded-none border-b bg-transparent p-0">
             <TabsTrigger value="sync-providers" className={tabTriggerClass}>
               Sync Providers
             </TabsTrigger>
@@ -85,6 +88,9 @@ export default function AdminGatewayPage() {
             </TabsTrigger>
             <TabsTrigger value="routing" className={tabTriggerClass}>
               Routing
+            </TabsTrigger>
+            <TabsTrigger value="monthly-usage" className={tabTriggerClass}>
+              Model Usage
             </TabsTrigger>
             <TabsTrigger value="model-experiments" className={tabTriggerClass}>
               Model Experiments
@@ -107,6 +113,9 @@ export default function AdminGatewayPage() {
           </TabsContent>
           <TabsContent value="routing" className="mt-4">
             <RoutingContent />
+          </TabsContent>
+          <TabsContent value="monthly-usage" className="mt-4">
+            <UsageContent />
           </TabsContent>
           <TabsContent value="model-experiments" className="mt-4">
             <ModelExperimentsContent />

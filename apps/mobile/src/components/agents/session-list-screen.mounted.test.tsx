@@ -6,9 +6,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { i18n } from '@/i18n';
 import type * as PlatformFilterModule from './platform-filter-modal';
 import { AgentSessionListScreen } from './session-list-screen';
+import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 
@@ -52,6 +54,14 @@ vi.mock('@/lib/auth/account-metadata-write', () => ({
 }));
 vi.mock('sonner-native', () => ({
   toast: { error: vi.fn() },
+}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/ui/activity-indicator', () => ({
+  ActivityIndicator: 'ActivityIndicator',
+}));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
+vi.mock('@/components/centered-state-surface', () => ({
+  StateSurfaceInsets: ({ children }: { children: ReactNode }): ReactNode => children,
 }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
@@ -411,7 +421,11 @@ describe('AgentSessionListScreen live presentation', () => {
     expect(text().includes('Updating')).toBe(Boolean(test.updating));
     expect(text().includes('Loading…')).toBe(Boolean(test.skeleton));
     expect(nodes('FlatList')).toHaveLength(test.rows ? 1 : 0);
-    expect(nodes('ScrollView')).toHaveLength(test.empty ? 1 : 0);
+    expect(nodes('ScrollView')).toHaveLength(0);
+    expect(nodes('CenteredState')).toHaveLength(test.empty || (test.error && !test.rows) ? 1 : 0);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(
+      state.tabBarHeight + (test.empty ? 0 : 64)
+    );
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: null, enabled: true });
     expect(headerAction().props.testID).toBe('agents-view-history');
     expect(headerAction().props.accessibilityRole).toBe('button');
@@ -421,58 +435,35 @@ describe('AgentSessionListScreen live presentation', () => {
       expect(nodes('Pressable').some(node => node.props.testID === 'agents-new-session-fab')).toBe(
         false
       );
-      press('New coding task');
-    } else {
-      press('New session');
     }
+    press('New session');
     expect(state.destination).toBe('/(app)/agent-chat/new');
   });
 
-  it('compensates the empty state for measured controls and keeps large text scrollable', async () => {
+  it('uses shared scrolling and refresh while preserving the large-text creation action', async () => {
     state.topInset = 44;
     await renderScreen();
-    const scroll = requireNode('ScrollView');
+    const viewport = requireNode('CenteredState');
     const emptyState = root().findByType(EmptyState);
-    const spacer = scroll.findByProps({ pointerEvents: 'none' });
-    const onLayout = scroll.props.onLayout as (event: {
-      nativeEvent: { layout: { y: number } };
-    }) => void;
 
-    expect(scroll.parent?.parent).toBe(header().parent);
     expect(header().parent?.children[0]).toBe(header());
     expect(header().props.className).toContain('px-[22px]');
     expect(header().props.context).toBeUndefined();
-    expect(scroll.props.className).toBe('flex-1');
-    expect(scroll.props.contentContainerClassName).toBe('grow justify-center py-4');
-    expect(scroll.props.contentContainerStyle).toBeUndefined();
-    expect(scroll.props.scrollEnabled).not.toBe(false);
-    expect(emptyState.props.placement).toBe('top');
-    expect(emptyState.props.className).toBe('shrink-0 pt-0');
-    expect(spacer.props.className).toBe('shrink-0');
-    expect(spacer.props.style).toEqual({ height: 60 });
-
-    for (const { y, height } of [
-      { y: 180, height: 196 },
-      { y: 260, height: 276 },
-      { y: 20, height: 60 },
-    ]) {
-      act(() => {
-        onLayout({ nativeEvent: { layout: { y } } });
-      });
-      expect(spacer.props.style).toEqual({ height });
-    }
+    expect(emptyState.props.placement).toBeUndefined();
+    expect(nodes('ScrollView')).toHaveLength(0);
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(60);
+    const refreshControl = viewport.props.refreshControl as { props: { onRefresh: () => void } };
+    await act(async () => {
+      refreshControl.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(state.refetch).toHaveBeenCalledTimes(1);
 
     state.fontScale = 2;
     state.tabBarHeight = 84;
     await renderScreen();
-    act(() => {
-      onLayout({ nativeEvent: { layout: { y: 260 } } });
-    });
-    expect(spacer.props.style).toEqual({ height: 300 });
-    state.topInset = 64;
-    await renderScreen();
-    expect(spacer.props.style).toEqual({ height: 280 });
-    const createAction = action('New coding task');
+    expect(root().findByType(StateSurfaceInsets).props.bottomInset).toBe(84);
+    const createAction = action('New session');
     const label = createAction.findByType(Text);
     expect(createAction.props.className).toContain('max-w-full');
     expect(createAction.props.className).toContain('min-h-[44px]');
@@ -635,29 +626,29 @@ describe('AgentSessionListScreen live presentation', () => {
     }
   );
 
-  it('keeps the retained error and Retry mounted as socket rows appear and disappear', async () => {
+  it('preserves error recovery when switching between centered feedback and socket rows', async () => {
     state.live.hasAcceptedSuccess = false;
     state.live.terminalError = failure;
     await renderScreen();
     const message = 'Could not load active sessions';
-    const retry = action('Retry');
-    const status = nodes('Text').find(node => node.children.includes(message));
-    expect(status).toBeDefined();
-    expect(nodes('AlertCircle')).toHaveLength(1);
+    expect(text()).toContain(message);
+    expect(nodes('CenteredState')).toHaveLength(1);
 
     async function updateSocketRows(activeSessions: ActiveSession[]) {
       state.live.activeSessions = activeSessions;
       await renderScreen();
       expect(nodes('RemoteSessionRow')).toHaveLength(activeSessions.length);
-      expect.soft(action('Retry') === retry).toBe(true);
-      expect
-        .soft(nodes('Text').find(node => node.children.includes(message)) === status)
-        .toBe(true);
-      expect.soft(state.announcements).toEqual([message]);
-      expect(nodes('AlertCircle')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
+      expect(nodes('CenteredState')).toHaveLength(activeSessions.length === 0 ? 1 : 0);
+      expect(text()).toContain(message);
+      expect(state.announcements).toEqual([message]);
+      await act(async () => {
+        press('Retry');
+        await Promise.resolve();
+      });
     }
     await updateSocketRows([row]);
     await updateSocketRows([]);
+    expect(state.refetch).toHaveBeenCalledTimes(2);
   });
 
   it('does not invent internet or retry activity for an unknown paused connection', async () => {
@@ -692,14 +683,58 @@ describe('AgentSessionListScreen live presentation', () => {
       pending.resolve(false);
       await pending.promise;
     });
+    // The rejected pull holds the in-flight feedback through the beat before
+    // the failure line takes over (device defect e1-updating).
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 100);
+      });
+    });
     expect(refresh().props.refreshing).toBe(false);
-    expect(text()).toContain('Could not load active sessions');
-    expect(
-      state.announcements.filter(message => message === 'Could not load active sessions')
-    ).toHaveLength(1);
-  });
+    // The pull-failed state speaks through the reserved status line: the
+    // scenario copy with its Retry action, announced exactly once.
+    expect(text()).toContain("Couldn't refresh");
+    expect(state.announcements.filter(message => message === "Couldn't refresh")).toHaveLength(1);
+  }, 15_000);
 
-  it('does not announce on a successful pull with cached rows', async () => {
+  it('retires the pull-failure line when a later foreground refresh lands an accepted result', async () => {
+    state.live.activeSessions = [row];
+    const rejected = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValueOnce(rejected.promise);
+    await renderScreen();
+    const refresh = () =>
+      nodes('FlatList')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    await act(async () => {
+      rejected.resolve(false);
+      await rejected.promise;
+    });
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 100);
+      });
+    });
+    expect(text()).toContain("Couldn't refresh");
+
+    // A refresh outside the pull lifecycle (app foreground) lands an accepted
+    // result afterwards: the list is up to date, so the stale failure line
+    // must retire instead of claiming "Couldn't refresh" indefinitely.
+    await act(async () => {
+      foreground();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(text()).not.toContain("Couldn't refresh");
+    expect(refresh().props.refreshing).toBe(false);
+    expect(state.refetch).toHaveBeenCalledTimes(2);
+  }, 15_000);
+
+  it('announces only the in-flight Updating on a successful pull with cached rows', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const refresh = nodes('FlatList')[0]?.props.refreshControl as {
@@ -710,7 +745,7 @@ describe('AgentSessionListScreen live presentation', () => {
       await Promise.resolve();
     });
     expect(state.refetch).toHaveBeenCalledTimes(1);
-    expect(state.announcements).toEqual([]);
+    expect(state.announcements).toEqual(['Updating']);
   });
 
   it('passes a numeric attention revision as extraData to the live FlatList', async () => {
@@ -934,11 +969,16 @@ describe('AgentSessionListScreen live filtering', () => {
 
     const emptyState = renderer.root.findByType(EmptyState);
     expect(emptyState.props.description).toBe('Try a different search term.');
+    expect(nodes('CenteredState')).toHaveLength(1);
+    expect(nodes('FlatList')).toHaveLength(0);
+    expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     act(() => {
       (emptyState.props.action as { props: { onPress: () => void } }).props.onPress();
     });
 
     expect(nodes('FlatList')).toHaveLength(1);
+    expect(nodes('CenteredState')).toHaveLength(0);
+    expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
     expect(headerAction('agents-open-filters').props.activeCount).toBe(1);
   });
 
@@ -1044,7 +1084,7 @@ describe('AgentSessionListScreen live filtering', () => {
       const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
       expect(
         tree.children?.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['View', 'View', 'SessionListSearchHeader', 'FlatList']);
+      ).toEqual(['View', 'SessionListSearchHeader', 'View', 'FlatList']);
     }
   });
 
@@ -1242,6 +1282,43 @@ describe('Live list admission and lifecycle', () => {
     expect(state.destination).toBe('/(app)/(tabs)/(2_agents)/history');
   });
 
+  it('refreshes the organization error through the context and resumes session refresh after recovery', async () => {
+    state.organization.organizationId = 'org-1';
+    state.boundary.isError = true;
+    state.boundary.orgs = undefined;
+    const pending = Promise.withResolvers<undefined>();
+    state.boundaryRefetch.mockReturnValue(pending.promise);
+    await renderScreen();
+    const refresh = () =>
+      nodes('CenteredState')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+    expect(state.refetch).not.toHaveBeenCalled();
+    expect(refresh().props.refreshing).toBe(true);
+    await act(async () => {
+      pending.resolve(undefined);
+      await pending.promise;
+    });
+    expect(refresh().props.refreshing).toBe(false);
+
+    state.organization.organizationId = null;
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const readyRefresh = nodes('FlatList')[0]?.props.refreshControl as {
+      props: { onRefresh: () => void };
+    };
+    await act(async () => {
+      readyRefresh.props.onRefresh();
+      await Promise.resolve();
+    });
+    expect(state.refetch).toHaveBeenCalledOnce();
+    expect(state.boundaryRefetch).toHaveBeenCalledOnce();
+  });
+
   it('recovers membership through boundary Retry and revokes admission on an unresolved organization change', async () => {
     state.organization.organizationId = 'org-1';
     state.boundary.isError = true;
@@ -1260,7 +1337,7 @@ describe('Live list admission and lifecycle', () => {
     await renderScreen();
     expect(state.liveQuery).toHaveBeenLastCalledWith({ organizationId: 'org-1', enabled: true });
     expect(text()).toContain('Nothing running right now');
-    press('New coding task');
+    press('New session');
     expect(state.destination).toBe('/(app)/agent-chat/new?organizationId=org-1');
     expect(state.boundaryRefetch).toHaveBeenCalledTimes(1);
     expect(state.refetch).not.toHaveBeenCalled();
@@ -1272,7 +1349,7 @@ describe('Live list admission and lifecycle', () => {
     expect(header().props.eyebrow).toBeUndefined();
   });
 
-  it('refreshes live sessions on focus and preserves foreground tray invalidation', async () => {
+  it('refreshes live sessions once on focus and foreground', async () => {
     state.refetch.mockImplementationOnce(async () => {
       await Promise.resolve();
       state.live.activeSessions = [row];
@@ -1298,7 +1375,7 @@ describe('Live list admission and lifecycle', () => {
       title: 'Foreground result',
     });
     expect(state.refetch).toHaveBeenCalledTimes(2);
-    expect(state.invalidate).toHaveBeenCalledWith({ queryKey: [['activeSessions']] });
+    expect(state.invalidate).not.toHaveBeenCalled();
   });
 
   it.each([false, true])(

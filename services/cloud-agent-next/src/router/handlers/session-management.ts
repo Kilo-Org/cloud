@@ -14,12 +14,15 @@ import {
 import { withDORetry } from '../../utils/do-retry.js';
 import { getSandboxSessionStub, resolveSessionStub } from '../../sandbox-session/session-stub.js';
 import { sessionPlaneFromId } from '../../session-plane.js';
+import { interruptControlSession } from '../control-plane-session.js';
 import { protectedProcedure, publicProcedure, internalApiProtectedProcedure } from '../auth.js';
 import {
   sessionIdSchema,
   MessageIdSchema,
   GetSessionInput,
   GetSessionOutput,
+  GetSandboxStatusInput,
+  GetSandboxStatusOutput,
   GetSessionHealthInput,
   GetSessionHealthOutput,
   GetMessageResultInput,
@@ -204,34 +207,45 @@ export function createSessionManagementHandlers() {
               };
             }
 
-            // Mark session as interrupted in DO before killing processes (with retry)
-            // This signals the streaming generator to stop
             const getStub = () => resolveSessionStub(env, userId, sessionId);
 
             await withDORetry(getStub, stub => stub.markAsInterrupted(), 'markAsInterrupted');
 
-            const interruptResult = await withDORetry(
-              getStub,
-              stub => stub.interruptExecution(),
-              'interruptExecution'
-            );
+            const interruptResult =
+              sessionPlaneFromId(sessionId) === 'control'
+                ? await interruptControlSession({ env, ownerId: userId, sessionId })
+                : await withDORetry(
+                    getStub,
+                    stub => stub.interruptExecution(),
+                    'interruptExecution'
+                  );
 
-            if (!interruptResult.success) {
+            const success =
+              interruptResult !== undefined &&
+              ('success' in interruptResult
+                ? interruptResult.success
+                : interruptResult.state !== 'rejected');
+            const message =
+              interruptResult === undefined
+                ? 'No session work to interrupt'
+                : 'success' in interruptResult
+                  ? interruptResult.message
+                  : interruptResult.message;
+
+            if (!success) {
               logger
                 .withFields({
-                  message:
-                    interruptResult.message ??
-                    'No accepted current messages or pending queued messages',
+                  message: message ?? 'No accepted current messages or pending queued messages',
                 })
                 .info('No accepted current messages or pending queued messages to interrupt');
             }
 
             logger.info('Session interruption completed');
             return {
-              success: interruptResult.success,
-              message: interruptResult.success
+              success,
+              message: success
                 ? 'Session interruption accepted'
-                : (interruptResult.message ?? 'No session work to interrupt'),
+                : (message ?? 'No session work to interrupt'),
               processesFound: false,
             };
           } catch (error) {
@@ -436,6 +450,43 @@ export function createSessionManagementHandlers() {
             latestEventId,
           };
         });
+      }),
+
+    getSandboxStatus: protectedProcedure
+      .input(GetSandboxStatusInput)
+      .output(GetSandboxStatusOutput)
+      .query(async ({ input, ctx }) => {
+        await requireCurrentSessionAccess({
+          env: ctx.env,
+          kiloUserId: ctx.userId,
+          cloudAgentSessionId: input.cloudAgentSessionId,
+        });
+
+        try {
+          return await withDORetry(
+            () => () => getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId),
+            async getStub => {
+              try {
+                return GetSandboxStatusOutput.parse(await getStub().getSandboxStatus());
+              } catch (error) {
+                throw Object.assign(new Error('Sandbox status unavailable'), {
+                  retryable:
+                    error instanceof Error && 'retryable' in error && error.retryable === true,
+                });
+              }
+            },
+            'getSandboxStatus'
+          );
+        } catch {
+          return {
+            status: 'unknown',
+            provider: 'Unknown',
+            observedAt: Date.now(),
+            detailCode: 'status_unavailable',
+            inactivityTimeoutMs: null,
+            estimatedSleepAt: null,
+          };
+        }
       }),
 
     getComputeBillingStatus: protectedProcedure

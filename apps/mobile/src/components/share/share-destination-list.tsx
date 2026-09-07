@@ -1,11 +1,12 @@
 import { Search, Terminal } from '@/components/ui/icons';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, TextInput, View, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
+import { CenteredState } from '@/components/centered-state';
 import { DestinationOptionRow } from '@/components/destination-option-row';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,6 +21,7 @@ const SEARCH_THRESHOLD = 8;
 const SKELETON_COUNT = 5;
 
 type ShareDestinationListProps = {
+  headerContent?: ReactNode;
   state: ShareGateState;
   destinations: readonly ShareDestinationRow[];
   onSelect: (row: ShareDestinationRow) => void;
@@ -106,13 +108,8 @@ function CliInstanceRows({
   );
 }
 
-/**
- * Destination FlatList for the share gate. Must be a direct child of the
- * formSheet screen content (paired with the collapsable header View).
- * Search is ListHeaderComponent — scrolls with the list, shown only when
- * loaded destination count > 8.
- */
 export function ShareDestinationList({
+  headerContent,
   state,
   destinations,
   onSelect,
@@ -126,8 +123,7 @@ export function ShareDestinationList({
   const { bottom } = useSafeAreaInsets();
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
-
-  const showSearch = destinations.length > SEARCH_THRESHOLD;
+  const showSearch = state.kind === 'happy' && destinations.length > SEARCH_THRESHOLD;
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -142,126 +138,90 @@ export function ShareDestinationList({
   }, [destinations, search]);
 
   const contentPad = useMemo(() => ({ paddingBottom: bottom + 16 }) satisfies ViewStyle, [bottom]);
-  const growContentPad = useMemo(
-    () => ({ paddingBottom: bottom + 16, flexGrow: 1 }) satisfies ViewStyle,
-    [bottom]
-  );
+  const noChoices = instances.length === 0;
+  let body: ReactNode = null;
 
-  const cliSection =
-    instances.length > 0 ? (
-      <CliInstanceRows
-        instances={instances}
-        spawningConnectionId={spawningConnectionId}
-        instanceRowsDisabled={instanceRowsDisabled}
-        onSpawnInstance={onSpawnInstance}
-      />
-    ) : null;
-
-  if (state.kind === 'loading') {
-    return (
-      <FlatList
-        className="flex-1 bg-background"
-        data={[] as ShareDestinationRow[]}
-        keyExtractor={(_, index) => `skeleton-${index}`}
-        ListHeaderComponent={
-          <>
-            {cliSection}
-            <SkeletonRows />
-          </>
-        }
-        renderItem={() => null}
-        contentContainerStyle={contentPad}
-        keyboardShouldPersistTaps="handled"
-      />
-    );
-  }
-
-  if (state.kind === 'retryable') {
-    return (
-      <FlatList
-        className="flex-1 bg-background"
-        data={[] as ShareDestinationRow[]}
-        keyExtractor={() => 'error'}
-        ListHeaderComponent={cliSection}
-        ListEmptyComponent={
-          <QueryError message={state.message} onRetry={onRetry} placement="top" />
-        }
-        renderItem={() => null}
-        contentContainerStyle={growContentPad}
-        keyboardShouldPersistTaps="handled"
-      />
-    );
-  }
-
-  if (state.kind === 'empty') {
-    return (
-      <FlatList
-        className="flex-1 bg-background"
-        data={[] as ShareDestinationRow[]}
-        keyExtractor={() => 'empty'}
-        ListHeaderComponent={cliSection}
-        ListEmptyComponent={<EmptyMessage message={state.message} />}
-        renderItem={() => null}
-        contentContainerStyle={growContentPad}
-        keyboardShouldPersistTaps="handled"
-      />
-    );
-  }
-
-  // Terminal non-retryable states: header already shows the message; keep an
-  // empty FlatList so the formSheet still has [header, list] as direct children.
-  // No CLI section (criterion 20).
   if (state.kind === 'stale-share' || state.kind === 'non-retryable-classification') {
-    return (
+    body = (
+      <CenteredState className="bg-background px-6">
+        <Text className="text-center text-sm text-muted-foreground">{state.message}</Text>
+      </CenteredState>
+    );
+  } else if (noChoices && state.kind === 'retryable') {
+    body = <QueryError message={state.message} onRetry={onRetry} className="bg-background" />;
+  } else if (
+    noChoices &&
+    (state.kind === 'empty' || (state.kind === 'happy' && filtered.length === 0))
+  ) {
+    body = (
+      <CenteredState className="bg-background px-6">
+        <Text className="text-center text-sm text-muted-foreground">
+          {state.kind === 'empty' ? state.message : t('share.noMatchingSessions')}
+        </Text>
+      </CenteredState>
+    );
+  } else {
+    let emptyContent: ReactNode = null;
+    if (state.kind === 'loading') {
+      emptyContent = <SkeletonRows />;
+    } else if (state.kind === 'retryable') {
+      emptyContent = <QueryError message={state.message} onRetry={onRetry} placement="top" />;
+    } else if (state.kind === 'empty') {
+      emptyContent = <EmptyMessage message={state.message} />;
+    } else if (search.trim()) {
+      emptyContent = <EmptyMessage message={t('share.noMatchingSessions')} />;
+    }
+
+    body = (
       <FlatList
         className="flex-1 bg-background"
-        data={[] as ShareDestinationRow[]}
-        keyExtractor={() => 'terminal'}
-        renderItem={() => null}
-        contentContainerStyle={contentPad}
+        data={state.kind === 'happy' ? filtered : []}
+        keyExtractor={item => item.session_id}
+        ListHeaderComponent={
+          instances.length > 0 ? (
+            <CliInstanceRows
+              instances={instances}
+              spawningConnectionId={spawningConnectionId}
+              instanceRowsDisabled={instanceRowsDisabled}
+              onSpawnInstance={onSpawnInstance}
+            />
+          ) : null
+        }
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={contentPad}
+        renderItem={({ item }) => (
+          <View
+            pointerEvents={destinationsDisabled ? 'none' : 'auto'}
+            className={destinationsDisabled ? 'opacity-50' : undefined}
+          >
+            <StoredSessionRow
+              session={item}
+              sortBy="updated_at"
+              live={item.live}
+              metaWhileLive={item.live}
+              interactive={false}
+              onPress={() => {
+                if (destinationsDisabled) {
+                  return;
+                }
+                onSelect(item);
+              }}
+            />
+          </View>
+        )}
+        ListEmptyComponent={emptyContent}
       />
     );
   }
 
-  // happy
   return (
-    <FlatList
-      className="flex-1 bg-background"
-      data={filtered as ShareDestinationRow[]}
-      keyExtractor={item => item.session_id}
-      ListHeaderComponent={
-        <>
-          {cliSection}
-          {showSearch ? <DestinationSearch onChange={setSearch} /> : null}
-        </>
-      }
-      keyboardShouldPersistTaps="handled"
-      keyboardDismissMode="on-drag"
-      contentContainerStyle={contentPad}
-      renderItem={({ item }) => (
-        <View
-          pointerEvents={destinationsDisabled ? 'none' : 'auto'}
-          className={destinationsDisabled ? 'opacity-50' : undefined}
-        >
-          <StoredSessionRow
-            session={item}
-            sortBy="updated_at"
-            live={item.live}
-            metaWhileLive={item.live}
-            interactive={false}
-            onPress={() => {
-              if (destinationsDisabled) {
-                return;
-              }
-              onSelect(item);
-            }}
-          />
-        </View>
-      )}
-      ListEmptyComponent={
-        search.trim() ? <EmptyMessage message={t('share.noMatchingSessions')} /> : null
-      }
-    />
+    <>
+      <View collapsable={false} className="bg-background">
+        {headerContent}
+        {showSearch ? <DestinationSearch onChange={setSearch} /> : null}
+      </View>
+      {body}
+    </>
   );
 }

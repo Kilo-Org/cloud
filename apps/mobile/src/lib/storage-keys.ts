@@ -31,11 +31,14 @@ export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
 /** Login SSO-recovery banner draft, persisted before an RTL language reload. */
 export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
+export const LIVE_ACTIVITY_KEY = 'live-activity-enabled';
 /** Return key in the agent composer sends/start instead of inserting a newline. */
 export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';
 /** Revocable per-host list of markdown link hosts that open without an Alert. */
 export const TRUSTED_HOSTS_KEY = 'trusted-hosts';
 export const PR_REVIEW_FOOTER_KEY = 'pr-review-footer-enabled';
+/** Master switch for the glanceable Active Agents surfaces (widgets, Live Activity,
+ * Android ongoing). Off blanks every surface and unregisters its push tokens. */
 /** SQLCipher database key for the encrypted persistence store (DEC-01). */
 export const PERSIST_DB_KEY = 'persist-db-key';
 /**

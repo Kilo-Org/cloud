@@ -211,6 +211,64 @@ describe('mapGooglePlayKiloPassPurchase', () => {
 });
 
 describe('decodeGooglePlaySubscriptionPurchase', () => {
+  it.each([false, true])(
+    'selects the paid item in a deferred replacement (reversed: %s)',
+    reversed => {
+      const { decodeGooglePlaySubscriptionPurchase, mapGooglePlayKiloPassPurchase } =
+        loadVerifier();
+      const current = {
+        ...apiData().lineItems![0],
+        deferredItemReplacement: { productId: 'kilopass_tier49' },
+      };
+      const future = { productId: 'kilopass_tier49' };
+      const data = apiData({
+        linkedPurchaseToken: 'play-token-1',
+        lineItems: reversed ? [future, current] : [current, future],
+      });
+      const decoded = decodeGooglePlaySubscriptionPurchase(data, 'new-token');
+      const mapped = mapGooglePlayKiloPassPurchase(
+        decoded,
+        order({ purchaseToken: 'new-token', lineItems: [{ productId: 'kilopass_tier49' }] })
+      );
+      expect(mapped).toMatchObject({
+        tier: 'tier_19',
+        providerSubscriptionId: 'new-token',
+        googlePlayReplacement: {
+          linkedPurchaseToken: 'play-token-1',
+          deferred: true,
+          orderPurchaseToken: 'new-token',
+        },
+      });
+    }
+  );
+
+  it('selects the new paid tier after the deferred period ends', () => {
+    const { decodeGooglePlaySubscriptionPurchase } = loadVerifier();
+    const result = decodeGooglePlaySubscriptionPurchase(
+      apiData({
+        linkedPurchaseToken: 'old-token',
+        lineItems: [
+          {
+            productId: 'kilopass_tier19',
+            expiryTime: '2020-01-01T00:00:00Z',
+            latestSuccessfulOrderId: 'old-order',
+          },
+          {
+            productId: 'kilopass_tier49',
+            expiryTime: '2100-01-01T00:00:00Z',
+            latestSuccessfulOrderId: 'new-order',
+          },
+        ],
+      }),
+      'new-token'
+    );
+    expect(result).toMatchObject({
+      productId: 'kilopass_tier49',
+      latestOrderId: 'new-order',
+      deferredReplacement: false,
+    });
+  });
+
   it.each([undefined, 'current-account'])(
     'links a Play center resubscription with current account %s',
     current => {

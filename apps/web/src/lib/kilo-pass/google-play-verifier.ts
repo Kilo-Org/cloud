@@ -19,6 +19,7 @@ export type GooglePlayDecodedPurchase = {
   obfuscatedExternalAccountId?: string;
   linkedPurchaseToken?: string;
   deferredReplacement?: boolean;
+  replacementProductId?: string;
   environment: GooglePlayEnvironment;
   subscriptionState: string;
   rawPayload: Record<string, unknown>;
@@ -62,22 +63,33 @@ export function mapGooglePlayKiloPassPurchase(
   }
 
   const product = getMobileStoreKiloPassProductByGoogleProductId(decoded.productId);
-  if (!product) {
+  if (
+    !product ||
+    (decoded.deferredReplacement &&
+      !getMobileStoreKiloPassProductByGoogleProductId(decoded.replacementProductId ?? ''))
+  ) {
     throw new Error('Google Play Kilo Pass product is not enabled');
   }
 
-  const orderItems = order.lineItems?.filter(item => item.productId === decoded.productId) ?? [];
+  const orderProductId = decoded.deferredReplacement
+    ? decoded.replacementProductId
+    : decoded.productId;
+  const orderItems = order.lineItems?.filter(item => item.productId === orderProductId) ?? [];
   if (
     order.orderId !== decoded.latestOrderId ||
-    (order.purchaseToken !== decoded.purchaseToken && !decoded.deferredReplacement) ||
+    order.purchaseToken !== decoded.purchaseToken ||
     orderItems.length !== 1 ||
     !['PROCESSED', 'PENDING_REFUND', 'PARTIALLY_REFUNDED'].includes(order.state ?? '')
   ) {
     throw new Error('Google Play order does not match the paid subscription');
   }
   const period = orderItems[0].subscriptionDetails;
-  const periodStart = Date.parse(period?.servicePeriodStartTime ?? '');
-  const periodEnd = Date.parse(period?.servicePeriodEndTime ?? '');
+  const periodStart = decoded.deferredReplacement
+    ? decoded.startTimeMs
+    : Date.parse(period?.servicePeriodStartTime ?? '');
+  const periodEnd = decoded.deferredReplacement
+    ? decoded.expiryTimeMs
+    : Date.parse(period?.servicePeriodEndTime ?? '');
   if (
     !Number.isFinite(periodStart) ||
     !Number.isFinite(periodEnd) ||
@@ -142,6 +154,7 @@ export function decodeGooglePlaySubscriptionPurchase(
     purchaseToken,
     linkedPurchaseToken: apiData.linkedPurchaseToken ?? undefined,
     deferredReplacement: Boolean(lineItem.deferredItemReplacement && apiData.linkedPurchaseToken),
+    replacementProductId: lineItem.deferredItemReplacement?.productId ?? undefined,
     productId: lineItem.productId ?? '',
     latestOrderId,
     startTimeMs: Date.parse(apiData.startTime ?? ''),

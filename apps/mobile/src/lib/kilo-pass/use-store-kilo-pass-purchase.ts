@@ -16,6 +16,10 @@ const alreadyOwnedPurchaseErrorSchema = z.object({
   code: z.literal(ErrorCode.AlreadyOwned),
 });
 
+const billingUnavailableErrorSchema = z.object({
+  code: z.literal(ErrorCode.BillingUnavailable),
+});
+
 const errorMessageSchema = z.object({
   message: z.string(),
 });
@@ -191,6 +195,10 @@ export function getKiloPassPurchaseErrorMessage(
         ? 'kiloPass.purchaseOwnedByAnotherAccountPlay'
         : 'kiloPass.purchaseOwnedByAnotherAccount'
     );
+  }
+
+  if (storefront === 'play' && billingUnavailableErrorSchema.safeParse(error).success) {
+    return i18n.t('kiloPass.purchaseUnavailable');
   }
 
   const message = getErrorMessage(error, fallback);

@@ -56,6 +56,7 @@ const mockedTrpc = vi.hoisted(() => ({ useTRPC: vi.fn() }));
 vi.mock('expo-iap', () => ({
   ErrorCode: {
     AlreadyOwned: 'already-owned',
+    BillingUnavailable: 'billing-unavailable',
     UserCancelled: 'user-cancelled',
   },
   fetchProducts: mockedIap.fetchProducts,
@@ -1003,6 +1004,14 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     });
     expect(finishTransaction).toHaveBeenCalledWith({ purchase, isConsumable: false });
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps Play billing failures to translated copy without changing Apple errors', () => {
+    const error = { code: 'billing-unavailable', message: 'Billing API version is not supported' };
+    expect(getKiloPassPurchaseErrorMessage(error, 'fallback', 'play')).toBe(
+      'Kilo Pass purchase is not available right now.'
+    );
+    expect(getKiloPassPurchaseErrorMessage(error, 'fallback', 'app_store')).toBe(error.message);
   });
 
   it('maps Google Play account mismatch strings to Play-specific copy', () => {

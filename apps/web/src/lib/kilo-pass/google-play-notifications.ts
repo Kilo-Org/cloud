@@ -17,7 +17,7 @@ import { KiloPassIssuanceItemKind } from './enums';
 import { appendKiloPassAuditLog } from './issuance';
 import {
   decodeGooglePlaySubscriptionPurchase,
-  getGooglePlayKiloPassPurchase,
+  mapGooglePlayKiloPassPurchase,
 } from './google-play-verifier';
 import {
   GOOGLE_PLAY_PACKAGE_NAME,
@@ -198,24 +198,6 @@ async function markGooglePlayStoreEventProcessed(eventId: string): Promise<void>
       and(
         eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
         eq(kilo_pass_store_events.event_id, eventId)
-      )
-    );
-}
-
-async function setGooglePlaySubscriptionCancelingAtPeriodEnd(
-  dbOrTx: DbOrTx,
-  purchaseToken: string,
-  cancelAtPeriodEnd: boolean
-): Promise<void> {
-  await dbOrTx
-    .update(kilo_pass_subscriptions)
-    .set({
-      cancel_at_period_end: cancelAtPeriodEnd,
-    })
-    .where(
-      and(
-        eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
-        eq(kilo_pass_subscriptions.provider_subscription_id, purchaseToken)
       )
     );
 }
@@ -721,7 +703,17 @@ export async function processGooglePlayKiloPassNotification(params: {
       return { processed: true };
     }
 
-    const purchase = await getGooglePlayKiloPassPurchase(decoded);
+    const order = await getGooglePlaySubscriptionOrder(decoded.latestOrderId);
+    if (
+      order.state === 'REFUNDED' &&
+      order.orderId === decoded.latestOrderId &&
+      order.purchaseToken === purchaseToken
+    ) {
+      await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
+      await markGooglePlayStoreEventProcessed(eventId);
+      return { processed: true };
+    }
+    const purchase = mapGooglePlayKiloPassPurchase(decoded, order);
 
     const terminalEvent = await findProcessedTerminalStoreEventForGooglePlayPurchase({
       purchaseToken,
@@ -840,14 +832,7 @@ export async function processGooglePlayKiloPassNotification(params: {
   }
 
   if (notificationType === GOOGLE_PLAY_NOTIFICATION_TYPE.SUBSCRIPTION_CANCELED) {
-    // Pub/Sub does not guarantee order and Play is the source of truth. A stale
-    // cancellation must not flag a subscription that Play reports as active again
-    // after the buyer restored auto-renew.
-    if (decoded.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE') {
-      await markGooglePlayStoreEventProcessed(eventId);
-      return { processed: true };
-    }
-    await setGooglePlaySubscriptionCancelingAtPeriodEnd(db, purchaseToken, true);
+    await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionCanceled,
       result: KiloPassAuditLogResult.Success,

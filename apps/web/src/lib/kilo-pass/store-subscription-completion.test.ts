@@ -975,7 +975,7 @@ describe('completeStoreKiloPassPurchase', () => {
     [KiloPassPaymentProvider.AppStore, KiloPassPaymentProvider.GooglePlay],
     [KiloPassPaymentProvider.GooglePlay, KiloPassPaymentProvider.AppStore],
     [KiloPassPaymentProvider.GooglePlay, KiloPassPaymentProvider.GooglePlay],
-  ])(
+  ] as const)(
     'accepts a new %s pass after the old %s receipt expires before its notification',
     async (oldProvider, newProvider) => {
       const user = await insertTestUser({ total_microdollars_acquired: 0 });

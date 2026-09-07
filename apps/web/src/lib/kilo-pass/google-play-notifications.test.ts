@@ -216,6 +216,59 @@ describe('processGooglePlayKiloPassNotification', () => {
     );
   });
 
+  it.each([
+    [1, 'SUBSCRIPTION_STATE_ACTIVE', false],
+    [2, 'SUBSCRIPTION_STATE_ACTIVE', false],
+    [4, 'SUBSCRIPTION_STATE_ACTIVE', false],
+    [7, 'SUBSCRIPTION_STATE_ACTIVE', false],
+    [7, 'SUBSCRIPTION_STATE_CANCELED', true],
+  ] as const)(
+    'reconciles cancellation on event %i with state %s without credit replay',
+    async (notificationType, subscriptionState, cancelAtPeriodEnd) => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      const orderId = `GPA.${crypto.randomUUID()}`;
+      const purchaseToken = `restart-${crypto.randomUUID()}`;
+      const send = (type: number) =>
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({
+            notificationType: type,
+            purchaseToken,
+            messageId: crypto.randomUUID(),
+          }),
+        });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId)
+      );
+      await send(4);
+      const before = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId, {
+          subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+        })
+      );
+      await send(3);
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId, { subscriptionState })
+      );
+      await send(notificationType);
+      const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+      });
+      expect(subscription?.status).toBe('active');
+      expect(subscription?.cancel_at_period_end).toBe(cancelAtPeriodEnd);
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after?.total_microdollars_acquired).toBe(before?.total_microdollars_acquired);
+      const purchases = await db.query.kilo_pass_store_purchases.findMany({
+        where: eq(kilo_pass_store_purchases.kilo_user_id, user.id),
+      });
+      expect(purchases).toHaveLength(1);
+    }
+  );
+
   it('sets cancel_at_period_end for a canceled notification', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));

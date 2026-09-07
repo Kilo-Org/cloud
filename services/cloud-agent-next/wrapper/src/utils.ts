@@ -154,6 +154,13 @@ export function runProcess(
         detached: true,
         stdio: [opts?.stdinFd ?? 'ignore', 'pipe', 'pipe'],
       });
+    const stdoutStream = proc.stdout;
+    const stderrStream = proc.stderr;
+    if (stdoutStream === null || stderrStream === null) {
+      proc.kill();
+      reject(new Error('Child process did not create output streams'));
+      return;
+    }
     let stdout = '';
     let stderr = '';
     let stdoutTruncated = false;
@@ -193,8 +200,8 @@ export function runProcess(
     };
 
     const destroyPipes = (): void => {
-      proc.stdout.destroy();
-      proc.stderr.destroy();
+      stdoutStream.destroy();
+      stderrStream.destroy();
     };
 
     const resolveTermination = (destroyOpenPipes = false): void => {
@@ -307,13 +314,13 @@ export function runProcess(
         }
         resetInactivityTimer();
       };
-      proc.stdout.on('data', (output: Buffer) => captureBytes('stdout', output));
-      proc.stderr.on('data', (output: Buffer) => captureBytes('stderr', output));
+      stdoutStream.on('data', (output: Buffer) => captureBytes('stdout', output));
+      stderrStream.on('data', (output: Buffer) => captureBytes('stderr', output));
     } else {
-      proc.stdout.setEncoding('utf8');
-      proc.stderr.setEncoding('utf8');
-      proc.stdout.on('data', (output: string) => captureOutput('stdout', output));
-      proc.stderr.on('data', (output: string) => captureOutput('stderr', output));
+      stdoutStream.setEncoding('utf8');
+      stderrStream.setEncoding('utf8');
+      stdoutStream.on('data', (output: string) => captureOutput('stdout', output));
+      stderrStream.on('data', (output: string) => captureOutput('stderr', output));
     }
 
     if (opts?.signal) {

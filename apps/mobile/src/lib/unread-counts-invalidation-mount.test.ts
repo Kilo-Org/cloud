@@ -69,50 +69,26 @@ vi.mock('@/components/kilo-chat/hooks/use-current-user-id', () => ({
   useCurrentUserId: () => testState.currentUserId,
 }));
 
-vi.mock('expo-constants', () => ({
-  default: {
-    expoConfig: {
-      extra: {
-        eas: {
-          projectId: 'project-1',
-        },
-      },
-    },
-  },
-}));
-
 vi.mock('expo-notifications', () => ({
   addNotificationReceivedListener: mocks.addNotificationReceivedListener,
-  PermissionStatus: {
-    GRANTED: 'granted',
-  },
-}));
-
-vi.mock('expo-router', () => ({
-  router: {
-    replace: vi.fn(),
-  },
 }));
 
 vi.mock('react-native', () => ({
   AppState: {
     addEventListener: mocks.addAppStateListener,
   },
-  Platform: {
-    OS: 'ios',
-  },
 }));
 
-vi.mock('@sentry/react-native', () => ({
-  captureException: vi.fn(),
-}));
-
-// `@/lib/notifications` imports `@/lib/analytics/posthog`, which imports
-// expo-application (and friends), failing this node suite with `__DEV__ is not
-// defined`. Mock posthog with the single export `notifications.ts` references.
-vi.mock('@/lib/analytics/posthog', () => ({
-  captureEvent: vi.fn(),
-}));
+// Keep the shared payload validation without loading native notification wiring.
+vi.mock('@/lib/notifications', async () => {
+  const { pushDataSchema } = await import('@kilocode/notifications');
+  return {
+    parseNotificationData: (data: unknown) => {
+      const parsed = pushDataSchema.safeParse(data);
+      return parsed.success ? parsed.data : null;
+    },
+  };
+});
 
 beforeEach(() => {
   testState.appStateListeners = [];

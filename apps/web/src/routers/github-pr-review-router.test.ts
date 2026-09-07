@@ -1206,6 +1206,8 @@ describe('githubPrReviewRouter.getPullRequest and listChecks parallel legs (P2-G
     mergeable: true,
     mergeable_state: 'clean',
     auto_merge: null,
+    created_at: '2026-03-01T12:00:00Z',
+    updated_at: '2026-03-02T09:30:00Z',
   };
 
   const overviewRepoData = {

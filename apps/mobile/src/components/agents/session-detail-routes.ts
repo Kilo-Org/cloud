@@ -33,10 +33,14 @@ export function getAgentSessionPath(
 
 /**
  * Replace the current route with the canonical agent-chat detail for the new
- * session. Using `replace` (not `push`) means the previous session route is
- * not on the stack, so the system back gesture does not return to it. The
- * route-keyed `AgentSessionProvider` recreates the manager for the new id, so
- * the caller does not switch the current manager before navigation.
+ * session. Replacing (not pushing) means the previous route is not left on the
+ * stack, so the system back gesture does not return to it. The route-keyed
+ * `AgentSessionProvider` recreates the manager for the new id, so the caller
+ * does not switch the current manager before navigation.
+ *
+ * Pass `useStackSafeReplace()` as the router: a literal `router.replace` swaps
+ * both screens in one native-stack commit, which crashes Android Fabric with
+ * `addViewAt: failed to insert view` (Sentry KILO-APP-25).
  */
 export function replaceWithAgentSession(
   router: AgentSessionRouterLike,

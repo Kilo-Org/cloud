@@ -16,6 +16,7 @@ import {
   createSandboxTerminalLifecycle,
   SANDBOX_SESSION_LIFECYCLE_KEY,
   SANDBOX_SESSION_METADATA_KEY,
+  SANDBOX_SESSION_DELETED_WORKTREE_KEY,
 } from './terminal-lifecycle.js';
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
@@ -192,6 +193,25 @@ function createFixture(
 }
 
 describe('SandboxSession terminal lifecycle', () => {
+  it('honors a retained worktree deletion marker without repairing storage during reads', async () => {
+    const fixture = createFixture();
+    fixture.storage.kv.put(SANDBOX_SESSION_DELETED_WORKTREE_KEY, 'worktree_deleted');
+    const before = structuredClone([...fixture.values]);
+    expect(fixture.lifecycle.isDeleted()).toBe(true);
+    expect(fixture.lifecycle.isBlocked()).toBe(true);
+    expect(fixture.lifecycle.captureEpoch()).toBeNull();
+    expect(
+      await fixture.lifecycle.createTerminal({ operationId: FIRST_OPERATION_ID })
+    ).toMatchObject({ success: false });
+    expect([...fixture.values]).toEqual(before);
+    expect(fixture.control.request).not.toHaveBeenCalled();
+    fixture.lifecycle.beginDeletion(fixture.metadata);
+    expect(fixture.storage.kv.get(SANDBOX_SESSION_LIFECYCLE_KEY)).toMatchObject({
+      state: 'deleted',
+      epoch: 1,
+    });
+  });
+
   it('requires successful runtime-bound session attachment without starting compute', async () => {
     const fixture = createFixture({ attached: false });
 

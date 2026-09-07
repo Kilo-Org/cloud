@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { type RefObject } from 'react';
-import { ActivityIndicator } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';

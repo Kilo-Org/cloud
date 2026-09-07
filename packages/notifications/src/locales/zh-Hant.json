@@ -7,7 +7,8 @@
       "instanceLifecycle": "您的執行個體有更新",
       "scheduledAction": "排定的操作有更新",
       "lowBalance": "您的餘額需要留意",
-      "securityFinding": "安全發現需要留意"
+      "securityFinding": "安全發現需要留意",
+      "activeAgentsGlanceable": "使用中的代理有更新"
     }
   },
   "cloudAgentSession": {

@@ -18,7 +18,7 @@ export function getKiloPassLegalLinks(
 
   return [
     {
-      label: i18n.t('kiloPass.legalPrivacyPolicy'),
+      label: i18n.t('common.privacyPolicy'),
       url: `${baseUrl}/privacy-app`,
     },
     {

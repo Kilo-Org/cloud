@@ -6,11 +6,10 @@ import {
   findIntegrationByInstallationId,
   suspendIntegration,
   unsuspendIntegration,
-  deleteIntegration,
+  deleteGitHubInstallationRecords,
   autoCompleteInstallation,
   suspendIntegrationForOwner,
   unsuspendIntegrationForOwner,
-  deleteIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '../adapter';
@@ -133,15 +132,6 @@ export async function handleInstallationDeleted(
 ) {
   const installationIdStr = payload.installation.id.toString();
 
-  // Find and delete the integration (whether completed or pending). The
-  // webhook is signed by a specific GitHub App, so scope the lookup by app
-  // type to avoid deleting the other app's row for the same installation ID.
-  const integrationToDelete = await findIntegrationByInstallationId(
-    PLATFORM.GITHUB,
-    installationIdStr,
-    appType
-  );
-
   try {
     // The bot identity store has no app-type dimension and the lite app has no
     // bot-link flow, so only the standard app unlinks team bot identities.
@@ -156,34 +146,7 @@ export async function handleInstallationDeleted(
     });
   }
 
-  if (integrationToDelete) {
-    // Determine owner from the integration record
-    if (integrationToDelete.owned_by_organization_id) {
-      await deleteIntegration(
-        integrationToDelete.owned_by_organization_id,
-        PLATFORM.GITHUB,
-        appType,
-        installationIdStr
-      );
-      logExceptInTest('Deleted organization installation:', {
-        installation_id: installationIdStr,
-        owned_by_organization_id: integrationToDelete.owned_by_organization_id,
-      });
-    } else if (integrationToDelete.owned_by_user_id) {
-      await deleteIntegrationForOwner(
-        { type: 'user', id: integrationToDelete.owned_by_user_id },
-        PLATFORM.GITHUB,
-        appType,
-        installationIdStr
-      );
-      logExceptInTest('Deleted user installation:', {
-        installation_id: installationIdStr,
-        owned_by_user_id: integrationToDelete.owned_by_user_id,
-      });
-    } else {
-      console.error('Integration found but has no owner:', integrationToDelete.id);
-    }
-  }
+  await deleteGitHubInstallationRecords(installationIdStr, appType);
 
   return NextResponse.json({ message: 'Installation removed' }, { status: 200 });
 }

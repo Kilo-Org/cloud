@@ -88,7 +88,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
   function handlePress() {
     // Flag off: GitHub taps fall back to the browser (same as chat links).
     if (!prReviewEnabled) {
-      void openExternalUrl(pr.url, { label: t('agentChat.prBadge.externalLinkLabel') });
+      void openExternalUrl(pr.url, { label: t('common.pullRequest') });
       return;
     }
     const target = resolveSessionPrTapTarget({
@@ -99,7 +99,7 @@ export function SessionPrBadge(props: SessionPrBadgeProps) {
       router.push(target.href);
       return;
     }
-    void openExternalUrl(target.url, { label: t('agentChat.prBadge.externalLinkLabel') });
+    void openExternalUrl(target.url, { label: t('common.pullRequest') });
   }
 
   return (

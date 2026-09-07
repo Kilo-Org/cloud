@@ -77,7 +77,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
   if (isResolving || organizationId == null || org == null) {
     return (
       <OrganizationBoundary
-        title={t('organization.hub.title')}
+        title={t('common.organization')}
         organizationIdOverride={organizationIdOverride}
       />
     );
@@ -95,7 +95,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
       ? t('organization.hub.lowBalanceBelow', {
           amount: formatMoney(minimumBalance, i18n.language),
         })
-      : t('organization.hub.lowBalanceOff');
+      : t('common.off');
 
   return (
     <View className="flex-1 bg-background">

@@ -12,6 +12,7 @@ import {
   type KiloSessionId,
   type SessionManager,
   type SessionSnapshotPageOutcome,
+  type SessionStatusIndicator,
   type StoredMessage,
   type ToolPart,
 } from '@kilocode/cloud-agent-sdk';
@@ -37,6 +38,8 @@ import { i18n } from '@/i18n';
 import { renderWithProviders } from '@/test/render-with-providers';
 
 const managerSlot = vi.hoisted(() => ({ current: null as SessionManager | null }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/components/agents/session-provider', () => ({
   useSessionManager: () => {
     if (!managerSlot.current) {
@@ -49,6 +52,7 @@ vi.mock('@/components/agents/session-provider', () => ({
 // Keep the actual detail/card/sheet/header callbacks and SDK. Replace native
 // rendering and unrelated composer, account, model-picker, and router dependencies.
 const navigationRoutes = vi.hoisted(() => ['session-detail']);
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
@@ -78,6 +82,17 @@ vi.mock('expo-router', () => ({
     },
     push: (href: string) => {
       navigationRoutes.push(href);
+    },
+  }),
+}));
+// `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
+// Android Fabric alive (KILO-APP-25); its own mechanics are covered in
+// src/lib/navigation/stack-safe-replace.mounted.test.tsx. Here it stands in for
+// the navigation call so these assertions stay about the resulting route list.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({
+    replace: (href: string) => {
+      navigationRoutes.splice(-1, 1, href);
     },
   }),
 }));
@@ -521,9 +536,9 @@ function pressHeaderBack(renderer: ReactTestRenderer) {
 
 describe('SessionDetailContent display scope', () => {
   it.each([
-    { organizationId: null, isResolved: true, label: i18n.t('profile.personal') },
+    { organizationId: null, isResolved: true, label: i18n.t('common.personal') },
     { organizationId: 'org-a', isResolved: true, label: 'Session organization' },
-    { organizationId: 'missing-org', isResolved: true, label: i18n.t('profile.organization') },
+    { organizationId: 'missing-org', isResolved: true, label: i18n.t('common.organization') },
     { organizationId: null, isResolved: false, label: i18n.t('profile.selectAccount') },
   ])('omits the $label context label and preserves header actions', async state => {
     const { renderer } = await mountDetails([], undefined, {
@@ -532,15 +547,18 @@ describe('SessionDetailContent display scope', () => {
     });
     const header = renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
+    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
+      'min-h-14'
+    );
     expect(header.props.context).toBeUndefined();
     expect(header.findAllByType(ContextControl)).toHaveLength(0);
     expect(
       header.findAll(node => node.props.accessibilityHint === i18n.t('profile.selectAccount'))
     ).toHaveLength(0);
-    expect(header.findByProps({ accessibilityLabel: i18n.t('screenHeader.goBack') })).toBeDefined();
+    expect(header.findByProps({ accessibilityLabel: i18n.t('common.goBack') })).toBeDefined();
     const { onPress } = header.findByProps({
       accessibilityLabel: i18n.t('agentChat.session.renameAccessibility', {
         title: `Root ${ROOT_ID}`,
@@ -553,6 +571,31 @@ describe('SessionDetailContent display scope', () => {
     expect(globalContext.organizationId).toBe('global-org');
     expect(globalContext.setOrganizationId).not.toHaveBeenCalled();
   });
+});
+
+describe('session detail status placement', () => {
+  it.each(['progress', 'info'] as const)(
+    'centers a %s status without transcript rows',
+    async type => {
+      const view = await mountDetails([]);
+      act(() => {
+        view.store.set<SessionStatusIndicator | null, [SessionStatusIndicator | null], unknown>(
+          view.manager.atoms.statusIndicator,
+          {
+            type,
+            message: 'Session status',
+            timestamp: 0,
+          }
+        );
+      });
+      const centered = view.renderer.root.findAll(node => Object.is(node.type, 'CenteredState'));
+      expect(centered).toHaveLength(1);
+      expect(
+        centered[0]?.findAll(node => Object.is(node.type, 'SessionStatusIndicator'))
+      ).toHaveLength(1);
+      expect(view.renderer.root.findAllByType(EmptyState)).toHaveLength(0);
+    }
+  );
 });
 
 describe.each([true, false])('session detail return with history=%s', hasHistory => {
@@ -606,6 +649,10 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
       const error = view.renderer.root.findByType(QueryError).props as ComponentProps<
         typeof QueryError
       >;
+      expect(
+        view.renderer.root.findAll(node => Object.is(node.type, 'CenteredState'))
+      ).toHaveLength(1);
+      expect(error.placement).toBe('top');
       expect(error.variant).toBe(code === 'UNAUTHORIZED' ? 'permission' : 'server');
       expect(Boolean(error.onRetry)).toBe(code !== 'UNAUTHORIZED');
       expect(renderedText(view.renderer.root)).toContain('Back to sessions');
@@ -614,9 +661,12 @@ describe.each([true, false])('session detail return with history=%s', hasHistory
 
     const header = view.renderer.root.findByType(ScreenHeader);
     expect(header.findByProps({ accessibilityRole: 'header' }).props).toMatchObject({
-      numberOfLines: 1,
+      numberOfLines: 2,
       ellipsizeMode: 'tail',
     });
+    expect(header.findByProps({ accessibilityRole: 'header' }).parent?.props.className).toContain(
+      'min-h-14'
+    );
     pressHeaderBack(view.renderer);
     expect(navigationRoutes).toEqual(
       hasHistory ? ['previous-screen'] : ['/(app)/(tabs)/(2_agents)']

@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
@@ -233,6 +235,7 @@ export function RemoteSessionRow({
             remoteMeta(session)
           )}
           live
+          statusKind={glanceableStatusKind(session.status)}
           needsInput={needsInput}
           metaWhileLive
           platformIcon={platformIcon}

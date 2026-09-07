@@ -46,6 +46,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: safeAreaMock.useSafeAreaInsets,
 }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
@@ -125,20 +126,27 @@ describe('SessionPageSheet mounted', () => {
     expect(modalNode.props.onRequestClose).toBe(onClose);
     expect(modalNode.props.onDismiss).toBe(onDismiss);
 
-    // No Android surface on iOS.
-    expect(findByTestID(renderer.root, 'session-page-sheet-surface')).toHaveLength(0);
+    const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
+    expect(surface).toHaveLength(1);
+    expect(surface[0]?.props.style).toBeUndefined();
 
     renderer.unmount();
   });
 
-  it('renders children inside the iOS surface View', async () => {
+  it.each(['ios', 'android'])('uses a StateSurface as the %s Modal root', async platform => {
+    reactNativeMock.Platform.OS = platform;
     const renderer = await mountSheet({
       children: createElement('SheetHeader', { title: 'Details' }),
     });
-
-    expect(findByType(renderer.root, 'SheetHeader')).toHaveLength(1);
-
-    renderer.unmount();
+    const surfaces = findByType(renderer.root, 'StateSurface');
+    expect(surfaces).toHaveLength(1);
+    expect(surfaces[0]?.parent).toBe(modal(renderer.root));
+    expect(surfaces[0]?.props.className).toBe('flex-1 bg-background');
+    expect(findByType(renderer.root, 'SheetHeader')[0]?.parent).toBe(surfaces[0]);
+    expect(findByType(renderer.root, 'View')).toHaveLength(0);
+    act(() => {
+      renderer.unmount();
+    });
   });
 
   it('renders an opaque full-window Modal on Android', async () => {
@@ -185,31 +193,35 @@ describe('SessionPageSheet mounted', () => {
     renderer.unmount();
   });
 
-  it('force-closes the Modal on the privacy cover even when onClose leaves it open', async () => {
-    // MessageDetailsSheet passes a stacked closer that only pops its inner
-    // select-text view, so `visible` stays true and the native Modal would
-    // otherwise stay in the Recents snapshot.
-    const onClose = vi.fn<() => void>();
-    const renderer = await mountSheet({ onClose });
-    expect(modal(renderer.root).props.visible).toBe(true);
+  it.each(['ios', 'android'])(
+    'force-closes the %s Modal on privacy cover and restores it on foreground',
+    async platform => {
+      reactNativeMock.Platform.OS = platform;
+      // MessageDetailsSheet passes a stacked closer that only pops its inner
+      // select-text view, so `visible` stays true and the native Modal would
+      // otherwise stay in the Recents snapshot.
+      const onClose = vi.fn<() => void>();
+      const renderer = await mountSheet({ onClose });
+      expect(modal(renderer.root).props.visible).toBe(true);
 
-    await act(async () => {
-      await Promise.resolve();
-      emitPrivacyCover();
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-    expect(modal(renderer.root).props.visible).toBe(false);
+      await act(async () => {
+        await Promise.resolve();
+        emitPrivacyCover();
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(modal(renderer.root).props.visible).toBe(false);
 
-    // The forced close releases on the next foreground, so the caller is not
-    // left holding a sheet that can never show again.
-    await act(async () => {
-      await Promise.resolve();
-      reactNativeMock.emitAppState('active');
-    });
-    expect(modal(renderer.root).props.visible).toBe(true);
+      // The forced close releases on the next foreground, so the caller is not
+      // left holding a sheet that can never show again.
+      await act(async () => {
+        await Promise.resolve();
+        reactNativeMock.emitAppState('active');
+      });
+      expect(modal(renderer.root).props.visible).toBe(true);
 
-    renderer.unmount();
-  });
+      renderer.unmount();
+    }
+  );
 
   it('keeps SheetHeader as the first surface child and routes Done to onClose', async () => {
     reactNativeMock.Platform.OS = 'android';

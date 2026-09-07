@@ -3,11 +3,14 @@ export const DEADLINE_IDS = [
   'socketHandshake',
   'wrapperReadiness',
   'heartbeatExpiry',
+  'recoveryExpiry',
+  'recoveryRetry',
   'acceptedAlarmCap',
   'idleStop',
   'stopAttempt',
   'reconciliation',
   'credentialExpiry',
+  'nativeRetirement',
 ] as const;
 export type DeadlineId = (typeof DEADLINE_IDS)[number];
 
@@ -27,6 +30,8 @@ export const DEADLINE_MS = {
   createSettle: 5 * 60_000,
   acceptedOverdue: 90_000,
   idleStopLeaseMargin: 60_000,
+  nativeRetirementRetry: 1_000,
+  nativeRetirementMaxAttempts: 5,
 } as const;
 
 export function leaseAtLeastMs(): number {

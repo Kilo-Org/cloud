@@ -1,6 +1,9 @@
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
-import { SESSION_INGEST_USER_DELETION_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  SESSION_INGEST_AUDIENCE,
+  SESSION_INGEST_USER_DELETION_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 
 import type { Env } from '../env';
@@ -73,6 +76,7 @@ export const kiloJwtAuthMiddleware = createMiddleware<{
         token,
         nextAuthSecret: c.env.NEXTAUTH_SECRET_PROD,
         connectionString: c.env.HYPERDRIVE.connectionString,
+        resourceAudience: { audience: SESSION_INGEST_AUDIENCE, mode: 'allow-legacy' },
       });
     }
   } catch (error) {

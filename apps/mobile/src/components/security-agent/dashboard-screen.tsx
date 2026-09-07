@@ -11,7 +11,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
@@ -61,7 +62,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.openFindings'),
           value: number(data.analysis.total),
-          detail: i18n.t('securityAgent.dashboardMetrics.openFindingsDetail', {
+          detail: i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', {
             critical: number(data.severity.critical),
             high: number(data.severity.high),
           }),
@@ -69,21 +70,21 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
       }
       case 'exploitable': {
         return Object.assign(metric, {
-          label: i18n.t('securityAgent.dashboardMetrics.confirmedExploitable'),
+          label: i18n.t('securityAgent.dashboard.confirmedExploitable'),
           value: number(data.analysis.exploitable),
           detail: i18n.t('securityAgent.dashboardMetrics.confirmedExploitableDetail'),
         });
       }
       case 'needsReview': {
         return Object.assign(metric, {
-          label: i18n.t('securityAgent.dashboardMetrics.needsReview'),
+          label: i18n.t('securityAgent.dashboard.needsYourReview'),
           value: number(data.analysis.needsReview),
           detail: i18n.t('securityAgent.dashboardMetrics.needsReviewDetail'),
         });
       }
       case 'analysisIncomplete': {
         return Object.assign(metric, {
-          label: i18n.t('securityAgent.dashboardMetrics.analysisIncomplete'),
+          label: i18n.t('securityAgent.dashboard.analysisNotComplete'),
           value: number(getAnalysisIncompleteCount(data.analysis)),
           detail: i18n.t('securityAgent.dashboardMetrics.analysisIncompleteDetail'),
         });
@@ -97,7 +98,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
           label: i18n.t('securityAgent.dashboardMetrics.slaCompliance'),
           value:
             compliance === null
-              ? i18n.t('securityAgent.dashboardMetrics.notMeasured')
+              ? i18n.t('securityAgent.dashboard.notMeasured')
               : formatPercent(compliance, i18n.language),
           detail: measured
             ? i18n.t('securityAgent.dashboardMetrics.withinDeadlineDetail', {
@@ -226,11 +227,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
     const repoNames = getSecurityRepositoriesInScope(repositories.data ?? [], config.data).map(
       repo => repo.fullName
     );
-    const options = [
-      t('securityAgent.repositories.allRepositories'),
-      ...repoNames,
-      t('common.cancel'),
-    ];
+    const options = [t('common.allRepositories'), ...repoNames, t('common.cancel')];
     showActionSheetWithOptions({ options, cancelButtonIndex: options.length - 1 }, index => {
       if (index === undefined || index === options.length - 1) {
         return;
@@ -242,7 +239,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
-        title={t('securityAgent.title')}
+        title={t('common.securityAgent')}
         headerRight={
           <View className="flex-row items-center">
             <Pressable
@@ -250,7 +247,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 router.push(getSecurityAgentPath(scope, 'findings'));
               }}
               accessibilityRole="button"
-              accessibilityLabel={t('securityAgent.dashboard.findings')}
+              accessibilityLabel={t('common.findings')}
               className="size-11 items-center justify-center active:opacity-70"
             >
               <ShieldAlert size={20} color={colors.foreground} />
@@ -285,7 +282,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             accessibilityState={{ disabled: repoFilterUnavailable }}
           >
             <Text className="text-sm font-medium" numberOfLines={1}>
-              {repoFullName ?? t('securityAgent.repositories.allRepositories')}
+              {repoFullName ?? t('common.allRepositories')}
             </Text>
             <Text variant="muted" className="text-xs">
               {lastSyncLabel}

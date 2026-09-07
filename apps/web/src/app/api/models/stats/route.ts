@@ -1,11 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/drizzle';
-import { modelStats } from '@kilocode/db/schema';
-import { eq, desc } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
+import { publishEnkryptModelStats } from '@/lib/model-stats/enkrypt-publication';
+import { getModelStatsSnapshot } from '@/lib/model-stats/model-stats-cache';
 
-export const revalidate = 3600; // 1 hour cache
+export const revalidate = 0;
+export const dynamic = 'force-dynamic';
+
+const headers = { 'Cache-Control': 'no-store' };
 
 /**
  * GET /api/models/stats
@@ -13,19 +15,22 @@ export const revalidate = 3600; // 1 hour cache
  */
 export async function GET(_request: NextRequest) {
   try {
-    const stats = await db
-      .select()
-      .from(modelStats)
-      .where(eq(modelStats.isActive, true))
-      .orderBy(desc(modelStats.codingIndex));
-
-    return NextResponse.json(stats);
+    const snapshot = await getModelStatsSnapshot();
+    return NextResponse.json(
+      snapshot.entries
+        .filter(({ stat }) => stat.isActive === true)
+        .map(({ stat, verification }) => publishEnkryptModelStats(stat, snapshot, verification)),
+      { headers }
+    );
   } catch (error) {
     console.error('Error fetching model stats:', error);
     captureException(error, {
       tags: { endpoint: 'api/models/stats' },
     });
 
-    return NextResponse.json({ error: 'Failed to fetch model statistics' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch model statistics' },
+      { status: 500, headers }
+    );
   }
 }

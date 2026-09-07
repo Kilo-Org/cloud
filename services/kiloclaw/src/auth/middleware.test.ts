@@ -4,12 +4,16 @@ import { SignJWT } from 'jose';
 import type { AppEnv } from '../types';
 import { authMiddleware, internalApiMiddleware } from './middleware';
 import { KILO_TOKEN_VERSION, KILOCLAW_AUTH_COOKIE } from '../config';
+import { KILOCLAW_AUDIENCE } from '@kilocode/worker-utils';
+import { findPepperByUserId, getWorkerDb } from '../db';
+
+let downstreamExecutions = 0;
 
 vi.mock('../db', () => ({
   getWorkerDb: vi.fn(() => ({})),
   findPepperByUserId: vi.fn(async (_db: unknown, userId: string) => ({
     id: userId,
-    api_token_pepper: `pepper_for_${userId}`,
+    api_token_pepper: userId === 'pepperless_user' ? null : `pepper_for_${userId}`,
     blocked_reason: userId === 'blocked_user' ? 'abuse' : null,
   })),
 }));
@@ -36,6 +40,7 @@ function createTestApp() {
   // Auth-protected route
   app.use('/protected/*', authMiddleware);
   app.get('/protected/whoami', c => {
+    downstreamExecutions += 1;
     return c.json({ userId: c.get('userId'), authToken: c.get('authToken') });
   });
 
@@ -62,6 +67,8 @@ describe('authMiddleware', () => {
   let app: ReturnType<typeof createTestApp>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    downstreamExecutions = 0;
     app = createTestApp();
   });
 
@@ -131,6 +138,98 @@ describe('authMiddleware', () => {
     expect(body.userId).toBe('user_cookie');
   });
 
+  it.each([
+    { tokenPepper: 'absent', storedPepper: null, expectedStatus: 200 },
+    { tokenPepper: null, storedPepper: null, expectedStatus: 200 },
+    { tokenPepper: 'absent', storedPepper: 'rotated_pepper', expectedStatus: 401 },
+    { tokenPepper: null, storedPepper: 'rotated_pepper', expectedStatus: 401 },
+  ])(
+    'validates $tokenPepper token pepper against $storedPepper stored pepper',
+    async ({ tokenPepper, storedPepper, expectedStatus }) => {
+      const token = await signToken({
+        kiloUserId: 'pepperless_user',
+        ...(tokenPepper === null ? { apiTokenPepper: null } : {}),
+        version: KILO_TOKEN_VERSION,
+        aud: KILOCLAW_AUDIENCE,
+      });
+      const lookup = vi.mocked(findPepperByUserId);
+      lookup.mockResolvedValueOnce({
+        id: 'pepperless_user',
+        api_token_pepper: storedPepper,
+        blocked_reason: null,
+      });
+
+      const res = await app.request(
+        '/protected/whoami',
+        { headers: { Authorization: `Bearer ${token}` } },
+        ENV_WITH_HYPERDRIVE
+      );
+
+      expect(res.status).toBe(expectedStatus);
+      expect(lookup).toHaveBeenCalledOnce();
+      if (storedPepper === null) {
+        expect(await jsonBody(res)).toEqual({ userId: 'pepperless_user', authToken: token });
+      } else {
+        expect(await jsonBody(res)).toEqual({ error: 'Token revoked' });
+      }
+    }
+  );
+
+  it('authenticates correct-audience Bearer and cookie tokens', async () => {
+    for (const headers of [
+      { Authorization: 'Bearer TOKEN' },
+      { Cookie: `${KILOCLAW_AUTH_COOKIE}=TOKEN` },
+    ]) {
+      const token = await signToken({
+        kiloUserId: 'user_123',
+        apiTokenPepper: pepperFor('user_123'),
+        version: KILO_TOKEN_VERSION,
+        aud: KILOCLAW_AUDIENCE,
+      });
+      const resolvedHeaders = Object.fromEntries(
+        Object.entries(headers).map(([name, value]) => [name, value.replace('TOKEN', token)])
+      );
+
+      const res = await app.request(
+        '/protected/whoami',
+        { headers: resolvedHeaders },
+        ENV_WITH_HYPERDRIVE
+      );
+      expect(res.status).toBe(200);
+      expect(await jsonBody(res)).toEqual({ userId: 'user_123', authToken: token });
+    }
+  });
+
+  it('rejects wrong-audience Bearer and cookie tokens before database lookup', async () => {
+    const lookup = vi.mocked(findPepperByUserId);
+    const workerDb = vi.mocked(getWorkerDb);
+    for (const headers of [
+      { Authorization: 'Bearer TOKEN' },
+      { Cookie: `${KILOCLAW_AUTH_COOKIE}=TOKEN` },
+    ]) {
+      const token = await signToken({
+        kiloUserId: 'user_123',
+        apiTokenPepper: pepperFor('user_123'),
+        version: KILO_TOKEN_VERSION,
+        aud: 'another-resource',
+      });
+      const resolvedHeaders = Object.fromEntries(
+        Object.entries(headers).map(([name, value]) => [name, value.replace('TOKEN', token)])
+      );
+      lookup.mockClear();
+
+      const res = await app.request(
+        '/protected/whoami',
+        { headers: resolvedHeaders },
+        ENV_WITH_HYPERDRIVE
+      );
+      expect(res.status).toBe(401);
+      expect(lookup).not.toHaveBeenCalled();
+      expect(workerDb).not.toHaveBeenCalled();
+      expect(downstreamExecutions).toBe(0);
+    }
+  });
+
   it('prefers Bearer header over cookie', async () => {
     const bearerToken = await signToken({
       kiloUserId: 'user_bearer',
@@ -156,6 +255,53 @@ describe('authMiddleware', () => {
     expect(res.status).toBe(200);
     const body = await jsonBody(res);
     expect(body.userId).toBe('user_bearer');
+  });
+
+  it('does not fall back to a valid cookie when the Bearer token has the wrong audience', async () => {
+    const bearerToken = await signToken({
+      kiloUserId: 'user_bearer',
+      apiTokenPepper: pepperFor('user_bearer'),
+      version: KILO_TOKEN_VERSION,
+      aud: 'another-resource',
+    });
+    const cookieToken = await signToken({
+      kiloUserId: 'user_cookie',
+      apiTokenPepper: pepperFor('user_cookie'),
+      version: KILO_TOKEN_VERSION,
+      aud: KILOCLAW_AUDIENCE,
+    });
+
+    const res = await app.request(
+      '/protected/whoami',
+      {
+        headers: {
+          Authorization: `Bearer ${bearerToken}`,
+          Cookie: `${KILOCLAW_AUTH_COOKIE}=${cookieToken}`,
+        },
+      },
+      ENV_WITH_HYPERDRIVE
+    );
+    expect(res.status).toBe(401);
+    expect(vi.mocked(findPepperByUserId)).not.toHaveBeenCalled();
+    expect(vi.mocked(getWorkerDb)).not.toHaveBeenCalled();
+    expect(downstreamExecutions).toBe(0);
+  });
+
+  it('rejects a correct-audience token with a stale pepper', async () => {
+    const token = await signToken({
+      kiloUserId: 'user_123',
+      apiTokenPepper: 'stale_pepper',
+      version: KILO_TOKEN_VERSION,
+      aud: KILOCLAW_AUDIENCE,
+    });
+
+    const res = await app.request(
+      '/protected/whoami',
+      { headers: { Authorization: `Bearer ${token}` } },
+      ENV_WITH_HYPERDRIVE
+    );
+    expect(res.status).toBe(401);
+    expect((await jsonBody(res)).error).toContain('revoked');
   });
 
   it('rejects when pepper does not match', async () => {
@@ -226,6 +372,8 @@ describe('blocked users', () => {
   let app: ReturnType<typeof createTestApp>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    downstreamExecutions = 0;
     app = createTestApp();
   });
 
@@ -234,6 +382,7 @@ describe('blocked users', () => {
       kiloUserId: 'blocked_user',
       apiTokenPepper: pepperFor('blocked_user'),
       version: KILO_TOKEN_VERSION,
+      aud: KILOCLAW_AUDIENCE,
     });
 
     const res = await app.request(
@@ -249,6 +398,8 @@ describe('C15 deviceSessionId compatibility', () => {
   let app: ReturnType<typeof createTestApp>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    downstreamExecutions = 0;
     app = createTestApp();
   });
 
@@ -276,6 +427,8 @@ describe('internalApiMiddleware', () => {
   let app: ReturnType<typeof createTestApp>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    downstreamExecutions = 0;
     app = createTestApp();
   });
 

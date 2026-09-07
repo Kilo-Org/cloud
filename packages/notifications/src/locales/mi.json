@@ -7,7 +7,8 @@
       "instanceLifecycle": "He whakahoutanga tā tō wae",
       "scheduledAction": "He whakahoutanga tā tētahi mahi kua whakaritea",
       "lowBalance": "Me aro ki tō toenga",
-      "securityFinding": "Me aro ki tētahi kitenga haumaru"
+      "securityFinding": "Me aro ki tētahi kitenga haumaru",
+      "activeAgentsGlanceable": "He whakahoutanga tā ngā māngai hohe"
     }
   },
   "cloudAgentSession": {

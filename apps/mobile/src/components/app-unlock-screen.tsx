@@ -1,8 +1,10 @@
-import { type ReactElement } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
+import { type ComponentProps, type ReactElement } from 'react';
+import { Platform, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { type EdgeInsets, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CenteredState } from '@/components/centered-state';
+import { NativeStateSurface, StateSurface } from '@/components/centered-state-surface';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -27,10 +29,9 @@ function unlockFeedbackKey(outcome: UnlockOutcome) {
 
 /** One owner announces shared outcomes, including setting failures behind a locked scene. */
 export function AppUnlockAnnouncements() {
-  const { status, outcome } = useAppUnlock();
+  const { outcome } = useAppUnlock();
   const { t } = useTranslation();
-  const key =
-    status === 'preference-error' ? 'common.somethingWentWrong' : unlockFeedbackKey(outcome);
+  const key = unlockFeedbackKey(outcome);
   useStatusAnnouncement(key === null ? null : t(key));
   return null;
 }
@@ -65,15 +66,8 @@ export function AppUnlockFeedback({ outcome }: Readonly<{ outcome: UnlockOutcome
   return feedback;
 }
 
-function contentPadding({ top, bottom, left, right }: EdgeInsets) {
-  return {
-    flexGrow: 1,
-    justifyContent: 'center' as const,
-    paddingTop: top + 24,
-    paddingBottom: bottom + 24,
-    paddingLeft: left + 24,
-    paddingRight: right + 24,
-  };
+function contentPadding({ left, right }: EdgeInsets) {
+  return { paddingLeft: left + 24, paddingRight: right + 24 };
 }
 
 function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
@@ -95,16 +89,13 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
         {children}
       </View>
       {hidden ? (
-        <View className="absolute inset-0 bg-background" accessibilityViewIsModal>
-          <ScrollView className="flex-1" contentContainerStyle={contentPadding(insets)}>
-            <View className="w-full gap-8">
+        <StateSurface className="absolute inset-0 bg-background" accessibilityViewIsModal>
+          <CenteredState>
+            <View className="w-full gap-8" style={contentPadding(insets)}>
               <View className="gap-3">
                 <Text accessibilityRole="header" className="text-center text-xl font-semibold">
                   {t('preferences.biometricUnlock')}
                 </Text>
-                <UnlockStatusText
-                  message={status === 'preference-error' ? t('common.somethingWentWrong') : null}
-                />
                 <AppUnlockFeedback outcome={outcome} />
               </View>
               {status === 'preference-loading' ? (
@@ -122,8 +113,8 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
                 </Button>
               )}
             </View>
-          </ScrollView>
-        </View>
+          </CenteredState>
+        </StateSurface>
       ) : null}
     </>
   );
@@ -132,6 +123,11 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
 /** Presentation only: one provider owns authentication across every native Stack scene. */
 export function appUnlockScreenLayout({
   children,
-}: Readonly<{ children: ReactElement }>): ReactElement {
-  return <AppUnlockScene>{children}</AppUnlockScene>;
+  ...props
+}: ComponentProps<typeof NativeStateSurface>): ReactElement {
+  return (
+    <NativeStateSurface {...props}>
+      <AppUnlockScene>{children}</AppUnlockScene>
+    </NativeStateSurface>
+  );
 }

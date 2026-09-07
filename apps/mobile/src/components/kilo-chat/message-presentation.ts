@@ -13,6 +13,8 @@ import { ulid } from 'ulid';
 
 import { i18n } from '@/i18n';
 
+import { htmlSanitizesToEmpty } from '../agents/markdown-html-sanitization';
+
 type SendMessageVariables = CreateMessageRequest & { clientId: string };
 export type ReplyPreviewSource = Message | ReplyToMessageSnapshot;
 export type MessageAuthorMember = ConversationDetailResponse['members'][number];
@@ -65,7 +67,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
     return i18n.t('chat.messageBubble.deleted');
   }
   if ('previewText' in replyToMessage) {
-    return replyToMessage.previewText ?? i18n.t('chat.messageBubble.message');
+    return replyToMessage.previewText ?? i18n.t('common.message');
   }
   const text = contentBlocksToText(replyToMessage.content).trim();
   if (text) {
@@ -73,7 +75,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
   }
   const labels = contentBlocksAttachmentPreviewLabels(replyToMessage.content);
   if (labels.length === 0) {
-    return i18n.t('chat.messageBubble.message');
+    return i18n.t('common.message');
   }
   return labels
     .map(label => {
@@ -83,7 +85,7 @@ export function getReplyPreviewText(replyToMessage: ReplyPreviewSource): string 
       if (label.kind === 'image') {
         return i18n.t('chat.messageBubble.image');
       }
-      return i18n.t('chat.messageBubble.attachment');
+      return i18n.t('chat.attachment.defaultName');
     })
     .join(', ');
 }
@@ -94,6 +96,36 @@ export function getDeliveryFailureLabel(message: Message): string | null {
 
 export function isMessageTextSelectionEnabled(): boolean {
   return false;
+}
+
+/**
+ * Whether a text block renders any ink. The HTML renderer strips blocked tags
+ * entirely, so a message that is only blocked tags must not reserve a bubble.
+ */
+export function textBlockHasVisibleContent(text: string): boolean {
+  return text.trim() !== '' && !htmlSanitizesToEmpty(text);
+}
+
+/**
+ * Whether the bubble wrapper has anything visible to wrap. Mirrors the agent
+ * transcript gate (`messageRendersContent`): a message whose text sanitizes to
+ * empty renders no bubble at all instead of a tiny empty one.
+ */
+export function messageRendersBubble(
+  message: Message,
+  options: { hasReplyPreview: boolean }
+): boolean {
+  if (message.deleted) {
+    // The bubble renders the "deleted" label instead of the content.
+    return true;
+  }
+  if (options.hasReplyPreview || message.deliveryFailed) {
+    // The reply preview and the delivery-failure footer live inside the bubble.
+    return true;
+  }
+  return message.content.some(block =>
+    block.type === 'text' ? textBlockHasVisibleContent(block.text) : true
+  );
 }
 
 export function canShowReactionPills(message: Message): boolean {
@@ -137,7 +169,7 @@ export function resolveMessageAuthorLabel({
 }): string {
   const member = members.find(candidate => candidate.id === senderId);
   if (senderId.startsWith('bot:')) {
-    return firstDisplayValue([botName, member?.displayName]) ?? i18n.t('kiloclaw.title');
+    return firstDisplayValue([botName, member?.displayName]) ?? i18n.t('common.kiloclaw');
   }
   return firstDisplayValue([member?.displayName]) ?? senderId;
 }

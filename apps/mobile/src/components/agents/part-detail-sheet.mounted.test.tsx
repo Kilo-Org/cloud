@@ -1,6 +1,11 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/test/render-with-providers.tsx) */
 /* eslint-disable max-lines -- cohesive mounted suite: mono-control presence and streaming auto-follow share one sheet harness */
-import { type Part, type ReasoningPart, type ToolPart } from '@kilocode/cloud-agent-sdk';
+import {
+  type Part,
+  type ReasoningPart,
+  type StoredMessage,
+  type ToolPart,
+} from '@kilocode/cloud-agent-sdk';
 import { createElement, type ReactElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { describe, expect, it, type Mock, vi } from 'vitest';
@@ -9,6 +14,8 @@ import { describe, expect, it, type Mock, vi } from 'vitest';
 // while the sheet module loads, so its binding must already be initialized.
 import { MonoScrollBlock } from './mono-scroll-block';
 import { PartDetailSheet } from './part-detail-sheet';
+import { PartDetailSheetHost } from './part-detail-sheet-host';
+import { useOpenPartDetail } from './open-part-detail-context';
 
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
@@ -24,6 +31,9 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
+vi.mock('./tool-card-image-cache', () => ({ useToolCardImageUri: () => undefined }));
 vi.mock('@/components/sheet-header', () => ({
   SheetHeader: 'SheetHeader',
 }));
@@ -310,6 +320,59 @@ function contentSizeChange(scrollView: TestRenderer.ReactTestInstance, height: n
 }
 
 describe('PartDetailSheet mounted', () => {
+  it('centers state-only tool details independently in main and subagent hosts', () => {
+    const openers = new Map<string, ReturnType<typeof useOpenPartDetail>>();
+    function CaptureOpener({ name }: { name: string }) {
+      openers.set(name, useOpenPartDetail());
+      return null;
+    }
+    const messages: StoredMessage[] = [
+      {
+        info: {
+          id: 'm1',
+          sessionID: 's1',
+          role: 'user',
+          time: { created: 1 },
+          agent: 'test',
+          model: { providerID: 'kilo', modelID: 'test' },
+        },
+        parts: [{ ...makeGenericPart('write-1', {}, 'error'), tool: 'write' }],
+      },
+    ];
+    const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
+    act(() => {
+      holder.renderer = TestRenderer.create(
+        <PartDetailSheetHost messages={messages}>
+          <CaptureOpener name="main" />
+          <PartDetailSheetHost messages={messages}>
+            <CaptureOpener name="subagent" />
+          </PartDetailSheetHost>
+        </PartDetailSheetHost>
+      );
+    });
+    const renderer = holder.renderer;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    act(() => {
+      openers.get('main')?.('write-1');
+    });
+    expect(findByType(renderer.root, 'Modal').filter(node => propOf(node, 'visible'))).toHaveLength(
+      1
+    );
+    act(() => {
+      openers.get('subagent')?.('write-1');
+    });
+    expect(findByType(renderer.root, 'Modal').filter(node => propOf(node, 'visible'))).toHaveLength(
+      2
+    );
+    expect(findByType(renderer.root, 'CenteredState')).toHaveLength(2);
+    expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
   it('defaults to wrap: Wrap radio selected, block renders no inner scroller', async () => {
     const renderer = await mountSheet(makeBashPart('bash-1', 'echo hi'));
 

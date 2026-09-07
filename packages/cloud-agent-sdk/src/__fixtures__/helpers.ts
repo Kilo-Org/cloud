@@ -1,6 +1,6 @@
 import type { CloudAgentEvent } from '../event-types';
 
-function createEventHelpers() {
+function createEventHelpers(defaultSessionId = 'ses-1') {
   let eventCounter = 0;
 
   function resetCounter() {
@@ -10,7 +10,7 @@ function createEventHelpers() {
   function createEvent(
     streamEventType: string,
     data: unknown,
-    sessionId = 'ses-1'
+    sessionId = defaultSessionId
   ): CloudAgentEvent {
     return {
       eventId: ++eventCounter,
@@ -22,7 +22,11 @@ function createEventHelpers() {
     };
   }
 
-  function kilocode(type: string, properties: unknown, sessionId = 'ses-1'): CloudAgentEvent {
+  function kilocode(
+    type: string,
+    properties: unknown,
+    sessionId = defaultSessionId
+  ): CloudAgentEvent {
     return createEvent('kilocode', { type, properties }, sessionId);
   }
 

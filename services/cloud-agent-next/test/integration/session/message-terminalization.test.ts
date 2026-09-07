@@ -7,7 +7,7 @@
  */
 
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
@@ -103,6 +103,40 @@ async function seedAssistantMessageWithParent(
   }
 }
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('message terminalization and stream events', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
@@ -122,9 +156,7 @@ describe('message terminalization and stream events', () => {
       const sessionId = `agent_cancel_report_${failFirstReport}`;
       const messageId = 'msg_018f1e2d3c4bCancelReportAB';
       const acceptedMessageId = 'msg_018f1e2d3c4bCancelActiveAB';
-      const stub = env.CLOUD_AGENT_SESSION.get(
-        env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-      );
+      const stub = sessionStub(userId, sessionId);
       const reports: CloudAgentQueueReport[] = [];
       const callbackQueue = createCapturedQueue();
       const broadcastTypes: string[] = [];
@@ -242,9 +274,7 @@ describe('message terminalization and stream events', () => {
   it('alarm repairs terminal effects without duplicating a durable terminal event', async () => {
     const userId = 'user_term_repair_alarm';
     const sessionId = 'agent_term_repair_alarm';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const queue = createCapturedQueue();
 
     const result = await runInDurableObject(stub, async (instance, state) => {
@@ -294,9 +324,7 @@ describe('message terminalization and stream events', () => {
   it('does not emit session lifecycle reports for readiness or deletion', async () => {
     const userId = 'user_runtime_reports';
     const sessionId = 'agent_runtime_reports';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const reports: CloudAgentQueueReport[] = [];
 
     await runInDurableObject(stub, async instance => {
@@ -320,9 +348,7 @@ describe('message terminalization and stream events', () => {
   it('terminal ingest reconstructs acceptance before the runtime acceptance hook persists', async () => {
     const userId = 'user_term_before_accept';
     const sessionId = 'agent_term_before_accept';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const reports: CloudAgentQueueReport[] = [];
     const result = await runInDurableObject(stub, async (instance, state) => {
@@ -385,9 +411,7 @@ describe('message terminalization and stream events', () => {
   it('reports a safe insufficient-credit diagnostic for a wrapper failure after activity', async () => {
     const userId = 'user_term_credit_report';
     const sessionId = 'agent_term_credit_report';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const reports: CloudAgentQueueReport[] = [];
 
     const message = await runInDurableObject(stub, async instance => {
@@ -451,9 +475,7 @@ describe('message terminalization and stream events', () => {
   it('ignores terminal acceptance reconstruction for a non-current wrapper run', async () => {
     const userId = 'user_term_stale_accept';
     const sessionId = 'agent_term_stale_accept';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -481,9 +503,7 @@ describe('message terminalization and stream events', () => {
   it('alarm preserves a near-term sent-effect repair deadline after accepted pending residue fails', async () => {
     const userId = 'user_term_sent_alarm';
     const sessionId = 'agent_term_sent_alarm';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -526,9 +546,7 @@ describe('message terminalization and stream events', () => {
   it('alarm preserves a near-term terminal-effect repair deadline after terminal insertion fails', async () => {
     const userId = 'user_term_event_alarm';
     const sessionId = 'agent_term_event_alarm';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerReadySession(instance, {
@@ -566,9 +584,7 @@ describe('message terminalization and stream events', () => {
   it('alarm preserves a near-term callback retry deadline after callback progression fails', async () => {
     const userId = 'user_term_callback_alarm';
     const sessionId = 'agent_term_callback_alarm';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       (
@@ -619,8 +635,7 @@ describe('message terminalization and stream events', () => {
   it('terminalization by messageId emits exactly one cloud.message.completed event', async () => {
     const userId = 'user_term_complete';
     const sessionId = 'agent_term_complete';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -674,8 +689,7 @@ describe('message terminalization and stream events', () => {
   it('terminalization by messageId emits exactly one cloud.message.failed event', async () => {
     const userId = 'user_term_failed';
     const sessionId = 'agent_term_failed';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -734,8 +748,7 @@ describe('message terminalization and stream events', () => {
   it('duplicate terminalization does not emit duplicate stream events', async () => {
     const userId = 'user_term_dup';
     const sessionId = 'agent_term_dup';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -792,8 +805,7 @@ describe('message terminalization and stream events', () => {
   it('duplicate terminalization does not enqueue duplicate callbacks', async () => {
     const userId = 'user_term_dup_cb';
     const sessionId = 'agent_term_dup_cb';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 
@@ -855,8 +867,7 @@ describe('message terminalization and stream events', () => {
   it('wrapper complete gate results wait past idle callback finalization and reach the callback job', async () => {
     const userId = 'user_term_gate_callback';
     const sessionId = 'agent_term_gate_callback';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
     const reports: CloudAgentQueueReport[] = [];
@@ -943,8 +954,7 @@ describe('message terminalization and stream events', () => {
   it('terminalization emits cloud.message.interrupted for interrupted kind', async () => {
     const userId = 'user_term_int';
     const sessionId = 'agent_term_int';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerReadySession(instance, {
@@ -1002,8 +1012,7 @@ describe('message terminalization and stream events', () => {
   it('completed callback resolves assistant text by matching parentID, not latest assistant', async () => {
     const userId = 'user_term_corr';
     const sessionId = 'agent_term_corr';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 
@@ -1078,8 +1087,7 @@ describe('message terminalization and stream events', () => {
   it('completed callback omits assistant text when no matching parentID reply exists', async () => {
     const userId = 'user_term_missing';
     const sessionId = 'agent_term_missing';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 

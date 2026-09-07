@@ -3,6 +3,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { createRequire } from 'node:module';
 import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
+import type { ChatHeader } from './ChatHeader';
+import type { WorktreeChangesDrawer } from './WorktreeChanges';
 import type { StoredSession } from './types';
 import {
   CHAT_TAB_ID,
@@ -12,6 +14,7 @@ import {
   getWorkspaceTabScope,
   resetWorkspaceTabs,
   selectWorkspaceTab,
+  terminalIdFromTabId,
   terminalTabId,
 } from './terminal-tabs';
 
@@ -121,7 +124,28 @@ jest.mock('./older-messages-scroll', () => ({
   shouldAnnounceOlderMessagesArrival: () => false,
 }));
 jest.mock('./MobileSidebarToggle', () => ({ MobileSidebarToggle: () => null }));
-jest.mock('./ChatHeader', () => ({ ChatHeader: () => null }));
+jest.mock('./ChatHeader', () => ({
+  ChatHeader: ({ onToggleChanges, changesOpen }: ComponentProps<typeof ChatHeader>) =>
+    onToggleChanges
+      ? createElement('button', {
+          'data-changes-trigger': true,
+          'aria-expanded': changesOpen,
+          onClick: onToggleChanges,
+        })
+      : null,
+}));
+jest.mock('./WorktreeChanges', () => ({
+  WorktreeChangesDrawer: ({
+    cloudAgentSessionId,
+    organizationId,
+    open,
+  }: ComponentProps<typeof WorktreeChangesDrawer>) =>
+    createElement('aside', {
+      'data-changes-owner': cloudAgentSessionId,
+      'data-changes-organization': organizationId ?? 'personal',
+      hidden: !open,
+    }),
+}));
 jest.mock('./ChatInput', () => ({ ChatInput: () => null }));
 jest.mock('./OlderMessagesHeader', () => ({ OlderMessagesHeader: () => null }));
 jest.mock('./MessageBubble', () => ({ MessageBubble: () => null }));
@@ -195,10 +219,17 @@ describe('cloud agent workspace terminal tabs', () => {
     });
   });
 
+  it('distinguishes chat from terminal IDs', () => {
+    expect(terminalIdFromTabId(CHAT_TAB_ID)).toBeNull();
+    expect(terminalIdFromTabId(terminalTabId('tab-a'))).toBe('tab-a');
+  });
+
   it('selects chat and existing terminal tabs only', () => {
     const state = addTerminalTab(createWorkspaceTabsState(), 'tab-a', 'cloud-agent-session-a');
 
     expect(selectWorkspaceTab(state, CHAT_TAB_ID).activeTabId).toBe(CHAT_TAB_ID);
+    expect(selectWorkspaceTab(state, 'changes')).toBe(state);
+    expect(selectWorkspaceTab(state, 'unknown')).toBe(state);
     expect(selectWorkspaceTab(state, terminalTabId('tab-a')).activeTabId).toBe(
       terminalTabId('tab-a')
     );
@@ -334,6 +365,15 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     return terminal;
   }
 
+  function openChanges() {
+    const trigger = dom.container.querySelector<HTMLButtonElement>('[data-changes-trigger]');
+    if (!trigger) throw new Error('Missing changes trigger');
+    act(() => trigger.click());
+    const drawer = dom.container.querySelector<HTMLElement>('[data-changes-owner]');
+    expect(drawer?.hidden).toBe(false);
+    return drawer;
+  }
+
   function resolveSession(worktreeId: string | null) {
     mockWorktreeId = worktreeId;
     mockAtomValues.fetchedSessionData = {
@@ -382,6 +422,66 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
     expect(mockTabs.terminals[0]?.cloudAgentSessionId).toBe('workspace_recent');
     expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('scopes changes to each sibling control session without replacing its worktree terminal', () => {
+    render();
+    const terminal = openTerminal();
+    const activeTabId = mockTabs.activeTabId;
+    const changes = openChanges();
+    expect(changes?.getAttribute('data-changes-owner')).toBe('workspace_recent');
+    expect(mockTabs.activeTabId).toBe(activeTabId);
+
+    mockSessionId = 'ses_historical';
+    render();
+    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
+    expect(dom.container.querySelector('[data-changes-trigger]')).toBeNull();
+
+    resolveSession('worktree_shared');
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    const siblingChanges = openChanges();
+    expect(siblingChanges?.getAttribute('data-changes-owner')).toBe('workspace_ses_historical');
+    expect(siblingChanges).not.toBe(changes);
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+  });
+
+  it('clears changes when the last chat closes before its session atoms are cleared', () => {
+    render();
+    const terminal = openTerminal();
+    openChanges();
+
+    mockSessionId = null;
+    render();
+    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
+    expect(dom.container.querySelector('[data-changes-trigger]')).toBeNull();
+    expect(dom.container.querySelector('[data-pty-owner]')).toBe(terminal);
+    expect(mockClosedPtys).toEqual([]);
+
+    mockSessionId = 'ses_recent';
+    render();
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+  });
+
+  it('keeps changes hidden across organization navigation until matching session data resolves', () => {
+    render();
+    const personalChanges = openChanges();
+    expect(personalChanges?.getAttribute('data-changes-organization')).toBe('personal');
+
+    render({ organizationId: 'organization-a' });
+    expect(dom.container.querySelector('[data-changes-owner]')).toBeNull();
+    expect(dom.container.querySelector('[data-changes-trigger]')).toBeNull();
+
+    mockAtomValues.fetchedSessionData = {
+      kiloSessionId: mockSessionId,
+      organizationId: 'organization-a',
+      worktreeId: mockWorktreeId,
+    };
+    render({ organizationId: 'organization-a' });
+    expect(dom.container.querySelector<HTMLElement>('[data-changes-owner]')?.hidden).toBe(true);
+    const organizationChanges = openChanges();
+    expect(organizationChanges?.getAttribute('data-changes-organization')).toBe('organization-a');
+    expect(organizationChanges).not.toBe(personalChanges);
   });
 
   it.each(['worktree_other', null])(

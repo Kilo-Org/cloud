@@ -1,30 +1,30 @@
 import { Hono } from 'hono';
+import { trpcServer } from '@hono/trpc-server';
+import { TRPCError } from '@trpc/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HonoContext } from '../hono-context.js';
 import type { Env } from '../types.js';
+import type * as BalanceValidationModule from '../balance-validation.js';
+import type * as LoggerModule from '../logger.js';
 
 const { requireCurrentSessionAccessMock } = vi.hoisted(() => ({
   requireCurrentSessionAccessMock: vi.fn(),
 }));
 
-vi.mock('../balance-validation.js', () => ({
-  BALANCE_REQUIRED_MUTATIONS: new Set([
-    'initiateFromKilocodeSessionV2',
-    'sendMessageV2',
-    'start',
-    'send',
-  ]),
-  extractProcedureName: (pathname: string) => {
-    const match = pathname.match(/^\/trpc\/([^?/]+)/);
-    return match ? match[1] : null;
-  },
+vi.mock('../balance-validation.js', async importOriginal => ({
+  ...(await importOriginal<typeof BalanceValidationModule>()),
   fetchOrgIdForSession: vi.fn(),
   validateBalanceOnly: vi.fn(),
 }));
 
-vi.mock('../logger.js', () => ({
+vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
+
+vi.mock('../logger.js', async importOriginal => ({
+  ...(await importOriginal<typeof LoggerModule>()),
   logger: {
     withFields: () => ({ info: vi.fn(), warn: vi.fn() }),
+    warn: vi.fn(),
+    error: vi.fn(),
   },
 }));
 
@@ -35,6 +35,9 @@ vi.mock('../session-access.js', () => ({
 
 const { balanceMiddleware } = await import('./balance.js');
 const { fetchOrgIdForSession, validateBalanceOnly } = await import('../balance-validation.js');
+const { createSessionManagementHandlers } =
+  await import('../router/handlers/session-management.js');
+const { router } = await import('../router/auth.js');
 
 describe('balanceMiddleware', () => {
   const env = {} as Env;
@@ -72,6 +75,98 @@ describe('balanceMiddleware', () => {
       env
     );
   }
+
+  it('serves the real passive status query without credits or a balance bypass', async () => {
+    vi.mocked(validateBalanceOnly).mockResolvedValue({
+      success: false,
+      status: 402,
+      message: 'Insufficient credits',
+    });
+    const snapshot = {
+      status: 'sleeping',
+      provider: 'Cloudflare',
+      observedAt: Date.now(),
+      detailCode: 'sandbox_stopped',
+      inactivityTimeoutMs: 300_000,
+      estimatedSleepAt: null,
+    };
+    const getSandboxStatus = vi.fn().mockResolvedValue(snapshot);
+    const legacyLookup = vi.fn();
+    const sandboxLookup = vi.fn(() => ({ getSandboxStatus }));
+    const statusEnv = {
+      SANDBOX_SESSION: { idFromName: (name: string) => name, get: sandboxLookup },
+      CLOUD_AGENT_SESSION: { idFromName: legacyLookup, get: legacyLookup },
+    } as unknown as Env;
+    const app = new Hono<HonoContext>();
+    app.use('/trpc/*', async (c, next) => {
+      c.set('userId', 'user-123');
+      c.set('authToken', 'token-123');
+      await next();
+    });
+    app.use('/trpc/*', balanceMiddleware);
+    app.use(
+      '/trpc/*',
+      trpcServer({
+        router: router({ getSandboxStatus: createSessionManagementHandlers().getSandboxStatus }),
+        createContext: (_opts, c) => ({
+          env: c.env,
+          userId: c.get('userId'),
+          authToken: c.get('authToken'),
+          request: c.req.raw,
+        }),
+      })
+    );
+    const input = encodeURIComponent(
+      JSON.stringify({
+        cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+      })
+    );
+    const request = () => new Request(`https://worker.test/trpc/getSandboxStatus?input=${input}`);
+    const response = await app.fetch(request(), statusEnv);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ result: { data: snapshot } });
+    expect(getSandboxStatus).toHaveBeenCalledTimes(1);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+    expect(legacyLookup).not.toHaveBeenCalled();
+
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+    );
+    const denied = await app.fetch(request(), statusEnv);
+    expect(denied.status).toBe(403);
+    expect(getSandboxStatus).toHaveBeenCalledTimes(1);
+    expect(sandboxLookup).toHaveBeenCalledTimes(1);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+  });
+
+  it.each(['start', 'send', 'sendMessageV2', 'initiateFromKilocodeSessionV2'])(
+    'still rejects paid %s execution without credits',
+    async procedure => {
+      vi.mocked(validateBalanceOnly).mockResolvedValue({
+        success: false,
+        status: 402,
+        message: 'Insufficient credits',
+      });
+      const response = await postTrpc(procedure, {
+        cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+      });
+      expect(response.status).toBe(402);
+      if (procedure !== 'start') expect(requireCurrentSessionAccessMock).toHaveBeenCalledTimes(1);
+      expect(validateBalanceOnly).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('still checks execution ownership before the paid send balance', async () => {
+    requireCurrentSessionAccessMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+    );
+    const response = await postTrpc('send', {
+      cloudAgentSessionId: 'workspace_12345678-1234-4234-9234-123456789abc',
+    });
+    expect(response.status).toBe(403);
+    expect(validateBalanceOnly).not.toHaveBeenCalled();
+  });
 
   it('returns non-retryable clientError for insufficient credits', async () => {
     vi.mocked(validateBalanceOnly).mockResolvedValue({

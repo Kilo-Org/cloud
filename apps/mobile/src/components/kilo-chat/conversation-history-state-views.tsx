@@ -42,7 +42,6 @@ export function ConversationHistoryErrorView({
       <ConversationHeader title={title} subtitle={subtitle} />
       <AppAwareKeyboardPaddingView className="flex-1">
         <QueryError
-          className="flex-1"
           message={message ?? t('chat.conversation.couldNotLoadHistory')}
           onRetry={onRetry}
         />

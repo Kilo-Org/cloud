@@ -48,6 +48,7 @@ const flatListMock = vi.hoisted(
       return createElement('FlatList', null, ListHeaderComponent, ...rows, empty);
     }
 );
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   FlatList: flatListMock,
@@ -84,7 +85,11 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
   };
 });
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
+vi.mock('@/components/picker-sheet', () => ({
+  PickerSheet: (props: { headerContent?: ReactNode; children?: ReactNode }) =>
+    createElement('PickerSheet', props, props.headerContent, props.children),
+}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/icons', () => ({ SearchX: 'SearchX' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -213,11 +218,13 @@ describe('LanguagePickerSheet apply', () => {
     const emptyState = findByType(renderer.root, 'EmptyState')[0];
     expect(emptyState?.props).toMatchObject({
       icon: 'SearchX',
-      placement: 'top',
       title: 'No languages match',
       description: 'Try a different search term.',
     });
     expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
+    expect(emptyState?.props.placement).toBeUndefined();
 
     act(() => {
       (input.props.onChangeText as (value: string) => void)('');

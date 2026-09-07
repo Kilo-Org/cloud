@@ -7,7 +7,8 @@
       "instanceLifecycle": "I-instance yakho inokubuyekezwa",
       "scheduledAction": "Isenzo esihleliwe sinokubuyekezwa",
       "lowBalance": "Ibhalansi yakho idinga ukunakwa",
-      "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa"
+      "securityFinding": "Okutholakele kokuphepha kudinga ukunakwa",
+      "activeAgentsGlanceable": "Ama-agent asebenzayo anokubuyekezwa"
     }
   },
   "cloudAgentSession": {

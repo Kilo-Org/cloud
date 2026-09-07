@@ -120,8 +120,12 @@ import {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  EnkryptBenchmarkSchema,
 } from './schema-types';
 import type {
+  EnkryptFailureCategory,
+  EnkryptSyncCounts,
+  EnkryptVerifications,
   UserDeletionTaskProgress,
   UserDeletionManualEvidence,
   UserDeletionAuditDetails,
@@ -136,6 +140,7 @@ import type {
   KiloClawScheduledActionNotificationKind,
   CustomLlmMetadata,
   CustomLlmApiConfig,
+  DirectByokModel,
 } from './schema-types';
 import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-pricing-catalog';
 import type {
@@ -5075,6 +5080,7 @@ export type WebhookEvent = typeof webhook_events.$inferSelect;
 // Zod schemas for runtime validation of JSONB data
 export const ModelStatsBenchmarksSchema = z
   .object({
+    enkrypt: EnkryptBenchmarkSchema.optional(),
     artificialAnalysis: z
       .object({
         codingIndex: z.number().optional(),
@@ -5216,6 +5222,36 @@ export const modelStats = pgTable(
 
 export type ModelStats = typeof modelStats.$inferSelect;
 export type NewModelStats = typeof modelStats.$inferInsert;
+
+export type EnkryptSyncOutcome = 'running' | 'succeeded' | 'failed';
+
+export const enkrypt_sync_state = pgTable(
+  'enkrypt_sync_state',
+  {
+    job_name: text('job_name').$type<'enkrypt'>().primaryKey(),
+    attempt_id: uuid('attempt_id'),
+    last_attempt_at: timestamp('last_attempt_at', { withTimezone: true, mode: 'string' }),
+    last_completed_at: timestamp('last_completed_at', { withTimezone: true, mode: 'string' }),
+    last_success_at: timestamp('last_success_at', { withTimezone: true, mode: 'string' }),
+    last_outcome: text('last_outcome').$type<EnkryptSyncOutcome>(),
+    last_failure_category: text('last_failure_category').$type<EnkryptFailureCategory>(),
+    last_counts: jsonb('last_counts').$type<EnkryptSyncCounts>(),
+    last_success_counts: jsonb('last_success_counts').$type<EnkryptSyncCounts>(),
+    verified_models: jsonb('verified_models').$type<EnkryptVerifications>().notNull().default({}),
+    baseline_matched_count: integer('baseline_matched_count'),
+  },
+  table => [
+    check('enkrypt_sync_state_singleton', sql`${table.job_name} = 'enkrypt'`),
+    check(
+      'enkrypt_sync_state_outcome',
+      sql`${table.last_outcome} IN ('running', 'succeeded', 'failed')`
+    ),
+    check('enkrypt_sync_state_baseline', sql`${table.baseline_matched_count} >= 0`),
+  ]
+);
+
+export type EnkryptSyncState = typeof enkrypt_sync_state.$inferSelect;
+export type NewEnkryptSyncState = typeof enkrypt_sync_state.$inferInsert;
 
 export const model_eval_ingestions = pgTable(
   'model_eval_ingestions',
@@ -5396,6 +5432,12 @@ export const modelsByProvider = pgTable('models_by_provider', {
   data: jsonb('data').$type<NormalizedOpenRouterResponse>().notNull(),
   openrouter: jsonb('openrouter').$type<Record<string, StoredModel>>(),
   vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
+});
+
+export const direct_byok_model_lists = pgTable('direct_byok_model_lists', {
+  provider_id: text().primaryKey(),
+  models: jsonb().$type<DirectByokModel[]>().notNull(),
+  synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
 });
 
 export const cloud_agent_code_reviews = pgTable(
@@ -9457,6 +9499,46 @@ export const user_push_tokens = pgTable(
 
 export type UserPushToken = typeof user_push_tokens.$inferSelect;
 export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
+
+// ─── Activity Tokens (Live Activity / push-to-start / Android ongoing) ──
+//
+// Tokens for the glanceable surfaces (iOS Live Activity + push-to-start,
+// Android ongoing notification). These are NOT Expo push tokens and never
+// share a table with `user_push_tokens`. `organization_id` is null for the
+// personal surface and is a server-only lookup key — it never enters a
+// glanceable payload. Old clients never insert rows; drop this table when
+// every client is past this release and no tokens remain.
+
+export const user_activity_tokens = pgTable(
+  'user_activity_tokens',
+  {
+    id: uuid()
+      .default(sql`gen_random_uuid()`)
+      .primaryKey()
+      .notNull(),
+    user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    token: text().notNull(),
+    kind: text().$type<'ios_push_to_start' | 'ios_activity' | 'android_ongoing'>().notNull(),
+    platform: text().$type<'ios' | 'android'>().notNull(),
+    // Null means the personal surface. Server-only lookup key; never sent in a
+    // glanceable payload.
+    organization_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_user_activity_tokens_token').on(table.token),
+    index('IDX_user_activity_tokens_user_org').on(table.user_id, table.organization_id),
+  ]
+);
+
+export type UserActivityToken = typeof user_activity_tokens.$inferSelect;
+export type NewUserActivityToken = typeof user_activity_tokens.$inferInsert;
 
 // ─── Notification Preferences ─────────────────────────────────────────
 

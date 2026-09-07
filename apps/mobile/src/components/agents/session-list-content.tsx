@@ -1,14 +1,10 @@
 /* eslint-disable max-lines -- Session-list content and its error/empty surfaces are kept together. */
 import { useFocusEffect, useScrollToTop } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Platform,
-  RefreshControl,
-  SectionList,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { Platform, SectionList, useWindowDimensions, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
+import { RefreshProgress } from '@/components/ui/refresh-progress';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,10 +13,13 @@ import { BodyEmpty } from '@/components/agents/session-list-body-empty';
 import { selectSessionListBodyModel } from '@/components/agents/session-list-body-model';
 import { selectSessionListContentSurface } from '@/components/agents/session-list-content-surface';
 import { type SessionSection } from '@/components/agents/session-list-helpers';
+import { SessionListRefreshStatus } from '@/components/agents/session-list-refresh-status';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
 import { StoredSessionRow } from '@/components/agents/session-row';
+import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { QueryError } from '@/components/query-error';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -50,6 +49,13 @@ type AgentSessionListContentProps = {
   onRetry: () => void;
   onEndReached: () => void;
   onSessionPress: (sessionId: string, organizationId?: string | null, title?: string) => void;
+  /**
+   * Count of refreshes the screen settled outside the pull lifecycle (focus
+   * return, app foreground). When it advances, a standing pull failure is
+   * stale — the list was just refreshed — so the gesture failure line retires
+   * while the query error state keeps owning persistent failures.
+   */
+  nonPullRefreshes: number;
   hasActiveQuery: boolean;
   isSearching: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
@@ -71,6 +77,7 @@ export function AgentSessionListContent({
   onRetry,
   onEndReached,
   onSessionPress,
+  nonPullRefreshes,
   hasActiveQuery,
   isSearching,
   searchQuery,
@@ -98,7 +105,29 @@ export function AgentSessionListContent({
   const { bottom } = useSafeAreaInsets();
   const { fontScale } = useWindowDimensions();
   const { deleteSession, renameSession } = useSessionMutations();
-  const [refreshing, setRefreshing] = useState(false);
+  // The stored refetch resolves void: a pull failure surfaces through the
+  // query error state (showInlineError below), so a settlement is always
+  // "accepted" here. Only the feedback budget can fail a history pull.
+  const pull = usePullRefresh(async () => {
+    await refetch();
+    return true;
+  });
+  const { markSettled } = pull;
+  const pullBusy = pull.refreshing || pull.busy;
+  const handleRefresh = () => {
+    pull.startPull();
+  };
+  const handlePullRetry = () => {
+    pull.startRetry();
+  };
+  // The screen refreshes outside the pull lifecycle (focus return, app
+  // foreground). When one settles, a standing pull failure is stale — the
+  // list was just refreshed — so retire the gesture failure line. The
+  // query-driven error (showInlineError below) still owns persistent
+  // failures and auto-clears on recovery, as it did before the pull state.
+  useEffect(() => {
+    markSettled();
+  }, [nonPullRefreshes, markSettled]);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
   // must clear it or the last rows are stuck underneath it. The history list
@@ -132,9 +161,7 @@ export function AgentSessionListContent({
   const clearQueryAction = useMemo(
     () => (
       <Button variant="outline" onPress={onClearQuery}>
-        <Text>
-          {isSearching ? t('agents.search.clearSearch') : t('agents.search.clearFilters')}
-        </Text>
+        <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
       </Button>
     ),
     [isSearching, onClearQuery, t]
@@ -154,16 +181,18 @@ export function AgentSessionListContent({
     }, [])
   );
 
-  const handleRefresh = useCallback(() => {
-    void (async () => {
-      setRefreshing(true);
-      try {
-        await refetch();
-      } finally {
-        setRefreshing(false);
-      }
-    })();
-  }, [refetch]);
+  // Screen-reader status for the in-flight pull on the non-list surfaces:
+  // those already carry their own Retry (QueryError / BodyEmpty), so the pull
+  // only announces Updating here (same contract as the live Agents tab). The
+  // rows surface renders the visible reserved status line instead.
+  const updatingStatus = pullBusy ? (
+    <AccessibleStatus
+      message={t('agents.sessionList.updating')}
+      tone="status"
+      className="absolute size-px overflow-hidden"
+    />
+  ) : null;
+  const refreshControl = <RefreshControl refreshing={pull.refreshing} onRefresh={handleRefresh} />;
 
   const renderItem = useCallback(
     ({ item }: { item: StoredSession }) => (
@@ -206,12 +235,13 @@ export function AgentSessionListContent({
   // Gated on !isLoading so a cold-open load never flashes this surface.
   if (surface.kind === 'full-screen-error') {
     return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1 items-center justify-center"
-        style={tabBarOnlyClearanceStyle}
-      >
-        <QueryError message={t('agents.sessionList.couldNotLoad')} onRetry={onRetry} />
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        {updatingStatus}
+        <QueryError
+          message={t('common.couldNotLoadSessions')}
+          onRetry={onRetry}
+          refreshControl={refreshControl}
+        />
       </Animated.View>
     );
   }
@@ -222,16 +252,14 @@ export function AgentSessionListContent({
   // not flash this while queries run.
   if (surface.kind === 'history-empty') {
     return (
-      <Animated.View
-        entering={FadeIn.duration(200)}
-        className="flex-1"
-        style={tabBarOnlyClearanceStyle}
-      >
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        {updatingStatus}
         <BodyEmpty
           kind="no-past-sessions"
           isSearching={isSearching}
           clearQueryAction={clearQueryAction}
           onRetry={onRetry}
+          refreshControl={refreshControl}
         />
       </Animated.View>
     );
@@ -252,21 +280,31 @@ export function AgentSessionListContent({
       </Animated.View>
     );
   } else if (surface.listEmpty === 'body-empty' && bodyModel.kind !== 'render-list') {
-    emptyComponent = (
-      <BodyEmpty
-        kind={bodyModel.kind}
-        isSearching={isSearching}
-        secondaryAction={
-          bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
-        }
-        clearQueryAction={clearQueryAction}
-        onRetry={onRetry}
-      />
+    return (
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+        {updatingStatus}
+        <BodyEmpty
+          kind={bodyModel.kind}
+          isSearching={isSearching}
+          secondaryAction={
+            bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
+          }
+          clearQueryAction={clearQueryAction}
+          onRetry={onRetry}
+          refreshControl={refreshControl}
+        />
+      </Animated.View>
     );
   }
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="flex-1">
+      <SessionListRefreshStatus
+        busy={pullBusy}
+        failed={pull.failed || bodyModel.showInlineError}
+        onRetry={handlePullRetry}
+        className="mx-[22px]"
+      />
       <SectionList<StoredSession, SessionSection>
         ref={listRef}
         sections={sections}
@@ -274,7 +312,7 @@ export function AgentSessionListContent({
         renderSectionHeader={renderSectionHeader}
         keyExtractor={keyExtractor}
         extraData={attentionFocusRevision}
-        ListHeaderComponent={null}
+        ListHeaderComponent={<RefreshProgress refreshControl={refreshControl} />}
         ListEmptyComponent={emptyComponent}
         ListFooterComponent={
           isFetchingNextPage ? (
@@ -287,7 +325,7 @@ export function AgentSessionListContent({
         keyboardDismissMode="on-drag"
         onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        refreshControl={refreshControl}
         maintainVisibleContentPosition={{
           minIndexForVisible: 0,
           autoscrollToTopThreshold: 10,

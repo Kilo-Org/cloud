@@ -1,4 +1,4 @@
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import { notifyCliSessionRenamed } from './session-events';
 
 jest.mock('@/lib/config.server', () => ({
@@ -6,18 +6,18 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 jest.mock('@/lib/tokens', () => ({
-  generateInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
+  generateBoundedInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
 }));
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
-const mockGenerateInternalServiceToken = jest.mocked(generateInternalServiceToken);
+const mockGenerateBoundedInternalServiceToken = jest.mocked(generateBoundedInternalServiceToken);
 
 describe('notifyCliSessionRenamed', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('returns delivered on success', async () => {
@@ -49,7 +49,10 @@ describe('notifyCliSessionRenamed', () => {
       userId: 'user_test_456',
     });
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user_test_456', {
+      audience: 'session-ingest',
+      expiresIn: 60 * 60,
+    });
     expect(mockFetch).toHaveBeenCalledWith(
       'https://ingest.test.example.com/api/session/ses_abc123/rename-notify',
       expect.objectContaining({

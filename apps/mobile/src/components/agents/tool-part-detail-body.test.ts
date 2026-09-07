@@ -5,6 +5,7 @@ import type * as ReactI18next from 'react-i18next';
 
 import { ToolPartDetailBody } from './tool-part-detail-body';
 import { SuggestToolCardBody } from './suggest-tool-card';
+import { shouldCenterPartDetail } from './part-detail-model';
 import {
   BashToolCardBody,
   EditToolCardBody,
@@ -151,25 +152,8 @@ function findByType(node: unknown, type: string | ToolBody): React.ReactElement[
   return findAll(node, el => el.type === type);
 }
 
-function orderedTypes(node: unknown): (string | React.ComponentType)[] {
-  const types: (string | React.ComponentType)[] = [];
-  function walk(value: unknown): void {
-    if (value == null || typeof value === 'string' || typeof value === 'number') {
-      return;
-    }
-    if (Array.isArray(value)) {
-      for (const child of value) {
-        walk(child);
-      }
-      return;
-    }
-    if (React.isValidElement(value)) {
-      types.push(value.type as string | React.ComponentType);
-      walk((value.props as Record<string, unknown>).children);
-    }
-  }
-  walk(node);
-  return types;
+function orderedTypes(node: unknown): React.ReactElement['type'][] {
+  return findAll(node, () => true).map(el => el.type);
 }
 
 const textChildren = (el: React.ReactElement): unknown =>
@@ -223,17 +207,24 @@ describe('ToolPartDetailBody routing', () => {
     expect(findByType(root, GenericToolCardBody)).toHaveLength(1);
   });
 
-  it('renders attachments above the body when present', () => {
+  it('renders attachments above the body and forwards decode-failure props', () => {
     getToolImageAttachments.mockReturnValue([makeFilePart('img-1', 'image/png')]);
     getToolFileAttachments.mockReturnValue([makeFilePart('file-1', 'application/pdf')]);
+    const part = makeToolPart('bash', completedState);
+    const onImageError = vi.fn<(uri: string) => void>();
     // eslint-disable-next-line new-cap, react-compiler-runtime/react-compiler-runtime -- direct function call
-    const root = ToolPartDetailBody({ part: makeToolPart('bash', completedState) });
+    const root = ToolPartDetailBody({ part, imageFailed: true, onImageError });
     expect(orderedTypes(root)).toEqual([
       'View',
       'ToolCardImageAttachments',
       'ToolCardFileAttachments',
       'BashToolCardBody',
     ]);
+    expect(findByType(root, 'ToolCardImageAttachments')[0]?.props).toEqual({
+      part,
+      imageFailed: true,
+      onImageError,
+    });
   });
 });
 
@@ -287,6 +278,43 @@ describe('ToolPartDetailBody status line', () => {
     );
     expect(statusLines).toHaveLength(0);
   });
+});
+
+describe('ToolPartDetailBody error placement', () => {
+  beforeEach(() => {
+    getToolImageAttachments.mockReturnValue([]);
+    getToolFileAttachments.mockReturnValue([]);
+  });
+
+  it.each(routingTable.filter(([tool]) => tool !== 'suggest'))(
+    'centers an error-only %s body',
+    tool => {
+      expect(shouldCenterPartDetail(makeToolPart(tool, errorState), false)).toBe(true);
+    }
+  );
+
+  it('centers an error-only generic body', () => {
+    expect(shouldCenterPartDetail(makeToolPart('custom_tool', errorState), false)).toBe(true);
+  });
+
+  it.each([
+    ['bash', { command: 'pwd' }],
+    ['edit', { oldString: 'old' }],
+    ['edit', { newString: 'new' }],
+    ['patch', { patchText: 'patch' }],
+    ['apply_patch', { patchText: 'patch' }],
+    ['custom_tool', { query: 'data' }],
+    ['write', { content: 'file' }],
+    ['todoread', { todos: [{ content: 'Task' }] }],
+    ['todowrite', { todos: [{ content: 'Task' }] }],
+  ] satisfies [string, Record<string, unknown>][])(
+    'keeps a %s error inline with content',
+    (tool, input) => {
+      expect(shouldCenterPartDetail(makeToolPart(tool, { ...errorState, input }), false)).toBe(
+        false
+      );
+    }
+  );
 });
 
 describe('BashToolCardBody streaming contract', () => {

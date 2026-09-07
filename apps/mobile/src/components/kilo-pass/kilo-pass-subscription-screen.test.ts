@@ -40,6 +40,7 @@ const mocks = vi.hoisted(() => ({
     retryOwnershipCheck: vi.fn(),
   },
   routerPush: vi.fn(),
+  openPlayManagement: vi.fn(),
 }));
 
 // ── Mocks ───────────────────────────────────────────────────────────
@@ -93,6 +94,10 @@ vi.mock('@/components/ui/skeleton', () => ({
 
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
+}));
+
+vi.mock('./kilo-pass-play-manage', () => ({
+  openPlaySubscriptionManagement: mocks.openPlayManagement,
 }));
 
 vi.mock('@/lib/config', () => ({
@@ -294,6 +299,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.ownershipCheckFailed = false;
     mocks.nativeIap.retryOwnershipCheck.mockReset();
     mocks.routerPush.mockReset();
+    mocks.openPlayManagement.mockReset();
   });
 
   it.each(['web_management', 'unavailable'])(
@@ -612,6 +618,32 @@ describe('KiloPassSubscriptionScreen', () => {
 
     renderer.unmount();
   });
+
+  it.each([false, true])(
+    'opens Play management without catalog products while loading=%s',
+    async loading => {
+      setAndroidNativeIapPresentation();
+      mocks.nativeIap.productsIsLoading = loading;
+      mocks.nativeIap.ownedGoogleProductId = 'kilopass_tier19';
+
+      const renderer = await renderScreen();
+      const manage = renderer.root.find(
+        node =>
+          String(node.type) === 'Button' &&
+          node.findAll(child => String(child.type) === 'Text' && child.children.includes('Manage'))
+            .length > 0
+      );
+      await press(manage);
+
+      expect(mocks.openPlayManagement).toHaveBeenCalledWith({
+        skuAndroid: 'kilopass_tier19',
+        invalidateAfter: expect.any(Function),
+      });
+      expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
+      expect(mocks.preflightMutateAsync).not.toHaveBeenCalled();
+      renderer.unmount();
+    }
+  );
 
   it('sends the Android preflight payload with platform, storefront, googleProductId, and googlePurchaseToken', async () => {
     setAndroidNativeIapPresentation();

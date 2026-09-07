@@ -288,6 +288,17 @@ function KiloPassNativeIapContent() {
     });
   };
 
+  const managePlaySubscription = async () => {
+    if (!ownedGoogleProductId) {
+      return;
+    }
+    const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
+    await openPlaySubscriptionManagement({
+      skuAndroid: ownedGoogleProductId,
+      invalidateAfter: invalidateAfterManagement,
+    });
+  };
+
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
 
@@ -300,11 +311,7 @@ function KiloPassNativeIapContent() {
     ) {
       void (async () => {
         if (isAndroid) {
-          const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
-          await openPlaySubscriptionManagement({
-            skuAndroid: ownedProductId,
-            invalidateAfter: invalidateAfterManagement,
-          });
+          await managePlaySubscription();
           return;
         }
         const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
@@ -448,12 +455,8 @@ function KiloPassNativeIapContent() {
             <Button
               variant="outline"
               onPress={() => {
-                const current = products.find(
-                  product => product.googleProductId === ownedGoogleProductId
-                );
-                if (current) {
-                  handleProductPress(current);
-                }
+                void Haptics.selectionAsync();
+                void managePlaySubscription();
               }}
             >
               <Text>{t('kiloPass.manage')}</Text>

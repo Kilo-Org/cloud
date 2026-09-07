@@ -180,6 +180,22 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     start,
     prune,
     active: (rootKiloSessionId: string) => active.get(rootKiloSessionId),
+    abortTarget(session: SessionRequestIdentity, messageId?: string) {
+      const current = active.get(session.kiloSessionId);
+      if (
+        current &&
+        isDeepStrictEqual(current.session, session) &&
+        (messageId === undefined || current.messageId === messageId)
+      ) {
+        return current;
+      }
+      if (messageId === undefined) return undefined;
+      const matches = [...retained.values()].filter(
+        operation =>
+          operation.messageId === messageId && isDeepStrictEqual(operation.session, session)
+      );
+      return matches.find(operation => operation.kind !== 'preparation') ?? matches[0];
+    },
     hasActive: (rootKiloSessionId: string) => active.has(rootKiloSessionId),
     activeOperations: () => [...active.values()],
     retained: () => [...retained.values()],

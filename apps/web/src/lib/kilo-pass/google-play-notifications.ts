@@ -191,13 +191,15 @@ async function markGooglePlayStoreEventProcessed(eventId: string): Promise<void>
     );
 }
 
-async function markGooglePlaySubscriptionCancelingAtPeriodEnd(
-  purchaseToken: string
+async function setGooglePlaySubscriptionCancelingAtPeriodEnd(
+  dbOrTx: DbOrTx,
+  purchaseToken: string,
+  cancelAtPeriodEnd: boolean
 ): Promise<void> {
-  await db
+  await dbOrTx
     .update(kilo_pass_subscriptions)
     .set({
-      cancel_at_period_end: true,
+      cancel_at_period_end: cancelAtPeriodEnd,
     })
     .where(
       and(
@@ -700,6 +702,11 @@ export async function processGooglePlayKiloPassNotification(params: {
         }
         throw error;
       }
+      // A restart can reuse a settled order. Reconcile the live Play state
+      // even when the purchase ledger correctly skips credit issuance.
+      if (decoded.subscriptionState === 'SUBSCRIPTION_STATE_ACTIVE') {
+        await setGooglePlaySubscriptionCancelingAtPeriodEnd(tx, purchaseToken, false);
+      }
       await appendKiloPassAuditLog(tx, {
         action: KiloPassAuditLogAction.StoreSubscriptionRenewed,
         result: KiloPassAuditLogResult.Success,
@@ -750,7 +757,7 @@ export async function processGooglePlayKiloPassNotification(params: {
       await markGooglePlayStoreEventProcessed(eventId);
       return { processed: true };
     }
-    await markGooglePlaySubscriptionCancelingAtPeriodEnd(purchaseToken);
+    await setGooglePlaySubscriptionCancelingAtPeriodEnd(db, purchaseToken, true);
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionCanceled,
       result: KiloPassAuditLogResult.Success,

@@ -5,6 +5,7 @@ import {
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
+  kilo_pass_store_events,
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   kilocode_users,
@@ -43,6 +44,42 @@ function applePurchase(
 }
 
 describe('completeStoreKiloPassPurchase', () => {
+  it.each([12, 'voided_purchase'])(
+    'rejects a paid snapshot after refund claim %s',
+    async notificationType => {
+      const user = await insertTestUser({ total_microdollars_acquired: 0 });
+      const purchase = applePurchase({
+        paymentProvider: KiloPassPaymentProvider.GooglePlay,
+        productId: 'kilopass_tier49',
+      });
+      await db.insert(kilo_pass_store_events).values({
+        payment_provider: KiloPassPaymentProvider.GooglePlay,
+        event_id: crypto.randomUUID(),
+        product_id: purchase.productId,
+        provider_transaction_id: purchase.providerTransactionId,
+        provider_subscription_id: purchase.providerSubscriptionId,
+        environment: 'Sandbox',
+        payload_json: { notificationType },
+        processing_started_at: new Date().toISOString(),
+      });
+      await expect(completeStoreKiloPassPurchase({ user, purchase })).rejects.toThrow(
+        'Store purchase has been refunded'
+      );
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired).toBe(0);
+      expect(
+        await db.query.kilo_pass_store_purchases.findFirst({
+          where: eq(
+            kilo_pass_store_purchases.provider_transaction_id,
+            purchase.providerTransactionId
+          ),
+        })
+      ).toBeUndefined();
+    }
+  );
+
   it('creates an active app store subscription and issues base credits once', async () => {
     const user = await insertTestUser({ total_microdollars_acquired: 0, microdollars_used: 0 });
     const purchase = applePurchase();

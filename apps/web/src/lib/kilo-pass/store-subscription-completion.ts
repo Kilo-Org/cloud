@@ -553,6 +553,16 @@ export async function completeStoreKiloPassPurchase(params: {
       const subscription = subscriptions[0];
       if (subscription.kilo_user_id !== user.id)
         throw new Error('Store subscription already belongs to another user');
+      const otherActive = await tx.query.kilo_pass_subscriptions.findFirst({
+        where: and(
+          eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+          isNull(kilo_pass_subscriptions.ended_at),
+          sql`${kilo_pass_subscriptions.id} <> ${subscription.id}`
+        ),
+      });
+      if (otherActive && !isStripeSubscriptionEnded(otherActive.status)) {
+        throw new Error('You already have an active Kilo Pass subscription');
+      }
       if (replacement.deferred) {
         const receipt = await tx.query.kilo_pass_store_purchases.findFirst({
           where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, subscription.id),

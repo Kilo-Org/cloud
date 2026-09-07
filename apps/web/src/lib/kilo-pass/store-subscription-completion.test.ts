@@ -44,6 +44,81 @@ function applePurchase(
 }
 
 describe('completeStoreKiloPassPurchase', () => {
+  it.each([
+    [KiloPassTier.Tier19, KiloPassTier.Tier49],
+    [KiloPassTier.Tier19, KiloPassTier.Tier199],
+    [KiloPassTier.Tier49, KiloPassTier.Tier19],
+    [KiloPassTier.Tier49, KiloPassTier.Tier199],
+    [KiloPassTier.Tier199, KiloPassTier.Tier19],
+    [KiloPassTier.Tier199, KiloPassTier.Tier49],
+  ])('defers Play tier %s to %s until its paid renewal', async (from, to) => {
+    const user = await insertTestUser({ total_microdollars_acquired: 0 });
+    const oldToken = crypto.randomUUID();
+    const newToken = crypto.randomUUID();
+    const original = applePurchase({
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+      providerSubscriptionId: oldToken,
+      purchaseToken: oldToken,
+      tier: from,
+      productId: `kilopass_${from}`,
+    });
+    const initial = await completeStoreKiloPassPurchase({ user, purchase: original });
+    const deferred = {
+      ...original,
+      providerSubscriptionId: newToken,
+      purchaseToken: newToken,
+      googlePlayReplacement: {
+        linkedPurchaseToken: oldToken,
+        deferred: true,
+        orderPurchaseToken: oldToken,
+      },
+    };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      expect(await completeStoreKiloPassPurchase({ user, purchase: deferred })).toMatchObject({
+        subscriptionId: initial.subscriptionId,
+        tier: from,
+        alreadyProcessed: true,
+      });
+    }
+    const before = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(before!.total_microdollars_acquired).toBe(getMonthlyPriceUsd(from) * 1_000_000);
+    const renewal = {
+      ...deferred,
+      providerTransactionId: crypto.randomUUID(),
+      tier: to,
+      productId: `kilopass_${to}`,
+      purchasedAtIso: '2026-06-01T12:00:00.000Z',
+      expiresAtIso: '2026-07-01T12:00:00.000Z',
+      googlePlayReplacement: {
+        linkedPurchaseToken: oldToken,
+        deferred: false,
+        orderPurchaseToken: newToken,
+      },
+    };
+    expect(await completeStoreKiloPassPurchase({ user, purchase: renewal })).toMatchObject({
+      subscriptionId: initial.subscriptionId,
+      tier: to,
+      alreadyProcessed: false,
+    });
+    await completeStoreKiloPassPurchase({ user, purchase: renewal });
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired).toBe(
+      (getMonthlyPriceUsd(from) + getMonthlyPriceUsd(to)) * 1_000_000
+    );
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, initial.subscriptionId),
+    });
+    expect(subscription).toMatchObject({
+      tier: to,
+      current_streak_months: 2,
+      provider_subscription_id: newToken,
+    });
+  });
+
   it.each([12, 'voided_purchase'])(
     'rejects a paid snapshot after refund claim %s',
     async notificationType => {

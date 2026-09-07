@@ -142,14 +142,18 @@ export function PrReviewMergeScreen() {
   );
   const mergeStateQuery = useQuery(mergeStateOptions);
 
-  // The sheet mounts only once its reads SUCCEED, so its content never shifts
-  // and a doomed submit is never offered: loading → content happens in the
-  // screen body, not inside the sheet, and an errored provider read keeps the
-  // sheet unmounted rather than losing the restrictions list (getMergeState)
-  // or the capability banner (getCapabilities).
+  // The sheet mounts only once its reads HAVE DATA, so its content never
+  // shifts and a doomed submit is never offered: loading → content happens in
+  // the screen body, not inside the sheet, and a first-load failure of a
+  // provider read (no data yet) keeps the sheet unmounted rather than losing
+  // the restrictions list (getMergeState) or the capability banner
+  // (getCapabilities). Data presence, not `isSuccess`: a foreground refresh
+  // whose refetch fails RETAINS the last good read, and gating on success
+  // would unmount an open sheet — dropping the commit message the user typed
+  // — over data the sheet still has.
   const isProviderArm = scope.ref.platform !== 'github';
-  const mergeStateReady = !isProviderArm || mergeStateQuery.isSuccess;
-  const capabilitiesReady = !needsAutoMergeCapability || capabilitiesQuery.isSuccess;
+  const mergeStateReady = !isProviderArm || mergeStateQuery.data !== undefined;
+  const capabilitiesReady = !needsAutoMergeCapability || capabilitiesQuery.data !== undefined;
 
   if (pr.data && mergeStateReady && capabilitiesReady) {
     return (
@@ -197,14 +201,15 @@ export function PrReviewMergeScreen() {
           // Retry recovers every read the screen is waiting on: the overview
           // and, on the provider arms, the errored merge gate / capability
           // read — a Retry that refetched only the overview could never
-          // clear the failure that kept the sheet from mounting.
-          void Promise.all([
-            pr.refetch(),
-            ...(isProviderArm && mergeStateQuery.isError ? [mergeStateQuery.refetch()] : []),
-            ...(needsAutoMergeCapability && capabilitiesQuery.isError
-              ? [capabilitiesQuery.refetch()]
-              : []),
-          ]);
+          // clear the failure that kept the sheet from mounting. Each
+          // refetch starts as it is called, so the reads run concurrently.
+          void pr.refetch();
+          if (isProviderArm && mergeStateQuery.isError) {
+            void mergeStateQuery.refetch();
+          }
+          if (needsAutoMergeCapability && capabilitiesQuery.isError) {
+            void capabilitiesQuery.refetch();
+          }
         }}
         isRetrying={
           pr.isFetching ||

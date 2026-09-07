@@ -1,14 +1,20 @@
-// The merge screen gates its sheet on the provider reads' SUCCESS (ux2): an
+// The merge screen gates its sheet on the provider reads' DATA (ux2): an
 // errored `providerReview.getMergeState` must not mount the GitLab sheet
 // without its restrictions list, and an errored `providerReview.getCapabilities`
 // must not mount the Bitbucket auto-merge sheet without its capability banner.
+// The gate is data presence, not `isSuccess`: a foreground refresh whose
+// refetch fails retains the last good read, and the open sheet must stay
+// mounted on that retained data rather than drop the user's typed message.
 // The failure body's Retry refetches the failed provider reads alongside the
 // overview. Mounted with a keyed `useQuery` mock so each read can settle into a
 // different state than its siblings.
 
+/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/components/pr-review/pr-review-submit.test.tsx */
+/* eslint-disable require-await, @typescript-eslint/require-await -- the fake refetch factories settle without await because they resolve immediately */
+
 import type * as ReactQuery from '@tanstack/react-query';
-import { type ReactNode, createElement } from 'react';
-import { type ReactTestRenderer } from 'react-test-renderer';
+import { type ReactNode } from 'react';
+import { type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
@@ -28,10 +34,16 @@ type MockQueryResult = {
 
 type ResultKey = 'overview' | 'mergeState' | 'capabilities';
 
-const mock = vi.hoisted(() => ({
-  results: {} as Record<ResultKey, MockQueryResult>,
-  params: {} as Record<string, string | string[]>,
-  scope: null as ProviderPrScope | null,
+type MockState = {
+  results: Partial<Record<ResultKey, MockQueryResult>>;
+  params: Record<string, string | string[]>;
+  scope: ProviderPrScope | null;
+};
+
+const mock = vi.hoisted((): MockState => ({
+  results: {},
+  params: {},
+  scope: null,
 }));
 
 function mockResult(overrides: Partial<MockQueryResult> = {}): MockQueryResult {
@@ -45,6 +57,14 @@ function mockResult(overrides: Partial<MockQueryResult> = {}): MockQueryResult {
     refetch: vi.fn(async () => undefined),
     ...overrides,
   };
+}
+
+function resultOf(key: ResultKey): MockQueryResult {
+  const query = mock.results[key];
+  if (query === undefined) {
+    throw new Error(`the test did not set a mock result for the ${key} read`);
+  }
+  return query;
 }
 
 vi.mock('@tanstack/react-query', async importOriginal => ({
@@ -84,7 +104,11 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 function ScopeWrapper({ children }: Readonly<{ children: ReactNode }>) {
-  return createElement(ProviderPrScopeProvider, { value: mock.scope!, children });
+  const { scope } = mock;
+  if (scope === null) {
+    throw new Error('the test did not set a provider scope');
+  }
+  return <ProviderPrScopeProvider value={scope}>{children}</ProviderPrScopeProvider>;
 }
 
 const gitlabMergeState = {
@@ -125,15 +149,31 @@ function bitbucketAutoMergeParams() {
 }
 
 async function renderScreen() {
-  return renderWithProviders(createElement(PrReviewMergeScreen), { wrapper: ScopeWrapper });
+  return renderWithProviders(<PrReviewMergeScreen />, { wrapper: ScopeWrapper });
 }
 
 function findSheet(renderer: ReactTestRenderer) {
   return renderer.root.findAll(node => String(node.type) === 'PrMergeSheet');
 }
 
+function oneSheet(renderer: ReactTestRenderer): ReactTestInstance {
+  const [sheet] = findSheet(renderer);
+  if (sheet === undefined) {
+    throw new Error('the merge sheet did not mount');
+  }
+  return sheet;
+}
+
 function findError(renderer: ReactTestRenderer) {
   return renderer.root.findAll(node => String(node.type) === 'QueryError');
+}
+
+function oneError(renderer: ReactTestRenderer): ReactTestInstance {
+  const [error] = findError(renderer);
+  if (error === undefined) {
+    throw new Error('the failure body did not render');
+  }
+  return error;
 }
 
 beforeEach(() => {
@@ -159,13 +199,13 @@ describe('PrReviewMergeScreen provider-read gating', () => {
     gitlabMergeParams();
     mock.results.mergeState = mockResult({ data: undefined, isSuccess: false, isError: true });
     const { renderer, unmount } = await renderScreen();
-    const error = findError(renderer)[0]!;
+    const error = oneError(renderer);
     (error.props.onRetry as () => void)();
     await vi.waitFor(() => {
-      expect(mock.results.overview.refetch).toHaveBeenCalledOnce();
-      expect(mock.results.mergeState.refetch).toHaveBeenCalledOnce();
+      expect(resultOf('overview').refetch).toHaveBeenCalledOnce();
+      expect(resultOf('mergeState').refetch).toHaveBeenCalledOnce();
     });
-    expect(mock.results.capabilities.refetch).not.toHaveBeenCalled();
+    expect(resultOf('capabilities').refetch).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -176,14 +216,14 @@ describe('PrReviewMergeScreen provider-read gating', () => {
     const { renderer, unmount } = await renderScreen();
     expect(findSheet(renderer)).toHaveLength(0);
     expect(findError(renderer)).toHaveLength(1);
-    const error = findError(renderer)[0]!;
+    const error = oneError(renderer);
     (error.props.onRetry as () => void)();
     await vi.waitFor(() => {
-      expect(mock.results.overview.refetch).toHaveBeenCalledOnce();
-      expect(mock.results.capabilities.refetch).toHaveBeenCalledOnce();
+      expect(resultOf('overview').refetch).toHaveBeenCalledOnce();
+      expect(resultOf('capabilities').refetch).toHaveBeenCalledOnce();
     });
     // The merge-state read succeeded, so Retry does not refetch it.
-    expect(mock.results.mergeState.refetch).not.toHaveBeenCalled();
+    expect(resultOf('mergeState').refetch).not.toHaveBeenCalled();
     unmount();
   });
 
@@ -191,10 +231,10 @@ describe('PrReviewMergeScreen provider-read gating', () => {
     bitbucketAutoMergeParams();
     mock.results.mergeState = mockResult({ data: { ...gitlabMergeState, canMerge: true } });
     const { renderer, unmount } = await renderScreen();
-    const sheets = findSheet(renderer);
-    expect(sheets).toHaveLength(1);
-    expect(sheets[0]!.props.mergeState).toEqual({ ...gitlabMergeState, canMerge: true });
-    expect(sheets[0]!.props.autoMergeCapability).toEqual(autoMergeUnsupported);
+    expect(findSheet(renderer)).toHaveLength(1);
+    const sheet = oneSheet(renderer);
+    expect(sheet.props.mergeState).toEqual({ ...gitlabMergeState, canMerge: true });
+    expect(sheet.props.autoMergeCapability).toEqual(autoMergeUnsupported);
     expect(findError(renderer)).toHaveLength(0);
     unmount();
   });
@@ -211,6 +251,42 @@ describe('PrReviewMergeScreen provider-read gating', () => {
     expect(findSheet(renderer)).toHaveLength(0);
     expect(findError(renderer)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
+    unmount();
+  });
+
+  it('keeps the open GitLab sheet mounted when a refresh refetch of getMergeState fails on retained data', async () => {
+    // A foreground refresh invalidates the provider reads; the refetch errors
+    // but the query keeps its last good data. Gating on `isSuccess` would
+    // unmount the sheet and drop the commit message the user typed.
+    gitlabMergeParams();
+    mock.results.mergeState = mockResult({
+      data: gitlabMergeState,
+      isSuccess: false,
+      isError: true,
+      isFetching: true,
+    });
+    const { renderer, unmount } = await renderScreen();
+    expect(findSheet(renderer)).toHaveLength(1);
+    const sheet = oneSheet(renderer);
+    expect(sheet.props.mergeState).toEqual(gitlabMergeState);
+    expect(findError(renderer)).toHaveLength(0);
+    unmount();
+  });
+
+  it('keeps the open Bitbucket auto-merge sheet mounted when a refresh refetch of getCapabilities fails on retained data', async () => {
+    bitbucketAutoMergeParams();
+    mock.results.mergeState = mockResult({ data: { ...gitlabMergeState, canMerge: true } });
+    mock.results.capabilities = mockResult({
+      data: { autoMerge: autoMergeUnsupported },
+      isSuccess: false,
+      isError: true,
+      isFetching: true,
+    });
+    const { renderer, unmount } = await renderScreen();
+    expect(findSheet(renderer)).toHaveLength(1);
+    const sheet = oneSheet(renderer);
+    expect(sheet.props.autoMergeCapability).toEqual(autoMergeUnsupported);
+    expect(findError(renderer)).toHaveLength(0);
     unmount();
   });
 });

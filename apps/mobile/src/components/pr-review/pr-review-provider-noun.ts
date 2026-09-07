@@ -9,6 +9,6 @@ import { type ProviderPrPlatform } from '@kilocode/app-shared/provider-review';
 
 export function providerPrNounKey(
   platform: ProviderPrPlatform
-): 'common.mergeRequest' | 'common.pullRequest' {
+): 'common.mergeRequest' | 'common.pullRequest' { // i18n-dup-ok: mid-sentence lowercase noun for {{term}} interpolation vs the capitalized standalone prReview.terms.* label; languages case-decline them apart.
   return platform === 'gitlab' ? 'common.mergeRequest' : 'common.pullRequest';
 }

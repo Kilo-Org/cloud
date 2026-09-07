@@ -535,7 +535,7 @@ export async function completeStoreKiloPassPurchase(params: {
       tx: DrizzleTransaction
     ): Promise<CompleteStoreKiloPassPurchaseResult | null> => {
       await lockUserForStoreCompletion(tx, user.id);
-      const [subscription] = await tx
+      const subscriptions = await tx
         .select()
         .from(kilo_pass_subscriptions)
         .where(
@@ -548,7 +548,9 @@ export async function completeStoreKiloPassPurchase(params: {
           )
         )
         .for('update');
-      if (!subscription) throw new Error('Google Play replacement has no current subscription');
+      if (subscriptions.length !== 1)
+        throw new Error('Google Play replacement has no current subscription');
+      const subscription = subscriptions[0];
       if (subscription.kilo_user_id !== user.id)
         throw new Error('Store subscription already belongs to another user');
       if (replacement.deferred) {
@@ -564,6 +566,15 @@ export async function completeStoreKiloPassPurchase(params: {
         ) {
           throw new Error('Google Play replacement does not match the paid receipt');
         }
+        const refund = await tx.query.kilo_pass_store_events.findFirst({
+          columns: { id: true },
+          where: and(
+            eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
+            eq(kilo_pass_store_events.provider_transaction_id, receipt.provider_transaction_id),
+            sql`(${kilo_pass_store_events.payload_json}->>'notificationType') IN ('12', 'voided_purchase')`
+          ),
+        });
+        if (refund) throw new Error('Store purchase has been refunded');
       }
       await tx
         .update(kilo_pass_subscriptions)

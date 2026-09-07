@@ -336,6 +336,7 @@ async function reverseGooglePlayRefundCredits(
   purchaseToken: string,
   latestOrderId: string
 ): Promise<CreditReversalResult> {
+  // Refunds target the original receipt token, which survives subscription replacement.
   const storePurchase = await tx.query.kilo_pass_store_purchases.findFirst({
     where: and(
       eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),

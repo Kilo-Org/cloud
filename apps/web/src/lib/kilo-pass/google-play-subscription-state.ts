@@ -60,6 +60,7 @@ export async function reconcileGooglePlaySubscriptionState(
       desc(kilo_pass_store_purchases.created_at),
     ],
   });
+  // Replacement cascades provider_subscription_id; purchase_token identifies the original receipt.
   if (
     !latest ||
     (latest.purchase_token === purchase.providerSubscriptionId &&

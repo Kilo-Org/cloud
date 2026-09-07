@@ -1,7 +1,8 @@
 import { Download, FileText } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -33,9 +34,9 @@ const STATUS_LABEL_KEYS = {
   paid: 'organization.invoices.status.paid',
   open: 'organization.invoices.status.open',
   void: 'organization.invoices.status.void',
-  draft: 'organization.invoices.status.draft',
+  draft: 'common.draft',
   uncollectible: 'organization.invoices.status.uncollectible',
-  unknown: 'organization.invoices.status.unknown',
+  unknown: 'common.unknown',
 } satisfies Record<string, string>;
 
 const STATUS_META = {
@@ -229,13 +230,21 @@ export function OrganizationInvoicesScreen() {
     );
   } else if (isFirstPageError) {
     body = (
-      <Animated.View entering={FadeIn.duration(200)} className="flex-1" style={{ paddingBottom }}>
+      <Animated.View entering={FadeIn.duration(200)} className="flex-1">
         <QueryError
           variant={errorVariant}
           onRetry={isPermanentError ? undefined : () => void query.refetch()}
           isRetrying={query.isFetching}
         />
       </Animated.View>
+    );
+  } else if (invoices.length === 0 && !hasMore && !isLaterPageError) {
+    body = (
+      <EmptyState
+        icon={FileText}
+        title={t('organization.invoices.emptyTitle')}
+        description={t('organization.invoices.emptyDescription')}
+      />
     );
   } else {
     const footer = (
@@ -250,16 +259,16 @@ export function OrganizationInvoicesScreen() {
               size="sm"
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
-              accessibilityLabel={t('organization.invoices.loadMore')}
+              accessibilityLabel={t('common.loadMore')}
             >
-              <Text>{t('organization.invoices.loadMore')}</Text>
+              <Text>{t('common.loadMore')}</Text>
             </Button>
           </View>
         )}
         {isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('organization.invoices.loadMoreFailed')}
+              {t('common.couldnTLoadMore')}
             </Text>
             <Button
               variant="outline"
@@ -285,6 +294,7 @@ export function OrganizationInvoicesScreen() {
           contentContainerClassName="grow gap-3 px-6 pt-4"
           ListEmptyComponent={
             <EmptyState
+              placement="top"
               icon={FileText}
               title={t('organization.invoices.emptyTitle')}
               description={t('organization.invoices.emptyDescription')}

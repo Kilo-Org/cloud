@@ -43,26 +43,22 @@ export default function SecretsScreen() {
 
     if (catalogQuery.isError) {
       return (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.secrets.couldNotLoad')}
-            onRetry={() => {
-              void catalogQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.secrets.couldNotLoad')}
+          onRetry={() => {
+            void catalogQuery.refetch();
+          }}
+        />
       );
     }
 
     if (catalogQuery.data.length === 0) {
       return (
-        <View className="flex-1 items-center justify-center">
-          <EmptyState
-            icon={KeyRound}
-            title={t('kiloclaw.secrets.noSecrets')}
-            description={t('kiloclaw.secrets.noSecretsDescription')}
-          />
-        </View>
+        <EmptyState
+          icon={KeyRound}
+          title={t('kiloclaw.secrets.noSecrets')}
+          description={t('kiloclaw.secrets.noSecretsDescription')}
+        />
       );
     }
 

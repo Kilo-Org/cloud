@@ -168,6 +168,13 @@ export type SendCloudAgentSessionNotificationResult = z.infer<
   typeof sendCloudAgentSessionNotificationOutputSchema
 >;
 
+// Aggregate refreshes carry identity only; the server reads current status and scope.
+export const refreshGlanceableSessionsInputSchema = z.object({
+  userId: z.string().min(1),
+  cliSessionIds: z.array(z.string().min(1)).min(1),
+});
+export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
+
 // ── sendSessionReadyNotification ────────────────────────────────────
 
 export const sendSessionReadyNotificationInputSchema = z.object({

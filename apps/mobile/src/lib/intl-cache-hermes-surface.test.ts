@@ -16,6 +16,10 @@ describe('Hermes Intl surface', () => {
     vi.resetModules();
   });
 
+  // The formatters and i18next are imported inside the test, so their transform
+  // runs on the test clock: under the parallel full-suite load this body takes
+  // several seconds against the 5 s default (it formats all 86 languages), so
+  // it carries its own budget. Same sizing as auth-context.test.tsx.
   it('formats every supported language and pluralizes for i18next', async () => {
     stubHermesIntl();
     const { SUPPORTED_LANGUAGES } = await import('@/i18n/languages');
@@ -46,5 +50,5 @@ describe('Hermes Intl surface', () => {
     const few = i18n.t('prReview.hunkRows.fileLoadedCount', { count: 2, displayCount: '2' });
     const many = i18n.t('prReview.hunkRows.fileLoadedCount', { count: 5, displayCount: '5' });
     expect(few).not.toBe(many);
-  });
+  }, 15_000);
 });

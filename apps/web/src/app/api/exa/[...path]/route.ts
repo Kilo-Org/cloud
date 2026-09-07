@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { EXA_API_KEY } from '@/lib/config.server';
 import { after } from 'next/server';
 import { wrapInSafeNextResponse } from '@/lib/ai-gateway/llm-proxy-helpers';
@@ -50,6 +51,7 @@ function extractCostMicrodollars(responseBody: unknown): number | undefined {
 export async function POST(request: NextRequest) {
   const { user, authFailedResponse, organizationId } = await getUserFromAuth({
     adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
   });
   if (authFailedResponse) return authFailedResponse;
 

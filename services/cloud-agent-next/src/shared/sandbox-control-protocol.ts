@@ -1,4 +1,16 @@
 import { z } from 'zod';
+import { SandboxRuntimeVersionSchema } from './sandbox-status.js';
+
+export {
+  MAX_WORKTREE_CHANGES_BYTES,
+  MAX_WORKTREE_CHANGES_FILES,
+  worktreeChangesFileSchema,
+  sessionGitSummaryPayloadSchema,
+  sessionGitSummaryResultSchema,
+  type WorktreeChangesFile,
+  type SessionGitSummaryPayload,
+  type SessionGitSummaryResult,
+} from './worktree-changes-wire.js';
 
 export const SANDBOX_CONTROL_PROTOCOL_VERSION = 1;
 
@@ -17,10 +29,18 @@ export const SANDBOX_CONTROL_REQUEST_TIMEOUT_MS = 30_000;
 export const SANDBOX_CONTROL_ATTACH_TIMEOUT_MS = 8 * 60_000;
 
 export const SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS = 60 * 60_000;
+export const SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS = 10_000;
+export const SANDBOX_CONTROL_OPERATION_LIMIT = 32;
+export const SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS = 90_000;
+export const SANDBOX_CONTROL_OUTCOME_RETRY_MS = 1_000;
+export const SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS = 3;
+export const SANDBOX_CONTROL_RECOVERY_ATTEMPT_TIMEOUT_MS = 30_000;
 
 export const SANDBOX_OPERATIONS = [
   'sandbox.hello',
   'sandbox.status',
+  'sandbox.reconcile',
+  'sandbox.event.publish',
   'sandbox.shutdown',
   'worktree.prepareDeletion',
   'worktree.delete',
@@ -33,11 +53,14 @@ export const SESSION_OPERATIONS = [
   'session.question.resolve',
   'session.abort',
   'session.sync',
+  'session.git.summary',
   'session.detach',
   'session.terminal.create',
   'session.terminal.resize',
   'session.terminal.close',
   'session.terminal.connect',
+  'session.operation.get',
+  'session.operation.ack',
 ] as const;
 
 export const SANDBOX_EVENTS = ['sandbox.ready', 'sandbox.heartbeat'] as const;
@@ -64,6 +87,7 @@ export const controlErrorCodes = [
   'session_busy',
   'runtime_unhealthy',
   'idempotency_conflict',
+  'event_rejected',
 ] as const;
 
 export type ControlErrorCode = (typeof controlErrorCodes)[number];
@@ -86,6 +110,7 @@ export const sessionRequestIdentitySchema = z.object({
 
 export const sessionEventIdentitySchema = z.object({
   directory: z.string().min(1),
+  nativeRuntimeId: z.string().uuid().optional(),
   kiloSessionId: z.string().min(1).optional(),
   rootKiloSessionId: z.string().min(1).optional(),
 });
@@ -94,6 +119,7 @@ export const controlErrorSchema = z.object({
   code: z.string().min(1),
   message: z.string(),
   retryable: z.boolean(),
+  admission: z.literal('not-admitted').optional(),
 });
 
 export const requestFrameSchema = z.object({
@@ -102,6 +128,7 @@ export const requestFrameSchema = z.object({
   operation: z.string().min(1),
   session: sessionRequestIdentitySchema.optional(),
   payload: z.unknown(),
+  authorization: z.lazy(() => sessionOperationAuthorizationSchema).optional(),
 });
 
 export const responseFrameSchema = z.object({
@@ -138,15 +165,62 @@ export const sandboxHelloPayloadSchema = z.object({
   providerInstanceId: z.string().min(1).max(256),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
   wrapperVersion: z.string().min(1).max(128).optional(),
+  capabilities: z
+    .object({
+      sessionOperationResults: z.boolean().optional(),
+      scopedStopAbort: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
+      connectionRecovery: z.boolean().optional(),
+      eventReceipts: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export const sandboxHelloResultSchema = z.object({
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION),
   handshakeComplete: z.literal(true),
+  capabilities: z
+    .object({
+      kiloVersionHeartbeat: z.boolean().optional(),
+      sessionOperationResults: z.boolean().optional(),
+      scopedStopAbort: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
+      connectionRecovery: z.boolean().optional(),
+      eventReceipts: z.boolean().optional(),
+    })
+    .optional(),
 });
 
 export type SandboxHelloPayload = z.infer<typeof sandboxHelloPayloadSchema>;
 export type SandboxHelloResult = z.infer<typeof sandboxHelloResultSchema>;
+
+export const sandboxRecoverySchema = z
+  .object({
+    episodeId: z.string().uuid(),
+    cause: z.enum(['activation_pending', 'control_disconnected', 'heartbeat_expired']),
+    startedAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    deadlineAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    attempt: z.number().int().nonnegative().max(SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS),
+  })
+  .strict()
+  .refine(value => value.deadlineAt >= value.startedAt);
+
+export type SandboxRecovery = z.infer<typeof sandboxRecoverySchema>;
+
+export const sandboxReconcilePayloadSchema = z
+  .object({
+    recovery: sandboxRecoverySchema,
+    phase: z.enum(['drain', 'ready', 'commit']),
+  })
+  .strict();
+
+export const sandboxReconcileResultSchema = z
+  .object({
+    episodeId: z.string().uuid(),
+    attempt: z.number().int().nonnegative().max(SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS),
+    phase: z.enum(['drain', 'ready', 'commit']),
+  })
+  .strict();
 
 export const sandboxReadyPayloadSchema = z
   .object({
@@ -163,6 +237,7 @@ export const sandboxHeartbeatPayloadSchema = z
     kilo: z
       .object({
         ready: z.boolean(),
+        version: SandboxRuntimeVersionSchema.nullable().optional().catch(undefined),
         reason: z
           .enum([
             'feed_stale',
@@ -240,6 +315,7 @@ export type WorktreeDeleteResult = z.infer<typeof worktreeDeleteResultSchema>;
 
 export const sessionAttachPayloadSchema = z
   .object({
+    captureNativeRuntimeId: z.literal(true).optional(),
     snapshotIdentity: z.string().min(1).max(512).optional(),
     directory: z.string().min(1).max(1024).optional(),
     branch: z.string().min(1).max(256).optional(),
@@ -291,6 +367,7 @@ export const sessionAttachPayloadSchema = z
 export const sessionAttachResultSchema = z
   .object({
     attached: z.literal(true),
+    nativeRuntimeId: z.string().uuid().optional(),
   })
   .strict();
 
@@ -373,6 +450,7 @@ export const sessionPromptResultSchema = z
   .object({
     messageId: z.string().min(1).max(128),
     status: z.enum(['accepted', 'existing']),
+    executionDeadlineAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
   })
   .strict();
 
@@ -416,12 +494,43 @@ export const sessionAbortPayloadSchema = z
   .object({
     messageId: z.string().min(1).max(128).optional(),
     reason: z.string().min(1).max(256).optional(),
+    operationId: z.string().uuid().optional(),
+    cleanupDeadlineAt: z.number().int().positive().optional(),
+    nativeRuntimeId: z.string().uuid().optional(),
+  })
+  .strict();
+
+export const sessionScopedStopAbortPayloadSchema = z
+  .object({
+    messageId: z.string().min(1).max(128),
+    operationId: z.string().uuid(),
+    cleanupDeadlineAt: z.number().int().positive(),
   })
   .strict();
 
 export const sessionAbortResultSchema = z
   .object({
-    status: z.enum(['aborted', 'already_idle']),
+    status: z.enum(['aborted', 'already_idle', 'unconfirmed']),
+    quiescent: z.boolean().optional(),
+    runtimeRetired: z.boolean().optional(),
+    nativeRuntimeId: z.string().uuid().optional(),
+    delivery: z.lazy(() => sessionOperationDeliverySchema).optional(),
+  })
+  .strict();
+
+export const sessionNativeRuntimeRetirementPayloadSchema = z
+  .object({
+    retirementId: z.string().uuid(),
+    directory: z.string().min(1),
+    nativeRuntimeId: z.string().uuid(),
+    reason: z.string().min(1).max(256),
+    cleanupDeadlineAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+
+export const sessionNativeRuntimeRetirementResultSchema = z
+  .object({
+    retired: z.literal(true),
   })
   .strict();
 
@@ -545,6 +654,33 @@ export const sessionPreparingPayloadSchema = z
   })
   .passthrough();
 
+export const sandboxEventPublicationPayloadSchema = z.discriminatedUnion('event', [
+  z
+    .object({
+      event: z.literal('session.event'),
+      receiptId: z.string().uuid(),
+      receiptHash: z.string().regex(/^[a-f0-9]{64}$/),
+      sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      session: sessionEventIdentitySchema,
+      payload: sessionEventPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      event: z.literal('session.preparing'),
+      receiptId: z.string().uuid(),
+      receiptHash: z.string().regex(/^[a-f0-9]{64}$/),
+      sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      session: sessionEventIdentitySchema,
+      payload: sessionPreparingPayloadSchema,
+    })
+    .strict(),
+]);
+
+export const sandboxEventPublicationResultSchema = z
+  .object({ receiptId: z.string().uuid(), applied: z.literal(true) })
+  .strict();
+
 export type SandboxReadyPayload = z.infer<typeof sandboxReadyPayloadSchema>;
 export type SandboxHeartbeatPayload = z.infer<typeof sandboxHeartbeatPayloadSchema>;
 export type SandboxStatusPayload = z.infer<typeof sandboxStatusPayloadSchema>;
@@ -555,6 +691,9 @@ export type SessionAttachPayload = z.infer<typeof sessionAttachPayloadSchema>;
 export type SessionAttachResult = z.infer<typeof sessionAttachResultSchema>;
 export type SessionPromptPayload = z.infer<typeof sessionPromptPayloadSchema>;
 export type SessionPromptResult = z.infer<typeof sessionPromptResultSchema>;
+export type SessionNativeRuntimeRetirementPayload = z.infer<
+  typeof sessionNativeRuntimeRetirementPayloadSchema
+>;
 export type SessionPermissionResolvePayload = z.infer<typeof sessionPermissionResolvePayloadSchema>;
 export type SessionPermissionResolveResult = z.infer<typeof sessionPermissionResolveResultSchema>;
 export type SessionQuestionResolvePayload = z.infer<typeof sessionQuestionResolvePayloadSchema>;
@@ -575,14 +714,190 @@ export type SessionTerminalConnectPayload = z.infer<typeof sessionTerminalConnec
 export type SessionTerminalConnectResult = z.infer<typeof sessionTerminalConnectResultSchema>;
 export type SessionEventPayload = z.infer<typeof sessionEventPayloadSchema>;
 export type SessionPreparingPayload = z.infer<typeof sessionPreparingPayloadSchema>;
+export type SandboxEventPublicationPayload = z.infer<typeof sandboxEventPublicationPayloadSchema>;
+export type SandboxEventPublicationResult = z.infer<typeof sandboxEventPublicationResultSchema>;
+
+export const sessionOperationAuthorizationSchema = z
+  .object({
+    operation: z.enum(['session.attach', 'session.prompt']),
+    operationId: requestIdSchema,
+    messageId: requestIdSchema,
+    session: sessionRequestIdentitySchema,
+    wrapperInstanceId: wrapperInstanceIdSchema,
+    dispatchDeadlineAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict()
+  .refine(value => value.operation !== 'session.prompt' || value.operationId === value.messageId);
+
+export type SessionOperationAuthorization = z.infer<typeof sessionOperationAuthorizationSchema>;
+
+export function sameSessionOperation(
+  left: SessionOperationAuthorization,
+  right: SessionOperationAuthorization
+): boolean {
+  return (
+    left.operation === right.operation &&
+    left.operationId === right.operationId &&
+    left.messageId === right.messageId &&
+    left.session.sessionId === right.session.sessionId &&
+    left.session.kiloSessionId === right.session.kiloSessionId &&
+    left.session.directory === right.session.directory &&
+    left.wrapperInstanceId === right.wrapperInstanceId &&
+    left.dispatchDeadlineAt === right.dispatchDeadlineAt
+  );
+}
+
+export function sessionOperationExpiresAt(authorization: SessionOperationAuthorization): number {
+  return (
+    authorization.dispatchDeadlineAt +
+    (authorization.operation === 'session.attach'
+      ? SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+      : SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS) +
+    SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS
+  );
+}
+
+export const sessionOperationResultSchema = z.discriminatedUnion('ok', [
+  z.object({ ok: z.literal(true), result: z.unknown() }).strict(),
+  z.object({ ok: z.literal(false), error: controlErrorSchema }).strict(),
+]);
+
+export const sessionOperationDeliverySchema = z
+  .object({
+    version: z.literal(2),
+    authorization: sessionOperationAuthorizationSchema,
+    completedAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+    result: sessionOperationResultSchema,
+    outcome: sessionMessageOutcomeSchema.optional(),
+    assistantMessageId: requestIdSchema.optional(),
+    events: z.array(sessionEventPayloadSchema).max(8),
+    preparing: z.array(sessionPreparingPayloadSchema).max(64),
+  })
+  .strict()
+  .refine(value =>
+    value.authorization.operation === 'session.prompt'
+      ? value.outcome?.messageId === value.authorization.messageId && value.preparing.length === 0
+      : value.outcome === undefined && value.events.length === 0
+  )
+  .refine(value => value.completedAt < sessionOperationExpiresAt(value.authorization))
+  .refine(value =>
+    value.events.every(
+      event =>
+        (event.type === 'autocommit_completed' || event.type === 'status') &&
+        typeof event.properties.messageId === 'string' &&
+        (event.properties.messageId === value.authorization.messageId ||
+          event.properties.messageId === value.assistantMessageId)
+    )
+  )
+  .refine(value =>
+    value.preparing.every(
+      event =>
+        event.attemptId === value.authorization.operationId &&
+        event.triggerMessageId === value.authorization.messageId
+    )
+  )
+  .refine(value => {
+    try {
+      return (
+        new TextEncoder().encode(JSON.stringify(value)).byteLength <=
+        MAX_SANDBOX_CONTROL_FRAME_BYTES - 4096
+      );
+    } catch {
+      return false;
+    }
+  });
+
+export type SessionOperationDelivery = z.infer<typeof sessionOperationDeliverySchema>;
+
+export const sessionOperationLookupResultSchema = z.discriminatedUnion('state', [
+  z.object({ state: z.literal('missing') }).strict(),
+  z
+    .object({
+      state: z.literal('running'),
+      authorization: sessionOperationAuthorizationSchema,
+      executionDeadlineAt: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      state: z.literal('completed'),
+      delivery: sessionOperationDeliverySchema,
+    })
+    .strict(),
+]);
+
+export type SessionOperationLookupResult = z.infer<typeof sessionOperationLookupResultSchema>;
+
+export const sessionOperationAckSchema = z
+  .object({
+    version: z.literal(2),
+    authorization: sessionOperationAuthorizationSchema,
+    resultHash: z.string().regex(/^[a-f0-9]{64}$/),
+    disposition: z.enum(['applied', 'identical', 'already_final', 'superseded']),
+    decision: z
+      .object({
+        state: z.enum(['queued', 'accepted', 'completed', 'failed', 'cancelled']),
+        at: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+      })
+      .strict(),
+  })
+  .strict()
+  .refine(
+    value =>
+      (value.authorization.operation !== 'session.prompt' &&
+        value.disposition !== 'already_final' &&
+        value.disposition !== 'superseded') ||
+      ['completed', 'failed', 'cancelled'].includes(value.decision.state)
+  );
+
+export type SessionOperationAck = z.infer<typeof sessionOperationAckSchema>;
+
+export async function sessionOperationResultHash(
+  delivery: SessionOperationDelivery
+): Promise<string> {
+  const bytes = new TextEncoder().encode(
+    JSON.stringify(sessionOperationDeliverySchema.parse(delivery))
+  );
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(hash), byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+const observationTimestampSchema = z.number().int().nonnegative().max(8_640_000_000_000_000);
+
+export const sandboxControlObservationSchema = z
+  .object({
+    ready: z.boolean(),
+    receivedAt: observationTimestampSchema,
+    idle: z
+      .object({
+        sessionCount: z.number().int().nonnegative(),
+        sessionIdsHash: z.string().regex(/^[0-9a-f]{64}$/),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+
+export type SandboxControlObservation = z.infer<typeof sandboxControlObservationSchema>;
 
 export const sandboxControlSocketAttachmentSchema = z.object({
   handshakeComplete: z.boolean(),
+  kiloReady: z.boolean().optional(),
   acceptedAt: z.number().int().nonnegative(),
   connectionId: z.string().uuid().optional(),
   protocolVersion: z.literal(SANDBOX_CONTROL_PROTOCOL_VERSION).optional(),
+  recoveryCapable: z.boolean().optional(),
+  capabilities: z
+    .object({
+      sessionOperationResults: z.boolean().optional(),
+      scopedStopAbort: z.boolean().optional(),
+      nativeRuntimeRetirement: z.boolean().optional(),
+      connectionRecovery: z.boolean().optional(),
+    })
+    .optional(),
   providerInstanceId: z.string().min(1).max(256).optional(),
   wrapperInstanceId: wrapperInstanceIdSchema.optional(),
+  observation: sandboxControlObservationSchema.optional(),
 });
 
 export type SandboxControlSocketAttachment = z.infer<typeof sandboxControlSocketAttachmentSchema>;

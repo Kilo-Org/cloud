@@ -36,6 +36,7 @@ import {
   kiloclaw_subscriptions,
   user_notification_preferences,
   user_push_tokens,
+  user_activity_tokens,
   agent_configs,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull } from 'drizzle-orm';
@@ -1186,6 +1187,60 @@ export const userRouter = createTRPCRouter({
         .delete(user_push_tokens)
         .where(
           and(eq(user_push_tokens.user_id, ctx.user.id), eq(user_push_tokens.token, input.token))
+        );
+      return { success: true };
+    }),
+
+  // Activity tokens for glanceable surfaces (Live Activity / push-to-start /
+  // Android ongoing). Upsert on `token` so a re-registration of the same
+  // device token replaces the row instead of failing the unique index.
+
+  registerActivityToken: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+        kind: z.enum(['ios_push_to_start', 'ios_activity', 'android_ongoing']),
+        platform: z.enum(['ios', 'android']),
+        organizationId: z.string().min(1).nullable(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .insert(user_activity_tokens)
+        .values({
+          user_id: ctx.user.id,
+          token: input.token,
+          kind: input.kind,
+          platform: input.platform,
+          organization_id: input.organizationId,
+        })
+        .onConflictDoUpdate({
+          target: [user_activity_tokens.token],
+          set: {
+            user_id: ctx.user.id,
+            kind: input.kind,
+            platform: input.platform,
+            organization_id: input.organizationId,
+            updated_at: sql`now()`,
+          },
+        });
+      return { success: true };
+    }),
+
+  unregisterActivityToken: baseProcedure
+    .input(
+      z.object({
+        token: z.string().min(1),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      await db
+        .delete(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, ctx.user.id),
+            eq(user_activity_tokens.token, input.token)
+          )
         );
       return { success: true };
     }),

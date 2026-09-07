@@ -9,6 +9,8 @@ import { KiloChatProvider } from '@/components/kilo-chat/kilo-chat-provider';
 import { SharePayloadNavigator } from '@/components/share/share-payload-navigator';
 import { ActiveSessionsLiveSyncMount } from '@/lib/active-sessions-live-sync-mount';
 import { attemptLogoutReconciliation } from '@/lib/auth/logout-reconciliation';
+import { GlanceablePublisherMount } from '@/lib/glanceable/mount';
+import { useGlanceableOrgFence } from '@/lib/glanceable/org-fence';
 import {
   attemptPushRegistrationReconciliation,
   subscribeToPushTokenRotation,
@@ -108,10 +110,12 @@ export default function AppLayout() {
   const colors = useThemeColors();
   const { fullSheetDetent } = useFormSheetDetents();
   useSecurityLifecycleInvalidation();
+  useGlanceableOrgFence();
 
   return (
     <UserWebConnectionProvider>
       <ActiveSessionsLiveSyncMount />
+      <GlanceablePublisherMount />
       <CachePersistenceMount />
       <LogoutReconciliationMount />
       <PushRegistrationMount />

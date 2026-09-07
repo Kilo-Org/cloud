@@ -80,6 +80,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
 - `SUPPORT_API_SECRET` - Shared bearer token for Customer Support Automation (CSA) internal API calls. Cloud uses it to authorize CSA → Cloud `apps/web/src/app/api/internal/support/` and Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`. A CSA compromise can also call Cloud deletion and Cloud can scrub CSA-local PII. Leak can look up any email and enqueue deletion for non-admin, non-bot, non-live-subscription customers; access disable is deferred to worker preflight and pending requests can be cancelled. Keep production values off preview deployments; rotate Cloud and CSA together. `[SECRET]`
+- `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` - Set to exact `true` to enable modern, purpose-labelled internal assertions at the Phase 5.1 bounded Git broker, export, deletion, and Session Ingest callsites. Unset or any other value retains their existing legacy token formats. Enable only after compatible readers, including the dedicated GitHub disconnect audience, are deployed; generic human/control/runtime signers are not affected. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
 
@@ -256,11 +257,11 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/ai-gateway/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `apps/web/src/app/api/fim/completions/route.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `LONGCAT_API_KEY` - LongCat API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
 - `STREAMLAKE_API_KEY` - StreamLake API key for model inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
-- `FRIENDLI_API_KEY` - Friendli API key for percentage-routed GLM 5.2 inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
-- `PERPLEXITY_API_KEY` - Perplexity API key for percentage-routed Kimi K3 inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/provider-definitions.ts`. `[SECRET]`
+- `PERPLEXITY_API_KEY` - Perplexity API key for percentage-routed Kimi K3 inference through the AI gateway; provider definition in `apps/web/src/lib/ai-gateway/providers/partner/providers.ts`. `[SECRET]`
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `apps/web/src/app/api/fim/completions/route.ts` and `apps/web/src/app/api/edit/completions/route.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `apps/web/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
+- `ENKRYPT_API_KEY` - API key for the Enkrypt scores endpoint; sent only in the server-side `apikey` header. Required when Enkrypt ingestion is enabled, but optional at application startup. See [Enkrypt operations](docs/enkrypt-sync-operations.md) for release gates, monitoring, and independent shutdown controls. `[SECRET]`
 - `FAKE_LLM_URL` - Local-only URL for the fake-llm service. Next.js uses it in development to list and route `fake-deterministic` through the real gateway (`apps/web/.env.development.local.example`, `apps/web/src/lib/ai-gateway/local-fake-llm.ts`). The cloud-agent-next E2E driver uses the same var for `/test/*` side channels (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`). Defaults to `http://localhost:8811`. Ignored on Vercel. [SERVER]
 
 ### Vector DBs
@@ -293,6 +294,8 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 
 ### Feature Flags
 
+- `ENKRYPT_SYNC_ENABLED` - Enables daily Enkrypt ingestion and mapped-model catalog enrollment only when exactly `true`; defaults to disabled. Does not enable publication. Configure the API key and an external monitor for the read-only health endpoint before enabling. [SERVER]
+- `ENKRYPT_PUBLICATION_ENABLED` - Exposes stored Enkrypt scores through public model catalogs and model-statistics endpoints only when exactly `true`; defaults to disabled. Does not enable ingestion. Keep disabled until redistribution approval and the release gates in [Enkrypt operations](docs/enkrypt-sync-operations.md) are satisfied. Disabling suppresses existing and cached scores after the updated deployment is serving traffic; previously delivered client responses cannot be recalled. [SERVER]
 - `KILOCLAW_BILLING_ENFORCEMENT` - Feature flag controlling KiloClaw billing enforcement. [SERVER]
 - `BRIEFING_DEBUG` - Enables verbose debug logging for the KiloClaw morning briefing plugin; checked in `services/kiloclaw/plugins/kiloclaw-morning-briefing/src/index.ts`. [SERVER]
 - `KILOCLAW_DISABLE_AI_COAUTHOR` - Disables AI co-author features in Gastown; checked in `services/gastown/container/src/control-server.ts`. [SERVER]
@@ -325,6 +328,18 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_CLI_SESSIONS_BUCKET_NAME` - R2 bucket name for CLI session blobs. [SERVER]
 
 ## Services
+
+### Notifications Worker
+
+- `APNS_TEAM_ID` - Apple Developer team ID for the token-based APNs key used to send Live Activity pushes. Set in `services/notifications/wrangler.jsonc` under `vars`. [SERVER]
+- `APNS_KEY_ID` - APNs key identifier (`kid`) for the Live Activity push key. Set beside `APNS_TEAM_ID`. [SERVER]
+- `APNS_PRIVATE_KEY` - PKCS#8 ES256 `.p8` private key contents for APNs provider-token signing. Stored as one line: the PEM decoder strips every whitespace character, so the newlines are not needed. Store the key in the Secrets Store first, then add its `secrets_store_secrets` binding; a binding for a missing secret fails the deploy. `[SECRET]`
+- `APNS_TOPIC` - iOS app bundle id (`com.kilocode.kiloapp`); Live Activity pushes use `<topic>.push-type.liveactivity`. Already set in `vars`. [SERVER]
+- `KILO_WEB_API_BASE_URL` - Base origin of the web app, used to reach the internal `glanceable-agents-snapshot` route; `https://app.kilo.ai` in production. [SERVER]
+
+Until all four values reach the worker it logs `APNs Live Activity credentials missing` and skips Live Activity pushes. Every other glanceable delivery, including the Expo aggregate push, keeps working.
+
+The key is team-scoped for all topics and valid in both the sandbox and production APNs environments. A backup of the `.p8` lives in the 1Password "Eng / Product" vault as "Apple AuthKey KRYMZL626P (.p8)"; Apple never serves it a second time.
 
 ### KiloClaw Controller
 

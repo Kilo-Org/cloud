@@ -1344,12 +1344,63 @@ describe('normalize', () => {
     });
   });
 
+  describe('cloud.worktree.changes.ready', () => {
+    it('normalizes an execution-independent service event with the Cloud envelope identity', () => {
+      const result = normalize({
+        eventId: 1,
+        sessionId: 'agent-1',
+        streamEventType: 'cloud.worktree.changes.ready',
+        timestamp: '2026-09-02T00:00:00.000Z',
+        data: { revision: 4 },
+      });
+      expect(result).toEqual({
+        type: 'worktree.changes.ready',
+        cloudSessionId: 'agent-1',
+        revision: 4,
+      });
+      if (!result) throw new Error('Expected worktree changes event');
+      expect(isChatEvent(result)).toBe(false);
+    });
+
+    it.each([
+      {},
+      { revision: 0 },
+      { revision: '1' },
+      { revision: NaN },
+      { revision: 1, extra: true },
+    ])('rejects invalid data %p', data =>
+      expect(normalize(createRaw('cloud.worktree.changes.ready', data))).toBeNull()
+    );
+
+    it.each(['cloud.worktree.changes.ready', 'worktree.changes.ready'])(
+      'does not accept %s as a Kilo event',
+      type => {
+        expect(normalize(createKilocode(type, { revision: 1 }))).toBeNull();
+        expect(normalizeCliEvent(type, { revision: 1 })).toBeNull();
+      }
+    );
+  });
+
   describe('connected', () => {
+    it('uses only the Cloud envelope session ID for refresh routing', () => {
+      expect(
+        normalize(createRaw('connected', { cloudSessionId: 'agent-other' }, 'agent-1'))
+      ).toEqual({
+        type: 'connected',
+        cloudSessionId: 'agent-1',
+      });
+      expect(normalizeCliEvent('connected', { cloudSessionId: 'agent-1' })).toEqual({
+        type: 'connected',
+      });
+      expect(normalize(createKilocode('connected', {}, 'agent-1'))).toEqual({ type: 'connected' });
+    });
+
     it.each(['active-message', null])(
       'retains authoritative active identity %p',
       activeMessageId => {
         expect(normalize(createRaw('connected', { activeMessageId }))).toEqual({
           type: 'connected',
+          cloudSessionId: 'ses-1',
           activeMessageId,
         });
       }
@@ -1365,7 +1416,7 @@ describe('normalize', () => {
               sessionStatus: { type: 'busy' },
             })
           )
-        ).toEqual({ type: 'connected', sessionStatus: { type: 'busy' } });
+        ).toEqual({ type: 'connected', cloudSessionId: 'ses-1', sessionStatus: { type: 'busy' } });
       }
     );
 
@@ -1377,6 +1428,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'connected',
+        cloudSessionId: 'ses-1',
         sessionStatus: { type: 'busy' },
       });
     });
@@ -1390,6 +1442,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'connected',
+        cloudSessionId: 'ses-1',
         sessionStatus: { type: 'idle' },
         cloudStatus: { type: 'ready' },
       });
@@ -1403,6 +1456,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'connected',
+        cloudSessionId: 'ses-1',
         cloudStatus: { type: 'preparing' },
       });
     });
@@ -1417,6 +1471,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'connected',
+        cloudSessionId: 'ses-1',
         sessionStatus: { type: 'busy' },
         cloudStatus: { type: 'preparing', step: 'cloning' },
       });
@@ -1424,13 +1479,13 @@ describe('normalize', () => {
 
     it('normalizes without sessionStatus', () => {
       const result = normalize(createRaw('connected', {}));
-      expect(result).toEqual({ type: 'connected' });
+      expect(result).toEqual({ type: 'connected', cloudSessionId: 'ses-1' });
       expect(result).not.toHaveProperty('sessionStatus');
     });
 
     it('ignores malformed sessionStatus', () => {
       const result = normalize(createRaw('connected', { sessionStatus: 'busy' }));
-      expect(result).toEqual({ type: 'connected' });
+      expect(result).toEqual({ type: 'connected', cloudSessionId: 'ses-1' });
       expect(result).not.toHaveProperty('sessionStatus');
     });
 
@@ -1443,6 +1498,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'connected',
+        cloudSessionId: 'ses-1',
         sessionStatus: { type: 'idle' },
       });
     });
@@ -1456,6 +1512,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'connected',
+        cloudSessionId: 'ses-1',
         sessionStatus: { type: 'idle' },
       });
       expect(result).not.toHaveProperty('question');
@@ -1477,6 +1534,7 @@ describe('normalize', () => {
       );
       expect(result).toEqual({
         type: 'connected',
+        cloudSessionId: 'ses-1',
         sessionStatus: { type: 'busy' },
       });
       expect(result).not.toHaveProperty('permission');

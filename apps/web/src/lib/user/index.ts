@@ -83,6 +83,7 @@ import {
   kiloclaw_admin_audit_logs,
   kiloclaw_cli_runs,
   user_push_tokens,
+  user_activity_tokens,
   user_notification_preferences,
   contributor_champion_events,
   contributor_champion_memberships,
@@ -1470,6 +1471,10 @@ export async function anonymizeCloudUserData(
     );
   // Locale is account-adjacent and is removed with the token row.
   await tx.delete(user_push_tokens).where(eq(user_push_tokens.user_id, userId));
+  // Activity tokens (Live Activity / push-to-start / Android ongoing) are
+  // account-owned device identifiers; a signed-out or deleted user must stop
+  // receiving glanceable deliveries.
+  await tx.delete(user_activity_tokens).where(eq(user_activity_tokens.user_id, userId));
   await tx
     .delete(user_notification_preferences)
     .where(eq(user_notification_preferences.user_id, userId));
@@ -1949,7 +1954,8 @@ async function getEmailAccountCandidates(email: string) {
 
 export async function getCrossAccountEmailConflicts(
   emails: string[],
-  currentUserId: string
+  currentUserId: string,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<Map<string, boolean>> {
   const uniqueEmails = [...new Set(emails)];
   if (uniqueEmails.length === 0) return new Map();
@@ -1957,7 +1963,7 @@ export async function getCrossAccountEmailConflicts(
   const lowerEmails = [...new Set(uniqueEmails.map(email => email.toLowerCase().trim()))];
   const normalizedEmails = [...new Set(uniqueEmails.map(normalizeEmail))];
   const [linkedProviderMatches, primaryEmailMatches] = await Promise.all([
-    db
+    database
       .select({ email: user_auth_provider.email })
       .from(user_auth_provider)
       .where(
@@ -1966,7 +1972,7 @@ export async function getCrossAccountEmailConflicts(
           ne(user_auth_provider.kilo_user_id, currentUserId)
         )
       ),
-    db
+    database
       .select({
         normalizedEmail: kilocode_users.normalized_email,
         primaryEmail: kilocode_users.google_user_email,

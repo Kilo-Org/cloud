@@ -406,7 +406,7 @@ describe('NewSessionPrompt initialPrompt seed', () => {
       findElementByType(
         element,
         'Pressable',
-        ReactI18next.getI18n().t('agentChat.newSession.addAttachment')
+        ReactI18next.getI18n().t('agentChat.composer.addAttachment')
       )
     ).toMatchObject({
       disabled: paperclipDisabled,

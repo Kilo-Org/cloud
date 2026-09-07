@@ -3,7 +3,7 @@ import 'server-only';
 import { z } from 'zod';
 import { GITLAB_CREDENTIAL_BROKER_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { GIT_TOKEN_SERVICE_API_URL } from '@/lib/config.server';
-import { generateInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken, TOKEN_EXPIRY } from '@/lib/tokens';
 
 const GITLAB_CREDENTIAL_RESPONSE_MAX_BYTES = 16_384;
 const GITLAB_CREDENTIAL_REQUEST_TIMEOUT_MS = 30_000;
@@ -101,7 +101,7 @@ export async function fetchGitLabCredential(
 
   let serviceToken: string;
   try {
-    serviceToken = generateInternalServiceToken(actor.userId, {
+    serviceToken = generateBoundedInternalServiceToken(actor.userId, {
       expiresIn: TOKEN_EXPIRY.fiveMinutes,
       audience: GITLAB_CREDENTIAL_BROKER_AUDIENCE,
       organizationId: actor.organizationId,

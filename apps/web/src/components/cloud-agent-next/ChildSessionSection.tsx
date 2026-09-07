@@ -1,9 +1,11 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { ChevronRight, ChevronDown, Bot, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Bot, CornerDownRight } from 'lucide-react';
+import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import type { KiloSessionId } from '@kilocode/cloud-agent-sdk';
 import type { SubtaskPart, StoredMessage, ToolPart, Part } from './types';
 import { isMessageStreaming, isToolPart } from './types';
@@ -38,10 +40,6 @@ type ChildSessionSectionProps = {
   onOpenChildSession?: OpenChildSession;
 };
 
-/**
- * ChildSessionSection - Compact task row that opens Cloud Agent child transcripts in a drawer.
- * Consumers without a drawer callback retain the existing inline child transcript fallback.
- */
 export function ChildSessionSection({
   subtaskPart,
   taskToolPart,
@@ -56,11 +54,11 @@ export function ChildSessionSection({
   const description = subtaskPart?.description || getTaskDescription(taskToolPart);
   const agent = subtaskPart?.agent || getTaskAgent(taskToolPart);
   const taskStatus = taskToolPart?.state?.status;
+  const isCompleted = taskStatus === 'completed';
   const isRunning = taskStatus === 'running' || taskStatus === 'pending';
   const latestTool = isRunning ? getLatestToolActivity(childMessages) : undefined;
   const agentLabel = agent ? agent.charAt(0).toUpperCase() + agent.slice(1) : undefined;
-  const activity = latestTool ? `Latest: ${latestTool}` : undefined;
-  const progress = activity ?? (taskStatus === 'pending' ? 'Delegating...' : 'Working...');
+  const progress = latestTool ?? (taskStatus === 'pending' ? 'Delegating...' : 'Working...');
   const statusLabel =
     taskStatus === 'completed' ? 'Completed' : taskStatus === 'error' ? 'Failed' : undefined;
   const toolCount = childMessages.reduce(
@@ -83,22 +81,52 @@ export function ChildSessionSection({
     }
   };
 
+  const summary = (statusLabel || toolCount > 0) && (
+    <span className="flex shrink-0 items-center gap-2 font-normal whitespace-nowrap">
+      {statusLabel && (
+        <span className={taskStatus === 'error' ? 'text-destructive' : undefined}>
+          {statusLabel}
+        </span>
+      )}
+      {statusLabel && toolCount > 0 && <span aria-hidden="true">·</span>}
+      {toolCount > 0 && (
+        <span className="tabular-nums">
+          {toolCount} {toolCount === 1 ? 'tool call' : 'tool calls'}
+        </span>
+      )}
+    </span>
+  );
+
   const rowContent = (
     <>
-      {isRunning ? (
-        <Loader2 className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
-      ) : (
-        <Bot className="size-3.5 shrink-0" />
-      )}
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-left">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="truncate" title={description}>
+      <span className="flex min-w-0 items-center gap-2">
+        {isRunning ? (
+          <StatusSpinner
+            className="size-4 shrink-0 motion-reduce:[&_rect]:animate-none!"
+            title={taskStatus === 'pending' ? 'Delegating' : 'Working'}
+          />
+        ) : (
+          <Bot className="size-4 shrink-0" aria-hidden="true" />
+        )}
+        <span
+          className={cn(
+            'flex min-w-0 flex-1 items-center gap-x-2 gap-y-1',
+            !isCompleted && 'flex-wrap'
+          )}
+        >
+          <span
+            className={cn('min-w-0 font-normal', isCompleted ? 'truncate' : 'wrap-anywhere')}
+            title={description}
+          >
             {description || 'Subagent task'}
           </span>
           {agentLabel && (
             <Badge
               variant="outline"
-              className="max-w-[35%] shrink-0 px-1.5 py-0 text-xs font-normal"
+              className={cn(
+                'px-1.5 py-0 text-xs font-normal',
+                isCompleted ? 'max-w-[45%] shrink-0' : 'max-w-full'
+              )}
             >
               <span className="truncate" title={agentLabel}>
                 {agentLabel}
@@ -106,51 +134,51 @@ export function ChildSessionSection({
             </Badge>
           )}
         </span>
-        {isRunning && (
-          <span className="truncate font-normal" title={progress}>
-            {progress}
-          </span>
-        )}
+        {isCompleted && summary}
+        {isInteractive &&
+          (canExpandInline && isExpanded ? (
+            <ChevronDown className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+          ) : (
+            <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+          ))}
       </span>
-      {(statusLabel || toolCount > 0) && (
-        <span className="flex shrink-0 items-center gap-2 font-normal">
-          {statusLabel && (
-            <span className={taskStatus === 'error' ? 'text-destructive' : undefined}>
-              {statusLabel}
+      {!isCompleted && (isRunning || statusLabel || toolCount > 0) && (
+        <span className="text-muted-foreground ml-6 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 font-normal">
+          {isRunning && (
+            <span className="flex min-w-0 items-center gap-2">
+              {latestTool && <CornerDownRight className="size-4 shrink-0" aria-hidden="true" />}
+              <span className="truncate" title={progress}>
+                {progress}
+              </span>
             </span>
           )}
-          {statusLabel && toolCount > 0 && <span aria-hidden="true">·</span>}
-          {toolCount > 0 && (
-            <span className="tabular-nums">
-              {toolCount} {toolCount === 1 ? 'tool call' : 'tool calls'}
-            </span>
-          )}
+          {summary}
         </span>
       )}
-      {isInteractive &&
-        (canExpandInline && isExpanded ? (
-          <ChevronDown className="size-3.5 shrink-0" />
-        ) : (
-          <ChevronRight className="size-3.5 shrink-0" />
-        ))}
     </>
   );
 
   return (
-    <div className="text-muted-foreground min-w-0 text-xs">
+    <div className="text-muted-foreground min-w-0 py-1 text-xs">
       {isInteractive ? (
         <Button
           variant="ghost"
+          size={null}
           onClick={handleOpen}
           aria-busy={isRunning || undefined}
           aria-haspopup={canOpenDrawer ? 'dialog' : undefined}
           aria-expanded={canExpandInline ? isExpanded : undefined}
-          className="hover:bg-muted/40 h-auto min-h-6 w-full items-center justify-start gap-2 px-2 py-1 text-left text-xs pointer-coarse:min-h-11"
+          className="hover:bg-muted/40 h-auto min-h-8 w-full flex-col items-stretch justify-center gap-1 px-2 py-2 text-left text-xs whitespace-normal pointer-coarse:min-h-11"
         >
           {rowContent}
         </Button>
       ) : (
-        <div className="flex min-h-6 w-full items-center gap-2 px-2 py-1">{rowContent}</div>
+        <div
+          aria-busy={isRunning || undefined}
+          className="flex min-h-8 w-full flex-col justify-center gap-1 px-2 py-2 pointer-coarse:min-h-11"
+        >
+          {rowContent}
+        </div>
       )}
 
       {isExpanded && inlineRenderPart && (

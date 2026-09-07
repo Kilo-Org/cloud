@@ -7,6 +7,7 @@ import { getEmbeddingProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { debugSaveProxyRequest } from '@/lib/debugUtils';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@/lib/getRootSpan';
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
@@ -126,7 +127,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     organizationId: authOrganizationId,
     botId: authBotId,
     tokenSource: authTokenSource,
-  } = await getUserFromAuth({ adminOnly: false });
+  } = await getUserFromAuth({
+    adminOnly: false,
+    expectedAudience: KILO_GATEWAY_AUDIENCE,
+  });
   authSpan.end();
 
   let user: typeof maybeUser | AnonymousUserContext;

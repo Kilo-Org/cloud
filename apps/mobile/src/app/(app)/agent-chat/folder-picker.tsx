@@ -108,11 +108,6 @@ export default function FolderPickerScreen() {
   const title = current?.title ?? bridge.projectName;
   const currentState = state?.path === current?.path ? state : null;
 
-  // One long-lived FlatList renders in every phase. Non-ready states go
-  // through ListEmptyComponent so the scroll view instance never changes:
-  // react-native-screens sizes a formSheet's scroll view once per bounds
-  // change and binds the correction to one instance, so swapping the body
-  // between a View and a FlatList breaks the header's frames.
   const data = currentState?.phase === 'ready' ? currentState.directories : [];
   const listContentStyle = { flexGrow: 1, paddingBottom: bottom } satisfies ViewStyle;
   let empty: ReactNode = null;
@@ -128,47 +123,38 @@ export default function FolderPickerScreen() {
     );
   } else if (currentState.phase === 'retryable') {
     empty = (
-      <View className="flex-1 items-center justify-center">
-        <EmptyState
-          icon={FolderOpen}
-          placement="center"
-          title={t('agentChat.folderPicker.retryableTitle')}
-          description={t('agentChat.folderPicker.retryableDescription')}
-          action={
-            <Button
-              variant="outline"
-              onPress={() => {
-                list(currentState.path);
-              }}
-              accessibilityLabel={t('common.retry')}
-            >
-              <Text>{t('common.retry')}</Text>
-            </Button>
-          }
-        />
-      </View>
+      <EmptyState
+        icon={FolderOpen}
+        title={t('agentChat.folderPicker.retryableTitle')}
+        description={t('agentChat.folderPicker.retryableDescription')}
+        action={
+          <Button
+            variant="outline"
+            onPress={() => {
+              list(currentState.path);
+            }}
+            accessibilityLabel={t('common.retry')}
+          >
+            <Text>{t('common.retry')}</Text>
+          </Button>
+        }
+      />
     );
   } else if (currentState.phase === 'unsupported') {
     empty = (
-      <View className="flex-1 items-center justify-center">
-        <EmptyState
-          icon={FolderOpen}
-          placement="center"
-          title={t('agentChat.folderPicker.unsupportedTitle')}
-          description={t('agentChat.folderPicker.unsupportedDescription')}
-        />
-      </View>
+      <EmptyState
+        icon={FolderOpen}
+        title={t('agentChat.folderPicker.unsupportedTitle')}
+        description={t('agentChat.folderPicker.unsupportedDescription')}
+      />
     );
-  } else {
+  } else if (data.length === 0) {
     empty = (
-      <View className="items-center justify-center px-6 pt-10">
-        <EmptyState
-          icon={FolderOpen}
-          placement="top"
-          title={t('agentChat.folderPicker.emptyTitle')}
-          description={t('agentChat.folderPicker.emptyDescription')}
-        />
-      </View>
+      <EmptyState
+        icon={FolderOpen}
+        title={t('agentChat.folderPicker.emptyTitle')}
+        description={t('agentChat.folderPicker.emptyDescription')}
+      />
     );
   }
 
@@ -180,47 +166,51 @@ export default function FolderPickerScreen() {
       cancelLabel={isNested ? t('common.back') : undefined}
       scrollable={false}
     >
-      <FlatList
-        className="flex-1 bg-background"
-        data={data}
-        keyExtractor={entry => entry.path}
-        contentContainerStyle={listContentStyle}
-        ListHeaderComponent={
-          data.length > 0 ? (
-            <View className="px-4 pb-2 pt-3">
-              <Text variant="muted" className="text-sm">
-                {t('agentChat.folderPicker.tapToListHint')}
-              </Text>
-            </View>
-          ) : null
-        }
-        ListEmptyComponent={empty}
-        scrollEnabled={data.length > 0}
-        renderItem={({ item }) => (
-          <Pressable
-            className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
-            onPress={() => {
-              openChild(item);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={item.name}
-            accessibilityHint={t('agentChat.folderPicker.tapToListHint')}
-          >
-            <View className="flex-1">
-              <Text className="text-base text-foreground" numberOfLines={1}>
-                {item.name}
-              </Text>
-            </View>
-            <View
-              pointerEvents="none"
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
+      {currentState !== null && currentState.phase !== 'skeleton' && data.length === 0 ? (
+        empty
+      ) : (
+        <FlatList
+          className="flex-1 bg-background"
+          data={data}
+          keyExtractor={entry => entry.path}
+          contentContainerStyle={listContentStyle}
+          ListHeaderComponent={
+            data.length > 0 ? (
+              <View className="px-4 pb-2 pt-3">
+                <Text variant="muted" className="text-sm">
+                  {t('agentChat.folderPicker.tapToListHint')}
+                </Text>
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={empty}
+          scrollEnabled={data.length > 0}
+          renderItem={({ item }) => (
+            <Pressable
+              className="flex-row items-center gap-3 border-b border-border px-4 py-3 active:bg-secondary"
+              onPress={() => {
+                openChild(item);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={item.name}
+              accessibilityHint={t('agentChat.folderPicker.tapToListHint')}
             >
-              <DirectionalChevronRight size={14} color={colors.mutedForeground} />
-            </View>
-          </Pressable>
-        )}
-      />
+              <View className="flex-1">
+                <Text className="text-base text-foreground" numberOfLines={1}>
+                  {item.name}
+                </Text>
+              </View>
+              <View
+                pointerEvents="none"
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
+                <DirectionalChevronRight size={14} color={colors.mutedForeground} />
+              </View>
+            </Pressable>
+          )}
+        />
+      )}
     </PickerSheet>
   );
 }

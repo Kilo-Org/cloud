@@ -30,7 +30,7 @@ export function classifyPollResponse(httpStatus: number): PollOutcome {
   }
   // Any other 4xx (400, 401, ...) is not something retrying will fix — and
   // 1xx/3xx are statuses this endpoint never returns, so treat them the same.
-  return { status: 'error', message: i18n.t('authErrors.signInFailed') };
+  return { status: 'error', message: i18n.t('authErrors.invalidToken') };
 }
 
 /** Extract the user-facing message from a device-auth start 429 JSON body. */

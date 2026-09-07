@@ -44,7 +44,7 @@ function confirmCancel(onConfirm: () => void) {
     i18n.t('codeReviewer.reviewDetail.cancelTitle'),
     i18n.t('codeReviewer.reviewDetail.cancelMessage'),
     [
-      { text: i18n.t('codeReviewer.reviewDetail.keepRunning'), style: 'cancel' },
+      { text: i18n.t('common.keepRunning'), style: 'cancel' },
       {
         text: i18n.t('codeReviewer.reviewDetail.cancelReview'),
         style: 'destructive',
@@ -102,23 +102,19 @@ export function ReviewDetailScreen({
       return (
         <View className="flex-1 bg-background">
           <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
-          <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 flex-1 pt-4">
-            <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
-          </TabScreenScrollView>
+          <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
         </View>
       );
     }
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
-        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 flex-1 pt-4">
-          <QueryError
-            variant="server"
-            title={t('codeReviewer.reviewDetail.couldNotLoad')}
-            onRetry={() => void refetch()}
-            isRetrying={isFetching}
-          />
-        </TabScreenScrollView>
+        <QueryError
+          variant="server"
+          title={t('codeReviewer.reviewDetail.couldNotLoad')}
+          onRetry={() => void refetch()}
+          isRetrying={isFetching}
+        />
       </View>
     );
   }
@@ -172,14 +168,21 @@ export function ReviewDetailScreen({
           <Text className={cn('text-sm font-semibold', meta.className)}>{meta.label}</Text>
           {review.error_message ? (
             <View className="rounded-lg bg-danger-tile-bg p-3">
-              <Text className="text-xs text-destructive">{review.error_message}</Text>
+              {/* Upstream failures can persist a serialized stack dump here;
+                  unclamped it filled the screen and pushed the retry action
+                  below the fold (e1-review-status.png). Bound the block so
+                  the conclusion keeps a fixed footprint and the actions stay
+                  reachable. */}
+              <Text className="text-xs text-destructive" numberOfLines={4}>
+                {review.error_message}
+              </Text>
             </View>
           ) : null}
         </View>
 
         {/* Findings: flattened from the council result, paginated in memory. */}
         <View className="gap-2">
-          <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.findings')}</Text>
+          <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
             <Text variant="muted" className="text-xs">
               {t('codeReviewer.reviewDetail.noFindings')}
@@ -216,19 +219,11 @@ export function ReviewDetailScreen({
 
         {/* Metadata: technical details after the outcome. */}
         <View className="gap-2">
-          <Text className="text-sm font-medium">{t('codeReviewer.reviewDetail.details')}</Text>
+          <Text className="text-sm font-medium">{t('common.details')}</Text>
           <View className="gap-1 rounded-lg bg-secondary p-4">
-            <MetaRow
-              label={t('codeReviewer.reviewDetail.branch')}
-              value={`${review.head_ref} → ${review.base_ref}`}
-            />
-            <MetaRow
-              label={t('codeReviewer.reviewDetail.platform')}
-              value={reviewerPlatformLabel(review.platform)}
-            />
-            {review.model ? (
-              <MetaRow label={t('codeReviewer.reviewDetail.model')} value={review.model} />
-            ) : null}
+            <MetaRow label={t('common.branch')} value={`${review.head_ref} → ${review.base_ref}`} />
+            <MetaRow label={t('common.platform')} value={reviewerPlatformLabel(review.platform)} />
+            {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
             <MetaRow
               label={t('codeReviewer.reviewDetail.created')}
               value={timeAgo(parseTimestamp(review.created_at))}
@@ -241,13 +236,13 @@ export function ReviewDetailScreen({
             ) : null}
             {review.completed_at ? (
               <MetaRow
-                label={t('codeReviewer.reviewDetail.completed')}
+                label={t('codeReviewer.status.completed')}
                 value={timeAgo(parseTimestamp(review.completed_at))}
               />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (
               <MetaRow
-                label={t('codeReviewer.reviewDetail.cost')}
+                label={t('common.cost')}
                 value={formatMoney(fromMicrodollars(review.total_cost_musd), i18n.language)}
               />
             ) : null}
@@ -279,11 +274,13 @@ export function ReviewDetailScreen({
                 return;
               }
               void openExternalUrl(review.pr_url, {
-                label: t('codeReviewer.reviewDetail.pullRequest'),
+                label: t('common.pullRequest'),
               });
             }}
           >
-            <Text>{t('codeReviewer.reviewDetail.openPullRequest')}</Text>
+            {/* i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
+                this key is the verb CTA — cs/pl/be translate the two apart. */}
+            <Text>{t('common.openPullRequest')}</Text>
           </Button>
 
           {canCancel ? (

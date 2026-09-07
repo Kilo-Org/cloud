@@ -42,6 +42,8 @@ const hoisted = vi.hoisted(() => {
 // Mock every RN / Expo / SDK side-effect import that `mobile-session-manager.ts`
 // and `session-detail-content.tsx` pull in transitively before loading either
 // module.
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'StateSurface' }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: vi.fn(),
 }));
@@ -107,6 +109,7 @@ vi.mock('@/lib/trpc', () => ({
 }));
 
 // ── react-native / native bridges ──────────────────────────────────────────
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Alert: { alert: vi.fn() },
@@ -132,6 +135,14 @@ vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
   useIsFocused: () => true,
   useRouter: () => ({ replace: vi.fn() }),
+}));
+
+// `useStackSafeReplace` owns the push + post-transition stack cleanup that keeps
+// Android Fabric alive (KILO-APP-25); its own mechanics are covered in
+// src/lib/navigation/stack-safe-replace.mounted.test.tsx. Here it stands in for
+// the navigation call so these assertions stay about the destination href.
+vi.mock('@/lib/navigation/stack-safe-replace', () => ({
+  useStackSafeReplace: () => ({ replace: vi.fn() }),
 }));
 vi.mock('expo-keep-awake', () => ({
   useKeepAwake: vi.fn(),

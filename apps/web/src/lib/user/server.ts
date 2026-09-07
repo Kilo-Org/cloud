@@ -1087,6 +1087,7 @@ export const nextAuthHttpHandler = NextAuth(authOptions);
 export type RequiredPermissions = {
   adminOnly: boolean;
   DANGEROUS_allowBlockedUsers?: boolean;
+  expectedAudience?: string;
 };
 
 type GetAuthResponse =
@@ -1218,7 +1219,9 @@ async function resolveUserFromAuth(
   // all calls from the extension including the openrouter proxy call use this auth method
   // also val.town and other blessed API users who are given their own custom JWTs use this path
   if (headersList.get('Authorization')) {
-    const authorizationValidationResult = validateAuthorizationHeader(headersList);
+    const authorizationValidationResult = validateAuthorizationHeader(headersList, {
+      expectedAudience: opts.expectedAudience,
+    });
     if (authorizationValidationResult.error != undefined) {
       return authError(401, authorizationValidationResult.error, '?');
     }

@@ -26,6 +26,10 @@ import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 import { type QuickChatRow } from './quick-chat-messages';
 import { QuickChatScreen } from './quick-chat-screen';
 
+vi.mock('@/components/centered-state-surface', () => ({
+  StateSurfaceInsets: 'StateSurfaceInsets',
+}));
+
 const listMessagesQueryFn = vi.hoisted(() => vi.fn());
 const getOrCreateThreadMutate = vi.hoisted(() => vi.fn());
 const listMessagesQuery = vi.hoisted(() => vi.fn());
@@ -72,6 +76,7 @@ const orgLoaded = vi.hoisted(() => ({ value: true }));
 const organizationId = vi.hoisted(() => ({ value: null as string | null }));
 const authEpoch = vi.hoisted(() => ({ value: 0 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',
@@ -416,7 +421,7 @@ describe('QuickChatScreen composer', () => {
     expect(latestComposer()?.disabled).toBeUndefined();
     const error = queryErrors.list[0];
     expect(error?.variant).toBe('server');
-    expect(error?.title).toBe(i18n.t('quickChat.catalogRetry'));
+    expect(error?.title).toBe(i18n.t('common.couldNotLoadModels'));
     expect(error?.onRetry).toBeDefined();
     expect(emptyStateRenders.list).toHaveLength(0);
   });

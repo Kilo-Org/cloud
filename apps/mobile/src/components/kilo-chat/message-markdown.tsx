@@ -1,7 +1,7 @@
 import { Text } from '@/components/ui/text';
 
 import { ChatMarkdownText } from '../agents/chat-markdown-text';
-import { isMessageTextSelectionEnabled } from './message-presentation';
+import { isMessageTextSelectionEnabled, textBlockHasVisibleContent } from './message-presentation';
 
 type MessageMarkdownProps = {
   text: string;
@@ -9,7 +9,7 @@ type MessageMarkdownProps = {
 };
 
 export function MessageMarkdown({ text, isFromMe }: Readonly<MessageMarkdownProps>) {
-  if (text.trim().length === 0) {
+  if (!textBlockHasVisibleContent(text)) {
     return null;
   }
 

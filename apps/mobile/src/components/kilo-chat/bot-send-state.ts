@@ -29,7 +29,7 @@ function computeMobileBotDisplay(params: {
     return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
   }
   if (!params.presence) {
-    return { state: 'unknown', label: i18n.t('chat.botStatus.unknown') };
+    return { state: 'unknown', label: i18n.t('common.unknown') };
   }
   if (!params.presence.online) {
     return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
@@ -39,9 +39,9 @@ function computeMobileBotDisplay(params: {
     return { state: 'offline', label: i18n.t('chat.botStatus.offline') };
   }
   if (elapsed > 30_000) {
-    return { state: 'idle', label: i18n.t('chat.botStatus.idle') };
+    return { state: 'idle', label: i18n.t('common.idle') };
   }
-  return { state: 'online', label: i18n.t('chat.botStatus.online') };
+  return { state: 'online', label: i18n.t('common.online') };
 }
 
 export function resolveMobileMessageInputAvailability(params: {

@@ -20,7 +20,7 @@ export function terminalTabId(terminalId: string): TerminalTabId {
 }
 
 export function terminalIdFromTabId(tabId: WorkspaceTabId): string | null {
-  if (tabId === CHAT_TAB_ID) return null;
+  if (!tabId.startsWith('terminal:')) return null;
   return tabId.slice('terminal:'.length);
 }
 
@@ -61,18 +61,16 @@ export function addTerminalTab(
 
 export function selectWorkspaceTab(
   state: WorkspaceTabsState,
-  activeTabId: WorkspaceTabId
+  activeTabId: string
 ): WorkspaceTabsState {
   if (activeTabId === CHAT_TAB_ID) {
     return { ...state, activeTabId };
   }
 
-  const terminalId = terminalIdFromTabId(activeTabId);
-  if (!terminalId || !state.terminals.some(tab => tab.id === terminalId)) {
-    return state;
-  }
+  const terminal = state.terminals.find(tab => terminalTabId(tab.id) === activeTabId);
+  if (!terminal) return state;
 
-  return { ...state, activeTabId };
+  return { ...state, activeTabId: terminalTabId(terminal.id) };
 }
 
 export function closeTerminalTab(

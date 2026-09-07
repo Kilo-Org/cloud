@@ -142,8 +142,7 @@ export function ModelSelector({
   const providerAware = pickerOptions.some(
     option => option.modelRef !== undefined || !option.showGatewayMetadata
   );
-  const label =
-    selectedModel?.name ?? (!providerAware && value ? value : t('agentChat.modelSelector.model'));
+  const label = selectedModel?.name ?? (!providerAware && value ? value : t('common.model'));
   const { byok, collectsData } = modelSelectorBadges(selectedModel);
   const hasVariants = selectedModel ? selectedModel.variants.length > 1 : false;
   const variantLabel = variant ? thinkingEffortLabel(variant) : '';

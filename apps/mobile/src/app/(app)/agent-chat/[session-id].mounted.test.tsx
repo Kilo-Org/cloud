@@ -34,6 +34,8 @@ import {
 import SessionDetailScreen from './[session-id]';
 
 const useLocalSearchParamsMock = vi.hoisted(() => vi.fn());
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 const useRouterMock = vi.hoisted(() => vi.fn());
 const useQueryMock = vi.hoisted(() => vi.fn());
 const queryOptionsMock = vi.hoisted(() => vi.fn());
@@ -73,6 +75,7 @@ const confirmationRequests = vi.hoisted(() => ({
 }));
 
 const navigationRoutes = ['session-detail'];
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',
@@ -991,8 +994,9 @@ describe.each([true, false])('SessionDetailScreen header return with history=%s'
     );
     const header = renderer.root.findByType(ScreenHeader);
     const title = header.findByProps({ accessibilityRole: 'header' });
-    expect(propOf(title, 'numberOfLines')).toBe(1);
+    expect(propOf(title, 'numberOfLines')).toBe(2);
     expect(propOf(title, 'ellipsizeMode')).toBe('tail');
+    expect(title.parent?.props.className).toContain('min-h-14');
     const back = findByType(header, 'Pressable').find(
       node => propOf(node, 'accessibilityLabel') === 'Go back'
     );

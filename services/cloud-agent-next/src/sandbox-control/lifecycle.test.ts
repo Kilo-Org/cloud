@@ -1,4 +1,8 @@
+import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SandboxSession } from '../sandbox-session/SandboxSession.js';
+import { canonicalControlEventJson } from '../shared/control-event-canonical.js';
+import { createMemoryEventQueries } from '../session/preparation-test-helpers.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import { SandboxControl, type SandboxAcquisition } from '../persistence/SandboxControl.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from '../sandbox-session/control-dispatch.js';
@@ -17,19 +21,27 @@ import type {
   SandboxControlSocketHooks,
 } from './socket.js';
 import { DEADLINE_MS } from './deadlines.js';
-import { loadDeadlines, loadRouteTable, loadSessionCredentialGrants } from './durable-state.js';
+import {
+  loadDeadlines,
+  loadRecoveryDecisions,
+  loadRouteTable,
+  loadSessionCredentialGrants,
+} from './durable-state.js';
 import type * as cloudflareProvider from './cloudflare-provider.js';
+import type * as SocketModule from './socket.js';
 import { decodeCloudflareProviderRef } from './cloudflare-provider.js';
 import { WORKTREE_CREDENTIAL_CONTAINMENT } from './physical-lifecycle.js';
 import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import { logger } from '../logger.js';
 import { validateControlLogUploadGrant } from './log-upload-grant.js';
+import { summarizeHeartbeatIdle } from './status-projection.js';
 
 const mocks = vi.hoisted(() => ({
   getSandbox: vi.fn(),
   providerCreate: vi.fn(),
   socket: vi.fn(),
   session: vi.fn(),
+  eventQueries: vi.fn(),
 }));
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: mocks.getSandbox }));
@@ -59,8 +71,15 @@ vi.mock('./cloudflare-provider.js', async importOriginal => {
     },
   };
 });
-vi.mock('./socket.js', () => ({ createSandboxControlSocketHandler: mocks.socket }));
+vi.mock('./socket.js', async importOriginal => ({
+  ...(await importOriginal<typeof SocketModule>()),
+  createSandboxControlSocketHandler: mocks.socket,
+}));
 vi.mock('../sandbox-session/session-stub.js', () => ({ getSandboxSessionStub: mocks.session }));
+vi.mock('drizzle-orm/durable-sqlite', () => ({ drizzle: vi.fn() }));
+vi.mock('drizzle-orm/durable-sqlite/migrator', () => ({ migrate: vi.fn(async () => undefined) }));
+vi.mock('../../drizzle/migrations', () => ({ default: {} }));
+vi.mock('../session/queries/index.js', () => ({ createEventQueries: mocks.eventQueries }));
 
 const SANDBOX_ID = 'ses-abcdef';
 const OWNER = 'owner_1';
@@ -75,6 +94,16 @@ const PROMPT = {
   turn: { type: 'prompt', prompt: 'Continue the task' },
   agent: { mode: 'code', model: 'kilo/fake' },
 };
+
+function nativeRetirementPayload(directory: string, nativeRuntimeId: string) {
+  return {
+    retirementId: '99999999-9999-4999-8999-999999999999',
+    directory,
+    nativeRuntimeId,
+    reason: 'process_exited',
+    cleanupDeadlineAt: Date.now() + DEADLINE_MS.stopAttempt,
+  };
+}
 const BILLING = parseSandboxBillingInput({
   sandboxId: SANDBOX_ID,
   subject: { type: 'user', id: OWNER },
@@ -277,10 +306,12 @@ async function harness(
         lifecycle: { version: 1, timestamp: Date.now() },
       })
     ),
+    getControlState: vi.fn().mockResolvedValue(null),
     receiveSandboxControlEvent: vi.fn().mockResolvedValue({ applied: true }),
     receiveSandboxControlPreparing: vi.fn().mockResolvedValue({ applied: true }),
     failWaitingMessages: vi.fn().mockResolvedValue(undefined),
     invalidateTerminalRuntime: vi.fn().mockResolvedValue(undefined),
+    recordNativeRuntime: vi.fn().mockResolvedValue(undefined),
   };
   mocks.session.mockReturnValue(session);
   let hooks: SandboxControlSocketHooks = {};
@@ -298,6 +329,8 @@ async function harness(
       connection = null;
     }),
     closeProvisionalSockets: vi.fn(),
+    supportsOperationResults: () => true,
+    supportsNativeRuntimeRetirement: () => true,
     sendRequest,
   } as unknown as SandboxControlSocketHandler;
   mocks.socket.mockImplementation(
@@ -321,6 +354,7 @@ async function harness(
     },
     storage,
     records,
+    ctx,
     env,
     namespace,
     namespaces,
@@ -353,16 +387,17 @@ async function harness(
         billing: BILLING,
       });
     },
-    async ready() {
+    async ready(runtime?: { wrapperVersion: string | null; recoveryCapable?: boolean }) {
       const physical = await control.getPhysicalRecord();
       if (!physical.providerRef) throw new Error('No physical allocation');
       connection = {
         connectionId: crypto.randomUUID(),
         wrapperInstanceId: crypto.randomUUID(),
         providerInstanceId: physical.providerRef,
+        recoveryCapable: runtime?.recoveryCapable === true,
       };
       const identity = connection;
-      await hooks.onHandshakeComplete?.(identity);
+      await hooks.onHandshakeComplete?.(identity, runtime);
       await hooks.onReady?.(identity);
       await control.attachSession(ROUTE);
       return identity;
@@ -374,9 +409,13 @@ async function harness(
       await control.alarm();
       await flush();
     },
-    async evict() {
+    replaceConnection(identity: SandboxControlConnectionIdentity) {
+      connection = identity;
+    },
+    async evict(passive = false) {
       control = new SandboxControl(ctx, env);
       await Promise.all(initializing);
+      if (!passive) await control.getStatus();
     },
   };
 }
@@ -401,6 +440,324 @@ afterEach(() => {
 });
 
 describe('SandboxControl lifecycle boundaries', () => {
+  it('recovers one eligible wrapper runtime through the production socket hooks', async () => {
+    const h = await harness();
+    h.session.getControlState.mockResolvedValue({
+      version: 1,
+      scope: { sandboxId: SANDBOX_ID },
+      targets: [],
+    });
+    h.sendRequest.mockImplementation(async (request: SandboxControlOutboundRequest) => ({
+      type: 'response',
+      requestId: 'request_1',
+      ok: true,
+      result:
+        request.operation === 'sandbox.status'
+          ? { healthy: true, state: 'idle', version: '2.4.0', kiloReady: true }
+          : request.operation === 'sandbox.reconcile'
+            ? {
+                episodeId: (request.payload as { recovery: { episodeId: string } }).recovery
+                  .episodeId,
+                attempt: (request.payload as { recovery: { attempt: number } }).recovery.attempt,
+                phase: (request.payload as { phase: 'drain' | 'ready' | 'commit' }).phase,
+              }
+            : undefined,
+    }));
+    await h.create();
+    const first = await h.ready({ wrapperVersion: null, recoveryCapable: true });
+    await h.flush();
+
+    expect(h.sendRequest.mock.calls.map(([request]) => request.operation)).toEqual([
+      'sandbox.reconcile',
+      'sandbox.reconcile',
+      'sandbox.status',
+      'sandbox.reconcile',
+    ]);
+    expect(await loadRecoveryDecisions(h.storage)).toEqual([]);
+
+    await h.hooks.onSocketClosed?.(true, first);
+    const pending = await loadRecoveryDecisions(h.storage);
+    expect(pending).toHaveLength(1);
+    expect(pending[0]).toMatchObject({ wrapperInstanceId: first.wrapperInstanceId });
+
+    const replacement = { ...first, connectionId: crypto.randomUUID() };
+    h.replaceConnection(replacement);
+    await h.hooks.onHandshakeComplete?.(replacement);
+    await h.hooks.onReady?.(replacement);
+    await h.flush();
+
+    expect(await loadRecoveryDecisions(h.storage)).toEqual([]);
+    expect((await h.control.getPhysicalRecord()).state).toBe('running');
+    expect(h.sendRequest.mock.calls.map(([request]) => request.operation)).toEqual([
+      'sandbox.reconcile',
+      'sandbox.reconcile',
+      'sandbox.status',
+      'sandbox.reconcile',
+      'sandbox.reconcile',
+      'sandbox.reconcile',
+      'sandbox.status',
+      'sandbox.reconcile',
+    ]);
+  });
+
+  it('retains observed versions through readiness, eviction and stop, then clears them on a new allocation', async () => {
+    const h = await harness();
+    const status = () => h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' });
+    await h.create();
+    const empty = {
+      sandboxType: 'isolated-small',
+      wrapperVersion: null,
+      kiloCliVersion: null,
+      startedAt: null,
+      stoppedAt: null,
+    };
+    expect((await status()).runtime).toEqual(empty);
+    const identity = await h.ready({ wrapperVersion: '2.4.0' });
+    expect((await status()).runtime).toEqual({ ...empty, wrapperVersion: '2.4.0' });
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '7.4.20' } },
+      identity
+    );
+    const runtime = { ...empty, wrapperVersion: '2.4.0', kiloCliVersion: '7.4.20' };
+    expect((await status()).runtime).toEqual(runtime);
+    await h.hooks.onHeartbeat?.(activeHeartbeat, identity);
+    await h.evict();
+    expect((await status()).runtime).toEqual(runtime);
+    await h.control.beginStop('idle');
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '9.9.9' } },
+      identity
+    );
+    await h.control.confirmStopped();
+    await h.evict(true);
+    expect(await status()).toMatchObject({ status: 'sleeping', runtime });
+    await h.create();
+    expect((await status()).runtime).toEqual(empty);
+    const replacement = await h.ready({ wrapperVersion: '2.5.0' });
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '7.5.0' } },
+      replacement
+    );
+    await h.hooks.onHandshakeComplete?.(identity, { wrapperVersion: '9.9.9' });
+    await h.hooks.onHeartbeat?.(
+      { ...activeHeartbeat, kilo: { ready: true, version: '9.9.9' } },
+      identity
+    );
+    expect((await status()).runtime).toEqual({
+      ...empty,
+      wrapperVersion: '2.5.0',
+      kiloCliVersion: '7.5.0',
+    });
+    await h.control.eraseRecord();
+    expect(h.records.has('runtime_metadata')).toBe(false);
+  });
+
+  it('fences a delayed hello against allocation replacement inside its transaction', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready({ wrapperVersion: '2.4.0' });
+    const gate = deferred<void>();
+    const entered = deferred<void>();
+    const replacement = {
+      sandboxType: 'isolated-small',
+      wrapperVersion: null,
+      kiloCliVersion: null,
+      startedAt: null,
+      stoppedAt: null,
+    };
+    const blocked = h.storage.transaction(async () => {
+      entered.resolve();
+      await gate.promise;
+      h.records.set('physical_record', {
+        state: 'creating',
+        providerRef: null,
+        createIntent: { intentId: 'replacement', createdAt: Date.now() },
+        stopTombstone: null,
+        resumable: false,
+      });
+      h.records.set('runtime_metadata', replacement);
+    });
+    await entered.promise;
+    const hello = h.hooks.onHandshakeComplete?.(identity, { wrapperVersion: '9.9.9' });
+    await Promise.resolve();
+    gate.resolve();
+    await blocked;
+    await hello;
+    expect(h.records.get('runtime_metadata')).toEqual(replacement);
+  });
+
+  it('omits runtime metadata on owner or provider mismatch without any operational effects', async () => {
+    const h = await harness();
+    await h.create();
+    await h.ready({ wrapperVersion: '2.4.0' });
+    await h.evict(true);
+    const writes = [
+      vi.spyOn(h.storage, 'put'),
+      vi.spyOn(h.storage, 'delete'),
+      vi.spyOn(h.storage, 'setAlarm'),
+      vi.spyOn(h.storage, 'deleteAlarm'),
+    ];
+    const before = structuredClone([...h.records]);
+    for (const input of [
+      { ownerId: 'other-owner', provider: 'cloudflare' },
+      { ownerId: OWNER, provider: 'vercel' },
+    ] as const) {
+      expect(await h.control.getSandboxStatus(input)).not.toHaveProperty('runtime');
+    }
+    expect([...h.records]).toEqual(before);
+    for (const write of writes) expect(write).not.toHaveBeenCalled();
+  });
+
+  it.each(['missing', 'stopped', 'creating', 'stopping'] as const)(
+    'keeps cold passive %s reads independent of lifecycle repair and credentials',
+    async state => {
+      const h = await harness();
+      h.records.clear();
+      h.records.set('owner_id', OWNER);
+      h.records.set('provider_kind', 'cloudflare');
+      h.records.set('worktree_credential_grants', [{ untouched: true }]);
+      const runtime = {
+        sandboxType: 'isolated-small',
+        wrapperVersion: '2.4.0',
+        kiloCliVersion: '7.4.20',
+        startedAt: null,
+        stoppedAt: null,
+      };
+      h.records.set('runtime_metadata', runtime);
+      if (state !== 'missing') {
+        h.records.set('physical_record', {
+          state,
+          providerRef: state === 'stopped' ? null : 'instance_pending',
+          resumable: false,
+          createIntent:
+            state === 'creating' ? { intentId: 'pending', createdAt: Date.now() - 10_000 } : null,
+          stopTombstone:
+            state === 'stopping'
+              ? { reason: 'retired', attempts: 5, createdAt: Date.now() - 10_000 }
+              : null,
+        });
+      }
+      await h.storage.setAlarm(Date.now() + 12_345);
+      const before = structuredClone([...h.records]);
+      const alarm = h.alarmAt;
+      const writes = [
+        vi.spyOn(h.storage, 'put'),
+        vi.spyOn(h.storage, 'delete'),
+        vi.spyOn(h.storage, 'setAlarm'),
+        vi.spyOn(h.storage, 'deleteAlarm'),
+      ];
+      const close = vi.fn();
+      h.socket.closeAll = close;
+      await h.evict(true);
+      for (let i = 0; i < 3; i++) {
+        expect(
+          await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+        ).toMatchObject({
+          status: {
+            missing: 'unknown',
+            stopped: 'sleeping',
+            creating: 'starting',
+            stopping: 'stopping',
+          }[state],
+          estimatedSleepAt: null,
+          ...(state === 'missing' ? {} : { runtime }),
+        });
+      }
+      expect([...h.records]).toEqual(before);
+      expect(h.alarmAt).toBe(alarm);
+      for (const write of writes) expect(write).not.toHaveBeenCalled();
+      expect(close).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(h.allocations.size).toBe(0);
+    }
+  );
+
+  it('reads two shared-directory roots after reconstruction without initializing operational state', async () => {
+    const h = await harness();
+    const now = Date.now();
+    const identity = {
+      connectionId: crypto.randomUUID(),
+      wrapperInstanceId: crypto.randomUUID(),
+      providerInstanceId: 'instance_shared',
+    };
+    const first = {
+      ...ROUTE,
+      worktreeId: 'worktree_shared',
+      lastState: 'idle',
+      lastStateAt: now,
+      idleForMs: 0,
+      waitingOn: null,
+    };
+    const sibling = { ...first, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' };
+    const idle = await summarizeHeartbeatIdle({
+      state: 'idle',
+      pendingMessages: 0,
+      kilo: { ready: true },
+      sessions: [first, sibling].map(route => ({
+        kiloSessionId: route.kiloSessionId,
+        state: 'idle',
+        idleForMs: 0,
+      })),
+    });
+    const attachment = {
+      ...identity,
+      handshakeComplete: true,
+      protocolVersion: 1,
+      acceptedAt: now - 1_000,
+      observation: { ready: true, receivedAt: now, idle },
+    };
+    const socket = {
+      readyState: 1,
+      deserializeAttachment: vi.fn(() => attachment),
+      serializeAttachment: vi.fn(),
+      send: vi.fn(),
+      close: vi.fn(),
+    };
+    vi.spyOn(h.ctx, 'getWebSockets').mockReturnValue([socket as unknown as WebSocket]);
+    h.records.set('provider_kind', 'cloudflare');
+    h.records.set('physical_record', {
+      state: 'running',
+      providerRef: identity.providerInstanceId,
+      createIntent: null,
+      stopTombstone: null,
+      resumable: false,
+    });
+    h.records.set('active_wrapper_runtime', {
+      ...identity,
+      readyConnectionId: identity.connectionId,
+    });
+    h.records.set('session_routes', [first, sibling]);
+    h.records.set('deadlines', {
+      idleStop: now + DEADLINE_MS.idleStop,
+      heartbeatExpiry: now + DEADLINE_MS.heartbeatExpiry,
+    });
+    const before = structuredClone([...h.records]);
+    const alarm = h.alarmAt;
+    await h.evict(true);
+    for (let i = 0; i < 3; i++) {
+      expect(
+        await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+      ).toMatchObject({ status: 'active', estimatedSleepAt: now + DEADLINE_MS.idleStop });
+    }
+    expect([...h.records]).toEqual(before);
+    expect(h.alarmAt).toBe(alarm);
+    expect(socket.serializeAttachment).not.toHaveBeenCalled();
+    expect(socket.send).not.toHaveBeenCalled();
+    expect(socket.close).not.toHaveBeenCalled();
+    h.records.set('session_routes', [first, { ...sibling, waitingOn: 'input' }]);
+    expect(
+      await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).toMatchObject({ status: 'active', estimatedSleepAt: null });
+    h.records.set('active_wrapper_runtime', {
+      ...identity,
+      connectionId: crypto.randomUUID(),
+      readyConnectionId: identity.connectionId,
+    });
+    expect(
+      await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).toMatchObject({ status: 'unknown', estimatedSleepAt: null });
+  });
+
   describe.each(['create', 'acquire'] as const)('%s credential policy', createPath => {
     it.each([false, undefined])(
       'launches and attaches using persisted containment %s',
@@ -460,7 +817,10 @@ describe('SandboxControl lifecycle boundaries', () => {
           })
         ).resolves.toMatchObject({ ok: true });
         expect(h.sendRequest).toHaveBeenCalledWith(
-          expect.objectContaining({ operation: 'session.attach', payload })
+          expect.objectContaining({
+            operation: 'session.attach',
+            payload: { ...payload, captureNativeRuntimeId: true },
+          })
         );
         await expect(h.control.getStatus()).resolves.toMatchObject({ reported: 'ready' });
         if (!contained) {
@@ -1117,7 +1477,10 @@ describe('SandboxControl lifecycle boundaries', () => {
       expect(h.records.has('wrapper_credential_hash')).toBe(false);
       expect(h.records.has('active_wrapper_runtime')).toBe(false);
       vi.setSystemTime(Date.now() + 1_000);
-      await expect(h.control.quarantineRuntime(quarantine)).resolves.toEqual({ quarantined: true });
+      await expect(h.control.quarantineRuntime(quarantine)).resolves.toEqual({
+        quarantined: true,
+        disposition: 'physical_stopping',
+      });
       expect(await loadDeadlines(h.storage)).toEqual(repaired);
       expect((await h.control.getPhysicalRecord()).stopTombstone?.attempts).toBe(0);
       await h.fireAlarm();
@@ -1130,11 +1493,18 @@ describe('SandboxControl lifecycle boundaries', () => {
   it('repairs a missing create alarm using the original startup deadline', async () => {
     const h = await harness();
     const claimed = await h.control.claimCreate('intent_repair');
+    h.records.set('provider_kind', 'cloudflare');
     const deadline = (claimed.createIntent?.createdAt ?? 0) + DEADLINE_MS.startup;
     h.records.delete('deadlines');
     await h.storage.deleteAlarm();
     vi.setSystemTime(Date.now() + 30_000);
-    await h.evict();
+    await h.evict(true);
+    expect(
+      await h.control.getSandboxStatus({ ownerId: OWNER, provider: 'cloudflare' })
+    ).toMatchObject({ status: 'starting' });
+    expect(await loadDeadlines(h.storage)).toEqual({});
+    expect(h.alarmAt).toBeNull();
+    await h.control.getStatus();
     expect(await loadDeadlines(h.storage)).toEqual({ startup: deadline });
     expect(h.alarmAt).toBe(deadline);
     expect(h.allocations.size).toBe(0);
@@ -1146,7 +1516,7 @@ describe('SandboxControl lifecycle boundaries', () => {
       const requestFor = (expectedWrapperInstanceId?: string): SandboxControlOutboundRequest => ({
         operation,
         session: ROUTE,
-        payload: operation === 'session.prompt' ? PROMPT : {},
+        payload: operation === 'session.prompt' ? PROMPT : { captureNativeRuntimeId: true },
         expectedWrapperInstanceId,
       });
 
@@ -1930,9 +2300,15 @@ describe('SandboxControl lifecycle boundaries', () => {
     );
     await expect(
       h.control.quarantineRuntime({ ...request, wrapperInstanceId: 'stale' })
-    ).resolves.toEqual({ quarantined: false });
-    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({ quarantined: true });
-    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
+    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({
+      quarantined: true,
+      disposition: 'physical_stopping',
+    });
+    await expect(h.control.quarantineRuntime(request)).resolves.toEqual({
+      quarantined: true,
+      disposition: 'physical_stopping',
+    });
     await expect(observed.promise).resolves.toEqual({ attempts: 1, alarmAt: expect.any(Number) });
     expect(await h.control.getPhysicalRecord()).toMatchObject({
       state: 'stopping',
@@ -1977,8 +2353,11 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.control.detachSession(ROUTE.sessionId);
     await expect(
       h.control.quarantineRuntime({ ...input, wrapperInstanceId: 'stale' })
-    ).resolves.toEqual({ quarantined: false });
-    await expect(transfer(input)).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
+    await expect(transfer(input)).resolves.toEqual({
+      quarantined: true,
+      disposition: 'physical_stopping',
+    });
     await h.flush();
     expect(await h.control.getPhysicalRecord()).toMatchObject({
       state: 'stopping',
@@ -1990,8 +2369,35 @@ describe('SandboxControl lifecycle boundaries', () => {
     await h.fireAlarm();
     expect(h.runtime(identity.providerInstanceId)?.state.running).toBe(false);
     expect(h.runtime(identity.providerInstanceId)?.destroy).toHaveBeenCalledTimes(2);
-    await expect(h.control.quarantineRuntime(input)).resolves.toEqual({ quarantined: false });
+    await expect(h.control.quarantineRuntime(input)).resolves.toEqual({
+      quarantined: false,
+      disposition: 'physical_stopped',
+    });
     expect((await h.control.getPhysicalRecord()).providerRef).toBeNull();
+  });
+
+  it.each([
+    { messageId: 'message_1', operationId: 'not-a-uuid', cleanupDeadlineAt: Date.now() + 1_000 },
+    {
+      messageId: 'message_1',
+      operationId: '33333333-3333-4333-8333-333333333333',
+      cleanupDeadlineAt: Date.now(),
+    },
+  ])('rejects invalid scoped Stop requests without forwarding them', async payload => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+
+    await expect(
+      h.control.request({
+        operation: 'session.abort',
+        session: ROUTE,
+        payload,
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).rejects.toThrow('Invalid scoped Stop maintenance request');
+
+    expect(h.sendRequest).not.toHaveBeenCalled();
   });
 
   it('rejects malformed cleanup transfers rather than acknowledging a stale runtime', async () => {
@@ -2007,6 +2413,737 @@ describe('SandboxControl lifecycle boundaries', () => {
       })
     ).rejects.toThrow('Invalid sandbox quarantine request');
     expect((await h.control.getPhysicalRecord()).stopTombstone).toBeNull();
+  });
+
+  it('records the exact native runtime returned by a successful attachment', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    h.sendRequest.mockResolvedValueOnce({
+      type: 'response',
+      requestId: 'attach_1',
+      ok: true,
+      result: { attached: true, nativeRuntimeId },
+    });
+
+    await expect(
+      h.control.request({
+        operation: 'session.attach',
+        session: {
+          sessionId: ROUTE.sessionId,
+          kiloSessionId: ROUTE.kiloSessionId,
+          directory: ROUTE.directory,
+        },
+        payload: {},
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ sessionId: ROUTE.sessionId, nativeRuntimeId }),
+    ]);
+  });
+
+  it('does not add native runtime capture to an older wrapper attachment', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    h.socket.supportsNativeRuntimeRetirement = () => false;
+
+    await expect(
+      h.control.request({
+        operation: 'session.attach',
+        session: ROUTE,
+        payload: {},
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    expect(h.sendRequest).toHaveBeenLastCalledWith(
+      expect.objectContaining({ operation: 'session.attach', payload: {} })
+    );
+  });
+
+  it('records the original native runtime from a lost attachment response lookup', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const authorization = {
+      operation: 'session.attach' as const,
+      operationId: 'prepare_1',
+      messageId: 'message_1',
+      session: {
+        sessionId: ROUTE.sessionId,
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: ROUTE.directory,
+      },
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      dispatchDeadlineAt: Date.now() + 1_000,
+    };
+    h.sendRequest.mockResolvedValueOnce({
+      type: 'response',
+      requestId: 'lookup_1',
+      ok: true,
+      result: {
+        state: 'completed',
+        delivery: {
+          version: 2,
+          authorization,
+          completedAt: Date.now(),
+          result: { ok: true, result: { attached: true, nativeRuntimeId } },
+          events: [],
+          preparing: [],
+        },
+      },
+    });
+
+    await expect(
+      h.control.request({
+        operation: 'session.operation.get',
+        session: ROUTE,
+        payload: authorization,
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toMatchObject({ ok: true });
+
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId }),
+    ]);
+    expect(h.session.recordNativeRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({ nativeRuntimeId, wrapperInstanceId: identity.wrapperInstanceId })
+    );
+  });
+
+  it('invalidates only routes on the retired native incarnation', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [
+      { ...route, nativeRuntimeId },
+      {
+        ...route,
+        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        nativeRuntimeId,
+      },
+      {
+        ...route,
+        sessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+        kiloSessionId: 'ses_33333333333333333333333333',
+        directory: '/workspace/m',
+        nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
+      },
+      {
+        ...route,
+        sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
+        kiloSessionId: 'ses_44444444444444444444444444',
+        directory: '/workspace/c',
+        nativeRuntimeId: '44444444-4444-4444-8444-444444444444',
+      },
+    ]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    const response = {
+      type: 'response' as const,
+      requestId: 'stop_1',
+      ok: true as const,
+      result: {
+        status: 'aborted' as const,
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId,
+      },
+    };
+    h.sendRequest.mockResolvedValueOnce(response);
+
+    await expect(
+      h.control.request({
+        operation: 'session.abort',
+        session: {
+          sessionId: ROUTE.sessionId,
+          kiloSessionId: ROUTE.kiloSessionId,
+          directory: ROUTE.directory,
+        },
+        payload: {
+          messageId: 'message_1',
+          operationId: '55555555-5555-4555-8555-555555555555',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toEqual(response);
+
+    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledTimes(2);
+    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({ wrapperInstanceId: identity.wrapperInstanceId, confirmed: true })
+    );
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.objectContaining({ directory: '/workspace/m' }),
+      expect.objectContaining({ directory: '/workspace/c' }),
+    ]);
+  });
+
+  it('does not invalidate a replacement when an old scoped Stop reply arrives late', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    const reply = deferred<{
+      type: 'response';
+      requestId: string;
+      ok: true;
+      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
+    }>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+    const stop = h.control.request({
+      operation: 'session.abort',
+      session: {
+        sessionId: ROUTE.sessionId,
+        kiloSessionId: ROUTE.kiloSessionId,
+        directory: ROUTE.directory,
+      },
+      payload: {
+        messageId: 'message_1',
+        operationId: '55555555-5555-4555-8555-555555555555',
+        cleanupDeadlineAt: Date.now() + 1_000,
+      },
+      expectedWrapperInstanceId: identity.wrapperInstanceId,
+    });
+    await sent.promise;
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    reply.resolve({
+      type: 'response',
+      requestId: 'stop_1',
+      ok: true,
+      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
+    });
+
+    await expect(stop).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+  });
+
+  it('retains a native retirement fence across a lost scoped Stop reply', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    h.sendRequest.mockRejectedValueOnce(new Error('lost Stop reply'));
+
+    await expect(
+      h.control.request({
+        operation: 'session.abort',
+        session: {
+          sessionId: ROUTE.sessionId,
+          kiloSessionId: ROUTE.kiloSessionId,
+          directory: ROUTE.directory,
+        },
+        payload: {
+          messageId: 'message_1',
+          operationId: '55555555-5555-4555-8555-555555555555',
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).rejects.toThrow('lost Stop reply');
+    await h.evict();
+
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
+    ]);
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+  });
+
+  it('defers unconfirmed scoped Stop instead of releasing the retirement fence', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const operationId = '33333333-3333-4333-8333-333333333333';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    const unconfirmed = {
+      type: 'response' as const,
+      requestId: 'stop_u',
+      ok: true as const,
+      result: { status: 'unconfirmed' as const, quiescent: false },
+    };
+    h.sendRequest.mockResolvedValueOnce(unconfirmed);
+    await expect(
+      h.control.request({
+        operation: 'session.abort',
+        session: {
+          sessionId: route.sessionId,
+          kiloSessionId: route.kiloSessionId,
+          directory: route.directory,
+        },
+        payload: {
+          messageId: 'message_a',
+          operationId,
+          cleanupDeadlineAt: Date.now() + 1_000,
+        },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      })
+    ).resolves.toEqual(unconfirmed);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({
+        operationId,
+        state: 'pending',
+      }),
+    ]);
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
+    ]);
+  });
+
+  it('keeps an operation-only Stop replay from blocking or changing a fresh native retirement', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const operationA = '33333333-3333-4333-8333-333333333333';
+    const operationB = '44444444-4444-4444-8444-444444444444';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => true;
+    h.socket.supportsScopedStopAbort = () => true;
+    const stop = (messageId: string, operationId: string, cleanupDeadlineAt: number) =>
+      h.control.request({
+        operation: 'session.abort',
+        session: {
+          sessionId: route.sessionId,
+          kiloSessionId: route.kiloSessionId,
+          directory: route.directory,
+        },
+        payload: { messageId, operationId, cleanupDeadlineAt },
+        expectedWrapperInstanceId: identity.wrapperInstanceId,
+      });
+    const firstDeadline = Date.now() + 1_000;
+    const operationOnly = {
+      type: 'response' as const,
+      requestId: 'stop_a',
+      ok: true as const,
+      result: { status: 'aborted' as const, quiescent: true },
+    };
+    h.sendRequest.mockResolvedValueOnce(operationOnly);
+
+    await expect(stop('message_a', operationA, firstDeadline)).resolves.toEqual(operationOnly);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({
+        operationId: operationA,
+        cleanupDeadlineAt: firstDeadline,
+        state: 'released',
+        disposition: 'operation_only',
+      }),
+    ]);
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId }),
+    ]);
+
+    const reply = deferred<{
+      type: 'response';
+      requestId: string;
+      ok: true;
+      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
+    }>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+    const stopB = stop('message_b', operationB, Date.now() + 2_000);
+    await sent.promise;
+
+    await expect(stop('message_a', operationA, Date.now() + 3_000)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+    expect(h.sendRequest).toHaveBeenCalledTimes(2);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({
+        operationId: operationA,
+        cleanupDeadlineAt: firstDeadline,
+        state: 'released',
+      }),
+      expect.objectContaining({ operationId: operationB, attempts: 1, state: 'pending' }),
+    ]);
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
+    ]);
+
+    const retired = {
+      type: 'response' as const,
+      requestId: 'stop_b',
+      ok: true as const,
+      result: {
+        status: 'aborted' as const,
+        quiescent: true as const,
+        runtimeRetired: true as const,
+        nativeRuntimeId,
+      },
+    };
+    reply.resolve(retired);
+    await expect(stopB).resolves.toEqual(retired);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({ operationId: operationA, state: 'released' }),
+      expect.objectContaining({
+        operationId: operationB,
+        state: 'completed',
+        notificationState: 'delivered',
+      }),
+    ]);
+
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    h.session.invalidateTerminalRuntime.mockClear();
+    h.session.failWaitingMessages.mockClear();
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        nativeRetirementPayload(route.directory, nativeRuntimeId),
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+  });
+
+  it('does not physically stop when completed native proof wins a stale escalation', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    const reply = deferred<never>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+
+    const quarantine = h.control.quarantineRuntime({
+      ownerId: OWNER,
+      sessionId: route.sessionId,
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      reason: 'native_cleanup_unavailable',
+    });
+    await sent.promise;
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        nativeRetirementPayload(route.directory, nativeRuntimeId),
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+    vi.setSystemTime(Date.now() + DEADLINE_MS.stopAttempt);
+    reply.reject(new Error('late lost reply'));
+
+    await expect(quarantine).resolves.toEqual({ quarantined: true, disposition: 'native_pending' });
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      stopTombstone: null,
+    });
+  });
+
+  it('replays a completed native quarantine after its response is lost without selecting N2', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    const authorization = {
+      operation: 'session.attach' as const,
+      operationId: '33333333-3333-4333-8333-333333333333',
+      messageId: 'message_1',
+      session: {
+        sessionId: route.sessionId,
+        kiloSessionId: route.kiloSessionId,
+        directory: route.directory,
+      },
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      dispatchDeadlineAt: Date.now() + 1_000,
+    };
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.sendRequest.mockResolvedValueOnce({
+      type: 'response',
+      requestId: 'retire_n1',
+      ok: true,
+      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
+    });
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: route.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'runtime_unhealthy',
+        nativeRuntimeId,
+        authorization,
+      })
+    ).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
+
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    const beforeRetry = {
+      deadlines: await loadDeadlines(h.storage),
+      alarmAt: await h.storage.getAlarm(),
+    };
+    h.sendRequest.mockClear();
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: route.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'runtime_unhealthy',
+        nativeRuntimeId,
+        authorization,
+      })
+    ).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
+
+    expect(h.sendRequest).not.toHaveBeenCalled();
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      stopTombstone: null,
+    });
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+    expect(await loadDeadlines(h.storage)).toEqual(beforeRetry.deadlines);
+    expect(await h.storage.getAlarm()).toBe(beforeRetry.alarmAt);
+  });
+
+  it('coalesces concurrent native retirement commands for one runtime', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    const reply = deferred<{
+      type: 'response';
+      requestId: string;
+      ok: true;
+      result: { status: 'aborted'; quiescent: true; runtimeRetired: true; nativeRuntimeId: string };
+    }>();
+    const sent = Promise.withResolvers<void>();
+    h.sendRequest.mockImplementationOnce(() => {
+      sent.resolve();
+      return reply.promise;
+    });
+    const first = h.control.quarantineRuntime({
+      ownerId: OWNER,
+      sessionId: route.sessionId,
+      wrapperInstanceId: identity.wrapperInstanceId ?? '',
+      reason: 'native_cleanup_unavailable',
+    });
+    await sent.promise;
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: route.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'native_cleanup_unavailable',
+      })
+    ).resolves.toEqual({ quarantined: true, disposition: 'native_pending' });
+    expect(h.sendRequest).toHaveBeenCalledOnce();
+    reply.resolve({
+      type: 'response',
+      requestId: 'abort_1',
+      ok: true,
+      result: { status: 'aborted', quiescent: true, runtimeRetired: true, nativeRuntimeId },
+    });
+    await expect(first).resolves.toEqual({ quarantined: true, disposition: 'native_retired' });
+  });
+
+  it('retains an exhausted notification fence without escalating a completed retirement', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.session.failWaitingMessages.mockRejectedValue(new Error('session unavailable'));
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        nativeRetirementPayload(route.directory, nativeRuntimeId),
+        identity
+      )
+    ).resolves.toBeUndefined();
+    for (let attempt = 1; attempt < DEADLINE_MS.nativeRetirementMaxAttempts; attempt++) {
+      await h.fireAlarm();
+    }
+
+    expect(h.session.failWaitingMessages).toHaveBeenCalledTimes(
+      DEADLINE_MS.nativeRetirementMaxAttempts
+    );
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'running',
+      stopTombstone: null,
+    });
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId, retiringNativeRuntimeId: nativeRuntimeId }),
+    ]);
+    expect(h.records.get('native_runtime_retirements')).toEqual([
+      expect.objectContaining({ state: 'completed', notificationState: 'exhausted' }),
+    ]);
+  });
+
+  it('persists an automatic native retirement before failing only affected routes', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [
+      { ...route, nativeRuntimeId },
+      {
+        ...route,
+        sessionId: 'workspace_22222222-2222-4222-8222-222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        nativeRuntimeId,
+      },
+      {
+        ...route,
+        sessionId: 'workspace_33333333-3333-4333-8333-333333333333',
+        kiloSessionId: 'ses_33333333333333333333333333',
+        directory: '/workspace/m',
+        nativeRuntimeId: '33333333-3333-4333-8333-333333333333',
+      },
+      {
+        ...route,
+        sessionId: 'workspace_44444444-4444-4444-8444-444444444444',
+        kiloSessionId: 'ses_44444444444444444444444444',
+        directory: '/workspace/c',
+        nativeRuntimeId: '44444444-4444-4444-8444-444444444444',
+      },
+    ]);
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        nativeRetirementPayload(ROUTE.directory, nativeRuntimeId),
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+
+    expect(h.session.invalidateTerminalRuntime).toHaveBeenCalledTimes(2);
+    expect(h.session.failWaitingMessages).toHaveBeenCalledTimes(2);
+    expect(h.session.failWaitingMessages).toHaveBeenCalledWith(
+      'process_exited',
+      identity.wrapperInstanceId,
+      nativeRuntimeId
+    );
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.not.objectContaining({ nativeRuntimeId }),
+      expect.objectContaining({ directory: '/workspace/m' }),
+      expect.objectContaining({ directory: '/workspace/c' }),
+    ]);
+  });
+
+  it('replays a completed native retirement after reconstruction without touching N2', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        nativeRetirementPayload(ROUTE.directory, nativeRuntimeId),
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+    h.session.invalidateTerminalRuntime.mockClear();
+    h.session.failWaitingMessages.mockClear();
+    await h.evict();
+    await h.flush();
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+    h.session.invalidateTerminalRuntime.mockClear();
+    h.session.failWaitingMessages.mockClear();
+
+    await expect(
+      h.hooks.onNativeRuntimeRetired?.(
+        nativeRetirementPayload(ROUTE.directory, nativeRuntimeId),
+        identity
+      )
+    ).resolves.toEqual({ retired: true });
+
+    expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+    expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+    await expect(h.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+    ]);
+  });
+
+  it('falls back to physical containment when targeted native cleanup is unavailable', async () => {
+    const h = await harness();
+    await h.create();
+    const identity = await h.ready();
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const [route] = await h.control.listRoutes();
+    if (!route) throw new Error('Missing route');
+    h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+    h.socket.supportsNativeRuntimeRetirement = () => false;
+
+    await expect(
+      h.control.quarantineRuntime({
+        ownerId: OWNER,
+        sessionId: ROUTE.sessionId,
+        wrapperInstanceId: identity.wrapperInstanceId ?? '',
+        reason: 'native_cleanup_unavailable',
+      })
+    ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
+
+    await expect(h.control.getPhysicalRecord()).resolves.toMatchObject({
+      state: 'stopping',
+      stopTombstone: { reason: 'native_cleanup_unavailable' },
+    });
   });
 
   it('performs all five stop attempts, never reactivates the tombstone, and eventually releases by observation', async () => {
@@ -2194,7 +3331,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         wrapperInstanceId: identity.wrapperInstanceId ?? '',
         reason: 'late_failure',
       })
-    ).resolves.toEqual({ quarantined: false });
+    ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
   });
 
   it('retains a known allocation through a hanging launch and cleans it without a background replacement', async () => {
@@ -2471,6 +3608,567 @@ describe('SandboxControl lifecycle boundaries', () => {
     });
     expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
     expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+  });
+
+  describe('receipt-backed session forwarding', () => {
+    it('preserves pending native attach retryability through Control and the publication socket', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const publication = {
+        event: 'session.event',
+        session: {
+          directory: ROUTE.directory,
+          kiloSessionId: ROUTE.kiloSessionId,
+          rootKiloSessionId: ROUTE.kiloSessionId,
+          nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+        },
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: ROUTE.kiloSessionId, title: 'Native startup' } },
+        },
+        sequence: 1,
+      };
+      const receiptId = '33333333-3333-4333-8333-333333333333';
+      const receiptHash = createHash('sha256')
+        .update(canonicalControlEventJson(publication))
+        .digest('hex');
+      const frame = {
+        type: 'request',
+        requestId: 'pending-native-attach',
+        operation: 'sandbox.event.publish',
+        payload: { ...publication, receiptId, receiptHash },
+      };
+      let attachment: unknown = {
+        ...connection,
+        handshakeComplete: true,
+        acceptedAt: Date.now(),
+        protocolVersion: 1,
+      };
+      const send = vi.fn();
+      const close = vi.fn();
+      const ws = {
+        readyState: 1,
+        deserializeAttachment: () => attachment,
+        serializeAttachment: (next: unknown) => {
+          attachment = next;
+        },
+        send,
+        close,
+      } as unknown as WebSocket;
+      const { createSandboxControlSocketHandler } =
+        await vi.importActual<typeof SocketModule>('./socket.js');
+      const handler = createSandboxControlSocketHandler(
+        { ...h.ctx, getWebSockets: () => [ws] } as DurableObjectState,
+        SANDBOX_ID,
+        undefined,
+        h.hooks
+      );
+      const pending = { applied: false, retryable: true };
+      h.session.receiveSandboxControlEvent.mockResolvedValueOnce(pending);
+      h.sendRequest.mockClear();
+      const before = structuredClone([...h.records]);
+      await handler.handleMessage(ws, JSON.stringify(frame));
+      await h.flush();
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledExactlyOnceWith({
+        identity: publication.session,
+        payload: publication.payload,
+        wrapperInstanceId: connection.wrapperInstanceId,
+        receiptId,
+        receiptHash,
+        sequence: 1,
+      });
+      expect(send).toHaveBeenLastCalledWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: frame.requestId,
+          ok: false,
+          error: {
+            code: 'not_ready',
+            message: 'Sandbox event publication was not applied',
+            retryable: true,
+          },
+        })
+      );
+      h.session.receiveSandboxControlEvent.mockResolvedValueOnce({ applied: true });
+      await handler.handleMessage(ws, JSON.stringify(frame));
+      await h.flush();
+      expect(send).toHaveBeenLastCalledWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: frame.requestId,
+          ok: true,
+          result: { receiptId, applied: true },
+        })
+      );
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(2);
+      expect([...h.records]).toEqual(before);
+      expect(h.socket.getConnectionIdentity()).toEqual(connection);
+      expect(close).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+      expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+      expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+    });
+
+    it('ACKs trailing native events and exact N1 replay through Session, Control, and the socket', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+      const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+      const authorization = {
+        operation: 'session.attach',
+        operationId: '55555555-5555-4555-8555-555555555555',
+        messageId: 'message_A',
+        session: {
+          sessionId: route.sessionId,
+          kiloSessionId: route.kiloSessionId,
+          directory: route.directory,
+        },
+        wrapperInstanceId: connection.wrapperInstanceId,
+        dispatchDeadlineAt: Date.now() + 1_000,
+      };
+      const nativeFence = {
+        sandboxId: SANDBOX_ID,
+        wrapperInstanceId: connection.wrapperInstanceId,
+        nativeRuntimeId,
+        attachmentEpoch: 1,
+        authorization,
+      };
+      const completed = {
+        messageId: 'message_A',
+        state: 'completed',
+        wrapperInstanceId: connection.wrapperInstanceId,
+      };
+      const values = new Map<string, unknown>([
+        ['session_metadata', await h.session.getCredentialMetadata()],
+        ['session_messages', [completed]],
+        ['native_runtime_fence', nativeFence],
+      ]);
+      const kv: SyncKvStorage = {
+        get: <T>(key: string): T | undefined => structuredClone(values.get(key)) as T | undefined,
+        put: <T>(key: string, value: T) => {
+          values.set(key, structuredClone(value));
+        },
+        delete: key => values.delete(key),
+        list: <T>(options?: SyncKvListOptions) =>
+          [...values.entries()]
+            .filter(([key]) => !options?.prefix || key.startsWith(options.prefix))
+            .map(([key, value]) => [key, structuredClone(value) as T] as [string, T]),
+      };
+      const sessionStorage = {
+        kv,
+        get: async <T>(key: string) => kv.get<T>(key),
+        sql: {},
+        transactionSync: <T>(callback: () => T) => callback(),
+      } as unknown as DurableObjectStorage;
+      const eventQueries = createMemoryEventQueries();
+      let eventSequence = 0;
+      eventQueries.insert = params =>
+        eventQueries.upsert({ ...params, entityId: `test-event/${++eventSequence}` });
+      mocks.eventQueries.mockReturnValue(eventQueries);
+      const initializing: Promise<unknown>[] = [];
+      const session = new SandboxSession(
+        {
+          ...h.ctx,
+          id: { name: `${OWNER}:${route.sessionId}` },
+          storage: sessionStorage,
+          blockConcurrencyWhile: (callback: () => Promise<void>) => {
+            const pending = callback();
+            initializing.push(pending);
+            return pending;
+          },
+        } as unknown as DurableObjectState,
+        {
+          ...h.env,
+          SANDBOX_CONTROL: { getByName: () => h.control },
+        } as unknown as Env
+      );
+      await Promise.all(initializing);
+      mocks.session.mockReturnValue(session);
+      const receive = vi.spyOn(session, 'receiveSandboxControlEvent');
+      const failWaitingMessages = vi.spyOn(session, 'failWaitingMessages');
+      const invalidateTerminalRuntime = vi.spyOn(session, 'invalidateTerminalRuntime');
+      const quarantine = vi.spyOn(h.control, 'quarantineRuntime');
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+      h.sendRequest.mockClear();
+
+      let attachment: unknown = {
+        ...connection,
+        handshakeComplete: true,
+        acceptedAt: Date.now(),
+        protocolVersion: 1,
+      };
+      const send = vi.fn();
+      const close = vi.fn();
+      const ws = {
+        readyState: 1,
+        deserializeAttachment: () => attachment,
+        serializeAttachment: (next: unknown) => {
+          attachment = next;
+        },
+        send,
+        close,
+      } as unknown as WebSocket;
+      const { createSandboxControlSocketHandler } =
+        await vi.importActual<typeof SocketModule>('./socket.js');
+      const handler = createSandboxControlSocketHandler(
+        {
+          ...h.ctx,
+          getWebSockets: () => [ws],
+        } as DurableObjectState,
+        SANDBOX_ID,
+        undefined,
+        h.hooks
+      );
+      const publication = {
+        event: 'session.event',
+        session: {
+          directory: route.directory,
+          kiloSessionId: route.kiloSessionId,
+          nativeRuntimeId,
+        },
+        payload: {
+          type: 'session.updated',
+          properties: { info: { id: route.kiloSessionId, title: 'Completed A' } },
+        },
+        sequence: 1,
+      };
+      const receiptId = '33333333-3333-4333-8333-333333333333';
+      const frame = {
+        type: 'request',
+        requestId: 'trailing-native-event',
+        operation: 'sandbox.event.publish',
+        payload: {
+          ...publication,
+          receiptId,
+          receiptHash: createHash('sha256')
+            .update(canonicalControlEventJson(publication))
+            .digest('hex'),
+        },
+      };
+      const beforeControl = structuredClone([...h.records]);
+      await handler.handleMessage(ws, JSON.stringify(frame));
+      await h.flush();
+      expect(await receive.mock.results[0]?.value).toEqual({ applied: true });
+      expect(send).toHaveBeenLastCalledWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: frame.requestId,
+          ok: true,
+          result: { receiptId, applied: true },
+        })
+      );
+      const persisted = eventQueries.findByEntityPrefix('');
+      expect(persisted).toHaveLength(1);
+      expect(values.get('session_messages')).toEqual([completed]);
+      expect([...h.records]).toEqual(beforeControl);
+
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+      kv.put('native_runtime_fence', {
+        ...nativeFence,
+        nativeRuntimeId: replacementRuntimeId,
+        attachmentEpoch: 2,
+      });
+      kv.put('session_messages', [
+        completed,
+        {
+          messageId: 'message_B',
+          state: 'accepted',
+          wrapperInstanceId: connection.wrapperInstanceId,
+        },
+      ]);
+      const beforeReplacement = structuredClone([...h.records]);
+      const beforeSessionReplay = structuredClone([...values]);
+      await handler.handleMessage(ws, JSON.stringify(frame));
+      await h.flush();
+      expect(await receive.mock.results[1]?.value).toEqual({ applied: true });
+      expect(send.mock.calls[1]).toEqual(send.mock.calls[0]);
+
+      const stalePublication = { ...publication, sequence: 2 };
+      await handler.handleMessage(
+        ws,
+        JSON.stringify({
+          ...frame,
+          requestId: 'unseen-stale-native-event',
+          payload: {
+            ...stalePublication,
+            receiptId: '44444444-4444-4444-8444-444444444444',
+            receiptHash: createHash('sha256')
+              .update(canonicalControlEventJson(stalePublication))
+              .digest('hex'),
+          },
+        })
+      );
+      await h.flush();
+      expect(await receive.mock.results[2]?.value).toEqual({ applied: false });
+      expect(send).toHaveBeenLastCalledWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: 'unseen-stale-native-event',
+          ok: false,
+          error: {
+            code: 'event_rejected',
+            message: 'Sandbox event publication was not applied',
+            retryable: false,
+          },
+        })
+      );
+      expect(receive).toHaveBeenCalledTimes(3);
+      expect([...h.records]).toEqual(beforeReplacement);
+      expect([...values]).toEqual(beforeSessionReplay);
+      expect(eventQueries.findByEntityPrefix('')).toEqual(persisted);
+
+      const replacementPublication = {
+        ...publication,
+        session: { ...publication.session, nativeRuntimeId: replacementRuntimeId },
+        sequence: 3,
+      };
+      const replacementReceiptId = '66666666-6666-4666-8666-666666666666';
+      await handler.handleMessage(
+        ws,
+        JSON.stringify({
+          ...frame,
+          requestId: 'replacement-native-event',
+          payload: {
+            ...replacementPublication,
+            receiptId: replacementReceiptId,
+            receiptHash: createHash('sha256')
+              .update(canonicalControlEventJson(replacementPublication))
+              .digest('hex'),
+          },
+        })
+      );
+      await h.flush();
+      expect(await receive.mock.results[3]?.value).toEqual({ applied: true });
+      expect(send).toHaveBeenLastCalledWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: 'replacement-native-event',
+          ok: true,
+          result: { receiptId: replacementReceiptId, applied: true },
+        })
+      );
+      expect(eventQueries.findByEntityPrefix('')).toHaveLength(2);
+      expect(values.get('session_messages')).toEqual([
+        completed,
+        expect.objectContaining({ messageId: 'message_B', state: 'accepted' }),
+      ]);
+      expect([...h.records]).toEqual(beforeReplacement);
+      expect(h.socket.getConnectionIdentity()).toEqual(connection);
+      expect(close).not.toHaveBeenCalled();
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(failWaitingMessages).not.toHaveBeenCalled();
+      expect(invalidateTerminalRuntime).not.toHaveBeenCalled();
+      expect(quarantine).not.toHaveBeenCalled();
+      expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])(
+      'leaves N2 healthy when Session returns applied=%s for an N1 receipt',
+      async applied => {
+        const h = await harness();
+        await h.create();
+        const connection = await h.ready();
+        const [route] = await h.control.listRoutes();
+        if (!route) throw new Error('Missing route');
+        const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+        const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+        h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+        const identity = {
+          directory: route.directory,
+          kiloSessionId: route.kiloSessionId,
+          nativeRuntimeId,
+        };
+        const payload = {
+          type: 'session.message.outcome',
+          properties: { messageId: 'message_A', status: 'completed' },
+        };
+        const receiptId = '33333333-3333-4333-8333-333333333333';
+        const receiptHash = 'a'.repeat(64);
+        h.session.receiveSandboxControlEvent.mockResolvedValueOnce({ applied });
+        const before = structuredClone([...h.records]);
+        h.sendRequest.mockClear();
+        const closeAll = vi.spyOn(h.socket, 'closeAll').mockClear();
+        const closeHandshakenSockets = vi.spyOn(h.socket, 'closeHandshakenSockets').mockClear();
+
+        await expect(
+          h.hooks.onSessionEvent?.(identity, payload, connection, receiptId, receiptHash, 1)
+        ).resolves.toEqual(applied ? { applied: true } : { applied: false, retryable: false });
+        await h.flush();
+
+        expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledExactlyOnceWith({
+          identity,
+          payload,
+          wrapperInstanceId: connection.wrapperInstanceId,
+          receiptId,
+          receiptHash,
+          sequence: 1,
+        });
+        expect([...h.records]).toEqual(before);
+        expect(h.socket.getConnectionIdentity()).toEqual(connection);
+        expect(closeAll).not.toHaveBeenCalled();
+        expect(closeHandshakenSockets).not.toHaveBeenCalled();
+        expect(h.sendRequest).not.toHaveBeenCalled();
+        expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+        expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+        expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+      }
+    );
+
+    it('keeps preparation rejection retryable without tearing down healthy work', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const [route] = await h.control.listRoutes();
+      if (!route) throw new Error('Missing route');
+      const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+      h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+      h.session.receiveSandboxControlPreparing.mockResolvedValueOnce({ applied: false });
+      const before = structuredClone([...h.records]);
+      h.sendRequest.mockClear();
+
+      await expect(
+        h.hooks.onSessionPreparing?.(
+          { directory: route.directory, kiloSessionId: route.kiloSessionId, nativeRuntimeId },
+          {
+            version: 2,
+            attemptId: 'preparation_A',
+            triggerMessageId: 'message_A',
+            revision: 1,
+            timestamp: Date.now(),
+            step: 'cloning',
+            action: 'start',
+            message: 'Cloning repository',
+          },
+          connection,
+          '33333333-3333-4333-8333-333333333333',
+          'a'.repeat(64),
+          1
+        )
+      ).resolves.toEqual({ applied: false, retryable: true });
+      await h.flush();
+
+      expect(h.session.receiveSandboxControlPreparing).toHaveBeenCalledOnce();
+      expect([...h.records]).toEqual(before);
+      expect(h.socket.getConnectionIdentity()).toEqual(connection);
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+      expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+      expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+    });
+
+    it('leaves an exhausted transient delivery available for receipt replay', async () => {
+      const h = await harness();
+      await h.create();
+      const connection = await h.ready();
+      const identity = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
+      const payload = { type: 'message.updated', properties: { id: 'message_A' } };
+      const receiptId = '33333333-3333-4333-8333-333333333333';
+      const receiptHash = 'a'.repeat(64);
+      h.session.receiveSandboxControlEvent.mockRejectedValue(
+        Object.assign(new Error('Session temporarily unavailable'), { retryable: true })
+      );
+      const before = structuredClone([...h.records]);
+      h.sendRequest.mockClear();
+
+      const first = h.hooks.onSessionEvent?.(
+        identity,
+        payload,
+        connection,
+        receiptId,
+        receiptHash,
+        1
+      );
+      await vi.advanceTimersByTimeAsync(1_000);
+      await expect(first).resolves.toEqual({ applied: false, retryable: true });
+      await h.flush();
+
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(3);
+      expect([...h.records]).toEqual(before);
+      expect(h.socket.getConnectionIdentity()).toEqual(connection);
+      expect(h.sendRequest).not.toHaveBeenCalled();
+      expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+      expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+      expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+
+      h.session.receiveSandboxControlEvent.mockResolvedValueOnce({ applied: true });
+      await expect(
+        h.hooks.onSessionEvent?.(identity, payload, connection, receiptId, receiptHash, 1)
+      ).resolves.toEqual({ applied: true });
+      await h.flush();
+      expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(4);
+      expect(h.session.receiveSandboxControlEvent.mock.calls.at(-1)).toEqual(
+        h.session.receiveSandboxControlEvent.mock.calls[0]
+      );
+      expect([...h.records]).toEqual(before);
+    });
+
+    it.each(['applied', 'rejected', 'transport_failed', 'legacy_transport_failed'] as const)(
+      'fences an in-flight N1 %s and queued send after N2 replaces only the native runtime',
+      async result => {
+        const h = await harness();
+        await h.create();
+        const connection = await h.ready();
+        const [route] = await h.control.listRoutes();
+        if (!route) throw new Error('Missing route');
+        const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+        const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+        h.records.set('session_routes', [{ ...route, nativeRuntimeId }]);
+        const identity = {
+          directory: route.directory,
+          kiloSessionId: route.kiloSessionId,
+          nativeRuntimeId,
+        };
+        const payload = { type: 'message.updated', properties: {} };
+        const forwarding = deferred<{ applied: boolean }>();
+        h.session.receiveSandboxControlEvent.mockReturnValueOnce(forwarding.promise);
+        const first = h.hooks.onSessionEvent?.(
+          identity,
+          payload,
+          connection,
+          result === 'legacy_transport_failed' ? undefined : '33333333-3333-4333-8333-333333333333',
+          'a'.repeat(64),
+          1
+        );
+        await vi.advanceTimersByTimeAsync(0);
+        expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledOnce();
+        const queued = h.hooks.onSessionEvent?.(
+          identity,
+          payload,
+          connection,
+          '44444444-4444-4444-8444-444444444444',
+          'b'.repeat(64),
+          2
+        );
+        await vi.advanceTimersByTimeAsync(0);
+        h.records.set('session_routes', [{ ...route, nativeRuntimeId: replacementRuntimeId }]);
+        const before = structuredClone([...h.records]);
+        h.sendRequest.mockClear();
+        if (result === 'transport_failed' || result === 'legacy_transport_failed')
+          forwarding.reject(new Error('Session transport failed'));
+        else forwarding.resolve({ applied: result === 'applied' });
+
+        await expect(first).resolves.toEqual(
+          result === 'legacy_transport_failed'
+            ? { applied: true }
+            : { applied: false, retryable: true }
+        );
+        await expect(queued).resolves.toEqual({ applied: false, retryable: true });
+        await h.flush();
+
+        expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledOnce();
+        expect([...h.records]).toEqual(before);
+        expect(h.socket.getConnectionIdentity()).toEqual(connection);
+        expect(h.sendRequest).not.toHaveBeenCalled();
+        expect(h.session.failWaitingMessages).not.toHaveBeenCalled();
+        expect(h.session.invalidateTerminalRuntime).not.toHaveBeenCalled();
+        expect(h.runtime(connection.providerInstanceId)?.destroy).not.toHaveBeenCalled();
+      }
+    );
   });
 
   it('forwards raw events and preparation with the runtime fence, then quarantines an exhausted delivery', async () => {

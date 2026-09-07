@@ -30,12 +30,12 @@ export function ScopeListScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.title')} />
+      <ScreenHeader title={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         {isError && (
           <QueryError
             variant="server"
-            title={t('codeReviewer.scopeList.couldNotLoad')}
+            title={t('common.couldNotLoadOrganizations')}
             message={t('codeReviewer.scopeList.personalStillAvailable')}
             placement="top"
             className="pb-6 pt-0"
@@ -45,8 +45,8 @@ export function ScopeListScreen() {
         )}
         <ConfigureRow
           icon={User}
-          title={t('codeReviewer.scopeList.personal')}
-          subtitle={t('codeReviewer.scopeList.personalSubtitle')}
+          title={t('common.personal')}
+          subtitle={t('common.yourOwnRepositories')}
           onPress={() => {
             openScope(PERSONAL_SCOPE);
           }}

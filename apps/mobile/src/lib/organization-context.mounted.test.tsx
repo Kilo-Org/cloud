@@ -10,6 +10,7 @@ import { waitFor } from '@/test/render-with-providers';
 const auth = vi.hoisted(() => ({ token: 'token-a' as string | undefined }));
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => auth }));
+vi.mock('@/lib/auth/logout-cleanup', () => ({ unregisterActivityTokensAndTombstone: vi.fn() }));
 vi.mock('expo-secure-store', () => ({
   getItemAsync: storage.read,
   setItemAsync: storage.write,

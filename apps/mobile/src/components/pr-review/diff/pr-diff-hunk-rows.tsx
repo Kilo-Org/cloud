@@ -2,13 +2,13 @@
 
 import { Check, ChevronDown, File, GitCommit, X } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { Pressable, type ScrollViewProps, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
+import { CenteredState } from '@/components/centered-state';
 import { type ExpandSeparatorItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 
 const DEFAULT_EXPAND_WINDOW = 20;
@@ -259,52 +259,52 @@ export function PaginationRow({
 }
 
 export function TabStateMessage({ title, message }: { title: string; message: string }) {
-  const bottomPadding = useDetailScreenBottomPadding();
   return (
-    <View
-      className="flex-1 items-center justify-center gap-2 px-6 py-12"
-      style={{ paddingBottom: bottomPadding }}
-    >
-      <Text className="text-lg font-semibold text-foreground">{title}</Text>
-      <Text variant="muted" className="text-center">
-        {message}
-      </Text>
-    </View>
+    <CenteredState>
+      <View className="items-center gap-2 px-6">
+        <Text className="text-center text-lg font-semibold text-foreground">{title}</Text>
+        <Text variant="muted" className="text-center">
+          {message}
+        </Text>
+      </View>
+    </CenteredState>
   );
 }
 
 export function EmptyFilesView({
   changedFiles,
   onRequestOverview,
+  refreshControl,
 }: {
   changedFiles: number;
   onRequestOverview?: () => void;
+  refreshControl?: ScrollViewProps['refreshControl'];
 }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const bottomPadding = useDetailScreenBottomPadding();
   return (
-    <View
-      className="flex-1 items-center justify-center gap-3 px-6 py-16"
-      style={{ paddingBottom: bottomPadding }}
-    >
-      <File size={28} color={colors.mutedForeground} />
-      <Text className="text-lg font-semibold text-foreground">{t('prReview.noFilesChanged')}</Text>
-      <Text variant="muted" className="text-center">
-        {changedFiles === 0
-          ? t('prReview.noFilesChangedDescription')
-          : t('prReview.hunkRows.filesStillLoading')}
-      </Text>
-      {onRequestOverview ? (
-        <Pressable
-          onPress={onRequestOverview}
-          className="mt-2 rounded-md border border-border bg-card px-3 py-2 active:opacity-70"
-          accessibilityRole="button"
-          accessibilityLabel={t('prReview.hunkRows.goToOverviewTab')}
-        >
-          <Text className="text-sm font-medium">{t('prReview.hunkRows.goToOverview')}</Text>
-        </Pressable>
-      ) : null}
-    </View>
+    <CenteredState refreshControl={refreshControl}>
+      <View className="items-center gap-3 px-6">
+        <File size={28} color={colors.mutedForeground} />
+        <Text className="text-lg font-semibold text-foreground">
+          {t('prReview.noFilesChanged')}
+        </Text>
+        <Text variant="muted" className="text-center">
+          {changedFiles === 0
+            ? t('prReview.noFilesChangedDescription')
+            : t('prReview.hunkRows.filesStillLoading')}
+        </Text>
+        {onRequestOverview ? (
+          <Pressable
+            onPress={onRequestOverview}
+            className="mt-2 rounded-md border border-border bg-card px-3 py-2 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel={t('prReview.hunkRows.goToOverviewTab')}
+          >
+            <Text className="text-sm font-medium">{t('prReview.hunkRows.goToOverview')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </CenteredState>
   );
 }

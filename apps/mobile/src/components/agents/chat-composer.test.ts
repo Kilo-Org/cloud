@@ -131,7 +131,14 @@ vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeIn: { duration: vi.fn(() => ({})) },
   FadeOut: { duration: vi.fn(() => ({})) },
-  useReducedMotion: () => reducedMotionOn.value,
+}));
+vi.mock('@/lib/a11y/motion', () => ({
+  selectReducedMotionEntrance: <T>(reduced: boolean, entrance: T) =>
+    reduced ? undefined : entrance,
+  useMotionPolicy: () => ({
+    reducedMotion: reducedMotionOn.value,
+    scrollAnimated: !reducedMotionOn.value,
+  }),
 }));
 
 vi.mock('expo-haptics', () => ({

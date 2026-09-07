@@ -7,7 +7,8 @@
       "instanceLifecycle": "Tu instancia tiene una actualización",
       "scheduledAction": "Una acción programada tiene una actualización",
       "lowBalance": "Tu saldo necesita atención",
-      "securityFinding": "Un hallazgo de seguridad necesita atención"
+      "securityFinding": "Un hallazgo de seguridad necesita atención",
+      "activeAgentsGlanceable": "Los agentes activos tienen una actualización"
     }
   },
   "cloudAgentSession": {

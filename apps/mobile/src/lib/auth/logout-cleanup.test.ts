@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one cohesive logout-cleanup suite: runLogoutCleanup and the account/org-switch activity unregister share the SecureStore and delivery mocks */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const store = new Map<string, string>();
@@ -19,10 +20,20 @@ vi.mock('@sentry/react-native', () => ({ captureException: vi.fn() }));
 const trpcMock = vi.hoisted(() => ({
   revokeCurrentDeviceSession: { mutate: vi.fn() },
   unregisterPushToken: { mutate: vi.fn() },
+  unregisterActivityToken: { mutate: vi.fn() },
+}));
+
+const deliveryMock = vi.hoisted(() => ({
+  registerTokens: vi.fn(),
+  unregisterTokens: vi.fn(),
 }));
 
 vi.mock('@/lib/trpc', () => ({
   trpcClient: { user: trpcMock },
+}));
+
+vi.mock('@/lib/glanceable/sink-registry', () => ({
+  getGlanceableDelivery: () => deliveryMock,
 }));
 
 vi.mock('@/lib/notifications', () => ({
@@ -45,7 +56,16 @@ vi.mock('@/lib/persist/encrypted-kv', () => ({
   clearScopePrefix: vi.fn(),
 }));
 
-import { readLogoutCleanupTombstone, runLogoutCleanup } from '@/lib/auth/logout-cleanup';
+import {
+  readLogoutCleanupTombstone,
+  runLogoutCleanup,
+  unregisterActivityTokensAndTombstone,
+} from '@/lib/auth/logout-cleanup';
+import {
+  attemptLogoutReconciliation,
+  hasPendingActivityUnregister,
+  resetLogoutReconciliationForTests,
+} from '@/lib/auth/logout-reconciliation';
 import { getDevicePushTokenOutcome } from '@/lib/notifications';
 import { getActiveToken } from '@/lib/auth/token-owner';
 import { queryClient } from '@/lib/query-client';
@@ -87,6 +107,7 @@ describe('runLogoutCleanup', () => {
       expiresAtMs: null,
     });
     seedUser('u1');
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: [] });
   });
 
   it('revokes the session and unregisters the token, then deletes any existing tombstone on full success', async () => {
@@ -128,6 +149,8 @@ describe('runLogoutCleanup', () => {
       userId: 'u1',
       pushToken: 'push-1',
       needsPushUnregister: true,
+      needsActivityUnregister: false,
+      activityTokens: [],
       failedAt: expect.any(Number),
     });
   });
@@ -180,6 +203,55 @@ describe('runLogoutCleanup', () => {
 
     expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
     expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+  });
+
+  it('awaits the activity unregister and tombstones its recorded tokens when it fails', async () => {
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    deliveryMock.unregisterTokens.mockResolvedValue({
+      ok: false,
+      tokens: ['activity-token-1', 'activity-token-2'],
+    });
+
+    await runLogoutCleanup();
+
+    expect(deliveryMock.unregisterTokens).toHaveBeenCalledTimes(1);
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      needsPushUnregister: false,
+      needsActivityUnregister: true,
+      activityTokens: ['activity-token-1', 'activity-token-2'],
+    });
+  });
+
+  it('does not write the tombstone until the activity unregister settles', async () => {
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+    const gate = { release: null as (() => void) | null };
+    const unregisterGate = new Promise<void>(resolve => {
+      gate.release = resolve;
+    });
+    deliveryMock.unregisterTokens.mockImplementation(async () => {
+      await unregisterGate;
+      return { ok: false, tokens: ['activity-token-1'] };
+    });
+
+    const run = runLogoutCleanup();
+    // Flush microtasks and a macrotask: the activity unregister is still in
+    // flight, so the tombstone must not be written yet.
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+
+    gate.release?.();
+    await run;
+
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      needsActivityUnregister: true,
+      activityTokens: ['activity-token-1'],
+    });
   });
 
   it('still resolves when a tombstone write fails and reports it to Sentry', async () => {
@@ -235,16 +307,297 @@ describe('runLogoutCleanup', () => {
     [
       'is fully valid',
       { userId: 'u1', pushToken: null, needsPushUnregister: false, failedAt: 1_700_000_000_000 },
-      { userId: 'u1', pushToken: null, needsPushUnregister: false, failedAt: 1_700_000_000_000 },
+      {
+        userId: 'u1',
+        pushToken: null,
+        needsPushUnregister: false,
+        needsActivityUnregister: false,
+        activityTokens: [],
+        failedAt: 1_700_000_000_000,
+      },
     ],
     [
       'is valid with a null userId (identity unknown)',
       { userId: null, pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
-      { userId: null, pushToken: 'push-1', needsPushUnregister: true, failedAt: 1_700_000_000_000 },
+      {
+        userId: null,
+        pushToken: 'push-1',
+        needsPushUnregister: true,
+        needsActivityUnregister: false,
+        activityTokens: [],
+        failedAt: 1_700_000_000_000,
+      },
     ],
   ])('reads a persisted tombstone that %s', async (_label, persisted, expected) => {
     store.set(LOGOUT_CLEANUP_TOMBSTONE_KEY, JSON.stringify(persisted));
 
     await expect(readLogoutCleanupTombstone()).resolves.toEqual(expected);
+  });
+});
+
+describe('unregisterActivityTokensAndTombstone', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetLogoutReconciliationForTests();
+    store.clear();
+    seedUser('u1');
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: [] });
+  });
+
+  it('unregisters the activity tokens and writes no tombstone on success', async () => {
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: ['a1', 'a2'] });
+
+    await expect(unregisterActivityTokensAndTombstone()).resolves.toBeUndefined();
+
+    expect(deliveryMock.unregisterTokens).toHaveBeenCalledTimes(1);
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
+  });
+
+  it('tombstones the recorded activity tokens when the unregister fails', async () => {
+    deliveryMock.unregisterTokens.mockResolvedValue({
+      ok: false,
+      tokens: ['activity-token-1', 'activity-token-2'],
+    });
+
+    await unregisterActivityTokensAndTombstone();
+
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      userId: 'u1',
+      pushToken: null,
+      needsPushUnregister: false,
+      needsActivityUnregister: true,
+      activityTokens: ['activity-token-1', 'activity-token-2'],
+    });
+  });
+
+  it('retains scope delivery and tombstones only the failed ended activity', async () => {
+    const rows = new Set(['scope-token', 'ended-token']);
+    deliveryMock.unregisterTokens.mockImplementation(async (lifetime: 'scope' | 'activity') => {
+      await Promise.resolve();
+      if (lifetime !== 'activity') {
+        rows.delete('scope-token');
+      }
+      return { ok: false, tokens: ['ended-token'] };
+    });
+
+    await unregisterActivityTokensAndTombstone('activity');
+
+    expect(rows).toEqual(new Set(['scope-token', 'ended-token']));
+    expect(await readLogoutCleanupTombstone()).toMatchObject({
+      userId: 'u1',
+      needsActivityUnregister: true,
+      activityTokens: ['ended-token'],
+    });
+  });
+
+  it('finishes an earlier activity tombstone write before successful logout clears it', async () => {
+    const { setItemAsync } = await import('expo-secure-store');
+    const writing = Promise.withResolvers<undefined>();
+    const writeGate = Promise.withResolvers<undefined>();
+    vi.mocked(setItemAsync).mockImplementationOnce(async (key, value) => {
+      writing.resolve(undefined);
+      await writeGate.promise;
+      store.set(key, value);
+    });
+    deliveryMock.unregisterTokens
+      .mockResolvedValueOnce({ ok: false, tokens: ['ended-token'] })
+      .mockResolvedValue({ ok: true, tokens: [] });
+    pushOutcome('none');
+    trpcMock.revokeCurrentDeviceSession.mutate.mockResolvedValue({ outcome: 'revoked' });
+
+    const activityEnd = unregisterActivityTokensAndTombstone('activity');
+    await writing.promise;
+    const logout = runLogoutCleanup();
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+    writeGate.resolve(undefined);
+    await Promise.all([activityEnd, logout]);
+
+    expect(await readLogoutCleanupTombstone()).toBeNull();
+  });
+
+  it('leaves an existing tombstone untouched on success so a pending push unregister survives', async () => {
+    store.set(
+      LOGOUT_CLEANUP_TOMBSTONE_KEY,
+      JSON.stringify({
+        userId: 'u1',
+        pushToken: 'push-1',
+        needsPushUnregister: true,
+        needsActivityUnregister: false,
+        activityTokens: [],
+        failedAt: 1_700_000_000_000,
+      })
+    );
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: true, tokens: ['a1'] });
+
+    await unregisterActivityTokensAndTombstone();
+
+    const tombstone = await readLogoutCleanupTombstone();
+    expect(tombstone).toMatchObject({
+      needsPushUnregister: true,
+      pushToken: 'push-1',
+      needsActivityUnregister: false,
+    });
+  });
+
+  it.each(['push-1', null])(
+    'preserves same-owner push cleanup and failed activity tokens (%s)',
+    async pushToken => {
+      store.set(
+        LOGOUT_CLEANUP_TOMBSTONE_KEY,
+        JSON.stringify({
+          userId: 'u1',
+          pushToken,
+          needsPushUnregister: true,
+          needsActivityUnregister: true,
+          activityTokens: ['earlier-activity', 'shared-activity'],
+          failedAt: Date.now(),
+        })
+      );
+      deliveryMock.unregisterTokens.mockResolvedValue({
+        ok: false,
+        tokens: ['shared-activity', 'new-activity'],
+      });
+
+      await unregisterActivityTokensAndTombstone();
+
+      expect(await readLogoutCleanupTombstone()).toMatchObject({
+        userId: 'u1',
+        pushToken,
+        needsPushUnregister: true,
+        needsActivityUnregister: true,
+        activityTokens: ['earlier-activity', 'shared-activity', 'new-activity'],
+      });
+    }
+  );
+
+  it("does not transfer another known owner's pending tokens into the new cleanup", async () => {
+    store.set(
+      LOGOUT_CLEANUP_TOMBSTONE_KEY,
+      JSON.stringify({
+        userId: 'u2',
+        pushToken: 'other-push',
+        needsPushUnregister: true,
+        needsActivityUnregister: true,
+        activityTokens: ['other-activity'],
+        failedAt: Date.now(),
+      })
+    );
+    deliveryMock.unregisterTokens.mockResolvedValue({ ok: false, tokens: ['current-activity'] });
+
+    await unregisterActivityTokensAndTombstone();
+
+    expect(await readLogoutCleanupTombstone()).toMatchObject({
+      userId: 'u1',
+      pushToken: null,
+      needsPushUnregister: false,
+      needsActivityUnregister: true,
+      activityTokens: ['current-activity'],
+    });
+  });
+
+  it('waits for overlapping cleanup writes before allowing the registration guard to settle', async () => {
+    const { setItemAsync } = await import('expo-secure-store');
+    const writeGate = Promise.withResolvers<undefined>();
+    let writing = false;
+    vi.mocked(setItemAsync).mockImplementationOnce(async (key, value) => {
+      writing = true;
+      await writeGate.promise;
+      store.set(key, value);
+    });
+    deliveryMock.unregisterTokens
+      .mockResolvedValueOnce({ ok: false, tokens: ['first-activity'] })
+      .mockResolvedValueOnce({ ok: false, tokens: ['second-activity'] });
+
+    const first = unregisterActivityTokensAndTombstone();
+    await vi.waitFor(() => {
+      expect(writing).toBe(true);
+    });
+    const second = unregisterActivityTokensAndTombstone();
+    let pending: boolean | undefined = undefined;
+    const guard = (async () => {
+      pending = await hasPendingActivityUnregister('u1');
+    })();
+    await new Promise<void>(resolve => {
+      setTimeout(resolve, 0);
+    });
+    const pendingBeforeWrite = pending;
+    writeGate.resolve(undefined);
+    await Promise.all([first, second, guard]);
+
+    expect(pendingBeforeWrite).toBeUndefined();
+    expect(pending).toBe(true);
+    expect(await readLogoutCleanupTombstone()).toMatchObject({
+      needsActivityUnregister: true,
+      activityTokens: ['first-activity', 'second-activity'],
+    });
+  });
+
+  it.each([
+    { path: 'successful deletion', pushSucceeds: true, activityTokens: [] },
+    { path: 'partial-success rewrite', pushSucceeds: false, activityTokens: ['earlier-activity'] },
+  ])(
+    'preserves later scope cleanup after reconciliation $path',
+    async ({ pushSucceeds, activityTokens }) => {
+      store.set(
+        LOGOUT_CLEANUP_TOMBSTONE_KEY,
+        JSON.stringify({
+          userId: 'u1',
+          pushToken: 'push-1',
+          needsPushUnregister: true,
+          needsActivityUnregister: activityTokens.length > 0,
+          activityTokens,
+          failedAt: Date.now(),
+        })
+      );
+      const pushStarted = Promise.withResolvers<undefined>();
+      const pushGate = Promise.withResolvers<undefined>();
+      trpcMock.unregisterPushToken.mutate.mockImplementationOnce(async () => {
+        pushStarted.resolve(undefined);
+        await pushGate.promise;
+        if (!pushSucceeds) {
+          throw new Error('network down');
+        }
+        return { success: true };
+      });
+      trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
+      deliveryMock.unregisterTokens.mockResolvedValue({ ok: false, tokens: ['later-activity'] });
+
+      // Keep the auth epoch unchanged, as an organization switch does.
+      const attempt = attemptLogoutReconciliation('u1');
+      await pushStarted.promise;
+      const cleanup = unregisterActivityTokensAndTombstone();
+      // Let the failed scope cleanup reach its tombstone merge while the
+      // reconciliation still holds the older record.
+      await new Promise<void>(resolve => {
+        setTimeout(resolve, 0);
+      });
+      pushGate.resolve(undefined);
+      await Promise.all([attempt, cleanup]);
+
+      const tombstone = await readLogoutCleanupTombstone();
+      expect(tombstone).toMatchObject({
+        userId: 'u1',
+        needsActivityUnregister: true,
+        activityTokens: ['later-activity'],
+      });
+      if (!pushSucceeds) {
+        expect(tombstone).toMatchObject({
+          pushToken: 'push-1',
+          needsPushUnregister: true,
+        });
+      }
+      expect(await attemptLogoutReconciliation('u1')).toEqual({ kind: 'spacing-skipped' });
+      await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
+    }
+  );
+
+  it('never throws when the unregister itself rejects', async () => {
+    deliveryMock.unregisterTokens.mockRejectedValue(new Error('network down'));
+
+    await expect(unregisterActivityTokensAndTombstone()).resolves.toBeUndefined();
+    expect(store.has(LOGOUT_CLEANUP_TOMBSTONE_KEY)).toBe(false);
   });
 });

@@ -8,7 +8,18 @@
   "dev": { "port": 8804 },
   "placement": { "mode": "smart" },
   "observability": { "enabled": true },
-  "vars": { "WORKER_ENV": "production" },
+  "vars": {
+    "WORKER_ENV": "production",
+    "KILO_WEB_API_BASE_URL": "https://app.kilo.ai",
+    // APNs auth for Live Activity push. The topic is the iOS bundle id; the
+    // client appends `.push-type.liveactivity`. The team and key ids are public
+    // identifiers, so they live here; the .p8 itself is a Secrets Store secret.
+    // Until all four values are present the worker logs "credentials missing"
+    // and skips Live Activity delivery.
+    "APNS_TOPIC": "com.kilocode.kiloapp",
+    "APNS_TEAM_ID": "X96D76J65Z",
+    "APNS_KEY_ID": "KRYMZL626P",
+  },
 
   "routes": [
     {
@@ -60,6 +71,13 @@
   ],
 
   "secrets_store_secrets": [
+    {
+      // The APNs .p8 auth key, stored as one line: `pemToDer()` strips every
+      // whitespace character, so the newlines the file had are not needed.
+      "binding": "APNS_PRIVATE_KEY",
+      "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",
+      "secret_name": "APNS_PRIVATE_KEY_PROD",
+    },
     {
       "binding": "EXPO_ACCESS_TOKEN",
       "store_id": "342a86d9e3a94da698e82d0c6e2a36f0",

@@ -1,5 +1,5 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import { storePendingSessionMessage } from '../../../src/session/pending-messages.js';
@@ -10,13 +10,45 @@ import {
 } from '../../../src/session/wrapper-runtime-state.js';
 import type { ExecutionId } from '../../../src/types/ids.js';
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('Disconnect handling and compatibility execution RPCs', () => {
   it('alarm schedules the idle cadence when no current message deadlines exist', async () => {
     const userId = 'user_alarm_idle';
     const sessionId = 'agent_alarm_idle';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       const now = Date.now();
@@ -34,9 +66,7 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
   it('idle cleanup respects accepted wrapper-run messages and pending queue work', async () => {
     const userId = 'user_idle_cleanup';
     const sessionId = 'agent_idle_cleanup';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       const now = Date.now();
@@ -88,9 +118,7 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
   it('idle cleanup preserves a completed wrapper retained for warm fenced reuse', async () => {
     const userId = 'user_idle_warm_reuse';
     const sessionId = 'agent_idle_warm_reuse';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       const now = Date.now();
@@ -139,9 +167,7 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
   it('failExecutionRpc retains the public execution-record failure contract', async () => {
     const userId = 'user_rpc_failure';
     const sessionId = 'agent_rpc_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       const now = Date.now();
@@ -181,9 +207,7 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
   it('failExecutionRpc is idempotent for an already-terminal execution', async () => {
     const userId = 'user_rpc_terminal';
     const sessionId = 'agent_rpc_terminal';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await instance.updateMetadata({ version: 1, sessionId, userId, timestamp: 1 });
@@ -220,9 +244,7 @@ describe('Disconnect handling and compatibility execution RPCs', () => {
   it('failExecutionRpc preserves the custom event type compatibility input', async () => {
     const userId = 'user_rpc_custom';
     const sessionId = 'agent_rpc_custom';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await instance.updateMetadata({ version: 1, sessionId, userId, timestamp: 1 });

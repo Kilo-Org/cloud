@@ -31,7 +31,6 @@
     "@trpc/server": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
-    "itty-time": "1.0.6",
     "jose": "catalog:",
     "jsonwebtoken": "catalog:",
     "pg": "8.20.0",

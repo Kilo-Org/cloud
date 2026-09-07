@@ -1,89 +1,80 @@
 import { describe, expect, test } from '@jest/globals';
 
 import type { GatewayRequest } from '@/lib/ai-gateway/providers/openrouter/types';
-import {
-  FRIENDLI_GLM_PUBLIC_ID,
-  PERPLEXITY_KIMI_PUBLIC_ID,
-} from '@/lib/ai-gateway/providers/partner/constants';
-import {
-  FRIENDLI_GLM_PROVIDER,
-  PERPLEXITY_KIMI_PROVIDER,
-} from '@/lib/ai-gateway/providers/partner/providers';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
+import { PERPLEXITY_KIMI_PROVIDER } from '@/lib/ai-gateway/providers/partner/providers';
 import {
   ReasoningDetailsTransform,
   type TransformRequestContext,
 } from '@/lib/ai-gateway/providers/types';
 
-describe.each([
-  {
-    name: 'Friendli GLM',
-    provider: FRIENDLI_GLM_PROVIDER,
-    expectedUrl: 'https://api.friendli.ai/serverless/v1/chat/completions',
-    requestedModel: FRIENDLI_GLM_PUBLIC_ID,
-    upstreamModel: 'zai-org/GLM-5.2',
-  },
-  {
-    name: 'Perplexity Kimi',
-    provider: PERPLEXITY_KIMI_PROVIDER,
-    expectedUrl: 'https://api.perplexity.ai/router/v1/chat/completions',
-    requestedModel: PERPLEXITY_KIMI_PUBLIC_ID,
-    upstreamModel: 'perplexity/kimi-k3',
-  },
-])('$name provider', ({ provider, expectedUrl, requestedModel, upstreamModel }) => {
+describe('Perplexity Kimi provider', () => {
   test('supports the chat completions API', () => {
-    expect(`${provider.apiUrl}/chat/completions`).toBe(expectedUrl);
-    expect(provider.supportedChatApis).toEqual(['chat_completions']);
+    expect(`${PERPLEXITY_KIMI_PROVIDER.apiUrl}/chat/completions`).toBe(
+      'https://api.perplexity.ai/router/v1/chat/completions'
+    );
+    expect(PERPLEXITY_KIMI_PROVIDER.supportedChatApis).toEqual(['chat_completions']);
   });
 
   test('enables the reasoning details response transform', () => {
-    expect(provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
+    expect(PERPLEXITY_KIMI_PROVIDER.responseTransforms).toBe(
+      ReasoningDetailsTransform.ReasoningContent
+    );
   });
 
-  test('hardwires the upstream model and removes provider settings', async () => {
+  test('hardwires the upstream model and removes provider and user settings', async () => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
-        model: requestedModel,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         messages: [{ role: 'user', content: 'hello' }],
-        provider: { order: ['friendli'] },
+        provider: { order: ['perplexity'] },
+        user: 'user-id',
       },
     };
 
-    await provider.transformRequest({ request } as TransformRequestContext);
+    await PERPLEXITY_KIMI_PROVIDER.transformRequest({ request } as TransformRequestContext);
 
-    expect(request.body.model).toBe(upstreamModel);
+    expect(request.body.model).toBe('perplexity/kimi-k3');
     expect(request.body.provider).toBeUndefined();
+    expect(request.body.user).toBeUndefined();
   });
-});
 
-describe('Friendli GLM reasoning', () => {
   test.each([
-    [
-      { enabled: false as const, effort: 'none' as const },
-      { chat_template_kwargs: { enable_thinking: false } },
-    ],
-    [
-      { enabled: true as const, effort: 'high' as const },
-      {
-        chat_template_kwargs: { enable_thinking: true },
-        reasoning_effort: 'high',
-        parse_reasoning: true,
-        include_reasoning: true,
-      },
-    ],
-  ])('maps reasoning %p to Friendli settings', async (reasoning, expected) => {
+    [{ enabled: false as const, effort: 'none' as const }, 'none'],
+    [{ enabled: true as const, effort: 'high' as const }, 'high'],
+  ])('maps reasoning %p to Perplexity effort %s', async (reasoning, expected) => {
     const request: GatewayRequest = {
       kind: 'chat_completions',
       body: {
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         messages: [{ role: 'user', content: 'hello' }],
         reasoning,
+        reasoning_effort: 'low',
       },
     };
 
-    await FRIENDLI_GLM_PROVIDER.transformRequest({ request } as TransformRequestContext);
+    await PERPLEXITY_KIMI_PROVIDER.transformRequest({ request } as TransformRequestContext);
 
-    expect(request.body).toMatchObject(expected);
+    expect(request.body.reasoning_effort).toBe(expected);
     expect(request.body.reasoning).toBeUndefined();
   });
+
+  test.each(['none', 'low', undefined] as const)(
+    'preserves legacy reasoning effort %p when reasoning settings are absent',
+    async reasoning_effort => {
+      const request: GatewayRequest = {
+        kind: 'chat_completions',
+        body: {
+          model: PERPLEXITY_KIMI_PUBLIC_ID,
+          messages: [{ role: 'user', content: 'hello' }],
+          reasoning_effort,
+        },
+      };
+
+      await PERPLEXITY_KIMI_PROVIDER.transformRequest({ request } as TransformRequestContext);
+
+      expect(request.body.reasoning_effort).toBe(reasoning_effort);
+    }
+  );
 });

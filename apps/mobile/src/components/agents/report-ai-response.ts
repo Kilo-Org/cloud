@@ -85,5 +85,5 @@ export function classifyReportAiResponseFailure(error: unknown): ReportAiRespons
 
 /** Submitted toast copy: the receipt id only, never the message body. */
 export function reportAiResponseSubmittedToast(receiptId: string): string {
-  return i18n.t('agentChat.messageDetails.reportAiResponseSubmitted', { receiptId });
+  return i18n.t('common.reportSubmittedReceipt', { receiptId });
 }

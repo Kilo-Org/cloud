@@ -1,4 +1,5 @@
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
+import { HTML_DEPLOY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import * as Sentry from '@sentry/cloudflare';
 import type { Context } from 'hono';
@@ -64,6 +65,7 @@ export async function htmlDeployHandler(c: Context<HonoEnv>): Promise<Response> 
     nextAuthSecret: c.env.NEXTAUTH_SECRET,
     workerEnv: c.env.WORKER_ENV,
     connectionString: c.env.HYPERDRIVE.connectionString,
+    resourceAudience: { audience: HTML_DEPLOY_AUDIENCE, mode: 'allow-legacy' },
   });
 
   if (!authResult) {

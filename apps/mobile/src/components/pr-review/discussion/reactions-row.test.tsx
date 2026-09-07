@@ -98,6 +98,9 @@ describe('ReactionsRow picker dismissal focus', () => {
   it('restores focus to the trigger after the backdrop closes the picker', async () => {
     const renderer = await openPicker();
     expect(modalProps(renderer).visible).toBe(true);
+    const surface = renderer.root.findByProps({ className: 'flex-1 justify-end bg-[#00000066]' });
+    expect(String(surface.type)).toBe('View');
+    expect(String(surface.parent?.type)).toBe('Modal');
 
     // The backdrop is the labelled pressable without a button role.
     press(

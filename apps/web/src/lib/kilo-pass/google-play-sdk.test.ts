@@ -10,12 +10,15 @@ const mockSubscriptionsV2Get = jest.fn().mockImplementation(() => ({
   data: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' },
 }));
 
+const mockAcknowledge = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+
 const mockOrdersGet = jest.fn().mockImplementation(() => ({ data: { orderId: 'paid-order' } }));
 
 const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) => ({
   args,
   orders: { get: mockOrdersGet },
   purchases: {
+    subscriptions: { acknowledge: mockAcknowledge },
     subscriptionsv2: {
       get: mockSubscriptionsV2Get,
     },
@@ -97,6 +100,28 @@ describe('google-play-sdk', () => {
     await expect(getGooglePlaySubscriptionOrder('paid-order')).rejects.toThrow(
       'provider unavailable'
     );
+  });
+
+  it('acknowledges a verified subscription and tolerates a concurrent acknowledgement', async () => {
+    const { acknowledgeGooglePlaySubscriptionPurchase } = loadGooglePlaySdk();
+    await acknowledgeGooglePlaySubscriptionPurchase('kilopass_tier19', 'test-token');
+    expect(mockAcknowledge).toHaveBeenCalledWith({
+      packageName: 'com.kilocode.kiloapp',
+      subscriptionId: 'kilopass_tier19',
+      token: 'test-token',
+      requestBody: {},
+    });
+    mockAcknowledge.mockRejectedValueOnce(new Error('response lost'));
+    mockSubscriptionsV2Get.mockReturnValueOnce({
+      data: { acknowledgementState: 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED' },
+    });
+    await expect(
+      acknowledgeGooglePlaySubscriptionPurchase('kilopass_tier19', 'test-token')
+    ).resolves.toBeUndefined();
+    mockAcknowledge.mockRejectedValueOnce(new Error('provider unavailable'));
+    await expect(
+      acknowledgeGooglePlaySubscriptionPurchase('kilopass_tier19', 'test-token')
+    ).rejects.toThrow('provider unavailable');
   });
 
   it('throws when the service account JSON is not set', () => {

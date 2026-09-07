@@ -22,6 +22,8 @@ import {
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/utils';
 
+const mockAcknowledge = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+
 const mockGetGooglePlaySubscriptionPurchase =
   jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
 
@@ -45,6 +47,7 @@ const mockGetGooglePlaySubscriptionOrder = jest.fn(
 );
 
 jest.mock('./google-play-sdk', () => ({
+  acknowledgeGooglePlaySubscriptionPurchase: mockAcknowledge,
   getGooglePlaySubscriptionPurchase: mockGetGooglePlaySubscriptionPurchase,
   getGooglePlaySubscriptionOrder: mockGetGooglePlaySubscriptionOrder,
   GOOGLE_PLAY_PACKAGE_NAME: 'com.kilocode.kiloapp',
@@ -159,6 +162,7 @@ describe('processGooglePlayKiloPassNotification', () => {
   });
 
   beforeEach(() => {
+    mockAcknowledge.mockReset().mockResolvedValue(undefined);
     getPosthogTrackingMock().trackKiloPassPurchaseCompleted.mockClear();
     dateNowSpy.mockReturnValue(GOOGLE_PLAY_NOTIFICATION_TEST_NOW_MS);
     mockGetGooglePlaySubscriptionOrder.mockClear();
@@ -717,6 +721,48 @@ describe('processGooglePlayKiloPassNotification', () => {
       expect(after!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
     }
   );
+
+  it('acknowledges after committed credits and retries acknowledgement without another grant', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = crypto.randomUUID();
+    const messageId = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+      apiDataForUser(obfsAccountId, undefined, {
+        acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+      })
+    );
+    mockAcknowledge.mockImplementationOnce(async () => {
+      const granted = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(granted!.total_microdollars_acquired).toBe(
+        user.total_microdollars_acquired + toMicrodollars(19)
+      );
+      throw new Error('acknowledgement unavailable');
+    });
+    const message = pubsubMessage({ purchaseToken: token, messageId });
+    await expect(processGooglePlayKiloPassNotification({ pubsubMessage: message })).rejects.toThrow(
+      'acknowledgement unavailable'
+    );
+    const pending = await db.query.kilo_pass_store_events.findFirst({
+      where: eq(kilo_pass_store_events.event_id, messageId),
+    });
+    expect(pending!.processed_at).toBeNull();
+    await db
+      .update(kilo_pass_store_events)
+      .set({ processing_started_at: new Date(Date.now() - 6 * 60 * 1000).toISOString() })
+      .where(eq(kilo_pass_store_events.id, pending!.id));
+    await expect(
+      processGooglePlayKiloPassNotification({ pubsubMessage: message })
+    ).resolves.toEqual({ processed: true });
+    expect(mockAcknowledge).toHaveBeenCalledTimes(2);
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired).toBe(
+      user.total_microdollars_acquired + toMicrodollars(19)
+    );
+  });
 
   it('returns already_processed for a duplicate messageId', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();

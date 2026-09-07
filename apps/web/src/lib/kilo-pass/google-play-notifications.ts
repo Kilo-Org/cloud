@@ -20,6 +20,7 @@ import {
   mapGooglePlayKiloPassPurchase,
 } from './google-play-verifier';
 import {
+  acknowledgeGooglePlaySubscriptionPurchase,
   GOOGLE_PLAY_PACKAGE_NAME,
   getGooglePlaySubscriptionPurchase,
   getGooglePlaySubscriptionOrder,
@@ -798,19 +799,14 @@ export async function processGooglePlayKiloPassNotification(params: {
           providerSubscriptionId: purchase.providerSubscriptionId,
         },
       });
-      await tx
-        .update(kilo_pass_store_events)
-        .set({ processed_at: new Date().toISOString() })
-        .where(
-          and(
-            eq(kilo_pass_store_events.payment_provider, KiloPassPaymentProvider.GooglePlay),
-            eq(kilo_pass_store_events.event_id, eventId)
-          )
-        );
     });
     if (purchaseMismatch) {
       return { processed: true };
     }
+    if (purchase.rawPayload.acknowledgementState === 'ACKNOWLEDGEMENT_STATE_PENDING') {
+      await acknowledgeGooglePlaySubscriptionPurchase(purchase.productId, purchaseToken);
+    }
+    await markGooglePlayStoreEventProcessed(eventId);
     // Post-commit only — never capture inside the transaction.
     const trackedResult = completionResult as CompleteStoreKiloPassPurchaseResult | null;
     if (trackedResult && !trackedResult.alreadyProcessed) {

@@ -7,6 +7,9 @@ import { PreferencesScreen } from '@/components/preferences-screen';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { renderWithProviders } from '@/test/render-with-providers';
 
+vi.hoisted(() => {
+  vi.stubGlobal('__DEV__', true);
+});
 const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
 // The screen mounts the feature-flag debug surface, which reads PostHog flag

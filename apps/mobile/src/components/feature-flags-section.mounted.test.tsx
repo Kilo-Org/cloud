@@ -7,6 +7,9 @@ import '@/i18n';
 import { FeatureFlagsSection } from '@/components/feature-flags-section';
 import { renderWithProviders } from '@/test/render-with-providers';
 
+vi.hoisted(() => {
+  vi.stubGlobal('__DEV__', true);
+});
 /** Statuses the mocked PostHog module reports; each test seeds this. */
 const posthog = vi.hoisted(() => ({
   statuses: [] as Record<string, unknown>[],

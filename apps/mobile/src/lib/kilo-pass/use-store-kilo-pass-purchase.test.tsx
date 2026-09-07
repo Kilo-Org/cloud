@@ -1006,6 +1006,46 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
   });
 
+  it('restores an owned Play purchase when another purchase fails ownership checks', async () => {
+    const owned = createPurchase({
+      store: 'google',
+      productId: product.googleProductId,
+      purchaseToken: 'owned-token',
+      id: 'owned',
+      transactionId: 'owned-order',
+    });
+    const other = createPurchase({
+      store: 'google',
+      productId: product.googleProductId,
+      purchaseToken: 'other-token',
+      id: 'other',
+      transactionId: 'other-order',
+    });
+    const completePlayPurchase = vi.fn(async ({ purchaseToken }) => {
+      if (purchaseToken === 'other-token') throw new Error('google_play_account_token_mismatch');
+      return { alreadyProcessed: true };
+    });
+    const finishTransaction = vi.fn();
+    const invalidateAfterCompletion = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      finishTransaction,
+      invalidateAfterCompletion,
+      enabledAppleProductIds: [],
+      enabledGoogleProductIds: [product.googleProductId],
+      getAvailablePurchases: vi.fn().mockResolvedValue([other, owned]),
+      restorePurchases: vi.fn().mockResolvedValue(undefined),
+    });
+    expect(await actions.restorePurchases()).toBe('restored');
+    expect(completePlayPurchase).toHaveBeenCalledTimes(2);
+    expect(finishTransaction).toHaveBeenCalledExactlyOnceWith({
+      purchase: owned,
+      isConsumable: false,
+    });
+    expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
+  });
+
   it('acknowledges a verified Play purchase before waiting for account refresh', async () => {
     const refresh = createDeferredPromise();
     const finishTransaction = vi.fn().mockResolvedValue(undefined);

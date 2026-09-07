@@ -16,6 +16,7 @@ export async function reconcileGooglePlaySubscriptionState(
     providerTransactionId: string;
     expiresAtIso: string | null;
     subscriptionState: string;
+    googlePlayReplacement?: { deferred: boolean };
   }
 ): Promise<void> {
   const expiry = Date.parse(purchase.expiresAtIso ?? '');
@@ -60,7 +61,12 @@ export async function reconcileGooglePlaySubscriptionState(
       desc(kilo_pass_store_purchases.created_at),
     ],
   });
-  if (!latest || latest.provider_transaction_id !== purchase.providerTransactionId) return;
+  if (
+    !latest ||
+    (!purchase.googlePlayReplacement?.deferred &&
+      latest.provider_transaction_id !== purchase.providerTransactionId)
+  )
+    return;
   const revoked = await tx.query.kilo_pass_store_events.findFirst({
     columns: { id: true },
     where: and(

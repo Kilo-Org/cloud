@@ -1006,6 +1006,88 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(invalidateAfterCompletion).toHaveBeenCalledTimes(1);
   });
 
+  it('acknowledges a verified Play purchase before waiting for account refresh', async () => {
+    const refresh = createDeferredPromise();
+    const finishTransaction = vi.fn().mockResolvedValue(undefined);
+    const invalidateAfterCompletion = vi.fn(async () => {
+      await refresh.promise;
+    });
+    const actions = createActions({
+      storefront: 'play',
+      finishTransaction,
+      invalidateAfterCompletion,
+    });
+    const completion = actions.handlePurchaseSuccess(
+      createPurchase({ store: 'google', productId: 'kilopass_tier19' })
+    );
+    await vi.waitFor(() => expect(invalidateAfterCompletion).toHaveBeenCalled());
+    const acknowledgedBeforeRefresh = finishTransaction.mock.calls.length;
+    refresh.resolve(undefined);
+    expect(await completion).toBe(true);
+    expect(acknowledgedBeforeRefresh).toBe(1);
+  });
+
+  it('retries Play acknowledgement after backend completion without losing recovery', async () => {
+    const finishTransaction = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('store disconnected'))
+      .mockResolvedValue(undefined);
+    const completePlayPurchase = vi.fn().mockResolvedValue({ alreadyProcessed: true });
+    const purchase = createPurchase({ store: 'google', productId: 'kilopass_tier19' });
+    const actions = createActions({
+      storefront: 'play',
+      finishTransaction,
+      completePlayPurchase,
+      enabledGoogleProductIds: ['kilopass_tier19'],
+    });
+    expect(await actions.handlePurchaseSuccess(purchase)).toBe(false);
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(completePlayPurchase).toHaveBeenCalledTimes(2);
+    expect(finishTransaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('recovers a Play purchase after a backend outage without premature acknowledgement', async () => {
+    const completePlayPurchase = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('network timeout'))
+      .mockResolvedValue({ alreadyProcessed: false });
+    const finishTransaction = vi.fn();
+    const purchase = createPurchase({
+      store: 'google',
+      productId: 'kilopass_tier49',
+      transactionId: 'retry-play',
+    });
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      finishTransaction,
+      enabledGoogleProductIds: ['kilopass_tier49'],
+    });
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(finishTransaction).not.toHaveBeenCalled();
+    expect(await actions.recoverPurchases([purchase])).toEqual([purchase]);
+    expect(finishTransaction).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not acknowledge a pending Play transaction during recovery', async () => {
+    const completePlayPurchase = vi.fn();
+    const finishTransaction = vi.fn();
+    const purchase = createPurchase({
+      store: 'google',
+      productId: 'kilopass_tier19',
+      purchaseState: 'pending',
+    });
+    const actions = createActions({
+      storefront: 'play',
+      completePlayPurchase,
+      finishTransaction,
+      enabledGoogleProductIds: ['kilopass_tier19'],
+    });
+    expect(await actions.recoverPurchases([purchase])).toEqual([]);
+    expect(completePlayPurchase).not.toHaveBeenCalled();
+    expect(finishTransaction).not.toHaveBeenCalled();
+  });
+
   it('maps Play billing failures to translated copy without changing Apple errors', () => {
     const error = { code: 'billing-unavailable', message: 'Billing API version is not supported' };
     expect(getKiloPassPurchaseErrorMessage(error, 'fallback', 'play')).toBe(

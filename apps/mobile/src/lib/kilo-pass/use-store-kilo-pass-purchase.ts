@@ -259,10 +259,10 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
             storefront: 'app_store',
             product: 'kilo_pass',
           }));
+      await deps.finishTransaction({ purchase, isConsumable: false });
       if (options.invalidateAfterCompletion ?? true) {
         await deps.invalidateAfterCompletion();
       }
-      await deps.finishTransaction({ purchase, isConsumable: false });
       return { completed: true };
     } catch (error) {
       const message = getKiloPassPurchaseErrorMessage(

@@ -16,7 +16,6 @@ export async function reconcileGooglePlaySubscriptionState(
     providerTransactionId: string;
     expiresAtIso: string | null;
     subscriptionState: string;
-    googlePlayReplacement?: { deferred: boolean };
   }
 ): Promise<void> {
   const expiry = Date.parse(purchase.expiresAtIso ?? '');
@@ -63,7 +62,7 @@ export async function reconcileGooglePlaySubscriptionState(
   });
   if (
     !latest ||
-    (!purchase.googlePlayReplacement?.deferred &&
+    (latest.provider_subscription_id === purchase.providerSubscriptionId &&
       latest.provider_transaction_id !== purchase.providerTransactionId)
   )
     return;

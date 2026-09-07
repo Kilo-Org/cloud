@@ -100,15 +100,6 @@ vi.mock('react-native', () => ({
   useWindowDimensions: () => ({ height: 800, width: 400 }),
 }));
 
-// The capability banner fades in as conditional content (AGENTS.md); this
-// suite builds element trees without mounting, so the animated host only
-// needs to resolve in the node environment.
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'Animated.View' },
-  FadeIn: { duration: () => ({}) },
-  FadeOut: { duration: () => ({}) },
-}));
-
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'Success' },

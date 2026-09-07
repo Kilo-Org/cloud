@@ -20,11 +20,6 @@ vi.mock('react-i18next', async importOriginal => {
 });
 
 vi.mock('react-native', () => ({ View: 'View' }));
-vi.mock('react-native-reanimated', () => ({
-  default: { View: 'Animated.View' },
-  FadeIn: { duration: () => ({}) },
-  FadeOut: { duration: () => ({}) },
-}));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 const UNSUPPORTED: ProviderReviewCapability = {
@@ -34,14 +29,11 @@ const UNSUPPORTED: ProviderReviewCapability = {
 const SUPPORTED: ProviderReviewCapability = { supported: true, reason: '' };
 
 function renderBanner(
-  capability: ProviderReviewCapability | undefined,
-  overrides?: { title?: string; reason?: string }
+  capability: ProviderReviewCapability | undefined
 ): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | null = null;
   act(() => {
-    renderer = TestRenderer.create(
-      createElement(PrReviewCapabilityBanner, { capability, ...overrides })
-    );
+    renderer = TestRenderer.create(createElement(PrReviewCapabilityBanner, { capability }));
   });
   // eslint-disable-next-line typescript-eslint/no-unnecessary-condition -- the act() callback runs synchronously; this narrows the definite assignment
   if (!renderer) {
@@ -69,34 +61,10 @@ describe('PrReviewCapabilityBanner', () => {
 
   it('announces title and reason together for accessibility', () => {
     const renderer = renderBanner(UNSUPPORTED);
-    const view = renderer.root.find(node => (node.type as string) === 'Animated.View');
+    const view = renderer.root.find(node => (node.type as string) === 'View');
     expect(view.props.accessibilityLabel).toBe(
       `Not available on this provider: ${UNSUPPORTED.reason}`
     );
-    renderer.unmount();
-  });
-
-  it('renders a localized title/reason override instead of the generic banner copy', () => {
-    const renderer = renderBanner(UNSUPPORTED, {
-      title: 'Auto-merge is not available',
-      reason: 'Bitbucket Cloud does not expose auto-merge in its API',
-    });
-    const texts = textsOf(renderer);
-    expect(texts).toContain('Auto-merge is not available');
-    expect(texts).toContain('Bitbucket Cloud does not expose auto-merge in its API');
-    expect(texts).not.toContain('Not available on this provider');
-    renderer.unmount();
-  });
-
-  it('keeps capability.reason as the fallback when no override is passed', () => {
-    const unknownCapability: ProviderReviewCapability = {
-      supported: false,
-      reason: 'Some provider answers a reason the catalog does not name',
-    };
-    const renderer = renderBanner(unknownCapability);
-    const texts = textsOf(renderer);
-    expect(texts).toContain('Not available on this provider');
-    expect(texts).toContain(unknownCapability.reason);
     renderer.unmount();
   });
 

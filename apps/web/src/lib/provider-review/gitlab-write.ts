@@ -10,27 +10,27 @@
  * effect. `operationKey` is accepted for that ledger; this layer performs no
  * ledger writes itself.
  */
-import "server-only";
+import 'server-only';
 
 import type {
   ProviderReviewCapabilities,
   ProviderReviewInlineAnchor,
   ProviderReviewInlineComment,
-} from "@kilocode/app-shared/provider-review";
+} from '@kilocode/app-shared/provider-review';
 import {
   createMRNote,
   fetchGitLabMergeRequest,
   type GitLabDiscussion,
   type GitLabMergeRequest,
-} from "@/lib/integrations/platforms/gitlab/adapter";
+} from '@/lib/integrations/platforms/gitlab/adapter';
 import {
   authorizeProject,
   classifyGitLabError,
   GitLabReviewError,
   type GitLabProjectAccess,
   type GitLabReviewOwner,
-} from "./gitlab-authorization";
-import { requestGitLabJson } from "./gitlab-read";
+} from './gitlab-authorization';
+import { requestGitLabJson } from './gitlab-read';
 
 /** The MR a write acts on. `instanceHint` is display/matching only. */
 export type GitLabMrTarget = {
@@ -54,14 +54,14 @@ export type GitLabMutationResult = {
  * event, so callers show this instead of silently falling back to a comment.
  */
 export const GITLAB_REQUEST_CHANGES_UNSUPPORTED_REASON =
-  "GitLab merge requests do not support request-changes reviews. Post a comment instead.";
+  'GitLab merge requests do not support request-changes reviews. Post a comment instead.';
 
 /**
  * The stale-head fence reason, shared with classifyGitLabStatus so a locally
  * detected moved head and a provider 409 read identically on mobile.
  */
 export const GITLAB_STALE_HEAD_REASON =
-  "The merge request changed since it was loaded. Reload the merge request and try again.";
+  'The merge request changed since it was loaded. Reload the merge request and try again.';
 
 /**
  * The exact reason arming auto-merge is refused on an MR without an active
@@ -70,7 +70,7 @@ export const GITLAB_STALE_HEAD_REASON =
  * fall-through path.
  */
 export const GITLAB_AUTO_MERGE_NO_PIPELINE_REASON =
-  "GitLab arms auto-merge only while a pipeline is running. This merge request has no running pipeline. Start a pipeline, then try again.";
+  'GitLab arms auto-merge only while a pipeline is running. This merge request has no running pipeline. Start a pipeline, then try again.';
 
 /**
  * The GitLab capability list for review surfaces. It excludes
@@ -80,12 +80,12 @@ export const GITLAB_AUTO_MERGE_NO_PIPELINE_REASON =
  */
 export const GITLAB_MR_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
   canComment: true,
-  reviewEvents: ["approve", "comment"],
+  reviewEvents: ['approve', 'comment'],
   canResolveThreads: true,
   canMerge: true,
-  autoMerge: { supported: true, reason: "" },
-  reactions: { supported: true, reason: "" },
-  reviewStatus: { supported: true, reason: "" },
+  autoMerge: { supported: true, reason: '' },
+  reactions: { supported: true, reason: '' },
+  reviewStatus: { supported: true, reason: '' },
 };
 
 type GitLabMergeRequestDetail = GitLabMergeRequest & {
@@ -100,31 +100,25 @@ type GitLabMergeRequestDetail = GitLabMergeRequest & {
  * immediately instead of waiting, so auto-merge cannot be armed on it.
  */
 const GITLAB_ACTIVE_PIPELINE_STATUSES = new Set([
-  "created",
-  "waiting_for_resources",
-  "waiting",
-  "pending",
-  "running",
-  "scheduled",
-  "preparing",
-  "completing",
+  'created',
+  'waiting_for_resources',
+  'waiting',
+  'pending',
+  'running',
+  'scheduled',
+  'preparing',
+  'completing',
 ]);
 
 function hasActivePipeline(mr: GitLabMergeRequestDetail): boolean {
   return (
-    typeof mr.head_pipeline?.status === "string" &&
+    typeof mr.head_pipeline?.status === 'string' &&
     GITLAB_ACTIVE_PIPELINE_STATUSES.has(mr.head_pipeline.status)
   );
 }
 
-async function targetAccess(
-  target: GitLabMrTarget,
-): Promise<GitLabProjectAccess> {
-  return authorizeProject(
-    target.owner,
-    target.projectPath,
-    target.instanceHint,
-  );
+async function targetAccess(target: GitLabMrTarget): Promise<GitLabProjectAccess> {
+  return authorizeProject(target.owner, target.projectPath, target.instanceHint);
 }
 
 function mrPath(access: GitLabProjectAccess, mrIid: number): string {
@@ -140,7 +134,7 @@ type GitLabDiffRefs = { base_sha: string; head_sha: string; start_sha: string };
 
 async function fetchMrDiffRefs(
   access: GitLabProjectAccess,
-  mrIid: number,
+  mrIid: number
 ): Promise<GitLabDiffRefs> {
   const mr = (await fetchGitLabMergeRequest({
     accessToken: access.accessToken,
@@ -151,8 +145,8 @@ async function fetchMrDiffRefs(
   const refs = mr.diff_refs;
   if (!refs?.base_sha || !refs.head_sha || !refs.start_sha) {
     throw new GitLabReviewError(
-      "bad_request",
-      "The merge request has no diff positions to anchor a comment to.",
+      'bad_request',
+      'The merge request has no diff positions to anchor a comment to.'
     );
   }
   return refs;
@@ -161,23 +155,26 @@ async function fetchMrDiffRefs(
 /**
  * The GitLab text position for one anchor: the current diff refs plus the
  * anchored path/line. RIGHT anchors the new side (`new_line`), LEFT the old
- * side (`old_line`); a `startLine` range adds `old_line` to a RIGHT anchor.
+ * side (`old_line`). A `startLine` range is NOT sent as an `old_line` beside
+ * the `new_line`: GitLab reads that pair as one changed-line relation, so a
+ * range on added lines (no old-side counterpart) 400s. A range anchors its
+ * end line on the tapped side; the range stays in the ledger key and the
+ * pending list, not in the provider position.
  */
 function buildTextPosition(
   refs: GitLabDiffRefs,
-  anchor: ProviderReviewInlineAnchor,
+  anchor: ProviderReviewInlineAnchor
 ): Record<string, unknown> {
   const position: Record<string, unknown> = {
-    position_type: "text",
+    position_type: 'text',
     base_sha: refs.base_sha,
     start_sha: refs.start_sha,
     head_sha: refs.head_sha,
     new_path: anchor.path,
     old_path: anchor.path,
   };
-  if (anchor.side === "RIGHT") {
+  if (anchor.side === 'RIGHT') {
     position.new_line = anchor.line;
-    if (anchor.startLine !== undefined) position.old_line = anchor.startLine;
   } else {
     position.old_line = anchor.line;
   }
@@ -185,21 +182,58 @@ function buildTextPosition(
 }
 
 /**
+ * The partial-apply reason: an inline discussion committed before a later
+ * rejection, so the provider already holds effects a replayed batch would
+ * duplicate. The retryable kind keeps the router's ledger row
+ * reconcile_pending instead of settling it failed.
+ */
+const GITLAB_INLINE_PARTIAL_APPLY_REASON =
+  'GitLab applied part of this review before the request failed. Check the merge request before retrying.';
+
+/**
+ * Classify one submitReview failure. A position outside the diff (400) is a
+ * clean deterministic refusal only while nothing has committed: the failed
+ * settle lets the client rotate its operation key and a fresh intent re-posts
+ * the whole batch. Once any inline discussion is live every later failure —
+ * mid-batch or the approval/summary step — is a partial apply, so it reports
+ * the retryable kind and the router reconciles instead of replaying.
+ */
+function classifySubmitFailure(error: unknown, inlineCommitted: boolean): GitLabReviewError {
+  const classified = classifyGitLabError(error);
+  if (inlineCommitted && !classified.retryable) {
+    return new GitLabReviewError('retryable', GITLAB_INLINE_PARTIAL_APPLY_REASON);
+  }
+  return classified;
+}
+
+/**
  * Create one diff discussion per anchored comment on the merge request.
  * GitLab rejects a position outside the diff (400), which classifyGitLabError
- * surfaces as a non-retryable bad_request through the existing taxonomy.
+ * surfaces as a non-retryable bad_request through the existing taxonomy —
+ * but only while nothing has committed: a rejection after an earlier
+ * discussion committed is a partial apply, reported through the retryable
+ * kind so the ledger row stays reconcile_pending and never replays the
+ * committed comments as duplicates.
  */
 async function createInlineDiscussions(
   access: GitLabProjectAccess,
   mrIid: number,
-  anchored: Array<{ anchor: ProviderReviewInlineAnchor; body: string }>,
+  anchored: Array<{ anchor: ProviderReviewInlineAnchor; body: string }>
 ): Promise<void> {
   const refs = await fetchMrDiffRefs(access, mrIid);
+  let committed = false;
   for (const item of anchored) {
-    await requestGitLabJson(access, `${mrPath(access, mrIid)}/discussions`, {
-      method: "POST",
-      body: { body: item.body, position: buildTextPosition(refs, item.anchor) },
-    });
+    try {
+      await requestGitLabJson(access, `${mrPath(access, mrIid)}/discussions`, {
+        method: 'POST',
+        body: { body: item.body, position: buildTextPosition(refs, item.anchor) },
+      });
+    } catch (error) {
+      throw committed
+        ? new GitLabReviewError('retryable', GITLAB_INLINE_PARTIAL_APPLY_REASON)
+        : error;
+    }
+    committed = true;
   }
 }
 
@@ -212,7 +246,7 @@ export async function addComment(
   target: GitLabMrTarget & {
     body: string;
     anchor?: ProviderReviewInlineAnchor;
-  } & GitLabMutationInput,
+  } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
@@ -226,7 +260,7 @@ export async function addComment(
         access.projectPath,
         target.mrIid,
         target.body,
-        access.instanceUrl,
+        access.instanceUrl
       );
     }
     return { done: true, replayed: false };
@@ -240,14 +274,14 @@ export async function replyToDiscussion(
   target: GitLabMrTarget & {
     discussionId: string;
     body: string;
-  } & GitLabMutationInput,
+  } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
     await requestGitLabJson(
       access,
       `${mrPath(access, target.mrIid)}/discussions/${encodeURIComponent(target.discussionId)}/notes`,
-      { method: "POST", body: { body: target.body } },
+      { method: 'POST', body: { body: target.body } }
     );
     return { done: true, replayed: false };
   } catch (error) {
@@ -260,50 +294,46 @@ export async function replyToDiscussion(
  * `comment` → note; `request_changes` is not a GitLab concept and is refused
  * with the exact reason — never a silent fallback to another event. An
  * optional `comments` batch posts real inline diff discussions BEFORE the
- * approval/summary note, so a review carries GitHub-parity inline threads; a
- * mid-batch failure throws the classified error and the router's
- * reconcile-ambiguous handling keeps the ledger from replaying a duplicate.
+ * approval/summary note, so a review carries GitHub-parity inline threads;
+ * once any discussion has committed, every failure reports the retryable
+ * kind, so the router marks the ledger row reconcile_pending and a same-key
+ * retry never re-posts the committed comments as duplicates.
  */
 export async function submitReview(
   target: GitLabMrTarget & {
-    event: "approve" | "comment" | "request_changes";
+    event: 'approve' | 'comment' | 'request_changes';
     body?: string;
     comments?: ProviderReviewInlineComment[];
-  } & GitLabMutationInput,
+  } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
-  if (target.event === "request_changes") {
-    throw new GitLabReviewError(
-      "bad_request",
-      GITLAB_REQUEST_CHANGES_UNSUPPORTED_REASON,
-    );
+  if (target.event === 'request_changes') {
+    throw new GitLabReviewError('bad_request', GITLAB_REQUEST_CHANGES_UNSUPPORTED_REASON);
   }
   const access = await targetAccess(target);
+  let inlineCommitted = false;
   try {
     if (target.comments?.length) {
       await createInlineDiscussions(
         access,
         target.mrIid,
-        target.comments.map((comment) => ({
+        target.comments.map(comment => ({
           anchor: comment,
           body: comment.body,
-        })),
+        }))
       );
+      inlineCommitted = true;
     }
-    if (target.event === "approve") {
-      await requestGitLabJson(
-        access,
-        `${mrPath(access, target.mrIid)}/approve`,
-        {
-          method: "POST",
-        },
-      );
+    if (target.event === 'approve') {
+      await requestGitLabJson(access, `${mrPath(access, target.mrIid)}/approve`, {
+        method: 'POST',
+      });
       if (target.body) {
         await createMRNote(
           access.accessToken,
           access.projectPath,
           target.mrIid,
           target.body,
-          access.instanceUrl,
+          access.instanceUrl
         );
       }
     } else if (target.body) {
@@ -312,17 +342,14 @@ export async function submitReview(
         access.projectPath,
         target.mrIid,
         target.body,
-        access.instanceUrl,
+        access.instanceUrl
       );
     } else if (!target.comments?.length) {
-      throw new GitLabReviewError(
-        "bad_request",
-        "A comment review needs a body.",
-      );
+      throw new GitLabReviewError('bad_request', 'A comment review needs a body.');
     }
     return { done: true, replayed: false };
   } catch (error) {
-    throw classifyGitLabError(error);
+    throw classifySubmitFailure(error, inlineCommitted);
   }
 }
 
@@ -330,13 +357,13 @@ export async function submitReview(
 async function fetchDiscussionResolvedState(
   access: GitLabProjectAccess,
   mrIid: number,
-  discussionId: string,
+  discussionId: string
 ): Promise<{ resolved: boolean; resolvable: boolean }> {
   const discussion = await requestGitLabJson<GitLabDiscussion>(
     access,
-    `${mrPath(access, mrIid)}/discussions/${encodeURIComponent(discussionId)}`,
+    `${mrPath(access, mrIid)}/discussions/${encodeURIComponent(discussionId)}`
   );
-  const resolvableNote = discussion?.notes?.find((note) => note.resolvable);
+  const resolvableNote = discussion?.notes?.find(note => note.resolvable);
   return {
     resolvable: Boolean(resolvableNote),
     resolved: resolvableNote?.resolved === true,
@@ -345,20 +372,13 @@ async function fetchDiscussionResolvedState(
 
 async function setThreadResolved(
   target: GitLabMrTarget & { discussionId: string } & GitLabMutationInput,
-  resolved: boolean,
+  resolved: boolean
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
-    const state = await fetchDiscussionResolvedState(
-      access,
-      target.mrIid,
-      target.discussionId,
-    );
+    const state = await fetchDiscussionResolvedState(access, target.mrIid, target.discussionId);
     if (!state.resolvable) {
-      throw new GitLabReviewError(
-        "bad_request",
-        "This discussion cannot be resolved on GitLab.",
-      );
+      throw new GitLabReviewError('bad_request', 'This discussion cannot be resolved on GitLab.');
     }
     if (state.resolved === resolved) {
       return { done: true, replayed: true };
@@ -366,7 +386,7 @@ async function setThreadResolved(
     await requestGitLabJson(
       access,
       `${mrPath(access, target.mrIid)}/discussions/${encodeURIComponent(target.discussionId)}`,
-      { method: "PUT", query: { resolved } },
+      { method: 'PUT', query: { resolved } }
     );
     return { done: true, replayed: false };
   } catch (error) {
@@ -376,14 +396,14 @@ async function setThreadResolved(
 
 /** Resolve a discussion thread (PUT discussions). */
 export async function resolveThread(
-  target: GitLabMrTarget & { discussionId: string } & GitLabMutationInput,
+  target: GitLabMrTarget & { discussionId: string } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   return setThreadResolved(target, true);
 }
 
 /** Un-resolve a discussion thread (PUT discussions). */
 export async function unresolveThread(
-  target: GitLabMrTarget & { discussionId: string } & GitLabMutationInput,
+  target: GitLabMrTarget & { discussionId: string } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   return setThreadResolved(target, false);
 }
@@ -393,13 +413,10 @@ export async function unresolveThread(
  * A moved head is refused BEFORE any merge call, so a stale revision can
  * never merge another commit or be redirected (requirement 16).
  */
-function requireHeadShaFence(
-  mr: GitLabMergeRequestDetail,
-  expectedHeadSha: string,
-): void {
+function requireHeadShaFence(mr: GitLabMergeRequestDetail, expectedHeadSha: string): void {
   const currentHead = mr.diff_refs?.head_sha || mr.sha;
   if (currentHead !== expectedHeadSha) {
-    throw new GitLabReviewError("stale_head", GITLAB_STALE_HEAD_REASON);
+    throw new GitLabReviewError('stale_head', GITLAB_STALE_HEAD_REASON);
   }
 }
 
@@ -415,7 +432,7 @@ export async function mergePullRequest(
     shouldRemoveSourceBranch?: boolean;
     commitTitle?: string;
     commitMessage?: string;
-  } & GitLabMutationInput,
+  } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
@@ -425,31 +442,24 @@ export async function mergePullRequest(
       mrIid: target.mrIid,
       instanceUrl: access.instanceUrl,
     })) as GitLabMergeRequestDetail;
-    if (mr.state === "merged") {
+    if (mr.state === 'merged') {
       // The target state already holds: report the replay, run no effect.
       return { done: true, replayed: true };
     }
     requireHeadShaFence(mr, target.expectedHeadSha);
-    if (mr.state === "closed" || mr.state === "locked") {
-      throw new GitLabReviewError(
-        "bad_request",
-        "The merge request is closed.",
-      );
+    if (mr.state === 'closed' || mr.state === 'locked') {
+      throw new GitLabReviewError('bad_request', 'The merge request is closed.');
     }
     await requestGitLabJson(access, `${mrPath(access, target.mrIid)}/merge`, {
-      method: "PUT",
+      method: 'PUT',
       body: {
         sha: target.expectedHeadSha,
         ...(target.squash !== undefined ? { squash: target.squash } : {}),
         ...(target.shouldRemoveSourceBranch !== undefined
           ? { should_remove_source_branch: target.shouldRemoveSourceBranch }
           : {}),
-        ...(target.commitTitle
-          ? { merge_commit_title: target.commitTitle }
-          : {}),
-        ...(target.commitMessage
-          ? { merge_commit_message: target.commitMessage }
-          : {}),
+        ...(target.commitTitle ? { merge_commit_title: target.commitTitle } : {}),
+        ...(target.commitMessage ? { merge_commit_message: target.commitMessage } : {}),
       },
     });
     return { done: true, replayed: false };
@@ -468,7 +478,7 @@ export async function mergePullRequest(
  * immediately in that state. Already-armed reports `replayed`.
  */
 export async function enableAutoMerge(
-  target: GitLabMrTarget & { expectedHeadSha: string } & GitLabMutationInput,
+  target: GitLabMrTarget & { expectedHeadSha: string } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
@@ -483,13 +493,10 @@ export async function enableAutoMerge(
     }
     requireHeadShaFence(mr, target.expectedHeadSha);
     if (!hasActivePipeline(mr)) {
-      throw new GitLabReviewError(
-        "bad_request",
-        GITLAB_AUTO_MERGE_NO_PIPELINE_REASON,
-      );
+      throw new GitLabReviewError('bad_request', GITLAB_AUTO_MERGE_NO_PIPELINE_REASON);
     }
     await requestGitLabJson(access, `${mrPath(access, target.mrIid)}/merge`, {
-      method: "PUT",
+      method: 'PUT',
       body: { merge_when_pipeline_succeeds: true, sha: target.expectedHeadSha },
     });
     return { done: true, replayed: false };
@@ -507,7 +514,7 @@ export async function enableAutoMerge(
  * not required here.
  */
 export async function disableAutoMerge(
-  target: GitLabMrTarget & { expectedHeadSha?: string } & GitLabMutationInput,
+  target: GitLabMrTarget & { expectedHeadSha?: string } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
@@ -526,7 +533,7 @@ export async function disableAutoMerge(
     await requestGitLabJson(
       access,
       `${mrPath(access, target.mrIid)}/cancel_merge_when_pipeline_succeeds`,
-      { method: "POST" },
+      { method: 'POST' }
     );
     return { done: true, replayed: false };
   } catch (error) {
@@ -539,18 +546,18 @@ export async function disableAutoMerge(
  * state already, so it reports `replayed` rather than an error.
  */
 export async function deleteBranch(
-  target: GitLabMrTarget & { branchName: string } & GitLabMutationInput,
+  target: GitLabMrTarget & { branchName: string } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
   try {
     await requestGitLabJson(
       access,
       `/api/v4/projects/${encodeURIComponent(access.projectPath)}/repository/branches/${encodeURIComponent(target.branchName)}`,
-      { method: "DELETE" },
+      { method: 'DELETE' }
     );
     return { done: true, replayed: false };
   } catch (error) {
-    if (error instanceof GitLabReviewError && error.kind === "not_found") {
+    if (error instanceof GitLabReviewError && error.kind === 'not_found') {
       return { done: true, replayed: true };
     }
     throw error;

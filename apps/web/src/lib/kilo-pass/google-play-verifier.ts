@@ -130,7 +130,8 @@ export function decodeGooglePlaySubscriptionPurchase(
     expiryTimeMs: Date.parse(lineItem.expiryTime ?? ''),
     obfuscatedExternalAccountId:
       apiData.externalAccountIdentifiers?.obfuscatedExternalAccountId ??
-      apiData.outOfAppPurchaseContext?.expiredExternalAccountIdentifiers?.obfuscatedExternalAccountId ??
+      apiData.outOfAppPurchaseContext?.expiredExternalAccountIdentifiers
+        ?.obfuscatedExternalAccountId ??
       undefined,
     environment: apiData.testPurchase != null ? 'Sandbox' : 'Production',
     subscriptionState: apiData.subscriptionState ?? '',

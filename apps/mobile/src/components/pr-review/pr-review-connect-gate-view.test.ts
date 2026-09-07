@@ -138,6 +138,8 @@ vi.mock('@/components/ui/icons', () => ({
   ShieldAlert: 'ShieldAlert',
 }));
 
+vi.mock('@/components/icons/github-icon', () => ({ GitHubIcon: 'GitHubIcon' }));
+
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -161,8 +163,9 @@ function containsType(node: unknown, type: string): boolean {
     if (element.type === type) {
       return true;
     }
-    const props = element.props as { children?: unknown };
-    return containsType(props.children, type);
+    return Object.values(element.props as Record<string, unknown>).some(value =>
+      containsType(value, type)
+    );
   }
   return false;
 }
@@ -183,5 +186,22 @@ describe('PrReviewConnectGate wiring', () => {
 
     expect(containsType(tree, 'ActivityIndicator')).toBe(true);
     expect(containsType(tree, 'EmptyState')).toBe(false);
+  });
+
+  it('shows the GitHub icon in the Connect GitHub action', () => {
+    authorizationQueryResult = {
+      data: { connected: false, revoked: false },
+      isPending: false,
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    };
+
+    // eslint-disable-next-line new-cap
+    const tree = PrReviewConnectGate({ children: null });
+
+    expect(containsType(tree, 'GitHubIcon')).toBe(true);
+    expect(containsType(tree, 'RefreshCcw')).toBe(false);
   });
 });

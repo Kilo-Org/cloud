@@ -320,7 +320,7 @@ export function ProfileScreen() {
           />
           <ActionTile
             icon={LogOut}
-            label={t('profile.signOut')}
+            label={t('common.signOut')}
             color={colors.mutedForeground}
             onPress={confirmSignOut}
           />

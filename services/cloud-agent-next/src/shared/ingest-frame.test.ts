@@ -103,6 +103,7 @@ describe('prepareIngestFrame', () => {
           part: {
             type: 'tool',
             id: 'part_1',
+            sessionID: 'sess_1',
             messageID: 'msg_1',
             state: {
               status: 'completed',
@@ -129,6 +130,7 @@ describe('prepareIngestFrame', () => {
     expect(sent.streamEventType).toBe('kilocode');
     const part = sent.data.properties.part;
     expect(part.id).toBe('part_1');
+    expect(part.sessionID).toBe('sess_1');
     expect(part.messageID).toBe('msg_1');
     expect(part.state.status).toBe('completed');
   });

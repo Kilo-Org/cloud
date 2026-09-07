@@ -40,6 +40,7 @@ export type SessionOperationProof = {
   authorization: SessionOperationAuthorization;
   dispatched: boolean;
   executionDeadlineAt?: number;
+  executionDeadlineSource?: 'dispatch' | 'wrapper';
   result?: SessionOperationDelivery['result'];
   resultHash?: string;
   completedAt?: number;
@@ -559,6 +560,7 @@ export function recordSessionOperationDispatch(
                     executionDeadlineAt:
                       item.executionDeadlineAt ??
                       authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
+                    executionDeadlineSource: proof?.executionDeadlineSource ?? 'dispatch',
                   }
                 : {}),
             },
@@ -570,6 +572,43 @@ export function recordSessionOperationDispatch(
                   authorization.dispatchDeadlineAt + SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
               }
             : {}),
+        }
+      : item
+  );
+}
+
+export function recordSessionOperationExecutionDeadline(
+  messages: readonly SessionMessageRecord[],
+  authorization: SessionOperationAuthorization,
+  executionDeadlineAt: number
+): SessionMessageRecord[] | undefined {
+  const message = messages.find(item => item.messageId === authorization.messageId);
+  const prompt = message?.operations?.prompt;
+  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(prompt?.authorization);
+  if (
+    authorization.operation !== 'session.prompt' ||
+    !Number.isSafeInteger(executionDeadlineAt) ||
+    executionDeadlineAt <= 0 ||
+    !message ||
+    !prompt?.dispatched ||
+    !storedAuthorization.success ||
+    !sameSessionOperation(storedAuthorization.data, authorization)
+  )
+    return undefined;
+  if (prompt.executionDeadlineSource === 'wrapper') return [...messages];
+  return messages.map(item =>
+    item.messageId === message.messageId
+      ? {
+          ...item,
+          executionDeadlineAt,
+          operations: {
+            ...item.operations,
+            prompt: {
+              ...prompt,
+              executionDeadlineAt,
+              executionDeadlineSource: 'wrapper',
+            },
+          },
         }
       : item
   );

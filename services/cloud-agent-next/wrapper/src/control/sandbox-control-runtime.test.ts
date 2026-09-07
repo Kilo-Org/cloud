@@ -103,7 +103,8 @@ describe('maybeStartSandboxControlClient', () => {
       wrapperVersion: '2.4.0',
     });
     expect(received?.log).toBeTypeOf('function');
-    expect(received?.onDisconnected).toBeTypeOf('function');
+    expect(received?.onConnectionLost).toBeTypeOf('function');
+    expect(received?.onReconnectExhausted).toBeTypeOf('function');
     await Promise.resolve();
     expect(connectCalls).toBe(1);
     expect(logs.join('\n')).not.toContain(credential);
@@ -520,7 +521,7 @@ describe('maybeStartSandboxControlClient', () => {
         expect(signal?.aborted).toBe(false);
         if (loss === 'readiness') ready = false;
         else if (loss === 'close') started?.close();
-        else received?.onDisconnected?.();
+        else received?.onReconnectExhausted?.();
         tick();
         expect(signal?.aborted).toBe(true);
         expect(cleared).toHaveBeenCalledTimes(1);

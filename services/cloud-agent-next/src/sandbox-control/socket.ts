@@ -14,6 +14,7 @@ import {
   SANDBOX_HELLO_DEADLINE_MS,
   sandboxControlSocketAttachmentSchema,
   sandboxControlObservationSchema,
+  sandboxEventPublicationPayloadSchema,
   sessionNativeRuntimeRetirementPayloadSchema,
   sessionOperationAuthorizationSchema,
   sessionOperationDeliverySchema,
@@ -68,7 +69,10 @@ export type SandboxControlConnectionIdentity = {
   connectionId: string;
   providerInstanceId: string;
   wrapperInstanceId?: string;
+  recoveryCapable?: boolean;
 };
+
+export type SandboxControlEventResult = { applied: boolean; retryable?: boolean };
 
 export type SandboxControlSocketHooks = {
   validateHandshake?(providerInstanceId: string): boolean | Promise<boolean>;
@@ -84,13 +88,19 @@ export type SandboxControlSocketHooks = {
   onSessionEvent?(
     sessionIdentity: SessionEventIdentity | undefined,
     payload: SessionEventPayload,
-    identity: SandboxControlConnectionIdentity
-  ): void | Promise<void>;
+    identity: SandboxControlConnectionIdentity,
+    receiptId?: string,
+    receiptHash?: string,
+    sequence?: number
+  ): void | SandboxControlEventResult | Promise<void | SandboxControlEventResult | undefined>;
   onSessionPreparing?(
     sessionIdentity: SessionEventIdentity | undefined,
     payload: SessionPreparingPayload,
-    identity: SandboxControlConnectionIdentity
-  ): void | Promise<void>;
+    identity: SandboxControlConnectionIdentity,
+    receiptId?: string,
+    receiptHash?: string,
+    sequence?: number
+  ): void | SandboxControlEventResult | Promise<void | SandboxControlEventResult | undefined>;
   onOperationResult?(
     session: SessionRequestIdentity,
     delivery: SessionOperationDelivery,
@@ -117,6 +127,7 @@ export type SandboxControlSocketHandler = {
   supportsOperationResults(): boolean;
   supportsScopedStopAbort(): boolean;
   supportsNativeRuntimeRetirement(): boolean;
+  supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
   closeProvisionalSockets(): void;
@@ -214,6 +225,7 @@ function readConnectionIdentity(
   return {
     connectionId: attachment.connectionId,
     providerInstanceId: attachment.providerInstanceId,
+    ...(attachment.recoveryCapable ? { recoveryCapable: true } : {}),
     ...(attachment.wrapperInstanceId ? { wrapperInstanceId: attachment.wrapperInstanceId } : {}),
   };
 }
@@ -357,6 +369,14 @@ export function createSandboxControlSocketHandler(
       return (
         current !== null &&
         readAttachment(current.socket)?.capabilities?.nativeRuntimeRetirement === true
+      );
+    },
+
+    supportsConnectionRecovery(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null &&
+        readAttachment(current.socket)?.capabilities?.connectionRecovery === true
       );
     },
 
@@ -514,6 +534,7 @@ export function createSandboxControlSocketHandler(
           connectionId: attachment.connectionId,
           providerInstanceId: payload.providerInstanceId,
           ...(payload.wrapperInstanceId ? { wrapperInstanceId: payload.wrapperInstanceId } : {}),
+          ...(payload.capabilities?.connectionRecovery === true ? { recoveryCapable: true } : {}),
         };
         const completed: SandboxControlSocketAttachment = {
           handshakeComplete: true,
@@ -521,6 +542,7 @@ export function createSandboxControlSocketHandler(
           acceptedAt: attachment.acceptedAt,
           connectionId: identity.connectionId,
           protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+          ...(identity.recoveryCapable ? { recoveryCapable: true } : {}),
           providerInstanceId: identity.providerInstanceId,
           ...(payload.capabilities ? { capabilities: payload.capabilities } : {}),
           ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
@@ -567,7 +589,16 @@ export function createSandboxControlSocketHandler(
         }
 
         if (!isCurrentConnection(state, ws, identity)) return;
-        sendJson(ws, okResponse(frame.requestId, helloResult()));
+        sendJson(
+          ws,
+          okResponse(
+            frame.requestId,
+            helloResult({
+              connectionRecovery: payload.capabilities?.connectionRecovery === true,
+              eventReceipts: payload.capabilities?.eventReceipts === true,
+            })
+          )
+        );
         sendJson(ws, {
           type: 'request',
           requestId: crypto.randomUUID(),
@@ -657,6 +688,67 @@ export function createSandboxControlSocketHandler(
             eventPayload.payload as SessionPreparingPayload,
             identity
           );
+        }
+        return;
+      }
+
+      if (frame.operation === 'sandbox.event.publish') {
+        const publication = sandboxEventPublicationPayloadSchema.safeParse(frame.payload);
+        if (!publication.success) {
+          sendJson(
+            ws,
+            errorResponse(
+              frame.requestId,
+              'protocol_error',
+              'Invalid sandbox event publication',
+              false
+            )
+          );
+          return;
+        }
+        try {
+          const result =
+            publication.data.event === 'session.event'
+              ? await hooks.onSessionEvent?.(
+                  publication.data.session,
+                  publication.data.payload,
+                  identity,
+                  publication.data.receiptId,
+                  publication.data.receiptHash,
+                  publication.data.sequence
+                )
+              : await hooks.onSessionPreparing?.(
+                  publication.data.session,
+                  publication.data.payload,
+                  identity,
+                  publication.data.receiptId,
+                  publication.data.receiptHash,
+                  publication.data.sequence
+                );
+          if (!isCurrentConnection(state, ws, identity)) return;
+          if (!result?.applied) {
+            sendJson(ws, {
+              type: 'response',
+              requestId: frame.requestId,
+              ok: false,
+              error: {
+                code: result?.retryable === false ? 'event_rejected' : 'not_ready',
+                message: 'Sandbox event publication was not applied',
+                retryable: result?.retryable !== false,
+              },
+            } satisfies ResponseFrame);
+            return;
+          }
+          sendJson(
+            ws,
+            okResponse(frame.requestId, { receiptId: publication.data.receiptId, applied: true })
+          );
+        } catch {
+          if (isCurrentConnection(state, ws, identity))
+            sendJson(
+              ws,
+              errorResponse(frame.requestId, 'not_ready', 'Sandbox event publication failed', true)
+            );
         }
         return;
       }

@@ -20,6 +20,7 @@ export type KiloFeedEvent = {
   type: string;
   properties: Record<string, unknown>;
   directory?: string;
+  nativeRuntimeId: string;
 };
 
 export type WorktreeFeedSource = Readonly<{
@@ -53,7 +54,7 @@ type Recovery = {
 export function createWorktreeFeed(options: {
   source: WorktreeFeedSource;
   isCurrent: (runtimeId: string, client: WorktreeFeedSource['kiloClient']) => boolean;
-  onEvent?: (event: KiloFeedEvent) => void;
+  onEvent?: (event: KiloFeedEvent) => unknown;
   onFailure: (reason: KiloEventFeedError['reason']) => void;
   onStateChange?: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -133,7 +134,7 @@ export function createWorktreeFeed(options: {
       consume: async stream => {
         for await (const event of unfilteredKiloEvents(stream)) {
           if (!isCurrentAttempt(attempt)) return;
-          options.onEvent?.(event);
+          await options.onEvent?.({ ...event, nativeRuntimeId: runtimeId });
         }
       },
       onUnexpectedClose: error => {

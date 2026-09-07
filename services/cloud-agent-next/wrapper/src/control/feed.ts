@@ -1,3 +1,4 @@
+import type { SessionEventIdentity } from '../../../src/shared/sandbox-control-protocol.js';
 import type { HandlerSessionSnapshot } from './sandbox-control-handlers';
 import { directoryForSession, rememberChildSession, rootForSession } from './session-directories';
 
@@ -40,9 +41,10 @@ export function sessionEventIdentity(input: {
   sessionId?: string;
   directory?: string;
   runtimeDirectory?: string;
+  nativeRuntimeId?: string;
   type?: string;
   properties?: Record<string, unknown>;
-}): { directory: string; kiloSessionId?: string; rootKiloSessionId?: string } | undefined {
+}): SessionEventIdentity | undefined {
   let directory = input.directory;
   if ((input.type === 'session.created' || input.type === 'session.updated') && input.properties) {
     const info = input.properties.info;
@@ -73,6 +75,7 @@ export function sessionEventIdentity(input: {
     directory,
     ...(input.sessionId ? { kiloSessionId: input.sessionId } : {}),
     rootKiloSessionId: root,
+    ...(input.nativeRuntimeId !== undefined ? { nativeRuntimeId: input.nativeRuntimeId } : {}),
   };
 }
 

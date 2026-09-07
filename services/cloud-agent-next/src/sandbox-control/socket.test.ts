@@ -1007,6 +1007,144 @@ describe('sandbox control socket handler', () => {
     );
   });
 
+  it('returns an exact receipt only after a session event is applied', async () => {
+    const ws = createFakeWebSocket({
+      handshakeComplete: true,
+      acceptedAt: Date.now(),
+      protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+      providerInstanceId: 'inst_1',
+      wrapperInstanceId: WRAPPER_INSTANCE_ID,
+    });
+    const receiptId = '123e4567-e89b-42d3-a456-426614174099';
+    const receiptHash = 'a'.repeat(64);
+    const onSessionEvent = vi.fn().mockResolvedValue({ applied: true });
+    const handler = createSandboxControlSocketHandler(
+      createFakeState([ws]),
+      'sbx_test',
+      undefined,
+      { onSessionEvent }
+    );
+
+    await handler.handleMessage(
+      asWs(ws),
+      JSON.stringify({
+        type: 'request',
+        requestId: 'event-receipt',
+        operation: 'sandbox.event.publish',
+        payload: {
+          event: 'session.event',
+          receiptId,
+          receiptHash,
+          sequence: 1,
+          session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+          payload: { type: 'message.updated', properties: { id: 'msg_1' } },
+        },
+      })
+    );
+
+    expect(onSessionEvent).toHaveBeenCalledWith(
+      { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
+      { type: 'message.updated', properties: { id: 'msg_1' } },
+      handler.getConnectionIdentity(),
+      receiptId,
+      receiptHash,
+      1
+    );
+    expect(JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string)).toEqual({
+      type: 'response',
+      requestId: 'event-receipt',
+      ok: true,
+      result: { receiptId, applied: true },
+    });
+  });
+
+  it.each([false, true, undefined, 'transport_error'] as const)(
+    'returns rejection retryability %s without ACKing, then accepts the next receipt',
+    async retryable => {
+      const ws = createFakeWebSocket({
+        handshakeComplete: true,
+        acceptedAt: Date.now(),
+        protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
+        providerInstanceId: 'inst_1',
+        wrapperInstanceId: WRAPPER_INSTANCE_ID,
+      });
+      const onSessionEvent = vi.fn().mockResolvedValue({ applied: true });
+      if (retryable === 'transport_error')
+        onSessionEvent.mockRejectedValueOnce(new Error('Session transport unavailable'));
+      else onSessionEvent.mockResolvedValueOnce({ applied: false, retryable });
+      const handler = createSandboxControlSocketHandler(
+        createFakeState([ws]),
+        'sbx_test',
+        undefined,
+        { onSessionEvent }
+      );
+      const publication = {
+        type: 'request',
+        requestId: 'rejected-event',
+        operation: 'sandbox.event.publish',
+        payload: {
+          event: 'session.event',
+          receiptId: '123e4567-e89b-42d3-a456-426614174099',
+          receiptHash: 'a'.repeat(64),
+          sequence: 1,
+          session: {
+            directory: '/workspace/a',
+            kiloSessionId: 'kilo_1',
+            nativeRuntimeId: '11111111-1111-4111-8111-111111111111',
+          },
+          payload: { type: 'session.updated', properties: { info: { id: 'kilo_1' } } },
+        },
+      };
+
+      await handler.handleMessage(asWs(ws), JSON.stringify(publication));
+      expect(ws.send).toHaveBeenCalledExactlyOnceWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: publication.requestId,
+          ok: false,
+          error: {
+            code: retryable === false ? 'event_rejected' : 'not_ready',
+            message:
+              retryable === 'transport_error'
+                ? 'Sandbox event publication failed'
+                : 'Sandbox event publication was not applied',
+            retryable: retryable !== false,
+          },
+        })
+      );
+      expect(ws.close).not.toHaveBeenCalled();
+
+      const receiptId = '123e4567-e89b-42d3-a456-426614174100';
+      await handler.handleMessage(
+        asWs(ws),
+        JSON.stringify({
+          ...publication,
+          requestId: 'next-event',
+          payload: {
+            ...publication.payload,
+            receiptId,
+            sequence: 2,
+            session: {
+              ...publication.payload.session,
+              nativeRuntimeId: '22222222-2222-4222-8222-222222222222',
+            },
+          },
+        })
+      );
+      expect(onSessionEvent).toHaveBeenCalledTimes(2);
+      expect(ws.send).toHaveBeenCalledTimes(2);
+      expect(ws.send).toHaveBeenLastCalledWith(
+        JSON.stringify({
+          type: 'response',
+          requestId: 'next-event',
+          ok: true,
+          result: { receiptId, applied: true },
+        })
+      );
+      expect(ws.close).not.toHaveBeenCalled();
+    }
+  );
+
   it('does not dispatch a session.event with an invalid payload', async () => {
     const ws = createFakeWebSocket({
       handshakeComplete: true,

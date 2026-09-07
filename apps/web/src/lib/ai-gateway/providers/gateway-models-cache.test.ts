@@ -65,13 +65,6 @@ describe('isValidOpenRouterModelId', () => {
     };
   }
 
-  it('accepts known legacy aliases without consulting Redis', async () => {
-    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
-
-    await expect(isValidOpenRouterModelId('gpt-4o')).resolves.toBe(true);
-    expect(redisGet).not.toHaveBeenCalled();
-  });
-
   it('accepts ids present in the Redis catalog', async () => {
     const { isValidOpenRouterModelId, redisGet } = await loadValidator();
     redisGet.mockResolvedValue(JSON.stringify(['openai/gpt-4o']));

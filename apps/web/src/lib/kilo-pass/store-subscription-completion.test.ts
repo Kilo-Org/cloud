@@ -70,7 +70,7 @@ describe('completeStoreKiloPassPurchase', () => {
       googlePlayReplacement: {
         linkedPurchaseToken: oldToken,
         deferred: true,
-        orderPurchaseToken: oldToken,
+        orderPurchaseToken: newToken,
       },
     };
     for (let attempt = 0; attempt < 2; attempt++) {

@@ -18,10 +18,7 @@ import {
 import { OpenRouterInferenceProviderIdSchema } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { applyMoonshotModelSettings, isKimiModel } from '@/lib/ai-gateway/providers/moonshotai';
 import { isGlmModel } from '@/lib/ai-gateway/providers/zai';
-import {
-  FRIENDLI_GLM_PUBLIC_ID,
-  PERPLEXITY_KIMI_PUBLIC_ID,
-} from '@/lib/ai-gateway/providers/partner/constants';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import { isMinimaxModel } from '@/lib/ai-gateway/providers/minimax';
 import {
   ReasoningDetailsTransform,
@@ -213,7 +210,7 @@ export function applyAnthropicThinkingDefault(
 ) {
   const defaultsToThinking =
     (isMinimaxModel(requestedModel) && requestedModel.includes('m3')) ||
-    requestedModel === FRIENDLI_GLM_PUBLIC_ID ||
+    requestedModel === 'z-ai/glm-5.2' ||
     requestedModel === PERPLEXITY_KIMI_PUBLIC_ID;
   if (
     defaultsToThinking &&

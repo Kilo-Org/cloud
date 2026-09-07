@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- Use the repository's DOM-free mounted renderer. */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
 import { createElement, type ElementType, type ReactElement, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from 'react-test-renderer';
@@ -60,6 +60,10 @@ export { announcements, catalogs, lifecycle, native, platform, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
@@ -91,12 +95,18 @@ vi.mock('react-native-reanimated', () => ({
   useAnimatedStyle: (build: () => unknown) => build(),
 }));
 vi.mock('expo-screen-capture', () => ({}));
+vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
+vi.mock('@/components/centered-state-surface', () => ({
+  NativeStateSurface: ({ children }: { children: ReactElement }) => children,
+  StateSurface: 'StateSurface',
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
   Bell: 'Icon',
   Brain: 'Icon',
   CheckCircle2: 'Icon',
   CornerDownLeft: 'Icon',
+  Gauge: 'Icon',
   Globe: 'Icon',
   Info: 'Icon',
   Loader: 'Icon',
@@ -106,11 +116,17 @@ vi.mock('@/components/ui/icons', () => ({
   TriangleAlert: 'Icon',
   XCircle: 'Icon',
 }));
+// The organization and security-agent layouts reach real expo-image through
+// the privacy cover's splash logo; the native module cannot load in this
+// DOM-free harness (its expo root import needs __DEV__ and a native binding).
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+// No Vitest project transforms .png.
+vi.mock('@/../assets/images/logo-mark.png', () => ({ default: 1 }));
 vi.mock('expo-router', () => ({
   // One mounted descriptor per navigator exercises its production callback.
   Stack: Object.assign(
     ({ screenLayout }: { screenLayout: typeof appUnlockScreenLayout }) =>
-      createElement('Scene', null, screenLayout({ children: <Draft /> })),
+      createElement('Scene', null, unlockScene(<Draft />, screenLayout)),
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
@@ -124,6 +140,8 @@ vi.mock('react-native-gesture-handler', () => ({
 }));
 vi.mock('sonner-native', () => ({ Toaster: 'Toaster' }));
 vi.mock('@/lib/auth/auth-context', () => ({ AuthProvider: 'AuthProvider' }));
+vi.mock('@/lib/glanceable/org-fence', () => ({ useGlanceableOrgFence: () => undefined }));
+vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null }));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({
@@ -234,6 +252,13 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
 }));
 vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
+// The preferences screen mounts the feature-flag debug surface, which reads
+// PostHog flag statuses; the real module pulls in expo-application's native
+// chain, which no mounted test loads. An empty registry keeps the section
+// out of these scenes.
+vi.mock('@/lib/analytics/posthog', () => ({
+  useFeatureFlagStatuses: () => [],
+}));
 
 function Draft() {
   const [value, onChange] = useState('saved draft');
@@ -259,31 +284,7 @@ export async function flush(update?: () => void) {
   });
 }
 
-export function text(root: ReactTestInstance) {
-  const texts = root.findAllByType('Text' as ElementType);
-  return texts.map(node => node.props.children).join('\n');
-}
-
-export function expectHidden(root: ReactTestInstance, hidden: boolean) {
-  const scenes = root.findAllByType('Scene' as ElementType);
-  expect(scenes.length).toBeGreaterThan(0);
-  for (const scene of scenes) {
-    const wrapper = scene.find(
-      node => (node.type as string) === 'View' && node.props.pointerEvents !== undefined
-    );
-    expect(wrapper.props).toMatchObject({
-      pointerEvents: hidden ? 'none' : 'auto',
-      accessibilityElementsHidden: hidden,
-      importantForAccessibility: hidden ? 'no-hide-descendants' : 'auto',
-    });
-    expect((wrapper.props.className as string).includes('opacity-0')).toBe(hidden);
-    expect(wrapper.findAllByType('Draft' as ElementType)).toHaveLength(1);
-  }
-}
-
-export function nestedUnlockScenes(children: ReactElement) {
-  return appUnlockScreenLayout({ children: appUnlockScreenLayout({ children }) });
-}
+export { expectHidden, text } from './app-unlock-screen.test-assertions';
 
 function isHidden(node: ReactTestInstance): boolean {
   for (let parent = node.parent; parent; parent = parent.parent) {
@@ -307,4 +308,13 @@ export function expectFeedback(root: ReactTestInstance, message: string, copies:
   expect(visible[0]?.props.accessibilityLiveRegion).toBe(
     platform.OS === 'android' ? 'polite' : undefined
   );
+}
+
+export function unlockScene(children: ReactElement, layout = appUnlockScreenLayout) {
+  const props = { children };
+  return layout(props as Parameters<typeof appUnlockScreenLayout>[0]);
+}
+
+export function nestedUnlockScenes(children: ReactElement) {
+  return unlockScene(unlockScene(children));
 }

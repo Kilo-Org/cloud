@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 
+import { NativeStateSurface } from '@/components/centered-state-surface';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 
 export const unstable_settings = {
@@ -10,7 +11,10 @@ export default function AuthLayout() {
   const { fullSheetDetent } = useFormSheetDetents();
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack
+      screenLayout={props => <NativeStateSurface {...props} />}
+      screenOptions={{ headerShown: false }}
+    >
       <Stack.Screen name="login" />
       <Stack.Screen
         name="language-picker"

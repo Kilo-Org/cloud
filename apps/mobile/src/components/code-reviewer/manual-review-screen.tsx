@@ -124,7 +124,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('codeReviewer.title')}
+          eyebrow={t('common.codeReviewer')}
         />
         <QueryError
           variant={variant}
@@ -149,7 +149,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('codeReviewer.manualReview.title')}
-          eyebrow={t('codeReviewer.title')}
+          eyebrow={t('common.codeReviewer')}
         />
         <EmptyState
           icon={GitPullRequest}
@@ -161,7 +161,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                 router.push(`/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/github` as Href);
               }}
             >
-              <Text>{t('codeReviewer.manualReview.connectGitHub')}</Text>
+              <Text>{t('common.connectGithub')}</Text>
             </Button>
           }
         />
@@ -173,7 +173,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     <View className="flex-1 bg-background">
       <ScreenHeader
         title={t('codeReviewer.manualReview.title')}
-        eyebrow={t('codeReviewer.title')}
+        eyebrow={t('common.codeReviewer')}
       />
       <TabScreenScrollView
         className="flex-1"
@@ -184,7 +184,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
       >
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.manualReview.platform')}
+            {t('common.platform')}
           </Text>
           {statusesLoading ? (
             <View className="gap-2">
@@ -193,7 +193,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
             </View>
           ) : (
             <RadioGroup
-              label={t('codeReviewer.manualReview.platform')}
+              label={t('common.platform')}
               className="overflow-hidden rounded-lg bg-secondary"
             >
               {MANUAL_REVIEW_PLATFORMS.map((option, index) => {
@@ -226,7 +226,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                       </Text>
                       {!connected && (
                         <Text variant="muted" className="text-xs">
-                          {t('codeReviewer.manualReview.notConnected')}
+                          {t('common.notConnected')}
                         </Text>
                       )}
                     </View>
@@ -285,7 +285,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
         <View className="gap-3">
           <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-            {t('codeReviewer.manualReview.model')}
+            {t('common.model')}
           </Text>
           {/* flex-row so the pill hugs its content instead of stretching to column width */}
           <View className="flex-row">

@@ -63,6 +63,7 @@ import {
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
+  user_activity_tokens,
   user_notification_preferences,
   user_data_export_object_deletions,
   security_advisor_scans,
@@ -1616,6 +1617,49 @@ describe('User', () => {
             inArray(analytics_event_outbox.id, [userOutbox.id, fallbackOutbox.id, otherOutbox.id])
           )
       ).toEqual([expect.objectContaining({ id: otherOutbox.id })]);
+    });
+
+    it("deletes the user's activity tokens and leaves other users' tokens", async () => {
+      const user = await insertTestUser({ google_user_email: 'activity-token-user@example.com' });
+      const otherUser = await insertTestUser();
+
+      const [userToken, otherToken] = await db
+        .insert(user_activity_tokens)
+        .values([
+          {
+            user_id: user.id,
+            token: `ios-activity-${crypto.randomUUID()}`,
+            kind: 'ios_activity',
+            platform: 'ios',
+            organization_id: null,
+          },
+          {
+            user_id: otherUser.id,
+            token: `android-ongoing-${crypto.randomUUID()}`,
+            kind: 'android_ongoing',
+            platform: 'android',
+            organization_id: null,
+          },
+        ])
+        .returning();
+      if (!userToken || !otherToken) {
+        throw new Error('Failed to seed activity token rows');
+      }
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(user_activity_tokens)
+          .where(eq(user_activity_tokens.id, userToken.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(user_activity_tokens)
+          .where(eq(user_activity_tokens.id, otherToken.id))
+      ).toHaveLength(1);
     });
 
     it("deletes the user's cloud agent pending-upload rows and leaves other users' rows", async () => {

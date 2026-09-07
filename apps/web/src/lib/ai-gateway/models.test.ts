@@ -3,7 +3,6 @@ import {
   autoFreeModels,
   findKiloExclusiveModel,
   getKiloExclusiveInferenceProviderRestriction,
-  isDisabledKiloExclusiveModel,
   isKiloExclusiveRateLimitedModel,
   kiloExclusiveModels,
   preferredModels,
@@ -20,9 +19,7 @@ import {
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
 import { gpt_5_6_sol_discounted_model } from './providers/openai-exclusive';
-import { tencent_hy3_free_model } from './providers/tencent';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
-import { longcat_2_free_model } from './providers/longcat';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
 
@@ -32,7 +29,7 @@ describe('rate-limited Kilo-exclusive models', () => {
       gemma_4_26b_a4b_it_free_model,
     ]);
     expect(isKiloExclusiveRateLimitedModel(gemma_4_26b_a4b_it_free_model.public_id)).toBe(true);
-    expect(isKiloExclusiveRateLimitedModel(tencent_hy3_free_model.public_id)).toBe(false);
+    expect(isKiloExclusiveRateLimitedModel('tencent/hy3:free')).toBe(false);
   });
 });
 
@@ -82,26 +79,16 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
     });
 
-    test('disables Tencent Hy3 free and excludes it from Auto Free and preferred models', () => {
-      expect(tencent_hy3_free_model.status).toBe('disabled');
-      expect(findKiloExclusiveModel('tencent/hy3:free')).toBeNull();
-      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
-        tencent_hy3_free_model.public_id
-      );
-      expect(preferredModels).not.toContain(tencent_hy3_free_model.public_id);
-    });
-
-    test('disables LongCat 2.0 free and excludes it from Auto Free and preferred models', async () => {
-      expect(kiloExclusiveModels).toContain(longcat_2_free_model);
-      expect(longcat_2_free_model.status).toBe('disabled');
-      expect(isDisabledKiloExclusiveModel(longcat_2_free_model.public_id)).toBe(true);
-      expect(findKiloExclusiveModel(longcat_2_free_model.public_id)).toBeNull();
-      expect(await isFreeModel(longcat_2_free_model.public_id)).toBe(false);
-      expect(autoFreeModels.map(({ model }) => model)).not.toContain(
-        longcat_2_free_model.public_id
-      );
-      expect(preferredModels).not.toContain(longcat_2_free_model.public_id);
-    });
+    test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free'])(
+      'removes %s from exclusive, Auto Free, and preferred models while keeping it unavailable',
+      modelId => {
+        expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
+        expect(findKiloExclusiveModel(modelId)).toBeNull();
+        expect(isUnavailableModel(modelId)).toBe(true);
+        expect(autoFreeModels.map(({ model }) => model)).not.toContain(modelId);
+        expect(preferredModels).not.toContain(modelId);
+      }
+    );
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
       'inherits %s without an exclusive definition or availability restriction',
@@ -115,14 +102,14 @@ describe('isFreeModel', () => {
     );
 
     test('preserves MiniMax Auto Free and preferred model membership', () => {
-      expect(autoFreeModels).toContainEqual({
-        model: 'minimax/minimax-m3:free',
-        weight: 1,
-        reasoning: { enabled: true, effort: 'high' },
-      });
-      expect(preferredModels).toContain('minimax/minimax-m3:free');
-      expect(autoFreeModels.map(({ model }) => model)).not.toContain('minimax/minimax-m2.7:free');
-      expect(preferredModels).not.toContain('minimax/minimax-m2.7:free');
+      for (const model of ['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free']) {
+        expect(autoFreeModels).toContainEqual({
+          model,
+          weight: 1,
+          reasoning: { enabled: true, effort: 'high' },
+        });
+        expect(preferredModels).toContain(model);
+      }
     });
 
     test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
@@ -151,19 +138,19 @@ describe('isFreeModel', () => {
         {
           start_context_length: 0,
           pricing: {
-            prompt_per_million: 2.5,
-            completion_per_million: 15,
-            input_cache_read_per_million: 0.25,
-            input_cache_write_per_million: 3.125,
+            prompt_per_million: 2,
+            completion_per_million: 10,
+            input_cache_read_per_million: 0.2,
+            input_cache_write_per_million: 2.5,
           },
         },
         {
           start_context_length: 272_000,
           pricing: {
-            prompt_per_million: 5,
-            completion_per_million: 22.5,
-            input_cache_read_per_million: 0.5,
-            input_cache_write_per_million: 6.25,
+            prompt_per_million: 4,
+            completion_per_million: 15,
+            input_cache_read_per_million: 0.4,
+            input_cache_write_per_million: 5,
           },
         },
       ]);
@@ -216,17 +203,25 @@ describe('isFreeModel', () => {
         'stepfun/step-3.7-flash:free': { enabled: true, effort: 'high' },
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'minimax/minimax-m3:free': { enabled: true, effort: 'high' },
+        'minimax/minimax-m2.7:free': { enabled: true, effort: 'high' },
+        'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights every Auto Free model equally', () => {
-      expect(
-        Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
-      ).toEqual({
-        'stepfun/step-3.7-flash:free': 1,
+    test('keeps Step at 50% of Auto Free selections', () => {
+      const weights = Object.fromEntries(
+        autoFreeModels.map(({ model, weight }) => [model, weight])
+      );
+      expect(weights).toEqual({
+        'stepfun/step-3.7-flash:free': 4,
         'poolside/laguna-s-2.1:free': 1,
         'minimax/minimax-m3:free': 1,
+        'minimax/minimax-m2.7:free': 1,
+        'dots-studio/dots-3-note-preview:free': 1,
       });
+      expect(weights['stepfun/step-3.7-flash:free']).toBe(
+        autoFreeModels.reduce((total, { weight }) => total + weight, 0) / 2
+      );
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {
@@ -392,10 +387,8 @@ describe('getKiloExclusiveInferenceProviderRestriction', () => {
     ).toEqual(new Set(['openai']));
   });
 
-  test('does not treat disabled or unrestricted exclusives or unknown ids as restricted', () => {
-    expect(
-      getKiloExclusiveInferenceProviderRestriction(tencent_hy3_free_model.public_id)
-    ).toBeUndefined();
+  test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
+    expect(getKiloExclusiveInferenceProviderRestriction('tencent/hy3:free')).toBeUndefined();
     expect(
       getKiloExclusiveInferenceProviderRestriction(gemma_4_26b_a4b_it_free_model.public_id)
     ).toBeUndefined();

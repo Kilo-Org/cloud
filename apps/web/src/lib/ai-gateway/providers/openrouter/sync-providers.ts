@@ -11,10 +11,8 @@ import type {
   OpenRouterModel,
   OpenRouterProvider,
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
-import {
-  OpenRouterProvidersResponse,
-  OpenRouterSearchResponse,
-} from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { OpenRouterProvidersResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
+import { fetchModelsForProvider } from '@/lib/ai-gateway/providers/openrouter/fetch-provider-models';
 import { modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { desc, lt, sql } from 'drizzle-orm';
@@ -150,43 +148,6 @@ async function fetchProviders(): Promise<OpenRouterProvider[]> {
   console.log(`Found ${providers.length} providers from endpoint`);
 
   return providers;
-}
-
-async function fetchModelsForProvider(provider: OpenRouterProvider): Promise<OpenRouterModel[]> {
-  console.log(`Fetching models for provider: ${provider.name} (${provider.slug})`);
-
-  // Use the frontend API endpoint with provider filter
-  const searchParams = new URLSearchParams({
-    providers: provider.name,
-    fmt: 'cards',
-  });
-
-  console.log(
-    'GET',
-    `https://openrouter.ai/api/frontend/v1/models/find?${searchParams.toString()}`
-  );
-
-  const response = await fetch(
-    `https://openrouter.ai/api/frontend/v1/models/find?${searchParams}`,
-    {
-      method: 'GET',
-      headers: ATTRIBUTION_HEADERS,
-    }
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Failed to fetch models for provider ${provider.name}: ${response.status} ${response.statusText}`
-    );
-  }
-
-  const data = await response.json().then(d => OpenRouterSearchResponse.parse(d));
-
-  console.log(`  Found ${data.data.models.length} models for provider ${provider.name}`);
-
-  // Note: Models still contain redundant provider info in endpoint.provider_info, etc.
-  // This is now available in the comprehensive providers array, but we keep it for compatibility
-  return data.data.models;
 }
 
 async function syncProviders(

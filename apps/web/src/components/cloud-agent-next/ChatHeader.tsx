@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type MouseEvent, type RefObject } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,8 +16,10 @@ import type { SessionCostBreakdown } from './session-cost-breakdown';
 import { SessionActionsDialog } from './SessionActionsDialog';
 import { SoundToggleButton } from '@/components/shared/SoundToggleButton';
 import { FeedbackDialog } from './FeedbackDialog';
+import { WorktreeChangesButton } from './WorktreeChanges';
 import { buildRepoBrowseUrl, detectGitPlatform } from './utils/git-utils';
 import { useTRPC } from '@/lib/trpc/utils';
+import { SandboxStatusIndicator } from './SandboxStatusIndicator';
 
 export function computeBillingRefetchInterval(
   sessionActive: boolean,
@@ -43,8 +45,11 @@ type ChatHeaderProps = {
   sessionInfoTriggerRef: RefObject<HTMLElement | null>;
   soundEnabled?: boolean;
   onToggleSound?: () => void;
+  changesOpen?: boolean;
+  onToggleChanges?: (event: MouseEvent<HTMLButtonElement>) => void;
   sessionTitle?: string;
   sessionActive: boolean;
+  sandboxStatusEligible?: boolean;
 };
 
 export function ChatHeader({
@@ -60,10 +65,13 @@ export function ChatHeader({
   sessionInfoTriggerRef,
   soundEnabled = true,
   onToggleSound,
+  changesOpen = false,
+  onToggleChanges,
   kiloSessionId,
   organizationId,
   sessionTitle,
   sessionActive,
+  sandboxStatusEligible = false,
 }: ChatHeaderProps) {
   const [showActionsDialog, setShowActionsDialog] = useState(false);
   const moreOptionsTriggerRef = useRef<HTMLButtonElement | null>(null);
@@ -124,16 +132,33 @@ export function ChatHeader({
         repository={repository}
       />
       <div className="flex min-w-0 items-center gap-1">
+        {sandboxStatusEligible && (
+          <SandboxStatusIndicator
+            key={`sandbox-status:${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
+            cloudAgentSessionId={cloudAgentSessionId}
+            organizationId={organizationId}
+            sessionActive={sessionActive}
+          />
+        )}
+        {onToggleChanges && (
+          <WorktreeChangesButton
+            key={`worktree-changes:${organizationId ?? 'personal'}:${cloudAgentSessionId}`}
+            cloudAgentSessionId={cloudAgentSessionId}
+            organizationId={organizationId}
+            open={changesOpen}
+            onToggle={onToggleChanges}
+          />
+        )}
         {onToggleSound && (
-          <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="sm" />
+          <SoundToggleButton enabled={soundEnabled} onToggle={onToggleSound} size="toolbar" />
         )}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               ref={moreOptionsTriggerRef}
-              size="icon"
+              size="icon-sm"
               variant="ghost"
-              className="h-8 w-8"
+              className="text-muted-foreground"
               aria-label="More options"
             >
               <MoreHorizontal className="h-4 w-4" />

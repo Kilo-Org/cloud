@@ -36,7 +36,6 @@ let usesListFormatPolyfill = false;
 let usesRelativeTimePolyfill = false;
 let usesDurationFormatPolyfill = false;
 let usesSegmenterPolyfill = false;
-let usesLocalePolyfill = false;
 
 /**
  * The tag every formatter is built with.
@@ -65,16 +64,36 @@ function localeDataLanguage(locale: string): SupportedLanguage {
   return isSupportedLanguage(base) ? base : 'en';
 }
 
+/**
+ * Install the `Intl.Locale` polyfill. Every `ensure*` below calls this before
+ * its own `shouldPolyfill(locale)`, and it must stay that way.
+ *
+ * `shouldPolyfill` runs the CLDR locale matcher, whose best-fit path
+ * constructs `Intl.Locale` for a tag the package's locale list does not carry:
+ * `zh-Hans`, `zh-Hant`, `ht`, `mi` and `pt-BR` all miss the plural-rules list.
+ * Hermes ships no `Intl.Locale`, so the first formatter call in one of those
+ * languages threw "undefined cannot be used as a constructor" before any
+ * polyfill could install, and every formatted number, list and duration on the
+ * screen fell back to its raw value.
+ */
 function ensureLocale(): void {
-  if (!usesLocalePolyfill && shouldPolyfillLocale()) {
-    require('@formatjs/intl-locale/polyfill-force.js');
-    usesLocalePolyfill = true;
+  if (!shouldPolyfillLocale()) {
+    return;
   }
+  // The class, not `polyfill-force`. That entry point assigns onto whichever
+  // `Intl` was global the first time it ran, and a second `require` is a cache
+  // hit that assigns nothing, so a later `Intl` would keep no `Locale` at all.
+  // Assigning here depends on the current `Intl` alone, and `shouldPolyfill`
+  // already returns false once a usable `Intl.Locale` is in place.
+  // eslint-disable-next-line typescript-eslint/no-require-imports, unicorn/prefer-module -- the polyfill is a lazy native-weight load, like every other one here
+  const { Locale } = require('@formatjs/intl-locale') as { Locale: unknown };
+  Object.defineProperty(Intl, 'Locale', { value: Locale, configurable: true, writable: true });
 }
 
 // Hermes ships without Intl.PluralRules, and the NumberFormat and
 // RelativeTimeFormat polyfills construct one.
 function ensurePluralRules(language: SupportedLanguage): void {
+  ensureLocale();
   if (!usesPluralRulesPolyfill && shouldPolyfillPluralRules(language)) {
     require('@formatjs/intl-pluralrules/polyfill-force.js');
     usesPluralRulesPolyfill = true;
@@ -88,6 +107,7 @@ function ensurePluralRules(language: SupportedLanguage): void {
 function ensureNumberFormat(locale: string): void {
   const language = localeDataLanguage(locale);
   ensurePluralRules(language);
+  ensureLocale();
   if (!usesNumberFormatPolyfill && shouldPolyfillNumberFormat(locale)) {
     require('@formatjs/intl-numberformat/polyfill-force.js');
     usesNumberFormatPolyfill = true;
@@ -100,6 +120,7 @@ function ensureNumberFormat(locale: string): void {
 
 function ensureListFormat(locale: string): void {
   const language = localeDataLanguage(locale);
+  ensureLocale();
   if (!usesListFormatPolyfill && shouldPolyfillListFormat(locale)) {
     require('@formatjs/intl-listformat/polyfill-force.js');
     usesListFormatPolyfill = true;
@@ -113,6 +134,7 @@ function ensureListFormat(locale: string): void {
 function ensureRelativeTimeFormat(locale: string): void {
   const language = localeDataLanguage(locale);
   ensureNumberFormat(locale);
+  ensureLocale();
   if (!usesRelativeTimePolyfill && shouldPolyfillRelativeTimeFormat(language)) {
     require('@formatjs/intl-relativetimeformat/polyfill-force.js');
     usesRelativeTimePolyfill = true;

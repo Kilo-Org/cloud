@@ -16,6 +16,10 @@ export const cloudAgentEventSchema = z.object({
 });
 export type CloudAgentEvent = z.infer<typeof cloudAgentEventSchema>;
 
+export const cloudWorktreeChangesReadyDataSchema = z
+  .object({ revision: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) })
+  .strict();
+
 export const streamErrorSchema = z.object({
   type: z.literal('error'),
   code: z.enum([

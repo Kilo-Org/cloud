@@ -9,8 +9,8 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
 
 const BUTTON_LABEL_KEY = {
   save: 'securityAgent.settingsSave.saveChanges',
-  discard: 'securityAgent.settingsSave.discard',
-  'keep-editing': 'securityAgent.settingsSave.keepEditing',
+  discard: 'common.discard',
+  'keep-editing': 'common.keepEditing',
 } as const;
 
 /**

@@ -7,7 +7,8 @@
       "instanceLifecycle": "Tvoja instanca ima posodobitev",
       "scheduledAction": "Načrtovano dejanje ima posodobitev",
       "lowBalance": "Tvoje stanje potrebuje pozornost",
-      "securityFinding": "Varnostna najdba potrebuje pozornost"
+      "securityFinding": "Varnostna najdba potrebuje pozornost",
+      "activeAgentsGlanceable": "Aktivni agenti imajo posodobitev"
     }
   },
   "cloudAgentSession": {

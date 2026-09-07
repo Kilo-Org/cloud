@@ -60,6 +60,9 @@ export const MISTRAL_API_KEY = getEnvVariable('MISTRAL_API_KEY');
 export const INCEPTION_API_KEY = getEnvVariable('INCEPTION_API_KEY');
 export const EXA_API_KEY = getEnvVariable('EXA_API_KEY');
 export const INTERNAL_API_SECRET = getEnvVariable('INTERNAL_API_SECRET');
+export function isBoundedInternalServiceTokenIssuanceEnabled(): boolean {
+  return getEnvVariable('BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED') === 'true';
+}
 export const USER_DATA_EXPORT_WORKER_URL =
   getEnvVariable('USER_DATA_EXPORT_WORKER_URL') ||
   (process.env.NODE_ENV === 'development' ? 'http://127.0.0.1:8818' : '');
@@ -159,6 +162,9 @@ export const BYOK_ENCRYPTION_KEY = requireEnv(
 
 // Artificial Analysis API
 export const ARTIFICIAL_ANALYSIS_API_KEY = getEnvVariable('ARTIFICIAL_ANALYSIS_API_KEY');
+export const ENKRYPT_API_KEY = getEnvVariable('ENKRYPT_API_KEY');
+export const ENKRYPT_SYNC_ENABLED = getEnvVariable('ENKRYPT_SYNC_ENABLED') === 'true';
+export const ENKRYPT_PUBLICATION_ENABLED = getEnvVariable('ENKRYPT_PUBLICATION_ENABLED') === 'true';
 
 // Cron jobs
 export const CRON_SECRET = getEnvVariable('CRON_SECRET');

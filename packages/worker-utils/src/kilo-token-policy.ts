@@ -1,4 +1,4 @@
-import { jwtVerify } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { KILO_API_AUDIENCE } from './internal-service-token-audiences';
 import { KILO_TOKEN_VERSION, kiloTokenPayload } from './kilo-token';
@@ -267,6 +267,25 @@ const modernClaims = policyClaims
 
 export type ModernKiloTokenClaims = z.infer<typeof modernClaims>;
 
+const positiveSafeInteger = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+
+type ModernKiloTokenSigningPurpose =
+  | { tokenPurpose: 'human-api'; credentialExchange: boolean }
+  | {
+      tokenPurpose: Exclude<ModernKiloTokenPurpose['tokenPurpose'], 'human-api'>;
+      credentialExchange: false;
+    };
+
+export type SignModernKiloTokenParams = {
+  userId: string;
+  secret: string;
+  expiresInSeconds: number;
+  pepper?: string | null;
+  env?: string;
+  audience: string;
+  extra?: z.infer<typeof modernTokenExtra>;
+} & ModernKiloTokenSigningPurpose;
+
 export function buildModernKiloTokenPayload(
   params: {
     userId: string;
@@ -293,4 +312,43 @@ export function buildModernKiloTokenPayload(
     credentialExchange: params.credentialExchange,
   };
   return modernClaims.parse(claims);
+}
+
+export async function signModernKiloToken(
+  params: SignModernKiloTokenParams
+): Promise<{ token: string; expiresAt: string }> {
+  const expiresInSeconds = positiveSafeInteger.parse(params.expiresInSeconds);
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const expiresAt = issuedAt + expiresInSeconds;
+  if (!Number.isSafeInteger(expiresAt)) {
+    throw new Error('Token expiration exceeds the safe integer range');
+  }
+
+  const payloadParams = {
+    userId: params.userId,
+    pepper: params.pepper,
+    env: params.env,
+    audience: params.audience,
+    issuedAt,
+    expiresAt,
+    extra: params.extra,
+  };
+  const payload =
+    params.tokenPurpose === 'human-api'
+      ? buildModernKiloTokenPayload({
+          ...payloadParams,
+          tokenPurpose: 'human-api',
+          credentialExchange: params.credentialExchange,
+        })
+      : buildModernKiloTokenPayload({
+          ...payloadParams,
+          tokenPurpose: params.tokenPurpose,
+          credentialExchange: params.credentialExchange,
+        });
+  const expiresAtIso = new Date(expiresAt * 1000).toISOString();
+  const token = await new SignJWT(payload)
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .sign(new TextEncoder().encode(params.secret));
+
+  return { token, expiresAt: expiresAtIso };
 }

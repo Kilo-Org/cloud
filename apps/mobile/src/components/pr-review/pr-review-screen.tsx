@@ -3,9 +3,9 @@ import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Check, Share as ShareIcon } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, RefreshControl, Share, View } from 'react-native';
+import { Pressable, Share, View } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 
-import { DetailScreenScrollView } from '@/components/detail-screen';
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
@@ -164,21 +164,19 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     })();
   }, [queryClient, trpc, owner, repo, number, pr.data?.headSha]);
 
-  // Each tab owns its own scroll: Overview is a DetailScreenScrollView with
-  // pull-to-refresh; the Files tab hosts a virtualized FlashList and must
-  // NOT be nested inside a ScrollView.
   let body: ReactNode = null;
   if (tab === 'overview') {
     body = (
-      <DetailScreenScrollView
-        className="flex-1"
-        contentContainerClassName="gap-5 px-4"
-        keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-      >
+      <>
         {partialMergeReason ? <PrMergePartialSuccessBanner reason={partialMergeReason} /> : null}
-        <PrReviewOverview owner={owner} repo={repo} number={number} isActive />
-      </DetailScreenScrollView>
+        <PrReviewOverview
+          owner={owner}
+          repo={repo}
+          number={number}
+          isActive
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        />
+      </>
     );
   } else if (tab === 'files') {
     body = (
@@ -229,18 +227,22 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
               <Button
                 size="sm"
                 onPress={openReviewSubmit}
-                accessibilityLabel={t('prReview.submit.title')}
+                accessibilityLabel={t('prReview.submit.submitReview')}
                 className={cn('px-3')}
               >
                 <Check size={14} color={colors.primaryForeground} />
-                <Text>{t('prReview.submit.title')}</Text>
+                <Text>{t('prReview.submit.submitReview')}</Text>
               </Button>
             ) : null}
           </View>
         }
       />
       <View className="px-4 pb-2 pt-3">
-        <PrReviewTabSelector activeTab={tab} onChange={setTab} />
+        <PrReviewTabSelector
+          activeTab={tab}
+          onChange={setTab}
+          discussionCount={pr.data?.commentCount}
+        />
       </View>
       {body}
     </View>

@@ -80,7 +80,7 @@ export async function pickCameraImage(): Promise<MessageAttachment[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
-      title: i18n.t('chat.attachmentPicker.cameraAccessDisabled'),
+      title: i18n.t('common.cameraAccessDisabled'),
       message: i18n.t('chat.attachmentPicker.cameraAccessMessage'),
     });
     return [];

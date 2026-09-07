@@ -7,7 +7,8 @@
       "instanceLifecycle": "دۆخەکەت نوێکراوەتەوە",
       "scheduledAction": "کردارێکی دیاریکراو نوێکراوەتەوە",
       "lowBalance": "تەوازنەکەت پێویستی بە سەرنجە",
-      "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە"
+      "securityFinding": "دۆزینەوەیەکی ئاسایش پێویستی بە سەرنجە",
+      "activeAgentsGlanceable": "ئەجێنتە چالاکەکان نوێکارییەکیان هەیە"
     }
   },
   "cloudAgentSession": {

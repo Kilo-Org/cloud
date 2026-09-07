@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import * as WebBrowser from 'expo-web-browser';
-import { Alert, Platform } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
@@ -11,6 +12,7 @@ import {
   type GitHubInstallReturnOutcome,
   subscribeToGitHubInstallReturnOutcome,
 } from '@/lib/github-install-return';
+import { recoverGlanceableActivityKit } from '@/lib/glanceable/activity-kit-prompt';
 import { trpcClient } from '@/lib/trpc';
 
 export type GitHubInstallOutcomeAlertButton = {
@@ -134,6 +136,22 @@ export default function AgentSessionList() {
     consumeReturnOutcome();
     return subscribeToGitHubInstallReturnOutcome(consumeReturnOutcome);
   }, [consumeReturnOutcome]);
+
+  // Only tab focus can show the one-time alert. Settings can return without
+  // changing route focus, so also retry recovery when the app becomes active.
+  useFocusEffect(
+    useCallback(() => {
+      void recoverGlanceableActivityKit();
+      const subscription = AppState.addEventListener('change', state => {
+        if (state === 'active') {
+          void recoverGlanceableActivityKit();
+        }
+      });
+      return () => {
+        subscription.remove();
+      };
+    }, [])
+  );
 
   return <AgentSessionListScreen />;
 }

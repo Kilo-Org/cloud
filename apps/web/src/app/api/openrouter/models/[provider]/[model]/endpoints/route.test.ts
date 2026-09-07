@@ -87,23 +87,26 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
   });
 
-  test('returns 404 for unavailable models without reading cached metadata', async () => {
-    mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();
-    const modelId = 'openai/gpt-oss-20b:free';
+  test.each(['openai/gpt-oss-20b:free', 'tencent/hy3:free', 'meituan/longcat-2.0-free'])(
+    'returns 404 for unavailable model %s without reading cached metadata',
+    async modelId => {
+      mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();
+      const [provider, model] = modelId.split('/');
 
-    const response = await GET(request(modelId), {
-      params: Promise.resolve({ provider: 'openai', model: 'gpt-oss-20b:free' }),
-    });
+      const response = await GET(request(modelId), {
+        params: Promise.resolve({ provider, model }),
+      });
 
-    expect(response.status).toBe(404);
-    expect(response.headers.get('cache-control')).toBe(
-      'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
-    );
-    await expect(response.json()).resolves.toEqual({
-      error: { message: 'Not Found', code: 404 },
-    });
-    expect(mockedGetOpenRouterModelsMetadataFromDatabase).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(404);
+      expect(response.headers.get('cache-control')).toBe(
+        'public, max-age=0, s-maxage=60, stale-while-revalidate=60'
+      );
+      await expect(response.json()).resolves.toEqual({
+        error: { message: 'Not Found', code: 404 },
+      });
+      expect(mockedGetOpenRouterModelsMetadataFromDatabase).not.toHaveBeenCalled();
+    }
+  );
 
   test('applies custom pricing to every priced endpoint', async () => {
     const model = {

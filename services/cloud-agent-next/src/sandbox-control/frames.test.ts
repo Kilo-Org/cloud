@@ -3,6 +3,7 @@ import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   sandboxControlSocketAttachmentSchema,
+  sandboxHelloResultSchema,
   sessionTerminalCloseResultSchema,
   sessionTerminalConnectResultSchema,
   sessionTerminalCreateResultSchema,
@@ -11,6 +12,7 @@ import {
 } from '../shared/sandbox-control-protocol.js';
 import {
   errorResponse,
+  helloResult,
   isControlEvent,
   isControlOperation,
   isSessionOperation,
@@ -37,6 +39,34 @@ const terminalPty = {
 };
 
 describe('sandbox control frames', () => {
+  it('advertises heartbeat version support without requiring it from an old Worker', () => {
+    expect(sandboxHelloResultSchema.parse(helloResult())).toEqual({
+      protocolVersion: 1,
+      handshakeComplete: true,
+      capabilities: {
+        kiloVersionHeartbeat: true,
+        sessionOperationResults: true,
+        scopedStopAbort: true,
+        nativeRuntimeRetirement: true,
+      },
+    });
+    const previous = { protocolVersion: 1, handshakeComplete: true };
+    expect(sandboxHelloResultSchema.parse(previous)).toEqual(previous);
+    for (const capabilities of [
+      null,
+      { kiloVersionHeartbeat: 'true' },
+      { kiloVersionHeartbeat: 1 },
+    ]) {
+      expect(sandboxHelloResultSchema.safeParse({ ...previous, capabilities }).success).toBe(false);
+    }
+    expect(
+      sandboxHelloResultSchema.safeParse({ ...helloResult(), protocolVersion: 2 }).success
+    ).toBe(false);
+    expect(
+      sandboxHelloResultSchema.safeParse({ ...helloResult(), handshakeComplete: false }).success
+    ).toBe(false);
+  });
+
   it('accepts a valid request envelope', () => {
     const parsed = parseControlFrame(
       JSON.stringify({
@@ -65,6 +95,8 @@ describe('sandbox control frames', () => {
   it('recognizes known operations', () => {
     expect(isControlOperation('sandbox.hello')).toBe(true);
     expect(isControlOperation('session.prompt')).toBe(true);
+    expect(isControlOperation('session.git.summary')).toBe(true);
+    expect(isSessionOperation('session.git.summary')).toBe(true);
     expect(isControlOperation('http.tunnel')).toBe(false);
     for (const operation of [
       'session.terminal.create',
@@ -226,6 +258,32 @@ describe('sandbox control frames', () => {
         agent: { mode: 'code', provider: 'anthropic' },
       }).ok
     ).toBe(false);
+  });
+
+  it('validates summary requests without accepting a payload directory', () => {
+    expect(parseOperationPayload('session.git.summary', { revision: 1 })).toEqual({
+      ok: true,
+      payload: { revision: 1 },
+    });
+    expect(
+      parseOperationPayload('session.git.summary', {
+        revision: 2,
+        baseRef: 'refs/remotes/origin/main',
+      }).ok
+    ).toBe(true);
+    for (const payload of [
+      {},
+      { revision: 0 },
+      { revision: 1.5 },
+      { revision: Number.MAX_SAFE_INTEGER + 1 },
+      { revision: 1, baseRef: '--help' },
+      { revision: 1, directory: '/outside' },
+    ]) {
+      expect(parseOperationPayload('session.git.summary', payload)).toEqual({
+        ok: false,
+        error: { code: 'protocol_error', message: 'Invalid session.git.summary payload' },
+      });
+    }
   });
 
   it('accepts a full sandbox.heartbeat payload', () => {

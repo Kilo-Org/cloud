@@ -7,7 +7,8 @@
       "instanceLifecycle": "Данаңызда жаңарту бар",
       "scheduledAction": "Жоспарланған әрекетте жаңарту бар",
       "lowBalance": "Балансыңыз назар қажет етеді",
-      "securityFinding": "Қауіпсіздік табылғаны назар қажет етеді"
+      "securityFinding": "Қауіпсіздік табылғаны назар қажет етеді",
+      "activeAgentsGlanceable": "Белсенді агенттерде жаңарту бар"
     }
   },
   "cloudAgentSession": {

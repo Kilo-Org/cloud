@@ -6,6 +6,11 @@ import {
   runDurableObjectAlarm,
   runInDurableObject,
 } from 'cloudflare:test';
+import {
+  worktreeChangesCaptureRequestSchema,
+  type WorktreeChangesCapture,
+  type WorktreeChangesSnapshot,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BillingContext } from '@kilocode/container-usage';
@@ -27,7 +32,7 @@ import type {
   AgentSelectionOverride,
   SubmittedSessionMessageRequest,
 } from '../../src/execution/types.js';
-import type { AttachSessionInput, SandboxControl } from '../../src/persistence/SandboxControl.js';
+import { type AttachSessionInput, SandboxControl } from '../../src/persistence/SandboxControl.js';
 import {
   serializeSessionMetadata,
   type SessionMetadata,
@@ -46,7 +51,7 @@ import {
 } from '../../src/sandbox-control/session-credentials.js';
 import { findMatchingCredentialInjectionRule } from '../../src/sandbox-control/vercel-network-policy.js';
 import { MANAGED_SCM_OUTBOUND_HANDLER } from '../../src/sandbox-id.js';
-import type { SandboxSession } from '../../src/sandbox-session/SandboxSession.js';
+import { SandboxSession } from '../../src/sandbox-session/SandboxSession.js';
 import {
   SANDBOX_SESSION_LIFECYCLE_KEY,
   SANDBOX_SESSION_METADATA_KEY,
@@ -92,6 +97,7 @@ import {
   type VercelControlRestClient,
 } from '../../src/sandbox-control/vercel-provider.js';
 import {
+  ATTACH_FAILURE_LIMIT,
   createSessionMessageRecord,
   type SessionMessageRecord,
 } from '../../src/sandbox-session/session-message-queue.js';
@@ -100,13 +106,28 @@ import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
   requestFrameSchema,
+  responseFrameSchema,
+  sessionOperationAckSchema,
+  sessionOperationAuthorizationSchema,
   sessionPromptPayloadSchema,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
+  SANDBOX_CONTROL_WS_TAG,
   type RequestFrame,
   type ResponseFrame,
   type SessionAttachPayload,
+  type SessionOperationDelivery,
+  sandboxControlSocketAttachmentSchema,
+  type SandboxHeartbeatPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
+import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
+import { WORKTREE_CHANGES_KEY } from '../../src/sandbox-session/worktree-changes.js';
+import {
+  WORKTREE_CHANGED_EVENT,
+  WORKTREE_CHANGES_READY_EVENT,
+} from '../../src/shared/worktree-changes-wire.js';
+import { getWorktreeWorkspacePath } from '../../src/workspace.js';
+import type { StoredEvent } from '../../src/websocket/types.js';
 
 vi.mock('../../src/session-access.js', () => ({
   requireCurrentSessionAccess: vi.fn(),
@@ -328,7 +349,12 @@ function persistedSessionEvents(state: DurableObjectState, eventTypes: string[])
 function sendHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
+  } = {}
 ): void {
   ws.send(
     JSON.stringify({
@@ -339,6 +365,17 @@ function sendHello(
         protocolVersion: 1,
         providerInstanceId:
           identity.providerInstanceId ?? cloudflareRef(socketSandboxIds.get(ws) ?? sandboxId),
+        ...(identity.sessionOperationResults
+          ? { capabilities: { sessionOperationResults: true } }
+          : {}),
+        ...(identity.nativeRuntimeRetirement
+          ? {
+              capabilities: {
+                sessionOperationResults: true,
+                nativeRuntimeRetirement: true,
+              },
+            }
+          : {}),
         ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
       },
     })
@@ -348,7 +385,12 @@ function sendHello(
 async function completeHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
+  } = {}
 ): Promise<void> {
   sendHello(ws, requestId, identity);
   await expect(nextMessage(ws)).resolves.toBe(
@@ -356,7 +398,16 @@ async function completeHello(
       type: 'response',
       requestId,
       ok: true,
-      result: { protocolVersion: 1, handshakeComplete: true },
+      result: {
+        protocolVersion: 1,
+        handshakeComplete: true,
+        capabilities: {
+          kiloVersionHeartbeat: true,
+          sessionOperationResults: true,
+          scopedStopAbort: true,
+          nativeRuntimeRetirement: true,
+        },
+      },
     })
   );
   const status = JSON.parse(await nextMessage(ws)) as {
@@ -382,7 +433,10 @@ type TerminalRuntimeFixture = {
   wrapperInstanceId?: string;
 };
 
-async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
+async function initializeTerminalRuntime(
+  fixture: TerminalRuntimeFixture,
+  capabilities: { sessionOperationResults?: boolean; nativeRuntimeRetirement?: boolean } = {}
+) {
   const credential = generateSandboxCredential();
   await seedCredential(credential, fixture.sandboxId);
   const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
@@ -410,6 +464,7 @@ async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
   await completeHello(socket, `hello_${fixture.sandboxId}`, {
     providerInstanceId: providerRef,
     ...(fixture.wrapperInstanceId ? { wrapperInstanceId: fixture.wrapperInstanceId } : {}),
+    ...capabilities,
   });
   return { control, credential, socket, providerRef, ...provider };
 }
@@ -1317,7 +1372,11 @@ async function deliverWrapperEvent(
   });
 }
 
-function respondToWrapperRequest(ws: WebSocket, request: WrapperRequest, result: unknown): void {
+function respondToWrapperRequest(
+  ws: WebSocket,
+  request: Pick<WrapperRequest, 'requestId'>,
+  result: unknown
+): void {
   ws.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result }));
 }
 
@@ -4867,7 +4926,7 @@ describe('SandboxControl recovery watchdogs', () => {
         wrapperInstanceId,
         reason: 'preparation_interrupted',
       })
-    ).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
     await runInDurableObject(control, async (_instance, state) => {
       expect(await state.storage.getAlarm()).toBe(repairedAt);
     });
@@ -5954,6 +6013,2091 @@ describe('SandboxControl durable remainder', () => {
   });
 });
 
+const statusOwner = 'owner_status';
+const statusInput = { ownerId: statusOwner, provider: 'cloudflare' as const };
+const statusHeartbeat: SandboxHeartbeatPayload = {
+  state: 'idle',
+  pendingMessages: 0,
+  kilo: { ready: true },
+  sessions: [{ kiloSessionId: 'kilo_status', state: 'idle', idleForMs: 0 }],
+};
+
+function statusSocket(state: DurableObjectState) {
+  const socket = state.getWebSockets(SANDBOX_CONTROL_WS_TAG).find(ws => ws.readyState === 1);
+  if (!socket) throw new Error('Expected an open control socket');
+  return socket;
+}
+
+async function receiveHeartbeat(
+  instance: SandboxControl,
+  state: DurableObjectState,
+  payload: SandboxHeartbeatPayload = statusHeartbeat
+) {
+  await instance.webSocketMessage(
+    statusSocket(state),
+    JSON.stringify({ type: 'event', event: 'sandbox.heartbeat', payload })
+  );
+}
+
+async function seedStatusControl(id: string) {
+  const stub = env.SANDBOX_CONTROL.getByName(id);
+  await runInDurableObject(stub, async (instance, state) => {
+    await instance.initializeOwner(statusOwner);
+    await state.storage.put('provider_kind', 'cloudflare');
+    await seedRunningCloudflare(instance);
+    await saveRouteTable(
+      state.storage,
+      attachRoute(
+        new Map(),
+        {
+          sessionId: 'workspace_status',
+          kiloSessionId: 'kilo_status',
+          directory: '/workspace/status',
+          worktreeId: WORKTREE_ID,
+          ownerId: statusOwner,
+        },
+        statusOwner
+      ).table
+    );
+    instance['provider'].ensureLeaseAtLeast = vi.fn(async () => undefined);
+  });
+  return stub;
+}
+
+async function completeStatusHello(ws: WebSocket, requestId: string) {
+  await completeHello(ws, requestId, { wrapperInstanceId: crypto.randomUUID() });
+  const id = socketSandboxIds.get(ws);
+  if (!id) throw new Error('Missing status sandbox identity');
+  await runInDurableObject(env.SANDBOX_CONTROL.getByName(id), async (instance, state) => {
+    await instance.webSocketMessage(
+      statusSocket(state),
+      JSON.stringify({
+        type: 'event',
+        event: 'sandbox.ready',
+        payload: { kiloReady: true, globalFeedAttached: true },
+      })
+    );
+  });
+}
+
+async function reconstructControl(instance: SandboxControl, state: DurableObjectState) {
+  const callbacks: Promise<unknown>[] = [];
+  const block = vi.spyOn(state, 'blockConcurrencyWhile').mockImplementation(callback => {
+    const promise = callback();
+    callbacks.push(promise);
+    return promise;
+  });
+  try {
+    const fresh = new SandboxControl(state, instance['env']);
+    await Promise.all(callbacks);
+    expect(callbacks).toHaveLength(0);
+    return fresh;
+  } finally {
+    block.mockRestore();
+  }
+}
+
+function forbidControlOperations(instance: SandboxControl) {
+  const forbidden = () => {
+    throw new Error('Passive status reached a control operation');
+  };
+  instance['provider'] = {
+    resumable: false,
+    ensureBillingAdmission: forbidden,
+    launch: forbidden,
+    create: forbidden,
+    stop: forbidden,
+    observe: forbidden,
+    ensureLeaseAtLeast: forbidden,
+    logs: forbidden,
+  };
+  instance.ensureReady = forbidden;
+  instance.initializeOwner = forbidden;
+  instance.getStatus = forbidden;
+  instance.request = forbidden;
+  instance['pinProvider'] = forbidden;
+  instance['socketHandler'].sendRequest = forbidden;
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+describe('SandboxControl passive status', () => {
+  it('returns unknown for a cold missing record without synthesizing or storing sleeping', async () => {
+    const stub = env.SANDBOX_CONTROL.getByName('sbx_status_empty');
+    expect(await stub.getSandboxStatus(statusInput)).toMatchObject({
+      status: 'unknown',
+      provider: 'Unknown',
+      estimatedSleepAt: null,
+      inactivityTimeoutMs: DEADLINE_MS.idleStop,
+    });
+    await runInDurableObject(stub, async (_instance, state) => {
+      expect(await state.storage.list()).toEqual(new Map());
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it.each([null, 10_000, 86_400_000])(
+    'preserves records and exact alarm %j on repeated reconstructed reads',
+    async offset => {
+      const stub = await seedStatusControl(`sbx_status_passive_${offset}`);
+      await runInDurableObject(stub, async (instance, state) => {
+        await state.storage.put('wrapper_ready_at', Date.now());
+        await state.storage.put('deadlines', {
+          heartbeatExpiry: Date.now() + DEADLINE_MS.heartbeatExpiry,
+          idleStop: Date.now() + DEADLINE_MS.idleStop,
+        });
+        if (offset === null) await state.storage.deleteAlarm();
+        else await state.storage.setAlarm(Date.now() + offset);
+        const alarm = await state.storage.getAlarm();
+        const records = await state.storage.list();
+        const fresh = await reconstructControl(instance, state);
+        forbidControlOperations(fresh);
+        const put = vi.spyOn(state.storage, 'put');
+        const remove = vi.spyOn(state.storage, 'delete');
+        const setAlarm = vi.spyOn(state.storage, 'setAlarm');
+        const deleteAlarm = vi.spyOn(state.storage, 'deleteAlarm');
+        for (let read = 0; read < 3; read++) {
+          expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+            status: 'unreachable',
+            estimatedSleepAt: null,
+          });
+        }
+        expect(await state.storage.list()).toEqual(records);
+        expect(await state.storage.getAlarm()).toBe(alarm);
+        expect(put).not.toHaveBeenCalled();
+        expect(remove).not.toHaveBeenCalled();
+        expect(setAlarm).not.toHaveBeenCalled();
+        expect(deleteAlarm).not.toHaveBeenCalled();
+      });
+    }
+  );
+
+  it('preserves unhealthy-runtime quarantine through passive reconstruction', async () => {
+    const id = 'sbx_status_false_reconstruction';
+    const stub = await seedStatusControl(id);
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const ws = await connect(credential, id);
+    await completeStatusHello(ws, 'hello-status-false');
+    await runInDurableObject(stub, async (instance, state) => {
+      const socket = statusSocket(state);
+      await instance.webSocketMessage(
+        socket,
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.ready',
+          payload: { kiloReady: true, globalFeedAttached: true },
+        })
+      );
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      instance['provider'].stop = vi.fn<ProviderAdapter['stop']>(async () => 'retryable');
+      await receiveHeartbeat(instance, state, { ...statusHeartbeat, kilo: { ready: false } });
+      await vi.waitFor(async () => {
+        expect((await instance.getPhysicalRecord()).stopTombstone).toMatchObject({
+          reason: 'kilo_unhealthy',
+          attempts: 1,
+        });
+      });
+      expect(await state.storage.get('wrapper_ready_at')).toBeUndefined();
+      expect((await loadDeadlines(state.storage)).heartbeatExpiry).toBeUndefined();
+      const fresh = await reconstructControl(instance, state);
+      expect(fresh['kiloReady']).toBe(false);
+      const records = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      const attachment = socket.deserializeAttachment();
+      forbidControlOperations(fresh);
+      const serialize = vi.spyOn(socket, 'serializeAttachment');
+      const send = vi.spyOn(socket, 'send');
+      expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'stopping',
+        detailCode: 'sandbox_stopping',
+        estimatedSleepAt: null,
+      });
+      expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'stopping',
+        estimatedSleepAt: null,
+      });
+      expect(await state.storage.list()).toEqual(records);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+      expect(socket.deserializeAttachment()).toEqual(attachment);
+      expect(serialize).not.toHaveBeenCalled();
+      expect(send).not.toHaveBeenCalled();
+    });
+    ws.close();
+  });
+
+  it('does not inherit readiness when a same-provider replacement quarantines the runtime', async () => {
+    const id = 'sbx_status_replacement';
+    const stub = await seedStatusControl(id);
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const first = await connect(credential, id);
+    await completeStatusHello(first, 'hello-status-old');
+    await runInDurableObject(stub, async (instance, state) => {
+      instance['provider'].stop = vi.fn<ProviderAdapter['stop']>(async () => 'retryable');
+      await receiveHeartbeat(instance, state);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({ status: 'active' });
+    });
+    const second = await connect(credential, id);
+    const closed = new Promise<number>(resolve =>
+      second.addEventListener('close', event => resolve(event.code), { once: true })
+    );
+    sendHello(second, 'hello-status-new', { wrapperInstanceId: crypto.randomUUID() });
+    await expect(closed).resolves.toBe(4001);
+    await vi.waitFor(async () => {
+      expect((await stub.getPhysicalRecord()).stopTombstone).toMatchObject({
+        reason: 'control_replaced',
+        attempts: 1,
+      });
+    });
+    await runInDurableObject(stub, async (instance, state) => {
+      const fresh = await reconstructControl(instance, state);
+      forbidControlOperations(fresh);
+      const before = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'stopping',
+        estimatedSleepAt: null,
+      });
+      expect(await state.storage.list()).toEqual(before);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+    });
+  });
+
+  it('requires fresh coherent evidence for all shared routes and leaves ordinary heartbeat scheduling unchanged', async () => {
+    const id = 'sbx_status_shared_idle';
+    const stub = await seedStatusControl(id);
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const ws = await connect(credential, id);
+    await completeStatusHello(ws, 'hello-status-idle');
+    await runInDurableObject(stub, async (instance, state) => {
+      const renew = vi.fn(async () => undefined);
+      instance['provider'].ensureLeaseAtLeast = renew;
+      await saveRouteTable(
+        state.storage,
+        attachRoute(
+          await loadRouteTable(state.storage),
+          {
+            sessionId: 'workspace_sibling',
+            kiloSessionId: 'kilo_sibling',
+            directory: '/workspace/status',
+            worktreeId: WORKTREE_ID,
+            ownerId: statusOwner,
+          },
+          statusOwner
+        ).table
+      );
+      const socket = statusSocket(state);
+      await instance.webSocketMessage(
+        socket,
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.ready',
+          payload: { kiloReady: true, globalFeedAttached: true },
+        })
+      );
+      const initialDeadline = (await loadDeadlines(state.storage)).idleStop;
+      expect(initialDeadline).toEqual(expect.any(Number));
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      await receiveHeartbeat(instance, state);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        estimatedSleepAt: null,
+      });
+      const sharedIdle: SandboxHeartbeatPayload = {
+        ...statusHeartbeat,
+        sessions: [
+          ...statusHeartbeat.sessions,
+          { kiloSessionId: 'kilo_sibling', state: 'idle', idleForMs: 0 },
+        ],
+      };
+      await receiveHeartbeat(instance, state, sharedIdle);
+      expect((await loadDeadlines(state.storage)).idleStop).toBe(initialDeadline);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: initialDeadline,
+      });
+      const records = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      const beforeAttachment = socket.deserializeAttachment();
+      const send = vi.spyOn(socket, 'send');
+      const serialize = vi.spyOn(socket, 'serializeAttachment');
+      const reconstructed = await reconstructControl(instance, state);
+      forbidControlOperations(reconstructed);
+      for (let read = 0; read < 3; read++) {
+        const snapshot = await reconstructed.getSandboxStatus(statusInput);
+        expect(snapshot.estimatedSleepAt).toBe(initialDeadline);
+        expect(SandboxStatusSnapshotSchema.safeParse(snapshot).success).toBe(true);
+      }
+      expect(await state.storage.list()).toEqual(records);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+      expect(socket.deserializeAttachment()).toEqual(beforeAttachment);
+      expect(send).not.toHaveBeenCalled();
+      expect(serialize).not.toHaveBeenCalled();
+      expect(renew).toHaveBeenCalledTimes(2);
+      const active: SandboxHeartbeatPayload = {
+        ...sharedIdle,
+        state: 'active',
+        sessions: [
+          ...statusHeartbeat.sessions,
+          { kiloSessionId: 'kilo_sibling', state: 'active', idleForMs: 0 },
+        ],
+      };
+      await receiveHeartbeat(instance, state, active);
+      expect((await loadDeadlines(state.storage)).idleStop).toBeUndefined();
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      let heartbeatTime = Date.now();
+      vi.spyOn(Date, 'now').mockImplementation(() => heartbeatTime++);
+      await receiveHeartbeat(instance, state, sharedIdle);
+      const nextDeadline = (await loadDeadlines(state.storage)).idleStop;
+      expect(nextDeadline).toBeGreaterThanOrEqual(initialDeadline ?? 0);
+      const rearmedObservation = sandboxControlSocketAttachmentSchema.parse(
+        socket.deserializeAttachment()
+      ).observation;
+      expect(rearmedObservation?.receivedAt).toBeLessThan(
+        (nextDeadline ?? 0) - DEADLINE_MS.idleStop
+      );
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'active',
+        estimatedSleepAt: null,
+      });
+      expect(renew).toHaveBeenCalledTimes(4);
+      await receiveHeartbeat(instance, state, sharedIdle);
+      expect((await loadDeadlines(state.storage)).idleStop).toBe(nextDeadline);
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        estimatedSleepAt: nextDeadline,
+      });
+      expect(renew).toHaveBeenCalledTimes(5);
+      expect(renew).toHaveBeenLastCalledWith(
+        cloudflareRef(id),
+        DEADLINE_MS.idleStop + DEADLINE_MS.idleStopLeaseMargin
+      );
+      const attachment = sandboxControlSocketAttachmentSchema.parse(socket.deserializeAttachment());
+      const expiredAt = Date.now() - DEADLINE_MS.heartbeatExpiry;
+      socket.serializeAttachment({
+        ...attachment,
+        acceptedAt: expiredAt - 1,
+        observation: { ...attachment.observation, receivedAt: expiredAt },
+      });
+      await state.storage.put('deadlines', {
+        heartbeatExpiry: Date.now() + DEADLINE_MS.heartbeatExpiry,
+        idleStop: Date.now() + DEADLINE_MS.idleStop,
+      });
+      expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+        status: 'unreachable',
+        estimatedSleepAt: null,
+      });
+    });
+    ws.close();
+  });
+
+  it('suppresses an idle estimate after a busy event without changing operational scheduling', async () => {
+    const id = 'usr-b05a1d1e1';
+    const stub = await seedStatusControl(id);
+    const session = env.SANDBOX_SESSION.getByName(`${statusOwner}:workspace_status`);
+    await runInDurableObject(session, async instance => {
+      await instance.registerSession({
+        identity: { sessionId: 'workspace_status', userId: statusOwner },
+        auth: { kiloSessionId: 'kilo_status' },
+        agent: { mode: 'code', model: 'test' },
+        workspace: {
+          sandboxId: id,
+          sandboxProvider: 'cloudflare',
+          workspacePath: '/workspace/status',
+        },
+      });
+    });
+    const credential = generateSandboxCredential();
+    await seedCredential(credential, id);
+    const ws = await connect(credential, id);
+    await completeStatusHello(ws, 'hello-status-busy');
+    const runtime = await stub.getStatus();
+    await runInDurableObject(session, (_instance, state) => {
+      state.storage.kv.put('session_messages', [
+        {
+          messageId: 'msg_status_busy',
+          state: 'accepted',
+          acceptedAt: Date.now(),
+          wrapperInstanceId: runtime.wrapperInstanceId,
+        } satisfies SessionMessageRecord,
+      ]);
+    });
+    try {
+      await runInDurableObject(stub, async (instance, state) => {
+        await receiveHeartbeat(instance, state);
+        const deadline = (await loadDeadlines(state.storage)).idleStop;
+        expect(deadline).toEqual(expect.any(Number));
+        expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: deadline,
+        });
+        const fresh = await reconstructControl(instance, state);
+        await fresh.getStatus();
+        const renew = vi.fn(async () => undefined);
+        fresh['provider'].ensureLeaseAtLeast = renew;
+        const socket = statusSocket(state);
+        const before = sandboxControlSocketAttachmentSchema.parse(socket.deserializeAttachment());
+        const records = await state.storage.list();
+        const alarm = await state.storage.getAlarm();
+        const send = vi.spyOn(socket, 'send');
+        await fresh.webSocketMessage(
+          socket,
+          JSON.stringify({
+            type: 'event',
+            event: 'session.event',
+            session: { directory: '/workspace/status', kiloSessionId: 'kilo_status' },
+            payload: {
+              type: 'session.status',
+              properties: { sessionID: 'kilo_status', status: { type: 'busy' } },
+            },
+          })
+        );
+        await Promise.all(fresh['sessionForwarding'].values());
+        expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: null,
+        });
+        expect(socket.deserializeAttachment()).toEqual({
+          ...before,
+          observation: { ...before.observation, idle: null },
+        });
+        const reconstructed = await reconstructControl(fresh, state);
+        forbidControlOperations(reconstructed);
+        const serialize = vi.spyOn(socket, 'serializeAttachment');
+        expect(await reconstructed.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: null,
+        });
+        expect(await state.storage.list()).toEqual(records);
+        expect(await state.storage.getAlarm()).toBe(alarm);
+        expect(renew).not.toHaveBeenCalled();
+        expect(send).not.toHaveBeenCalled();
+        expect(serialize).not.toHaveBeenCalled();
+        await receiveHeartbeat(fresh, state);
+        expect((await loadDeadlines(state.storage)).idleStop).toBe(deadline);
+        expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'active',
+          estimatedSleepAt: deadline,
+        });
+        expect(renew).toHaveBeenCalledTimes(1);
+      });
+      await runInDurableObject(session, async (_instance, state) => {
+        const events = createEventQueries(
+          drizzle(state.storage, { logger: false }),
+          state.storage.sql
+        ).findByFilters({ eventTypes: ['kilocode'] });
+        expect(events.map(event => JSON.parse(event.payload))).toContainEqual({
+          type: 'session.status',
+          event: 'session.status',
+          properties: { sessionID: 'kilo_status', status: { type: 'busy' } },
+        });
+      });
+    } finally {
+      ws.close();
+    }
+  });
+
+  it.each([
+    { owner: undefined, provider: 'cloudflare' },
+    { owner: 'other-owner', provider: 'cloudflare' },
+    { owner: statusOwner, provider: undefined },
+    { owner: statusOwner, provider: 'vercel' },
+    { owner: statusOwner, provider: 'private-provider' },
+  ])(
+    'does not use missing or disagreeing owner/provider records: %j',
+    async ({ owner, provider }) => {
+      const stub = env.SANDBOX_CONTROL.getByName(`sbx_status_mismatch_${owner}_${provider}`);
+      await runInDurableObject(stub, async (instance, state) => {
+        if (owner !== undefined) await state.storage.put('owner_id', owner);
+        if (provider !== undefined) await state.storage.put('provider_kind', provider);
+        await state.storage.put('physical_record', {
+          state: 'stopped',
+          providerRef: null,
+          createIntent: null,
+          stopTombstone: null,
+          resumable: false,
+        });
+        const before = await state.storage.list();
+        expect(await instance.getSandboxStatus(statusInput)).toMatchObject({
+          status: 'unknown',
+          provider: 'Unknown',
+          estimatedSleepAt: null,
+        });
+        expect(await state.storage.list()).toEqual(before);
+      });
+    }
+  );
+});
+
+describe('SandboxSession passive delegation', () => {
+  it.each(['fence', 'worktree-marker'] as const)(
+    'does not expose or repair retained deleted metadata through %s',
+    async mode => {
+      const sessionId = `workspace_status_deleted_${mode}`;
+      const session = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+      await runInDurableObject(session, async (instance, state) => {
+        await instance.registerSession({
+          identity: { sessionId, userId: statusOwner },
+          auth: { kiloSessionId: 'kilo_status' },
+          agent: { mode: 'code', model: 'test' },
+          workspace: { sandboxId: 'usr-abcdef123', sandboxProvider: 'cloudflare' },
+        });
+        if (mode === 'fence')
+          state.storage.kv.put(SANDBOX_SESSION_LIFECYCLE_KEY, { state: 'deleted', epoch: 1 });
+        else state.storage.kv.put('deleted_worktree', WORKTREE_ID);
+        const before = await state.storage.list();
+        const callbacks: Promise<unknown>[] = [];
+        const block = vi.spyOn(state, 'blockConcurrencyWhile').mockImplementation(callback => {
+          const promise = callback();
+          callbacks.push(promise);
+          return promise;
+        });
+        const fresh = new SandboxSession(state, instance['env']);
+        await Promise.all(callbacks);
+        block.mockRestore();
+        const lookup = vi.spyOn(instance['env'].SANDBOX_CONTROL, 'getByName');
+        expect(await fresh.getMetadata()).toBeNull();
+        expect(await fresh.getSandboxStatus()).toMatchObject({
+          status: 'unknown',
+          estimatedSleepAt: null,
+        });
+        expect(lookup).not.toHaveBeenCalled();
+        expect(await state.storage.list()).toEqual(before);
+      });
+    }
+  );
+
+  it('uses stored assignment and owner without metadata recovery or control initialization', async () => {
+    const id = 'usr-abcdef123';
+    const control = await seedStatusControl(id);
+    await runInDurableObject(control, async (instance, state) => {
+      await instance.beginStop('test');
+      await instance.confirmStopped();
+      await state.storage.deleteAlarm();
+      forbidControlOperations(instance);
+    });
+    const sessionId = 'workspace_status_delegation';
+    const session = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+    await runInDurableObject(session, async (instance, state) => {
+      await instance.registerSession({
+        identity: { sessionId, userId: statusOwner },
+        auth: { kiloSessionId: 'kilo_status' },
+        agent: { mode: 'code', model: 'test' },
+        workspace: { sandboxId: id, sandboxProvider: 'cloudflare' },
+      });
+      await state.storage.put('session_messages', [{ messageId: 'msg_status', state: 'queued' }]);
+      await state.storage.setAlarm(Date.now() + 86_400_000);
+      const before = await state.storage.list();
+      const alarm = await state.storage.getAlarm();
+      const callbacks: Promise<unknown>[] = [];
+      const block = vi.spyOn(state, 'blockConcurrencyWhile').mockImplementation(callback => {
+        const promise = callback();
+        callbacks.push(promise);
+        return promise;
+      });
+      const fresh = new SandboxSession(state, instance['env']);
+      await Promise.all(callbacks);
+      block.mockRestore();
+      fresh.getMetadata = () => {
+        throw new Error('Passive delegation called operational metadata');
+      };
+      fresh['dispatchQueued'] = () => {
+        throw new Error('Passive delegation dispatched');
+      };
+      for (let read = 0; read < 3; read++) {
+        expect(await fresh.getSandboxStatus()).toMatchObject({
+          status: 'sleeping',
+          provider: 'Cloudflare',
+          inactivityTimeoutMs: DEADLINE_MS.idleStop,
+          estimatedSleepAt: null,
+        });
+      }
+      expect(await state.storage.list()).toEqual(before);
+      expect(await state.storage.getAlarm()).toBe(alarm);
+    });
+    await runInDurableObject(control, async (_instance, state) => {
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it('sanitizes and bounds failed passive delegation before retry logging', async () => {
+    const sessionId = 'workspace_status_retry';
+    const stub = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+    await runInDurableObject(stub, async (instance, state) => {
+      await instance.registerSession({
+        identity: { sessionId, userId: statusOwner },
+        auth: {},
+        agent: { mode: 'code', model: 'test' },
+        workspace: { sandboxId: 'usr-abcde987', sandboxProvider: 'cloudflare' },
+      });
+      const control = instance['env'].SANDBOX_CONTROL.getByName('usr-abcde987');
+      const failure = vi
+        .spyOn(control, 'getSandboxStatus')
+        .mockRejectedValue(
+          Object.assign(new Error('private-runtime-error-sentinel'), { retryable: true })
+        );
+      const getStub = vi
+        .spyOn(instance['env'].SANDBOX_CONTROL, 'getByName')
+        .mockReturnValue(control);
+      const before = await state.storage.list();
+      const result = await instance.getSandboxStatus();
+      expect(result).toMatchObject({
+        status: 'unknown',
+        detailCode: 'status_unavailable',
+        estimatedSleepAt: null,
+      });
+      expect(getStub).toHaveBeenCalledTimes(3);
+      expect(failure).toHaveBeenCalledTimes(3);
+      expect(JSON.stringify(result)).not.toContain('private-runtime-error-sentinel');
+      expect(await state.storage.list()).toEqual(before);
+      expect(await state.storage.getAlarm()).toBeNull();
+    });
+  });
+
+  it.each(['empty', 'missing-assignment', 'invalid', 'wrong-session'] as const)(
+    'does not generate an assignment for %s metadata',
+    async mode => {
+      const sessionId = `workspace_status_${mode}`;
+      const stub = env.SANDBOX_SESSION.getByName(`${statusOwner}:${sessionId}`);
+      await runInDurableObject(stub, async (instance, state) => {
+        if (mode === 'invalid') await state.storage.put('session_metadata', { invalid: true });
+        if (mode === 'missing-assignment' || mode === 'wrong-session') {
+          await instance.registerSession({
+            identity: {
+              sessionId: mode === 'wrong-session' ? 'workspace_other' : sessionId,
+              userId: statusOwner,
+            },
+            auth: {},
+            agent: { mode: 'code', model: 'test' },
+            ...(mode === 'wrong-session' ? { workspace: { sandboxId: 'usr-abcdef123' } } : {}),
+          });
+        }
+        const before = await state.storage.list();
+        const getStub = vi.spyOn(instance['env'].SANDBOX_CONTROL, 'getByName');
+        expect(await instance.getSandboxStatus()).toMatchObject({
+          status: 'unknown',
+          estimatedSleepAt: null,
+        });
+        expect(getStub).not.toHaveBeenCalled();
+        expect(await state.storage.list()).toEqual(before);
+        expect(await state.storage.getAlarm()).toBeNull();
+      });
+    }
+  );
+});
+
+function worktreeCapture(revision: number, empty = false): WorktreeChangesCapture {
+  return {
+    revision,
+    comparison: {
+      baseRef: 'refs/remotes/origin/main',
+      mergeBase: 'a'.repeat(40),
+      head: 'b'.repeat(40),
+    },
+    files: empty
+      ? []
+      : [
+          {
+            path: 'changed.ts',
+            status: 'modified',
+            additions: 2,
+            deletions: 1,
+            tracked: true,
+            binary: false,
+            countsComplete: true,
+          },
+        ],
+    truncated: false,
+  };
+}
+
+const savedWorktreeSnapshot: WorktreeChangesSnapshot = {
+  ...worktreeCapture(4),
+  schemaVersion: 1,
+  capturedAt: '2026-08-20T10:00:00.000Z',
+};
+
+async function worktreeFixture(options: { sessionOperationResults?: boolean } = {}) {
+  const suffix = crypto.randomUUID();
+  const userId = `user_worktree_${suffix}`;
+  const sessionId = `workspace_${suffix}` as const;
+  const sandboxId = `usr-${suffix.replaceAll('-', '').slice(0, 12)}` as const;
+  const kiloSessionId = ROOT_ID;
+  const worktreeId = `worktree_${suffix}` as const;
+  const directory = getWorktreeWorkspacePath(undefined, userId, worktreeId);
+  const wrapperInstanceId = crypto.randomUUID();
+  const control = env.SANDBOX_CONTROL.getByName(sandboxId);
+  const session = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+  const credential = generateSandboxCredential();
+  const controlTasks: Promise<unknown>[] = [];
+  const sessionTasks: Promise<unknown>[] = [];
+  const readyNotifications: {
+    event: StoredEvent;
+    snapshot: unknown;
+    storedEvent: StoredEvent | null;
+    inTransaction: boolean;
+  }[] = [];
+  await seedRunningCredential(credential, sandboxId);
+  const { provider } = await installProvider(control, cloudflareRef(sandboxId));
+  await runInDurableObject(control, async (instance, state) => {
+    await instance.initializeOwner(userId);
+    const waitUntil = state.waitUntil.bind(state);
+    vi.spyOn(state, 'waitUntil').mockImplementation(promise => {
+      controlTasks.push(promise);
+      waitUntil(promise);
+    });
+  });
+  const restoreObservation = await runInDurableObject(session, async (instance, state) => {
+    await instance.registerSession({
+      identity: { sessionId, userId, createdOnPlatform: 'cloud-agent-web' },
+      auth: { kiloSessionId, kilocodeToken: KILO_TOKEN },
+      agent: { mode: 'code', model: 'test' },
+      repository: {
+        type: 'github',
+        repo: 'acme/demo',
+        upstreamBranch: 'main',
+      },
+      workspace: {
+        sandboxId,
+        sandboxProvider: 'cloudflare',
+        worktreeId,
+        workspacePath: directory,
+        branchName: 'moving-work-branch',
+      },
+    });
+    const waitUntil = state.waitUntil.bind(state);
+    vi.spyOn(state, 'waitUntil').mockImplementation(promise => {
+      sessionTasks.push(promise);
+      waitUntil(promise);
+    });
+    let inTransaction = false;
+    const transactionSync = state.storage.transactionSync.bind(state.storage);
+    const transactionSpy = vi
+      .spyOn(state.storage, 'transactionSync')
+      .mockImplementation(callback => {
+        inTransaction = true;
+        try {
+          return transactionSync(callback);
+        } finally {
+          inTransaction = false;
+        }
+      });
+    const broadcast = instance['broadcastStoredEvent'].bind(instance);
+    instance['broadcastStoredEvent'] = event => {
+      if (event.stream_event_type === WORKTREE_CHANGES_READY_EVENT) {
+        readyNotifications.push({
+          event,
+          snapshot: state.storage.kv.get(WORKTREE_CHANGES_KEY),
+          storedEvent: instance['eventQueries'].findByEntityId(
+            `worktree-changes/${JSON.parse(event.payload).revision}`
+          ),
+          inTransaction,
+        });
+      }
+      broadcast(event);
+    };
+    return () => {
+      transactionSpy.mockRestore();
+      instance['broadcastStoredEvent'] = broadcast;
+    };
+  });
+  await control.prepareSessionCredentials({ ownerId: userId, sessionId });
+  await control.attachSession({ sessionId, kiloSessionId, directory, worktreeId, ownerId: userId });
+  let ws = await connect(credential, sandboxId);
+  await completeHello(ws, `hello_${suffix}`, {
+    wrapperInstanceId,
+    sessionOperationResults: options.sessionOperationResults,
+  });
+  const captures: RequestFrame[] = [];
+  const inbox: RequestFrame[] = [];
+  const captureWaiters: ((request: RequestFrame) => void)[] = [];
+  const prompts: RequestFrame[] = [];
+  const promptSeen = Promise.withResolvers<void>();
+  const aborts: RequestFrame[] = [];
+  const resultWaiters = new Map<string, (response: ResponseFrame) => void>();
+  let nextAttach: ((request: RequestFrame) => void) | undefined;
+
+  function receive(client: WebSocket): void {
+    client.addEventListener('message', event => {
+      const frame = JSON.parse(String(event.data));
+      const response = responseFrameSchema.safeParse(frame);
+      if (response.success) {
+        const resolve = resultWaiters.get(response.data.requestId);
+        if (resolve) {
+          resultWaiters.delete(response.data.requestId);
+          resolve(response.data);
+        }
+        return;
+      }
+      const parsed = requestFrameSchema.safeParse(frame);
+      if (!parsed.success) return;
+      const request = parsed.data;
+      if (request.operation === 'session.git.summary') {
+        captures.push(request);
+        const waiting = captureWaiters.shift();
+        if (waiting) waiting(request);
+        else inbox.push(request);
+        return;
+      }
+      if (request.operation === 'session.attach' && nextAttach) {
+        const resolve = nextAttach;
+        nextAttach = undefined;
+        resolve(request);
+        return;
+      }
+      let result: unknown;
+      if (request.operation === 'session.attach') result = { attached: true };
+      else if (request.operation === 'session.prompt') {
+        prompts.push(request);
+        const payload = request.payload as { messageId: string };
+        result = { messageId: payload.messageId, status: 'accepted' };
+        promptSeen.resolve();
+      } else if (request.operation === 'session.abort') {
+        aborts.push(request);
+        result = { status: 'aborted' };
+      } else if (request.operation === 'session.detach') {
+        result = { detached: true };
+      } else return;
+      client.send(
+        JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result })
+      );
+    });
+  }
+  receive(ws);
+
+  async function ready(): Promise<void> {
+    await runInDurableObject(control, async (instance, state) => {
+      const server = state
+        .getWebSockets(SANDBOX_CONTROL_WS_TAG)
+        .find(socket => socket.readyState === 1);
+      if (!server) throw new Error('Missing test control socket');
+      await instance.webSocketMessage(
+        server,
+        JSON.stringify({
+          type: 'event',
+          event: 'sandbox.ready',
+          payload: { kiloReady: true, globalFeedAttached: true },
+        })
+      );
+    });
+  }
+  await ready();
+  const noWake = await runInDurableObject(control, instance => {
+    const prototype = Object.getPrototypeOf(instance) as typeof instance;
+    return {
+      ensureReady: vi.spyOn(prototype, 'ensureReady'),
+      attachSession: vi.spyOn(prototype, 'attachSession'),
+      claimCreate: vi.spyOn(prototype, 'claimCreate'),
+    };
+  });
+
+  return {
+    userId,
+    sessionId,
+    sandboxId,
+    kiloSessionId,
+    worktreeId,
+    wrapperInstanceId,
+    directory,
+    control,
+    session,
+    provider,
+    captures,
+    readyNotifications,
+    prompts,
+    aborts,
+    noWake,
+    promptSeen: promptSeen.promise,
+    holdNextAttach(): Promise<RequestFrame> {
+      return new Promise(resolve => {
+        nextAttach = resolve;
+      });
+    },
+    async nextCapture(): Promise<RequestFrame> {
+      const request = inbox.shift();
+      if (request) return request;
+      return new Promise(resolve => captureWaiters.push(resolve));
+    },
+    reply(request: RequestFrame, result: unknown): void {
+      ws.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result }));
+    },
+    async sendOperationResult(delivery: SessionOperationDelivery): Promise<ResponseFrame> {
+      const requestId = crypto.randomUUID();
+      const response = new Promise<ResponseFrame>(resolve => resultWaiters.set(requestId, resolve));
+      ws.send(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'session.operation.result',
+          session: delivery.authorization.session,
+          payload: delivery,
+        })
+      );
+      return response;
+    },
+    fail(
+      request: RequestFrame,
+      retryable = false,
+      code = retryable ? 'not_ready' : 'git_failed'
+    ): void {
+      ws.send(
+        JSON.stringify({
+          type: 'response',
+          requestId: request.requestId,
+          ok: false,
+          error: {
+            code,
+            message: 'Fixture request failed',
+            retryable,
+          },
+        })
+      );
+    },
+    async event(
+      type: string,
+      root = kiloSessionId,
+      properties: Record<string, unknown> = {},
+      eventDirectory = directory
+    ): Promise<void> {
+      await runInDurableObject(control, async (instance, state) => {
+        const server = state
+          .getWebSockets(SANDBOX_CONTROL_WS_TAG)
+          .find(socket => socket.readyState === 1);
+        if (!server) throw new Error('Missing test control socket');
+        await instance.webSocketMessage(
+          server,
+          JSON.stringify({
+            type: 'event',
+            event: 'session.event',
+            session: {
+              directory: eventDirectory,
+              kiloSessionId: root,
+              rootKiloSessionId: kiloSessionId,
+            },
+            payload: {
+              type,
+              properties:
+                type === 'session.message.outcome' || type === WORKTREE_CHANGED_EVENT
+                  ? properties
+                  : { sessionID: root, ...properties },
+            },
+          })
+        );
+      });
+      await Promise.all(controlTasks);
+    },
+    async settled(): Promise<void> {
+      await Promise.all(controlTasks);
+      await Promise.all(sessionTasks);
+    },
+    async rotateSocket(): Promise<void> {
+      await control.setWrapperCredentialHash(await hashSandboxCredential(credential));
+      ws = await connect(credential, sandboxId);
+      await completeHello(ws, `hello_replacement_${suffix}`, { wrapperInstanceId });
+      receive(ws);
+    },
+    ready,
+    close(): void {
+      try {
+        ws.close();
+      } finally {
+        restoreObservation();
+      }
+    },
+  };
+}
+
+function captureRevision(request: RequestFrame): number {
+  return (request.payload as { revision: number }).revision;
+}
+
+describe('SandboxSession operation authorization admission', () => {
+  it('persists dispatch proof before the capability-gated attach and prompt reach the wrapper socket', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_authorization';
+    try {
+      const attach = fixture.holdNextAttach();
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'persist before egress' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+
+      const attachRequest = await attach;
+      expect(attachRequest).toMatchObject({
+        operation: 'session.attach',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: fixture.kiloSessionId,
+          directory: fixture.directory,
+        },
+        authorization: {
+          operation: 'session.attach',
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'queued',
+            unresolvedDispatch: true,
+            operations: {
+              attach: {
+                dispatched: true,
+                authorization: {
+                  operation: 'session.attach',
+                  messageId,
+                  wrapperInstanceId: fixture.wrapperInstanceId,
+                },
+              },
+            },
+          },
+        ]);
+      });
+
+      fixture.reply(attachRequest, { attached: true });
+      await fixture.promptSeen;
+      expect(fixture.prompts).toHaveLength(1);
+      expect(fixture.prompts[0]).toMatchObject({
+        operation: 'session.prompt',
+        authorization: {
+          operation: 'session.prompt',
+          operationId: messageId,
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('returns the exact durable acknowledgement when the wrapper repeats a completed prompt result', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_result_ack';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'retain this completed result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+
+      const first = await fixture.sendOperationResult(delivery);
+      const second = await fixture.sendOperationResult(delivery);
+      const firstAck = sessionOperationAckSchema.parse(first.ok ? first.result : undefined);
+      expect(first).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'applied',
+          decision: { state: 'completed' },
+          resultHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+      });
+      expect(second).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'identical',
+          resultHash: firstAck.resultHash,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'completed',
+            terminalSource: 'operation_result',
+            operations: { prompt: { resultHash: firstAck.resultHash } },
+          },
+        ]);
+      });
+      expect(fixture.prompts).toHaveLength(1);
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+});
+
+describe('SandboxSession worktree changes persistence', () => {
+  beforeEach(() => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
+  });
+
+  afterEach(() => vi.restoreAllMocks());
+
+  it('broadcasts committed snapshots with distinct cursor IDs and idempotent revision events', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      for (const revision of [1, 2]) {
+        const pending = fixture.session.refreshWorktreeChanges();
+        const request = await fixture.nextCapture();
+        expect(captureRevision(request)).toBe(revision);
+        expect(fixture.readyNotifications).toHaveLength(revision - 1);
+        fixture.reply(request, worktreeCapture(revision));
+        const saved = await pending;
+        expect(saved.status).toBe('refreshed');
+        expect(fixture.readyNotifications).toHaveLength(revision);
+        const notification = fixture.readyNotifications[revision - 1];
+        expect(notification).toEqual({
+          event: {
+            id: expect.any(Number),
+            execution_id: '',
+            session_id: fixture.sessionId,
+            stream_event_type: WORKTREE_CHANGES_READY_EVENT,
+            payload: JSON.stringify({ revision }),
+            timestamp: expect.any(Number),
+          },
+          snapshot: saved.snapshot,
+          storedEvent: notification.event,
+          inTransaction: false,
+        });
+      }
+      const [first, second] = fixture.readyNotifications.map(notification => notification.event);
+      expect(first.id).toBeGreaterThan(0);
+      expect(second.id).toBeGreaterThan(first.id);
+      await runInDurableObject(fixture.session, instance => {
+        const queries = instance['eventQueries'];
+        expect(queries.findByFilters({ fromId: first.id })).toEqual([second]);
+        expect(
+          queries.insertUnique({
+            executionId: '',
+            sessionId: fixture.sessionId,
+            streamEventType: WORKTREE_CHANGES_READY_EVENT,
+            payload: second.payload,
+            timestamp: second.timestamp,
+            entityId: 'worktree-changes/2',
+          })
+        ).toBeNull();
+        expect(queries.findByFilters({})).toEqual([first, second]);
+      });
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('rolls back the snapshot and ready event when event insertion fails', async () => {
+    const fixture = await worktreeFixture();
+    let restoreInsert: (() => void) | undefined;
+    try {
+      restoreInsert = await runInDurableObject(fixture.session, (instance, state) => {
+        state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+        const queries = instance['eventQueries'];
+        const insert = queries.insertUnique.bind(queries);
+        const insertSpy = vi.spyOn(queries, 'insertUnique').mockImplementationOnce(params => {
+          insert(params);
+          throw new Error('fixture insert failure');
+        });
+        return () => insertSpy.mockRestore();
+      });
+      const pending = fixture.session.refreshWorktreeChanges();
+      const request = await fixture.nextCapture();
+      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      await expect(pending).resolves.toEqual({ status: 'failed', snapshot: savedWorktreeSnapshot });
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
+        snapshot: savedWorktreeSnapshot,
+      });
+      await runInDurableObject(fixture.session, instance => {
+        expect(instance['eventQueries'].findByFilters({})).toEqual([]);
+      });
+      expect(fixture.readyNotifications).toEqual([]);
+    } finally {
+      restoreInsert?.();
+      fixture.close();
+    }
+  });
+
+  it('preserves a successful saved result and replay event when broadcast fails', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      await runInDurableObject(fixture.session, (instance, state) => {
+        state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+        instance['broadcastStoredEvent'] = () => {
+          throw new Error('fixture broadcast failure');
+        };
+      });
+      const pending = fixture.session.refreshWorktreeChanges();
+      const request = await fixture.nextCapture();
+      fixture.reply(request, worktreeCapture(captureRevision(request), true));
+      const saved = await pending;
+      expect(saved).toMatchObject({ status: 'refreshed', snapshot: { revision: 5, files: [] } });
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
+        snapshot: saved.snapshot,
+      });
+      await runInDurableObject(fixture.session, instance => {
+        expect(instance['eventQueries'].findByFilters({ fromId: 0 })).toEqual([
+          {
+            id: expect.any(Number),
+            execution_id: '',
+            session_id: fixture.sessionId,
+            stream_event_type: WORKTREE_CHANGES_READY_EVENT,
+            payload: JSON.stringify({ revision: 5 }),
+            timestamp: expect.any(Number),
+          },
+        ]);
+      });
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('does not rebroadcast an existing revision event', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      const existingId = await runInDurableObject(fixture.session, instance =>
+        instance['eventQueries'].insertUnique({
+          executionId: '',
+          sessionId: fixture.sessionId,
+          streamEventType: WORKTREE_CHANGES_READY_EVENT,
+          payload: JSON.stringify({ revision: 1 }),
+          timestamp: Date.now(),
+          entityId: 'worktree-changes/1',
+        })
+      );
+      const pending = fixture.session.refreshWorktreeChanges();
+      const request = await fixture.nextCapture();
+      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      await expect(pending).resolves.toMatchObject({
+        status: 'refreshed',
+        snapshot: { revision: 1 },
+      });
+      expect(fixture.readyNotifications).toEqual([]);
+      await runInDurableObject(fixture.session, instance => {
+        expect(instance['eventQueries'].findByFilters({})).toEqual([
+          expect.objectContaining({ id: existingId, payload: JSON.stringify({ revision: 1 }) }),
+        ]);
+      });
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('captures after attach without a UI request and does not delay prompt delivery', async () => {
+    const fixture = await worktreeFixture();
+    await fixture.session.admitSubmittedMessage({
+      userId: fixture.userId,
+      turn: { type: 'prompt', id: 'msg_worktree_attach', prompt: 'test prompt' },
+    });
+    const request = await fixture.nextCapture();
+    expect(request.session).toEqual({
+      sessionId: fixture.sessionId,
+      kiloSessionId: fixture.kiloSessionId,
+      directory: fixture.directory,
+    });
+    expect(request.payload).toEqual({ revision: 1, baseRef: 'refs/remotes/origin/main' });
+    await fixture.promptSeen;
+    expect(fixture.prompts).toHaveLength(1);
+    fixture.reply(request, worktreeCapture(1));
+    await fixture.settled();
+    await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
+      snapshot: { schemaVersion: 1, revision: 1, files: worktreeCapture(1).files },
+    });
+    await expect(fixture.session.getCurrentMessageWork()).resolves.toMatchObject({
+      messageId: 'msg_worktree_attach',
+      status: 'running',
+    });
+    fixture.close();
+  });
+
+  it('captures dirty hints during an accepted turn without chat events or artificial activity', async () => {
+    const fixture = await worktreeFixture();
+    const messageId = 'msg_worktree_dirty';
+    try {
+      await fixture.session.admitSubmittedMessage({
+        userId: fixture.userId,
+        turn: { type: 'prompt', id: messageId, prompt: 'edit the worktree' },
+      });
+      const attached = await fixture.nextCapture();
+      fixture.reply(attached, worktreeCapture(captureRevision(attached), true));
+      await fixture.settled();
+      fixture.noWake.ensureReady.mockClear();
+      fixture.noWake.attachSession.mockClear();
+      fixture.noWake.claimCreate.mockClear();
+      const before = await runInDurableObject(fixture.session, async (instance, state) => {
+        const messages = (
+          state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? []
+        ).map(message => ({ ...message, lastActivityAt: 1 }));
+        state.storage.kv.put('session_messages', messages);
+        const broadcast = vi.fn(instance['broadcastStoredEvent'].bind(instance));
+        instance['broadcastStoredEvent'] = broadcast;
+        return {
+          broadcast,
+          messages,
+          events: createEventQueries(drizzle(state.storage), state.storage.sql).findByFilters({}),
+          alarm: await state.storage.getAlarm(),
+        };
+      });
+      const controlBefore = await runInDurableObject(fixture.control, async (_instance, state) => ({
+        records: await state.storage.list(),
+        alarm: await state.storage.getAlarm(),
+      }));
+
+      await fixture.event(WORKTREE_CHANGED_EVENT);
+      await vi.waitFor(() => expect(fixture.captures).toHaveLength(2));
+      const dirty = await fixture.nextCapture();
+      for (let hint = 0; hint < 3; hint++) await fixture.event(WORKTREE_CHANGED_EVENT);
+      expect(fixture.captures).toHaveLength(2);
+      expect(before.broadcast).not.toHaveBeenCalled();
+      fixture.reply(dirty, worktreeCapture(captureRevision(dirty)));
+      const trailing = await fixture.nextCapture();
+      expect(captureRevision(trailing)).toBe(captureRevision(dirty) + 1);
+      await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
+        snapshot: { revision: 2, files: worktreeCapture(2).files },
+      });
+      fixture.reply(trailing, worktreeCapture(captureRevision(trailing), true));
+      await fixture.settled();
+      await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
+        snapshot: { revision: 3, files: [] },
+      });
+      await expect(fixture.session.getCurrentMessageWork()).resolves.toMatchObject({
+        messageId,
+        status: 'running',
+      });
+      expect(fixture.captures).toHaveLength(3);
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        expect(state.storage.kv.get('session_messages')).toEqual(before.messages);
+        expect(
+          createEventQueries(drizzle(state.storage), state.storage.sql).findByFilters({})
+        ).toEqual([
+          ...before.events,
+          ...fixture.readyNotifications.slice(1).map(notification => notification.event),
+        ]);
+        expect(await state.storage.getAlarm()).toEqual(before.alarm);
+      });
+      await runInDurableObject(fixture.control, async (_instance, state) => {
+        expect(await state.storage.list()).toEqual(controlBefore.records);
+        expect(await state.storage.getAlarm()).toEqual(controlBefore.alarm);
+      });
+      expect(before.broadcast.mock.calls.map(([event]) => event)).toEqual(
+        fixture.readyNotifications.slice(1).map(notification => notification.event)
+      );
+      expect(fixture.readyNotifications.map(({ event }) => JSON.parse(event.payload))).toEqual([
+        { revision: 1 },
+        { revision: 2 },
+        { revision: 3 },
+      ]);
+      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+      expect(fixture.noWake.claimCreate).not.toHaveBeenCalled();
+      await fixture.event('session.status', fixture.kiloSessionId, { status: { type: 'busy' } });
+      expect(before.broadcast).toHaveBeenCalledTimes(3);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('rejects dirty hints without positive root and current runtime scope', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      await runInDurableObject(fixture.session, async (instance, state) => {
+        const messages: SessionMessageRecord[] = [
+          {
+            messageId: 'msg_worktree_scoped',
+            state: 'accepted',
+            wrapperInstanceId: fixture.wrapperInstanceId,
+            acceptedAt: 1,
+            lastActivityAt: 2,
+          },
+        ];
+        state.storage.kv.put('session_messages', messages);
+        const identity = {
+          directory: fixture.directory,
+          kiloSessionId: fixture.kiloSessionId,
+          rootKiloSessionId: fixture.kiloSessionId,
+        };
+        const input = {
+          identity,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+          payload: { type: WORKTREE_CHANGED_EVENT, properties: {} },
+        };
+        for (const invalid of [
+          { ...input, identity: { ...identity, directory: '/other' } },
+          { ...input, identity: { ...identity, rootKiloSessionId: SECOND_ROOT_ID } },
+          { ...input, identity: { ...identity, kiloSessionId: 'kilo_child' } },
+          { ...input, identity: { ...identity, kiloSessionId: undefined } },
+          { ...input, identity: { directory: fixture.directory } },
+          { ...input, wrapperInstanceId: crypto.randomUUID() },
+          { ...input, wrapperInstanceId: undefined },
+          { ...input, payload: { ...input.payload, properties: { sessionID: 'kilo_child' } } },
+        ]) {
+          await expect(instance.receiveSandboxControlEvent(invalid)).resolves.toEqual({
+            applied: false,
+          });
+        }
+        const metadata = await instance.getMetadata();
+        if (!metadata) throw new Error('Missing test metadata');
+        state.storage.kv.put('session_metadata', { ...metadata, auth: {} });
+        await expect(
+          instance.receiveSandboxControlEvent({
+            ...input,
+            identity: { directory: fixture.directory },
+          })
+        ).resolves.toEqual({ applied: false });
+        expect(state.storage.kv.get('session_messages')).toEqual(messages);
+        expect(
+          createEventQueries(drizzle(state.storage), state.storage.sql).findByFilters({})
+        ).toEqual([]);
+      });
+      await fixture.settled();
+      expect(fixture.readyNotifications).toEqual([]);
+      expect(fixture.captures).toHaveLength(0);
+      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+      expect(fixture.noWake.claimCreate).not.toHaveBeenCalled();
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('recaptures after a current-wrapper finalized outcome without capturing stale or duplicate outcomes', async () => {
+    const fixture = await worktreeFixture();
+    const messageId = 'msg_worktree_finalized';
+    const staleMessageId = 'msg_worktree_stale';
+    const staleWrapperInstanceId = crypto.randomUUID();
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'finalize the changes' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      const attached = await fixture.nextCapture();
+      fixture.reply(attached, worktreeCapture(captureRevision(attached)));
+      await fixture.settled();
+      const saved = await fixture.session.getWorktreeChanges();
+
+      await fixture.event('session.turn.close');
+      const early = await fixture.nextCapture();
+      fixture.fail(early);
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(2);
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual(saved);
+      await expect(fixture.session.getMessageResult(messageId)).resolves.toMatchObject({
+        result: { status: 'running' },
+      });
+
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        state.storage.kv.put('session_messages', [
+          {
+            ...createSessionMessageRecord({
+              turn: { type: 'prompt', messageId: staleMessageId, prompt: 'previous wrapper turn' },
+              agent: { mode: 'code', model: 'test' },
+            }),
+            state: 'accepted',
+            wrapperInstanceId: staleWrapperInstanceId,
+            acceptedAt: Date.now(),
+          } satisfies SessionMessageRecord,
+          ...messages,
+        ]);
+      });
+      await expect(
+        fixture.session.receiveSandboxControlEvent({
+          identity: { directory: fixture.directory, kiloSessionId: fixture.kiloSessionId },
+          wrapperInstanceId: staleWrapperInstanceId,
+          payload: {
+            type: 'session.message.outcome',
+            properties: { messageId: staleMessageId, status: 'completed' },
+          },
+        })
+      ).resolves.toEqual({ applied: true });
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(2);
+      await expect(fixture.session.getMessageResult(staleMessageId)).resolves.toMatchObject({
+        result: { status: 'completed' },
+      });
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual(saved);
+
+      const outcome = { messageId, status: 'completed' };
+      await fixture.event('session.message.outcome', fixture.kiloSessionId, outcome);
+      const finalized = await fixture.nextCapture();
+      expect(captureRevision(finalized)).toBe(captureRevision(early) + 1);
+      expect(finalized.session).toEqual({
+        sessionId: fixture.sessionId,
+        kiloSessionId: fixture.kiloSessionId,
+        directory: fixture.directory,
+      });
+      const capture = worktreeCapture(captureRevision(finalized));
+      capture.comparison.head = 'c'.repeat(40);
+      fixture.reply(finalized, capture);
+      await fixture.settled();
+      await expect(fixture.session.getMessageResult(messageId)).resolves.toMatchObject({
+        result: { status: 'completed' },
+      });
+      const completed = await fixture.session.getWorktreeChanges();
+      expect(completed.snapshot).toMatchObject({ ...capture, schemaVersion: 1 });
+      expect(fixture.captures).toHaveLength(3);
+
+      await fixture.event('session.message.outcome', fixture.kiloSessionId, outcome);
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(3);
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual(completed);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('captures the shared directory through sibling roots and deletes only the selected chat summary', async () => {
+    const fixture = await worktreeFixture();
+    const siblingId = `workspace_${crypto.randomUUID()}` as const;
+    const sibling = env.SANDBOX_SESSION.getByName(`${fixture.userId}:${siblingId}`);
+    const metadata = await runInDurableObject(fixture.session, instance => instance.getMetadata());
+    if (!metadata) throw new Error('Missing test metadata');
+    await sibling.registerSession({
+      identity: { ...metadata.identity, sessionId: siblingId },
+      auth: { ...metadata.auth, kiloSessionId: SECOND_ROOT_ID },
+      agent: metadata.agent,
+      repository: metadata.repository,
+      workspace: metadata.workspace,
+    });
+    await fixture.control.prepareSessionCredentials({
+      ownerId: fixture.userId,
+      sessionId: siblingId,
+    });
+    await fixture.control.attachSession({
+      sessionId: siblingId,
+      kiloSessionId: SECOND_ROOT_ID,
+      directory: fixture.directory,
+      worktreeId: fixture.worktreeId,
+      ownerId: fixture.userId,
+    });
+    fixture.noWake.attachSession.mockClear();
+
+    for (const [session, sessionId, kiloSessionId] of [
+      [fixture.session, fixture.sessionId, fixture.kiloSessionId],
+      [sibling, siblingId, SECOND_ROOT_ID],
+    ] as const) {
+      const pending = session.refreshWorktreeChanges();
+      const request = await fixture.nextCapture();
+      expect(request.session).toEqual({ sessionId, kiloSessionId, directory: fixture.directory });
+      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      await expect(pending).resolves.toMatchObject({
+        status: 'refreshed',
+        snapshot: { revision: 1 },
+      });
+    }
+    const savedSibling = await sibling.getWorktreeChanges();
+    await fixture.session.deleteSession();
+    await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+    await expect(sibling.getWorktreeChanges()).resolves.toEqual(savedSibling);
+    await expect(fixture.control.listRoutes()).resolves.toEqual([
+      expect.objectContaining({ sessionId: siblingId, worktreeId: fixture.worktreeId }),
+    ]);
+    const pending = sibling.refreshWorktreeChanges();
+    const request = await fixture.nextCapture();
+    fixture.reply(request, worktreeCapture(captureRevision(request), true));
+    await expect(pending).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { revision: 2, files: [] },
+    });
+    expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+    expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+    expect(fixture.noWake.claimCreate).not.toHaveBeenCalled();
+    fixture.close();
+  });
+
+  it.each(['cancelled', 'exhausted'] as const)(
+    'preserves capture and the healthy runtime after a rejected reattach is %s',
+    async retry => {
+      const fixture = await worktreeFixture();
+      try {
+        await fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: 'msg_initial_attach', prompt: 'initial prompt' },
+        });
+        const attachedCapture = await fixture.nextCapture();
+        fixture.reply(attachedCapture, worktreeCapture(captureRevision(attachedCapture)));
+        await fixture.settled();
+        await fixture.event('session.turn.close');
+        const completedCapture = await fixture.nextCapture();
+        fixture.reply(completedCapture, worktreeCapture(captureRevision(completedCapture)));
+        await fixture.settled();
+        await fixture.event('session.message.outcome', fixture.kiloSessionId, {
+          messageId: 'msg_initial_attach',
+          status: 'completed',
+        });
+        const finalizedCapture = await fixture.nextCapture();
+        fixture.reply(finalizedCapture, worktreeCapture(captureRevision(finalizedCapture)));
+        await fixture.settled();
+        await expect(fixture.session.getMessageResult('msg_initial_attach')).resolves.toMatchObject(
+          {
+            result: { status: 'completed' },
+          }
+        );
+        await fixture.session.invalidateTerminalRuntime({
+          sandboxId: fixture.sandboxId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+          confirmed: true,
+        });
+        const saved = await fixture.session.getWorktreeChanges();
+
+        const failedAttach = fixture.holdNextAttach();
+        await fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: 'msg_failed_reattach', prompt: 'follow-up prompt' },
+        });
+        const request = await failedAttach;
+        await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
+          status: 'offline',
+          snapshot: saved.snapshot,
+        });
+        fixture.fail(request, true);
+        await fixture.settled();
+        await expect(fixture.control.getStatus()).resolves.toMatchObject({
+          physical: 'running',
+          connection: 'ready',
+        });
+        fixture.noWake.ensureReady.mockClear();
+        fixture.noWake.attachSession.mockClear();
+
+        const refreshed = fixture.session.refreshWorktreeChanges();
+        const next = await fixture.nextCapture();
+        fixture.reply(next, worktreeCapture(captureRevision(next), true));
+        await expect(refreshed).resolves.toMatchObject({
+          status: 'refreshed',
+          snapshot: { files: [] },
+        });
+        await fixture.event('session.error');
+        const terminalCapture = await fixture.nextCapture();
+        fixture.reply(terminalCapture, worktreeCapture(captureRevision(terminalCapture)));
+        await fixture.settled();
+        const beforeCleanup = await fixture.session.getWorktreeChanges();
+        expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+        expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+
+        if (retry === 'cancelled') {
+          await fixture.session.interruptExecution();
+          await runInDurableObject(fixture.session, instance => instance.alarm());
+        } else {
+          for (let attempt = 1; attempt < ATTACH_FAILURE_LIMIT; attempt++) {
+            const failedRetry = fixture.holdNextAttach();
+            const alarm = runInDurableObject(fixture.session, instance => instance.alarm());
+            fixture.fail(await failedRetry, true);
+            await alarm;
+          }
+        }
+        await fixture.settled();
+        await expect(
+          fixture.session.getMessageResult('msg_failed_reattach')
+        ).resolves.toMatchObject({
+          type: 'found',
+          result: { status: retry === 'cancelled' ? 'interrupted' : 'failed' },
+        });
+        await expect(fixture.session.getWorktreeChanges()).resolves.toEqual(beforeCleanup);
+        await expect(fixture.control.getStatus()).resolves.toMatchObject({
+          physical: 'running',
+          connection: 'ready',
+        });
+        expect(fixture.provider.stop).not.toHaveBeenCalled();
+        fixture.noWake.ensureReady.mockClear();
+        fixture.noWake.attachSession.mockClear();
+        const afterRejection = fixture.session.refreshWorktreeChanges();
+        const capture = await fixture.nextCapture();
+        fixture.reply(capture, worktreeCapture(captureRevision(capture)));
+        await expect(afterRejection).resolves.toMatchObject({
+          status: 'refreshed',
+          snapshot: { revision: captureRevision(capture) },
+        });
+        expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+        expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+        expect(fixture.noWake.claimCreate).not.toHaveBeenCalled();
+        expect(fixture.prompts).toHaveLength(1);
+      } finally {
+        fixture.close();
+      }
+    }
+  );
+
+  it('keeps saved changes and passive status offline after runtime-unhealthy attachment cleanup', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        await state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+      });
+      const attached = fixture.holdNextAttach();
+      await fixture.session.admitSubmittedMessage({
+        userId: fixture.userId,
+        turn: { type: 'prompt', id: 'msg_unhealthy_attach', prompt: 'follow-up' },
+      });
+      fixture.fail(await attached, false, 'runtime_unhealthy');
+      await fixture.settled();
+      expect(fixture.provider.stop).toHaveBeenCalled();
+      await expect(fixture.control.getStatus()).resolves.toMatchObject({
+        physical: 'stopped',
+        connection: 'disconnected',
+      });
+      fixture.noWake.ensureReady.mockClear();
+      fixture.noWake.attachSession.mockClear();
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
+        snapshot: savedWorktreeSnapshot,
+      });
+      await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
+        status: 'offline',
+        snapshot: savedWorktreeSnapshot,
+      });
+      await expect(fixture.session.getSandboxStatus()).resolves.toMatchObject({
+        status: 'sleeping',
+      });
+      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+      expect(fixture.noWake.claimCreate).not.toHaveBeenCalled();
+      expect(fixture.captures).toHaveLength(0);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it.each(['session.turn.close', 'session.error', WORKTREE_CHANGED_EVENT])(
+    'captures root %s with no accepted queue entry and excludes child events',
+    async type => {
+      const fixture = await worktreeFixture();
+      await fixture.event(type, 'kilo_child');
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(0);
+      await fixture.event(type);
+      const request = await fixture.nextCapture();
+      fixture.reply(request, worktreeCapture(1));
+      await fixture.settled();
+      const saved = await fixture.session.getWorktreeChanges();
+      expect(saved.snapshot).toMatchObject({ revision: 1, files: worktreeCapture(1).files });
+      expect(saved.snapshot?.capturedAt).toEqual(expect.any(String));
+      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+      fixture.close();
+    }
+  );
+
+  it('coalesces concurrent manual refreshes and retains one trailing lifecycle capture', async () => {
+    const fixture = await worktreeFixture();
+    const refreshed = runInDurableObject(fixture.session, instance =>
+      Promise.all([instance.refreshWorktreeChanges(), instance.refreshWorktreeChanges()])
+    );
+    const first = await fixture.nextCapture();
+    await fixture.event('session.turn.close');
+    await fixture.event('session.error');
+    expect(fixture.captures).toHaveLength(1);
+    fixture.reply(first, worktreeCapture(captureRevision(first)));
+    const trailing = await fixture.nextCapture();
+    expect(captureRevision(trailing)).toBe(captureRevision(first) + 1);
+    fixture.reply(trailing, worktreeCapture(captureRevision(trailing), true));
+    const results = await refreshed;
+    expect(results[0]).toEqual(results[1]);
+    expect(results[0]).toMatchObject({ status: 'refreshed', snapshot: { files: [], revision: 2 } });
+    await fixture.settled();
+    expect(fixture.captures).toHaveLength(2);
+    expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+    expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+    fixture.close();
+  });
+
+  it.each(['session.idle', 'session.status'])(
+    'does not capture queue cancellation or abort acknowledgement, only settled root %s',
+    async type => {
+      const fixture = await worktreeFixture();
+      await runInDurableObject(fixture.session, async (instance, state) => {
+        await state.storage.put('session_messages', [
+          {
+            messageId: 'msg_interrupted',
+            state: 'accepted',
+            acceptedAt: Date.now(),
+          } satisfies SessionMessageRecord,
+        ]);
+        await instance.markAsInterrupted();
+      });
+      await fixture.event(type, fixture.kiloSessionId, { status: { type: 'idle' } });
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(0);
+      await fixture.session.interruptExecution();
+      expect(fixture.aborts).toHaveLength(1);
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(0);
+      await fixture.event(type, 'kilo_child', { status: { type: 'idle' } });
+      await fixture.event('session.status', fixture.kiloSessionId, { status: { type: 'busy' } });
+      expect(fixture.captures).toHaveLength(0);
+      await fixture.event(WORKTREE_CHANGED_EVENT);
+      const dirty = await fixture.nextCapture();
+      fixture.reply(dirty, worktreeCapture(captureRevision(dirty)));
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(1);
+      await fixture.event(type, fixture.kiloSessionId, { status: { type: 'idle' } });
+      const request = await fixture.nextCapture();
+      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      await fixture.settled();
+      expect(fixture.captures).toHaveLength(2);
+      await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
+        snapshot: { revision: 2 },
+      });
+      fixture.close();
+    }
+  );
+
+  it.each(['session', 'worktree'] as const)(
+    'discards capture results after metadata changes or %s deletion',
+    async deletion => {
+      const fixture = await worktreeFixture();
+      await runInDurableObject(fixture.session, async (_instance, state) =>
+        state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+      );
+      const pending = fixture.session.refreshWorktreeChanges();
+      const request = await fixture.nextCapture();
+      await runInDurableObject(fixture.session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        if (!metadata) throw new Error('Missing test metadata');
+        await state.storage.put('session_metadata', {
+          ...metadata,
+          repository: { ...metadata.repository, upstreamBranch: 'other' },
+        });
+      });
+      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      await expect(pending).resolves.toEqual({ status: 'failed', snapshot: savedWorktreeSnapshot });
+      await runInDurableObject(fixture.session, async (instance, state) => {
+        const metadata = await instance.getMetadata();
+        if (!metadata) throw new Error('Missing test metadata');
+        await state.storage.put('session_metadata', {
+          ...metadata,
+          repository: { ...metadata.repository, upstreamBranch: 'main' },
+        });
+      });
+      const deletedCapture = fixture.session.refreshWorktreeChanges();
+      const lateRequest = await fixture.nextCapture();
+      if (deletion === 'worktree') {
+        await fixture.session.beginWorktreeDeletion({
+          worktreeId: fixture.worktreeId,
+          kiloSessionId: fixture.kiloSessionId,
+          ownerId: fixture.userId,
+        });
+        await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+        await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
+          status: 'offline',
+          snapshot: null,
+        });
+        await fixture.session.finishWorktreeDeletion(fixture.worktreeId);
+      } else {
+        await fixture.session.deleteSession();
+      }
+      fixture.reply(lateRequest, worktreeCapture(captureRevision(lateRequest)));
+      await expect(deletedCapture).resolves.toEqual({
+        status: 'failed',
+        snapshot: savedWorktreeSnapshot,
+      });
+      await fixture.settled();
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+      await expect(fixture.session.getMetadata()).resolves.toBeNull();
+      expect(fixture.captures).toHaveLength(2);
+      expect(fixture.aborts).toHaveLength(0);
+      expect(fixture.readyNotifications).toEqual([]);
+      fixture.close();
+    }
+  );
+
+  it('preserves the exact saved snapshot on failed, malformed and wrong-revision results, then accepts empty', async () => {
+    const fixture = await worktreeFixture();
+    await runInDurableObject(fixture.session, async (_instance, state) =>
+      state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+    );
+    for (const kind of ['git', 'malformed', 'revision'] as const) {
+      const pending = fixture.session.refreshWorktreeChanges();
+      const request = await fixture.nextCapture();
+      if (kind === 'git') fixture.fail(request);
+      else if (kind === 'malformed') fixture.reply(request, { files: [] });
+      else fixture.reply(request, worktreeCapture(captureRevision(request) + 1));
+      await expect(pending).resolves.toEqual({ status: 'failed', snapshot: savedWorktreeSnapshot });
+      await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
+        snapshot: savedWorktreeSnapshot,
+      });
+      expect(fixture.readyNotifications).toEqual([]);
+      await runInDurableObject(fixture.session, instance => {
+        expect(instance['eventQueries'].findByFilters({})).toEqual([]);
+      });
+    }
+    const pending = fixture.session.refreshWorktreeChanges();
+    const request = await fixture.nextCapture();
+    fixture.reply(request, worktreeCapture(captureRevision(request), true));
+    await expect(pending).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { revision: 8, files: [] },
+    });
+    expect(fixture.readyNotifications.map(({ event }) => JSON.parse(event.payload))).toEqual([
+      { revision: 8 },
+    ]);
+    fixture.close();
+  });
+
+  it('fences credential rotation and requires the new connection to be ready before sending', async () => {
+    const fixture = await worktreeFixture();
+    await runInDurableObject(fixture.session, async (_instance, state) =>
+      state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+    );
+    const pending = fixture.session.refreshWorktreeChanges();
+    await fixture.nextCapture();
+    await fixture.rotateSocket();
+    await expect(pending).resolves.toEqual({ status: 'failed', snapshot: savedWorktreeSnapshot });
+    await expect(fixture.control.getStatus()).resolves.toMatchObject({
+      physical: 'running',
+      connection: 'connected',
+    });
+    await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
+      status: 'offline',
+      snapshot: savedWorktreeSnapshot,
+    });
+    expect(fixture.captures).toHaveLength(1);
+    expect(fixture.readyNotifications).toEqual([]);
+    await fixture.ready();
+    const next = fixture.session.refreshWorktreeChanges();
+    const request = await fixture.nextCapture();
+    fixture.reply(request, worktreeCapture(captureRevision(request)));
+    await expect(next).resolves.toMatchObject({ status: 'refreshed' });
+    fixture.close();
+  });
+
+  it('requires a running physical sandbox and matching route at the request boundary', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      for (const identity of [
+        {
+          sessionId: 'workspace_other',
+          kiloSessionId: fixture.kiloSessionId,
+          directory: fixture.directory,
+        },
+        { sessionId: fixture.sessionId, kiloSessionId: 'other_root', directory: fixture.directory },
+        { sessionId: fixture.sessionId, kiloSessionId: fixture.kiloSessionId, directory: '/other' },
+      ]) {
+        await expect(
+          fixture.control.request({
+            operation: 'session.git.summary',
+            session: identity,
+            payload: { revision: 1 },
+          })
+        ).resolves.toMatchObject({ ok: false, error: { code: 'not_ready' } });
+      }
+      await fixture.control.beginStop('test');
+      await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
+        status: 'offline',
+        snapshot: null,
+      });
+      expect(fixture.captures).toHaveLength(0);
+      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+      await fixture.control.confirmStopped();
+      await fixture.settled();
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it.each(['physical stop', 'route detach'] as const)(
+    'discards a valid in-flight capture after %s and preserves the saved snapshot',
+    async change => {
+      const fixture = await worktreeFixture();
+      try {
+        await runInDurableObject(fixture.session, async (_instance, state) =>
+          state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+        );
+        const pending = fixture.session.refreshWorktreeChanges();
+        const request = await fixture.nextCapture();
+        if (change === 'physical stop') await fixture.control.beginStop('test in-flight capture');
+        else await fixture.control.detachSession(fixture.sessionId);
+        fixture.reply(request, worktreeCapture(captureRevision(request), true));
+        await expect(pending).resolves.toEqual({
+          status: 'failed',
+          snapshot: savedWorktreeSnapshot,
+        });
+        await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
+          snapshot: savedWorktreeSnapshot,
+        });
+        expect(fixture.captures).toHaveLength(1);
+        expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+        expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+        expect(fixture.noWake.claimCreate).not.toHaveBeenCalled();
+        expect(fixture.readyNotifications).toEqual([]);
+        if (change === 'physical stop') await fixture.control.confirmStopped();
+        await fixture.settled();
+      } finally {
+        fixture.close();
+      }
+    }
+  );
+
+  it('persists through DO eviction and serves offline GET and refresh without starting a sandbox', async () => {
+    const fixture = await worktreeFixture();
+    const pending = fixture.session.refreshWorktreeChanges();
+    const request = await fixture.nextCapture();
+    fixture.reply(request, worktreeCapture(captureRevision(request)));
+    const saved = await pending;
+    expect(saved.status).toBe('refreshed');
+    await fixture.control.beginStop('test');
+    await fixture.control.confirmStopped();
+    await fixture.settled();
+    let previousInstance: unknown;
+    await runInDurableObject(fixture.session, instance => {
+      previousInstance = instance;
+    });
+    fixture.close();
+    await abortAllDurableObjects();
+    const freshSession = env.SANDBOX_SESSION.getByName(`${fixture.userId}:${fixture.sessionId}`);
+    const freshControl = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
+    const noWake = await runInDurableObject(freshControl, instance => {
+      const prototype = Object.getPrototypeOf(instance) as typeof instance;
+      return {
+        ensureReady: vi.spyOn(prototype, 'ensureReady'),
+        attachSession: vi.spyOn(prototype, 'attachSession'),
+        request: vi.spyOn(prototype, 'request'),
+      };
+    });
+    await runInDurableObject(freshSession, async instance => {
+      expect(instance).not.toBe(previousInstance);
+      await expect(instance.getWorktreeChanges()).resolves.toEqual({ snapshot: saved.snapshot });
+    });
+    expect(noWake.request).not.toHaveBeenCalled();
+    await expect(freshSession.refreshWorktreeChanges()).resolves.toEqual({
+      status: 'offline',
+      snapshot: saved.snapshot,
+    });
+    await expect(freshControl.getStatus()).resolves.toMatchObject({
+      physical: 'stopped',
+      connection: 'disconnected',
+    });
+    expect(noWake.ensureReady).not.toHaveBeenCalled();
+    expect(noWake.attachSession).not.toHaveBeenCalled();
+  });
+});
+
 describe('SandboxSession control-plane regressions', () => {
   beforeEach(() => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
@@ -6242,9 +8386,12 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: cloudflareRef(fixture.sandboxId),
       });
       await runInDurableObject(session, (_instance, state) => {
-        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toEqual(cleanup);
       });
-      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
+      expect((await admissionState(session)).messages[1]).toEqual(b);
+      expect(acquisitions.map(input => input.acquisition?.id)).toEqual([
+        preparing.preparationAttemptId,
+      ]);
       expect(provider.create).not.toHaveBeenCalled();
       await runInDurableObject(control, async (_instance, state) => {
         expect(await state.storage.get('acquisition_receipts')).toEqual([
@@ -6259,6 +8406,10 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: null,
       });
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
       expect(provider.launch).toHaveBeenCalledTimes(1);
       const launch = provider.launch.mock.calls[0];
       if (!launch) throw new Error('Expected one replacement launch for B');
@@ -6284,7 +8435,7 @@ describe('SandboxSession control-plane regressions', () => {
           wrapperInstanceId: fixture.wrapperInstanceId,
           reason: 'late_cancelled_runtime_cleanup',
         })
-      ).resolves.toEqual({ quarantined: false });
+      ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
       expect((await admissionState(session)).messages).toMatchObject([
         { messageId: 'msg_ffffffffffff00000000000001', state: 'cancelled' },
         {
@@ -6294,12 +8445,8 @@ describe('SandboxSession control-plane regressions', () => {
         },
       ]);
       const continuations = acquisitions.filter(input => input.acquisition?.id === acquisitionB.id);
-      expect(continuations).toHaveLength(3);
-      expect(continuations.map(input => input.acquisition)).toEqual([
-        acquisitionB,
-        acquisitionB,
-        acquisitionB,
-      ]);
+      expect(continuations).toHaveLength(2);
+      expect(continuations.map(input => input.acquisition)).toEqual([acquisitionB, acquisitionB]);
       expect(continuations.every(input => input.allowCreate === undefined)).toBe(true);
       expect(
         replacementRequests
@@ -6317,6 +8464,193 @@ describe('SandboxSession control-plane regressions', () => {
       stream?.close();
       socket.close();
       replacement?.close();
+    }
+  });
+
+  it('retries a lost completed native cleanup after Session reload without selecting N2', async () => {
+    const { fixture, session: originalSession } = messageFixture();
+    let session = originalSession;
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const { control, socket, provider } = await initializeTerminalRuntime(fixture, {
+      nativeRuntimeRetirement: true,
+    });
+    let dropCleanupResponse = true;
+    const requests: RequestFrame[] = [];
+    socket.addEventListener('message', event => {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      requests.push(request);
+      let result: unknown;
+      switch (request.operation) {
+        case 'session.attach':
+          result = {
+            attached: true,
+            nativeRuntimeId:
+              requests.filter(candidate => candidate.operation === 'session.attach').length === 1
+                ? nativeRuntimeId
+                : replacementRuntimeId,
+          };
+          break;
+        case 'session.prompt':
+          result = {
+            messageId: sessionPromptPayloadSchema.parse(request.payload).messageId,
+            status: 'accepted',
+          };
+          break;
+        case 'session.operation.get':
+          result = { state: 'missing' };
+          break;
+        case 'session.sync':
+          result = { status: { type: 'idle' }, questions: [], permissions: [] };
+          break;
+        case 'session.abort':
+          result = {
+            status: 'aborted',
+            quiescent: true,
+            runtimeRetired: true,
+            nativeRuntimeId,
+          };
+          break;
+        default:
+          throw new Error(`Unexpected control request: ${request.operation}`);
+      }
+      socket.send(
+        JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result })
+      );
+    });
+    await runInDurableObject(control, instance => {
+      const prototype = Object.getPrototypeOf(instance) as typeof instance;
+      const quarantine = instance.quarantineRuntime.bind(instance);
+      vi.spyOn(prototype, 'quarantineRuntime').mockImplementation(async input => {
+        const result = await quarantine(input);
+        if (dropCleanupResponse) throw new Error('lost cleanup response');
+        return result;
+      });
+    });
+    try {
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      await session.createSessionWithInitialAdmission({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+        agent: agentA,
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+        message: {
+          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'A' },
+        },
+      });
+      await waitForAccepted(session, INITIAL_MESSAGE_ID);
+      const attached = sessionOperationAuthorizationSchema.parse({
+        operation: 'session.attach',
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: INITIAL_MESSAGE_ID,
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId,
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        state.storage.kv.put('native_runtime_fence', {
+          sandboxId: fixture.sandboxId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+          nativeRuntimeId,
+          attachmentEpoch: 1,
+          authorization: attached,
+        });
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId }),
+      ]);
+      await runInDurableObject(session, (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        state.storage.kv.put(
+          'session_messages',
+          messages.map(message =>
+            message.messageId === INITIAL_MESSAGE_ID
+              ? {
+                  ...message,
+                  acceptedAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                  lastActivityAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                }
+              : message
+          )
+        );
+      });
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await vi.waitFor(async () => {
+        await expect(control.listRoutes()).resolves.toEqual([
+          expect.not.objectContaining({ nativeRuntimeId }),
+        ]);
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toMatchObject({
+          nativeRuntimeId,
+          authorization: attached,
+        });
+      });
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+
+      const replacementAuthorization = {
+        operation: 'session.attach' as const,
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMo',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      };
+      await expect(
+        control.request({
+          operation: 'session.attach',
+          authorization: replacementAuthorization,
+          session: replacementAuthorization.session,
+          expectedWrapperInstanceId: fixture.wrapperInstanceId,
+          payload: {},
+        })
+      ).resolves.toMatchObject({ ok: true, result: { nativeRuntimeId: replacementRuntimeId } });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      const beforeRetry = await runInDurableObject(control, async (_instance, state) => ({
+        deadlines: await loadDeadlines(state.storage),
+        alarmAt: await state.storage.getAlarm(),
+      }));
+
+      await expect(
+        runInDurableObject(session, (_instance, state) => state.abort('reload after lost cleanup'))
+      ).rejects.toThrow('reload after lost cleanup');
+      session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
+      dropCleanupResponse = false;
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+      expect(provider.stop).not.toHaveBeenCalled();
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadDeadlines(state.storage)).toEqual(beforeRetry.deadlines);
+        expect(await state.storage.getAlarm()).toBe(beforeRetry.alarmAt);
+      });
+    } finally {
+      socket.close();
     }
   });
 
@@ -7349,6 +9683,7 @@ describe('SandboxSession control-plane regressions', () => {
         preparationAttemptId: expect.any(String),
         deliveryDeadlineAt: expect.any(Number),
         terminalAt: expect.any(Number),
+        terminalSource: 'coordinator',
       });
       expect(delivered.messages.slice(1)).toMatchObject([
         { messageId: 'msg_model_less', state: 'accepted' },
@@ -9346,6 +11681,177 @@ describe('SandboxControl worktree activity deadlines', () => {
   });
 });
 
+function receiveAdmissionPrompt(ws: WebSocket, attach: WrapperRequest) {
+  expect(attach.operation).toBe('session.attach');
+  expect(attach.session).toBeDefined();
+  const prompt = Promise.withResolvers<RequestFrame>();
+  let promptCount = 0;
+  let failure: unknown;
+  const cleanup = () => {
+    ws.removeEventListener('message', onMessage);
+    ws.removeEventListener('error', onError);
+    ws.removeEventListener('close', onClose);
+  };
+  const fail = (error: unknown) => {
+    failure = error;
+    cleanup();
+    prompt.reject(error);
+  };
+  const onMessage = (event: MessageEvent) => {
+    try {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      expect(request.session).toEqual(attach.session);
+      if (request.operation === 'session.git.summary') {
+        const payload = worktreeChangesCaptureRequestSchema.parse(request.payload);
+        const capture = worktreeCapture(payload.revision, true);
+        if (payload.baseRef) capture.comparison.baseRef = payload.baseRef;
+        respondToWrapperRequest(ws, request, capture);
+      } else if (request.operation === 'session.prompt') {
+        promptCount++;
+        prompt.resolve(request);
+      } else {
+        throw new Error(`Unexpected admission request: ${request.operation}`);
+      }
+    } catch (error) {
+      fail(error);
+    }
+  };
+  const onError = () => fail(new Error('sandbox control websocket error'));
+  const onClose = (event: CloseEvent) =>
+    fail(new Error(`sandbox control websocket closed: ${event.code}`));
+  ws.addEventListener('message', onMessage);
+  ws.addEventListener('error', onError);
+  ws.addEventListener('close', onClose);
+  return {
+    prompt: prompt.promise,
+    finish(): void {
+      cleanup();
+      if (failure !== undefined) throw failure;
+      expect(promptCount).toBe(1);
+    },
+  };
+}
+
+describe('SandboxSession worktree admission receiver', () => {
+  const attach: WrapperRequest = {
+    type: 'request',
+    requestId: 'attach',
+    operation: 'session.attach',
+    session: {
+      sessionId: GRANT_SESSION_ID,
+      kiloSessionId: ROOT_ID,
+      directory: '/workspace/shared',
+    },
+  };
+  const capture = {
+    ...attach,
+    requestId: 'capture',
+    operation: 'session.git.summary',
+    payload: { revision: 7, baseRef: 'refs/remotes/origin/feature/shared-worktree' },
+  };
+  const prompt = {
+    ...attach,
+    requestId: 'prompt',
+    operation: 'session.prompt',
+    payload: { messageId: INITIAL_MESSAGE_ID, finalization: { autoCommit: false } },
+  };
+
+  function fixture() {
+    const pair = new WebSocketPair();
+    const client = pair[0];
+    const server = pair[1];
+    client.accept();
+    server.accept();
+    const receiver = receiveAdmissionPrompt(client, attach);
+    return {
+      client,
+      server,
+      receiver,
+      receive(frame: unknown) {
+        client.dispatchEvent(new MessageEvent('message', { data: JSON.stringify(frame) }));
+      },
+      close() {
+        client.close();
+        server.close();
+      },
+    };
+  }
+
+  it.each(['capture first', 'prompt first'])(
+    'acknowledges capture and retains the prompt before awaiting it: %s',
+    async order => {
+      const f = fixture();
+      try {
+        const reply = nextMessage(f.server);
+        for (const frame of order === 'capture first' ? [capture, prompt] : [prompt, capture]) {
+          f.receive(frame);
+        }
+        await expect(f.receiver.prompt).resolves.toEqual(prompt);
+        expect(JSON.parse(await reply)).toEqual({
+          type: 'response',
+          requestId: capture.requestId,
+          ok: true,
+          result: {
+            ...worktreeCapture(capture.payload.revision, true),
+            comparison: {
+              ...worktreeCapture(capture.payload.revision).comparison,
+              baseRef: capture.payload.baseRef,
+            },
+          },
+        });
+        f.receiver.finish();
+      } finally {
+        f.close();
+      }
+    }
+  );
+
+  it('does not hide duplicate prompt delivery', async () => {
+    const f = fixture();
+    try {
+      f.receive(prompt);
+      await expect(f.receiver.prompt).resolves.toEqual(prompt);
+      f.receive(prompt);
+      expect(() => f.receiver.finish()).toThrow();
+    } finally {
+      f.close();
+    }
+  });
+
+  it.each([
+    { name: 'unknown operation', frame: { ...prompt, operation: 'session.unexpected' } },
+    { name: 'malformed capture', frame: { ...capture, payload: { revision: 0 } } },
+    {
+      name: 'wrong session',
+      frame: { ...capture, session: { ...attach.session, sessionId: 'other' } },
+    },
+  ])('rejects $name instead of skipping it', async ({ frame }) => {
+    const f = fixture();
+    try {
+      const rejected = expect(f.receiver.prompt).rejects.toThrow();
+      f.receive(frame);
+      await rejected;
+      expect(() => f.receiver.finish()).toThrow();
+    } finally {
+      f.close();
+    }
+  });
+
+  it.each(['close', 'error'] as const)('rejects a pending prompt on socket %s', async event => {
+    const f = fixture();
+    try {
+      const rejected = expect(f.receiver.prompt).rejects.toThrow('sandbox control websocket');
+      f.client.dispatchEvent(
+        event === 'close' ? new CloseEvent('close', { code: 1001 }) : new Event('error')
+      );
+      await rejected;
+      expect(() => f.receiver.finish()).toThrow('sandbox control websocket');
+    } finally {
+      f.close();
+    }
+  });
+});
+
 describe('SandboxSession worktree admission', () => {
   beforeEach(() => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
@@ -9533,9 +12039,9 @@ describe('SandboxSession worktree admission', () => {
         ]);
       });
 
-      const incomingPrompt = nextMessage(ws);
+      const receiver = receiveAdmissionPrompt(ws, attach);
       respondToWrapperRequest(ws, attach, { attached: true });
-      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      const prompt = await receiver.prompt;
       expect(prompt).toMatchObject({
         operation: 'session.prompt',
         session: { sessionId, kiloSessionId },
@@ -9548,6 +12054,13 @@ describe('SandboxSession worktree admission', () => {
         messageId: INITIAL_MESSAGE_ID,
         status: 'accepted',
       });
+      await vi.waitFor(async () => {
+        expect(await session.getCurrentMessageWork()).toMatchObject({
+          messageId: INITIAL_MESSAGE_ID,
+          status: 'running',
+        });
+      });
+      receiver.finish();
       ws.close();
     }
   );
@@ -9637,9 +12150,9 @@ describe('SandboxSession worktree admission', () => {
       });
     });
 
-    const incomingCommand = nextMessage(wrapper);
+    const receiver = receiveAdmissionPrompt(wrapper, attach);
     respondToWrapperRequest(wrapper, attach, { attached: true });
-    const command = JSON.parse(await incomingCommand) as WrapperRequest;
+    const command = await receiver.prompt;
     expect(command).toMatchObject({
       operation: 'session.prompt',
       session: { sessionId, kiloSessionId },
@@ -9654,6 +12167,13 @@ describe('SandboxSession worktree admission', () => {
       messageId: INITIAL_MESSAGE_ID,
       status: 'accepted',
     });
+    await vi.waitFor(async () => {
+      expect(await session.getCurrentMessageWork()).toMatchObject({
+        messageId: INITIAL_MESSAGE_ID,
+        status: 'running',
+      });
+    });
+    receiver.finish();
     wrapper.close();
   });
 
@@ -9728,9 +12248,9 @@ describe('SandboxSession worktree admission', () => {
         }),
       ]);
     });
-    const incomingPrompt = nextMessage(wrapper);
+    const receiver = receiveAdmissionPrompt(wrapper, attach);
     respondToWrapperRequest(wrapper, attach, { attached: true });
-    const prompt = JSON.parse(await incomingPrompt) as WrapperRequest & {
+    const prompt = (await receiver.prompt) as WrapperRequest & {
       payload: {
         attachments: Array<{
           mime: string;
@@ -9767,6 +12287,13 @@ describe('SandboxSession worktree admission', () => {
       messageId: INITIAL_MESSAGE_ID,
       status: 'accepted',
     });
+    await vi.waitFor(async () => {
+      expect(await session.getCurrentMessageWork()).toMatchObject({
+        messageId: INITIAL_MESSAGE_ID,
+        status: 'running',
+      });
+    });
+    receiver.finish();
     wrapper.close();
   });
 
@@ -10076,9 +12603,9 @@ describe('SandboxSession worktree admission', () => {
           finalization: { autoCommit: !expected, condenseOnComplete: true },
         });
       });
-      const incomingPrompt = nextMessage(wrapper);
+      const receiver = receiveAdmissionPrompt(wrapper, attach);
       respondToWrapperRequest(wrapper, attach, { attached: true });
-      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      const prompt = await receiver.prompt;
       expect(prompt).toMatchObject({
         operation: 'session.prompt',
         payload: {
@@ -10099,6 +12626,7 @@ describe('SandboxSession worktree admission', () => {
           condenseOnComplete: true,
         });
       });
+      receiver.finish();
       wrapper.close();
     }
   );
@@ -10191,9 +12719,9 @@ describe('SandboxSession durable message lifecycle', () => {
           directory: '/workspace/shared',
         },
       });
-      const incomingPrompt = nextMessage(wrapper);
+      const receiver = receiveAdmissionPrompt(wrapper, attach);
       respondToWrapperRequest(wrapper, attach, { attached: true });
-      const prompt = JSON.parse(await incomingPrompt) as WrapperRequest;
+      const prompt = await receiver.prompt;
       expect(prompt).toMatchObject({
         operation: 'session.prompt',
         session: { sessionId: session.sessionId, kiloSessionId: session.kiloSessionId },
@@ -10234,6 +12762,7 @@ describe('SandboxSession durable message lifecycle', () => {
         });
         expect(persistedSessionEvents(state, ['cloud.message.sent'])).toHaveLength(1);
       });
+      receiver.finish();
     }
 
     for (const session of sessions) {
@@ -10620,7 +13149,7 @@ describe('SandboxSession running stream state', () => {
 });
 
 describe('SandboxSession root-scoped reconnect sync', () => {
-  it('reconciles an accepted root before connected and replays only its questions and permissions afterward', async () => {
+  it('connects from cached root inputs before sync and preserves scoped background reconciliation', async () => {
     const wrapperInstanceId = crypto.randomUUID();
     const ownerId = 'user_grouped_sync';
     const activeSessionId = GRANT_SESSION_ID;
@@ -10691,20 +13220,6 @@ describe('SandboxSession root-scoped reconnect sync', () => {
     };
     expect(emptyConnected.streamEventType).toBe('connected');
 
-    const pendingActiveResponse = SELF.fetch(
-      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
-      { headers: { Upgrade: 'websocket' } }
-    );
-    const sync = JSON.parse(await incomingSync) as WrapperRequest;
-    expect(sync).toMatchObject({
-      operation: 'session.sync',
-      session: {
-        sessionId: activeSessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/shared',
-      },
-      payload: {},
-    });
     const questions = [
       { id: 'question_root', sessionID: ROOT_ID, questions: [{ question: 'Root?' }] },
       {
@@ -10718,6 +13233,67 @@ describe('SandboxSession root-scoped reconnect sync', () => {
       { id: 'permission_root', sessionID: ROOT_ID },
       { id: 'permission_child', sessionID: THIRD_ROOT_ID, rootKiloSessionId: ROOT_ID },
     ];
+    await runInDurableObject(active, async (_instance, state) => {
+      await state.storage.put('session_pending_interactions', {
+        revision: 1,
+        questions,
+        permissions,
+      });
+    });
+    const activeResponse = await SELF.fetch(
+      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    const sync = JSON.parse(await incomingSync) as WrapperRequest;
+    expect(sync).toMatchObject({
+      operation: 'session.sync',
+      session: {
+        sessionId: activeSessionId,
+        kiloSessionId: ROOT_ID,
+        directory: '/workspace/shared',
+      },
+      payload: {},
+    });
+    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
+      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
+    }
+    activeResponse.webSocket.accept();
+    const events = (await nextMessages(activeResponse.webSocket, 7)).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+    expect(events.map(event => event.streamEventType)).toEqual([
+      'connected',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'cloud.message.queued',
+      'cloud.message.sent',
+    ]);
+    expect(events[0]?.data).toMatchObject({
+      cloudStatus: { type: 'ready' },
+      activeMessageId: INITIAL_MESSAGE_ID,
+      pendingInteractions: { questions, permissions },
+    });
+    expect(events.slice(1, 3)).toEqual(
+      questions.map(question =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'question.asked', event: 'question.asked', properties: question },
+        })
+      )
+    );
+    expect(events.slice(3, 5)).toEqual(
+      permissions.map(permission =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        })
+      )
+    );
+    const incomingStatus = nextMessage(activeResponse.webSocket);
     respondToWrapperRequest(wrapper, sync, {
       status: { type: 'busy' },
       questions: [
@@ -10731,49 +13307,13 @@ describe('SandboxSession root-scoped reconnect sync', () => {
         { id: 'permission_contradictory', sessionID: ROOT_ID, rootKiloSessionId: SECOND_ROOT_ID },
       ],
     });
-    const activeResponse = await pendingActiveResponse;
-    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
-      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
-    }
-    activeResponse.webSocket.accept();
-    const events = (await nextMessages(activeResponse.webSocket, 8)).map(
-      message => JSON.parse(message) as SessionStreamEvent
-    );
-    expect(events.map(event => event.streamEventType)).toEqual([
-      'kilocode',
-      'connected',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'cloud.message.queued',
-      'cloud.message.sent',
-    ]);
-    expect(events[1]?.data).toMatchObject({
-      cloudStatus: { type: 'ready' },
-      activeMessageId: INITIAL_MESSAGE_ID,
-      pendingInteractions: { questions, permissions },
+    expect(JSON.parse(await incomingStatus)).toMatchObject({
+      streamEventType: 'kilocode',
+      data: { type: 'session.status' },
     });
-    expect(events.slice(2, 4)).toEqual(
-      questions.map(question =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'question.asked', event: 'question.asked', properties: question },
-        })
-      )
-    );
-    expect(events.slice(4, 6)).toEqual(
-      permissions.map(permission =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
-        })
-      )
-    );
     await runInDurableObject(active, async (_instance, state) => {
       expect(await state.storage.get('session_pending_interactions')).toMatchObject({
+        revision: 2,
         questions,
         permissions,
       });

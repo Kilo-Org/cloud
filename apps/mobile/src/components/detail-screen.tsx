@@ -1,5 +1,6 @@
 import { ScrollView, type ScrollViewProps, View } from 'react-native';
 
+import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
 // Detail-screen counterpart to TabScreenScrollView. Provides bottom clearance via
@@ -9,6 +10,7 @@ export function DetailScreenScrollView({ children, ...props }: ScrollViewProps) 
   const paddingBottom = useDetailScreenBottomPadding();
   return (
     <ScrollView {...props}>
+      {props.refreshControl ? <RefreshProgress refreshControl={props.refreshControl} /> : null}
       {children}
       <View style={{ height: paddingBottom }} pointerEvents="none" />
     </ScrollView>

@@ -3,8 +3,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type LogoutCleanupTombstone } from '@/lib/auth/logout-cleanup';
 
 const cleanupMock = vi.hoisted(() => ({
+  awaitActivityCleanupSettled: vi.fn().mockResolvedValue(undefined),
   readLogoutCleanupTombstone: vi.fn<() => Promise<LogoutCleanupTombstone | null>>(),
   deleteLogoutCleanupTombstone: vi.fn().mockResolvedValue(undefined),
+  writeLogoutCleanupTombstone: vi.fn().mockResolvedValue(undefined),
   isNotFoundTrpcError: (error: unknown) => {
     if (typeof error !== 'object' || error === null) {
       return false;
@@ -16,6 +18,7 @@ const cleanupMock = vi.hoisted(() => ({
 
 const trpcMock = vi.hoisted(() => ({
   unregisterPushToken: { mutate: vi.fn() },
+  unregisterActivityToken: { mutate: vi.fn() },
 }));
 
 const notificationsMock = vi.hoisted(() => ({
@@ -32,6 +35,7 @@ vi.mock('@/lib/notifications', () => notificationsMock);
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   attemptLogoutReconciliation,
+  hasPendingActivityUnregister,
   resetLogoutReconciliationForTests,
   TOMBSTONE_MAX_AGE_MS,
 } from '@/lib/auth/logout-reconciliation';
@@ -44,6 +48,8 @@ function makeTombstone(overrides: Partial<LogoutCleanupTombstone> = {}): LogoutC
     userId: 'u1',
     pushToken: 'push-stored',
     needsPushUnregister: true,
+    needsActivityUnregister: false,
+    activityTokens: [],
     failedAt: Date.now(),
     ...overrides,
   };
@@ -148,6 +154,75 @@ describe('attemptLogoutReconciliation', () => {
     expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
   });
 
+  it('unregisters each recorded activity token and deletes the tombstone when all succeed', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({
+        needsPushUnregister: false,
+        needsActivityUnregister: true,
+        activityTokens: ['activity-1', 'activity-2'],
+      })
+    );
+    trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: true });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'activity-1' });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'activity-2' });
+    expect(trpcMock.unregisterPushToken.mutate).not.toHaveBeenCalled();
+    expect(cleanupMock.deleteLogoutCleanupTombstone).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the tombstone when any recorded activity token unregister rejects', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({
+        needsPushUnregister: false,
+        needsActivityUnregister: true,
+        activityTokens: ['activity-1', 'activity-2'],
+      })
+    );
+    trpcMock.unregisterActivityToken.mutate
+      .mockResolvedValueOnce({ success: true })
+      .mockRejectedValueOnce(new Error('server 500'));
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledTimes(2);
+    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
+  });
+
+  it('clears the activity part after success while the push part stays outstanding', async () => {
+    const failedAt = Date.now();
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({
+        pushToken: 'push-stored',
+        needsPushUnregister: true,
+        needsActivityUnregister: true,
+        activityTokens: ['activity-1'],
+        failedAt,
+      })
+    );
+    trpcMock.unregisterPushToken.mutate.mockRejectedValue(new Error('server 500'));
+    trpcMock.unregisterActivityToken.mutate.mockResolvedValue({ success: true });
+
+    const outcome = await attemptLogoutReconciliation('u1');
+
+    expect(outcome).toEqual({ kind: 'attempted', tombstoneDeleted: false });
+    expect(trpcMock.unregisterActivityToken.mutate).toHaveBeenCalledWith({ token: 'activity-1' });
+    expect(cleanupMock.deleteLogoutCleanupTombstone).not.toHaveBeenCalled();
+    // The activity part is cleared so a later retry never re-unregisters the
+    // same token, while the push part stays for the next attempt.
+    expect(cleanupMock.writeLogoutCleanupTombstone).toHaveBeenCalledWith({
+      userId: 'u1',
+      pushToken: 'push-stored',
+      needsPushUnregister: true,
+      needsActivityUnregister: false,
+      activityTokens: [],
+      failedAt,
+    });
+  });
+
   it('skips a second attempt within the 60 s spacing window', async () => {
     cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(makeTombstone());
     trpcMock.unregisterPushToken.mutate.mockResolvedValue({ success: true });
@@ -230,5 +305,57 @@ describe('attemptLogoutReconciliation', () => {
     const outcome = await attemptLogoutReconciliation('u1');
 
     expect(outcome).toEqual({ kind: 'expired-retained' });
+  });
+
+  it('reports a pending activity unregister while the tombstone still needs it', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({ needsActivityUnregister: true, activityTokens: ['activity-1'] })
+    );
+
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(true);
+  });
+
+  it.each([
+    { owner: 'u1', currentUser: 'u2', pending: false },
+    { owner: null, currentUser: 'u2', pending: true },
+    { owner: 'u1', currentUser: null, pending: true },
+  ])(
+    'scopes the activity guard to owner $owner and current user $currentUser',
+    async ({ owner, currentUser, pending }) => {
+      cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+        makeTombstone({
+          userId: owner,
+          needsActivityUnregister: true,
+          activityTokens: ['activity-1'],
+        })
+      );
+
+      await expect(hasPendingActivityUnregister(currentUser)).resolves.toBe(pending);
+    }
+  );
+
+  it('does not block a new account when the old tombstone survives deletion and the retry is spacing-skipped', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({ needsActivityUnregister: true, activityTokens: ['activity-1'] })
+    );
+    cleanupMock.deleteLogoutCleanupTombstone.mockRejectedValueOnce(new Error('secure store down'));
+
+    await attemptLogoutReconciliation('u2');
+    expect(await attemptLogoutReconciliation('u2')).toEqual({ kind: 'spacing-skipped' });
+    await expect(hasPendingActivityUnregister('u2')).resolves.toBe(false);
+  });
+
+  it('reports no pending activity unregister when the tombstone needs only the push part', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(
+      makeTombstone({ needsActivityUnregister: false, needsPushUnregister: true })
+    );
+
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(false);
+  });
+
+  it('reports no pending activity unregister when no tombstone exists', async () => {
+    cleanupMock.readLogoutCleanupTombstone.mockResolvedValue(null);
+
+    await expect(hasPendingActivityUnregister('u1')).resolves.toBe(false);
   });
 });

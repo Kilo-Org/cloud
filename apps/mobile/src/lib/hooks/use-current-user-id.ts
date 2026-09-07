@@ -8,7 +8,7 @@ type UseCurrentUserIdOptions = {
 
 export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
   const trpc = useTRPC();
-  const { data, isLoading, isError, refetch } = useQuery({
+  const { data, isLoading, isError, isFetched, refetch } = useQuery({
     ...trpc.user.getMe.queryOptions(),
     enabled: options.enabled ?? true,
   });
@@ -17,7 +17,7 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     userId: data?.id,
     email: data?.email,
     isLoading,
-    isError,
+    isError: isError || (isLoading && isFetched),
     refetch: () => {
       void refetch();
     },

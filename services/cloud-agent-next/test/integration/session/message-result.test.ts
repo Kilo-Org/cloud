@@ -1,6 +1,6 @@
 import { env, listDurableObjectIds, runInDurableObject } from 'cloudflare:test';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import { createEventQueries } from '../../../src/session/queries/events.js';
 import {
@@ -96,6 +96,40 @@ function lifecycleState(
   };
 }
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('CloudAgentSession.getMessageResult', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
@@ -109,9 +143,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   });
 
   it('returns session-not-found when metadata is absent', async () => {
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName('user_message_result_missing:agent_message_result_missing')
-    );
+    const stub = sessionStub('user_message_result_missing', 'agent_message_result_missing');
 
     await expect(stub.getMessageResult(messageA)).resolves.toEqual({ type: 'session-not-found' });
   });
@@ -119,9 +151,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('returns message-not-found when the exact message ID is absent', async () => {
     const userId = 'user_message_result_unknown';
     const sessionId = 'agent_message_result_unknown';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerSession(instance, sessionId, userId);
@@ -134,9 +164,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('returns correlated assistant text for an exact completed turn', async () => {
     const userId = 'user_message_result_exact';
     const sessionId = 'agent_message_result_exact';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerSession(instance, sessionId, userId);
@@ -184,9 +212,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('omits assistant text when a persisted assistant ID belongs to another turn', async () => {
     const userId = 'user_message_result_mismatched_parent';
     const sessionId = 'agent_message_result_mismatched_parent';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerSession(instance, sessionId, userId);
@@ -223,9 +249,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('omits assistant text when a persisted assistant ID belongs to another Kilo session', async () => {
     const userId = 'user_message_result_mismatched_kilo_session';
     const sessionId = 'agent_message_result_mismatched_kilo_session';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerSession(instance, sessionId, userId);
@@ -263,9 +287,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('returns a queued recovery result for pending-only compatibility rows', async () => {
     const userId = 'user_message_result_pending';
     const sessionId = 'agent_message_result_pending';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerSession(instance, sessionId, userId);
@@ -297,9 +319,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('fails closed when a corrupt lifecycle row has pending compatibility residue', async () => {
     const userId = 'user_message_result_corrupt';
     const sessionId = 'agent_message_result_corrupt';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerSession(instance, sessionId, userId);
@@ -327,9 +347,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('fails closed when a lifecycle row embeds another valid message ID', async () => {
     const userId = 'user_message_result_mismatched_identity';
     const sessionId = 'agent_message_result_mismatched_identity';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerSession(instance, sessionId, userId);
@@ -343,9 +361,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('returns a safe exact result for current pending rows', async () => {
     const userId = 'user_message_result_current_pending';
     const sessionId = 'agent_message_result_current_pending';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const token = 'private-current-pending-token';
 
     const result = await runInDurableObject(stub, async instance => {
@@ -381,9 +397,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('does not expose assistant text for a queued turn', async () => {
     const userId = 'user_message_result_queued';
     const sessionId = 'agent_message_result_queued';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerSession(instance, sessionId, userId);
@@ -412,9 +426,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('omits assistant text for completed rows without an assistant message ID', async () => {
     const userId = 'user_message_result_parent';
     const sessionId = 'agent_message_result_parent';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async (instance, state) => {
       await registerSession(instance, sessionId, userId);
@@ -453,9 +465,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('never exposes sensitive persisted diagnostics', async () => {
     const userId = 'user_message_result_safe';
     const sessionId = 'agent_message_result_safe';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
     const token = 'private-token-like-text';
 
     const result = await runInDurableObject(stub, async instance => {
@@ -488,9 +498,7 @@ describe('CloudAgentSession.getMessageResult', () => {
   it('returns allowlisted structured failure fields', async () => {
     const userId = 'user_message_result_failure';
     const sessionId = 'agent_message_result_failure';
-    const stub = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
-    );
+    const stub = sessionStub(userId, sessionId);
 
     const result = await runInDurableObject(stub, async instance => {
       await registerSession(instance, sessionId, userId);

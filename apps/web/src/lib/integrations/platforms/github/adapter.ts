@@ -117,6 +117,54 @@ export async function deleteGitHubInstallation(
   });
 }
 
+export async function verifyAndDeleteGitHubOrganizationInstallation(params: {
+  installationId: string;
+  accountId: string;
+  appType: GitHubAppType;
+}): Promise<void> {
+  const credentials = getGitHubAppCredentials(params.appType);
+  if (!credentials.appId || !credentials.privateKey)
+    throw new Error('GitHub App credentials unavailable');
+  const installationId = Number(params.installationId);
+  const accountId = Number(params.accountId);
+  if (!Number.isSafeInteger(installationId) || !Number.isSafeInteger(accountId)) {
+    throw new Error('GitHub installation identity unavailable');
+  }
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const auth = createAppAuth({ appId: credentials.appId, privateKey: credentials.privateKey });
+    const { token } = await auth({ type: 'app' });
+    const octokit = new Octokit({
+      auth: token,
+      log: { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} },
+    });
+    const installation = await octokit.apps.getInstallation({
+      installation_id: installationId,
+      request: { signal: controller.signal },
+    });
+    const account = installation.data.account;
+    if (
+      installation.data.id !== installationId ||
+      account?.id !== accountId ||
+      !account ||
+      !('type' in account) ||
+      account.type !== 'Organization' ||
+      (installation.data.app_id !== undefined &&
+        installation.data.app_id.toString() !== credentials.appId)
+    ) {
+      throw new Error('GitHub installation identity mismatch');
+    }
+    const deleted = await octokit.apps.deleteInstallation({
+      installation_id: installationId,
+      request: { signal: controller.signal },
+    });
+    if (deleted.status !== 204) throw new Error('GitHub installation deletion not confirmed');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 type GitHubRepository = {
   id: number;
   name: string;

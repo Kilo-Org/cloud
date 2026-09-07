@@ -15,10 +15,12 @@ import { type Href, useRouter } from 'expo-router';
 import { X } from '@/components/ui/icons';
 import { type ReactNode, useCallback, useEffect, useReducer } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { z } from 'zod';
 
+import { CenteredState } from '@/components/centered-state';
 import { AccessRequiredScreen } from '@/components/kiloclaw/access-required-screen';
 import { resolveAccessRequiredSubcase } from '@/components/kiloclaw/empty-state-content';
 import { FlowBody } from '@/components/kiloclaw/onboarding/flow-body';
@@ -345,13 +347,27 @@ export function OnboardingFlow() {
     <Pressable
       onPress={onDismiss}
       hitSlop={12}
-      accessibilityLabel={t('kiloclaw.onboarding.flow.close')}
+      accessibilityLabel={t('common.close')}
       accessibilityRole="button"
       className="active:opacity-70"
     >
       <X size={24} color={colors.foreground} />
     </Pressable>
   );
+
+  if (onboardingQuery.isError) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title="" modal showBackButton={false} headerRight={closeButton} />
+        <QueryError
+          message={t('kiloclaw.onboarding.flow.couldNotLoad')}
+          onRetry={() => {
+            void onboardingQuery.refetch();
+          }}
+        />
+      </View>
+    );
+  }
 
   if (onboardingQuery.isPending || !state.onboardingStateLoaded) {
     return (
@@ -366,44 +382,32 @@ export function OnboardingFlow() {
     );
   }
 
-  if (onboardingQuery.isError) {
-    return (
-      <View className="flex-1 bg-background">
-        <ScreenHeader title="" modal showBackButton={false} headerRight={closeButton} />
-        <View className="flex-1 items-center justify-center px-4">
-          <QueryError
-            message={t('kiloclaw.onboarding.flow.couldNotLoad')}
-            onRetry={() => {
-              void onboardingQuery.refetch();
-            }}
-          />
-        </View>
-      </View>
-    );
-  }
-
   if (!state.eligible && !state.hasAccessWithInstance) {
     const subcase = onboardingQuery.data
       ? resolveAccessRequiredSubcase(onboardingQuery.data)
       : null;
     let unavailableContent: ReactNode = (
-      <View className="items-center gap-3 px-6">
-        <ActivityIndicator size="small" color={colors.mutedForeground} />
-        <Text variant="muted" className="text-center">
-          {t('kiloclaw.onboarding.flow.finishingSetup')}
-        </Text>
-      </View>
+      <CenteredState>
+        <View className="items-center gap-3 px-6">
+          <ActivityIndicator size="small" color={colors.mutedForeground} />
+          <Text variant="muted" className="text-center">
+            {t('kiloclaw.onboarding.flow.finishingSetup')}
+          </Text>
+        </View>
+      </CenteredState>
     );
     if (onboardingQuery.data?.state === 'signup_unavailable') {
       unavailableContent = (
-        <View className="items-center gap-2 px-6">
-          <Text className="text-center text-2xl font-semibold">
-            {t('kiloclaw.onboarding.unavailableTitle')}
-          </Text>
-          <Text variant="muted" className="text-center text-base">
-            {t('kiloclaw.onboarding.unavailableDescription')}
-          </Text>
-        </View>
+        <CenteredState>
+          <View className="items-center gap-2 px-6">
+            <Text className="text-center text-2xl font-semibold">
+              {t('kiloclaw.onboarding.unavailableTitle')}
+            </Text>
+            <Text variant="muted" className="text-center text-base">
+              {t('kiloclaw.onboarding.unavailableDescription')}
+            </Text>
+          </View>
+        </CenteredState>
       );
     } else if (subcase) {
       unavailableContent = <AccessRequiredScreen subcase={subcase} />;
@@ -412,10 +416,7 @@ export function OnboardingFlow() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title="" modal showBackButton={false} headerRight={closeButton} />
-        <Animated.View
-          entering={FadeIn.duration(200)}
-          className="flex-1 items-center justify-center"
-        >
+        <Animated.View entering={FadeIn.duration(200)} className="flex-1">
           {unavailableContent}
         </Animated.View>
       </View>

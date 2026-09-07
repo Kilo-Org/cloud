@@ -60,7 +60,7 @@ export function VoiceTranscriptionControl() {
   }
 
   if (isLoading) {
-    return <Text className="mt-3 text-sm text-muted-foreground">{t('consent.loading')}</Text>;
+    return <Text className="mt-3 text-sm text-muted-foreground">{t('common.loading')}</Text>;
   }
 
   if (isError) {
@@ -184,7 +184,7 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
             title={t('consent.errorScreenshotsTitle')}
             what={t('consent.errorScreenshotsWhat')}
             why={t('consent.errorScreenshotsWhy')}
-            who={t('consent.errorScreenshotsWho')}
+            who={t('consent.crashReportingWho')}
             footer={
               <View className="mt-3">
                 <View className="rounded-md bg-warn-tile-bg p-3">

@@ -1,15 +1,34 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  buildGlanceableSnapshot,
+  buildOpaqueScopeKey,
+} from '../../../../packages/app-shared/src/glanceable-agents-snapshot';
+import { getWorkerDb } from '@kilocode/db/client';
+import { drizzle } from 'drizzle-orm/pg-proxy';
+import { NotificationChannelDO, NotificationsService } from '../../../notifications/src/index';
+import {
+  sendPushNotifications,
+  type ExpoPushMessage,
+} from '../../../notifications/src/lib/expo-push';
+import type * as ExpoPushModule from '../../../notifications/src/lib/expo-push';
+import type { Env } from '../env';
 
-// Mock cloudflare:workers before importing UserConnectionDO
-vi.mock('cloudflare:workers', () => ({
-  DurableObject: class {
+// Mock only the runtime base classes; the producers, coordinator, and delivery adapter stay real.
+vi.mock('cloudflare:workers', () => {
+  class WorkerBase {
     ctx: unknown;
     env: unknown;
     constructor(ctx: unknown, env: unknown) {
       this.ctx = ctx;
       this.env = env;
     }
-  },
+  }
+  return { DurableObject: WorkerBase, WorkerEntrypoint: WorkerBase };
+});
+vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn() }));
+vi.mock('../../../notifications/src/lib/expo-push', async importOriginal => ({
+  ...(await importOriginal<typeof ExpoPushModule>()),
+  sendPushNotifications: vi.fn(),
 }));
 
 const sessionIngestMocks = vi.hoisted(() => ({
@@ -202,11 +221,67 @@ function getCorrelationId(cliWs: MockWS, callIndex = 0): string {
 }
 
 /** Instantiate a fresh DO with a mock context. Returns the DO and helpers. */
-function setup() {
+function setup(env: Partial<Env> = {}) {
   const mockCtx = createMockCtx();
   const ctx = mockCtx.build();
-  const doInstance = new UserConnectionDO(ctx as never, {} as never);
+  const doInstance = new UserConnectionDO(ctx as never, env as Env);
   return { doInstance, ctx, mockCtx };
+}
+
+function setupGlanceableDelivery(foreignSessionIds: string[] = []) {
+  const messages: ExpoPushMessage[] = [];
+  vi.mocked(getWorkerDb).mockReturnValue(
+    drizzle(async (sql, params) => {
+      if (sql.includes('from "cli_sessions_v2"')) {
+        return {
+          rows: foreignSessionIds.filter(id => params.includes(id)).map(id => [id, 'usr_2', null]),
+        };
+      }
+      if (sql.includes('from "user_activity_tokens"')) return { rows: [] };
+      if (sql.includes('from "user_push_tokens"'))
+        return { rows: [['ExponentPushToken[ios]', null]] };
+      throw new Error(`Unexpected query: ${sql}`);
+    }) as never
+  );
+  vi.mocked(sendPushNotifications).mockImplementation(async incoming => {
+    messages.push(...incoming);
+    return { ticketTokenPairs: [], staleTokens: [], ticketErrors: [] };
+  });
+  const storage = makeStorageFake();
+  const notificationEnv = {
+    HYPERDRIVE: { connectionString: 'postgres://unused' },
+    KILO_WEB_API_BASE_URL: 'https://snapshot.test',
+    INTERNAL_API_SECRET: { get: async () => 'test-internal-secret' },
+    EXPO_ACCESS_TOKEN: { get: async () => 'test-expo-token' },
+    NOTIFICATION_CHANNEL_DO: {
+      idFromName: (userId: string) => userId,
+      get: () => channel,
+    },
+  };
+  const channel = new NotificationChannelDO(
+    {
+      storage: {
+        ...storage,
+        transaction: async (fn: (tx: typeof storage) => Promise<unknown>) => fn(storage),
+      },
+    } as never,
+    notificationEnv as never
+  );
+  const service = new NotificationsService({} as never, notificationEnv as never);
+  const env: Partial<Env> = { NOTIFICATIONS: service as never };
+  const result = setup(env);
+  vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+    if (typeof init.body !== 'string') throw new Error('Expected a JSON request body');
+    const scope = JSON.parse(init.body) as { userId: string; organizationId: string | null };
+    return Response.json(
+      buildGlanceableSnapshot({
+        ...scope,
+        sessions: result.doInstance.getActiveSessions(),
+        now: Date.now(),
+      })
+    );
+  });
+  return { ...result, env, messages };
 }
 
 function connectWebSocket(doInstance: UserConnectionDO, connectionId: string): MockWS {
@@ -516,6 +591,179 @@ describe('UserConnectionDO', () => {
   // -------------------------------------------------------------------------
   // Heartbeat processing
   // -------------------------------------------------------------------------
+
+  describe('glanceable aggregate transitions', () => {
+    it('delivers rowless personal busy, retry, attention-clear, and idle heartbeats through the real coordinator', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      for (const status of ['busy', 'retry', 'question', 'busy', 'idle']) {
+        sendHeartbeat(doInstance, cliWs, [makeSession('s1', status)]);
+        await flushAsync();
+      }
+      expect(messages.map(message => message.data)).toMatchObject([
+        { status: 'happy', running: 1, needsInput: 0, idle: 0 },
+        // The retry and the question deliver the same counts, because one
+        // orange state covers both, but each still delivers: the coordinator
+        // resends on a root status change, not on a count change.
+        { status: 'happy', running: 0, needsInput: 1, idle: 0 },
+        { status: 'happy', running: 0, needsInput: 1, idle: 0 },
+        { status: 'happy', running: 1, needsInput: 0, idle: 0 },
+        // Idle is a count, not an empty aggregate.
+        { status: 'happy', running: 0, needsInput: 0, idle: 1 },
+      ]);
+      expect(messages.every(message => message._contentAvailable && !message.body)).toBe(true);
+      expect(
+        messages.every(
+          message =>
+            message.data?.scopeKey ===
+            buildOpaqueScopeKey({ userId: 'usr_1', organizationId: null })
+        )
+      ).toBe(true);
+      expect(messages.every(message => message.data?.organizationBound === false)).toBe(true);
+    });
+
+    it('does not authorize a foreign-owned row from a real authenticated heartbeat', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery(['foreign']);
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('foreign')]);
+      await flushAsync();
+      expect(messages).toEqual([]);
+      expect(allSent(cliWs)).toContainEqual({ type: 'heartbeat_ack' });
+    });
+
+    it('resends only when a reorder, rename, or child attention changes the roots', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1'), makeSession('s2', 'retry')]);
+      await flushAsync();
+      // A reorder and a rename leave every root status unchanged: no resend.
+      sendHeartbeat(doInstance, cliWs, [makeSession('s2', 'retry', 'Renamed'), makeSession('s1')]);
+      await flushAsync();
+      // A child raise hoists NEEDS INPUT onto its root, so the counts change.
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('s1'),
+        makeSession('s2', 'retry'),
+        makeSession('child', 'question', 'Child', 's1'),
+      ]);
+      await flushAsync();
+      sendHeartbeat(doInstance, cliWs, [
+        makeSession('s1'),
+        makeSession('s2', 'retry'),
+        makeSession('child', 'busy', 'Child', 's1'),
+      ]);
+      await flushAsync();
+      expect(messages.map(message => message.data)).toMatchObject([
+        { running: 1, needsInput: 1, idle: 0 },
+        { running: 0, needsInput: 2, idle: 0 },
+        { running: 1, needsInput: 1, idle: 0 },
+      ]);
+    });
+
+    it('ignores child-only heartbeats and disconnects', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('child', 'busy', 'Child', 'parent')]);
+      await flushAsync();
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+      expect(messages).toEqual([]);
+    });
+
+    it('uses the persisted heartbeat attachment before delivery and after hibernation', async () => {
+      const { doInstance, mockCtx, ctx, env, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'retry')]);
+      await flushAsync();
+      const restored = new UserConnectionDO(ctx as never, env as Env);
+      expect(restored.getActiveSessions()).toMatchObject([{ id: 's1', status: 'retry' }]);
+      sendHeartbeat(restored, cliWs, [makeSession('s1', 'retry')]);
+      await flushAsync();
+      expect(messages.map(message => message.data)).toMatchObject([{ running: 0, needsInput: 1 }]);
+    });
+
+    it('delivers an empty aggregate when a root disappears from the heartbeat', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await flushAsync();
+      sendHeartbeat(doInstance, cliWs, []);
+      await flushAsync();
+      expect(messages.map(message => message.data)).toMatchObject([
+        { running: 1 },
+        { status: 'empty', running: 0, needsInput: 0, idle: 0 },
+      ]);
+    });
+
+    it.each([true, false])(
+      'delivers disconnect only after attention reset (socket still listed: %s)',
+      async listed => {
+        const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+        const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+        sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'question')]);
+        await flushAsync();
+        messages.length = 0;
+        const reset = Promise.withResolvers<undefined>();
+        sessionIngestMocks.resetAttentionStatusOnCliDisconnect.mockImplementation(
+          () => reset.promise
+        );
+        if (!listed) mockCtx.removeSocket(cliWs);
+        const disconnect = disconnectCli(doInstance, cliWs);
+        await flushAsync();
+        expect(messages).toEqual([]);
+        reset.resolve(undefined);
+        await disconnect;
+        await flushAsync();
+        expect(messages.map(message => message.data)).toMatchObject([
+          { status: 'empty', running: 0, needsInput: 0, idle: 0 },
+        ]);
+      }
+    );
+
+    it.each(['cli-1', 'cli-2'])(
+      'does not send a stale close after replacement by %s',
+      async replacementId => {
+        const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+        const oldCli = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+        sendHeartbeat(doInstance, oldCli, [makeSession('s1')]);
+        await flushAsync();
+        const nextCli = addCliSocket(mockCtx, replacementId, [], undefined, 'usr_1');
+        sendHeartbeat(doInstance, nextCli, [makeSession('s1')]);
+        await flushAsync();
+        mockCtx.removeSocket(oldCli);
+        await disconnectCli(doInstance, oldCli);
+        await flushAsync();
+        expect(messages.map(message => message.data)).toMatchObject([{ running: 1 }]);
+        expect(doInstance.getActiveSessions()).toMatchObject([
+          { id: 's1', connectionId: replacementId },
+        ]);
+      }
+    );
+
+    it('never infers user identity for legacy sockets', async () => {
+      const { doInstance, mockCtx, messages } = setupGlanceableDelivery();
+      const cliWs = addCliSocket(mockCtx, 'cli-1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1')]);
+      await flushAsync();
+      await disconnectCli(doInstance, cliWs);
+      await flushAsync();
+      expect(messages).toEqual([]);
+    });
+
+    it('keeps heartbeat state and acknowledgement when aggregate transport fails', async () => {
+      const { doInstance, mockCtx } = setup({
+        NOTIFICATIONS: {
+          refreshGlanceableSessions: async () => {
+            throw new Error('transport unavailable');
+          },
+        } as unknown as Env['NOTIFICATIONS'],
+      });
+      const cliWs = addCliSocket(mockCtx, 'cli-1', [], undefined, 'usr_1');
+      sendHeartbeat(doInstance, cliWs, [makeSession('s1', 'retry')]);
+      await flushAsync();
+      expect(doInstance.getActiveSessions()).toMatchObject([{ id: 's1', status: 'retry' }]);
+      expect(allSent(cliWs)).toContainEqual({ type: 'heartbeat_ack' });
+    });
+  });
 
   describe('heartbeat processing', () => {
     it('updates session ownership and persists attachment', async () => {

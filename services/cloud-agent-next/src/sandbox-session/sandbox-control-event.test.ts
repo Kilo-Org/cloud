@@ -95,7 +95,7 @@ describe('persistSandboxControlSessionEvent', () => {
           },
         },
       },
-      eventQueries: { upsert, insert: vi.fn() },
+      eventQueries: { upsert, insert: vi.fn(), insertUnique: vi.fn() },
       broadcast,
     });
 

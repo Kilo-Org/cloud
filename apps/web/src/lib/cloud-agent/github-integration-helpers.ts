@@ -61,6 +61,23 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
   errorMessage: message,
 });
 
+/**
+ * A repository can be reachable from more than one installation. Keep the
+ * first occurrence: integrations arrive oldest-first, matching the primary
+ * installation a session resolves by default.
+ */
+const dedupeRepositories = (
+  repositories: GitHubRepositoriesResult['repositories']
+): GitHubRepositoriesResult['repositories'] => {
+  const seen = new Set<string>();
+  return repositories.filter(repo => {
+    const key = repo.fullName.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
 export async function getGitHubTokenForOrganization(
   organizationId: string
 ): Promise<string | undefined> {
@@ -235,7 +252,7 @@ async function fetchRepositoriesForIntegrations(
     }
     return {
       integrationInstalled: true,
-      repositories: results.flatMap(result => result.repositories),
+      repositories: dedupeRepositories(results.flatMap(result => result.repositories)),
       syncedAt: results
         .map(result => result.syncedAt)
         .filter((value): value is string => value !== null)

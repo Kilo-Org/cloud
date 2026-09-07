@@ -689,7 +689,6 @@ export async function processGooglePlayKiloPassNotification(params: {
       ? new Date(decoded.expiryTimeMs).toISOString()
       : null,
     subscriptionState: decoded.subscriptionState,
-    googlePlayReplacement: { deferred: decoded.deferredReplacement ?? false },
   };
   if (isPurchaseType) {
     if (

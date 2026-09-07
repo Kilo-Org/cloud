@@ -144,7 +144,7 @@ export function staleHeadRejectionMessage(error: unknown): string | null {
  * through the existing term-parameterized key; GitHub keeps the exact
  * pre-s6 copy.
  */
-export function mergeForbiddenCopy(
+function mergeForbiddenCopy(
   platform: ProviderPrPlatform | undefined,
   t: ReturnType<typeof useTranslation>['t']
 ): string {

@@ -186,7 +186,7 @@ export type SubmitReviewComment = NonNullable<SubmitReviewInput['comments']>[num
  * user tapped, with `startLine` marking the first line of a multi-line
  * range ending at `line`. Absent, the comment is a top-level note.
  */
-export type ProviderCommentAnchor = {
+type ProviderCommentAnchor = {
   path: string;
   side: 'LEFT' | 'RIGHT';
   line: number;
@@ -216,7 +216,7 @@ export function formatPendingCommentBody(item: {
 }
 
 /** One anchored item in a provider `submitReview` batch (c3). */
-export type ProviderSubmitReviewComment = ProviderCommentAnchor & { body: string };
+type ProviderSubmitReviewComment = ProviderCommentAnchor & { body: string };
 
 /**
  * The provider `submitReview` intent the submit sheet builds: every pending

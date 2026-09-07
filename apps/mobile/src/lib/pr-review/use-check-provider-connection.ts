@@ -13,7 +13,7 @@ import { toast } from 'sonner-native';
 
 import { useTRPC } from '@/lib/trpc';
 
-export type ProviderConnectionPlatform = 'gitlab' | 'bitbucket';
+type ProviderConnectionPlatform = 'gitlab' | 'bitbucket';
 
 export type CheckProviderConnectionInput = {
   platform: ProviderConnectionPlatform;

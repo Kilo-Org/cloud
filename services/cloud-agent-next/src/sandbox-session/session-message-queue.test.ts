@@ -86,7 +86,7 @@ vi.mock('../websocket/stream.js', () => ({
     options?: {
       deriveCloudStatus?: () => Promise<unknown>;
       deriveQueuedMessages?: () => Promise<unknown>;
-      derivePendingInteractions?: () => Promise<unknown>;
+      readPendingInteractions?: () => unknown;
       deriveSessionStatus?: () => Promise<unknown>;
       getPreparationSnapshots?: () => Promise<unknown>;
     }
@@ -96,7 +96,7 @@ vi.mock('../websocket/stream.js', () => ({
       Response.json({
         cloudStatus: await options?.deriveCloudStatus?.(),
         queuedMessages: await options?.deriveQueuedMessages?.(),
-        pendingInteractions: await options?.derivePendingInteractions?.(),
+        pendingInteractions: options?.readPendingInteractions?.(),
         sessionStatus: await options?.deriveSessionStatus?.(),
         preparationSnapshots: await options?.getPreparationSnapshots?.(),
       }),
@@ -2770,6 +2770,38 @@ describe('SandboxSession orchestration', () => {
     expect(fixture.control.quarantineRuntime).toHaveBeenCalledOnce();
   });
 
+  it('keeps the original client-started sync deadline when the watchdog joins later', async () => {
+    const fixture = sessionFixture();
+    const sync = deferred<ResponseFrame>();
+    await fixture.admit('a');
+    await fixture.flush();
+    delegateRequest(fixture, 'session.sync', () => sync.promise);
+    vi.setSystemTime(Date.now() + DEADLINE_MS.acceptedOverdue);
+    await fixture.snapshot();
+    await fixture.flush();
+    await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS / 2);
+    const alarm = fixture.fireAlarm();
+    await fixture.flush();
+    expect(
+      fixture.control.request.mock.calls.filter(([input]) => input.operation === 'session.sync')
+    ).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS / 2 - 1);
+    expect(fixture.record('a')?.state).toBe('accepted');
+    await vi.advanceTimersByTimeAsync(1);
+    await alarm;
+    expect(fixture.record('a')).toMatchObject({
+      state: 'failed',
+      failedReason: 'runtime_unhealthy',
+    });
+    const afterFailure = fixture.storage.kv.get('session_pending_interactions');
+    sync.resolve(
+      controlResponse({ status: { type: 'busy' }, questions: [{ id: 'late' }], permissions: [] })
+    );
+    await fixture.flush();
+    expect(fixture.storage.kv.get('session_pending_interactions')).toEqual(afterFailure);
+    expect(fixture.control.quarantineRuntime).toHaveBeenCalledOnce();
+  });
+
   it('does not apply a late unhealthy health result to the next accepted message', async () => {
     const fixture = sessionFixture();
     const sync = deferred<ResponseFrame>();
@@ -2867,6 +2899,7 @@ describe('SandboxSession orchestration', () => {
     expect(await fixture.snapshot()).toMatchObject({
       pendingInteractions: { questions: [childQuestion], permissions: [childPermission] },
     });
+    await fixture.flush();
     const rootQuestion = { id: 'root_q', sessionID: 'kilo_root' };
     delegateRequest(fixture, 'session.sync', async input => {
       expect(input.session).toEqual({
@@ -2881,10 +2914,12 @@ describe('SandboxSession orchestration', () => {
       });
     });
     expect(await fixture.snapshot()).toMatchObject({
-      pendingInteractions: {
-        questions: [rootQuestion, childQuestion],
-        permissions: [childPermission],
-      },
+      pendingInteractions: { questions: [childQuestion], permissions: [childPermission] },
+    });
+    await fixture.flush();
+    expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
+      questions: [rootQuestion, childQuestion],
+      permissions: [childPermission],
     });
     await fixture.rawEvent(
       'question.replied',
@@ -2946,6 +2981,8 @@ describe('SandboxSession orchestration', () => {
       error: { code: 'read_failed', message: 'Not available', retryable: true },
     }));
     expect(await fixture.snapshot()).not.toHaveProperty('pendingInteractions');
+    await fixture.flush();
+    expect(fixture.storage.kv.get('session_pending_interactions')).toBeUndefined();
     delegateRequest(fixture, 'session.sync', async input => {
       expect(input.session?.directory).toBe(DIRECTORY);
       return controlResponse({
@@ -2954,14 +2991,22 @@ describe('SandboxSession orchestration', () => {
         permissions: [{ id: 'p' }],
       });
     });
-    expect(await fixture.snapshot()).toMatchObject({
-      pendingInteractions: { questions: [{ id: 'q' }], permissions: [{ id: 'p' }] },
+    expect(await fixture.snapshot()).not.toHaveProperty('pendingInteractions');
+    await fixture.flush();
+    expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
+      questions: [{ id: 'q' }],
+      permissions: [{ id: 'p' }],
     });
     delegateRequest(fixture, 'session.sync', async () =>
       controlResponse({ status: { type: 'busy' }, questions: [], permissions: [] })
     );
     expect(await fixture.snapshot()).toMatchObject({
-      pendingInteractions: { questions: [], permissions: [] },
+      pendingInteractions: { questions: [{ id: 'q' }], permissions: [{ id: 'p' }] },
+    });
+    await fixture.flush();
+    expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
+      questions: [],
+      permissions: [],
     });
   });
 
@@ -2980,7 +3025,12 @@ describe('SandboxSession orchestration', () => {
       controlResponse({ status: { type: 'busy' }, questions: [question], permissions: [] })
     );
     expect(await snapshot).toMatchObject({
-      pendingInteractions: { questions: [], permissions: [] },
+      pendingInteractions: { questions: [question], permissions: [] },
+    });
+    await fixture.flush();
+    expect(fixture.storage.kv.get('session_pending_interactions')).toMatchObject({
+      questions: [],
+      permissions: [],
     });
   });
 

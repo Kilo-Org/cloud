@@ -79,6 +79,12 @@ import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createMessageId } from '../session/message-id.js';
 import { validateControlSessionOptions } from './attach-payload.js';
+import { pendingInputProjection } from './session-input-projection.js';
+import {
+  createInteractionRefresh,
+  type InteractionRefresh,
+  type InteractionRefreshScope,
+} from './session-interaction-refresh.js';
 import {
   createWorktreeChanges,
   worktreeChangesContext,
@@ -206,6 +212,7 @@ export class SandboxSession extends DurableObject<Env> {
   private readonly activeOperations = new Set<Promise<unknown>>();
   private deletionCompletion: Promise<void> | undefined;
   private readonly worktreeChanges: ReturnType<typeof createWorktreeChanges>;
+  private readonly interactionRefresh: InteractionRefresh;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -290,6 +297,15 @@ export class SandboxSession extends DurableObject<Env> {
         ),
       waitUntil: promise => this.ctx.waitUntil(promise),
     });
+    this.interactionRefresh = createInteractionRefresh({
+      captureScope: () => this.captureInteractionScope(),
+      sync: (scope, trigger) => this.syncAcceptedMessage(scope, trigger),
+      onBackgroundError: () => {
+        logger
+          .withFields({ sessionId: this.sessionId })
+          .warn('Pending interaction sync unavailable');
+      },
+    });
     void ctx.blockConcurrencyWhile(async () => {
       await migrate(db, migrations);
       this.deletedWorktreeId = cloudAgentWorktreeIdSchema
@@ -314,7 +330,7 @@ export class SandboxSession extends DurableObject<Env> {
     const handler = createStreamHandler(this.ctx, this.eventQueries, sessionId, {
       deriveCloudStatus: () => this.deriveCloudStatus(),
       deriveQueuedMessages: () => this.deriveQueuedMessages(),
-      derivePendingInteractions: () => this.derivePendingInteractions(),
+      readPendingInteractions: () => this.derivePendingInteractions(),
       deriveSessionStatus: async () =>
         hasAcceptedMessage(this.loadMessages())
           ? { type: 'busy' as const }
@@ -1270,6 +1286,7 @@ export class SandboxSession extends DurableObject<Env> {
         now,
         accepted.lastActivityAt
       );
+      const scope = this.captureInteractionScope();
       await this.armQueueRetry(
         decision.action === 'rearm' ? decision.at : now + DEADLINE_MS.acceptedAlarmCap
       );
@@ -1292,8 +1309,12 @@ export class SandboxSession extends DurableObject<Env> {
           );
         logControlDiagnostic('accepted_reconciliation', { ...diagnostic, phase: 'started' });
         try {
-          const snapshot = await this.syncAcceptedMessage(accepted, epoch, 'accepted_alarm');
-          if (!snapshot || !this.isCurrentAcceptedMessage(accepted, epoch)) {
+          const snapshot = await this.interactionRefresh.refresh(scope, 'accepted_alarm');
+          if (
+            !snapshot ||
+            !scope ||
+            !this.interactionRefresh.isCurrent(scope, (scope.interactionRevision ?? 0) + 1)
+          ) {
             diagnostic.reason = snapshot ? 'accepted_message_changed' : 'sync_superseded';
             report('superseded');
             return;
@@ -2056,11 +2077,36 @@ export class SandboxSession extends DurableObject<Env> {
     return current?.state === 'accepted' && current.wrapperInstanceId === message.wrapperInstanceId;
   }
 
+  private captureInteractionScope(): InteractionRefreshScope | undefined {
+    const epoch = this.terminalLifecycle.captureEpoch();
+    const message = this.loadMessages().find(item => item.state === 'accepted');
+    if (epoch === null || !message) return undefined;
+    const metadata = this.terminalLifecycle.getStoredMetadata();
+    return {
+      message,
+      epoch,
+      interactionRevision: this.readPendingInteractions()?.revision,
+      sessionId: metadata?.identity.sessionId,
+      sandboxId: metadata?.workspace?.sandboxId,
+      kiloSessionId: metadata?.auth.kiloSessionId,
+      directory: metadata ? this.directory(metadata) : undefined,
+      worktreeId: metadata?.workspace?.worktreeId,
+    };
+  }
+
   private async syncAcceptedMessage(
-    message: MessageRecord,
-    epoch: number,
+    scope: InteractionRefreshScope,
     trigger: 'accepted_alarm' | 'pending_interactions'
   ): Promise<SessionSyncResult | undefined> {
+    const {
+      message,
+      epoch,
+      sessionId,
+      sandboxId,
+      kiloSessionId,
+      directory,
+      interactionRevision: revision,
+    } = scope;
     const startedAt = Date.now();
     const diagnostic: ControlDiagnosticFields = {
       sessionId: this.sessionId,
@@ -2075,28 +2121,27 @@ export class SandboxSession extends DurableObject<Env> {
     let outcome: 'synced' | 'superseded' | 'failed' = 'failed';
     logControlDiagnostic('session_sync', { ...diagnostic, phase: 'started' });
     try {
-      const metadata = this.terminalLifecycle.getStoredMetadata();
-      const sandboxId = metadata?.workspace?.sandboxId;
-      const kiloSessionId = metadata?.auth.kiloSessionId;
       diagnostic.sandboxId = sandboxId;
       diagnostic.kiloSessionId = kiloSessionId;
-      diagnostic.worktreeId = metadata?.workspace?.worktreeId;
+      diagnostic.worktreeId = scope.worktreeId;
       if (
-        !metadata ||
+        !sessionId ||
+        !directory ||
         !sandboxId ||
         !kiloSessionId ||
         !message.wrapperInstanceId ||
         this.pendingRuntimeCleanup()
       ) {
-        diagnostic.reason = !metadata
-          ? 'missing_metadata'
-          : !sandboxId
-            ? 'missing_sandbox'
-            : !kiloSessionId
-              ? 'missing_kilo_session'
-              : !message.wrapperInstanceId
-                ? 'missing_wrapper_identity'
-                : 'cleanup_pending';
+        diagnostic.reason =
+          !sessionId || !directory
+            ? 'missing_metadata'
+            : !sandboxId
+              ? 'missing_sandbox'
+              : !kiloSessionId
+                ? 'missing_kilo_session'
+                : !message.wrapperInstanceId
+                  ? 'missing_wrapper_identity'
+                  : 'cleanup_pending';
         throw new Error('Accepted runtime is unavailable');
       }
       const control = sandboxControlRpc(this.env, sandboxId);
@@ -2109,9 +2154,9 @@ export class SandboxSession extends DurableObject<Env> {
           diagnostic.timedOut = true;
         }
       );
-      if (!this.isCurrentAcceptedMessage(message, epoch)) {
+      if (!this.interactionRefresh.isCurrent(scope) || this.pendingRuntimeCleanup()) {
         outcome = 'superseded';
-        diagnostic.reason = 'accepted_message_changed';
+        diagnostic.reason = 'observation_scope_changed';
         return undefined;
       }
       diagnostic.stage = 'runtime_identity';
@@ -2151,19 +2196,13 @@ export class SandboxSession extends DurableObject<Env> {
               : 'wrapper_mismatch';
         throw new Error('Accepted runtime is not ready');
       }
-      diagnostic.stage = 'read_interactions';
-      const revision = this.readPendingInteractions()?.revision;
       diagnostic.interactionRevision = revision;
       diagnostic.stage = 'sync_request';
       const response = await withTimeout(
         control.request({
           operation: 'session.sync',
           expectedWrapperInstanceId: message.wrapperInstanceId,
-          session: {
-            sessionId: metadata.identity.sessionId,
-            kiloSessionId,
-            directory: this.directory(metadata),
-          },
+          session: { sessionId, kiloSessionId, directory },
           payload: {},
         }),
         SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
@@ -2172,9 +2211,9 @@ export class SandboxSession extends DurableObject<Env> {
           diagnostic.timedOut = true;
         }
       );
-      if (!this.isCurrentAcceptedMessage(message, epoch)) {
+      if (!this.interactionRefresh.isCurrent(scope) || this.pendingRuntimeCleanup()) {
         outcome = 'superseded';
-        diagnostic.reason = 'accepted_message_changed';
+        diagnostic.reason = 'observation_scope_changed';
         return undefined;
       }
       diagnostic.requestId = response?.requestId;
@@ -2211,7 +2250,7 @@ export class SandboxSession extends DurableObject<Env> {
         return root === undefined ? request.sessionID === kiloSessionId : root === kiloSessionId;
       };
       diagnostic.stage = 'scope_interactions';
-      const result = metadata.workspace?.worktreeId
+      const result = scope.worktreeId
         ? {
             ...parsed,
             questions: parsed.questions.filter(belongsToRoot),
@@ -2221,20 +2260,30 @@ export class SandboxSession extends DurableObject<Env> {
       diagnostic.questionCount = result.questions.length;
       diagnostic.permissionCount = result.permissions.length;
       diagnostic.stage = 'interaction_revision';
-      const applyInteractions = this.readPendingInteractions()?.revision === revision;
+      const previousInteractions = this.readPendingInteractions();
+      const currentRevision = previousInteractions?.revision;
+      const applySnapshot = currentRevision === revision;
       diagnostic.interactionSnapshotApplied = false;
-      if (applyInteractions) {
-        diagnostic.stage = 'persist_interactions';
-        this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
-          revision: (revision ?? 0) + 1,
-          questions: result.questions,
-          permissions: result.permissions,
-        });
-        diagnostic.interactionSnapshotApplied = true;
+      if (!applySnapshot) {
+        diagnostic.reason = 'interaction_revision_changed';
+        outcome = 'superseded';
+        return undefined;
       }
+      if (!this.interactionRefresh.isCurrent(scope) || this.pendingRuntimeCleanup()) {
+        diagnostic.reason = 'observation_scope_changed';
+        outcome = 'superseded';
+        return undefined;
+      }
+      diagnostic.stage = 'persist_interactions';
+      this.ctx.storage.kv.put(PENDING_INTERACTIONS_KEY, {
+        revision: (currentRevision ?? 0) + 1,
+        questions: result.questions,
+        permissions: result.permissions,
+      });
+      diagnostic.interactionSnapshotApplied = true;
       diagnostic.stage = 'persist_status';
       persistSandboxControlSessionEvent({
-        sessionId: metadata.identity.sessionId,
+        sessionId,
         payload: {
           type: 'session.status',
           properties: { sessionID: kiloSessionId, status: result.status },
@@ -2242,9 +2291,27 @@ export class SandboxSession extends DurableObject<Env> {
         eventQueries: this.eventQueries,
         broadcast: event => this.broadcastStoredEvent(event),
       });
+      for (const event of pendingInputProjection(
+        sessionId,
+        previousInteractions,
+        result,
+        Date.now()
+      )) {
+        this.broadcastStoredEvent(event);
+      }
       outcome = 'synced';
       return result;
     } catch (error) {
+      if (
+        !this.interactionRefresh.isCurrent(
+          scope,
+          diagnostic.interactionSnapshotApplied ? (revision ?? 0) + 1 : revision
+        )
+      ) {
+        outcome = 'superseded';
+        diagnostic.reason = 'observation_scope_changed';
+        return undefined;
+      }
       diagnostic.reason ??= diagnostic.timedOut
         ? 'timeout'
         : error instanceof z.ZodError
@@ -2274,22 +2341,13 @@ export class SandboxSession extends DurableObject<Env> {
     }
   }
 
-  private async derivePendingInteractions(): Promise<
-    { questions: unknown[]; permissions: unknown[] } | undefined
-  > {
+  private derivePendingInteractions():
+    | { questions: unknown[]; permissions: unknown[] }
+    | undefined {
     const epoch = this.terminalLifecycle.captureEpoch();
     if (epoch === null) return undefined;
-    const accepted = this.loadMessages().find(message => message.state === 'accepted');
-    if (accepted) {
-      try {
-        await this.syncAcceptedMessage(accepted, epoch, 'pending_interactions');
-      } catch {
-        logger
-          .withFields({ sessionId: this.sessionId })
-          .warn('Pending interaction sync unavailable');
-      }
-    }
     if (!this.terminalLifecycle.isCurrent(epoch)) return undefined;
+    this.interactionRefresh.scheduleRefresh();
     const snapshot = this.readPendingInteractions();
     return snapshot
       ? { questions: snapshot.questions, permissions: snapshot.permissions }

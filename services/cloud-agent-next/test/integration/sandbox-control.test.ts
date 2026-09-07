@@ -12761,7 +12761,7 @@ describe('SandboxSession running stream state', () => {
 });
 
 describe('SandboxSession root-scoped reconnect sync', () => {
-  it('reconciles an accepted root before connected and replays only its questions and permissions afterward', async () => {
+  it('connects from cached root inputs before sync and preserves scoped background reconciliation', async () => {
     const wrapperInstanceId = crypto.randomUUID();
     const ownerId = 'user_grouped_sync';
     const activeSessionId = GRANT_SESSION_ID;
@@ -12832,20 +12832,6 @@ describe('SandboxSession root-scoped reconnect sync', () => {
     };
     expect(emptyConnected.streamEventType).toBe('connected');
 
-    const pendingActiveResponse = SELF.fetch(
-      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
-      { headers: { Upgrade: 'websocket' } }
-    );
-    const sync = JSON.parse(await incomingSync) as WrapperRequest;
-    expect(sync).toMatchObject({
-      operation: 'session.sync',
-      session: {
-        sessionId: activeSessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/shared',
-      },
-      payload: {},
-    });
     const questions = [
       { id: 'question_root', sessionID: ROOT_ID, questions: [{ question: 'Root?' }] },
       {
@@ -12859,6 +12845,67 @@ describe('SandboxSession root-scoped reconnect sync', () => {
       { id: 'permission_root', sessionID: ROOT_ID },
       { id: 'permission_child', sessionID: THIRD_ROOT_ID, rootKiloSessionId: ROOT_ID },
     ];
+    await runInDurableObject(active, async (_instance, state) => {
+      await state.storage.put('session_pending_interactions', {
+        revision: 1,
+        questions,
+        permissions,
+      });
+    });
+    const activeResponse = await SELF.fetch(
+      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    const sync = JSON.parse(await incomingSync) as WrapperRequest;
+    expect(sync).toMatchObject({
+      operation: 'session.sync',
+      session: {
+        sessionId: activeSessionId,
+        kiloSessionId: ROOT_ID,
+        directory: '/workspace/shared',
+      },
+      payload: {},
+    });
+    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
+      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
+    }
+    activeResponse.webSocket.accept();
+    const events = (await nextMessages(activeResponse.webSocket, 7)).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+    expect(events.map(event => event.streamEventType)).toEqual([
+      'connected',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'cloud.message.queued',
+      'cloud.message.sent',
+    ]);
+    expect(events[0]?.data).toMatchObject({
+      cloudStatus: { type: 'ready' },
+      activeMessageId: INITIAL_MESSAGE_ID,
+      pendingInteractions: { questions, permissions },
+    });
+    expect(events.slice(1, 3)).toEqual(
+      questions.map(question =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'question.asked', event: 'question.asked', properties: question },
+        })
+      )
+    );
+    expect(events.slice(3, 5)).toEqual(
+      permissions.map(permission =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        })
+      )
+    );
+    const incomingStatus = nextMessage(activeResponse.webSocket);
     respondToWrapperRequest(wrapper, sync, {
       status: { type: 'busy' },
       questions: [
@@ -12872,49 +12919,13 @@ describe('SandboxSession root-scoped reconnect sync', () => {
         { id: 'permission_contradictory', sessionID: ROOT_ID, rootKiloSessionId: SECOND_ROOT_ID },
       ],
     });
-    const activeResponse = await pendingActiveResponse;
-    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
-      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
-    }
-    activeResponse.webSocket.accept();
-    const events = (await nextMessages(activeResponse.webSocket, 8)).map(
-      message => JSON.parse(message) as SessionStreamEvent
-    );
-    expect(events.map(event => event.streamEventType)).toEqual([
-      'kilocode',
-      'connected',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'cloud.message.queued',
-      'cloud.message.sent',
-    ]);
-    expect(events[1]?.data).toMatchObject({
-      cloudStatus: { type: 'ready' },
-      activeMessageId: INITIAL_MESSAGE_ID,
-      pendingInteractions: { questions, permissions },
+    expect(JSON.parse(await incomingStatus)).toMatchObject({
+      streamEventType: 'kilocode',
+      data: { type: 'session.status' },
     });
-    expect(events.slice(2, 4)).toEqual(
-      questions.map(question =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'question.asked', event: 'question.asked', properties: question },
-        })
-      )
-    );
-    expect(events.slice(4, 6)).toEqual(
-      permissions.map(permission =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
-        })
-      )
-    );
     await runInDurableObject(active, async (_instance, state) => {
       expect(await state.storage.get('session_pending_interactions')).toMatchObject({
+        revision: 2,
         questions,
         permissions,
       });

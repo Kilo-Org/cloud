@@ -13,6 +13,7 @@ import {
 } from '../../../wrapper/src/control/session-directories.js';
 import { resetDirectoryOperationState } from '../../../wrapper/src/control/worktree-operations.js';
 import {
+  createControlHandlerDeps,
   createSessionActivityRegistry,
   handleControlRequest,
   refreshHeartbeatPayload,
@@ -572,7 +573,7 @@ describe('direct worktree credential refresh', () => {
     f.statuses.mockReturnValueOnce(status.promise);
     const activity = createSessionActivityRegistry();
     activity.attach(identity.kiloSessionId);
-    const deps: HandlerDeps = {
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: f.registry,
       version: 'test',
       kiloReady: true,
@@ -581,7 +582,7 @@ describe('direct worktree credential refresh', () => {
       activity,
       emitSessionEvent: vi.fn(),
       retireRuntime: vi.fn(),
-    };
+    });
     const heartbeat = refreshHeartbeatPayload(deps);
     const oldClient = runtime.kiloClient;
     await f.attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' });

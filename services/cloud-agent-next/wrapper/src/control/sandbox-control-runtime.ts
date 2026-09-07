@@ -3,6 +3,7 @@ import {
   emitControlDiagnostic,
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
+import type { SandboxHeartbeatPayload } from '../../../src/shared/sandbox-control-protocol.js';
 import {
   createSandboxControlClient,
   type SandboxControlClient,
@@ -23,7 +24,8 @@ type StartOptions = {
   onRequest?: SandboxControlRequestHandler;
   onConnected?: (client: SandboxControlClient) => void;
   onDisconnected?: () => void;
-  getHeartbeatPayload?: () => unknown;
+  getHeartbeatPayload?: () => SandboxHeartbeatPayload;
+  sampleHeartbeat?: (signal: AbortSignal) => Promise<void>;
   isReady?: () => boolean;
   onDiagnostic?: ControlDiagnosticReporter;
 };
@@ -37,7 +39,7 @@ type SandboxControlEventFeedOptions = {
   now?: () => number;
 };
 
-const HEARTBEAT_INTERVAL_MS = 30_000;
+export const SANDBOX_CONTROL_REPORT_INTERVAL_MS = 15_000;
 export const KILO_FEED_FRESHNESS_TIMEOUT_MS = 30_000;
 export const KILO_CONTROL_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -190,8 +192,9 @@ export function maybeStartSandboxControlClient(
   }
 
   const createClient = options.createClient ?? createSandboxControlClient;
-  let heartbeat: ReturnType<typeof setTimeout> | null = null;
-  let heartbeatInFlight = false;
+  let heartbeat: ReturnType<typeof setInterval> | null = null;
+  let sampling: Promise<void> | undefined;
+  const sampleAbort = new AbortController();
   let closed = false;
   let heartbeatSequence = 0;
   let lastSentAt: number | undefined;
@@ -204,8 +207,8 @@ export function maybeStartSandboxControlClient(
     });
 
   function stopHeartbeat(): void {
-    if (!heartbeat) return;
-    clearTimeout(heartbeat);
+    sampleAbort.abort();
+    if (heartbeat) clearInterval(heartbeat);
     heartbeat = null;
     diagnostic('stopped');
   }
@@ -217,46 +220,53 @@ export function maybeStartSandboxControlClient(
     options.onDisconnected?.();
   }
 
-  async function sendHeartbeat(active: SandboxControlClient): Promise<void> {
-    if (
-      closed ||
-      heartbeatInFlight ||
-      options.isReady?.() === false ||
-      !options.getHeartbeatPayload
-    )
+  function triggerSample(): void {
+    const sample = options.sampleHeartbeat;
+    if (closed || sampleAbort.signal.aborted || sampling || !sample) return;
+    const pending = Promise.resolve().then(() => {
+      if (!sampleAbort.signal.aborted) return sample(sampleAbort.signal);
+    });
+    sampling = pending;
+    void pending.then(
+      () => {
+        if (sampling === pending) sampling = undefined;
+      },
+      () => {
+        if (sampling === pending) sampling = undefined;
+        if (!sampleAbort.signal.aborted) log('sandbox control heartbeat sampling failed');
+      }
+    );
+  }
+
+  function sendHeartbeat(active: SandboxControlClient): void {
+    if (closed || sampleAbort.signal.aborted) return;
+    if (options.isReady?.() === false) {
+      stopHeartbeat();
       return;
-    heartbeatInFlight = true;
+    }
+    if (!options.getHeartbeatPayload) return;
     heartbeatSequence += 1;
     diagnostic('sending');
+    let payload: SandboxHeartbeatPayload;
     try {
-      const payload = await options.getHeartbeatPayload();
-      if (closed || options.isReady?.() === false) return;
-      try {
-        if (!active.sendEvent?.('sandbox.heartbeat', payload)) {
-          diagnostic('send_failed');
-          handleDisconnected();
-        } else {
-          lastSentAt = Date.now();
-          diagnostic('sent');
-        }
-      } catch {
-        diagnostic('send_threw');
+      payload = options.getHeartbeatPayload();
+    } catch {
+      diagnostic('send_threw');
+      log('sandbox control heartbeat failed');
+      return;
+    }
+    if (closed) return;
+    try {
+      if (!active.sendEvent?.('sandbox.heartbeat', payload)) {
+        diagnostic('send_failed');
         handleDisconnected();
+      } else {
+        lastSentAt = Date.now();
+        diagnostic('sent');
       }
     } catch {
-      if (!closed) {
-        diagnostic('send_threw');
-        log('sandbox control heartbeat failed');
-      }
-    } finally {
-      heartbeatInFlight = false;
-      if (!closed && options.isReady?.() !== false) {
-        heartbeat = setTimeout(() => {
-          heartbeat = null;
-          void sendHeartbeat(active);
-        }, HEARTBEAT_INTERVAL_MS);
-        heartbeat.unref();
-      }
+      diagnostic('send_threw');
+      handleDisconnected();
     }
   }
 
@@ -266,9 +276,15 @@ export function maybeStartSandboxControlClient(
       handleDisconnected();
       return;
     }
-    if (options.getHeartbeatPayload) {
-      stopHeartbeat();
-      void sendHeartbeat(active);
+    sendHeartbeat(active);
+    triggerSample();
+    if (!closed && !sampleAbort.signal.aborted && options.getHeartbeatPayload) {
+      if (heartbeat) clearInterval(heartbeat);
+      heartbeat = setInterval(() => {
+        sendHeartbeat(active);
+        triggerSample();
+      }, SANDBOX_CONTROL_REPORT_INTERVAL_MS);
+      heartbeat.unref();
     }
     options.onConnected?.(active);
   }

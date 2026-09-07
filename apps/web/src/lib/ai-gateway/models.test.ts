@@ -217,18 +217,24 @@ describe('isFreeModel', () => {
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'minimax/minimax-m3:free': { enabled: true, effort: 'high' },
         'minimax/minimax-m2.7:free': { enabled: true, effort: 'high' },
+        'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('weights Step three times as heavily as each other Auto Free model', () => {
-      expect(
-        Object.fromEntries(autoFreeModels.map(({ model, weight }) => [model, weight]))
-      ).toEqual({
-        'stepfun/step-3.7-flash:free': 3,
+    test('keeps Step at 50% of Auto Free selections', () => {
+      const weights = Object.fromEntries(
+        autoFreeModels.map(({ model, weight }) => [model, weight])
+      );
+      expect(weights).toEqual({
+        'stepfun/step-3.7-flash:free': 4,
         'poolside/laguna-s-2.1:free': 1,
         'minimax/minimax-m3:free': 1,
         'minimax/minimax-m2.7:free': 1,
+        'dots-studio/dots-3-note-preview:free': 1,
       });
+      expect(weights['stepfun/step-3.7-flash:free']).toBe(
+        autoFreeModels.reduce((total, { weight }) => total + weight, 0) / 2
+      );
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {

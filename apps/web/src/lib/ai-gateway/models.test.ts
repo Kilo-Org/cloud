@@ -103,11 +103,12 @@ describe('isFreeModel', () => {
 
     test('preserves MiniMax Auto Free and preferred model membership', () => {
       for (const model of ['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free']) {
-        expect(autoFreeModels).toContainEqual({
-          model,
-          weight: 1,
-          reasoning: { enabled: true, effort: 'high' },
-        });
+        expect(autoFreeModels).toContainEqual(
+          expect.objectContaining({
+            model,
+            reasoning: { enabled: true, effort: 'high' },
+          })
+        );
         expect(preferredModels).toContain(model);
       }
     });
@@ -208,20 +209,21 @@ describe('isFreeModel', () => {
       });
     });
 
-    test('keeps Step at 50% of Auto Free selections', () => {
+    test('keeps Step and MiniMax M2.7 at one-third of Auto Free selections each', () => {
       const weights = Object.fromEntries(
         autoFreeModels.map(({ model, weight }) => [model, weight])
       );
       expect(weights).toEqual({
-        'stepfun/step-3.7-flash:free': 4,
+        'stepfun/step-3.7-flash:free': 3,
         'poolside/laguna-s-2.1:free': 1,
         'minimax/minimax-m3:free': 1,
-        'minimax/minimax-m2.7:free': 1,
+        'minimax/minimax-m2.7:free': 3,
         'dots-studio/dots-3-note-preview:free': 1,
       });
-      expect(weights['stepfun/step-3.7-flash:free']).toBe(
-        autoFreeModels.reduce((total, { weight }) => total + weight, 0) / 2
-      );
+      const oneThirdOfTotalWeight =
+        autoFreeModels.reduce((total, { weight }) => total + weight, 0) / 3;
+      expect(weights['stepfun/step-3.7-flash:free']).toBe(oneThirdOfTotalWeight);
+      expect(weights['minimax/minimax-m2.7:free']).toBe(oneThirdOfTotalWeight);
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {

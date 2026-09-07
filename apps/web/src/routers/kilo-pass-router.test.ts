@@ -1119,9 +1119,9 @@ describe('kiloPassRouter', () => {
           providerTransactionId: crypto.randomUUID(),
           expiresAtIso: '2099-01-01T00:00:00.000Z',
         });
-        const actual = jest.requireActual<
-          typeof StoreSubscriptionCompletion
-        >('@/lib/kilo-pass/store-subscription-completion');
+        const actual = jest.requireActual<typeof StoreSubscriptionCompletion>(
+          '@/lib/kilo-pass/store-subscription-completion'
+        );
         const completed = await actual.completeStoreKiloPassPurchase({ user, purchase });
         const before = await db.query.kilocode_users.findFirst({
           where: eq(kilocode_users.id, user.id),

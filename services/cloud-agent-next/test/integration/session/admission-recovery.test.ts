@@ -306,7 +306,16 @@ describe('forward-only clone reporting admission', () => {
       const input = cloneRegistrationInput(new Date().toISOString());
       const release = Promise.withResolvers<void>();
       let shouldFail = failFirstWrite;
-      vi.mocked(sessionReports.ensureCloneSessionReport).mockImplementation(async () => {
+      let anchorAttempts = 0;
+      vi.mocked(sessionReports.ensureCloneSessionReport).mockImplementation(async metadata => {
+        // Earlier tests in this file leave sessions with undrained pending messages and
+        // armed drain alarms. When the alarm loop wakes one of those sessions while this
+        // test runs, its queued-state report reaches the same module-level mock through
+        // the prototype `reportRunState`, invisible to this session's instance stubs.
+        // Only this session's anchor attempts may gate the slow-write simulation or
+        // count toward the anchor budget.
+        if (metadata?.identity.sessionId !== input.identity.sessionId) return;
+        anchorAttempts += 1;
         await release.promise;
         if (shouldFail) {
           shouldFail = false;
@@ -362,7 +371,7 @@ describe('forward-only clone reporting admission', () => {
           if (!state) throw new Error('Expected persisted first message');
           await instance['reportRunState'](state);
           expect(reports).toHaveLength(3);
-          expect(sessionReports.ensureCloneSessionReport).toHaveBeenCalledTimes(3);
+          expect(anchorAttempts).toBe(3);
         } finally {
           release.resolve();
           await progress;
@@ -375,6 +384,13 @@ describe('forward-only clone reporting admission', () => {
     'does not anchor from cached identity when live metadata is %s',
     async missingState => {
       const input = cloneRegistrationInput(new Date().toISOString());
+      const anchorMetadata: unknown[] = [];
+      vi.mocked(sessionReports.ensureCloneSessionReport).mockImplementation(async metadata => {
+        // Alarm-driven reports from other sessions (see the anchor-writes test) reach
+        // the same module-level mock; only this session's attempts are meaningful here.
+        if (metadata && metadata.identity.sessionId !== input.identity.sessionId) return;
+        anchorMetadata.push(metadata);
+      });
       await runInDurableObject(cloneStub(input), async instance => {
         expect(await instance.registerSession(input)).toEqual({ success: true });
         expect(
@@ -397,10 +413,8 @@ describe('forward-only clone reporting admission', () => {
           });
         }
         await instance['reportRunState'](state);
-        expect(sessionReports.ensureCloneSessionReport).toHaveBeenLastCalledWith(
-          null,
-          expect.anything()
-        );
+        expect(anchorMetadata.length).toBeGreaterThan(0);
+        expect(anchorMetadata.at(-1)).toBeNull();
         expect(await instance.getMetadata()).toBeNull();
       });
     }

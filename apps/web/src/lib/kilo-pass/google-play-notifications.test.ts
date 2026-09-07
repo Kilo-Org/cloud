@@ -172,6 +172,107 @@ describe('processGooglePlayKiloPassNotification', () => {
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiData());
   });
 
+  it.each([false, true])(
+    'keeps deferred entitlement when old expiry arrives first: %s',
+    async expiredFirst => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      const oldToken = crypto.randomUUID();
+      const token = crypto.randomUUID();
+      const oldOrder = crypto.randomUUID();
+      const deferredOrder = crypto.randomUUID();
+      const oldItem = {
+        productId: 'kilopass_tier19',
+        expiryTime: '2026-06-01T00:00:00Z',
+        latestSuccessfulOrderId: oldOrder,
+      };
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, oldOrder, {
+          startTime: '2026-05-01T00:00:00Z',
+          lineItems: [oldItem],
+        })
+      );
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({ purchaseToken: oldToken }),
+      });
+      const expireOld = async () => {
+        mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+          apiDataForUser(obfsAccountId, oldOrder, {
+            subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+            lineItems: [{ ...oldItem, expiryTime: '2026-05-15T00:00:00Z' }],
+          })
+        );
+        await processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({ purchaseToken: oldToken, notificationType: 13 }),
+        });
+      };
+      if (expiredFirst) await expireOld();
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, deferredOrder, {
+          linkedPurchaseToken: oldToken,
+          startTime: '2026-05-15T00:00:00Z',
+          acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+          lineItems: [
+            { productId: 'kilopass_tier49' },
+            {
+              ...oldItem,
+              latestSuccessfulOrderId: deferredOrder,
+              deferredItemReplacement: { productId: 'kilopass_tier49' },
+            },
+          ],
+        })
+      );
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId: deferredOrder,
+        purchaseToken: token,
+        state: 'PROCESSED',
+        lineItems: [{ productId: 'kilopass_tier49' }],
+      });
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({ purchaseToken: token }),
+      });
+      if (!expiredFirst) await expireOld();
+      const active = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.provider_subscription_id, token),
+      });
+      expect(active).toMatchObject({ status: 'active', tier: KiloPassTier.Tier19, ended_at: null });
+      const unchanged = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(unchanged!.total_microdollars_acquired).toBe(
+        user.total_microdollars_acquired + toMicrodollars(19)
+      );
+      expect(mockAcknowledge).toHaveBeenCalledTimes(1);
+      dateNowSpy.mockReturnValue(Date.parse('2026-06-01T00:00:00Z'));
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, undefined, {
+          linkedPurchaseToken: oldToken,
+          startTime: '2026-06-01T00:00:00Z',
+          lineItems: [
+            oldItem,
+            {
+              productId: 'kilopass_tier49',
+              expiryTime: '2026-07-01T00:00:00Z',
+              latestSuccessfulOrderId: crypto.randomUUID(),
+            },
+          ],
+        })
+      );
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({ purchaseToken: token, notificationType: 2 }),
+      });
+      const renewed = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.id, active!.id),
+      });
+      expect(renewed).toMatchObject({ tier: KiloPassTier.Tier49, current_streak_months: 2 });
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired).toBe(
+        user.total_microdollars_acquired + toMicrodollars(68)
+      );
+    }
+  );
+
   it('completes a purchased notification and tracks google_play', async () => {
     const trackingMock = getPosthogTrackingMock();
     const { user, obfsAccountId } = await insertGooglePlayUser();

@@ -10,8 +10,11 @@ const mockSubscriptionsV2Get = jest.fn().mockImplementation(() => ({
   data: { subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' },
 }));
 
+const mockOrdersGet = jest.fn().mockImplementation(() => ({ data: { orderId: 'paid-order' } }));
+
 const mockAndroidPublisher = jest.fn().mockImplementation((...args: unknown[]) => ({
   args,
+  orders: { get: mockOrdersGet },
   purchases: {
     subscriptionsv2: {
       get: mockSubscriptionsV2Get,
@@ -75,6 +78,25 @@ describe('google-play-sdk', () => {
       token: 'purchase-token',
     });
     expect(data).toEqual({ subscriptionState: 'SUBSCRIPTION_STATE_ACTIVE' });
+  });
+
+  it('reads only subscription order fields and propagates provider errors', async () => {
+    const { getGooglePlaySubscriptionOrder } = loadGooglePlaySdk();
+    await expect(getGooglePlaySubscriptionOrder('paid-order')).resolves.toEqual({
+      orderId: 'paid-order',
+    });
+    expect(mockOrdersGet).toHaveBeenCalledWith({
+      packageName: 'com.kilocode.kiloapp',
+      orderId: 'paid-order',
+      fields:
+        'orderId,purchaseToken,state,lineItems(productId,subscriptionDetails(servicePeriodStartTime,servicePeriodEndTime))',
+    });
+    mockOrdersGet.mockImplementationOnce(() => {
+      throw new Error('provider unavailable');
+    });
+    await expect(getGooglePlaySubscriptionOrder('paid-order')).rejects.toThrow(
+      'provider unavailable'
+    );
   });
 
   it('throws when the service account JSON is not set', () => {

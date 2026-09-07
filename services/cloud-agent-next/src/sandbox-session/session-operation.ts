@@ -1,37 +1,39 @@
+import type { DORetryScope } from '@kilocode/worker-utils';
+import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
+import type { EventQueries } from '../session/queries/index.js';
+import type { StoredEvent } from '../websocket/types.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
-  SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
+  sameSessionOperation,
   sessionAttachPayloadSchema,
   sessionAttachResultSchema,
-  sessionOperationAuthorizationSchema,
   sessionOperationAckSchema,
+  sessionOperationAuthorizationSchema,
   sessionOperationExpiresAt,
   sessionOperationLookupResultSchema,
   sessionPromptPayloadSchema,
   sessionPromptResultSchema,
-  sameSessionOperation,
+  type ControlError,
   type ResponseFrame,
   type SessionOperationAck,
   type SessionOperationAuthorization,
   type SessionOperationDelivery,
 } from '../shared/sandbox-control-protocol.js';
-import type { SandboxControlOutboundRequest } from '../sandbox-control/socket.js';
-import type { EventQueries } from '../session/queries/index.js';
-import type { StoredEvent } from '../websocket/types.js';
 import {
   applySessionOperationResult,
   completeSessionOperationAttachment,
   recordSessionOperationDispatch,
   type SessionMessageRecord,
 } from './session-message-queue.js';
-import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
 import { applyControlPlanePreparingEvent } from './control-plane-preparing.js';
+import { persistSandboxControlSessionEvent } from './sandbox-control-event.js';
 import {
   ControlRequestError,
   controlRequestResult,
   withDeliveryDeadline,
 } from './control-dispatch.js';
+import { persistSessionOperationDelivery } from './session-delivery.js';
 
 type OperationMessages = {
   read: () => SessionMessageRecord[];
@@ -39,152 +41,213 @@ type OperationMessages = {
 };
 
 export type SessionOperationEffects = {
-  request: (input: SandboxControlOutboundRequest) => Promise<ResponseFrame>;
+  request: (input: SandboxControlOutboundRequest, scope: DORetryScope) => Promise<ResponseFrame>;
   persistResult: (delivery: SessionOperationDelivery) => Promise<SessionOperationAck | undefined>;
-  isDispatchCurrent: () => boolean;
-  isMaintenanceCurrent: () => boolean;
+  assertAdmission: () => void;
+  assertScope: () => void;
+  defer: (pending: Promise<void>) => void;
 };
 
+type RunningOperation = Extract<
+  ReturnType<typeof sessionOperationLookupResultSchema.parse>,
+  { state: 'running' }
+>;
+type CompletedOperation = Extract<
+  ReturnType<typeof sessionOperationLookupResultSchema.parse>,
+  { state: 'completed' }
+>;
+type UncertainOperation = {
+  state: 'uncertain';
+  reason: 'missing' | 'unverified' | 'transport';
+  error?: unknown;
+};
+type RejectedOperation = { state: 'rejected'; error: ControlError };
+export type SessionOperationObservation =
+  | RunningOperation
+  | CompletedOperation
+  | UncertainOperation
+  | RejectedOperation;
 export type SessionOperationDispatch =
   | { state: 'response'; result: unknown }
-  | { state: 'running' }
-  | { state: 'completed' };
+  | { state: 'completed'; result: unknown }
+  | RunningOperation
+  | UncertainOperation
+  | RejectedOperation;
 
-function uncertainOperation(reason: string): ControlRequestError {
-  return new ControlRequestError({ code: 'runtime_unhealthy', message: reason, retryable: false });
+function rejectedOrUncertain(error: unknown): RejectedOperation | UncertainOperation {
+  return error instanceof ControlRequestError
+    ? {
+        state: 'rejected',
+        error: { code: error.code, message: error.message, retryable: error.retryable },
+      }
+    : { state: 'uncertain', reason: 'transport', error };
+}
+
+function rejectedBeforeAdmission(error: unknown): error is ControlRequestError {
+  return error instanceof ControlRequestError && error.admission === 'not-admitted';
+}
+
+export async function reconcileSessionOperation(
+  original: SessionOperationAuthorization,
+  deadlineAt: number,
+  effects: SessionOperationEffects
+): Promise<SessionOperationObservation> {
+  const authorization = sessionOperationAuthorizationSchema.parse(original);
+  const operationDeadlineAt = Math.min(deadlineAt, sessionOperationExpiresAt(authorization));
+  const scope = { deadlineAt: operationDeadlineAt, assertCurrent: effects.assertScope };
+  try {
+    effects.assertScope();
+    const response = await withDeliveryDeadline(
+      () =>
+        effects.request(
+          {
+            operation: 'session.operation.get',
+            session: authorization.session,
+            payload: authorization,
+            expectedWrapperInstanceId: authorization.wrapperInstanceId,
+            timeoutMs: Math.max(
+              1,
+              Math.min(SANDBOX_CONTROL_REQUEST_TIMEOUT_MS, operationDeadlineAt - Date.now())
+            ),
+            deadlineAt: operationDeadlineAt,
+          },
+          scope
+        ),
+      operationDeadlineAt
+    );
+    effects.assertScope();
+    if (Date.now() >= operationDeadlineAt) throw new Error('Operation observation expired');
+    const lookup = sessionOperationLookupResultSchema.parse(controlRequestResult(response));
+    if (lookup.state === 'missing') return { state: 'uncertain', reason: 'missing' };
+    const observed =
+      lookup.state === 'completed' ? lookup.delivery.authorization : lookup.authorization;
+    if (!sameSessionOperation(observed, authorization))
+      throw new Error('Operation observation identity changed');
+    if (lookup.state === 'completed') {
+      if (
+        (await persistSessionOperationDelivery(lookup.delivery, operationDeadlineAt, effects)) ===
+        'unverified'
+      )
+        return { state: 'uncertain', reason: 'unverified' };
+    }
+    return lookup;
+  } catch (error) {
+    return rejectedOrUncertain(error);
+  }
 }
 
 export async function dispatchSessionOperation(
   input: { authorization: SessionOperationAuthorization; payload: unknown },
   messages: OperationMessages,
-  effects: SessionOperationEffects
+  effects: SessionOperationEffects & { isCurrent: () => boolean }
 ): Promise<SessionOperationDispatch> {
   const authorization = sessionOperationAuthorizationSchema.parse(input.authorization);
   const kind = authorization.operation === 'session.attach' ? 'attach' : 'prompt';
-  const timeoutMs =
-    kind === 'attach' ? SANDBOX_CONTROL_ATTACH_TIMEOUT_MS : SANDBOX_CONTROL_REQUEST_TIMEOUT_MS;
-  const assertDispatchCurrent = () => {
-    if (!effects.isDispatchCurrent() || Date.now() >= authorization.dispatchDeadlineAt)
-      throw uncertainOperation('Session operation dispatch authority expired');
+  const deadlineAt = authorization.dispatchDeadlineAt;
+  const current = () => effects.isCurrent() && Date.now() < deadlineAt;
+  const assertAdmissionCurrent = () => {
+    effects.assertAdmission();
+    if (!current()) throw new Error('Session delivery is no longer authorized');
   };
-  const assertMaintenanceCurrent = () => {
-    if (!effects.isMaintenanceCurrent() || Date.now() >= sessionOperationExpiresAt(authorization))
-      throw uncertainOperation('Session operation maintenance authority expired');
+  const assertDispatchedCurrent = () => {
+    effects.assertScope();
+    if (!current()) throw new Error('Session delivery is no longer authorized');
   };
-  const existing = messages.read().find(message => message.messageId === authorization.messageId);
-  const proof = existing?.operations?.[kind];
-  if (
-    proof &&
-    !sameSessionOperation(
-      sessionOperationAuthorizationSchema.parse(proof.authorization),
-      authorization
-    )
-  )
-    throw uncertainOperation('Session operation authorization changed');
-
-  if (proof?.dispatched) {
-    assertMaintenanceCurrent();
-    const lookup = sessionOperationLookupResultSchema.parse(
-      controlRequestResult(
-        await withDeliveryDeadline(
-          () =>
-            effects.request({
-              operation: 'session.operation.get',
-              session: authorization.session,
-              payload: authorization,
-              expectedWrapperInstanceId: authorization.wrapperInstanceId,
-              deadlineAt: sessionOperationExpiresAt(authorization),
-              timeoutMs: SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
-            }),
-          sessionOperationExpiresAt(authorization),
-          SANDBOX_CONTROL_REQUEST_TIMEOUT_MS
-        )
-      )
-    );
-    assertMaintenanceCurrent();
-    if (lookup.state === 'missing')
-      throw uncertainOperation('Original session operation is missing');
-    if (lookup.state === 'running') {
-      if (!sameSessionOperation(lookup.authorization, authorization))
-        throw uncertainOperation('Original session operation identity changed');
-      return { state: 'running' };
-    }
-    if (!sameSessionOperation(lookup.delivery.authorization, authorization))
-      throw uncertainOperation('Original session operation identity changed');
-    const ack = await effects.persistResult(lookup.delivery);
-    if (!ack) throw uncertainOperation('Original session operation result was not verified');
-    assertMaintenanceCurrent();
-    controlRequestResult(
-      await withDeliveryDeadline(
-        () =>
-          effects.request({
-            operation: 'session.operation.ack',
-            session: authorization.session,
-            payload: ack,
-            expectedWrapperInstanceId: authorization.wrapperInstanceId,
-            deadlineAt: Math.min(
-              sessionOperationExpiresAt(authorization),
-              lookup.delivery.completedAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS
-            ),
-            timeoutMs: SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
-          }),
-        Math.min(
-          sessionOperationExpiresAt(authorization),
-          lookup.delivery.completedAt + SANDBOX_CONTROL_OUTCOME_TIMEOUT_MS
-        ),
-        SANDBOX_CONTROL_REQUEST_TIMEOUT_MS
-      )
-    );
-    if (kind === 'attach') {
-      const attached = sessionAttachResultSchema.safeParse(
-        lookup.delivery.result.ok ? lookup.delivery.result.result : undefined
+  const record = (dispatched: boolean) => {
+    if (!current()) return false;
+    const next = recordSessionOperationDispatch(messages.read(), authorization, dispatched);
+    return next !== undefined && messages.commit(next);
+  };
+  try {
+    const message = messages.read().find(item => item.messageId === authorization.messageId);
+    const proof = message?.operations?.[kind];
+    if (proof && !sameSessionOperation(proof.authorization, authorization))
+      throw new Error('Original operation authorization changed');
+    if (proof?.dispatched) {
+      effects.assertScope();
+      const lookup = await reconcileSessionOperation(
+        authorization,
+        sessionOperationExpiresAt(authorization),
+        effects
       );
-      if (!attached.success) throw uncertainOperation('Original attachment result is invalid');
-      const completed = completeSessionOperationAttachment(messages.read(), authorization);
-      if (!completed || !messages.commit(completed))
-        throw uncertainOperation('Original attachment result was not persisted');
-      return { state: 'response', result: attached.data };
+      if (lookup.state !== 'completed') return lookup;
+      if (!lookup.delivery.result.ok)
+        return { state: 'rejected', error: lookup.delivery.result.error };
+      if (kind === 'attach') {
+        const completed = completeSessionOperationAttachment(messages.read(), authorization);
+        if (!completed || !messages.commit(completed))
+          return { state: 'uncertain', reason: 'unverified' };
+      }
+      return { state: 'completed', result: lookup.delivery.result.result };
     }
-    return { state: 'completed' };
+    assertAdmissionCurrent();
+    const payload = structuredClone(
+      kind === 'attach'
+        ? sessionAttachPayloadSchema.parse(input.payload)
+        : sessionPromptPayloadSchema.parse(input.payload)
+    );
+    if (!record(true)) throw new Error('Session operation proof could not be persisted');
+    assertDispatchedCurrent();
+    try {
+      const timeoutMs =
+        kind === 'attach' ? SANDBOX_CONTROL_ATTACH_TIMEOUT_MS : SANDBOX_CONTROL_REQUEST_TIMEOUT_MS;
+      const response = await withDeliveryDeadline(
+        () =>
+          effects.request(
+            {
+              operation: authorization.operation,
+              authorization,
+              session: authorization.session,
+              expectedWrapperInstanceId: authorization.wrapperInstanceId,
+              payload,
+              timeoutMs,
+              deadlineAt,
+            },
+            { deadlineAt, assertCurrent: assertDispatchedCurrent }
+          ),
+        deadlineAt,
+        timeoutMs
+      );
+      const result = controlRequestResult(response);
+      assertDispatchedCurrent();
+      if (kind === 'attach') {
+        const attached = sessionAttachResultSchema.parse(result);
+        const completed = completeSessionOperationAttachment(messages.read(), authorization);
+        if (!completed || !messages.commit(completed))
+          return { state: 'uncertain', reason: 'unverified' };
+        return { state: 'response', result: attached };
+      }
+      const prompt = sessionPromptResultSchema.parse(result);
+      if (prompt.messageId !== authorization.messageId)
+        throw new Error('Prompt response message identity mismatch');
+      return { state: 'response', result: prompt };
+    } catch (error) {
+      if (rejectedBeforeAdmission(error)) record(false);
+      return rejectedOrUncertain(error);
+    }
+  } catch (error) {
+    return rejectedOrUncertain(error);
   }
+}
 
-  const payload =
-    kind === 'attach'
-      ? sessionAttachPayloadSchema.parse(input.payload)
-      : sessionPromptPayloadSchema.parse(input.payload);
-  assertDispatchCurrent();
-  const recorded = recordSessionOperationDispatch(messages.read(), authorization);
-  if (!recorded || !messages.commit(recorded))
-    throw uncertainOperation('Session operation dispatch proof was not persisted');
-  assertDispatchCurrent();
-  const result = controlRequestResult(
-    await withDeliveryDeadline(
-      () =>
-        effects.request({
-          operation: authorization.operation,
-          authorization,
-          session: authorization.session,
-          expectedWrapperInstanceId: authorization.wrapperInstanceId,
-          payload,
-          deadlineAt: authorization.dispatchDeadlineAt,
-          timeoutMs,
-        }),
-      authorization.dispatchDeadlineAt,
-      timeoutMs
-    )
-  );
-  assertDispatchCurrent();
-  if (kind === 'attach') {
-    const attached = sessionAttachResultSchema.parse(result);
-    const completed = completeSessionOperationAttachment(messages.read(), authorization);
-    if (!completed || !messages.commit(completed))
-      throw uncertainOperation('Session attachment response was not persisted');
-    return { state: 'response', result: attached };
-  }
-  const prompt = sessionPromptResultSchema.parse(result);
-  if (prompt.messageId !== authorization.messageId)
-    throw uncertainOperation('Prompt response message identity mismatch');
-  return { state: 'response', result: prompt };
+export function operationDispatchError(
+  result: Exclude<SessionOperationDispatch, { state: 'response' } | { state: 'completed' }>
+): ControlRequestError {
+  if (result.state === 'rejected') return new ControlRequestError(result.error);
+  if (result.state === 'running')
+    return new ControlRequestError({
+      code: 'session_busy',
+      message: 'Original preparation is running',
+      retryable: true,
+    });
+  return new ControlRequestError({
+    code: 'runtime_unhealthy',
+    message:
+      result.reason === 'transport'
+        ? 'Operation admission acknowledgement is unconfirmed'
+        : 'Original operation outcome is unconfirmed',
+    retryable: result.reason === 'transport',
+  });
 }
 
 export function commitSessionOperationResult(input: {

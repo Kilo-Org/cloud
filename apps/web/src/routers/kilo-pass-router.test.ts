@@ -1,3 +1,4 @@
+import type * as StoreSubscriptionCompletion from '@/lib/kilo-pass/store-subscription-completion';
 import { describe, expect, it, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
 
 import { db } from '@/lib/drizzle';
@@ -1119,7 +1120,7 @@ describe('kiloPassRouter', () => {
           expiresAtIso: '2099-01-01T00:00:00.000Z',
         });
         const actual = jest.requireActual<
-          typeof import('@/lib/kilo-pass/store-subscription-completion')
+          typeof StoreSubscriptionCompletion
         >('@/lib/kilo-pass/store-subscription-completion');
         const completed = await actual.completeStoreKiloPassPurchase({ user, purchase });
         const before = await db.query.kilocode_users.findFirst({

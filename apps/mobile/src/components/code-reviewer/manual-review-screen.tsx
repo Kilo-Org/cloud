@@ -226,10 +226,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
                       </Text>
                       {!connected && (
                         <Text variant="muted" className="text-xs">
-                          {t(
-                            // i18n-dup-ok: 'common.notConnected' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                            'common.notConnected'
-                          )}
+                          {t('common.notConnected')}
                         </Text>
                       )}
                     </View>

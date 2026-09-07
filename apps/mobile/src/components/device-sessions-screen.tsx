@@ -217,12 +217,7 @@ export function DeviceSessionsScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t(
-          // i18n-dup-ok: 'common.deviceSessions' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-          'common.deviceSessions'
-        )}
-      />
+      <ScreenHeader title={t('common.deviceSessions')} />
       {body}
     </View>
   );

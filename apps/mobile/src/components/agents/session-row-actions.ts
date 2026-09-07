@@ -10,14 +10,7 @@ export function showDeleteConfirm(onDelete: () => void) {
   void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
   Alert.alert(i18n.t('agents.sessionRow.deleteTitle'), i18n.t('agents.sessionRow.deleteMessage'), [
     { text: i18n.t('common.cancel'), style: 'cancel' },
-    {
-      text: i18n.t(
-        // i18n-dup-ok: 'common.delete' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-        'common.delete'
-      ),
-      style: 'destructive',
-      onPress: onDelete,
-    },
+    { text: i18n.t('common.delete'), style: 'destructive', onPress: onDelete },
   ]);
 }
 
@@ -29,10 +22,7 @@ export function showRenamePrompt(currentTitle: string, onRename: (newTitle: stri
     [
       { text: i18n.t('common.cancel'), style: 'cancel' },
       {
-        text: i18n.t(
-          // i18n-dup-ok: 'common.rename' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-          'common.rename'
-        ),
+        text: i18n.t('common.rename'),
         onPress: (newName: string | undefined) => {
           if (newName?.trim()) {
             onRename(newName.trim());

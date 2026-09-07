@@ -81,12 +81,7 @@ export async function exitRemoteSessionFromList({
         return;
       }
 
-      announcingToast.success(
-        i18n.t(
-          // i18n-dup-ok: 'common.sessionExited' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-          'common.sessionExited'
-        )
-      );
+      announcingToast.success(i18n.t('common.sessionExited'));
       try {
         await refreshActiveList();
       } catch {

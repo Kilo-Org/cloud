@@ -71,19 +71,13 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     footer = (
       <View className="items-center gap-2 px-6 py-4">
         <Text variant="muted" className="text-center text-xs">
-          {t(
-            // i18n-dup-ok: 'common.couldnTLoadMore' — sole key; organization.invoices.loadMoreFailed was removed here
-            'common.couldnTLoadMore'
-          )}
+          {t('common.couldnTLoadMore')}
         </Text>
         <Button
           size="sm"
           variant="outline"
           onPress={() => void proposalsQuery.fetchNextPage()}
-          accessibilityLabel={t(
-            // i18n-dup-ok: 'common.retryLoadingMore' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-            'common.retryLoadingMore'
-          )}
+          accessibilityLabel={t('common.retryLoadingMore')}
         >
           <Text>{t('common.retry')}</Text>
         </Button>

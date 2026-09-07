@@ -178,17 +178,11 @@ export default function SessionDetailScreen() {
       ? 'neutral'
       : 'server';
     if (notFound) {
-      title = t(
-        // i18n-dup-ok: 'common.notFound' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-        'common.notFound'
-      );
+      title = t('common.notFound');
       message = t('queryError.notFoundDescription');
       variant = 'not-found';
     } else if (unauthorized) {
-      title = t(
-        // i18n-dup-ok: 'common.accessDenied' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-        'common.accessDenied'
-      );
+      title = t('common.accessDenied');
       message = t('queryError.permissionDescription');
       variant = 'permission';
     }

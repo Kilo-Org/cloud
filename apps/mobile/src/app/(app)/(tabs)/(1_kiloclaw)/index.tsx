@@ -55,10 +55,7 @@ export default function KiloClawTab() {
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader
-          title={t(
-            // i18n-dup-ok: 'common.kiloclaw' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-            'common.kiloclaw'
-          )}
+          title={t('common.kiloclaw')}
           size="large"
           showBackButton={false}
           className="px-[22px]"

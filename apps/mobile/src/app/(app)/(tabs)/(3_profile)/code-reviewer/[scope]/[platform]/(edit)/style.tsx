@@ -12,10 +12,7 @@ export default function ReviewStyleRoute() {
   const { t } = useTranslation();
   const labels = {
     strict: t('codeReviewer.reviewStyle.strict'),
-    balanced: t(
-      // i18n-dup-ok: 'common.balanced' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-      'common.balanced'
-    ),
+    balanced: t('common.balanced'),
     lenient: t('codeReviewer.reviewStyle.lenient'),
     roast: t('codeReviewer.reviewStyle.roast'),
   } as const;

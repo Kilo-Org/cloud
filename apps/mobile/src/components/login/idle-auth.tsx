@@ -300,10 +300,7 @@ export function IdleAuth({
           className="text-xs text-primary underline"
           onPress={() => void WebBrowser.openBrowserAsync(PRIVACY_URL)}
         >
-          {t(
-            // i18n-dup-ok: 'common.privacyPolicy' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-            'common.privacyPolicy'
-          )}
+          {t('common.privacyPolicy')}
         </Text>
         {t('login.termsSuffix')}
       </Text>

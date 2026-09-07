@@ -11,19 +11,10 @@ export default function GateThresholdRoute() {
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
   const labels = {
-    off: t(
-      // i18n-dup-ok: 'common.off' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-      'common.off'
-    ),
-    all: t(
-      // i18n-dup-ok: 'common.all' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-      'common.all'
-    ),
+    off: t('common.off'),
+    all: t('common.all'),
     warning: t('codeReviewer.gateThreshold.warning'),
-    critical: t(
-      // i18n-dup-ok: 'common.critical' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-      'common.critical'
-    ),
+    critical: t('common.critical'),
   } as const;
   const descriptions = {
     off: t('codeReviewer.gate.off'),

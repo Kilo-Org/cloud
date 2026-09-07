@@ -121,10 +121,7 @@ export default function ReposRoute() {
       <QueryError
         variant="server"
         placement={fullBodyState ? 'center' : 'top'}
-        title={t(
-          // i18n-dup-ok: 'common.couldNotLoadRepositories' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-          'common.couldNotLoadRepositories'
-        )}
+        title={t('common.couldNotLoadRepositories')}
         onRetry={refetchRepos}
         isRetrying={reposFetching}
       />
@@ -194,12 +191,7 @@ export default function ReposRoute() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t(
-          // i18n-dup-ok: 'common.repositories' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-          'common.repositories'
-        )}
-      />
+      <ScreenHeader title={t('common.repositories')} />
       {fullBodyState ? (
         repoState
       ) : (
@@ -211,14 +203,8 @@ export default function ReposRoute() {
                   key={option}
                   label={
                     option === 'all'
-                      ? t(
-                          // i18n-dup-ok: 'common.allRepositories' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                          'common.allRepositories'
-                        )
-                      : t(
-                          // i18n-dup-ok: 'common.selectedRepositories' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                          'common.selectedRepositories'
-                        )
+                      ? t('common.allRepositories')
+                      : t('common.selectedRepositories')
                   }
                   selected={mode === option}
                   disabled={configDisabled}

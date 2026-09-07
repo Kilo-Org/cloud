@@ -63,13 +63,7 @@ export function BitbucketOverview({
   if (providerState.status === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
-          title={capabilities.label}
-          eyebrow={t(
-            // i18n-dup-ok: 'common.codeReviewer' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-            'common.codeReviewer'
-          )}
-        />
+        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <QueryError
           onRetry={() => {
             providerState.refetch();
@@ -227,12 +221,7 @@ export function BitbucketOverview({
                         pushField('repos');
                       }}
                     >
-                      <Text>
-                        {t(
-                          // i18n-dup-ok: 'common.selectRepositories' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                          'common.selectRepositories'
-                        )}
-                      </Text>
+                      <Text>{t('common.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}

@@ -57,12 +57,7 @@ export function BitbucketConnectForm({ scope }: Readonly<{ scope: string }>) {
         onPress={onConnect}
       >
         {connect.isPending ? <ActivityIndicator size="small" /> : null}
-        <Text>
-          {t(
-            // i18n-dup-ok: 'common.connect' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-            'common.connect'
-          )}
-        </Text>
+        <Text>{t('common.connect')}</Text>
       </Button>
     </View>
   );

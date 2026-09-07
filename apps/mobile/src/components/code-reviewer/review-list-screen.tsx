@@ -32,18 +32,12 @@ const STATUS_CLASSNAME = {
 } satisfies Record<CodeReviewStatus, string>;
 
 const STATUS_KEY = {
-  pending:
-    // i18n-dup-ok: 'common.pending' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-    'common.pending',
+  pending: 'common.pending',
   queued: 'common.queued',
   running: 'codeReviewer.status.running',
   completed: 'codeReviewer.status.completed',
-  failed:
-    // i18n-dup-ok: 'common.failed' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-    'common.failed',
-  cancelled:
-    // i18n-dup-ok: 'common.cancelled' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-    'common.cancelled',
+  failed: 'common.failed',
+  cancelled: 'common.cancelled',
   interrupted: 'codeReviewer.status.interrupted',
 } satisfies Record<CodeReviewStatus, string>;
 

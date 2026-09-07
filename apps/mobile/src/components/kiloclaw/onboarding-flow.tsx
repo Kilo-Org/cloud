@@ -346,10 +346,7 @@ export function OnboardingFlow() {
     <Pressable
       onPress={onDismiss}
       hitSlop={12}
-      accessibilityLabel={t(
-        // i18n-dup-ok: 'common.close' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-        'common.close'
-      )}
+      accessibilityLabel={t('common.close')}
       accessibilityRole="button"
       className="active:opacity-70"
     >

@@ -50,10 +50,7 @@ export function BodyEmpty({
             message={
               isSearching
                 ? t('agents.sessionList.couldNotSearch')
-                : t(
-                    // i18n-dup-ok: 'common.couldNotLoadSessions' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                    'common.couldNotLoadSessions'
-                  )
+                : t('common.couldNotLoadSessions')
             }
             onRetry={onRetry}
           />

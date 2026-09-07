@@ -120,12 +120,7 @@ export function PreferencesScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t(
-          // i18n-dup-ok: 'common.preferences' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-          'common.preferences'
-        )}
-      />
+      <ScreenHeader title={t('common.preferences')} />
       <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="px-6 gap-3 pt-4"

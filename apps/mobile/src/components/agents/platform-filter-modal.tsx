@@ -50,10 +50,7 @@ function platformFilterLabel(p: string): string {
       return i18n.t('agentChat.sessionFilter.platformSlack');
     }
     case 'github': {
-      return i18n.t(
-        // i18n-dup-ok: 'common.github' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-        'common.github'
-      );
+      return i18n.t('common.github');
     }
     case 'linear': {
       return i18n.t('agentChat.sessionFilter.platformLinear');
@@ -154,10 +151,7 @@ export function SessionFilterModal({
             <View className="gap-4">
               <View className="gap-1">
                 <Text variant="eyebrow" className="px-3">
-                  {t(
-                    // i18n-dup-ok: 'common.platform' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                    'common.platform'
-                  )}
+                  {t('common.platform')}
                 </Text>
                 {platforms.map(platform => (
                   <FilterCheckboxRow

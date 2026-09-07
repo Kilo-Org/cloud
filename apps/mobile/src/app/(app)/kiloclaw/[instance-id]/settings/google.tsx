@@ -139,12 +139,7 @@ export default function GoogleScreen() {
                 isConnected ? 'text-good' : 'text-muted-foreground'
               )}
             >
-              {isConnected
-                ? t(
-                    // i18n-dup-ok: 'common.connected' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                    'common.connected'
-                  )
-                : t('common.notConnected')}
+              {isConnected ? t('common.connected') : t('common.notConnected')}
             </Text>
           </View>
         </View>
@@ -224,14 +219,7 @@ export default function GoogleScreen() {
                 onPress={handleToggleGmail}
                 disabled={mutations.setGmailNotifications.isPending}
               >
-                <Text>
-                  {gmailEnabled
-                    ? t('common.enabled')
-                    : t(
-                        // i18n-dup-ok: 'common.disabled' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                        'common.disabled'
-                      )}
-                </Text>
+                <Text>{gmailEnabled ? t('common.enabled') : t('common.disabled')}</Text>
               </Button>
             </View>
           </View>

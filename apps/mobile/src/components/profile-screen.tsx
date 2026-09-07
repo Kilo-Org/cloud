@@ -52,9 +52,7 @@ const PROVIDER_LABEL_KEYS = {
   email: 'common.email',
   'fake-login': 'profile.providerTestAccount',
   github: 'common.github',
-  gitlab:
-    // i18n-dup-ok: 'common.gitlab' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-    'common.gitlab',
+  gitlab: 'common.gitlab',
   google: 'profile.providerGoogle',
   linkedin: 'profile.providerLinkedin',
   workos: 'profile.providerEnterpriseSso',

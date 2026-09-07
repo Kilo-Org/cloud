@@ -33,9 +33,7 @@ const STATUS_LABEL_KEYS = {
   paid: 'organization.invoices.status.paid',
   open: 'organization.invoices.status.open',
   void: 'organization.invoices.status.void',
-  draft:
-    // i18n-dup-ok: 'common.draft' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-    'common.draft',
+  draft: 'common.draft',
   uncollectible: 'organization.invoices.status.uncollectible',
   unknown: 'common.unknown',
 } satisfies Record<string, string>;

@@ -225,10 +225,7 @@ export function OrganizationCreditActivityScreen() {
               size="sm"
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
-              accessibilityLabel={t(
-                // i18n-dup-ok: 'common.loadMore' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                'common.loadMore'
-              )}
+              accessibilityLabel={t('common.loadMore')}
             >
               <Text>{t('common.loadMore')}</Text>
             </Button>

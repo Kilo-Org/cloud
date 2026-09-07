@@ -132,14 +132,7 @@ export function AgentSessionListContent({
   const clearQueryAction = useMemo(
     () => (
       <Button variant="outline" onPress={onClearQuery}>
-        <Text>
-          {isSearching
-            ? t('common.clearSearch')
-            : t(
-                // i18n-dup-ok: 'common.clearFilters' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                'common.clearFilters'
-              )}
-        </Text>
+        <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
       </Button>
     ),
     [isSearching, onClearQuery, t]

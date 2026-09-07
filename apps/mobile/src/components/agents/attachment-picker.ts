@@ -85,10 +85,7 @@ async function pickAgentCameraImage(): Promise<AgentAttachmentCandidate[]> {
   const permission = await ImagePicker.requestCameraPermissionsAsync();
   if (!permission.granted) {
     showPermissionSettingsAlert({
-      title: i18n.t(
-        // i18n-dup-ok: 'common.cameraAccessDisabled' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-        'common.cameraAccessDisabled'
-      ),
+      title: i18n.t('common.cameraAccessDisabled'),
       message: i18n.t('chat.attachmentPicker.cameraAccessMessage'),
     });
     return [];

@@ -145,25 +145,13 @@ export default function ModelListScreen() {
   const sections = [
     ...(preferred.length > 0
       ? [
-          {
-            type: 'header' as const,
-            title: t(
-              // i18n-dup-ok: 'common.recommended' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-              'common.recommended'
-            ),
-          },
+          { type: 'header' as const, title: t('common.recommended') },
           ...preferred.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
     ...(rest.length > 0
       ? [
-          {
-            type: 'header' as const,
-            title: t(
-              // i18n-dup-ok: 'common.allModels' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-              'common.allModels'
-            ),
-          },
+          { type: 'header' as const, title: t('common.allModels') },
           ...rest.map(m => ({ type: 'model' as const, model: m })),
         ]
       : []),
@@ -180,10 +168,7 @@ export default function ModelListScreen() {
         <TextInput
           ref={searchInputRef}
           className="rounded-lg bg-secondary px-4 py-3 text-sm text-foreground"
-          placeholder={t(
-            // i18n-dup-ok: 'common.searchModels' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-            'common.searchModels'
-          )}
+          placeholder={t('common.searchModels')}
           placeholderTextColor={colors.mutedForeground}
           autoCapitalize="none"
           autoCorrect={false}
@@ -200,10 +185,7 @@ export default function ModelListScreen() {
       )}
       {isError && (
         <QueryError
-          message={t(
-            // i18n-dup-ok: 'common.couldNotLoadModels' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-            'common.couldNotLoadModels'
-          )}
+          message={t('common.couldNotLoadModels')}
           onRetry={() => {
             void refetch();
             void configQuery.refetch();
@@ -215,14 +197,7 @@ export default function ModelListScreen() {
         (sections.length === 0 ? (
           <EmptyState
             icon={Search}
-            title={
-              searchFilter
-                ? t('kiloclaw.modelList.noMatches')
-                : t(
-                    // i18n-dup-ok: 'common.noModelsAvailable' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                    'common.noModelsAvailable'
-                  )
-            }
+            title={searchFilter ? t('kiloclaw.modelList.noMatches') : t('common.noModelsAvailable')}
             description={
               searchFilter
                 ? t('kiloclaw.modelList.noResultsFor', { query: searchFilter })
@@ -231,12 +206,7 @@ export default function ModelListScreen() {
             action={
               searchFilter ? (
                 <Button variant="outline" size="sm" onPress={handleClearSearch}>
-                  <Text>
-                    {t(
-                      // i18n-dup-ok: 'common.clearSearch' — sole key for this copy; the base-catalog twin this scan cites was removed by the catalog consolidation
-                      'common.clearSearch'
-                    )}
-                  </Text>
+                  <Text>{t('common.clearSearch')}</Text>
                 </Button>
               ) : undefined
             }

@@ -11,6 +11,8 @@ import {
 } from './worktree-runtime';
 import type { OwnedProcessScope } from './owned-processes';
 import {
+  SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
+  SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   sessionMessageOutcomeSchema,
   type SessionEventIdentity,
   type SessionRequestIdentity,
@@ -103,9 +105,11 @@ function asFetch(
 function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) {
   const requests: Array<{ pathname: string; directory: string | null; body?: unknown }> = [];
   const permissions: Awaited<ReturnType<WrapperKiloClient['getPermissions']>> = [];
+  const sessionStatuses: Record<string, { type: string }> = {};
   const feeds = new Set<ReadableStreamDefaultController<Uint8Array>>();
   const encoder = new TextEncoder();
   let feedConnections = 0;
+  let heldPrompts: PromiseWithResolvers<void> | undefined;
   const server = Bun.serve({
     port: 0,
     hostname: '127.0.0.1',
@@ -144,7 +148,8 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
       if (request.method === 'GET' && url.pathname === '/permission') {
         return Response.json(permissions);
       }
-      if (request.method === 'GET' && url.pathname === '/session/status') return Response.json({});
+      if (request.method === 'GET' && url.pathname === '/session/status')
+        return Response.json(sessionStatuses);
       if (request.method === 'GET' && url.pathname === '/pty') return Response.json([]);
       if (request.method === 'POST' && url.pathname.startsWith('/permission/')) {
         const id = decodeURIComponent(url.pathname.split('/')[2]);
@@ -154,6 +159,7 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
         return Response.json(true);
       }
       if (request.method === 'POST' && url.pathname.endsWith('/abort')) {
+        heldPrompts?.resolve();
         return Response.json(true);
       }
       if (request.method === 'POST' && /\/session\/[^/]+\/(message|command)$/.test(url.pathname)) {
@@ -175,6 +181,7 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
           },
           parts: [],
         };
+        await heldPrompts?.promise;
         return Response.json(completion);
       }
       if (request.method === 'GET' && url.pathname.startsWith('/session/')) {
@@ -198,11 +205,18 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
     url: server.url.toString(),
     requests,
     permissions,
+    sessionStatuses,
     get feedConnections() {
       return feedConnections;
     },
     emit(event: unknown) {
       for (const feed of feeds) feed.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    },
+    holdPrompts() {
+      heldPrompts ??= Promise.withResolvers<void>();
+    },
+    releasePrompts() {
+      heldPrompts?.resolve();
     },
     endFeeds() {
       for (const feed of feeds) feed.close();
@@ -594,7 +608,7 @@ describe('worktree Kilo runtime registry', () => {
   });
 
   it.each(['stream-error', 'feed-end', 'reconnect'] as const)(
-    'classifies real SDK SSE %s without exposing private errors or reconnecting',
+    'retires real SDK SSE %s only after bounded observer recovery fails',
     async failure => {
       const connected = 'data: {"payload":{"type":"server.connected","properties":{}}}\n\n';
       const encoder = new TextEncoder();
@@ -646,7 +660,7 @@ describe('worktree Kilo runtime registry', () => {
             ([request]) =>
               request instanceof Request && new URL(request.url).pathname === '/global/event'
           )
-        ).toHaveLength(1);
+        ).toHaveLength(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
       } finally {
         harness.registry.shutdown();
         fetchSpy.mockRestore();
@@ -708,9 +722,11 @@ describe('worktree Kilo runtime registry', () => {
     expect(harness.registry.get(identity.directory)).toBe(refreshed);
     expect(harness.unexpectedCloses).toBe(0);
     servers[1]?.endFeeds();
-    await waitUntil(() => harness.unexpectedCloses === 1);
-    expect(runtime.signal.aborted).toBe(true);
+    await waitUntil(() => (servers[1]?.feedConnections ?? 0) === 2);
+    expect(runtime.signal.aborted).toBe(false);
     expect(harness.registry.isHealthy()).toBe(true);
+    expect(harness.registry.get(identity.directory)).toBe(refreshed);
+    expect(harness.unexpectedCloses).toBe(0);
   });
 
   it('isolates different worktrees with separate servers, homes, auth files, and event clients', async () => {
@@ -1419,14 +1435,153 @@ describe('worktree Kilo runtime registry', () => {
     expect(stub.feedConnections).toBe(0);
   });
 
-  it('invalidates a runtime and reports an unexpected event-feed closure', async () => {
+  it('replaces an unexpected event-feed closure without invalidating its runtime', async () => {
     const harness = createRegistry();
     const runtime = await harness.registry.ensure(path.join(tmpDir, 'a'), auth);
     servers[0]?.endFeeds();
-    await waitUntil(() => harness.unexpectedCloses === 1);
+    await waitUntil(() => (servers[0]?.feedConnections ?? 0) === 2);
+    expect(runtime.signal.aborted).toBe(false);
+    expect(harness.registry.get(runtime.directory)).toBe(runtime);
+    expect(harness.closes).toBe(0);
+    expect(harness.unexpectedCloses).toBe(0);
+  });
+
+  it('retires a runtime on process exit independently of feed recovery', async () => {
+    const exited = Promise.withResolvers<void>();
+    const server = createKiloStub();
+    const failures: unknown[] = [];
+    servers.push(server);
+    const harness = createRegistry({
+      startServer: async options => {
+        options.onProcessScope?.({ stop: async () => true } as unknown as OwnedProcessScope);
+        return { url: server.url, close() {}, exited: exited.promise };
+      },
+      onUnexpectedClose: failure => failures.push(failure),
+    });
+    const runtime = await harness.registry.ensure(path.join(tmpDir, 'process-exit'), auth);
+    exited.resolve();
+    await waitUntil(() => failures.length === 1);
+    expect(failures).toEqual([
+      expect.objectContaining({
+        directory: runtime.directory,
+        reason: 'process_exited',
+        cleanup: 'confirmed',
+        runtimeId: runtime.runtimeId,
+      }),
+    ]);
     expect(runtime.signal.aborted).toBe(true);
     expect(harness.registry.get(runtime.directory)).toBeUndefined();
-    expect(harness.closes).toBe(1);
+  });
+
+  it('preserves an admitted operation and its runtime while a real feed recovers', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => true,
+          verify: async () => true,
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close() {} };
+      },
+    });
+    const identity = rootIdentity(path.join(tmpDir, 'recovery'));
+    const runtime = await harness.registry.ensure(identity.directory, auth);
+    const server = servers.find(item => item.url === runtime.kiloClient.serverUrl);
+    if (!server) throw new Error('Missing Kilo test server');
+    const deps = createHandlerDeps(harness.registry);
+    const client = runtime.kiloClient;
+    const prompt = {
+      messageId: 'feed_recovery',
+      turn: { type: 'prompt' as const, prompt: 'continue the admitted work' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    server.sessionStatuses[identity.kiloSessionId] = { type: 'idle' };
+    server.holdPrompts();
+    server.permissions.push({
+      id: 'permission_recovery',
+      sessionID: identity.kiloSessionId,
+      permission: 'bash',
+      patterns: [],
+      metadata: {},
+      always: [],
+    });
+    try {
+      expect(await handleControlRequest('session.prompt', identity, prompt, deps)).toEqual({
+        ok: true,
+        result: { messageId: prompt.messageId, status: 'accepted' },
+      });
+      await waitUntil(() =>
+        server.requests.some(
+          request => request.pathname === `/session/${identity.kiloSessionId}/message`
+        )
+      );
+      const executionDeadlineCount = timers.mock.calls.filter(
+        ([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS
+      ).length;
+      expect(executionDeadlineCount).toBeGreaterThan(0);
+
+      server.endFeeds();
+      await waitUntil(() => server.feedConnections === 2);
+      expect(harness.registry.prepareForNewWork?.(identity.directory)).toBe(false);
+      expect(harness.registry.get(identity.directory)).toBe(runtime);
+      expect(runtime.kiloClient).toBe(client);
+      expect(runtime.kiloClient.serverUrl).toBe(client.serverUrl);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          identity,
+          { ...prompt, messageId: 'feed_recovery_rejected' },
+          deps
+        )
+      ).toEqual({
+        ok: false,
+        error: {
+          code: 'not_ready',
+          message: 'Native feed recovery is in progress',
+          retryable: true,
+          admission: 'not-admitted',
+        },
+      });
+      expect(
+        await handleControlRequest(
+          'session.permission.resolve',
+          identity,
+          { permissionId: 'permission_recovery', response: 'once' },
+          deps
+        )
+      ).toEqual({ ok: true, result: { success: true } });
+      const stopping = handleControlRequest(
+        'session.abort',
+        identity,
+        { messageId: prompt.messageId },
+        deps
+      );
+      await waitUntil(() =>
+        server.requests.some(
+          request => request.pathname === `/session/${identity.kiloSessionId}/abort`
+        )
+      );
+      expect(await stopping).toEqual({ ok: true, result: { status: 'aborted' } });
+      expect(
+        server.requests.filter(
+          request => request.pathname === `/session/${identity.kiloSessionId}/message`
+        )
+      ).toHaveLength(1);
+      expect(
+        timers.mock.calls.filter(([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS)
+      ).toHaveLength(executionDeadlineCount);
+
+      server.emit({ payload: { type: 'server.heartbeat', properties: {} } });
+      await waitUntil(() => harness.registry.prepareForNewWork?.(identity.directory) === true);
+      expect(harness.registry.get(identity.directory)).toBe(runtime);
+      expect(runtime.kiloClient).toBe(client);
+      expect(harness.unexpectedCloses).toBe(0);
+    } finally {
+      server.releasePrompts();
+      timers.mockRestore();
+    }
   });
 });
 

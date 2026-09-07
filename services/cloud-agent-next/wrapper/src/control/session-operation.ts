@@ -102,6 +102,7 @@ export type SessionOperationDependencies = {
   signal?: AbortSignal;
   isCurrent: () => boolean;
   getRuntime: () => WorktreeKiloRuntime | undefined;
+  prepareForNewWork?: () => boolean;
   verifyQuiescence: (target: NativeOperationTarget, deadlineAt: number) => Promise<boolean>;
   retireRuntime: (reason: string, deadlineAt: number, target?: NativeOperationTarget) => void;
   emitSessionEvent: (payload: SessionEventPayload, options?: { retained?: true }) => void;
@@ -399,6 +400,8 @@ export class SessionOperation {
     work: Extract<SessionOperationWork, { operation: 'session.attach' }>
   ): Promise<ControlHandlerResult> {
     this.assertCurrent();
+    if (this.deps.prepareForNewWork?.() === false)
+      return fail('Native feed recovery is in progress', true);
     const result = await work.apply(this.session, work.payload, {
       signal: this.signal,
       assertCurrent: () => this.assertCurrent(),

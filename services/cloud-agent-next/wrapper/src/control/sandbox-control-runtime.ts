@@ -3,7 +3,10 @@ import {
   emitControlDiagnostic,
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
-import type { SandboxHeartbeatPayload } from '../../../src/shared/sandbox-control-protocol.js';
+import {
+  MAX_SANDBOX_CONTROL_FRAME_BYTES,
+  type SandboxHeartbeatPayload,
+} from '../../../src/shared/sandbox-control-protocol.js';
 import {
   createSandboxControlClient,
   type SandboxControlClient,
@@ -32,8 +35,13 @@ type StartOptions = {
 
 type SandboxControlEventFeedOptions = {
   signal: AbortSignal;
-  open: (signal: AbortSignal) => Promise<{ stream?: AsyncIterable<unknown> }>;
+  open: (
+    signal: AbortSignal,
+    onActivity: () => void,
+    onFrame: (frame: string) => void
+  ) => Promise<{ stream?: AsyncIterable<unknown> }>;
   consume: (stream: AsyncIterable<unknown>) => Promise<void>;
+  deadlineAt?: number;
   onUnexpectedClose: (error: unknown) => void;
   onDiagnostic?: ControlDiagnosticReporter;
   now?: () => number;
@@ -73,6 +81,54 @@ export async function withKiloRequestDeadline<T>(
   }
 }
 
+export function observeKiloFeedResponse(
+  response: Response,
+  signal: AbortSignal,
+  onActivity: () => void,
+  onFrame?: (frame: string) => void
+): Response {
+  if (!response.body) return response;
+  let frameBytes = 0;
+  let lineBreaks = 0;
+  let previousCR = false;
+  let frame: number[] = [];
+  return new Response(
+    response.body.pipeThrough(
+      new TransformStream<Uint8Array, Uint8Array>({
+        transform(chunk, controller) {
+          signal.throwIfAborted();
+          if (chunk.byteLength > 0) onActivity();
+          for (const byte of chunk) {
+            frameBytes++;
+            frame.push(byte);
+            if (frameBytes > MAX_SANDBOX_CONTROL_FRAME_BYTES)
+              throw new KiloEventFeedError(
+                'feed_failed',
+                'Kilo event frame exceeds the transport budget'
+              );
+            if (byte === 13 || byte === 10) {
+              if (!(byte === 10 && previousCR)) lineBreaks++;
+              previousCR = byte === 13;
+              if (lineBreaks >= 2) {
+                onFrame?.(new TextDecoder().decode(Uint8Array.from(frame)));
+                frameBytes = 0;
+                lineBreaks = 0;
+                frame = [];
+              }
+            } else {
+              lineBreaks = 0;
+              previousCR = false;
+            }
+          }
+          controller.enqueue(chunk);
+        },
+      }),
+      { signal }
+    ),
+    { status: response.status, statusText: response.statusText, headers: response.headers }
+  );
+}
+
 function isFeedConnectedEvent(envelope: unknown): boolean {
   return (
     typeof envelope === 'object' &&
@@ -85,20 +141,87 @@ function isFeedConnectedEvent(envelope: unknown): boolean {
   );
 }
 
+function isFeedConnectedFrame(frame: string): boolean {
+  for (const line of frame.split(/\r?\n/)) {
+    if (!line.startsWith('data:')) continue;
+    try {
+      if (isFeedConnectedEvent(JSON.parse(line.slice('data:'.length).trimStart()))) return true;
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
 export async function startSandboxControlEventFeed(
   options: SandboxControlEventFeedOptions
-): Promise<{ isFresh: () => boolean }> {
+): Promise<{
+  isFresh: () => boolean;
+  usable: Promise<boolean>;
+  close: () => void;
+  settled: Promise<void>;
+}> {
   const controller = new AbortController();
   const signal = AbortSignal.any([options.signal, controller.signal]);
   const now = options.now ?? Date.now;
-  let feed: { stream?: AsyncIterable<unknown> };
-  let iterator: AsyncIterator<unknown>;
+  const deadlineAt = Math.min(
+    options.deadlineAt ?? Infinity,
+    now() + KILO_FEED_FRESHNESS_TIMEOUT_MS
+  );
+  let lastEventAt = now();
+  const onActivity = () => {
+    if (!signal.aborted) lastEventAt = now();
+  };
+  const usable = Promise.withResolvers<boolean>();
+  let usableSettled = false;
+  let initialFrameSeen = false;
+  let iterator: AsyncIterator<unknown> | undefined;
+  let disposed = false;
+  let closed = false;
+  const settleUsable = (value: boolean): void => {
+    if (usableSettled) return;
+    usableSettled = true;
+    usable.resolve(value);
+  };
+  const disposeIterator = (): void => {
+    if (disposed || !iterator) return;
+    disposed = true;
+    try {
+      const returned = iterator.return?.();
+      if (returned) void returned.catch(() => undefined);
+    } catch {
+      return;
+    }
+  };
+  const close = (): void => {
+    if (closed) return;
+    closed = true;
+    controller.abort();
+    settleUsable(false);
+    disposeIterator();
+  };
+  signal.addEventListener(
+    'abort',
+    () => {
+      settleUsable(false);
+      disposeIterator();
+    },
+    { once: true }
+  );
+  const onFrame = (frame: string): void => {
+    if (!initialFrameSeen) {
+      initialFrameSeen = true;
+      return;
+    }
+    if (!isFeedConnectedFrame(frame)) settleUsable(true);
+  };
   let first: IteratorResult<unknown>;
   emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'opening' });
   try {
-    feed = await withTimeoutAndAbort(options.open(signal), {
+    if (now() >= deadlineAt) throw new Error('Kilo feed attempt expired');
+    const feed = await withTimeoutAndAbort(options.open(signal, onActivity, onFrame), {
       signal,
-      timeoutMs: KILO_FEED_FRESHNESS_TIMEOUT_MS,
+      timeoutMs: Math.max(1, deadlineAt - now()),
       timeoutMessage: 'Kilo global event feed startup timed out',
       abortMessage: 'Kilo global event feed cancelled',
     });
@@ -108,7 +231,7 @@ export async function startSandboxControlEventFeed(
     iterator = feed.stream[Symbol.asyncIterator]();
     first = await withTimeoutAndAbort(iterator.next(), {
       signal,
-      timeoutMs: KILO_FEED_FRESHNESS_TIMEOUT_MS,
+      timeoutMs: Math.max(1, deadlineAt - now()),
       timeoutMessage: 'Kilo global event feed startup timed out',
       abortMessage: 'Kilo global event feed cancelled',
     });
@@ -118,11 +241,11 @@ export async function startSandboxControlEventFeed(
     }
   } catch (error) {
     emitControlDiagnostic(options.onDiagnostic, 'control.feed', { phase: 'start_failed' });
-    controller.abort();
+    close();
     throw error;
   }
 
-  let lastEventAt = now();
+  onActivity();
   let eventsReceived = 1;
   const diagnostic = (phase: string): void =>
     emitControlDiagnostic(options.onDiagnostic, 'control.feed', {
@@ -136,7 +259,7 @@ export async function startSandboxControlEventFeed(
   const fail = (error: unknown, phase: 'stale' | 'ended' | 'failed'): void => {
     if (signal.aborted) return;
     diagnostic(phase);
-    controller.abort();
+    close();
     options.onUnexpectedClose(error);
   };
   const freshnessTimer = setInterval(() => {
@@ -150,13 +273,39 @@ export async function startSandboxControlEventFeed(
   freshnessTimer.unref();
   signal.addEventListener('abort', () => clearInterval(freshnessTimer), { once: true });
 
+  const next = (): Promise<IteratorResult<unknown>> => {
+    if (!iterator || signal.aborted) return Promise.resolve({ done: true, value: undefined });
+    let pending: Promise<IteratorResult<unknown>>;
+    try {
+      pending = Promise.resolve(iterator.next());
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = (callback: () => void): void => {
+        if (settled) return;
+        settled = true;
+        signal.removeEventListener('abort', onAbort);
+        callback();
+      };
+      const onAbort = () => finish(() => resolve({ done: true, value: undefined }));
+      signal.addEventListener('abort', onAbort, { once: true });
+      pending.then(
+        result => finish(() => resolve(result)),
+        error => finish(() => reject(error))
+      );
+      if (signal.aborted) onAbort();
+    });
+  };
+
   async function* establishedFeed(): AsyncGenerator<unknown> {
     try {
       yield first.value;
       while (!signal.aborted) {
-        const next = await iterator.next();
-        if (signal.aborted || next.done) return;
-        if (isFeedConnectedEvent(next.value)) {
+        const value = await next();
+        if (signal.aborted || value.done) return;
+        if (isFeedConnectedEvent(value.value)) {
           diagnostic('reconnected');
           throw new KiloEventFeedError(
             'feed_reconnected',
@@ -165,18 +314,19 @@ export async function startSandboxControlEventFeed(
         }
         lastEventAt = now();
         eventsReceived += 1;
-        yield next.value;
+        settleUsable(true);
+        yield value.value;
       }
     } finally {
-      await iterator.return?.();
+      disposeIterator();
     }
   }
 
-  void options.consume(establishedFeed()).then(
+  const settled = options.consume(establishedFeed()).then(
     () => fail(new KiloEventFeedError('feed_ended', 'Kilo global event feed ended'), 'ended'),
     error => fail(error, 'failed')
   );
-  return { isFresh };
+  return { isFresh, usable: usable.promise, close, settled };
 }
 
 export function maybeStartSandboxControlClient(

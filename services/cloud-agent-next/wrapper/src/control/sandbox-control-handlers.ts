@@ -328,6 +328,7 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
       native: {
         get: directory => input.kiloRuntimes?.get(directory),
         getRetained: directory => input.kiloRuntimes?.getRetained?.(directory),
+        prepareForNewWork: directory => input.kiloRuntimes?.prepareForNewWork?.(directory) ?? true,
         retireRuntime: (directory, deadlineAt, target) =>
           input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
           Promise.resolve('unconfirmed'),
@@ -492,6 +493,14 @@ export async function handleControlRequest(
   if (operation === 'session.operation.ack') return deps.operations.acknowledge(session, payload);
   const admission = deps.operations.admission(operation, session, payload, authorization);
   if (admission.kind === 'reply') return admission.result;
+  if (
+    (operation === 'session.attach' ||
+      operation === 'session.prompt' ||
+      operation === 'session.terminal.create') &&
+    deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false
+  ) {
+    return rejectBeforeAdmission('not_ready', 'Native feed recovery is in progress', true);
+  }
   if (
     (deps.signal?.aborted || (!deps.kiloReady && operation !== 'session.git.summary')) &&
     operation !== 'session.abort' &&

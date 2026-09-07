@@ -665,6 +665,49 @@ describe('handleControlRequest', () => {
     expect(answered).toEqual([{ permissionId: 'perm_1', response: 'once' }]);
   });
 
+  it('fences new work during feed recovery while preserving pending input replies and Stop', async () => {
+    const kiloClient = fakeKilo({
+      getPermissions: async () => [
+        {
+          id: 'perm_1',
+          sessionID: session.kiloSessionId,
+          permission: 'bash',
+          patterns: [],
+          metadata: {},
+          always: [],
+        },
+      ],
+    });
+    const handlerDeps = deps({ kiloClient });
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(
+      await handleControlRequest(
+        'session.permission.resolve',
+        session,
+        { permissionId: 'perm_1', response: 'once' },
+        handlerDeps
+      )
+    ).toEqual({ ok: true, result: { success: true } });
+    expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
+      ok: true,
+      result: { status: 'already_idle' },
+    });
+  });
+
   it('does not send an unfenced abort when the wrapper owns no work', async () => {
     const aborted: string[] = [];
     const kiloClient = fakeKilo({

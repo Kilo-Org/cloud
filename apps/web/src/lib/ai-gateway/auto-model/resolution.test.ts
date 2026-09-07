@@ -1,7 +1,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  getOpenRouterModelsFromRedis: jest.fn(async () => new Set<string>()),
+  getOpenRouterModelsFromDatabase: jest.fn(async () => new Set<string>()),
 }));
 
 import { resolveAutoModel } from './resolution';

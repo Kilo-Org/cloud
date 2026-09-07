@@ -51,7 +51,7 @@ import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models'
  * logs for the same diff. Auto-releases on transaction commit/rollback.
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
-const VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS = 7 * 24 * 60 * 60;
+const UNUSED_GATEWAY_METADATA_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 async function mirrorVercelInferenceProvidersToRedis(vercelModels: Record<string, StoredModel>) {
   const pipeline = redisClient.pipeline();
@@ -59,7 +59,7 @@ async function mirrorVercelInferenceProvidersToRedis(vercelModels: Record<string
     pipeline.set(
       vercelInferenceProvidersRedisKey(model.id),
       JSON.stringify(extractVercelInferenceProviderIdsFromModel(model)),
-      { ex: VERCEL_INFERENCE_PROVIDERS_TTL_SECONDS }
+      { ex: UNUSED_GATEWAY_METADATA_TTL_SECONDS }
     );
   }
   await pipeline.exec();
@@ -329,19 +329,20 @@ async function mirrorToRedis(values: {
   vercel: Record<string, StoredModel>;
   openrouterProviders: OpenRouterProvider[];
 }): Promise<void> {
-  const entries: [RedisKey, unknown][] = [
+  const expiringEntries: [RedisKey, unknown][] = [
     [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
     [GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds, getLanguageModelIds(values.openrouter)],
     [GATEWAY_METADATA_REDIS_KEYS.vercelModelIds, getLanguageModelIds(values.vercel)],
   ];
-  if (values.openrouterProviders) {
-    entries.push([GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders]);
-  }
   await Promise.all([
-    ...entries.map(([key, value]) => {
+    ...expiringEntries.map(([key, value]) => {
       const serializedValue = JSON.stringify(value);
-      return redisClient.set(key, serializedValue);
+      return redisClient.set(key, serializedValue, { ex: UNUSED_GATEWAY_METADATA_TTL_SECONDS });
     }),
+    redisClient.set(
+      GATEWAY_METADATA_REDIS_KEYS.openrouterProviders,
+      JSON.stringify(values.openrouterProviders)
+    ),
     mirrorVercelInferenceProvidersToRedis(values.vercel),
   ]);
 }

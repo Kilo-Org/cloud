@@ -211,6 +211,15 @@ describe('mapGooglePlayKiloPassPurchase', () => {
 });
 
 describe('decodeGooglePlaySubscriptionPurchase', () => {
+  it.each([undefined, 'current-account'])('links a Play center resubscription with current account %s', current => {
+    const { decodeGooglePlaySubscriptionPurchase } = loadVerifier();
+    const result = decodeGooglePlaySubscriptionPurchase(apiData({
+      externalAccountIdentifiers: current ? { obfuscatedExternalAccountId: current } : undefined,
+      outOfAppPurchaseContext: { expiredExternalAccountIdentifiers: { obfuscatedExternalAccountId: 'expired-account' } },
+    }), 'new-token');
+    expect(result.obfuscatedExternalAccountId).toBe(current ?? 'expired-account');
+  });
+
   it('marks a test purchase as Sandbox', () => {
     const { decodeGooglePlaySubscriptionPurchase } = loadVerifier();
 

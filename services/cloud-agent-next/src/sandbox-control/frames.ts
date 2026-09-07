@@ -24,6 +24,8 @@ import {
   sessionTerminalConnectPayloadSchema,
   sessionTerminalCreatePayloadSchema,
   sessionTerminalResizePayloadSchema,
+  sessionOperationAuthorizationSchema,
+  sessionOperationAckSchema,
   worktreeDeletePayloadSchema,
   type ControlError,
   type ControlErrorCode,
@@ -57,6 +59,8 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'session.terminal.resize': sessionTerminalResizePayloadSchema,
   'session.terminal.close': sessionTerminalClosePayloadSchema,
   'session.terminal.connect': sessionTerminalConnectPayloadSchema,
+  'session.operation.get': sessionOperationAuthorizationSchema,
+  'session.operation.ack': sessionOperationAckSchema,
 };
 
 const EVENT_PAYLOAD_SCHEMAS: Record<ControlEvent, z.ZodType> = {
@@ -177,6 +181,6 @@ export function helloResult(): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
     handshakeComplete: true,
-    capabilities: { kiloVersionHeartbeat: true },
+    capabilities: { kiloVersionHeartbeat: true, sessionOperationResults: true },
   };
 }

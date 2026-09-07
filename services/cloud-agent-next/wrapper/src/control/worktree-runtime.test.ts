@@ -16,6 +16,7 @@ import {
 } from '../../../src/shared/sandbox-control-protocol';
 import {
   buildHeartbeatPayload,
+  createControlHandlerDeps,
   handleControlRequest,
   type HandlerDeps,
 } from './sandbox-control-handlers';
@@ -272,16 +273,15 @@ function createHandlerDeps(registry: WorktreeKiloRuntimes): HandlerDeps {
     getKiloRuntime: directory => registry.get(directory),
   });
   terminalRuntimes.push(terminalRuntime);
-  return {
+  return createControlHandlerDeps({
     kiloRuntimes: registry,
     terminalRuntime,
     version: 'test',
     kiloReady: true,
     sessions: [],
-    tasks: new Map(),
     emitSessionEvent: () => {},
     retireRuntime: () => {},
-  };
+  });
 }
 
 beforeEach(() => {
@@ -768,13 +768,12 @@ describe('worktree Kilo runtime registry', () => {
       wrapperInstanceId: crypto.randomUUID(),
       getKiloRuntime: directory => harness.registry.get(directory),
     });
-    const deps: HandlerDeps = {
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: harness.registry,
       terminalRuntime: terminals,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       emitSessionEvent: (identity, event) => {
         if (event.type === 'session.message.outcome') {
           const { messageId, status } = sessionMessageOutcomeSchema.parse(event.properties);
@@ -782,8 +781,9 @@ describe('worktree Kilo runtime registry', () => {
         }
       },
       retireRuntime: () => {},
-    };
-    const waitForTasks = () => Promise.all([...deps.tasks.values()].map(task => task.done));
+    });
+    const waitForTasks = () =>
+      Promise.all(deps.operations.activeOperations().map(task => task.done));
     try {
       const attached = await Promise.all(
         identities.map((identity, index) =>

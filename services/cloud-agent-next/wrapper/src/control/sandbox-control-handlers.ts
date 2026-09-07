@@ -6,15 +6,11 @@ import {
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
 import {
-  SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
-  SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   SESSION_OPERATIONS,
   sandboxShutdownPayloadSchema,
   sessionAbortPayloadSchema,
   sessionAttachPayloadSchema,
   sessionDetachPayloadSchema,
-  sessionMessageOutcomeSchema,
-  sessionEventPayloadSchema,
   sessionGitSummaryPayloadSchema,
   sessionPermissionResolvePayloadSchema,
   sessionPromptPayloadSchema,
@@ -31,16 +27,18 @@ import {
   worktreeDeletePayloadSchema,
   type SandboxHeartbeatPayload,
   type SessionEventPayload,
-  type SessionMessageOutcome,
+  type SessionOperationAuthorization,
+  type SessionOperationDelivery,
+  type SessionOperationAck,
   type SessionPromptPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-api.js';
-import { materializeMessageAttachments } from '../session-bootstrap.js';
-import { runAutoCommit } from '../auto-commit.js';
-import type { IngestEvent } from '../../../src/shared/protocol.js';
-import { withTimeoutAndAbort } from '../utils.js';
+import type { materializeMessageAttachments } from '../session-bootstrap.js';
+import type { runAutoCommit } from '../auto-commit.js';
+import { rejectBeforeAdmission, type ControlHandlerResult } from './control-handler-result.js';
+import { createOperationRegistry, type OperationRegistry } from './operation-registry.js';
 import { applySessionAttach, type AttachPreparingEmitter } from './apply-attach';
 import {
   directoriesForRoot,
@@ -48,7 +46,10 @@ import {
   forgetAttachedRoot,
   rootForSession,
 } from './session-directories';
-import { withKiloRequestDeadline } from './sandbox-control-runtime';
+import {
+  KILO_CONTROL_REQUEST_TIMEOUT_MS,
+  withKiloRequestDeadline,
+} from './sandbox-control-runtime';
 import { ControlTerminalRuntimeError, type ControlTerminalRuntime } from './terminal-runtime.js';
 import {
   WorktreeKiloRuntimeError,
@@ -70,21 +71,13 @@ import {
 import { collectWorktreeChanges } from './worktree-changes';
 import { createNativeObservations, type NativeObservations } from './native-observations.js';
 
+export type { ControlHandlerResult } from './control-handler-result.js';
+export type { SessionOperation as OwnedSessionTask } from './session-operation.js';
+
 export type HandlerSessionSnapshot = {
   kiloSessionId: string;
   lastActivityAt: number;
   pendingInputs?: Set<string>;
-};
-
-type TaskIdentity =
-  | { kind: 'preparation'; messageId?: string }
-  | { kind: 'execution' | 'finalizing'; messageId: string };
-
-export type OwnedSessionTask = TaskIdentity & {
-  session: SessionRequestIdentity;
-  controller: AbortController;
-  signal: AbortSignal;
-  done: Promise<ControlHandlerResult>;
 };
 
 type SessionActivity = {
@@ -215,14 +208,24 @@ export function createSessionActivityRegistry(
 export type HandlerDeps = {
   kiloRuntimes?: WorktreeKiloRuntimes;
   worktreeCleanupClient?: WorktreeKiloCleanupClient;
+  operations: OperationRegistry;
   version: string;
   kiloReady: boolean;
   sessions: HandlerSessionSnapshot[];
-  tasks: Map<string, OwnedSessionTask>;
+  sendOperationResult?: (
+    session: SessionRequestIdentity,
+    delivery: SessionOperationDelivery,
+    signal: AbortSignal,
+    deadlineAt: number
+  ) => Promise<SessionOperationAck>;
   signal?: AbortSignal;
   activity?: SessionActivityRegistry;
   nativeObservations?: NativeObservations;
-  emitSessionEvent: (session: SessionRequestIdentity, payload: SessionEventPayload) => void;
+  emitSessionEvent: (
+    session: SessionRequestIdentity,
+    payload: SessionEventPayload,
+    options?: { retained?: true }
+  ) => void;
   retireRuntime: (reason: string) => void;
   onShutdown?: () => void;
   onDiagnostic?: ControlDiagnosticReporter;
@@ -233,19 +236,6 @@ export type HandlerDeps = {
   runAutoCommit?: typeof runAutoCommit;
   collectWorktreeChanges?: typeof collectWorktreeChanges;
 };
-
-export type ControlHandlerResult =
-  | { ok: true; result: unknown }
-  | { ok: false; error: { code: string; message: string; retryable: boolean } };
-
-class ControlTaskCancellation extends Error {
-  constructor(
-    readonly status: 'failed' | 'cancelled',
-    message: string
-  ) {
-    super(message);
-  }
-}
 
 const SESSION_OPERATION_SET = new Set<string>(SESSION_OPERATIONS);
 
@@ -261,13 +251,31 @@ function kiloFailure(error: unknown): ControlHandlerResult {
   return fail('not_ready', 'Kilo request failed', isKiloServerUnreachableError(error));
 }
 
+function operationEffects(session: SessionRequestIdentity, deps: HandlerDeps) {
+  const send = deps.sendOperationResult;
+  return {
+    signal: deps.signal,
+    onDiagnostic: deps.onDiagnostic,
+    emitSessionEvent: (event: SessionEventPayload, options?: { retained?: true }) =>
+      deps.emitSessionEvent(session, event, options),
+    sendOperationResult: send
+      ? (delivery: SessionOperationDelivery, signal: AbortSignal, deadlineAt: number) =>
+          send(session, delivery, signal, deadlineAt)
+      : undefined,
+  };
+}
+
+export function pruneControlOperations(deps: HandlerDeps, now = Date.now()): void {
+  deps.operations.prune(now);
+}
+
 export function buildHeartbeatPayload(deps: HandlerDeps): SandboxHeartbeatPayload {
   const now = Date.now();
   const snapshots = new Map(
     deps.activity?.snapshots().map(snapshot => [snapshot.kiloSessionId, snapshot])
   );
   for (const snapshot of deps.sessions) {
-    const task = deps.tasks.get(snapshot.kiloSessionId);
+    const task = deps.operations.active(snapshot.kiloSessionId);
     if (!task && snapshots.has(snapshot.kiloSessionId)) continue;
     const waitingOn =
       task?.kind === 'preparation'
@@ -294,7 +302,7 @@ export function buildHeartbeatPayload(deps: HandlerDeps): SandboxHeartbeatPayloa
           ? 'finalizing'
           : 'active',
     activeKiloSessions: active.length,
-    pendingMessages: deps.tasks.size,
+    pendingMessages: deps.operations.counts().active,
     kilo: {
       ready: deps.kiloReady && !deps.signal?.aborted,
       ...(deps.kiloRuntimes?.kiloCliVersion !== undefined
@@ -313,7 +321,28 @@ export async function refreshHeartbeatPayload(
   return buildHeartbeatPayload(deps);
 }
 
-export function createControlHandlerDeps(deps: HandlerDeps): HandlerDeps {
+export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>): HandlerDeps {
+  const deps: HandlerDeps = Object.assign(input, {
+    operations: createOperationRegistry({
+      native: { get: directory => input.kiloRuntimes?.get(directory) },
+      onStarted: (session, preparation) => {
+        if (!preparation) deps.activity?.markActive(session.kiloSessionId);
+        const snapshot = deps.sessions.find(item => item.kiloSessionId === session.kiloSessionId);
+        if (snapshot) snapshot.lastActivityAt = Date.now();
+        else
+          deps.sessions.push({ kiloSessionId: session.kiloSessionId, lastActivityAt: Date.now() });
+      },
+      onCompleted: session => {
+        deps.activity?.reconcile({}, [session.kiloSessionId]);
+        const snapshot = deps.sessions.find(item => item.kiloSessionId === session.kiloSessionId);
+        if (snapshot) {
+          snapshot.lastActivityAt = Date.now();
+          delete snapshot.pendingInputs;
+        }
+      },
+      retireRuntime: reason => deps.retireRuntime(reason),
+    }),
+  });
   if (!deps.nativeObservations && deps.activity && deps.kiloRuntimes) {
     deps.nativeObservations = createNativeObservations({
       get signal() {
@@ -332,82 +361,13 @@ export function createControlHandlerDeps(deps: HandlerDeps): HandlerDeps {
   return deps;
 }
 
-function startSessionTask(
-  session: SessionRequestIdentity,
-  identity: TaskIdentity,
-  deps: HandlerDeps,
-  run: (task: OwnedSessionTask) => Promise<ControlHandlerResult>
-): OwnedSessionTask {
-  const startedAt = Date.now();
-  const diagnostic = (phase: string): void =>
-    emitControlDiagnostic(deps.onDiagnostic, 'session.task', {
-      sessionId: session.sessionId,
-      kiloSessionId: session.kiloSessionId,
-      messageId: identity.messageId,
-      kind: identity.kind,
-      phase,
-      elapsedMs: Date.now() - startedAt,
-    });
-  diagnostic('started');
-  const completion = Promise.withResolvers<ControlHandlerResult>();
-  const controller = new AbortController();
-  const task: OwnedSessionTask = {
-    ...identity,
-    session,
-    controller,
-    signal: deps.signal ? AbortSignal.any([controller.signal, deps.signal]) : controller.signal,
-    done: completion.promise,
-  };
-  deps.tasks.set(session.kiloSessionId, task);
-  if (identity.kind !== 'preparation') deps.activity?.markActive(session.kiloSessionId);
-  const snapshot = deps.sessions.find(item => item.kiloSessionId === session.kiloSessionId);
-  if (snapshot) {
-    snapshot.lastActivityAt = Date.now();
-  } else {
-    deps.sessions.push({ kiloSessionId: session.kiloSessionId, lastActivityAt: Date.now() });
-  }
-  const timeout = setTimeout(
-    () => {
-      const reason =
-        identity.kind !== 'preparation'
-          ? 'Execution exceeded the 60 minute limit'
-          : 'Session preparation timed out';
-      diagnostic('deadline_expired');
-      controller.abort(new ControlTaskCancellation('failed', reason));
-      deps.retireRuntime(reason);
-    },
-    identity.kind !== 'preparation'
-      ? SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS
-      : SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
-  );
-  timeout.unref();
-  void Promise.resolve()
-    .then(() => run(task))
-    .catch(kiloFailure)
-    .then(result => {
-      clearTimeout(timeout);
-      if (deps.tasks.get(session.kiloSessionId) === task) {
-        deps.tasks.delete(session.kiloSessionId);
-        deps.activity?.reconcile({}, [session.kiloSessionId]);
-        const snapshot = deps.sessions.find(item => item.kiloSessionId === session.kiloSessionId);
-        if (snapshot) {
-          snapshot.lastActivityAt = Date.now();
-          delete snapshot.pendingInputs;
-        }
-      }
-      diagnostic(result.ok ? 'finished' : 'failed');
-      completion.resolve(result);
-    });
-  return task;
-}
-
 export async function cancelControlTasks(
   deps: HandlerDeps,
   reason: string,
   status: 'failed' | 'cancelled' = 'cancelled'
 ): Promise<void> {
-  const tasks = [...deps.tasks.values()];
-  for (const task of tasks) task.controller.abort(new ControlTaskCancellation(status, reason));
+  const tasks = deps.operations.activeOperations();
+  for (const task of tasks) task.cancel(reason, status);
   await Promise.all(tasks.map(task => task.done));
 }
 
@@ -415,7 +375,8 @@ export async function handleControlRequest(
   operation: string,
   session: SessionRequestIdentity | undefined,
   payload: unknown,
-  deps: HandlerDeps
+  deps: HandlerDeps,
+  authorization?: SessionOperationAuthorization
 ): Promise<ControlHandlerResult> {
   if (operation === 'sandbox.status') {
     const heartbeat = buildHeartbeatPayload(deps);
@@ -427,11 +388,13 @@ export async function handleControlRequest(
     });
   }
   if (operation === 'sandbox.shutdown') {
+    const deadlineAt = Date.now() + KILO_CONTROL_REQUEST_TIMEOUT_MS;
     if (!sandboxShutdownPayloadSchema.safeParse(payload).success) {
       return fail('protocol_error', 'Invalid payload', false);
     }
     deps.onShutdown?.();
     await cancelControlTasks(deps, 'Sandbox shutting down');
+    await deps.operations.drainDelivery(deadlineAt);
     deps.terminalRuntime?.shutdown();
     deps.kiloRuntimes?.shutdown();
     return ok({ shuttingDown: true });
@@ -465,12 +428,10 @@ export async function handleControlRequest(
       const fenced = fenceDirectoryOperations(input.directory);
       diagnostic('started', 'deletion_fence');
       failureStage = 'task_cancellation';
-      const tasks = [...deps.tasks.values()].filter(
-        task => task.session.directory === input.directory
-      );
-      for (const task of tasks) {
-        task.controller.abort(new ControlTaskCancellation('cancelled', 'Worktree deleted'));
-      }
+      const tasks = deps.operations
+        .activeOperations()
+        .filter(task => task.session.directory === input.directory);
+      for (const task of tasks) task.cancel('Worktree deleted', 'cancelled');
       const results = await Promise.all(tasks.map(task => task.done));
       failureStage = 'deletion_fence';
       await fenced;
@@ -518,6 +479,9 @@ export async function handleControlRequest(
   if (!session) {
     return fail('protocol_error', 'session identity is required', false);
   }
+  if (operation === 'session.operation.ack') return deps.operations.acknowledge(session, payload);
+  const admission = deps.operations.admission(operation, session, payload, authorization);
+  if (admission.kind === 'reply') return admission.result;
   if (
     (deps.signal?.aborted || (!deps.kiloReady && operation !== 'session.git.summary')) &&
     operation !== 'session.abort' &&
@@ -535,7 +499,7 @@ export async function handleControlRequest(
         errorCode: 'not_ready',
         retryable: true,
         aborted: deps.signal?.aborted ?? false,
-        ownedTask: deps.tasks.has(session.kiloSessionId),
+        ownedTask: deps.operations.hasActive(session.kiloSessionId),
         statusQueryPending: false,
         questionQueryPending: false,
         permissionQueryPending: false,
@@ -552,7 +516,7 @@ export async function handleControlRequest(
   ) {
     return fail('unauthorized', 'Session directory mismatch', false);
   }
-  const current = deps.tasks.get(session.kiloSessionId);
+  const current = deps.operations.active(session.kiloSessionId);
   if (
     current &&
     (current.session.directory !== session.directory ||
@@ -563,7 +527,7 @@ export async function handleControlRequest(
 
   try {
     assertDirectoryActive(session.directory);
-    return await handleSessionControlRequest(operation, session, payload, deps);
+    return await handleSessionControlRequest(operation, session, payload, deps, authorization);
   } catch {
     return fail('not_ready', 'Worktree is being deleted', false);
   }
@@ -573,15 +537,16 @@ async function handleSessionControlRequest(
   operation: string,
   session: SessionRequestIdentity,
   payload: unknown,
-  deps: HandlerDeps
+  deps: HandlerDeps,
+  authorization?: SessionOperationAuthorization
 ): Promise<ControlHandlerResult> {
   switch (operation) {
     case 'session.attach':
-      return handleAttach(session, payload, deps);
+      return handleAttach(session, payload, deps, authorization);
     case 'session.detach':
       return handleDetach(session, payload, deps);
     case 'session.prompt':
-      return handlePrompt(session, payload, deps);
+      return handlePrompt(session, payload, deps, authorization);
     case 'session.abort':
       return handleAbort(session, payload, deps);
     case 'session.permission.resolve':
@@ -659,49 +624,56 @@ function terminalFailure(error: unknown): ControlHandlerResult {
 async function handleAttach(
   session: SessionRequestIdentity,
   payload: unknown,
-  deps: HandlerDeps
+  deps: HandlerDeps,
+  authorization?: SessionOperationAuthorization
 ): Promise<ControlHandlerResult> {
   const parsed = sessionAttachPayloadSchema.safeParse(payload ?? {});
-  if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  if (!parsed.success) return rejectBeforeAdmission('protocol_error', 'Invalid payload', false);
 
   if (
     parsed.data.env &&
     CONTROL_RUNTIME_RESERVED_ENV_VARS.some(name => Object.hasOwn(parsed.data.env ?? {}, name))
   ) {
-    return fail('protocol_error', 'Reserved control runtime environment variable', false);
+    return rejectBeforeAdmission(
+      'protocol_error',
+      'Reserved control runtime environment variable',
+      false
+    );
   }
-  if (deps.tasks.has(session.kiloSessionId)) {
-    return fail('session_busy', 'Session has work in progress', true);
+  if (deps.operations.hasActive(session.kiloSessionId)) {
+    return rejectBeforeAdmission('session_busy', 'Session has work in progress', true);
   }
 
-  const task = startSessionTask(
+  const task = deps.operations.start(
     session,
-    { kind: 'preparation', messageId: parsed.data.preparation?.triggerMessageId },
-    deps,
-    async owned => {
-      const result = await (deps.applyAttach ?? applySessionAttach)(session, parsed.data, {
-        onDiagnostic: deps.onDiagnostic,
-        kiloRuntimes: deps.kiloRuntimes,
-        signal: owned.signal,
-        canRefreshCredentials: () =>
-          !owned.signal.aborted &&
-          ![...deps.tasks.values()].some(
-            task => task !== owned && task.session.directory === session.directory
-          ) &&
-          !(deps.activity?.snapshots() ?? []).some(
-            snapshot =>
-              snapshot.state !== 'idle' &&
-              directoryForSession(snapshot.kiloSessionId) === session.directory
-          ),
-        ...(deps.terminalRuntime ? { terminalRuntime: deps.terminalRuntime } : {}),
-        ...(deps.emitPreparing ? { emitPreparing: deps.emitPreparing } : {}),
-      });
-      if (owned.signal.aborted) {
-        return fail('not_ready', 'Session attachment cancelled', true);
-      }
-      if (result.ok) deps.activity?.attach(session.kiloSessionId);
-      return result;
-    }
+    authorization,
+    {
+      operation: 'session.attach',
+      payload: parsed.data,
+      apply: (identity, payload, hooks) =>
+        (deps.applyAttach ?? applySessionAttach)(identity, payload, {
+          ...hooks,
+          onDiagnostic: deps.onDiagnostic,
+          kiloRuntimes: deps.kiloRuntimes,
+          canRefreshCredentials: () =>
+            !deps.operations
+              .activeOperations()
+              .some(
+                task =>
+                  task.session.directory === session.directory &&
+                  task.session.kiloSessionId !== session.kiloSessionId
+              ) &&
+            !(deps.activity?.snapshots() ?? []).some(
+              snapshot =>
+                snapshot.state !== 'idle' &&
+                directoryForSession(snapshot.kiloSessionId) === session.directory
+            ),
+          ...(deps.terminalRuntime ? { terminalRuntime: deps.terminalRuntime } : {}),
+        }),
+      onAttached: () => deps.activity?.attach(session.kiloSessionId),
+      emitPreparing: deps.emitPreparing,
+    },
+    operationEffects(session, deps)
   );
   return task.done;
 }
@@ -714,9 +686,9 @@ async function handleDetach(
   if (!sessionDetachPayloadSchema.safeParse(payload).success) {
     return fail('protocol_error', 'Invalid payload', false);
   }
-  const task = deps.tasks.get(session.kiloSessionId);
+  const task = deps.operations.active(session.kiloSessionId);
   if (task) {
-    task.controller.abort(new ControlTaskCancellation('cancelled', 'Session detached'));
+    task.cancel('Session detached', 'cancelled');
     const result = await task.done;
     if (!result.ok && task.kind !== 'preparation') return result;
   }
@@ -824,7 +796,8 @@ function validAttachmentPaths(
 function handlePrompt(
   session: SessionRequestIdentity,
   payload: unknown,
-  deps: HandlerDeps
+  deps: HandlerDeps,
+  authorization?: SessionOperationAuthorization
 ): ControlHandlerResult {
   const runtime = sessionKiloRuntime(session, deps);
   if (!runtime) {
@@ -832,38 +805,42 @@ function handlePrompt(
       deps.kiloRuntimes?.isHealthy() &&
       directoryForSession(session.kiloSessionId) === session.directory &&
       rootForSession(session.kiloSessionId) === session.kiloSessionId &&
-      [...deps.tasks.values()].some(
-        task =>
-          task.kind === 'preparation' &&
-          task.session.directory === session.directory &&
-          !task.signal.aborted
-      )
+      deps.operations
+        .activeOperations()
+        .some(
+          task =>
+            task.kind === 'preparation' &&
+            task.session.directory === session.directory &&
+            !task.signal.aborted
+        )
     ) {
-      return fail('session_busy', 'Worktree has preparation in progress', true);
+      return rejectBeforeAdmission('session_busy', 'Worktree has preparation in progress', true);
     }
-    return missingKilo();
+    return rejectBeforeAdmission('not_ready', 'Kilo is not ready', true);
   }
   const parsed = sessionPromptPayloadSchema.safeParse(payload);
-  if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  if (!parsed.success) return rejectBeforeAdmission('protocol_error', 'Invalid payload', false);
   const request = parsed.data;
+  if (authorization && authorization.messageId !== request.messageId)
+    return rejectBeforeAdmission('idempotency_conflict', 'Message identity mismatch', false);
   if (
     request.turn.type === 'command' &&
     request.turn.command === 'compact' &&
     !request.agent.model
   ) {
-    return fail('protocol_error', 'Model is required for compact', false);
+    return rejectBeforeAdmission('protocol_error', 'Model is required for compact', false);
   }
   if (!validAttachmentPaths(session, request)) {
-    return fail('protocol_error', 'Invalid attachment path', false);
+    return rejectBeforeAdmission('protocol_error', 'Invalid attachment path', false);
   }
   if (request.turn.type === 'command' && request.attachments?.length) {
-    return fail(
+    return rejectBeforeAdmission(
       'protocol_error',
       'Command attachments are not supported by the control runtime',
       false
     );
   }
-  const existing = deps.tasks.get(session.kiloSessionId);
+  const existing = deps.operations.active(session.kiloSessionId);
   if (existing) {
     if (
       existing.kind !== 'preparation' &&
@@ -872,16 +849,19 @@ function handlePrompt(
     ) {
       return ok({ messageId: request.messageId, status: 'existing' });
     }
-    return fail('session_busy', 'Session has work in progress', true);
+    return rejectBeforeAdmission('session_busy', 'Session has work in progress', true);
   }
-  startSessionTask(
+  deps.operations.start(
     session,
-    { kind: 'execution', messageId: request.messageId },
+    authorization,
     {
-      ...deps,
-      signal: deps.signal ? AbortSignal.any([deps.signal, runtime.signal]) : runtime.signal,
+      operation: 'session.prompt',
+      payload: request,
+      runtime,
+      materializeAttachments: deps.materializeAttachments,
+      runAutoCommit: deps.runAutoCommit,
     },
-    task => executePrompt(task, request, runtime, deps)
+    operationEffects(session, deps)
   );
   return ok({ messageId: request.messageId, status: 'accepted' });
 }
@@ -900,214 +880,6 @@ async function abortKiloSession(
   if (aborted !== true) throw new Error('Kilo cancellation was not confirmed');
 }
 
-function emitFinalizationEvent(
-  session: SessionRequestIdentity,
-  event: IngestEvent,
-  deps: HandlerDeps
-): void {
-  deps.emitSessionEvent(
-    session,
-    sessionEventPayloadSchema.parse({
-      type: event.streamEventType,
-      properties: event.data,
-      timestamp: event.timestamp,
-    })
-  );
-}
-
-async function summarizeOwnedSession(
-  task: OwnedSessionTask,
-  kiloClient: WrapperKiloClient,
-  model: { providerID?: string; modelID: string },
-  auto?: boolean
-): Promise<void> {
-  const success = await withTimeoutAndAbort(
-    kiloClient.summarizeSession({
-      sessionId: task.session.kiloSessionId,
-      directory: task.session.directory,
-      signal: task.signal,
-      model,
-      ...(auto === undefined ? {} : { auto }),
-    }),
-    {
-      signal: task.signal,
-      timeoutMs: SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
-      timeoutMessage: 'Execution exceeded the 60 minute limit',
-      abortMessage: 'Execution cancelled',
-    }
-  );
-  if (!success) throw new Error('Session summarization failed');
-}
-
-async function executePrompt(
-  task: OwnedSessionTask,
-  request: SessionPromptPayload,
-  runtime: WorktreeKiloRuntime,
-  deps: HandlerDeps
-): Promise<ControlHandlerResult> {
-  const { session, signal } = task;
-  const { kiloClient, env } = runtime;
-  const { messageId, turn, agent } = request;
-  const startedAt = Date.now();
-  const diagnostic = (phase: string, status?: SessionMessageOutcome['status']): void =>
-    emitControlDiagnostic(deps.onDiagnostic, 'session.execution', {
-      sessionId: session.sessionId,
-      kiloSessionId: session.kiloSessionId,
-      messageId,
-      phase,
-      status,
-      elapsedMs: Date.now() - startedAt,
-      aborted: signal.aborted,
-    });
-  let outcome: SessionMessageOutcome;
-  let result = ok({});
-  let failureReason = 'Kilo execution failed';
-  const emitStatus = (message: string): void =>
-    emitFinalizationEvent(
-      session,
-      {
-        streamEventType: 'status',
-        data: { message, messageId },
-        timestamp: new Date().toISOString(),
-      },
-      deps
-    );
-  try {
-    signal.throwIfAborted();
-    let completion: Awaited<ReturnType<WrapperKiloClient['sendPrompt']>> | undefined;
-    const options = {
-      sessionId: session.kiloSessionId,
-      directory: session.directory,
-      signal,
-      messageId,
-      agent: agent.mode,
-      ...(agent.variant ? { variant: agent.variant } : {}),
-    };
-    const deadline = {
-      signal,
-      timeoutMs: SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
-      timeoutMessage: 'Execution exceeded the 60 minute limit',
-      abortMessage: 'Execution cancelled',
-    };
-    if (turn.type === 'prompt') {
-      if (agent.model === undefined) throw new Error('Prompt model is required');
-      const message = await (deps.materializeAttachments ?? materializeMessageAttachments)(
-        { id: messageId, prompt: turn.prompt, parts: turn.parts, attachments: request.attachments },
-        { signal }
-      );
-      signal.throwIfAborted();
-      diagnostic('prompt_started');
-      completion = await withTimeoutAndAbort(
-        kiloClient.sendPrompt({
-          ...options,
-          prompt: message.prompt,
-          ...(message.parts ? { parts: message.parts } : {}),
-          model: { providerID: 'kilo', modelID: agent.model },
-        }),
-        deadline
-      );
-      diagnostic('prompt_completed');
-    } else if (turn.command === 'compact') {
-      if (!agent.model) throw new Error('Model is required for compact');
-      failureReason = 'Context condensation failed';
-      emitStatus('Condensing context...');
-      diagnostic('compact_started');
-      await summarizeOwnedSession(task, kiloClient, { providerID: 'kilo', modelID: agent.model });
-      diagnostic('compact_completed');
-      signal.throwIfAborted();
-      emitStatus('Context condensed successfully');
-    } else {
-      diagnostic('command_started');
-      completion = await withTimeoutAndAbort(
-        kiloClient.sendCommand({
-          ...options,
-          command: turn.command,
-          args: turn.arguments,
-          ...(agent.model !== undefined
-            ? { model: { providerID: 'kilo', modelID: agent.model } }
-            : {}),
-        }),
-        deadline
-      );
-      diagnostic('command_completed');
-    }
-    signal.throwIfAborted();
-    const error = completion?.info.error;
-    if (!error && (request.finalization?.autoCommit || request.finalization?.condenseOnComplete)) {
-      task.kind = 'finalizing';
-      diagnostic('finalization_started');
-      if (request.finalization.autoCommit) {
-        failureReason = 'Auto-commit failed';
-        diagnostic('autocommit_started');
-        const committed = await (deps.runAutoCommit ?? runAutoCommit)({
-          workspacePath: session.directory,
-          kiloClient,
-          env,
-          messageId: completion?.info.id ?? messageId,
-          signal,
-          onEvent: event => emitFinalizationEvent(session, event, deps),
-        });
-        signal.throwIfAborted();
-        if (!committed.success) throw new Error('Auto-commit failed');
-        diagnostic('autocommit_completed');
-      }
-      if (request.finalization.condenseOnComplete) {
-        failureReason = 'Context condensation failed';
-        const model = agent.model
-          ? { providerID: 'kilo', modelID: agent.model }
-          : completion
-            ? { providerID: completion.info.providerID, modelID: completion.info.modelID }
-            : undefined;
-        if (!model) throw new Error('Model is required for condensation');
-        emitStatus('Condensing context...');
-        diagnostic('condense_started');
-        await summarizeOwnedSession(task, kiloClient, model, true);
-        diagnostic('condense_completed');
-        signal.throwIfAborted();
-        emitStatus('Context condensed successfully');
-      }
-    }
-    outcome = error
-      ? {
-          messageId,
-          status: error.name === 'MessageAbortedError' ? 'cancelled' : 'failed',
-          reason: `Kilo execution ended with ${error.name}`,
-        }
-      : { messageId, status: 'completed' };
-  } catch {
-    diagnostic('execution_failed');
-    const cancellation: unknown = signal.reason;
-    outcome = {
-      messageId,
-      status: cancellation instanceof ControlTaskCancellation ? cancellation.status : 'failed',
-      reason:
-        cancellation instanceof ControlTaskCancellation ? cancellation.message : failureReason,
-    };
-    try {
-      diagnostic('abort_started');
-      await abortKiloSession(session, kiloClient);
-      diagnostic('abort_completed');
-    } catch (error) {
-      diagnostic('abort_failed');
-      deps.retireRuntime('Kilo cancellation failed');
-      result = kiloFailure(error);
-    }
-  }
-  try {
-    diagnostic('outcome_sending', outcome.status);
-    deps.emitSessionEvent(session, {
-      type: 'session.message.outcome',
-      properties: sessionMessageOutcomeSchema.parse(outcome),
-    });
-    diagnostic('outcome_sent', outcome.status);
-  } catch {
-    diagnostic('outcome_failed', outcome.status);
-    deps.retireRuntime('Session outcome delivery failed');
-    return fail('not_ready', 'Session outcome delivery failed', false);
-  }
-  return result;
-}
-
 async function handleAbort(
   session: SessionRequestIdentity,
   payload: unknown,
@@ -1115,12 +887,12 @@ async function handleAbort(
 ): Promise<ControlHandlerResult> {
   const parsed = sessionAbortPayloadSchema.safeParse(payload ?? {});
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
-  const task = deps.tasks.get(session.kiloSessionId);
+  const task = deps.operations.active(session.kiloSessionId);
   if (parsed.data.messageId && task?.messageId !== parsed.data.messageId) {
     return ok({ status: 'already_idle' });
   }
   if (task) {
-    task.controller.abort(new ControlTaskCancellation('cancelled', 'Session aborted'));
+    task.cancel('Session aborted', 'cancelled');
     const result = await task.done;
     if (!result.ok && task.kind !== 'preparation') return result;
     return ok({ status: 'aborted' });
@@ -1258,7 +1030,7 @@ async function handleSync(
       elapsedMs: Math.max(0, Date.now() - startedAt),
       ok: phase === 'completed',
       aborted: deps.signal?.aborted ?? false,
-      ownedTask: deps.tasks.has(session.kiloSessionId),
+      ownedTask: deps.operations.hasActive(session.kiloSessionId),
       statusQueryPending: queries.sync_status,
       questionQueryPending: queries.sync_questions,
       permissionQueryPending: queries.sync_permissions,
@@ -1350,7 +1122,7 @@ async function handleSync(
     if (!questions.complete || !permissions.complete) {
       throw new Error('Native requests contain unresolved ancestry');
     }
-    const ownedTask = deps.tasks.has(session.kiloSessionId);
+    const ownedTask = deps.operations.hasActive(session.kiloSessionId);
     const status = ownedTask
       ? { type: 'busy' }
       : (statuses[session.kiloSessionId] ?? { type: 'idle' });

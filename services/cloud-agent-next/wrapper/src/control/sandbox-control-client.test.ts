@@ -1,7 +1,7 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test';
 import { z } from 'zod';
 import { helloResult } from '../../../src/sandbox-control/frames';
-import { buildHeartbeatPayload } from './sandbox-control-handlers';
+import { buildHeartbeatPayload, createControlHandlerDeps } from './sandbox-control-handlers';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
@@ -119,25 +119,26 @@ const previousHeartbeatSchema = z
   .strict();
 
 function versionHeartbeat(version: string | null) {
-  return buildHeartbeatPayload({
-    kiloRuntimes: {
-      kiloCliVersion: version,
-      attach() {
-        throw new Error('Unexpected attach');
+  return buildHeartbeatPayload(
+    createControlHandlerDeps({
+      kiloRuntimes: {
+        kiloCliVersion: version,
+        attach() {
+          throw new Error('Unexpected attach');
+        },
+        detach: () => false,
+        deleteDirectory: async () => {},
+        get: () => undefined,
+        isHealthy: () => true,
+        shutdown() {},
       },
-      detach: () => false,
-      deleteDirectory: async () => {},
-      get: () => undefined,
-      isHealthy: () => true,
-      shutdown() {},
-    },
-    version: '2.4.0',
-    kiloReady: true,
-    sessions: [],
-    tasks: new Map(),
-    emitSessionEvent() {},
-    retireRuntime() {},
-  });
+      version: '2.4.0',
+      kiloReady: true,
+      sessions: [],
+      emitSessionEvent() {},
+      retireRuntime() {},
+    })
+  );
 }
 
 describe('heartbeat version rollout compatibility', () => {
@@ -299,13 +300,19 @@ describe('createSandboxControlClient', () => {
     const hello = JSON.parse(fake.sent[0] ?? '{}') as {
       requestId: string;
       operation: string;
-      payload: { protocolVersion: number; wrapperVersion: string; providerInstanceId: string };
+      payload: {
+        protocolVersion: number;
+        wrapperVersion: string;
+        providerInstanceId: string;
+        capabilities?: { sessionOperationResults?: boolean };
+      };
     };
     expect(hello.operation).toBe('sandbox.hello');
     expect(hello.payload).toEqual({
       protocolVersion: 1,
       wrapperVersion: '2.4.0',
       providerInstanceId: 'inst_1',
+      capabilities: { sessionOperationResults: true },
     });
     fake.respond(
       JSON.stringify({

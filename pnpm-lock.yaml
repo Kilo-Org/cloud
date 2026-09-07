@@ -2960,6 +2960,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -2994,6 +2997,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/event-service':
         specifier: workspace:*
         version: link:../../packages/event-service
@@ -3083,6 +3089,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3117,6 +3126,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils
@@ -3148,6 +3160,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/notifications':
         specifier: workspace:*
         version: link:../../packages/notifications
@@ -3203,6 +3218,9 @@ importers:
       '@kilocode/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@kilocode/encryption':
+        specifier: workspace:*
+        version: link:../../packages/encryption
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../../packages/worker-utils

@@ -1,4 +1,4 @@
-import { timingSafeEqual as nodeTimingSafeEqual } from 'crypto';
+import { timingSafeEqual } from '@kilocode/encryption';
 import { z } from 'zod';
 import {
   createOrFindSecurityAgentCommandByOperationKey,
@@ -195,15 +195,6 @@ function toCommandOwner(owner: SecuritySyncMessage['owner']): SecurityAgentComma
   if (owner.organizationId) return { type: 'org', id: owner.organizationId };
   if (owner.userId) return { type: 'user', id: owner.userId };
   throw new Error('owner.organizationId or owner.userId is required');
-}
-
-async function timingSafeEqual(left: string, right: string): Promise<boolean> {
-  const encoder = new TextEncoder();
-  const [leftDigest, rightDigest] = await Promise.all([
-    crypto.subtle.digest('SHA-256', encoder.encode(left)),
-    crypto.subtle.digest('SHA-256', encoder.encode(right)),
-  ]);
-  return nodeTimingSafeEqual(new Uint8Array(leftDigest), new Uint8Array(rightDigest));
 }
 
 // ----- same-key command dedupe (P1-A-08e) ------------------------------------
@@ -744,7 +735,7 @@ export default {
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 
-      if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+      if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
 
@@ -780,7 +771,7 @@ export default {
         Promise.resolve(request.headers.get('x-internal-api-key')),
       ]);
 
-      if (!authHeader || !internalSecret || !(await timingSafeEqual(authHeader, internalSecret))) {
+      if (!authHeader || !internalSecret || !timingSafeEqual(authHeader, internalSecret)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
 

@@ -1020,7 +1020,9 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     const completion = actions.handlePurchaseSuccess(
       createPurchase({ store: 'google', productId: 'kilopass_tier19' })
     );
-    await vi.waitFor(() => expect(invalidateAfterCompletion).toHaveBeenCalled());
+    await vi.waitFor(() => {
+      expect(invalidateAfterCompletion).toHaveBeenCalled();
+    });
     const acknowledgedBeforeRefresh = finishTransaction.mock.calls.length;
     refresh.resolve(undefined);
     expect(await completion).toBe(true);

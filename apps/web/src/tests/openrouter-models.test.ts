@@ -289,14 +289,12 @@ describe('GET /api/openrouter/models', () => {
       data: [
         ...mockOpenRouterModels.data,
         { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
-        ...['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'].map(
-          id => ({
-            ...original,
-            id,
-            name: id,
-            pricing: { ...original.pricing, prompt: '0', completion: '0' },
-          })
-        ),
+        ...['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'].map(id => ({
+          ...original,
+          id,
+          name: id,
+          pricing: { ...original.pricing, prompt: '0', completion: '0' },
+        })),
       ],
     };
     global.fetch = jest

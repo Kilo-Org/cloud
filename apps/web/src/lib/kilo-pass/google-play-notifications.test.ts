@@ -22,7 +22,9 @@ import {
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/utils';
 
-const mockAcknowledge = jest.fn<() => Promise<void>>().mockResolvedValue(undefined);
+const mockAcknowledge = jest
+  .fn<(...args: unknown[]) => Promise<void>>()
+  .mockResolvedValue(undefined);
 
 const mockGetGooglePlaySubscriptionPurchase =
   jest.fn<(purchaseToken: string) => Promise<androidpublisher_v3.Schema$SubscriptionPurchaseV2>>();
@@ -722,49 +724,63 @@ describe('processGooglePlayKiloPassNotification', () => {
     }
   );
 
-  it.each([false, true])('acknowledges committed credits and retries without another grant (resubscription: %s)', async resubscription => {
-    const { user, obfsAccountId } = await insertGooglePlayUser();
-    const token = crypto.randomUUID();
-    const messageId = crypto.randomUUID();
-    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
-      apiDataForUser(obfsAccountId, undefined, {
-        acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
-        ...(resubscription ? { externalAccountIdentifiers: undefined, outOfAppPurchaseContext: { expiredExternalAccountIdentifiers: { obfuscatedExternalAccountId: obfsAccountId } } } : {}),
-      })
-    );
-    mockAcknowledge.mockImplementationOnce(async () => {
-      const granted = await db.query.kilocode_users.findFirst({
+  it.each([false, true])(
+    'acknowledges committed credits and retries without another grant (resubscription: %s)',
+    async resubscription => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      const token = crypto.randomUUID();
+      const messageId = crypto.randomUUID();
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, undefined, {
+          acknowledgementState: 'ACKNOWLEDGEMENT_STATE_PENDING',
+          ...(resubscription
+            ? {
+                externalAccountIdentifiers: undefined,
+                outOfAppPurchaseContext: {
+                  expiredExternalAccountIdentifiers: { obfuscatedExternalAccountId: obfsAccountId },
+                },
+              }
+            : {}),
+        })
+      );
+      mockAcknowledge.mockImplementationOnce(async () => {
+        const granted = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, user.id),
+        });
+        expect(granted!.total_microdollars_acquired).toBe(
+          user.total_microdollars_acquired + toMicrodollars(19)
+        );
+        throw new Error('acknowledgement unavailable');
+      });
+      const message = pubsubMessage({ purchaseToken: token, messageId });
+      await expect(
+        processGooglePlayKiloPassNotification({ pubsubMessage: message })
+      ).rejects.toThrow('acknowledgement unavailable');
+      const pending = await db.query.kilo_pass_store_events.findFirst({
+        where: eq(kilo_pass_store_events.event_id, messageId),
+      });
+      expect(pending!.processed_at).toBeNull();
+      await db
+        .update(kilo_pass_store_events)
+        .set({ processing_started_at: new Date(Date.now() - 6 * 60 * 1000).toISOString() })
+        .where(eq(kilo_pass_store_events.id, pending!.id));
+      await expect(
+        processGooglePlayKiloPassNotification({ pubsubMessage: message })
+      ).resolves.toEqual({ processed: true });
+      expect(mockAcknowledge).toHaveBeenCalledTimes(2);
+      expect(mockAcknowledge).toHaveBeenLastCalledWith(
+        'kilopass_tier19',
+        token,
+        resubscription ? obfsAccountId : undefined
+      );
+      const after = await db.query.kilocode_users.findFirst({
         where: eq(kilocode_users.id, user.id),
       });
-      expect(granted!.total_microdollars_acquired).toBe(
+      expect(after!.total_microdollars_acquired).toBe(
         user.total_microdollars_acquired + toMicrodollars(19)
       );
-      throw new Error('acknowledgement unavailable');
-    });
-    const message = pubsubMessage({ purchaseToken: token, messageId });
-    await expect(processGooglePlayKiloPassNotification({ pubsubMessage: message })).rejects.toThrow(
-      'acknowledgement unavailable'
-    );
-    const pending = await db.query.kilo_pass_store_events.findFirst({
-      where: eq(kilo_pass_store_events.event_id, messageId),
-    });
-    expect(pending!.processed_at).toBeNull();
-    await db
-      .update(kilo_pass_store_events)
-      .set({ processing_started_at: new Date(Date.now() - 6 * 60 * 1000).toISOString() })
-      .where(eq(kilo_pass_store_events.id, pending!.id));
-    await expect(
-      processGooglePlayKiloPassNotification({ pubsubMessage: message })
-    ).resolves.toEqual({ processed: true });
-    expect(mockAcknowledge).toHaveBeenCalledTimes(2);
-    expect(mockAcknowledge).toHaveBeenLastCalledWith('kilopass_tier19', token, resubscription ? obfsAccountId : undefined);
-    const after = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
-    });
-    expect(after!.total_microdollars_acquired).toBe(
-      user.total_microdollars_acquired + toMicrodollars(19)
-    );
-  });
+    }
+  );
 
   it('preserves the current paid period and bonus when an older order is voided', async () => {
     const { user, obfsAccountId } = await insertGooglePlayUser();

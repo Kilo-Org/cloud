@@ -300,7 +300,12 @@ function expectedHint(kiloSessionId = 'root', worktree = directory): Parameters<
   return [
     'session.event',
     { type: WORKTREE_CHANGED_EVENT, properties: {} },
-    { directory: worktree, kiloSessionId, rootKiloSessionId: kiloSessionId },
+    {
+      directory: worktree,
+      kiloSessionId,
+      rootKiloSessionId: kiloSessionId,
+      nativeRuntimeId: expect.any(String),
+    },
   ];
 }
 
@@ -863,6 +868,7 @@ describe('worktree mutation notifications', () => {
     h.notifications.observe(replacement.runtime, { ...fileEdited, directory });
     jest.advanceTimersByTime(5_000);
     expect(h.sendEvent.mock.calls).toEqual([expectedHint()]);
+    expect(h.sendEvent.mock.calls[0]?.[2].nativeRuntimeId).toBe(replacement.runtime.runtimeId);
   });
 
   it('never queues while aborted, disposed, deleting, or without an attached snapshot', async () => {

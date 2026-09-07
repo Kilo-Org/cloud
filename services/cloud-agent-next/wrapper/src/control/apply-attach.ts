@@ -52,7 +52,7 @@ const workspacePreparations = new Map<string, Promise<ControlHandlerResult | und
 
 export type AttachPreparingEmitter = (
   event: PreparingEventDataV2,
-  options?: { retained?: true }
+  options?: { retained?: true; nativeRuntimeId?: string }
 ) => void;
 
 export type ApplyAttachDeps = {

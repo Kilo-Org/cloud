@@ -40,8 +40,12 @@ export async function interruptControlSession(
       withDORetry(stub, operation, operationName));
   const state = await retry(session => session.getControlState(), 'getControlState');
   if (!state) return undefined;
+  const controlState = controlSessionStateSchema.parse(state);
+  if (controlState.targets.length === 0) {
+    return controlState.stops?.[0];
+  }
   const request = createControlStopRequest(
-    controlSessionStateSchema.parse(state),
+    controlState,
     dependencies.now,
     dependencies.operationId
   );

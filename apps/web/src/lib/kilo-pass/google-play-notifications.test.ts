@@ -681,6 +681,43 @@ describe('processGooglePlayKiloPassNotification', () => {
     }
   );
 
+  it.each([{ state: 'PROCESSED' }, { orderId: 'wrong-order' }, { purchaseToken: 'wrong-token' }])(
+    'rejects unverified refund %j without a credit change',
+    async overrides => {
+      const { user } = await insertGooglePlayUser();
+      const orderId = crypto.randomUUID();
+      const purchaseToken = crypto.randomUUID();
+      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+        orderId,
+        purchaseToken,
+        state: 'REFUNDED',
+        ...overrides,
+      });
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: {
+            messageId: crypto.randomUUID(),
+            data: Buffer.from(
+              JSON.stringify({
+                packageName: 'com.kilocode.kiloapp',
+                voidedPurchaseNotification: {
+                  purchaseToken,
+                  orderId,
+                  productType: 1,
+                  refundType: 1,
+                },
+              })
+            ).toString('base64'),
+          },
+        })
+      ).rejects.toThrow('Google Play refund does not match');
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
+    }
+  );
+
   it('returns already_processed for a duplicate messageId', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
     mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId));

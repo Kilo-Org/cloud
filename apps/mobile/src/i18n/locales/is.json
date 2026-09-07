@@ -2556,6 +2556,10 @@
     "stopped": "Raddinnsláttur stöðvaðist. Ýttu á hljóðnemann til að reyna aftur.",
     "unavailableDevice": "Raddinnsláttur er ekki í boði á þessu tæki.",
     "unavailableLanguage": "Raddinnsláttur er ekki í boði á tungumáli tækisins.",
+    "languageNotInstalledTitle": "Raddinnsláttur fyrir {{language}} er ekki tilbúinn ennþá",
+    "languageNotInstalledMessage": "Ónettengdu talgagnaskrárnar fyrir {{language}} eru ekki uppsettar á þessum síma. Hladdu þeim niður og reyndu raddinnslátt aftur.",
+    "downloadOfflineModel": "Hlaða niður",
+    "offlineModelDownloadScheduled": "Ónettengdu talgagnaskrárnar verða hlaðnar niður í bakgrunni. Reyndu raddinnslátt aftur síðar.",
     "listeningStopped": "Hlustun stöðvuð."
   },
   "share": {

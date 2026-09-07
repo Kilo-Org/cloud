@@ -2556,6 +2556,10 @@
     "stopped": "Dikteringen er stoppet. Tryk på mikrofonen for at prøve igen.",
     "unavailableDevice": "Diktering er ikke tilgængelig på denne enhed.",
     "unavailableLanguage": "Diktering er ikke tilgængelig på enhedens valgte sprog.",
+    "languageNotInstalledTitle": "Diktering for {{language}} er ikke klar endnu",
+    "languageNotInstalledMessage": "De offline talefiler til {{language}} er ikke installeret på denne telefon. Download dem, og prøv diktering igen.",
+    "downloadOfflineModel": "Download",
+    "offlineModelDownloadScheduled": "De offline talefiler downloades i baggrunden. Prøv diktering igen senere.",
     "listeningStopped": "Dikteringen er stoppet."
   },
   "share": {

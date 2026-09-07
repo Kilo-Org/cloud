@@ -2577,6 +2577,10 @@
     "stopped": "Glasovni unos je zaustavljen. Dodirni mikrofon za ponovni pokušaj.",
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
     "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
+    "languageNotInstalledTitle": "Glasovni unos za {{language}} još nije spreman",
+    "languageNotInstalledMessage": "Datoteke govora za izvanmrežni rad za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovno.",
+    "downloadOfflineModel": "Preuzmi",
+    "offlineModelDownloadScheduled": "Datoteke govora za izvanmrežni rad preuzet će se u pozadini. Pokušaj glasovni unos ponovno kasnije.",
     "listeningStopped": "Slušanje je zaustavljeno."
   },
   "share": {

@@ -2139,6 +2139,10 @@
     "stopped": "El dictado se detuvo. Toca el micrófono para intentarlo de nuevo.",
     "unavailableDevice": "El dictado no está disponible en este dispositivo.",
     "unavailableLanguage": "El dictado no está disponible en el idioma de este dispositivo.",
+    "languageNotInstalledTitle": "El dictado para {{language}} aún no está listo",
+    "languageNotInstalledMessage": "Los archivos de voz sin conexión de {{language}} no están instalados en este teléfono. Descárgalos y vuelve a intentar el dictado.",
+    "downloadOfflineModel": "Descargar",
+    "offlineModelDownloadScheduled": "Los archivos de voz sin conexión se descargarán en segundo plano. Vuelve a probar el dictado más tarde.",
     "listeningStopped": "Se ha detenido la escucha."
   },
   "share": {

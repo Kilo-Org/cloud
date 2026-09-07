@@ -2181,6 +2181,10 @@
     "stopped": "توقف الإدخال الصوتي. اضغط على الميكروفون للمحاولة مرة أخرى.",
     "unavailableDevice": "الإدخال الصوتي غير متاح على هذا الجهاز.",
     "unavailableLanguage": "الإدخال الصوتي غير متاح باللغة المحددة للجهاز.",
+    "languageNotInstalledTitle": "الإدخال الصوتي للغة {{language}} غير جاهز",
+    "languageNotInstalledMessage": "ملفات الكلام دون اتصال للغة {{language}} غير مثبّتة على هذا الهاتف. نزّلها، ثم حاول استخدام الإدخال الصوتي مرة أخرى.",
+    "downloadOfflineModel": "تنزيل",
+    "offlineModelDownloadScheduled": "ستُنزَّل ملفات الكلام دون اتصال في الخلفية. حاول استخدام الإدخال الصوتي مرة أخرى لاحقًا.",
     "listeningStopped": "توقف الاستماع."
   },
   "share": {

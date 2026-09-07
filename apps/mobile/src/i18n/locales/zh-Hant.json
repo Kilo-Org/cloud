@@ -2125,6 +2125,10 @@
     "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
     "unavailableDevice": "此裝置上無法使用語音輸入。",
     "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。",
+    "languageNotInstalledTitle": "{{language}} 的語音輸入尚未就緒",
+    "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
+    "downloadOfflineModel": "下載",
+    "offlineModelDownloadScheduled": "離線語音檔案將在背景下載。請稍後再試一次語音輸入。",
     "listeningStopped": "已停止聆聽。"
   },
   "share": {

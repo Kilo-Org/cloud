@@ -2139,6 +2139,10 @@
     "stopped": "La dettatura si è interrotta. Tocca il microfono per riprovare.",
     "unavailableDevice": "La dettatura non è disponibile su questo dispositivo.",
     "unavailableLanguage": "La dettatura non è disponibile per la lingua del dispositivo.",
+    "languageNotInstalledTitle": "La dettatura per {{language}} non è ancora pronta",
+    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati su questo telefono. Scaricali, poi riprova con la dettatura.",
+    "downloadOfflineModel": "Scarica",
+    "offlineModelDownloadScheduled": "I file vocali offline verranno scaricati in background. Riprova con la dettatura più tardi.",
     "listeningStopped": "Ascolto interrotto."
   },
   "share": {

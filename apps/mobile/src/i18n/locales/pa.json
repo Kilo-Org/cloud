@@ -2556,6 +2556,10 @@
     "stopped": "ਵੌਇਸ ਇਨਪੁਟ ਰੁਕ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਮਾਈਕ੍ਰੋਫ਼ੋਨ 'ਤੇ ਟੈਪ ਕਰੋ।",
     "unavailableDevice": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਵੌਇਸ ਇਨਪੁਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "unavailableLanguage": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਭਾਸ਼ਾ ਲਈ ਵੌਇਸ ਇਨਪੁਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+    "languageNotInstalledTitle": "{{language}} ਲਈ ਵੌਇਸ ਇਨਪੁਟ ਹਾਲੇ ਤਿਆਰ ਨਹੀਂ ਹੈ",
+    "languageNotInstalledMessage": "{{language}} ਦੀਆਂ ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਇਸ ਫ਼ੋਨ 'ਤੇ ਇੰਸਟਾਲ ਨਹੀਂ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਡਾਊਨਲੋਡ ਕਰੋ, ਫਿਰ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
+    "downloadOfflineModel": "ਡਾਊਨਲੋਡ",
+    "offlineModelDownloadScheduled": "ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਊਨਲੋਡ ਹੋਣਗੀਆਂ। ਬਾਅਦ ਵਿੱਚ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
     "listeningStopped": "ਸੁਣਨਾ ਰੁਕ ਗਿਆ।"
   },
   "share": {

@@ -2556,6 +2556,10 @@
     "stopped": "Səslə daxiletmə dayandı. Yenidən cəhd etmək üçün mikrofona toxun.",
     "unavailableDevice": "Bu cihazda səslə daxiletmə dəstəklənmir.",
     "unavailableLanguage": "Cihazın seçilmiş dili üçün səslə daxiletmə dəstəklənmir.",
+    "languageNotInstalledTitle": "{{language}} üçün səslə daxiletmə hazır deyil",
+    "languageNotInstalledMessage": "{{language}} dilinin oflayn nitq faylları bu telefonda quraşdırılmayıb. Onları endir, sonra səslə daxiletməni yenidən sına.",
+    "downloadOfflineModel": "Endir",
+    "offlineModelDownloadScheduled": "Oflayn nitq faylları fonda endiriləcək. Səslə daxiletməni daha sonra yenidən sına.",
     "listeningStopped": "Dinləmə dayandı."
   },
   "share": {

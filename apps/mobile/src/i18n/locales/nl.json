@@ -2125,6 +2125,10 @@
     "stopped": "De spraakinvoer is gestopt. Tik op de microfoon om het opnieuw te proberen.",
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
     "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
+    "languageNotInstalledTitle": "Spraakinvoer voor {{language}} is nog niet gereed",
+    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet op deze telefoon geïnstalleerd. Download ze en probeer spraakinvoer opnieuw.",
+    "downloadOfflineModel": "Downloaden",
+    "offlineModelDownloadScheduled": "De offline spraakbestanden worden op de achtergrond gedownload. Probeer spraakinvoer later opnieuw.",
     "listeningStopped": "Het luisteren is gestopt."
   },
   "share": {

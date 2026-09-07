@@ -2125,6 +2125,10 @@
     "stopped": "Die Spracheingabe wurde gestoppt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
     "unavailableDevice": "Die Spracheingabe ist auf diesem Gerät nicht verfügbar.",
     "unavailableLanguage": "Die Spracheingabe ist für die eingestellte Gerätesprache nicht verfügbar.",
+    "languageNotInstalledTitle": "Spracheingabe für {{language}} ist noch nicht bereit",
+    "languageNotInstalledMessage": "Die Offline-Sprachdateien für {{language}} sind auf diesem Telefon nicht installiert. Lade sie herunter und versuche die Spracheingabe erneut.",
+    "downloadOfflineModel": "Herunterladen",
+    "offlineModelDownloadScheduled": "Die Offline-Sprachdateien werden im Hintergrund heruntergeladen. Versuche die Spracheingabe später erneut.",
     "listeningStopped": "Die Aufnahme wurde beendet."
   },
   "share": {

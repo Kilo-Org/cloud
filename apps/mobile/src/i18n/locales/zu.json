@@ -2556,6 +2556,10 @@
     "stopped": "Ukufaka ngezwi kumisiwe. Thepha imakrofoni ukuze uzame futhi.",
     "unavailableDevice": "Ukufaka ngezwi akutholakali kule divayisi.",
     "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi.",
+    "languageNotInstalledTitle": "Ukufaka ngezwi kwe-{{language}} akalungile okwamanje",
+    "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakwanga kule foni. Landa la mafayela, bese uzame futhi ukufaka ngezwi.",
+    "downloadOfflineModel": "Landa",
+    "offlineModelDownloadScheduled": "Amafayela okukhuluma e-offline azolandwa ngemuva. Zama futhi ukufaka ngezwi kamuva.",
     "listeningStopped": "Ukulalela kumisiwe."
   },
   "share": {

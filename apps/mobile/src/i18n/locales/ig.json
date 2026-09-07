@@ -2556,6 +2556,10 @@
     "stopped": "Ntinye olu kwụsịrị. Pịa igwe okwu ka ị nwaa ọzọ.",
     "unavailableDevice": "Ntinye olu adịghị na ngwaọrụ a.",
     "unavailableLanguage": "Ntinye olu adịghị maka asụsụ ngwaọrụ a.",
+    "languageNotInstalledTitle": "Ntinye olu maka {{language}} adịghị njikere ugbu a",
+    "languageNotInstalledMessage": "Faịlụ okwu offline maka {{language}} etinyeghị na ekwentị a. Budata ha, mgbe ahụ nwaa ntinye olu ọzọ.",
+    "downloadOfflineModel": "Budata",
+    "offlineModelDownloadScheduled": "A ga-ebudata faịlụ okwu offline na ndabere. Nwaa ntinye olu ọzọ ma e mesịa.",
     "listeningStopped": "Ịge ntị kwụsịrị."
   },
   "share": {

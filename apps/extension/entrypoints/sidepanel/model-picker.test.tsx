@@ -121,3 +121,71 @@ describe('model picker stored-model display', () => {
     expect(queryByRole('dialog', { name: 'Select model' })).toBeNull();
   });
 });
+
+describe('model picker pinned search bar', () => {
+  beforeEach(() => {
+    // jsdom implements no layout and defines no scrollIntoView to spy on.
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: vi.fn(),
+    });
+    mockUseModelPreferences.mockReturnValue({
+      favorites: new Set<string>(),
+      refetch: vi.fn(),
+      status: 'ready',
+      toggleError: false,
+      toggleFavorite: vi.fn(),
+    });
+  });
+
+  const longCatalog = Array.from({ length: 60 }, (_, index) =>
+    gatewayModel(`org/model-${index}`, `Model ${index}`)
+  );
+
+  const openPicker = (): ReturnType<typeof renderModelPicker> => {
+    const view = renderModelPicker({ model: 'org/model-0', modelOptions: longCatalog });
+    fireEvent.click(view.getByLabelText('Model'));
+    return view;
+  };
+
+  it('pins the search bar under the header so it stays visible while the list scrolls', () => {
+    const { getByLabelText } = openPicker();
+
+    const search = getByLabelText('Search models');
+    // jsdom has no layout engine, so the pin contract is the sticky positioning
+    // of the search bar's wrapper, the same mechanism as the dialog header.
+    // top-14 must keep matching the h-14 header height directly above it.
+    const pinnedBar = search.parentElement;
+    expect(pinnedBar?.classList.contains('sticky')).toBe(true);
+    expect(pinnedBar?.classList.contains('top-14')).toBe(true);
+    expect(pinnedBar?.classList.contains('z-10')).toBe(true);
+    // Rows scroll under the pinned bar, so it must paint its own background.
+    expect(pinnedBar?.classList.contains('bg-surface-background')).toBe(true);
+    // The pinned bar and the list live in the dialog's scroll container, whose
+    // chrome stays put while the rows move.
+    expect(pinnedBar?.parentElement?.classList.contains('overflow-y-auto')).toBe(true);
+  });
+
+  it('keeps the search focus and typed text while the model list scrolls', () => {
+    const { getByLabelText, getByRole } = openPicker();
+
+    const search = getByLabelText('Search models');
+    if (!(search instanceof HTMLInputElement)) {
+      throw new Error('Search models must be an input');
+    }
+
+    expect(document.activeElement).toBe(search);
+    fireEvent.change(search, { target: { value: 'model 5' } });
+
+    const dialog = getByRole('dialog', { name: 'Select model' });
+    fireEvent.scroll(dialog, { target: { scrollTop: 400 } });
+
+    const searchAfterScroll = getByLabelText('Search models');
+    if (!(searchAfterScroll instanceof HTMLInputElement)) {
+      throw new Error('Search models must be an input');
+    }
+
+    expect(document.activeElement).toBe(searchAfterScroll);
+    expect(searchAfterScroll.value).toBe('model 5');
+  });
+});

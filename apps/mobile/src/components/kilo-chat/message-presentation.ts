@@ -13,6 +13,8 @@ import { ulid } from 'ulid';
 
 import { i18n } from '@/i18n';
 
+import { htmlSanitizesToEmpty } from '../agents/markdown-html-sanitization';
+
 type SendMessageVariables = CreateMessageRequest & { clientId: string };
 export type ReplyPreviewSource = Message | ReplyToMessageSnapshot;
 export type MessageAuthorMember = ConversationDetailResponse['members'][number];
@@ -94,6 +96,36 @@ export function getDeliveryFailureLabel(message: Message): string | null {
 
 export function isMessageTextSelectionEnabled(): boolean {
   return false;
+}
+
+/**
+ * Whether a text block renders any ink. The HTML renderer strips blocked tags
+ * entirely, so a message that is only blocked tags must not reserve a bubble.
+ */
+export function textBlockHasVisibleContent(text: string): boolean {
+  return text.trim() !== '' && !htmlSanitizesToEmpty(text);
+}
+
+/**
+ * Whether the bubble wrapper has anything visible to wrap. Mirrors the agent
+ * transcript gate (`messageRendersContent`): a message whose text sanitizes to
+ * empty renders no bubble at all instead of a tiny empty one.
+ */
+export function messageRendersBubble(
+  message: Message,
+  options: { hasReplyPreview: boolean }
+): boolean {
+  if (message.deleted) {
+    // The bubble renders the "deleted" label instead of the content.
+    return true;
+  }
+  if (options.hasReplyPreview || message.deliveryFailed) {
+    // The reply preview and the delivery-failure footer live inside the bubble.
+    return true;
+  }
+  return message.content.some(block =>
+    block.type === 'text' ? textBlockHasVisibleContent(block.text) : true
+  );
 }
 
 export function canShowReactionPills(message: Message): boolean {

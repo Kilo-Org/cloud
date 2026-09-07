@@ -2175,7 +2175,6 @@
     "filePart": {
       "loadingImage": "Loading image",
       "imageUnavailableRetry": "Image unavailable, retry loading",
-      "imageUnavailableWithAlt": "Image unavailable {{alt}}",
       "imagePreviewUnavailableInSession": "Image preview unavailable in this session.",
       "viewImage": "View image",
       "viewImageWithAlt": "View image {{alt}}",

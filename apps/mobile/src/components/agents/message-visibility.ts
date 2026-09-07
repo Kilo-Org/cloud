@@ -10,6 +10,7 @@ import {
   isToolPart,
   shouldRenderReasoningPart,
 } from './part-types';
+import { htmlSanitizesToEmpty } from './markdown-html-sanitization';
 
 /**
  * Whether `PartRenderer` renders visible content for this part.
@@ -24,7 +25,9 @@ export function partRendersContent(part: Part): boolean {
     // TextPartRenderer renders nothing for blank text. Whitespace-only text is
     // blank: markdown draws no ink for it, so counting it as content adds a
     // zero-height row that eats a transcript gap and doubles the visible one.
-    return !isSnapshotProgressPart(part) && part.text.trim() !== '';
+    return (
+      !isSnapshotProgressPart(part) && part.text.trim() !== '' && !htmlSanitizesToEmpty(part.text)
+    );
   }
   if (isToolPart(part)) {
     // ToolPartRenderer renders nothing for the plan-mode transition tools.
@@ -39,9 +42,12 @@ export function partRendersContent(part: Part): boolean {
 }
 
 /**
- * Whether the message renders anything in the transcript. A user message always
- * renders its bubble; an assistant message renders only what its parts render.
+ * Whether the message renders anything in the transcript. Keep the transient
+ * zero-part user row, but drop a user row whose parts sanitize to no content.
  */
 export function messageRendersContent(message: StoredMessage): boolean {
-  return message.info.role === 'user' || message.parts.some(partRendersContent);
+  return (
+    (message.info.role === 'user' && message.parts.length === 0) ||
+    message.parts.some(partRendersContent)
+  );
 }

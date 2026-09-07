@@ -26,7 +26,10 @@ import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun'
 import { isGrokModel } from '@/lib/ai-gateway/providers/xai';
 import { isClaudeModel } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID, isOpenAiModel } from '@/lib/ai-gateway/providers/openai';
-import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
+import {
+  gpt_5_6_sol_discounted_model,
+  gpt_6_astra_flex_model,
+} from '@/lib/ai-gateway/providers/openai-exclusive';
 import { GLM_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
 import { type ProviderId } from '@/lib/ai-gateway/providers/types';
 import type { OpenRouterReasoningConfig } from '@/lib/ai-gateway/providers/openrouter/types';
@@ -102,6 +105,7 @@ export const preferredModels = [
   ...(gpt_5_6_sol_discounted_model.status === 'public'
     ? [gpt_5_6_sol_discounted_model.public_id]
     : []),
+  ...(gpt_6_astra_flex_model.status === 'public' ? [gpt_6_astra_flex_model.public_id] : []),
   GLM_CURRENT_MODEL_ID,
   KIMI_CURRENT_MODEL_ID,
   MINIMAX_CURRENT_MODEL_ID,
@@ -137,6 +141,7 @@ export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   qwen36_plus_stealth_model,
   gpt_5_6_sol_discounted_model,
+  gpt_6_astra_flex_model,
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,

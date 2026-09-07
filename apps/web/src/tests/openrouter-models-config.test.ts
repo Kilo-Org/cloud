@@ -5,7 +5,10 @@ import {
   CLAUDE_SONNET_CURRENT_MODEL_ID,
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
-import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
+import {
+  gpt_5_6_sol_discounted_model,
+  gpt_6_astra_flex_model,
+} from '@/lib/ai-gateway/providers/openai-exclusive';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 
 describe('OpenRouter Models Config', () => {
@@ -42,6 +45,12 @@ describe('OpenRouter Models Config', () => {
       );
     } else {
       expect(preferredModels).not.toContain(gpt_5_6_sol_discounted_model.public_id);
+    }
+
+    if (gpt_6_astra_flex_model.status === 'public') {
+      expect(preferredModels).toContain(gpt_6_astra_flex_model.public_id);
+    } else {
+      expect(preferredModels).not.toContain(gpt_6_astra_flex_model.public_id);
     }
   });
 });

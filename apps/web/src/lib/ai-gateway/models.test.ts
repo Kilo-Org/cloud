@@ -18,7 +18,7 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './providers/anthropic.constants';
-import { gpt_5_6_sol_discounted_model } from './providers/openai-exclusive';
+import { gpt_5_6_sol_discounted_model, gpt_6_astra_flex_model } from './providers/openai-exclusive';
 import { gemma_4_26b_a4b_it_free_model } from './providers/google';
 import { isUnavailableModel } from './unavailable-models';
 import { getRandomNumber } from './getRandomNumber';
@@ -151,6 +151,40 @@ describe('isFreeModel', () => {
             completion_per_million: 15,
             input_cache_read_per_million: 0.4,
             input_cache_write_per_million: 5,
+          },
+        },
+      ]);
+    });
+
+    test('registers the GPT-6 Astra OpenAI Flex endpoint', async () => {
+      expect(findKiloExclusiveModel(gpt_6_astra_flex_model.public_id)).toBe(gpt_6_astra_flex_model);
+      expect(gpt_6_astra_flex_model).toMatchObject({
+        internal_id: 'openai/gpt-6-astra',
+        gateway: 'openrouter',
+        flags: ['reasoning', 'vision', 'flex'],
+        inference_provider_restriction: ['openai'],
+        pricing: { fallbackOnly: true },
+      });
+      expect(
+        await hasBestEffortGuessDataCollectionRequirement(gpt_6_astra_flex_model.public_id)
+      ).toBe(false);
+      expect(gpt_6_astra_flex_model.pricing?.tiers).toEqual([
+        {
+          start_context_length: 0,
+          pricing: {
+            prompt_per_million: 5,
+            completion_per_million: 25,
+            input_cache_read_per_million: 0.5,
+            input_cache_write_per_million: 6.25,
+          },
+        },
+        {
+          start_context_length: 272_000,
+          pricing: {
+            prompt_per_million: 10,
+            completion_per_million: 37.5,
+            input_cache_read_per_million: 1,
+            input_cache_write_per_million: 12.5,
           },
         },
       ]);

@@ -17,10 +17,14 @@ import {
   InteractionManager,
   Keyboard,
   Platform,
+  Pressable,
   ScrollView,
   type TextInput,
   View,
 } from 'react-native';
+
+import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
+import { cn } from '@/lib/utils';
 
 import {
   PrFormSheetFooter,
@@ -44,14 +48,20 @@ import {
   reviewSubmitBlockReason,
 } from '@/lib/pr-review/build-submit-review-input';
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { i18n } from '@/i18n';
 import { formatNumber } from '@/lib/format';
 import { classifyPrReviewMutationError } from '@/lib/pr-review/classify-pr-review-query-state';
 import { mutationErrorDisplay } from '@/lib/pr-review/mutation-error-display';
+import {
+  buildProviderSubmitBody,
+  type ProviderReviewEventOption,
+  useSubmitReviewMutation,
+} from '@/lib/pr-review/use-pr-review-mutations';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
-import { useSubmitReviewMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import { type ProviderPrRef, providerPrRouteSegments } from '@/lib/pr-review/provider-pr-ref';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { maybeAskAfterSuccessfulOutcome } from '@/lib/feedback';
@@ -63,6 +73,83 @@ import {
 
 const COMMENT_COMPOSER_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/comment-composer' as const;
 
+/** The review event a provider `submitReview` input accepts, per chip event. */
+const EVENT_TO_PROVIDER = {
+  APPROVE: 'approve',
+  REQUEST_CHANGES: 'request_changes',
+  COMMENT: 'comment',
+} satisfies Record<ReviewEvent, ProviderReviewEventOption>;
+
+/** The chip label for one capability review event. */
+const PROVIDER_EVENT_LABEL_KEYS = {
+  approve: 'common.approve',
+  request_changes: 'prReview.eventChips.requestChanges',
+  comment: 'prReview.eventChips.comment',
+} satisfies Record<ProviderReviewEventOption, string>;
+
+/**
+ * Event chips driven by the server capability list (s6). The shared
+ * `ReviewEventChips` renders GitHub's three fixed options; on provider arms
+ * the capability list decides what is offered — a GitLab MR never offers
+ * request changes — so this renders only the events the provider accepts.
+ */
+function CapabilityReviewEventChips(props: {
+  events: readonly ProviderReviewEventOption[];
+  value: ReviewEvent;
+  disabled: boolean;
+  onChange: (next: ReviewEvent) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <View className="gap-1.5">
+      <Text className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+        {t('prReview.eventChips.label')}
+      </Text>
+      <RadioGroup label={t('prReview.eventChips.label')} className="flex-row flex-wrap gap-2">
+        {props.events.map(providerEvent => {
+          const event = (Object.keys(EVENT_TO_PROVIDER) as ReviewEvent[]).find(
+            candidate => EVENT_TO_PROVIDER[candidate] === providerEvent
+          );
+          if (!event) {
+            return null;
+          }
+          const active = props.value === event;
+          return (
+            <Pressable
+              key={providerEvent}
+              disabled={props.disabled}
+              onPress={() => {
+                void Haptics.selectionAsync();
+                props.onChange(event);
+              }}
+              {...radioItemA11y({
+                label: t(PROVIDER_EVENT_LABEL_KEYS[providerEvent]),
+                checked: active,
+                disabled: props.disabled,
+              })}
+              className={cn(
+                'min-h-11 items-center justify-center rounded-full border px-4 py-2 active:opacity-70',
+                active ? 'border-primary bg-primary' : 'bg-secondary',
+                !active && (props.disabled ? 'border-hair-soft' : 'border-border')
+              )}
+            >
+              <Text
+                className={cn(
+                  'text-sm font-medium',
+                  active ? 'text-primary-foreground' : 'text-foreground',
+                  !active && props.disabled && 'text-muted-foreground'
+                )}
+              >
+                {t(PROVIDER_EVENT_LABEL_KEYS[providerEvent])}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </RadioGroup>
+    </View>
+  );
+}
+
 type PrReviewSubmitProps = Readonly<{
   owner: string;
   repo: string;
@@ -70,15 +157,27 @@ type PrReviewSubmitProps = Readonly<{
   headSha: string;
   title: string;
   eyebrow: string;
+  /**
+   * The provider ref (s6). Present on the GitLab/Bitbucket surface: the
+   * submit posts one `providerReview.submitReview` event with the pending
+   * comments folded into the body, and the pending-comment edit route is
+   * the ref's own. Absent on GitHub, which keeps the exact pre-s6 path.
+   */
+  prRef?: ProviderPrRef;
+  /**
+   * The review events the server capability list accepts (provider arms).
+   * Absent on GitHub, which keeps the fixed three-option chip row.
+   */
+  reviewEvents?: readonly ProviderReviewEventOption[];
   onDismiss: () => void;
 }>;
 
 export function PrReviewSubmit(props: PrReviewSubmitProps) {
-  const { owner, repo, number, headSha, title, eyebrow, onDismiss } = props;
+  const { owner, repo, number, headSha, title, eyebrow, prRef, reviewEvents, onDismiss } = props;
   const router = useRouter();
   const pending = usePendingReview();
   const { t } = useTranslation();
-  const submitReview = useSubmitReviewMutation({ owner, repo, number });
+  const submitReview = useSubmitReviewMutation(prRef ?? { owner, repo, number });
   const { userId } = useCurrentUserId();
   const { prReviewFooter, hasLoaded: prReviewFooterLoaded } = usePrReviewFooterPreference();
 
@@ -108,6 +207,10 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const isSubmitting = submitReview.isPending;
   const queuedCount = pending.items.length;
+  // The provider platform as a stable primitive: the error effect words a
+  // rejected submit after the connected provider (s6f) without depending on
+  // the `prRef` object identity.
+  const providerPlatform = prRef?.platform;
   const { fresh, stale } = partitionPendingItems(pending.items, headSha);
   const staleIds = new Set(stale.map(item => item.id));
   const blockReason = reviewSubmitBlockReason({
@@ -142,11 +245,17 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         })();
         return;
       }
-      const display = mutationErrorDisplay('submit', classification, submitReview.error);
+      // The provider arm words the rejected submit after the connected
+      // provider (merge request vs pull request); GitHub rides no term and
+      // keeps the exact pre-s6 copy.
+      const display = mutationErrorDisplay('submit', classification, {
+        rawError: submitReview.error,
+        term: providerPlatform ? i18n.t(providerPrNounKey(providerPlatform)) : undefined,
+      });
       setInlineError(display.message);
       setInlineErrorKind(display.kind);
     }
-  }, [submitReview.error]);
+  }, [submitReview.error, providerPlatform]);
 
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {
@@ -182,16 +291,23 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     }
     try {
       const body = bodyRef.current.trim();
+      // Provider arms post one event; the summary and every fresh pending
+      // comment fold into the body (the provider event has no batch).
       await submitReview.mutateAsync(
-        buildSubmitReviewInput({
-          owner,
-          repo,
-          number,
-          event,
-          ...(body.length > 0 ? { body } : {}),
-          commitSha: headSha,
-          items: fresh,
-        })
+        prRef
+          ? {
+              event: EVENT_TO_PROVIDER[event],
+              body: buildProviderSubmitBody(body, fresh),
+            }
+          : buildSubmitReviewInput({
+              owner,
+              repo,
+              number,
+              event,
+              ...(body.length > 0 ? { body } : {}),
+              commitSha: headSha,
+              items: fresh,
+            })
       );
       pending.removeComments(fresh.map(item => item.id));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -214,6 +330,27 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   }
 
   function openEditComposer(item: PendingReviewItem) {
+    if (prRef) {
+      // The pending comment edits through the ref's own composer route, so
+      // the composer stays inside the scope its queries run under.
+      const { platform, identity } = providerPrRouteSegments(prRef);
+      const encoded = identity.map(segment => encodeURIComponent(segment)).join('/');
+      const href: Href = {
+        pathname: `/(app)/pr-review/${platform}/${encoded}/comment-composer`,
+        params: {
+          path: item.path,
+          side: item.side,
+          line: String(item.line),
+          ...(item.startLine !== undefined ? { startLine: String(item.startLine) } : {}),
+          pendingId: item.id,
+          ...(prRef.platform === 'gitlab' && prRef.instanceHint
+            ? { instance: prRef.instanceHint }
+            : {}),
+        },
+      };
+      router.push(href);
+      return;
+    }
     const href: Href = {
       pathname: COMMENT_COMPOSER_PATH,
       params: {
@@ -286,14 +423,26 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         keyboardDismissMode="interactive"
       >
         <View className="gap-4 px-6 pt-4">
-          <ReviewEventChips
-            value={event}
-            disabled={isSubmitting}
-            onChange={next => {
-              setEvent(next);
-              clearRecoverableError();
-            }}
-          />
+          {reviewEvents ? (
+            <CapabilityReviewEventChips
+              events={reviewEvents}
+              value={event}
+              disabled={isSubmitting}
+              onChange={next => {
+                setEvent(next);
+                clearRecoverableError();
+              }}
+            />
+          ) : (
+            <ReviewEventChips
+              value={event}
+              disabled={isSubmitting}
+              onChange={next => {
+                setEvent(next);
+                clearRecoverableError();
+              }}
+            />
+          )}
           <View className="gap-1.5">
             <Text className="text-sm font-medium text-foreground">
               {t('prReview.submit.summaryOptional')}

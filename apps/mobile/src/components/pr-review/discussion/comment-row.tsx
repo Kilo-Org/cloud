@@ -43,6 +43,13 @@ type CommentRowProps = {
   readonly onToggleReaction: (content: ReviewReactionContent) => void;
   readonly reactionsDisabled?: boolean;
   readonly readOnly?: boolean;
+  /**
+   * The `capabilities.reactions.supported` flag (s6). False renders NO
+   * reactions row at all — the provider has no reaction affordance to
+   * offer, so the row shows nothing instead of an empty or failing one.
+   * Defaults to true, so the GitHub call sites are unchanged.
+   */
+  readonly reactionsSupported?: boolean;
   /** The viewer's GitHub login, used to disable self-target moderation. */
   readonly viewerLogin?: string | null;
 };
@@ -96,6 +103,7 @@ export function CommentRow({
   onToggleReaction,
   reactionsDisabled,
   readOnly,
+  reactionsSupported = true,
   viewerLogin = null,
 }: Readonly<CommentRowProps>) {
   const authorName = selectCommentAuthorName(comment.author);
@@ -257,12 +265,14 @@ export function CommentRow({
         </Pressable>
       </View>
       <MarkdownText value={comment.bodyMarkdown} selectable={false} />
-      <ReactionsRow
-        reactions={comment.reactions}
-        onToggle={onToggleReaction}
-        disabled={reactionsDisabled}
-        readOnly={readOnly}
-      />
+      {reactionsSupported ? (
+        <ReactionsRow
+          reactions={comment.reactions}
+          onToggle={onToggleReaction}
+          disabled={reactionsDisabled}
+          readOnly={readOnly}
+        />
+      ) : null}
     </View>
   );
 }

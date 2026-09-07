@@ -49,6 +49,7 @@ import {
 } from '@/lib/pr-review/diff/pr-review-file-list-state';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
 import { filterNavigatorFiles } from '@/lib/pr-review/diff/navigator-file-filter';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // Memoized row so recycled cells do not re-render on every keystroke: `file`
@@ -114,7 +115,11 @@ export function PrDiffFileNavigator({
     number,
     enabled: true,
   });
-  const viewed = usePrReviewViewedFiles({ owner, repo, number }, headSha);
+  // The viewed set is keyed by the live provider ref (s6, identity rule 17),
+  // so the sheet toggling a file here and the diff list behind it read and
+  // write the SAME provider-scoped set — and never a same-numbered PR's.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchAll = useFetchToCompletion(query, changedFiles);
 
   const hasActiveSearch = searchRef.current.trim().length > 0;

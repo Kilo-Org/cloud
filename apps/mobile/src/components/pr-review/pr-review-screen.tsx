@@ -9,6 +9,7 @@ import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-mer
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import {
   type PrReviewTabId,
   PrReviewTabSelector,
@@ -64,14 +65,16 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
 
   // P1-F-46b: push the review-submit route with the same params the
   // Files-tab `PrDiffFloatingActions` uses, so a clean PR (no queued
-  // comments) can still be approved from the Overview tab.
+  // comments) can still be approved from the Overview tab. On a provider
+  // arm the sheet is a sibling of the ref's own route (s6), so the push
+  // carries the provider identity through the provider route.
   const openReviewSubmit = useCallback(() => {
-    const href: Href = {
-      pathname: REVIEW_SUBMIT_PATH,
-      params: { owner, repo, number },
-    };
+    const href: Href =
+      queries.ref.platform === 'github'
+        ? { pathname: REVIEW_SUBMIT_PATH, params: { owner, repo, number } }
+        : providerPrSheetHref(queries.ref, 'review-submit');
     router.push(href);
-  }, [router, owner, repo, number]);
+  }, [router, owner, repo, number, queries.ref]);
 
   // P0-B-08: post-merge "branch delete failed" partial-success banner.
   // The merge sheet writes the reason into the in-memory store right
@@ -184,10 +187,11 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   }, [queryClient, queries, pr.data?.headSha]);
 
   const isMergeRequest = queries.platform === 'gitlab';
-  // The review-submit sheet is a GitHub-route sibling; the provider write
-  // surfaces land with the provider write slice, so the affordance is only
-  // offered where it can actually be reached.
-  const canSubmitReview = isGitHub;
+  // The review-submit sheet is a route sibling on every provider (s6), so
+  // the affordance is offered wherever its scope can actually be queried:
+  // a Bitbucket PR without a selected organization waits at the boundary
+  // instead of opening a sheet that cannot load.
+  const canSubmitReview = queries.isReady;
 
   let body: ReactNode = null;
   if (!queries.isReady) {

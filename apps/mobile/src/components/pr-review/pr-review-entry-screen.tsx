@@ -8,7 +8,7 @@ import { ActivityIndicator, Alert, Pressable, TextInput, View } from 'react-nati
 
 import { EmptyState } from '@/components/empty-state';
 import { PrReviewInboxList } from '@/components/pr-review/pr-review-inbox-list';
-import { selectRecentPrRowState } from '@/components/pr-review/recent-pr-row-state';
+import { selectRecentPrRowState } from '@/lib/pr-review/recent-pr-row-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';

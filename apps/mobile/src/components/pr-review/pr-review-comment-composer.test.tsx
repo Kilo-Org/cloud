@@ -14,6 +14,7 @@ import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrReviewCommentComposer } from './pr-review-comment-composer';
 import { clearDraft } from '@/lib/persist/drafts';
+import { providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 vi.mock('react-i18next', async importOriginal => {
   const actual = await importOriginal<typeof ReactI18next>();
@@ -153,6 +154,18 @@ vi.mock('@/lib/pr-review/pending-review-provider', () => ({
 }));
 
 vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
+  formatPendingCommentBody: (item: {
+    path: string;
+    line: number;
+    startLine?: number;
+    body: string;
+  }) => {
+    const location =
+      item.startLine !== undefined && item.startLine !== item.line
+        ? `${item.path}:L${item.startLine}–L${item.line}`
+        : `${item.path}:L${item.line}`;
+    return `${location}\n\n${item.body}`;
+  },
   useCreateReviewCommentMutation: () => ({
     mutateAsync: createCommentMocks.mutateAsync,
     isPending: createCommentMocks.isPending,
@@ -285,5 +298,57 @@ describe('PrReviewCommentComposer draft clear rules', () => {
     call.buttons.find(b => b.text === 'Keep editing')?.onPress?.();
 
     expect(clearDraft).not.toHaveBeenCalled();
+  });
+});
+
+describe('PrReviewCommentComposer provider arm (s6)', () => {
+  // A GitLab MR with the same owner/repo/number triple as the GitHub
+  // fixtures: the folded draft key and the body-only post must differ from
+  // the GitHub arm in both bytes.
+  const gitlabRef = { platform: 'gitlab' as const, projectPath: 'octocat/hello', mrIid: 1 };
+  const providerProps = { ...baseProps, prRef: gitlabRef };
+
+  function mountProviderComposer(): React.ReactElement {
+    // eslint-disable-next-line new-cap
+    return PrReviewCommentComposer(providerProps);
+  }
+
+  beforeEach(() => {
+    createCommentMocks.mutateAsync.mockReset();
+    createCommentMocks.isPending = false;
+    createCommentMocks.error = null;
+    vi.clearAllMocks();
+  });
+
+  it('posts body-only through the provider arm, with the location anchored in the text', async () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onCommentNow')?.();
+    await flushMicrotasks();
+
+    expect(createCommentMocks.mutateAsync).toHaveBeenCalledWith({
+      body: 'src/a.ts:L10\n\nhello',
+    });
+  });
+
+  it('keeps the provider comment out of the pending queue path (comment now is direct)', () => {
+    createCommentMocks.mutateAsync.mockResolvedValueOnce({});
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onAddToReview')?.();
+
+    // Add-to-review stays provider-agnostic: the queue is local and the
+    // submit sheet folds it into the review body later.
+    expect(createCommentMocks.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('folds the provider ref identity into the durable comment draft key', () => {
+    const element = mountProviderComposer();
+    typeBody(element, 'hello');
+    footerProp(element, 'onAddToReview')?.();
+
+    const expected = `pr-comment:key@${providerPrRefKey(gitlabRef)}`;
+    expect(clearDraft).toHaveBeenCalledWith('u1', expected);
   });
 });

@@ -55,7 +55,7 @@ import {
   useResolveThreadMutation,
   useUnresolveThreadMutation,
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
-import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrCapabilities, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -80,13 +80,19 @@ export function DiscussionThread({
   onToggleExpand,
   viewerLogin = null,
 }: Readonly<DiscussionThreadProps>) {
-  // The resolve / reply / reaction controls below call the `githubPrReview`
-  // mutations, and the provider write routes are siblings of the GitHub
-  // route only — so on a GitLab MR or Bitbucket PR the whole write row is
-  // withheld, exactly like the diff list's write bar (`pr-diff-write-gate`).
-  // A dead button that always fails is worse than no button; the Resolved
-  // badge stays, because the provider read layer reports it.
-  const canWrite = useProviderPrScope({ owner, repo, number }).ref.platform === 'github';
+  // s6: the reply and resolve writes route through the `providerReview` seam
+  // on a GitLab MR / Bitbucket PR (the mutation hooks pick the arm from the
+  // provider scope the layout publishes), so what this card offers is decided
+  // by the capability list, not by the platform. Reactions stay behind the
+  // GitHub write path: the seam has no reaction procedure and no provider
+  // read layer returns reaction data, so a provider comment row renders
+  // read-only — the row shows nothing rather than a dead or failing
+  // affordance.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const capabilities = providerPrCapabilities(scope.ref.platform);
+  const isGithub = scope.ref.platform === 'github';
+  const canReply = capabilities.canComment;
+  const canResolve = capabilities.canResolveThreads;
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
   const addReaction = useAddReactionMutation(thread.threadId);
@@ -139,12 +145,23 @@ export function DiscussionThread({
     firstTimestamp: firstComment?.createdAt ?? null,
     expanded,
     onToggleResolve,
-    canResolve: canWrite,
+    canResolve,
     resolveDisabled: isResolving,
     onToggleExpand,
   } as const;
 
   if (expanded) {
+    // The provider reply target carries the provider-native ids the seam
+    // needs: the thread's discussion/root-comment id and the first comment's
+    // verbatim provider id (kept in `nodeId` by the read layer).
+    const providerReply =
+      !isGithub && firstComment
+        ? {
+            ref: scope.ref,
+            threadId: thread.threadId,
+            commentNodeId: firstComment.nodeId,
+          }
+        : undefined;
     return (
       <View
         accessibilityLabel={t('prReview.discussion.threadAccessibilityLabel', { anchorLabel })}
@@ -158,7 +175,8 @@ export function DiscussionThread({
               <CommentRow
                 comment={comment}
                 reactionsDisabled={isReacting}
-                readOnly={!canWrite}
+                readOnly={!isGithub}
+                reactionsSupported={capabilities.reactions.supported}
                 viewerLogin={viewerLogin}
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
@@ -167,13 +185,14 @@ export function DiscussionThread({
             </View>
           ))}
         </View>
-        {firstComment && canWrite ? (
+        {firstComment && canReply ? (
           <ReplyInput
             owner={owner}
             repo={repo}
             number={number}
             commentId={firstComment.commentId}
             reply={reply}
+            provider={providerReply}
           />
         ) : null}
       </View>

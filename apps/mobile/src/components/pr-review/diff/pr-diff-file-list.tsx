@@ -40,8 +40,9 @@ import {
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
-import { NO_LINE_TAP, usePrDiffWriteGate } from '@/components/pr-review/diff/pr-diff-write-gate';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
+import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
@@ -91,7 +92,12 @@ export function PrReviewFileList({
     number,
     enabled: true,
   });
-  const viewed = usePrReviewViewedFiles({ owner, repo, number }, headSha);
+  // The live provider scope: the viewed set is keyed by the ref (s6,
+  // identity rule 17), so a GitLab MR and a same-numbered GitHub PR — or
+  // one project on two GitLab instances — never share a set. On the GitHub
+  // route the fallback ref is the triple itself, keeping the legacy bytes.
+  const scope = useProviderPrScope({ owner, repo, number });
+  const viewed = usePrReviewViewedFiles(scope.ref, headSha);
   const fetchToCompletion = useFetchToCompletion(query, changedFiles);
 
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -135,9 +141,16 @@ export function PrReviewFileList({
     });
   }, []);
 
-  // Which write affordances this provider can offer, and the space its bar
-  // needs reserved (none, where no bar is drawn).
-  const write = usePrDiffWriteGate({ owner, repo, number }, barHeight);
+  // The write bar renders on every provider (s6): its two routes — the
+  // comment composer and the review-submit sheet — are siblings of the
+  // GitHub route AND of the provider route, so the bar pushes the sheet
+  // inside the scope its queries run under. The list's bottom padding
+  // reserves the bar's space at its measured (or fallback) height, so the
+  // last diff row is never hidden under it.
+  const listContentStyle = useMemo(
+    () => ({ paddingBottom: prDiffListBottomPadding(barHeight) }),
+    [barHeight]
+  );
 
   // Which provider's words the terminal and empty states use.
   const copy = usePrDiffStateCopy({ owner, repo, number });
@@ -258,8 +271,8 @@ export function PrReviewFileList({
     onFetchAll,
     handleLoadContext,
     setExpanded,
-    onLineTap: write.canReviewInline ? handleLineTap : NO_LINE_TAP,
-    selection: write.canReviewInline ? selectionView : null,
+    onLineTap: handleLineTap,
+    selection: selectionView,
   });
 
   if (files.length === 0) {
@@ -352,21 +365,20 @@ export function PrReviewFileList({
               }
             }}
             onEndReachedThreshold={0.5}
-            contentContainerStyle={write.listContentStyle}
+            contentContainerStyle={listContentStyle}
             ItemSeparatorComponent={null}
           />
         )}
-        {write.canReviewInline ? (
-          <PrDiffFloatingActions
-            owner={owner}
-            repo={repo}
-            number={number}
-            viewMode={effectiveViewMode}
-            selection={selection}
-            onClearSelection={clearSelection}
-            onHeightChange={handleHeightChange}
-          />
-        ) : null}
+        <PrDiffFloatingActions
+          owner={owner}
+          repo={repo}
+          number={number}
+          prRef={scope.ref.platform === 'github' ? undefined : scope.ref}
+          viewMode={effectiveViewMode}
+          selection={selection}
+          onClearSelection={clearSelection}
+          onHeightChange={handleHeightChange}
+        />
       </View>
     </DiffFontMetricsContext.Provider>
   );

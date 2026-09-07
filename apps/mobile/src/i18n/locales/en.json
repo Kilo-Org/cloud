@@ -36,6 +36,7 @@
     "cost": "Cost",
     "discard": "Discard",
     "findings": "Findings",
+    "mergeRequest": "merge request",
     "notConnected": "Not connected",
     "notifications": "Notifications",
     "pullRequest": "pull request",
@@ -333,10 +334,17 @@
       "emptyDiffRow": "Empty diff row"
     },
     "connectionExpired": "GitHub connection expired.",
+    "capabilities": {
+      "banner": {
+        "title": "Not available on this provider",
+        "accessibility": "Not available on this provider: {{reason}}"
+      }
+    },
     "merge": {
       "merge": "Merge",
       "mergeNow": "Merge now",
       "mergePullRequest": "Merge pull request",
+      "mergeTermTitle": "Merge {{term}}",
       "enableAutoMerge": "Enable auto-merge",
       "disableAutoMerge": "Disable auto-merge",
       "autoMergeOn": "Auto-merge is on",
@@ -355,9 +363,12 @@
       "deleteBranchAfterMerge": "Delete branch after merge",
       "noEnabledMethods": "This repository has no enabled merge methods. Ask a repository admin to enable merge, squash, or rebase merging.",
       "confirmTitle": "Merge pull request?",
+      "confirmTitleTerm": "Merge {{term}}?",
       "confirmMessage": "This will merge your changes into the base branch.",
       "enableAutoMergeConfirmTitle": "Enable auto-merge?",
       "enableAutoMergeConfirmMessage": "GitHub will merge this pull request automatically when all required checks pass.",
+      "enableAutoMergeConfirmMessageTerm": "The {{term}} will merge automatically once its pipeline succeeds.",
+      "enableAutoMergeDescriptionTerm": "GitLab merges this {{term}} automatically once its pipeline succeeds.",
       "forbidden": "You don't have permission to merge this pull request.",
       "cannotMerge": "This pull request cannot be merged as is.",
       "couldNotMerge": "Could not merge pull request.",
@@ -368,7 +379,8 @@
       },
       "terminal": {
         "alreadyMerged": "Already merged",
-        "closed": "This pull request is closed"
+        "closed": "This pull request is closed",
+        "closedMergeRequest": "This merge request is closed"
       },
       "partialSuccessBanner": {
         "body": "Couldn't delete the branch: {{reason}}",
@@ -393,6 +405,19 @@
         "behindDetail": "The head branch is behind the base. Rebase or update the branch before merging.",
         "notMergeableTitle": "This pull request is not mergeable yet",
         "notMergeableDetail": "GitHub reported a {{state}} mergeable state."
+      },
+      "restrictions": {
+        "title": "Merge restrictions",
+        "approvalsRequired_one": "{{displayCount}} approval required",
+        "approvalsRequired": "{{displayCount}} approvals required",
+        "approvalsRequired_other": "{{displayCount}} approvals required",
+        "pipelineMustSucceed": "The pipeline must succeed before merging."
+      },
+      "providerBlocked": {
+        "failingPipeline": "The pipeline is failing on the latest commit.",
+        "pendingPipeline": "The pipeline is still running on the latest commit.",
+        "permission": "You don't have permission to merge this {{term}}.",
+        "draft": "Mark the {{term}} as ready for review before merging."
       },
       "methodLabels": {
         "merge": "Create a merge commit",
@@ -441,6 +466,7 @@
       "acceptTerms": "Accept",
       "replyBadRequest": "This reply can't be posted. The thread may have changed.",
       "replyForbidden": "You don't have permission to reply to this pull request.",
+      "replyForbiddenTerm": "You don't have permission to reply to this {{term}}.",
       "moderation": {
         "reportContent": {
           "terminal": "This comment can't be reported.",
@@ -676,6 +702,7 @@
     "mutationError": {
       "commentNotPosted": "This comment can't be posted. The selected line may have changed, or the PR may have been updated.",
       "reviewNotSubmitted": "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request.",
+      "reviewNotSubmittedTerm": "This review can't be submitted as is. The {{term}} may have changed, or you can't review your own {{term}}.",
       "couldNotPostComment": "Could not post comment.",
       "couldNotSubmitReview": "Could not submit review. Check your connection and try again."
     },
@@ -683,6 +710,7 @@
       "couldNotReply": "Could not reply.",
       "couldNotCompleteAction": "Could not complete this action.",
       "mergeResultDefaultError": "GitHub did not complete the merge.",
+      "mergeResultNotCompleted": "The {{term}} was not merged. Check its state and try again.",
       "ambiguous": "Couldn't confirm — check the PR before retrying.",
       "persistenceFailed": "We could not record this action. Please try again later.",
       "forbidden": "Forbidden"

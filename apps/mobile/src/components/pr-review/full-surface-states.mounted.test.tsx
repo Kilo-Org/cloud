@@ -63,6 +63,9 @@ vi.mock('@/components/pr-review/diff/pr-diff-file-navigator', () => ({
 vi.mock('@/components/pr-review/merge/pr-merge-section', () => ({
   PrMergeSection: 'PrMergeSection',
 }));
+vi.mock('@/components/pr-review/merge/pr-merge-section-provider', () => ({
+  PrMergeSectionProvider: 'PrMergeSectionProvider',
+}));
 vi.mock('@/components/pr-review/pr-review-checks-section', () => ({
   PrReviewChecksSection: 'PrReviewChecksSection',
 }));
@@ -98,6 +101,13 @@ vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
     githubPrReview: { getPullRequest: { queryOptions: () => ({}) } },
     githubApps: { getUserAuthorization: { queryKey: () => [] } },
+    // s6: the submit/merge screens build the provider seam's capability and
+    // merge-state options even on the GitHub arm (the queries register
+    // disabled and never fetch), so the router mock carries the namespace.
+    providerReview: {
+      getCapabilities: { queryOptions: () => ({}) },
+      getMergeState: { queryOptions: () => ({}) },
+    },
   }),
 }));
 

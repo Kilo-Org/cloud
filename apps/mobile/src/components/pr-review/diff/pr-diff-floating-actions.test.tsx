@@ -18,6 +18,7 @@ import '@/i18n';
 import type * as ReactI18next from 'react-i18next';
 import { PrDiffFloatingActions } from './pr-diff-floating-actions';
 import { type PendingReviewItem } from '@/lib/pr-review/pending-review-provider';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { type SelectionState } from '@/lib/pr-review/diff-selection';
 
 vi.mock('react-i18next', async importOriginal => {
@@ -238,6 +239,67 @@ describe('PrDiffFloatingActions submit reachability (P1-F-46b)', () => {
       pathname: '/(app)/pr-review/[owner]/[repo]/[number]/review-submit',
       params: { owner: 'octocat', repo: 'hello', number: 7 },
     });
+  });
+});
+
+// ── Provider arms (s6) ───────────────────────────────────────────────
+//
+// The two sheets are route siblings on every provider, so a bar holding a
+// provider ref pushes the sheet inside the ref's own route (the provider
+// scope the layout publishes), never the GitHub sibling.
+
+const GITLAB_REF: ProviderPrRef = { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 };
+const BITBUCKET_REF: ProviderPrRef = {
+  platform: 'bitbucket',
+  workspace: 'acme',
+  repoSlug: 'api',
+  prId: 42,
+};
+
+describe('PrDiffFloatingActions provider routes (s6)', () => {
+  const selection: SelectionState = {
+    path: 'src/lib.ts',
+    side: 'RIGHT',
+    hunkKey: 'h1',
+    startLine: 3,
+    line: 5,
+    selectedText: 'x',
+  };
+
+  function pressButtonWith(prRef: ProviderPrRef | undefined, label: string): void {
+    routerPush.mockClear();
+    // eslint-disable-next-line new-cap
+    const element = PrDiffFloatingActions({ ...baseProps, prRef, selection });
+    const button = findElement({
+      node: element,
+      type: 'Button',
+      prop: 'accessibilityLabel',
+      value: label,
+    });
+    if (!button) {
+      throw new Error(`${label} button not found`);
+    }
+    (button.props as { onPress?: () => void }).onPress?.();
+  }
+
+  it('pushes the comment composer inside the GitLab ref route with the line params', () => {
+    pressButtonWith(GITLAB_REF, 'Comment on selected lines');
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith({
+      pathname: '/(app)/pr-review/gitlab/group/sub/repo/12/comment-composer',
+      params: { path: 'src/lib.ts', side: 'RIGHT', line: 5, startLine: 3 },
+    });
+  });
+
+  it.each<[ProviderPrRef, string]>([
+    [GITLAB_REF, '/(app)/pr-review/gitlab/group/sub/repo/12/review-submit'],
+    [BITBUCKET_REF, '/(app)/pr-review/bitbucket/acme/api/42/review-submit'],
+  ])('pushes the review-submit sheet inside the %s ref route', (prRef, expectedPathname) => {
+    pressButtonWith(prRef, 'Finish review');
+
+    expect(routerPush).toHaveBeenCalledTimes(1);
+    expect(routerPush).toHaveBeenCalledWith({ pathname: expectedPathname, params: {} });
   });
 });
 

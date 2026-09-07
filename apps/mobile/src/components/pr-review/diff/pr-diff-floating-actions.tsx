@@ -18,9 +18,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { type SelectionState } from '@/lib/pr-review/diff-selection';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { cn } from '@/lib/utils';
@@ -32,6 +34,13 @@ type PrDiffFloatingActionsProps = Readonly<{
   owner: string;
   repo: string;
   number: number;
+  /**
+   * The provider ref when the diff renders under a GitLab / Bitbucket scope
+   * (s6). The two sheets are route siblings on every provider, so the bar
+   * pushes the sheet inside the ref's own route — pushing the GitHub sibling
+   * would leave the provider scope and write to the wrong provider.
+   */
+  prRef?: ProviderPrRef;
   /** Unified (default) or side-by-side (tablet only). */
   viewMode: DiffViewMode;
   /** `null` when no selection exists. Drives the "Comment" affordance. */
@@ -46,6 +55,7 @@ export function PrDiffFloatingActions({
   owner,
   repo,
   number,
+  prRef,
   viewMode,
   selection,
   onClearSelection,
@@ -70,22 +80,29 @@ export function PrDiffFloatingActions({
     if (!selection) {
       return;
     }
+    const lineParams = {
+      path: selection.path,
+      side: selection.side,
+      line: selection.line,
+      ...(selection.startLine !== selection.line ? { startLine: selection.startLine } : {}),
+    };
+    if (prRef) {
+      router.push(providerPrSheetHref(prRef, 'comment-composer', lineParams));
+      return;
+    }
     const href: Href = {
       pathname: COMMENT_COMPOSER_PATH,
-      params: {
-        owner,
-        repo,
-        number,
-        path: selection.path,
-        side: selection.side,
-        line: selection.line,
-        ...(selection.startLine !== selection.line ? { startLine: selection.startLine } : {}),
-      },
+      // The bracketed GitHub pathname needs the route segments as params.
+      params: { owner, repo, number, ...lineParams },
     };
     router.push(href);
   }
 
   function openReviewSubmit() {
+    if (prRef) {
+      router.push(providerPrSheetHref(prRef, 'review-submit'));
+      return;
+    }
     const href: Href = {
       pathname: REVIEW_SUBMIT_PATH,
       params: { owner, repo, number },

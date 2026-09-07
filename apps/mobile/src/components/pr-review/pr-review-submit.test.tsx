@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- the submit suite covers queue retention, the footer preference, and the refused-submit wording wiring in one cohesive file */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/lib/pr-review/pending-review-provider.mounted.test.tsx */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake mutation and drafts factories settle without await because they resolve immediately */
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewSubmit } from './pr-review-submit';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import {
   type PendingReviewItem,
   PendingReviewProvider,
@@ -12,6 +14,7 @@ import {
 
 const submitMutationMock = vi.hoisted(() => ({
   mutateAsync: vi.fn(async (): Promise<unknown> => undefined),
+  error: null as Error | null,
 }));
 
 const feedbackMock = vi.hoisted(() => ({
@@ -22,7 +25,7 @@ vi.mock('@/lib/pr-review/use-pr-review-mutations', () => ({
   useSubmitReviewMutation: () => ({
     mutateAsync: submitMutationMock.mutateAsync,
     isPending: false,
-    error: null,
+    error: submitMutationMock.error,
   }),
 }));
 
@@ -147,7 +150,13 @@ function Consumer() {
 
 const SUBMIT_TITLE = 'Submit review';
 
-function mount(): TestRenderer.ReactTestRenderer {
+const GITLAB_REF: ProviderPrRef = {
+  platform: 'gitlab',
+  projectPath: 'acme/kilo',
+  mrIid: 42,
+};
+
+function mount(prRef?: ProviderPrRef): TestRenderer.ReactTestRenderer {
   let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
   act(() => {
     renderer = TestRenderer.create(
@@ -160,6 +169,7 @@ function mount(): TestRenderer.ReactTestRenderer {
           headSha="head-1"
           title={SUBMIT_TITLE}
           eyebrow="acme/kilo#42"
+          prRef={prRef}
           onDismiss={vi.fn(() => undefined)}
         />
       </PendingReviewProvider>
@@ -212,6 +222,7 @@ beforeEach(() => {
   addCommentFn = null;
   submitMutationMock.mutateAsync.mockReset();
   submitMutationMock.mutateAsync.mockResolvedValue(undefined);
+  submitMutationMock.error = null;
   feedbackMock.maybeAskAfterSuccessfulOutcome.mockReset();
   feedbackMock.maybeAskAfterSuccessfulOutcome.mockResolvedValue(undefined);
   footerPreferenceMock.hasLoaded = true;
@@ -307,5 +318,56 @@ describe('PrReviewSubmit footer preference', () => {
     // No prefilled footer and no queued comments: the comment review is
     // blocked, so the submit button is disabled.
     expect(findSubmitButton(renderer).disabled).toBe(true);
+  });
+});
+
+// ── s6f: refused-submit wording ──────────────────────────────────────
+
+/** Every string the mounted tree rendered inside a Text element. */
+function renderedTexts(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAll(node => typeof node.props.children === 'string')
+    .map(node => node.props.children as string);
+}
+
+function badRequestError(): Error {
+  return Object.assign(new Error('You cannot perform the requested action'), {
+    data: { code: 'BAD_REQUEST' },
+  });
+}
+
+describe('PrReviewSubmit refused-submit wording (s6f)', () => {
+  it('words a rejected provider submit after the merge-request noun', () => {
+    submitMutationMock.error = badRequestError();
+    const renderer = mount(GITLAB_REF);
+    const texts = renderedTexts(renderer);
+    // A rejected review submit on a GitLab merge request must never read
+    // "your own pull request".
+    expect(
+      texts.some(
+        text =>
+          text ===
+          "This review can't be submitted as is. The merge request may have changed, or you can't review your own merge request."
+      )
+    ).toBe(true);
+    expect(
+      texts.some(
+        text =>
+          text ===
+          "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request."
+      )
+    ).toBe(false);
+  });
+
+  it('keeps the exact pre-s6 submit copy on the GitHub arm', () => {
+    submitMutationMock.error = badRequestError();
+    const renderer = mount();
+    expect(
+      renderedTexts(renderer).some(
+        text =>
+          text ===
+          "This review can't be submitted as is. The PR may have changed, or you can't review your own pull request."
+      )
+    ).toBe(true);
   });
 });

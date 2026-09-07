@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator } from 'react-native';
 
@@ -8,10 +8,23 @@ import { CenteredState } from '@/components/centered-state';
 
 import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
 import { QueryError } from '@/components/query-error';
-import { PrMergeSheet } from '@/components/pr-review/merge/pr-merge-sheet';
+import { PrMergeSheet, providerPrNounKey } from '@/components/pr-review/merge/pr-merge-sheet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrMergeMethod } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { parseParam } from '@/lib/route-params';
+import {
+  buildPrMergeStateQueryOptions,
+  buildPrOverviewQueryOptions,
+  providerCapabilitiesIdentity,
+  selectProviderCapabilitiesData,
+} from '@/lib/pr-review/provider-pr-queries';
+import {
+  isProviderScopeReady,
+  parseProviderPrRoute,
+  providerPrRefLabel,
+  providerPrTriple,
+  useProviderPrScope,
+} from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 
 type Params = {
@@ -20,6 +33,10 @@ type Params = {
   number: string;
   mode?: string;
   method?: string;
+  // Provider route shape (`[platform]/[...identity]/merge`).
+  platform?: string;
+  identity?: string[] | string;
+  instance?: string;
 };
 
 const MERGE_METHODS = new Set<PrMergeMethod>(['merge', 'squash', 'rebase']);
@@ -27,39 +44,112 @@ const MERGE_METHODS = new Set<PrMergeMethod>(['merge', 'squash', 'rebase']);
 /**
  * Merge formSheet route. Reads the PR + mode/method from params, fetches the
  * overview so the sheet has the repo settings + head SHA fence, and mounts the
- * S8 merge sheet. Rendered inside the `[number]` layout's formSheet stack.
+ * merge sheet. Rendered inside BOTH the GitHub `[number]` layout and the
+ * provider `[...identity]` layout (s6): on provider arms the s2/s3 merge
+ * state rides along as the confirmation sheet's restrictions list, and the
+ * wording follows the connected provider (merge request vs pull request).
  */
 export function PrReviewMergeScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const params = useLocalSearchParams<Params>();
-  const owner = parseParam(params.owner) ?? '';
-  const repo = parseParam(params.repo) ?? '';
-  const rawNumber = parseParam(params.number) ?? '';
+
+  // The provider route carries the identity segments; the GitHub route the
+  // plain triple. Exactly one parses — the provider layout redirects a
+  // hand-built `/pr-review/github/...` link to the GitHub route.
+  const providerRef = useMemo(
+    () =>
+      parseProviderPrRoute({
+        platform: params.platform,
+        identity: params.identity,
+        instance: params.instance,
+      }),
+    [params.platform, params.identity, params.instance]
+  );
+  const providerTriple = providerRef ? providerPrTriple(providerRef) : null;
+  const owner = providerTriple ? providerTriple.owner : (parseParam(params.owner) ?? '');
+  const repo = providerTriple ? providerTriple.repo : (parseParam(params.repo) ?? '');
+  const rawNumber = providerTriple
+    ? String(providerTriple.number)
+    : (parseParam(params.number) ?? '');
   const number = Number.parseInt(rawNumber, 10);
+
   const mode = params.mode === 'enable-auto-merge' ? 'enable-auto-merge' : 'merge';
   const method: PrMergeMethod = MERGE_METHODS.has(params.method as PrMergeMethod)
     ? (params.method as PrMergeMethod)
     : 'merge';
-  const sheetTitle =
-    mode === 'enable-auto-merge'
-      ? t('prReview.merge.enableAutoMerge')
-      : t('prReview.merge.mergePullRequest');
-  const eyebrow = `${owner}/${repo}#${rawNumber}`;
+  const sheetTitle = (() => {
+    if (mode === 'enable-auto-merge') {
+      return t('prReview.merge.enableAutoMerge');
+    }
+    if (providerRef && providerRef.platform !== 'github') {
+      return t('prReview.merge.mergeTermTitle', {
+        term: t(providerPrNounKey(providerRef.platform)),
+      });
+    }
+    return t('prReview.merge.mergePullRequest');
+  })();
+  const eyebrow = providerRef ? providerPrRefLabel(providerRef) : `${owner}/${repo}#${rawNumber}`;
   const dismiss = () => {
     router.back();
   };
 
-  const trpc = useTRPC();
-  const pr = useQuery(
-    trpc.githubPrReview.getPullRequest.queryOptions(
-      { owner, repo, number },
-      { enabled: Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0 }
-    )
+  // The scope the reads run under: the layout publishes the provider scope in
+  // context; the GitHub route falls back to the parsed triple, so the GitHub
+  // query key is byte-identical to the pre-s6 one.
+  const scope = useProviderPrScope(
+    owner && repo && Number.isInteger(number) && number > 0
+      ? { owner, repo, number }
+      : { owner: '', repo: '', number: 0 }
   );
 
-  if (pr.data) {
+  const trpc = useTRPC();
+  const overviewOptions = useMemo(() => buildPrOverviewQueryOptions(trpc, scope), [trpc, scope]);
+  const paramsValid = Boolean(owner) && Boolean(repo) && Number.isInteger(number) && number > 0;
+  const pr = useQuery({
+    ...overviewOptions,
+    enabled: paramsValid && isProviderScopeReady(scope),
+  });
+
+  // The auto-merge capability, provider auto-merge arms only: a
+  // `supported: false` answer (Bitbucket) renders the capability banner.
+  // The GitHub arm keeps its query disabled — it never touches the
+  // `providerReview` namespace over the network.
+  const needsAutoMergeCapability =
+    providerRef !== null && providerRef.platform !== 'github' && mode === 'enable-auto-merge';
+  // The options call sits directly in the body and the result is bound
+  // before `useQuery`: wrapped in a helper/useMemo closure the linter's
+  // inference loses the option type, and passed inline the type-checker's
+  // inference collapses every `.data` read. The data itself is read back
+  // through the seam's typed selector.
+  const capabilitiesOptions = trpc.providerReview.getCapabilities.queryOptions(
+    providerCapabilitiesIdentity(scope),
+    {
+      enabled:
+        needsAutoMergeCapability && scope.ref.platform !== 'github' && isProviderScopeReady(scope),
+    }
+  );
+  const capabilitiesQuery = useQuery(capabilitiesOptions);
+  const capabilitiesData = selectProviderCapabilitiesData(capabilitiesQuery.data);
+
+  // The s2/s3 merge gate, provider arms only (GitHub's gate derives from the
+  // overview DTO in the merge section — the GitHub arm's query registers
+  // disabled and never touches the `providerReview` namespace).
+  const mergeStateOptions = useMemo(
+    () => buildPrMergeStateQueryOptions(trpc, scope),
+    [trpc, scope]
+  );
+  const mergeStateQuery = useQuery(mergeStateOptions);
+
+  // The sheet mounts only once its reads settle, so its content never shifts:
+  // loading → content happens in the screen body, not inside the sheet.
+  const isProviderArm = scope.ref.platform !== 'github';
+  const mergeStateSettled =
+    !isProviderArm || (!mergeStateQuery.isLoading && !mergeStateQuery.isPending);
+  const capabilitiesSettled = !needsAutoMergeCapability || !capabilitiesQuery.isPending;
+
+  if (pr.data && mergeStateSettled && capabilitiesSettled) {
     return (
       <PrMergeSheet
         owner={owner}
@@ -77,6 +167,11 @@ export function PrReviewMergeScreen() {
         mode={mode}
         sheetTitle={sheetTitle}
         eyebrow={eyebrow}
+        prRef={providerRef && providerRef.platform !== 'github' ? providerRef : undefined}
+        mergeState={isProviderArm ? (mergeStateQuery.data ?? null) : undefined}
+        autoMergeCapability={
+          needsAutoMergeCapability && capabilitiesData ? capabilitiesData.autoMerge : undefined
+        }
         onRefetch={async () => {
           await pr.refetch();
         }}
@@ -85,20 +180,23 @@ export function PrReviewMergeScreen() {
     );
   }
 
-  const body: ReactNode = pr.isLoading ? (
-    <CenteredState>
-      <ActivityIndicator size="small" color={colors.mutedForeground} />
-    </CenteredState>
-  ) : (
-    <QueryError
-      variant="server"
-      title={t('prReview.merge.loadFailedTitle')}
-      onRetry={() => {
-        void pr.refetch();
-      }}
-      isRetrying={pr.isFetching}
-    />
-  );
+  const body: ReactNode =
+    pr.isLoading ||
+    (isProviderArm && mergeStateQuery.isLoading) ||
+    (needsAutoMergeCapability && capabilitiesQuery.isLoading) ? (
+      <CenteredState>
+        <ActivityIndicator size="small" color={colors.mutedForeground} />
+      </CenteredState>
+    ) : (
+      <QueryError
+        variant="server"
+        title={t('prReview.merge.loadFailedTitle')}
+        onRetry={() => {
+          void pr.refetch();
+        }}
+        isRetrying={pr.isFetching}
+      />
+    );
 
   return (
     <>

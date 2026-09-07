@@ -30,7 +30,11 @@ import {
   type ProviderPrScope,
   useProviderPrScope,
 } from '@/lib/pr-review/provider-pr-ref';
-import { getViewedFiles, toggleViewedFile } from '@/lib/pr-review/viewed-files';
+import {
+  getViewedFiles,
+  toggleViewedFile,
+  type ViewedFilesRef,
+} from '@/lib/pr-review/viewed-files';
 import { withInfiniteRetention } from '@/lib/query/infinite-retention';
 import { useTRPC } from '@/lib/trpc';
 
@@ -100,12 +104,13 @@ export function usePrReviewFileListQuery(args: {
 }
 
 /**
- * Subscribes the viewed-files store for a specific PR (keyed by
- * `owner/repo#number` + `headSha`). Returns the current viewed path
- * set plus a `toggle` callback that flips a single path. The
- * underlying store is a single SecureStore key shared across all
- * PRs, so the hook re-reads on toggle rather than maintaining a
- * long-lived in-memory cache.
+ * Subscribes the viewed-files store for a specific PR (keyed by the ref's
+ * provider-scoped identity + `headSha`, so a GitLab MR and a same-numbered
+ * GitHub PR — or one project on two GitLab instances — never share a set;
+ * identity rule 17). Returns the current viewed path set plus a `toggle`
+ * callback that flips a single path. The underlying store is a single
+ * SecureStore key shared across all PRs, so the hook re-reads on toggle
+ * rather than maintaining a long-lived in-memory cache.
  */
 // Module-level notifier so every mounted viewed-files hook (e.g. the diff list
 // AND the file navigator sheet mounted over it) re-reads after any toggle,
@@ -118,15 +123,7 @@ function notifyViewedChange(): void {
   }
 }
 
-export function usePrReviewViewedFiles(
-  ref: {
-    owner: string;
-    repo: string;
-    number: number;
-  },
-  headSha: string
-) {
-  const { owner, repo, number } = ref;
+export function usePrReviewViewedFiles(ref: ViewedFilesRef, headSha: string) {
   const [paths, setPaths] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -136,7 +133,7 @@ export function usePrReviewViewedFiles(
 
     async function load() {
       try {
-        const next = await getViewedFiles({ owner, repo, number }, headSha);
+        const next = await getViewedFiles(ref, headSha);
         if (!cancelled) {
           setPaths(next);
           setIsLoading(false);
@@ -160,7 +157,7 @@ export function usePrReviewViewedFiles(
       cancelled = true;
       viewedChangeListeners.delete(onChange);
     };
-  }, [owner, repo, number, headSha]);
+  }, [ref, headSha]);
 
   const toggle = useCallback(
     async (path: string) => {
@@ -172,11 +169,11 @@ export function usePrReviewViewedFiles(
         }
         return [...previous, path];
       });
-      await toggleViewedFile({ owner, repo, number, headSha, path });
+      await toggleViewedFile({ ...ref, headSha, path });
       // Notify other mounted instances (they re-read the durable store).
       notifyViewedChange();
     },
-    [owner, repo, number, headSha]
+    [ref, headSha]
   );
 
   // Stabilize identities for downstream memos (`items`, `renderItem`). A fresh

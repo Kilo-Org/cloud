@@ -8,11 +8,16 @@ import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/pro
 
 import { DiscussionThread } from './discussion-thread';
 
-// The provider read surface must not offer the GitHub-only write controls:
-// the resolve toggle, the reply input and the reaction picker all call
-// `githubPrReview` mutations, which cannot work for a GitLab MR or a
-// Bitbucket PR identity (the same rule the diff list's write bar follows in
-// `pr-diff-write-gate`). The read-only facts the providers DO report — the
+// The s6 write arm of the provider discussion surface. The reply and resolve
+// mutations route through the `providerReview` seam on a GitLab MR / Bitbucket
+// PR (the hooks pick the arm from the provider scope the layout publishes), so
+// the thread OFFERS resolve and reply on every platform whose capabilities
+// allow it — with the provider-native ids (discussion id / verbatim comment
+// id) riding on the wire. Reactions have no seam write path and no provider
+// read layer returns reaction data, so a provider comment row stays read-only:
+// the row shows nothing rather than a dead or failing affordance, and the
+// capability flag removes the reaction row entirely where the provider says
+// unsupported (Bitbucket). The read-only facts the providers DO report — the
 // Resolved badge — stay rendered.
 
 const GITLAB_REF: ProviderPrRef = { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 };
@@ -77,11 +82,13 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61', good: '#22C55E' }),
 }));
+const { resolveMutate } = vi.hoisted(() => ({ resolveMutate: vi.fn<() => void>() }));
+
 vi.mock('@/lib/pr-review/discussion/use-review-discussion-mutations', () => ({
   useAddReactionMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveReactionMutation: () => ({ mutate: vi.fn(), isPending: false }),
   useReplyToCommentMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useResolveThreadMutation: () => ({ mutate: vi.fn(), isPending: false }),
+  useResolveThreadMutation: () => ({ mutate: resolveMutate, isPending: false }),
   useUnresolveThreadMutation: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -130,27 +137,73 @@ function pressableCount(root: TestRenderer.ReactTestInstance, label: string): nu
   );
 }
 
-describe('DiscussionThread provider write gate', () => {
+/** Press the resolve toggle (its own nested pressable in the header). */
+function pressResolve(root: TestRenderer.ReactTestInstance): void {
+  const resolveToggle = root.findAll(
+    node =>
+      typeof node.type === 'string' &&
+      (node.type as string) === 'Pressable' &&
+      (node.props as Record<string, unknown>).accessibilityLabel === 'Resolve thread'
+  )[0];
+  if (!resolveToggle) {
+    throw new Error('Resolve toggle not found');
+  }
+  (resolveToggle.props as { onPress?: () => void }).onPress?.();
+}
+
+describe('DiscussionThread provider write arm (s6)', () => {
   it.each<[string, ProviderPrRef]>([
     ['gitlab', GITLAB_REF],
     ['bitbucket', BITBUCKET_REF],
-  ])('withholds resolve, reply and reaction writes on a %s thread', async (_platform, ref) => {
+  ])('offers resolve and reply through the seam on a %s thread', async (_platform, ref) => {
     const renderer = await renderThread(ref, true, makeThread());
     try {
-      expect(pressableCount(renderer.root, 'Resolve thread')).toBe(0);
-      expect(countByType(renderer.root, 'ReplyInput')).toBe(0);
+      // Resolve is offered and carries the provider-native thread id.
+      expect(pressableCount(renderer.root, 'Resolve thread')).toBe(1);
+      pressResolve(renderer.root);
+      expect(resolveMutate).toHaveBeenCalledWith({ threadId: 'D-12' });
+
+      // Reply is offered with the provider target (discussion id + verbatim
+      // comment id), so the seam posts it for this provider identity.
+      expect(countByType(renderer.root, 'ReplyInput')).toBe(1);
+      const replyInput = renderer.root.find(
+        node => typeof node.type === 'string' && (node.type as string) === 'ReplyInput'
+      );
+      expect(replyInput.props.provider).toEqual({
+        ref,
+        threadId: 'D-12',
+        commentNodeId: '12',
+      });
+
       expect(countByType(renderer.root, 'CommentRow')).toBe(1);
     } finally {
       renderer.unmount();
     }
   });
 
-  it('makes thread comments read-only on a provider scope', async () => {
+  it('makes thread comments read-only on a provider scope (no reaction write path)', async () => {
     const renderer = await renderThread(GITLAB_REF, true, makeThread());
     try {
       const row = renderer.root.find(
         node => typeof node.type === 'string' && (node.type as string) === 'CommentRow'
       );
+      expect(row.props.readOnly).toBe(true);
+      // GitLab's capability says reactions are supported, so the row is
+      // gated on the flag (true) — but it is read-only and the read layer
+      // returns no reaction data, so nothing renders.
+      expect(row.props.reactionsSupported).toBe(true);
+    } finally {
+      renderer.unmount();
+    }
+  });
+
+  it('drops the reaction row entirely on a Bitbucket thread (capability unsupported)', async () => {
+    const renderer = await renderThread(BITBUCKET_REF, true, makeThread());
+    try {
+      const row = renderer.root.find(
+        node => typeof node.type === 'string' && (node.type as string) === 'CommentRow'
+      );
+      expect(row.props.reactionsSupported).toBe(false);
       expect(row.props.readOnly).toBe(true);
     } finally {
       renderer.unmount();
@@ -162,6 +215,11 @@ describe('DiscussionThread provider write gate', () => {
     try {
       expect(pressableCount(renderer.root, 'Resolve thread')).toBe(1);
       expect(countByType(renderer.root, 'ReplyInput')).toBe(1);
+      const replyInput = renderer.root.find(
+        node => typeof node.type === 'string' && (node.type as string) === 'ReplyInput'
+      );
+      // GitHub carries no provider target — the exact pre-s6 call shape.
+      expect(replyInput.props.provider).toBeUndefined();
       const row = renderer.root.find(
         node => typeof node.type === 'string' && (node.type as string) === 'CommentRow'
       );
@@ -174,7 +232,9 @@ describe('DiscussionThread provider write gate', () => {
   it('keeps the read-only Resolved badge on a provider thread', async () => {
     const renderer = await renderThread(GITLAB_REF, false, makeThread({ isResolved: true }));
     try {
-      expect(pressableCount(renderer.root, 'Unresolve thread')).toBe(0);
+      // Collapsed provider thread: the unresolve affordance is offered
+      // through the seam, and the read-only Resolved badge stays.
+      expect(pressableCount(renderer.root, 'Unresolve thread')).toBe(1);
       expect(countByType(renderer.root, 'Text', props => props.children === 'Resolved')).toBe(1);
     } finally {
       renderer.unmount();

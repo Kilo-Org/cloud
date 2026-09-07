@@ -35,7 +35,11 @@ import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { buildSuggestionFence } from '@/lib/pr-review/build-suggestion-fence';
 import { getDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { usePendingReview } from '@/lib/pr-review/pending-review-provider';
-import { useCreateReviewCommentMutation } from '@/lib/pr-review/use-pr-review-mutations';
+import {
+  formatPendingCommentBody,
+  useCreateReviewCommentMutation,
+} from '@/lib/pr-review/use-pr-review-mutations';
+import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
 
 type CommentComposerMode =
   | { kind: 'create'; headSha: string }
@@ -45,6 +49,14 @@ type PrReviewCommentComposerProps = Readonly<{
   owner: string;
   repo: string;
   number: number;
+  /**
+   * The provider ref (s6). Present on the GitLab/Bitbucket surface: the
+   * comment posts through `providerReview.addComment` with the location
+   * anchored in the body, and the durable comment draft key folds the ref
+   * identity so a same-numbered GitHub PR never shares this sheet's draft.
+   * Absent on GitHub, which keeps the exact pre-s6 write path.
+   */
+  prRef?: ProviderPrRef;
   mode: CommentComposerMode;
   path: string;
   side: 'LEFT' | 'RIGHT';
@@ -62,6 +74,7 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
     owner,
     repo,
     number,
+    prRef,
     mode,
     path,
     side,
@@ -74,13 +87,18 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
   } = props;
   const pending = usePendingReview();
   const { t } = useTranslation();
-  const createComment = useCreateReviewCommentMutation({ owner, repo, number });
+  const createComment = useCreateReviewCommentMutation(prRef ?? { owner, repo, number });
   const isEdit = mode.kind === 'edit';
 
   // Durable comment draft (create mode only). Edit mode edits an already-queued
   // item, durable through the pending-review provider, so no draft there.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const commentDraftKey = prCommentDraftKey(owner, repo, number, path, side, line, startLine);
+  const positionDraftKey = prCommentDraftKey(owner, repo, number, path, side, line, startLine);
+  // Provider arms fold the collision-free ref identity into the key (identity
+  // rule 17); the GitHub bytes stay exactly as stored before this slice.
+  const commentDraftKey = prRef
+    ? `${positionDraftKey}@${providerPrRefKey(prRef)}`
+    : positionDraftKey;
   const draftUserId = isEdit ? undefined : userId;
   const draft = useFencedDraftLoad({
     userId: draftUserId,
@@ -199,17 +217,23 @@ export function PrReviewCommentComposer(props: PrReviewCommentComposerProps) {
       return;
     }
     try {
-      await createComment.mutateAsync({
-        owner,
-        repo,
-        number,
-        body,
-        path,
-        line,
-        side,
-        ...(startLine !== undefined ? { startLine, startSide: side } : {}),
-        commitSha: mode.headSha,
-      });
+      // Provider arms post body-only: the inline position rides in the
+      // text, because the provider APIs have no comment position.
+      await createComment.mutateAsync(
+        prRef
+          ? { body: formatPendingCommentBody({ path, line, startLine, body }) }
+          : {
+              owner,
+              repo,
+              number,
+              body,
+              path,
+              line,
+              side,
+              ...(startLine !== undefined ? { startLine, startSide: side } : {}),
+              commitSha: mode.headSha,
+            }
+      );
       if (draftUserId) {
         void clearDraft(draftUserId, commentDraftKey);
       }

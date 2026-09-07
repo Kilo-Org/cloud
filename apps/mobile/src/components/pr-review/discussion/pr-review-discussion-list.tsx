@@ -125,6 +125,9 @@ export function PrReviewDiscussionList({
                 <CommentRow
                   comment={item.comment}
                   readOnly
+                  // s6: reactions render only when the provider exposes them;
+                  // a provider without them shows no reaction row at all.
+                  reactionsSupported={queries.capabilities.reactions.supported}
                   viewerLogin={viewerLogin}
                   onToggleReaction={noopReactionToggle}
                 />

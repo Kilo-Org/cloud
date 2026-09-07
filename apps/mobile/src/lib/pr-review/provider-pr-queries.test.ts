@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the namespace-selection tests and the pure normalizer tests share the same stubbed-trpc harness. */
 import { describe, expect, it, vi } from 'vitest';
 
 import {
@@ -11,6 +12,7 @@ import {
   normalizeProviderOverview,
   normalizeProviderThreadsPage,
   normalizePrThreadsPages,
+  providerCapabilitiesIdentity,
 } from './provider-pr-queries';
 import { githubPrRef, isProviderScopeReady, type ProviderPrScope } from './provider-pr-ref';
 
@@ -23,7 +25,7 @@ type Trpc = Parameters<typeof buildPrOverviewQueryOptions>[0];
 // Every read procedure both namespaces answer, stubbed by name so a builder
 // that picked the wrong namespace shows up as the wrong `procedure` tag.
 const GITHUB_PROCEDURES = ['getPullRequest', 'listChecks', 'listFiles', 'listReviewThreads'];
-const PROVIDER_PROCEDURES = ['listDiscussions', 'getFileLines', 'getMergeState'];
+const PROVIDER_PROCEDURES = ['listDiscussions', 'getFileLines', 'getMergeState', 'getCapabilities'];
 
 function makeTrpc() {
   const record = (name: string) =>
@@ -144,12 +146,37 @@ describe('namespace selection', () => {
     });
   });
 
-  it('has no merge-state procedure on GitHub (the overview carries the gate)', () => {
+  it('keeps the GitHub merge-state query disabled (the overview carries the gate)', () => {
     const { trpc } = makeTrpc();
-    expect(buildPrMergeStateQueryOptions(trpc, githubScope)).toBeNull();
-    expect(loose(buildPrMergeStateQueryOptions(trpc, gitlabScope)).procedure).toBe(
-      'provider.getMergeState'
-    );
+    // The GitHub arm registers a never-enabled query so the hook keeps one
+    // type; nothing leaves the app on that path.
+    const githubOptions = loose(buildPrMergeStateQueryOptions(trpc, githubScope));
+    expect(githubOptions.procedure).toBe('provider.getMergeState');
+    expect(githubOptions.enabled).toBe(false);
+    const gitlabOptions = loose(buildPrMergeStateQueryOptions(trpc, gitlabScope));
+    expect(gitlabOptions.procedure).toBe('provider.getMergeState');
+    expect(gitlabOptions.enabled).toBe(true);
+  });
+
+  it('builds the capability identity from the platform, never a repository ref', () => {
+    // The `getCapabilities` query itself stays at its call site (the option
+    // type only resolves inline); the seam owns the identity it reads under.
+    expect(providerCapabilitiesIdentity(gitlabScope)).toEqual({ platform: 'gitlab' });
+    expect(
+      providerCapabilitiesIdentity({
+        ref: {
+          platform: 'gitlab',
+          projectPath: 'g/r',
+          mrIid: 1,
+          instanceHint: 'gitlab.example.com',
+        },
+        organizationId: 'org-2',
+      })
+    ).toEqual({ platform: 'gitlab', instanceHint: 'gitlab.example.com', organizationId: 'org-2' });
+    expect(providerCapabilitiesIdentity(bitbucketScope)).toEqual({
+      platform: 'bitbucket',
+      organizationId: 'org-1',
+    });
   });
 
   it('paginates each provider on its own opaque cursor', () => {

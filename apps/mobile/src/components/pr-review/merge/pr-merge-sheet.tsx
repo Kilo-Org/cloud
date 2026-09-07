@@ -14,19 +14,36 @@
 // dismisses (cancel) or the mutation succeeds (auto-dismiss).
 
 import * as Haptics from 'expo-haptics';
-import { Alert, Keyboard, ScrollView, type TextInput, useWindowDimensions } from 'react-native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
+  Keyboard,
+  ScrollView,
+  type TextInput,
+  useWindowDimensions,
+  View,
+} from 'react-native';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { type inferRouterInputs, type MobileRouter } from '@kilocode/trpc/mobile';
+import {
+  type ProviderPrMergeBlockedReason,
+  type ProviderPrMergeState,
+  type ProviderPrPlatform,
+  type ProviderReviewCapability,
+} from '@kilocode/app-shared/provider-review';
 
-import { PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
+import { PrFormSheetFooter, PrFormSheetHeader } from '@/components/pr-review/pr-form-sheet-chrome';
+import { PrReviewCapabilityBanner } from '@/components/pr-review/pr-review-capability-banner';
+import { Button } from '@/components/ui/button';
+import { Text } from '@/components/ui/text';
 import {
   type AllowedMergeMethod,
   type PrMergeMethod,
   type PrOverviewRepoSettings,
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import {
+  type EnableAutoMergeVars,
+  type MergeVars,
   useEnableAutoMergeMutation,
   useMergePullRequestMutation,
 } from '@/lib/pr-review/merge/use-pr-merge-mutations';
@@ -41,11 +58,16 @@ import {
   mergeMethodOptionsFor,
 } from '@/components/pr-review/merge/pr-merge-icons';
 import { MergeSheetFormBody } from '@/components/pr-review/merge/pr-merge-sheet-parts';
+import { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
 import {
   defaultCommitMessage,
   defaultCommitTitle,
 } from '@/lib/pr-review/merge/merge-commit-defaults';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { formatNumber } from '@/lib/format';
+import { i18n } from '@/i18n';
+import { type ProviderPrRef, providerPrRefKey } from '@/lib/pr-review/provider-pr-ref';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import { clearDraft, isMergeDraft, prMergeDraftKey, saveDraft } from '@/lib/persist/drafts';
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
@@ -69,15 +91,67 @@ type PrMergeSheetProps = Readonly<{
   mode: PrMergeSheetMode;
   sheetTitle: string;
   eyebrow: string;
+  /**
+   * The provider ref (s6). Present on the GitLab/Bitbucket surface: the merge
+   * posts through `providerReview.mergePullRequest` with the head fence, the
+   * method list comes from the provider (not the GitHub repo settings), and
+   * the draft key folds the ref identity. Absent on GitHub, which keeps the
+   * exact pre-s6 path.
+   */
+  prRef?: ProviderPrRef;
+  /**
+   * The provider merge gate from `providerReview.getMergeState` (s2/s3).
+   * Rendered as the restrictions list and gates the submit; null on GitHub,
+   * whose gate derives from the overview DTO in the merge section.
+   */
+  mergeState?: ProviderPrMergeState | null;
+  /**
+   * The auto-merge capability (provider arms). A `supported: false` answer
+   * (Bitbucket) renders the explicit capability banner instead of the form.
+   */
+  autoMergeCapability?: ProviderReviewCapability;
   /** Called after a successful merge / auto-merge enable so the orchestrator can refetch. */
   onRefetch: () => Promise<void>;
   /** Called when the user cancels or after a successful submit. */
   onDismiss: () => void;
 }>;
 
-type RouterInputs = inferRouterInputs<MobileRouter>;
-type MergePullRequestInput = RouterInputs['githubPrReview']['mergePullRequest'];
-type AutoMergeInput = RouterInputs['githubPrReview']['enableAutoMerge'];
+/**
+ * The provider's own noun in sentence form (s6). Defined in
+ * `pr-review-provider-noun.ts` (shared with the overview's provider merge
+ * arm) and re-exported here for the sheet's callers.
+ */
+export { providerPrNounKey } from '@/components/pr-review/pr-review-provider-noun';
+
+/**
+ * The explicit stale-head rejection (s6): the server refuses a merge whose
+ * head moved (or whose target closed) with CONFLICT carrying the provider's
+ * own reason. There is nothing to retry against the old head, so the sheet
+ * keeps that reason inline and stays put — no redirect, no retry affordance.
+ * Returns the reason to show, or null when the error is not a stale-head.
+ */
+export function staleHeadRejectionMessage(error: unknown): string | null {
+  if (readTrpcErrorField(error, 'code') !== 'CONFLICT') {
+    return null;
+  }
+  const message = error instanceof Error ? error.message : '';
+  return /changed since it was loaded|closed without merging/.test(message) ? message : null;
+}
+
+/**
+ * The inline copy for a refused merge (s6f): the provider arm words the
+ * refusal after the connected provider (merge request vs pull request)
+ * through the existing term-parameterized key; GitHub keeps the exact
+ * pre-s6 copy.
+ */
+export function mergeForbiddenCopy(
+  platform: ProviderPrPlatform | undefined,
+  t: ReturnType<typeof useTranslation>['t']
+): string {
+  return platform
+    ? t('prReview.merge.providerBlocked.permission', { term: t(providerPrNounKey(platform)) })
+    : t('prReview.merge.forbidden');
+}
 
 /**
  * Wraps an uncontrolled-input ref so every `.current` write (the parts file's
@@ -113,22 +187,45 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     mode,
     sheetTitle,
     eyebrow,
+    prRef,
+    mergeState,
+    autoMergeCapability,
     onRefetch,
     onDismiss,
   } = props;
 
   const { t } = useTranslation();
 
-  const methodOptions = useMemo(() => mergeMethodOptionsFor(repoSettings), [repoSettings]);
+  // Provider arms derive the method list from the platform, not the GitHub
+  // repo settings: GitLab offers merge + squash, Bitbucket Cloud only the
+  // merge commit. GitHub keeps the repo-settings list unchanged.
+  const providerMethodOptions = useMemo(() => {
+    if (!prRef) {
+      return null;
+    }
+    return mergeMethodOptionsFor({
+      ...repoSettings,
+      allowMergeCommit: true,
+      allowSquashMerge: prRef.platform === 'gitlab',
+      allowRebaseMerge: false,
+      allowAutoMerge: prRef.platform === 'gitlab',
+    });
+  }, [prRef, repoSettings]);
+  const methodOptions = useMemo(
+    () => providerMethodOptions ?? mergeMethodOptionsFor(repoSettings),
+    [providerMethodOptions, repoSettings]
+  );
   const safeInitial: AllowedMergeMethod = useMemo(
     () =>
       methodOptions.find(o => o.value === initialMethod)?.value ??
-      defaultMergeMethodOptionFor(repoSettings),
-    [initialMethod, methodOptions, repoSettings]
+      (providerMethodOptions
+        ? (providerMethodOptions[0]?.value ?? defaultMergeMethodOptionFor(repoSettings))
+        : defaultMergeMethodOptionFor(repoSettings)),
+    [initialMethod, methodOptions, providerMethodOptions, repoSettings]
   );
   const [method, setMethod] = useState<AllowedMergeMethod>(safeInitial);
 
-  const showDeleteBranchToggle = !isCrossRepo;
+  const showDeleteBranchToggle = prRef ? true : !isCrossRepo;
   const [deleteBranch, setDeleteBranch] = useState<boolean>(repoSettings.deleteBranchOnMerge);
 
   // iOS uncontrolled-input pattern: store text in a ref via onChangeText,
@@ -145,7 +242,10 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
   // read while the user id is unknown. The inputs render only once the draft
   // settles, seeded from the stored value or today's defaults.
   const { userId, isLoading: isIdentityLoading } = useCurrentUserId();
-  const mergeDraftKey = prMergeDraftKey(owner, repoName, number);
+  const positionDraftKey = prMergeDraftKey(owner, repoName, number);
+  // Provider arms fold the collision-free ref identity into the key (identity
+  // rule 17); the GitHub bytes stay exactly as stored before this slice.
+  const mergeDraftKey = prRef ? `${positionDraftKey}@${providerPrRefKey(prRef)}` : positionDraftKey;
   const draft = useFencedDraftLoad<{ title: string; message: string }>({
     userId,
     isIdentityLoading,
@@ -190,13 +290,16 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     [owner, repoName, number]
   );
 
-  const mergeMutation = useMergePullRequestMutation(ref);
-  const enableAutoMergeMutation = useEnableAutoMergeMutation(ref);
+  const mergeMutation = useMergePullRequestMutation(prRef ?? ref);
+  const enableAutoMergeMutation = useEnableAutoMergeMutation(prRef ?? ref);
 
   const isMutating =
     (mode === 'merge' && mergeMutation.isPending) ||
     (mode === 'enable-auto-merge' && enableAutoMergeMutation.isPending);
   const lastError = mode === 'merge' ? mergeMutation.error : enableAutoMergeMutation.error;
+  // The provider platform as a stable primitive: the error effect words a
+  // refusal after it without depending on the `prRef` object identity.
+  const providerPlatform = prRef?.platform;
 
   useEffect(() => {
     if (lastError) {
@@ -207,11 +310,20 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
         setInlineErrorKind('non-retryable');
         return;
       }
+      // A moved head is the explicit stale-head rejection (s6): the server
+      // answers CONFLICT with the provider's own reason, there is nothing to
+      // retry against the old head, and the sheet stays put showing it.
+      const staleHead = staleHeadRejectionMessage(lastError);
+      if (staleHead !== null) {
+        setInlineError(staleHead);
+        setInlineErrorKind('non-retryable');
+        return;
+      }
       const classification = classifyPrReviewMutationError(lastError);
       if (classification.kind === 'bad-request' || classification.kind === 'forbidden') {
         setInlineError(
           classification.kind === 'forbidden'
-            ? t('prReview.merge.forbidden')
+            ? mergeForbiddenCopy(providerPlatform, t)
             : t('prReview.merge.cannotMerge')
         );
         setInlineErrorKind('non-retryable');
@@ -225,7 +337,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
         setInlineErrorKind('retryable');
       }
     }
-  }, [lastError, t]);
+  }, [lastError, t, providerPlatform]);
 
   useEffect(() => {
     const sub = Keyboard.addListener('keyboardDidShow', () => {
@@ -242,7 +354,29 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     setMethod(next);
   }
 
-  function buildMergeInput(): MergePullRequestInput {
+  function buildMergeInput(): MergeVars {
+    if (prRef) {
+      // The provider merge carries the head fence (the server refuses a moved
+      // head before any merge call); GitLab folds the method into `squash`
+      // and takes a commit title, Bitbucket only the message — and the form
+      // hides the title input on that arm (s6f), so no typed value is ever
+      // dropped. The term rides the fingerprint so a retried intent re-merges
+      // the same revision.
+      const commitMessage = messageRef.current.trim();
+      return {
+        expectedHeadSha: headSha,
+        ...(prRef.platform === 'gitlab'
+          ? {
+              squash: method === 'squash',
+              ...(titleRef.current.trim().length > 0
+                ? { commitTitle: titleRef.current.trim() }
+                : {}),
+            }
+          : {}),
+        deleteBranch: showDeleteBranchToggle ? deleteBranch : false,
+        ...(commitMessage.length > 0 ? { commitMessage } : {}),
+      };
+    }
     return {
       owner,
       repo: repoName,
@@ -255,7 +389,13 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     };
   }
 
-  function buildAutoMergeInput(): AutoMergeInput {
+  function buildAutoMergeInput(): EnableAutoMergeVars {
+    if (prRef) {
+      // GitLab arms merge-when-pipeline-succeeds fenced on the head; the
+      // method rides the server-side squash handling. Bitbucket never gets
+      // here: the capability banner replaces the form.
+      return { expectedHeadSha: headSha };
+    }
     const autoMethod: 'MERGE' | 'SQUASH' | 'REBASE' = (() => {
       if (method === 'merge') {
         return 'MERGE';
@@ -328,8 +468,16 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       void performSubmit();
     };
 
+    // Provider arms word the nouns after the connected provider (merge
+    // request vs pull request); GitHub keeps its exact pre-s6 copy.
     if (mode === 'merge') {
-      Alert.alert(t('prReview.merge.confirmTitle'), t('prReview.merge.confirmMessage'), [
+      const [confirmTitle, confirmMessage] = prRef
+        ? [
+            t('prReview.merge.confirmTitleTerm', { term: t(providerPrNounKey(prRef.platform)) }),
+            t('prReview.merge.confirmMessage'),
+          ]
+        : [t('prReview.merge.confirmTitle'), t('prReview.merge.confirmMessage')];
+      Alert.alert(confirmTitle, confirmMessage, [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('prReview.merge.merge'), style: 'destructive', onPress: submit },
       ]);
@@ -337,7 +485,11 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     }
     Alert.alert(
       t('prReview.merge.enableAutoMergeConfirmTitle'),
-      t('prReview.merge.enableAutoMergeConfirmMessage'),
+      prRef
+        ? t('prReview.merge.enableAutoMergeConfirmMessageTerm', {
+            term: t(providerPrNounKey(prRef.platform)),
+          })
+        : t('prReview.merge.enableAutoMergeConfirmMessage'),
       [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('prReview.merge.enableAutoMerge'), style: 'destructive', onPress: submit },
@@ -347,6 +499,12 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
 
   const submitLabel =
     mode === 'merge' ? t('prReview.merge.merge') : t('prReview.merge.enableAutoMerge');
+  // Provider arms (s6): the provider's own noun for the confirm copy, and the
+  // two auto-merge shapes — GitLab arms through the seam, Bitbucket Cloud has
+  // no auto-merge API and opens onto the capability banner instead.
+  const providerTerm = prRef ? t(providerPrNounKey(prRef.platform)) : '';
+  const providerAutoMerge = Boolean(prRef) && mode === 'enable-auto-merge';
+  const autoMergeUnsupported = providerAutoMerge && autoMergeCapability?.supported === false;
   // A repository can (rarely) have every merge method disabled. GitHub would
   // reject any submission, so surface it explicitly and block the action
   // rather than sending a method the repo does not allow.
@@ -361,7 +519,116 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     onDismiss();
   }
 
+  // The body a settled draft renders: the arm the provider state selects —
+  // the Bitbucket auto-merge capability banner, the GitLab auto-merge body,
+  // a blocked merge state's restrictions, or the form. The cancel-only
+  // arms share the ghost footer button.
+  function cancelOnlyFooter() {
+    return (
+      <PrFormSheetFooter>
+        <Button
+          variant="ghost"
+          onPress={handleCancel}
+          disabled={isMutating}
+          className="mt-2"
+          accessibilityLabel={t('common.cancel')}
+        >
+          <Text>{t('common.cancel')}</Text>
+        </Button>
+      </PrFormSheetFooter>
+    );
+  }
+
+  const settledBody = ((): ReactNode => {
+    if (autoMergeUnsupported) {
+      // A Bitbucket auto-merge opens onto the capability banner: the provider
+      // has no API to arm, so there is nothing to submit or retry.
+      return (
+        <>
+          <View className="gap-4 px-6 pt-4">
+            <PrReviewCapabilityBanner capability={autoMergeCapability} />
+          </View>
+          {cancelOnlyFooter()}
+        </>
+      );
+    }
+    if (providerAutoMerge) {
+      return (
+        <>
+          <ProviderAutoMergeBody mergeState={mergeState} term={providerTerm} />
+          <PrFormSheetFooter>
+            <Button
+              onPress={handleConfirmPress}
+              loading={isMutating}
+              disabled={isMutating}
+              accessibilityLabel={t('prReview.merge.enableAutoMerge')}
+            >
+              <Text>{t('prReview.merge.enableAutoMerge')}</Text>
+            </Button>
+            <Button
+              variant="ghost"
+              onPress={handleCancel}
+              disabled={isMutating}
+              className="mt-2"
+              accessibilityLabel={t('common.cancel')}
+            >
+              <Text>{t('common.cancel')}</Text>
+            </Button>
+          </PrFormSheetFooter>
+        </>
+      );
+    }
+    if (mergeState && !mergeState.canMerge) {
+      // A blocked merge state replaces the form with the restrictions list
+      // (nothing to submit).
+      return (
+        <>
+          <View className="gap-4 px-6 pt-4">
+            <MergeRestrictionsList mergeState={mergeState} term={providerTerm} />
+          </View>
+          {cancelOnlyFooter()}
+        </>
+      );
+    }
+    return (
+      <>
+        {mergeState ? (
+          <View className="px-6 pt-4">
+            <MergeRestrictionsList mergeState={mergeState} term={providerTerm} />
+          </View>
+        ) : null}
+        <MergeSheetFormBody
+          noMethodsAllowed={noMethodsAllowed}
+          methodOptions={methodOptions}
+          method={method}
+          isMutating={isMutating}
+          onMethodChange={resetForNewMethod}
+          titleRef={titleSaveRef}
+          titleInputRef={titleInputRef}
+          titlePlaceholder={defaultCommitTitle(title, number)}
+          // Bitbucket Cloud's merge API takes only the message: no title
+          // input exists on that arm whose value would be dropped on submit.
+          showTitle={prRef?.platform !== 'bitbucket'}
+          messageRef={messageSaveRef}
+          messageInputRef={messageInputRef}
+          isHalfDetent={isHalfDetent}
+          showDeleteBranchToggle={showDeleteBranchToggle}
+          deleteBranch={deleteBranch}
+          onDeleteBranchChange={setDeleteBranch}
+          inlineError={inlineError}
+          inlineErrorKind={inlineErrorKind}
+          submitLabel={submitLabel}
+          onConfirm={handleConfirmPress}
+          onDismiss={handleCancel}
+        />
+      </>
+    );
+  })();
+
   // PickerSheet invariant: [header, ScrollView]; footer is trailing content.
+  // Provider arms (s6): the s2/s3 merge state renders as the restrictions
+  // list; a blocked state replaces the form with that list (nothing to
+  // submit), and a Bitbucket auto-merge opens onto the capability banner.
   return (
     <>
       <PrFormSheetHeader title={sheetTitle} eyebrow={eyebrow} onBack={onDismiss} />
@@ -376,30 +643,112 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
           setScrollViewportHeight(event.nativeEvent.layout.height);
         }}
       >
-        {draft.settled ? (
-          <MergeSheetFormBody
-            noMethodsAllowed={noMethodsAllowed}
-            methodOptions={methodOptions}
-            method={method}
-            isMutating={isMutating}
-            onMethodChange={resetForNewMethod}
-            titleRef={titleSaveRef}
-            titleInputRef={titleInputRef}
-            titlePlaceholder={defaultCommitTitle(title, number)}
-            messageRef={messageSaveRef}
-            messageInputRef={messageInputRef}
-            isHalfDetent={isHalfDetent}
-            showDeleteBranchToggle={showDeleteBranchToggle}
-            deleteBranch={deleteBranch}
-            onDeleteBranchChange={setDeleteBranch}
-            inlineError={inlineError}
-            inlineErrorKind={inlineErrorKind}
-            submitLabel={submitLabel}
-            onConfirm={handleConfirmPress}
-            onDismiss={handleCancel}
-          />
-        ) : null}
+        {draft.settled ? settledBody : null}
       </ScrollView>
     </>
+  );
+}
+
+/** The localized copy for one provider blocked reason; `other` keeps the server's message. */
+function providerBlockedReasonText(
+  reason: ProviderPrMergeBlockedReason,
+  term: string,
+  t: ReturnType<typeof useTranslation>['t']
+): string {
+  // Literal keys, never a template: the catalog check scans the source for
+  // the keys a lookup passes on, and a computed key is invisible to it.
+  const KEY_BY_CODE = {
+    conflicts: 'prReview.merge.blocked.conflictsDetail',
+    required_approvals: 'prReview.merge.blocked.requiredReviewsDetail',
+    failing_pipeline: 'prReview.merge.providerBlocked.failingPipeline',
+    pending_pipeline: 'prReview.merge.providerBlocked.pendingPipeline',
+    draft: 'prReview.merge.providerBlocked.draft',
+    permission: 'prReview.merge.providerBlocked.permission',
+    other: null,
+  } satisfies Record<ProviderPrMergeBlockedReason['code'], string | null>;
+  const key = KEY_BY_CODE[reason.code];
+  if (key === null) {
+    return reason.message;
+  }
+  return t(key, { term });
+}
+
+/**
+ * The s2/s3 merge state as an explicit restrictions list (s6): the branch
+ * policy flags first, then the provider's concrete blocked reasons. Rows the
+ * reasons list already carries are not repeated from the flags.
+ */
+export function MergeRestrictionsList({
+  mergeState,
+  term,
+}: Readonly<{ mergeState: ProviderPrMergeState; term: string }>) {
+  const { t } = useTranslation();
+  const hasConflictReason = mergeState.blockedReasons.some(reason => reason.code === 'conflicts');
+  const hasApprovalsReason = mergeState.blockedReasons.some(
+    reason => reason.code === 'required_approvals'
+  );
+  const hasPipelineReason = mergeState.blockedReasons.some(
+    reason => reason.code === 'failing_pipeline' || reason.code === 'pending_pipeline'
+  );
+  const rows: { id: string; text: string }[] = [];
+  if (mergeState.conflicts && !hasConflictReason) {
+    rows.push({ id: 'conflicts', text: t('prReview.merge.blocked.conflictsDetail') });
+  }
+  if (mergeState.approvalsRequired > 0 && !hasApprovalsReason) {
+    rows.push({
+      id: 'approvals',
+      text: t('prReview.merge.restrictions.approvalsRequired', {
+        count: mergeState.approvalsRequired,
+        displayCount: formatNumber(mergeState.approvalsRequired, i18n.language),
+      }),
+    });
+  }
+  if (mergeState.pipelineMustSucceed && !hasPipelineReason) {
+    rows.push({
+      id: 'pipeline',
+      text: t('prReview.merge.restrictions.pipelineMustSucceed'),
+    });
+  }
+  for (const reason of mergeState.blockedReasons) {
+    rows.push({
+      id: `blocked:${reason.code}:${reason.message}`,
+      text: providerBlockedReasonText(reason, term, t),
+    });
+  }
+  if (rows.length === 0) {
+    return null;
+  }
+  return (
+    <View className="gap-2 rounded-lg border border-border bg-secondary p-4">
+      <Text className="text-sm font-medium text-foreground">
+        {t('prReview.merge.restrictions.title')}
+      </Text>
+      {rows.map(row => (
+        <Text key={row.id} className="text-xs text-muted-foreground">
+          {'• '}
+          {row.text}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * The GitLab auto-merge body (s6): the merge state's restrictions plus one
+ * plain explanation. No form fields exist on this arm — arming rides only
+ * the head fence.
+ */
+export function ProviderAutoMergeBody({
+  mergeState,
+  term,
+}: Readonly<{ mergeState: ProviderPrMergeState | null | undefined; term: string }>) {
+  const { t } = useTranslation();
+  return (
+    <View className="gap-4 px-6 pt-4">
+      {mergeState ? <MergeRestrictionsList mergeState={mergeState} term={term} /> : null}
+      <Text className="text-sm text-muted-foreground">
+        {t('prReview.merge.enableAutoMergeDescriptionTerm', { term })}
+      </Text>
+    </View>
   );
 }

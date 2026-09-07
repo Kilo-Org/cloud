@@ -14,6 +14,7 @@ import { MarkdownText } from '@/components/agents/markdown-text';
 import { PrOverviewMeta } from '@/components/pr-review/pr-review-meta-parts';
 import { PrReviewChecksSection } from '@/components/pr-review/pr-review-checks-section';
 import { PrMergeSection } from '@/components/pr-review/merge/pr-merge-section';
+import { PrMergeSectionProvider } from '@/components/pr-review/merge/pr-merge-section-provider';
 import {
   describePrState,
   formatPrCounts,
@@ -286,7 +287,11 @@ export function PrReviewOverview({
           }}
           isRefetching={pr.isFetching}
         />
-      ) : null}
+      ) : (
+        // The provider merge arm (s6): the merge affordance and the
+        // capability-gated auto-merge row, pushing the ref's own sheet route.
+        <PrMergeSectionProvider prRef={queries.ref} state={data.state} />
+      )}
 
       <Text variant="muted" className="text-xs">
         {t('prReview.headLine', {

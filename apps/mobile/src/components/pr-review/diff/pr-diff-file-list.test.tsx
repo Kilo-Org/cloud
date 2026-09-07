@@ -14,6 +14,11 @@ import { PrReviewFileList } from './pr-diff-file-list';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 
+// Records every (ref, headSha) the list hands to the viewed-files hook, so
+// the provider-scoped keying (s6, identity rule 17) is proven at the call
+// site rather than only in the store's unit tests.
+const viewedFilesCalls = vi.hoisted(() => [] as unknown[][]);
+
 const listQueryState = vi.hoisted(() => ({
   query: {
     isLoading: false,
@@ -94,7 +99,10 @@ vi.mock('@/lib/pr-review/diff/use-pr-diff-context-loader', () => ({
 }));
 vi.mock('@/lib/pr-review/diff/pr-review-file-list-state', () => ({
   usePrReviewFileListQuery: () => listQueryState,
-  usePrReviewViewedFiles: () => ({ isViewed: () => false, toggle: vi.fn(), isLoading: false }),
+  usePrReviewViewedFiles: (...args: unknown[]) => {
+    viewedFilesCalls.push(args);
+    return { isViewed: () => false, toggle: vi.fn(), isLoading: false };
+  },
   useFetchToCompletion: () => ({
     run: vi.fn(),
     isRunning: false,
@@ -241,55 +249,85 @@ describe('PrReviewFileList full-body states', () => {
   });
 });
 
-// The comment composer and the review-submit sheet are siblings of the GitHub
-// route only, so the write bar must not be offered on a provider MR/PR — it
-// would push a GitHub route carrying a GitLab or Bitbucket identity.
+// The comment composer and the review-submit sheet are route siblings on
+// every provider (s6): the write bar renders on a GitLab MR / Bitbucket PR
+// too, and the bar carries the provider ref so it pushes the sheet inside
+// the ref's own route — never the GitHub sibling.
 describe('PrReviewFileList write affordances per provider', () => {
   beforeEach(() => {
     insetsState.bottom = 0;
     resetState();
     listQueryState.files = [{ path: 'src/file.ts' }];
+    viewedFilesCalls.length = 0;
   });
 
   it('keeps the write bar on a GitHub pull request', () => {
     const renderer = mountList();
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'PrDiffFloatingActions')
-    ).toHaveLength(1);
+    const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
+    expect(bar.props.prRef).toBeUndefined();
   });
 
-  it('hides the write bar on a GitLab merge request', () => {
+  // The viewed set must be keyed by the live provider ref (s6, identity
+  // rule 17): the store folds `providerPrRefKey` into the key only when the
+  // call site hands it a ref, so the bare triple would silently collide.
+  it('keys the viewed set by the live ref, never the bare triple', () => {
+    mountList();
+    expect(viewedFilesCalls[0]).toEqual([
+      { platform: 'github', owner: 'octocat', repo: 'hello-world', number: 7 },
+      'sha',
+    ]);
+    mountListInScope({ platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 });
+    expect(viewedFilesCalls[1]).toEqual([
+      { platform: 'gitlab', projectPath: 'group/sub/repo', mrIid: 12 },
+      'sha',
+    ]);
+    mountListInScope({ platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 });
+    expect(viewedFilesCalls[2]).toEqual([
+      { platform: 'bitbucket', workspace: 'acme', repoSlug: 'api', prId: 42 },
+      'sha',
+    ]);
+  });
+
+  it('keeps the write bar on a GitLab merge request, carrying the provider ref', () => {
     const renderer = mountListInScope({
       platform: 'gitlab',
       projectPath: 'group/sub/repo',
       mrIid: 12,
     });
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'PrDiffFloatingActions')
-    ).toHaveLength(0);
+    const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
+    expect(bar.props.prRef).toEqual({
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+    });
   });
 
-  it('hides the write bar on a Bitbucket pull request', () => {
+  it('keeps the write bar on a Bitbucket pull request, carrying the provider ref', () => {
     const renderer = mountListInScope({
       platform: 'bitbucket',
       workspace: 'acme',
       repoSlug: 'api',
       prId: 42,
     });
-    expect(
-      renderer.root.findAll(node => String(node.type) === 'PrDiffFloatingActions')
-    ).toHaveLength(0);
+    const bar = renderer.root.find(node => String(node.type) === 'PrDiffFloatingActions');
+    expect(bar.props.prRef).toEqual({
+      platform: 'bitbucket',
+      workspace: 'acme',
+      repoSlug: 'api',
+      prId: 42,
+    });
   });
 
-  it('reserves no bar-sized gap under a provider diff list', () => {
+  it('reserves the bar-sized gap under a provider diff list too', () => {
     const githubPadding = listBottomPadding(mountList());
     const gitlabPadding = listBottomPadding(
       mountListInScope({ platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 })
     );
-    // GitHub reserves the bar's fallback height plus the footer gap; a
-    // provider list keeps only the gap, so the diff does not end in a hole
-    // where no bar is drawn.
-    expect(githubPadding).toBe(PR_DIFF_FLOATING_ACTIONS_FALLBACK_HEIGHT + PR_DIFF_LIST_FOOTER_GAP);
-    expect(gitlabPadding).toBe(PR_DIFF_LIST_FOOTER_GAP);
+    // The bar renders on every provider (s6), so every list reserves the
+    // bar's fallback height plus the footer gap — the last diff row is
+    // never hidden under the bar.
+    const expected = PR_DIFF_FLOATING_ACTIONS_FALLBACK_HEIGHT + PR_DIFF_LIST_FOOTER_GAP;
+    expect(githubPadding).toBe(expected);
+    expect(gitlabPadding).toBe(expected);
   });
 });

@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the seam owns the one provider→GitHub read-model mapping and every query builder; splitting it would scatter the seam across callers. */
 // The ONE data seam of the provider-aware PR review surface.
 //
 // Every read the review screens make goes through a builder here. Given a
@@ -19,6 +20,7 @@ import {
   type ProviderPrChecksResult,
   type ProviderPrSummary,
   type ProviderPrThread,
+  type ProviderReviewCapabilities,
 } from '@kilocode/app-shared/provider-review';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useMemo } from 'react';
@@ -368,16 +370,54 @@ export function buildPrFileLinesQueryOptions(
 
 /**
  * The provider merge gate. GitHub has no `getMergeState` procedure — its
- * merge surface derives the gate from the overview DTO — so this returns
- * null there and the caller keeps that path.
+ * merge surface derives the gate from the overview DTO — so its arm keeps
+ * the query disabled (a placeholder input registers it, nothing fetches).
  */
 export function buildPrMergeStateQueryOptions(trpc: Trpc, scope: ProviderPrScope) {
-  if (scope.ref.platform === 'github') {
-    return null;
+  const isProviderArm = scope.ref.platform !== 'github';
+  const identity = isProviderArm ? providerIdentity(scope) : null;
+  return trpc.providerReview.getMergeState.queryOptions(
+    identity ?? { platform: 'gitlab', projectPath: '', mrIid: 0 },
+    {
+      enabled: isProviderArm && isProviderScopeReady(scope),
+    }
+  );
+}
+
+/** The identity `providerReview.getCapabilities` takes: no repository to pin. */
+type ProviderCapabilitiesInput =
+  | { platform: 'gitlab'; instanceHint?: string; organizationId?: string }
+  | { platform: 'bitbucket'; organizationId: string };
+
+/**
+ * The identity the capability list is read under. The query itself stays at
+ * its call site (the merge screen's auto-merge arm, the review-submit event
+ * list) — the option type only resolves inline; a wrapper loses it under
+ * the linter's type inference. The GitHub arm keeps its query disabled and
+ * never touches `providerReview` over the network.
+ */
+export function providerCapabilitiesIdentity(scope: ProviderPrScope): ProviderCapabilitiesInput {
+  const ref = scope.ref;
+  if (ref.platform === 'bitbucket') {
+    return { platform: 'bitbucket', organizationId: scope.organizationId ?? '' };
   }
-  return trpc.providerReview.getMergeState.queryOptions(providerIdentity(scope), {
-    enabled: isProviderScopeReady(scope),
-  });
+  return {
+    platform: 'gitlab',
+    ...(ref.platform === 'gitlab' && ref.instanceHint ? { instanceHint: ref.instanceHint } : {}),
+    ...(scope.organizationId ? { organizationId: scope.organizationId } : {}),
+  };
+}
+
+/**
+ * The capability query's option type only resolves when the `queryOptions`
+ * call sits inline at its call site (a wrapper loses it under the checkers),
+ * so the screens read its answer back through this typed selector instead of
+ * member-accessing the raw, checker-opaque query data.
+ */
+export function selectProviderCapabilitiesData(
+  data: unknown
+): ProviderReviewCapabilities | undefined {
+  return data as ProviderReviewCapabilities | undefined;
 }
 
 /**

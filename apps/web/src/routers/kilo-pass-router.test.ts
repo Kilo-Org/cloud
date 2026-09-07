@@ -1104,6 +1104,58 @@ describe('kiloPassRouter', () => {
       expect(sentryMock.captureException).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['SUBSCRIPTION_STATE_CANCELED', true],
+      ['SUBSCRIPTION_STATE_IN_GRACE_PERIOD', false],
+      ['SUBSCRIPTION_STATE_ACTIVE', false],
+    ] as const)(
+      'refreshes %s and expiry after a settled restore without granting again',
+      async (subscriptionState, cancelAtPeriodEnd) => {
+        const user = await insertTestUser();
+        const purchase = googlePlayPurchaseFixture({
+          appAccountToken: user.app_store_account_token,
+          providerSubscriptionId: crypto.randomUUID(),
+          providerTransactionId: crypto.randomUUID(),
+          expiresAtIso: '2099-01-01T00:00:00.000Z',
+        });
+        const actual = jest.requireActual<
+          typeof import('@/lib/kilo-pass/store-subscription-completion')
+        >('@/lib/kilo-pass/store-subscription-completion');
+        const completed = await actual.completeStoreKiloPassPurchase({ user, purchase });
+        const before = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, user.id),
+        });
+        getGooglePlayVerifierMock().verifyGooglePlayKiloPassPurchase.mockResolvedValue({
+          ...purchase,
+          expiresAtIso: '2100-01-01T00:00:00.000Z',
+          subscriptionState,
+        });
+        getStoreCompletionMock().completeStoreKiloPassPurchase.mockImplementation(
+          actual.completeStoreKiloPassPurchase
+        );
+        const caller = await createCallerForUser(user.id);
+        await caller.kiloPass.completePlayPurchase({
+          purchaseToken: 'play-router-test-token',
+          platform: 'android',
+          storefront: 'play',
+          product: 'kilo_pass',
+        });
+        const sub = await db.query.kilo_pass_subscriptions.findFirst({
+          where: eq(kilo_pass_subscriptions.id, completed.subscriptionId),
+        });
+        expect(sub!.status).toBe('active');
+        expect(sub!.cancel_at_period_end).toBe(cancelAtPeriodEnd);
+        const saved = await db.query.kilo_pass_store_purchases.findFirst({
+          where: eq(kilo_pass_store_purchases.kilo_pass_subscription_id, completed.subscriptionId),
+        });
+        expect(new Date(saved!.expires_at!).toISOString()).toBe('2100-01-01T00:00:00.000Z');
+        const after = await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.id, user.id),
+        });
+        expect(after!.total_microdollars_acquired).toBe(before!.total_microdollars_acquired);
+      }
+    );
+
     it('rejects the Play completion mutation when the platform is ios', async () => {
       const user = await insertTestUser();
       const caller = await createCallerForUser(user.id);

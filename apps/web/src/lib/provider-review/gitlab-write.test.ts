@@ -3,11 +3,13 @@ import type { PlatformIntegration } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
 import { GitLabReviewError } from './gitlab-authorization';
 import {
+  GITLAB_AUTO_MERGE_NO_PIPELINE_REASON,
   GITLAB_MR_REVIEW_CAPABILITIES,
   GITLAB_REQUEST_CHANGES_UNSUPPORTED_REASON,
   GITLAB_STALE_HEAD_REASON,
   addComment,
   deleteBranch,
+  disableAutoMerge,
   enableAutoMerge,
   mergePullRequest,
   replyToDiscussion,
@@ -368,16 +370,26 @@ describe('mergePullRequest', () => {
 });
 
 describe('enableAutoMerge', () => {
-  it('sets merge-when-pipeline-succeeds', async () => {
-    const result = await enableAutoMerge({ ...TARGET });
+  it('arms merge-when-pipeline-succeeds through the merge endpoint with the head fence as sha', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue(
+      openMrFixture('sha-head', { head_pipeline: { status: 'running' } })
+    );
+
+    const result = await enableAutoMerge({ ...TARGET, expectedHeadSha: 'sha-head' });
 
     expect(result).toEqual({ done: true, replayed: false });
     const { url, init } = lastRequest();
     expect(init.method).toBe('PUT');
+    // The plain update endpoint silently ignores this attribute, so the
+    // request must hit /merge (GitLab docs: merge when pipeline succeeds),
+    // and the caller's head fence travels as `sha`.
     expect(url.pathname).toBe(
-      `/api/v4/projects/${encodeURIComponent(PROJECT_PATH)}/merge_requests/12`
+      `/api/v4/projects/${encodeURIComponent(PROJECT_PATH)}/merge_requests/12/merge`
     );
-    expect(JSON.parse(String(init.body))).toEqual({ merge_when_pipeline_succeeds: true });
+    expect(JSON.parse(String(init.body))).toEqual({
+      merge_when_pipeline_succeeds: true,
+      sha: 'sha-head',
+    });
   });
 
   it('reports replayed when auto-merge is already enabled', async () => {
@@ -385,18 +397,92 @@ describe('enableAutoMerge', () => {
       openMrFixture('sha-head', { merge_when_pipeline_succeeds: true })
     );
 
-    const result = await enableAutoMerge({ ...TARGET });
+    const result = await enableAutoMerge({ ...TARGET, expectedHeadSha: 'sha-head' });
+
+    expect(result).toEqual({ done: true, replayed: true });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stale head with the exact reason and never arms', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue(
+      openMrFixture('sha-moved', { head_pipeline: { status: 'running' } })
+    );
+
+    const error = await captureRejection(
+      enableAutoMerge({ ...TARGET, expectedHeadSha: 'sha-head' })
+    );
+
+    expect(error.kind).toBe('stale_head');
+    expect(error.message).toBe(GITLAB_STALE_HEAD_REASON);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('refuses an MR with no pipeline instead of letting GitLab merge immediately', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue(
+      openMrFixture('sha-head', { head_pipeline: null })
+    );
+
+    const error = await captureRejection(
+      enableAutoMerge({ ...TARGET, expectedHeadSha: 'sha-head' })
+    );
+
+    expect(error).toBeInstanceOf(GitLabReviewError);
+    expect(error.kind).toBe('bad_request');
+    expect(error.retryable).toBe(false);
+    expect(error.message).toBe(GITLAB_AUTO_MERGE_NO_PIPELINE_REASON);
+    const mergeCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith('/merge'));
+    expect(mergeCall).toBeUndefined();
+  });
+
+  it('refuses when the latest pipeline already finished', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue(
+      openMrFixture('sha-head', { head_pipeline: { status: 'success' } })
+    );
+
+    await expect(
+      enableAutoMerge({ ...TARGET, expectedHeadSha: 'sha-head' })
+    ).rejects.toMatchObject({
+      kind: 'bad_request',
+      message: GITLAB_AUTO_MERGE_NO_PIPELINE_REASON,
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('disableAutoMerge', () => {
+  it('cancels through the dedicated cancel endpoint, not the update endpoint', async () => {
+    mockFetchGitLabMergeRequest.mockResolvedValue(
+      openMrFixture('sha-head', { merge_when_pipeline_succeeds: true })
+    );
+
+    const result = await disableAutoMerge({ ...TARGET });
+
+    expect(result).toEqual({ done: true, replayed: false });
+    const { url, init } = lastRequest();
+    // The plain update endpoint does not accept the attribute: a PUT there
+    // would report success while auto-merge stays armed.
+    expect(init.method).toBe('POST');
+    expect(url.pathname).toBe(
+      `/api/v4/projects/${encodeURIComponent(PROJECT_PATH)}/merge_requests/12/cancel_merge_when_pipeline_succeeds`
+    );
+    expect(init.body).toBeUndefined();
+  });
+
+  it('reports replayed when auto-merge is not armed', async () => {
+    const result = await disableAutoMerge({ ...TARGET });
 
     expect(result).toEqual({ done: true, replayed: true });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('fences a stale head when the caller provides one', async () => {
-    mockFetchGitLabMergeRequest.mockResolvedValue(openMrFixture('sha-moved'));
-
-    await expect(enableAutoMerge({ ...TARGET, expectedHeadSha: 'sha-head' })).rejects.toMatchObject(
-      { kind: 'stale_head' }
+    mockFetchGitLabMergeRequest.mockResolvedValue(
+      openMrFixture('sha-moved', { merge_when_pipeline_succeeds: true })
     );
+
+    await expect(
+      disableAutoMerge({ ...TARGET, expectedHeadSha: 'sha-head' })
+    ).rejects.toMatchObject({ kind: 'stale_head' });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -83,7 +83,7 @@ export function gitlabInstanceOrigin(instanceHint?: string): string {
   let rest = instanceHint.trim().toLowerCase();
   const scheme = rest.match(/^[a-z][a-z0-9+.-]*:\/\//);
   if (scheme) rest = rest.slice(scheme[0].length);
-  return (rest.split('/')[0] ?? '').split('?')[0];
+  return (rest.split('/')[0] ?? '').split('?')[0] ?? '';
 }
 
 /** An author or reviewer identity. `login` is the provider username. */

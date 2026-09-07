@@ -4,6 +4,12 @@ import { type RefreshControlProps } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  PR_DIFF_FLOATING_ACTIONS_FALLBACK_HEIGHT,
+  PR_DIFF_LIST_FOOTER_GAP,
+} from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
+import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+
 import { PrReviewFileList } from './pr-diff-file-list';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -129,6 +135,29 @@ function mountList(changedFiles = BASE_PROPS.changedFiles): TestRenderer.ReactTe
   return renderer;
 }
 
+function mountListInScope(
+  ref: Parameters<typeof ProviderPrScopeProvider>[0]['value']['ref']
+): TestRenderer.ReactTestRenderer {
+  const holder: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  act(() => {
+    holder.current = TestRenderer.create(
+      <ProviderPrScopeProvider value={{ ref, organizationId: null }}>
+        <PrReviewFileList {...BASE_PROPS} />
+      </ProviderPrScopeProvider>
+    );
+  });
+  const renderer = holder.current;
+  if (!renderer) {
+    throw new Error('renderer was not created');
+  }
+  return renderer;
+}
+
+function listBottomPadding(renderer: TestRenderer.ReactTestRenderer): number {
+  const list = renderer.root.find(node => String(node.type) === 'FlashList');
+  return (list.props.contentContainerStyle as { paddingBottom: number }).paddingBottom;
+}
+
 function bottomPaddedViews(
   renderer: TestRenderer.ReactTestRenderer
 ): TestRenderer.ReactTestInstance[] {
@@ -209,5 +238,58 @@ describe('PrReviewFileList full-body states', () => {
     const renderer = mountList();
     expect(renderer.root.findAll(node => String(node.type) === 'FlashList')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+  });
+});
+
+// The comment composer and the review-submit sheet are siblings of the GitHub
+// route only, so the write bar must not be offered on a provider MR/PR — it
+// would push a GitHub route carrying a GitLab or Bitbucket identity.
+describe('PrReviewFileList write affordances per provider', () => {
+  beforeEach(() => {
+    insetsState.bottom = 0;
+    resetState();
+    listQueryState.files = [{ path: 'src/file.ts' }];
+  });
+
+  it('keeps the write bar on a GitHub pull request', () => {
+    const renderer = mountList();
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'PrDiffFloatingActions')
+    ).toHaveLength(1);
+  });
+
+  it('hides the write bar on a GitLab merge request', () => {
+    const renderer = mountListInScope({
+      platform: 'gitlab',
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+    });
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'PrDiffFloatingActions')
+    ).toHaveLength(0);
+  });
+
+  it('hides the write bar on a Bitbucket pull request', () => {
+    const renderer = mountListInScope({
+      platform: 'bitbucket',
+      workspace: 'acme',
+      repoSlug: 'api',
+      prId: 42,
+    });
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'PrDiffFloatingActions')
+    ).toHaveLength(0);
+  });
+
+  it('reserves no bar-sized gap under a provider diff list', () => {
+    const githubPadding = listBottomPadding(mountList());
+    const gitlabPadding = listBottomPadding(
+      mountListInScope({ platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 })
+    );
+    // GitHub reserves the bar's fallback height plus the footer gap; a
+    // provider list keeps only the gap, so the diff does not end in a hole
+    // where no bar is drawn.
+    expect(githubPadding).toBe(PR_DIFF_FLOATING_ACTIONS_FALLBACK_HEIGHT + PR_DIFF_LIST_FOOTER_GAP);
+    expect(gitlabPadding).toBe(PR_DIFF_LIST_FOOTER_GAP);
   });
 });

@@ -55,6 +55,7 @@ import {
   useResolveThreadMutation,
   useUnresolveThreadMutation,
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -79,6 +80,13 @@ export function DiscussionThread({
   onToggleExpand,
   viewerLogin = null,
 }: Readonly<DiscussionThreadProps>) {
+  // The resolve / reply / reaction controls below call the `githubPrReview`
+  // mutations, and the provider write routes are siblings of the GitHub
+  // route only — so on a GitLab MR or Bitbucket PR the whole write row is
+  // withheld, exactly like the diff list's write bar (`pr-diff-write-gate`).
+  // A dead button that always fails is worse than no button; the Resolved
+  // badge stays, because the provider read layer reports it.
+  const canWrite = useProviderPrScope({ owner, repo, number }).ref.platform === 'github';
   const resolve = useResolveThreadMutation();
   const unresolve = useUnresolveThreadMutation();
   const addReaction = useAddReactionMutation(thread.threadId);
@@ -131,6 +139,7 @@ export function DiscussionThread({
     firstTimestamp: firstComment?.createdAt ?? null,
     expanded,
     onToggleResolve,
+    canResolve: canWrite,
     resolveDisabled: isResolving,
     onToggleExpand,
   } as const;
@@ -149,6 +158,7 @@ export function DiscussionThread({
               <CommentRow
                 comment={comment}
                 reactionsDisabled={isReacting}
+                readOnly={!canWrite}
                 viewerLogin={viewerLogin}
                 onToggleReaction={content => {
                   onToggleReaction(comment, content);
@@ -157,7 +167,7 @@ export function DiscussionThread({
             </View>
           ))}
         </View>
-        {firstComment ? (
+        {firstComment && canWrite ? (
           <ReplyInput
             owner={owner}
             repo={repo}
@@ -195,6 +205,8 @@ type ThreadHeaderProps = {
   readonly expanded: boolean;
   readonly onToggleExpand: () => void;
   readonly onToggleResolve: () => void;
+  /** False on a GitLab/Bitbucket scope: the resolve control is withheld. */
+  readonly canResolve: boolean;
   readonly resolveDisabled: boolean;
 };
 
@@ -208,6 +220,7 @@ function ThreadHeader({
   expanded,
   onToggleExpand,
   onToggleResolve,
+  canResolve,
   resolveDisabled,
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
@@ -237,7 +250,9 @@ function ThreadHeader({
             {anchorLabel}
           </Text>
         </LabelRow>
-        <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        {canResolve ? (
+          <ResolveToggle resolved={resolved} disabled={resolveDisabled} onPress={onToggleResolve} />
+        ) : null}
       </View>
       <View className="flex-row flex-wrap items-center gap-1.5">
         {resolved ? (

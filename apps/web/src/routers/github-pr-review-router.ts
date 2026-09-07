@@ -1002,7 +1002,7 @@ type ReplayedResult<T> = T & { replayed: true };
  * creates a ledger row. Throws PRECONDITION_FAILED `terms_required` when
  * absent.
  */
-async function assertTermsAccepted(userId: string): Promise<void> {
+export async function assertTermsAccepted(userId: string): Promise<void> {
   const [row] = await db
     .select({ id: user_terms_acceptances.id })
     .from(user_terms_acceptances)

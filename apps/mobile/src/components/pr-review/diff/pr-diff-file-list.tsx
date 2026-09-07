@@ -26,7 +26,7 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshControl, View, type ViewStyle } from 'react-native';
+import { RefreshControl, View } from 'react-native';
 
 import { QueryError } from '@/components/query-error';
 import {
@@ -40,11 +40,12 @@ import {
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
+import { NO_LINE_TAP, usePrDiffWriteGate } from '@/components/pr-review/diff/pr-diff-write-gate';
+import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
 import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
 import { buildFileItems, buildPaginationItem } from '@/lib/pr-review/diff/pr-diff-list-builder';
-import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
 import { usePrDiffContextLoader } from '@/lib/pr-review/diff/use-pr-diff-context-loader';
@@ -134,10 +135,12 @@ export function PrReviewFileList({
     });
   }, []);
 
-  const contentContainerStyle = useMemo<ViewStyle>(
-    () => ({ paddingBottom: prDiffListBottomPadding(barHeight) }),
-    [barHeight]
-  );
+  // Which write affordances this provider can offer, and the space its bar
+  // needs reserved (none, where no bar is drawn).
+  const write = usePrDiffWriteGate({ owner, repo, number }, barHeight);
+
+  // Which provider's words the terminal and empty states use.
+  const copy = usePrDiffStateCopy({ owner, repo, number });
 
   const viewedCount = useMemo(() => {
     let count = 0;
@@ -255,25 +258,17 @@ export function PrReviewFileList({
     onFetchAll,
     handleLoadContext,
     setExpanded,
-    onLineTap: handleLineTap,
-    selection: selectionView,
+    onLineTap: write.canReviewInline ? handleLineTap : NO_LINE_TAP,
+    selection: write.canReviewInline ? selectionView : null,
   });
 
   if (files.length === 0) {
     if (firstPageErrorState?.kind === 'not-found') {
-      return (
-        <TabStateMessage
-          title={t('prReview.pullRequestUnavailable')}
-          message={t('prReview.pullRequestUnavailableDescription')}
-        />
-      );
+      return <TabStateMessage title={copy.unavailableTitle} message={copy.unavailableMessage} />;
     }
     if (firstPageErrorState?.kind === 'permission') {
       return (
-        <TabStateMessage
-          title={t('common.accessDenied')}
-          message={t('prReview.accessDeniedDescription')}
-        />
+        <TabStateMessage title={t('common.accessDenied')} message={copy.accessDeniedMessage} />
       );
     }
     if (firstPageErrorState?.kind === 'reconnect') {
@@ -300,6 +295,7 @@ export function PrReviewFileList({
     return (
       <EmptyFilesView
         changedFiles={changedFiles}
+        noChangesDescription={copy.noChangesDescription}
         onRequestOverview={onRequestOverview}
         refreshControl={
           changedFiles > 0 ? (
@@ -356,19 +352,21 @@ export function PrReviewFileList({
               }
             }}
             onEndReachedThreshold={0.5}
-            contentContainerStyle={contentContainerStyle}
+            contentContainerStyle={write.listContentStyle}
             ItemSeparatorComponent={null}
           />
         )}
-        <PrDiffFloatingActions
-          owner={owner}
-          repo={repo}
-          number={number}
-          viewMode={effectiveViewMode}
-          selection={selection}
-          onClearSelection={clearSelection}
-          onHeightChange={handleHeightChange}
-        />
+        {write.canReviewInline ? (
+          <PrDiffFloatingActions
+            owner={owner}
+            repo={repo}
+            number={number}
+            viewMode={effectiveViewMode}
+            selection={selection}
+            onClearSelection={clearSelection}
+            onHeightChange={handleHeightChange}
+          />
+        ) : null}
       </View>
     </DiffFontMetricsContext.Provider>
   );

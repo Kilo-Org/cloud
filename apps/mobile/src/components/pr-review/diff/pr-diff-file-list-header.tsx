@@ -21,6 +21,7 @@ import { formatNumber } from '@/lib/format';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffViewMode } from '@/lib/pr-review/diff/pr-diff-list-items';
+import { providerPrChildRoutePath, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 
 type PrDiffFileListHeaderProps = {
@@ -33,8 +34,6 @@ type PrDiffFileListHeaderProps = {
   readonly viewMode: DiffViewMode;
   readonly onViewModeChange: (mode: DiffViewMode) => void;
 };
-
-const FILE_NAVIGATOR_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/file-navigator' as const;
 
 export function PrDiffFileListHeader({
   owner,
@@ -51,10 +50,14 @@ export function PrDiffFileListHeader({
   const colors = useThemeColors();
   const { t } = useTranslation();
 
-  const navigatorHref = useMemo<Href>(
-    () => ({ pathname: FILE_NAVIGATOR_PATH, params: { owner, repo, number } }),
-    [owner, repo, number]
-  );
+  // The sheet is a sibling of the screen it was opened from, so its href is
+  // built from the live scope: a GitHub ref keeps the original
+  // `[owner]/[repo]/[number]/file-navigator` path, a GitLab or Bitbucket ref
+  // opens the sheet inside the provider layout — the only place its scope is
+  // published, and therefore the only place the sheet can query the right
+  // provider.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const navigatorHref = useMemo<Href>(() => providerPrChildRoutePath(ref, 'file-navigator'), [ref]);
 
   const handleOpenNavigator = useCallback(() => {
     router.push(navigatorHref);

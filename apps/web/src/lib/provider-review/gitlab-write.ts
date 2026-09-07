@@ -60,6 +60,15 @@ export const GITLAB_STALE_HEAD_REASON =
   'The merge request changed since it was loaded. Reload the merge request and try again.';
 
 /**
+ * The exact reason arming auto-merge is refused on an MR without an active
+ * pipeline: GitLab's merge endpoint with `merge_when_pipeline_succeeds` and
+ * no waiting pipeline merges immediately, so arming must never take that
+ * fall-through path.
+ */
+export const GITLAB_AUTO_MERGE_NO_PIPELINE_REASON =
+  'GitLab arms auto-merge only while a pipeline is running. This merge request has no running pipeline. Start a pipeline, then try again.';
+
+/**
  * The GitLab capability list for review surfaces. It excludes
  * `request_changes` from `reviewEvents` (the provider has no such event);
  * the app-shared GITLAB_REVIEW_CAPABILITIES constant still lists it, so the
@@ -78,7 +87,31 @@ export const GITLAB_MR_REVIEW_CAPABILITIES: ProviderReviewCapabilities = {
 type GitLabMergeRequestDetail = GitLabMergeRequest & {
   merge_when_pipeline_succeeds?: boolean;
   force_remove_source_branch?: boolean;
+  head_pipeline?: { status?: string } | null;
 };
+
+/**
+ * Pipeline states that can still succeed. Any other state (no pipeline, a
+ * terminal state, a manual one) means GitLab's merge endpoint would merge
+ * immediately instead of waiting, so auto-merge cannot be armed on it.
+ */
+const GITLAB_ACTIVE_PIPELINE_STATUSES = new Set([
+  'created',
+  'waiting_for_resources',
+  'waiting',
+  'pending',
+  'running',
+  'scheduled',
+  'preparing',
+  'completing',
+]);
+
+function hasActivePipeline(mr: GitLabMergeRequestDetail): boolean {
+  return (
+    typeof mr.head_pipeline?.status === 'string' &&
+    GITLAB_ACTIVE_PIPELINE_STATUSES.has(mr.head_pipeline.status)
+  );
+}
 
 async function targetAccess(target: GitLabMrTarget): Promise<GitLabProjectAccess> {
   return authorizeProject(target.owner, target.projectPath, target.instanceHint);
@@ -286,10 +319,51 @@ export async function mergePullRequest(
 }
 
 /**
- * Enable merge-when-pipeline-succeeds (GitLab's auto-merge). Already-enabled
- * reports `replayed`; an optional head fence refuses a stale revision.
+ * Enable merge-when-pipeline-succeeds (GitLab's auto-merge) through the merge
+ * endpoint: the plain merge-request update endpoint does not accept the
+ * attribute, so a PUT there would succeed without arming auto-merge.
+ * `expectedHeadSha` is REQUIRED and is sent as `sha` on the merge call, so a
+ * moved head can never arm auto-merge on another revision, and arming is
+ * refused while the MR has no active pipeline — GitLab would merge
+ * immediately in that state. Already-armed reports `replayed`.
  */
 export async function enableAutoMerge(
+  target: GitLabMrTarget & { expectedHeadSha: string } & GitLabMutationInput
+): Promise<GitLabMutationResult> {
+  const access = await targetAccess(target);
+  try {
+    const mr = (await fetchGitLabMergeRequest({
+      accessToken: access.accessToken,
+      projectId: access.projectPath,
+      mrIid: target.mrIid,
+      instanceUrl: access.instanceUrl,
+    })) as GitLabMergeRequestDetail;
+    if (mr.merge_when_pipeline_succeeds === true) {
+      return { done: true, replayed: true };
+    }
+    requireHeadShaFence(mr, target.expectedHeadSha);
+    if (!hasActivePipeline(mr)) {
+      throw new GitLabReviewError('bad_request', GITLAB_AUTO_MERGE_NO_PIPELINE_REASON);
+    }
+    await requestGitLabJson(access, `${mrPath(access, target.mrIid)}/merge`, {
+      method: 'PUT',
+      body: { merge_when_pipeline_succeeds: true, sha: target.expectedHeadSha },
+    });
+    return { done: true, replayed: false };
+  } catch (error) {
+    throw classifyGitLabError(error);
+  }
+}
+
+/**
+ * Disable merge-when-pipeline-succeeds through the dedicated cancel endpoint:
+ * the plain merge-request update endpoint does not accept the attribute, so
+ * a PUT with `false` there would succeed without disarming auto-merge.
+ * Already-disabled reports `replayed`; an optional head fence refuses a stale
+ * revision. Cancelling arms nothing, so unlike enableAutoMerge the fence is
+ * not required here.
+ */
+export async function disableAutoMerge(
   target: GitLabMrTarget & { expectedHeadSha?: string } & GitLabMutationInput
 ): Promise<GitLabMutationResult> {
   const access = await targetAccess(target);
@@ -303,13 +377,14 @@ export async function enableAutoMerge(
     if (target.expectedHeadSha) {
       requireHeadShaFence(mr, target.expectedHeadSha);
     }
-    if (mr.merge_when_pipeline_succeeds === true) {
+    if (mr.merge_when_pipeline_succeeds !== true) {
       return { done: true, replayed: true };
     }
-    await requestGitLabJson(access, mrPath(access, target.mrIid), {
-      method: 'PUT',
-      body: { merge_when_pipeline_succeeds: true },
-    });
+    await requestGitLabJson(
+      access,
+      `${mrPath(access, target.mrIid)}/cancel_merge_when_pipeline_succeeds`,
+      { method: 'POST' }
+    );
     return { done: true, replayed: false };
   } catch (error) {
     throw classifyGitLabError(error);

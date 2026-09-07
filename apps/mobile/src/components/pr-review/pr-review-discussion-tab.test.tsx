@@ -3,6 +3,8 @@ import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { type ProviderPrRef, ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+
 import { PrReviewDiscussionTab } from './pr-review-discussion-tab';
 
 const insetsState = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -56,10 +58,19 @@ const BASE_PROPS = {
   onRequestFiles: vi.fn(() => undefined),
 };
 
-function mountTab(): TestRenderer.ReactTestRenderer {
+/** Mounts the tab, optionally under a provider scope (no scope = GitHub). */
+function mountTab(scopeRef?: ProviderPrRef): TestRenderer.ReactTestRenderer {
+  const tab = createElement(PrReviewDiscussionTab, BASE_PROPS);
+  const tree = scopeRef ? (
+    <ProviderPrScopeProvider value={{ ref: scopeRef, organizationId: null }}>
+      {tab}
+    </ProviderPrScopeProvider>
+  ) : (
+    tab
+  );
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
-    ref.current = TestRenderer.create(createElement(PrReviewDiscussionTab, BASE_PROPS));
+    ref.current = TestRenderer.create(tree);
   });
   const renderer = ref.current;
   if (!renderer) {
@@ -166,6 +177,41 @@ describe('PrReviewDiscussionTab full-body states', () => {
     expect(
       renderer.root.findAll(node => String(node.type) === 'PrReviewDiscussionList')
     ).toHaveLength(0);
+  });
+
+  // Wording, not layout: the same three states below must never call a GitLab
+  // merge request a "pull request". Every other state's copy is already
+  // provider-neutral, so it stays on one key.
+  const GITLAB_REF: ProviderPrRef = {
+    platform: 'gitlab',
+    projectPath: 'group/sub/repo',
+    mrIid: 12,
+  };
+
+  function errorMessage(scopeRef?: ProviderPrRef): unknown {
+    return mountTab(scopeRef).root.find(node => String(node.type) === 'QueryError').props.message;
+  }
+
+  it.each(['permission', 'not-found'])('names a merge request in the %s copy', kind => {
+    discussionState.firstPageErrorState = { kind };
+    expect(errorMessage(GITLAB_REF)).toContain('merge request');
+    expect(errorMessage(GITLAB_REF)).not.toContain('pull request');
+  });
+
+  it.each(['permission', 'not-found'])(
+    'keeps the pull request copy on the %s state without a provider scope',
+    kind => {
+      discussionState.firstPageErrorState = { kind };
+      expect(errorMessage()).not.toContain('merge request');
+    }
+  );
+
+  it('names a merge request in the empty state description', () => {
+    const description = (scopeRef?: ProviderPrRef) =>
+      mountTab(scopeRef).root.find(node => String(node.type) === 'EmptyState').props
+        .description as string;
+    expect(description(GITLAB_REF)).toContain('merge request');
+    expect(description()).toContain('pull request');
   });
 
   it('renders the happy list without a chrome wrapper', () => {

@@ -46,6 +46,7 @@ import { mcpGatewayRouter } from '@/routers/mcp-gateway-router';
 import { mcpGatewayAuthorizationsRouter } from '@/routers/mcp-gateway-authorizations-router';
 import { modelPreferencesRouter } from '@/routers/model-preferences-router';
 import { githubPrReviewRouter } from '@/routers/github-pr-review-router';
+import { providerReviewRouter } from '@/routers/provider-review-router';
 import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { quickChatRouter } from '@/routers/quick-chat-router';
@@ -96,6 +97,7 @@ export const rootRouter = createTRPCRouter({
   mcpGatewayAuthorizations: mcpGatewayAuthorizationsRouter,
   modelPreferences: modelPreferencesRouter,
   githubPrReview: githubPrReviewRouter,
+  providerReview: providerReviewRouter,
   moderation: moderationRouter,
   userExports: userExportsRouter,
   quickChat: quickChatRouter,

@@ -1,9 +1,11 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the repository's native-free mounted test tool. */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SpinningIcon } from '@/components/ui/spinning-icon';
+import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
+import { openExternalUrl } from '@/lib/external-link';
 import { PrReviewChecksSection } from './pr-review-checks-section';
 
 const query = vi.hoisted(() => ({
@@ -83,7 +85,10 @@ vi.mock('@/lib/pr-review/classify-pr-review-query-state', () => ({
   classifyPrReviewQueryState: () => ({ kind: 'retryable' }),
 }));
 vi.mock('@/lib/trpc', () => ({
-  useTRPC: () => ({ githubPrReview: { listChecks: { queryOptions: () => ({}) } } }),
+  useTRPC: () => ({
+    githubPrReview: { listChecks: { queryOptions: () => ({}) } },
+    providerReview: { listChecks: { queryOptions: () => ({}) } },
+  }),
 }));
 
 describe('PrReviewChecksSection check status icons', () => {
@@ -115,5 +120,87 @@ describe('PrReviewChecksSection check status icons', () => {
     act(() => {
       renderer.unmount();
     });
+  });
+});
+
+describe('PrReviewChecksSection view-on-provider link', () => {
+  const gitlabScope = {
+    ref: {
+      platform: 'gitlab' as const,
+      projectPath: 'group/sub/repo',
+      mrIid: 12,
+      instanceHint: 'https://gitlab.example.com',
+    },
+    organizationId: null,
+  };
+
+  function mountSection(scope?: { ref: typeof gitlabScope.ref; organizationId: string | null }) {
+    const previousData = query.data;
+    query.data = {
+      checkRuns: [],
+      rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
+    };
+    const section = (
+      <PrReviewChecksSection owner="group/sub" repo="repo" number={12} headSha="head" />
+    );
+    const renderer: { current: TestRenderer.ReactTestRenderer | undefined } = {
+      current: undefined,
+    };
+    act(() => {
+      renderer.current = TestRenderer.create(
+        scope ? <ProviderPrScopeProvider value={scope}>{section}</ProviderPrScopeProvider> : section
+      );
+    });
+    const created = renderer.current;
+    if (!created) {
+      throw new Error('renderer was not created');
+    }
+    return {
+      renderer: created,
+      restore: () => {
+        query.data = previousData;
+      },
+    };
+  }
+
+  beforeEach(() => {
+    vi.mocked(openExternalUrl).mockClear();
+  });
+
+  function pressViewButton(renderer: TestRenderer.ReactTestRenderer) {
+    const button = renderer.root.findAllByType('Button' as never)[0];
+    if (!button) {
+      throw new Error('the view-on-provider button did not render');
+    }
+    act(() => {
+      (button.props.onPress as () => void)();
+    });
+  }
+
+  it('labels the opened link "pull request" on the GitHub arm', () => {
+    const { renderer, restore } = mountSection();
+    pressViewButton(renderer);
+
+    expect(openExternalUrl).toHaveBeenCalledWith('https://github.com/group/sub/repo/pull/12', {
+      label: 'prReview.terms.pullRequest',
+    });
+    act(() => {
+      renderer.unmount();
+    });
+    restore();
+  });
+
+  it('labels the same link "merge request" on a GitLab scope', () => {
+    const { renderer, restore } = mountSection(gitlabScope);
+    pressViewButton(renderer);
+
+    expect(openExternalUrl).toHaveBeenCalledWith(
+      'https://gitlab.example.com/group/sub/repo/-/merge_requests/12',
+      { label: 'prReview.terms.mergeRequest' }
+    );
+    act(() => {
+      renderer.unmount();
+    });
+    restore();
   });
 });

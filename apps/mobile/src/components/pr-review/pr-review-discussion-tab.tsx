@@ -70,6 +70,7 @@ import {
   toggleThreadExpanded,
 } from '@/lib/pr-review/discussion/thread-expansion';
 import { usePrReviewDiscussionThreads } from '@/lib/pr-review/discussion/use-pr-review-discussion-threads';
+import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { selectDiscussionTabView } from '@/components/pr-review/pr-review-discussion-tab-view';
 import { useDetailScreenBottomPadding } from '@/lib/screen-insets';
 
@@ -100,6 +101,11 @@ export function PrReviewDiscussionTab({
     });
 
   const { t } = useTranslation();
+  // GitLab calls this a merge request; GitHub and Bitbucket both say pull
+  // request, so the three provider-named strings below switch on that term
+  // alone rather than forking the tab per provider.
+  const { ref } = useProviderPrScope({ owner, repo, number });
+  const isMergeRequest = ref.platform === 'gitlab';
 
   const [expansion, setExpansion] = useState<Record<string, boolean>>({});
   const [suppressContentPosition, setSuppressContentPosition] = useState(false);
@@ -219,7 +225,14 @@ export function PrReviewDiscussionTab({
 
   if (view.kind === 'permission') {
     return (
-      <QueryError variant="permission" message={t('prReview.discussion.accessDeniedMessage')} />
+      <QueryError
+        variant="permission"
+        message={
+          isMergeRequest
+            ? t('prReview.terms.discussionAccessDenied')
+            : t('prReview.discussion.accessDeniedMessage')
+        }
+      />
     );
   }
   if (view.kind === 'not-found') {
@@ -227,7 +240,11 @@ export function PrReviewDiscussionTab({
       <QueryError
         variant="not-found"
         title={t('prReview.discussion.unavailable')}
-        message={t('prReview.discussion.unavailableMessage')}
+        message={
+          isMergeRequest
+            ? t('prReview.terms.discussionUnavailableMessage')
+            : t('prReview.discussion.unavailableMessage')
+        }
       />
     );
   }
@@ -278,7 +295,11 @@ export function PrReviewDiscussionTab({
       <EmptyState
         icon={MessageSquarePlus}
         title={t('prReview.discussion.noDiscussion')}
-        description={t('prReview.discussion.noDiscussionDescription')}
+        description={
+          isMergeRequest
+            ? t('prReview.terms.noDiscussionDescription')
+            : t('prReview.discussion.noDiscussionDescription')
+        }
         action={
           onRequestFiles ? (
             <Button

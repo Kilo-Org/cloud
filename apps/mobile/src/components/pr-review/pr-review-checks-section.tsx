@@ -9,7 +9,6 @@ import {
   MinusCircle,
   XCircle,
 } from '@/components/ui/icons';
-import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -18,10 +17,12 @@ import { Button } from '@/components/ui/button';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatList, formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { classifyPrReviewQueryState } from '@/lib/pr-review/classify-pr-review-query-state';
-import { useTRPC } from '@/lib/trpc';
+import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import { providerPrTermKey, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { cn } from '@/lib/utils';
 import { openExternalUrl } from '@/lib/external-link';
 
@@ -179,17 +180,13 @@ export function PrReviewChecksSection({
   number,
   headSha,
 }: PrReviewChecksSectionProps) {
-  const trpc = useTRPC();
+  const queries = useProviderPrQueries({ owner, repo, number });
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const prUrl = useMemo(
-    () => `https://github.com/${owner}/${repo}/pull/${number}`,
-    [owner, repo, number]
-  );
+  // Null on a GitLab ref with no instance hint: no host, so no link out.
+  const prUrl = providerPrWebUrl(queries.ref);
 
-  const checks = useQuery(
-    trpc.githubPrReview.listChecks.queryOptions({ owner, repo, ref: headSha })
-  );
+  const checks = useQuery(queries.checksOptions(headSha));
 
   // Loading (first time, no cached data): show three skeleton rows in a
   // card so the section matches the final dimensions once the data lands.
@@ -273,6 +270,11 @@ export function PrReviewChecksSection({
     );
   }
 
+  const viewOnProviderLabel =
+    queries.platform === 'github'
+      ? t('prReview.checks.viewOnGitHub')
+      : t('prReview.terms.viewOnProvider', { provider: reviewerPlatformLabel(queries.platform) });
+
   const data = checks.data;
   const runList = data?.checkRuns ?? [];
   const rollup = data?.rollup ?? { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 };
@@ -286,18 +288,20 @@ export function PrReviewChecksSection({
         </Text>
         <View className="gap-3 rounded-lg bg-secondary p-4">
           <Text className="text-sm text-muted-foreground">{rollupLine}</Text>
-          <Button
-            variant="outline"
-            onPress={() => {
-              void openExternalUrl(prUrl, { label: t('common.pullRequest') });
-            }}
-            accessibilityLabel={t('prReview.checks.viewOnGitHub')}
-          >
-            <View className="flex-row items-center gap-2">
-              <ExternalLink size={14} color={colors.foreground} />
-              <Text>{t('prReview.checks.viewOnGitHub')}</Text>
-            </View>
-          </Button>
+          {prUrl ? (
+            <Button
+              variant="outline"
+              onPress={() => {
+                void openExternalUrl(prUrl, { label: t(providerPrTermKey(queries.platform)) });
+              }}
+              accessibilityLabel={viewOnProviderLabel}
+            >
+              <View className="flex-row items-center gap-2">
+                <ExternalLink size={14} color={colors.foreground} />
+                <Text>{viewOnProviderLabel}</Text>
+              </View>
+            </Button>
+          ) : null}
         </View>
       </View>
     );

@@ -18,20 +18,34 @@
 
 import type { ProviderPrPlatform } from '../provider-review/contracts';
 
-export type PrLedgerIntent = 'merge' | 'submit_review' | 'create_review_comment' | 'reply_comment';
+export type PrLedgerIntent =
+  | 'merge'
+  | 'submit_review'
+  | 'create_review_comment'
+  | 'reply_comment'
+  | 'resolve_thread'
+  | 'unresolve_thread'
+  | 'enable_auto_merge'
+  | 'disable_auto_merge';
 
 /**
  * The intent inputs folded into the ledger fingerprint. Any change to one
  * (comment body, review contents, merge method, fence sha, …) yields a
  * different fingerprint, so a key reused for a different request is rejected
  * instead of replaying the old canonical result. Field ORDER is part of the
- * hash — do not reorder.
+ * hash — do not reorder. The four thread/auto-merge intents serve the
+ * provider review router (GitLab/Bitbucket); the GitHub router never uses
+ * them, and the four legacy field lists are byte-frozen.
  */
 const PR_FINGERPRINT_FIELDS: Record<PrLedgerIntent, readonly string[]> = {
   create_review_comment: ['body', 'path', 'line', 'side', 'startLine', 'startSide', 'commitSha'],
   reply_comment: ['commentId', 'body'],
   submit_review: ['event', 'body', 'commitSha', 'comments'],
   merge: ['method', 'commitTitle', 'commitMessage', 'deleteBranch', 'expectedHeadSha'],
+  resolve_thread: ['threadId'],
+  unresolve_thread: ['threadId'],
+  enable_auto_merge: ['expectedHeadSha'],
+  disable_auto_merge: ['expectedHeadSha'],
 };
 
 /**

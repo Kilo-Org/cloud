@@ -2556,6 +2556,10 @@
     "stopped": "Títẹ ọ̀rọ̀ pẹ̀lú ohùn ti dá dúró. Tẹ míkírọ́fóònù láti gbìyànjú lẹ́ẹ̀kan sí i.",
     "unavailableDevice": "Ẹ̀rọ yìí kò lè tẹ ọ̀rọ̀ pẹ̀lú ohùn.",
     "unavailableLanguage": "Títẹ ọ̀rọ̀ pẹ̀lú ohùn kò sí fún èdè ẹ̀rọ yìí.",
+    "languageNotInstalledTitle": "Títẹ ọ̀rọ̀ pẹ̀lú ohùn fún {{language}} kò tíì ṣetán",
+    "languageNotInstalledMessage": "Àwọn fáìlù ọ̀rọ̀ tí kì í ṣiṣẹ́ pẹ̀lú ayélujára fún {{language}} kò tíì sí lórí fónù yìí. Gbà wọ́n sílẹ̀, lẹ́yìn náà tún gbìyànjú títẹ ọ̀rọ̀ pẹ̀lú ohùn.",
+    "downloadOfflineModel": "Gbà sílẹ̀",
+    "offlineModelDownloadScheduled": "Àwọn fáìlù ọ̀rọ̀ tí kì í ṣiṣẹ́ pẹ̀lú ayélujára yóò gbà sílẹ̀ ní ẹ̀yẹ. Tún gbìyànjú títẹ ọ̀rọ̀ pẹ̀lú ohùn lẹ́yìn ìgbà díẹ̀.",
     "listeningStopped": "A ti dá fífetí sílẹ̀ dúró."
   },
   "share": {

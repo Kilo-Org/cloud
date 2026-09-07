@@ -24,13 +24,14 @@ function chineseScriptFor(tag: string): SupportedLanguage | undefined {
 }
 
 /**
- * Resolve the supported language for a device locale list. For each device
- * tag in preference order, map Chinese scripts, then exact match, then
- * same-language fallback. An empty list or no match resolves to `en`.
+ * Resolve the supported language for a locale list. For each tag in
+ * preference order, map Chinese scripts, then exact match, then
+ * same-language fallback. Returns `null` when no tag matches a supported
+ * language, so callers can apply their own fallback.
  */
-export function resolveLanguageTag(
+export function resolveSupportedLanguageTag(
   locales: readonly { languageTag?: string }[]
-): SupportedLanguage {
+): SupportedLanguage | null {
   for (const locale of locales) {
     const raw = locale.languageTag;
     if (raw && raw.length > 0) {
@@ -55,7 +56,18 @@ export function resolveLanguageTag(
       }
     }
   }
-  return 'en';
+  return null;
+}
+
+/**
+ * Resolve the supported language for a device locale list. For each device
+ * tag in preference order, map Chinese scripts, then exact match, then
+ * same-language fallback. An empty list or no match resolves to `en`.
+ */
+export function resolveLanguageTag(
+  locales: readonly { languageTag?: string }[]
+): SupportedLanguage {
+  return resolveSupportedLanguageTag(locales) ?? 'en';
 }
 
 /** Resolve the supported language from the device's preferred locale list. */

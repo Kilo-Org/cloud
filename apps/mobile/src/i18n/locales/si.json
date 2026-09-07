@@ -2556,6 +2556,10 @@
     "stopped": "හඬ ආදානය නතර විය. නැවත උත්සාහ කිරීමට මයික්‍රෆෝනයේ සලකුණ තට්ටු කරන්න.",
     "unavailableDevice": "මෙම උපාංගයේ හඬ ආදානය ලබා ගත නොහැක.",
     "unavailableLanguage": "මෙම උපාංගයේ භාෂාව සඳහා හඬ ආදානය භාවිතා කළ නොහැක.",
+    "languageNotInstalledTitle": "{{language}} සඳහා හඬ ආදානය තවම සූදානම් නැත",
+    "languageNotInstalledMessage": "{{language}} සඳහා ඔෆ්ලයින් කථන ගොනු මෙම දුරකථනයේ ස්ථාපනය කර නැත. ඒවා බාගන්න, පසුව හඬ ආදානය නැවත උත්සාහ කරන්න.",
+    "downloadOfflineModel": "බාගන්න",
+    "offlineModelDownloadScheduled": "ඔෆ්ලයින් කථන ගොනු පසුබිමින් බාගත වනු ඇත. පසුව හඬ ආදානය නැවත උත්සාහ කරන්න.",
     "listeningStopped": "සවන් දීම නතර විය."
   },
   "share": {

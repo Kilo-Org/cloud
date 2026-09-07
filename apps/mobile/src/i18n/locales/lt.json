@@ -2598,6 +2598,10 @@
     "stopped": "Balso įvestis sustabdyta. Bakstelėk mikrofoną ir bandyk dar kartą.",
     "unavailableDevice": "Balso įvestis šiame įrenginyje nepasiekiama.",
     "unavailableLanguage": "Balso įvestis nepalaiko pasirinktos įrenginio kalbos.",
+    "languageNotInstalledTitle": "Balso įvestis {{language}} kalbai dar neparengta",
+    "languageNotInstalledMessage": "{{language}} kalbos neprisijungus veikiantys kalbos failai šiame telefone nėra įdiegti. Atsisiųsk juos ir vėl pabandyk balso įvestį.",
+    "downloadOfflineModel": "Atsisiųsti",
+    "offlineModelDownloadScheduled": "Neprisijungus veikiantys kalbos failai bus atsisiunčiami fone. Pabandyk balso įvestį vėliau.",
     "listeningStopped": "Klausymasis sustabdytas."
   },
   "share": {

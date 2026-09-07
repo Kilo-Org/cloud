@@ -2125,6 +2125,10 @@
     "stopped": "语音输入已停止。请点按麦克风重试。",
     "unavailableDevice": "此设备不支持语音输入。",
     "unavailableLanguage": "语音输入不支持此设备的语言。",
+    "languageNotInstalledTitle": "{{language}} 的语音输入尚未就绪",
+    "languageNotInstalledMessage": "此手机尚未安装 {{language}} 的离线语音文件。请下载这些文件，然后重试语音输入。",
+    "downloadOfflineModel": "下载",
+    "offlineModelDownloadScheduled": "离线语音文件将在后台下载。稍后请重试语音输入。",
     "listeningStopped": "已停止收听。"
   },
   "share": {

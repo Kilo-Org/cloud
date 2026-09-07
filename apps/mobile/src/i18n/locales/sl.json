@@ -2598,6 +2598,10 @@
     "stopped": "Glasovni vnos se je ustavil. Za ponovni poskus tapni mikrofon.",
     "unavailableDevice": "Glasovni vnos na tej napravi ni na voljo.",
     "unavailableLanguage": "Glasovni vnos ni na voljo za jezik, nastavljen v napravi.",
+    "languageNotInstalledTitle": "Glasovni vnos za {{language}} še ni pripravljen",
+    "languageNotInstalledMessage": "Datoteke govora za delo brez povezave za {{language}} niso nameščene na tem telefonu. Prenesi jih, nato poskusi glasovni vnos znova.",
+    "downloadOfflineModel": "Prenesi",
+    "offlineModelDownloadScheduled": "Datoteke govora za delo brez povezave bodo prenesene v ozadju. Poskusi glasovni vnos znova pozneje.",
     "listeningStopped": "Poslušanje je ustavljeno."
   },
   "share": {

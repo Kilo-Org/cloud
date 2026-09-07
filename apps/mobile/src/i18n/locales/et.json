@@ -2556,6 +2556,10 @@
     "stopped": "Häälsisestus peatus. Uuesti proovimiseks puuduta mikrofoni.",
     "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
     "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval.",
+    "languageNotInstalledTitle": "Häälsisestus keele {{language}} jaoks pole veel valmis",
+    "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole selles telefonis installitud. Laadi need alla ja proovi häälsisestust uuesti.",
+    "downloadOfflineModel": "Laadi alla",
+    "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
     "listeningStopped": "Kuulamine peatus."
   },
   "share": {

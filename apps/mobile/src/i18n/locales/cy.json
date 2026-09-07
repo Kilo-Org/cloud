@@ -2640,6 +2640,10 @@
     "stopped": "Daeth y mewnbwn llais i ben. Tapiwch y meicroffon i geisio eto.",
     "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
     "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon.",
+    "languageNotInstalledTitle": "Nid yw mewnbwn llais ar gyfer {{language}} yn barod eto",
+    "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod ar y ffôn hon. Llwythwch nhw i lawr, yna ceisiwch fewnbwn llais eto.",
+    "downloadOfflineModel": "Llwytho i lawr",
+    "offlineModelDownloadScheduled": "Bydd y ffeiliau lleferydd all-lein yn cael eu llwytho i lawr yn y cefndir. Ceisiwch fewnbwn llais eto yn nes ymlaen.",
     "listeningStopped": "Daeth y gwrando i ben."
   },
   "share": {

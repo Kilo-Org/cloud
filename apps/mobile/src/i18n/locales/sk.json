@@ -2598,6 +2598,10 @@
     "stopped": "Hlasový vstup sa zastavil. Klepnutím na mikrofón to skúste znova.",
     "unavailableDevice": "Hlasový vstup nie je na tomto zariadení dostupný.",
     "unavailableLanguage": "Hlasový vstup nie je dostupný pre jazyk nastavený v tomto zariadení.",
+    "languageNotInstalledTitle": "Hlasový vstup pre jazyk {{language}} zatiaľ nie je pripravený",
+    "languageNotInstalledMessage": "Offline súbory reči pre jazyk {{language}} nie sú v tomto telefóne nainštalované. Stiahnite ich a potom skúste hlasový vstup znova.",
+    "downloadOfflineModel": "Stiahnuť",
+    "offlineModelDownloadScheduled": "Offline súbory reči sa stiahnu na pozadí. Skúste hlasový vstup znova neskôr.",
     "listeningStopped": "Počúvanie sa skončilo."
   },
   "share": {

@@ -2556,6 +2556,10 @@
     "stopped": "Input suara dihentikan. Ketik mikrofon untuk mencuba lagi.",
     "unavailableDevice": "Input suara tidak tersedia pada peranti ini.",
     "unavailableLanguage": "Input suara tidak tersedia untuk bahasa peranti ini.",
+    "languageNotInstalledTitle": "Input suara untuk {{language}} belum sedia",
+    "languageNotInstalledMessage": "Fail pertuturan luar talian untuk {{language}} tidak dipasang pada telefon ini. Muat turun fail itu, kemudian cuba input suara lagi.",
+    "downloadOfflineModel": "Muat turun",
+    "offlineModelDownloadScheduled": "Fail pertuturan luar talian akan dimuat turun di latar belakang. Cuba input suara lagi kemudian.",
     "listeningStopped": "Input suara telah dihentikan."
   },
   "share": {

@@ -2619,6 +2619,10 @@
     "stopped": "Stopadh an t-ionchur gutha. Tapáil an micreafón chun triail a bhaint as arís.",
     "unavailableDevice": "Níl ionchur gutha ar fáil ar an ngléas seo.",
     "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga atá roghnaithe ar an ngléas seo.",
+    "languageNotInstalledTitle": "Níl ionchur gutha do {{language}} réidh fós",
+    "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte ar an bhfón seo. Íoslódáil iad, agus bain triail as ionchur gutha arís ina dhiaidh sin.",
+    "downloadOfflineModel": "Íoslódáil",
+    "offlineModelDownloadScheduled": "Íoslódófar na comhaid cainte as líne sa chúlra. Bain triail as ionchur gutha arís níos déanaí.",
     "listeningStopped": "Stopadh an éisteacht."
   },
   "share": {

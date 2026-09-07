@@ -2572,7 +2572,11 @@
     "busy": "Voice input is busy. Try again.",
     "stopped": "Voice input stopped. Tap the microphone to try again.",
     "unavailableDevice": "Voice input isn't available on this device.",
-    "unavailableLanguage": "Voice input isn't available for this device language."
+    "unavailableLanguage": "Voice input isn't available for this device language. Install its offline speech files or use another app language.",
+    "languageNotInstalledTitle": "Voice input for {{language}} isn't ready",
+    "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed on this phone. Download them, then try voice input again.",
+    "downloadOfflineModel": "Download",
+    "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later."
   },
   "share": {
     "title": "Share to Kilo",

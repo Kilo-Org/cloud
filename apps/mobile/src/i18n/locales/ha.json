@@ -2556,6 +2556,10 @@
     "stopped": "An daina shigar da rubutu ta murya. Danna makirufo don sake gwadawa.",
     "unavailableDevice": "Ba a iya shigar da rubutu ta murya a wannan na'urar.",
     "unavailableLanguage": "Ba a iya shigar da rubutu ta murya da harshen wannan na'urar.",
+    "languageNotInstalledTitle": "Shigar da rubutu ta murya na {{language}} ba ta shirya ba tukuna",
+    "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a shigar da su a wayar ba. Sauke su, sannan sake gwada shigar da rubutu ta murya.",
+    "downloadOfflineModel": "Sauke",
+    "offlineModelDownloadScheduled": "Za a sauke fayilolin magana na offline a bango. Gwada shigar da rubutu ta murya daga baya.",
     "listeningStopped": "An dakatar da sauraro."
   },
   "share": {

@@ -2153,6 +2153,10 @@
     "stopped": "Dyktowanie zostało zatrzymane. Dotknij mikrofonu, aby spróbować ponownie.",
     "unavailableDevice": "Dyktowanie nie jest dostępne na tym urządzeniu.",
     "unavailableLanguage": "Dyktowanie nie jest dostępne w języku ustawionym na tym urządzeniu.",
+    "languageNotInstalledTitle": "Dyktowanie dla języka {{language}} nie jest jeszcze gotowe",
+    "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane na tym telefonie. Pobierz je, a następnie ponownie spróbuj dyktowania.",
+    "downloadOfflineModel": "Pobierz",
+    "offlineModelDownloadScheduled": "Pliki mowy offline zostaną pobrane w tle. Spróbuj dyktowania ponownie później.",
     "listeningStopped": "Nasłuchiwanie zostało zatrzymane."
   },
   "share": {

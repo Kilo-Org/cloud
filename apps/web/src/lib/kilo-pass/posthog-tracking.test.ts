@@ -73,6 +73,35 @@ describe('Kilo Pass PostHog tracking', () => {
     });
   });
 
+  it('captures google_play purchase completed with snake_case wire properties', () => {
+    trackKiloPassPurchaseCompleted({
+      channel: 'google_play',
+      distinctId: 'user@example.com',
+      userId: 'user-789',
+      tier: KiloPassTier.Tier49,
+      cadence: KiloPassCadence.Monthly,
+      purchaseKind: 'renewal',
+      providerTransactionId: 'GPA.1234',
+      productId: 'kilopass_tier49',
+      environment: 'Sandbox',
+    });
+
+    expect(mockCapture).toHaveBeenCalledWith({
+      distinctId: 'user@example.com',
+      event: 'kilo_pass_purchase_completed',
+      properties: {
+        channel: 'google_play',
+        tier: KiloPassTier.Tier49,
+        cadence: KiloPassCadence.Monthly,
+        purchase_kind: 'renewal',
+        user_id: 'user-789',
+        provider_transaction_id: 'GPA.1234',
+        product_id: 'kilopass_tier49',
+        environment: 'Sandbox',
+      },
+    });
+  });
+
   it('captures stripe purchase completed with snake_case wire properties', () => {
     trackKiloPassPurchaseCompleted({
       channel: 'stripe',

@@ -13,7 +13,12 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { KiloPassIssuanceItemKind, KiloPassPaymentProvider } from './enums';
+import {
+  KiloPassCadence,
+  KiloPassTier,
+  KiloPassIssuanceItemKind,
+  KiloPassPaymentProvider,
+} from './enums';
 import type * as GooglePlayNotifications from './google-play-notifications';
 import { toMicrodollars } from '@/lib/utils';
 
@@ -710,69 +715,77 @@ describe('processGooglePlayKiloPassNotification', () => {
     // Base + reversed base only: the delayed renewal issued nothing new.
     expect(userCreditTransactions.filter(row => row.amount_microdollars > 0)).toHaveLength(1);
   });
-  it('issues new credits and advances streak for the next paid month', async () => {
-    const { user, obfsAccountId } = await insertGooglePlayUser();
-    const token = 'parity-review-token';
-    for (const [index, now, expiry] of [
-      [0, '2026-05-01T09:00:00.000Z', '2026-06-01T09:00:00.000Z'],
-      [1, '2026-06-01T09:00:00.000Z', '2026-07-01T09:00:00.000Z'],
-    ] as const) {
-      dateNowSpy.mockReturnValue(Date.parse(now));
-      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
-        apiDataForUser(obfsAccountId, `parity-order-${index}`, {
-          startTime: '2026-05-01T09:00:00.000Z',
+  it.each([
+    [19, '2026-05-01T09:00:00.000Z', '2026-06-01T09:00:00.000Z', '2026-07-01T09:00:00.000Z'],
+    [49, '2026-01-31T09:00:00.000Z', '2026-02-28T09:00:00.000Z', '2026-03-28T09:00:00.000Z'],
+    [199, '2025-12-31T09:00:00.000Z', '2026-01-31T09:00:00.000Z', '2026-02-28T09:00:00.000Z'],
+    [19, '2024-01-31T09:00:00.000Z', '2024-02-29T09:00:00.000Z', '2024-03-29T09:00:00.000Z'],
+  ] as const)(
+    'issues tier %i credits across paid month %s to %s',
+    async (tier, initial, renewal, end) => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      const token = `parity-review-${crypto.randomUUID()}`;
+      for (const [index, now, expiry] of [
+        [0, initial, renewal],
+        [1, renewal, end],
+      ] as const) {
+        dateNowSpy.mockReturnValue(Date.parse(now));
+        mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+          apiDataForUser(obfsAccountId, `${token}-order-${index}`, {
+            startTime: initial,
+            lineItems: [
+              {
+                productId: `kilopass_tier${tier}`,
+                expiryTime: expiry,
+                latestSuccessfulOrderId: `${token}-order-${index}`,
+              },
+            ],
+          })
+        );
+        mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
+          orderId: `${token}-order-${index}`,
+          purchaseToken: token,
+          state: 'PROCESSED',
           lineItems: [
             {
-              productId: 'kilopass_tier19',
-              expiryTime: expiry,
-              latestSuccessfulOrderId: `parity-order-${index}`,
+              productId: `kilopass_tier${tier}`,
+              subscriptionDetails: { servicePeriodStartTime: now, servicePeriodEndTime: expiry },
             },
           ],
+        });
+        await processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({
+            notificationType: index === 0 ? 4 : 2,
+            purchaseToken: token,
+            messageId: `${token}-event-${index}`,
+            eventTimeMillis: String(Date.parse(now)),
+          }),
+        });
+      }
+      const sub = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+      });
+      const issuances = await db.query.kilo_pass_issuances.findMany({
+        where: eq(kilo_pass_issuances.kilo_pass_subscription_id, sub!.id),
+      });
+      const refreshed = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      console.log(
+        'PARITY_REVIEW',
+        JSON.stringify({
+          months: issuances.map(x => x.issue_month),
+          streak: sub?.current_streak_months,
+          credits: refreshed!.total_microdollars_acquired - user.total_microdollars_acquired,
         })
       );
-      mockGetGooglePlaySubscriptionOrder.mockResolvedValueOnce({
-        orderId: `parity-order-${index}`,
-        purchaseToken: token,
-        state: 'PROCESSED',
-        lineItems: [
-          {
-            productId: 'kilopass_tier19',
-            subscriptionDetails: { servicePeriodStartTime: now, servicePeriodEndTime: expiry },
-          },
-        ],
-      });
-      await processGooglePlayKiloPassNotification({
-        pubsubMessage: pubsubMessage({
-          notificationType: index === 0 ? 4 : 2,
-          purchaseToken: token,
-          messageId: `parity-event-${index}`,
-          eventTimeMillis: String(Date.parse(now)),
-        }),
-      });
+      expect(issuances).toHaveLength(2);
+      expect(sub?.current_streak_months).toBe(2);
+      expect(refreshed!.total_microdollars_acquired - user.total_microdollars_acquired).toBe(
+        toMicrodollars(tier * 2)
+      );
     }
-    const sub = await db.query.kilo_pass_subscriptions.findFirst({
-      where: eq(kilo_pass_subscriptions.kilo_user_id, user.id),
-    });
-    const issuances = await db.query.kilo_pass_issuances.findMany({
-      where: eq(kilo_pass_issuances.kilo_pass_subscription_id, sub!.id),
-    });
-    const refreshed = await db.query.kilocode_users.findFirst({
-      where: eq(kilocode_users.id, user.id),
-    });
-    console.log(
-      'PARITY_REVIEW',
-      JSON.stringify({
-        months: issuances.map(x => x.issue_month),
-        streak: sub?.current_streak_months,
-        credits: refreshed!.total_microdollars_acquired - user.total_microdollars_acquired,
-      })
-    );
-    expect(issuances).toHaveLength(2);
-    expect(sub?.current_streak_months).toBe(2);
-    expect(refreshed!.total_microdollars_acquired - user.total_microdollars_acquired).toBe(
-      toMicrodollars(38)
-    );
-  });
+  );
   it('preserves the Play grace-period expiry for account state', async () => {
     const { obfsAccountId } = await insertGooglePlayUser();
     const token = 'parity-grace-token';
@@ -820,5 +833,252 @@ describe('processGooglePlayKiloPassNotification', () => {
       where: eq(kilo_pass_store_purchases.provider_subscription_id, token),
     });
     expect(new Date(purchase!.expires_at!).toISOString()).toBe('2026-06-08T09:00:00.000Z');
+  });
+  it.each([
+    [5, 'SUBSCRIPTION_STATE_ON_HOLD', 'past_due'],
+    [6, 'SUBSCRIPTION_STATE_IN_GRACE_PERIOD', 'active'],
+    [9, 'SUBSCRIPTION_STATE_ACTIVE', 'active'],
+    [10, 'SUBSCRIPTION_STATE_PAUSED', 'paused'],
+    [11, 'SUBSCRIPTION_STATE_PAUSED', 'paused'],
+  ] as const)(
+    'reconciles event %i and recovers the same order without credits',
+    async (type, state, expected) => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      const token = crypto.randomUUID();
+      const orderId = crypto.randomUUID();
+      const send = (notificationType: number) =>
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({
+            notificationType,
+            purchaseToken: token,
+            messageId: crypto.randomUUID(),
+          }),
+        });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId)
+      );
+      await send(4);
+      const before = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId, { subscriptionState: state })
+      );
+      await send(type);
+      const paused = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+      });
+      expect(paused?.status).toBe(expected);
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId)
+      );
+      await send(1);
+      const recovered = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.kilo_user_id, user.id),
+      });
+      expect(recovered?.status).toBe('active');
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after?.total_microdollars_acquired).toBe(before?.total_microdollars_acquired);
+      expect(
+        await db.query.kilo_pass_store_purchases.findMany({
+          where: eq(kilo_pass_store_purchases.kilo_user_id, user.id),
+        })
+      ).toHaveLength(1);
+    }
+  );
+
+  it('does not grant credits after an order lookup fails and completes one stale retry', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const orderId = crypto.randomUUID();
+    const token = crypto.randomUUID();
+    const messageId = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId, orderId));
+    mockGetGooglePlaySubscriptionOrder.mockRejectedValueOnce(new Error('provider unavailable'));
+    const message = pubsubMessage({ purchaseToken: token, messageId });
+    await expect(processGooglePlayKiloPassNotification({ pubsubMessage: message })).rejects.toThrow(
+      'provider unavailable'
+    );
+    expect(
+      await db.query.kilo_pass_store_purchases.findMany({
+        where: eq(kilo_pass_store_purchases.kilo_user_id, user.id),
+      })
+    ).toHaveLength(0);
+    await db
+      .update(kilo_pass_store_events)
+      .set({ processing_started_at: '2026-05-01T00:00:00Z' })
+      .where(eq(kilo_pass_store_events.event_id, messageId));
+    await expect(
+      processGooglePlayKiloPassNotification({ pubsubMessage: message })
+    ).resolves.toEqual({ processed: true });
+    await expect(
+      processGooglePlayKiloPassNotification({ pubsubMessage: message })
+    ).resolves.toEqual({ processed: true, status: 'already_processed' });
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired - user.total_microdollars_acquired).toBe(
+      toMicrodollars(19)
+    );
+  });
+  it.each([
+    [19, false],
+    [49, false],
+    [199, false],
+    [19, true],
+    [49, true],
+    [199, true],
+  ] as const)(
+    'grants tier %i bonus once and reverses it on refund (returning=%s)',
+    async (tier, returning) => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      if (returning)
+        await db.insert(kilo_pass_subscriptions).values({
+          kilo_user_id: user.id,
+          payment_provider: KiloPassPaymentProvider.AppStore,
+          provider_subscription_id: crypto.randomUUID(),
+          tier: KiloPassTier.Tier19,
+          cadence: KiloPassCadence.Monthly,
+          status: 'canceled',
+          ended_at: '2025-01-01T00:00:00Z',
+        });
+      const now = new Date();
+      dateNowSpy.mockReturnValue(now.valueOf());
+      const start = now.toISOString();
+      const end = new Date(now.valueOf() + 31 * 86400000).toISOString();
+      const token = crypto.randomUUID();
+      const orderId = crypto.randomUUID();
+      const live = apiDataForUser(obfsAccountId, orderId, {
+        startTime: start,
+        lineItems: [
+          {
+            productId: `kilopass_tier${tier}`,
+            latestSuccessfulOrderId: orderId,
+            expiryTime: end,
+          },
+        ],
+      });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(live);
+      const send = (notificationType: number, messageId: string) =>
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({ purchaseToken: token, messageId, notificationType }),
+        });
+      await send(4, crypto.randomUUID());
+      const paid = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(paid!.total_microdollars_acquired - user.total_microdollars_acquired).toBe(
+        toMicrodollars(tier)
+      );
+      const threshold = paid!.kilo_pass_threshold! - toMicrodollars(1);
+      const { maybeIssueKiloPassBonusFromUsageThreshold } = await import('./usage-triggered-bonus');
+      const issue = () =>
+        maybeIssueKiloPassBonusFromUsageThreshold({ kiloUserId: user.id, nowIso: start });
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: threshold - 1 })
+        .where(eq(kilocode_users.id, user.id));
+      await issue();
+      const below = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(below!.total_microdollars_acquired).toBe(paid!.total_microdollars_acquired);
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: threshold })
+        .where(eq(kilocode_users.id, user.id));
+      await Promise.all([issue(), issue()]);
+      const bonus = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      const bonusUsd = tier * (returning ? 0.05 : 0.5);
+      expect(bonus!.total_microdollars_acquired - paid!.total_microdollars_acquired).toBe(
+        toMicrodollars(bonusUsd)
+      );
+      expect(bonus!.kilo_pass_threshold).toBeNull();
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue({
+        ...live,
+        subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
+        lineItems: [
+          { ...live.lineItems![0], expiryTime: new Date(now.valueOf() - 1).toISOString() },
+        ],
+      });
+      const refundId = crypto.randomUUID();
+      await send(12, refundId);
+      await send(12, refundId);
+      await send(12, crypto.randomUUID());
+      const refunded = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(refunded!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
+      const sub = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.provider_subscription_id, token),
+      });
+      expect(sub!.status).toBe('canceled');
+    }
+  );
+  it.each(['SUBSCRIPTION_STATE_ON_HOLD', 'SUBSCRIPTION_STATE_PAUSED'])(
+    'uses live %s state for a delayed renewal without issuing credits',
+    async subscriptionState => {
+      const { user, obfsAccountId } = await insertGooglePlayUser();
+      const token = crypto.randomUUID();
+      const orderId = crypto.randomUUID();
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId)
+      );
+      await processGooglePlayKiloPassNotification({
+        pubsubMessage: pubsubMessage({ purchaseToken: token, messageId: crypto.randomUUID() }),
+      });
+      mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(
+        apiDataForUser(obfsAccountId, orderId, { subscriptionState })
+      );
+      await expect(
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({
+            purchaseToken: token,
+            messageId: crypto.randomUUID(),
+            notificationType: 2,
+          }),
+        })
+      ).resolves.toEqual({ processed: true });
+      const after = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(after!.total_microdollars_acquired - user.total_microdollars_acquired).toBe(
+        toMicrodollars(19)
+      );
+      const sub = await db.query.kilo_pass_subscriptions.findFirst({
+        where: eq(kilo_pass_subscriptions.provider_subscription_id, token),
+      });
+      expect(sub!.status).toBe(
+        subscriptionState === 'SUBSCRIPTION_STATE_PAUSED' ? 'paused' : 'past_due'
+      );
+    }
+  );
+
+  it('settles concurrent messages for one paid order with one credit grant', async () => {
+    const { user, obfsAccountId } = await insertGooglePlayUser();
+    const token = crypto.randomUUID();
+    const orderId = crypto.randomUUID();
+    mockGetGooglePlaySubscriptionPurchase.mockResolvedValue(apiDataForUser(obfsAccountId, orderId));
+    await Promise.all(
+      [1, 2].map(() =>
+        processGooglePlayKiloPassNotification({
+          pubsubMessage: pubsubMessage({ purchaseToken: token, messageId: crypto.randomUUID() }),
+        })
+      )
+    );
+    const after = await db.query.kilocode_users.findFirst({
+      where: eq(kilocode_users.id, user.id),
+    });
+    expect(after!.total_microdollars_acquired - user.total_microdollars_acquired).toBe(
+      toMicrodollars(19)
+    );
+    expect(
+      await db.query.kilo_pass_store_purchases.findMany({
+        where: eq(kilo_pass_store_purchases.kilo_user_id, user.id),
+      })
+    ).toHaveLength(1);
   });
 });

@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 
 import { appUnlockScreenLayout } from '@/components/app-unlock-screen';
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { PrReviewConnectGate } from '@/components/pr-review/pr-review-connect-gate';
 import { useFormSheetDetents } from '@/lib/form-sheet';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
@@ -103,9 +104,21 @@ export default function ProviderPrReviewLayout() {
         userId={userId}
         draftEntityKey={draftEntityKey}
       >
-        <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="file-navigator" options={sheetOptions} />
-        </Stack>
+        {/* The provider-aware connect gate (s7): a disconnected reader can
+            never reach the authenticated queries and mutations below, and a
+            Bitbucket personal scope gets the terminal org-only explanation
+            instead of a retry that could not succeed. */}
+        <PrReviewConnectGate platform={ref.platform} organizationId={organizationId}>
+          <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+            {/* The three write sheets (s6) are siblings of the GitHub route's
+                sheets: they mount inside this layout, so they see the provider
+                scope and this PR's single `PendingReviewProvider` queue. */}
+            <Stack.Screen name="comment-composer" options={sheetOptions} />
+            <Stack.Screen name="review-submit" options={sheetOptions} />
+            <Stack.Screen name="merge" options={sheetOptions} />
+            <Stack.Screen name="file-navigator" options={sheetOptions} />
+          </Stack>
+        </PrReviewConnectGate>
       </PendingReviewProvider>
     </ProviderPrScopeProvider>
   );

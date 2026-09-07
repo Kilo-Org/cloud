@@ -13,19 +13,26 @@ import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
-import { parseGitHubPrUrl } from '@/lib/github-pr-url';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { getPrReviewPath } from '@/lib/profile-agent-navigation';
+import {
+  providerPrRefLabel,
+  providerPrRoutePath,
+} from '@/lib/pr-review/provider-pr-ref';
 import { consumePrLinkInputEcho, pushPrLinkInputEcho } from '@/lib/pr-review/pr-link-input-echo';
 import {
+  decidePrLinkOpen,
   decidePrLinkPaste,
   prLinkToastClipboardEmptyCopy,
   prLinkToastInvalidCopy,
   selectPrLinkClearButtonVisible,
 } from '@/lib/pr-review/pr-link-paste';
-import { getRecentPrs, type RecentPr, removeRecentPr } from '@/lib/pr-review/recent-prs';
-
-const URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
+import {
+  getRecentPrs,
+  providerRefFromRecentPr,
+  recentPrKey,
+  type RecentPr,
+  removeRecentPr,
+} from '@/lib/pr-review/recent-prs';
 
 export function PrReviewEntryScreen() {
   const router = useRouter();
@@ -71,16 +78,18 @@ export function PrReviewEntryScreen() {
   };
 
   const handleSubmit = () => {
-    const raw = inputValueRef.current;
-    const parsed = parseGitHubPrUrl(raw.trim());
-    if (!parsed) {
+    const decision = decidePrLinkOpen(inputValueRef.current);
+    if (decision.kind === 'invalid') {
       announcingToast.error(prLinkToastInvalidCopy());
       return;
     }
-    // Navigate straight to the PR route. Recents are written only after an
-    // authorized payload (the PR screen's backfill effect), so a failed or
-    // unauthorized open never persists an entry.
-    router.push(getPrReviewPath(parsed.owner, parsed.repo, parsed.number));
+    // Navigate straight to the ref's own provider route. Recents are written
+    // only after an authorized payload (the review screen's backfill effect),
+    // so a failed or unauthorized open never persists an entry. A
+    // self-managed GitLab host parses to a ref whose instanceHint rides as
+    // the route's `instance` param — the server re-derives the authoritative
+    // instance, so a mismatched host lands on the clear not-authorized state.
+    router.push(providerPrRoutePath(decision.ref));
   };
 
   const handlePaste = async () => {
@@ -104,9 +113,11 @@ export function PrReviewEntryScreen() {
   };
 
   const handleRecentPress = (entry: RecentPr) => {
-    // Navigate only. The PR screen's backfill effect updates `lastOpenedAt`
-    // (and `lastResult`) once an authorized payload loads.
-    router.push(getPrReviewPath(entry.owner, entry.repo, entry.number));
+    // Navigate only. The review screen's backfill effect updates
+    // `lastOpenedAt` (and `lastResult`) once an authorized payload loads.
+    // The entry's platform (legacy entries: GitHub) decides the route, so a
+    // GitLab row opens the GitLab surface, never a same-named GitHub PR.
+    router.push(providerPrRoutePath(providerRefFromRecentPr(entry)));
   };
 
   const handleRemoveRecent = (entry: RecentPr) => {
@@ -156,11 +167,12 @@ export function PrReviewEntryScreen() {
           const isLast = index === recent.length - 1;
           const rowState = selectRecentPrRowState(entry);
           const removeLabel = t('prReview.entry.removeRecentAccessibility', {
-            repo: `${entry.owner}/${entry.repo}#${entry.number}`,
+            repo: providerPrRefLabel(providerRefFromRecentPr(entry)),
           });
           return (
             <View
-              key={`${entry.owner}/${entry.repo}#${entry.number}`}
+              key={recentPrKey(entry)}
+              testID="recent-row"
               className={isLast ? '' : 'border-b-[0.5px] border-hair-soft'}
             >
               <Pressable
@@ -170,6 +182,12 @@ export function PrReviewEntryScreen() {
                 className="flex-row items-center gap-3 px-3 py-3 active:opacity-70"
               >
                 <View className="flex-1 gap-1">
+                  <Text
+                    variant="small"
+                    className="text-[10px] uppercase tracking-wide text-muted-foreground"
+                  >
+                    {rowState.provider}
+                  </Text>
                   <Text className="text-sm font-medium" numberOfLines={1}>
                     {rowState.primary}
                   </Text>
@@ -239,7 +257,7 @@ export function PrReviewEntryScreen() {
             <TextInput
               ref={inputRef}
               defaultValue=""
-              placeholder={URL_PLACEHOLDER}
+              placeholder={t('prReview.entry.urlPlaceholder')}
               placeholderTextColor={colors.mutedForeground}
               autoCapitalize="none"
               autoCorrect={false}
@@ -305,7 +323,7 @@ export function PrReviewEntryScreen() {
         <Button
           disabled={!hasInput}
           onPress={handleSubmit}
-          accessibilityLabel={t('common.openPullRequest')}
+          accessibilityLabel={t('prReview.entry.openAccessibility')}
         >
           <Text>{t('prReview.entry.open')}</Text>
         </Button>

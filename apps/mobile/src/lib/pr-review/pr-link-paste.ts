@@ -59,5 +59,8 @@ export function prLinkToastClipboardEmptyCopy(): string {
 }
 /** Toast copy when paste or Open gets a link no provider serves. */
 export function prLinkToastInvalidCopy(): string {
-  return i18n.t('prReview.linkPasteNotAReviewLink');
+  // Reuses the pre-s7 key: it exists in all 86 catalogs, and renaming it in
+  // en.json alone would make every catalog an "extra key" failure. s9
+  // retranslates the changed English value.
+  return i18n.t('prReview.linkPasteNotAPullRequest');
 }

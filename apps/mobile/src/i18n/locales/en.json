@@ -527,17 +527,19 @@
     "reviewPullRequest": "Review pull request",
     "headLine": "{{counts}} · head {{sha}}",
     "entry": {
-      "eyebrow": "Open a pull request by URL",
-      "pastePrLink": "Paste a PR link",
-      "noRecentPrs": "No recent PRs",
-      "noRecentPrsDescription": "Paste a PR link above to start a review — it'll show up here next time.",
+      "eyebrow": "Open a pull request or merge request by URL",
+      "pastePrLink": "Paste a pull request or merge request link",
+      "noRecentPrs": "No recent reviews",
+      "noRecentPrsDescription": "Paste a link above to start a review — it'll show up here next time.",
       "couldNotLoad": "Couldn't load",
       "removeFromRecentsTitle": "Remove from recents?",
-      "removeFromRecentsMessage": "This pull request will be removed from your recents.",
+      "removeFromRecentsMessage": "This review will be removed from your recents.",
       "removeRecentAccessibility": "Remove {{repo}} from recents",
-      "urlAccessibility": "GitHub pull request URL",
-      "clearLink": "Clear pull request link",
-      "pasteLink": "Paste pull request link",
+      "urlAccessibility": "Enter a pull request or merge request URL",
+      "urlPlaceholder": "Pull request or merge request URL",
+      "openAccessibility": "Open pull request or merge request",
+      "clearLink": "Clear link",
+      "pasteLink": "Paste pull request or merge request link",
       "open": "Open"
     },
     "checks": {
@@ -586,9 +588,15 @@
     "connect": {
       "checkFailedTitle": "Could not check GitHub connection",
       "checkFailedMessage": "Sign-in status is unavailable until this loads.",
+      "checkFailedTitleGitLab": "Could not check GitLab connection",
+      "checkFailedTitleBitbucket": "Could not check Bitbucket connection",
+      "providerCheckFailedMessage": "Connection status is unavailable until this loads.",
       "reconnectTitle": "Reconnect GitHub",
       "reconnectDescription": "Your GitHub connection was revoked. Reconnect to keep reviewing pull requests on mobile.",
-      "description": "Connect your GitHub account to review pull requests on mobile."
+      "description": "Connect your GitHub account to review pull requests on mobile.",
+      "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
+      "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
+      "bitbucketOrgOnlyDescription": "Select an organization in your profile to review its Bitbucket pull requests."
     },
     "screen": {
       "title": "#{{number}}",
@@ -610,7 +618,10 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
+      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
+      "gitlabTitle": "GitLab connection expired",
+      "bitbucketTitle": "Bitbucket connection expired",
+      "providerMessage": "Your {{provider}} connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
     },
     "eventChips": {
       "comment": "Comment",
@@ -693,7 +704,7 @@
       "emptyLine": "(empty)"
     },
     "linkPasteClipboardEmpty": "Clipboard is empty",
-    "linkPasteNotAPullRequest": "Not a GitHub pull request link",
+    "linkPasteNotAPullRequest": "Not a pull request or merge request link",
     "announce": {
       "commentPosted": "Comment posted",
       "reviewSubmitted": "Review submitted",

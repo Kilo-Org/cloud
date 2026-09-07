@@ -429,10 +429,15 @@ describe('PrReviewScreen recents backfill per provider', () => {
     prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
     // eslint-disable-next-line new-cap
     PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
-    expect(markRecentPrFailed).toHaveBeenCalledWith({ owner: 'octocat', repo: 'hello', number: 7 });
+    expect(markRecentPrFailed).toHaveBeenCalledWith({
+      owner: 'octocat',
+      repo: 'hello',
+      number: 7,
+      platform: 'github',
+    });
   });
 
-  it('never files a loaded GitLab merge request under a GitHub triple', () => {
+  it('files a loaded GitLab merge request under its GitLab identity, never a GitHub triple', () => {
     vi.mocked(React.useContext).mockReturnValue(GITLAB_SCOPE);
     prQueryResult = {
       data: { title: 'Bump the dep' },
@@ -442,14 +447,55 @@ describe('PrReviewScreen recents backfill per provider', () => {
     };
     // eslint-disable-next-line new-cap
     PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
-    expect(upsertRecentPr).not.toHaveBeenCalled();
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({
+        owner: 'group/sub',
+        repo: 'repo',
+        number: 12,
+        platform: 'gitlab',
+        title: 'Bump the dep',
+        lastResult: 'ok',
+      })
+    );
+    const written = vi.mocked(upsertRecentPr).mock.calls[0]?.[0];
+    expect(written?.platform).toBe('gitlab');
+    // No instance hint on the scope: no hint key on the entry.
+    expect(written && 'instanceHint' in written).toBe(false);
   });
 
-  it('never marks a GitLab merge request failed in the GitHub recents store', () => {
+  it('keeps the GitLab instance hint on the entry for identity and recents', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/sub/repo',
+        mrIid: 12,
+        instanceHint: 'https://gl.acme.dev',
+      },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: { title: 'Bump the dep' },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    // eslint-disable-next-line new-cap
+    PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
+    expect(upsertRecentPr).toHaveBeenCalledWith(
+      expect.objectContaining({ platform: 'gitlab', instanceHint: 'https://gl.acme.dev' })
+    );
+  });
+
+  it('marks a GitLab merge request failed on its own row, not the GitHub twin', () => {
     vi.mocked(React.useContext).mockReturnValue(GITLAB_SCOPE);
     prQueryResult = { data: undefined, isLoading: false, isError: true, isFetching: false };
     // eslint-disable-next-line new-cap
     PrReviewScreen({ owner: 'group/sub', repo: 'repo', number: 12 });
-    expect(markRecentPrFailed).not.toHaveBeenCalled();
+    expect(markRecentPrFailed).toHaveBeenCalledWith({
+      owner: 'group/sub',
+      repo: 'repo',
+      number: 12,
+      platform: 'gitlab',
+    });
   });
 });

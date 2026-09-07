@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type Href, useFocusEffect, useRouter } from 'expo-router';
 import { Check, GitPullRequest, Share as ShareIcon } from '@/components/ui/icons';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, RefreshControl, Share, View } from 'react-native';
 
@@ -21,7 +21,7 @@ import { Text } from '@/components/ui/text';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 import { cn } from '@/lib/utils';
 
@@ -103,26 +103,35 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   // also clears any previous `'failed'` marker. A never-authorized PR
   // (no successful load) never gets an entry.
   //
-  // GitHub only: the recents store is keyed on the `owner/repo#number`
-  // triple and its rows navigate to the GitHub route, so writing a GitLab MR
-  // or a Bitbucket PR there would file it under a GitHub identity and send
-  // the user to a GitHub pull request on the way back. A provider ref stays
-  // out of recents until the store carries one.
-  const isGitHub = queries.platform === 'github';
+  // Every provider writes through the same triple — `providerPrTriple` splits
+  // the ref's project path at its last separator, and `providerRefFromRecentPr`
+  // folds it back — plus the platform and (GitLab) the instance hint, so the
+  // collision-free `recentPrKey` keeps one row per provider and per instance,
+  // and a row navigates back to the surface it was opened on.
+  const recentIdentity = useMemo(() => {
+    const triple = providerPrTriple(queries.ref);
+    const instanceHint =
+      queries.ref.platform === 'gitlab' ? queries.ref.instanceHint : undefined;
+    return {
+      owner: triple.owner,
+      repo: triple.repo,
+      number: triple.number,
+      platform: queries.ref.platform,
+      ...(instanceHint ? { instanceHint } : {}),
+    };
+  }, [queries.ref]);
   useEffect(() => {
     const data = pr.data;
-    if (!isGitHub || !data?.title) {
+    if (!data?.title) {
       return;
     }
     void upsertRecentPr({
-      owner,
-      repo,
-      number,
+      ...recentIdentity,
       title: data.title,
       lastOpenedAt: Date.now(),
       lastResult: 'ok',
     });
-  }, [pr.data, isGitHub, owner, repo, number]);
+  }, [pr.data, recentIdentity]);
 
   // Mark an existing recents entry as failed exactly once per error. The
   // ref guards against re-writing on re-render; `markRecentPrFailed` is a
@@ -135,12 +144,12 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
       markedFailedRef.current = false;
       return;
     }
-    if (markedFailedRef.current || !isGitHub) {
+    if (markedFailedRef.current) {
       return;
     }
     markedFailedRef.current = true;
-    void markRecentPrFailed({ owner, repo, number });
-  }, [pr.isError, isGitHub, owner, repo, number]);
+    void markRecentPrFailed(recentIdentity);
+  }, [pr.isError, recentIdentity]);
 
   // Share the PR's public GitHub URL via the native share sheet. The URL comes
   // from the route params, so this works before the PR query resolves; the title

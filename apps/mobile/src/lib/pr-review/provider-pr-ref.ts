@@ -283,6 +283,17 @@ export function useProviderPrScope(fallback: ProviderPrTriple): ProviderPrScope 
   );
 }
 
+/**
+ * The live scope, or null when no provider route is above this component —
+ * which is the GitHub route, since only the provider layout mounts the
+ * scope provider. Recovery affordances (the reconnect notice) use it to
+ * check the right provider's connection without inventing a GitHub identity
+ * for a GitLab or Bitbucket surface.
+ */
+export function useProviderPrScopeOrNull(): ProviderPrScope | null {
+  return useContext(ProviderPrScopeContext);
+}
+
 export function providerPrCapabilities(platform: ProviderPrPlatform): ProviderReviewCapabilities {
   return PROVIDER_REVIEW_CAPABILITIES[platform];
 }

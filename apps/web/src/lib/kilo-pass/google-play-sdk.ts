@@ -69,3 +69,22 @@ export async function getGooglePlaySubscriptionOrder(
   });
   return response.data;
 }
+
+export async function acknowledgeGooglePlaySubscriptionPurchase(
+  productId: string,
+  purchaseToken: string
+): Promise<void> {
+  const client = createGooglePlayAndroidPublisherClient();
+  try {
+    await client.purchases.subscriptions.acknowledge({
+      packageName: GOOGLE_PLAY_PACKAGE_NAME,
+      subscriptionId: productId,
+      token: purchaseToken,
+      requestBody: {},
+    });
+  } catch (error) {
+    // The app can acknowledge concurrently, or the response can be lost.
+    const current = await getGooglePlaySubscriptionPurchase(purchaseToken);
+    if (current.acknowledgementState !== 'ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED') throw error;
+  }
+}

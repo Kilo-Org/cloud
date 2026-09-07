@@ -13,6 +13,7 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 34 }),
 }));
+vi.mock('@/components/ui/refresh-progress', () => ({ RefreshProgress: 'RefreshProgress' }));
 
 describe('TabScreenScrollView', () => {
   it('reserves the tab bar and final gap outside the scroll viewport', async () => {

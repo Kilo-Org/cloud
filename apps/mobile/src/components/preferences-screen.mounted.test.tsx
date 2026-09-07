@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Biometric cases share one mounted harness with the feature-flag mock. */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
 import { type ElementType } from 'react';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -49,6 +50,7 @@ vi.mock('@/components/centered-state-surface', () => ({
   StateSurface: 'StateSurface',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Switch: 'Switch',
   View: 'View',

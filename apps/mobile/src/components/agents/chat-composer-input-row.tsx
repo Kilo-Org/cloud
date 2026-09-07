@@ -1,10 +1,9 @@
 import { ArrowUp, CornerDownLeft, Paperclip, Square } from '@/components/ui/icons';
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { type RefObject } from 'react';
-import Animated, { FadeIn, FadeOut, useReducedMotion } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTranslation } from 'react-i18next';
 import {
-  ActivityIndicator,
   type LayoutChangeEvent,
   Platform,
   Pressable,
@@ -15,7 +14,9 @@ import {
 } from 'react-native';
 
 import { shouldEnableComposerInputScroll } from '@/components/agents/chat-composer-input-height';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { VoiceInputButton } from '@/components/voice-input-control';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
@@ -96,7 +97,7 @@ export function ChatComposerInputRow({
 }: Readonly<ChatComposerInputRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const reducedMotion = useReducedMotion();
+  const { reducedMotion } = useMotionPolicy();
   const inputScrollable = shouldEnableComposerInputScroll(measureHeight, maxInputHeight);
 
   return (

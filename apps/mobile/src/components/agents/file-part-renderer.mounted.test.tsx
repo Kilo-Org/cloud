@@ -110,6 +110,7 @@ const safeAreaMock = vi.hoisted(() => ({
   useSafeAreaInsets: vi.fn(() => ({ top: 0, bottom: 0 })),
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Modal: 'Modal',

@@ -41,6 +41,8 @@ const spawnMock = vi.hoisted(() =>
     })
   )
 );
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 const toastError = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
 const refetchInstancesMock = vi.hoisted(() => vi.fn(() => undefined));

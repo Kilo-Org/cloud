@@ -1,5 +1,6 @@
 import { cva, type VariantProps } from 'class-variance-authority';
-import { ActivityIndicator, Pressable } from 'react-native';
+import { Pressable } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { TextClassContext } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';

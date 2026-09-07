@@ -1,14 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Check, Eye, Search } from '@/components/ui/icons';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  TextInput,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { FlatList, Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 

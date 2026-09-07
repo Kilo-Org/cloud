@@ -12,6 +12,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   View: 'View',
 }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 // The real Button stays mounted: the contract under test is its `loading`
 // wiring (disabled + busy + inline spinner, button.tsx), not a mock of it.

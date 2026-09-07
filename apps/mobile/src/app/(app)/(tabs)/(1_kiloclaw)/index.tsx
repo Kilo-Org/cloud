@@ -33,8 +33,11 @@ export default function KiloClawTab() {
   // billing/access issue is still surfaced as a card annotation when the
   // list is non-empty — see `personalAccessIssue` below.
   const onboardingQuery = useKiloClawMobileOnboardingState();
-  const personalAccessIssue = onboardingQuery.data
-    ? resolveAccessRequiredSubcase(onboardingQuery.data)
+  // Read the nullable state once into a local binding: `tsgo` does not narrow
+  // repeated `onboardingQuery.data` property accesses, only local variables.
+  const onboardingState = onboardingQuery.data;
+  const personalAccessIssue = onboardingState
+    ? resolveAccessRequiredSubcase(onboardingState)
     : null;
   useForegroundInvalidateKiloclawState();
 
@@ -107,7 +110,7 @@ export default function KiloClawTab() {
         className="px-[22px]"
       />
       <Animated.View layout={LinearTransition} className="flex-1 px-4">
-        {showInstanceSkeleton || onboardingQuery.data === undefined ? (
+        {showInstanceSkeleton || onboardingState === undefined ? (
           <Animated.View exiting={FadeOut.duration(150)} className="w-full gap-3 pt-5">
             <Skeleton className="h-[72px] w-full rounded-2xl" />
             <Skeleton className="h-[72px] w-full rounded-2xl" />
@@ -117,7 +120,7 @@ export default function KiloClawTab() {
           <Animated.View entering={FadeIn.duration(200)} className="flex-1">
             <EmptyStateContent
               foregroundColor={colors.foreground}
-              state={onboardingQuery.data}
+              state={onboardingState}
               onCreate={() => {
                 router.push('/(app)/onboarding' as Href);
               }}

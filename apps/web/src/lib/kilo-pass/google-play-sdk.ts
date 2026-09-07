@@ -81,6 +81,8 @@ export async function acknowledgeGooglePlaySubscriptionPurchase(
       packageName: GOOGLE_PLAY_PACKAGE_NAME,
       subscriptionId: productId,
       token: purchaseToken,
+      // Google accepts these identifiers only for out-of-app resubscriptions.
+      // https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.subscriptions/acknowledge#ExternalAccountIds
       requestBody: appAccountToken
         ? { externalAccountIds: { obfuscatedAccountId: appAccountToken } }
         : {},

@@ -8,7 +8,7 @@ import {
   type OperationLedgerRow,
   type User,
 } from '@kilocode/db/schema';
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { captureException } from '@sentry/nextjs';
 
@@ -60,6 +60,11 @@ export type ValidatedStoreKiloPassPurchase = {
   expiresAtIso: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
+  googlePlayReplacement?: {
+    linkedPurchaseToken: string;
+    deferred: boolean;
+    orderPurchaseToken: string;
+  };
   rawPayload: Record<string, unknown>;
 };
 
@@ -521,6 +526,60 @@ export async function completeStoreKiloPassPurchase(params: {
   purchase: ValidatedStoreKiloPassPurchase;
 }): Promise<CompleteStoreKiloPassPurchaseResult> {
   const { user, purchase } = params;
+  if (
+    purchase.paymentProvider === KiloPassPaymentProvider.GooglePlay &&
+    purchase.googlePlayReplacement
+  ) {
+    const replacement = purchase.googlePlayReplacement;
+    const transfer = async (
+      tx: DrizzleTransaction
+    ): Promise<CompleteStoreKiloPassPurchaseResult | null> => {
+      await lockUserForStoreCompletion(tx, user.id);
+      const [subscription] = await tx
+        .select()
+        .from(kilo_pass_subscriptions)
+        .where(
+          and(
+            eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
+            or(
+              eq(kilo_pass_subscriptions.provider_subscription_id, replacement.linkedPurchaseToken),
+              eq(kilo_pass_subscriptions.provider_subscription_id, purchase.providerSubscriptionId)
+            )
+          )
+        )
+        .for('update');
+      if (!subscription) throw new Error('Google Play replacement has no current subscription');
+      if (subscription.kilo_user_id !== user.id)
+        throw new Error('Store subscription already belongs to another user');
+      if (replacement.deferred) {
+        const receipt = await findStorePurchaseByProviderTransaction(tx, purchase);
+        if (
+          !receipt ||
+          receipt.kilo_pass_subscription_id !== subscription.id ||
+          receipt.purchase_token !== replacement.orderPurchaseToken ||
+          receipt.product_id !== purchase.productId
+        ) {
+          throw new Error('Google Play replacement does not match the paid receipt');
+        }
+      }
+      await tx
+        .update(kilo_pass_subscriptions)
+        .set({ provider_subscription_id: purchase.providerSubscriptionId })
+        .where(eq(kilo_pass_subscriptions.id, subscription.id));
+      return replacement.deferred
+        ? {
+            subscriptionId: subscription.id,
+            tier: purchase.tier,
+            cadence: purchase.cadence,
+            alreadyProcessed: true,
+          }
+        : null;
+    };
+    const transferred = params.dbOrTx
+      ? await transfer(params.dbOrTx)
+      : await db.transaction(transfer);
+    if (transferred) return transferred;
+  }
   const ledgerHandle = params.dbOrTx ?? db;
   const startedAt = Date.now();
   const resourceKey = `${purchase.paymentProvider}:${purchase.providerTransactionId}`;

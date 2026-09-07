@@ -2416,9 +2416,6 @@ importers:
       hono:
         specifier: 4.12.34
         version: 4.12.34
-      itty-time:
-        specifier: 1.0.6
-        version: 1.0.6
       jose:
         specifier: 'catalog:'
         version: 6.2.3
@@ -3243,9 +3240,6 @@ importers:
       hono:
         specifier: 4.12.34
         version: 4.12.34
-      itty-time:
-        specifier: ^1.0.6
-        version: 1.0.6
       jose:
         specifier: 'catalog:'
         version: 6.2.3
@@ -14075,9 +14069,6 @@ packages:
   istanbul-reports@3.2.0:
     resolution: {integrity: sha512-HGYWWS/ehqTV3xN10i23tkPkpH46MLCIMFNCaaKNavAXTF1RkqxawEPtnjnGZ6XKSInBKkiOA5BKS+aZiY3AvA==}
     engines: {node: '>=8'}
-
-  itty-time@1.0.6:
-    resolution: {integrity: sha512-+P8IZaLLBtFv8hCkIjcymZOp4UJ+xW6bSlQsXGqrkmJh7vSiMFSlNne0mCYagEE0N7HDNR5jJBRxwN0oYv61Rw==}
 
   javascript-stringify@2.1.0:
     resolution: {integrity: sha512-JVAfqNPTvNq3sB/VHQJAFxN/sPgKnsKrCwyRt15zwNCdrMMJDdcEOdubuy+DuJYYdm0ox1J4uzEuYKkN+9yhVg==}
@@ -31865,8 +31856,6 @@ snapshots:
     dependencies:
       html-escaper: 2.0.2
       istanbul-lib-report: 3.0.1
-
-  itty-time@1.0.6: {}
 
   javascript-stringify@2.1.0: {}
 

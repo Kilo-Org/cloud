@@ -210,7 +210,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     ).toEqual({
       kind: 'card',
       state: {
-        action: 'open-store-management',
+        action: 'open-native',
         actionLabel: 'Manage',
         description: '$49 monthly credits · Managed on Google Play',
         title: 'Kilo Pass active',
@@ -238,7 +238,7 @@ describe('getKiloPassSubscriptionCardContentState', () => {
     ).toEqual({
       kind: 'card',
       state: {
-        action: 'open-store-management',
+        action: 'open-native',
         actionLabel: 'Manage',
         description: `$49 monthly credits · Ends ${endDate}`,
         title: 'Kilo Pass canceling',

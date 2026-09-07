@@ -39,6 +39,7 @@ import {
   getPurchaseCompletionId,
   isRecoverableKiloPassPurchase,
   showDedupedPurchaseError,
+  type StoreKiloPassPurchaseOptions,
   type StoreKiloPassRestorePurchasesResult,
 } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
 import { useTRPC } from '@/lib/trpc';
@@ -89,10 +90,6 @@ async function fetchAppStoreSubscriptions(productSkus: string[]): Promise<StoreK
 
   return storeProducts;
 }
-
-type StoreKiloPassPurchaseOptions = {
-  onCompleted?: () => void;
-};
 
 export type KiloPassNativeIapContextValue = {
   products: readonly AppStoreKiloPassProduct[];
@@ -162,7 +159,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
   }, []);
   const recoveredPurchaseIdsRef = useRef(new Set<string>());
   const recoveryInFlightPurchaseIdsRef = useRef(new Set<string>());
-  const activePurchaseRequestRef = useRef<{ sku: string } | null>(null);
+  const activePurchaseRequestRef = useRef<{ sku: string; replacedSku?: string } | null>(null);
   const pendingPurchaseCompletedCallbackRef = useRef<(() => void) | null>(null);
 
   const completeAppStorePurchase = useMutation(
@@ -200,7 +197,10 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
         return;
       }
 
-      if (activePurchaseRequestRef.current?.sku !== purchase.productId) {
+      if (
+        activePurchaseRequestRef.current?.sku !== purchase.productId &&
+        activePurchaseRequestRef.current?.replacedSku !== purchase.productId
+      ) {
         // The store answered the in-flight request with a transaction for another
         // SKU (an upgrade it refused re-delivers the current subscription), and no
         // purchase error follows. Release the request or the screen keeps its
@@ -358,6 +358,7 @@ export function KiloPassNativeIapOwner({ children }: { children: ReactNode }) {
 
       activePurchaseRequestRef.current = {
         sku: isAndroid ? product.googleProductId : product.appleProductId,
+        replacedSku: options.googleReplacement?.productId,
       };
       setIsRequestingPurchase(true);
       setErrorMessage(null);

@@ -44,7 +44,9 @@ const mockedReactQuery = vi.hoisted(() => ({
   fetchQuery: vi.fn(),
   invalidateQueries: vi.fn(),
   lastQueryKey: null as unknown[] | null,
-  mobileStoreProductsData: undefined as { products: { appleProductId: string }[] } | undefined,
+  mobileStoreProductsData: undefined as
+    | { products: { appleProductId: string; googleProductId?: string }[] }
+    | undefined,
   removeQueries: vi.fn(),
   useMutation: vi.fn(),
   useQuery: vi.fn(),
@@ -871,6 +873,66 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
     expect(showError).toHaveBeenCalledWith('Failed to restore purchases. Try again.');
   });
 
+  it.each([
+    ['kilopass_tier19', 'kilopass_tier49'],
+    ['kilopass_tier19', 'kilopass_tier199'],
+    ['kilopass_tier49', 'kilopass_tier19'],
+    ['kilopass_tier49', 'kilopass_tier199'],
+    ['kilopass_tier199', 'kilopass_tier19'],
+    ['kilopass_tier199', 'kilopass_tier49'],
+  ])('defers Play replacement from %s to %s', async (oldProductId, target) => {
+    const requestPurchase = vi.fn();
+    const completePlayPurchase = vi.fn();
+    const actions = createActions({ storefront: 'play', requestPurchase, completePlayPurchase });
+    await actions.purchase(
+      {
+        ...product,
+        googleProductId: target,
+        storeProduct: { ...product.storeProduct, offerToken: 'target-offer' },
+      },
+      {
+        googleReplacement: { productId: oldProductId, purchaseToken: 'old-token' },
+      }
+    );
+    expect(completePlayPurchase).toHaveBeenCalledWith({
+      purchaseToken: 'old-token',
+      platform: 'android',
+      storefront: 'play',
+      product: 'kilo_pass',
+    });
+    expect(requestPurchase).toHaveBeenCalledWith(
+      expect.objectContaining({
+        request: {
+          google: {
+            skus: [target],
+            obfuscatedAccountId: product.appAccountToken,
+            subscriptionOffers: [{ sku: target, offerToken: 'target-offer' }],
+            purchaseToken: 'old-token',
+            subscriptionProductReplacementParams: { oldProductId, replacementMode: 'deferred' },
+          },
+        },
+      })
+    );
+  });
+
+  it('does not replace a Play purchase when ownership verification fails', async () => {
+    const requestPurchase = vi.fn();
+    const actions = createActions({
+      storefront: 'play',
+      requestPurchase,
+      completePlayPurchase: vi.fn().mockRejectedValue(new Error('wrong account')),
+    });
+    expect(
+      await actions.purchase(
+        { ...product, storeProduct: { ...product.storeProduct, offerToken: 'offer' } },
+        {
+          googleReplacement: { productId: 'kilopass_tier19', purchaseToken: 'other-token' },
+        }
+      )
+    ).toBe(false);
+    expect(requestPurchase).not.toHaveBeenCalled();
+  });
+
   it('requests a Google Play subscription purchase', async () => {
     const requestPurchase = vi.fn().mockResolvedValue(null);
     const actions = createActions({
@@ -1203,6 +1265,37 @@ describe('createAppStoreKiloPassPurchaseActions', () => {
 });
 
 describe('KiloPassNativeIapOwner', () => {
+  it('completes a deferred Play callback that still names the old tier', async () => {
+    mockedPlatform.OS = 'android';
+    mockedReactQuery.mobileStoreProductsData = {
+      products: [{ appleProductId: product.appleProductId, googleProductId: 'kilopass_tier19' }],
+    };
+    const owner = renderKiloPassNativeIapOwner();
+    const onCompleted = vi.fn<() => void>();
+    await owner.render().purchase(
+      {
+        ...product,
+        googleProductId: 'kilopass_tier49',
+        storeProduct: { ...product.storeProduct, offerToken: 'offer' },
+      },
+      {
+        googleReplacement: { productId: 'kilopass_tier19', purchaseToken: 'old-token' },
+        onCompleted,
+      }
+    );
+    mockedIap.handlers?.onPurchaseSuccess(
+      createPurchase({
+        store: 'google',
+        productId: 'kilopass_tier19',
+        purchaseToken: 'replacement-token',
+      })
+    );
+    await flushPromises();
+    expect(mockedIap.finishTransaction).toHaveBeenCalledTimes(1);
+    expect(onCompleted).toHaveBeenCalledTimes(1);
+    expect(owner.render().isPending).toBe(false);
+  });
+
   it('is the single useIAP call site', () => {
     const owner = renderKiloPassNativeIapOwner();
 

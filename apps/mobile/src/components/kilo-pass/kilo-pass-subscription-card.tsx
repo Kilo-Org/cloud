@@ -16,12 +16,6 @@ import {
   getKiloPassSubscriptionCardContentState,
 } from '@/lib/kilo-pass/subscription-card-state';
 
-const GOOGLE_PRODUCT_ID_BY_TIER = {
-  tier_19: 'kilopass_tier19',
-  tier_49: 'kilopass_tier49',
-  tier_199: 'kilopass_tier199',
-} as const;
-
 export function KiloPassSubscriptionCard() {
   const colors = useThemeColors();
   const router = useRouter();
@@ -112,21 +106,6 @@ export function KiloPassSubscriptionCard() {
       return;
     }
     if (cardState.action === 'open-store-management') {
-      if (Platform.OS === 'android') {
-        const tier = subscription?.tier;
-        const skuAndroid =
-          (tier != null
-            ? GOOGLE_PRODUCT_ID_BY_TIER[tier as keyof typeof GOOGLE_PRODUCT_ID_BY_TIER]
-            : undefined) ?? 'kilopass_tier19';
-        void (async () => {
-          const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
-          await openPlaySubscriptionManagement({
-            skuAndroid,
-            invalidateAfter: invalidateKiloPassState,
-          });
-        })();
-        return;
-      }
       void (async () => {
         const { openAppStoreManagement } = await import('./kilo-pass-ios-manage');
         await openAppStoreManagement({ invalidateAfter: invalidateKiloPassState });

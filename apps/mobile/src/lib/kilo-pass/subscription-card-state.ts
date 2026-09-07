@@ -267,7 +267,7 @@ function getActiveSubscriptionCardState(
     }
 
     return {
-      action: 'open-store-management',
+      action: 'open-native',
       actionLabel: i18n.t('kiloPass.manage'),
       description: subscription.cancelAtPeriodEnd
         ? `${credits} · ${i18n.t('common.ends', {

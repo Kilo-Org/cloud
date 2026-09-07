@@ -271,6 +271,17 @@ function KiloPassNativeIapContent() {
     }
 
     await purchase(product, {
+      ...(isAndroid &&
+      ownedGoogleProductId &&
+      ownedGooglePurchaseToken &&
+      ownedGoogleProductId !== product.googleProductId
+        ? {
+            googleReplacement: {
+              productId: ownedGoogleProductId,
+              purchaseToken: ownedGooglePurchaseToken,
+            },
+          }
+        : {}),
       onCompleted: () => {
         ensureProfileAfterKiloPassPurchase(router);
       },
@@ -280,12 +291,13 @@ function KiloPassNativeIapContent() {
   const handleProductPress = (product: AppStoreKiloPassProduct) => {
     void Haptics.selectionAsync();
 
-    // The store owns tier changes inside a subscription group: requesting another
-    // SKU while this device already owns one is refused, and the app cannot show
-    // the proration the store applies. Send those taps to store management.
+    // Apple manages tier changes. Android opens management for the current tier.
     const ownedProductId = isAndroid ? ownedGoogleProductId : ownedAppleProductId;
     const productId = isAndroid ? product.googleProductId : product.appleProductId;
-    if (ownedProductId && ownedProductId !== productId) {
+    if (
+      ownedProductId &&
+      (isAndroid ? ownedProductId === productId : ownedProductId !== productId)
+    ) {
       void (async () => {
         if (isAndroid) {
           const { openPlaySubscriptionManagement } = await import('./kilo-pass-play-manage');
@@ -432,6 +444,21 @@ function KiloPassNativeIapContent() {
               </Pressable>
             ))}
 
+          {isAndroid && ownedGoogleProductId ? (
+            <Button
+              variant="outline"
+              onPress={() => {
+                const current = products.find(
+                  product => product.googleProductId === ownedGoogleProductId
+                );
+                if (current) {
+                  handleProductPress(current);
+                }
+              }}
+            >
+              <Text>{t('kiloPass.manage')}</Text>
+            </Button>
+          ) : null}
           <RestorePurchasesButton
             onResult={result => {
               if (result === 'restored') {

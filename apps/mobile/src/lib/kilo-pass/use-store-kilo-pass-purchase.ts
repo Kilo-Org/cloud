@@ -1,7 +1,7 @@
 /* eslint-disable max-lines */
 
 import { useEffect } from 'react';
-import { ErrorCode, type Purchase } from 'expo-iap';
+import { ErrorCode, type Purchase, type RequestSubscriptionAndroidProps } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
@@ -43,6 +43,8 @@ type StoreKiloPassPurchaseRequest =
         obfuscatedAccountId: string;
         skus: string[];
         subscriptionOffers: { sku: string; offerToken: string }[];
+        purchaseToken?: string;
+        subscriptionProductReplacementParams?: RequestSubscriptionAndroidProps['subscriptionProductReplacementParams'];
       };
     };
 
@@ -87,7 +89,8 @@ export type AppStoreKiloPassPurchaseActionsDeps = {
   showError: (message: string) => void;
 };
 
-type StoreKiloPassPurchaseOptions = {
+export type StoreKiloPassPurchaseOptions = {
+  googleReplacement?: { purchaseToken: string; productId: string };
   onCompleted?: () => void;
 };
 
@@ -373,10 +376,29 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
             deps.setPendingPurchaseCompletedCallback?.(null);
             return false;
           }
+          const replacement = options.googleReplacement;
+          if (replacement) {
+            // Verify ownership and acknowledge the current purchase before replacing it.
+            await deps.completePlayPurchase({
+              purchaseToken: replacement.purchaseToken,
+              platform: 'android',
+              storefront: 'play',
+              product: 'kilo_pass',
+            });
+          }
           await deps.requestPurchase({
             request: {
               google: {
                 obfuscatedAccountId: product.appAccountToken,
+                ...(replacement
+                  ? {
+                      purchaseToken: replacement.purchaseToken,
+                      subscriptionProductReplacementParams: {
+                        oldProductId: replacement.productId,
+                        replacementMode: 'deferred' as const,
+                      },
+                    }
+                  : {}),
                 skus: [product.googleProductId],
                 subscriptionOffers: [{ sku: product.googleProductId, offerToken }],
               },

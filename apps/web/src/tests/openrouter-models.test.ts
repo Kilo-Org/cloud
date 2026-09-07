@@ -282,19 +282,21 @@ describe('GET /api/openrouter/models', () => {
     expect(Array.isArray(responseData.data)).toBe(true);
   });
 
-  test('excludes retired free Tencent and LongCat models advertised upstream while retaining paid Tencent', async () => {
+  test('excludes unavailable free Gemma models advertised upstream while retaining paid Gemma', async () => {
     const original = mockOpenRouterModels.data.find(model => model.id === 'some-other-model');
     if (!original) throw new Error('Expected catalog fixture');
     const upstream = {
       data: [
         ...mockOpenRouterModels.data,
-        { ...original, id: 'tencent/hy3', name: 'Tencent: HY3' },
-        ...['tencent/hy3:free', 'meituan/longcat-2.0-free'].map(id => ({
-          ...original,
-          id,
-          name: id,
-          pricing: { ...original.pricing, prompt: '0', completion: '0' },
-        })),
+        { ...original, id: 'google/gemma-4-31b-it', name: 'Google: Gemma 4 31B IT' },
+        ...['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'].map(
+          id => ({
+            ...original,
+            id,
+            name: id,
+            pricing: { ...original.pricing, prompt: '0', completion: '0' },
+          })
+        ),
       ],
     };
     global.fetch = jest
@@ -307,9 +309,9 @@ describe('GET /api/openrouter/models', () => {
 
     expect(captureException).not.toHaveBeenCalled();
     expect(response.status).toBe(200);
-    expect(modelIds).not.toContain('tencent/hy3:free');
-    expect(modelIds).not.toContain('meituan/longcat-2.0-free');
-    expect(modelIds).toContain('tencent/hy3');
+    expect(modelIds).not.toContain('google/gemma-4-26b-a4b-it:free');
+    expect(modelIds).not.toContain('google/gemma-4-31b-it:free');
+    expect(modelIds).toContain('google/gemma-4-31b-it');
   });
 
   test('should include publishable Terminal Bench summaries for canonical models', async () => {

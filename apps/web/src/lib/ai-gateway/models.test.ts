@@ -80,11 +80,11 @@ describe('isFreeModel', () => {
     });
 
     test.each(['tencent/hy3:free', 'meituan/longcat-2.0-free'])(
-      'removes %s from exclusive, Auto Free, and preferred models while keeping it unavailable',
+      'removes %s from exclusive, Auto Free, and preferred models without restricting availability',
       modelId => {
         expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
         expect(findKiloExclusiveModel(modelId)).toBeNull();
-        expect(isUnavailableModel(modelId)).toBe(true);
+        expect(isUnavailableModel(modelId)).toBe(false);
         expect(autoFreeModels.map(({ model }) => model)).not.toContain(modelId);
         expect(preferredModels).not.toContain(modelId);
       }

@@ -624,8 +624,24 @@ export async function processGooglePlayKiloPassNotification(params: {
   const isPurchaseType = PURCHASE_TYPES.has(notificationType);
   const isExpired = decoded.expiryTimeMs <= Date.now();
 
+  const entitlement = {
+    providerSubscriptionId: purchaseToken,
+    providerTransactionId: decoded.latestOrderId,
+    expiresAtIso: Number.isFinite(decoded.expiryTimeMs)
+      ? new Date(decoded.expiryTimeMs).toISOString()
+      : null,
+    subscriptionState: decoded.subscriptionState,
+  };
   if (isPurchaseType) {
-    if (isExpired) {
+    if (
+      isExpired ||
+      ![
+        'SUBSCRIPTION_STATE_ACTIVE',
+        'SUBSCRIPTION_STATE_CANCELED',
+        'SUBSCRIPTION_STATE_IN_GRACE_PERIOD',
+      ].includes(decoded.subscriptionState)
+    ) {
+      await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
       await markGooglePlayStoreEventProcessed(eventId);
       return { processed: true };
     }
@@ -834,16 +850,7 @@ export async function processGooglePlayKiloPassNotification(params: {
 
   // Reconcile entitlement-only changes without granting a paid month again.
   if ([5, 6, 9, 10, 11].includes(notificationType)) {
-    await db.transaction(async tx => {
-      await reconcileGooglePlaySubscriptionState(tx, {
-        providerSubscriptionId: purchaseToken,
-        providerTransactionId: decoded.latestOrderId,
-        expiresAtIso: Number.isFinite(decoded.expiryTimeMs)
-          ? new Date(decoded.expiryTimeMs).toISOString()
-          : null,
-        subscriptionState: decoded.subscriptionState,
-      });
-    });
+    await db.transaction(tx => reconcileGooglePlaySubscriptionState(tx, entitlement));
   }
   await markGooglePlayStoreEventProcessed(eventId);
   return { processed: true };

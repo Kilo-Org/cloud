@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "აქტიური სესიების ჩატვირთვა ვერ მოხერხდა.",
+      "couldNotRefresh": "განახლება ვერ მოხერხდა",
       "noSessionsYetDescription": "დაიწყე კოდის წერის დავალება ტელეფონიდან. შენი სესიები აქ გამოჩნდება.",
       "noMatches": "შესაბამისი სესიები არ არის",
       "tryDifferentSearch": "სხვა საძიებო სიტყვა სცადე.",

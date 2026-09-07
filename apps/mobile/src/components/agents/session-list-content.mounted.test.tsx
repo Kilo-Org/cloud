@@ -8,6 +8,7 @@ import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
 import { AgentSessionListContent } from './session-list-content';
 import { type SessionSection } from './session-list-helpers';
 import { type StoredSessionRow } from './session-row';
+import { PULL_FEEDBACK_BUDGET_MS } from './use-pull-refresh';
 
 type RowProps = Parameters<typeof StoredSessionRow>[0];
 type CellProps = {
@@ -39,6 +40,7 @@ vi.mock('react-native', async () => {
   });
   return {
     View: 'View',
+    Pressable: 'Pressable',
     ActivityIndicator: 'ActivityIndicator',
     RefreshControl: 'RefreshControl',
     Platform: { OS: 'ios' },
@@ -149,6 +151,7 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     onRetry: () => undefined,
     onEndReached: () => undefined,
     onSessionPress: () => undefined,
+    nonPullRefreshes: 0,
     hasActiveQuery: false,
     isSearching: false,
     searchQuery: '',
@@ -328,7 +331,71 @@ describe('AgentSessionListContent liveness', () => {
       })
     );
     expect(rows(renderer)).toEqual([{ id: 'cached', live: true, metaWhileLive: true }]);
-    expect(hosts(renderer, 'AccessibleStatus')).toHaveLength(0);
+    // The reserved status line carries the failure: one inline
+    // "Couldn't refresh" with a Retry action beside the kept rows.
+    const statuses = hosts(renderer, 'AccessibleStatus');
+    expect(statuses).toHaveLength(1);
+    const [statusLine] = statuses;
+    if (!statusLine) {
+      throw new Error('no refresh status line rendered');
+    }
+    expect((statusLine.props as { message: string }).message).toBe("Couldn't refresh");
+    const retry = hosts(renderer, 'Pressable').find(
+      node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+    );
+    expect(retry).toBeDefined();
+  });
+
+  it('retires a stale pull failure when the screen settles a later non-pull refresh', () => {
+    const hang = vi.fn<ContentProps['refetch']>(async () => {
+      await new Promise<void>(() => {
+        /* The hung-request shape: never settles on its own. */
+      });
+    });
+    vi.useFakeTimers();
+    try {
+      const props = contentProps({
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        refetch: hang,
+      });
+      const renderer = mount(props);
+      // The pull hangs past the feedback budget: the reserved line fails over
+      // to "Couldn't refresh" with Retry.
+      const refreshControl = hosts(renderer, 'SectionList')[0]?.props.refreshControl as
+        | { props: { onRefresh: () => void } }
+        | undefined;
+      act(() => {
+        refreshControl?.props.onRefresh();
+      });
+      act(() => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
+      });
+      expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
+        "Couldn't refresh"
+      );
+      expect(
+        hosts(renderer, 'Pressable').some(
+          node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+        )
+      ).toBe(true);
+
+      // The screen settles a refresh outside the pull lifecycle (focus return,
+      // app foreground) afterwards: the stale gesture failure retires from an
+      // up-to-date list even though the hung pull never settles.
+      act(() => {
+        renderer.update(createElement(AgentSessionListContent, { ...props, nonPullRefreshes: 1 }));
+      });
+      expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).not.toContain(
+        "Couldn't refresh"
+      );
+      expect(
+        hosts(renderer, 'Pressable').filter(
+          node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
+        )
+      ).toHaveLength(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it.each([

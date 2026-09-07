@@ -1917,6 +1917,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
+      "couldNotRefresh": "Ma setax isir l-aġġornament",
       "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
       "noMatches": "L-ebda sessjoni ma taqbel mat-tfittxija",
       "tryDifferentSearch": "Ipprova fittex b'kelma oħra.",

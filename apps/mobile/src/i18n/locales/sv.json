@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner.",
+      "couldNotRefresh": "Kunde inte uppdatera",
       "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen. Dina sessioner visas här.",
       "noMatches": "Inga matchande sessioner",
       "tryDifferentSearch": "Prova en annan sökterm.",

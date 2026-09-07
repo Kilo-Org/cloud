@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "بارگذاری نشست‌های فعال ممکن نشد.",
+      "couldNotRefresh": "بازخوانی ممکن نشد",
       "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید. نشست‌های شما اینجا نمایش داده می‌شوند.",
       "noMatches": "نشستی مطابق با فیلترها پیدا نشد",
       "tryDifferentSearch": "عبارت دیگری را جست‌وجو کنید.",

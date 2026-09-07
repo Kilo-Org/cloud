@@ -1917,6 +1917,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
+      "couldNotRefresh": "Níorbh fhéidir athnuachan a dhéanamh",
       "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán. Beidh do sheisiúin le feiceáil anseo.",
       "noMatches": "Gan aon seisiún comhoiriúnach",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",

@@ -8,10 +8,9 @@ import { Image } from '@/components/ui/image';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import {
   AgentSessionsSection,
-  liveSessionContent,
   LiveSessionFeedback,
-  useLiveSessionContext,
 } from '@/components/home/agent-sessions-section';
+import { liveSessionContent, useLiveSessionContext } from '@/components/home/live-session-state';
 import { buildTimedGreeting } from '@/components/home/greeting';
 import { NewTaskButton } from '@/components/home/new-task-button';
 import { ProductChoices } from '@/components/home/product-choices';

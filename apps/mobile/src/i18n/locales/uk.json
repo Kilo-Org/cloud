@@ -1459,6 +1459,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Не вдалося завантажити активні сеанси.",
+      "couldNotRefresh": "Не вдалося оновити",
       "noSessionsYetDescription": "Запустіть завдання з програмування з телефона. Ваші сеанси з'являться тут.",
       "noMatches": "Немає відповідних сеансів",
       "tryDifferentSearch": "Спробуй інший пошуковий запит.",

@@ -1453,6 +1453,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "No se pudieron cargar las sesiones activas.",
+      "couldNotRefresh": "No se pudo actualizar",
       "noSessionsYetDescription": "Inicia una tarea de programación desde tu teléfono. Tus sesiones aparecerán aquí.",
       "noMatches": "No hay sesiones que coincidan con los filtros",
       "tryDifferentSearch": "Prueba con otro término de búsqueda.",

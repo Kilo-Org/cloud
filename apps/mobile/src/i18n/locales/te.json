@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "కొనసాగుతున్న సెషన్‌లను లోడ్ చేయలేకపోయాము.",
+      "couldNotRefresh": "రిఫ్రెష్ చేయలేకపోయాము",
       "noSessionsYetDescription": "మీ ఫోన్‌లో కోడింగ్ పనిని ప్రారంభించండి. మీ సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noMatches": "సరిపోలే సెషన్‌లు లేవు",
       "tryDifferentSearch": "వేరే పదంతో వెతకండి.",

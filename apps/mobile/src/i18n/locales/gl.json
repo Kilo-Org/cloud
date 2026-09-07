@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Non se puideron cargar as sesións activas.",
+      "couldNotRefresh": "Non se puido actualizar",
       "noSessionsYetDescription": "Inicia unha tarefa de programación desde o móbil. As túas sesións aparecerán aquí.",
       "noMatches": "Non hai sesións que coincidan",
       "tryDifferentSearch": "Proba con outro termo de busca.",

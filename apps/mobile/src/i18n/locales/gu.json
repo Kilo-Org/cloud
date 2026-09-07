@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "સક્રિય સત્રો લોડ કરી શકાયાં નહીં.",
+      "couldNotRefresh": "ફરી લોડ કરી શકાયું નહીં",
       "noSessionsYetDescription": "તમારા ફોન પરથી કોડિંગ કાર્ય શરૂ કરો. તમારા સત્રો અહીં દેખાશે.",
       "noMatches": "કોઈ સત્ર મેળ ખાતું નથી",
       "tryDifferentSearch": "બીજો શબ્દ વાપરીને શોધો.",

@@ -10,6 +10,7 @@ import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
+import { PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 import { type ActiveSession, type useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { type BannerState } from '@/lib/offline-banner-state';
 
@@ -680,14 +681,58 @@ describe('AgentSessionListScreen live presentation', () => {
       pending.resolve(false);
       await pending.promise;
     });
+    // The rejected pull holds the in-flight feedback through the beat before
+    // the failure line takes over (device defect e1-updating).
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 100);
+      });
+    });
     expect(refresh().props.refreshing).toBe(false);
-    expect(text()).toContain('Could not load active sessions');
-    expect(
-      state.announcements.filter(message => message === 'Could not load active sessions')
-    ).toHaveLength(1);
-  });
+    // The pull-failed state speaks through the reserved status line: the
+    // scenario copy with its Retry action, announced exactly once.
+    expect(text()).toContain("Couldn't refresh");
+    expect(state.announcements.filter(message => message === "Couldn't refresh")).toHaveLength(1);
+  }, 15_000);
 
-  it('does not announce on a successful pull with cached rows', async () => {
+  it('retires the pull-failure line when a later foreground refresh lands an accepted result', async () => {
+    state.live.activeSessions = [row];
+    const rejected = Promise.withResolvers<boolean>();
+    state.refetch.mockReturnValueOnce(rejected.promise);
+    await renderScreen();
+    const refresh = () =>
+      nodes('FlatList')[0]?.props.refreshControl as {
+        props: { refreshing: boolean; onRefresh: () => void };
+      };
+    act(() => {
+      refresh().props.onRefresh();
+    });
+    await act(async () => {
+      rejected.resolve(false);
+      await rejected.promise;
+    });
+    await act(async () => {
+      await new Promise(resolve => {
+        setTimeout(resolve, PULL_FEEDBACK_MIN_BEAT_MS + 100);
+      });
+    });
+    expect(text()).toContain("Couldn't refresh");
+
+    // A refresh outside the pull lifecycle (app foreground) lands an accepted
+    // result afterwards: the list is up to date, so the stale failure line
+    // must retire instead of claiming "Couldn't refresh" indefinitely.
+    await act(async () => {
+      foreground();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(text()).not.toContain("Couldn't refresh");
+    expect(refresh().props.refreshing).toBe(false);
+    expect(state.refetch).toHaveBeenCalledTimes(2);
+  }, 15_000);
+
+  it('announces only the in-flight Updating on a successful pull with cached rows', async () => {
     state.live.activeSessions = [row];
     await renderScreen();
     const refresh = nodes('FlatList')[0]?.props.refreshControl as {
@@ -698,7 +743,7 @@ describe('AgentSessionListScreen live presentation', () => {
       await Promise.resolve();
     });
     expect(state.refetch).toHaveBeenCalledTimes(1);
-    expect(state.announcements).toEqual([]);
+    expect(state.announcements).toEqual(['Updating']);
   });
 
   it('passes a numeric attention revision as extraData to the live FlatList', async () => {

@@ -1891,6 +1891,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije.",
+      "couldNotRefresh": "Nije moguće osvježiti",
       "noSessionsYetDescription": "Pokreni zadatak programiranja s mobitela. Ovdje će se prikazivati tvoje sesije.",
       "noMatches": "Nema sesija koje odgovaraju filtrima",
       "tryDifferentSearch": "Pokušaj s drugim pojmom za pretragu.",

@@ -1447,6 +1447,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "無法載入進行中的工作階段。",
+      "couldNotRefresh": "無法重新整理",
       "noSessionsYetDescription": "用手機開始程式開發任務，工作階段就會顯示在這裡。",
       "noMatches": "沒有相符的工作階段",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",

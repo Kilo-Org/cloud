@@ -1878,6 +1878,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "සක්‍රීය සැසි පූරණය කිරීමට නොහැකි විය.",
+      "couldNotRefresh": "නැවුම් කිරීමට නොහැකි විය",
       "noSessionsYetDescription": "ඔබේ දුරකථනයෙන් කේත ලිවීමේ කාර්යයක් ආරම්භ කරන්න. ඔබේ සැසි මෙහි දිස්වනු ඇත.",
       "noMatches": "ගැළපෙන සැසි නොමැත",
       "tryDifferentSearch": "වෙනත් සෙවුම් පදයක් යොදා බලන්න.",

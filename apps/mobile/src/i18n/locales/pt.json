@@ -1891,6 +1891,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Não foi possível carregar as sessões ativas.",
+      "couldNotRefresh": "Não foi possível atualizar",
       "noSessionsYetDescription": "Inicia uma tarefa de programação no teu telemóvel. As tuas sessões aparecerão aqui.",
       "noMatches": "Nenhuma sessão encontrada",
       "tryDifferentSearch": "Experimenta outro termo de pesquisa.",

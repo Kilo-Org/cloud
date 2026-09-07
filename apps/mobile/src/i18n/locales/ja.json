@@ -1447,6 +1447,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした。",
+      "couldNotRefresh": "更新できませんでした",
       "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",

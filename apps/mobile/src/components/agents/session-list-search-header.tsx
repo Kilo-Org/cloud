@@ -3,7 +3,6 @@ import { type RefObject } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
-import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 type SessionListSearchHeaderProps = {
@@ -12,7 +11,6 @@ type SessionListSearchHeaderProps = {
    * parent so the TextInput itself stays uncontrolled (iOS TextInput rules). */
   hasText: boolean;
   showSearchBusy: boolean;
-  showInlineError: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
   /** Initial content for the uncontrolled input, applied on a restore remount. */
@@ -25,7 +23,6 @@ export function SessionListSearchHeader({
   inputRef,
   hasText,
   showSearchBusy,
-  showInlineError,
   onChangeText,
   onClearSearch,
   defaultValue,
@@ -73,11 +70,6 @@ export function SessionListSearchHeader({
           </Pressable>
         ) : null}
       </View>
-      {showInlineError ? (
-        <Text variant="muted" className="mx-[22px] mb-[14px] text-xs">
-          {t('common.couldNotRefresh')}
-        </Text>
-      ) : null}
     </View>
   );
 }

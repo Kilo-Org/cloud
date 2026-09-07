@@ -1,24 +1,61 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (node env, no jsdom); see src/components/agents/use-new-session-creator.test.ts */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the fake query factories settle without await because they resolve immediately */
+/* eslint-disable max-lines -- one mock harness serves the force-fresh suite and the branch-query suite; splitting it would duplicate every tRPC and react-query fake */
 import * as React from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useNewSessionRepos } from './use-new-session-repos';
+import {
+  getSelectedBranchOverride,
+  type NewSessionRepository,
+  setNewSessionBranchScope,
+  setSelectedBranchOverride,
+} from '@/components/agents/new-session-repository-state';
+import { useNewSessionRepos, useRepositoryBranches } from './use-new-session-repos';
 
 const mocks = vi.hoisted(() => ({
   fetchQuery: vi.fn(async (_opts: unknown): Promise<unknown> => ({})),
   setQueryData: vi.fn(() => undefined),
   toastError: vi.fn(),
   refreshGitHubForceFresh: vi.fn(async () => undefined),
+  listBranches: vi.fn(
+    async (_input: unknown): Promise<unknown> => ({
+      defaultBranch: 'main',
+      branches: ['main'],
+    })
+  ),
+  /** Every `useQuery` call in mount order, so a test can read the branch query's options. */
+  queryCalls: [] as { queryKey?: unknown[]; enabled?: boolean }[],
+  /** Result the branch query (the one with a `queryFn`) reports. */
+  branchQueryResult: emptyQueryResult(),
 }));
+
+function emptyQueryResult(): Record<string, unknown> {
+  return {};
+}
 
 vi.mock('react-native', () => ({ Platform: { OS: 'ios' } }));
 
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({ data: undefined, isLoading: false, isError: false, isRefetching: false }),
+  // Records every call so the branch query's key and `enabled` can be asserted.
+  // The provider queries have no `queryFn`; the branch query does, and only it
+  // reads `branchQueryResult`.
+  useQuery: (options: { queryKey?: unknown[]; enabled?: boolean; queryFn?: unknown }) => {
+    mocks.queryCalls.push(options);
+    const base = {
+      data: undefined,
+      isLoading: false,
+      isPending: false,
+      isError: false,
+      isFetching: false,
+      isRefetching: false,
+      error: null,
+      refetch: vi.fn(),
+    };
+    return options.queryFn ? { ...base, ...mocks.branchQueryResult } : base;
+  },
   useQueryClient: () => ({ fetchQuery: mocks.fetchQuery, setQueryData: mocks.setQueryData }),
 }));
 
@@ -51,6 +88,10 @@ vi.mock('@/lib/use-github-repos-refresh', () => ({
 }));
 
 vi.mock('@/lib/trpc', () => ({
+  trpcClient: {
+    cloudAgentNext: { listRepositoryBranches: { query: mocks.listBranches } },
+    organizations: { cloudAgentNext: { listRepositoryBranches: { query: mocks.listBranches } } },
+  },
   useTRPC: () => ({
     cloudAgentNext: {
       listGitHubRepositories: {
@@ -62,6 +103,9 @@ vi.mock('@/lib/trpc', () => ({
           queryKey: ['gitlab', forceRefresh],
         }),
         queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['gitlab', forceRefresh],
+      },
+      listRepositoryBranches: {
+        queryKey: (input: unknown) => ['branches', input],
       },
     },
     organizations: {
@@ -81,6 +125,9 @@ vi.mock('@/lib/trpc', () => ({
             queryKey: ['bitbucket', forceRefresh],
           }),
           queryKey: ({ forceRefresh }: { forceRefresh: boolean }) => ['bitbucket', forceRefresh],
+        },
+        listRepositoryBranches: {
+          queryKey: (input: unknown) => ['org-branches', input],
         },
       },
     },
@@ -132,6 +179,8 @@ function mockFetchQuery(resultForBitbucket: unknown, gitlabAndGithub: unknown) {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.fetchQuery.mockImplementation(async (_opts: unknown) => ({ repositories: [] }));
+  mocks.queryCalls.length = 0;
+  mocks.branchQueryResult = {};
 });
 
 describe('useNewSessionRepos force-fresh Bitbucket cache write', () => {
@@ -170,5 +219,176 @@ describe('useNewSessionRepos force-fresh Bitbucket cache write', () => {
 
     expect(mocks.setQueryData).toHaveBeenCalledWith(['bitbucket', false], available);
     expect(mocks.toastError).not.toHaveBeenCalled();
+  });
+});
+
+// ── Branches of the selected repository ──────────────────────────────
+
+type BranchesResult = ReturnType<typeof useRepositoryBranches>;
+
+const githubRepo: NewSessionRepository = {
+  platform: 'github',
+  fullName: 'owner/repo',
+  isPrivate: false,
+};
+const bitbucketRepo: NewSessionRepository = {
+  platform: 'bitbucket',
+  fullName: 'team/repo',
+  isPrivate: true,
+  workspaceUuid: 'ws-1',
+  repositoryUuid: 'id-1',
+};
+
+function BranchHarness({
+  repository,
+  resultRef,
+}: {
+  repository: NewSessionRepository | null;
+  resultRef: { current: BranchesResult | null };
+}) {
+  resultRef.current = useRepositoryBranches(repository);
+  return null;
+}
+
+function mountBranches(repository: NewSessionRepository | null) {
+  const resultRef: { current: BranchesResult | null } = { current: null };
+  act(() => {
+    TestRenderer.create(React.createElement(BranchHarness, { repository, resultRef }));
+  });
+  const result = resultRef.current;
+  if (result === null) {
+    throw new Error('useRepositoryBranches did not run');
+  }
+  return result;
+}
+
+/** The recorded branch query — the only `useQuery` call that carries a `queryFn`. */
+function branchQueryOptions() {
+  const options = mocks.queryCalls.at(-1);
+  if (!options) {
+    throw new Error('no query was issued');
+  }
+  return options;
+}
+
+describe('useRepositoryBranches', () => {
+  it('does not query until a repository is selected', () => {
+    setNewSessionBranchScope(undefined);
+    const result = mountBranches(null);
+
+    expect(branchQueryOptions().enabled).toBe(false);
+    expect(result.isEnabled).toBe(false);
+    expect(result.isLoading).toBe(false);
+  });
+
+  it('queries the personal procedure for a selected repository', () => {
+    setNewSessionBranchScope(undefined);
+    const result = mountBranches(githubRepo);
+
+    expect(result.isEnabled).toBe(true);
+    expect(branchQueryOptions().enabled).toBe(true);
+    expect(branchQueryOptions().queryKey?.[0]).toBe('branches');
+  });
+
+  it('queries the organization procedure inside an organization', () => {
+    setNewSessionBranchScope('org-1');
+    mountBranches(githubRepo);
+
+    expect(branchQueryOptions().queryKey?.[0]).toBe('org-branches');
+    expect(branchQueryOptions().queryKey?.[1]).toMatchObject({
+      organizationId: 'org-1',
+      platform: 'github',
+      repository: { fullName: 'owner/repo' },
+    });
+  });
+
+  it('keys the cache by the full repository identity, uuids included', () => {
+    setNewSessionBranchScope('org-1');
+    mountBranches(bitbucketRepo);
+    const first = branchQueryOptions().queryKey;
+    mountBranches({ ...bitbucketRepo, workspaceUuid: 'ws-2', repositoryUuid: 'id-2' });
+    const second = branchQueryOptions().queryKey;
+
+    expect(first).not.toEqual(second);
+  });
+
+  it('never queries a personal Bitbucket repository (organizations only)', () => {
+    setNewSessionBranchScope(undefined);
+    const result = mountBranches(bitbucketRepo);
+
+    expect(result.isEnabled).toBe(false);
+    expect(branchQueryOptions().enabled).toBe(false);
+  });
+
+  it('waits for the route to publish the organization scope before querying', async () => {
+    // `undefined` is a real scope (a personal session), so "not published yet"
+    // has to be its own state — otherwise the first render would query the
+    // personal procedure for what is about to be an organization session.
+    vi.resetModules();
+    const fresh = await import('./use-new-session-repos');
+    const resultRef: { current: BranchesResult | null } = { current: null };
+    function FreshHarness() {
+      resultRef.current = fresh.useRepositoryBranches(githubRepo);
+      return null;
+    }
+    act(() => {
+      TestRenderer.create(React.createElement(FreshHarness));
+    });
+
+    expect(resultRef.current?.isEnabled).toBe(false);
+    expect(branchQueryOptions().enabled).toBe(false);
+  });
+
+  it('reports a transient failure as retryable', () => {
+    setNewSessionBranchScope(undefined);
+    mocks.branchQueryResult = {
+      isError: true,
+      error: { data: { code: 'BAD_GATEWAY' } },
+    };
+    const result = mountBranches(githubRepo);
+
+    expect(result.isRetryableError).toBe(true);
+    expect(result.isPermanentError).toBe(false);
+  });
+
+  it('reports a refusal a retry cannot fix as permanent', () => {
+    setNewSessionBranchScope(undefined);
+    mocks.branchQueryResult = { isError: true, error: { data: { code: 'FORBIDDEN' } } };
+    const result = mountBranches(githubRepo);
+
+    expect(result.isPermanentError).toBe(true);
+    expect(result.isRetryableError).toBe(false);
+  });
+
+  it('reports the provider default and an empty list without an override', () => {
+    setNewSessionBranchScope(undefined);
+    mocks.branchQueryResult = { data: { defaultBranch: null, branches: [] } };
+    const result = mountBranches(githubRepo);
+
+    expect(result.branches).toEqual([]);
+    expect(result.defaultBranch).toBeNull();
+    expect(getSelectedBranchOverride(githubRepo)).toBeNull();
+  });
+
+  it('fetches through the organization procedure when the query runs', async () => {
+    setNewSessionBranchScope('org-1');
+    mountBranches(githubRepo);
+    const queryFn = (branchQueryOptions() as { queryFn?: () => Promise<unknown> }).queryFn;
+
+    await queryFn?.();
+
+    expect(mocks.listBranches).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      platform: 'github',
+      repository: { fullName: 'owner/repo' },
+    });
+  });
+});
+
+describe('branch overrides across a repository change', () => {
+  it('drops a branch chosen for another repository', () => {
+    setSelectedBranchOverride(githubRepo, 'release/2.0');
+    expect(getSelectedBranchOverride(githubRepo)).toBe('release/2.0');
+    expect(getSelectedBranchOverride({ ...githubRepo, platform: 'gitlab' })).toBeNull();
   });
 });

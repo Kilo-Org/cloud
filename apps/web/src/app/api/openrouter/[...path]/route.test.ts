@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import type { User } from '@kilocode/db/schema';
+import jwt from 'jsonwebtoken';
 import { getUserFromAuth } from '@/lib/user/server';
+import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { JWT_TOKEN_VERSION, validateAuthorizationHeader } from '@/lib/tokens';
+import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getBalanceAndOrgSettings } from '@/lib/organizations/organization-usage';
 import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
@@ -30,7 +37,7 @@ import { gemma_4_26b_a4b_it_free_model } from '@/lib/ai-gateway/providers/google
 import { stepfun_37_flash_free_model } from '@/lib/ai-gateway/providers/stepfun';
 import { getEffectiveModelDecision } from '@/lib/organizations/effective-model-access.server';
 import { getPercentageRoutedPartnerProvider } from '@/lib/ai-gateway/providers/partner/routing';
-import { FRIENDLI_GLM_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import type { GatewayMessagesRequest } from '@/lib/ai-gateway/providers/openrouter/types';
 import { warnExceptInTest } from '@/lib/utils.server';
 
@@ -171,13 +178,13 @@ const vercelProvider = {
 
 const partnerProvider = {
   ...provider,
-  id: 'friendli',
-  apiUrl: 'https://api.friendli.ai/serverless/v1',
+  id: 'perplexity',
+  apiUrl: 'https://api.perplexity.ai/router/v1',
   supportedChatApis: ['messages'],
   transformRequest: jest.fn(async context => {
     Object.assign(context.request.body, {
-      model: 'zai-org/GLM-5.2',
-      metadata: { transformedBy: 'friendli' },
+      model: 'perplexity/kimi-k3',
+      metadata: { transformedBy: 'perplexity' },
     });
     delete context.request.body.provider;
   }),
@@ -266,6 +273,217 @@ function upstreamJsonResponse(body: unknown, status = 200) {
     headers: { 'content-type': 'application/json', 'request-id': 'req-123' },
   });
 }
+
+type AuthResult = Awaited<ReturnType<typeof getUserFromAuth>>;
+
+function signedToken(audience: string) {
+  return jwt.sign(
+    {
+      version: JWT_TOKEN_VERSION,
+      kiloUserId: 'user-123',
+      apiTokenPepper: 'test-pepper',
+      aud: audience,
+    },
+    NEXTAUTH_SECRET,
+    { algorithm: 'HS256' }
+  );
+}
+
+function setSignedTokenAuth(token: string, authenticatedResult: AuthResult) {
+  mockedGetUserFromAuth.mockImplementation(async options => {
+    const validation = validateAuthorizationHeader(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { expectedAudience: options.expectedAudience }
+    );
+    if ('error' in validation) {
+      return {
+        user: null,
+        authFailedResponse: new Response(validation.error, { status: 401 }),
+        organizationId: undefined,
+      } as AuthResult;
+    }
+    return authenticatedResult;
+  });
+}
+
+describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1_000,
+      settings: undefined,
+      plan: undefined,
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: null,
+      bypassAccessCheck: false,
+    });
+    mockedClassifyAbuse.mockResolvedValue(classifyResult(null));
+    mockedRedisGet.mockResolvedValue(null);
+    mockedRedisSet.mockResolvedValue('OK');
+    mockedGetOpenRouterModels.mockResolvedValue(new Set());
+    mockedIsValidOpenRouterModelId.mockResolvedValue(true);
+    mockedUpstreamRequest.mockResolvedValue({
+      type: 'success',
+      response: upstreamJsonResponse({ id: 'chatcmpl-1', model: 'openai/gpt-4o', choices: [] }),
+    });
+    mockedEmitApiMetricsForResponse.mockReturnValue(undefined);
+    mockedAccountForMicrodollarUsage.mockReturnValue(undefined);
+  });
+
+  it('treats an API-only token as anonymous for a free model', async () => {
+    setSignedTokenAuth(signedToken(KILO_API_AUDIENCE), {
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 99,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+      botId: 'bot-123',
+      tokenSource: 'api-token',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(stepfun_37_flash_free_model.public_id), {
+        authorization: `Bearer ${signedToken(KILO_API_AUDIENCE)}`,
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+    expect(mockedGetBalanceAndOrgSettings).not.toHaveBeenCalled();
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user: expect.objectContaining({
+          id: 'anon:127.0.0.1',
+          isAnonymous: true,
+          microdollars_used: 0,
+        }),
+        organizationId: undefined,
+      })
+    );
+    const providerInput = mockedGetProvider.mock.calls[0]?.[0];
+    expect(providerInput).not.toHaveProperty('botId');
+    expect(providerInput).not.toHaveProperty('tokenSource');
+    expect(providerInput).not.toHaveProperty('balance');
+    expect(providerInput).not.toHaveProperty('userByok');
+    expect(mockedClassifyAbuse).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.anything(),
+      expect.objectContaining({
+        kiloUserId: 'anon:127.0.0.1',
+        organizationId: undefined,
+        isByok: false,
+      })
+    );
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        kiloUserId: 'anon:127.0.0.1',
+        organizationId: undefined,
+        botId: undefined,
+        tokenSource: undefined,
+        prior_microdollar_usage: 0,
+        user_byok: false,
+      }),
+      expect.anything()
+    );
+  });
+
+  it('retains verified gateway-token identity through the provider path', async () => {
+    const authenticatedUser = {
+      id: 'user-123',
+      google_user_email: 'test@example.com',
+      microdollars_used: 99,
+    } as User;
+    setSignedTokenAuth(signedToken(KILO_GATEWAY_AUDIENCE), {
+      user: authenticatedUser,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+      botId: 'bot-123',
+      tokenSource: 'gateway-token',
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider,
+      userByok: [{ decryptedAPIKey: 'byok-key', providerId: 'openai' }],
+      bypassAccessCheck: false,
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(), {
+        authorization: `Bearer ${signedToken(KILO_GATEWAY_AUDIENCE)}`,
+      }) as never
+    );
+
+    expect(response.status).toBe(200);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+    expect(mockedGetBalanceAndOrgSettings).toHaveBeenCalledTimes(1);
+    const balanceCall = mockedGetBalanceAndOrgSettings.mock.calls[0];
+    expect(balanceCall?.[0]).toBe('org-123');
+    expect(balanceCall?.[1]).toBe(authenticatedUser);
+    expect(balanceCall?.[2]).toBe(readDb);
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ user: authenticatedUser, organizationId: 'org-123' })
+    );
+    expect(mockedClassifyAbuse).toHaveBeenCalledWith(
+      expect.any(Request),
+      expect.anything(),
+      expect.objectContaining({
+        kiloUserId: 'user-123',
+        organizationId: 'org-123',
+        isByok: true,
+      })
+    );
+    expect(mockedAccountForMicrodollarUsage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        botId: 'bot-123',
+        tokenSource: 'gateway-token',
+        user_byok: true,
+      }),
+      expect.anything()
+    );
+  });
+
+  it('rejects an API-only token for a paid model before upstream', async () => {
+    setSignedTokenAuth(signedToken(KILO_API_AUDIENCE), {
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 99,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(
+      makeRequest(makeBody(), {
+        authorization: `Bearer ${signedToken(KILO_API_AUDIENCE)}`,
+      }) as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(mockedGetUserFromAuth).toHaveBeenCalledWith({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+    expect(mockedGetProvider).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+});
 
 describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => {
   beforeEach(() => {
@@ -496,7 +714,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     });
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
-      provider: { ...provider, id: 'friendli' },
+      provider: { ...provider, id: 'perplexity' },
       userByok: null,
       bypassAccessCheck: false,
       experiment: {
@@ -531,7 +749,7 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     });
     mockedGetProvider.mockResolvedValue({
       kind: 'provider',
-      provider: { ...provider, id: 'friendli' },
+      provider: { ...provider, id: 'perplexity' },
       userByok: null,
       bypassAccessCheck: false,
       experiment: {
@@ -566,16 +784,19 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('rejects the disabled LongCat free model before upstream', async () => {
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody('meituan/longcat-2.0-free')) as never);
+  it.each(['tencent/hy3:free', 'meituan/longcat-2.0-free'])(
+    'rejects the removed free model %s before upstream',
+    async modelId => {
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody(modelId)) as never);
 
-    expect(response.status).toBe(404);
-    expect(await response.json()).toMatchObject({
-      error_type: 'unavailable_model',
-    });
-    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({
+        error_type: 'unavailable_model',
+      });
+      expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+    }
+  );
 
   it('rate limits rules-engine rate-limit actions before upstream', async () => {
     mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('rate-limit'));
@@ -1339,7 +1560,7 @@ describe('percentage-routed partner fallback', () => {
       const { POST } = await import('./route');
       const response = await POST(
         makeMessagesRequest({
-          model: FRIENDLI_GLM_PUBLIC_ID,
+          model: PERPLEXITY_KIMI_PUBLIC_ID,
           max_tokens: 1_024,
           messages: [{ role: 'user', content: 'hello' }],
         }) as never
@@ -1350,10 +1571,10 @@ describe('percentage-routed partner fallback', () => {
       const partnerAttempt = mockedUpstreamRequest.mock.calls[0]?.[0];
       const fallbackAttempt = mockedUpstreamRequest.mock.calls[1]?.[0];
       expect(partnerAttempt.provider).toBe(partnerProvider);
-      expect(partnerAttempt.body.model).toBe('zai-org/GLM-5.2');
-      expect(partnerAttempt.body.metadata).toEqual({ transformedBy: 'friendli' });
+      expect(partnerAttempt.body.model).toBe('perplexity/kimi-k3');
+      expect(partnerAttempt.body.metadata).toEqual({ transformedBy: 'perplexity' });
       expect(fallbackAttempt.provider).toBe(sourceProvider);
-      expect(fallbackAttempt.body.model).toBe(FRIENDLI_GLM_PUBLIC_ID);
+      expect(fallbackAttempt.body.model).toBe(PERPLEXITY_KIMI_PUBLIC_ID);
       expect(fallbackAttempt.body.metadata).not.toHaveProperty('transformedBy');
       expect(fallbackAttempt.body).not.toBe(partnerAttempt.body);
       expect((fallbackAttempt.body as GatewayMessagesRequest).messages).not.toBe(
@@ -1409,7 +1630,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never
@@ -1440,7 +1661,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never
@@ -1465,7 +1686,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never
@@ -1484,7 +1705,7 @@ describe('percentage-routed partner fallback', () => {
     const { POST } = await import('./route');
     const response = await POST(
       makeMessagesRequest({
-        model: FRIENDLI_GLM_PUBLIC_ID,
+        model: PERPLEXITY_KIMI_PUBLIC_ID,
         max_tokens: 1_024,
         messages: [{ role: 'user', content: 'hello' }],
       }) as never

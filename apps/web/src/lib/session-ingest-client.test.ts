@@ -1,5 +1,5 @@
 import { captureException } from '@sentry/nextjs';
-import { generateInternalServiceToken } from '@/lib/tokens';
+import { generateBoundedInternalServiceToken } from '@/lib/tokens';
 import type { SessionSnapshot } from './session-ingest-client';
 import {
   fetchSessionSnapshot,
@@ -27,14 +27,14 @@ jest.mock('@/lib/config.server', () => ({
 }));
 
 jest.mock('@/lib/tokens', () => ({
-  generateInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
+  generateBoundedInternalServiceToken: jest.fn().mockReturnValue('mock-jwt-token'),
 }));
 
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
 const mockCaptureException = jest.mocked(captureException);
-const mockGenerateInternalServiceToken = jest.mocked(generateInternalServiceToken);
+const mockGenerateBoundedInternalServiceToken = jest.mocked(generateBoundedInternalServiceToken);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,7 +68,7 @@ describe('fetchSessionSnapshot', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('returns parsed snapshot with session model metadata on 200 response', async () => {
@@ -184,11 +184,14 @@ describe('fetchSessionSnapshot', () => {
 
     await fetchSessionSnapshot('ses_abc123', 'user_test_456');
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user_test_456', {
+      audience: 'session-ingest',
+      expiresIn: 60 * 60,
+    });
   });
 
   it('uses the generated token in the Authorization header', async () => {
-    mockGenerateInternalServiceToken.mockReturnValue('custom-test-token');
+    mockGenerateBoundedInternalServiceToken.mockReturnValue('custom-test-token');
 
     mockFetch.mockResolvedValue({
       ok: true,
@@ -215,7 +218,7 @@ describe('deleteSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('resolves successfully on 200', async () => {
@@ -251,7 +254,10 @@ describe('deleteSession', () => {
 
     await deleteSession('ses_abc123', 'user_test_456');
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user_test_456', {
+      audience: 'session-ingest',
+      expiresIn: 60 * 60,
+    });
   });
 
   it('throws and calls captureException on 500', async () => {
@@ -307,7 +313,7 @@ describe('shareSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('returns share_token on success', async () => {
@@ -361,7 +367,10 @@ describe('shareSession', () => {
 
     await shareSession('ses_abc123', 'user_test_456');
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user_test_456');
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user_test_456', {
+      audience: 'session-ingest',
+      expiresIn: 60 * 60,
+    });
   });
 
   it('throws on 404', async () => {
@@ -420,7 +429,7 @@ describe('unshareSession', () => {
   beforeEach(() => {
     mockFetch.mockReset();
     mockCaptureException.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   it('resolves on success', async () => {
@@ -720,7 +729,7 @@ describe('invalidateOrganizationSessionAccess', () => {
 describe('fetchSessionMessages', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   const fakeUser = { id: 'user_123' } as Parameters<typeof fetchSessionMessages>[1];
@@ -755,7 +764,7 @@ describe('fetchSessionMessages', () => {
 describe('fetchSessionMessagesPage', () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    mockGenerateInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
+    mockGenerateBoundedInternalServiceToken.mockReset().mockReturnValue('mock-jwt-token');
   });
 
   const validSessionId = 'ses_12345678901234567890123456';

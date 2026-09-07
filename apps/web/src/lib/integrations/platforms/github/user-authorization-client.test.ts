@@ -3,8 +3,9 @@ import { disconnectStoredGitHubUserAuthorization } from './user-authorization-cl
 const mockConfig = {
   apiUrl: 'https://git-token-service.example.com',
 };
-const mockGenerateInternalServiceToken = jest.fn(
-  (userId: string, _options?: { expiresIn?: number }) => `short-lived-user-token:${userId}`
+const mockGenerateBoundedInternalServiceToken = jest.fn(
+  (userId: string, _options?: { audience: string; expiresIn: number }) =>
+    `short-lived-user-token:${userId}`
 );
 
 jest.mock('@/lib/config.server', () => ({
@@ -15,15 +16,17 @@ jest.mock('@/lib/config.server', () => ({
 
 jest.mock('@/lib/tokens', () => ({
   TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
-  generateInternalServiceToken: (userId: string, options?: { expiresIn?: number }) =>
-    mockGenerateInternalServiceToken(userId, options),
+  generateBoundedInternalServiceToken: (
+    userId: string,
+    options: { audience: string; expiresIn: number }
+  ) => mockGenerateBoundedInternalServiceToken(userId, options),
 }));
 
 describe('disconnectStoredGitHubUserAuthorization', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
     mockConfig.apiUrl = 'https://git-token-service.example.com';
-    mockGenerateInternalServiceToken.mockClear();
+    mockGenerateBoundedInternalServiceToken.mockClear();
   });
 
   it('authenticates disconnect using a short-lived user-scoped token', async () => {
@@ -33,7 +36,8 @@ describe('disconnectStoredGitHubUserAuthorization', () => {
 
     await disconnectStoredGitHubUserAuthorization('kilo-user-1');
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('kilo-user-1', {
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('kilo-user-1', {
+      audience: 'git-token-service:github-user-authorizations:disconnect',
       expiresIn: 5 * 60,
     });
     expect(fetchMock).toHaveBeenCalledWith(

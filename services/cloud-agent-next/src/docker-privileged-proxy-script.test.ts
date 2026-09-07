@@ -95,18 +95,29 @@ async function startProxy(): Promise<{ proxySocket: string; request: Promise<Buf
 }
 
 function sendCreateRequest(proxySocket: string, name: string, image: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ Image: image, HostConfig: { PidMode: 'host' } });
-    const socket = net.createConnection(proxySocket, () => {
-      socket.write(
-        `POST /v1.48/containers/create?name=${encodeURIComponent(name)} HTTP/1.1\r\n` +
-          `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`
-      );
+  const body = JSON.stringify({ Image: image, HostConfig: { PidMode: 'host' } });
+  const attempt = (retry: number): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const socket = net.createConnection(proxySocket, () => {
+        socket.write(
+          `POST /v1.48/containers/create?name=${encodeURIComponent(name)} HTTP/1.1\r\n` +
+            `Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`
+        );
+      });
+      socket.once('error', error => {
+        socket.destroy();
+        // The proxy creates the socket file before it starts accepting
+        // connections; under load connect() can land in that window.
+        if (retry > 0 && (error as NodeJS.ErrnoException).code === 'ECONNREFUSED') {
+          setTimeout(() => attempt(retry - 1).then(resolve, reject), 25).unref();
+          return;
+        }
+        reject(error);
+      });
+      socket.once('end', resolve);
+      socket.resume();
     });
-    socket.once('error', reject);
-    socket.once('end', resolve);
-    socket.resume();
-  });
+  return attempt(40);
 }
 
 describe('docker-privileged-proxy.mjs', () => {

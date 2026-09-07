@@ -81,7 +81,7 @@ export function RenameModal<TSaveResult>({
       await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : t('kiloclaw.dashboard.renameFailed'));
+      setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
     } finally {
       setPending(false);
     }

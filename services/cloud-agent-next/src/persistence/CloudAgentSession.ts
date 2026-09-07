@@ -6,7 +6,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
-import { generateEphemeralDeploymentSlug } from '@kilocode/worker-utils/deployment-slug';
+import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import type { OperationResult } from './types.js';
 import {
   getSandboxProvider,
@@ -2560,7 +2560,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       workspace: {
         ...input.workspace,
         sandboxProvider: input.workspace?.sandboxProvider ?? 'cloudflare',
-        branchName: repository?.upstreamBranch ?? `kilo/${generateEphemeralDeploymentSlug()}`,
+        branchName: repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`,
       },
       lifecycle: {
         version: now,

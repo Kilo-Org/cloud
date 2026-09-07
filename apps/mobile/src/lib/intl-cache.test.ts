@@ -54,6 +54,12 @@ describe('intl-cache', () => {
       PluralRules: nativeIntl.PluralRules,
     });
 
+    // First, deliberately: a tag no `@formatjs` locale list carries — the
+    // others are `zh-Hans`, `zh-Hant`, `ht` and `pt-BR`. `shouldPolyfill`
+    // cannot match one by lookup, so it falls through to the CLDR best-fit
+    // matcher, which constructs `Intl.Locale`. This is the call that used to
+    // throw, before any other had installed that polyfill.
+    expect(numberFormat('mi', {}).format(1234.5)).toMatch(/1/);
     expect(relativeTimeFormat('de', { numeric: 'auto' }).format(-5, 'minute')).toBe(
       'vor 5 Minuten'
     );

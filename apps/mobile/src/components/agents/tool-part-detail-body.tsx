@@ -71,7 +71,11 @@ function renderToolBody(part: ToolPart): React.ReactNode {
   }
 }
 
-export function ToolPartDetailBody({ part }: Readonly<{ part: ToolPart }>) {
+export function ToolPartDetailBody({
+  part,
+  imageFailed,
+  onImageError,
+}: Readonly<{ part: ToolPart; imageFailed?: boolean; onImageError?: (uri: string) => void }>) {
   const { t } = useTranslation();
   const status = part.state.status;
 
@@ -83,7 +87,13 @@ export function ToolPartDetailBody({ part }: Readonly<{ part: ToolPart }>) {
       {status === 'running' ? (
         <Text className="text-xs text-muted-foreground">{t('agentChat.partDetail.running')}</Text>
       ) : null}
-      {getToolImageAttachments(part).length > 0 ? <ToolCardImageAttachments part={part} /> : null}
+      {getToolImageAttachments(part).length > 0 ? (
+        <ToolCardImageAttachments
+          part={part}
+          imageFailed={imageFailed}
+          onImageError={onImageError}
+        />
+      ) : null}
       {getToolFileAttachments(part).length > 0 ? <ToolCardFileAttachments part={part} /> : null}
       {renderToolBody(part)}
     </View>

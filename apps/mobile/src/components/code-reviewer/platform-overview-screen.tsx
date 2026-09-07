@@ -1,9 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
+import { CenteredState } from '@/components/centered-state';
 import { openModelPicker } from '@/components/agents/model-selector';
 import { BitbucketOverview } from '@/components/code-reviewer/bitbucket-overview';
 import {
@@ -59,7 +61,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow={t('codeReviewer.title')}
+        eyebrow={t('common.codeReviewer')}
         onRetry={() => {
           permission.refetch();
         }}
@@ -95,7 +97,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow={t('codeReviewer.title')}
+        eyebrow={t('common.codeReviewer')}
         variant={providerState.variant}
         // A permission/not-found error can't be fixed by retrying — hide retry.
         onRetry={
@@ -122,12 +124,30 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow={t('codeReviewer.title')}
+        eyebrow={t('common.codeReviewer')}
         onRetry={() => {
           void config.refetch();
         }}
         isRetrying={config.isFetching}
       />
+    );
+  }
+
+  const handleConnected = status.refetch;
+  if (!isLoading && !connected) {
+    return (
+      <View className="flex-1 bg-background">
+        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <CenteredState className="px-6">
+          {canEdit ? (
+            <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
+          ) : (
+            <Text className="text-center text-xs text-muted-foreground">
+              {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
+            </Text>
+          )}
+        </CenteredState>
+      </View>
     );
   }
 
@@ -176,7 +196,7 @@ export function PlatformOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.eyebrow')} />
+      <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
@@ -187,23 +207,6 @@ export function PlatformOverviewScreen({
                   <Skeleton key={index} className="h-12 w-full rounded-lg" />
                 ))}
               </View>
-            </Animated.View>
-          )}
-
-          {!isLoading && !connected && (
-            <Animated.View entering={FadeIn.duration(200)}>
-              {canEdit ? (
-                <ProviderConnectCard
-                  scope={scope}
-                  platform={platform}
-                  // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-                  onConnected={() => status.refetch()}
-                />
-              ) : (
-                <Text className="text-center text-xs text-muted-foreground">
-                  {t('codeReviewer.notConnectedReadOnly', { platform: capabilities.label })}
-                </Text>
-              )}
             </Animated.View>
           )}
 
@@ -279,7 +282,7 @@ export function PlatformOverviewScreen({
                         pushField('repos');
                       }}
                     >
-                      <Text>{t('codeReviewer.selectRepositories')}</Text>
+                      <Text>{t('common.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}
@@ -312,7 +315,7 @@ export function PlatformOverviewScreen({
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
-                  {t('codeReviewer.readOnlyDescription')}
+                  {t('securityAgent.sla.permissionNote')}
                 </Text>
               )}
             </Animated.View>

@@ -1,0 +1,37 @@
+import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
+
+type ConfigData = inferRouterOutputs<MobileRouter>['organizations']['securityAgent']['getConfig'];
+
+export const securityConfigFixture: ConfigData = {
+  hasConfig: false,
+  configRevision: 1,
+  isEnabled: false,
+  slaCriticalDays: 15,
+  slaHighDays: 30,
+  slaMediumDays: 45,
+  slaLowDays: 90,
+  slaEnabled: false,
+  autoSyncEnabled: true,
+  repositorySelectionMode: 'all',
+  selectedRepositoryIds: [],
+  modelSlug: 'test/model',
+  triageModelSlug: 'test/model',
+  analysisModelSlug: 'test/model',
+  analysisMode: 'auto',
+  autoDismissEnabled: false,
+  autoDismissConfidenceThreshold: 'high',
+  autoAnalysisEnabled: false,
+  autoAnalysisMinSeverity: 'high',
+  autoAnalysisIncludeExisting: false,
+  autoRemediationEnabled: false,
+  autoRemediationMinSeverity: 'high',
+  autoRemediationIncludeExisting: false,
+  autoRemediationRequireApproval: true,
+  autoRemediationEnabledAt: null,
+  remediationModelSlug: 'test/model',
+  slaNotificationsEnabled: false,
+  slaNotificationMinSeverity: 'high',
+  slaNotificationWarningDays: 3,
+  newFindingNotificationsEnabled: false,
+  newFindingNotificationMinSeverity: 'high',
+};

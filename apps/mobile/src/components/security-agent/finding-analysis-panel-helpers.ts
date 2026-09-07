@@ -17,7 +17,7 @@ export function getAgentChatSessionHref(scope: string, cliSessionId: string | nu
 
 export function formatExploitable(isExploitable: boolean | 'unknown'): string {
   if (isExploitable === 'unknown') {
-    return i18n.t('securityAgent.analysis.unknown');
+    return i18n.t('common.unknown');
   }
   return isExploitable ? i18n.t('securityAgent.analysis.yes') : i18n.t('securityAgent.analysis.no');
 }

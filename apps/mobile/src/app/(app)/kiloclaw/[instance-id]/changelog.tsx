@@ -60,26 +60,22 @@ export default function ChangelogScreen() {
 
     if (changelogQuery.isError) {
       return (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('kiloclaw.changelog.couldNotLoad')}
-            onRetry={() => {
-              void changelogQuery.refetch();
-            }}
-          />
-        </View>
+        <QueryError
+          message={t('kiloclaw.changelog.couldNotLoad')}
+          onRetry={() => {
+            void changelogQuery.refetch();
+          }}
+        />
       );
     }
 
     if (!entries || entries.length === 0) {
       return (
-        <View className="flex-1 items-center justify-center">
-          <EmptyState
-            icon={Newspaper}
-            title={t('kiloclaw.changelog.noUpdates')}
-            description={t('kiloclaw.changelog.noUpdatesDescription')}
-          />
-        </View>
+        <EmptyState
+          icon={Newspaper}
+          title={t('kiloclaw.changelog.noUpdates')}
+          description={t('kiloclaw.changelog.noUpdatesDescription')}
+        />
       );
     }
 

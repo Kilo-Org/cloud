@@ -1,10 +1,7 @@
 import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { OpenRouterModel } from '@/lib/organizations/organization-types';
-import {
-  FRIENDLI_GLM_PUBLIC_ID,
-  PERPLEXITY_KIMI_PUBLIC_ID,
-} from '@/lib/ai-gateway/providers/partner/constants';
+import { PERPLEXITY_KIMI_PUBLIC_ID } from '@/lib/ai-gateway/providers/partner/constants';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
@@ -115,7 +112,8 @@ describe('custom model pricing', () => {
     ).toBeUndefined();
   });
 
-  test('uses GLM 5.2 Friendli pricing only when market cost is missing', () => {
+  test('does not apply custom pricing to GLM 5.2', () => {
+    const model = makeModel('z-ai/glm-5.2');
     const usage = makeUsage({
       inputTokens: 100,
       outputTokens: 10,
@@ -123,12 +121,10 @@ describe('custom model pricing', () => {
       cacheWriteTokens: 30,
     });
 
-    expect(calculateCustomCost_mUsd(FRIENDLI_GLM_PUBLIC_ID, usage)).toBe(
-      Math.round(50 * 1.4 + 10 * 4.4 + 20 * 0.26 + 30 * 1.4)
-    );
-    expect(
-      calculateCustomCost_mUsd(FRIENDLI_GLM_PUBLIC_ID, { ...usage, cost_mUsd: 123 })
-    ).toBeUndefined();
+    expect(applyCustomPricingToModel(model)).toBe(model);
+    expect(applyCustomPricingToPricing(model.id, model.pricing)).toBe(model.pricing);
+    expect(calculateCustomCost_mUsd(model.id, usage)).toBeUndefined();
+    expect(calculateCustomCost_mUsd(model.id, { ...usage, cost_mUsd: 123 })).toBeUndefined();
   });
 
   test('uses fallback-only custom pricing in the model list', () => {

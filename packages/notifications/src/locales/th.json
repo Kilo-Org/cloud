@@ -7,7 +7,8 @@
       "instanceLifecycle": "อินสแตนซ์ของคุณมีการอัปเดต",
       "scheduledAction": "การดำเนินการที่กำหนดไว้มีการอัปเดต",
       "lowBalance": "ยอดคงเหลือของคุณต้องได้รับการดูแล",
-      "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล"
+      "securityFinding": "พบปัญหาความปลอดภัยที่ต้องได้รับการดูแล",
+      "activeAgentsGlanceable": "เอเจนต์ที่กำลังทำงานมีการอัปเดต"
     }
   },
   "cloudAgentSession": {

@@ -50,11 +50,14 @@ import type { Organization, User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
-import { generateApiToken } from '@/lib/tokens';
+import { generateApiToken, JWT_TOKEN_VERSION } from '@/lib/tokens';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
-import { KILO_API_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import {
+  KILO_API_AUDIENCE,
+  KILO_GATEWAY_AUDIENCE,
+} from '@kilocode/worker-utils/internal-service-token-audiences';
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@/lib/config.server';
@@ -551,6 +554,63 @@ describe('uuidSchema (organization ID validation)', () => {
 });
 
 describe('getUserFromAuth', () => {
+  test('enforces the requested audience without falling through to a valid session', async () => {
+    const user = await insertTestUser({
+      api_token_pepper: 'audience-transition-pepper',
+      web_session_pepper: 'current-web-session-pepper',
+    });
+    const token = signPolicyClaims({
+      version: JWT_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_API_AUDIENCE,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        authorization: `Bearer ${token}`,
+        cookie: 'next-auth.session-token=session',
+      })
+    );
+    mockGetServerSession.mockResolvedValue({
+      kiloUserId: user.id,
+      webSessionPepper: 'current-web-session-pepper',
+    });
+
+    const apiResult = await getUserFromAuth({ adminOnly: false });
+    const gatewayResult = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    expect(apiResult.user?.id).toBe(user.id);
+    expect(gatewayResult.user).toBeNull();
+    expect(gatewayResult.authFailedResponse?.status).toBe(401);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
+  test('accepts a gateway audience only for a gateway operation', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'gateway-audience-pepper' });
+    const token = signPolicyClaims({
+      version: JWT_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_GATEWAY_AUDIENCE,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const gatewayResult = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+    const apiResult = await getUserFromAuth({ adminOnly: false });
+
+    expect(gatewayResult.user?.id).toBe(user.id);
+    expect(apiResult.user).toBeNull();
+    expect(apiResult.authFailedResponse?.status).toBe(401);
+  });
+
   test('allows API-token authentication for users from SSO-protected domains', async () => {
     const ssoDomain = `${crypto.randomUUID()}.example.com`;
     const user = await insertTestUser({

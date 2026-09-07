@@ -7,7 +7,8 @@
       "instanceLifecycle": "Instansiyangizda yangilanish bor",
       "scheduledAction": "Rejalashtirilgan harakatda yangilanish bor",
       "lowBalance": "Balansingiz e'tibor talab qiladi",
-      "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi"
+      "securityFinding": "Xavfsizlik xulosasi e'tibor talab qiladi",
+      "activeAgentsGlanceable": "Faol agentlarda yangilanish bor"
     }
   },
   "cloudAgentSession": {

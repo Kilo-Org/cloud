@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, TextInput, View } from 'react-native';
+import { TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -83,9 +84,9 @@ export function EmailOtpForm({
         variant="ghost"
         disabled={authBusy}
         onPress={onBack}
-        accessibilityLabel={t('login.back')}
+        accessibilityLabel={t('common.back')}
       >
-        <Text>{t('login.back')}</Text>
+        <Text>{t('common.back')}</Text>
       </Button>
     </View>
   );

@@ -25,6 +25,9 @@ import { db } from '@/lib/drizzle';
 import { organizations, organization_memberships } from '@kilocode/db/schema';
 import { expectNonExchangeableSystemToken } from '@/tests/helpers/system-token.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { verifyKiloTokenForResource } from '@kilocode/worker-utils/kilo-token-policy';
+import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { User } from '@kilocode/db/schema';
 
@@ -155,6 +158,12 @@ describe('App Builder system tokens', () => {
 
     for (const { token } of tokens) {
       await expectNonExchangeableSystemToken(token, user, 'app-builder');
+      await expect(
+        verifyKiloTokenForResource(token, NEXTAUTH_SECRET, {
+          audience: CLOUD_AGENT_NEXT_AUDIENCE,
+          mode: 'allow-legacy',
+        })
+      ).resolves.toMatchObject({ kiloUserId: user.id, tokenSource: 'app-builder' });
     }
   });
 });

@@ -553,8 +553,9 @@ describe('ConversationMessages', () => {
     const childControl = renderedButtons.find(button => button.includes('Inspect the parser'));
     expect(childControl).toContain('>Explore<');
     expect(childControl).not.toContain('explore Agent');
-    expect(childControl).toContain('Latest: Read parser.ts');
-    expect(childControl).toContain('parser.ts');
+    expect(childControl).toMatch(/<title>Working<\/title>[\s\S]*Inspect the parser/);
+    expect(childControl).toContain('>Read parser.ts<');
+    expect(childControl).not.toContain('Latest:');
     expect(childControl).toContain('2 tool calls');
     expect(childControl).toContain('aria-busy="true"');
     expect(childControl).not.toContain('aria-expanded=');
@@ -621,8 +622,8 @@ describe('ConversationMessages', () => {
         });
       const html = render();
 
-      expect(html).toContain(`Latest: Read package.json${status === 'error' ? ' (failed)' : ''}`);
-      expect(html).not.toContain('Latest: Shell');
+      expect(html).toContain(`>Read package.json${status === 'error' ? ' (failed)' : ''}<`);
+      expect(html).not.toContain('Shell pnpm');
       expect(html).not.toContain('Working...');
       expect(html).toContain('2 tool calls');
       expect(html).toContain('aria-busy="true"');
@@ -638,8 +639,8 @@ describe('ConversationMessages', () => {
         ])
       );
       const next = render();
-      expect(next).toContain('Latest: Read README.md');
-      expect(next).not.toContain('Latest: Read package.json');
+      expect(next).toContain('>Read README.md<');
+      expect(next).not.toContain('Read package.json');
       expect(next).toContain('3 tool calls');
       expect(next).toContain('aria-busy="true"');
     }
@@ -657,6 +658,8 @@ describe('ConversationMessages', () => {
       ]);
 
       expect(html).toContain(status === 'pending' ? 'Delegating...' : 'Working...');
+      expect(html).toContain(`<title>${status === 'pending' ? 'Delegating' : 'Working'}</title>`);
+      expect(html).toContain('aria-busy="true"');
       expect(html).not.toContain('0 tool calls');
       expect(html).not.toContain('Completed');
     }
@@ -690,7 +693,8 @@ describe('ConversationMessages', () => {
     expect(buttons(html)).toEqual([expect.stringContaining('Inspect the parser')]);
     expect(buttons(html)[0]).toContain('>Explore<');
     expect(buttons(html)[0]).toContain('Completed');
-    expect(buttons(html)[0]).not.toContain('Latest:');
+    expect(buttons(html)[0]).not.toContain('<title>Working</title>');
+    expect(buttons(html)[0]).not.toContain('>Shell pnpm<');
     expect(buttons(html)[0]).toContain('1 tool call');
     expect(buttons(html)[0]).not.toContain('1 tool calls');
     expect(buttons(html)[0]).not.toContain('aria-busy="true"');

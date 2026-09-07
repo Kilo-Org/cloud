@@ -70,6 +70,7 @@ function createRuntime(
       let worktree = worktrees.get(directory);
       if (!worktree) {
         worktree = {
+          runtimeId: `native_${worktrees.size + 1}`,
           scopeId: directory,
           directory,
           env: { WORKTREE_VALUE: directory },
@@ -551,6 +552,7 @@ describe('control terminal PTY ownership', () => {
     for (const identity of [firstSession, secondSession]) {
       const directory = identity.directory;
       worktrees.set(directory, {
+        runtimeId: `native_${identity.sessionId}`,
         directory,
         scopeId: directory,
         env: { HOME: `/home/${identity.sessionId}`, KILOCODE_TOKEN: `guest-${identity.sessionId}` },
@@ -763,6 +765,7 @@ describe('control terminal reverse WebSocket bridge', () => {
       [secondSession, secondServers, 'pty_second'],
     ] as const) {
       worktrees.set(identity.directory, {
+        runtimeId: `native_${identity.sessionId}`,
         scopeId: identity.directory,
         directory: identity.directory,
         env: {},

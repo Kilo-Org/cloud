@@ -7,7 +7,8 @@
       "instanceLifecycle": "Forekomsten din har en oppdatering",
       "scheduledAction": "En planlagt handling har en oppdatering",
       "lowBalance": "Saldoen din krever oppmerksomhet",
-      "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet"
+      "securityFinding": "Et sikkerhetsfunn krever oppmerksomhet",
+      "activeAgentsGlanceable": "Aktive agenter har en oppdatering"
     }
   },
   "cloudAgentSession": {

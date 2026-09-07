@@ -4,7 +4,7 @@ import {
 } from './credential-broker-client';
 
 const mockConfig = { apiUrl: 'https://git-token-service.example.com' };
-const mockGenerateInternalServiceToken = jest.fn(
+const mockGenerateBoundedInternalServiceToken = jest.fn(
   (userId: string, _options: { expiresIn: number; audience: string; organizationId?: string }) =>
     `broker-token:${userId}`
 );
@@ -17,10 +17,10 @@ jest.mock('@/lib/config.server', () => ({
 
 jest.mock('@/lib/tokens', () => ({
   TOKEN_EXPIRY: { fiveMinutes: 5 * 60 },
-  generateInternalServiceToken: (
+  generateBoundedInternalServiceToken: (
     userId: string,
     options: { expiresIn: number; audience: string; organizationId?: string }
-  ) => mockGenerateInternalServiceToken(userId, options),
+  ) => mockGenerateBoundedInternalServiceToken(userId, options),
 }));
 
 function jsonResponse(body: unknown, init?: ResponseInit): Response {
@@ -34,7 +34,7 @@ describe('fetchGitLabCredential', () => {
   beforeEach(() => {
     jest.restoreAllMocks();
     mockConfig.apiUrl = 'https://git-token-service.example.com';
-    mockGenerateInternalServiceToken.mockClear();
+    mockGenerateBoundedInternalServiceToken.mockClear();
   });
 
   it('uses a purpose-bound actor token and posts the strict integration selector', async () => {
@@ -51,7 +51,7 @@ describe('fetchGitLabCredential', () => {
       { credential: 'integration', integrationId: '22222222-2222-4222-8222-222222222222' }
     );
 
-    expect(mockGenerateInternalServiceToken).toHaveBeenCalledWith('user-1', {
+    expect(mockGenerateBoundedInternalServiceToken).toHaveBeenCalledWith('user-1', {
       expiresIn: 5 * 60,
       audience: 'git-token-service:gitlab-credentials',
       organizationId: '11111111-1111-4111-8111-111111111111',

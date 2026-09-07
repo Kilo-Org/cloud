@@ -91,11 +91,6 @@ export type OpenRouterChatCompletionRequest = OpenAI.Chat.ChatCompletionCreatePa
     // https://openrouter.ai/docs/use-cases/reasoning-tokens#controlling-reasoning-tokens
     reasoning?: OpenRouterReasoningConfig;
 
-    // https://friendli.ai/docs/guides/reasoning
-    chat_template_kwargs?: {
-      enable_thinking: boolean;
-    };
-    parse_reasoning?: boolean;
     include_reasoning?: boolean;
   };
 

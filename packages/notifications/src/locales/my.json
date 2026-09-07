@@ -7,7 +7,8 @@
       "instanceLifecycle": "သင့် instance တွင် အသစ်အဆန်း ရှိသည်",
       "scheduledAction": "စီစဉ်ထားသော လုပ်ဆောင်ချက်တွင် အသစ်အဆန်း ရှိသည်",
       "lowBalance": "သင့်လက်ကျန် အာရုံစိုက်ရန် လိုအပ်သည်",
-      "securityFinding": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်"
+      "securityFinding": "လုံခြုံရေး တွေ့ရှိချက်တစ်ခု အာရုံစိုက်ရန် လိုအပ်သည်",
+      "activeAgentsGlanceable": "လုပ်ဆောင်နေသော agent များတွင် အသစ်အဆန်း ရှိသည်"
     }
   },
   "cloudAgentSession": {

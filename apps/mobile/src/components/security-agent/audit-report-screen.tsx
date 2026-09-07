@@ -27,13 +27,13 @@ const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
 // Literal keys, never a template: the catalog check scans the source for the
 // keys a lookup passes on, and a computed key is invisible to it.
 const SEVERITY_LABEL_KEYS = {
-  critical: 'securityAgent.sla.critical',
+  critical: 'common.critical',
   high: 'securityAgent.sla.high',
   medium: 'securityAgent.sla.medium',
   low: 'securityAgent.sla.low',
   // A finding whose severity the scanner never reported. The SLA policy has no
   // row for it, so reuse the finding-details word.
-  unknown: 'securityAgent.findingDetails.unknown',
+  unknown: 'common.unknown',
 } as const;
 
 // Personal and org procedures resolve to nominally distinct tRPC option
@@ -109,10 +109,7 @@ function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }
     <View className="gap-3 rounded-lg bg-secondary p-3">
       <Text className="text-sm font-medium">{t('securityAgent.auditReport.summary')}</Text>
       <View className="flex-row flex-wrap gap-x-6 gap-y-2">
-        <SummaryCount
-          label={t('securityAgent.auditReport.findings')}
-          value={report.summary.findingCount}
-        />
+        <SummaryCount label={t('common.findings')} value={report.summary.findingCount} />
         <SummaryCount
           label={t('securityAgent.auditReport.events')}
           value={report.summary.activityCount}
@@ -156,7 +153,10 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
   );
 }
 
-function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
+function AuditReportView({
+  report,
+  onRetry,
+}: Readonly<{ report: SecurityAgentAuditReport; onRetry?: () => void }>) {
   const { t } = useTranslation();
   if (report.findings.length === 0) {
     const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
@@ -177,6 +177,13 @@ function AuditReportView({ report }: Readonly<{ report: SecurityAgentAuditReport
 
   return (
     <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
+      {onRetry ? (
+        <QueryError
+          placement="top"
+          message={t('securityAgent.auditReport.couldNotLoad')}
+          onRetry={onRetry}
+        />
+      ) : null}
       <ReportHeader report={report} />
       <ReportSummary report={report} />
       {report.findings.map(finding => (
@@ -190,6 +197,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
   const { t } = useTranslation();
   const query = useSecurityAgentAuditReport(scope);
   const errorCode = query.error?.data?.code;
+  const hasReport = query.data?.status === 'ok' && query.data.report.findings.length > 0;
   // The org procedure is `organizationBillingProcedure`, which rejects
   // viewers without the owner/billing_manager role. That denial is
   // non-retryable: retrying cannot change the viewer's role.
@@ -213,37 +221,37 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
         />
       )}
 
-      {!query.isLoading && query.isError && !forbidden && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('securityAgent.auditReport.couldNotLoad')}
-            onRetry={() => void query.refetch()}
-          />
-        </View>
+      {!query.isLoading && query.isError && !forbidden && !hasReport && (
+        <QueryError
+          message={t('securityAgent.auditReport.couldNotLoad')}
+          onRetry={() => void query.refetch()}
+        />
       )}
 
       {!query.isLoading && !query.isError && query.data?.status === 'query_failed' && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            message={t('securityAgent.auditReport.queryFailed')}
-            onRetry={() => void query.refetch()}
-          />
-        </View>
+        <QueryError
+          message={t('securityAgent.auditReport.queryFailed')}
+          onRetry={() => void query.refetch()}
+        />
       )}
 
       {query.isPending && query.isPaused && (
-        <View className="flex-1 items-center justify-center">
-          <QueryError
-            variant="offline"
-            message={t('securityAgent.auditReport.checkConnection')}
-            onRetry={() => void query.refetch()}
-          />
-        </View>
+        <QueryError
+          variant="offline"
+          message={t('organization.boundary.loadErrorMessage')}
+          onRetry={() => void query.refetch()}
+        />
       )}
 
-      {!query.isLoading && !query.isError && query.data?.status === 'ok' && (
-        <AuditReportView report={query.data.report} />
-      )}
+      {!query.isLoading &&
+        !forbidden &&
+        (!query.isError || hasReport) &&
+        query.data?.status === 'ok' && (
+          <AuditReportView
+            report={query.data.report}
+            onRetry={query.isError ? () => void query.refetch() : undefined}
+          />
+        )}
     </View>
   );
 }

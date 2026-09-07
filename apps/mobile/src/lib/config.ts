@@ -67,3 +67,7 @@ function optionalLatencyMs(key: keyof typeof OPTIONAL_ENV_KEYS): number {
 export const E2E_LATENCY_SESSION_MS: number = optionalLatencyMs('e2eLatencySessionMs');
 export const E2E_LATENCY_MESSAGES_MS: number = optionalLatencyMs('e2eLatencyMessagesMs');
 export const E2E_LATENCY_WS_MS: number = optionalLatencyMs('e2eLatencyWsMs');
+
+/** E2E-only secure-store fault window (see lib/auth/secure-store-read.ts):
+ *  while it is open, every read through the retry helper rejects. 0 = disabled. */
+export const E2E_SECURE_STORE_FAULT_MS: number = optionalLatencyMs('e2eSecureStoreFaultMs');

@@ -57,7 +57,7 @@ vi.mock('@/components/security-agent/collapsible-section', () => ({
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({
-  TabScreenScrollView: (props: { children?: unknown }) => props.children,
+  TabScreenScrollView: 'TabScreenScrollView',
 }));
 
 type R = TestRenderer.ReactTestRenderer;
@@ -173,11 +173,7 @@ function isInstance(child: I | string): child is I {
 function firstChildTypeOfScreenRoot(root: I): string | undefined {
   const screenView = root.children.find(isInstance);
   const first = screenView?.children.find(isInstance);
-  if (!first) {
-    return undefined;
-  }
-  const type = first.type;
-  return typeof type === 'string' ? type : undefined;
+  return first && typeof first.type === 'string' ? first.type : undefined;
 }
 
 function useQueryEnabledFlags(): boolean[] {
@@ -244,18 +240,8 @@ describe('AuditReportScreen states', () => {
     expect(findByType(root.root, 'EmptyState')).toHaveLength(0);
   });
 
-  it('renders a non-retryable explanation without Retry on FORBIDDEN', () => {
-    setQueryState({ isError: true, error: { data: { code: 'FORBIDDEN' } } });
-    const root = renderScreen('org-123');
-
-    const empty = findByType(root.root, 'EmptyState');
-    expect(empty).toHaveLength(1);
-    expect(empty[0]?.props.title).toBe('Audit report unavailable');
-    expect(findByType(root.root, 'QueryError')).toHaveLength(0);
-  });
-
-  it('treats the org billing-gate UNAUTHORIZED denial as non-retryable too', () => {
-    setQueryState({ isError: true, error: { data: { code: 'UNAUTHORIZED' } } });
+  it.each(['FORBIDDEN', 'UNAUTHORIZED'])('renders a non-retryable explanation for %s', code => {
+    setQueryState({ isError: true, error: { data: { code } } });
     const root = renderScreen('org-123');
 
     const empty = findByType(root.root, 'EmptyState');
@@ -287,6 +273,43 @@ describe('AuditReportScreen states', () => {
     const empty = findByType(root.root, 'EmptyState');
     expect(empty).toHaveLength(1);
     expect(empty[0]?.props.title).toBe('No recorded activity');
+    expect(empty[0]?.props.placement).not.toBe('top');
+    expect(findByType(root.root, 'TabScreenScrollView')).toHaveLength(0);
+  });
+
+  it('retains a cached report with an inline retry after a transient failure', () => {
+    setQueryState({
+      isError: true,
+      error: { data: { code: 'INTERNAL_SERVER_ERROR' } },
+      data: { status: 'ok', report: makeReport() },
+    });
+    const tree = renderScreen('personal');
+    expect(findByType(tree.root, 'CollapsibleSection')).toHaveLength(1);
+    expect(findByType(tree.root, 'QueryError')[0]?.props.placement).toBe('top');
+    expect(findByType(tree.root, 'TabScreenScrollView')).toHaveLength(1);
+  });
+
+  it('shows a full-body failure when the cached report has no activity', () => {
+    setQueryState({
+      isError: true,
+      data: { status: 'ok', report: makeReport({ findings: [] }) },
+    });
+    const tree = renderScreen('personal');
+    expect(findByType(tree.root, 'QueryError')).toHaveLength(1);
+    expect(findByType(tree.root, 'QueryError')[0]?.props.placement).not.toBe('top');
+    expect(findByType(tree.root, 'TabScreenScrollView')).toHaveLength(0);
+    expect(findByType(tree.root, 'EmptyState')).toHaveLength(0);
+  });
+
+  it.each(['FORBIDDEN', 'UNAUTHORIZED'])('does not retain a report after %s', code => {
+    setQueryState({
+      isError: true,
+      error: { data: { code } },
+      data: { status: 'ok', report: makeReport() },
+    });
+    const tree = renderScreen('org-123');
+    expect(findByType(tree.root, 'TabScreenScrollView')).toHaveLength(0);
+    expect(findByType(tree.root, 'EmptyState')).toHaveLength(1);
   });
 
   it('renders one section per finding group for a non-empty report', () => {

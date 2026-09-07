@@ -7,7 +7,7 @@
 // real `ShareGateSheet` with every RN-touching dependency stubbed and drives
 // the spawn via the list's captured `onSpawnInstance` prop.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,6 +41,8 @@ const spawnMock = vi.hoisted(() =>
     })
   )
 );
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 const toastError = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
 const refetchInstancesMock = vi.hoisted(() => vi.fn(() => undefined));
@@ -187,9 +189,10 @@ vi.mock('./share-destination-list', () => ({
   ShareDestinationList: (props: {
     onSpawnInstance: (row: ShareCliSpawnRow) => void;
     instanceRowsDisabled: boolean;
-  }) => {
+    headerContent: ReactNode;
+  }): ReactNode => {
     shareDestinationListProps.current = props;
-    return null;
+    return props.headerContent;
   },
 }));
 

@@ -44,18 +44,36 @@ describe('root layout startup order (text contract)', () => {
   // The persisted deep-link record is account-bound. Auth bootstrap publishes
   // the signed-in user id before it clears `authLoading`, so a restore that
   // runs on an empty dependency array reads a null user id and deletes the
-  // record it was meant to restore.
-  it('gates the persisted deep-link restore on authLoading', () => {
-    const codeSource = stripComments(layoutSource);
+  // record it was meant to restore. A FAILED restore is not a signed-out
+  // answer either: the credential reads never resolved, so the account
+  // binding is unknown and the restore must also wait out the retryable
+  // error surface until bootstrap settles signed-in or signed-out.
+  it('gates the persisted deep-link restore on the bootstrap outcome', () => {
+    const hookPath = fileURLToPath(
+      new URL('hooks/use-pending-deep-link-restore.ts', import.meta.url)
+    );
+    const hookSource = stripComments(readFileSync(hookPath, 'utf8'));
     const restoreEffect =
-      /restorePersistedPendingDeepLink\(\);[\s\S]{0,60}?\}, \[([^\]]*)\]\)/.exec(codeSource);
+      /restorePersistedPendingDeepLink\(\);[\s\S]{0,60}?\}, \[([^\]]*)\]\)/.exec(hookSource);
     expect(
       restoreEffect,
-      '_layout.tsx must call restorePersistedPendingDeepLink in an effect'
+      'use-pending-deep-link-restore.ts must call restorePersistedPendingDeepLink in an effect'
     ).not.toBe(null);
     expect(
       restoreEffect?.[1]?.includes('authLoading'),
       'the restore effect must depend on authLoading, not run on mount'
+    ).toBe(true);
+    expect(
+      restoreEffect?.[1]?.includes('restoreFailed'),
+      'the restore effect must depend on restoreFailed: a failed restore is not a signed-out answer'
+    ).toBe(true);
+
+    // The layout owns no inline restore effect: it wires the gate through the
+    // hook with both bootstrap inputs.
+    const codeSource = stripComments(layoutSource);
+    expect(
+      codeSource.includes('usePendingDeepLinkRestore({ authLoading, restoreFailed })'),
+      '_layout.tsx must gate the persisted deep-link restore through usePendingDeepLinkRestore'
     ).toBe(true);
   });
 

@@ -1,14 +1,36 @@
 import { describe, expect, it, jest, beforeAll, beforeEach } from '@jest/globals';
+import { inspect } from 'node:util';
+import { DrizzleQueryError } from 'drizzle-orm';
 import type * as TrpcInitModule from '@/lib/trpc/init';
 import type { createWorktreeChat as CreateWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import type * as MinimumVersionModule from '@/lib/trpc/min-version';
+import type * as OrganizationUtilsModule from '@/routers/organizations/utils';
+import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import type * as ZodModule from 'zod';
 import type { z } from 'zod';
-import type { User } from '@kilocode/db/schema';
+import {
+  cli_sessions_v2,
+  organization_memberships,
+  organizations,
+  type Organization,
+  type User,
+} from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
+import { insertTestUser } from '@/tests/helpers/user.helper';
+import { and, eq } from 'drizzle-orm';
+import type * as SessionOwnership from '@/lib/cloud-agent/session-ownership';
+import type {
+  GetWorktreeChangesOutput,
+  RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type * as BitbucketIntegrationHelpers from '@/lib/cloud-agent/bitbucket-integration-helpers';
 import type { BitbucketOrganizationRepositoryListResult } from '@/lib/cloud-agent/bitbucket-integration-helpers';
 import { TRPCError } from '@trpc/server';
-import type { basePrepareSessionNextSchema } from '@/routers/cloud-agent-next-schemas';
+import type { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
+import type {
+  basePrepareSessionNextSchema,
+  SandboxStatusSnapshot,
+} from '@/routers/cloud-agent-next-schemas';
 
 const ORGANIZATION_ID = '9a283301-b75d-4375-a1ba-e319a02e18b7';
 
@@ -62,12 +84,21 @@ const mockCreateWorktreeChat = jest.fn<typeof CreateWorktreeChat>();
 
 const mockCancelQueuedMessage =
   jest.fn<(input: { sessionId: string; messageId: string }) => Promise<{ dropped: boolean }>>();
+const mockGetSandboxStatus =
+  jest.fn<(cloudAgentSessionId: string) => Promise<SandboxStatusSnapshot>>();
+const mockGetWorktreeChanges =
+  jest.fn<(cloudAgentSessionId: string) => Promise<GetWorktreeChangesOutput>>();
+const mockRefreshWorktreeChanges =
+  jest.fn<(cloudAgentSessionId: string) => Promise<RefreshWorktreeChangesOutput>>();
 
-const mockCreateCloudAgentNextClient = jest.fn(() => ({
+const mockCreateCloudAgentNextClient = jest.fn((_authToken: string) => ({
   prepareSession: mockPrepareSession,
   sendMessage: mockSendMessage,
   getSession: mockGetSession,
   cancelQueuedMessage: mockCancelQueuedMessage,
+  getSandboxStatus: mockGetSandboxStatus,
+  getWorktreeChanges: mockGetWorktreeChanges,
+  refreshWorktreeChanges: mockRefreshWorktreeChanges,
 }));
 
 const mockCreateCloudAgentNextClientForModel = jest.fn(
@@ -87,7 +118,7 @@ const mockComputeCloudAgentNextBalanceCheckEligibility = jest.fn<
 const mockIsFeatureFlagEnabledOrDevelopment =
   jest.fn<(flagName: string, distinctId: string) => Promise<boolean>>();
 const mockVerifyOrgOwnsSessionV2ByCloudAgentId =
-  jest.fn<() => Promise<{ kiloSessionId: string } | null>>();
+  jest.fn<typeof verifyOrgOwnsSessionV2ByCloudAgentId>();
 const mockFetchBitbucketRepositoriesForOrganization =
   jest.fn<
     (
@@ -130,7 +161,9 @@ const mockOrderRepositoriesByUsage =
       gitlabInstanceUrl?: string;
     }) => Promise<T[]>
   >();
-const mockEnsureOrganizationAccess = jest.fn<(userId: string, organizationId: string) => void>();
+const mockEnsureOrganizationAccess =
+  jest.fn<typeof OrganizationUtilsModule.ensureOrganizationAccess>();
+const mockRequireActiveSubscription = jest.fn<() => void>();
 
 jest.mock('@/lib/tokens', () => ({
   generateCloudAgentToken: jest.fn(() => 'cloud-agent-token'),
@@ -201,13 +234,17 @@ jest.mock('@/routers/organizations/utils', () => {
   const organizationProcedure = trpcInit.baseProcedure
     .input(zod.object({ organizationId: zod.uuid() }))
     .use(async ({ ctx, input, next }) => {
-      mockEnsureOrganizationAccess(ctx.user.id, input.organizationId);
+      await mockEnsureOrganizationAccess(ctx, input.organizationId);
       return next();
     });
 
   return {
+    ensureOrganizationAccess: mockEnsureOrganizationAccess,
     organizationMemberProcedure: organizationProcedure,
-    organizationMemberMutationProcedure: organizationProcedure,
+    organizationMemberMutationProcedure: organizationProcedure.use(({ next }) => {
+      mockRequireActiveSubscription();
+      return next();
+    }),
   };
 });
 
@@ -253,6 +290,10 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     organizationId: string;
     forceRefresh?: boolean;
   }) => Promise<BitbucketOrganizationRepositoryListResult>;
+  getSandboxStatus: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<SandboxStatusSnapshot>;
   checkEligibility: (input: { organizationId: string }) => Promise<{
     balance: number;
     minBalance: number;
@@ -267,6 +308,14 @@ let createCaller: (ctx: { user: User; headersList?: Headers }) => {
     organizationId: string;
     forceRefresh: boolean;
   }) => Promise<unknown>;
+  getWorktreeChanges: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<GetWorktreeChangesOutput>;
+  refreshWorktreeChanges: (input: {
+    organizationId: string;
+    cloudAgentSessionId: string;
+  }) => Promise<RefreshWorktreeChangesOutput>;
   refreshTerminalTicket: (input: {
     organizationId: string;
     cloudAgentSessionId: string;
@@ -297,7 +346,375 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+  mockEnsureOrganizationAccess.mockReset().mockResolvedValue('member');
+  mockRequireActiveSubscription.mockReset();
+});
+
+describe('organizationCloudAgentNextRouter.getSandboxStatus', () => {
+  const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const user = { id: 'oauth/provider:status-owner', is_admin: false } as User;
+  const input = { organizationId: ORGANIZATION_ID, cloudAgentSessionId };
+  const snapshot = {
+    status: 'active',
+    provider: 'Cloudflare',
+    observedAt: 1_800_000_000_000,
+    detailCode: 'sandbox_ready',
+    inactivityTimeoutMs: 300_000,
+    estimatedSleepAt: 1_800_000_060_000,
+  } satisfies SandboxStatusSnapshot;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockReset().mockResolvedValue({
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockGetSandboxStatus.mockReset().mockResolvedValue(snapshot);
+  });
+
+  it('requires exact organization creator access before observation without paid execution checks', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockImplementationOnce(async () => {
+      expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      return { kiloSessionId: 'ses_12345678901234567890123456' };
+    });
+    await expect(createCaller({ user }).getSandboxStatus(input)).resolves.toEqual(snapshot);
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user }),
+      ORGANIZATION_ID
+    );
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).toHaveBeenCalledWith(
+      expect.anything(),
+      ORGANIZATION_ID,
+      user.id,
+      cloudAgentSessionId
+    );
+    expect(mockGetSandboxStatus).toHaveBeenCalledWith(cloudAgentSessionId);
+    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('cloud-agent-token');
+    expect(mockCreateCloudAgentNextClientForModel).not.toHaveBeenCalled();
+    expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+    expect(mockGetBalanceForOrganizationUser).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'agent_12345678-1234-4234-9234-123456789abc',
+    'ses_12345678901234567890123456',
+    'workspace_',
+    'workspace_pending',
+    'workspace_../../private',
+    `${cloudAgentSessionId} `,
+    '',
+  ])('rejects invalid reference %s before session or Worker lookup', async invalidId => {
+    await expect(
+      createCaller({ user }).getSandboxStatus({ ...input, cloudAgentSessionId: invalidId })
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'provider',
+    'ownerId',
+    'userId',
+    'orgId',
+    'sandboxId',
+    'providerInstanceId',
+    'observedAt',
+    'inactivityTimeoutMs',
+    'estimatedSleepAt',
+  ])('rejects caller override %s', async field => {
+    await expect(
+      createCaller({ user }).getSandboxStatus({ ...input, [field]: 'private-override' })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+  });
+
+  it('denies removed members before querying session status', async () => {
+    mockEnsureOrganizationAccess.mockImplementationOnce(() => {
+      throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Organization access denied' });
+    });
+    await expect(createCaller({ user }).getSandboxStatus(input)).rejects.toMatchObject({
+      code: 'UNAUTHORIZED',
+    });
+    expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+  });
+
+  it('requires session ownership even when organization membership succeeds', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValueOnce(null);
+    await expect(createCaller({ user }).getSandboxStatus(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Session not found or access denied',
+    });
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledTimes(1);
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+  });
+
+  it.each(['development', 'production'] as const)(
+    'sanitizes early membership failures in %s responses and error reporting',
+    async nodeEnv => {
+      const { ensureOrganizationAccess } = jest.requireActual<typeof OrganizationUtilsModule>(
+        '@/routers/organizations/utils'
+      );
+      const { organizationCloudAgentNextRouter } =
+        await import('./organization-cloud-agent-next-router');
+      const env = jest.replaceProperty(process.env, 'NODE_ENV', nodeEnv);
+      const log = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const errorLog = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      const select = jest.spyOn(db, 'select').mockImplementationOnce(() => {
+        throw new DrizzleQueryError(
+          'select private-membership-query from organization_memberships',
+          ['private-membership-parameter'],
+          new Error('private-membership-database-cause')
+        );
+      });
+      mockEnsureOrganizationAccess.mockImplementationOnce(ensureOrganizationAccess);
+      const onError = jest.fn<({ error }: { error: TRPCError }) => void>();
+
+      try {
+        const url = new URL('http://localhost/api/trpc/getSandboxStatus');
+        url.searchParams.set('input', JSON.stringify(input));
+        const response = await fetchRequestHandler({
+          endpoint: '/api/trpc',
+          req: new Request(url),
+          router: organizationCloudAgentNextRouter,
+          createContext: async () => ({ user }),
+          onError,
+        });
+        const body = await response.text();
+
+        expect(response.status).toBe(403);
+        expect(JSON.parse(body)).toMatchObject({
+          error: {
+            message: 'Session not found or access denied',
+            data: { code: 'FORBIDDEN' },
+          },
+        });
+        expect(onError).toHaveBeenCalledTimes(1);
+        expect(onError).toHaveBeenCalledWith(
+          expect.objectContaining({
+            error: expect.objectContaining({
+              code: 'FORBIDDEN',
+              message: 'Session not found or access denied',
+              cause: undefined,
+            }),
+          })
+        );
+        expect(
+          inspect(
+            [body, onError.mock.calls, log.mock.calls, warn.mock.calls, errorLog.mock.calls],
+            {
+              depth: null,
+            }
+          )
+        ).not.toContain('private-membership');
+        expect(select).toHaveBeenCalledTimes(1);
+        expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+        expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+        expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+      } finally {
+        select.mockRestore();
+        errorLog.mockRestore();
+        warn.mockRestore();
+        log.mockRestore();
+        env.restore();
+      }
+    }
+  );
+
+  it('fails closed without leaking unavailable authorization storage diagnostics', async () => {
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockRejectedValueOnce(
+      new Error('private-database-diagnostics')
+    );
+    await expect(createCaller({ user }).getSandboxStatus(input)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'Session not found or access denied',
+      cause: undefined,
+    });
+    expect(mockGetSandboxStatus).not.toHaveBeenCalled();
+  });
+
+  it.each(['UNAUTHORIZED', 'FORBIDDEN'] as const)('preserves Worker %s denials', async code => {
+    mockGetSandboxStatus.mockRejectedValueOnce(
+      new TRPCError({ code, message: 'Session access denied' })
+    );
+    await expect(createCaller({ user }).getSandboxStatus(input)).rejects.toMatchObject({ code });
+  });
+
+  it('strips unexpected client fields at the organization output boundary', async () => {
+    mockGetSandboxStatus.mockResolvedValueOnce({
+      ...snapshot,
+      credentials: 'private-token',
+      sandboxId: 'private-runtime',
+    } as SandboxStatusSnapshot);
+    const response = await createCaller({ user }).getSandboxStatus(input);
+    expect(response).toEqual(snapshot);
+    expect(JSON.stringify(response)).not.toContain('private');
+  });
+});
+
+describe('organizationCloudAgentNextRouter worktree changes access', () => {
+  const orgSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
+  const personalSessionId = 'workspace_12345678-1234-4234-9234-123456789abd';
+  let owner: User;
+  let otherMember: User;
+  let organization: Organization;
+  let otherOrganization: Organization;
+
+  beforeAll(async () => {
+    owner = await insertTestUser({ id: 'oauth/worktree-org-owner' });
+    otherMember = await insertTestUser();
+    [organization, otherOrganization] = await db
+      .insert(organizations)
+      .values([
+        { name: 'Changes organization', created_by_kilo_user_id: owner.id },
+        { name: 'Other changes organization', created_by_kilo_user_id: owner.id },
+      ])
+      .returning();
+    await db.insert(organization_memberships).values([
+      { organization_id: organization.id, kilo_user_id: owner.id, role: 'owner' },
+      { organization_id: organization.id, kilo_user_id: otherMember.id, role: 'member' },
+      { organization_id: otherOrganization.id, kilo_user_id: owner.id, role: 'owner' },
+    ]);
+    await db.insert(cli_sessions_v2).values([
+      {
+        session_id: 'ses_changes_org',
+        cloud_agent_session_id: orgSessionId,
+        organization_id: organization.id,
+        kilo_user_id: owner.id,
+        created_on_platform: 'cloud-agent-web',
+      },
+      {
+        session_id: 'ses_changes_org_personal',
+        cloud_agent_session_id: personalSessionId,
+        kilo_user_id: owner.id,
+        created_on_platform: 'cloud-agent-web',
+      },
+    ]);
+  });
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockImplementation(
+      jest.requireActual<typeof SessionOwnership>('@/lib/cloud-agent/session-ownership')
+        .verifyOrgOwnsSessionV2ByCloudAgentId
+    );
+    mockGetWorktreeChanges.mockResolvedValue({ snapshot: null });
+    mockRefreshWorktreeChanges.mockResolvedValue({ status: 'offline', snapshot: null });
+    await db
+      .update(organizations)
+      .set({ deleted_at: null })
+      .where(eq(organizations.id, organization.id));
+    await db
+      .insert(organization_memberships)
+      .values({
+        organization_id: organization.id,
+        kilo_user_id: owner.id,
+        role: 'owner',
+      })
+      .onConflictDoNothing();
+  });
+
+  describe.each(['getWorktreeChanges', 'refreshWorktreeChanges'] as const)('%s', procedure => {
+    it('allows the creator without an active subscription, model balance, or rollout gate', async () => {
+      mockRequireActiveSubscription.mockImplementation(() => {
+        throw new Error('Subscription inactive');
+      });
+      const result = await createCaller({ user: owner })[procedure]({
+        organizationId: organization.id,
+        cloudAgentSessionId: orgSessionId,
+      });
+      expect(result.snapshot).toBeNull();
+      expect(
+        procedure === 'getWorktreeChanges' ? mockGetWorktreeChanges : mockRefreshWorktreeChanges
+      ).toHaveBeenCalledWith(orgSessionId);
+      expect(mockRequireActiveSubscription).not.toHaveBeenCalled();
+      expect(mockComputeCloudAgentNextBalanceCheckEligibility).not.toHaveBeenCalled();
+      expect(mockGetBalanceForOrganizationUser).not.toHaveBeenCalled();
+      expect(mockIsFeatureFlagEnabledOrDevelopment).not.toHaveBeenCalled();
+    });
+
+    it('denies another member who did not create the session before calling the Worker', async () => {
+      await expect(
+        createCaller({ user: otherMember })[procedure]({
+          organizationId: organization.id,
+          cloudAgentSessionId: orgSessionId,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    });
+
+    it('denies a different organization even when the creator belongs to both', async () => {
+      await expect(
+        createCaller({ user: owner })[procedure]({
+          organizationId: otherOrganization.id,
+          cloudAgentSessionId: orgSessionId,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    });
+
+    it('denies personal sessions through the organization endpoint', async () => {
+      await expect(
+        createCaller({ user: owner })[procedure]({
+          organizationId: organization.id,
+          cloudAgentSessionId: personalSessionId,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    });
+
+    it('denies removed members even when organization middleware grants access', async () => {
+      await db
+        .delete(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.id),
+            eq(organization_memberships.kilo_user_id, owner.id)
+          )
+        );
+      await expect(
+        createCaller({ user: owner })[procedure]({
+          organizationId: organization.id,
+          cloudAgentSessionId: orgSessionId,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    });
+
+    it('denies deleted organizations before calling the Worker', async () => {
+      await db
+        .update(organizations)
+        .set({ deleted_at: new Date().toISOString() })
+        .where(eq(organizations.id, organization.id));
+      await expect(
+        createCaller({ user: owner })[procedure]({
+          organizationId: organization.id,
+          cloudAgentSessionId: orgSessionId,
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+    });
+
+    it.each(['agent_12345678-1234-4234-9234-123456789abc', 'ses_12345678901234567890123456'])(
+      'rejects legacy ID %s before ownership or Worker calls',
+      async cloudAgentSessionId => {
+        await expect(
+          createCaller({ user: owner })[procedure]({
+            organizationId: organization.id,
+            cloudAgentSessionId,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        expect(mockVerifyOrgOwnsSessionV2ByCloudAgentId).not.toHaveBeenCalled();
+        expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
+      }
+    );
+  });
 });
 
 describe('organizationCloudAgentNextRouter attachment forwarding', () => {
@@ -507,7 +924,7 @@ describe('organizationCloudAgentNextRouter attachment forwarding', () => {
 describe('organizationCloudAgentNextRouter.cancelQueuedMessage', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockVerifyOrgOwnsSessionV2ByCloudAgentId.mockResolvedValue({
       kiloSessionId: 'ses_12345678901234567890123456',
     });
@@ -533,7 +950,7 @@ describe('organizationCloudAgentNextRouter.cancelQueuedMessage', () => {
 describe('organizationCloudAgentNextRouter helper procedures', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockOrderRepositoriesByUsage.mockImplementation(async ({ repositories }) => repositories);
   });
 
@@ -552,7 +969,10 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
         isEligible,
         accessLevel,
       });
-      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith('member-user', ORGANIZATION_ID);
+      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ user: { id: 'member-user', is_admin: false } }),
+        ORGANIZATION_ID
+      );
       expect(mockGetBalanceForOrganizationUser).toHaveBeenCalledWith(
         ORGANIZATION_ID,
         'member-user'
@@ -593,7 +1013,10 @@ describe('organizationCloudAgentNextRouter helper procedures', () => {
       await expect(
         caller[method]({ organizationId: ORGANIZATION_ID, forceRefresh: true })
       ).resolves.toEqual(repositories);
-      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith('member-user', ORGANIZATION_ID);
+      expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+        expect.objectContaining({ user: { id: 'member-user', is_admin: false } }),
+        ORGANIZATION_ID
+      );
       if (platform === 'GitLab') {
         expect(mockFetchGitLabRepositoriesForOrganization).toHaveBeenCalledWith(
           ORGANIZATION_ID,
@@ -688,7 +1111,7 @@ describe('organizationCloudAgentNextRouter terminal ownership', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
   });
 
   it('issues a terminal ticket for a session owned by the organization', async () => {
@@ -1024,7 +1447,7 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockCreateWorktreeChat.mockResolvedValue(result);
   });
 
@@ -1041,7 +1464,10 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
       })
     ).resolves.toEqual(result);
 
-    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(user.id, ORGANIZATION_ID);
+    expect(mockEnsureOrganizationAccess).toHaveBeenCalledWith(
+      expect.objectContaining({ user }),
+      ORGANIZATION_ID
+    );
     expect(mockCreateWorktreeChat).toHaveBeenCalledWith({
       user,
       headersList,
@@ -1093,7 +1519,7 @@ describe('organizationCloudAgentNextRouter.createWorktreeChat', () => {
 describe('organizationCloudAgentNextRouter Bitbucket repository listing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockEnsureOrganizationAccess.mockImplementation(() => undefined);
+    mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockOrderRepositoriesByUsage.mockImplementation(async ({ repositories }) => repositories);
   });
 

@@ -40,7 +40,7 @@ export function SecurityCommandRetryCard({
             <Text>{t('common.retry')}</Text>
           </Button>
           <Button size="sm" variant="ghost" onPress={onDiscard}>
-            <Text>{t('securityAgent.commandRetry.discard')}</Text>
+            <Text>{t('common.discard')}</Text>
           </Button>
         </View>
       ) : null}

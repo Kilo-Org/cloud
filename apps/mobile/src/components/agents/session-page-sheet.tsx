@@ -1,7 +1,8 @@
 import { type ReactNode, useEffect, useState } from 'react';
-import { AppState, Modal, Platform, View } from 'react-native';
+import { AppState, Modal, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StateSurface } from '@/components/centered-state-surface';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
@@ -74,7 +75,9 @@ export function SessionPageSheet({
         onRequestClose={onClose}
         onDismiss={onDismiss}
       >
-        <View className="flex-1 bg-background">{children}</View>
+        <StateSurface className="flex-1 bg-background" testID="session-page-sheet-surface">
+          {children}
+        </StateSurface>
       </Modal>
     );
   }
@@ -86,13 +89,13 @@ export function SessionPageSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View
+      <StateSurface
         style={{ paddingTop: insets.top }}
         className="flex-1 bg-background"
         testID="session-page-sheet-surface"
       >
         {children}
-      </View>
+      </StateSurface>
     </Modal>
   );
 }

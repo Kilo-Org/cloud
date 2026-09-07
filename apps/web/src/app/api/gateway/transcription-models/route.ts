@@ -3,6 +3,7 @@ import { captureException } from '@sentry/nextjs';
 import type { OpenRouterModelsResponse } from '@/lib/organizations/organization-types';
 import { getOpenRouterTranscriptionModels } from '@/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@/lib/user/server';
+import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
@@ -17,7 +18,10 @@ export async function GET(): Promise<
 > {
   try {
     const data = await getOpenRouterTranscriptionModels();
-    const auth = await getUserFromAuth({ adminOnly: false }).catch(() => null);
+    const auth = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    }).catch(() => null);
     if (auth?.organizationId && auth.user && Array.isArray(data.data)) {
       // Resolve the member's policy once, then evaluate each catalog model.
       const policy = await resolveOrganizationMemberModelPolicy({

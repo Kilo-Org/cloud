@@ -81,7 +81,7 @@ export function MemberRow({
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: t('organization.members.removeConfirm'),
+          text: t('common.remove'),
           style: 'destructive',
           onPress: () => {
             mutations.removeMember.mutate(

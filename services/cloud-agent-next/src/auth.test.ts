@@ -177,6 +177,27 @@ describe('validateWrapperDispatchTicket', () => {
     });
   });
 
+  it.each([
+    ['the Cloud Agent Next REST audience', 'cloud-agent-next'],
+    ['an array containing the REST audience', ['other-service', 'cloud-agent-next']],
+    ['a different resource audience', 'kilo-gateway'],
+    ['an explicit null audience', null],
+    ['an explicit empty audience', ''],
+    ['a malformed empty audience list', []],
+    ['a malformed null audience list', [null]],
+    ['a malformed audience object', { audience: 'cloud-agent-next' }],
+  ])('rejects a legacy Kilo JWT with %s', async (_description, aud) => {
+    const token = jwt.sign({ version: 3, kiloUserId: 'user-1', aud }, secret, {
+      algorithm: 'HS256',
+      expiresIn: '1 minute',
+    });
+
+    await expect(validateWrapperDispatchTicket(`Bearer ${token}`, secret)).resolves.toEqual({
+      success: false,
+      error: 'Invalid ticket type',
+    });
+  });
+
   it('rejects an expired ticket', async () => {
     const ticket = jwt.sign(wrapperDispatchTicketClaims, secret, {
       algorithm: 'HS256',

@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
+import { generateText } from 'ai';
+import { COMPATIBLE_USER_AGENT } from './types';
 
 jest.mock('@/lib/drizzle', () => ({
   readDb: {},
@@ -68,6 +70,71 @@ jest.mock('./direct-byok-definitions', () => ({
     },
   ],
 }));
+
+describe('createAiSdkProvider session headers', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function mockCompletions() {
+    return jest.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      Response.json({
+        id: 'test-completion',
+        object: 'chat.completion',
+        created: 0,
+        model: 'test-model',
+        choices: [
+          { index: 0, message: { role: 'assistant', content: 'Hi' }, finish_reason: 'stop' },
+        ],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      })
+    );
+  }
+
+  test('keeps an OpenCode Go probe session stable across SDK retries and isolates new probes', async () => {
+    const { createAiSdkProvider } = await import('.');
+    const { directByokProviders } = await loadDirectByokModule();
+    const provider = { ...directByokProviders[0], id: 'opencode-go' as const };
+    const fetchMock = mockCompletions().mockResolvedValueOnce(
+      new Response('Temporary failure', { status: 500 })
+    );
+    const firstProbe = createAiSdkProvider(provider, 'test-key');
+
+    await generateText({ model: firstProbe('test-model'), prompt: 'Say hi', maxRetries: 1 });
+    await generateText({
+      model: createAiSdkProvider(provider, 'test-key')('test-model'),
+      prompt: 'Say hi',
+      maxRetries: 0,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    const headers = fetchMock.mock.calls.map(([, init]) => new Headers(init?.headers));
+    const session = headers[0].get('x-opencode-session');
+    expect(session).toEqual(expect.any(String));
+    expect(session).not.toBe('');
+    expect(headers[1].get('x-opencode-session')).toBe(session);
+    expect(headers[2].get('x-opencode-session')).not.toBe(session);
+    for (const header of headers) {
+      expect(header.get('authorization')).toBe('Bearer test-key');
+      expect(header.get('user-agent')).toBe(COMPATIBLE_USER_AGENT);
+    }
+  });
+
+  test('does not add OpenCode session headers to other direct providers', async () => {
+    const { createAiSdkProvider } = await import('.');
+    const { directByokProviders } = await loadDirectByokModule();
+    const fetchMock = mockCompletions();
+
+    await generateText({
+      model: createAiSdkProvider(directByokProviders[0], 'test-key')('test-model'),
+      prompt: 'Say hi',
+      maxRetries: 0,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(new Headers(fetchMock.mock.calls[0][1]?.headers).has('x-opencode-session')).toBe(false);
+  });
+});
 
 async function loadDirectByokModule() {
   const directByokProviders = (await import('./direct-byok-definitions')).default;

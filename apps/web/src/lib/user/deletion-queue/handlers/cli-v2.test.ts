@@ -7,6 +7,7 @@ jest.mock('@/lib/config.server', () => {
 });
 
 import { and, eq } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
 import {
   cli_sessions_v2,
   type UserDeletionRequest,
@@ -18,12 +19,15 @@ import {
   UserDeletionStepStatus,
 } from '@kilocode/db/schema-types';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { NEXTAUTH_SECRET } from '@/lib/config.server';
 import { USER_DELETION_RESOURCE_BATCH_SIZE } from '@/lib/user/deletion-queue/deletion-constants';
 import type { DeletionHandlerContext } from '@/lib/user/deletion-queue/deletion-types';
 import { handleCliV2Sessions } from '@/lib/user/deletion-queue/handlers/cli-v2';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 const INGEST_BASE = 'https://test-ingest.example.com/api/session/';
+const boundedTokenFlag = 'BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED';
+const originalBoundedTokenFlag = process.env[boundedTokenFlag];
 
 describe('handleCliV2Sessions', () => {
   beforeEach(async () => {
@@ -32,6 +36,72 @@ describe('handleCliV2Sessions', () => {
 
   afterEach(() => {
     jest.restoreAllMocks();
+    if (originalBoundedTokenFlag === undefined) {
+      delete process.env[boundedTokenFlag];
+    } else {
+      process.env[boundedTokenFlag] = originalBoundedTokenFlag;
+    }
+  });
+
+  describe.each([
+    { name: 'disabled', enabled: false },
+    { name: 'enabled', enabled: true },
+  ])('bounded deletion assertions when issuance is $name', ({ enabled }) => {
+    beforeEach(() => {
+      if (enabled) {
+        process.env[boundedTokenFlag] = 'true';
+      } else {
+        delete process.env[boundedTokenFlag];
+      }
+    });
+
+    it('signs a leaf DELETE and preserves confirmed 404 cleanup semantics', async () => {
+      const user = await insertTestUser();
+      const sessionId = newSessionId('cleanup404');
+      await insertSession(user.id, sessionId);
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+        await deleteSessionRow(user.id, sessionId);
+        const authorization = new Headers(init?.headers).get('authorization');
+        expect(authorization).toMatch(/^Bearer .+$/);
+        if (!authorization) throw new Error('expected authorization header');
+        const token = authorization.slice('Bearer '.length);
+        const claims = jwt.verify(token, NEXTAUTH_SECRET, { algorithms: ['HS256'] });
+        if (typeof claims === 'string') throw new Error('expected JWT claims');
+
+        expect(claims).toMatchObject({
+          aud: 'session-ingest:user-deletion',
+          kiloUserId: user.id,
+        });
+        expect(claims.exp! - claims.iat!).toBe(5 * 60);
+        expect(claims.organizationId).toBeUndefined();
+        expect(claims.apiTokenPepper).toBeUndefined();
+        expect(claims.env).toBeUndefined();
+        if (enabled) {
+          expect(claims).toMatchObject({
+            tokenPurpose: 'internal-service',
+            credentialExchange: false,
+          });
+        } else {
+          expect(claims.tokenPurpose).toBeUndefined();
+          expect(claims.credentialExchange).toBeUndefined();
+        }
+        return new Response(JSON.stringify({ cleanup: 'done' }), { status: 404 });
+      });
+
+      await expect(
+        handleCliV2Sessions({
+          request: { user_id: user.id } as UserDeletionRequest,
+          step: runningStep(),
+          context: handlerContext(),
+        })
+      ).resolves.toEqual({ kind: 'succeeded', progress: { processed_count: 1 } });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `${INGEST_BASE}${encodeURIComponent(sessionId)}`,
+        expect.objectContaining({ method: 'DELETE' })
+      );
+      expect(await remainingSessionIds(user.id)).toEqual([]);
+    });
   });
 
   it('returns not_applicable when the user has no CLI v2 sessions', async () => {

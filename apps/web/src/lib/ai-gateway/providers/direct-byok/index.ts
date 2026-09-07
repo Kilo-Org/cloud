@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { type UserByokProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   COMPATIBLE_USER_AGENT,
@@ -126,6 +127,8 @@ export function createAiSdkProvider(directByokProvider: DirectByokProvider, apiK
     baseURL: directByokProvider.base_url,
     apiKey,
     name: 'openaiCompatible',
+    headers:
+      directByokProvider.id === 'opencode-go' ? { 'x-opencode-session': randomUUID() } : undefined,
     fetch: (url, init) => {
       const headers = new Headers(init?.headers);
       headers.set('user-agent', COMPATIBLE_USER_AGENT);

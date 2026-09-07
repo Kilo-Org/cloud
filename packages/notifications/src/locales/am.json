@@ -7,7 +7,8 @@
       "instanceLifecycle": "ምሳሌዎ ማዘመኛ አለው",
       "scheduledAction": "የተያዘ ተግባር ማዘመኛ አለው",
       "lowBalance": "ቀሪ ሂሳብዎ ትኩረት ይፈልጋል",
-      "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል"
+      "securityFinding": "የደህንነት ግኝት ትኩረት ይፈልጋል",
+      "activeAgentsGlanceable": "ንቁ ወኪሎች ማዘመኛ አላቸው"
     }
   },
   "cloudAgentSession": {

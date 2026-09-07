@@ -46,6 +46,7 @@ const flatListMock = vi.hoisted(
 vi.mock('react-native', () => ({
   FlatList: flatListMock,
   Pressable: 'Pressable',
+  ScrollView: 'ScrollView',
   View: 'View',
 }));
 vi.mock('expo-router', () => ({
@@ -61,7 +62,7 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
-vi.mock('@/components/picker-sheet', () => ({ PickerSheet: 'PickerSheet' }));
+vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/directional-icons', () => ({
   DirectionalChevronRight: 'DirectionalChevronRight',
@@ -142,11 +143,11 @@ describe('FolderPickerScreen body', () => {
     });
   });
 
-  it('renders one FlatList in the retryable phase, with the retry empty state', async () => {
+  it('replaces the list with the retryable state', async () => {
     listFn.mockResolvedValueOnce({ ok: false, reason: 'transport' });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(1);
+    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     expect(propOf(emptyState[0], 'action')).toBeTruthy();
@@ -157,11 +158,11 @@ describe('FolderPickerScreen body', () => {
     });
   });
 
-  it('renders one FlatList in the unsupported phase, with no retry action', async () => {
+  it('replaces the list with the unsupported state without a retry action', async () => {
     listFn.mockResolvedValueOnce({ ok: false, reason: 'unsupported' });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(1);
+    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     expect(propOf(emptyState[0], 'action')).toBeUndefined();
@@ -172,11 +173,43 @@ describe('FolderPickerScreen body', () => {
     });
   });
 
-  it('renders one FlatList in the ready-empty phase, with the empty state', async () => {
+  it('keeps the native header mounted when a child folder is empty', async () => {
+    listFn.mockResolvedValueOnce({
+      ok: true,
+      path: '',
+      directories: [{ name: 'src', path: 'src' }],
+    });
+    listFn.mockResolvedValueOnce({ ok: true, path: 'src', directories: [] });
+    const renderer = await mount();
+    const header = findByType(renderer.root, 'SheetHeader')[0];
+    const folder = findByType(renderer.root, 'Pressable')[0];
+    if (!header || !folder) {
+      throw new Error('Folder controls did not mount');
+    }
+    const group = header.parent;
+    expect(group?.props.collapsable).toBe(false);
+    await act(async () => {
+      (folder.props.onPress as () => void)();
+      await Promise.resolve();
+    });
+    expect(findByType(renderer.root, 'SheetHeader')[0]).toBe(header);
+    expect(header.parent).toBe(group);
+    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
+    act(() => {
+      (header.props.onDone as () => void)();
+    });
+    expect(bridge.onSelect).toHaveBeenCalledWith('src');
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('replaces the list with the ready-empty state', async () => {
     listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(1);
+    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
     expect(findByType(renderer.root, 'Button')).toHaveLength(0);

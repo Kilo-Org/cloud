@@ -7,7 +7,8 @@
       "instanceLifecycle": "نمونه شما به‌روزرسانی دارد",
       "scheduledAction": "یک اقدام زمان‌بندی‌شده به‌روزرسانی دارد",
       "lowBalance": "موجودی شما نیاز به توجه دارد",
-      "securityFinding": "یک یافته امنیتی نیاز به توجه دارد"
+      "securityFinding": "یک یافته امنیتی نیاز به توجه دارد",
+      "activeAgentsGlanceable": "عامل‌های فعال به‌روزرسانی دارند"
     }
   },
   "cloudAgentSession": {

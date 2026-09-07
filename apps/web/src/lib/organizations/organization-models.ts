@@ -15,6 +15,7 @@ import { isOrganizationAutoEnabled } from '@/lib/organizations/organization-auto
 import { addUserByokAvailability, getOrganizationByokProviderIds } from '@/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@/lib/ai-gateway/local-fake-llm';
 import { readDb } from '@/lib/drizzle';
+import { getEnkryptBenchmarks, publishEnkryptModels } from '@/lib/model-stats/enkrypt';
 import {
   getOrganizationGroupPolicyContext,
   type OrganizationPolicySubject,
@@ -58,8 +59,12 @@ export async function getAvailableModelsForOrganization(
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
   availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
 
+  const snapshot = await getEnkryptBenchmarks();
   return {
     ...responseData,
-    data: appendLocalFakeDeterministicCatalogModels(availableModels),
+    data: publishEnkryptModels(
+      appendLocalFakeDeterministicCatalogModels(availableModels),
+      snapshot
+    ),
   };
 }

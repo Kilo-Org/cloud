@@ -7,6 +7,7 @@ import type { Env } from '../env';
 import { getSessionAccessCacheDO } from '../dos/SessionAccessCacheDO';
 import { isNeedsInputStatus } from '../dos/session-ingest-attention';
 import { mapSessionEventRow, notifyUserSessionEvent } from '../session-events';
+import { refreshGlanceableSessions } from '../remote-session-notifications';
 import { SessionStatusSchema } from '../types/user-connection-protocol';
 import { isDefaultSessionTitle } from './default-session-title';
 import { isWorktreeDeleting } from '../services/worktree-deletion';
@@ -439,6 +440,15 @@ export async function applyMetadataChanges(
       },
       ctx
     );
+    if (notification.session.parentSessionId === null) {
+      // The transaction has committed, so the snapshot route reads the new status.
+      const delivery = refreshGlanceableSessions(env, {
+        userId: kiloUserId,
+        cliSessionIds: [sessionId],
+      });
+      if (ctx) ctx.waitUntil(delivery);
+      else await delivery;
+    }
   }
 }
 

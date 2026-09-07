@@ -228,7 +228,7 @@ function getActiveSubscriptionCardState(
       action: 'none',
       actionLabel: null,
       description: subscription.cancelAtPeriodEnd
-        ? `${credits} · ${i18n.t('kiloPass.ends', {
+        ? `${credits} · ${i18n.t('common.ends', {
             date: formatSubscriptionEndDate(subscription.refillAt),
           })} · ${i18n.t('kiloPass.managedOnGooglePlay')}`
         : `${credits} · ${i18n.t('kiloPass.managedOnGooglePlay')}`,
@@ -241,7 +241,7 @@ function getActiveSubscriptionCardState(
       action: 'open-store-management',
       actionLabel: i18n.t('kiloPass.manage'),
       description: subscription.cancelAtPeriodEnd
-        ? `${credits} · ${i18n.t('kiloPass.ends', {
+        ? `${credits} · ${i18n.t('common.ends', {
             date: formatSubscriptionEndDate(subscription.refillAt),
           })}`
         : `${credits} · ${i18n.t('kiloPass.managedInAppStore')}`,
@@ -254,7 +254,7 @@ function getActiveSubscriptionCardState(
     action: 'none',
     actionLabel: null,
     description: subscription.cancelAtPeriodEnd
-      ? `${credits} · ${i18n.t('kiloPass.ends', {
+      ? `${credits} · ${i18n.t('common.ends', {
           date: formatSubscriptionEndDate(subscription.refillAt),
         })} · ${i18n.t('kiloPass.managedOnWeb')}`
       : `${credits} · ${i18n.t('kiloPass.managedOnWeb')}`,

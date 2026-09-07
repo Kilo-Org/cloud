@@ -7,7 +7,8 @@
       "instanceLifecycle": "Je instance heeft een update",
       "scheduledAction": "Een geplande actie heeft een update",
       "lowBalance": "Je saldo heeft aandacht nodig",
-      "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig"
+      "securityFinding": "Een beveiligingsbevinding heeft aandacht nodig",
+      "activeAgentsGlanceable": "Actieve agents hebben een update"
     }
   },
   "cloudAgentSession": {

@@ -5,6 +5,12 @@
 import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
+// Enter the local module's JS in the main process on both platforms. Its
+// Android branch stays a no-op until slice `and` lands; iOS runs the
+// registered glanceable sink below.
+import 'active-agents-live-update';
+// Registers the iOS Live Activity and widget sink with the glanceable publisher.
+import '@/glanceable-ios/register';
 
 import { installE2EWebSocketLatency } from '@/lib/e2e-ws-latency';
 
@@ -18,7 +24,7 @@ import * as Sentry from '@sentry/react-native';
 import { reloadAppAsync } from 'expo';
 import { loadAsync, useFonts } from 'expo-font';
 import {
-  ErrorBoundary as ExpoRouterErrorBoundary,
+  type ErrorBoundaryProps,
   type Href,
   Slot,
   ThemeProvider,
@@ -39,10 +45,13 @@ import { toast } from 'sonner-native';
 import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
+import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
 import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
+import { QueryError } from '@/components/query-error';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { MotionProvider } from '@/lib/a11y/motion';
 import { useAuth } from '@/lib/auth/auth-context';
 import { resolveBootstrapDecision } from '@/lib/bootstrap-decision';
 import { consentModeForSearchParam } from '@/components/consent/consent-mode';
@@ -56,6 +65,7 @@ import { prefetchCurrentUser } from '@/lib/startup-prefetch';
 import { useAnalyticsConsentGate } from '@/lib/hooks/use-analytics-consent-gate';
 import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import {
@@ -77,13 +87,14 @@ import {
   captureLaunchDeepLink,
   getPendingDeepLink,
   getPendingDeepLinkSnapshot,
-  restorePersistedPendingDeepLink,
   subscribeToPendingDeepLink,
 } from '@/lib/deep-link-launch';
+import { usePendingDeepLinkRestore } from '@/lib/hooks/use-pending-deep-link-restore';
 import {
   checkInitialNotification,
   ensureAndroidNotificationChannels,
   renameAndroidNotificationChannels,
+  setupNotificationBackgroundHandler,
   setupNotificationHandler,
   setupNotificationResponseHandler,
 } from '@/lib/notifications';
@@ -145,6 +156,9 @@ function preloadStartupFonts(): void {
 void SplashScreen.preventAutoHideAsync();
 void ensureAndroidNotificationChannels();
 setupNotificationHandler();
+// Applies the aggregate glanceable push while backgrounded/killed via a
+// headless expo-notifications task; see setupNotificationBackgroundHandler.
+setupNotificationBackgroundHandler();
 checkInitialNotification();
 captureLaunchDeepLink();
 prefetchCurrentUser();
@@ -159,7 +173,14 @@ function RootLayoutNav({
   languageReady: boolean;
   setLanguageReady: (ready: boolean) => void;
 }>) {
-  const { token, isLoading: authLoading, isSigningOut, signOut } = useAuth();
+  const {
+    token,
+    isLoading: authLoading,
+    isSigningOut,
+    signOut,
+    restoreFailed,
+    retryRestore,
+  } = useAuth();
   const { updateRequired } = useForceUpdate();
   const [fontsLoaded, fontsError] = useFonts({
     JetBrainsMono_500Medium,
@@ -238,19 +259,14 @@ function RootLayoutNav({
   }, []);
 
   // Restore a deep-link destination persisted before process death. Waits for
-  // auth bootstrap: a persisted record is account-bound, and the token owner
-  // publishes the signed-in user id before `authLoading` clears. Restoring
-  // earlier compares an account-bound record against a null user id, so a
-  // signed-in cold start would delete its own destination. The slot is
-  // observable, so the consumer still fires when the destination lands.
-  const deepLinkRestoreStarted = useRef(false);
-  useEffect(() => {
-    if (authLoading || deepLinkRestoreStarted.current) {
-      return;
-    }
-    deepLinkRestoreStarted.current = true;
-    void restorePersistedPendingDeepLink();
-  }, [authLoading]);
+  // auth bootstrap to settle into a state where the account binding is known:
+  // a persisted record is account-bound, and the token owner publishes the
+  // signed-in user id before `authLoading` clears. Restoring earlier compares
+  // an account-bound record against a null user id, so a signed-in cold start
+  // would delete its own destination — and a FAILED restore is not a
+  // signed-out answer, so the hook also holds the restore through the
+  // retryable error surface.
+  usePendingDeepLinkRestore({ authLoading, restoreFailed });
 
   // Scope share persistence to the current account (DEC-01): null while signed
   // out, so a share captured signed out never persists (in-memory only, and a
@@ -636,6 +652,7 @@ function RootLayoutNav({
       onConsentRoute,
       onConsentReviewRoute,
       languageReloadFailed,
+      restoreFailed,
     });
 
     // Replaces the old inline if-chain (resolveBootstrapTag in
@@ -644,6 +661,11 @@ function RootLayoutNav({
     switch (decision.tag) {
       case 'settle-language-error': {
         markStartupComplete('language-error');
+        setStartupFinished(true);
+        return;
+      }
+      case 'settle-restore-error': {
+        markStartupComplete('restore-error');
         setStartupFinished(true);
         return;
       }
@@ -721,6 +743,7 @@ function RootLayoutNav({
     onConsentRoute,
     onConsentReviewRoute,
     languageReloadFailed,
+    restoreFailed,
   ]);
 
   // Reactive snapshot of the pending deep-link slot so a destination stashed
@@ -791,22 +814,28 @@ function RootLayoutNav({
   // initialised — returning null unmounts it and breaks router.replace.
   // The native splash screen covers everything during initial load, and
   // opacity 0 hides the wrong screen during redirects.
-  const { hasUserBootstrapError, hasConsentBootstrapError, hasBootstrapError, hidden } =
-    resolveBootstrapDecision({
-      isLoading,
-      updateRequired,
-      inForceUpdate,
-      inAuthGroup,
-      hasToken: token != null,
-      userIdLoading,
-      userIdError,
-      consentCheckError: consentCheckError != null,
-      consentChecked,
-      needsConsent,
-      onConsentRoute,
-      onConsentReviewRoute,
-      languageReloadFailed,
-    });
+  const {
+    hasUserBootstrapError,
+    hasConsentBootstrapError,
+    hasRestoreError,
+    hasBootstrapError,
+    hidden,
+  } = resolveBootstrapDecision({
+    isLoading,
+    updateRequired,
+    inForceUpdate,
+    inAuthGroup,
+    hasToken: token != null,
+    userIdLoading,
+    userIdError,
+    consentCheckError: consentCheckError != null,
+    consentChecked,
+    needsConsent,
+    onConsentRoute,
+    onConsentReviewRoute,
+    languageReloadFailed,
+    restoreFailed,
+  });
 
   // Hidden root-route entry contract (D17): while `hidden`, the wrapper leaves
   // both accessibility trees. On the hidden → visible transition,
@@ -840,16 +869,33 @@ function RootLayoutNav({
     };
   }, [hidden, hasBootstrapError]);
 
+  // The restore-error surface is settled, but a successful Retry does not
+  // reveal the app immediately: the token publish, the user fetch, and the
+  // consent check still run behind the loading gate, and the splash overlay
+  // that covers a cold start's hidden window is already gone (startup
+  // completed when the error settled). Dropping the error screen the moment
+  // `restoreFailed` clears would expose that hidden window as a blank frame
+  // before Home. `useRestoreErrorHold` latches the settled surface: it stays
+  // mounted while the retried bootstrap finishes, and the layout effect
+  // releases it only when the gate actually reveals the tree (`hidden` flips
+  // false) or sign-out begins the escape hatch — released in a layout effect,
+  // so the error screen and the revealed tree swap inside one paint.
+  const showRestoreError = useRestoreErrorHold({
+    hasRestoreError,
+    hidden,
+    isSigningOut,
+  });
+
   if (hasUserBootstrapError) {
     return (
       <BootstrapErrorScreen
         title={t('bootstrap.couldNotLoadAccount')}
-        description={t('bootstrap.couldNotLoadAccountDescription')}
+        description={t('organization.boundary.loadErrorMessage')}
         primaryLabel={t('common.retry')}
         primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
         onPrimaryPress={refetchUserId}
-        secondaryLabel={t('bootstrap.signOut')}
-        secondaryAccessibilityLabel={t('bootstrap.signOut')}
+        secondaryLabel={t('common.signOut')}
+        secondaryAccessibilityLabel={t('common.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}
@@ -868,8 +914,8 @@ function RootLayoutNav({
           setConsentCheckError(null);
           setConsentCheckRetryKey(key => key + 1);
         }}
-        secondaryLabel={t('bootstrap.signOut')}
-        secondaryAccessibilityLabel={t('bootstrap.signOut')}
+        secondaryLabel={t('common.signOut')}
+        secondaryAccessibilityLabel={t('common.signOut')}
         onSecondaryPress={() => {
           void signOut();
         }}
@@ -896,20 +942,64 @@ function RootLayoutNav({
     );
   }
 
+  // Placed after the language block so the render order matches the decision
+  // tag chain. The user and consent errors above cannot co-occur with this
+  // one: both require a token, and a failed credential read has none.
+  //
+  // The stored session could not be read, so it is not known to be gone: the
+  // person is asked to retry, never presented as signed out. A retry holds
+  // this settled surface until the fresh reads resolve (`restoreFailed`
+  // stays true) AND through the post-restore gates (the hold), so the busy
+  // state is the primary button's inline spinner — no blank frame and no
+  // gate swap — and Sign out is the explicit escape hatch to the login
+  // screen.
+  //
+  // The held surface is an absolute overlay ABOVE the wrapper, not an early
+  // return: while it is up, the retried bootstrap settles into redirect tags
+  // (redirect-login / redirect-consent / redirect-app) whose router.replace
+  // must land. An early return unmounts Slot, so those replaces fire into a
+  // torn-down navigation tree and the hold can dead-end on the error screen
+  // (retry succeeds with the session deleted → login). With the overlay, Slot
+  // stays mounted, the replace lands (login mounts, inAuthGroup flips), and
+  // `hidden` clears — the hold releases in a layout effect, so the error
+  // surface and the revealed tree swap inside one paint. Under the overlay
+  // the wrapper is forced to the hidden presentation (opacity-0, no touch, no
+  // a11y), so the settled state renders exactly like the early return it
+  // replaces.
   return (
-    <View
-      ref={wrapperRef}
-      // `opacity-0` + `pointerEvents` hide the redirecting tree visually and
-      // from touch, but not from screen readers. Leave both accessibility
-      // trees while hidden (iOS, then Android).
-      accessibilityElementsHidden={hidden}
-      importantForAccessibility={hidden ? 'no-hide-descendants' : 'auto'}
-      className={`flex-1 ${hidden ? 'opacity-0' : 'opacity-100'}`}
-      pointerEvents={hidden ? 'none' : 'auto'}
-    >
-      <Slot />
-      <PrivacyCoverOverlay segments={segments} />
-    </View>
+    <>
+      <View
+        ref={wrapperRef}
+        // `opacity-0` + `pointerEvents` hide the redirecting tree visually and
+        // from touch, but not from screen readers. Leave both accessibility
+        // trees while hidden (iOS, then Android). The held error surface
+        // forces the same presentation: it owns the screen above the wrapper.
+        accessibilityElementsHidden={hidden || showRestoreError}
+        importantForAccessibility={hidden || showRestoreError ? 'no-hide-descendants' : 'auto'}
+        className={`flex-1 ${hidden || showRestoreError ? 'opacity-0' : 'opacity-100'}`}
+        pointerEvents={hidden || showRestoreError ? 'none' : 'auto'}
+      >
+        <Slot />
+        <PrivacyCoverOverlay segments={segments} />
+      </View>
+      {showRestoreError ? (
+        <View className="absolute inset-0">
+          <BootstrapErrorScreen
+            title={t('bootstrap.couldNotLoadAccount')}
+            description={t('common.somethingWentWrong')}
+            primaryLabel={t('common.retry')}
+            primaryAccessibilityLabel={t('bootstrap.retryLoadingAccount')}
+            onPrimaryPress={retryRestore}
+            primaryLoading={authLoading || userIdLoading}
+            secondaryLabel={t('common.signOut')}
+            secondaryAccessibilityLabel={t('common.signOut')}
+            onSecondaryPress={() => {
+              void signOut();
+            }}
+          />
+        </View>
+      ) : null}
+    </>
   );
 }
 
@@ -959,20 +1049,32 @@ function RootLayout() {
   }, []);
 
   return (
-    <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
-      <ThemeProvider value={navigationTheme}>
-        <AppRootProviders languageReady={languageReady}>
-          <StatusBar style="auto" />
-          <AppContentReveal>
-            <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
-          </AppContentReveal>
-          <AnimatedSplashOverlay />
-        </AppRootProviders>
-      </ThemeProvider>
-    </ShareIntentProvider>
+    <MotionProvider>
+      <ShareIntentProvider options={SHARE_INTENT_OPTIONS}>
+        <ThemeProvider value={navigationTheme}>
+          <AppRootProviders languageReady={languageReady}>
+            <StatusBar style="auto" />
+            <AppContentReveal>
+              <StateSurface className="flex-1">
+                <RootLayoutNav languageReady={languageReady} setLanguageReady={setLanguageReady} />
+              </StateSurface>
+            </AppContentReveal>
+            <AnimatedSplashOverlay />
+          </AppRootProviders>
+        </ThemeProvider>
+      </ShareIntentProvider>
+    </MotionProvider>
   );
 }
 
-export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(ExpoRouterErrorBoundary);
+function RootErrorBoundary({ retry }: ErrorBoundaryProps) {
+  return (
+    <StateSurface className="flex-1 bg-background">
+      <QueryError onRetry={() => void retry()} />
+    </StateSurface>
+  );
+}
+
+export const ErrorBoundary = Sentry.wrapExpoRouterErrorBoundary(RootErrorBoundary);
 
 export default Sentry.wrap(RootLayout);

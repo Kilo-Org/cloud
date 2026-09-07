@@ -34,7 +34,7 @@ export function retireWorktreeRuntime<Entry extends RuntimeCleanupEntry<Root>, R
     return Promise.resolve('stale');
   const deadlineAt = deps.cleanupDeadline(entry, requested);
   if (entry.retiring) {
-    entry.processes?.stop(deadlineAt);
+    void entry.processes?.stop(deadlineAt);
     return entry.retiring;
   }
   const completion = Promise.withResolvers<NativeRetirement>();

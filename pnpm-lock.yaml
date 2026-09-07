@@ -160,6 +160,7 @@ overrides:
 packageExtensionsChecksum: sha256-1pgKZxx87NNMe1poF5N5u5kZB/qlEyILBQPxofM1shE=
 
 patchedDependencies:
+  decode-uri-component@0.5.0: 44dc7ee3ec754d20fab8b07d7efd2442940d872ab7e8c3b61386a3d344fa3ac8
   expo-router@57.0.15: 616f8a79932a3ebc7d31343b53b3fc425a14bfb89bb86cdafa614cefa4e603ed
   expo-server-sdk: 7850520582b5b394397b35d1ea195192fe78589d8a6a748fe15177b818c4ed0b
   expo-widgets@57.0.11: 1e56973d7097e3ff0eb5e8e339cdda799cece44b89ce2e13a43f00873f280adc
@@ -29243,7 +29244,7 @@ snapshots:
     dependencies:
       character-entities: 2.0.2
 
-  decode-uri-component@0.5.0: {}
+  decode-uri-component@0.5.0(patch_hash=44dc7ee3ec754d20fab8b07d7efd2442940d872ab7e8c3b61386a3d344fa3ac8): {}
 
   decompress-response@6.0.0:
     dependencies:
@@ -35340,7 +35341,7 @@ snapshots:
 
   query-string@7.1.3:
     dependencies:
-      decode-uri-component: 0.5.0
+      decode-uri-component: 0.5.0(patch_hash=44dc7ee3ec754d20fab8b07d7efd2442940d872ab7e8c3b61386a3d344fa3ac8)
       filter-obj: 1.1.0
       split-on-first: 1.1.0
       strict-uri-encode: 2.0.0

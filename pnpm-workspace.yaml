@@ -166,6 +166,8 @@ packageExtensions:
     dependencies:
       '@expo/config-plugins': '*'
 patchedDependencies:
+  # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
+  decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
   expo-router@57.0.15: patches/expo-router@57.0.15.patch
   expo-server-sdk: patches/expo-server-sdk.patch
   expo-widgets@57.0.11: patches/expo-widgets@57.0.11.patch

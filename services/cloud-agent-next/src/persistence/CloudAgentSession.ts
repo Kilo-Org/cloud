@@ -697,7 +697,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
             parentMessageId
           ),
         ensureTerminalMessageEvent: event => {
-          this.ensureTerminalMessageEvent({
+          this.ensureUniqueMessageEvent({
             executionId: '' as EventSourceId,
             ...event,
           });
@@ -1152,7 +1152,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
           isWrapperRunFinalizing(await getWrapperRuntimeState(this.ctx.storage)),
         checkBillingAdmission: () => this.containerBillingAdmissionFailure(),
         ensureQueuedMessageEvent: event => {
-          this.ensureQueuedMessageEvent({
+          this.ensureUniqueMessageEvent({
             executionId: '' as EventSourceId,
             ...event,
           });
@@ -1518,34 +1518,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     });
   }
 
-  private ensureTerminalMessageEvent(params: {
-    executionId: EventSourceId;
-    sessionId: string;
-    streamEventType: string;
-    payload: string;
-    timestamp: number;
-    entityId: string;
-  }): void {
-    const eventId = this.eventQueries.insertUnique({
-      executionId: params.executionId,
-      sessionId: params.sessionId,
-      streamEventType: params.streamEventType,
-      payload: params.payload,
-      timestamp: params.timestamp,
-      entityId: params.entityId,
-    });
-    if (eventId === null) return;
-    this.broadcastEvent({
-      id: eventId,
-      execution_id: params.executionId,
-      session_id: params.sessionId,
-      stream_event_type: params.streamEventType,
-      payload: params.payload,
-      timestamp: params.timestamp,
-    });
-  }
-
-  private ensureQueuedMessageEvent(params: {
+  private ensureUniqueMessageEvent(params: {
     executionId: EventSourceId;
     sessionId: string;
     streamEventType: string;

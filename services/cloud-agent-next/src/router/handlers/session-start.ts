@@ -11,21 +11,12 @@
  * session ownership state is created.
  */
 import { protectedProcedure } from '../auth.js';
-import type { WorkerDb } from '@kilocode/db/client';
 import { logger, withLogTags } from '../../logger.js';
-import { getPgDb } from '../../db/pg.js';
 import type * as z from 'zod';
 import { StartSessionInput, StartSessionOutput } from '../schemas.js';
 import { startNewSession } from '../../session/session-registration.js';
-import {
-  assertModeAvailableForProfile,
-  profileResolutionPolicyForSessionCreateOrigin,
-  resolveEffectiveSessionConfiguration,
-} from './session-prepare.js';
 import type { SessionCreateRequest } from '../../session/session-requests.js';
-import { assertKiloModelAvailable } from '../../model-validation.js';
-import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
-import { assertOrganizationMembership } from './organization-membership.js';
+import { preflightSessionCreation } from './session-creation-preflight.js';
 
 type SessionStartHandlers = {
   start: typeof startSessionHandler;
@@ -99,44 +90,14 @@ const startSessionHandler = protectedProcedure
   .output(StartSessionOutput)
   .mutation(async ({ input, ctx }) => {
     return withLogTags({ source: 'start' }, async () => {
-      const request = startInputToSessionCreateRequest(input);
-      const organizationId = request.options?.kilocodeOrganizationId;
-      let db: WorkerDb | undefined;
-      if (organizationId) {
-        db = getPgDb(ctx.env);
-        await assertOrganizationMembership(db, ctx.userId, organizationId);
-      }
-      await assertRepositoryAccessBeforeSessionCreation({
-        env: ctx.env,
-        userId: ctx.userId,
-        orgId: organizationId,
-        repository: request.repository,
-      });
-
-      const policy = profileResolutionPolicyForSessionCreateOrigin(
-        input.options?.createdOnPlatform
-      );
-      const requestWithProfile = await resolveEffectiveSessionConfiguration(
+      const request = await preflightSessionCreation(
+        startInputToSessionCreateRequest(input),
         ctx,
-        request,
-        policy,
-        db
+        'start'
       );
-      assertModeAvailableForProfile(
-        requestWithProfile.agent.mode,
-        requestWithProfile.profile?.resolved ?? {}
-      );
-      await assertKiloModelAvailable({
-        env: ctx.env,
-        submittedModel: requestWithProfile.agent.model,
-        originalToken: ctx.authToken,
-        originalOrganizationId: requestWithProfile.options?.kilocodeOrganizationId,
-        createdOnPlatform: requestWithProfile.options?.createdOnPlatform,
-        procedure: 'start',
-      });
 
       const registration = await startNewSession(
-        requestWithProfile,
+        request,
         {
           env: ctx.env,
           userId: ctx.userId,

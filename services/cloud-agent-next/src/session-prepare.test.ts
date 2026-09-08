@@ -123,7 +123,7 @@ vi.mock('./session-service.js', () => ({
 }));
 
 import { appRouter } from './router.js';
-import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-prepare.js';
+import { profileResolutionPolicyForSessionCreateOrigin } from './router/handlers/session-creation-preflight.js';
 import type { TRPCContext, SessionId } from './types.js';
 
 function createMockDOStub(
@@ -1022,6 +1022,7 @@ describe('prepareSession endpoint', () => {
     ).rejects.toThrow('devcontainer sessions must use autoInitiate');
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('auto-initiates command-valued initialPayload through grouped canonical admission', async () => {
@@ -1091,6 +1092,7 @@ describe('prepareSession endpoint', () => {
 
     expect(doStub.registerSession).not.toHaveBeenCalled();
     expect(doStub.admitSubmittedMessage).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
   });
 
   it('returns a prepared session when post-registration fact persistence fails', async () => {
@@ -1471,6 +1473,38 @@ describe('start endpoint', () => {
       );
     }
   );
+
+  it('passes resolved profile output into grouped start registration', async () => {
+    const runtimeAgent = {
+      slug: 'reviewer',
+      name: 'Reviewer',
+      config: { prompt: 'Review the diff', mode: 'subagent' as const },
+    };
+    mergeProfileConfigurationMock.mockResolvedValueOnce({
+      envVars: { PROFILE_VALUE: 'resolved' },
+      agents: [runtimeAgent],
+    });
+    const doStub = createMockDOStub();
+    const caller = appRouter.createCaller(createInternalApiContext({ doStub }));
+
+    await caller.start({
+      message: { prompt: 'Use the resolved profile' },
+      agent: { mode: 'reviewer', model: 'anthropic/claude-sonnet-4-20250514' },
+      repository: { type: 'github', repo: 'acme/repo' },
+      profile: { id: '123e4567-e89b-12d3-a456-426614174011' },
+      options: { createdOnPlatform: 'cloud-agent-web' },
+    });
+
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: expect.objectContaining({ mode: 'reviewer' }),
+        profile: expect.objectContaining({
+          envVars: { PROFILE_VALUE: 'resolved' },
+          runtimeAgents: [runtimeAgent],
+        }),
+      })
+    );
+  });
 
   it('returns an admitted session without persisting setup success milestones', async () => {
     const caller = appRouter.createCaller(createInternalApiContext({}));

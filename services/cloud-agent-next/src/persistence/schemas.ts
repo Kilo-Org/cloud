@@ -394,7 +394,7 @@ export type InitialExecutionPayload = z.infer<typeof InitialExecutionPayloadSche
  * session. Current metadata stores this under the nested `profile` key.
  * Legacy flat profile fields are normalized by `parseSessionMetadata`.
  */
-export const SessionProfileBundleSchema = z.object({
+const SharedSessionProfileFields = {
   envVars: z
     .record(z.string().max(256), z.string().max(256))
     .refine(obj => Object.keys(obj).length <= 50, {
@@ -411,6 +411,10 @@ export const SessionProfileBundleSchema = z.object({
     .optional(),
   runtimeSkills: RuntimeSkillsSchema.optional(),
   runtimeAgents: RuntimeAgentsSchema.optional(),
+};
+
+export const SessionProfileBundleSchema = z.object({
+  ...SharedSessionProfileFields,
   kiloCommands: RuntimeKiloCommandsSchema.optional(),
 });
 
@@ -446,22 +450,7 @@ export const MetadataSchema = z.object({
    */
   profile: SessionProfileBundleSchema.optional(),
   // --- Legacy flat profile fields (read-only fallback, no longer written) ---
-  envVars: z
-    .record(z.string().max(256), z.string().max(256))
-    .refine(obj => Object.keys(obj).length <= 50, {
-      message: 'Maximum 50 environment variables allowed',
-    })
-    .optional(),
-  encryptedSecrets: EncryptedSecretsSchema.optional(),
-  setupCommands: z.array(z.string().max(500)).max(Limits.MAX_SETUP_COMMANDS).optional(),
-  mcpServers: z
-    .record(z.string().max(100), MCPServerConfigSchema)
-    .refine(obj => Object.keys(obj).length <= Limits.MAX_MCP_SERVERS, {
-      message: `Maximum ${Limits.MAX_MCP_SERVERS} MCP servers allowed`,
-    })
-    .optional(),
-  runtimeSkills: RuntimeSkillsSchema.optional(),
-  runtimeAgents: RuntimeAgentsSchema.optional(),
+  ...SharedSessionProfileFields,
   upstreamBranch: branchNameSchema.optional(),
   kiloSessionId: z.string().optional(),
   createdOnPlatform: z.string().max(100).optional(),

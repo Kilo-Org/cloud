@@ -5,6 +5,7 @@ import {
   CloudAgentSafeFailureSchema,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
+import { assistantErrorDetail } from '../shared/assistant-failure.js';
 import {
   SAFE_FAILURE_MESSAGE_MAX_LENGTH,
   SafeFailureProjectionSchema,
@@ -18,6 +19,46 @@ import {
 } from './safe-failure-projection.js';
 
 describe('projectSafeAssistantError', () => {
+  it.each([
+    [
+      'string',
+      'Rate limit exceeded',
+      'Rate limit exceeded',
+      'rate_limited',
+      'Assistant request was rate limited',
+    ],
+    [
+      'nested message ahead of top-level message',
+      { data: { message: 'deadline exceeded' }, message: 'Unknown model' },
+      'deadline exceeded',
+      'timeout',
+      'Assistant request timed out',
+    ],
+    [
+      'top-level message',
+      { message: 'Unknown model' },
+      'Unknown model',
+      'model_unavailable',
+      'Assistant request failed: model not found',
+    ],
+    ['null', null, undefined, 'unknown', undefined],
+    ['undefined', undefined, undefined, 'unknown', undefined],
+    [
+      'unrecognized non-null value',
+      { code: 'future-error' },
+      'Assistant message failed',
+      'unknown',
+      'Assistant request failed',
+    ],
+  ] as const)(
+    'keeps recognition and classification/raw fallbacks distinct for %s',
+    (_name, source, rawDetail, reason, safeProjection) => {
+      expect(assistantErrorDetail(source)).toBe(rawDetail);
+      expect(classifyAssistantFailure(source).reason).toBe(reason);
+      expect(projectSafeAssistantError(source)).toBe(safeProjection);
+    }
+  );
+
   it.each([
     'Payment required: insufficient credits',
     'Unknown model',

@@ -43,6 +43,9 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `pnpm run format` - oxfmt write (src only)
 - `pnpm run format:check` - oxfmt check (src only)
 - `pnpm run typecheck` - TypeScript (tsgo) + wrapper typecheck
+- `pnpm run test:checkers` - Duplication and architecture checker fixtures
+- `pnpm run check:architecture` - Production ownership boundaries
+- `pnpm run check:duplication` - Production duplicate-code ratchet
 
 ### Deployment
 
@@ -126,7 +129,9 @@ This pattern blocks API endpoints from running for external contributors who don
 - A legacy pending-message flush blocked on exhaustion forces one out-of-cadence recheck (`recoverExhaustedDeliveryBlock` → `recheckExhaustedCleanup`) because a user is actively waiting, then retries on the `WRAPPER_CLEANUP_EXHAUSTED` budget before failing closed. The retry budget is what keeps the two halves consistent — recovery takes minutes, so terminalizing on the first blocked attempt would discard messages a later probe would have delivered — and failing closed at the end of it is what keeps a message from sitting `queued` with no terminal signal. The flush failure code must stay authoritative: `INTERNAL` is treated as non-authoritative by `recordPendingFlushFailure` and would terminalize the message under whatever earlier cause it carried.
 - Callback delivery retry policy is paired with `wrangler.jsonc`: `CALLBACK_DELIVERY_MAX_ATTEMPTS` includes the initial attempt, and each Cloud Agent Next callback queue consumer must configure `max_retries` for the remaining redeliveries.
 - Queue/drain emits unfenced `MessageDeliveryRequest`; only `AgentRuntime` may allocate/reuse current identity and construct `FencedWrapperDispatchRequest` with complete `WrapperRunFence` for downstream dispatch.
-- Session creation selects an explicit `ProfileResolutionPolicy` at the handler boundary. Implicit repository/default profile resolution is limited to the closed set of approved session origins; omitted, unknown, and non-approved automation origins fail closed unless they supply an explicit profile id.
+- Session creation preflight selects an explicit `ProfileResolutionPolicy`. Implicit repository/default profile resolution is limited to the closed set of approved session origins; omitted, unknown, and non-approved automation origins fail closed unless they supply an explicit profile id.
+- Creation admission belongs to `src/router/handlers/session-creation-preflight.ts`. Registration/ledger and stored-session preflight remain separate owners.
+- Wrapper production code may import Worker code only through `src/shared`; Worker production code must not import `wrapper`.
 - Public `start` must authorize any supplied `kilocodeOrganizationId` against `organization_memberships` before resolving profile layers or creating session ownership state. Balance validation is billing-only and `x-skip-balance-check` must never bypass organization authorization.
 - Current wrapper identity is fenced `wrapperRunId` plus generation/connection; do not reintroduce execution-ID-only reconnect, supervision, or pending-drain blocking. Legacy endpoint/result/callback `executionId` fields remain boundary compatibility aliases only.
 - A control-plane session must remain recoverable after the physical sandbox dies. `SandboxControl` retains its allocation and stop tombstone until stop confirmation or a non-waking terminal observation; only explicit authorized demand may create a replacement. Do not require a new `workspace_*` session. Cloudflare cleanup retains five fast attempts, then observes and issues at most one native stop per five-minute reconciliation pass until death is confirmed. Keep these slow reaping alarms beyond one hour without resetting the attempt budget or postponing them on demand. Vercel retains its observation-only cutoff. Continued reaping retains cleanup responsibility, not an absolute physical lifetime guarantee during provider unavailability.

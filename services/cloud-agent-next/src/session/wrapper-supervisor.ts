@@ -10,6 +10,7 @@ import type {
 import type { AgentRuntime } from './agent-runtime.js';
 import { WRAPPER_NO_OUTPUT_TIMEOUT_MS, WRAPPER_PING_INTERVAL_MS } from './agent-runtime.js';
 import type { MessageSettlementOutbox } from './message-settlement-outbox.js';
+import { assistantErrorDetail } from '../shared/assistant-failure.js';
 import {
   assistantFailureMessage,
   classifyAssistantFailure,
@@ -281,34 +282,18 @@ function matchesDisconnectGraceFence(
   return true;
 }
 
-function getAssistantErrorMessage(error: unknown): string | undefined {
-  if (error === undefined || error === null) return undefined;
-  if (typeof error === 'string') return error;
-  if (typeof error === 'object') {
-    if ('data' in error && error.data && typeof error.data === 'object') {
-      if ('message' in error.data && typeof error.data.message === 'string') {
-        return error.data.message;
-      }
-    }
-    if ('message' in error && typeof error.message === 'string') {
-      return error.message;
-    }
-  }
-  return 'Assistant message failed';
-}
-
 function assistantErrorTerminalizeParams(info: LatestAssistantMessage['info']): TerminalizeParams {
   const assistantError = info.error;
   if (isAssistantInterrupt(assistantError)) {
     return {
       kind: 'interrupted',
-      error: getAssistantErrorMessage(assistantError) ?? 'The message was interrupted by the user',
+      error: assistantErrorDetail(assistantError) ?? 'The message was interrupted by the user',
       completionSource: 'interrupt',
       failureStage: 'interruption',
       failureCode: 'user_interrupt',
     };
   }
-  const errorMessage = getAssistantErrorMessage(assistantError) ?? 'Assistant request failed';
+  const errorMessage = assistantErrorDetail(assistantError) ?? 'Assistant request failed';
   const assistantFailure = classifyAssistantFailure(assistantError);
   return {
     kind: 'failed',

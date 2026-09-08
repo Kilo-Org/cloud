@@ -32,6 +32,8 @@ export type CallbackTarget = {
 };
 
 export type DriverConfig = {
+  /** Track returned session IDs, including prepare success followed by initiation failure. */
+  onSessionCreated?: (sessionId: string) => void;
   workerUrl: string;
   expectControlPlane?: boolean;
   user: TestUser;
@@ -193,6 +195,7 @@ export async function startSession(
     api === 'legacy'
       ? await startSessionLegacy(config, args)
       : await startSessionUnified(config, args);
+  if (api === 'unified') config.onSessionCreated?.(result.cloudAgentSessionId);
   if (config.expectControlPlane && !result.cloudAgentSessionId.startsWith('workspace_')) {
     throw new Error(
       `Started ${result.cloudAgentSessionId}, but expected an enrolled workspace_* session; do not retry start`
@@ -279,6 +282,7 @@ async function startSessionLegacy(
     streamUrl?: string;
     status?: string;
   };
+  config.onSessionCreated?.(prepared.cloudAgentSessionId);
   const initiated = await trpcCall<InitiateResult>(config, 'initiateFromKilocodeSessionV2', {
     cloudAgentSessionId: prepared.cloudAgentSessionId,
   });

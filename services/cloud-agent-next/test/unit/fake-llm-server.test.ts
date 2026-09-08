@@ -406,6 +406,15 @@ describe('fake-llm-server HTTP', () => {
     expect(chunks[chunks.length - 1].data).toBe('[DONE]');
   });
 
+  it('error-terminal returns HTTP 400 with an OpenAI-shaped error', async () => {
+    const h = await start();
+    const res = await postChat(h.url, '__fake__:error-terminal:boom');
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({
+      error: { message: 'boom', code: 400, type: 'invalid_request' },
+    });
+  });
+
   it('error scenario returns HTTP 402 with OpenAI-shaped error', async () => {
     const h = await start();
     const res = await postChat(h.url, '__fake__:error:too broke');

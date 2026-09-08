@@ -205,6 +205,13 @@ async function stopOwnedSandboxFamily(sandbox: SandboxContainer, sessionId: stri
   return killed;
 }
 
+/** Only tear down sandboxes whose exclusive session ownership can be proven. */
+export async function stopOwnedSessionSandboxes(sessionId: string): Promise<void> {
+  for (const sandbox of await findOwnedSandboxes(sessionId, new Set())) {
+    await stopOwnedSandboxFamily(sandbox, sessionId);
+  }
+}
+
 async function sendRecoveryTurn(
   config: DriverConfig,
   sessionId: string,
@@ -2208,8 +2215,9 @@ export async function lifecycleQueueInterruptClears(args: LifecycleArgs): Promis
 // ---------------------------------------------------------------------------
 
 /**
- * llm-error: drives `__fake__:error:<msg>` so the fake returns HTTP 402 with
- * an OpenAI-shape error body. Assert the worker terminalizes with a failure
+ * llm-error: drives `__fake__:error-terminal:<msg>` so the fake returns HTTP 400
+ * with an OpenAI-shape error body. The gateway converts upstream 402 to retryable
+ * 503 for non-BYOK requests. Assert the worker terminalizes with a failure
  * (not `complete`), and the sandbox doesn't hang indefinitely.
  *
  * Conversation arg is the error message (e.g. `llm-error boom`).
@@ -2220,7 +2228,11 @@ export async function lifecycleLlmError(args: LifecycleArgs): Promise<LifecycleR
   const errorMsg = conversation || 'simulated-error';
   try {
     const knownSandboxIds = await snapshotSandboxIds();
-    const session = await startSession(config, { prompt: fakeDirective(`error:${errorMsg}`) }, api);
+    const session = await startSession(
+      config,
+      { prompt: fakeDirective(`error-terminal:${errorMsg}`) },
+      api
+    );
     const stream = openStream(config, session.cloudAgentSessionId, { replay: false });
 
     const sandbox = await waitForNewSandboxPresent(knownSandboxIds, 60_000);

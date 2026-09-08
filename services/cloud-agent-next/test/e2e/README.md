@@ -166,10 +166,18 @@ tsx services/cloud-agent-next/test/e2e/smoke.ts
 ```
 
 The matrix starts with `cold-hot`, which pays one cold sandbox boot and then
-runs several hot same-session turns. Fresh sessions use per-session sandboxes
-in local dev, so the harness identifies each newly-created sandbox instead of
-killing every sandbox between cases. Kill scenarios only terminate the sandbox
-family created for that scenario.
+runs several hot same-session turns. The matrix tracks the session IDs returned by its own start/prepare calls.
+After each scenario, including failures, it interrupts those sessions before
+stopping sandboxes with proven exclusive ownership. It does not kill unrelated
+or previous-run sandboxes at startup. Cleanup failures stop the matrix instead
+of allowing pending work to contaminate later scenarios. Kill scenarios inject
+their intentional fault before interruption, then cancel remaining work during
+cleanup.
+
+Tracking requires a returned session ID. If unified `start` allocates ownership
+but fails before returning that ID, the driver cannot automatically cancel it.
+Use the failed run's user ID and ownership logs to identify and interrupt only
+those sessions; do not infer ownership from container creation time.
 
 Per-run overrides via env vars. Defaults assume a zero-offset session;
 for any other offset, compute the real ports from `pnpm dev:status --json`
@@ -225,7 +233,8 @@ source of directive truth is `test/e2e/fake-llm-server.ts`.
 | `slow:<n>:<ms>` | `n` content chunks `<ms>` apart, then stop + `[DONE]`. Used for pacing/timing probes. |
 | `idle` | One empty-delta chunk, then stop + `[DONE]`. |
 | `hang` | Opens the SSE stream but emits nothing and never closes. Drives abort/timeout paths. |
-| `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. Exercises kilo's error propagation. |
+| `error-terminal:<msg>` | HTTP 400 with OpenAI-shaped error body carrying `<msg>`. Exercises nonretryable provider-error propagation through the gateway. |
+| `error:<msg>` | HTTP 402 with OpenAI-shaped error body carrying `<msg>`. The non-BYOK gateway converts this to retryable HTTP 503. |
 | `gate:<tag>` | Opens the SSE stream, emits no chunks, blocks until the driver calls `POST /test/release?tag=<tag>`. On release, emits `"done"` + stop + `[DONE]`. |
 
 Unknown `__fake__:<name>` directives produce HTTP 402 with
@@ -265,7 +274,7 @@ These are wrapped by `releaseGate()`, `waitForGateEngaged()`,
 | `queue-rapid-fire-no-gate` | Send immediate follow-ups behind `echo:first` and assert they reach their terminal FIFO state without gate coordination. |
 | `queue-overflow` | Block on `gate:overflow`, fill the pending queue until enqueue fails with HTTP 429, release gate, drain. |
 | `queue-interrupt-clears` | Block on `gate:<tag>`, enqueue two, `interruptSession`, assert `cloud.message.failed` with `reason: 'interrupted'` for each. |
-| `llm-error` | Return fake provider HTTP 402 and assert the turn reaches a failed terminal event instead of hanging. |
+| `llm-error` | Return nonretryable fake provider HTTP 400 and assert the turn reaches a failed terminal event instead of hanging. |
 | `chunked-streaming` | Stream delayed fake chunks and assert multiple downstream `message.part.delta` events survive. |
 | `empty-response` | Run `idle`, assert completion, and assert no downstream `message.part.delta` is emitted. |
 | `interrupt-mid-stream` | Interrupt an actively gated fake request and assert the active message is interrupted, not a queued message. |
@@ -323,19 +332,16 @@ the newer `start` / `send` procedures. `prepareSession` requires
   `pnpm dev:restart cloudflare-git-token-service`, then confirm the entry
   reappears. The fake LLM is irrelevant here — kilo never gets far enough to
   dial it.
-- **Matrix fails intermittently with `preparing×N` and no terminal** —
-  environmental, not a regression. The `@cloudflare/containers` library's
-  container control connection sometimes returns 503 under Docker Desktop
-  load, triggering exponential-backoff retries that consume the scenario
-  timeout. The `smoke.ts` matrix now kills stale containers before starting
-  and uses a 120s per-scenario timeout, but this is not always enough. If
-  the matrix is flaky: (1) stop any competing dev session from another
-  worktree that also runs Cloud Agent sandboxes; (2) prune stopped containers
-  (`docker ps -a --filter status=exited --format '{{.Names}}' | rg
-  workerd-cloud-agent | xargs -r docker rm -f`); (3) restart
-  `cloud-agent-next` to clear stale DO alarm timers; (4) re-run the failing
-  scenario standalone — if it passes alone, the matrix failure was Docker
-  contention, not code.
+- **Matrix fails with `preparing×N` and no terminal** — Correlate the failed
+  message with Worker and wrapper logs before classifying the cause. Container
+  startup failures happen before wrapper bootstrap; a `post-bootstrap kilo
+  session lookup begin` without an end identifies a later native lookup stall.
+  Matrix cleanup interrupts its tracked sessions before stopping exclusively
+  owned sandboxes. For older runs or an interrupted driver, cancel only the
+  recorded run-owned sessions before any owned-family teardown: killing a
+  container alone leaves queued work able to recreate it after a Worker restart.
+  Preserve the failed result and rerun the scenario in isolation; a successful
+  retry does not erase the original failure.
 - **`releaseGate` returned 404** — the gate already went away, usually
   because the wrapper's request was aborted (e.g. by an `interruptSession`).
   Queue-interrupt-clears tolerates this; other scenarios treat it as an

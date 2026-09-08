@@ -251,7 +251,6 @@ export const gitlabRouter = createTRPCRouter({
         owner,
         'gitlab',
         {
-          ...existingMetadata,
           webhook_secret: newSecret,
         },
         integration.id
@@ -330,7 +329,6 @@ export const gitlabRouter = createTRPCRouter({
       owner,
       'gitlab',
       {
-        ...existingMetadata,
         webhook_secret: newSecret,
         configured_webhooks: updatedWebhooks,
       },

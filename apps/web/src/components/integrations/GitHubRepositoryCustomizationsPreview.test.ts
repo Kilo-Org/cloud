@@ -204,10 +204,14 @@ const models: ModelOption[] = [
 ];
 
 let mockRepositoryCustomizationsData: RepositoryCustomizationsData | undefined;
+let mockListIntegrationsError: Error | undefined;
+let mockGetRepositoryCustomizationsError: Error | undefined;
 const mockUpdateInstallationSettingsMutateAsync =
   jest.fn<(variables: unknown) => Promise<{ success: boolean; error?: string }>>();
 const mockUpdateRepositorySettingsMutateAsync =
   jest.fn<(variables: unknown) => Promise<{ success: boolean; error?: string }>>();
+const mockListIntegrationsRefetch = jest.fn();
+const mockGetRepositoryCustomizationsRefetch = jest.fn();
 const mockSetQueryData = jest.fn(
   (
     _queryKey: unknown,
@@ -242,10 +246,22 @@ jest.mock('@/lib/trpc/utils', () => ({
 jest.mock('@tanstack/react-query', () => ({
   useQuery: (options: { __tag: string }) => {
     if (options.__tag === 'listIntegrations') {
-      return { data: [{ id: 'first' }], isLoading: false };
+      return {
+        data: mockListIntegrationsError ? undefined : [{ id: 'first' }],
+        isLoading: false,
+        isError: mockListIntegrationsError !== undefined,
+        error: mockListIntegrationsError,
+        refetch: mockListIntegrationsRefetch,
+      };
     }
     if (options.__tag === 'getRepositoryCustomizations') {
-      return { data: mockRepositoryCustomizationsData, isLoading: false };
+      return {
+        data: mockGetRepositoryCustomizationsError ? undefined : mockRepositoryCustomizationsData,
+        isLoading: false,
+        isError: mockGetRepositoryCustomizationsError !== undefined,
+        error: mockGetRepositoryCustomizationsError,
+        refetch: mockGetRepositoryCustomizationsRefetch,
+      };
     }
     throw new Error(`Unexpected query tag: ${options.__tag}`);
   },
@@ -310,6 +326,8 @@ let GitHubRepositoryCustomizations: typeof GitHubRepositoryCustomizationsCompone
 beforeEach(async () => {
   jest.clearAllMocks();
   mockRepositoryCustomizationsData = createRepositoryCustomizationsData();
+  mockListIntegrationsError = undefined;
+  mockGetRepositoryCustomizationsError = undefined;
   mockUpdateInstallationSettingsMutateAsync.mockResolvedValue({
     success: true,
   });
@@ -485,5 +503,32 @@ describe('GitHubRepositoryCustomizations (live)', () => {
       await Promise.resolve();
     });
     expect(button(container, 'Edit first/repo-0').disabled).toBe(false);
+  });
+
+  it('shows a retryable error instead of an endless loading state when the customizations query fails', async () => {
+    mockGetRepositoryCustomizationsError = new Error('Request failed');
+    const { container } = render();
+
+    expect(container.textContent).not.toContain('Loading repository customizations…');
+    expect(container.textContent).toContain(
+      'Couldn’t load repository customizations: Request failed'
+    );
+
+    await click(button(container, 'Retry'));
+    expect(mockGetRepositoryCustomizationsRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a retryable error for the installations list when it fails to load', async () => {
+    mockListIntegrationsError = new Error('Request failed');
+    const { container } = render();
+
+    expect(container.textContent).not.toContain('Loading installations…');
+    expect(container.textContent).toContain(
+      'Couldn’t load GitHub App installations: Request failed'
+    );
+    expect(container.textContent).not.toContain('No GitHub App installations found.');
+
+    await click(button(container, 'Retry'));
+    expect(mockListIntegrationsRefetch).toHaveBeenCalledTimes(1);
   });
 });

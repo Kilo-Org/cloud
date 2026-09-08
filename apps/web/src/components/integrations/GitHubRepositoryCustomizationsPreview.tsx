@@ -107,7 +107,7 @@ export function InstallationCustomizations({
   const queryClient = useQueryClient();
   const queryInput = { organizationId, integrationId };
   const queryKey = trpc.githubApps.getRepositoryCustomizations.queryKey(queryInput);
-  const { data, isLoading } = useQuery(
+  const { data, isLoading, isError, error, refetch } = useQuery(
     trpc.githubApps.getRepositoryCustomizations.queryOptions(queryInput)
   );
   const updateInstallationSettings = useMutation(
@@ -131,9 +131,23 @@ export function InstallationCustomizations({
   const editTrigger = useRef<HTMLButtonElement | null>(null);
   const searchInput = useRef<HTMLInputElement | null>(null);
 
-  if (isLoading || !data) {
+  if (isLoading) {
     return (
       <Card className="p-5 text-sm text-muted-foreground">Loading repository customizations…</Card>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm text-muted-foreground">
+        <p>
+          Couldn’t load repository customizations
+          {error instanceof Error && error.message ? `: ${error.message}` : '.'}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          Retry
+        </Button>
+      </Card>
     );
   }
 
@@ -814,9 +828,13 @@ export function GitHubRepositoryCustomizations({
 }) {
   const trpc = useTRPC();
   const input = organizationId ? { organizationId } : undefined;
-  const { data: integrations, isLoading } = useQuery(
-    trpc.githubApps.listIntegrations.queryOptions(input)
-  );
+  const {
+    data: integrations,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery(trpc.githubApps.listIntegrations.queryOptions(input));
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -844,7 +862,18 @@ export function GitHubRepositoryCustomizations({
         </header>
         <div className="space-y-5">
           {isLoading && <p className="text-sm text-muted-foreground">Loading installations…</p>}
-          {!isLoading && integrations?.length === 0 && (
+          {isError && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-5 text-sm text-muted-foreground">
+              <p>
+                Couldn’t load GitHub App installations
+                {error instanceof Error && error.message ? `: ${error.message}` : '.'}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          )}
+          {!isLoading && !isError && integrations?.length === 0 && (
             <p className="text-sm text-muted-foreground">No GitHub App installations found.</p>
           )}
           {integrations

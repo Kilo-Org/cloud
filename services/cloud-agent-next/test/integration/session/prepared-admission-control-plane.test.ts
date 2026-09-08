@@ -140,4 +140,41 @@ describe('SandboxSession prepared initial admission (control plane)', () => {
     if (result.success) return;
     expect(result.code).toBe('BAD_REQUEST');
   });
+
+  it('persists a readable default branch for a new control-plane session', async () => {
+    const sessionId = cloudId();
+    const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+
+    const metadata = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        identity: { sessionId, userId },
+        auth: { kiloSessionId, kilocodeToken: 'test-session-token' },
+        agent: { mode: 'code', model: 'test-model' },
+        repository: { type: 'github', repo: 'acme/demo' },
+        workspace: { sandboxId, sandboxProvider: 'cloudflare' as const },
+      });
+      return instance.getMetadata();
+    });
+
+    expect(metadata?.workspace?.branchName).toMatch(/^kilo\/[a-z0-9-]+$/);
+  });
+
+  it('preserves an explicitly requested repository branch', async () => {
+    const sessionId = cloudId();
+    const stub = env.SANDBOX_SESSION.getByName(`${userId}:${sessionId}`);
+
+    const metadata = await runInDurableObject(stub, async instance => {
+      await instance.registerSession({
+        identity: { sessionId, userId },
+        auth: { kiloSessionId, kilocodeToken: 'test-session-token' },
+        agent: { mode: 'code', model: 'test-model' },
+        repository: { type: 'github', repo: 'acme/demo', branch: 'main' },
+        workspace: { sandboxId, sandboxProvider: 'cloudflare' as const },
+      });
+      return instance.getMetadata();
+    });
+
+    expect(metadata?.workspace?.branchName).toBe('main');
+    expect(metadata?.repository?.upstreamBranch).toBe('main');
+  });
 });

@@ -59,6 +59,10 @@ export function buildSessionAttachPayload(
     );
   const git = gitFromMetadata(metadata);
   const branch = metadata.workspace?.branchName ?? metadata.repository?.upstreamBranch;
+  const branchMode =
+    branch && metadata.workspace?.branchName === branch && !metadata.repository?.upstreamBranch
+      ? 'working'
+      : undefined;
   const profile = readProfileBundle(metadata);
   validateControlSessionOptions(metadata);
   const env = {
@@ -69,10 +73,21 @@ export function buildSessionAttachPayload(
   return {
     directory,
     ...(branch ? { branch } : {}),
+    ...(branchMode ? { branchMode } : {}),
     ...(metadata.auth.kiloSessionId ? { snapshotIdentity: metadata.auth.kiloSessionId } : {}),
     ...(git ? { git } : {}),
     ...(Object.keys(env).length > 0 ? { env } : {}),
     ...(profile.setupCommands?.length ? { setupCommands: profile.setupCommands } : {}),
     ...(preparation ? { preparation } : {}),
   };
+}
+
+export function adaptSessionAttachPayloadForWrapper(
+  payload: SessionAttachPayload,
+  supportsWorkingBranches: boolean
+): SessionAttachPayload {
+  if (supportsWorkingBranches || payload.branchMode !== 'working') return payload;
+
+  const { branch: _branch, branchMode: _branchMode, ...legacyPayload } = payload;
+  return legacyPayload;
 }

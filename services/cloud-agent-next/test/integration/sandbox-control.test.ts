@@ -354,8 +354,16 @@ function sendHello(
     wrapperInstanceId?: string;
     sessionOperationResults?: boolean;
     nativeRuntimeRetirement?: boolean;
+    workingBranches?: boolean;
   } = {}
 ): void {
+  const capabilities = {
+    ...(identity.sessionOperationResults || identity.nativeRuntimeRetirement
+      ? { sessionOperationResults: true }
+      : {}),
+    ...(identity.nativeRuntimeRetirement ? { nativeRuntimeRetirement: true } : {}),
+    ...(identity.workingBranches ? { workingBranches: true } : {}),
+  };
   ws.send(
     JSON.stringify({
       type: 'request',
@@ -365,17 +373,7 @@ function sendHello(
         protocolVersion: 1,
         providerInstanceId:
           identity.providerInstanceId ?? cloudflareRef(socketSandboxIds.get(ws) ?? sandboxId),
-        ...(identity.sessionOperationResults
-          ? { capabilities: { sessionOperationResults: true } }
-          : {}),
-        ...(identity.nativeRuntimeRetirement
-          ? {
-              capabilities: {
-                sessionOperationResults: true,
-                nativeRuntimeRetirement: true,
-              },
-            }
-          : {}),
+        ...(Object.keys(capabilities).length > 0 ? { capabilities } : {}),
         ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
       },
     })
@@ -390,6 +388,7 @@ async function completeHello(
     wrapperInstanceId?: string;
     sessionOperationResults?: boolean;
     nativeRuntimeRetirement?: boolean;
+    workingBranches?: boolean;
   } = {}
 ): Promise<void> {
   sendHello(ws, requestId, identity);
@@ -2373,7 +2372,10 @@ describe('SandboxControl contained Vercel lifecycle', () => {
     const previousRef = launch.env.PROVIDER_INSTANCE_ID;
     const previous = await connect(credential, sandboxId);
     try {
-      await completeHello(previous, 'hello-previous-wrapper', { providerInstanceId: previousRef });
+      await completeHello(previous, 'hello-previous-wrapper', {
+        providerInstanceId: previousRef,
+        workingBranches: true,
+      });
       signalWrapperReady(previous);
       await vi.waitFor(async () => {
         await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
@@ -2477,6 +2479,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       try {
         await completeHello(replacement, 'hello-replacement-wrapper', {
           providerInstanceId: replacementLaunch.env.PROVIDER_INSTANCE_ID,
+          workingBranches: true,
         });
         signalWrapperReady(replacement);
         await vi.waitFor(async () => {
@@ -3082,7 +3085,10 @@ describe('SandboxControl mandatory worktree credentials', () => {
     expectCredentialFreeLaunch(launch, broker);
     const ws = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
     try {
-      await completeHello(ws, 'hello-joined-containment', { providerInstanceId: providerRef });
+      await completeHello(ws, 'hello-joined-containment', {
+        providerInstanceId: providerRef,
+        workingBranches: true,
+      });
       const stale = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
       await rejectHello(
         stale,

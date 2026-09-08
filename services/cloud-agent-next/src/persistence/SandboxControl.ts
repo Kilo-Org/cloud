@@ -176,6 +176,7 @@ import {
   resolveSessionCredential,
   type SessionCredentialGrant,
 } from '../sandbox-control/session-credentials.js';
+import { adaptSessionAttachPayloadForWrapper } from '../sandbox-session/attach-payload.js';
 import { parseControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import {
   diagnosticCause,
@@ -897,12 +898,17 @@ export class SandboxControl extends DurableObject<Env> {
       return response;
     }
     const outbound =
-      input.operation === 'session.attach' && this.supportsNativeRuntimeRetirement()
+      input.operation === 'session.attach'
         ? {
             ...input,
             payload: {
-              ...sessionAttachPayloadSchema.parse(input.payload),
-              captureNativeRuntimeId: true,
+              ...adaptSessionAttachPayloadForWrapper(
+                sessionAttachPayloadSchema.parse(input.payload),
+                this.socketHandler.supportsWorkingBranches?.() === true
+              ),
+              ...(this.supportsNativeRuntimeRetirement()
+                ? { captureNativeRuntimeId: true as const }
+                : {}),
             },
           }
         : input;

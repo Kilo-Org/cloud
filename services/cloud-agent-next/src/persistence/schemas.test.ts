@@ -6,6 +6,7 @@ import {
   MetadataSchema,
   modelIdSchema,
   RuntimeAgentSchema,
+  SessionProfileBundleSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
 } from './schemas.js';
@@ -418,6 +419,75 @@ describe('MCPServerConfigSchema', () => {
 });
 
 describe('MetadataSchema', () => {
+  const legacyMetadata = {
+    version: 1,
+    sessionId: 'session123',
+    userId: 'user123',
+    timestamp: 1,
+  };
+
+  it.each([
+    ['envVars', { FEATURE: 'enabled' }, { ['A'.repeat(257)]: 'value' }],
+    [
+      'encryptedSecrets',
+      {
+        API_TOKEN: {
+          encryptedData: 'ciphertext',
+          encryptedDEK: 'encrypted-key',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      },
+      {
+        API_TOKEN: {
+          encryptedData: 'ciphertext',
+          encryptedDEK: 'encrypted-key',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 2,
+        },
+      },
+    ],
+    ['setupCommands', ['pnpm install'], ['x'.repeat(501)]],
+    [
+      'mcpServers',
+      { docs: { type: 'remote', url: 'https://example.com/mcp' } },
+      { docs: { type: 'remote', url: 'not-a-url' } },
+    ],
+    [
+      'runtimeSkills',
+      [{ name: 'review', rawMarkdown: '# Review' }],
+      [{ name: 'Not-A-Slug', rawMarkdown: '# Review' }],
+    ],
+    [
+      'runtimeAgents',
+      [{ slug: 'reviewer', name: 'Reviewer', config: { prompt: 'Review the diff' } }],
+      [{ slug: 'code', name: 'Code override', config: {} }],
+    ],
+  ] as const)(
+    'keeps nested and legacy-flat %s validation equivalent for representative values',
+    (field, valid, invalid) => {
+      expect(SessionProfileBundleSchema.safeParse({ [field]: valid }).success).toBe(true);
+      expect(MetadataSchema.safeParse({ ...legacyMetadata, [field]: valid }).success).toBe(true);
+      expect(SessionProfileBundleSchema.safeParse({ [field]: invalid }).success).toBe(false);
+      expect(MetadataSchema.safeParse({ ...legacyMetadata, [field]: invalid }).success).toBe(false);
+    }
+  );
+
+  it('keeps kilo commands in nested profiles only', () => {
+    const kiloCommands = [{ name: 'review', template: 'Review $ARGUMENTS' }];
+
+    expect(SessionProfileBundleSchema.parse({ kiloCommands })).toMatchObject({ kiloCommands });
+    expect(MetadataSchema.parse({ ...legacyMetadata, profile: { kiloCommands } })).toMatchObject({
+      profile: { kiloCommands },
+    });
+    expect(
+      MetadataSchema.parse({
+        ...legacyMetadata,
+        kiloCommands,
+      })
+    ).not.toHaveProperty('kiloCommands');
+  });
+
   describe('valid envVars', () => {
     it('should accept valid environment variables within limits', () => {
       const metadata = {

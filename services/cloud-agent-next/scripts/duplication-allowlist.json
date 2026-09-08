@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "scanner": "jscpd@5.0.16",
+  "exceptions": [
+    {
+      "files": ["src/session-service.ts", "src/session-service.ts"],
+      "fingerprint": "a3bbedbe1e52f04e",
+      "owner": "session-service workspace preparation",
+      "reason": "Legacy sandbox preparation and control-plane attachment intentionally project the same workspace execution context while retaining distinct lifecycle flows.",
+      "kind": "intentional",
+      "maxMatches": 1,
+      "maxTokens": 101
+    },
+    {
+      "files": [
+        "wrapper/src/control/sandbox-control-client.ts",
+        "wrapper/src/control/sandbox-control-client.ts"
+      ],
+      "fingerprint": "cddc940139a221f0",
+      "owner": "sandbox control transport",
+      "reason": "Event publication and native-runtime retirement intentionally use the same request-receipt timeout protocol while retaining operation-specific payloads and errors.",
+      "kind": "intentional",
+      "maxMatches": 1,
+      "maxTokens": 109
+    }
+  ]
+}

@@ -216,6 +216,95 @@ describe('getSessionMessageState / putSessionMessageState', () => {
     });
   });
 
+  it('applies the shared prompt and command turn contract at every stored turn location', async () => {
+    const attachments = {
+      path: '123e4567-e89b-12d3-a456-426614174000',
+      files: ['123e4567-e89b-12d3-a456-426614174001.pdf'],
+    };
+    const validTurns = [
+      {
+        type: 'prompt',
+        messageId: VALID_MESSAGE_ID,
+        prompt: 'stored document',
+        attachments,
+      },
+      {
+        type: 'command',
+        messageId: VALID_MESSAGE_ID,
+        command: 'compact',
+        arguments: '--aggressive',
+      },
+    ] as const;
+    const invalidTurns = [
+      {
+        type: 'prompt',
+        messageId: VALID_MESSAGE_ID,
+        prompt: 'legacy image prompt',
+        images: attachments,
+      },
+      {
+        type: 'command',
+        messageId: VALID_MESSAGE_ID,
+        command: 'compact',
+      },
+    ] as const;
+
+    for (const location of [
+      'admissionSnapshot',
+      'legacyAdmissionConstraints',
+      'predecessor',
+    ] as const) {
+      for (const turn of validTurns) {
+        const storage = createFakeStorage();
+        const state = {
+          messageId: VALID_MESSAGE_ID,
+          status: 'accepted',
+          prompt: 'stored turn',
+          createdAt: 1000,
+          acceptedAt: 2000,
+          ...(location === 'admissionSnapshot'
+            ? { admissionSnapshot: { turn, agent: { mode: 'code', model: 'default-model' } } }
+            : location === 'legacyAdmissionConstraints'
+              ? { legacyAdmissionConstraints: { turn } }
+              : { turn }),
+        };
+        await storage.put(`session_message:${VALID_MESSAGE_ID}`, state);
+
+        const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+        const loadedTurn =
+          location === 'admissionSnapshot'
+            ? loaded?.admissionSnapshot?.turn
+            : loaded?.legacyAdmissionConstraints?.turn;
+        expect(loadedTurn, `${location} should accept ${turn.type}`).toEqual(turn);
+      }
+
+      for (const turn of invalidTurns) {
+        const storage = createFakeStorage();
+        const state = {
+          messageId: VALID_MESSAGE_ID,
+          status: 'accepted',
+          prompt: 'stored turn',
+          createdAt: 1000,
+          acceptedAt: 2000,
+          ...(location === 'admissionSnapshot'
+            ? { admissionSnapshot: { turn, agent: { mode: 'code', model: 'default-model' } } }
+            : location === 'legacyAdmissionConstraints'
+              ? { legacyAdmissionConstraints: { turn } }
+              : { turn }),
+        };
+        await storage.put(`session_message:${VALID_MESSAGE_ID}`, state);
+
+        const loaded = await getSessionMessageState(storage, VALID_MESSAGE_ID);
+        if (location === 'predecessor') {
+          expect(loaded, `predecessor should discard invalid ${turn.type}`).toBeDefined();
+          expect(loaded?.legacyAdmissionConstraints?.turn).toBeUndefined();
+        } else {
+          expect(loaded, `${location} should reject invalid ${turn.type}`).toBeUndefined();
+        }
+      }
+    }
+  });
+
   it('prefers a current admission snapshot over conflicting legacy copied fields', async () => {
     const storage = createFakeStorage();
     const current = createIntent(VALID_MESSAGE_ID, 'current prompt');

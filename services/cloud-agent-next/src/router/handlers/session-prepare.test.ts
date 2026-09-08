@@ -13,8 +13,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 
 import { t } from '../auth.js';
+import { PrepareSessionInput } from '../schemas.js';
 import type { TRPCContext } from '../../types.js';
-import { createSessionPrepareHandlers } from './session-prepare.js';
+import {
+  createSessionPrepareHandlers,
+  prepareInputToSessionCreateRequest,
+} from './session-prepare.js';
 
 const {
   mergeProfileConfigurationMock,
@@ -319,6 +323,30 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(startNewSessionMock).not.toHaveBeenCalled();
   });
 
+  it('does not reach registration or the ledger when repository access is rejected', async () => {
+    const caller = router.createCaller(createContext());
+    assertBitbucketRepositoryAccessMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Repository access rejected' })
+    );
+
+    await expect(
+      caller.prepareSession({
+        prompt: 'Attempt repository access',
+        mode: 'code',
+        model: 'claude-3',
+        githubRepo: 'acme/repo',
+        autoInitiate: true,
+        operationKey: OPERATION_KEY,
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
+    expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+  });
+
   it('does not reach the ledger when the model preflight rejects', async () => {
     const caller = router.createCaller(createContext());
     assertKiloModelAvailableMock.mockRejectedValue(
@@ -337,6 +365,73 @@ describe('prepareSession operation-ledger admission gate', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
 
     expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
+    expect(startNewSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('passes the exact profile-resolved request to registration', async () => {
+    const caller = router.createCaller(createContext());
+    const profileId = '123e4567-e89b-12d3-a456-426614174011';
+    const runtimeAgent = {
+      slug: 'reviewer',
+      name: 'Reviewer',
+      config: { prompt: 'Review the diff', mode: 'subagent' as const },
+    };
+    mergeProfileConfigurationMock.mockResolvedValueOnce({
+      envVars: { PROFILE_VALUE: 'resolved' },
+      agents: [runtimeAgent],
+    });
+    const input = {
+      prompt: 'Use the resolved profile',
+      mode: 'reviewer',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      profileId,
+      createdOnPlatform: 'cloud-agent-web',
+      autoInitiate: false,
+      shallow: false,
+    } as const;
+
+    await caller.prepareSession(input);
+
+    const unresolved = prepareInputToSessionCreateRequest(PrepareSessionInput.parse(input));
+    expect(registerNewSessionMock.mock.calls[0]?.[0]).toEqual({
+      ...unresolved,
+      profile: {
+        ...unresolved.profile,
+        resolved: {
+          envVars: { PROFILE_VALUE: 'resolved' },
+          setupCommands: undefined,
+          encryptedSecrets: undefined,
+          mcpServers: undefined,
+          runtimeSkills: undefined,
+          runtimeAgents: [runtimeAgent],
+          kiloCommands: undefined,
+        },
+      },
+    });
+  });
+
+  it('registers command creation without model validation', async () => {
+    const caller = router.createCaller(createContext());
+
+    await caller.prepareSession({
+      prompt: '/compact --aggressive',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      initialPayload: {
+        type: 'command',
+        command: 'compact',
+        arguments: '--aggressive',
+      },
+    });
+
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
+    expect(startNewSessionMock).toHaveBeenCalledOnce();
+    expect(createSessionWithLedgerMock).not.toHaveBeenCalled();
+    expect(registerNewSessionMock).not.toHaveBeenCalled();
   });
 
   it('returns replayed true only when the ledger replays a settled create', async () => {
@@ -385,15 +480,30 @@ describe('prepareSession operation-ledger admission gate', () => {
   it('propagates the clone source through createSessionWithLedger and replays on a same-key retry', async () => {
     const caller = router.createCaller(createContext());
     const sourceKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
-
-    await caller.prepareSession({
-      mode: 'code',
+    const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    const profileId = '123e4567-e89b-12d3-a456-426614174011';
+    mergeProfileConfigurationMock.mockResolvedValue({
+      agents: [
+        {
+          slug: 'reviewer',
+          name: 'Reviewer',
+          config: { prompt: 'Review the diff', mode: 'subagent' },
+        },
+      ],
+    });
+    const input = {
+      mode: 'reviewer',
       model: 'claude-3',
       githubRepo: 'acme/repo',
       autoInitiate: true,
       operationKey: OPERATION_KEY,
       cloneFromKiloSessionId: sourceKiloSessionId,
-    });
+      kilocodeOrganizationId: organizationId,
+      profileId,
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
+
+    await caller.prepareSession(input);
 
     expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(1);
     expect(createSessionWithLedgerMock).toHaveBeenCalledWith(
@@ -406,6 +516,7 @@ describe('prepareSession operation-ledger admission gate', () => {
     );
     expect(startNewSessionMock).not.toHaveBeenCalled();
     expect(registerNewSessionMock).not.toHaveBeenCalled();
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
 
     // Same-key retry resumes: the ledger replays the settled clone create.
     createSessionWithLedgerMock.mockResolvedValueOnce({
@@ -413,20 +524,131 @@ describe('prepareSession operation-ledger admission gate', () => {
       kiloSessionId: 'cli-session-abc123',
       replayed: true,
     });
-    const retry = await caller.prepareSession({
-      mode: 'code',
-      model: 'claude-3',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-      operationKey: OPERATION_KEY,
-      cloneFromKiloSessionId: sourceKiloSessionId,
-    });
+    const retry = await caller.prepareSession(input);
 
     expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(2);
+    expect(assertOrganizationMembershipMock).toHaveBeenCalledTimes(2);
+    expect(assertBitbucketRepositoryAccessMock).toHaveBeenCalledTimes(2);
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledTimes(2);
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
+    for (let call = 0; call < 2; call += 1) {
+      expect(assertOrganizationMembershipMock.mock.invocationCallOrder[call]).toBeLessThan(
+        assertBitbucketRepositoryAccessMock.mock.invocationCallOrder[call] ??
+          Number.POSITIVE_INFINITY
+      );
+      expect(assertBitbucketRepositoryAccessMock.mock.invocationCallOrder[call]).toBeLessThan(
+        mergeProfileConfigurationMock.mock.invocationCallOrder[call] ?? Number.POSITIVE_INFINITY
+      );
+      expect(mergeProfileConfigurationMock.mock.invocationCallOrder[call]).toBeLessThan(
+        createSessionWithLedgerMock.mock.invocationCallOrder[call] ?? Number.POSITIVE_INFINITY
+      );
+    }
     expect(retry).toEqual({
       cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
       kiloSessionId: 'cli-session-abc123',
       replayed: true,
     });
+
+    mergeProfileConfigurationMock.mockResolvedValueOnce({});
+    await expect(caller.prepareSession(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('does not match any runtimeAgents'),
+    });
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledTimes(3);
+    expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(2);
+    expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
+  });
+
+  it('repeats prompt preflight before ledger replay and blocks a mode removed from the profile', async () => {
+    const caller = router.createCaller(createContext());
+    const input = {
+      prompt: 'Replay prompt creation',
+      mode: 'reviewer',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      operationKey: OPERATION_KEY,
+      kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      profileId: '123e4567-e89b-12d3-a456-426614174011',
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
+    mergeProfileConfigurationMock.mockResolvedValue({
+      agents: [
+        {
+          slug: 'reviewer',
+          name: 'Reviewer',
+          config: { prompt: 'Review the diff', mode: 'subagent' },
+        },
+      ],
+    });
+
+    await caller.prepareSession(input);
+    createSessionWithLedgerMock.mockResolvedValueOnce({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+      replayed: true,
+    });
+    await expect(caller.prepareSession(input)).resolves.toMatchObject({ replayed: true });
+
+    mergeProfileConfigurationMock.mockResolvedValueOnce({});
+    await expect(caller.prepareSession(input)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: expect.stringContaining('does not match any runtimeAgents'),
+    });
+
+    expect(assertOrganizationMembershipMock).toHaveBeenCalledTimes(3);
+    expect(assertBitbucketRepositoryAccessMock).toHaveBeenCalledTimes(3);
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledTimes(3);
+    expect(assertKiloModelAvailableMock).toHaveBeenCalledTimes(2);
+    expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(2);
+    for (let call = 0; call < 2; call += 1) {
+      expect(assertOrganizationMembershipMock.mock.invocationCallOrder[call]).toBeLessThan(
+        assertBitbucketRepositoryAccessMock.mock.invocationCallOrder[call] ??
+          Number.POSITIVE_INFINITY
+      );
+      expect(assertBitbucketRepositoryAccessMock.mock.invocationCallOrder[call]).toBeLessThan(
+        mergeProfileConfigurationMock.mock.invocationCallOrder[call] ?? Number.POSITIVE_INFINITY
+      );
+      expect(mergeProfileConfigurationMock.mock.invocationCallOrder[call]).toBeLessThan(
+        assertKiloModelAvailableMock.mock.invocationCallOrder[call] ?? Number.POSITIVE_INFINITY
+      );
+      expect(assertKiloModelAvailableMock.mock.invocationCallOrder[call]).toBeLessThan(
+        createSessionWithLedgerMock.mock.invocationCallOrder[call] ?? Number.POSITIVE_INFINITY
+      );
+    }
+  });
+
+  it('repeats authorization before prompt ledger replay and rejects later repository access', async () => {
+    const caller = router.createCaller(createContext());
+    const input = {
+      prompt: 'Replay authorization',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      operationKey: OPERATION_KEY,
+      kilocodeOrganizationId: 'f47ac10b-58cc-4372-a567-0e02b2c3d479',
+      profileId: '123e4567-e89b-12d3-a456-426614174011',
+      createdOnPlatform: 'cloud-agent-web',
+    } as const;
+
+    await caller.prepareSession(input);
+    createSessionWithLedgerMock.mockResolvedValueOnce({
+      cloudAgentSessionId: 'agent_12345678-1234-1234-1234-123456789abc',
+      kiloSessionId: 'cli-session-abc123',
+      replayed: true,
+    });
+    await expect(caller.prepareSession(input)).resolves.toMatchObject({ replayed: true });
+
+    assertBitbucketRepositoryAccessMock.mockRejectedValueOnce(
+      new TRPCError({ code: 'BAD_REQUEST', message: 'Repository access rejected' })
+    );
+    await expect(caller.prepareSession(input)).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect(assertOrganizationMembershipMock).toHaveBeenCalledTimes(3);
+    expect(assertBitbucketRepositoryAccessMock).toHaveBeenCalledTimes(3);
+    expect(mergeProfileConfigurationMock).toHaveBeenCalledTimes(2);
+    expect(assertKiloModelAvailableMock).toHaveBeenCalledTimes(2);
+    expect(createSessionWithLedgerMock).toHaveBeenCalledTimes(2);
   });
 });

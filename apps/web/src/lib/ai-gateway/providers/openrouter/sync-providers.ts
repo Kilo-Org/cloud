@@ -13,7 +13,7 @@ import type {
 } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { OpenRouterProvidersResponse } from '@/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { fetchModelsForProvider } from '@/lib/ai-gateway/providers/openrouter/fetch-provider-models';
-import { modelsByProvider } from '@kilocode/db/schema';
+import { ai_gateway_sync_providers_state, modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import { desc, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
@@ -396,6 +396,13 @@ export async function syncAndStoreProviders() {
 
   const completed_at = new Date().toISOString();
   await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completed_at);
+  await db
+    .insert(ai_gateway_sync_providers_state)
+    .values({ last_completed_at: completed_at })
+    .onConflictDoUpdate({
+      target: ai_gateway_sync_providers_state.id,
+      set: { last_completed_at: completed_at },
+    });
 
   return {
     id: result.id,

@@ -8,6 +8,8 @@ import {
 import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import type { GatewayConfig } from '@/lib/ai-gateway/gateway-config';
 import { TRPCError } from '@trpc/server';
+import { ai_gateway_config } from '@kilocode/db/schema';
+import { db } from '@/lib/drizzle';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
@@ -47,6 +49,10 @@ export const adminGatewayConfigRouter = createTRPCRouter({
         message: 'Redis is not configured — cannot save routing override',
       });
     }
+    await db.insert(ai_gateway_config).values({ config }).onConflictDoUpdate({
+      target: ai_gateway_config.id,
+      set: { config },
+    });
     return config;
   }),
 });

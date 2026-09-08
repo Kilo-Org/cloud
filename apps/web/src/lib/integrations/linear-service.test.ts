@@ -85,7 +85,7 @@ describe('upsertLinearInstallation', () => {
     ).rejects.toBeInstanceOf(LinearWorkspaceAlreadyConnectedError);
   });
 
-  test('reinstalling onto a different workspace cleans up the previous workspace', async () => {
+  test('reinstalling onto a different workspace persists new state inside admission', async () => {
     await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },
       organizationId: 'workspace-a',
@@ -93,9 +93,7 @@ describe('upsertLinearInstallation', () => {
       botUserId: 'bot-1',
     });
 
-    const accessTokenCalls: string[] = [];
-    const deleteInstallationCalls: string[] = [];
-    const deleteIdentityCacheCalls: string[] = [];
+    const persistInstallation = jest.fn(async () => undefined);
 
     await upsertLinearInstallation(
       {
@@ -105,22 +103,11 @@ describe('upsertLinearInstallation', () => {
         botUserId: 'bot-2',
       },
       {
-        getChatSdkAccessToken: async (orgId: string) => {
-          accessTokenCalls.push(orgId);
-          return 'old-token';
-        },
-        deleteChatSdkInstallation: async (orgId: string) => {
-          deleteInstallationCalls.push(orgId);
-        },
-        deleteChatSdkIdentityCache: async (orgId: string) => {
-          deleteIdentityCacheCalls.push(orgId);
-        },
+        persistInstallation,
       }
     );
 
-    expect(accessTokenCalls).toEqual(['workspace-a']);
-    expect(deleteInstallationCalls).toEqual(['workspace-a']);
-    expect(deleteIdentityCacheCalls).toEqual(['workspace-a']);
+    expect(persistInstallation).toHaveBeenCalledTimes(1);
 
     const [row] = await db
       .select()
@@ -135,7 +122,7 @@ describe('upsertLinearInstallation', () => {
     expect(row.platform_account_login).toBe('Workspace B');
   });
 
-  test('reinstalling onto the same workspace skips cleanup callbacks', async () => {
+  test('reinstalling onto the same workspace persists refreshed state', async () => {
     await upsertLinearInstallation({
       owner: { type: 'user', id: user.id },
       organizationId: 'workspace-a',
@@ -143,7 +130,7 @@ describe('upsertLinearInstallation', () => {
       botUserId: 'bot-1',
     });
 
-    const calls: string[] = [];
+    const persistInstallation = jest.fn(async () => undefined);
 
     await upsertLinearInstallation(
       {
@@ -153,15 +140,10 @@ describe('upsertLinearInstallation', () => {
         botUserId: 'bot-1',
       },
       {
-        getChatSdkAccessToken: async (orgId: string) => {
-          calls.push(orgId);
-          return null;
-        },
-        deleteChatSdkInstallation: async () => undefined,
-        deleteChatSdkIdentityCache: async () => undefined,
+        persistInstallation,
       }
     );
 
-    expect(calls).toEqual([]);
+    expect(persistInstallation).toHaveBeenCalledTimes(1);
   });
 });

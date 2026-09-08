@@ -215,10 +215,23 @@ describe('GitHub installation persistence', () => {
       await enableBarrier;
     });
     await enabledBeforeCommit;
+    let attachSettled = false;
     const attach = connectVerifiedGitHubInstallation(
       { type: 'org', id: organizationB.id },
       { ...data(), kiloUserId: otherOwnerId }
-    );
+    ).finally(() => {
+      attachSettled = true;
+    });
+    let observedAttachInstallationLock = false;
+    for (let attempt = 0; attempt < 50 && !observedAttachInstallationLock; attempt += 1) {
+      const probe = await db.execute<{ acquired: boolean }>(
+        sql`SELECT pg_try_advisory_xact_lock(hashtext(${'standard:123456'})) AS acquired`
+      );
+      observedAttachInstallationLock = probe.rows[0]?.acquired === false;
+      await Promise.resolve();
+    }
+    expect(observedAttachInstallationLock).toBe(true);
+    expect(attachSettled).toBe(false);
     releaseEnable?.();
 
     await expect(enable).resolves.toBeUndefined();

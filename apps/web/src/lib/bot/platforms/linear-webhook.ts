@@ -3,6 +3,7 @@ import type { Chat, WebhookOptions } from 'chat';
 import type { LinearAdapter } from '@chat-adapter/linear';
 import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
+import { withProviderInstallationLock } from '@/lib/integrations/provider-installation-lock';
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { LINEAR_WEBHOOK_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -86,9 +87,15 @@ async function handleLinearOAuthAppRevoked(
     // already handles this internally on revoked events, but calling it
     // explicitly is idempotent and keeps the cleanup behaviour consistent
     // with the Slack webhook handler.
-    await linearAdapter.deleteInstallation(organizationId);
-    await deleteInstallationByOrganizationId(organizationId);
-    await unlinkTeamKiloUsers(chat.getState(), PLATFORM.LINEAR, organizationId);
+    await withProviderInstallationLock({
+      platform: PLATFORM.LINEAR,
+      installationId: organizationId,
+      callback: async () => {
+        await linearAdapter.deleteInstallation(organizationId);
+        await deleteInstallationByOrganizationId(organizationId);
+        await unlinkTeamKiloUsers(chat.getState(), PLATFORM.LINEAR, organizationId);
+      },
+    });
   } catch (error) {
     captureException(error, {
       level: 'error',

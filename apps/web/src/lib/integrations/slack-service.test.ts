@@ -2,6 +2,7 @@ process.env.NEXTAUTH_SECRET ||= 'test-nextauth-secret';
 process.env.TURNSTILE_SECRET_KEY ||= 'test-turnstile-secret';
 
 const mockLimit = jest.fn();
+const mockForUpdate = jest.fn();
 const mockUpdateSet = jest.fn();
 const mockUpdateWhere = jest.fn();
 const mockUpdateReturning = jest.fn();
@@ -17,6 +18,7 @@ jest.mock('@/lib/drizzle', () => {
       from: jest.fn(() => ({
         where: jest.fn(() => ({
           limit: mockLimit,
+          for: mockForUpdate,
         })),
       })),
     })),
@@ -40,6 +42,10 @@ jest.mock('@/lib/drizzle', () => {
 jest.mock('@/lib/integrations/github/sharing-compatibility', () => ({
   assertGitHubAutomationCanBeEnabled: (...args: unknown[]) =>
     mockAssertGitHubAutomationCanBeEnabled(...args),
+}));
+jest.mock('@/lib/integrations/provider-installation-lock', () => ({
+  lockProviderInstallations: jest.fn(async () => undefined),
+  withProviderInstallationLock: jest.fn(async input => input.callback()),
 }));
 
 jest.mock('@slack/web-api', () => ({
@@ -92,6 +98,9 @@ function buildSlackIntegration(overrides: Record<string, unknown> = {}) {
 describe('slack-service uninstallApp', () => {
   beforeEach(() => {
     mockLimit.mockReset();
+    mockForUpdate.mockReset();
+    mockForUpdate.mockImplementation(async () => (await mockLimit()) ?? []);
+    mockForUpdate.mockReset();
     mockUpdateSet.mockReset();
     mockUpdateWhere.mockReset();
     mockUpdateReturning.mockReset();
@@ -278,6 +287,8 @@ describe('getMissingSlackScopes', () => {
 describe('upsertSlackInstallation', () => {
   beforeEach(() => {
     mockLimit.mockReset();
+    mockForUpdate.mockReset();
+    mockForUpdate.mockImplementation(async () => (await mockLimit()) ?? []);
     mockUpdateSet.mockReset();
     mockUpdateWhere.mockReset();
     mockUpdateReturning.mockReset();

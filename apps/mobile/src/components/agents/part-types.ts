@@ -47,12 +47,16 @@ export function isCompactionPart(part: Part): part is CompactionPart {
   return part.type === 'compaction';
 }
 
+function isOpenEndedTime(time: { end?: number } | undefined): boolean {
+  return time !== undefined && !time.end;
+}
+
 export function isPartStreaming(part: Part): boolean {
   if (part.type === 'text') {
     return !part.time?.end;
   }
   if (part.type === 'reasoning') {
-    return part.time !== undefined && !part.time.end;
+    return isOpenEndedTime(part.time);
   }
   if (part.type === 'tool') {
     return part.state.status === 'pending' || part.state.status === 'running';

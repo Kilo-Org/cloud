@@ -424,6 +424,53 @@ describe('CloudChatPage terminal ownership across navigation', () => {
     expect(mockClosedPtys).toEqual([]);
   });
 
+  it('passes current session progress to the matching URL session tab', () => {
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Preparing workspace' };
+    render();
+
+    expect(mockTabs.currentChatProgress).toEqual({
+      sessionId: 'ses_recent',
+      message: 'Preparing workspace',
+    });
+  });
+
+  it('does not pass stale progress while the URL and fetched session differ', () => {
+    mockSessionId = 'ses_historical';
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Preparing workspace' };
+    render();
+
+    expect(mockTabs.currentChatProgress).toBeNull();
+  });
+
+  it('does not pass progress without a URL session even when fetched session data remains', () => {
+    mockSessionId = null;
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Preparing workspace' };
+    render();
+
+    expect(mockTabs.currentChatProgress).toBeNull();
+  });
+
+  it.each([null, { type: 'error', message: 'Failed to prepare workspace' }])(
+    'does not pass a non-progress status indicator: %j',
+    statusIndicator => {
+      mockAtomValues.statusIndicator = statusIndicator;
+      render();
+
+      expect(mockTabs.currentChatProgress).toBeNull();
+    }
+  );
+
+  it('passes URL session progress while preparation suppresses the transcript status row', () => {
+    mockAtomValues.statusIndicator = { type: 'progress', message: 'Installing dependencies' };
+    mockAtomValues.preparationAttempts = [{ status: 'running', steps: [] }];
+    render();
+
+    expect(mockTabs.currentChatProgress).toEqual({
+      sessionId: 'ses_recent',
+      message: 'Installing dependencies',
+    });
+  });
+
   it('scopes changes to each sibling control session without replacing its worktree terminal', () => {
     render();
     const terminal = openTerminal();

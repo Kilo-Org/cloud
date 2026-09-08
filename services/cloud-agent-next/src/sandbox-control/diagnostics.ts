@@ -69,7 +69,9 @@ export function diagnosticEventType(value: string): string {
 }
 
 export function diagnosticCause(value: string): string {
-  return CAUSES.has(value) ? value.replaceAll(' ', '_') : 'other';
+  return CAUSES.has(value)
+    ? value.replaceAll(' ', '_')
+    : value.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 128);
 }
 
 const DELTA_PROGRESS_EVENTS = new Set([

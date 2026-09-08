@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { CONTROL_DIAGNOSTIC_COALESCE_LIMIT, logControlDiagnostic } from './diagnostics.js';
+import {
+  CONTROL_DIAGNOSTIC_COALESCE_LIMIT,
+  diagnosticCause,
+  logControlDiagnostic,
+} from './diagnostics.js';
 import { logger } from '../logger.js';
 
 describe('logControlDiagnostic', () => {
@@ -66,5 +70,12 @@ describe('logControlDiagnostic', () => {
       coalesceIdentity: `${prefix}0`,
     });
     expect(withFields).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('diagnosticCause', () => {
+  it('sanitizes and bounds unknown causes', () => {
+    expect(diagnosticCause('untrusted cause/value')).toBe('untrusted_cause_value');
+    expect(diagnosticCause('x'.repeat(129))).toHaveLength(128);
   });
 });

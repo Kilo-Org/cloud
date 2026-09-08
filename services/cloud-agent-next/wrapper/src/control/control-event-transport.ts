@@ -14,6 +14,7 @@ export function createControlEventFailureHandler<Runtime extends { runtimeId: st
   const failedRuntimes = new WeakSet<Runtime>();
   return (failure?: ControlEventOutboxFailure): void => {
     if (!failure) return;
+    if (failure.publication.event === 'session.preparing') return;
     const { directory, nativeRuntimeId } = failure.publication.session;
     if (!nativeRuntimeId) return;
     const runtime = options.getRuntime(directory);

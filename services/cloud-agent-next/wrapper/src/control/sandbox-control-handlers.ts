@@ -496,15 +496,14 @@ export async function handleControlRequest(
   const admission = deps.operations.admission(operation, session, payload, authorization);
   if (admission.kind === 'reply') return admission.result;
   if (
-    (operation === 'session.attach' ||
-      operation === 'session.prompt' ||
-      operation === 'session.terminal.create') &&
+    (operation === 'session.prompt' || operation === 'session.terminal.create') &&
     deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false
   ) {
     return rejectBeforeAdmission('not_ready', 'Native feed recovery is in progress', true);
   }
   if (
-    (deps.signal?.aborted || (!deps.kiloReady && operation !== 'session.git.summary')) &&
+    (deps.signal?.aborted ||
+      (!deps.kiloReady && operation !== 'session.attach' && operation !== 'session.git.summary')) &&
     operation !== 'session.abort' &&
     operation !== 'session.detach'
   ) {

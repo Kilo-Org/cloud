@@ -23,16 +23,7 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { redisClient } from '@/lib/redis';
-import {
-  GATEWAY_METADATA_REDIS_KEYS,
-  type RedisKey,
-  SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
-  vercelInferenceProvidersRedisKey,
-} from '@/lib/redis-keys';
-import {
-  extractVercelInferenceProviderIdsFromModel,
-  getLanguageModelIds,
-} from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY } from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -51,19 +42,6 @@ import { injectSupportedFimModels } from '@/lib/ai-gateway/supported-fim-models'
  * logs for the same diff. Auto-releases on transaction commit/rollback.
  */
 const SYNC_PROVIDERS_SNAPSHOT_LOCK_KEY = 'sync-providers:snapshot';
-const UNUSED_GATEWAY_METADATA_TTL_SECONDS = 7 * 24 * 60 * 60;
-
-async function mirrorVercelInferenceProvidersToRedis(vercelModels: Record<string, StoredModel>) {
-  const pipeline = redisClient.pipeline();
-  for (const model of Object.values(vercelModels)) {
-    pipeline.set(
-      vercelInferenceProvidersRedisKey(model.id),
-      JSON.stringify(extractVercelInferenceProviderIdsFromModel(model)),
-      { ex: UNUSED_GATEWAY_METADATA_TTL_SECONDS }
-    );
-  }
-  await pipeline.exec();
-}
 
 async function fetchGatewayModels(gateway: Provider) {
   const headers = {
@@ -323,27 +301,6 @@ async function syncProviders(
   return result;
 }
 
-async function mirrorToRedis(values: {
-  providers: NormalizedOpenRouterResponse;
-  openrouter: Record<string, StoredModel>;
-  vercel: Record<string, StoredModel>;
-  openrouterProviders: OpenRouterProvider[];
-}): Promise<void> {
-  const expiringEntries: [RedisKey, unknown][] = [
-    [GATEWAY_METADATA_REDIS_KEYS.allProviders, values.providers],
-    [GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds, getLanguageModelIds(values.openrouter)],
-    [GATEWAY_METADATA_REDIS_KEYS.vercelModelIds, getLanguageModelIds(values.vercel)],
-    [GATEWAY_METADATA_REDIS_KEYS.openrouterProviders, values.openrouterProviders],
-  ];
-  await Promise.all([
-    ...expiringEntries.map(([key, value]) => {
-      const serializedValue = JSON.stringify(value);
-      return redisClient.set(key, serializedValue, { ex: UNUSED_GATEWAY_METADATA_TTL_SECONDS });
-    }),
-    mirrorVercelInferenceProvidersToRedis(values.vercel),
-  ]);
-}
-
 /**
  * Apply a freshly-synced OpenRouter snapshot to the database and emit
  * per-org audit log entries describing how it affects each enterprise
@@ -432,13 +389,6 @@ export async function syncAndStoreProviders() {
     providers,
     openrouter_data,
     vercel_data,
-  });
-
-  await mirrorToRedis({
-    providers,
-    openrouter: openrouter_data,
-    vercel: vercel_data,
-    openrouterProviders,
   });
 
   const direct_byok_model_counts = await syncDirectByokModels();

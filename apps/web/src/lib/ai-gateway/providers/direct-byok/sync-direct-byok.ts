@@ -6,8 +6,6 @@ import {
 import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
-import { redisClient } from '@/lib/redis';
-import { directByokModelsRedisKey } from '@/lib/redis-keys';
 import {
   ReasoningEffortSchema,
   VerbositySchema,
@@ -336,9 +334,6 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       set: { models, synced_at },
     });
 
-  await redisClient.set(directByokModelsRedisKey(fetcher.providerId), JSON.stringify(models), {
-    ex: 7 * 24 * 60 * 60,
-  });
   return models.length;
 }
 

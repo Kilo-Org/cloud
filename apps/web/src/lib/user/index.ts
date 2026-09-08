@@ -50,7 +50,6 @@ import {
   platform_access_token_credentials,
   byok_api_keys,
   agent_configs,
-  webhook_events,
   agent_environment_profiles,
   security_findings,
   security_finding_notifications,
@@ -61,7 +60,6 @@ import {
   auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
-  cloud_agent_code_reviews,
   cloud_agent_pending_uploads,
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -141,6 +139,10 @@ import {
 } from '@/lib/ai-gateway/providerHash';
 import { normalizeEmail } from '@/lib/utils';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
+import {
+  deleteAllOwnedByUserIdPages,
+  OWNED_BY_USER_DELETE_PAGE_SIZE,
+} from '@/lib/user/owned-by-user-batch-delete';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { purgeUserPendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
@@ -1389,7 +1391,12 @@ export async function anonymizeCloudUserData(
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
   await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
-  await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
+  await deleteAllOwnedByUserIdPages(
+    tx,
+    'webhook_events',
+    userId,
+    OWNED_BY_USER_DELETE_PAGE_SIZE
+  );
   await tx
     .delete(security_analysis_owner_state)
     .where(eq(security_analysis_owner_state.owned_by_user_id, userId));
@@ -1424,9 +1431,12 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_pending_uploads)
     .where(eq(cloud_agent_pending_uploads.kilo_user_id, userId));
-  await tx
-    .delete(cloud_agent_code_reviews)
-    .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+  await deleteAllOwnedByUserIdPages(
+    tx,
+    'cloud_agent_code_reviews',
+    userId,
+    OWNED_BY_USER_DELETE_PAGE_SIZE
+  );
   await tx
     .delete(code_review_memory_proposals)
     .where(eq(code_review_memory_proposals.owned_by_user_id, userId));

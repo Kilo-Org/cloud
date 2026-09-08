@@ -56,6 +56,10 @@ const spectatorQueries = vi.hoisted(() => ({
     data: null as unknown,
     refetch: vi.fn(),
   },
+  sessionMessagesQuery: null as {
+    enabled?: boolean;
+    refetchInterval?: unknown;
+  } | null,
 }));
 const statusHelpers = vi.hoisted(() => ({
   cancellable: false,
@@ -172,11 +176,13 @@ vi.mock('@/lib/trpc', () => ({
   }),
 }));
 vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: { queryKey?: unknown[] }) => {
+  useQuery: (options: { queryKey?: unknown[]; enabled?: boolean; refetchInterval?: unknown }) => {
     const key = options.queryKey?.[0];
-    return key === 'codeReviews.getReviewStreamInfo'
-      ? spectatorQueries.streamInfo
-      : spectatorQueries.sessionMessages;
+    if (key === 'codeReviews.getReviewStreamInfo') {
+      return spectatorQueries.streamInfo;
+    }
+    spectatorQueries.sessionMessagesQuery = options;
+    return spectatorQueries.sessionMessages;
   },
 }));
 vi.mock('@/components/code-reviewer/review-spectator-stream', () => ({
@@ -309,6 +315,7 @@ beforeEach(() => {
   spectatorQueries.sessionMessages.isError = false;
   spectatorQueries.sessionMessages.data = { success: true, entries: [] };
   spectatorQueries.sessionMessages.refetch.mockClear();
+  spectatorQueries.sessionMessagesQuery = null;
   spectatorStream.createReviewSpectatorStream.mockReset();
   spectatorStream.createReviewSpectatorStream.mockResolvedValue({
     connect: vi.fn(),
@@ -680,6 +687,57 @@ describe('ReviewDetailScreen spectator transcript', () => {
     const texts = renderScreen(true);
 
     expect(texts).toContain('Waiting for the review transcript.');
+  });
+
+  it('polls session messages for an in-progress org review and does not open a websocket', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+      organizationId: 'org-1',
+    });
+    spectatorQueries.sessionMessages.data = {
+      success: true,
+      entries: [{ timestamp: 't1', message: 'Tool: read', eventType: 'tool' }],
+    };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    renderScreen(true);
+
+    expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
+    expect(spectatorQueries.sessionMessagesQuery?.enabled).toBe(true);
+    expect(spectatorQueries.sessionMessagesQuery?.refetchInterval).toBe(2000);
+    const items = sessionListRenders.list.at(-1)?.items as { message?: string }[] | undefined;
+    expect(items?.map(item => item.message)).toEqual(['Tool: read']);
+  });
+
+  it('keeps org poll rows when a later snapshot is empty', () => {
+    spectatorQueries.streamInfo.data = makeStreamInfo({
+      status: 'running',
+      cloudAgentSessionId: 'agent-1',
+      organizationId: 'org-1',
+    });
+    spectatorQueries.sessionMessages.data = {
+      success: true,
+      entries: [{ timestamp: 't1', message: 'Tool: read', eventType: 'tool' }],
+    };
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'running' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const renderer = mountScreen(true);
+    spectatorQueries.sessionMessages.data = { success: true, entries: [] };
+    act(() => {
+      renderer.update(createElement(ReviewDetailScreen, { scope: 'personal', reviewId: 'rev-1' }));
+    });
+
+    const items = sessionListRenders.list.at(-1)?.items as { message?: string }[] | undefined;
+    expect(items?.map(item => item.message)).toEqual(['Tool: read']);
   });
 
   it('shows empty copy for a completed review without a session', () => {

@@ -169,16 +169,20 @@ export function isReasoningPart(part: Part): part is ReasoningPart {
   return part.type === 'reasoning';
 }
 
-/** Whether the reasoning expander has content worth showing. */
-export function shouldRenderReasoningPart(part: Part): boolean {
+function hasVisibleReasoningText(text: string | undefined): boolean {
+  if (text == null) return false;
   return (
-    isReasoningPart(part) &&
-    part.text
+    text
       .replaceAll('[REDACTED]', '')
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace('<!--', '')
       .trim() !== ''
   );
+}
+
+/** Whether the reasoning expander has content worth showing. */
+export function shouldRenderReasoningPart(part: Part): boolean {
+  return isReasoningPart(part) && hasVisibleReasoningText(part.text);
 }
 
 /** Check if a part is a StepStartPart */

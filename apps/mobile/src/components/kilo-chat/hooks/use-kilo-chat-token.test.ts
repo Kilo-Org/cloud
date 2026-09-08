@@ -13,6 +13,8 @@ vi.mock('expo-secure-store', () => ({
   getItemAsync: mocks.getItemAsync,
 }));
 
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
+
 vi.mock('@/lib/storage-keys', () => ({
   AUTH_TOKEN_KEY: 'auth-token',
   NATIVE_CREDENTIAL_BUNDLE_KEY: 'native-credential-bundle',

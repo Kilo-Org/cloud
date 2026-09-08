@@ -8,8 +8,10 @@ import type * as ReactQuery from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import {
+  type AssistantMessage,
   createSessionManager,
   type KiloSessionId,
+  type Part,
   type SessionManager,
   type SessionManagerConfig,
   type SessionSnapshotPageOutcome,
@@ -53,6 +55,12 @@ const authState = vi.hoisted(() => ({
 
 const CHILD_ID = kiloId('ses_child_scope_probe');
 const childPageMock = vi.fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>();
+// Root transcript override: the default implementation serves the standard
+// root page, so one test can replace it without disturbing siblings.
+const rootPageMock = vi.fn<NonNullable<SessionManagerConfig['fetchSnapshotPage']>>();
+// KILO-APP-99 repro mode: render the real transcript build and real message
+// bubbles instead of the flat text stub. Off for every sibling test.
+const realTranscriptProbe = vi.hoisted(() => ({ active: false }));
 type ManagerProbe = { manager: SessionManager; store: SessionManagerConfig['store'] };
 const managers: ManagerProbe[] = [];
 // Request credentials can change independently of the React token (request-time refresh).
@@ -86,7 +94,10 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
 }));
-vi.mock('@/components/ui/directional-icons', () => ({ DirectionalChevronLeft: 'ChevronLeft' }));
+vi.mock('@/components/ui/directional-icons', () => ({
+  DirectionalChevronLeft: 'ChevronLeft',
+  DirectionalChevronRight: 'ChevronRight',
+}));
 vi.mock('@/components/ui/eyebrow', () => ({ Eyebrow: 'Eyebrow' }));
 vi.mock('expo-secure-store', () => ({ getItemAsync: vi.fn() }));
 vi.mock('@/lib/config', () => ({ SESSION_INGEST_WS_URL: 'wss://ingest.example.com' }));
@@ -98,10 +109,27 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/components/ui/icons', () => ({
   AlertCircle: 'AlertCircle',
   ChevronDown: 'ChevronDown',
+  Clock: 'Clock',
   Lock: 'Lock',
   SearchX: 'SearchX',
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
+}));
+
+// Leaves of the real bubble pipeline that the KILO-APP-99 repro mode mounts:
+// their own render trees are irrelevant to the defect, only the visibility
+// gates and the copy collector above them must be real.
+vi.mock('@/components/agents/file-part-renderer', () => ({
+  FilePartRenderer: 'FilePartRenderer',
+}));
+vi.mock('@/components/agents/tool-part-renderer', () => ({
+  ToolPartRenderer: 'ToolPartRenderer',
+}));
+vi.mock('@/components/agents/chat-markdown-text', () => ({
+  // The factory runs after the test module's imports are initialized, so the
+  // outer `createElement` is available; echoing the value keeps the transcript
+  // text assertions meaningful without loading the markdown stack.
+  ChatMarkdownText: ({ value }: { value: string }) => createElement('Text', null, value),
 }));
 
 vi.mock('expo-router', () => ({
@@ -155,45 +183,66 @@ vi.mock('@/lib/hooks/use-session-mutations', () => ({
   useSessionMutations: () => ({ renameSessionAsync: vi.fn() }),
 }));
 
-vi.mock('@/components/agents/session-detail-content', () => ({
-  SessionDetailContent: function SessionDetailContent(
-    props: Readonly<{ sessionId: KiloSessionId; cachedTitle?: string }>
-  ) {
-    const manager = useSessionManager();
-    const { t } = useTranslation();
-    const { sessionId, cachedTitle } = props;
-    // Match the real detail lifecycle for the original manager and every successor.
-    useEffect(() => {
-      void manager.switchSession(sessionId);
-    }, [sessionId, manager]);
-    const rootMessages = useAtomValue(manager.atoms.messagesList);
-    const childMessages = useAtomValue(manager.atoms.childMessages)(CHILD_ID);
-    const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
-    const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
-    // Use the real title hook with metadata from the real manager, not a fixed mock title.
-    const rename = useSessionDetailRename({
-      sessionId,
-      isLoaded: isSessionLoaded,
-      serverTitle: isSessionLoaded ? (fetchedData.title ?? undefined) : undefined,
-      fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
-    });
-    return createElement(
-      'SessionDetailContent',
-      props,
-      createElement(ScreenHeader, { title: rename.title }),
-      rootMessages.flatMap(message =>
-        message.parts.flatMap(part =>
-          part.type === 'text' ? [createElement('RootText', { key: part.id }, part.text)] : []
+vi.mock('@/components/agents/session-detail-content', async () => {
+  const { mergeSessionTranscript } = await import('@/components/agents/session-transcript');
+  const { MessageBubble } = await import('@/components/agents/message-bubble');
+  return {
+    SessionDetailContent: function SessionDetailContent(
+      props: Readonly<{ sessionId: KiloSessionId; cachedTitle?: string }>
+    ) {
+      const manager = useSessionManager();
+      const { t } = useTranslation();
+      const { sessionId, cachedTitle } = props;
+      // Match the real detail lifecycle for the original manager and every successor.
+      useEffect(() => {
+        void manager.switchSession(sessionId);
+      }, [sessionId, manager]);
+      const rootMessages = useAtomValue(manager.atoms.messagesList);
+      const childMessages = useAtomValue(manager.atoms.childMessages)(CHILD_ID);
+      const fetchedData = useAtomValue(manager.atoms.fetchedSessionData);
+      const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
+      // Use the real title hook with metadata from the real manager, not a fixed mock title.
+      const rename = useSessionDetailRename({
+        sessionId,
+        isLoaded: isSessionLoaded,
+        serverTitle: isSessionLoaded ? (fetchedData.title ?? undefined) : undefined,
+        fallbackTitle: cachedTitle ?? t('agentChat.session.title'),
+      });
+      if (realTranscriptProbe.active) {
+        // KILO-APP-99 repro mode: the REAL transcript build and REAL bubbles over
+        // the stored messages. mergeSessionTranscript → messageRendersContent →
+        // partRendersContent → shouldRenderReasoningPart is the Sentry crash stack;
+        // every bubble renders collectCopyableText and mounts PartRenderer gates.
+        const items = mergeSessionTranscript(rootMessages, []);
+        return createElement(
+          'SessionDetailContent',
+          props,
+          createElement(ScreenHeader, { title: rename.title }),
+          items.map(item =>
+            item.type === 'message'
+              ? createElement(MessageBubble, { key: item.message.info.id, message: item.message })
+              : null
+          )
+        );
+      }
+      return createElement(
+        'SessionDetailContent',
+        props,
+        createElement(ScreenHeader, { title: rename.title }),
+        rootMessages.flatMap(message =>
+          message.parts.flatMap(part =>
+            part.type === 'text' ? [createElement('RootText', { key: part.id }, part.text)] : []
+          )
+        ),
+        childMessages.flatMap(message =>
+          message.parts.flatMap(part =>
+            part.type === 'text' ? [createElement('Text', { key: part.id }, part.text)] : []
+          )
         )
-      ),
-      childMessages.flatMap(message =>
-        message.parts.flatMap(part =>
-          part.type === 'text' ? [createElement('Text', { key: part.id }, part.text)] : []
-        )
-      )
-    );
-  },
-}));
+      );
+    },
+  };
+});
 
 vi.mock('@/components/agents/session-detail-skeleton', () => ({
   SessionSkeletonMessages: 'SessionSkeletonMessages',
@@ -218,6 +267,7 @@ vi.mock('@/components/agents/session-terminal-error', () => ({
 
 vi.mock('@/components/agents/use-message-copy', () => ({
   performCopy: vi.fn(),
+  useMessageCopy: () => ({ copyMessage: vi.fn() }),
 }));
 
 vi.mock('@expo/react-native-action-sheet', () => ({
@@ -345,6 +395,13 @@ beforeEach(() => {
   rootRequests.length = 0;
   rootMetadataReady = null;
   childPageMock.mockReset();
+  rootPageMock.mockReset();
+  rootPageMock.mockImplementation(async id => {
+    // Mirrors the async fetchSnapshotPage contract. `requestAccount` is read at
+    // call time so account-replacement tests observe the live value.
+    await Promise.resolve();
+    return transcriptPage(id, `msg-root-${requestAccount}`, `Account ${requestAccount} root row`);
+  });
   createMobileManagerMock.mockReset();
   createMobileManagerMock.mockImplementation(
     ({ store, userWebConnection }: Pick<SessionManagerConfig, 'store' | 'userWebConnection'>) => {
@@ -362,11 +419,7 @@ beforeEach(() => {
             const page = await childPageMock(id, options);
             return page;
           }
-          return transcriptPage(
-            id,
-            `msg-root-${requestAccount}`,
-            `Account ${requestAccount} root row`
-          );
+          return rootPageMock(id, options);
         },
         api: {
           send: vi.fn(),
@@ -1286,4 +1339,86 @@ describe.each([
       expect(renderer.toJSON()).toBeNull();
     }
   );
+});
+
+// KILO-APP-99: a textless reasoning part on the wire used to crash the whole
+// agent chat screen. This repro mounts the real route and renders the real
+// transcript build and bubbles over the stored messages, so the Sentry crash
+// stack (mergeSessionTranscript → messageRendersContent →
+// partRendersContent → shouldRenderReasoningPart) runs for real.
+describe('SessionDetailScreen malformed part transcript', () => {
+  it('renders the transcript without crashing when a reasoning part arrives with no text', async () => {
+    realTranscriptProbe.active = true;
+    onTestFinished(() => {
+      realTranscriptProbe.active = false;
+    });
+
+    // The wire omits `text` (per-event schemas are `.passthrough()`), so the
+    // cast is the fixture, not a smell. The reasoning part's id sorts before
+    // the answer part's id (storage orders parts by id), so the malformed part
+    // is the first one the transcript's `.some(partRendersContent)` visits —
+    // the crash surfaces in shouldRenderReasoningPart exactly as Sentry saw it.
+    const reasoningNoText = {
+      id: 'part-a-broken-reasoning',
+      sessionID: 'sess-1',
+      messageID: 'msg-assistant-broken',
+      type: 'reasoning',
+      time: { start: 1, end: 2 },
+    } as unknown as Part;
+    const assistantInfo: AssistantMessage = {
+      id: 'msg-assistant-broken',
+      sessionID: 'sess-1',
+      role: 'assistant',
+      time: { created: 2 },
+      parentID: 'msg-user-question',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    rootPageMock.mockResolvedValueOnce({
+      kind: 'success',
+      info: { id: 'sess-1' },
+      messages: [
+        {
+          info: stubUserMessage({ id: 'msg-user-question', sessionID: 'sess-1' }),
+          parts: [
+            stubTextPart({
+              id: 'part-question',
+              sessionID: 'sess-1',
+              messageID: 'msg-user-question',
+              text: 'Question about the queue',
+            }),
+          ],
+        },
+        {
+          info: assistantInfo,
+          parts: [
+            reasoningNoText,
+            {
+              id: 'part-z-answer',
+              sessionID: 'sess-1',
+              messageID: 'msg-assistant-broken',
+              type: 'text',
+              text: 'Answer visible after broken reasoning',
+            },
+          ],
+        },
+      ],
+      nextCursor: null,
+      omittedItemCount: 0,
+    } satisfies SessionSnapshotPageOutcome);
+
+    useLocalSearchParamsMock.mockReturnValue({ 'session-id': 'sess-1', organizationId: 'org-a' });
+    const renderer = await mountRoute();
+
+    expect(findByType(renderer.root, 'SessionDetailContent')).toHaveLength(1);
+    const transcript = transcriptText(renderer);
+    expect(transcript).toContain('Question about the queue');
+    expect(transcript).toContain('Answer visible after broken reasoning');
+    expect(findByType(renderer.root, 'QueryError')).toHaveLength(0);
+  });
 });

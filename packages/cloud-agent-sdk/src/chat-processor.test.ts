@@ -2,6 +2,7 @@ import type {
   FilePart,
   Message,
   Part,
+  ReasoningPart,
   TextPart,
   ToolPart,
   UserMessage,
@@ -46,6 +47,17 @@ function makeTextPart(id: string, messageID: string, text: string, sessionID = '
     messageID,
     type: 'text' as const,
     text,
+  } satisfies Part;
+}
+
+function makeReasoningPart(id: string, messageID: string, text: string, sessionID = 'ses-1') {
+  return {
+    id,
+    sessionID,
+    messageID,
+    type: 'reasoning' as const,
+    text,
+    time: { start: 1, end: 2 },
   } satisfies Part;
 }
 
@@ -418,6 +430,81 @@ describe('createChatProcessor', () => {
       const stored = storage.getParts('msg-1');
       expect(stored).toHaveLength(1);
       expect((stored[0] satisfies Part as TextPart).text).toBe('user message text');
+    });
+
+    // --- textless part normalization (KILO-APP-99) ---
+    // The generated Part types declare `text: string`, but the wire can omit
+    // the field (per-event schemas are `.passthrough()`), so a textless part
+    // used to be stored verbatim and crashed every mobile reader.
+
+    it('stores a reasoning part whose text field is missing with text: ""', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      // The cast is the fixture: the wire really omits `text`.
+      const part = {
+        id: 'part-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning' as const,
+        time: { start: 1, end: 2 },
+      } as unknown as Part;
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ReasoningPart).text).toBe('');
+    });
+
+    it('stores a text part whose text field is missing with text: ""', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = {
+        id: 'part-text',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'text' as const,
+      } as unknown as Part;
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as TextPart).text).toBe('');
+    });
+
+    it('stores a whitespace-only reasoning part unchanged', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+      const part = makeReasoningPart('part-reasoning', 'msg-1', '   \n\t  ');
+
+      processor.process({ type: 'message.part.updated', part });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ReasoningPart).text).toBe('   \n\t  ');
+    });
+
+    it('keeps existing reasoning text when a textless update arrives', () => {
+      const storage = createMemoryStorage();
+      const processor = createChatProcessor(storage);
+
+      processor.process({
+        type: 'message.part.updated',
+        part: makeReasoningPart('part-reasoning', 'msg-1', 'streamed reasoning'),
+      });
+      const textless = {
+        id: 'part-reasoning',
+        sessionID: 'ses-1',
+        messageID: 'msg-1',
+        type: 'reasoning' as const,
+        time: { start: 1, end: 2 },
+      } as unknown as Part;
+      processor.process({ type: 'message.part.updated', part: textless });
+
+      const stored = storage.getParts('msg-1');
+      expect(stored).toHaveLength(1);
+      expect((stored[0] satisfies Part as ReasoningPart).text).toBe('streamed reasoning');
     });
   });
 

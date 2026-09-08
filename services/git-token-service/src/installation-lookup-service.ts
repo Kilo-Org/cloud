@@ -5,6 +5,7 @@ import {
   organization_memberships,
   kilocode_users,
   organizations,
+  github_app_installations,
 } from '@kilocode/db/schema';
 import { eq, and, exists, isNull, isNotNull, or, sql } from 'drizzle-orm';
 
@@ -338,16 +339,35 @@ export class InstallationLookupService {
   }
 
   async updateAccountLogin(integrationId: string, accountLogin: string): Promise<boolean> {
-    const updatedRows = await this.getDb()
-      .update(platform_integrations)
-      .set({
-        platform_account_login: accountLogin,
-        updated_at: new Date().toISOString(),
-      })
-      .where(eq(platform_integrations.id, integrationId))
-      .returning({ id: platform_integrations.id });
-
-    return updatedRows.length > 0;
+    return this.getDb().transaction(async tx => {
+      const [integration] = await tx
+        .select({ canonicalId: platform_integrations.github_installation_id })
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, integrationId))
+        .for('update');
+      if (!integration) return false;
+      const now = new Date().toISOString();
+      if (integration.canonicalId) {
+        await tx
+          .update(github_app_installations)
+          .set({ account_login: accountLogin, observed_at: now, updated_at: now })
+          .where(eq(github_app_installations.id, integration.canonicalId));
+      }
+      const updatedRows = await tx
+        .update(platform_integrations)
+        .set({ platform_account_login: accountLogin, updated_at: now })
+        .where(
+          and(
+            eq(platform_integrations.id, integrationId),
+            eq(platform_integrations.integration_status, 'active'),
+            isNull(platform_integrations.github_disconnected_at),
+            isNull(platform_integrations.suspended_at),
+            isNull(platform_integrations.auth_invalid_at)
+          )
+        )
+        .returning({ id: platform_integrations.id });
+      return updatedRows.length > 0;
+    });
   }
 
   async assertActiveAssociationForInstallation(

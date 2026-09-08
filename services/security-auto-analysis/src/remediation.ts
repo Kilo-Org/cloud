@@ -538,6 +538,7 @@ export function buildRemediationPrepareSessionBody(params: {
   model: string;
   repoFullName: string;
   organizationId: string | undefined;
+  githubIntegrationId: string;
   callbackTarget: { url: string; headers: Record<string, string> };
 }) {
   return {
@@ -546,6 +547,7 @@ export function buildRemediationPrepareSessionBody(params: {
     model: params.model,
     githubRepo: params.repoFullName,
     kilocodeOrganizationId: params.organizationId,
+    githubIntegrationId: params.githubIntegrationId,
     createdOnPlatform: 'security-remediation',
     autoCommit: false,
     callbackTarget: params.callbackTarget,
@@ -1159,6 +1161,10 @@ async function launchAttempt(params: {
   owner: QueueOwner;
   actor: ActorUser;
 }): Promise<void> {
+  if (!params.finding.platform_integration_id) {
+    throw new Error('Security remediation finding is missing its GitHub integration');
+  }
+  const githubIntegrationId = params.finding.platform_integration_id;
   const [nextAuthSecret, internalApiSecret, callbackTokenSecret] = await Promise.all([
     params.env.NEXTAUTH_SECRET.get(),
     params.env.INTERNAL_API_SECRET.get(),
@@ -1201,6 +1207,7 @@ async function launchAttempt(params: {
           model: params.attempt.remediation_model_slug,
           repoFullName: params.finding.repo_full_name,
           organizationId: params.owner.type === 'org' ? params.owner.id : undefined,
+          githubIntegrationId,
           callbackTarget,
         })
       ),

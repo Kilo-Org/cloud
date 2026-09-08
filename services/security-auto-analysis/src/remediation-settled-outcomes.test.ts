@@ -376,6 +376,7 @@ async function callbackAttempt(overrides: Record<string, unknown> = {}) {
     remediation_id: REMEDIATION_ID,
     branch_name: 'security-remediation/test-1',
     repo_full_name: 'kilo/repo',
+    platform_integration_id: 'integration-a',
     remediation_model_slug: 'model',
     origin: 'auto_policy',
     ...overrides,
@@ -616,6 +617,7 @@ function selectResult(rows: unknown[]) {
 function eligibleAutoPolicyFinding() {
   return {
     id: FINDING_ID,
+    platform_integration_id: 'integration-a',
     owned_by_user_id: 'user-1',
     owned_by_organization_id: null,
     repo_full_name: 'kilo/repo',

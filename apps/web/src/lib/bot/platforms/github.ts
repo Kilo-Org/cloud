@@ -301,6 +301,7 @@ export function createGitHubBotPlatform(githubAdapter: GitHubInstallationLookup)
         platform: PLATFORM.GITHUB,
         teamId: teamId.toString(),
         userId: message.author.userId,
+        githubAppType: 'standard',
       };
     },
     isEnabledForBot: () => true,

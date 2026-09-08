@@ -16,6 +16,7 @@ import {
 } from './github-installations';
 import { backfillGitHubInstallations } from './github-installations-backfill';
 import { assertGitHubInstallationRuntimeAuthorized } from '../github/runtime-authorization';
+import { getPlatformIntegration } from '../../bot/platform-helpers';
 import {
   findIntegrationByInstallationId,
   updateRepositoriesForIntegration,
@@ -123,6 +124,72 @@ describe('GitHub installation persistence', () => {
     await expect(
       findIntegrationByInstallationId('github', '654321', 'standard')
     ).resolves.toMatchObject({ id: legacy.id });
+  });
+
+  test('routes the same numeric GitHub installation ID by app identity', async () => {
+    await db.insert(platform_integrations).values([
+      {
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777777',
+        github_app_type: null,
+        integration_status: 'active',
+      },
+      {
+        owned_by_user_id: otherOwnerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '777777',
+        github_app_type: 'lite',
+        integration_status: 'active',
+      },
+    ]);
+    await expect(
+      getPlatformIntegration({
+        platform: 'github',
+        teamId: '777777',
+        userId: 'github-user',
+        githubAppType: 'standard',
+      })
+    ).resolves.toMatchObject({ owned_by_user_id: ownerId });
+    await expect(
+      getPlatformIntegration({
+        platform: 'github',
+        teamId: '777777',
+        userId: 'github-user',
+        githubAppType: 'lite',
+      })
+    ).resolves.toMatchObject({ owned_by_user_id: otherOwnerId });
+  });
+
+  test('consumes a legacy Standard-null pending row without creating a duplicate association', async () => {
+    const [pending] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_account_id: '222',
+        github_app_type: null,
+        integration_status: 'pending',
+      })
+      .returning();
+    const result = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      { ...data(), pendingIntegrationId: pending.id }
+    );
+    expect(result).toEqual({ ok: true, integrationId: pending.id });
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, ownerId));
+    expect(associations).toHaveLength(1);
+    expect(associations[0]).toMatchObject({
+      id: pending.id,
+      github_app_type: 'standard',
+      platform_installation_id: '123456',
+    });
   });
 
   test('keeps canonical repositories aligned with user refresh and suppresses disconnected projection', async () => {

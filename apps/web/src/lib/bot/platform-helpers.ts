@@ -1,6 +1,6 @@
 import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
@@ -34,7 +34,15 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
     .where(
       and(
         eq(platform_integrations.platform, identity.platform),
-        eq(platform_integrations.platform_installation_id, identity.teamId)
+        eq(platform_integrations.platform_installation_id, identity.teamId),
+        identity.platform === 'github'
+          ? identity.githubAppType === 'lite'
+            ? eq(platform_integrations.github_app_type, 'lite')
+            : or(
+                eq(platform_integrations.github_app_type, 'standard'),
+                isNull(platform_integrations.github_app_type)
+              )
+          : undefined
       )
     )
     .limit(1);

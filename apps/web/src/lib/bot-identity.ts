@@ -35,6 +35,7 @@ export type PlatformIdentity = {
   teamId: string;
   /** Platform-specific user ID (e.g. Slack's "U123ABC") */
   userId: string;
+  githubAppType?: 'standard' | 'lite';
 };
 
 type LinkTokenPayload = {

@@ -103,7 +103,7 @@ function buildAuthorizedInstallationsQuery(
   const accountLoginFilter =
     repoOwner === undefined
       ? undefined
-      : sql`lower(${platform_integrations.platform_account_login}) = lower(${repoOwner})`;
+      : sql`lower(COALESCE(${github_app_installations.account_login}, ${platform_integrations.platform_account_login})) = lower(${repoOwner})`;
   const requestedOrganizationMembership =
     params.orgId === undefined
       ? undefined
@@ -150,17 +150,27 @@ function buildAuthorizedInstallationsQuery(
   return db
     .select({
       id: platform_integrations.id,
-      platform_installation_id: platform_integrations.platform_installation_id,
-      platform_account_login: platform_integrations.platform_account_login,
-      github_app_type: platform_integrations.github_app_type,
+      platform_installation_id: sql<string>`COALESCE(${github_app_installations.installation_id}, ${platform_integrations.platform_installation_id})`,
+      platform_account_login: sql<
+        string | null
+      >`COALESCE(${github_app_installations.account_login}, ${platform_integrations.platform_account_login})`,
+      github_app_type: sql<
+        'standard' | 'lite' | null
+      >`COALESCE(${github_app_installations.github_app_type}, ${platform_integrations.github_app_type})`,
       integration_status: platform_integrations.integration_status,
       owned_by_organization_id: platform_integrations.owned_by_organization_id,
       owned_by_user_id: platform_integrations.owned_by_user_id,
-      repository_access: platform_integrations.repository_access,
-      repositories: platform_integrations.repositories,
-      permissions: platform_integrations.permissions,
+      repository_access: sql<
+        string | null
+      >`COALESCE(${github_app_installations.repository_access}, ${platform_integrations.repository_access})`,
+      repositories: sql`COALESCE(${github_app_installations.repositories}, ${platform_integrations.repositories})`,
+      permissions: sql`COALESCE(${github_app_installations.permissions}, ${platform_integrations.permissions})`,
     })
     .from(platform_integrations)
+    .leftJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
+    )
     .leftJoin(
       organization_memberships,
       and(
@@ -184,6 +194,15 @@ function buildAuthorizedInstallationsQuery(
         isNull(platform_integrations.suspended_at),
         isNull(platform_integrations.auth_invalid_at),
         isNull(platform_integrations.github_disconnected_at),
+        or(
+          isNull(platform_integrations.github_installation_id),
+          and(
+            eq(github_app_installations.lifecycle_state, 'active'),
+            isNull(github_app_installations.suspended_at),
+            isNull(github_app_installations.deleted_at),
+            isNull(github_app_installations.auth_invalid_at)
+          )
+        ),
         or(
           isNotNull(platform_integrations.owned_by_user_id),
           and(
@@ -390,6 +409,10 @@ export class InstallationLookupService {
     const rows = await this.getDb()
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
+      .leftJoin(
+        github_app_installations,
+        eq(platform_integrations.github_installation_id, github_app_installations.id)
+      )
       .leftJoin(kilocode_users, eq(platform_integrations.owned_by_user_id, kilocode_users.id))
       .leftJoin(organizations, eq(platform_integrations.owned_by_organization_id, organizations.id))
       .where(
@@ -402,6 +425,20 @@ export class InstallationLookupService {
           eq(platform_integrations.platform_installation_id, installationId),
           appTypeCondition,
           isNull(platform_integrations.github_disconnected_at),
+          or(
+            isNull(platform_integrations.github_installation_id),
+            and(
+              eq(github_app_installations.installation_id, installationId),
+              eq(github_app_installations.github_app_type, appType),
+              eq(github_app_installations.lifecycle_state, 'active'),
+              eq(github_app_installations.sharing_mode, 'exclusive'),
+              isNull(github_app_installations.suspended_at),
+              isNull(github_app_installations.deleted_at),
+              allowAuthenticationRecovery
+                ? undefined
+                : isNull(github_app_installations.auth_invalid_at)
+            )
+          ),
           expectedIntegrationId === undefined
             ? undefined
             : eq(platform_integrations.id, expectedIntegrationId),
@@ -435,10 +472,18 @@ export class InstallationLookupService {
     }
     const rows = await this.getDb()
       .select({
-        installationId: platform_integrations.platform_installation_id,
-        githubAppType: platform_integrations.github_app_type,
+        installationId: sql<
+          string | null
+        >`COALESCE(${github_app_installations.installation_id}, ${platform_integrations.platform_installation_id})`,
+        githubAppType: sql<
+          'standard' | 'lite' | null
+        >`COALESCE(${github_app_installations.github_app_type}, ${platform_integrations.github_app_type})`,
       })
       .from(platform_integrations)
+      .leftJoin(
+        github_app_installations,
+        eq(platform_integrations.github_installation_id, github_app_installations.id)
+      )
       .leftJoin(kilocode_users, eq(platform_integrations.owned_by_user_id, kilocode_users.id))
       .leftJoin(organizations, eq(platform_integrations.owned_by_organization_id, organizations.id))
       .where(
@@ -451,6 +496,16 @@ export class InstallationLookupService {
           isNull(platform_integrations.auth_invalid_at),
           isNull(platform_integrations.github_disconnected_at),
           isNotNull(platform_integrations.platform_installation_id),
+          or(
+            isNull(platform_integrations.github_installation_id),
+            and(
+              eq(github_app_installations.lifecycle_state, 'active'),
+              eq(github_app_installations.sharing_mode, 'exclusive'),
+              isNull(github_app_installations.suspended_at),
+              isNull(github_app_installations.deleted_at),
+              isNull(github_app_installations.auth_invalid_at)
+            )
+          ),
           or(
             and(
               isNotNull(platform_integrations.owned_by_user_id),

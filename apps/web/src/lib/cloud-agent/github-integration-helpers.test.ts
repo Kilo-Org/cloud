@@ -14,7 +14,9 @@ const mockUpdateRepositoriesForIntegration =
 const mockGetIntegrationsByOrganization =
   jest.fn<(organizationId: string, platform: string) => Promise<PlatformIntegration[]>>();
 const mockFetchGitHubRepositories =
-  jest.fn<(installationId: string, appType: string) => Promise<unknown[]>>();
+  jest.fn<
+    (installationId: string, appType: string, expectedIntegrationId?: string) => Promise<unknown[]>
+  >();
 const mockGenerateGitHubInstallationToken =
   jest.fn<(installationId: string, appType: string) => Promise<{ token: string }>>();
 const mockCheckExistingFork =
@@ -78,7 +80,15 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 1, name: 'repo', fullName: 'org/repo', private: false },
+        {
+          id: 1,
+          name: 'repo',
+          fullName: 'org/repo',
+          private: false,
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
+        },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     });
@@ -168,7 +178,15 @@ describe('github-integration-helpers', () => {
 
       expect(result.integrationInstalled).toBe(true);
       expect(result.repositories).toEqual([
-        { id: 2, name: 'fresh', fullName: 'org/fresh', private: true },
+        {
+          id: 2,
+          name: 'fresh',
+          fullName: 'org/fresh',
+          private: true,
+          platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
+        },
       ]);
       expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-1', [
         { id: 2, name: 'fresh', full_name: 'org/fresh', private: true },
@@ -192,6 +210,8 @@ describe('github-integration-helpers', () => {
           fullName: 'org/repo',
           private: false,
           platformIntegrationId: 'integration-1',
+          platformAccountLogin: undefined,
+          githubAppType: 'standard',
         },
       ]);
       expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
@@ -232,7 +252,7 @@ describe('github-integration-helpers', () => {
       ]);
     });
 
-    it('lists a repository shared by two installations exactly once, from the primary installation', async () => {
+    it('preserves both association choices when two installations expose one repository', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({
           id: 'integration-1',
@@ -268,6 +288,10 @@ describe('github-integration-helpers', () => {
         }),
         expect.objectContaining({
           fullName: 'acme-labs/scanner',
+          platformIntegrationId: 'integration-2',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-core/shared',
           platformIntegrationId: 'integration-2',
         }),
       ]);

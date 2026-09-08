@@ -10,9 +10,10 @@ const mockUpdateWhere = jest.fn();
 const mockUpdateReturning = jest.fn();
 const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
+const mockAssertGitHubAutomationCanBeEnabled = jest.fn();
 
-jest.mock('@/lib/drizzle', () => ({
-  db: {
+jest.mock('@/lib/drizzle', () => {
+  const db = {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
@@ -29,7 +30,17 @@ jest.mock('@/lib/drizzle', () => ({
     delete: jest.fn(() => ({
       where: jest.fn(),
     })),
-  },
+    transaction: jest.fn(),
+  };
+  db.transaction.mockImplementation((callback: (tx: typeof db) => Promise<unknown>) =>
+    callback(db)
+  );
+  return { db };
+});
+
+jest.mock('@/lib/integrations/github/sharing-compatibility', () => ({
+  assertGitHubAutomationCanBeEnabled: (...args: unknown[]) =>
+    mockAssertGitHubAutomationCanBeEnabled(...args),
 }));
 
 jest.mock('@/lib/organizations/organizations', () => ({

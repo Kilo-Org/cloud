@@ -46,6 +46,7 @@ import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
+import { isSharedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
   platform_installation_id: string | null;
@@ -192,6 +193,11 @@ export async function handleGitHubWebhook(
           });
           return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
+        if (
+          await isSharedGitHubInstallation(parseResult.data.installation.id.toString(), appType)
+        ) {
+          return NextResponse.json({ message: 'Event received' }, { status: 200 });
+        }
         // Note: For installation.created, webhook logging happens inside handler
         // because we need organization_id which is only available after processing
         return await handleInstallationCreated(parseResult.data, appType);
@@ -221,6 +227,9 @@ export async function handleGitHubWebhook(
 
         // Get integration before deletion to log the event
         const installationId = installation.id.toString();
+        if (await isSharedGitHubInstallation(installationId, appType)) {
+          return handleInstallationDeleted(deletedPayload, appType);
+        }
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
@@ -268,6 +277,9 @@ export async function handleGitHubWebhook(
         }
 
         const installationId = parseResult.data.installation.id.toString();
+        if (await isSharedGitHubInstallation(installationId, appType)) {
+          return handleInstallationSuspend(parseResult.data, appType);
+        }
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
@@ -315,6 +327,9 @@ export async function handleGitHubWebhook(
         }
 
         const installationId = parseResult.data.installation.id.toString();
+        if (await isSharedGitHubInstallation(installationId, appType)) {
+          return handleInstallationUnsuspend(parseResult.data, appType);
+        }
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
@@ -376,6 +391,9 @@ export async function handleGitHubWebhook(
       }
 
       const installationId = parseResult.data.installation.id.toString();
+      if (await isSharedGitHubInstallation(installationId, appType)) {
+        return handleInstallationTargetRenamed(parseResult.data, appType);
+      }
       const integration = await findIntegrationByInstallationId(
         PLATFORM.GITHUB,
         installationId,
@@ -388,7 +406,7 @@ export async function handleGitHubWebhook(
 
       // Identity synchronization is idempotent and must finish before delivery deduplication;
       // otherwise GitHub redelivery after a transient API or database failure cannot repair metadata.
-      const result = await handleInstallationTargetRenamed(parseResult.data, integration, appType);
+      const result = await handleInstallationTargetRenamed(parseResult.data, appType);
 
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
@@ -428,6 +446,9 @@ export async function handleGitHubWebhook(
       }
 
       const installationId = parseResult.data.installation.id.toString();
+      if (await isSharedGitHubInstallation(installationId, appType)) {
+        return handleInstallationRepositories(parseResult.data, appType);
+      }
       const integration = await findIntegrationByInstallationId(
         PLATFORM.GITHUB,
         installationId,
@@ -471,6 +492,13 @@ export async function handleGitHubWebhook(
     if (!installationId) {
       logExceptInTest(`Missing installation ID in payload${logSuffix}`);
       return NextResponse.json({ message: 'Missing installation ID' }, { status: 400 });
+    }
+
+    if (await isSharedGitHubInstallation(installationId, appType)) {
+      return NextResponse.json(
+        { message: 'Event unavailable for shared installations' },
+        { status: 200 }
+      );
     }
 
     const integration = await findIntegrationByInstallationId(

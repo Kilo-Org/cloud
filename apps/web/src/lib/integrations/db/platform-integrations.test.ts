@@ -379,7 +379,7 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(rows).toHaveLength(2);
   });
 
-  test('concurrent callbacks create one pending row for a GitHub app target', async () => {
+  test('pending GitHub app targets are idempotent per owner without suppressing another owner', async () => {
     const accountId = `pending-target-${Date.now()}`;
     const request = {
       requester: {
@@ -402,12 +402,12 @@ describe('upsertPlatformIntegrationForOwner', () => {
       createPendingIntegration({ ...request, userId: otherUserId }),
     ]);
 
-    expect(results.filter(Boolean)).toHaveLength(1);
+    expect(results.filter(Boolean)).toHaveLength(2);
     const rows = await db
       .select()
       .from(platform_integrations)
       .where(eq(platform_integrations.platform_account_id, accountId));
-    expect(rows).toHaveLength(1);
+    expect(rows).toHaveLength(2);
   });
 
   test('same-owner refresh with app type is not confused by another owner other-app-type row', async () => {

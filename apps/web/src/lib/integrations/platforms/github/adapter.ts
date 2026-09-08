@@ -67,9 +67,10 @@ export function verifyGitHubWebhookSignature(
  */
 export async function generateGitHubInstallationToken(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  expectedIntegrationId?: string
 ): Promise<InstallationToken> {
-  await assertGitHubInstallationRuntimeAuthorized(installationId, appType);
+  await assertGitHubInstallationRuntimeAuthorized(installationId, appType, expectedIntegrationId);
   return await generateGitHubInstallationTokenForMaintenance(installationId, appType);
 }
 
@@ -193,9 +194,14 @@ type GitHubBranch = {
  */
 export async function fetchGitHubRepositories(
   installationId: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  expectedIntegrationId?: string
 ): Promise<GitHubRepository[]> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const tokenData = await generateGitHubInstallationToken(
+    installationId,
+    appType,
+    expectedIntegrationId
+  );
   const octokit = new Octokit({ auth: tokenData.token });
 
   // Fetch all repositories accessible by the installation using pagination
@@ -263,9 +269,14 @@ export async function fetchGitHubRepositoriesForMaintenance(
 export async function fetchGitHubBranches(
   installationId: string,
   repositoryFullName: string,
-  appType: GitHubAppType = 'standard'
+  appType: GitHubAppType = 'standard',
+  expectedIntegrationId?: string
 ): Promise<GitHubBranch[]> {
-  const tokenData = await generateGitHubInstallationToken(installationId, appType);
+  const tokenData = await generateGitHubInstallationToken(
+    installationId,
+    appType,
+    expectedIntegrationId
+  );
   const octokit = new Octokit({ auth: tokenData.token });
 
   const [owner, repo] = repositoryFullName.split('/');

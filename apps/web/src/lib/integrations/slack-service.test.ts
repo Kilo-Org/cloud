@@ -10,9 +10,9 @@ const mockInsertValues = jest.fn();
 const mockInsertReturning = jest.fn();
 const mockAuthRevoke = jest.fn();
 const mockAuthTest = jest.fn();
-
-jest.mock('@/lib/drizzle', () => ({
-  db: {
+const mockAssertGitHubAutomationCanBeEnabled = jest.fn();
+jest.mock('@/lib/drizzle', () => {
+  const db = {
     select: jest.fn(() => ({
       from: jest.fn(() => ({
         where: jest.fn(() => ({
@@ -29,7 +29,17 @@ jest.mock('@/lib/drizzle', () => ({
     insert: jest.fn(() => ({
       values: mockInsertValues,
     })),
-  },
+    transaction: jest.fn(),
+  };
+  db.transaction.mockImplementation((callback: (tx: typeof db) => Promise<unknown>) =>
+    callback(db)
+  );
+  return { db };
+});
+
+jest.mock('@/lib/integrations/github/sharing-compatibility', () => ({
+  assertGitHubAutomationCanBeEnabled: (...args: unknown[]) =>
+    mockAssertGitHubAutomationCanBeEnabled(...args),
 }));
 
 jest.mock('@slack/web-api', () => ({
@@ -92,6 +102,7 @@ describe('slack-service uninstallApp', () => {
     mockUpdateWhere.mockReturnValue({ returning: mockUpdateReturning });
     mockUpdateReturning.mockResolvedValue([buildSlackIntegration()]);
     mockDeleteWhere.mockResolvedValue(undefined);
+    mockAssertGitHubAutomationCanBeEnabled.mockResolvedValue(undefined);
   });
 
   it('deletes Chat SDK Slack state before removing the platform integration row', async () => {
@@ -280,6 +291,29 @@ describe('upsertSlackInstallation', () => {
     mockWriteSlackCredential.mockReset();
     mockWriteSlackCredential.mockResolvedValue({ id: 'credential-1' });
     mockCaptureException.mockReset();
+    mockAssertGitHubAutomationCanBeEnabled.mockReset();
+    mockAssertGitHubAutomationCanBeEnabled.mockResolvedValue(undefined);
+  });
+
+  it('does not activate Slack after GitHub sharing containment rejects the owner', async () => {
+    mockLimit.mockResolvedValue([]);
+    mockAssertGitHubAutomationCanBeEnabled.mockRejectedValue(
+      new Error('This workflow is not available for shared GitHub installations yet')
+    );
+
+    await expect(
+      upsertSlackInstallation({
+        owner,
+        teamId: 'T123',
+        installation: {
+          botToken: 'xoxb-token',
+          botUserId: 'U_BOT',
+          teamName: 'Kilo Team',
+        } satisfies SlackInstallation,
+      })
+    ).rejects.toThrow('not available for shared GitHub installations');
+    expect(mockInsertValues).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
   it('preserves the selected model when refreshing an existing installation', async () => {

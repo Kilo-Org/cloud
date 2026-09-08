@@ -8,17 +8,35 @@ const association = {
     suspended_at: null,
     auth_invalid_at: null,
     github_disconnected_at: null,
-    github_installation_id: null,
+    github_installation_id: '00000000-0000-4000-8000-000000000001',
   },
-  installation: null,
+  installation: {
+    lifecycle_state: 'active',
+    suspended_at: null,
+    deleted_at: null,
+    auth_invalid_at: null,
+  },
   organizationDeletedAt: null,
   userRecordId: 'user-1',
   userBlockedReason: null,
 } as const;
 
 describe('isGitHubRuntimeAssociationAuthorized', () => {
-  it('allows a healthy legacy association while canonical data remains shadow state', () => {
+  it('allows a healthy association with an active canonical installation', () => {
     expect(isGitHubRuntimeAssociationAuthorized(association)).toBe(true);
+  });
+
+  it('preserves an unbound healthy legacy association without accepting a broken canonical link', () => {
+    expect(
+      isGitHubRuntimeAssociationAuthorized({
+        ...association,
+        integration: { ...association.integration, github_installation_id: null },
+        installation: null,
+      })
+    ).toBe(true);
+    expect(isGitHubRuntimeAssociationAuthorized({ ...association, installation: null })).toBe(
+      false
+    );
   });
 
   it('denies a locally disconnected association', () => {
@@ -39,7 +57,7 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
     ).toBe(false);
   });
 
-  it('denies deleted owners while canonical storage remains shadow data', () => {
+  it('denies deleted owners and unhealthy canonical installations', () => {
     expect(
       isGitHubRuntimeAssociationAuthorized({
         ...association,
@@ -61,6 +79,6 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
           auth_invalid_at: null,
         },
       })
-    ).toBe(true);
+    ).toBe(false);
   });
 });

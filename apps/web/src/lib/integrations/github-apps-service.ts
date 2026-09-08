@@ -16,6 +16,7 @@ import {
   updateRepositoriesForIntegration,
   upsertRepositoryCustomization,
 } from '@/lib/integrations/db/platform-integrations';
+import { isSharedGitHubInstallation } from '@/lib/integrations/db/github-installations';
 import {
   deleteGitHubInstallation,
   fetchGitHubBranches,
@@ -128,6 +129,12 @@ export async function uninstallApp(
 
   // Delete the installation from GitHub
   const appType = integration.github_app_type || 'standard';
+  if (await isSharedGitHubInstallation(integration.platform_installation_id, appType)) {
+    throw new TRPCError({
+      code: 'CONFLICT',
+      message: 'Disconnect this Kilo connection instead of uninstalling the shared GitHub App',
+    });
+  }
   try {
     await deleteGitHubInstallation(integration.platform_installation_id, appType);
   } catch (error) {
@@ -196,7 +203,11 @@ export async function listRepositories(
   // If forceRefresh, no cached repos, or never synced before, fetch from GitHub and update cache
   if (forceRefresh || !cachedRepositories?.length || !integration.repositories_synced_at) {
     const appType = integration.github_app_type || 'standard';
-    const repos = await fetchGitHubRepositories(integration.platform_installation_id, appType);
+    const repos = await fetchGitHubRepositories(
+      integration.platform_installation_id,
+      appType,
+      integration.id
+    );
     await updateRepositoriesForIntegration(integrationId, repos);
     return {
       repositories: repos,
@@ -294,7 +305,8 @@ export async function listBranches(
   const branches = await fetchGitHubBranches(
     integration.platform_installation_id,
     repositoryFullName,
-    appType
+    appType,
+    integration.id
   );
 
   return { branches };

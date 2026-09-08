@@ -107,6 +107,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
+- `GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS` - Comma-separated destination Kilo organization UUIDs allowed to create an association to a GitHub App installation already associated elsewhere. Unset or empty disables new shared associations without revoking existing ones. [SERVER]
 - `GITHUB_CONNECTION_MANAGEMENT_ENABLED` - Set to exact `true` to admit new existing-installation connection management and local disconnect. Unset or any other value keeps new management admission disabled without changing incumbent GitHub integration workflows. [SERVER]
 - `PER_REPO_SETTINGS` - Set to exactly `true` to reveal the Repository Customizations UI (per-installation default AI model / PR review mode, plus per-repository overrides) on the GitHub integration settings pages, for both personal accounts and organizations. Defaults to disabled so the feature can ship dark. [SERVER]
 - `GITHUB_ADMIN_STATS_TOKEN` - Token for admin GitHub API stats lookups; used in `apps/web/src/scripts/backfill-pr-author-github-ids.ts`. `[SECRET]`

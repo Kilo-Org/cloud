@@ -170,6 +170,13 @@ export function OrganizationGitHubInstallations({
   };
 
   const confirmConnection = async (installationId: string) => {
+    const confirmed = await confirm({
+      title: `Connect GitHub to ${organization?.name ?? 'this organization'}?`,
+      description:
+        'This organization will use the repositories and permissions granted to the existing GitHub App installation. Other Kilo connections keep separate settings, sessions, billing, and disconnect controls.',
+      confirmLabel: 'Connect existing installation',
+    });
+    if (!confirmed) return;
     try {
       const result = await selectConnection.mutateAsync({
         attemptId: connectionAttemptId ?? '',
@@ -239,11 +246,15 @@ export function OrganizationGitHubInstallations({
         </div>
         {connectionError && (
           <p className="border-border border-t px-5 py-4 text-sm text-destructive sm:px-6">
-            {connectionError === 'claimed_by_other_owner'
-              ? 'This GitHub installation is already connected to another Kilo account or organization. Sharing is not available yet.'
-              : connectionError === 'authorization_revoked'
-                ? 'GitHub ownership or Kilo administration could not be verified. Start again to reconnect.'
-                : 'The GitHub connection could not be completed. Start again or install the App on GitHub.'}
+            {connectionError === 'shared_installation_disabled'
+              ? 'This GitHub installation is already connected elsewhere and shared access is not approved for this organization.'
+              : connectionError === 'incompatible_workflow'
+                ? 'This GitHub installation has an existing workflow that is not yet compatible with shared access.'
+                : connectionError === 'claimed_by_other_owner'
+                  ? 'This GitHub installation is already connected to another Kilo account or organization.'
+                  : connectionError === 'authorization_revoked'
+                    ? 'GitHub ownership or Kilo administration could not be verified. Start again to reconnect.'
+                    : 'The GitHub connection could not be completed. Start again or install the App on GitHub.'}
           </p>
         )}
         {connectionAttemptId && (

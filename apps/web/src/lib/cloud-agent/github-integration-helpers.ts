@@ -31,6 +31,7 @@ type GitHubRepositoriesResult = {
     private: boolean;
     platformIntegrationId?: string;
     platformAccountLogin?: string;
+    githubAppType?: 'standard' | 'lite';
   }[];
   syncedAt?: string | null;
   errorMessage?: string;
@@ -38,7 +39,11 @@ type GitHubRepositoriesResult = {
 
 const mapRepositories = (
   repositories: PlatformRepository[],
-  integration?: { id: string; platform_account_login: string | null }
+  integration?: {
+    id: string;
+    platform_account_login: string | null;
+    github_app_type: 'standard' | 'lite' | null;
+  }
 ): GitHubRepositoriesResult['repositories'] => {
   return repositories.map(repo => ({
     id: repo.id,
@@ -49,6 +54,7 @@ const mapRepositories = (
       ? {
           platformIntegrationId: integration.id,
           platformAccountLogin: integration.platform_account_login ?? undefined,
+          githubAppType: integration.github_app_type ?? 'standard',
         }
       : {}),
   }));
@@ -60,23 +66,6 @@ const missingIntegrationResponse = (message: string): GitHubRepositoriesResult =
   syncedAt: null,
   errorMessage: message,
 });
-
-/**
- * A repository can be reachable from more than one installation. Keep the
- * first occurrence: integrations arrive oldest-first, matching the primary
- * installation a session resolves by default.
- */
-const dedupeRepositories = (
-  repositories: GitHubRepositoriesResult['repositories']
-): GitHubRepositoriesResult['repositories'] => {
-  const seen = new Set<string>();
-  return repositories.filter(repo => {
-    const key = repo.fullName.toLowerCase();
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-};
 
 export async function getGitHubTokenForOrganization(
   organizationId: string
@@ -184,7 +173,8 @@ export async function fetchGitHubRepositoriesForOrganization(
     if (forceRefresh || !cachedRepositories?.length) {
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
-        integration.github_app_type || 'standard'
+        integration.github_app_type || 'standard',
+        integration.id
       );
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
@@ -232,7 +222,8 @@ async function fetchRepositoriesForIntegrations(
         if (forceRefresh || !cachedRepositories?.length) {
           const repositories = await fetchGitHubRepositories(
             integration.platform_installation_id,
-            integration.github_app_type || 'standard'
+            integration.github_app_type || 'standard',
+            integration.id
           );
           await updateRepositoriesForIntegration(integration.id, repositories);
           return {
@@ -254,7 +245,7 @@ async function fetchRepositoriesForIntegrations(
     }
     return {
       integrationInstalled: true,
-      repositories: dedupeRepositories(results.flatMap(result => result.repositories)),
+      repositories: results.flatMap(result => result.repositories),
       syncedAt: results
         .map(result => result.syncedAt)
         .filter((value): value is string => value !== null)
@@ -307,12 +298,13 @@ export async function fetchGitHubRepositoriesForUser(
       const appType = integration.github_app_type || 'standard';
       const repositories = await fetchGitHubRepositories(
         integration.platform_installation_id,
-        appType
+        appType,
+        integration.id
       );
       await updateRepositoriesForIntegration(integration.id, repositories);
       return {
         integrationInstalled: true,
-        repositories: mapRepositories(repositories),
+        repositories: mapRepositories(repositories, integration),
         syncedAt: new Date().toISOString(),
       };
     }
@@ -320,7 +312,7 @@ export async function fetchGitHubRepositoriesForUser(
     // Return cached repos
     return {
       integrationInstalled: true,
-      repositories: mapRepositories(cachedRepositories),
+      repositories: mapRepositories(cachedRepositories, integration),
       syncedAt: integration.repositories_synced_at,
     };
   } catch (_error) {

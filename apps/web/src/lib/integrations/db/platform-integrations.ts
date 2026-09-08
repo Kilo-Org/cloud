@@ -318,7 +318,7 @@ export async function updateRepositoriesForIntegration(
     if (!integration) return;
     const now = new Date().toISOString();
     if (integration.platform === PLATFORM.GITHUB && integration.canonicalId) {
-      await tx
+      const updatedCanonical = await tx
         .update(github_app_installations)
         .set({ repositories, repositories_synced_at: now, observed_at: now, updated_at: now })
         .where(
@@ -326,7 +326,25 @@ export async function updateRepositoriesForIntegration(
             eq(github_app_installations.id, integration.canonicalId),
             ne(github_app_installations.lifecycle_state, 'deleted')
           )
+        )
+        .returning({ id: github_app_installations.id });
+      if (updatedCanonical.length !== 1 || integration.disconnectedAt) return;
+      await tx
+        .update(platform_integrations)
+        .set({
+          repositories,
+          repositories_synced_at: now,
+          auth_invalid_at: null,
+          auth_invalid_reason: null,
+          updated_at: now,
+        })
+        .where(
+          and(
+            eq(platform_integrations.github_installation_id, integration.canonicalId),
+            isNull(platform_integrations.github_disconnected_at)
+          )
         );
+      return;
     }
     if (integration.platform === PLATFORM.GITHUB && integration.disconnectedAt) return;
     await tx
@@ -555,14 +573,27 @@ export async function createPendingIntegration({
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })
-    .onConflictDoNothing({
-      target: [
-        platform_integrations.platform,
-        platform_integrations.github_app_type,
-        platform_integrations.platform_account_id,
-      ],
-      where: sql`${platform_integrations.platform} = 'github' AND ${platform_integrations.integration_status} = 'pending' AND ${platform_integrations.platform_installation_id} IS NULL AND ${platform_integrations.platform_account_id} IS NOT NULL`,
-    })
+    .onConflictDoNothing(
+      organizationId
+        ? {
+            target: [
+              platform_integrations.owned_by_organization_id,
+              platform_integrations.platform,
+              platform_integrations.github_app_type,
+              platform_integrations.platform_account_id,
+            ],
+            where: sql`${platform_integrations.platform} = 'github' AND ${platform_integrations.owned_by_organization_id} IS NOT NULL AND ${platform_integrations.integration_status} = 'pending' AND ${platform_integrations.platform_installation_id} IS NULL AND ${platform_integrations.platform_account_id} IS NOT NULL`,
+          }
+        : {
+            target: [
+              platform_integrations.owned_by_user_id,
+              platform_integrations.platform,
+              platform_integrations.github_app_type,
+              platform_integrations.platform_account_id,
+            ],
+            where: sql`${platform_integrations.platform} = 'github' AND ${platform_integrations.owned_by_user_id} IS NOT NULL AND ${platform_integrations.integration_status} = 'pending' AND ${platform_integrations.platform_installation_id} IS NULL AND ${platform_integrations.platform_account_id} IS NOT NULL`,
+          }
+    )
     .returning();
 
   return result;
@@ -852,10 +883,9 @@ export type UpsertPlatformIntegrationResult =
  * Owner-aware upsert for platform integrations.
  * Supports both user and organization ownership.
  *
- * For GitHub installations, the function prevents cross-owner theft:
- * an insert targeting the global unique index uses `onConflictDoNothing`,
- * and a blocked insert re-reads the owner before any update. Ownership
- * columns are never set in conflict-update targets or SET clauses.
+ * This is the legacy exclusive GitHub writer. It serializes by App identity
+ * and refuses cross-owner claims; only connectVerifiedGitHubInstallation can
+ * admit a shared association.
  */
 export async function upsertPlatformIntegrationForOwner(
   owner: Owner,
@@ -893,10 +923,8 @@ export async function upsertPlatformIntegrationForOwner(
     github_app_type: appType,
   };
 
-  // GitHub installations use a conflict-safe two-step pattern.
-  // Step 1: try insert with onConflictDoNothing on the global unique index.
-  // Step 2: if the insert was blocked, re-read the row and determine
-  // whether this is a same-owner refresh or a cross-owner claim.
+  // Preserve exclusive behavior for old callback/refresh paths after the
+  // database-level global uniqueness constraint is removed.
   if (data.platform === 'github') {
     return db.transaction(async tx => {
       await tx.execute(

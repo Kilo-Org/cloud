@@ -677,7 +677,11 @@ async function handleCoreInstallFlow(params: {
       const error =
         upsertResult.reason === 'multiple_installations_disabled'
           ? 'multiple_installations_disabled'
-          : 'installation_already_claimed';
+          : upsertResult.reason === 'shared_installation_disabled'
+            ? 'shared_installation_disabled'
+            : upsertResult.reason === 'incompatible_workflow'
+              ? 'incompatible_workflow'
+              : 'installation_already_claimed';
       if (isAppInitiated) {
         return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
       }

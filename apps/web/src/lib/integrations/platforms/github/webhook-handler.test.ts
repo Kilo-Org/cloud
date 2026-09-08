@@ -23,6 +23,7 @@ const mockHandleInstallationSuspend = jest.fn();
 const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
 const mockAssertGitHubInstallationRuntimeAuthorized = jest.fn();
+const mockIsSharedGitHubInstallation = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -70,8 +71,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationSuspend(payload, appType),
   handleInstallationUnsuspend: (payload: unknown, appType: string) =>
     mockHandleInstallationUnsuspend(payload, appType),
-  handleInstallationTargetRenamed: (payload: unknown, integration: unknown, appType: string) =>
-    mockHandleInstallationTargetRenamed(payload, integration, appType),
+  handleInstallationTargetRenamed: (payload: unknown, appType: string) =>
+    mockHandleInstallationTargetRenamed(payload, appType),
   handleIssue: jest.fn(),
   handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePRReviewComment(payload, platformIntegration),
@@ -80,6 +81,11 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
   handlePushEvent: jest.fn(),
   upsertCliSessionPullRequestsFromWebhook: jest.fn(),
   upsertCliSessionPullRequestReviewFromWebhook: jest.fn(),
+}));
+
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  isSharedGitHubInstallation: (installationId: string, appType: string) =>
+    mockIsSharedGitHubInstallation(installationId, appType),
 }));
 
 jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
@@ -212,6 +218,7 @@ describe('handleGitHubWebhook', () => {
     mockGetIntegrationForOrganization.mockResolvedValue(integration);
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
+    mockIsSharedGitHubInstallation.mockResolvedValue(false);
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
@@ -238,6 +245,23 @@ describe('handleGitHubWebhook', () => {
     );
   });
 
+  it('contains non-lifecycle events before tenant routing for a shared installation', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      message: 'Event unavailable for shared installations',
+    });
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+  });
+
   it('routes installation_target renamed events through authoritative login synchronization', async () => {
     const payload = {
       action: 'renamed',
@@ -255,7 +279,6 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     expect(mockHandleInstallationTargetRenamed).toHaveBeenCalledWith(
       expect.objectContaining(payload),
-      integration,
       'lite'
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(

@@ -674,30 +674,6 @@ export const githubAppsRouter = createTRPCRouter({
         });
       }
 
-      const upsertResult = await upsertPlatformIntegrationForOwner(owner, {
-        platform: 'github',
-        integrationType: 'app',
-        platformInstallationId: installationId,
-        platformAccountId: installationDetails.account.id.toString(),
-        platformAccountLogin: installationDetails.account.login,
-        permissions: installationDetails.permissions,
-        scopes: installationDetails.events,
-        repositoryAccess: installationDetails.repository_selection,
-        installedAt: installationDetails.created_at,
-        // Keep the integration's app type so a lite refresh is never matched
-        // against (or converted into) the standard app's row.
-        githubAppType: appType,
-      });
-
-      if (!upsertResult.ok) {
-        throw new TRPCError({
-          code: 'CONFLICT',
-          message: 'This GitHub installation is already claimed by another account.',
-        });
-      }
-
-      const repositories = await fetchGitHubRepositories(installationId, appType);
-      await updateRepositoriesForIntegration(integration.id, repositories);
       await observeGitHubInstallationLifecycle({
         installationId,
         appType,
@@ -714,6 +690,8 @@ export const githubAppsRouter = createTRPCRouter({
         installationId,
         appType,
       });
+      const repositories = await fetchGitHubRepositories(installationId, appType, integration.id);
+      await updateRepositoriesForIntegration(integration.id, repositories);
 
       if (input?.organizationId) {
         await createAuditLog({

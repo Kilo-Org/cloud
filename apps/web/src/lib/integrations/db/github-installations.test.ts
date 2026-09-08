@@ -1,12 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
+  agent_configs,
   github_app_installations,
   github_connection_attempts,
   kilocode_users,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
+import { createTestOrganization } from '@/tests/helpers/organization.helper';
+import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
   connectVerifiedGitHubInstallation,
   disconnectGitHubInstallation,
@@ -43,6 +46,8 @@ const data = (installationId = '123456') => ({
 
 describe('GitHub installation persistence', () => {
   beforeEach(async () => {
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
     await cleanupDbForTest();
     await db.insert(kilocode_users).values([
       {
@@ -63,6 +68,187 @@ describe('GitHub installation persistence', () => {
   });
 
   afterEach(cleanupDbForTest);
+
+  test('connects two approved organizations to one canonical installation', async () => {
+    const organizationA = await createTestOrganization('Shared GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Shared GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+
+    expect(first).toMatchObject({ ok: true });
+    expect(second).toMatchObject({ ok: true });
+    if (!first.ok) throw new Error('Expected first shared association');
+    const refreshedRepositories = [
+      { id: 2, name: 'shared', full_name: 'acme/shared', private: true },
+    ];
+    await updateRepositoriesForIntegration(first.integrationId, refreshedRepositories);
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '123456'));
+    expect(associations).toHaveLength(2);
+    expect(associations.every(association => association.repositories?.length === 1)).toBe(true);
+    expect(associations.map(association => association.repositories)).toEqual([
+      refreshedRepositories,
+      refreshedRepositories,
+    ]);
+    expect(new Set(associations.map(association => association.github_installation_id)).size).toBe(
+      1
+    );
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, associations[0]?.github_installation_id ?? ''));
+    expect(canonical).toMatchObject({
+      sharing_mode: 'web_cloud_agent',
+      sharing_admission_checked_at: expect.any(String),
+    });
+    await expect(
+      assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  test('keeps admission off for an unapproved destination without changing the incumbent', async () => {
+    const organizationA = await createTestOrganization('Unshared GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Unshared GitHub B', otherOwnerId, 0);
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    expect(first).toMatchObject({ ok: true });
+
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data(), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'shared_installation_disabled' });
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '123456'));
+    expect(associations).toHaveLength(1);
+    expect(associations[0]?.id).toBe(first.ok ? first.integrationId : undefined);
+  });
+
+  test('refuses sharing without changing an incumbent automation workflow', async () => {
+    const organizationA = await createTestOrganization('Automated GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Automated GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    if (!first.ok) throw new Error('Expected incumbent connection');
+    await db.insert(agent_configs).values({
+      owned_by_organization_id: organizationA.id,
+      agent_type: 'code_review',
+      platform: 'github',
+      config: {},
+      is_enabled: true,
+      created_by: ownerId,
+    });
+
+    await expect(
+      connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data(), kiloUserId: otherOwnerId }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    const [incumbentConfig] = await db
+      .select()
+      .from(agent_configs)
+      .where(eq(agent_configs.owned_by_organization_id, organizationA.id));
+    expect(incumbentConfig?.is_enabled).toBe(true);
+  });
+
+  test('keeps local disconnect separate from shared upstream suspension recovery', async () => {
+    const organizationA = await createTestOrganization('Lifecycle GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Lifecycle GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    const second = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+    if (!first.ok || !second.ok) throw new Error('Expected shared connections');
+
+    await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
+    await observeGitHubInstallationLifecycle({
+      installationId: '123456',
+      appType: 'standard',
+      state: 'suspended',
+    });
+    await observeGitHubInstallationLifecycle({
+      installationId: '123456',
+      appType: 'standard',
+      state: 'active',
+    });
+
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.platform_installation_id, '123456'));
+    expect(associations.find(association => association.id === first.integrationId)).toMatchObject({
+      integration_status: 'suspended',
+      suspended_by: 'local_disconnect',
+      github_disconnected_at: expect.any(String),
+    });
+    expect(associations.find(association => association.id === second.integrationId)).toMatchObject(
+      {
+        integration_status: 'active',
+        suspended_by: null,
+        github_disconnected_at: null,
+      }
+    );
+  });
+
+  test.each([
+    { sharing: false, multiple: false, expected: 'multiple_installations_disabled' },
+    { sharing: true, multiple: false, expected: 'multiple_installations_disabled' },
+    { sharing: false, multiple: true, expected: 'shared_installation_disabled' },
+    { sharing: true, multiple: true, expected: 'ok' },
+  ] as const)(
+    'applies sharing=$sharing and multiple-installation=$multiple independently',
+    async ({ sharing, multiple, expected }) => {
+      const organizationA = await createTestOrganization('Policy GitHub A', ownerId, 0);
+      const organizationB = await createTestOrganization('Policy GitHub B', otherOwnerId, 0);
+      process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = sharing ? organizationB.id : '';
+      process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = multiple ? organizationB.id : '';
+      const incumbent = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationA.id },
+        data('123456')
+      );
+      const destinationExisting = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data('654321'), kiloUserId: otherOwnerId }
+      );
+      if (!incumbent.ok || !destinationExisting.ok) {
+        throw new Error('Expected policy fixtures');
+      }
+
+      const result = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organizationB.id },
+        { ...data('123456'), kiloUserId: otherOwnerId }
+      );
+      if (expected === 'ok') {
+        expect(result).toMatchObject({ ok: true });
+      } else {
+        expect(result).toEqual({ ok: false, reason: expected });
+      }
+    }
+  );
 
   test('reconnects the same association after local disconnect and rejects another owner', async () => {
     const first = await connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data());
@@ -125,6 +311,9 @@ describe('GitHub installation persistence', () => {
     await expect(
       findIntegrationByInstallationId('github', '654321', 'standard')
     ).resolves.toMatchObject({ id: legacy.id });
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('654321', 'standard')
+    ).resolves.toBeUndefined();
   });
 
   test('routes the same numeric GitHub installation ID by app identity', async () => {
@@ -298,7 +487,8 @@ describe('GitHub installation persistence', () => {
     if (!connected.ok) throw new Error('Expected initial connection');
     await disconnectGitHubInstallation({ type: 'user', id: ownerId }, connected.integrationId);
     await updateGitHubInstallationAccountIdentity({
-      integrationId: connected.integrationId,
+      installationId: '123456',
+      appType: 'standard',
       accountId: '222',
       accountLogin: 'renamed-acme',
     });

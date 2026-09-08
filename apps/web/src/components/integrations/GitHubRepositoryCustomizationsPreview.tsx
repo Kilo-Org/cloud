@@ -47,7 +47,7 @@ import { cn } from '@/lib/utils';
 
 // Automatic PR review dispatch only, for now — see github-repository-settings.ts.
 // Manual/@mention-triggered reviews are a separate, later change.
-export type PreviewReviewMode = 'on' | 'off';
+type PreviewReviewMode = 'on' | 'off';
 
 const reviewModes: { value: PreviewReviewMode; label: string }[] = [
   { value: 'on', label: 'On' },
@@ -58,7 +58,7 @@ function reviewModeName(value: PreviewReviewMode) {
   return reviewModes.find(mode => mode.value === value)?.label ?? value;
 }
 
-export type PreviewRepository = {
+type PreviewRepository = {
   id: string;
   name: string;
   private: boolean;
@@ -66,7 +66,7 @@ export type PreviewRepository = {
   prReviews: PreviewReviewMode | null;
 };
 
-export type PreviewInstallation = {
+type PreviewInstallation = {
   id: string;
   account: string;
   access: 'all' | 'selected';
@@ -92,7 +92,7 @@ function repositoryCustomizationSummary(
 
 const PAGE_SIZE = 10;
 
-function InstallationCustomizations({
+export function InstallationCustomizations({
   integrationId,
   organizationId,
   models,

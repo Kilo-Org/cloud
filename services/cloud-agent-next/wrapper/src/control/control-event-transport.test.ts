@@ -58,7 +58,12 @@ describe('native-scoped control event failures', () => {
         expect(failures).toHaveLength(1);
         expect(failures[0]).toMatchObject({
           reason,
-          publication: { sequence: 1, session: { ...session, nativeRuntimeId: originalNativeId } },
+          publication: {
+            event: 'session.event',
+            receiptId: expect.any(String),
+            sequence: 1,
+            session: { ...session, nativeRuntimeId: originalNativeId },
+          },
         });
         expect(retired).not.toHaveBeenCalled();
         expect(published.at(-1)?.session.nativeRuntimeId).toBe(replacement.runtimeId);

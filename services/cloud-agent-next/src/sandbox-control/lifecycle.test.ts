@@ -1,7 +1,5 @@
-import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SandboxSession } from '../sandbox-session/SandboxSession.js';
-import { canonicalControlEventJson } from '../shared/control-event-canonical.js';
 import { createMemoryEventQueries } from '../session/preparation-test-helpers.js';
 import type { BillingContext } from '@kilocode/container-usage';
 import { SandboxControl, type SandboxAcquisition } from '../persistence/SandboxControl.js';
@@ -440,6 +438,38 @@ afterEach(() => {
 });
 
 describe('SandboxControl lifecycle boundaries', () => {
+  it('logs logical and derived physical allocation identities', async () => {
+    const h = await harness();
+    const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+    try {
+      await h.create();
+      const physical = await h.control.getPhysicalRecord();
+      expect(fields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'allocation_launch',
+          sandboxId: SANDBOX_ID,
+          physicalSandboxId: physical.createIntent?.allocationName,
+        })
+      );
+      expect(fields).toHaveBeenCalledWith(
+        expect.objectContaining({
+          diagnosticEvent: 'physical_committed',
+          sandboxId: SANDBOX_ID,
+          physicalSandboxId: physical.createIntent?.allocationName,
+        })
+      );
+      await h.control.beginStop('idle');
+      await h.control.confirmStopped();
+      await h.create();
+      const replacement = await h.control.getPhysicalRecord();
+      expect(replacement.createIntent?.allocationName).not.toBe(
+        physical.createIntent?.allocationName
+      );
+    } finally {
+      fields.mockRestore();
+    }
+  });
+
   it('recovers one eligible wrapper runtime through the production socket hooks', async () => {
     const h = await harness();
     h.session.getControlState.mockResolvedValue({
@@ -3630,14 +3660,11 @@ describe('SandboxControl lifecycle boundaries', () => {
         sequence: 1,
       };
       const receiptId = '33333333-3333-4333-8333-333333333333';
-      const receiptHash = createHash('sha256')
-        .update(canonicalControlEventJson(publication))
-        .digest('hex');
       const frame = {
         type: 'request',
         requestId: 'pending-native-attach',
         operation: 'sandbox.event.publish',
-        payload: { ...publication, receiptId, receiptHash },
+        payload: { ...publication, receiptId },
       };
       let attachment: unknown = {
         ...connection,
@@ -3675,7 +3702,6 @@ describe('SandboxControl lifecycle boundaries', () => {
         payload: publication.payload,
         wrapperInstanceId: connection.wrapperInstanceId,
         receiptId,
-        receiptHash,
         sequence: 1,
       });
       expect(send).toHaveBeenLastCalledWith(
@@ -3845,9 +3871,6 @@ describe('SandboxControl lifecycle boundaries', () => {
         payload: {
           ...publication,
           receiptId,
-          receiptHash: createHash('sha256')
-            .update(canonicalControlEventJson(publication))
-            .digest('hex'),
         },
       };
       const beforeControl = structuredClone([...h.records]);
@@ -3897,9 +3920,6 @@ describe('SandboxControl lifecycle boundaries', () => {
           payload: {
             ...stalePublication,
             receiptId: '44444444-4444-4444-8444-444444444444',
-            receiptHash: createHash('sha256')
-              .update(canonicalControlEventJson(stalePublication))
-              .digest('hex'),
           },
         })
       );
@@ -3936,9 +3956,6 @@ describe('SandboxControl lifecycle boundaries', () => {
           payload: {
             ...replacementPublication,
             receiptId: replacementReceiptId,
-            receiptHash: createHash('sha256')
-              .update(canonicalControlEventJson(replacementPublication))
-              .digest('hex'),
           },
         })
       );
@@ -3988,7 +4005,6 @@ describe('SandboxControl lifecycle boundaries', () => {
           properties: { messageId: 'message_A', status: 'completed' },
         };
         const receiptId = '33333333-3333-4333-8333-333333333333';
-        const receiptHash = 'a'.repeat(64);
         h.session.receiveSandboxControlEvent.mockResolvedValueOnce({ applied });
         const before = structuredClone([...h.records]);
         h.sendRequest.mockClear();
@@ -3996,7 +4012,7 @@ describe('SandboxControl lifecycle boundaries', () => {
         const closeHandshakenSockets = vi.spyOn(h.socket, 'closeHandshakenSockets').mockClear();
 
         await expect(
-          h.hooks.onSessionEvent?.(identity, payload, connection, receiptId, receiptHash, 1)
+          h.hooks.onSessionEvent?.(identity, payload, connection, receiptId, 1)
         ).resolves.toEqual(applied ? { applied: true } : { applied: false, retryable: false });
         await h.flush();
 
@@ -4005,7 +4021,6 @@ describe('SandboxControl lifecycle boundaries', () => {
           payload,
           wrapperInstanceId: connection.wrapperInstanceId,
           receiptId,
-          receiptHash,
           sequence: 1,
         });
         expect([...h.records]).toEqual(before);
@@ -4046,7 +4061,6 @@ describe('SandboxControl lifecycle boundaries', () => {
           },
           connection,
           '33333333-3333-4333-8333-333333333333',
-          'a'.repeat(64),
           1
         )
       ).resolves.toEqual({ applied: false, retryable: true });
@@ -4068,21 +4082,13 @@ describe('SandboxControl lifecycle boundaries', () => {
       const identity = { directory: ROUTE.directory, kiloSessionId: ROUTE.kiloSessionId };
       const payload = { type: 'message.updated', properties: { id: 'message_A' } };
       const receiptId = '33333333-3333-4333-8333-333333333333';
-      const receiptHash = 'a'.repeat(64);
       h.session.receiveSandboxControlEvent.mockRejectedValue(
         Object.assign(new Error('Session temporarily unavailable'), { retryable: true })
       );
       const before = structuredClone([...h.records]);
       h.sendRequest.mockClear();
 
-      const first = h.hooks.onSessionEvent?.(
-        identity,
-        payload,
-        connection,
-        receiptId,
-        receiptHash,
-        1
-      );
+      const first = h.hooks.onSessionEvent?.(identity, payload, connection, receiptId, 1);
       await vi.advanceTimersByTimeAsync(1_000);
       await expect(first).resolves.toEqual({ applied: false, retryable: true });
       await h.flush();
@@ -4097,7 +4103,7 @@ describe('SandboxControl lifecycle boundaries', () => {
 
       h.session.receiveSandboxControlEvent.mockResolvedValueOnce({ applied: true });
       await expect(
-        h.hooks.onSessionEvent?.(identity, payload, connection, receiptId, receiptHash, 1)
+        h.hooks.onSessionEvent?.(identity, payload, connection, receiptId, 1)
       ).resolves.toEqual({ applied: true });
       await h.flush();
       expect(h.session.receiveSandboxControlEvent).toHaveBeenCalledTimes(4);
@@ -4131,7 +4137,6 @@ describe('SandboxControl lifecycle boundaries', () => {
           payload,
           connection,
           result === 'legacy_transport_failed' ? undefined : '33333333-3333-4333-8333-333333333333',
-          'a'.repeat(64),
           1
         );
         await vi.advanceTimersByTimeAsync(0);
@@ -4141,7 +4146,6 @@ describe('SandboxControl lifecycle boundaries', () => {
           payload,
           connection,
           '44444444-4444-4444-8444-444444444444',
-          'b'.repeat(64),
           2
         );
         await vi.advanceTimersByTimeAsync(0);

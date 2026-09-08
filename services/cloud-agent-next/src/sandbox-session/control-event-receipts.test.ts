@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bindControlEventReceiptIdentity,
+  CONTROL_EVENT_RECEIPTS_KEY,
   controlEventReceiptDisposition,
   readControlEventReceipts,
   recordControlEventReceipt,
@@ -13,7 +14,6 @@ const runtimeB = '22222222-2222-4222-8222-222222222222';
 function receipt(wrapperInstanceId: string, sequence: number) {
   return {
     receiptId: `${String(sequence).padStart(8, '0')}-1111-4111-8111-111111111111`,
-    receiptHash: 'a'.repeat(64),
     wrapperInstanceId,
     sequence,
   };
@@ -52,6 +52,43 @@ describe('control event receipts', () => {
     const state = storage();
     recordControlEventReceipt(state, receipt(runtimeA, 1));
     expect(readControlEventReceipts(state).activeWrapperInstanceId).toBeUndefined();
+  });
+
+  it('reads legacy hashes but does not write or compare them', () => {
+    const state = storage();
+    const first = receipt(runtimeA, 1);
+    state.put(CONTROL_EVENT_RECEIPTS_KEY, {
+      highWater: { [runtimeA]: 1 },
+      retiredWrapperInstanceIds: [],
+      receipts: [{ ...first, receiptHash: 'a'.repeat(64) }],
+    });
+    expect(readControlEventReceipts(state).receipts).toEqual([
+      { ...first, receiptHash: 'a'.repeat(64) },
+    ]);
+    expect(controlEventReceiptDisposition(state, { ...first, receiptHash: 'b'.repeat(64) })).toBe(
+      'duplicate'
+    );
+    expect(controlEventReceiptDisposition(state, { ...first, sequence: 2 })).toBe('conflict');
+    expect(controlEventReceiptDisposition(state, { ...first, wrapperInstanceId: runtimeB })).toBe(
+      'apply'
+    );
+
+    recordControlEventReceipt(state, { ...first, receiptId: crypto.randomUUID(), sequence: 2 });
+    expect(readControlEventReceipts(state).receipts.at(-1)).toEqual({
+      receiptId: expect.any(String),
+      wrapperInstanceId: runtimeA,
+      sequence: 2,
+    });
+  });
+
+  it('rejects partial receipt identities', () => {
+    const state = storage();
+    expect(controlEventReceiptDisposition(state, {})).toBe('apply');
+    expect(controlEventReceiptDisposition(state, { receiptHash: 'a'.repeat(64) })).toBe('conflict');
+    expect(controlEventReceiptDisposition(state, { sequence: 1 })).toBe('conflict');
+    expect(controlEventReceiptDisposition(state, { receiptId: crypto.randomUUID() })).toBe(
+      'conflict'
+    );
   });
 
   it('rejects a retired wrapper identity after pruning its receipt state', () => {

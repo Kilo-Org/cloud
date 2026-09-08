@@ -248,11 +248,13 @@ describe('applySessionAttach', () => {
 
     it('fails preparation rather than falling back to main for a missing requested branch', async () => {
       let setupRan = false;
+      const diagnostics: Array<Record<string, string | number | boolean | undefined>> = [];
       const result = await applySessionAttach(
         { ...session, directory },
         { ...payload, branch: 'missing', setupCommands: ['prepare'] },
         {
           ...deps,
+          onDiagnostic: (_event, fields) => diagnostics.push(fields),
           runSetup: async () => {
             setupRan = true;
             return { stdout: '', stderr: '', exitCode: 0 };
@@ -264,6 +266,15 @@ describe('applySessionAttach', () => {
         error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
       });
       expect(setupRan).toBe(false);
+      expect(diagnostics).toContainEqual(
+        expect.objectContaining({
+          phase: 'failed',
+          stage: 'git_setup',
+          errorCode: 'not_ready',
+          retryable: true,
+          detail: 'git checkout failed',
+        })
+      );
     });
 
     it('preserves generated-branch commits when retrying failed setup', async () => {

@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import {
   spawn,
+  spawnSync,
   type ChildProcessWithoutNullStreams,
   type SpawnOptionsWithoutStdio,
 } from 'node:child_process';
@@ -31,12 +32,19 @@ export type OwnedProcessScope = {
   run<T>(operation: () => T): T;
   seal(): void;
   dispose(): boolean;
+  observesOccupancy(): boolean;
   captureBaseline(allowed: (argv: string[]) => boolean, deadlineAt?: number): Promise<void>;
   verify(baseline?: boolean, deadlineAt?: number): Promise<boolean>;
   stop(deadlineAt: number): Promise<boolean>;
 };
 
-type ProcessIdentity = { pid: number; parent: number; group: number; identity: string };
+type ProcessIdentity = {
+  pid: number;
+  parent: number;
+  group: number;
+  identity: string;
+  state: string;
+};
 type OwnedChild = {
   process: ChildProcessWithoutNullStreams;
   identity?: string;
@@ -138,10 +146,13 @@ function processIdentity(pid: number, value: string): ProcessIdentity {
     .slice(value.lastIndexOf(')') + 2)
     .trim()
     .split(/\s+/);
+  const state = fields[0];
   const startedAt = fields[19];
   const parent = Number(fields[1]);
   const group = Number(fields[2]);
   if (
+    !state ||
+    !/^[A-Za-z]$/.test(state) ||
     !startedAt ||
     !/^\d+$/.test(startedAt) ||
     !Number.isSafeInteger(parent) ||
@@ -151,7 +162,11 @@ function processIdentity(pid: number, value: string): ProcessIdentity {
   ) {
     throw new Error('Process identity unavailable');
   }
-  return { pid, parent, group, identity: `${pid}:${startedAt}` };
+  return { pid, parent, group, identity: `${pid}:${startedAt}`, state };
+}
+
+function isLiveProcessState(state: string): boolean {
+  return state !== 'Z' && state !== 'X' && state !== 'x';
 }
 
 function closeDescriptors(descriptors: number[]): void {
@@ -162,6 +177,14 @@ function closeDescriptors(descriptors: number[]): void {
       console.warn('Owned process descriptor close failed; continuing descriptor cleanup');
     }
   }
+}
+
+function isErofs(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'EROFS';
+}
+
+function remountCgroupWritable(target: string): void {
+  spawnSync('mount', ['-o', 'remount,rw', target], { stdio: 'ignore' });
 }
 
 function createCgroup(): Cgroup | undefined {
@@ -195,14 +218,22 @@ function createCgroup(): Cgroup | undefined {
     ) {
       throw new Error('Process containment root unavailable');
     }
-    descriptors.push(
-      openSync(
-        path.join(parentReference, 'cgroup.procs'),
-        constants.O_WRONLY | constants.O_NOFOLLOW
-      )
-    );
+    const parentProcs = path.join(parentReference, 'cgroup.procs');
+    try {
+      descriptors.push(openSync(parentProcs, constants.O_WRONLY | constants.O_NOFOLLOW));
+    } catch (error) {
+      if (!isErofs(error)) throw error;
+      remountCgroupWritable(parent);
+      descriptors.push(openSync(parentProcs, constants.O_WRONLY | constants.O_NOFOLLOW));
+    }
     const name = `kilo-control-${crypto.randomUUID()}`;
-    mkdirSync(path.join(parentReference, name));
+    try {
+      mkdirSync(path.join(parentReference, name));
+    } catch (error) {
+      if (!isErofs(error)) throw error;
+      remountCgroupWritable(parent);
+      mkdirSync(path.join(parentReference, name));
+    }
     const directory = path.join(parent, name);
     const descriptor = openSync(
       path.join(parentReference, name),
@@ -232,7 +263,9 @@ function createCgroup(): Cgroup | undefined {
     }
     closeDescriptors(descriptors.splice(0, 2));
     return { directory, reference, dev, ino, descriptors, procs, kill };
-  } catch {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'unknown';
+    console.warn(`Owned process containment unavailable: ${message}`);
     if (created) {
       try {
         const fresh = lstatSync(created.directory);
@@ -365,26 +398,37 @@ export function createOwnedProcessScope(): OwnedProcessScope {
   const baseline = new Set<string>();
   const observations = new Set<Deadline>();
   const live = (child: OwnedChild): boolean => !child.exited && child.process.pid !== undefined;
+  const occupancyGroup = (): Cgroup | undefined =>
+    group !== undefined && contained ? group : undefined;
+  const occupancyObservable = (): boolean => occupancyGroup() !== undefined;
 
   const verify = async (allowBaseline: boolean, deadline: Deadline): Promise<boolean> => {
     try {
       deadline.check();
       if (!used || removed || stopped) return true;
-      if (!group || !contained) return false;
-      await assertDirectory(group, deadline);
+      const observed = occupancyGroup();
+      if (!observed) return false;
+      await assertDirectory(observed, deadline);
       const populated = population(
-        await readText(path.join(group.reference, 'cgroup.events'), deadline)
+        await readText(path.join(observed.reference, 'cgroup.events'), deadline)
       );
-      await assertDirectory(group, deadline);
+      await assertDirectory(observed, deadline);
       if (populated === 0) return ![...children].some(live);
-      if (!allowBaseline || baseline.size === 0) return false;
+      if (!allowBaseline || baseline.size === 0) {
+        if (allowBaseline || [...children].some(live)) return false;
+        for (const pid of (await snapshotCgroup(observed, deadline)).pids) {
+          const { state } = processIdentity(pid, await readText(`/proc/${pid}/stat`, deadline));
+          if (isLiveProcessState(state)) return false;
+        }
+        return true;
+      }
       const identities = new Set<string>();
-      for (const pid of (await snapshotCgroup(group, deadline)).pids) {
+      for (const pid of (await snapshotCgroup(observed, deadline)).pids) {
         const { identity } = processIdentity(pid, await readText(`/proc/${pid}/stat`, deadline));
         if (!baseline.has(identity)) return false;
         identities.add(identity);
       }
-      await assertDirectory(group, deadline);
+      await assertDirectory(observed, deadline);
       return (
         identities.size > 0 &&
         [...children]
@@ -509,13 +553,14 @@ export function createOwnedProcessScope(): OwnedProcessScope {
       return child;
     },
     run: operation => current.run(scope, operation),
+    observesOccupancy: occupancyObservable,
     seal() {
       sealed = true;
     },
     dispose() {
       sealed = true;
       if (removed) return true;
-      if (used && (!group || !contained || [...children].some(live))) return false;
+      if (used && (!occupancyObservable() || [...children].some(live))) return false;
       if (
         group &&
         !removeCgroup(group, stopDeadline?.deadlineAt ?? Date.now() + OBSERVATION_TIMEOUT_MS)
@@ -530,9 +575,10 @@ export function createOwnedProcessScope(): OwnedProcessScope {
       const deadline = createDeadline(Math.min(deadlineAt, stopDeadline?.deadlineAt ?? Infinity));
       observations.add(deadline);
       try {
-        if (!group || !contained || sealed) return;
+        const observed = occupancyGroup();
+        if (!observed || sealed) return;
         const entries: (ProcessIdentity & { allowed: boolean })[] = [];
-        for (const pid of (await snapshotCgroup(group, deadline)).pids) {
+        for (const pid of (await snapshotCgroup(observed, deadline)).pids) {
           const before = processIdentity(pid, await readText(`/proc/${pid}/stat`, deadline));
           const argv = (await readText(`/proc/${pid}/cmdline`, deadline))
             .split('\0')
@@ -619,7 +665,7 @@ export function createOwnedProcessScope(): OwnedProcessScope {
           }
         }
         await signalChildren('SIGKILL', deadline);
-        if (!group || !contained) return false;
+        if (!occupancyObservable()) return false;
         while (true) {
           if (await verify(false, deadline)) return true;
           await deadline.wait(signal => delay(25, undefined, { signal }));

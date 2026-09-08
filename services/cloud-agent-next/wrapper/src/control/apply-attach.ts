@@ -2,13 +2,16 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
+  controlErrorCodes,
   sessionAttachPayloadSchema,
+  type ControlErrorCode,
   type SessionAttachPayload,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import type { PreparingEventDataV2, PreparingStep } from '../../../src/shared/protocol.js';
 import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-environment.js';
 import {
+  diagnosticDetail,
   emitControlDiagnostic,
   type ControlDiagnosticRecord,
   type ControlDiagnosticReporter,
@@ -91,8 +94,32 @@ function ok(): ControlHandlerResult {
   return { ok: true, result: { attached: true } };
 }
 
-function fail(code: string, message: string, retryable: boolean): ControlHandlerResult {
+function fail(
+  code: ControlErrorCode,
+  message: string,
+  retryable: boolean
+): Extract<ControlHandlerResult, { ok: false }> {
   return { ok: false, error: { code, message, retryable } };
+}
+
+function diagnosticErrorCode(
+  code: string
+): NonNullable<ControlDiagnosticRecord['fields']['errorCode']> {
+  for (const value of controlErrorCodes) {
+    if (value === code) return value;
+  }
+  return 'other';
+}
+
+function attachFailureFields(
+  result: Extract<ControlHandlerResult, { ok: false }>
+): Pick<ControlDiagnosticRecord['fields'], 'errorCode' | 'retryable' | 'detail'> {
+  const detail = diagnosticDetail(result.error.message);
+  return {
+    errorCode: diagnosticErrorCode(result.error.code),
+    retryable: result.error.retryable,
+    ...(detail ? { detail } : {}),
+  };
 }
 
 async function defaultHasGit(directory: string): Promise<boolean> {
@@ -292,7 +319,11 @@ async function executeSessionAttach(
   let stage: ControlDiagnosticRecord['fields']['stage'] = 'attach_validation';
   let workspaceAction: ControlDiagnosticRecord['fields']['workspaceAction'];
   let sessionResolution: ControlDiagnosticRecord['fields']['sessionResolution'];
-  const diagnostic = (phase: 'completed' | 'failed'): void =>
+  let attachment: WorktreeKiloAttachment | undefined;
+  const diagnostic = (
+    phase: 'completed' | 'failed',
+    extra: Partial<ControlDiagnosticRecord['fields']> = {}
+  ): void =>
     emitControlDiagnostic(deps.onDiagnostic, 'control.request', {
       operation: 'session.attach',
       phase,
@@ -304,19 +335,21 @@ async function executeSessionAttach(
       sessionResolution,
       elapsedMs: Math.max(0, Date.now() - startedAt),
       ok: phase === 'completed',
+      aborted: Boolean(deps.signal?.aborted || attachment?.signal.aborted),
+      ...extra,
     });
   const existingDirectory = directoryForSession(session.kiloSessionId);
   if (existingDirectory && existingDirectory !== directory) {
-    diagnostic('failed');
-    return fail('unauthorized', 'Session directory mismatch', false);
+    const result = fail('unauthorized', 'Session directory mismatch', false);
+    diagnostic('failed', attachFailureFields(result));
+    return result;
   }
   stage = 'runtime_attach';
   if (!deps.kiloRuntimes) {
-    diagnostic('failed');
-    return fail('not_ready', 'Kilo is not ready', true);
+    const result = fail('not_ready', 'Kilo is not ready', true);
+    diagnostic('failed', attachFailureFields(result));
+    return result;
   }
-
-  let attachment: WorktreeKiloAttachment | undefined;
   const taskSignal = deps.signal ?? AbortSignal.timeout(SANDBOX_CONTROL_ATTACH_TIMEOUT_MS);
   try {
     taskSignal.throwIfAborted();
@@ -494,8 +527,8 @@ async function executeSessionAttach(
         );
       }
     });
-    if (workspaceFailure) {
-      diagnostic('failed');
+    if (workspaceFailure && !workspaceFailure.ok) {
+      diagnostic('failed', attachFailureFields(workspaceFailure));
       return workspaceFailure;
     }
 
@@ -525,8 +558,9 @@ async function executeSessionAttach(
         if (!restored.ok) {
           if (restored.code !== 404 && !restored.emptySnapshot) {
             progress.fail('kilo_session', 'phase:kilo_session', restored.error);
-            diagnostic('failed');
-            return fail('not_ready', 'kilo session is not ready', true);
+            const result = fail('not_ready', 'kilo session is not ready', true);
+            diagnostic('failed', attachFailureFields(result));
+            return result;
           }
           stage = 'session_create';
           progress.progress('kilo_session', 'phase:kilo_session', 'Starting session…');
@@ -544,8 +578,9 @@ async function executeSessionAttach(
     } catch {
       const message = signal.aborted ? 'Session attachment cancelled' : 'kilo session is not ready';
       progress.fail('kilo_session', 'phase:kilo_session', message);
-      diagnostic('failed');
-      return fail('not_ready', message, true);
+      const result = fail('not_ready', message, true);
+      diagnostic('failed', attachFailureFields(result));
+      return result;
     }
     stage = 'attachment_commit';
     signal.throwIfAborted();
@@ -563,15 +598,16 @@ async function executeSessionAttach(
     return ok();
   } catch (error) {
     deps.onError?.(error);
-    diagnostic('failed');
-    if (error instanceof WorktreeKiloRuntimeError || error instanceof ControlTerminalRuntimeError) {
-      return fail(error.code, error.message, error.retryable);
-    }
-    return fail(
-      'not_ready',
-      taskSignal.aborted ? 'Session attachment cancelled' : 'Session attachment failed',
-      true
-    );
+    const result =
+      error instanceof WorktreeKiloRuntimeError || error instanceof ControlTerminalRuntimeError
+        ? fail(error.code, error.message, error.retryable)
+        : fail(
+            'not_ready',
+            taskSignal.aborted ? 'Session attachment cancelled' : 'Session attachment failed',
+            true
+          );
+    diagnostic('failed', attachFailureFields(result));
+    return result;
   } finally {
     attachment?.release();
   }

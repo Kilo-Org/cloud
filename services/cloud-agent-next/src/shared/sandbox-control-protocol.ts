@@ -229,6 +229,24 @@ export const sandboxReadyPayloadSchema = z
   })
   .strict();
 
+export const sandboxKiloHeartbeatReasonSchema = z.enum([
+  'feed_stale',
+  'feed_reconnected',
+  'feed_ended',
+  'feed_failed',
+  'process_exited',
+  'credential_refresh_failed',
+  'control_disconnected',
+  'shutdown',
+]);
+
+export type SandboxKiloHeartbeatReason = z.infer<typeof sandboxKiloHeartbeatReasonSchema>;
+
+export function heartbeatReasonFrom(reason: string): SandboxKiloHeartbeatReason {
+  const parsed = sandboxKiloHeartbeatReasonSchema.safeParse(reason);
+  return parsed.success ? parsed.data : 'shutdown';
+}
+
 export const sandboxHeartbeatPayloadSchema = z
   .object({
     state: z.enum(['idle', 'active', 'finalizing']),
@@ -238,18 +256,7 @@ export const sandboxHeartbeatPayloadSchema = z
       .object({
         ready: z.boolean(),
         version: SandboxRuntimeVersionSchema.nullable().optional().catch(undefined),
-        reason: z
-          .enum([
-            'feed_stale',
-            'feed_reconnected',
-            'feed_ended',
-            'feed_failed',
-            'process_exited',
-            'credential_refresh_failed',
-            'control_disconnected',
-            'shutdown',
-          ])
-          .optional(),
+        reason: sandboxKiloHeartbeatReasonSchema.optional(),
       })
       .strict(),
     sessions: z.array(
@@ -659,7 +666,6 @@ export const sandboxEventPublicationPayloadSchema = z.discriminatedUnion('event'
     .object({
       event: z.literal('session.event'),
       receiptId: z.string().uuid(),
-      receiptHash: z.string().regex(/^[a-f0-9]{64}$/),
       sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
       session: sessionEventIdentitySchema,
       payload: sessionEventPayloadSchema,
@@ -669,7 +675,6 @@ export const sandboxEventPublicationPayloadSchema = z.discriminatedUnion('event'
     .object({
       event: z.literal('session.preparing'),
       receiptId: z.string().uuid(),
-      receiptHash: z.string().regex(/^[a-f0-9]{64}$/),
       sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
       session: sessionEventIdentitySchema,
       payload: sessionPreparingPayloadSchema,

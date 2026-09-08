@@ -1016,7 +1016,6 @@ describe('sandbox control socket handler', () => {
       wrapperInstanceId: WRAPPER_INSTANCE_ID,
     });
     const receiptId = '123e4567-e89b-42d3-a456-426614174099';
-    const receiptHash = 'a'.repeat(64);
     const onSessionEvent = vi.fn().mockResolvedValue({ applied: true });
     const handler = createSandboxControlSocketHandler(
       createFakeState([ws]),
@@ -1034,7 +1033,6 @@ describe('sandbox control socket handler', () => {
         payload: {
           event: 'session.event',
           receiptId,
-          receiptHash,
           sequence: 1,
           session: { directory: '/workspace/a', kiloSessionId: 'kilo_1' },
           payload: { type: 'message.updated', properties: { id: 'msg_1' } },
@@ -1047,7 +1045,6 @@ describe('sandbox control socket handler', () => {
       { type: 'message.updated', properties: { id: 'msg_1' } },
       handler.getConnectionIdentity(),
       receiptId,
-      receiptHash,
       1
     );
     expect(JSON.parse(ws.send.mock.calls.at(-1)?.[0] as string)).toEqual({
@@ -1085,7 +1082,6 @@ describe('sandbox control socket handler', () => {
         payload: {
           event: 'session.event',
           receiptId: '123e4567-e89b-42d3-a456-426614174099',
-          receiptHash: 'a'.repeat(64),
           sequence: 1,
           session: {
             directory: '/workspace/a',

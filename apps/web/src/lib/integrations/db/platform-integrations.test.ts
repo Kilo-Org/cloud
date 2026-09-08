@@ -141,9 +141,19 @@ describe('upsertPlatformIntegrationForOwner', () => {
     const installationIds = [`${INSTALLATION_ID}-concurrent-a`, `${INSTALLATION_ID}-concurrent-b`];
     const lockClient = await pool.connect();
     const ownerLockKey = `${owner.type}:${owner.id}`;
-    await lockClient.query('SELECT pg_advisory_lock(hashtext($1))', [ownerLockKey]);
-    let pendingResults: Promise<Awaited<ReturnType<typeof upsertPlatformIntegrationForOwner>>[]>;
+    let lockAcquired = false;
+    let operationError: unknown;
+    let pendingResults:
+      | Promise<Awaited<ReturnType<typeof upsertPlatformIntegrationForOwner>>[]>
+      | undefined;
     try {
+      const identity = await lockClient.query<{ pid: number; database: string }>(
+        'SELECT pg_backend_pid() AS pid, current_database() AS database'
+      );
+      const holderPid = identity.rows[0]?.pid;
+      expect(holderPid).toBeDefined();
+      await lockClient.query('SELECT pg_advisory_lock(hashtext($1))', [ownerLockKey]);
+      lockAcquired = true;
       pendingResults = Promise.all(
         installationIds.map(installationId =>
           upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
@@ -152,19 +162,36 @@ describe('upsertPlatformIntegrationForOwner', () => {
       let waitingCount = 0;
       for (let attempt = 0; attempt < 2000 && waitingCount < 2; attempt += 1) {
         const result = await lockClient.query<{ count: string }>(
-          `SELECT count(*)::text AS count FROM pg_stat_activity
-           WHERE pid <> pg_backend_pid() AND wait_event = 'advisory'
-             AND query LIKE 'SELECT pg_advisory_xact_lock(hashtext(%'`
+          `SELECT count(*)::text AS count FROM pg_stat_activity activity
+           WHERE activity.datname = current_database()
+             AND $1::int = ANY(pg_blocking_pids(activity.pid))
+             AND activity.wait_event_type = 'Lock' AND activity.wait_event = 'advisory'
+             AND query LIKE 'SELECT pg_advisory_xact_lock(hashtext(%'`,
+          [holderPid]
         );
         waitingCount = Number(result.rows[0]?.count ?? 0);
         if (waitingCount < 2) await new Promise<void>(resolve => setImmediate(resolve));
       }
       expect(waitingCount).toBeGreaterThanOrEqual(2);
+    } catch (error) {
+      operationError = error;
     } finally {
-      await lockClient.query('SELECT pg_advisory_unlock(hashtext($1))', [ownerLockKey]);
-      lockClient.release();
+      let unlockFailed = false;
+      try {
+        if (lockAcquired) {
+          await lockClient.query('SELECT pg_advisory_unlock(hashtext($1))', [ownerLockKey]);
+        }
+      } catch (error) {
+        unlockFailed = true;
+        operationError ??= error;
+      } finally {
+        lockClient.release(unlockFailed);
+      }
+      if (pendingResults) await Promise.allSettled([pendingResults]);
     }
-    const results = await pendingResults!;
+    if (operationError) throw operationError;
+    if (!pendingResults) throw new Error('Concurrent upserts did not start');
+    const results = await pendingResults;
     expect(results.filter(result => result.ok)).toHaveLength(1);
     expect(results).toContainEqual({ ok: false, reason: 'multiple_installations_disabled' });
     const rows = await db

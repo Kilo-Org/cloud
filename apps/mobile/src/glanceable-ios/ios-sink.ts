@@ -1,4 +1,5 @@
 import {
+  GLANCEABLE_IDLE_END_DEBOUNCE_MS,
   GLANCEABLE_IDLE_ONLY_MS,
   GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
@@ -20,10 +21,13 @@ import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import {
   type Activity,
+  cancelIdleEnd,
   endExtra,
   endingActivities,
+  endOtherVisible,
   readEndingToken,
   scheduleEnd,
+  scheduleIdleEnd,
   settleEnds,
 } from './ending-activities';
 import { ActiveAgentsWidget } from './active-agents-widget';
@@ -31,7 +35,7 @@ import {
   buildExpiredWidgetProps,
   buildGlanceableLiveActivityContentState,
   buildGlanceableViewProps,
-  buildStaleWidgetProps,
+  staleTimelineFrame,
   toWidgetProps,
 } from './view-props';
 
@@ -78,18 +82,25 @@ function startCard(
   ctx: GlanceableSinkContext
 ): void {
   try {
-    activity = ActiveAgentsLiveActivity.start(contentState, OPEN_AGENTS_URL, STALE_AFTER_SECONDS);
+    const started = ActiveAgentsLiveActivity.start(
+      contentState,
+      OPEN_AGENTS_URL,
+      STALE_AFTER_SECONDS
+    );
+    activity = started;
     inFlightUpdate = null;
+    lastProps = contentState;
+    revision = snapshot.revision;
+    getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, started);
+    // A push-to-start or an idle card still waiting out its dismissal can share
+    // the Lock Screen with this start. Retire every other visible instance now.
+    endOtherVisible(started.getInfo().id, ActiveAgentsLiveActivity.getInstances(true));
   } catch (error) {
     // Only ActivityKit unavailability is permanent; transient starts retry later.
     if (isActivityKitUnavailable(error)) {
       activityKitDeniedState = true;
     }
-    return;
   }
-  lastProps = contentState;
-  revision = snapshot.revision;
-  getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
 }
 
 /** Recheck native state even when JavaScript missed the remote terminal snapshot. */
@@ -147,6 +158,7 @@ function endNow(
   props: Partial<GlanceableLiveActivityContentState> | null = lastProps,
   reachEnded = dismissMs === null
 ): Promise<void> | null {
+  cancelIdleEnd();
   const targets = new Map<string, Activity>();
   if (reachEnded) {
     try {
@@ -262,23 +274,7 @@ export function _resetIosSinkForTests(): void {
   pendingStart = null;
   pendingStartInput = null;
   pendingStartAt = 0;
-}
-
-/**
- * The delayed frame, when there is a claim worth retracting. Counts only: an
- * empty or waiting surface asserts nothing that can go out of date, and a
- * `stale` frame after `expiresAt` would only undo the expiry frame behind it.
- */
-function staleTimelineFrame(
-  snapshot: GlanceableAgentsSnapshot
-): { date: Date; props: Partial<ReturnType<typeof buildGlanceableViewProps>> }[] {
-  if (snapshot.status !== 'happy') {
-    return [];
-  }
-  const staleAt = Date.parse(snapshot.updatedAt) + GLANCEABLE_STALE_MS;
-  return staleAt >= Date.parse(snapshot.expiresAt)
-    ? []
-    : [{ date: new Date(staleAt), props: buildStaleWidgetProps(snapshot, translate) }];
+  cancelIdleEnd();
 }
 
 export const iosSink: GlanceableSink = {
@@ -302,7 +298,7 @@ export const iosSink: GlanceableSink = {
         // never delivered at all. Hand it the frame that stops asserting the
         // counts as current, so a widget nothing has refreshed reads as delayed
         // rather than as fact.
-        ...staleTimelineFrame(snapshot),
+        ...staleTimelineFrame(snapshot, translate),
         { date: new Date(snapshot.expiresAt), props: buildExpiredWidgetProps(snapshot, translate) },
       ]);
     }
@@ -322,14 +318,15 @@ export const iosSink: GlanceableSink = {
       lastProps = contentState;
       inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS);
       if (isIdleOnlyGlanceableWork(snapshot)) {
-        // Everything went idle: hand ActivityKit the dismissal date and stop
-        // owning the surface. A JavaScript timer would never fire — the app is
-        // asleep whenever this matters — and an idle agent produces no further
-        // snapshot to check a deadline against. `endNow` awaits the update
-        // above, so the card keeps the idle counts until it is removed. Work
-        // resuming inside the window starts a fresh card, and `startOrUpdate`
-        // dismisses this one first.
-        void endNow(GLANCEABLE_IDLE_ONLY_MS, contentState);
+        // Brief idle↔busy flips must not tear the card down. Debounce, then
+        // hand ActivityKit the dismissal date so the surface still retires
+        // if JavaScript stops. Work that resumes before the timer fires
+        // updates this same card.
+        scheduleIdleEnd(() => {
+          void endNow(GLANCEABLE_IDLE_ONLY_MS, lastProps);
+        }, GLANCEABLE_IDLE_END_DEBOUNCE_MS);
+      } else {
+        cancelIdleEnd();
       }
     }
   },
@@ -396,6 +393,9 @@ export const iosSink: GlanceableSink = {
     // publish can adopt an activity before this method sees it. Bind its token
     // listener here too; delivery deduplicates the sink's stable native handle.
     getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
+    if (isStartableGlanceableWork(snapshot)) {
+      cancelIdleEnd();
+    }
     // The publisher coalesces and guards revisions, but keep the sink monotonic
     // so a late or replayed emit can never move the surface backwards.
     if (snapshot.revision <= revision) {

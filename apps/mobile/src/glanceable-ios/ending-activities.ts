@@ -106,3 +106,31 @@ export function endExtra(instance: Activity, id: string): void {
   endingActivities.set(id, ending);
   void scheduleEnd(ending);
 }
+
+let idleEndTimer: ReturnType<typeof setTimeout> | null = null;
+
+export function cancelIdleEnd(): void {
+  if (idleEndTimer !== null) {
+    clearTimeout(idleEndTimer);
+    idleEndTimer = null;
+  }
+}
+
+export function scheduleIdleEnd(end: () => void, delayMs: number): void {
+  if (idleEndTimer !== null) {
+    return;
+  }
+  idleEndTimer = setTimeout(() => {
+    idleEndTimer = null;
+    end();
+  }, delayMs);
+}
+
+export function endOtherVisible(keptId: string, instances: readonly Activity[]): void {
+  for (const instance of instances) {
+    const id = instance.getInfo().id;
+    if (id !== keptId && instance.getInfo().state !== 'dismissed') {
+      endExtra(instance, id);
+    }
+  }
+}

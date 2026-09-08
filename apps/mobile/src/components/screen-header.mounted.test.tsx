@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
 import { type ComponentProps, createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -337,5 +337,22 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(back.parent?.parent?.parent);
       }
     }
+  });
+
+  it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
+    const renderer = renderHeader({
+      title: 'Submit review',
+      eyebrow: 'KILO-ORG/CLOUD#5058',
+      onBack: () => undefined,
+      backIcon: 'close',
+      showBackButton: true,
+      safeAreaTop: false,
+      className: 'pt-3',
+    });
+    const back = findBackPressable(renderer.root);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent).toBe(back.parent);
+    expect(renderer.root.props.style).toBeUndefined();
+    expect(renderer.root.props.className).toContain('pt-3');
   });
 });

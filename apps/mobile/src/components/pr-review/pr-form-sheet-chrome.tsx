@@ -8,9 +8,9 @@
 // OUTSIDE the ScrollView so keyboard focus does not scroll the title off-screen.
 //
 // collapsable={false}: keep a stable native subview at index 0 (SheetHeader
-// pattern). No `modal` top inset: the formSheet grabber already clears the
-// top edge; the modal 32pt pad left a transparent band content showed through
-// (that band + parent PR "Go back" is the stray ‹ root cause).
+// pattern). No `modal` top inset and no `centerTitle`: the formSheet grabber
+// already clears the top edge, and the close caret stays on the title row.
+// `safeAreaTop={false}` leaves vertical padding to `pt-3`.
 //
 // Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets. Footers must
 // NOT re-apply the full keyboard height (AppAwareKeyboardPaddingView double-
@@ -51,9 +51,10 @@ export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBac
       <ScreenHeader
         title={props.title}
         eyebrow={props.eyebrow}
-        centerTitle
         onBack={props.onBack}
         backIcon="close"
+        showBackButton
+        safeAreaTop={false}
         className="pt-3"
       />
     </View>

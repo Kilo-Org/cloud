@@ -330,6 +330,57 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
     expect(retry).not.toHaveBeenCalled();
   });
 
+  it('uses the organization from the queue configuration in prepareSession', async () => {
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const prepareRequests: Request[] = [];
+    const stub = {
+      getRequest: vi.fn(async () => makeRequest()),
+      getConfig: vi.fn(async () =>
+        makeTriggerConfig({
+          userId: null,
+          orgId: organizationId,
+          targetType: 'cloud_agent',
+          mode: 'code',
+          model: 'model-1',
+          githubRepo: 'owner/repo',
+          profileId: 'profile-1',
+        })
+      ),
+      updateRequest: vi.fn(async () => ({ success: true })),
+    };
+    const env = {
+      WEBHOOK_AGENT_URL: 'https://hooks.test',
+      WEBHOOK_TOKEN_CACHE: { get: vi.fn(async () => 'api-token'), put: vi.fn() },
+      INTERNAL_API_SECRET: { get: vi.fn(async () => 'test-internal-secret') },
+      CALLBACK_TOKEN_SECRET: { get: vi.fn(async () => 'test-callback-token-secret') },
+      TRIGGER_DO: { idFromName: vi.fn((name: string) => name), get: vi.fn(() => stub) },
+      CLOUD_AGENT: {
+        fetch: vi.fn(async (request: Request) => {
+          prepareRequests.push(request);
+          return request.url.includes('/trpc/prepareSession')
+            ? Response.json({ result: { data: { cloudAgentSessionId: 'cloud-session-1' } } })
+            : Response.json({
+                result: { data: { executionId: 'execution-1', status: 'running' } },
+              });
+        }),
+      },
+    } as unknown as Env;
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const batch = {
+      queue: 'webhook-delivery',
+      messages: [{ body: makeWebhook(), attempts: 1, ack, retry }],
+    } as unknown as MessageBatch<ReturnType<typeof makeWebhook>>;
+
+    await handleWebhookDeliveryBatch(batch, env);
+
+    expect(await prepareRequests[0]?.json()).toMatchObject({
+      kilocodeOrganizationId: organizationId,
+    });
+    expect(ack).toHaveBeenCalledTimes(1);
+    expect(retry).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['webhook', undefined, undefined],
     ['webhook', 'high', undefined],

@@ -5,6 +5,10 @@ import { getTownDOStub } from '../dos/Town.do';
 import { resSuccess, resError } from '../util/res.util';
 import { parseJsonBody } from '../util/parse-json-body.util';
 import type { GastownEnv } from '../gastown.worker';
+import {
+  authorizeOrganization,
+  TownAuthorizationUnavailableError,
+} from '../util/town-authorization.util';
 
 const ORG_TOWNS_LOG = '[org-towns.handler]';
 
@@ -19,6 +23,40 @@ const CreateOrgRigBody = z.object({
   default_branch: z.string().min(1).default('main'),
   platform_integration_id: z.string().min(1).optional(),
 });
+
+async function authorizeExistingTownMutation(
+  c: Context<GastownEnv>,
+  townId: string,
+  organizationId: string
+): Promise<Response | null> {
+  const town = getTownDOStub(c.env, townId);
+  const identityState = await town.getTownIdentityState();
+  if (identityState.type === 'invalid') {
+    return c.json(resError('Town authorization state is invalid'), 403);
+  }
+  if (identityState.type === 'legacy') return null;
+  const identity = identityState.identity;
+  if (identity.ownerType !== 'org' || identity.organizationId !== organizationId)
+    return c.json(resError('Forbidden'), 403);
+  const userId = c.get('kiloUserId');
+  if (!userId) return c.json(resError('Authentication required'), 401);
+  try {
+    const authorization = await authorizeOrganization(
+      c.env,
+      organizationId,
+      userId,
+      c.get('kiloApiTokenPepper')
+    );
+    if (!authorization || !('role' in authorization)) return c.json(resError('Forbidden'), 403);
+    c.set('orgRole', authorization.role);
+    return null;
+  } catch (error) {
+    if (error instanceof TownAuthorizationUnavailableError) {
+      return c.json(resError('Authorization unavailable'), 503);
+    }
+    throw error;
+  }
+}
 
 export async function handleCreateOrgTown(c: Context<GastownEnv>, params: { orgId: string }) {
   const parsed = CreateOrgTownBody.safeParse(await parseJsonBody(c));
@@ -42,7 +80,22 @@ export async function handleCreateOrgTown(c: Context<GastownEnv>, params: { orgI
   // Initialize the TownDO config with org ownership metadata
   const townDOStub = getTownDOStub(c.env, town.id);
   await townDOStub.setTownId(town.id);
+  const runtime = await townDOStub.initializeTownIdentityAndRuntimeAuthorization(
+    {
+      ownerType: 'org',
+      ownerUserId: userId,
+      organizationId: params.orgId,
+      createdByUserId: userId,
+      runtimeMode: 'legacy',
+    },
+    c.get('kiloControlToken')
+  );
+  if (runtime.modernControl && !runtime.runtimeToken) {
+    await orgDO.deleteTown(town.id);
+    return c.json(resError('A current Gastown control token is required'), 403);
+  }
   await townDOStub.updateTownConfig({
+    ...(runtime.runtimeToken ? { kilocode_token: runtime.runtimeToken } : {}),
     owner_type: 'org',
     owner_id: params.orgId,
     owner_user_id: userId,
@@ -90,6 +143,12 @@ export async function handleCreateOrgRig(c: Context<GastownEnv>, params: { orgId
   // Verify the town belongs to this org before creating the rig
   const town = await orgDO.getTownAsync(parsed.data.town_id);
   if (!town) return c.json(resError('Town not found in this org'), 404);
+  const authorizationError = await authorizeExistingTownMutation(
+    c,
+    parsed.data.town_id,
+    params.orgId
+  );
+  if (authorizationError) return authorizationError;
 
   const rig = await orgDO.createRig(parsed.data);
   console.log(
@@ -157,18 +216,16 @@ export async function handleDeleteOrgTown(
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
 
-  // Verify owner role via JWT claims (works in dev mode where orgAuthMiddleware is skipped)
-  const memberships = c.get('kiloOrgMemberships') ?? [];
-  const membership = memberships.find(m => m.orgId === params.orgId);
-  if (!membership || membership.role !== 'owner') {
-    return c.json(resError('Only org owners can delete towns'), 403);
-  }
-
   const orgDO = getGastownOrgStub(c.env, params.orgId);
 
   // Verify the town belongs to this org BEFORE destroying anything
   const town = await orgDO.getTownAsync(params.townId);
   if (!town) return c.json(resError('Town not found'), 404);
+  const authorizationError = await authorizeExistingTownMutation(c, params.townId, params.orgId);
+  if (authorizationError) return authorizationError;
+  if (c.get('orgRole') !== 'owner') {
+    return c.json(resError('Only org owners can delete towns'), 403);
+  }
 
   // Destroy the Town DO (handles all rigs, agents, and mayor cleanup)
   try {
@@ -193,16 +250,14 @@ export async function handleDeleteOrgRig(
   const userId = c.get('kiloUserId');
   if (!userId) return c.json(resError('Authentication required'), 401);
 
-  // Verify owner role via JWT claims (works in dev mode where orgAuthMiddleware is skipped)
-  const memberships = c.get('kiloOrgMemberships') ?? [];
-  const membership = memberships.find(m => m.orgId === params.orgId);
-  if (!membership || membership.role !== 'owner') {
-    return c.json(resError('Only org owners can delete rigs'), 403);
-  }
-
   const orgDO = getGastownOrgStub(c.env, params.orgId);
   const rig = await orgDO.getRigAsync(params.rigId);
   if (!rig) return c.json(resError('Rig not found'), 404);
+  const authorizationError = await authorizeExistingTownMutation(c, rig.town_id, params.orgId);
+  if (authorizationError) return authorizationError;
+  if (c.get('orgRole') !== 'owner') {
+    return c.json(resError('Only org owners can delete rigs'), 403);
+  }
 
   const deleted = await orgDO.deleteRig(params.rigId);
   if (!deleted) return c.json(resError('Rig not found'), 404);

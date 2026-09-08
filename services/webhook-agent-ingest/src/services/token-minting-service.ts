@@ -1,4 +1,6 @@
 import { signKiloToken } from '@kilocode/worker-utils';
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import { CLOUD_AGENT_NEXT_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import {
   getWorkerDb,
   findUserForToken,
@@ -7,14 +9,16 @@ import {
   type WorkerDb,
 } from '../db/queries.js';
 import { logger } from '../util/logger.js';
+import { getSecretValue } from '../util/secret.js';
 
 /**
  * Environment bindings required for token minting.
  */
 export type TokenMintingEnv = {
   HYPERDRIVE: { connectionString: string };
-  NEXTAUTH_SECRET: { get(): Promise<string> }; // Same secret used by kilocode-backend
+  NEXTAUTH_SECRET: SecretsStoreSecret | string; // Same secret used by kilocode-backend
   ENVIRONMENT: string;
+  SHARED_RESOURCE_TOKENS_ENABLED?: string | boolean;
 };
 
 type MintTokenParams = {
@@ -57,7 +61,7 @@ export class TokenMintingService {
 
   private async getJwtSecret(): Promise<string> {
     if (!this.jwtSecret) {
-      this.jwtSecret = await this.env.NEXTAUTH_SECRET.get();
+      this.jwtSecret = await getSecretValue(this.env.NEXTAUTH_SECRET);
     }
     return this.jwtSecret;
   }
@@ -80,8 +84,8 @@ export class TokenMintingService {
         throw new Error(`User not found: ${params.userId}`);
       }
 
-      if (user.blocked_reason) {
-        throw new Error(`User is blocked: ${user.blocked_reason}`);
+      if (user.blocked_at || user.blocked_reason) {
+        throw new Error('User is blocked');
       }
 
       const token = await this.signToken({
@@ -111,11 +115,15 @@ export class TokenMintingService {
 
       logger.info('Token minting: ensuring bot user', { orgId: params.orgId });
       const botUser = await ensureBotUserForOrg(db, params.orgId);
+      if (botUser.blocked_at || botUser.blocked_reason) {
+        throw new Error('Webhook bot user is blocked');
+      }
 
       const token = await this.signToken({
         kiloUserId: botUser.id,
         apiTokenPepper: botUser.api_token_pepper,
         botId: WEBHOOK_BOT_ID,
+        organizationId: params.orgId,
         internalApiUse: true,
         createdOnPlatform: 'webhook',
       });
@@ -143,10 +151,39 @@ export class TokenMintingService {
     kiloUserId: string;
     apiTokenPepper: string | null;
     botId?: string;
+    organizationId?: string;
     internalApiUse: boolean;
     createdOnPlatform: string;
   }): Promise<string> {
     const jwtSecret = await this.getJwtSecret();
+
+    if (
+      this.env.SHARED_RESOURCE_TOKENS_ENABLED === true ||
+      this.env.SHARED_RESOURCE_TOKENS_ENABLED === 'true'
+    ) {
+      const { token } = await signModernKiloToken({
+        userId: payload.kiloUserId,
+        pepper: payload.apiTokenPepper,
+        secret: jwtSecret,
+        expiresInSeconds: 60 * 60,
+        env: this.env.ENVIRONMENT === 'production' ? 'production' : 'development',
+        audience: CLOUD_AGENT_NEXT_AUDIENCE,
+        tokenPurpose: 'internal-service',
+        credentialExchange: false,
+        extra: {
+          botId: payload.botId,
+          organizationId: payload.organizationId,
+          internalApiUse: payload.internalApiUse,
+          createdOnPlatform: payload.createdOnPlatform,
+          runtimeAdmission: {
+            source: 'automation',
+            authorizationUserId: payload.kiloUserId,
+            authorizationPepper: payload.apiTokenPepper,
+          },
+        },
+      });
+      return token;
+    }
 
     const { token } = await signKiloToken({
       userId: payload.kiloUserId,

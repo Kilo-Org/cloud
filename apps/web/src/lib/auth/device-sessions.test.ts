@@ -9,6 +9,9 @@ import {
   revokeDeviceSession,
 } from './device-sessions';
 import type { User } from '@kilocode/db/schema';
+import jwt from 'jsonwebtoken';
+import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { API_GATEWAY_CREDENTIAL_FORMAT } from '@kilocode/app-shared/native-auth';
 
 describe('device-sessions', () => {
   const testUserId = 'test-user-ds-' + Date.now();
@@ -17,20 +20,18 @@ describe('device-sessions', () => {
   let fakeUser: User;
 
   beforeEach(async () => {
-    await db.insert(kilocode_users).values({
-      id: testUserId,
-      google_user_email: testUserEmail,
-      google_user_name: 'Test User',
-      google_user_image_url: 'https://example.com/avatar.jpg',
-      stripe_customer_id: 'cus_test',
-    });
-    fakeUser = {
-      id: testUserId,
-      google_user_email: testUserEmail,
-      google_user_name: 'Test User',
-      google_user_image_url: 'https://example.com/avatar.jpg',
-      api_token_pepper: undefined,
-    } as unknown as User;
+    const [createdUser] = await db
+      .insert(kilocode_users)
+      .values({
+        id: testUserId,
+        google_user_email: testUserEmail,
+        google_user_name: 'Test User',
+        google_user_image_url: 'https://example.com/avatar.jpg',
+        stripe_customer_id: 'cus_test',
+      })
+      .returning();
+    if (!createdUser) throw new Error('Expected a test user');
+    fakeUser = createdUser;
   });
 
   afterEach(async () => {
@@ -78,6 +79,58 @@ describe('device-sessions', () => {
       expect(tokens.length).toBe(1);
       expect(new Date(tokens[0]!.expires_at).getTime()).toBeGreaterThan(Date.now());
     });
+  });
+
+  test('rotates an actual negotiated bundle and supports legacy rollout rollback', async () => {
+    const key = 'NATIVE_RESOURCE_TOKENS_ENABLED';
+    const previous = process.env[key];
+    const sharedKey = 'SHARED_RESOURCE_TOKENS_ENABLED';
+    const previousShared = process.env[sharedKey];
+    process.env[key] = 'true';
+    process.env[sharedKey] = 'true';
+    try {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const first = await issueSessionCredentials(fakeUser, sessionId, {
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+      });
+      const next = await rotateRefreshToken(first.refreshToken, {
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+      });
+      expect(next.ok).toBe(true);
+      if (!next.ok) throw new Error('Expected successful rotation');
+      for (const pair of [first, next]) {
+        expect(pair.metadata?.credentialFormat).toBe(API_GATEWAY_CREDENTIAL_FORMAT);
+        if (!pair.metadata) throw new Error('Expected credential bundle metadata');
+        expect(jwt.verify(pair.token, NEXTAUTH_SECRET)).toMatchObject({
+          kiloUserId: testUserId,
+          aud: 'kilo-api',
+          deviceSessionId: sessionId,
+          tokenPurpose: 'device-access',
+          credentialExchange: false,
+        });
+        expect(jwt.verify(pair.metadata.gatewayToken, NEXTAUTH_SECRET)).toMatchObject({
+          kiloUserId: testUserId,
+          aud: 'kilo-gateway',
+          deviceSessionId: sessionId,
+          tokenPurpose: 'device-access',
+          credentialExchange: false,
+        });
+      }
+      expect(next.refreshToken).not.toBe(first.refreshToken);
+      process.env[key] = 'false';
+      const rollback = await rotateRefreshToken(next.refreshToken, {
+        credentialFormat: API_GATEWAY_CREDENTIAL_FORMAT,
+      });
+      expect(rollback.ok).toBe(true);
+      if (!rollback.ok) throw new Error('Expected compatible rollback rotation');
+      expect(rollback).not.toHaveProperty('metadata');
+      expect(jwt.verify(rollback.token, NEXTAUTH_SECRET)).not.toHaveProperty('aud');
+    } finally {
+      if (previous === undefined) delete process.env[key];
+      else process.env[key] = previous;
+      if (previousShared === undefined) delete process.env[sharedKey];
+      else process.env[sharedKey] = previousShared;
+    }
   });
 
   describe('rotateRefreshToken', () => {
@@ -397,6 +450,28 @@ describe('device-sessions', () => {
       if (retry.ok) {
         expect(retry.refreshToken).not.toBe(refreshToken);
       }
+    });
+
+    test('native credential generation failure rolls back consumption and preserves the session', async () => {
+      const sessionId = await createDeviceSession({ userId: testUserId });
+      const { refreshToken } = await issueSessionCredentials(fakeUser, sessionId);
+      await expect(
+        rotateRefreshToken(refreshToken, {
+          credentialFormat: 'unsupported-format' as never,
+        })
+      ).rejects.toThrow('Unsupported native credential format');
+
+      const [oldToken] = await db
+        .select()
+        .from(device_refresh_tokens)
+        .where(eq(device_refresh_tokens.device_session_id, sessionId));
+      const [session] = await db
+        .select()
+        .from(device_sessions)
+        .where(eq(device_sessions.id, sessionId));
+      expect(oldToken!.consumed_at).toBeNull();
+      expect(session!.revoked_at).toBeNull();
+      await expect(rotateRefreshToken(refreshToken)).resolves.toMatchObject({ ok: true });
     });
   });
 });

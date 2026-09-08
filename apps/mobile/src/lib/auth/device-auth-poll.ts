@@ -7,6 +7,7 @@ import { classifyPollResponse } from '@/lib/auth/poll-response';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 import {
   buildDeviceAuthPollRequest,
+  type NativeTokenPair,
   parseDeviceAuthTokenResponse,
 } from '@/lib/auth/native-auth-contract';
 import {
@@ -85,6 +86,8 @@ export function startDeviceAuthPoll(params: {
       })();
 
       if (parsed?.status === 'approved') {
+        const credentials: NativeTokenPair & { status?: 'approved' } = { ...parsed };
+        delete credentials.status;
         cleanup();
         if (Platform.OS !== 'android') {
           WebBrowser.dismissAuthSession();
@@ -92,9 +95,7 @@ export function startDeviceAuthPoll(params: {
         setState(previous =>
           approvedDeviceAuthState({
             code,
-            token: parsed.token,
-            refreshToken: parsed.refreshToken,
-            expiresIn: parsed.expiresIn,
+            credentials,
             previousVerificationUrl: previous.verificationUrl,
           })
         );

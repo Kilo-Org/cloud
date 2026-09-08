@@ -1,0 +1,99 @@
+import { describe, expect, it } from 'vitest';
+import {
+  generateControlToken,
+  generateInternalServiceToken,
+  generateTriageToken,
+} from './token.js';
+
+const secret = 'test-secret-at-least-thirty-two-characters';
+const user = { id: 'user-1', api_token_pepper: 'current-pepper' };
+
+function decodeJwt(token: string): Record<string, unknown> {
+  const payload = token.split('.')[1];
+  if (!payload) throw new Error('JWT payload missing');
+  return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+}
+
+describe('security analysis token issuance', () => {
+  it('preserves legacy tokens while shared resource tokens are disabled', async () => {
+    const [control, triage, session] = await Promise.all([
+      generateControlToken(user, secret, 'production', false),
+      generateTriageToken(user, secret, 'production', undefined, 'organization-1'),
+      generateInternalServiceToken(user.id, secret, 'false'),
+    ]);
+
+    expect(decodeJwt(control)).toMatchObject({
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: 'production',
+      internalApiUse: true,
+      createdOnPlatform: 'security-agent',
+    });
+    expect(decodeJwt(control)).not.toHaveProperty('aud');
+    expect(decodeJwt(control)).not.toHaveProperty('organizationId');
+    expect(decodeJwt(triage)).not.toHaveProperty('aud');
+    expect(decodeJwt(triage)).not.toHaveProperty('organizationId');
+    expect(decodeJwt(session)).not.toHaveProperty('aud');
+    expect(decodeJwt(session)).not.toHaveProperty('apiTokenPepper');
+  });
+
+  it('mints isolated modern control, triage, and session assertions', async () => {
+    const [control, triage, session] = await Promise.all([
+      generateControlToken(user, secret, 'production', true),
+      generateTriageToken(user, secret, 'production', true),
+      generateInternalServiceToken(user.id, secret, true),
+    ]);
+
+    expect(decodeJwt(control)).toMatchObject({
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+      env: 'production',
+      apiTokenPepper: user.api_token_pepper,
+      runtimeAdmission: {
+        source: 'automation',
+        authorizationUserId: user.id,
+        authorizationPepper: user.api_token_pepper,
+      },
+    });
+    expect(decodeJwt(control)).not.toHaveProperty('organizationId');
+    expect(decodeJwt(triage)).toMatchObject({
+      aud: 'kilo-gateway',
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+      env: 'production',
+      apiTokenPepper: user.api_token_pepper,
+    });
+    expect(decodeJwt(triage)).not.toHaveProperty('runtimeAdmission');
+    expect(decodeJwt(session)).toMatchObject({
+      aud: 'session-ingest',
+      tokenPurpose: 'internal-service',
+      credentialExchange: false,
+    });
+    expect(decodeJwt(session)).not.toHaveProperty('env');
+    expect(decodeJwt(session)).not.toHaveProperty('apiTokenPepper');
+  });
+
+  it('includes only the requested organization in modern control assertions', async () => {
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const control = await generateControlToken(user, secret, 'production', true, organizationId);
+
+    expect(decodeJwt(control)).toMatchObject({ organizationId });
+    expect(decodeJwt(control)).not.toMatchObject({
+      organizationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    });
+  });
+
+  it('includes only the requested organization in modern triage assertions', async () => {
+    const organizationId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const triage = await generateTriageToken(user, secret, 'production', true, organizationId);
+
+    expect(decodeJwt(triage)).toMatchObject({
+      aud: 'kilo-gateway',
+      organizationId,
+    });
+    expect(decodeJwt(triage)).not.toMatchObject({
+      organizationId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    });
+  });
+});

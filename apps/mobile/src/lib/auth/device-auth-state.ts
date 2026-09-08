@@ -1,11 +1,11 @@
+import { type NativeTokenPair } from '@kilocode/app-shared/native-auth';
+
 type DeviceAuthStatus = 'idle' | 'pending' | 'approved' | 'denied' | 'expired' | 'error';
 
 export type DeviceAuthState = {
   status: DeviceAuthStatus;
   code: string | undefined;
-  token: string | undefined;
-  refreshToken: string | undefined;
-  expiresIn: number | undefined;
+  credentials: NativeTokenPair | undefined;
   error: string | undefined;
   verificationUrl: string | undefined;
   resumed?: boolean;
@@ -19,9 +19,7 @@ export function errorDeviceAuthState(
   return {
     status: 'error',
     code,
-    token: undefined,
-    refreshToken: undefined,
-    expiresIn: undefined,
+    credentials: undefined,
     error,
     verificationUrl: previousVerificationUrl,
   };
@@ -31,9 +29,7 @@ export function idleDeviceAuthState(): DeviceAuthState {
   return {
     status: 'idle',
     code: undefined,
-    token: undefined,
-    refreshToken: undefined,
-    expiresIn: undefined,
+    credentials: undefined,
     error: undefined,
     verificationUrl: undefined,
   };
@@ -47,9 +43,7 @@ export function pendingDeviceAuthState(
   return {
     status: 'pending',
     code,
-    token: undefined,
-    refreshToken: undefined,
-    expiresIn: undefined,
+    credentials: undefined,
     error: undefined,
     verificationUrl,
     resumed,
@@ -58,17 +52,13 @@ export function pendingDeviceAuthState(
 
 export function approvedDeviceAuthState(params: {
   code: string;
-  token: string;
-  refreshToken?: string;
-  expiresIn?: number;
+  credentials: NativeTokenPair;
   previousVerificationUrl?: string;
 }): DeviceAuthState {
   return {
     status: 'approved',
     code: params.code,
-    token: params.token,
-    refreshToken: params.refreshToken,
-    expiresIn: params.expiresIn,
+    credentials: params.credentials,
     error: undefined,
     verificationUrl: params.previousVerificationUrl,
   };
@@ -83,9 +73,7 @@ export function terminalDeviceAuthState(params: {
   return {
     status: params.status,
     code: params.code,
-    token: undefined,
-    refreshToken: undefined,
-    expiresIn: undefined,
+    credentials: undefined,
     error: params.error,
     verificationUrl: params.previousVerificationUrl,
   };

@@ -10,7 +10,7 @@
     "deploy:dev": "wrangler deploy --env dev",
     "dev": "wrangler dev --env dev",
     "start": "wrangler dev --env dev",
-    "types": "wrangler types",
+    "types": "wrangler types --include-runtime false",
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/webhook-agent-ingest/src",
     "format": "oxfmt src",
     "format:check": "oxfmt --list-different src",
@@ -32,6 +32,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "catalog:",
     "@cloudflare/vitest-pool-workers": "catalog:",
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",

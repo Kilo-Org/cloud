@@ -7,7 +7,6 @@ import {
 } from '@kilocode/app-shared/native-auth';
 
 const tokenResponseSchema = z.object({ token: z.string().min(1) });
-const credentialEnvelopeSchema = z.record(z.string(), z.unknown());
 const emailCodeResponseSchema = z.object({
   success: z.literal(true),
   challengeId: z.uuid().optional(),
@@ -20,9 +19,6 @@ const errorResponseSchema = z.object({
 export type TokenPair = NativeTokenPair;
 
 export function parseTokenResponse(value: unknown): { token: string } | null {
-  if (hasCredentialFormat(value)) {
-    return null;
-  }
   const result = tokenResponseSchema.safeParse(value);
   return result.success ? result.data : null;
 }
@@ -32,16 +28,6 @@ export function parseTokenPair(value: unknown): TokenPair | null {
 }
 
 export { API_GATEWAY_CREDENTIAL_FORMAT, type NativeCredentialBundleMetadata, type NativeTokenPair };
-
-function hasCredentialFormat(value: unknown): boolean {
-  const envelope = credentialEnvelopeSchema.safeParse(value);
-  return (
-    envelope.success &&
-    (Object.hasOwn(envelope.data, 'credentialFormat') ||
-      Object.hasOwn(envelope.data, 'gatewayToken') ||
-      Object.hasOwn(envelope.data, 'metadata'))
-  );
-}
 
 const deviceAuthTokenStatusSchema = z.enum(['pending', 'approved', 'denied', 'expired']);
 

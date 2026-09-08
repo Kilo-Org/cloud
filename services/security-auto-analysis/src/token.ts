@@ -13,7 +13,7 @@ type TokenUser = {
 
 const ONE_HOUR_SECONDS = 60 * 60;
 
-export function isSharedResourceTokensEnabled(value: string | boolean | undefined): boolean {
+function isSharedResourceTokensEnabled(value: string | boolean | undefined): boolean {
   return value === true || value === 'true';
 }
 

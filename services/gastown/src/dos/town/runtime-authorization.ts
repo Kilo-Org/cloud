@@ -60,7 +60,7 @@ export async function initializePrivateTownIdentity(
   });
 }
 
-export function isModernControlToken(token: string): boolean {
+function isModernControlToken(token: string): boolean {
   try {
     return typeof decodeJwt(token).tokenPurpose === 'string';
   } catch {

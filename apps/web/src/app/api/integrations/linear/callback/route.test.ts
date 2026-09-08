@@ -17,8 +17,11 @@ import {
   getPlatformIntegrationById,
 } from '@/lib/bot/platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { createSignedToken } from '@/lib/signed-token';
+import { PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS } from '@/lib/integrations/oauth-state';
 
 const mockIsEnabledForBot = jest.fn();
+const mockHandleOAuthCallback = jest.fn();
 const mockLinearOrganization = jest.fn(async () => ({ name: 'Acme Workspace', urlKey: 'acme' }));
 
 jest.mock('@linear/sdk', () => ({
@@ -48,6 +51,7 @@ jest.mock('@/lib/integrations/linear-service', () => {
 });
 jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
   consumeProviderOAuthAttempt: jest.fn(async () => true),
+  cancelProviderOAuthAttempt: jest.fn(async () => true),
 }));
 jest.mock('@/lib/bot-identity', () => ({
   linkKiloUser: jest.fn(async () => undefined),
@@ -94,6 +98,8 @@ const PLATFORM_INTEGRATION_ID = 'pi_linear_1';
 // Different from the comment author's id, to prove the OAuth-derived id wins.
 const COMMENT_AUTHOR_LINEAR_ID = 'linear-user-A';
 const OAUTH_VIEWER_LINEAR_ID = 'linear-user-B';
+const createProviderState = (userId = USER_ID, returnTo?: string) =>
+  createOAuthState(`user_${userId}`, userId, returnTo, 'provider_install');
 
 function makeRequest(pathWithQuery: string) {
   return new NextRequest(`http://localhost:3000${pathWithQuery}`);
@@ -125,16 +131,17 @@ describe('GET /api/integrations/linear/callback', () => {
       authFailedResponse: null,
     } as never);
 
-    mockedBotGetAdapter.mockReturnValue({
-      handleOAuthCallback: jest.fn(async () => ({
+    mockHandleOAuthCallback.mockResolvedValue({
+      organizationId: ORGANIZATION_ID,
+      installation: {
+        accessToken: 'tok',
+        botUserId: 'bot-1',
         organizationId: ORGANIZATION_ID,
-        installation: {
-          accessToken: 'tok',
-          botUserId: 'bot-1',
-          organizationId: ORGANIZATION_ID,
-          expiresAt: null,
-        },
-      })),
+        expiresAt: null,
+      },
+    });
+    mockedBotGetAdapter.mockReturnValue({
+      handleOAuthCallback: mockHandleOAuthCallback,
       deleteInstallation: jest.fn(async () => undefined),
     } as never);
 
@@ -153,7 +160,7 @@ describe('GET /api/integrations/linear/callback', () => {
   });
 
   test('redirects with the oauth error when Linear returns one', async () => {
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createProviderState();
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?error=access_denied&state=${state}`)
     );
@@ -162,7 +169,7 @@ describe('GET /api/integrations/linear/callback', () => {
   });
 
   test('redirects oauth errors to returnTo when signed state carries one', async () => {
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new?step=linear');
+    const state = createProviderState(USER_ID, '/claw/new?step=linear');
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?error=access_denied&state=${state}`)
     );
@@ -171,7 +178,7 @@ describe('GET /api/integrations/linear/callback', () => {
   });
 
   test('encodes oauth error values before redirecting', async () => {
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createProviderState();
     const response = await callLinearCallback(
       makeRequest(
         `/api/integrations/linear/callback?error=${encodeURIComponent(
@@ -187,7 +194,7 @@ describe('GET /api/integrations/linear/callback', () => {
   });
 
   test('redirects with missing_code when no code is present', async () => {
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createProviderState();
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?state=${state}`)
     );
@@ -204,7 +211,7 @@ describe('GET /api/integrations/linear/callback', () => {
   });
 
   test('rejects when the state was signed for a different user', async () => {
-    const state = createOAuthState(`user_${OTHER_USER_ID}`, OTHER_USER_ID);
+    const state = createProviderState(OTHER_USER_ID);
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
@@ -212,9 +219,54 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations?error=unauthorized');
   });
 
+  test('accepts a purpose-less state issued before rollout while still inside the TTL', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.setSystemTime((PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS - 30) * 1000);
+      const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+      jest.setSystemTime((PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS + 1) * 1000);
+      mockedUpsertLinearInstallation.mockResolvedValue({} as never);
+
+      const response = await callLinearCallback(
+        makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+      );
+
+      expectRedirectLocation(response, '/integrations/linear?success=installed');
+      expect(mockHandleOAuthCallback).toHaveBeenCalledTimes(1);
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('rejects a post-rollout purpose-less state without provider mutation', async () => {
+    jest.useFakeTimers();
+    try {
+      jest.setSystemTime((PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS + 1) * 1000);
+      const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+      const response = await callLinearCallback(
+        makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+      );
+      expectRedirectLocation(response, '/integrations?error=invalid_state');
+      expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+      expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('rejects a wrong-purpose signed state without provider mutation', async () => {
+    const state = createSignedToken({ owner: `user_${USER_ID}`, uid: USER_ID, purpose: 'other' });
+    const response = await callLinearCallback(
+      makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
+    );
+    expectRedirectLocation(response, '/integrations?error=invalid_state');
+    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+  });
+
   test('invokes upsertLinearInstallation with the workspace name from Linear GraphQL', async () => {
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createProviderState();
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
@@ -236,7 +288,7 @@ describe('GET /api/integrations/linear/callback', () => {
 
   test('redirects successful installs to returnTo when signed state carries one', async () => {
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new?step=linear');
+    const state = createProviderState(USER_ID, '/claw/new?step=linear');
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
@@ -246,7 +298,7 @@ describe('GET /api/integrations/linear/callback', () => {
 
   test('inserts returnTo success query before a fragment', async () => {
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID, '/claw/new#calendar');
+    const state = createProviderState(USER_ID, '/claw/new#calendar');
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
@@ -262,7 +314,7 @@ describe('GET /api/integrations/linear/callback', () => {
   test('falls back to organizationId when the Linear GraphQL query fails', async () => {
     mockLinearOrganization.mockRejectedValue(new Error('Unauthorized'));
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createProviderState();
     await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
@@ -296,7 +348,7 @@ describe('GET /api/integrations/linear/callback', () => {
     };
     mockedBotGetAdapter.mockReturnValue(adapter as never);
 
-    const state = createOAuthState(`user_${USER_ID}`, USER_ID);
+    const state = createProviderState();
     const response = await callLinearCallback(
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );

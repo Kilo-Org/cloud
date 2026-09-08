@@ -1,6 +1,6 @@
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import { organizations, provider_oauth_attempts } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import {
@@ -319,11 +319,22 @@ describe('provider OAuth attempts', () => {
     ).finally(() => {
       settled = true;
     });
-    await Promise.resolve();
-    expect(settled).toBe(false);
-    release?.();
-    await reservation;
-    await expect(attach).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
+    let observationError: unknown;
+    try {
+      await waitForBlockedOwnerRowQuery();
+      expect(settled).toBe(false);
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const [reservationResult, attachResult] = await Promise.allSettled([reservation, attach]);
+    if (observationError) throw observationError;
+    expect(reservationResult.status).toBe('fulfilled');
+    expect(attachResult).toEqual({
+      status: 'fulfilled',
+      value: { ok: false, reason: 'incompatible_workflow' },
+    });
   });
 
   it('blocks reservation on the attach owner row until sharing commits', async () => {
@@ -376,10 +387,42 @@ describe('provider OAuth attempts', () => {
     }).finally(() => {
       settled = true;
     });
-    await Promise.resolve();
-    expect(settled).toBe(false);
-    release?.();
-    await expect(attach).resolves.toMatchObject({ ok: true });
-    await expect(start).rejects.toThrow('not available for shared GitHub installations');
+    let observationError: unknown;
+    try {
+      await waitForBlockedOwnerRowQuery();
+      expect(settled).toBe(false);
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const [attachResult, startResult] = await Promise.allSettled([attach, start]);
+    if (observationError) throw observationError;
+    expect(attachResult).toMatchObject({ status: 'fulfilled', value: { ok: true } });
+    expect(startResult.status).toBe('rejected');
+    if (startResult.status === 'rejected') {
+      expect(startResult.reason).toEqual(
+        expect.objectContaining({
+          message: 'This workflow is not available for shared GitHub installations yet',
+        })
+      );
+    }
   });
 });
+
+async function waitForBlockedOwnerRowQuery(): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const result = await db.execute<{ blocked: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND wait_event_type = 'Lock'
+          AND lower(query) LIKE '%organizations%'
+          AND lower(query) LIKE '%for update%'
+      ) AS blocked
+    `);
+    if (result.rows[0]?.blocked) return;
+    await new Promise<void>(resolve => setImmediate(resolve));
+  }
+  throw new Error('Expected a transaction blocked on the organization owner row');
+}

@@ -136,6 +136,24 @@ describe('upsertPlatformIntegrationForOwner', () => {
     expect(rows[0]?.platform_installation_id).toBe(INSTALLATION_ID);
   });
 
+  test('serializes concurrent different installations for a non-allowlisted organization', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    const installationIds = [`${INSTALLATION_ID}-concurrent-a`, `${INSTALLATION_ID}-concurrent-b`];
+    const results = await Promise.all(
+      installationIds.map(installationId =>
+        upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
+      )
+    );
+    expect(results.filter(result => result.ok)).toHaveLength(1);
+    expect(results).toContainEqual({ ok: false, reason: 'multiple_installations_disabled' });
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows).toHaveLength(1);
+    expect(installationIds).toContain(rows[0]?.platform_installation_id);
+  });
+
   test('same-owner refresh updates the existing row (by primary key)', async () => {
     const owner: Owner = { type: 'user', id: userId };
 

@@ -34,6 +34,7 @@ const FRESH_SYNC = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_AFTER_MS + 1);
 const STALE_SYNC = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_AFTER_MS);
 const OLDER_ALERT = new Date(STALE_SYNC.getTime() - 60_000);
 const NEWER_ALERT = new Date(STALE_SYNC.getTime() + 60_000);
+const EXPIRED_ALERT = new Date(NOW.getTime() - SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS * 1000);
 
 afterEach(() => {
   jest.restoreAllMocks();
@@ -107,6 +108,16 @@ describe('shouldPostStaleSyncAlert', () => {
         now: NOW,
       })
     ).toBe(false);
+  });
+
+  it('alerts again when the last alert has expired', () => {
+    expect(
+      shouldPostStaleSyncAlert({
+        lastCompletedAt: null,
+        lastAlertAt: EXPIRED_ALERT,
+        now: NOW,
+      })
+    ).toBe(true);
   });
 
   it('alerts again after a newer full sync goes stale', () => {

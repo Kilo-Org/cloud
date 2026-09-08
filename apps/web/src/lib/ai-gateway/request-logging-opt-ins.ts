@@ -60,7 +60,7 @@ export async function createRequestLoggingOptIn(
   entry: RequestLoggingOptIn
 ): Promise<'created' | 'duplicate' | 'full'> {
   const validated = RequestLoggingOptInSchema.parse(entry);
-  const mutation = await db.transaction(async tx => {
+  return db.transaction(async tx => {
     await tx
       .insert(ai_gateway_request_logging_opt_ins)
       .values({ opt_ins: [] })
@@ -79,43 +79,40 @@ export async function createRequestLoggingOptIn(
           optIn.target_type === validated.target_type && optIn.target_id === validated.target_id
       )
     ) {
-      return { result: 'duplicate' as const, optIns: null };
+      return 'duplicate' as const;
     }
-    if (optIns.length >= 500) return { result: 'full' as const, optIns: null };
+    if (optIns.length >= 500) return 'full' as const;
 
     const updatedOptIns = [...optIns, validated];
     await tx
       .update(ai_gateway_request_logging_opt_ins)
       .set({ opt_ins: updatedOptIns })
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
-    return { result: 'created' as const, optIns: updatedOptIns };
+    await mirrorRequestLoggingOptInsToRedis(updatedOptIns);
+    return 'created' as const;
   });
-  if (mutation.optIns) await mirrorRequestLoggingOptInsToRedis(mutation.optIns);
-  return mutation.result;
 }
 
 export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
-  const updatedOptIns = await db.transaction(async tx => {
+  return db.transaction(async tx => {
     const [row] = await tx
       .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
       .from(ai_gateway_request_logging_opt_ins)
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
       .for('update');
-    if (!row) return null;
+    if (!row) return false;
 
     const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
     const remaining = optIns.filter(entry => entry.id !== id);
-    if (remaining.length === optIns.length) return null;
+    if (remaining.length === optIns.length) return false;
 
     await tx
       .update(ai_gateway_request_logging_opt_ins)
       .set({ opt_ins: remaining })
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
-    return remaining;
+    await mirrorRequestLoggingOptInsToRedis(remaining);
+    return true;
   });
-  if (!updatedOptIns) return false;
-  await mirrorRequestLoggingOptInsToRedis(updatedOptIns);
-  return true;
 }
 
 export async function isDynamicallyOptedIntoRequestLogging(params: {

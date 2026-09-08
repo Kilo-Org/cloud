@@ -17,6 +17,7 @@ import { eq } from 'drizzle-orm';
 
 export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;
 export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = AI_GATEWAY_STATE_REDIS_TTL_SECONDS;
+const SYNC_PROVIDERS_STALE_ALERT_TTL_MS = SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS * 1000;
 
 const STALE_WINDOW_LABEL = 'hour';
 const STATUS_COPY = `No full sync has completed within the past ${STALE_WINDOW_LABEL}.`;
@@ -45,7 +46,11 @@ export function shouldPostStaleSyncAlert(input: {
   ) {
     return false;
   }
-  if (lastAlertAt !== null && (lastCompletedAt === null || lastAlertAt > lastCompletedAt)) {
+  if (
+    lastAlertAt !== null &&
+    (lastCompletedAt === null || lastAlertAt > lastCompletedAt) &&
+    now.getTime() - lastAlertAt.getTime() < SYNC_PROVIDERS_STALE_ALERT_TTL_MS
+  ) {
     return false;
   }
   return true;
@@ -186,15 +191,25 @@ async function defaultGetLastAlertAt(): Promise<string | null> {
 }
 
 async function defaultSetLastAlertAt(iso: string): Promise<unknown> {
-  await db
-    .insert(ai_gateway_sync_providers_state)
-    .values({ stale_alert_last_posted_at: iso })
-    .onConflictDoUpdate({
-      target: ai_gateway_sync_providers_state.id,
-      set: { stale_alert_last_posted_at: iso },
+  return db.transaction(async tx => {
+    await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
+    const [row] = await tx
+      .select({ lastAlertAt: ai_gateway_sync_providers_state.stale_alert_last_posted_at })
+      .from(ai_gateway_sync_providers_state)
+      .where(eq(ai_gateway_sync_providers_state.id, 1))
+      .for('update');
+    if (!row) throw new Error('Sync-providers state row is missing');
+
+    const current = parseIsoTimestamp(row.lastAlertAt);
+    const requested = new Date(iso);
+    const latestIso = current && current > requested ? current.toISOString() : iso;
+    await tx
+      .update(ai_gateway_sync_providers_state)
+      .set({ stale_alert_last_posted_at: latestIso })
+      .where(eq(ai_gateway_sync_providers_state.id, 1));
+    return redisClient.set(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY, latestIso, {
+      ex: SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
     });
-  return redisClient.set(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY, iso, {
-    ex: SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
   });
 }
 

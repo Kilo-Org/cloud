@@ -2315,11 +2315,12 @@ export const adminRouter = createTRPCRouter({
           .limit(1),
       ]);
       const lastCompletedAt = syncState?.lastCompletedAt ?? null;
+      const completedAtIso = lastCompletedAt ? new Date(lastCompletedAt).toISOString() : null;
       if (!latest && !lastCompletedAt) return null;
       return {
         id: latest?.id ?? null,
         generated_at: latest?.data.generated_at ?? null,
-        completed_at: lastCompletedAt ?? null,
+        completed_at: completedAtIso,
         total_providers: latest?.data.total_providers ?? 0,
         total_models: latest?.data.total_models ?? 0,
       };

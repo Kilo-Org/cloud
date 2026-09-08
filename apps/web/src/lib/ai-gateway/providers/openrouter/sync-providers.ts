@@ -15,7 +15,7 @@ import { OpenRouterProvidersResponse } from '@/lib/ai-gateway/providers/openrout
 import { fetchModelsForProvider } from '@/lib/ai-gateway/providers/openrouter/fetch-provider-models';
 import { ai_gateway_sync_providers_state, modelsByProvider } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
-import { desc, lt, sql } from 'drizzle-orm';
+import { desc, eq, lt, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import { OPENROUTER, VERCEL_AI_GATEWAY } from '@/lib/ai-gateway/providers/provider-definitions';
 import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-change-log';
@@ -397,16 +397,24 @@ export async function syncAndStoreProviders() {
   const direct_byok_model_counts = await syncDirectByokModels();
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
-  const completed_at = new Date().toISOString();
-  await db
-    .insert(ai_gateway_sync_providers_state)
-    .values({ last_completed_at: completed_at })
-    .onConflictDoUpdate({
-      target: ai_gateway_sync_providers_state.id,
-      set: { last_completed_at: completed_at },
+  const completed_at = await db.transaction(async tx => {
+    await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
+    const [row] = await tx
+      .select({ id: ai_gateway_sync_providers_state.id })
+      .from(ai_gateway_sync_providers_state)
+      .where(eq(ai_gateway_sync_providers_state.id, 1))
+      .for('update');
+    if (!row) throw new Error('Sync-providers state row is missing');
+
+    const completedAt = new Date().toISOString();
+    await tx
+      .update(ai_gateway_sync_providers_state)
+      .set({ last_completed_at: completedAt })
+      .where(eq(ai_gateway_sync_providers_state.id, 1));
+    await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completedAt, {
+      ex: AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
     });
-  await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completed_at, {
-    ex: AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
+    return completedAt;
   });
 
   return {

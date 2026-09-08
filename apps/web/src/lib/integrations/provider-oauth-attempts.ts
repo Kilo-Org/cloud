@@ -5,6 +5,8 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
   github_app_installations,
+  kilocode_users,
+  organizations,
   platform_integrations,
   provider_oauth_attempts,
 } from '@kilocode/db/schema';
@@ -20,8 +22,30 @@ const ownerCondition = (owner: Owner) =>
     ? eq(provider_oauth_attempts.owned_by_organization_id, owner.id)
     : eq(provider_oauth_attempts.owned_by_user_id, owner.id);
 
-async function lockOwner(tx: DrizzleTransaction, owner: Owner) {
-  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
+export async function lockProviderOAuthOwnerRow(tx: DrizzleTransaction, owner: Owner) {
+  const rows =
+    owner.type === 'org'
+      ? await tx
+          .select({ id: organizations.id })
+          .from(organizations)
+          .where(eq(organizations.id, owner.id))
+          .for('update')
+      : await tx
+          .select({ id: kilocode_users.id })
+          .from(kilocode_users)
+          .where(eq(kilocode_users.id, owner.id))
+          .for('update');
+  if (rows.length !== 1) throw new Error('OAuth destination owner not found');
+}
+
+export async function pruneProviderOAuthAttempts(tx: DrizzleTransaction): Promise<void> {
+  const now = new Date().toISOString();
+  await tx.execute(
+    sql`WITH expired AS (SELECT id FROM ${provider_oauth_attempts} WHERE status IN ('pending', 'consumed') AND expires_at < ${now} ORDER BY expires_at LIMIT 100) UPDATE ${provider_oauth_attempts} attempts SET status = 'expired' FROM expired WHERE attempts.id = expired.id`
+  );
+  await tx.execute(
+    sql`DELETE FROM ${provider_oauth_attempts} WHERE id IN (SELECT id FROM ${provider_oauth_attempts} WHERE status = 'expired' AND expires_at < ${new Date(Date.now() - 24 * 60 * 60_000).toISOString()} ORDER BY expires_at LIMIT 100)`
+  );
 }
 
 async function assertOwnerHasNoSharedGitHubInstallation(tx: DrizzleTransaction, owner: Owner) {
@@ -50,9 +74,11 @@ export async function beginProviderOAuthAttempt(input: {
   owner: Owner;
   provider: ReservedOAuthProvider;
   state: string;
+  purpose?: 'provider_install';
 }): Promise<void> {
   await db.transaction(async tx => {
-    await lockOwner(tx, input.owner);
+    await lockProviderOAuthOwnerRow(tx, input.owner);
+    await pruneProviderOAuthAttempts(tx);
     await assertOwnerHasNoSharedGitHubInstallation(tx, input.owner);
     const now = new Date().toISOString();
     await tx
@@ -71,6 +97,7 @@ export async function beginProviderOAuthAttempt(input: {
       );
     await tx.insert(provider_oauth_attempts).values({
       provider: input.provider,
+      purpose: input.purpose ?? 'provider_install',
       state_hash: stateHash(input.state),
       initiated_by_user_id: input.actorUserId,
       owned_by_user_id: input.owner.type === 'user' ? input.owner.id : null,
@@ -85,9 +112,11 @@ export async function consumeProviderOAuthAttempt(input: {
   owner: Owner;
   provider: ReservedOAuthProvider;
   state: string;
+  purpose?: 'provider_install';
 }): Promise<boolean> {
   return db.transaction(async tx => {
-    await lockOwner(tx, input.owner);
+    await lockProviderOAuthOwnerRow(tx, input.owner);
+    await pruneProviderOAuthAttempts(tx);
     await assertOwnerHasNoSharedGitHubInstallation(tx, input.owner);
     const now = new Date().toISOString();
     await tx
@@ -97,6 +126,7 @@ export async function consumeProviderOAuthAttempt(input: {
         and(
           ownerCondition(input.owner),
           eq(provider_oauth_attempts.provider, input.provider),
+          eq(provider_oauth_attempts.purpose, input.purpose ?? 'provider_install'),
           or(
             eq(provider_oauth_attempts.status, 'pending'),
             eq(provider_oauth_attempts.status, 'consumed')
@@ -122,11 +152,40 @@ export async function consumeProviderOAuthAttempt(input: {
   });
 }
 
+export async function cancelProviderOAuthAttempt(input: {
+  actorUserId: string;
+  owner: Owner;
+  provider: ReservedOAuthProvider;
+  state: string;
+  purpose: 'provider_install';
+}): Promise<boolean> {
+  return db.transaction(async tx => {
+    await lockProviderOAuthOwnerRow(tx, input.owner);
+    await pruneProviderOAuthAttempts(tx);
+    const cancelled = await tx
+      .update(provider_oauth_attempts)
+      .set({ status: 'expired' })
+      .where(
+        and(
+          ownerCondition(input.owner),
+          eq(provider_oauth_attempts.provider, input.provider),
+          eq(provider_oauth_attempts.purpose, input.purpose),
+          eq(provider_oauth_attempts.initiated_by_user_id, input.actorUserId),
+          eq(provider_oauth_attempts.state_hash, stateHash(input.state)),
+          eq(provider_oauth_attempts.status, 'pending')
+        )
+      )
+      .returning({ id: provider_oauth_attempts.id });
+    return cancelled.length === 1;
+  });
+}
+
 export async function hasPendingProviderOAuthAttempt(
   tx: DrizzleTransaction,
   owners: Owner[]
 ): Promise<boolean> {
   const now = new Date().toISOString();
+  await pruneProviderOAuthAttempts(tx);
   const conditions = owners.map(owner => ownerCondition(owner));
   await tx
     .update(provider_oauth_attempts)

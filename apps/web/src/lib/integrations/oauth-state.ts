@@ -40,6 +40,7 @@ export type VerifiedOAuthState = {
   userId: string;
   /** Optional relative path to return to after the OAuth callback. */
   returnTo?: string;
+  purpose?: 'provider_install';
 };
 
 /**
@@ -48,12 +49,18 @@ export type VerifiedOAuthState = {
  * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
  * @param userId – the ID of the currently-authenticated user initiating the flow
  */
-export function createOAuthState(owner: string, userId: string, returnTo?: string): string {
+export function createOAuthState(
+  owner: string,
+  userId: string,
+  returnTo?: string,
+  purpose?: 'provider_install'
+): string {
   const safeReturnTo = returnTo ? validateReturnPath(returnTo) : null;
   return createSignedToken({
     owner,
     uid: userId,
     ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+    ...(purpose ? { purpose } : {}),
   });
 }
 
@@ -85,6 +92,7 @@ const OAuthStatePayloadSchema = z.object({
   iat: z.number().finite(),
   nonce: z.string().min(1),
   returnTo: z.unknown().optional(),
+  purpose: z.enum(['provider_install']).optional(),
 });
 
 export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerificationResult {
@@ -101,6 +109,7 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
         owner: parsed.data.owner,
         userId: parsed.data.uid,
         ...(returnTo ? { returnTo } : {}),
+        ...(parsed.data.purpose ? { purpose: parsed.data.purpose } : {}),
       };
     },
   });

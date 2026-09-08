@@ -32,6 +32,7 @@ import {
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromOwner,
   parseOAuthStateOwner,
+  cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
@@ -261,6 +262,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     }
 
     if (!code) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'linear' });
       captureMessage('Linear callback missing code', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
@@ -315,11 +317,13 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     }
 
     if (
+      verified.purpose === 'provider_install' &&
       !(await consumeProviderOAuthAttempt({
         actorUserId: user.id,
         owner,
         provider: 'linear',
         state,
+        purpose: 'provider_install',
       }))
     ) {
       throw new Error('Linear OAuth attempt is invalid, expired, or already used');

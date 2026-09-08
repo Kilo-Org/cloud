@@ -9,6 +9,10 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { beginProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
+import {
+  cancelProviderOAuthAttempt,
+  type ReservedOAuthProvider,
+} from '@/lib/integrations/provider-oauth-attempts';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { RetainedOAuthPlatform, StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
@@ -62,6 +66,27 @@ export function parseOAuthStateOwner(owner: string): Owner | null {
   }
 
   return null;
+}
+
+export async function cancelMissingCodeProviderOAuthAttempt(input: {
+  state: string | null;
+  user: AuthenticatedOAuthUser;
+  provider: ReservedOAuthProvider;
+}): Promise<boolean> {
+  const verified = verifyOAuthState(input.state);
+  if (!input.state || !verified || verified.purpose !== 'provider_install') return false;
+  if (verified.userId !== input.user.id) return false;
+  const owner = parseOAuthStateOwner(verified.owner);
+  if (!owner) return false;
+  if (owner.type === 'org') await ensureOrganizationAccess({ user: input.user }, owner.id);
+  else if (owner.id !== input.user.id) return false;
+  return cancelProviderOAuthAttempt({
+    actorUserId: input.user.id,
+    owner,
+    provider: input.provider,
+    state: input.state,
+    purpose: 'provider_install',
+  });
 }
 
 export function buildIntegrationOAuthRedirectPath(
@@ -187,9 +212,24 @@ export async function handleStatefulPlatformOAuthConnect(
     });
     const returnToParam = request.nextUrl.searchParams.get('returnTo');
     const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
-    const state = createOAuthState(ownerToOAuthStateOwner(owner), user.id, returnTo ?? undefined);
+    const purpose =
+      platform === 'slack' || platform === 'linear' || platform === 'discord'
+        ? 'provider_install'
+        : undefined;
+    const state = createOAuthState(
+      ownerToOAuthStateOwner(owner),
+      user.id,
+      returnTo ?? undefined,
+      purpose
+    );
     if (platform === 'slack' || platform === 'linear' || platform === 'discord') {
-      await beginProviderOAuthAttempt({ actorUserId: user.id, owner, provider: platform, state });
+      await beginProviderOAuthAttempt({
+        actorUserId: user.id,
+        owner,
+        provider: platform,
+        state,
+        purpose: 'provider_install',
+      });
     }
 
     return NextResponse.redirect(buildOAuthUrl(state));

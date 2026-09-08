@@ -4422,7 +4422,7 @@ export const provider_oauth_attempts = pgTable(
   {
     id: idPrimaryKeyColumn,
     provider: text().$type<'slack' | 'linear' | 'discord'>().notNull(),
-    purpose: text().notNull().default('install'),
+    purpose: text().$type<'provider_install'>().notNull().default('provider_install'),
     state_hash: text().notNull().unique(),
     initiated_by_user_id: text()
       .notNull()
@@ -4443,6 +4443,7 @@ export const provider_oauth_attempts = pgTable(
       'provider_oauth_attempts_status_check',
       sql`${table.status} IN ('pending', 'consumed', 'expired')`
     ),
+    check('provider_oauth_attempts_purpose_check', sql`${table.purpose} = 'provider_install'`),
     check(
       'provider_oauth_attempts_owner_check',
       sql`num_nonnulls(${table.owned_by_user_id}, ${table.owned_by_organization_id}) = 1`
@@ -4453,6 +4454,7 @@ export const provider_oauth_attempts = pgTable(
     uniqueIndex('UQ_provider_oauth_attempts_org_pending')
       .on(table.owned_by_organization_id, table.provider)
       .where(sql`${table.status} = 'pending' AND ${table.owned_by_organization_id} IS NOT NULL`),
+    index('IDX_provider_oauth_attempts_expires_at').on(table.expires_at),
   ]
 );
 

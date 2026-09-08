@@ -21,6 +21,7 @@ import {
   organization_user_limits,
   organization_user_usage,
   organizations,
+  provider_oauth_attempts,
   external_side_effect_outbox,
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@/lib/drizzle';
@@ -1080,6 +1081,9 @@ export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction
 ): Promise<void> {
+  await (txn ?? db)
+    .delete(provider_oauth_attempts)
+    .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));
   await (txn ?? db)
     .update(organizations)
     .set({ ...auto_deleted_at })

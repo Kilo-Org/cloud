@@ -102,6 +102,7 @@ import {
   github_install_states,
   github_connection_attempts,
   github_app_installations,
+  provider_oauth_attempts,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -1084,6 +1085,14 @@ export async function anonymizeCloudUserData(
   tx: DrizzleTransaction,
   userId: string
 ): Promise<void> {
+  await tx
+    .delete(provider_oauth_attempts)
+    .where(
+      or(
+        eq(provider_oauth_attempts.initiated_by_user_id, userId),
+        eq(provider_oauth_attempts.owned_by_user_id, userId)
+      )
+    );
   const [user] = await tx
     .select()
     .from(kilocode_users)

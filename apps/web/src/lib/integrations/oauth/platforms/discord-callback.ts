@@ -12,6 +12,7 @@ import {
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
+  cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
@@ -56,6 +57,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
     // Validate code is present
     if (!code) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'discord' });
       captureMessage('Discord callback missing code', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
@@ -114,11 +116,13 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     }
 
     if (
+      verified.purpose === 'provider_install' &&
       !(await consumeProviderOAuthAttempt({
         actorUserId: user.id,
         owner,
         provider: 'discord',
         state,
+        purpose: 'provider_install',
       }))
     ) {
       throw new Error('Discord OAuth attempt is invalid, expired, or already used');

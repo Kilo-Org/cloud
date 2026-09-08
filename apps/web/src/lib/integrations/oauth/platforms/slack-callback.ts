@@ -17,6 +17,7 @@ import {
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
+  cancelMissingCodeProviderOAuthAttempt,
 } from '@/lib/integrations/oauth/common';
 import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
@@ -63,6 +64,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // Validate code is present
     if (!code) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'slack' });
       captureMessage('Slack callback missing code', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
@@ -121,11 +123,13 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     }
 
     if (
+      verified.purpose === 'provider_install' &&
       !(await consumeProviderOAuthAttempt({
         actorUserId: user.id,
         owner,
         provider: 'slack',
         state,
+        purpose: 'provider_install',
       }))
     ) {
       throw new Error('Slack OAuth attempt is invalid, expired, or already used');

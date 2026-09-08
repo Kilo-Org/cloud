@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" എന്ന ഏജന്റ് ലോക്ക് ചെയ്തു",
       "addToFavorites": "{{name}} പ്രിയപ്പെട്ടവയിലേക്ക് ചേർക്കുക",
       "removeFromFavorites": "{{name}} പ്രിയപ്പെട്ടവയിൽ നിന്ന് നീക്കം ചെയ്യുക",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "ഇടത്തരം",
       "sessionModel": "സെഷൻ മോഡൽ"
     },
     "attachmentPreview": {

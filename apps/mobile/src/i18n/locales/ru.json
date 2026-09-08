@@ -1914,8 +1914,6 @@
       "lockedByAgent": ", Заблокировано агентом «{{agent}}»",
       "addToFavorites": "Добавить {{name}} в избранное",
       "removeFromFavorites": "Убрать {{name}} из избранного",
-      "thinkingEffortXhigh": "ОЧ. ВЫС.",
-      "thinkingEffortMedium": "Сред.",
       "sessionModel": "Модель сеанса"
     },
     "attachmentPreview": {

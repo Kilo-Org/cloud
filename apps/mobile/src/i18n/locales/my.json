@@ -2319,8 +2319,6 @@
       "lockedByAgent": "၊ အေးဂျင့် “{{agent}}” က ပြောင်းလဲခွင့်ပိတ်ထားသည်",
       "addToFavorites": "{{name}} ကို စိတ်ကြိုက်များသို့ ထည့်ပါ",
       "removeFromFavorites": "{{name}} ကို စိတ်ကြိုက်များမှ ဖယ်ရှားပါ",
-      "thinkingEffortXhigh": "အလွန်မြင့်",
-      "thinkingEffortMedium": "အလယ်အလတ်",
       "sessionModel": "စက်ရှင်မော်ဒယ်"
     },
     "attachmentPreview": {

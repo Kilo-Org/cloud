@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", I bllokuar nga agjenti «{{agent}}»",
       "addToFavorites": "Shto {{name}} te të preferuarat",
       "removeFromFavorites": "Hiq {{name}} nga të preferuarat",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mes",
       "sessionModel": "Modeli i seancës"
     },
     "attachmentPreview": {

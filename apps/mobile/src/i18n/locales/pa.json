@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", ਏਜੰਟ \"{{agent}}\" ਦੁਆਰਾ ਲਾਕ ਕੀਤਾ ਗਿਆ",
       "addToFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਸੂਚੀ ਵਿੱਚ ਜੋੜੋ",
       "removeFromFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਸੂਚੀ ਤੋਂ ਹਟਾਓ",
-      "thinkingEffortXhigh": "ਬਹੁਤ ਉੱਚਾ",
-      "thinkingEffortMedium": "ਦਰਮਿਆਨਾ",
       "sessionModel": "ਸੈਸ਼ਨ ਦਾ ਮਾਡਲ"
     },
     "attachmentPreview": {

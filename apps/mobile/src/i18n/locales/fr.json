@@ -1813,8 +1813,6 @@
       "lockedByAgent": ", Verrouillé par l'agent « {{agent}} »",
       "addToFavorites": "Ajouter {{name}} aux favoris",
       "removeFromFavorites": "Retirer {{name}} des favoris",
-      "thinkingEffortXhigh": "TÉ",
-      "thinkingEffortMedium": "Moy.",
       "sessionModel": "Modèle de la session"
     },
     "attachmentPreview": {

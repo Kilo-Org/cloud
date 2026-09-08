@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Nohidin'ny mpanampy \"{{agent}}\"",
       "addToFavorites": "Ampio ao amin'ny ankafizinao ny {{name}}",
       "removeFromFavorites": "Esory ao amin'ny ankafizinao ny {{name}}",
-      "thinkingEffortXhigh": "AVO BE",
-      "thinkingEffortMedium": "Ant.",
       "sessionModel": "Modelin'ny fotoam-piasana"
     },
     "attachmentPreview": {

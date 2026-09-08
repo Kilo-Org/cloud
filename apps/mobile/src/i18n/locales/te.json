@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" ఏజెంట్ దీన్ని మార్చకుండా లాక్ చేసింది",
       "addToFavorites": "{{name}}ను ఇష్టమైనవాటికి జోడించండి",
       "removeFromFavorites": "{{name}}ను ఇష్టమైనవాటి నుండి తీసివేయండి",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "మధ్యస్థం",
       "sessionModel": "సెషన్ మోడల్"
     },
     "attachmentPreview": {

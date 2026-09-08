@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", एजेन्ट \"{{agent}}\" ले परिवर्तन गर्न नमिल्ने बनाएको",
       "addToFavorites": "मनपर्नेमा {{name}} थप्नुहोस्",
       "removeFromFavorites": "मनपर्नेबाट {{name}} हटाउनुहोस्",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "मध्यम",
       "sessionModel": "सत्रको मोडेल"
     },
     "attachmentPreview": {

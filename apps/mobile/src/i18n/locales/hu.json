@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Zároló ügynök: „{{agent}}”",
       "addToFavorites": "{{name}} hozzáadása a kedvencekhez",
       "removeFromFavorites": "{{name}} eltávolítása a kedvencekből",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Köz.",
       "sessionModel": "A munkamenet modellje"
     },
     "attachmentPreview": {

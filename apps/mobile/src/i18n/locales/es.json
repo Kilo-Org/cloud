@@ -1901,8 +1901,6 @@
       "lockedByAgent": ", Bloqueado por el agente «{{agent}}»",
       "addToFavorites": "Añadir {{name}} a favoritos",
       "removeFromFavorites": "Quitar {{name}} de favoritos",
-      "thinkingEffortXhigh": "MA",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Modelo de la sesión"
     },
     "attachmentPreview": {

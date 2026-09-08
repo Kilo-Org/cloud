@@ -1888,8 +1888,6 @@
       "lockedByAgent": "，已由智能体“{{agent}}”锁定",
       "addToFavorites": "将 {{name}} 添加到收藏",
       "removeFromFavorites": "从收藏中移除 {{name}}",
-      "thinkingEffortXhigh": "超高",
-      "thinkingEffortMedium": "中",
       "sessionModel": "会话模型"
     },
     "attachmentPreview": {

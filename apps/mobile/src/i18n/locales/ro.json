@@ -2339,8 +2339,6 @@
       "lockedByAgent": ", Blocat de agentul „{{agent}}”",
       "addToFavorites": "Adaugă {{name}} la favorite",
       "removeFromFavorites": "Elimină {{name}} din favorite",
-      "thinkingEffortXhigh": "F. RID.",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Modelul sesiunii"
     },
     "attachmentPreview": {

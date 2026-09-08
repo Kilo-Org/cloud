@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" या एजंटने लॉक केलेले",
       "addToFavorites": "{{name}} आवडत्या मॉडेलमध्ये जोडा",
       "removeFromFavorites": "{{name}} आवडत्या मॉडेलमधून काढा",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "मध्यम",
       "sessionModel": "सत्राचे मॉडेल"
     },
     "attachmentPreview": {

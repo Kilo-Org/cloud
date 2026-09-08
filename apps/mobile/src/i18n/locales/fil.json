@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Ni-lock ng ahenteng \"{{agent}}\"",
       "addToFavorites": "Idagdag ang {{name}} sa mga paborito",
       "removeFromFavorites": "Alisin ang {{name}} sa mga paborito",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Kat.",
       "sessionModel": "Modelo ng sesyon"
     },
     "attachmentPreview": {

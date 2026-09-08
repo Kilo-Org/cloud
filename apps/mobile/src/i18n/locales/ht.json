@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Bloke pa ajan \"{{agent}}\"",
       "addToFavorites": "Ajoute {{name}} nan favori",
       "removeFromFavorites": "Retire {{name}} nan favori",
-      "thinkingEffortXhigh": "TW",
-      "thinkingEffortMedium": "Mway.",
       "sessionModel": "Modèl sesyon"
     },
     "attachmentPreview": {

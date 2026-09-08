@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Κλειδωμένο από τον πράκτορα «{{agent}}»",
       "addToFavorites": "Προσθήκη του {{name}} στα αγαπημένα",
       "removeFromFavorites": "Αφαίρεση του {{name}} από τα αγαπημένα",
-      "thinkingEffortXhigh": "ΠΥ",
-      "thinkingEffortMedium": "Μέσ.",
       "sessionModel": "Μοντέλο συνεδρίας"
     },
     "attachmentPreview": {

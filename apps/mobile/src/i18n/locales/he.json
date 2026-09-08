@@ -1901,8 +1901,6 @@
       "lockedByAgent": ", נעול על ידי הסוכן \"{{agent}}\"",
       "addToFavorites": "הוספת {{name}} למועדפים",
       "removeFromFavorites": "הסרת {{name}} מהמועדפים",
-      "thinkingEffortXhigh": "גבוה מאוד",
-      "thinkingEffortMedium": "בינוני",
       "sessionModel": "המודל של הסשן"
     },
     "attachmentPreview": {

@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", «{{agent}}» agenti tərəfindən kilidlənib",
       "addToFavorites": "{{name}} modelini sevimlilərə əlavə et",
       "removeFromFavorites": "{{name}} modelini sevimlilərdən sil",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Orta",
       "sessionModel": "Sessiya modeli"
     },
     "attachmentPreview": {

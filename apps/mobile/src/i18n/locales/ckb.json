@@ -2319,8 +2319,6 @@
       "lockedByAgent": "، لەلایەن ئەجێنتی «{{agent}}» ـەوە قوفڵ کراوە",
       "addToFavorites": "زیادکردنی {{name}} بۆ دڵخوازەکان",
       "removeFromFavorites": "لابردنی {{name}} لە دڵخوازەکان",
-      "thinkingEffortXhigh": "زۆر بەرز",
-      "thinkingEffortMedium": "مامناوەند",
       "sessionModel": "مۆدێلی سێشن"
     },
     "attachmentPreview": {

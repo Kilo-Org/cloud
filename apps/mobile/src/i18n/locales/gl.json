@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Bloqueado polo axente «{{agent}}»",
       "addToFavorites": "Engadir {{name}} aos favoritos",
       "removeFromFavorites": "Eliminar {{name}} dos favoritos",
-      "thinkingEffortXhigh": "MA",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Modelo da sesión"
     },
     "attachmentPreview": {

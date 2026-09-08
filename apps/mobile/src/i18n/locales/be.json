@@ -2359,8 +2359,6 @@
       "lockedByAgent": ", Заблакавана агентам «{{agent}}»",
       "addToFavorites": "Дадаць {{name}} у абранае",
       "removeFromFavorites": "Прыбраць {{name}} з абранага",
-      "thinkingEffortXhigh": "ВВ",
-      "thinkingEffortMedium": "Сяр.",
       "sessionModel": "Мадэль сеанса"
     },
     "attachmentPreview": {

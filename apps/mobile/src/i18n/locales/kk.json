@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", «{{agent}}» агенті бекіткен",
       "addToFavorites": "{{name}} моделін таңдаулыларға қосу",
       "removeFromFavorites": "{{name}} моделін таңдаулылардан алып тастау",
-      "thinkingEffortXhigh": "ӨЖ",
-      "thinkingEffortMedium": "Орта",
       "sessionModel": "Сессия моделі"
     },
     "attachmentPreview": {

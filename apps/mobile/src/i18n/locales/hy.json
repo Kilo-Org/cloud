@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Կողպված է «{{agent}}» գործակալի կողմից",
       "addToFavorites": "Ավելացնել {{name}}-ը նախընտրածներին",
       "removeFromFavorites": "Հեռացնել {{name}}-ը նախընտրածներից",
-      "thinkingEffortXhigh": "ՇԲ",
-      "thinkingEffortMedium": "Միջ.",
       "sessionModel": "Նիստի մոդել"
     },
     "attachmentPreview": {

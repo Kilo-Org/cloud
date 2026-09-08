@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Imefungwa na wakala \"{{agent}}\"",
       "addToFavorites": "Ongeza {{name}} kwenye vipendwa",
       "removeFromFavorites": "Ondoa {{name}} kwenye vipendwa",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Wast.",
       "sessionModel": "Modeli ya kikao"
     },
     "attachmentPreview": {

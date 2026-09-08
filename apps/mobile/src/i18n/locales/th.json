@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", ถูกล็อกโดยเอเจนต์ \"{{agent}}\"",
       "addToFavorites": "เพิ่ม {{name}} ในรายการโปรด",
       "removeFromFavorites": "นำ {{name}} ออกจากรายการโปรด",
-      "thinkingEffortXhigh": "สูงมาก",
-      "thinkingEffortMedium": "กลาง",
       "sessionModel": "โมเดลของเซสชัน"
     },
     "attachmentPreview": {

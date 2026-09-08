@@ -1888,8 +1888,6 @@
       "lockedByAgent": ", 에이전트 \"{{agent}}\"에서 고정한 설정",
       "addToFavorites": "{{name}} 즐겨찾기에 추가",
       "removeFromFavorites": "{{name}} 즐겨찾기에서 제거",
-      "thinkingEffortXhigh": "매우 높음",
-      "thinkingEffortMedium": "보통",
       "sessionModel": "세션 모델"
     },
     "attachmentPreview": {

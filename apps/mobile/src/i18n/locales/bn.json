@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" এজেন্ট লক করেছে",
       "addToFavorites": "{{name}} পছন্দের তালিকায় যোগ করুন",
       "removeFromFavorites": "{{name}} পছন্দের তালিকা থেকে সরান",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "মাঝারি",
       "sessionModel": "সেশনের মডেল"
     },
     "attachmentPreview": {

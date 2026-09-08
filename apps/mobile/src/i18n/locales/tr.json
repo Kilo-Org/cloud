@@ -1888,8 +1888,6 @@
       "lockedByAgent": ", \"{{agent}}\" ajanı tarafından kilitlendi",
       "addToFavorites": "{{name}} modelini favorilere ekle",
       "removeFromFavorites": "{{name}} modelini favorilerden kaldır",
-      "thinkingEffortXhigh": "ÇY",
-      "thinkingEffortMedium": "Orta",
       "sessionModel": "Oturum modeli"
     },
     "attachmentPreview": {

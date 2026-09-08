@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", ລັອກໂດຍເອເຈນ \"{{agent}}\"",
       "addToFavorites": "ເພີ່ມ {{name}} ໃສ່ລາຍການທີ່ມັກ",
       "removeFromFavorites": "ເອົາ {{name}} ອອກຈາກລາຍການທີ່ມັກ",
-      "thinkingEffortXhigh": "ສູງພິເສດ",
-      "thinkingEffortMedium": "ປານກາງ",
       "sessionModel": "ໂມເດວຂອງເຊດຊັນ"
     },
     "attachmentPreview": {

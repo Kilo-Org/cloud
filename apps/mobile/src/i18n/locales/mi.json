@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Kua maukatihia e te māngai \"{{agent}}\"",
       "addToFavorites": "Tāpirihia a {{name}} ki ngā makau",
       "removeFromFavorites": "Tangohia {{name}} i ngā makau",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Waenga",
       "sessionModel": "Te tauira o te wātū"
     },
     "attachmentPreview": {

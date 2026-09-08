@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Kukhiywe umenzeli othi \"{{agent}}\"",
       "addToFavorites": "Engeza {{name}} kokuthandwayo",
       "removeFromFavorites": "Susa {{name}} kokuthandwayo",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Maph.",
       "sessionModel": "Imodeli yeseshini"
     },
     "attachmentPreview": {

@@ -1888,8 +1888,6 @@
       "lockedByAgent": ", Do tác nhân \"{{agent}}\" khóa",
       "addToFavorites": "Thêm {{name}} vào mục yêu thích",
       "removeFromFavorites": "Xóa {{name}} khỏi mục yêu thích",
-      "thinkingEffortXhigh": "RẤT CAO",
-      "thinkingEffortMedium": "TB",
       "sessionModel": "Mô hình của phiên"
     },
     "attachmentPreview": {

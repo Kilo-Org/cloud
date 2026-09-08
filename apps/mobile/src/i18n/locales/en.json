@@ -2343,8 +2343,6 @@
       "lockedByAgent": ", Locked by agent \"{{agent}}\"",
       "addToFavorites": "Add {{name}} to favorites",
       "removeFromFavorites": "Remove {{name}} from favorites",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Med",
       "sessionModel": "Session model"
     },
     "attachmentPreview": {

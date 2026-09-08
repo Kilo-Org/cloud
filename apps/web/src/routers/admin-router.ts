@@ -26,6 +26,7 @@ import {
   kiloclaw_instances,
   organizations,
   modelsByProvider,
+  ai_gateway_sync_providers_state,
   api_request_log,
 } from '@kilocode/db/schema';
 import { isGoneOrDeletingBlockedReason } from '@kilocode/db/user-soft-delete';
@@ -34,8 +35,6 @@ import { fetchSessionSnapshot } from '@/lib/session-ingest-client';
 import { sortSessionMessagesForDisplay } from '@/lib/cloud-agent-next/message-ordering';
 import { postTestStaleSyncAlert } from '@/lib/ai-gateway/providers/openrouter/sync-providers-stale-alert';
 import { syncAndStoreProviders } from '@/lib/ai-gateway/providers/openrouter/sync-providers';
-import { redisClient } from '@/lib/redis';
-import { SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY } from '@/lib/redis-keys';
 import { adminAppBuilderRouter } from '@/routers/admin-app-builder-router';
 import { adminDeploymentsRouter } from '@/routers/admin-deployments-router';
 import { adminKiloclawInstancesRouter } from '@/routers/admin-kiloclaw-instances-router';
@@ -2303,14 +2302,19 @@ export const adminRouter = createTRPCRouter({
       return { delivery };
     }),
     getLastSync: adminProcedure.query(async () => {
-      const [[latest], lastCompletedAt] = await Promise.all([
+      const [[latest], [syncState]] = await Promise.all([
         db
           .select({ id: modelsByProvider.id, data: modelsByProvider.data })
           .from(modelsByProvider)
           .orderBy(desc(modelsByProvider.id))
           .limit(1),
-        redisClient.get<string>(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY),
+        db
+          .select({ lastCompletedAt: ai_gateway_sync_providers_state.last_completed_at })
+          .from(ai_gateway_sync_providers_state)
+          .where(eq(ai_gateway_sync_providers_state.id, 1))
+          .limit(1),
       ]);
+      const lastCompletedAt = syncState?.lastCompletedAt ?? null;
       if (!latest && !lastCompletedAt) return null;
       return {
         id: latest?.id ?? null,

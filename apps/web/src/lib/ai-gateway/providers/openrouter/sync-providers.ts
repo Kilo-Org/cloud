@@ -23,7 +23,10 @@ import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
 import { redisClient } from '@/lib/redis';
-import { SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY } from '@/lib/redis-keys';
+import {
+  AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
+  SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
+} from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -395,7 +398,6 @@ export async function syncAndStoreProviders() {
   console.log('[syncAndStoreProviders] direct-byok model counts:', direct_byok_model_counts);
 
   const completed_at = new Date().toISOString();
-  await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completed_at);
   await db
     .insert(ai_gateway_sync_providers_state)
     .values({ last_completed_at: completed_at })
@@ -403,6 +405,9 @@ export async function syncAndStoreProviders() {
       target: ai_gateway_sync_providers_state.id,
       set: { last_completed_at: completed_at },
     });
+  await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completed_at, {
+    ex: AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
+  });
 
   return {
     id: result.id,

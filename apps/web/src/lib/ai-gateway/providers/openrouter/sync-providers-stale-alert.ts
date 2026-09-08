@@ -6,16 +6,17 @@ import { APP_URL } from '@/lib/constants';
 import { db } from '@/lib/drizzle';
 import { redisClient } from '@/lib/redis';
 import {
-  SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
+  AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
   SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY,
 } from '@/lib/redis-keys';
 import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
 } from '@/lib/slack/admin-notifications';
+import { eq } from 'drizzle-orm';
 
 export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;
-export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 3 * 24 * 60 * 60;
+export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = AI_GATEWAY_STATE_REDIS_TTL_SECONDS;
 
 const STALE_WINDOW_LABEL = 'hour';
 const STATUS_COPY = `No full sync has completed within the past ${STALE_WINDOW_LABEL}.`;
@@ -167,17 +168,24 @@ type StaleAlertDependencies = {
 };
 
 async function defaultGetLastCompletedAt(): Promise<string | null> {
-  return redisClient.get<string>(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY);
+  const [row] = await db
+    .select({ lastCompletedAt: ai_gateway_sync_providers_state.last_completed_at })
+    .from(ai_gateway_sync_providers_state)
+    .where(eq(ai_gateway_sync_providers_state.id, 1))
+    .limit(1);
+  return row?.lastCompletedAt ?? null;
 }
 
 async function defaultGetLastAlertAt(): Promise<string | null> {
-  return redisClient.get<string>(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY);
+  const [row] = await db
+    .select({ lastAlertAt: ai_gateway_sync_providers_state.stale_alert_last_posted_at })
+    .from(ai_gateway_sync_providers_state)
+    .where(eq(ai_gateway_sync_providers_state.id, 1))
+    .limit(1);
+  return row?.lastAlertAt ?? null;
 }
 
 async function defaultSetLastAlertAt(iso: string): Promise<unknown> {
-  const result = await redisClient.set(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY, iso, {
-    ex: SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
-  });
   await db
     .insert(ai_gateway_sync_providers_state)
     .values({ stale_alert_last_posted_at: iso })
@@ -185,7 +193,9 @@ async function defaultSetLastAlertAt(iso: string): Promise<unknown> {
       target: ai_gateway_sync_providers_state.id,
       set: { stale_alert_last_posted_at: iso },
     });
-  return result;
+  return redisClient.set(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY, iso, {
+    ex: SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
+  });
 }
 
 export async function postStaleSyncAlert(input: {

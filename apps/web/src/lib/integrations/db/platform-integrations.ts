@@ -55,6 +55,38 @@ export async function findIntegrationByInstallationId(
   return integration || null;
 }
 
+export async function findIntegrationByInstallationIdForOwner(
+  owner: Owner,
+  platform: (typeof PLATFORM)[keyof typeof PLATFORM],
+  platformInstallationId: string,
+  githubAppType?: GitHubAppType
+) {
+  const appTypeCondition =
+    githubAppType === 'standard'
+      ? or(
+          eq(platform_integrations.github_app_type, 'standard'),
+          isNull(platform_integrations.github_app_type)
+        )
+      : githubAppType
+        ? eq(platform_integrations.github_app_type, githubAppType)
+        : undefined;
+  const [integration] = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        owner.type === 'user'
+          ? eq(platform_integrations.owned_by_user_id, owner.id)
+          : eq(platform_integrations.owned_by_organization_id, owner.id),
+        eq(platform_integrations.platform, platform),
+        eq(platform_integrations.platform_installation_id, platformInstallationId),
+        appTypeCondition
+      )
+    )
+    .limit(1);
+  return integration;
+}
+
 /**
  * Gets an organization's preferred integration, including an unhealthy row
  * when no healthy integration exists. Use this for status and recovery UI.

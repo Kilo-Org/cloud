@@ -1362,6 +1362,11 @@ export async function anonymizeCloudUserData(
     .delete(github_connection_attempts)
     .where(eq(github_connection_attempts.kilo_user_id, userId));
 
+  const githubUserIds = await tx
+    .select({ id: user_github_app_tokens.github_user_id })
+    .from(user_github_app_tokens)
+    .where(eq(user_github_app_tokens.kilo_user_id, userId));
+
   await tx.execute(sql`
     DELETE FROM ${github_app_installations} canonical
     USING ${platform_integrations} owned
@@ -1374,6 +1379,20 @@ export async function anonymizeCloudUserData(
           AND retained.id <> owned.id
       )
   `);
+  if (githubUserIds.length > 0) {
+    await tx.execute(sql`
+      DELETE FROM ${github_app_installations} canonical
+      WHERE canonical.account_type = 'User'
+        AND canonical.account_id IN (${sql.join(
+          githubUserIds.map(user => sql`${user.id}`),
+          sql`, `
+        )})
+        AND NOT EXISTS (
+          SELECT 1 FROM ${platform_integrations} retained
+          WHERE retained.github_installation_id = canonical.id
+        )
+    `);
+  }
 
   await tx.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
   await tx.execute(sql`

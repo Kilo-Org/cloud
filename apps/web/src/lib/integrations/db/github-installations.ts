@@ -151,7 +151,7 @@ export async function connectVerifiedGitHubInstallation(
       })
       .where(eq(github_app_installations.id, canonical.id));
 
-    const [existing] = await tx
+    const existingMatches = await tx
       .select()
       .from(platform_integrations)
       .where(
@@ -161,7 +161,13 @@ export async function connectVerifiedGitHubInstallation(
           effectiveAppTypeCondition(data.githubAppType)
         )
       )
+      .limit(2)
       .for('update');
+
+    if (existingMatches.length > 1) {
+      return { ok: false, reason: 'installation_unavailable' };
+    }
+    const existing = existingMatches[0];
 
     if (existing) {
       const sameOwner =

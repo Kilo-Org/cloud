@@ -339,7 +339,7 @@ describe('GitHub installation persistence', () => {
       db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
     ).resolves.toMatchObject({ github_installation_id: expect.any(String) });
     await expect(db.select().from(github_app_installations)).resolves.toEqual([
-      expect.objectContaining({ installation_id: '5555', lifecycle_state: 'unknown' }),
+      expect.objectContaining({ installation_id: '5555', lifecycle_state: 'active' }),
     ]);
   });
 
@@ -363,6 +363,7 @@ describe('GitHub installation persistence', () => {
       skippedInvalid: 0,
       skippedDeduplicated: 1,
       skippedAmbiguous: 0,
+      skippedUnhealthy: 0,
       scanComplete: true,
       nextCursor: null,
     });

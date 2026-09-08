@@ -25,6 +25,7 @@ import { randomUUID } from 'node:crypto';
 import type { Owner } from '@/lib/integrations/core/types';
 import {
   findIntegrationByInstallationId,
+  findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
@@ -85,6 +86,7 @@ jest.mock('@/routers/organizations/utils', () => ({
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   createPendingIntegration: jest.fn(),
   findIntegrationByInstallationId: jest.fn(),
+  findIntegrationByInstallationIdForOwner: jest.fn(),
   findPendingInstallationByRequesterId: jest.fn(),
   upsertPlatformIntegrationForOwner: jest.fn(async () => ({ ok: true })),
 }));
@@ -111,6 +113,9 @@ const mockedExchangeGitHubOAuthCode = jest.mocked(exchangeGitHubOAuthCode);
 const mockedLinkKiloUser = jest.mocked(linkKiloUser);
 const mockedBot = jest.mocked(bot);
 const mockedFindIntegrationByInstallationId = jest.mocked(findIntegrationByInstallationId);
+const mockedFindIntegrationByInstallationIdForOwner = jest.mocked(
+  findIntegrationByInstallationIdForOwner
+);
 const mockedCreateAppAuth = jest.mocked(createAppAuth);
 const mockedOctokit = jest.mocked(Octokit);
 const mockedUpsertPlatformIntegrationForOwner = jest.mocked(upsertPlatformIntegrationForOwner);
@@ -153,6 +158,12 @@ beforeEach(() => {
         owned_by_user_id: writtenOwner.type === 'user' ? writtenOwner.id : null,
         owned_by_organization_id: writtenOwner.type === 'org' ? writtenOwner.id : null,
         github_app_type: 'standard',
+      }) as never
+  );
+  mockedFindIntegrationByInstallationIdForOwner.mockImplementation(
+    async () =>
+      ({
+        id: '00000000-0000-4000-8000-000000000099',
       }) as never
   );
   mockedExchangeGitHubOAuthCode.mockResolvedValue({

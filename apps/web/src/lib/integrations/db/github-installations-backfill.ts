@@ -12,6 +12,7 @@ export type GitHubInstallationBackfillResult = {
   skippedInvalid: number;
   skippedDeduplicated: number;
   skippedAmbiguous: number;
+  skippedUnhealthy: number;
   scanComplete: boolean;
   nextCursor: string | null;
 };
@@ -43,6 +44,7 @@ export async function backfillGitHubInstallations(
     skippedInvalid: 0,
     skippedDeduplicated: 0,
     skippedAmbiguous: 0,
+    skippedUnhealthy: 0,
     scanComplete,
     nextCursor: scanComplete ? null : (rows.at(-1)?.id ?? null),
   };
@@ -66,6 +68,16 @@ export async function backfillGitHubInstallations(
       result.skippedInvalid++;
       continue;
     }
+    if (
+      row.github_disconnected_at ||
+      row.suspended_at ||
+      row.auth_invalid_at ||
+      !['standard', 'lite', null].includes(row.github_app_type)
+    ) {
+      result.skipped++;
+      result.skippedUnhealthy++;
+      continue;
+    }
     const appType = row.github_app_type ?? 'standard';
     const peers = await db
       .select({ id: platform_integrations.id })
@@ -74,6 +86,10 @@ export async function backfillGitHubInstallations(
         and(
           eq(platform_integrations.platform, 'github'),
           eq(platform_integrations.platform_installation_id, installationId),
+          eq(platform_integrations.integration_status, 'active'),
+          isNull(platform_integrations.github_disconnected_at),
+          isNull(platform_integrations.suspended_at),
+          isNull(platform_integrations.auth_invalid_at),
           appType === 'standard'
             ? sql`(${platform_integrations.github_app_type} = 'standard' OR ${platform_integrations.github_app_type} IS NULL)`
             : eq(platform_integrations.github_app_type, appType)
@@ -98,7 +114,7 @@ export async function backfillGitHubInstallations(
           repository_access: row.repository_access,
           repositories: row.repositories,
           repositories_synced_at: row.repositories_synced_at,
-          lifecycle_state: 'unknown',
+          lifecycle_state: 'active',
           observed_at: row.installed_at,
         })
         .onConflictDoNothing()
@@ -121,7 +137,11 @@ export async function backfillGitHubInstallations(
         .where(
           and(
             eq(platform_integrations.id, row.id),
-            isNull(platform_integrations.github_installation_id)
+            isNull(platform_integrations.github_installation_id),
+            eq(platform_integrations.integration_status, 'active'),
+            isNull(platform_integrations.github_disconnected_at),
+            isNull(platform_integrations.suspended_at),
+            isNull(platform_integrations.auth_invalid_at)
           )
         );
       if ((updated.rowCount ?? 0) === 1) result.linked++;

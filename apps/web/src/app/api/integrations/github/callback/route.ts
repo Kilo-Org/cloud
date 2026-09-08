@@ -25,6 +25,7 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
   findIntegrationByInstallationId,
+  findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
 import type {
@@ -690,12 +691,15 @@ async function handleCoreInstallFlow(params: {
       state: 'active',
       accountId,
       accountLogin,
-      accountType: verifiedAccountType ?? ('login' in account ? 'User' : 'Organization'),
+      accountType:
+        verifiedAccountType ??
+        (installation.target_type === 'Organization' ? 'Organization' : 'User'),
       permissions: installation.permissions as IntegrationPermissions,
       scopes: installation.events || [],
       repositoryAccess: installation.repository_selection,
     });
-    const writtenIntegration = await findIntegrationByInstallationId(
+    const writtenIntegration = await findIntegrationByInstallationIdForOwner(
+      owner,
       PLATFORM.GITHUB,
       installationId,
       githubAppType

@@ -22,6 +22,8 @@ import { PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS } from '@/lib/integrations/o
 
 const mockIsEnabledForBot = jest.fn();
 const mockHandleOAuthCallback = jest.fn();
+const mockConsumeProviderOAuthAttempt = jest.fn(async (_input: unknown) => true);
+const mockCancelProviderOAuthAttempt = jest.fn(async (_input: unknown) => true);
 const mockLinearOrganization = jest.fn(async () => ({ name: 'Acme Workspace', urlKey: 'acme' }));
 
 jest.mock('@linear/sdk', () => ({
@@ -50,8 +52,8 @@ jest.mock('@/lib/integrations/linear-service', () => {
   };
 });
 jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
-  consumeProviderOAuthAttempt: jest.fn(async () => true),
-  cancelProviderOAuthAttempt: jest.fn(async () => true),
+  consumeProviderOAuthAttempt: (input: unknown) => mockConsumeProviderOAuthAttempt(input),
+  cancelProviderOAuthAttempt: (input: unknown) => mockCancelProviderOAuthAttempt(input),
 }));
 jest.mock('@/lib/bot-identity', () => ({
   linkKiloUser: jest.fn(async () => undefined),
@@ -120,6 +122,8 @@ async function callLinearCallback(request: NextRequest) {
 describe('GET /api/integrations/linear/callback', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockConsumeProviderOAuthAttempt.mockResolvedValue(true);
+    mockCancelProviderOAuthAttempt.mockResolvedValue(true);
 
     // Install-flow tests must take the install branch, not the bot-link
     // branch — explicitly null out the bot-link state so the dispatcher
@@ -166,6 +170,10 @@ describe('GET /api/integrations/linear/callback', () => {
     );
 
     expectRedirectLocation(response, '/integrations/linear?error=access_denied');
+    expect(mockCancelProviderOAuthAttempt).toHaveBeenCalledTimes(1);
+    expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
   });
 
   test('redirects oauth errors to returnTo when signed state carries one', async () => {
@@ -200,6 +208,10 @@ describe('GET /api/integrations/linear/callback', () => {
     );
 
     expectRedirectLocation(response, '/integrations/linear?error=missing_code');
+    expect(mockCancelProviderOAuthAttempt).toHaveBeenCalledTimes(1);
+    expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+    expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
+    expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
   });
 
   test('rejects an invalid state signature', async () => {
@@ -233,6 +245,8 @@ describe('GET /api/integrations/linear/callback', () => {
 
       expectRedirectLocation(response, '/integrations/linear?success=installed');
       expect(mockHandleOAuthCallback).toHaveBeenCalledTimes(1);
+      expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+      expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }
@@ -249,6 +263,8 @@ describe('GET /api/integrations/linear/callback', () => {
       expectRedirectLocation(response, '/integrations?error=invalid_state');
       expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
       expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+      expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+      expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
     } finally {
       jest.useRealTimers();
     }
@@ -262,6 +278,8 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations?error=invalid_state');
     expect(mockHandleOAuthCallback).not.toHaveBeenCalled();
     expect(mockedUpsertLinearInstallation).not.toHaveBeenCalled();
+    expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
+    expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
   });
 
   test('invokes upsertLinearInstallation with the workspace name from Linear GraphQL', async () => {

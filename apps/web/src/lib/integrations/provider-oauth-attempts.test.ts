@@ -290,8 +290,8 @@ describe('provider OAuth attempts', () => {
     const barrier = new Promise<void>(resolve => {
       release = resolve;
     });
-    let locked: (() => void) | undefined;
-    const lockedRow = new Promise<void>(resolve => {
+    let locked: ((pid: number) => void) | undefined;
+    const lockedRow = new Promise<number>(resolve => {
       locked = resolve;
     });
     const reservation = db.transaction(async tx => {
@@ -300,6 +300,7 @@ describe('provider OAuth attempts', () => {
         .from(organizations)
         .where(eq(organizations.id, orgB.id))
         .for('update');
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
       await tx.insert(provider_oauth_attempts).values({
         provider: 'slack',
         purpose: 'provider_install',
@@ -308,27 +309,34 @@ describe('provider OAuth attempts', () => {
         owned_by_organization_id: orgB.id,
         expires_at: new Date(Date.now() + 60_000).toISOString(),
       });
-      locked?.();
+      locked?.(backend.rows[0]!.pid);
       await barrier;
     });
-    await lockedRow;
     let settled = false;
-    const attach = connectVerifiedGitHubInstallation(
-      { type: 'org', id: orgB.id },
-      { ...github, kiloUserId: b.id }
-    ).finally(() => {
-      settled = true;
-    });
+    let attach: ReturnType<typeof connectVerifiedGitHubInstallation> | undefined;
     let observationError: unknown;
     try {
-      await waitForBlockedOwnerRowQuery();
+      const holderPid = await withTestTimeout(lockedRow, 'reservation holder readiness');
+      attach = connectVerifiedGitHubInstallation(
+        { type: 'org', id: orgB.id },
+        { ...github, kiloUserId: b.id }
+      ).finally(() => {
+        settled = true;
+      });
+      await withTestTimeout(
+        waitForBlockedOwnerRowQuery(holderPid),
+        'attach owner-row lock observation'
+      );
       expect(settled).toBe(false);
     } catch (error) {
       observationError = error;
     } finally {
       release?.();
     }
-    const [reservationResult, attachResult] = await Promise.allSettled([reservation, attach]);
+    const [reservationResult, attachResult] = await Promise.allSettled([
+      reservation,
+      attach ?? Promise.reject(new Error('Attach did not start')),
+    ]);
     if (observationError) throw observationError;
     expect(reservationResult.status).toBe('fulfilled');
     expect(attachResult).toEqual({
@@ -362,8 +370,8 @@ describe('provider OAuth attempts', () => {
     const barrier = new Promise<void>(resolve => {
       release = resolve;
     });
-    let attached: (() => void) | undefined;
-    const attachedBeforeCommit = new Promise<void>(resolve => {
+    let attached: ((pid: number) => void) | undefined;
+    const attachedBeforeCommit = new Promise<number>(resolve => {
       attached = resolve;
     });
     const attach = db.transaction(async tx => {
@@ -372,31 +380,39 @@ describe('provider OAuth attempts', () => {
         { ...github, kiloUserId: b.id },
         tx
       );
-      attached?.();
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      attached?.(backend.rows[0]!.pid);
       await barrier;
       return result;
     });
-    await attachedBeforeCommit;
     let settled = false;
-    const start = beginProviderOAuthAttempt({
-      actorUserId: b.id,
-      owner: { type: 'org', id: orgB.id },
-      provider: 'linear',
-      state: 'blocked-start',
-      purpose: 'provider_install',
-    }).finally(() => {
-      settled = true;
-    });
+    let start: ReturnType<typeof beginProviderOAuthAttempt> | undefined;
     let observationError: unknown;
     try {
-      await waitForBlockedOwnerRowQuery();
+      const holderPid = await withTestTimeout(attachedBeforeCommit, 'attach holder readiness');
+      start = beginProviderOAuthAttempt({
+        actorUserId: b.id,
+        owner: { type: 'org', id: orgB.id },
+        provider: 'linear',
+        state: 'blocked-start',
+        purpose: 'provider_install',
+      }).finally(() => {
+        settled = true;
+      });
+      await withTestTimeout(
+        waitForBlockedOwnerRowQuery(holderPid),
+        'reservation owner-row lock observation'
+      );
       expect(settled).toBe(false);
     } catch (error) {
       observationError = error;
     } finally {
       release?.();
     }
-    const [attachResult, startResult] = await Promise.allSettled([attach, start]);
+    const [attachResult, startResult] = await Promise.allSettled([
+      attach,
+      start ?? Promise.reject(new Error('Reservation did not start')),
+    ]);
     if (observationError) throw observationError;
     expect(attachResult).toMatchObject({ status: 'fulfilled', value: { ok: true } });
     expect(startResult.status).toBe('rejected');
@@ -410,12 +426,13 @@ describe('provider OAuth attempts', () => {
   });
 });
 
-async function waitForBlockedOwnerRowQuery(): Promise<void> {
+async function waitForBlockedOwnerRowQuery(holderPid: number): Promise<void> {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const result = await db.execute<{ blocked: boolean }>(sql`
       SELECT EXISTS (
         SELECT 1 FROM pg_stat_activity
         WHERE datname = current_database()
+          AND ${holderPid} = ANY(pg_blocking_pids(pid))
           AND wait_event_type = 'Lock'
           AND lower(query) LIKE '%organizations%'
           AND lower(query) LIKE '%for update%'
@@ -425,4 +442,18 @@ async function waitForBlockedOwnerRowQuery(): Promise<void> {
     await new Promise<void>(resolve => setImmediate(resolve));
   }
   throw new Error('Expected a transaction blocked on the organization owner row');
+}
+
+async function withTestTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), 5_000);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }

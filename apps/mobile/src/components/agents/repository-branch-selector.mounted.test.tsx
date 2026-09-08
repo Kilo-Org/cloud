@@ -12,15 +12,23 @@ import {
   setSelectedBranchOverride,
 } from './new-session-repository-state';
 import { type RepositoryBranchesState, useRepositoryBranches } from '@/lib/use-new-session-repos';
+import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 
+const router = vi.hoisted(() => ({ push: vi.fn() }));
+const keyboard = vi.hoisted(() => ({ dismiss: vi.fn() }));
+
+vi.mock('expo-router', () => ({
+  useRouter: () => router,
+  // The selector only builds an href literal; Href stays a type.
+}));
 vi.mock('react-native', async () => {
   const React = await import('react');
   return {
     View: 'View',
-    Modal: 'Modal',
     Pressable: 'Pressable',
-    // The real ScrollView scrolls; the fake renders every row so the
-    // picker's rows are assertable.
+    Keyboard: keyboard,
+    // The real ScrollView scrolls; the fake renders every row so a picker's
+    // rows are assertable.
     ScrollView: ({ children }: { children?: React.ReactNode }) =>
       React.createElement('ScrollView', {}, children),
   };
@@ -85,13 +93,6 @@ function mountSelector(
   return created;
 }
 
-function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
-  return renderer.root
-    .findAllByType('Text' as never)
-    .flatMap(node => node.children)
-    .filter((child): child is string => typeof child === 'string');
-}
-
 function pressableWithLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
   return renderer.root.findAll(
     node => node.props.accessibilityLabel === label && typeof node.props.onPress === 'function'
@@ -113,23 +114,13 @@ function openPicker(renderer: TestRenderer.ReactTestRenderer, selected: string) 
   press(pressableWithLabel(renderer, branchLabel(selected)));
 }
 
-/** The picker's row for a branch — the trigger row carries the same label. */
-function pickerRow(renderer: TestRenderer.ReactTestRenderer, branch: string) {
-  return renderer.root
-    .findAll(
-      node =>
-        node.props.accessibilityLabel === branchLabel(branch) &&
-        typeof node.props.onPress === 'function'
-    )
-    .at(-1);
-}
-
 beforeEach(() => {
   // Silences React's "environment is not configured to support act(...)"
   // warning, the same way the other mounted suites do.
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   vi.clearAllMocks();
   resetSelectedBranchOverrides();
+  branchPickerSlot.clear(UNFENCED_ROUTE_KEY);
 });
 
 describe('RepositoryBranchSelector', () => {
@@ -146,11 +137,33 @@ describe('RepositoryBranchSelector', () => {
     expect(texts(renderer)).toContain(i18n.t('agentChat.newSession.branchDefault'));
   });
 
+  it('opens the standard picker route, publishing the branches to the slot', () => {
+    const renderer = mountSelector(githubRow);
+
+    openPicker(renderer, 'main');
+
+    const bridge = branchPickerSlot.get(UNFENCED_ROUTE_KEY);
+    expect(bridge?.branches).toEqual(['main', 'release/2.0']);
+    expect(bridge?.defaultBranch).toBe('main');
+    expect(bridge?.selectedBranch).toBe('main');
+    expect(router.push).toHaveBeenCalledWith('/(app)/agent-chat/branch-picker');
+  });
+
+  it('dismisses the keyboard when the picker opens', () => {
+    const renderer = mountSelector(githubRow);
+
+    openPicker(renderer, 'main');
+
+    expect(keyboard.dismiss).toHaveBeenCalled();
+  });
+
   it('records a non-default choice for exactly this repository', () => {
     const renderer = mountSelector(githubRow);
     openPicker(renderer, 'main');
 
-    press(pickerRow(renderer, 'release/2.0'));
+    act(() => {
+      branchPickerSlot.get(UNFENCED_ROUTE_KEY)?.onSelect('release/2.0');
+    });
 
     expect(getSelectedBranchOverride(githubRow)).toBe('release/2.0');
     expect(getSelectedBranchOverride({ ...githubRow, platform: 'gitlab' })).toBeNull();
@@ -161,7 +174,9 @@ describe('RepositoryBranchSelector', () => {
     const renderer = mountSelector(githubRow);
     openPicker(renderer, 'release/2.0');
 
-    press(pickerRow(renderer, 'main'));
+    act(() => {
+      branchPickerSlot.get(UNFENCED_ROUTE_KEY)?.onSelect('main');
+    });
 
     expect(getSelectedBranchOverride(githubRow)).toBeNull();
   });
@@ -234,7 +249,7 @@ describe('RepositoryBranchSelector', () => {
     const renderer = mountSelector(githubRow, branchesState({ branches: [], defaultBranch: null }));
 
     expect(texts(renderer)).toContain(i18n.t('agentChat.newSession.branchEmpty'));
-    expect(renderer.root.findAllByType('Modal' as never)).toHaveLength(0);
+    expect(branchPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
     expect(getSelectedBranchOverride(githubRow)).toBeNull();
   });
 
@@ -252,8 +267,12 @@ describe('RepositoryBranchSelector', () => {
     expect(texts(renderer)).not.toContain(i18n.t('agentChat.newSession.branchDefault'));
 
     openPicker(renderer, placeholder);
-    press(pickerRow(renderer, 'trunk'));
 
+    const bridge = branchPickerSlot.get(UNFENCED_ROUTE_KEY);
+    expect(bridge?.selectedBranch).toBeNull();
+    act(() => {
+      bridge?.onSelect('trunk');
+    });
     expect(getSelectedBranchOverride(githubRow)).toBe('trunk');
   });
 
@@ -264,6 +283,15 @@ describe('RepositoryBranchSelector', () => {
     // RN blocks the press itself; the row has to say so to VoiceOver too.
     expect(trigger?.props.disabled).toBe(true);
     expect(trigger?.props.accessibilityState).toEqual({ disabled: true });
-    expect(renderer.root.findAllByType('Modal' as never)).toHaveLength(0);
+    press(trigger);
+    expect(router.push).not.toHaveBeenCalled();
+    expect(branchPickerSlot.get(UNFENCED_ROUTE_KEY)).toBeUndefined();
   });
 });
+
+function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
+  return renderer.root
+    .findAllByType('Text' as never)
+    .flatMap(node => node.children)
+    .filter((child): child is string => typeof child === 'string');
+}

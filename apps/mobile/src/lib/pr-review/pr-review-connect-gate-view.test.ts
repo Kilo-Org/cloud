@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { parseProviderPrRoute, providerPrRoutePath } from './provider-pr-ref';
+import { parseProviderPrUrl } from './provider-pr-url';
 import { selectPrReviewGateView } from './pr-review-connect-gate-view';
 
 /** A GitHub arm with everything settled and connected. */
@@ -112,6 +114,45 @@ describe('selectPrReviewGateView — Bitbucket', () => {
         organizationId: null,
         isLoading: true,
         connected: false,
+      })
+    ).toBe('org-only');
+  });
+
+  /**
+   * The spot-check defect behind s7's org-only arm: a Bitbucket PR link
+   * opened in the personal scope must reach the org-only explanation, never
+   * the invalid-route state. This binds the full in-app chain — the URL
+   * every entry point parses (badge, paste, recents), the route it pushes,
+   * the layout's own re-parse of that route, and the gate's decision.
+   */
+  it('a Bitbucket PR link lands on the org-only gate in the personal scope', () => {
+    const url = 'https://bitbucket.org/workspace/repo/pull-requests/12';
+    const ref = parseProviderPrUrl(url);
+    if (ref === null) {
+      throw new Error('the Bitbucket URL did not parse');
+    }
+    const route = providerPrRoutePath(ref);
+    expect(route).toBe('/(app)/pr-review/bitbucket/workspace/repo/12');
+
+    const reparsed = parseProviderPrRoute({
+      platform: 'bitbucket',
+      identity: ['workspace', 'repo', '12'],
+    });
+    if (reparsed === null) {
+      throw new Error('the pushed route did not re-parse');
+    }
+    expect(reparsed.platform).toBe('bitbucket');
+
+    // The personal scope (organizationId null) is the terminal org-only
+    // state — the gate never falls through to a retryable error or Connect.
+    expect(
+      selectPrReviewGateView({
+        platform: 'bitbucket',
+        isError: false,
+        isLoading: true,
+        connected: false,
+        revoked: false,
+        organizationId: null,
       })
     ).toBe('org-only');
   });

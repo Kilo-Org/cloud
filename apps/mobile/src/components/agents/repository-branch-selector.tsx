@@ -1,8 +1,9 @@
-import { useState, useSyncExternalStore } from 'react';
-import { Modal, Pressable, ScrollView, View } from 'react-native';
+import { useSyncExternalStore } from 'react';
+import { Keyboard, Pressable, View } from 'react-native';
+import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
-import { Check, ChevronDown } from '@/components/ui/icons';
+import { ChevronDown } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -15,6 +16,7 @@ import {
 } from '@/components/agents/new-session-repository-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRepositoryBranches } from '@/lib/use-new-session-repos';
+import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
 import { cn } from '@/lib/utils';
 
 type RepositoryBranchSelectorProps = {
@@ -39,6 +41,12 @@ const NOTE_MIN_HEIGHT = 'min-h-12';
  * exactly this repository (see `setSelectedBranchOverride`), which
  * `useNewSessionCreator` sends as `upstreamBranch`.
  *
+ * The picker itself is the standard formSheet route (`agent-chat/branch-picker`),
+ * like the repo/mode/model pickers: an opaque sheet with the dismiss controls
+ * in its header and the rows below them. The trigger publishes the branches to
+ * the picker slot and dismisses the keyboard, so the sheet never floats over
+ * the form translucently or under the keyboard.
+ *
  * The interactive states render at the same height as the trigger row, so the
  * section below never jumps between loading, branches, and a retryable error.
  * A note row is at least that tall and grows to show its whole message.
@@ -48,13 +56,13 @@ export function RepositoryBranchSelector({
   disabled,
 }: Readonly<RepositoryBranchSelectorProps>) {
   const { t } = useTranslation();
+  const router = useRouter();
   const colors = useThemeColors();
   const branches = useRepositoryBranches(repository);
   const branchState = useSyncExternalStore(
     subscribeNewSessionBranchState,
     getNewSessionBranchState
   );
-  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const handleRetry = branches.retry;
 
   if (!repository) {
@@ -68,7 +76,6 @@ export function RepositoryBranchSelector({
     <View className="mt-3">
       <Text className="mb-2 text-sm font-medium text-muted-foreground">{t('common.branch')}</Text>
       {renderBody()}
-      {isPickerOpen ? renderPicker() : null}
     </View>
   );
 
@@ -147,9 +154,7 @@ export function RepositoryBranchSelector({
     const isDefault = selectedBranch !== null && selectedBranch === branches.defaultBranch;
     return (
       <Pressable
-        onPress={() => {
-          setIsPickerOpen(true);
-        }}
+        onPress={openPicker}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.newSession.branchAccessibility', { label })}
@@ -173,81 +178,23 @@ export function RepositoryBranchSelector({
     );
   }
 
-  function renderPicker() {
-    const close = () => {
-      setIsPickerOpen(false);
-    };
-    return (
-      <Modal visible transparent animationType="fade" onRequestClose={close}>
-        <Pressable
-          // Backdrop tap-to-dismiss. accessible={false} so it does not collapse
-          // the sheet subtree into one VoiceOver node.
-          accessible={false}
-          className="flex-1 justify-start px-6 pt-[20%]"
-          onPress={close}
-        >
-          <View className="absolute inset-0 bg-black opacity-50" />
-          <Pressable
-            // Catches taps so the list does not dismiss the sheet.
-            accessible={false}
-            className="max-h-[70%] gap-4 rounded-2xl bg-popover p-5"
-            onPress={event => {
-              event.stopPropagation();
-            }}
-          >
-            <Text accessibilityRole="header" className="text-center text-base font-semibold">
-              {t('agentChat.newSession.branchPickerTitle')}
-            </Text>
-            {/* ScrollView, not FlatList: a FlatList stretches to the space
-                its container offers, so two branch rows rendered as a mostly
-                empty sheet. A ScrollView hugs its rows and only scrolls once
-                the card's max height is reached. */}
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {branches.branches.map(branch => renderBranchRow(branch, close))}
-            </ScrollView>
-            <View className="flex-row justify-end">
-              <Button variant="outline" onPress={close}>
-                <Text>{t('common.cancel')}</Text>
-              </Button>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    );
-  }
-
-  function renderBranchRow(branch: string, close: () => void) {
-    if (!repository) {
-      return null;
+  function openPicker() {
+    if (!repository || disabled) {
+      return;
     }
-    const isSelected = branch === selectedBranch;
-    const isDefault = branch === branches.defaultBranch;
-    return (
-      <Pressable
-        // Keyed map rows: the picker lists branches inside a ScrollView, and
-        // a mapped child without a key makes React warn on every open.
-        key={branch}
-        className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary"
-        accessibilityRole="button"
-        accessibilityState={{ selected: isSelected }}
-        accessibilityLabel={t('agentChat.newSession.branchAccessibility', { label: branch })}
-        onPress={() => {
-          // The provider default is stored as "no override", so the create body
-          // only carries `upstreamBranch` for a real, non-default choice.
-          setSelectedBranchOverride(repository, isDefault ? null : branch);
-          close();
-        }}
-      >
-        <Text className="flex-1 text-sm" numberOfLines={1}>
-          {branch}
-        </Text>
-        {isDefault ? (
-          <Text className="text-xs text-muted-foreground">
-            {t('agentChat.newSession.branchDefault')}
-          </Text>
-        ) : null}
-        {isSelected ? <Check size={16} color={colors.foreground} /> : null}
-      </Pressable>
-    );
+    // The keyboard belongs to the form; the sheet must not slide up over an
+    // open keyboard (the form keeps first responder across taps).
+    Keyboard.dismiss();
+    branchPickerSlot.set(UNFENCED_ROUTE_KEY, {
+      branches: branches.branches,
+      defaultBranch: branches.defaultBranch,
+      selectedBranch,
+      onSelect: branch => {
+        // The provider default is stored as "no override", so the create body
+        // only carries `upstreamBranch` for a real, non-default choice.
+        setSelectedBranchOverride(repository, branch === branches.defaultBranch ? null : branch);
+      },
+    });
+    router.push('/(app)/agent-chat/branch-picker' as Href);
   }
 }

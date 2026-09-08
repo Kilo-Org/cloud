@@ -10,7 +10,8 @@
 // collapsable={false}: keep a stable native subview at index 0 (SheetHeader
 // pattern). No `modal` top inset and no `centerTitle`: the formSheet grabber
 // already clears the top edge, and the close caret stays on the title row.
-// `safeAreaTop={false}` leaves vertical padding to `pt-3`.
+// `safeAreaTop={false}` leaves vertical padding to `pt-5` (eight extra
+// logical pixels over the old `pt-3`, per PR 5972 owner feedback).
 //
 // Keyboard: ScrollView uses automaticallyAdjustKeyboardInsets. Footers must
 // NOT re-apply the full keyboard height (AppAwareKeyboardPaddingView double-
@@ -55,7 +56,7 @@ export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBac
         backIcon="close"
         showBackButton
         safeAreaTop={false}
-        className="pt-3"
+        className="pt-5"
       />
     </View>
   );

@@ -543,8 +543,8 @@ function isMessageStreaming(msg: StoredMessage): boolean {
   if (msg.info.role === 'assistant' && msg.info.error) return false;
   if (msg.info.role === 'assistant' && !msg.info.time.completed) return true;
   return msg.parts.some(part => {
-    if (part.type === 'text') return part.time !== undefined && part.time.end === undefined;
-    if (part.type === 'reasoning') return part.time.end === undefined;
+    if (part.type === 'text' || part.type === 'reasoning')
+      return part.time !== undefined && part.time.end === undefined;
     if (part.type === 'tool')
       return part.state.status === 'pending' || part.state.status === 'running';
     return false;
@@ -1911,7 +1911,7 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
                 }
               }
             }
-            if (canApplyMessageObservation) {
+            if (canApplyMessageObservation && event.info.model) {
               const selection = toModelSelection(event.info.model, event.info.variant);
               updateObservedModel(selection, 'message');
               clearOverrideIfDiverged(selection);

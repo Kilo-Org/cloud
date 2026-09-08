@@ -51,6 +51,14 @@ const encryptedMetadata = [
   },
 ] satisfies { name: string; metadata: ReasoningPart['metadata'] }[];
 
+describe('isPartStreaming', () => {
+  it('does not treat a reasoning part with no time as streaming', () => {
+    const part = makeReasoningPart('thinking');
+    delete (part as { time?: unknown }).time;
+    expect(isPartStreaming(part)).toBe(false);
+  });
+});
+
 describe('shouldRenderReasoningPart', () => {
   it.each([
     { name: 'empty', text: '' },

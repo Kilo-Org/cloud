@@ -250,6 +250,7 @@ describe('createIngestHandler', () => {
             sessionID: 'kilo_1',
             time: { completed: 123 },
             error: 'Assistant request failed',
+            metadata: 'large metadata',
           },
         },
       });
@@ -272,42 +273,29 @@ describe('createIngestHandler', () => {
       [
         'tool',
         { metadata: { diff: 'large tool diff' }, input: 'large input', output: 'large output' },
+        { input: 'large input', output: 'large output' },
       ],
-      ['file', { url: 'data:image/png;base64,large-image', source: { content: 'large source' } }],
-      ['patch', { patch: 'large patch body' }],
-      ['reasoning', { text: 'large reasoning body' }],
-    ])('persists slim %s parts while broadcasting their live payload', async (type, extraPart) => {
-      const eventQueries = createFakeEventQueries();
-      const broadcast = vi.fn();
-      const handler = createIngestHandler(
-        createFakeState(),
-        eventQueries,
-        SESSION_ID,
-        broadcast,
-        createFakeDOContext()
-      );
-      const ws = createFakeWebSocket(makeAttachment());
-      const properties = {
-        sessionID: 'kilo_1',
-        part: {
-          type,
-          id: `${type}_1`,
-          sessionID: 'kilo_1',
-          messageID: 'asst_1',
-          status: 'running',
-          state: { status: 'running', metadata: { diff: 'large state diff' } },
-          ...extraPart,
-        },
-      };
-
-      await handler.handleIngestMessage(
-        ws,
-        makeKilocodeMessage('message.part.updated', properties)
-      );
-
-      expect(JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload)).toEqual({
-        event: 'message.part.updated',
-        properties: {
+      [
+        'file',
+        { url: 'data:image/png;base64,large-image', source: { content: 'large source' } },
+        { url: '' },
+      ],
+      ['patch', { patch: 'large patch body' }, {}],
+      ['reasoning', { text: 'large reasoning body' }, { text: 'large reasoning body' }],
+    ])(
+      'persists slim %s parts while broadcasting their live payload',
+      async (type, extraPart, persistedExtra) => {
+        const eventQueries = createFakeEventQueries();
+        const broadcast = vi.fn();
+        const handler = createIngestHandler(
+          createFakeState(),
+          eventQueries,
+          SESSION_ID,
+          broadcast,
+          createFakeDOContext()
+        );
+        const ws = createFakeWebSocket(makeAttachment());
+        const properties = {
           sessionID: 'kilo_1',
           part: {
             type,
@@ -315,16 +303,38 @@ describe('createIngestHandler', () => {
             sessionID: 'kilo_1',
             messageID: 'asst_1',
             status: 'running',
-            state: { status: 'running' },
+            state: { status: 'running', metadata: { diff: 'large state diff' } },
+            ...extraPart,
           },
-        },
-      });
-      expect(broadcast).toHaveBeenCalledWith(
-        expect.objectContaining({
-          payload: JSON.stringify({ event: 'message.part.updated', properties }),
-        })
-      );
-    });
+        };
+
+        await handler.handleIngestMessage(
+          ws,
+          makeKilocodeMessage('message.part.updated', properties)
+        );
+
+        expect(JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload)).toEqual({
+          event: 'message.part.updated',
+          properties: {
+            sessionID: 'kilo_1',
+            part: {
+              type,
+              id: `${type}_1`,
+              sessionID: 'kilo_1',
+              messageID: 'asst_1',
+              status: 'running',
+              state: { status: 'running' },
+              ...persistedExtra,
+            },
+          },
+        });
+        expect(broadcast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: JSON.stringify({ event: 'message.part.updated', properties }),
+          })
+        );
+      }
+    );
 
     it('persists text content for text parts', async () => {
       const eventQueries = createFakeEventQueries();
@@ -1367,6 +1377,8 @@ describe('createIngestHandler', () => {
             sessionID: 'kilo_session_333',
             role: 'assistant',
             parentID: 'msg_user_333',
+            modelID: 'vendor/model',
+            providerID: 'kilo',
             error: 'Assistant request was rate limited',
           },
         },

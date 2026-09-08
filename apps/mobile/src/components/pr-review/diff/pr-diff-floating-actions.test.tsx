@@ -286,20 +286,19 @@ describe('PrDiffFloatingActions provider routes (s6)', () => {
     pressButtonWith(GITLAB_REF, 'Comment on selected lines');
 
     expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith({
-      pathname: '/(app)/pr-review/gitlab/group/sub/repo/12/comment-composer',
-      params: { path: 'src/lib.ts', side: 'RIGHT', line: 5, startLine: 3 },
-    });
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/comment-composer?path=src%2Flib.ts&side=RIGHT&line=5&startLine=3'
+    );
   });
 
   it.each<[ProviderPrRef, string]>([
     [GITLAB_REF, '/(app)/pr-review/gitlab/group/sub/repo/12/review-submit'],
     [BITBUCKET_REF, '/(app)/pr-review/bitbucket/acme/api/42/review-submit'],
-  ])('pushes the review-submit sheet inside the %s ref route', (prRef, expectedPathname) => {
+  ])('pushes the review-submit sheet inside the %s ref route', (prRef, expectedHref) => {
     pressButtonWith(prRef, 'Finish review');
 
     expect(routerPush).toHaveBeenCalledTimes(1);
-    expect(routerPush).toHaveBeenCalledWith({ pathname: expectedPathname, params: {} });
+    expect(routerPush).toHaveBeenCalledWith(expectedHref);
   });
 });
 

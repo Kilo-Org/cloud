@@ -129,10 +129,9 @@ describe('PrMergeSectionProvider (s6)', () => {
     act(() => {
       findButton(renderer, 'Merge merge request')?.();
     });
-    expect(routerPush).toHaveBeenCalledWith({
-      pathname: '/(app)/pr-review/gitlab/group/sub/repo/12/merge',
-      params: { mode: 'merge' },
-    });
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/merge?mode=merge'
+    );
     renderer.unmount();
   });
 
@@ -141,10 +140,9 @@ describe('PrMergeSectionProvider (s6)', () => {
     act(() => {
       findButton(renderer, 'Enable auto-merge')?.();
     });
-    expect(routerPush).toHaveBeenCalledWith({
-      pathname: '/(app)/pr-review/gitlab/group/sub/repo/12/merge',
-      params: { mode: 'enable-auto-merge' },
-    });
+    expect(routerPush).toHaveBeenCalledWith(
+      '/(app)/pr-review/gitlab/group/sub/repo/12/merge?mode=enable-auto-merge'
+    );
     renderer.unmount();
   });
 

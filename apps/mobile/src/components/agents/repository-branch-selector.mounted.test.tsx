@@ -19,24 +19,10 @@ vi.mock('react-native', async () => {
     View: 'View',
     Modal: 'Modal',
     Pressable: 'Pressable',
-    // The real FlatList virtualizes; the fake renders every row so the picker's
-    // rows are assertable.
-    FlatList: ({
-      data,
-      renderItem,
-      keyExtractor,
-    }: {
-      data: string[];
-      renderItem: (info: { item: string }) => React.ReactNode;
-      keyExtractor: (item: string) => string;
-    }) =>
-      React.createElement(
-        'FlatList',
-        {},
-        ...data.map(item =>
-          React.createElement('FlatListRow', { key: keyExtractor(item) }, renderItem({ item }))
-        )
-      ),
+    // The real ScrollView scrolls; the fake renders every row so the
+    // picker's rows are assertable.
+    ScrollView: ({ children }: { children?: React.ReactNode }) =>
+      React.createElement('ScrollView', {}, children),
   };
 });
 vi.mock('@/components/ui/text', async () => {

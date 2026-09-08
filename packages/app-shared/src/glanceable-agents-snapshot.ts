@@ -92,10 +92,31 @@ export type GlanceableSessionRow = {
 /** Statuses that mean the agent waits on the user and cannot go on alone. */
 const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
 
+/** What a session's status means to a user: the one vocabulary every surface reads. */
+export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle';
+
+/**
+ * Map one session status to the kind the glanceable surfaces and the session
+ * lists both show. Total on strings: needs-input statuses → `needsInput`,
+ * `idle` → `idle`, everything else → `running` (starting, empty, unknown
+ * included). A session is idle only when the agent is not working and not
+ * waiting on the user, so a working session can never render idle and a row
+ * can never disagree with the widget beside it. Callers pass null only when
+ * a row has no status at all.
+ */
+export function glanceableStatusKind(status: string): GlanceableStatusKind {
+  if (NEEDS_INPUT_STATUSES.has(status)) {
+    return 'needsInput';
+  }
+  return status === 'idle' ? 'idle' : 'running';
+}
+
 /**
  * Map session rows to the three glanceable counts. `busy` → running,
- * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any
- * unknown status is ignored. Do not call `isCompletedStatus` here.
+ * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any other
+ * status (starting, empty, unknown, completed) counts as running: a session
+ * is idle only when the agent says so, and no row is dropped from the count
+ * its list row shows.
  *
  * `retry` folds into needs-input because it means one thing to the user: the
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
@@ -105,28 +126,11 @@ const NEEDS_INPUT_STATUSES = new Set(['question', 'permission', 'retry']);
 export function countGlanceableSessions(
   sessions: readonly GlanceableSessionRow[]
 ): GlanceableCounts {
-  let running = 0;
-  let needsInput = 0;
-  let idle = 0;
+  const counts = { running: 0, needsInput: 0, idle: 0 };
   for (const session of sessions) {
-    switch (session.status) {
-      case 'busy':
-        running += 1;
-        break;
-      case 'question':
-      case 'permission':
-      case 'retry':
-        needsInput += 1;
-        break;
-      case 'idle':
-        idle += 1;
-        break;
-      default:
-        // An unknown status contributes nothing.
-        break;
-    }
+    counts[glanceableStatusKind(session.status)] += 1;
   }
-  return { running, needsInput, idle };
+  return counts;
 }
 
 /**

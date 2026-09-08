@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Adolygu dyfeisiau eraill a'u hallgofnodi",
     "feedback": "Adborth",
     "privacyChoices": "Dewisiadau preifatrwydd",
-    "signOut": "Allgofnodi",
     "deleteAccount": "Dileu cyfrif",
     "confirmationCode": "Cod cadarnhau",
     "confirmationCodePlaceholder": "cod 6 digid",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Mae'r fysell Dychwelyd yn anfon neges",
     "returnSendsMessageSubtitle": "Pan fydd yr opsiwn hwn wedi'i ddiffodd, mae'r fysell Dychwelyd yn mewnosod llinell newydd ym mlychau negeseuon yr asiantau.",
     "biometricUnlock": "Datgloi â biometreg",
-    "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir."
+    "biometricUnlockSubtitle": "Rhaid datgloi wrth gychwyn yr ap ac ar ôl pum munud yn y cefndir.",
+    "featureFlags": "Baneri nodweddion",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Cais tynnu ddim ar gael",
@@ -1205,7 +1209,9 @@
       "nonCanonicalEarlybirdBody": "Rhaid i berson adolygu'ch cynllun mynediad cynnar cyn y gallwch ei ddefnyddio ar eich ffôn.",
       "iosTitle": "KiloClaw ddim ar gael ar iOS",
       "iosBody": "Ar gyfer y cyfrif hwn, rheolir mynediad at KiloClaw y tu allan i'r ap iOS.",
-      "iosContact": "Cwestiynau? Cysylltwch â hi@kilo.ai."
+      "iosContact": "Cwestiynau? Cysylltwch â hi@kilo.ai.",
+      "quarantinedCta": "Anfon e-bost i'n tîm",
+      "nonCanonicalEarlybirdCta": "Adolygu eich cynllun ar kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Mae angen sylw ar {{name}}: {{label}}",
@@ -1745,7 +1751,6 @@
       "couldNotOpenGithub": "Ni ellid agor GitHub. Ceisiwch eto."
     },
     "settingsSave": {
-      "keepEditing": "Parhau i olygu",
       "saveChanges": "Cadw newidiadau",
       "unsavedTitle": "Newidiadau heb eu cadw",
       "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?"
@@ -1930,6 +1935,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Ni lwyddwyd i lwytho'r sesiynau gweithredol.",
+      "couldNotRefresh": "Ni lwyddwyd i adnewyddu",
       "noSessionsYetDescription": "Dechreuwch dasg codio o'ch ffôn. Bydd eich sesiynau'n ymddangos yma.",
       "noMatches": "Dim sesiynau'n cyfateb",
       "tryDifferentSearch": "Rho gynnig ar derm chwilio gwahanol.",
@@ -2224,7 +2230,6 @@
     "filePart": {
       "loadingImage": "Yn llwytho delwedd",
       "imageUnavailableRetry": "Nid yw'r ddelwedd ar gael, ceisio ei llwytho eto",
-      "imageUnavailableWithAlt": "Nid yw'r ddelwedd ar gael: {{alt}}.",
       "imagePreviewUnavailableInSession": "Nid yw rhagolwg y ddelwedd ar gael yn y sesiwn hon.",
       "viewImage": "Gweld delwedd",
       "viewImageWithAlt": "Gweld delwedd {{alt}}",
@@ -2431,7 +2436,6 @@
       "selectModelBeforeSending": "Dewiswch fodel cyn anfon.",
       "preparingPlaceholder": "Yn paratoi'r amgylchedd...",
       "finalizingPlaceholder": "Yn gorffen...",
-      "messagePlaceholder": "Neges",
       "cannotReceiveFiles": "Ni all y sesiwn hon dderbyn ffeiliau. Tynnwch yr atodiadau i anfon eich neges.",
       "couldNotAttachFiles": "Methu atodi'r ffeiliau. Tapiwch Anfon i geisio eto.",
       "discardAttachmentsMessage": "Bydd ffeiliau a uwchlwythwyd ond sydd heb eu defnyddio yn cael eu dileu.",
@@ -2640,6 +2644,10 @@
     "stopped": "Daeth y mewnbwn llais i ben. Tapiwch y meicroffon i geisio eto.",
     "unavailableDevice": "Nid yw mewnbwn llais ar gael ar y ddyfais hon.",
     "unavailableLanguage": "Nid yw mewnbwn llais ar gael ar gyfer iaith y ddyfais hon.",
+    "languageNotInstalledTitle": "Nid yw mewnbwn llais ar gyfer {{language}} yn barod eto",
+    "languageNotInstalledMessage": "Nid yw ffeiliau lleferydd all-lein {{language}} wedi'u gosod ar y ffôn hon. Llwythwch nhw i lawr, yna ceisiwch fewnbwn llais eto.",
+    "downloadOfflineModel": "Llwytho i lawr",
+    "offlineModelDownloadScheduled": "Bydd y ffeiliau lleferydd all-lein yn cael eu llwytho i lawr yn y cefndir. Ceisiwch fewnbwn llais eto yn nes ymlaen.",
     "listeningStopped": "Daeth y gwrando i ben."
   },
   "share": {
@@ -2861,7 +2869,6 @@
         "void": "Wedi'i dirymu",
         "uncollectible": "Anghasgladwy"
       },
-      "loadMoreFailed": "Doedd dim modd llwytho mwy.",
       "truncated": "Mae anfonebau cynharach ar gael."
     },
     "lowBalanceAlert": {

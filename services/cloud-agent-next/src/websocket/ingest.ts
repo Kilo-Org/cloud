@@ -49,6 +49,7 @@ import {
   classifyAttentionKilocodeEvent,
   type AttentionEvent,
 } from './ingest-attention-classifier.js';
+import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
 
 // ---------------------------------------------------------------------------
 // Ingest Attachment
@@ -660,11 +661,12 @@ export function createIngestHandler(
           const data = ingestEvent.data as Record<string, unknown>;
           const entityId = extractEntityId(kiloEventName ?? '', data);
           if (entityId) {
+            const persistedPayload = JSON.stringify(slimPersistedKilocodeEvent(publicEventData));
             eventId = eventQueries.upsert({
               executionId: eventSourceId,
               sessionId,
               streamEventType: eventType,
-              payload,
+              payload: persistedPayload,
               timestamp,
               entityId,
             });

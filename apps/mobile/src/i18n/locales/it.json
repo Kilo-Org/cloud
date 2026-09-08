@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Controlla e disconnetti gli altri dispositivi",
     "feedback": "Invia un feedback",
     "privacyChoices": "Scelte sulla privacy",
-    "signOut": "Esci",
     "deleteAccount": "Elimina account",
     "confirmationCode": "Codice di conferma",
     "confirmationCodePlaceholder": "codice a 6 cifre",
@@ -583,7 +582,9 @@
       "subscriptionCanceledTitle": "Abbonati sul sito",
       "subscriptionPastDueBody": "Si è verificato un problema con il tuo ultimo pagamento. Apri kilo.ai/claw nel browser per aggiornare i dati di pagamento. Non puoi gestire la fatturazione dall'app.",
       "subscriptionPastDueTitle": "Aggiornamento del pagamento sul sito",
-      "trialExpiredBody": "Per continuare a usare KiloClaw, vai su kilo.ai/claw dal tuo browser. Non puoi abbonarti dall'app."
+      "trialExpiredBody": "Per continuare a usare KiloClaw, vai su kilo.ai/claw dal tuo browser. Non puoi abbonarti dall'app.",
+      "quarantinedCta": "Scrivi al nostro team",
+      "nonCanonicalEarlybirdCta": "Verifica il tuo piano su kilo.ai"
     },
     "controls": {
       "redeploying": "Ridistribuzione…",
@@ -1286,7 +1287,6 @@
       "repositoriesCount_many": "{{displayCount}} repository selezionati"
     },
     "settingsSave": {
-      "keepEditing": "Continua a modificare",
       "saveChanges": "Salva le modifiche",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
       "unsavedTitle": "Modifiche non salvate"
@@ -1435,6 +1435,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Impossibile caricare le sessioni attive.",
+      "couldNotRefresh": "Impossibile aggiornare",
       "noSessionsYetDescription": "Avvia un'attività di programmazione dal telefono. Le tue sessioni appariranno qui.",
       "noMatches": "Nessuna sessione trovata",
       "tryDifferentSearch": "Prova un termine di ricerca diverso.",
@@ -1717,7 +1718,6 @@
     "filePart": {
       "loadingImage": "Caricamento dell'immagine",
       "imageUnavailableRetry": "Immagine non disponibile, riprova a caricarla",
-      "imageUnavailableWithAlt": "L'immagine {{alt}} non è disponibile.",
       "imagePreviewUnavailableInSession": "L'anteprima dell'immagine non è disponibile in questa sessione.",
       "viewImage": "Visualizza l'immagine",
       "viewImageWithAlt": "Visualizza l'immagine {{alt}}",
@@ -1915,7 +1915,6 @@
       "selectModelBeforeSending": "Seleziona un modello prima di inviare il messaggio.",
       "preparingPlaceholder": "Configurazione dell'ambiente...",
       "finalizingPlaceholder": "Completamento in corso…",
-      "messagePlaceholder": "Messaggio",
       "cannotReceiveFiles": "Questa sessione non può ricevere file. Rimuovi gli allegati per inviare il messaggio.",
       "couldNotAttachFiles": "Impossibile allegare i file. Tocca Invia per riprovare.",
       "discardAttachmentsMessage": "I file caricati non allegati a messaggi inviati verranno eliminati.",
@@ -2046,7 +2045,12 @@
     "returnSendsMessage": "Il tasto Invio invia il messaggio",
     "returnSendsMessageSubtitle": "Se disattivato, il tasto Invio inserisce un'interruzione di riga nei campi dei messaggi agli agenti.",
     "biometricUnlock": "Sblocco biometrico",
-    "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano."
+    "biometricUnlockSubtitle": "Lo sblocco è richiesto all'avvio dell'app e dopo cinque minuti in secondo piano.",
+    "featureFlags": "Flag di funzionalità",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "addCredits": {
     "cta": "Aggiungi crediti",
@@ -2139,6 +2143,10 @@
     "stopped": "La dettatura si è interrotta. Tocca il microfono per riprovare.",
     "unavailableDevice": "La dettatura non è disponibile su questo dispositivo.",
     "unavailableLanguage": "La dettatura non è disponibile per la lingua del dispositivo.",
+    "languageNotInstalledTitle": "La dettatura per {{language}} non è ancora pronta",
+    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati su questo telefono. Scaricali, poi riprova con la dettatura.",
+    "downloadOfflineModel": "Scarica",
+    "offlineModelDownloadScheduled": "I file vocali offline verranno scaricati in background. Riprova con la dettatura più tardi.",
     "listeningStopped": "Ascolto interrotto."
   },
   "share": {
@@ -2797,7 +2805,6 @@
         "void": "Annullata",
         "uncollectible": "Inesigibile"
       },
-      "loadMoreFailed": "Impossibile caricare altri elementi.",
       "truncated": "Sono disponibili fatture precedenti."
     },
     "lowBalanceAlert": {

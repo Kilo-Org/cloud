@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Преглеждай другите устройства и прекратявай сесиите им",
     "feedback": "Обратна връзка",
     "privacyChoices": "Настройки за поверителност",
-    "signOut": "Излез",
     "deleteAccount": "Изтрий акаунта",
     "confirmationCode": "Код за потвърждение",
     "confirmationCodePlaceholder": "6-цифрен код",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Клавишът за нов ред изпраща съобщение",
     "returnSendsMessageSubtitle": "Когато настройката е изключена, клавишът за нов ред вмъква нов ред в полетата за въвеждане на съобщения до агенти.",
     "biometricUnlock": "Отключване с биометрични данни",
-    "biometricUnlockSubtitle": "Изисква се отключване при стартиране и след пет минути във фонов режим."
+    "biometricUnlockSubtitle": "Изисква се отключване при стартиране и след пет минути във фонов режим.",
+    "featureFlags": "Флагове на функции",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Недостъпна заявка за обединяване",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Твоят план за ранен достъп се нуждае от ръчна проверка, преди да може да се използва на мобилно устройство.",
       "iosTitle": "KiloClaw не е наличен в iOS",
       "iosBody": "Достъпът до KiloClaw за този акаунт се управлява извън приложението за iOS.",
-      "iosContact": "Въпроси? Свържи се с hi@kilo.ai."
+      "iosContact": "Въпроси? Свържи се с hi@kilo.ai.",
+      "quarantinedCta": "Изпрати имейл на екипа ни",
+      "nonCanonicalEarlybirdCta": "Прегледай плана си в kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} се нуждае от внимание: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Не може да се отвори GitHub. Моля, опитай отново."
     },
     "settingsSave": {
-      "keepEditing": "Продължи редактирането",
       "saveChanges": "Запази промените",
       "unsavedTitle": "Незапазени промени",
       "unsavedMessage": "Да се запазят ли промените, преди да напуснеш този екран?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Не можахме да заредим активните сесии.",
+      "couldNotRefresh": "Не можахме да опресним",
       "noSessionsYetDescription": "Започни задача за програмиране от телефона си. Сесиите ти ще се появят тук.",
       "noMatches": "Няма сесии за това търсене",
       "tryDifferentSearch": "Опитай с друга дума за търсене.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Зареждане на изображението",
       "imageUnavailableRetry": "Изображението е недостъпно. Опитай да го заредиш отново",
-      "imageUnavailableWithAlt": "Изображението {{alt}} е недостъпно.",
       "imagePreviewUnavailableInSession": "Прегледът на изображението е недостъпен в тази сесия.",
       "viewImage": "Прегледай изображението",
       "viewImageWithAlt": "Прегледай изображението {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Избери модел, преди да изпратиш съобщение.",
       "preparingPlaceholder": "Настройване на средата...",
       "finalizingPlaceholder": "Приключване...",
-      "messagePlaceholder": "Съобщение",
       "cannotReceiveFiles": "Тази сесия не може да получава файлове. Премахни прикачените файлове, за да изпратиш съобщението си.",
       "couldNotAttachFiles": "Не успяхме да прикачим файловете. Докосни бутона за изпращане, за да опиташ отново.",
       "discardAttachmentsMessage": "Качените файлове, които не са прикачени към изпратени съобщения, ще бъдат изтрити.",
@@ -2556,6 +2560,10 @@
     "stopped": "Гласовото въвеждане е спряно. Докосни микрофона, за да опиташ отново.",
     "unavailableDevice": "Гласовото въвеждане не се поддържа на това устройство.",
     "unavailableLanguage": "Гласовото въвеждане не се поддържа за избрания език на устройството.",
+    "languageNotInstalledTitle": "Гласовото въвеждане за {{language}} още не е готово",
+    "languageNotInstalledMessage": "Файловете с офлайн реч за {{language}} не са инсталирани на този телефон. Изтегли ги, след което опитай гласовото въвеждане отново.",
+    "downloadOfflineModel": "Изтегляне",
+    "offlineModelDownloadScheduled": "Файловете с офлайн реч ще се изтеглят на заден план. Опитай гласовото въвеждане отново по-късно.",
     "listeningStopped": "Слушането е спряно."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Анулирана",
         "uncollectible": "Несъбираема"
       },
-      "loadMoreFailed": "Не успяхме да заредим още резултати.",
       "truncated": "Налични са по-стари фактури."
     },
     "lowBalanceAlert": {

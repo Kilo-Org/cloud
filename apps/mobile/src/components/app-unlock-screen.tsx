@@ -29,10 +29,9 @@ function unlockFeedbackKey(outcome: UnlockOutcome) {
 
 /** One owner announces shared outcomes, including setting failures behind a locked scene. */
 export function AppUnlockAnnouncements() {
-  const { status, outcome } = useAppUnlock();
+  const { outcome } = useAppUnlock();
   const { t } = useTranslation();
-  const key =
-    status === 'preference-error' ? 'common.somethingWentWrong' : unlockFeedbackKey(outcome);
+  const key = unlockFeedbackKey(outcome);
   useStatusAnnouncement(key === null ? null : t(key));
   return null;
 }
@@ -97,9 +96,6 @@ function AppUnlockScene({ children }: Readonly<{ children: ReactElement }>) {
                 <Text accessibilityRole="header" className="text-center text-xl font-semibold">
                   {t('preferences.biometricUnlock')}
                 </Text>
-                <UnlockStatusText
-                  message={status === 'preference-error' ? t('common.somethingWentWrong') : null}
-                />
                 <AppUnlockFeedback outcome={outcome} />
               </View>
               {status === 'preference-loading' ? (

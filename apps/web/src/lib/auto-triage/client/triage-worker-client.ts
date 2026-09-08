@@ -2,36 +2,10 @@ import 'server-only';
 
 import type { DispatchTriageRequest } from '../core/schemas';
 import { AUTO_TRIAGE_CONSTANTS } from '../core/constants';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 
 const AUTO_TRIAGE_URL = process.env.AUTO_TRIAGE_URL;
 const AUTO_TRIAGE_AUTH_TOKEN = process.env.AUTO_TRIAGE_AUTH_TOKEN;
-
-/**
- * Fetch with timeout support
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs: number = AUTO_TRIAGE_CONSTANTS.WORKER_FETCH_TIMEOUT
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeoutMs}ms`);
-    }
-    throw error;
-  }
-}
 
 // Types for API responses
 export interface DispatchTriageResponse {
@@ -72,13 +46,17 @@ class TriageWorkerClient {
    * Creates a TriageOrchestrator Durable Object and starts the triage
    */
   async dispatchTriage(payload: DispatchTriageRequest): Promise<DispatchTriageResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/triage`, {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(payload),
-    });
+    const response = await fetchWithTimeout(
+      `${this.baseUrl}/triage`,
+      {
+        method: 'POST',
+        headers: this.getHeaders({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(payload),
+      },
+      AUTO_TRIAGE_CONSTANTS.WORKER_FETCH_TIMEOUT
+    );
 
     if (!response.ok) {
       const errorText = await response.text();

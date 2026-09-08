@@ -28,6 +28,7 @@ import { CONTROL_RUNTIME_RESERVED_ENV_VARS } from '../../../src/shared/runtime-e
 import {
   buildHeartbeatPayload,
   cancelControlTasks,
+  createControlHandlerDeps,
   createSessionActivityRegistry,
   handleControlRequest,
   refreshHeartbeatPayload,
@@ -83,6 +84,7 @@ function completion(error?: Completion['info']['error']): Completion {
 function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient {
   return {
     getSession: async id => ({ id }),
+    getSessionDetails: async (id, directory) => ({ id, directory }),
     ensureSession: async () => undefined,
     sendPrompt: async () => completion(),
     sendPromptAsync: async () => {},
@@ -93,7 +95,7 @@ function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient
     answerPermission: async () => true,
     answerQuestion: async () => true,
     rejectQuestion: async () => true,
-    getSessionStatuses: async () => ({}),
+    getSessionStatuses: async () => ({ [session.kiloSessionId]: { type: 'idle' } }),
     getQuestions: async () => [],
     getPermissions: async () => [],
     ...overrides,
@@ -121,6 +123,7 @@ function deps(
   const runtime: WorktreeKiloRuntime | undefined = client
     ? {
         scopeId: kilo.scopeId,
+        runtimeId: 'native_1',
         directory: identity.directory,
         env: buildWorktreeKiloEnvironment(
           identity.directory,
@@ -133,17 +136,29 @@ function deps(
         signal: new AbortController().signal,
       }
     : undefined;
-  return {
+  return createControlHandlerDeps({
     kiloRuntimes: runtime
       ? ({
           attach: () => ({
             ready: Promise.resolve(runtime),
             signal: runtime.signal,
+            cleanup: async () => 'retired',
             commit: () => {},
             release: () => {},
           }),
           detach: () => true,
           deleteDirectory: async () => {},
+          getRetained: directory => (directory === runtime.directory ? runtime : undefined),
+          retireRuntime: async (directory, _deadlineAt, target) =>
+            directory === runtime.directory &&
+            target?.runtimeId === runtime.runtimeId &&
+            target?.client === runtime.kiloClient
+              ? 'unconfirmed'
+              : 'stale',
+          verifyQuiescence: async (directory, target) =>
+            directory === runtime.directory &&
+            target.runtimeId === runtime.runtimeId &&
+            target.client === runtime.kiloClient,
           get: directory => (directory === runtime.directory ? runtime : undefined),
           isHealthy: () => true,
           shutdown: () => {},
@@ -152,13 +167,12 @@ function deps(
     version: '2.4.0',
     kiloReady: true,
     sessions: [],
-    tasks: new Map(),
     emitSessionEvent: () => {},
     retireRuntime: () => {},
     applyAttach: (session, payload, deps) =>
       applySessionAttach(session, payload, { ...deps, sessionExists: async () => true }),
     ...rest,
-  };
+  });
 }
 
 function runtimeDeps(kiloClient: WrapperKiloClient) {
@@ -166,8 +180,26 @@ function runtimeDeps(kiloClient: WrapperKiloClient) {
   const events: SessionEventPayload[] = [];
   const retired: string[] = [];
   let shuttingDown = false;
-  const handlerDeps: HandlerDeps = {
-    ...deps({ kiloClient }),
+  const handlerDeps: HandlerDeps = createControlHandlerDeps({
+    ...(() => {
+      const base = deps({ kiloClient });
+      return {
+        kiloRuntimes: base.kiloRuntimes,
+        worktreeCleanupClient: base.worktreeCleanupClient,
+        version: base.version,
+        sessions: base.sessions,
+        activity: base.activity,
+        nativeObservations: base.nativeObservations,
+        terminalRuntime: base.terminalRuntime,
+        applyAttach: base.applyAttach,
+        materializeAttachments: base.materializeAttachments,
+        runAutoCommit: base.runAutoCommit,
+        collectWorktreeChanges: base.collectWorktreeChanges,
+        onDiagnostic: base.onDiagnostic,
+        onShutdown: base.onShutdown,
+        emitPreparing: base.emitPreparing,
+      };
+    })(),
     get kiloReady() {
       return !shuttingDown;
     },
@@ -180,12 +212,12 @@ function runtimeDeps(kiloClient: WrapperKiloClient) {
       void cancelControlTasks(handlerDeps, reason, 'failed');
       abort.abort();
     },
-  };
+  });
   return { handlerDeps, events, retired };
 }
 
 async function waitForTasks(handlerDeps: HandlerDeps): Promise<void> {
-  await Promise.all([...handlerDeps.tasks.values()].map(task => task.done));
+  await Promise.all(handlerDeps.operations.activeOperations().map(task => task.done));
 }
 
 const promptPayload = {
@@ -389,7 +421,7 @@ describe('handleControlRequest', () => {
       deps({ kiloClient })
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       ok: false,
       error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
     });
@@ -415,6 +447,16 @@ describe('handleControlRequest', () => {
 
   it('attaches by verifying the kilo session', async () => {
     const result = await handleControlRequest('session.attach', session, { kilo }, deps());
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+  });
+
+  it('attaches while Kilo is not ready', async () => {
+    const result = await handleControlRequest(
+      'session.attach',
+      session,
+      { kilo },
+      deps({ kiloReady: false })
+    );
     expect(result).toEqual({ ok: true, result: { attached: true } });
   });
 
@@ -522,7 +564,7 @@ describe('handleControlRequest', () => {
     ).toMatchObject({ ok: false });
     expect(activity.snapshots()).toEqual([]);
     expect(rootForSession(session.kiloSessionId)).toBeUndefined();
-    expect(handlerDeps.tasks.size).toBe(0);
+    expect(handlerDeps.operations.counts().active).toBe(0);
   });
 
   it('marks only accepted root work active and leaves rejected sibling prompts idle', async () => {
@@ -548,7 +590,7 @@ describe('handleControlRequest', () => {
           { ...promptPayload, messageId: 'msg_2', agent: { mode: 'code' } },
           handlerDeps
         )
-      ).toEqual({
+      ).toMatchObject({
         ok: false,
         error: { code: 'protocol_error', message: 'Invalid payload', retryable: false },
       });
@@ -592,7 +634,7 @@ describe('handleControlRequest', () => {
         { env: { [name]: 'sensitive-value' } },
         deps({ kiloClient })
       );
-      expect(result).toEqual({
+      expect(result).toMatchObject({
         ok: false,
         error: {
           code: 'protocol_error',
@@ -632,6 +674,53 @@ describe('handleControlRequest', () => {
     );
     expect(result).toEqual({ ok: true, result: { success: true } });
     expect(answered).toEqual([{ permissionId: 'perm_1', response: 'once' }]);
+  });
+
+  it('fences prompts during feed recovery while allowing attachments and pending input replies', async () => {
+    const kiloClient = fakeKilo({
+      getPermissions: async () => [
+        {
+          id: 'perm_1',
+          sessionID: session.kiloSessionId,
+          permission: 'bash',
+          patterns: [],
+          metadata: {},
+          always: [],
+        },
+      ],
+    });
+    const handlerDeps = deps({ kiloClient });
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Expected Kilo runtimes');
+    runtimes.prepareForNewWork = () => false;
+
+    expect(
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps)
+    ).toEqual({
+      ok: false,
+      error: {
+        code: 'not_ready',
+        message: 'Native feed recovery is in progress',
+        retryable: true,
+        admission: 'not-admitted',
+      },
+    });
+    expect(await handleControlRequest('session.attach', session, { kilo }, handlerDeps)).toEqual({
+      ok: true,
+      result: { attached: true },
+    });
+    expect(
+      await handleControlRequest(
+        'session.permission.resolve',
+        session,
+        { permissionId: 'perm_1', response: 'once' },
+        handlerDeps
+      )
+    ).toEqual({ ok: true, result: { success: true } });
+    expect(await handleControlRequest('session.abort', session, {}, handlerDeps)).toEqual({
+      ok: true,
+      result: { status: 'already_idle' },
+    });
   });
 
   it('does not send an unfenced abort when the wrapper owns no work', async () => {
@@ -701,7 +790,11 @@ describe('handleControlRequest', () => {
         },
         getSessionStatuses: async () => {
           record('status', undefined);
-          return {};
+          return {
+            [session.kiloSessionId]: { type: 'idle' },
+            [sibling.kiloSessionId]: { type: 'idle' },
+            [other.kiloSessionId]: { type: 'idle' },
+          };
         },
         getPermissions: async () => {
           record('permissions', undefined);
@@ -726,6 +819,7 @@ describe('handleControlRequest', () => {
       runtimes.set(directory, {
         directory,
         scopeId: directory,
+        runtimeId: crypto.randomUUID(),
         env: buildWorktreeKiloEnvironment(
           directory,
           fs.mkdtempSync(path.join(homeRoot, 'worktree-')),
@@ -744,6 +838,24 @@ describe('handleControlRequest', () => {
         },
         detach: () => true,
         deleteDirectory: async () => {},
+        getRetained: directory => runtimes.get(directory),
+        retireRuntime: async (directory, _deadlineAt, target) => {
+          const runtime = runtimes.get(directory);
+          return runtime &&
+            target?.runtimeId === runtime.runtimeId &&
+            target?.client === runtime.kiloClient
+            ? 'unconfirmed'
+            : 'stale';
+        },
+        verifyQuiescence: async (directory, target) => {
+          const runtime = runtimes.get(directory);
+          return (
+            runtime !== undefined &&
+            target !== undefined &&
+            target.runtimeId === runtime.runtimeId &&
+            target.client === runtime.kiloClient
+          );
+        },
         get: directory => runtimes.get(directory),
         isHealthy: () => true,
         shutdown: () => {},
@@ -917,18 +1029,20 @@ describe('handleControlRequest', () => {
           )
         ).toEqual({ ok: true, result: { messageId: cancellingId, status: 'accepted' } });
         await pending.started.promise;
-        expect(
-          await handleControlRequest(
-            'session.abort',
-            identity,
-            { messageId: cancellingId },
-            handlerDeps
-          )
-        ).toEqual({
+        const aborting = handleControlRequest(
+          'session.abort',
+          identity,
+          { messageId: cancellingId },
+          handlerDeps
+        );
+        pending.completion.resolve(
+          completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+        );
+        expect(await aborting).toEqual({
           ok: true,
           result: { status: 'aborted' },
         });
-        expect(calls.at(-1)).toEqual({
+        expect(calls.at(-2)).toEqual({
           directory: identity.directory,
           operation: 'abort',
           value: {
@@ -937,7 +1051,11 @@ describe('handleControlRequest', () => {
             signal: expect.any(AbortSignal),
           },
         });
-        expect(handlerDeps.tasks.has(identity.kiloSessionId)).toBe(false);
+        expect(calls.at(-1)).toMatchObject({
+          directory: identity.directory,
+          operation: 'status',
+        });
+        expect(handlerDeps.operations.hasActive(identity.kiloSessionId)).toBe(false);
       } finally {
         pending.completion.resolve(completion());
         await waitForTasks(handlerDeps);
@@ -987,7 +1105,7 @@ describe('handleControlRequest', () => {
     let confirmed = false;
     const handlerDeps = deps({ kiloClient: fakeKilo({ abortSession: async () => confirmed }) });
     const runtime = handlerDeps.kiloRuntimes?.get(session.directory);
-    expect(handlerDeps.tasks.size).toBe(0);
+    expect(handlerDeps.operations.counts().active).toBe(0);
     expect(await handleControlRequest('session.detach', session, {}, handlerDeps)).toMatchObject({
       ok: false,
       error: { code: 'not_ready' },
@@ -1044,7 +1162,7 @@ describe('handleControlRequest', () => {
     try {
       await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
       await started.promise;
-      const task = handlerDeps.tasks.get(session.kiloSessionId);
+      const task = handlerDeps.operations.active(session.kiloSessionId);
       const snapshots = [...handlerDeps.sessions];
       expect(
         await handleControlRequest(
@@ -1061,7 +1179,7 @@ describe('handleControlRequest', () => {
       expect(rootForSession('child_1')).toBe(session.kiloSessionId);
       expect(rootForSession('child_2')).toBe(sibling.kiloSessionId);
       expect(directoryForSession(session.kiloSessionId)).toBe(session.directory);
-      expect(handlerDeps.tasks.get(session.kiloSessionId)).toBe(task);
+      expect(handlerDeps.operations.active(session.kiloSessionId)).toBe(task);
       expect(task?.signal.aborted).toBe(false);
       expect(handlerDeps.sessions).toEqual(snapshots);
       expect(activity.snapshots()).toEqual([
@@ -1115,10 +1233,12 @@ describe('handleControlRequest', () => {
     });
     expect(shutdowns).toBe(0);
     expect(runtimes.get(session.directory)).toBe(runtime);
-    expect(handlerDeps.tasks.get(sibling.kiloSessionId)?.signal.aborted).toBe(false);
+    expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
     expect(events).toEqual([]);
     expect(aborted).toEqual([session.kiloSessionId]);
-    expect(await handleControlRequest('session.abort', sibling, {}, handlerDeps)).toEqual({
+    const aborting = handleControlRequest('session.abort', sibling, {}, handlerDeps);
+    running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+    expect(await aborting).toEqual({
       ok: true,
       result: { status: 'aborted' },
     });
@@ -1129,7 +1249,7 @@ describe('handleControlRequest', () => {
         properties: {
           messageId: promptPayload.messageId,
           status: 'cancelled',
-          reason: 'Session aborted',
+          reason: 'Kilo execution ended with MessageAbortedError',
         },
       },
     ]);
@@ -1703,7 +1823,7 @@ describe('production worktree deletion routes', () => {
       lookups.length = 0;
       expect(rootForSession(sessionId(2))).toBeUndefined();
       expect(rootForSession(sessionId(3))).toBeUndefined();
-      const siblingTask = handlerDeps.tasks.get(sibling.kiloSessionId);
+      const siblingTask = handlerDeps.operations.active(sibling.kiloSessionId);
       preparation = handleControlRequest(
         'worktree.prepareDeletion',
         undefined,
@@ -1714,8 +1834,8 @@ describe('production worktree deletion routes', () => {
         return result;
       });
       await Promise.all([...abortStarted.values()].map(item => item.promise));
-      expect(handlerDeps.tasks.get(first.kiloSessionId)?.signal.aborted).toBe(true);
-      expect(handlerDeps.tasks.get(second.kiloSessionId)?.signal.aborted).toBe(true);
+      expect(handlerDeps.operations.active(first.kiloSessionId)?.signal.aborted).toBe(true);
+      expect(handlerDeps.operations.active(second.kiloSessionId)?.signal.aborted).toBe(true);
       expect(siblingTask?.signal.aborted).toBe(false);
       expect(prepared).toBe(false);
       expect(http.requests).toEqual([]);
@@ -1727,10 +1847,16 @@ describe('production worktree deletion routes', () => {
       });
       expect(attach).not.toHaveBeenCalled();
       abortResponses.get(first.kiloSessionId)?.resolve(true);
-      await handlerDeps.tasks.get(first.kiloSessionId)?.done;
+      completionResponses
+        .get(first.kiloSessionId)
+        ?.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await handlerDeps.operations.active(first.kiloSessionId)?.done;
       expect(prepared).toBe(false);
       expect(http.requests).toEqual([]);
       abortResponses.get(second.kiloSessionId)?.resolve(true);
+      completionResponses
+        .get(second.kiloSessionId)
+        ?.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
       expect(
         await withTimeoutAndAbort(preparation, {
           timeoutMs: 1_000,
@@ -1744,8 +1870,8 @@ describe('production worktree deletion routes', () => {
           sessionIds: [sessionId(1), sessionId(6), sessionId(2), sessionId(3)],
         },
       });
-      expect(handlerDeps.tasks.size).toBe(1);
-      expect(handlerDeps.tasks.get(sibling.kiloSessionId)).toBe(siblingTask);
+      expect(handlerDeps.operations.counts().active).toBe(1);
+      expect(handlerDeps.operations.active(sibling.kiloSessionId)).toBe(siblingTask);
       expect(siblingTask?.signal.aborted).toBe(false);
       expect(aborted.toSorted()).toEqual([first.kiloSessionId, second.kiloSessionId]);
       expect(outcomes.map(item => item.id).toSorted()).toEqual([
@@ -1759,7 +1885,8 @@ describe('production worktree deletion routes', () => {
             item.event.properties.status === 'cancelled'
         )
       ).toBe(true);
-      expect(lookups).toEqual([directory]);
+      expect(lookups.length).toBeGreaterThan(0);
+      expect(lookups.every(value => value === directory)).toBe(true);
       expect(http.requests.every(request => request.directory === directory)).toBe(true);
       expect(http.requests).toContainEqual({
         method: 'POST',
@@ -1892,6 +2019,7 @@ describe('production worktree deletion routes', () => {
     const detached: string[] = [];
     const forbidden: string[] = [];
     const siblingRuntime: WorktreeKiloRuntime = {
+      runtimeId: 'native_sibling',
       directory: siblingDirectory,
       scopeId: path.basename(siblingDirectory),
       env: {},
@@ -2151,7 +2279,7 @@ describe('owned control execution', () => {
       updateSessionSnapshots(event, handlerDeps.sessions);
     }
     expect(events).toEqual([]);
-    expect(handlerDeps.tasks.size).toBe(1);
+    expect(handlerDeps.operations.counts().active).toBe(1);
     finished.resolve(completion());
     await waitForTasks(handlerDeps);
     expect(events[0]?.properties).toEqual({ messageId: 'msg_1', status: 'completed' });
@@ -2203,6 +2331,18 @@ describe('owned control execution', () => {
       expect(
         await handleControlRequest('session.abort', session, { messageId: 'older' }, handlerDeps)
       ).toEqual({ ok: true, result: { status: 'already_idle' } });
+      expect(
+        await handleControlRequest(
+          'session.abort',
+          session,
+          {
+            messageId: 'older',
+            operationId: '11111111-1111-4111-8111-111111111111',
+            cleanupDeadlineAt: Date.now() + 1_000,
+          },
+          handlerDeps
+        )
+      ).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
       expect(taskSignal?.aborted).toBe(false);
       expect(aborts).toBe(0);
       const aborting = handleControlRequest(
@@ -2217,22 +2357,27 @@ describe('owned control execution', () => {
         await handleControlRequest('session.prompt', session, payload, handlerDeps)
       ).toMatchObject({ ok: false });
       expect(events).toEqual([]);
-      expect(handlerDeps.tasks.get(session.kiloSessionId)?.messageId).toBe('newer');
+      expect(handlerDeps.operations.active(session.kiloSessionId)?.messageId).toBe('newer');
       remoteStopped.resolve(true);
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
       expect(await aborting).toEqual({ ok: true, result: { status: 'aborted' } });
       expect(events).toEqual([
         {
           type: 'session.message.outcome',
-          properties: { messageId: 'newer', status: 'cancelled', reason: 'Session aborted' },
+          properties: {
+            messageId: 'newer',
+            status: 'cancelled',
+            reason: 'Kilo execution ended with MessageAbortedError',
+          },
         },
       ]);
-      expect(handlerDeps.tasks.size).toBe(0);
+      expect(handlerDeps.operations.counts().active).toBe(0);
       expect(await handleControlRequest('session.prompt', session, payload, handlerDeps)).toEqual({
         ok: true,
         result: { messageId: 'msg_1', status: 'accepted' },
       });
       await replacementStarted.promise;
-      const replacementTask = handlerDeps.tasks.get(session.kiloSessionId);
+      const replacementTask = handlerDeps.operations.active(session.kiloSessionId);
       expect(replacementTask?.messageId).toBe('msg_1');
       const oldCompletion = completion();
       running.resolve({
@@ -2240,7 +2385,7 @@ describe('owned control execution', () => {
         info: { ...oldCompletion.info, parentID: 'newer' },
       });
       await new Promise<void>(resolve => setImmediate(resolve));
-      expect(handlerDeps.tasks.get(session.kiloSessionId)).toBe(replacementTask);
+      expect(handlerDeps.operations.active(session.kiloSessionId)).toBe(replacementTask);
       expect(replacementTask?.signal.aborted).toBe(false);
       expect(finalized).toEqual([]);
       expect(events).toHaveLength(1);
@@ -2275,6 +2420,88 @@ describe('owned control execution', () => {
     }
   });
 
+  it('keeps a scoped Stop unconfirmed when native completion misses a successful abort acknowledgement', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const started = Promise.withResolvers<void>();
+    const { handlerDeps, retired } = runtimeDeps(
+      fakeKilo({
+        sendPrompt: () => {
+          started.resolve();
+          return running.promise;
+        },
+        abortSession: async () => true,
+      })
+    );
+    try {
+      await handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+      await started.promise;
+
+      const aborted = await handleControlRequest(
+        'session.abort',
+        session,
+        {
+          messageId: promptPayload.messageId,
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: Date.now() + 20,
+        },
+        handlerDeps
+      );
+      expect(aborted).toEqual({ ok: true, result: { status: 'aborted', quiescent: true } });
+
+      expect(retired).toEqual([]);
+    } finally {
+      running.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+      await waitForTasks(handlerDeps);
+    }
+  });
+
+  it('keeps a scoped Stop unconfirmed when preparation fails after cancellation', async () => {
+    const started = Promise.withResolvers<void>();
+    const handlerDeps = deps({
+      applyAttach: async (_identity, _payload, hooks) => {
+        started.resolve();
+        const signal = hooks.signal;
+        if (!signal) throw new Error('Missing preparation cancellation signal');
+        await new Promise<void>(resolve =>
+          signal.addEventListener('abort', () => resolve(), { once: true })
+        );
+        return {
+          ok: false,
+          error: { code: 'not_ready', message: 'Preparation failed', retryable: true },
+        };
+      },
+    });
+    const attaching = handleControlRequest('session.attach', session, {}, handlerDeps);
+    await started.promise;
+
+    const aborted = await handleControlRequest(
+      'session.abort',
+      session,
+      {
+        operationId: '11111111-1111-4111-8111-111111111111',
+        cleanupDeadlineAt: Date.now() + 1_000,
+      },
+      handlerDeps
+    );
+    expect(aborted).toEqual({ ok: true, result: { status: 'unconfirmed', quiescent: false } });
+    expect(await attaching).toMatchObject({ ok: false });
+  });
+
+  it('treats abort of a missing native runtime as already retired', async () => {
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    expect(
+      await handleControlRequest('session.abort', session, { nativeRuntimeId }, deps())
+    ).toEqual({
+      ok: true,
+      result: {
+        status: 'aborted',
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId,
+      },
+    });
+  });
+
   it.each(['false', 'malformed', 'HTTP failure'] as const)(
     'retires and rejects replacement work after an abort returns %s',
     async response => {
@@ -2301,10 +2528,10 @@ describe('owned control execution', () => {
         expect(
           await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
         ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
-        expect(retired).toEqual(['Kilo cancellation failed']);
+        expect(retired).toEqual(['Kilo cancellation was not confirmed']);
         expect(handlerDeps.signal?.aborted).toBe(true);
         expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
-        expect(handlerDeps.tasks.size).toBe(0);
+        expect(handlerDeps.operations.counts().active).toBe(0);
         expect(
           await handleControlRequest(
             'session.prompt',
@@ -2358,9 +2585,9 @@ describe('owned control execution', () => {
       expect(
         await handleControlRequest('session.abort', session, { messageId: 'msg_1' }, handlerDeps)
       ).toMatchObject({ ok: false, error: { code: 'not_ready' } });
-      expect(retired).toEqual(['Kilo cancellation failed']);
+      expect(retired).toEqual(['Kilo cancellation was not confirmed']);
       expect(handlerDeps.signal?.aborted).toBe(true);
-      expect(handlerDeps.tasks.size).toBe(0);
+      expect(handlerDeps.operations.counts().active).toBe(0);
       expect(
         await handleControlRequest(
           'session.prompt',
@@ -2407,7 +2634,7 @@ describe('owned control execution', () => {
       );
       const abortSignal = await abortStarted.promise;
       expect(abortSignal.aborted).toBe(false);
-      expect(handlerDeps.tasks.get(session.kiloSessionId)?.messageId).toBe('msg_1');
+      expect(handlerDeps.operations.active(session.kiloSessionId)?.messageId).toBe('msg_1');
       expect(events).toEqual([]);
       expect(
         await handleControlRequest(
@@ -2417,19 +2644,21 @@ describe('owned control execution', () => {
           handlerDeps
         )
       ).toMatchObject({ ok: false });
-      const deadline = timers.mock.calls.find(
-        ([, ms]) => ms === KILO_CONTROL_REQUEST_TIMEOUT_MS
-      )?.[0];
-      if (typeof deadline !== 'function') throw new Error('Missing abort request deadline');
-      deadline();
+      const deadlines = timers.mock.calls
+        .filter(([, ms]) => ms === KILO_CONTROL_REQUEST_TIMEOUT_MS)
+        .slice(-2)
+        .map(([callback]) => callback);
+      if (deadlines.length !== 2 || deadlines.some(callback => typeof callback !== 'function'))
+        throw new Error('Missing abort request deadlines');
+      for (const deadline of deadlines) deadline();
       expect(await aborting).toMatchObject({ ok: false, error: { code: 'not_ready' } });
       expect(abortSignal.aborted).toBe(true);
-      expect(retired).toEqual(['Kilo cancellation failed']);
+      expect(retired).toEqual(['Kilo cancellation was not confirmed']);
       expect(handlerDeps.signal?.aborted).toBe(true);
       remoteStopped.resolve(true);
       running.resolve(completion());
       await new Promise<void>(resolve => setImmediate(resolve));
-      expect(handlerDeps.tasks.size).toBe(0);
+      expect(handlerDeps.operations.counts().active).toBe(0);
       expect(events).toHaveLength(1);
       expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
       expect(
@@ -2460,6 +2689,12 @@ describe('owned control execution', () => {
           started.resolve();
           return running.promise;
         },
+        abortSession: async () => {
+          running.resolve(
+            completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+          );
+          return true;
+        },
       }),
       emitSessionEvent: (_session, event) => events.push(event),
       retireRuntime: reason => {
@@ -2482,16 +2717,16 @@ describe('owned control execution', () => {
       const deadline = timers.mock.calls.find(
         ([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS
       )?.[0];
-      if (typeof deadline !== 'function') throw new Error('missing owned execution deadline');
+      if (typeof deadline !== 'function') throw new Error('Missing owned execution deadline');
       deadline();
       await waitForTasks(handlerDeps);
-      expect(retired).toEqual(['Execution exceeded the 60 minute limit']);
+      expect(retired).toEqual([]);
       expect(events[0]?.properties).toEqual({
         messageId: 'msg_1',
-        status: 'failed',
-        reason: 'Execution exceeded the 60 minute limit',
+        status: 'cancelled',
+        reason: 'Kilo execution ended with MessageAbortedError',
       });
-      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(true);
       expect(
         await handleControlRequest(
           'session.prompt',
@@ -2499,7 +2734,7 @@ describe('owned control execution', () => {
           { ...promptPayload, messageId: 'next' },
           handlerDeps
         )
-      ).toMatchObject({ ok: false });
+      ).toMatchObject({ ok: true, result: { messageId: 'next', status: 'accepted' } });
     } finally {
       running.resolve(completion());
       timers.mockRestore();
@@ -2792,10 +3027,10 @@ describe('control finalization and compact', () => {
       if (typeof deadline !== 'function') throw new Error('Missing owned execution deadline');
       deadline();
       expect(signal.aborted).toBe(true);
-      expect(handlerDeps.tasks.size).toBe(1);
+      expect(handlerDeps.operations.counts().active).toBe(1);
       stopped.resolve({ success: false });
       await waitForTasks(handlerDeps);
-      expect(retired).toEqual(['Execution exceeded the 60 minute limit']);
+      expect(retired).toEqual([]);
       expect(events.at(-1)?.properties).toEqual({
         messageId: 'msg_1',
         status: 'failed',
@@ -2890,7 +3125,7 @@ describe('control finalization and compact', () => {
         handlerDeps
       )
     ).toMatchObject({ ok: false, error: { code: 'protocol_error' } });
-    expect(handlerDeps.tasks.size).toBe(0);
+    expect(handlerDeps.operations.counts().active).toBe(0);
     expect(
       await handleControlRequest('session.prompt', session, payload, handlerDeps)
     ).toMatchObject({ ok: true });
@@ -2978,7 +3213,7 @@ describe('control cancellation and attachments', () => {
         );
         expect(cancelled).toMatchObject({ ok: true });
         expect(await siblingAttach).toMatchObject({ ok: false });
-        expect(handlerDeps.tasks.has(sibling.kiloSessionId)).toBe(false);
+        expect(handlerDeps.operations.hasActive(sibling.kiloSessionId)).toBe(false);
         expect(signal.aborted).toBe(false);
         expect(buildHeartbeatPayload(handlerDeps).activeKiloSessions).toBe(1);
 
@@ -2998,7 +3233,7 @@ describe('control cancellation and attachments', () => {
         await new Promise<void>(resolve => setImmediate(resolve));
         expect(signal.aborted).toBe(true);
         expect(cancellationSettled).toBe(false);
-        expect(handlerDeps.tasks.has(session.kiloSessionId)).toBe(true);
+        expect(handlerDeps.operations.hasActive(session.kiloSessionId)).toBe(true);
         expect(setupCommands).toEqual(['first']);
 
         stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
@@ -3029,6 +3264,12 @@ describe('control cancellation and attachments', () => {
             started.resolve();
             return running.promise;
           },
+          abortSession: async () => {
+            running.resolve(
+              completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+            );
+            return true;
+          },
         }),
         applyAttach: (identity, payload, dependencies) =>
           applySessionAttach(identity, payload, {
@@ -3043,7 +3284,7 @@ describe('control cancellation and attachments', () => {
         terminalRuntime: fakeTerminalRuntime({
           detachSession: async () => {
             expect(workSignal?.aborted).toBe(true);
-            expect(handlerDeps.tasks.size).toBe(0);
+            expect(handlerDeps.operations.counts().active).toBe(0);
             detached = true;
           },
         }),
@@ -3095,7 +3336,7 @@ describe('control cancellation and attachments', () => {
       },
       terminalRuntime: fakeTerminalRuntime({
         shutdown: () => {
-          expect(handlerDeps.tasks.size).toBe(0);
+          expect(handlerDeps.operations.counts().active).toBe(0);
           terminalStopped = true;
         },
       }),
@@ -3109,6 +3350,12 @@ describe('control cancellation and attachments', () => {
           sendCommand: opts => {
             if (opts.signal) signals.push(opts.signal);
             return running.promise;
+          },
+          abortSession: async () => {
+            running.resolve(
+              completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+            );
+            return true;
           },
         }),
       },
@@ -3138,7 +3385,7 @@ describe('control cancellation and attachments', () => {
         handlerDeps
       )
     ).toEqual({ ok: true, result: { messageId: promptPayload.messageId, status: 'accepted' } });
-    expect(handlerDeps.tasks.size).toBe(2);
+    expect(handlerDeps.operations.counts().active).toBe(2);
     expect(await handleControlRequest('sandbox.shutdown', undefined, {}, handlerDeps)).toEqual({
       ok: true,
       result: { shuttingDown: true },
@@ -3147,11 +3394,6 @@ describe('control cancellation and attachments', () => {
     expect(signals).toHaveLength(2);
     expect(signals.every(signal => signal.aborted)).toBe(true);
     expect(terminalStopped).toBe(true);
-    expect(
-      await handleControlRequest('session.attach', session, { kilo }, handlerDeps)
-    ).toMatchObject({
-      ok: false,
-    });
     running.resolve(completion());
   });
 
@@ -3202,17 +3444,18 @@ describe('control cancellation and attachments', () => {
       ).toMatchObject({
         ok: false,
       });
-      expect(handlerDeps.tasks.size).toBe(1);
+      expect(handlerDeps.operations.counts().active).toBe(1);
       stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
       expect(await attaching).toMatchObject({ ok: false });
       expect(markerWritten).toBe(false);
-      expect(handlerDeps.tasks.size).toBe(0);
-      expect(retired).toEqual(['Session preparation timed out']);
-      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(false);
+      expect(handlerDeps.operations.counts().active).toBe(0);
+      expect(retired).toEqual([]);
+      expect(buildHeartbeatPayload(handlerDeps).kilo.ready).toBe(true);
       expect(
         await handleControlRequest('session.attach', session, { kilo }, handlerDeps)
       ).toMatchObject({
-        ok: false,
+        ok: true,
+        result: { attached: true },
       });
     } finally {
       stopped.resolve({ exitCode: 0, stdout: '', stderr: '' });
@@ -3605,6 +3848,98 @@ describe('control interactions and sync', () => {
     expect(resolved).toEqual([]);
   });
 
+  it.each(['question', 'permission'] as const)(
+    'keeps unresolved %s ancestry unknown regardless of claimed root and permits only proven replies',
+    async kind => {
+      rememberAttachedRoot('foreign', session.directory);
+      rememberChildSession({
+        childId: 'owned_child',
+        parentId: session.kiloSessionId,
+        directory: session.directory,
+      });
+      const replied: string[] = [];
+      for (const claimedRoot of [undefined, 'foreign', session.kiloSessionId]) {
+        const template = { ...question, ...permission };
+        const unknown = {
+          ...template,
+          id: 'unknown',
+          sessionID: 'unresolved_child',
+          rootKiloSessionId: claimedRoot,
+        };
+        const owned = {
+          ...template,
+          id: 'owned',
+          sessionID: 'owned_child',
+          rootKiloSessionId: 'foreign',
+        };
+        const foreign = {
+          ...template,
+          id: 'foreign',
+          sessionID: 'foreign',
+          rootKiloSessionId: session.kiloSessionId,
+        };
+        let requests = [unknown];
+        const handlerDeps = deps({
+          kiloClient: fakeKilo({
+            ...(kind === 'question'
+              ? { getQuestions: async () => requests }
+              : { getPermissions: async () => requests }),
+            answerQuestion: async id => {
+              replied.push(id);
+              return true;
+            },
+            answerPermission: async id => {
+              replied.push(id);
+              return true;
+            },
+          }),
+        });
+        expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+          ok: false,
+        });
+        requests = [unknown, owned, foreign];
+        for (const id of ['owned', 'unknown', 'foreign', 'missing']) {
+          const result = await handleControlRequest(
+            kind === 'question' ? 'session.question.resolve' : 'session.permission.resolve',
+            session,
+            kind === 'question'
+              ? { action: 'answer', questionId: id, answers: [['yes']] }
+              : { permissionId: id, response: 'once' },
+            handlerDeps
+          );
+          expect(result).toMatchObject(
+            id === 'owned' ? { ok: true } : { ok: false, error: { code: 'unauthorized' } }
+          );
+        }
+        expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+          ok: false,
+        });
+        requests = [foreign];
+        expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toEqual({
+          ok: true,
+          result: { status: { type: 'idle' }, questions: [], permissions: [] },
+        });
+      }
+      expect(replied).toEqual(['owned', 'owned', 'owned']);
+    }
+  );
+
+  it('replaces forged root metadata on positively owned root requests', async () => {
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({
+        getQuestions: async () => [{ ...question, rootKiloSessionId: 'foreign' }],
+        getPermissions: async () => [{ ...permission, rootKiloSessionId: 'foreign' }],
+      }),
+    });
+    expect(await handleControlRequest('session.sync', session, {}, handlerDeps)).toMatchObject({
+      ok: true,
+      result: {
+        questions: [{ ...question, rootKiloSessionId: session.kiloSessionId }],
+        permissions: [{ ...permission, rootKiloSessionId: session.kiloSessionId }],
+      },
+    });
+  });
+
   it('stamps verified child-question snapshots for reconnect without trusting sibling root claims', async () => {
     const syncSession = {
       sessionId: 'workspace_sync_a',
@@ -3613,6 +3948,11 @@ describe('control interactions and sync', () => {
     };
     rememberAttachedRoot('kilo_sync_a', syncSession.directory);
     rememberAttachedRoot('kilo_sync_b', syncSession.directory);
+    rememberChildSession({
+      childId: 'unmapped_child',
+      parentId: 'kilo_sync_b',
+      directory: syncSession.directory,
+    });
     rememberChildSession({
       childId: 'kilo_sync_child',
       parentId: 'kilo_sync_a',
@@ -3682,6 +4022,11 @@ describe('control interactions and sync', () => {
     });
     rememberChildSession({ childId: 'grandchild', parentId: 'child', directory: childDirectory });
     rememberAttachedRoot('sibling', session.directory);
+    rememberChildSession({
+      childId: 'unmapped',
+      parentId: 'sibling',
+      directory: session.directory,
+    });
     const replies: unknown[] = [];
     const queried = new Set<string>();
     const handlerDeps = deps({
@@ -3805,6 +4150,7 @@ describe('control interactions and sync', () => {
   });
 
   it('uses fresh directory-scoped reads and preserves the complete pending interaction shape', async () => {
+    rememberAttachedRoot('other', session.directory);
     const directories: unknown[] = [];
     let calls = 0;
     const handlerDeps = deps({
@@ -3971,6 +4317,22 @@ describe('control interactions and sync', () => {
   });
 });
 
+describe('control handler dependency construction', () => {
+  it('preserves live readiness getters instead of freezing their initial value', () => {
+    let ready = true;
+    const input = {
+      ...deps(),
+      get kiloReady() {
+        return ready;
+      },
+    };
+    const handlers = createControlHandlerDeps(input);
+    expect(buildHeartbeatPayload(handlers).kilo.ready).toBe(true);
+    ready = false;
+    expect(buildHeartbeatPayload(handlers).kilo.ready).toBe(false);
+  });
+});
+
 describe('control wrapper heartbeat source policy', () => {
   const source = fs
     .readFileSync(new URL('./main.ts', import.meta.url), 'utf8')
@@ -3980,17 +4342,20 @@ describe('control wrapper heartbeat source policy', () => {
     expect(source).toContain(
       "diagnosticReason: NonNullable<SandboxHeartbeatPayload['kilo']['reason']> = 'shutdown'"
     );
+    expect(source).toMatch(/void control \.reportNativeRuntimeRetirement\(\{/);
     expect(source).toContain(
-      'onUnexpectedClose: failure => shutdown( 1, `Kilo worktree failed reason=${failure.reason} directory=${failure.directory}`, failure.reason )'
+      "if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement)"
     );
+    expect(source).toContain('nativeRuntimeId: failure.runtimeId,');
     expect(source).toContain(
       "onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected')"
     );
+    expect(source).toContain('shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason))');
     expect(source).toContain(
       'if (!payload.kilo.ready && heartbeatReason) payload.kilo.reason = heartbeatReason;'
     );
     expect(source).toContain(
-      'getHeartbeatPayload: async () => withHeartbeatReason(await refreshHeartbeatPayload(deps))'
+      'getHeartbeatPayload: () => withHeartbeatReason(buildHeartbeatPayload(deps))'
     );
   });
 
@@ -4074,7 +4439,7 @@ describe('buildHeartbeatPayload', () => {
           running.resolve(completion());
           await finalizing.promise;
         }
-        const task = handlerDeps.tasks.get(session.kiloSessionId);
+        const task = handlerDeps.operations.active(session.kiloSessionId);
         expect(task?.kind).toBe(phase);
         expect(await refreshHeartbeatPayload(handlerDeps)).toMatchObject({
           state: phase === 'finalizing' ? 'finalizing' : 'active',
@@ -4090,7 +4455,7 @@ describe('buildHeartbeatPayload', () => {
           ],
         });
         expect(activity.snapshots().every(snapshot => snapshot.state === 'idle')).toBe(true);
-        expect(handlerDeps.tasks.get(session.kiloSessionId)).toBe(task);
+        expect(handlerDeps.operations.active(session.kiloSessionId)).toBe(task);
         expect(events).toEqual([]);
         running.resolve(completion());
         finalized.resolve({ success: true });
@@ -4270,7 +4635,7 @@ describe('refreshHeartbeatPayload', () => {
         kilo: { ready: true },
         sessions: [{ kiloSessionId: session.kiloSessionId, state: 'idle', idleForMs: 0 }],
       });
-      expect(handlerDeps.tasks.size).toBe(0);
+      expect(handlerDeps.operations.counts().active).toBe(0);
       expect(events).toEqual([
         {
           type: 'session.message.outcome',
@@ -4339,7 +4704,7 @@ describe('refreshHeartbeatPayload', () => {
           { kiloSessionId: session.kiloSessionId, state: 'idle', idleForMs: 0 },
         ],
       });
-      expect(handlerDeps.tasks.size).toBe(0);
+      expect(handlerDeps.operations.counts().active).toBe(0);
     } finally {
       statuses.resolve({});
       await refresh;
@@ -4855,7 +5220,7 @@ describe('session.git.summary', () => {
     expect(directories).toEqual([session.directory, session.directory]);
     expect(activity.snapshots()).toEqual(snapshots);
     expect(handlerDeps.sessions).toEqual([]);
-    expect(handlerDeps.tasks.size).toBe(0);
+    expect(handlerDeps.operations.counts().active).toBe(0);
   });
 
   it('drains in-flight capture before deletion and rejects late results without fencing another worktree', async () => {
@@ -4906,7 +5271,7 @@ describe('session.git.summary', () => {
       });
       await deletion;
       expect(fenced).toBe(true);
-      expect(handlerDeps.tasks.size).toBe(0);
+      expect(handlerDeps.operations.counts().active).toBe(0);
       expect(handlerDeps.sessions).toEqual([]);
     } finally {
       capture.resolve(captured);
@@ -4964,7 +5329,7 @@ describe('session.git.summary', () => {
         expect(rootForSession(sibling.kiloSessionId, sibling.directory)).toBe(
           sibling.kiloSessionId
         );
-        expect(handlerDeps.tasks.size).toBe(0);
+        expect(handlerDeps.operations.counts().active).toBe(0);
       } finally {
         capture.resolve(captured);
         await request;

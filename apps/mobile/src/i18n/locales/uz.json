@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Boshqa qurilmalarni ko'rish va ulardagi sessiyalarni tugatish",
     "feedback": "Fikr-mulohaza",
     "privacyChoices": "Maxfiylik sozlamalari",
-    "signOut": "Tizimdan chiqish",
     "deleteAccount": "Hisobni o‘chirish",
     "confirmationCode": "Tasdiqlash kodi",
     "confirmationCodePlaceholder": "6 xonali kod",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Enter tugmasi xabar yuboradi",
     "returnSendsMessageSubtitle": "O'chirilganda Enter tugmasi agentga xabar kiritish maydonida yangi qator ochadi.",
     "biometricUnlock": "Biometriya yordamida qulfni ochish",
-    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi."
+    "biometricUnlockSubtitle": "Ilova ishga tushirilganda va fonda besh daqiqa turgandan keyin qulfni ochish talab qilinadi.",
+    "featureFlags": "Funksiya bayroqlari",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR mavjud emas",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Erta foydalanish tarifingizni mobil qurilmada ishlatishdan oldin mutaxassis tekshirishi kerak.",
       "iosTitle": "KiloClaw iOSda mavjud emas",
       "iosBody": "Bu hisobning KiloClawdan foydalanish huquqi iOS ilovasidan tashqarida boshqariladi.",
-      "iosContact": "Savollaringiz bormi? hi@kilo.ai ga murojaat qiling."
+      "iosContact": "Savollaringiz bormi? hi@kilo.ai ga murojaat qiling.",
+      "quarantinedCta": "Jamoamizga xat yuborish",
+      "nonCanonicalEarlybirdCta": "Tarifingizni kilo.ai'da ko'rib chiqish"
     },
     "instanceCard": {
       "needsAttention": "{{name}} e'tibor talab qiladi: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHubni ochib bo'lmadi. Iltimos, qayta urinib ko'ring."
     },
     "settingsSave": {
-      "keepEditing": "Tahrirlashni davom ettirish",
       "saveChanges": "O'zgarishlarni saqlash",
       "unsavedTitle": "Saqlanmagan o'zgarishlar",
       "unsavedMessage": "Bu ekrandan chiqishdan oldin o'zgarishlar saqlansinmi?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Faol sessiyalarni yuklab bo'lmadi.",
+      "couldNotRefresh": "Yangilab bo'lmadi",
       "noSessionsYetDescription": "Telefoningizdan kod yozish vazifasini boshlang. Sessiyalaringiz shu yerda ko'rinadi.",
       "noMatches": "Mos sessiya topilmadi",
       "tryDifferentSearch": "Boshqa so‘z bilan qidirib ko‘ring.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Rasm yuklanmoqda",
       "imageUnavailableRetry": "Rasm yuklanmadi, qayta yuklash",
-      "imageUnavailableWithAlt": "Rasmni yuklab bo'lmadi: {{alt}}.",
       "imagePreviewUnavailableInSession": "Bu sessiyada rasmni oldindan ko'rib bo'lmaydi.",
       "viewImage": "Rasmni ko'rish",
       "viewImageWithAlt": "{{alt}} rasmini ko'rish",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Yuborishdan oldin modelni tanlang.",
       "preparingPlaceholder": "Muhit sozlanmoqda...",
       "finalizingPlaceholder": "Yakunlanmoqda...",
-      "messagePlaceholder": "Xabar",
       "cannotReceiveFiles": "Bu sessiya fayllarni qabul qila olmaydi. Xabarni yuborish uchun biriktirilgan fayllarni olib tashlang.",
       "couldNotAttachFiles": "Fayllarni biriktirib bo'lmadi. Qayta urinish uchun yuborish tugmasini bosing.",
       "discardAttachmentsMessage": "Hali hech bir xabarga biriktirilmagan yuklangan fayllar o'chiriladi.",
@@ -2556,6 +2560,10 @@
     "stopped": "Ovozli kiritish to'xtatildi. Qayta urinish uchun mikrofonni bosing.",
     "unavailableDevice": "Ovozli kiritish bu qurilmada mavjud emas.",
     "unavailableLanguage": "Qurilmada tanlangan til uchun ovozli kiritish mavjud emas.",
+    "languageNotInstalledTitle": "{{language}} uchun ovozli kiritish hali tayyor emas",
+    "languageNotInstalledMessage": "{{language}} tilining oflayn nutq fayllari bu telefonda o'rnatilmagan. Ularni yuklab oling, so'ngra ovozli kiritishni qayta sinab ko'ring.",
+    "downloadOfflineModel": "Yuklab olish",
+    "offlineModelDownloadScheduled": "Oflayn nutq fayllari fonda yuklab olinadi. Ovozli kiritishni keyinroq qayta sinab ko'ring.",
     "listeningStopped": "Tinglash to'xtatildi."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Bekor qilingan",
         "uncollectible": "Undirib bo'lmaydi"
       },
-      "loadMoreFailed": "Qolganlarini yuklab bo‘lmadi.",
       "truncated": "Oldingi hisob-fakturalar ham mavjud."
     },
     "lowBalanceAlert": {

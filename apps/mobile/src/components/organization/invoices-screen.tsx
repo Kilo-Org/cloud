@@ -1,7 +1,8 @@
 import { Download, FileText } from '@/components/ui/icons';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, Pressable, View } from 'react-native';
+import { FlatList, Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { toast } from 'sonner-native';
 
@@ -267,7 +268,7 @@ export function OrganizationInvoicesScreen() {
         {isLaterPageError && (
           <View className="items-center gap-3 px-6 py-4">
             <Text variant="muted" className="text-center text-xs">
-              {t('organization.invoices.loadMoreFailed')}
+              {t('common.couldnTLoadMore')}
             </Text>
             <Button
               variant="outline"

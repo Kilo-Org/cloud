@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "වෙනත් උපාංග පරීක්ෂා කර ඒවායේ ගිණුමෙන් පිටවන්න",
     "feedback": "ප්‍රතිපෝෂණය",
     "privacyChoices": "රහස්‍යතා තේරීම්",
-    "signOut": "පිටවන්න",
     "deleteAccount": "ගිණුම මකන්න",
     "confirmationCode": "තහවුරු කිරීමේ කේතය",
     "confirmationCodePlaceholder": "ඉලක්කම් 6 ක කේතය",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "එන්ටර් යතුරෙන් පණිවිඩය යවයි",
     "returnSendsMessageSubtitle": "මෙය අක්‍රීය කළ විට එන්ටර් යතුරෙන් නියෝජිත පණිවිඩ කොටුවල නව පේළියක් ඇතුළත් කරයි.",
     "biometricUnlock": "ජෛවමිතික දත්ත භාවිතයෙන් අගුළු හරින්න",
-    "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ."
+    "biometricUnlockSubtitle": "යෙදුම ආරම්භ කරන විට සහ පසුබිමේ මිනිත්තු පහක් පැවතීමෙන් පසු අගුළු හැරීම අවශ්‍ය වේ.",
+    "featureFlags": "විශේෂාංග ධ්වජ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "පුල් ඉල්ලීම ලබා ගත නොහැක",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "ඔබේ මුල් ප්‍රවේශ සැලැස්ම ජංගම දුරකථනයෙන් භාවිත කිරීමට පෙර පුද්ගලයෙකු විසින් සමාලෝචනය කළ යුතුය.",
       "iosTitle": "IOS හි KiloClaw ලබා ගත නොහැක",
       "iosBody": "මෙම ගිණුමේ KiloClaw ප්‍රවේශය කළමනාකරණය කරන්නේ iOS යෙදුමෙන් පිටතදීය.",
-      "iosContact": "ප්‍රශ්න තිබේද? hi@kilo.ai වෙත ඊමේල් පණිවිඩයක් යවන්න."
+      "iosContact": "ප්‍රශ්න තිබේද? hi@kilo.ai වෙත ඊමේල් පණිවිඩයක් යවන්න.",
+      "quarantinedCta": "අපේ කණ්ඩායමට ඊමේල් යවන්න",
+      "nonCanonicalEarlybirdCta": "ඔබේ සැලැස්ම Kilo.ai හි පරීක්ෂා කරන්න"
     },
     "instanceCard": {
       "needsAttention": "{{name}} පිළිබඳව අවධානය යොමු කළ යුතුය: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub විවෘත කළ නොහැකි විය. කරුණාකර නැවත උත්සාහ කරන්න."
     },
     "settingsSave": {
-      "keepEditing": "දිගටම සංස්කරණය කරන්න",
       "saveChanges": "වෙනස්කම් සුරකින්න",
       "unsavedTitle": "සුරැකී නැති වෙනස්කම්",
       "unsavedMessage": "මෙම තිරයෙන් ඉවත්වීමට පෙර ඔබේ වෙනස්කම් සුරකින්නද?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "සක්‍රීය සැසි පූරණය කිරීමට නොහැකි විය.",
+      "couldNotRefresh": "නැවුම් කිරීමට නොහැකි විය",
       "noSessionsYetDescription": "ඔබේ දුරකථනයෙන් කේත ලිවීමේ කාර්යයක් ආරම්භ කරන්න. ඔබේ සැසි මෙහි දිස්වනු ඇත.",
       "noMatches": "ගැළපෙන සැසි නොමැත",
       "tryDifferentSearch": "වෙනත් සෙවුම් පදයක් යොදා බලන්න.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "රූපය පූරණය වෙමින්",
       "imageUnavailableRetry": "රූපය ලබා ගත නොහැක. එය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
-      "imageUnavailableWithAlt": "{{alt}} රූපය ලබා ගත නොහැක.",
       "imagePreviewUnavailableInSession": "මෙම සැසියේදී රූප පෙරදසුන ලබාගත නොහැක.",
       "viewImage": "රූපය බලන්න",
       "viewImageWithAlt": "{{alt}} රූපය බලන්න",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "යැවීමට පෙර මාදිලියක් තෝරන්න.",
       "preparingPlaceholder": "පරිසරය සකසමින්...",
       "finalizingPlaceholder": "අවසන් කරමින්...",
-      "messagePlaceholder": "පණිවිඩය",
       "cannotReceiveFiles": "මෙම සැසියට ගොනු ලැබිය නොහැක. ඔබේ පණිවිඩය යැවීමට ඇමුණුම් ඉවත් කරන්න.",
       "couldNotAttachFiles": "ගොනු ඇමිණිය නොහැකි විය. නැවත උත්සාහ කිරීමට යැවීමේ බොත්තම තට්ටු කරන්න.",
       "discardAttachmentsMessage": "යැවූ පණිවිඩවලට අමුණා නැති උඩුගත කළ ගොනු මකා දමනු ඇත.",
@@ -2556,6 +2560,10 @@
     "stopped": "හඬ ආදානය නතර විය. නැවත උත්සාහ කිරීමට මයික්‍රෆෝනයේ සලකුණ තට්ටු කරන්න.",
     "unavailableDevice": "මෙම උපාංගයේ හඬ ආදානය ලබා ගත නොහැක.",
     "unavailableLanguage": "මෙම උපාංගයේ භාෂාව සඳහා හඬ ආදානය භාවිතා කළ නොහැක.",
+    "languageNotInstalledTitle": "{{language}} සඳහා හඬ ආදානය තවම සූදානම් නැත",
+    "languageNotInstalledMessage": "{{language}} සඳහා ඔෆ්ලයින් කථන ගොනු මෙම දුරකථනයේ ස්ථාපනය කර නැත. ඒවා බාගන්න, පසුව හඬ ආදානය නැවත උත්සාහ කරන්න.",
+    "downloadOfflineModel": "බාගන්න",
+    "offlineModelDownloadScheduled": "ඔෆ්ලයින් කථන ගොනු පසුබිමින් බාගත වනු ඇත. පසුව හඬ ආදානය නැවත උත්සාහ කරන්න.",
     "listeningStopped": "සවන් දීම නතර විය."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "අවලංගු",
         "uncollectible": "අයකරගත නොහැකි"
       },
-      "loadMoreFailed": "තවත් පූරණය කළ නොහැකි විය.",
       "truncated": "පෙර ඉන්වොයිසි ද බැලිය හැක."
     },
     "lowBalanceAlert": {

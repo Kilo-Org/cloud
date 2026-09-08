@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Féach ar ghléasanna eile agus sínigh amach astu",
     "feedback": "Aiseolas",
     "privacyChoices": "Roghanna príobháideachta",
-    "signOut": "Sínigh amach",
     "deleteAccount": "Scrios an cuntas",
     "confirmationCode": "Cód deimhnithe",
     "confirmationCodePlaceholder": "cód 6 dhigit",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Seolann an eochair aisfhillte teachtaireacht",
     "returnSendsMessageSubtitle": "Nuair atá sé seo as, cuireann an eochair aisfhillte líne nua isteach i mboscaí teachtaireachta na ngníomhairí.",
     "biometricUnlock": "Díghlasáil le bithmhéadracht",
-    "biometricUnlockSubtitle": "Ní mór an aip a dhíghlasáil nuair a sheoltar í agus tar éis di cúig nóiméad a chaitheamh sa chúlra."
+    "biometricUnlockSubtitle": "Ní mór an aip a dhíghlasáil nuair a sheoltar í agus tar éis di cúig nóiméad a chaitheamh sa chúlra.",
+    "featureFlags": "Bratacha gnéithe",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Iarratas tarraingthe gan fáil",
@@ -1197,7 +1201,9 @@
       "nonCanonicalEarlybirdBody": "Tá athbhreithniú daonna de dhíth ar do phlean luathrochtana sular féidir é a úsáid ar do ghuthán.",
       "iosTitle": "Níl KiloClaw ar fáil in iOS",
       "iosBody": "Bainistítear rochtain ar KiloClaw don chuntas seo taobh amuigh den aip iOS.",
-      "iosContact": "Ceisteanna? Déan teagmháil le hi@kilo.ai."
+      "iosContact": "Ceisteanna? Déan teagmháil le hi@kilo.ai.",
+      "quarantinedCta": "Seol ríomhphost chuig ár bhfoireann",
+      "nonCanonicalEarlybirdCta": "Athbhreithnigh do phlean ar kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Teastaíonn aird ar {{name}}: {{label}}",
@@ -1734,7 +1740,6 @@
       "couldNotOpenGithub": "Níorbh fhéidir GitHub a oscailt. Bain triail as arís le do thoil."
     },
     "settingsSave": {
-      "keepEditing": "Lean den eagarthóireacht",
       "saveChanges": "Sábháil athruithe",
       "unsavedTitle": "Athruithe gan sábháil",
       "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?"
@@ -1917,6 +1922,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Níorbh fhéidir na seisiúin ghníomhacha a lódáil.",
+      "couldNotRefresh": "Níorbh fhéidir athnuachan a dhéanamh",
       "noSessionsYetDescription": "Tosaigh tasc códaithe ó do ghuthán. Beidh do sheisiúin le feiceáil anseo.",
       "noMatches": "Gan aon seisiún comhoiriúnach",
       "tryDifferentSearch": "Bain triail as téarma cuardaigh eile.",
@@ -2207,7 +2213,6 @@
     "filePart": {
       "loadingImage": "Ag lódáil na híomhá",
       "imageUnavailableRetry": "Níl an íomhá ar fáil, bain triail eile as í a lódáil",
-      "imageUnavailableWithAlt": "Níl an íomhá ar fáil: {{alt}}.",
       "imagePreviewUnavailableInSession": "Níl réamhamharc na híomhá ar fáil sa seisiún seo.",
       "viewImage": "Féach ar an íomhá",
       "viewImageWithAlt": "Féach ar an íomhá {{alt}}",
@@ -2411,7 +2416,6 @@
       "selectModelBeforeSending": "Roghnaigh samhail sula seolfaidh tú an teachtaireacht.",
       "preparingPlaceholder": "Ag socrú na timpeallachta...",
       "finalizingPlaceholder": "Ag críochnú...",
-      "messagePlaceholder": "Teachtaireacht",
       "cannotReceiveFiles": "Ní féidir leis an seisiún seo comhaid a fháil. Bain na ceangaltáin le do theachtaireacht a sheoladh.",
       "couldNotAttachFiles": "Níorbh fhéidir na comhaid a cheangal. Tapáil Seol chun triail eile a bhaint as.",
       "discardAttachmentsMessage": "Scriosfar comhaid uaslódáilte nach bhfuil ceangailte le teachtaireachtaí seolta.",
@@ -2619,6 +2623,10 @@
     "stopped": "Stopadh an t-ionchur gutha. Tapáil an micreafón chun triail a bhaint as arís.",
     "unavailableDevice": "Níl ionchur gutha ar fáil ar an ngléas seo.",
     "unavailableLanguage": "Níl ionchur gutha ar fáil don teanga atá roghnaithe ar an ngléas seo.",
+    "languageNotInstalledTitle": "Níl ionchur gutha do {{language}} réidh fós",
+    "languageNotInstalledMessage": "Níl comhaid cainte as líne do {{language}} suiteáilte ar an bhfón seo. Íoslódáil iad, agus bain triail as ionchur gutha arís ina dhiaidh sin.",
+    "downloadOfflineModel": "Íoslódáil",
+    "offlineModelDownloadScheduled": "Íoslódófar na comhaid cainte as líne sa chúlra. Bain triail as ionchur gutha arís níos déanaí.",
     "listeningStopped": "Stopadh an éisteacht."
   },
   "share": {
@@ -2840,7 +2848,6 @@
         "void": "Ar neamhní",
         "uncollectible": "Dobhailithe"
       },
-      "loadMoreFailed": "Níorbh fhéidir tuilleadh a lódáil.",
       "truncated": "Tá sonraisc níos sine ar fáil."
     },
     "lowBalanceAlert": {

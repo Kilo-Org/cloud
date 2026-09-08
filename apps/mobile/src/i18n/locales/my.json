@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "အခြားစက်များကို စစ်ဆေးပြီး ထိုစက်များမှ အကောင့်ထွက်ပါ",
     "feedback": "အကြံပြုစာပို့ပါ",
     "privacyChoices": "ကိုယ်ရေးအချက်အလက်ဆိုင်ရာ ရွေးချယ်မှုများ",
-    "signOut": "အကောင့်မှ ထွက်ပါ",
     "deleteAccount": "အကောင့်ကို ဖျက်ပါ",
     "confirmationCode": "အတည်ပြုကုဒ်",
     "confirmationCodePlaceholder": "ဂဏန်း ၆ လုံးပါ ကုဒ်",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "စာကြောင်းပြန်ခလုတ်ဖြင့် မက်ဆေ့ခ်ျပို့ပါ",
     "returnSendsMessageSubtitle": "ပိတ်ထားပါက စာကြောင်းပြန်ခလုတ်သည် အေးဂျင့်ထံ စာရေးသည့်အကွက်တွင် စာကြောင်းအသစ် ထည့်ပေးပါသည်။",
     "biometricUnlock": "ဇီဝအချက်အလက်ဖြင့် သော့ဖွင့်ခြင်း",
-    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။"
+    "biometricUnlockSubtitle": "အက်ပ်ကို စတင်ဖွင့်သည့်အခါနှင့် နောက်ခံတွင် ငါးမိနစ်ကြာ ရှိနေပြီးနောက် သော့ဖွင့်ရန် လိုအပ်ပါသည်။",
+    "featureFlags": "လုပ်ဆောင်ချက်အလံများ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR မရနိုင်ပါ",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "သင့်ကြိုတင်အသုံးပြုခွင့် အစီအစဉ်ကို ဖုန်းပေါ်တွင် မသုံးမီ လူကိုယ်တိုင် စစ်ဆေးရန်လိုပါသည်။",
       "iosTitle": "KiloClaw ကို iOS တွင် မရရှိနိုင်ပါ",
       "iosBody": "ဤအကောင့်အတွက် KiloClaw အသုံးပြုခွင့်ကို iOS အက်ပ်ပြင်ပတွင် စီမံပါသည်။",
-      "iosContact": "မေးခွန်းများရှိလား။ hi@kilo.ai သို့ ဆက်သွယ်ပါ။"
+      "iosContact": "မေးခွန်းများရှိလား။ hi@kilo.ai သို့ ဆက်သွယ်ပါ။",
+      "quarantinedCta": "ကျွန်ုပ်တို့အဖွဲ့ကို အီးမေးလ်ပို့ပါ",
+      "nonCanonicalEarlybirdCta": "သင့်အစီအစဉ်ကို Kilo.ai တွင် ပြန်လည်သုံးသပ်ပါ"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ကို စစ်ဆေးရန်လိုသည်: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub ကို မဖွင့်နိုင်ခဲ့ပါ။ ထပ်ကြိုးစားပါ။"
     },
     "settingsSave": {
-      "keepEditing": "ဆက်လက်တည်းဖြတ်ပါ",
       "saveChanges": "အပြောင်းအလဲများ သိမ်းရန်",
       "unsavedTitle": "မသိမ်းဆည်းရသေးသော အပြောင်းအလဲများ",
       "unsavedMessage": "ဤမျက်နှာပြင်မှ မထွက်မီ အပြောင်းအလဲများကို သိမ်းမလား။"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "လုပ်ဆောင်နေသော စက်ရှင်များကို ရယူ၍မရပါ။",
+      "couldNotRefresh": "ပြန်ရယူ၍မရပါ",
       "noSessionsYetDescription": "သင့်ဖုန်းမှ ကုဒ်ရေးသည့် အလုပ်တစ်ခုကို စတင်ပါ။ သင့်စက်ရှင်များ ဒီနေရာတွင် ပေါ်လာပါမည်။",
       "noMatches": "ကိုက်ညီသော စက်ရှင် မရှိပါ",
       "tryDifferentSearch": "အခြားစကားလုံးဖြင့် ရှာကြည့်ပါ။",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "ပုံ ဖွင့်နေသည်",
       "imageUnavailableRetry": "ပုံကို ဖွင့်၍မရပါ၊ ထပ်ဖွင့်ကြည့်ပါ",
-      "imageUnavailableWithAlt": "{{alt}} ပုံကို ဖွင့်၍မရပါ။",
       "imagePreviewUnavailableInSession": "ဤစက်ရှင်တွင် ပုံကို အစမ်းကြည့်၍မရပါ။",
       "viewImage": "ပုံ ကြည့်ရှုပါ",
       "viewImageWithAlt": "{{alt}} ပုံကို ကြည့်ရှုပါ",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "မပို့မီ မော်ဒယ်တစ်ခု ရွေးပါ။",
       "preparingPlaceholder": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ပြင်ဆင်နေသည်...",
       "finalizingPlaceholder": "အပြီးသတ်နေသည်...",
-      "messagePlaceholder": "မက်ဆေ့ချ်",
       "cannotReceiveFiles": "ဤစက်ရှင်တွင် ဖိုင်များကို လက်ခံ၍မရပါ။ မက်ဆေ့ခ်ျပို့ရန် ပူးတွဲဖိုင်များကို ဖယ်ရှားပါ။",
       "couldNotAttachFiles": "ဖိုင်များကို ပူးတွဲ၍မရပါ။ ထပ်ကြိုးစားရန် ပို့သည့်ခလုတ်ကို နှိပ်ပါ။",
       "discardAttachmentsMessage": "မက်ဆေ့ခ်ျတွင် မပူးတွဲရသေးသော တင်ထားသည့်ဖိုင်များကို ဖျက်ပါမည်။",
@@ -2556,6 +2560,10 @@
     "stopped": "အသံဖြင့် စာထည့်သွင်းမှု ရပ်သွားသည်။ ထပ်ကြိုးစားရန် မိုက်ခရိုဖုန်းကို နှိပ်ပါ။",
     "unavailableDevice": "ဤစက်တွင် အသံဖြင့် စာထည့်သွင်း၍ မရပါ။",
     "unavailableLanguage": "ဤစက်၏ ဘာသာစကားအတွက် အသံဖြင့် စာထည့်သွင်း၍ မရပါ။",
+    "languageNotInstalledTitle": "{{language}} အတွက် အသံဖြင့် စာထည့်သွင်းမှု မပြီးသေးပါ",
+    "languageNotInstalledMessage": "{{language}} အတွက် အွန်လိုင်းမပါ အသံဖိုင်များကို ဖုန်းတွင် ထည့်သွင်းထားခြင်း မရှိပါ။ ဖိုင်များကို ဒေါင်းလုဒ်လုပ်ပြီး အသံဖြင့် စာထည့်သွင်းမှုကို ထပ်မံ ကြိုးစားပါ။",
+    "downloadOfflineModel": "ဒေါင်းလုဒ်",
+    "offlineModelDownloadScheduled": "အွန်လိုင်းမပါ အသံဖိုင်များကို နောက်ခံတွင် ဒေါင်းလုဒ်လုပ်မည်။ နောက်မှ အသံဖြင့် စာထည့်သွင်းမှုကို ထပ်မံ ကြိုးစားပါ။",
     "listeningStopped": "နားထောင်ခြင်း ရပ်သွားသည်။"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "ပယ်ဖျက်ပြီး",
         "uncollectible": "ကောက်ခံမရ"
       },
-      "loadMoreFailed": "နောက်ထပ် မရယူနိုင်ပါ။",
       "truncated": "ယခင်ငွေတောင်းခံလွှာများကို ကြည့်နိုင်ပါသည်။"
     },
     "lowBalanceAlert": {

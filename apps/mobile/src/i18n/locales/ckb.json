@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "پێداچوونەوە بە ئامێرەکانی تر و دەرکردنیان لە هەژمار",
     "feedback": "بۆچوون",
     "privacyChoices": "بژاردەکانی پاراستنی تایبەتی",
-    "signOut": "دەرچوون",
     "deleteAccount": "سڕینەوەی هەژمار",
     "confirmationCode": "کۆدی پشتڕاستکردنەوە",
     "confirmationCodePlaceholder": "کۆدی ٦ ژمارەیی",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "دوگمەی گەڕانەوە پەیام دەنێرێت",
     "returnSendsMessageSubtitle": "کاتێک ئەم بژاردەیە ناچالاکە، دوگمەی گەڕانەوە دێڕێکی نوێ لە خانەکانی نووسینی پەیام بۆ ئەجێنت تێدەخات.",
     "biometricUnlock": "کردنەوەی قوفڵ بە بایۆمەتریک",
-    "biometricUnlockSubtitle": "لە کاتی دەستپێکردنی ئەپەکە و دوای پێنج خولەک مانەوەی لە پاشبنەمادا، کردنەوەی قوفڵ پێویستە."
+    "biometricUnlockSubtitle": "لە کاتی دەستپێکردنی ئەپەکە و دوای پێنج خولەک مانەوەی لە پاشبنەمادا، کردنەوەی قوفڵ پێویستە.",
+    "featureFlags": "ئاڵای تایبەتمەندییەکان",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "داواکاری ڕاکێشان بەردەست نییە",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "پێش بەکارهێنان لە مۆبایلدا، دەبێت پێداچوونەوەی دەستی بە پلانی دەستگەیشتنی پێشوەختەکەت بکرێت.",
       "iosTitle": "KiloClaw لە iOS بەردەست نییە",
       "iosBody": "بۆ ئەم هەژمارە، دەستگەیشتن بە KiloClaw لە دەرەوەی ئەپی iOS بەڕێوە دەبرێت.",
-      "iosContact": "پرسیارت هەیە؟ پەیوەندی بە hi@kilo.ai بکە."
+      "iosContact": "پرسیارت هەیە؟ پەیوەندی بە hi@kilo.ai بکە.",
+      "quarantinedCta": "ناردنی ئیمەیڵ بۆ تیمەکەمان",
+      "nonCanonicalEarlybirdCta": "پێداچوونەوە بە پلانەکەتدا لەسەر kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} پێویستی بە سەرنجە: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "نەتوانرا GitHub بکرێتەوە. تکایە دووبارە هەوڵ بدە."
     },
     "settingsSave": {
-      "keepEditing": "بەردەوامبوون لە دەستکاری",
       "saveChanges": "گۆڕانکارییەکان پاشەکەوت بکە",
       "unsavedTitle": "گۆڕانکارییە پاشەکەوتنەکراوەکان",
       "unsavedMessage": "پێش جێهێشتنی ئەم شاشەیە، گۆڕانکارییەکانت پاشەکەوت بکرێن؟"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "نەتوانرا سێشنە چالاکەکان بار بکرێن.",
+      "couldNotRefresh": "نەتوانرا نوێ بکرێتەوە",
       "noSessionsYetDescription": "لە مۆبایلەکەتەوە ئەرکێکی کۆدنووسین دەست پێ بکە. سێشنەکانت لێرە دەردەکەون.",
       "noMatches": "هیچ سێشنێک ناگونجێت",
       "tryDifferentSearch": "وشەیەکی گەڕانی جیاواز تاقی بکەرەوە.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "بارکردنی وێنە",
       "imageUnavailableRetry": "وێنەکە بەردەست نییە، دووبارە هەوڵ بدەرەوە بۆ بارکردنی",
-      "imageUnavailableWithAlt": "وێنەی {{alt}} بەردەست نییە.",
       "imagePreviewUnavailableInSession": "پێشاندانی پێشەکیی وێنە لەم سێشنەدا بەردەست نییە.",
       "viewImage": "بینینی وێنە",
       "viewImageWithAlt": "بینینی وێنەی {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "پێش ناردن مۆدێلێک هەڵبژێرە.",
       "preparingPlaceholder": "ئامادەکردنی ژینگە...",
       "finalizingPlaceholder": "تەواوکردنی کار...",
-      "messagePlaceholder": "نامە",
       "cannotReceiveFiles": "ئەم سێشنە ناتوانێت پەڕگە وەربگرێت. بۆ ناردنی پەیامەکەت، هاوپێچەکان لاببە.",
       "couldNotAttachFiles": "نەتوانرا پەڕگەکان هاوپێچ بکرێن. بۆ دووبارە هەوڵدانەوە، لە «ناردن» بدە.",
       "discardAttachmentsMessage": "ئەو پەڕگە بارکراوانەی هاوپێچی پەیامی نێردراو نەکراون دەسڕێنەوە.",
@@ -2556,6 +2560,10 @@
     "stopped": "نووسین بە دەنگ وەستا. بۆ دووبارە هەوڵدان، لە مایکرۆفۆنەکە بدە.",
     "unavailableDevice": "نووسین بە دەنگ لەسەر ئەم ئامێرە بەردەست نییە.",
     "unavailableLanguage": "نووسین بە دەنگ بۆ زمانی ئەم ئامێرە بەردەست نییە.",
+    "languageNotInstalledTitle": "نووسین بە دەنگ بۆ {{language}} ئامادە نییە",
+    "languageNotInstalledMessage": "فایلە دەنگییە ئۆفلاینەکانی {{language}} لەسەر ئەم مۆبایلە دانەمەزراون. داگریان بکە، پاشان دووبارە نووسین بە دەنگ تاقی بکەوە.",
+    "downloadOfflineModel": "داگرتن",
+    "offlineModelDownloadScheduled": "فایلە دەنگییە ئۆفلاینەکان لە پاشبنەمادا داگیرێن. پاشان دووبارە نووسین بە دەنگ تاقی بکەوە.",
     "listeningStopped": "گوێگرتن وەستا."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "پووچەڵ",
         "uncollectible": "نەشیاوی وەرگرتن"
       },
-      "loadMoreFailed": "نەتوانرا زیاتر بار بکرێت.",
       "truncated": "فاکتۆرە کۆنەکان بەردەستن."
     },
     "lowBalanceAlert": {

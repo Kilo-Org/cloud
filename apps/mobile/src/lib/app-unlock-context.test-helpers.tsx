@@ -34,6 +34,9 @@ export { appState, native, storage };
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
 vi.mock('react-native', () => ({ AppState: appState }));
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 export const SUCCESS = { success: true };
 export const IOS_SUCCESSES = [
   { success: true, error: null, warning: null },
@@ -58,9 +61,18 @@ async function flush(update?: () => void) {
     await vi.dynamicImportSettled();
   });
 }
-export async function mount(raw: string | null = 'disabled') {
-  storage.value = raw;
-  storage.getItemAsync.mockResolvedValue(raw);
+export async function mount(raw: string | null = 'disabled', rejectRead = false) {
+  if (rejectRead) {
+    // The environmental keychain failure: every preference read rejects, so
+    // mount must not override the rejection with a resolved value. Fake
+    // timers are installed before the first read so the read helper's
+    // bounded backoff lands on the fake clock.
+    storage.getItemAsync.mockRejectedValue(new Error('keychain unavailable'));
+    vi.useFakeTimers();
+  } else {
+    storage.value = raw;
+    storage.getItemAsync.mockResolvedValue(raw);
+  }
   view = await renderWithProviders(
     <AppUnlockProvider promptMessage="Unlock Kilo">
       <Probe />
@@ -68,6 +80,21 @@ export async function mount(raw: string | null = 'disabled') {
     </AppUnlockProvider>
   );
   await flush();
+  if (rejectRead) {
+    await settleReadRetries();
+    vi.useRealTimers();
+  }
+}
+
+/**
+ * Drives one full `readStoredValueWithRetry` backoff budget (250 + 500 +
+ * 1000 ms) on the fake clock, so a rejected-read sequence settles
+ * deterministically. Fake timers must be active before the rejection lands.
+ */
+export async function settleReadRetries() {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
+  });
 }
 export function expectState(enabled: boolean, status: Unlock['status'], busy = false) {
   expect(state()).toMatchObject({ enabled, status, busy });
@@ -115,6 +142,7 @@ beforeEach(() => {
 afterEach(() => {
   view?.unmount();
   view = undefined;
+  vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });

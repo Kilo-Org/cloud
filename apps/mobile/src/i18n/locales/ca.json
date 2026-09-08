@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Revisa les sessions d'altres dispositius i tanca-les",
     "feedback": "Envia comentaris",
     "privacyChoices": "Opcions de privadesa",
-    "signOut": "Tanca la sessió",
     "deleteAccount": "Elimina el compte",
     "confirmationCode": "Codi de confirmació",
     "confirmationCodePlaceholder": "codi de 6 dígits",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "La tecla de retorn envia el missatge",
     "returnSendsMessageSubtitle": "Quan està desactivat, la tecla de retorn insereix un salt de línia als camps de missatge dels agents.",
     "biometricUnlock": "Desbloqueja amb biometria",
-    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla."
+    "biometricUnlockSubtitle": "Cal desbloquejar l'aplicació en iniciar-la i després de cinc minuts en segon pla.",
+    "featureFlags": "Indicadors de funcions",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Sol·licitud d'integració no disponible",
@@ -1181,7 +1185,9 @@
       "nonCanonicalEarlybirdBody": "El teu pla d'accés anticipat requereix una revisió manual abans de poder-se utilitzar al mòbil.",
       "iosTitle": "KiloClaw no està disponible a iOS",
       "iosBody": "L'accés d'aquest compte a KiloClaw es gestiona fora de l'aplicació per a iOS.",
-      "iosContact": "Tens preguntes? Contacta amb hi@kilo.ai."
+      "iosContact": "Tens preguntes? Contacta amb hi@kilo.ai.",
+      "quarantinedCta": "Escriu al nostre equip",
+      "nonCanonicalEarlybirdCta": "Revisa el teu pla a kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} requereix atenció: {{label}}",
@@ -1712,7 +1718,6 @@
       "couldNotOpenGithub": "No s'ha pogut obrir GitHub. Torna-ho a provar."
     },
     "settingsSave": {
-      "keepEditing": "Continua editant",
       "saveChanges": "Desa els canvis",
       "unsavedTitle": "Canvis sense desar",
       "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?"
@@ -1891,6 +1896,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "No s'han pogut carregar les sessions actives.",
+      "couldNotRefresh": "No s'ha pogut actualitzar",
       "noSessionsYetDescription": "Inicia una tasca de programació des del mòbil. Les teves sessions apareixeran aquí.",
       "noMatches": "Cap sessió coincideix amb la cerca",
       "tryDifferentSearch": "Prova un altre terme de cerca.",
@@ -2173,7 +2179,6 @@
     "filePart": {
       "loadingImage": "Carregant la imatge",
       "imageUnavailableRetry": "La imatge no està disponible. Torna a provar de carregar-la",
-      "imageUnavailableWithAlt": "La imatge no està disponible: {{alt}}.",
       "imagePreviewUnavailableInSession": "La previsualització de la imatge no està disponible en aquesta sessió.",
       "viewImage": "Mostra la imatge",
       "viewImageWithAlt": "Mostra la imatge {{alt}}",
@@ -2371,7 +2376,6 @@
       "selectModelBeforeSending": "Selecciona un model abans d'enviar el missatge.",
       "preparingPlaceholder": "Configurant l'entorn…",
       "finalizingPlaceholder": "Finalitzant…",
-      "messagePlaceholder": "Missatge",
       "cannotReceiveFiles": "Aquesta sessió no pot rebre fitxers. Treu els fitxers adjunts per enviar el teu missatge.",
       "couldNotAttachFiles": "No s'han pogut adjuntar els fitxers. Toca el botó d'enviament per tornar-ho a provar.",
       "discardAttachmentsMessage": "S'eliminaran els fitxers penjats que no s'hagin adjuntat a missatges enviats.",
@@ -2577,6 +2581,10 @@
     "stopped": "El dictat s'ha aturat. Toca el micròfon per tornar-ho a provar.",
     "unavailableDevice": "El dictat no està disponible en aquest dispositiu.",
     "unavailableLanguage": "El dictat no està disponible per a l'idioma d'aquest dispositiu.",
+    "languageNotInstalledTitle": "El dictat per a {{language}} encara no està a punt",
+    "languageNotInstalledMessage": "Els fitxers de veu fora de línia de {{language}} no estan instal·lats en aquest telèfon. Baixa'ls i torna-ho a provar amb el dictat.",
+    "downloadOfflineModel": "Baixa",
+    "offlineModelDownloadScheduled": "Els fitxers de veu fora de línia es baixaran en segon pla. Torna a provar el dictat més tard.",
     "listeningStopped": "S'ha deixat d'escoltar."
   },
   "share": {
@@ -2798,7 +2806,6 @@
         "void": "Anul·lada",
         "uncollectible": "Incobrable"
       },
-      "loadMoreFailed": "No se n'han pogut carregar més.",
       "truncated": "Hi ha factures més antigues disponibles."
     },
     "lowBalanceAlert": {

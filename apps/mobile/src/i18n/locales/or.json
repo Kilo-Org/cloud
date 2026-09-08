@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ଅନ୍ୟ ଡିଭାଇସ୍ ଯାଞ୍ଚ କରି ସେଗୁଡ଼ିକରୁ ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "feedback": "ମତାମତ",
     "privacyChoices": "ଗୋପନୀୟତା ପସନ୍ଦ",
-    "signOut": "ସାଇନ୍ ଆଉଟ୍ କରନ୍ତୁ",
     "deleteAccount": "ଆକାଉଣ୍ଟ୍ ବିଲୋପ କରନ୍ତୁ",
     "confirmationCode": "ନିଶ୍ଚିତକରଣ କୋଡ୍",
     "confirmationCodePlaceholder": "6 ଅଙ୍କର କୋଡ୍",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "ରିଟର୍ନ କି ବାର୍ତ୍ତା ପଠାଏ",
     "returnSendsMessageSubtitle": "ଏହା ବନ୍ଦ ଥିଲେ ରିଟର୍ନ କି ଏଜେଣ୍ଟର ବାର୍ତ୍ତା ଲେଖିବା ସ୍ଥାନରେ ନୂଆ ଧାଡ଼ି ଯୋଡ଼େ।",
     "biometricUnlock": "ବାୟୋମେଟ୍ରିକ୍ସ ସହିତ ଅନଲକ୍ କରନ୍ତୁ",
-    "biometricUnlockSubtitle": "ଆପ୍ ଆରମ୍ଭ ହେବାବେଳେ ଏବଂ ପୃଷ୍ଠଭୂମିରେ ପାଞ୍ଚ ମିନିଟ୍ ରହିବା ପରେ ଅନଲକ୍ କରିବା ଆବଶ୍ୟକ।"
+    "biometricUnlockSubtitle": "ଆପ୍ ଆରମ୍ଭ ହେବାବେଳେ ଏବଂ ପୃଷ୍ଠଭୂମିରେ ପାଞ୍ଚ ମିନିଟ୍ ରହିବା ପରେ ଅନଲକ୍ କରିବା ଆବଶ୍ୟକ।",
+    "featureFlags": "ବିଶେଷତ୍ୱ ପତାକା",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "ପୁଲ୍ ରିକ୍ୱେଷ୍ଟ ଉପଲବ୍ଧ ନାହିଁ",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "ମୋବାଇଲ୍‌ରେ ବ୍ୟବହାର କରିବା ପୂର୍ବରୁ ଆପଣଙ୍କ ପ୍ରାରମ୍ଭିକ ସୁବିଧା ଯୋଜନାକୁ ଜଣେ ସମୀକ୍ଷକ ଯାଞ୍ଚ କରିବା ଆବଶ୍ୟକ।",
       "iosTitle": "IOS ରେ KiloClaw ଉପଲବ୍ଧ ନାହିଁ",
       "iosBody": "ଏହି ଆକାଉଣ୍ଟ ପାଇଁ KiloClaw ବ୍ୟବହାରର ଅନୁମତି iOS ଆପ୍ ବାହାରେ ପରିଚାଳନା କରାଯାଏ।",
-      "iosContact": "କିଛି ପ୍ରଶ୍ନ ଅଛି? hi@kilo.ai ରେ ଯୋଗାଯୋଗ କରନ୍ତୁ।"
+      "iosContact": "କିଛି ପ୍ରଶ୍ନ ଅଛି? hi@kilo.ai ରେ ଯୋଗାଯୋଗ କରନ୍ତୁ।",
+      "quarantinedCta": "ଆମ ଦଳକୁ ଇମେଲ୍ କରନ୍ତୁ",
+      "nonCanonicalEarlybirdCta": "ଆପଣଙ୍କ ଯୋଜନାକୁ Kilo.ai ରେ ପରୀକ୍ଷା କରନ୍ତୁ"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ପ୍ରତି ଧ୍ୟାନ ଦେବା ଆବଶ୍ୟକ: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub ଖୋଲାଯାଇପାରିଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
     },
     "settingsSave": {
-      "keepEditing": "ସମ୍ପାଦନ ଜାରି ରଖନ୍ତୁ",
       "saveChanges": "ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରନ୍ତୁ",
       "unsavedTitle": "ସଂରକ୍ଷିତ ହୋଇନଥିବା ପରିବର୍ତ୍ତନ",
       "unsavedMessage": "ଏହି ସ୍କ୍ରିନରୁ ବାହାରିବା ପୂର୍ବରୁ ପରିବର୍ତ୍ତନ ସଂରକ୍ଷଣ କରିବେ?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "ସକ୍ରିୟ ସେସନ୍ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
+      "couldNotRefresh": "ରିଫ୍ରେସ୍ କରିହେଲା ନାହିଁ",
       "noSessionsYetDescription": "ଆପଣଙ୍କ ଫୋନରୁ ଏକ କୋଡିଂ କାର୍ଯ୍ୟ ଆରମ୍ଭ କରନ୍ତୁ। ଆପଣଙ୍କ ସେସନ୍ ଏଠାରେ ଦେଖାଯିବ।",
       "noMatches": "କୌଣସି ସେସନ୍ ମେଳ ଖାଉନାହିଁ",
       "tryDifferentSearch": "ଅନ୍ୟ ଏକ ଶବ୍ଦ ଦେଇ ଖୋଜନ୍ତୁ।",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "ଛବି ଲୋଡ୍ ହେଉଛି",
       "imageUnavailableRetry": "ଛବି ଉପଲବ୍ଧ ନାହିଁ, ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
-      "imageUnavailableWithAlt": "ଛବି ଉପଲବ୍ଧ ନାହିଁ: {{alt}}।",
       "imagePreviewUnavailableInSession": "ଏହି ସେସନରେ ଛବିର ପୂର୍ବଦର୍ଶନ ଉପଲବ୍ଧ ନାହିଁ।",
       "viewImage": "ଛବି ଦେଖନ୍ତୁ",
       "viewImageWithAlt": "{{alt}} ଛବି ଦେଖନ୍ତୁ",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "ପଠାଇବା ପୂର୍ବରୁ ଏକ ମଡେଲ୍ ବାଛନ୍ତୁ।",
       "preparingPlaceholder": "ପରିବେଶ ପ୍ରସ୍ତୁତ ହେଉଛି...",
       "finalizingPlaceholder": "ସମାପ୍ତ ହେଉଛି...",
-      "messagePlaceholder": "ସନ୍ଦେଶ",
       "cannotReceiveFiles": "ଏହି ସେସନ୍ ଫାଇଲ୍ ଗ୍ରହଣ କରିପାରିବ ନାହିଁ। ବାର୍ତ୍ତା ପଠାଇବାକୁ ଯୋଡ଼ା ହୋଇଥିବା ଫାଇଲ୍ ହଟାନ୍ତୁ।",
       "couldNotAttachFiles": "ଫାଇଲ୍ ଯୋଡ଼ି ହେଲା ନାହିଁ। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ “ପଠାନ୍ତୁ” ଟାପ୍ କରନ୍ତୁ।",
       "discardAttachmentsMessage": "କୌଣସି ପଠାଯାଇଥିବା ବାର୍ତ୍ତାରେ ଯୋଡ଼ା ହୋଇନଥିବା ଅପଲୋଡ୍ ଫାଇଲ୍ ହଟିଯିବ।",
@@ -2556,6 +2560,10 @@
     "stopped": "କହି ଲେଖିବା ବନ୍ଦ ହୋଇଛି। ପୁଣି ଚେଷ୍ଟା କରିବାକୁ ମାଇକ୍ରୋଫୋନ୍‌ରେ ଟାପ୍ କରନ୍ତୁ।",
     "unavailableDevice": "ଏହି ଡିଭାଇସ୍‌ରେ କହି ଲେଖିବା ସୁବିଧା ଉପଲବ୍ଧ ନାହିଁ।",
     "unavailableLanguage": "ଡିଭାଇସ୍‌ରେ ବଛାଯାଇଥିବା ଭାଷା ପାଇଁ କହି ଲେଖିବା ସୁବିଧା ଉପଲବ୍ଧ ନାହିଁ।",
+    "languageNotInstalledTitle": "{{language}} ପାଇଁ କହି ଲେଖିବା ଏବେ ବି ପ୍ରସ୍ତୁତ ନାହିଁ",
+    "languageNotInstalledMessage": "{{language}} ପାଇଁ ଅଫଲାଇନ୍ ସ୍ପିଚ୍ ଫାଇଲ୍ ଏହି ଫୋନ୍‌ରେ ଇନଷ୍ଟଲ୍ ହୋଇନାହିଁ। ସେଗୁଡ଼ିକ ଡାଉନଲୋଡ୍ କରନ୍ତୁ, ତାପରେ କହି ଲେଖିବା ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "downloadOfflineModel": "ଡାଉନଲୋଡ୍",
+    "offlineModelDownloadScheduled": "ଅଫଲାଇନ୍ ସ୍ପିଚ୍ ଫାଇଲ୍ ଗୁଡ଼ିକ ପୃଷ୍ଠପଟରେ ଡାଉନଲୋଡ୍ ହେବ। ପରେ କହି ଲେଖିବା ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
     "listeningStopped": "ଶୁଣିବା ବନ୍ଦ ହେଲା।"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "ବାତିଲ",
         "uncollectible": "ଅନାଦାୟ"
       },
-      "loadMoreFailed": "ଆହୁରି ତଥ୍ୟ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "truncated": "ପୁରୁଣା ଇନଭଏସ୍ ଉପଲବ୍ଧ ଅଛି।"
     },
     "lowBalanceAlert": {

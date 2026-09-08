@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "다른 기기의 로그인 확인 및 로그아웃",
     "feedback": "피드백",
     "privacyChoices": "개인정보 설정",
-    "signOut": "로그아웃",
     "deleteAccount": "계정 삭제",
     "confirmationCode": "확인 코드",
     "confirmationCodePlaceholder": "6자리 코드",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "리턴 키로 메시지 보내기",
     "returnSendsMessageSubtitle": "끄면 에이전트의 메시지 입력란에서 리턴 키로 줄바꿈을 삽입합니다.",
     "biometricUnlock": "생체 인증으로 잠금 해제",
-    "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다."
+    "biometricUnlockSubtitle": "앱을 실행할 때와 백그라운드에서 5분이 지난 후에는 잠금을 해제해야 합니다.",
+    "featureFlags": "기능 플래그",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "실시간 활동",
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "웹에서 구독",
       "subscriptionPastDueBody": "최근 결제에 문제가 발생했습니다. 브라우저에서 kilo.ai/claw로 이동해 결제 정보를 업데이트하세요. 앱에서는 결제를 관리할 수 없습니다.",
       "subscriptionPastDueTitle": "웹에서 결제 정보 업데이트",
-      "trialExpiredBody": "KiloClaw를 계속 사용하려면 브라우저에서 kilo.ai/claw로 이동하세요. 앱에서는 구독할 수 없습니다."
+      "trialExpiredBody": "KiloClaw를 계속 사용하려면 브라우저에서 kilo.ai/claw로 이동하세요. 앱에서는 구독할 수 없습니다.",
+      "quarantinedCta": "지원팀에게 이메일 보내기",
+      "nonCanonicalEarlybirdCta": "요금제를 Kilo.ai에서 검토하기"
     },
     "controls": {
       "redeploying": "다시 배포 중…",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "보안 에이전트가 모니터링할 저장소를 선택하세요."
     },
     "settingsSave": {
-      "keepEditing": "계속 편집",
       "saveChanges": "변경 사항 저장",
       "unsavedMessage": "이 화면을 떠나기 전에 변경 사항을 저장할까요?",
       "unsavedTitle": "저장되지 않은 변경 사항"
@@ -1447,6 +1452,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "활성 세션을 불러오지 못했습니다.",
+      "couldNotRefresh": "새로고침하지 못했습니다",
       "noSessionsYetDescription": "휴대폰에서 코딩 작업을 시작하세요. 세션이 여기에 표시됩니다.",
       "noMatches": "일치하는 세션 없음",
       "tryDifferentSearch": "다른 검색어를 사용해 보세요.",
@@ -1725,7 +1731,6 @@
     "filePart": {
       "loadingImage": "이미지 불러오는 중",
       "imageUnavailableRetry": "이미지를 불러올 수 없습니다. 불러오기 다시 시도",
-      "imageUnavailableWithAlt": "이미지를 표시할 수 없습니다: {{alt}}.",
       "imagePreviewUnavailableInSession": "이 세션에서 이미지 미리보기를 사용할 수 없습니다.",
       "viewImage": "이미지 보기",
       "viewImageWithAlt": "{{alt}} 이미지 보기",
@@ -1920,7 +1925,6 @@
       "selectModelBeforeSending": "메시지를 보내기 전에 모델을 선택하세요.",
       "preparingPlaceholder": "환경 설정 중...",
       "finalizingPlaceholder": "마무리 중...",
-      "messagePlaceholder": "메시지",
       "cannotReceiveFiles": "이 세션은 파일을 받을 수 없습니다. 메시지를 보내려면 첨부 파일을 제거하세요.",
       "couldNotAttachFiles": "파일을 첨부하지 못했습니다. 보내기를 눌러 다시 시도하세요.",
       "discardAttachmentsMessage": "보낸 메시지에 첨부되지 않은 업로드 파일이 삭제됩니다.",
@@ -2125,6 +2129,10 @@
     "stopped": "음성 입력이 중지되었습니다. 마이크를 탭하여 다시 시도하세요.",
     "unavailableDevice": "이 기기에서는 음성 입력을 사용할 수 없습니다.",
     "unavailableLanguage": "현재 기기에 설정된 언어는 음성 입력을 지원하지 않습니다.",
+    "languageNotInstalledTitle": "{{language}} 언어의 음성 입력이 아직 준비되지 않았습니다",
+    "languageNotInstalledMessage": "이 휴대전화에 {{language}} 오프라인 음성 파일이 설치되어 있지 않습니다. 파일을 다운로드한 후 음성 입력을 다시 시도하세요.",
+    "downloadOfflineModel": "다운로드",
+    "offlineModelDownloadScheduled": "오프라인 음성 파일이 백그라운드에서 다운로드됩니다. 나중에 음성 입력을 다시 시도하세요.",
     "listeningStopped": "음성 입력이 중지되었습니다."
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "무효",
         "uncollectible": "회수 불가"
       },
-      "loadMoreFailed": "추가 항목을 불러오지 못했습니다.",
       "truncated": "이전 청구서를 확인할 수 있습니다."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Skatīt citas ierīces un izrakstīties no tām",
     "feedback": "Atsauksmes",
     "privacyChoices": "Privātuma iestatījumi",
-    "signOut": "Izrakstīties",
     "deleteAccount": "Dzēst kontu",
     "confirmationCode": "Apstiprināšanas kods",
     "confirmationCodePlaceholder": "6 ciparu kods",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Ievades taustiņš nosūta ziņojumu",
     "returnSendsMessageSubtitle": "Ja šī opcija ir izslēgta, ievades taustiņš aģenta ziņojuma ievades laukā ievieto jaunu rindu.",
     "biometricUnlock": "Biometriskā atbloķēšana",
-    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm."
+    "biometricUnlockSubtitle": "Atbloķēšana ir nepieciešama, palaižot lietotni un pēc piecām fonā pavadītām minūtēm.",
+    "featureFlags": "Funkciju karodziņi",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Izmaiņu pieprasījums nav pieejams",
@@ -1181,7 +1185,9 @@
       "nonCanonicalEarlybirdBody": "Pirms tavu agrīnās piekļuves plānu var izmantot mobilajā ierīcē, speciālistam tas jāpārbauda.",
       "iosTitle": "KiloClaw nav pieejams iOS",
       "iosBody": "KiloClaw piekļuve šim kontam tiek pārvaldīta ārpus iOS lietotnes.",
-      "iosContact": "Ir jautājumi? Raksti uz hi@kilo.ai."
+      "iosContact": "Ir jautājumi? Raksti uz hi@kilo.ai.",
+      "quarantinedCta": "Rakstīt mūsu komandai",
+      "nonCanonicalEarlybirdCta": "Pārskatīt savu plānu vietnē kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ir nepieciešama uzmanība: {{label}}",
@@ -1712,7 +1718,6 @@
       "couldNotOpenGithub": "Neizdevās atvērt GitHub. Lūdzu, mēģini vēlreiz."
     },
     "settingsSave": {
-      "keepEditing": "Turpināt rediģēt",
       "saveChanges": "Saglabāt izmaiņas",
       "unsavedTitle": "Nesaglabātas izmaiņas",
       "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?"
@@ -1891,6 +1896,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Neizdevās ielādēt aktīvās sesijas.",
+      "couldNotRefresh": "Neizdevās atsvaidzināt",
       "noSessionsYetDescription": "Sāc programmēšanas uzdevumu savā tālrunī. Tavas sesijas parādīsies šeit.",
       "noMatches": "Nav atbilstošu sesiju",
       "tryDifferentSearch": "Izmēģini citu meklēšanas frāzi.",
@@ -2173,7 +2179,6 @@
     "filePart": {
       "loadingImage": "Ielādē attēlu",
       "imageUnavailableRetry": "Attēls nav pieejams, mēģināt ielādēt vēlreiz",
-      "imageUnavailableWithAlt": "Attēls „{{alt}}” nav pieejams.",
       "imagePreviewUnavailableInSession": "Attēla priekšskatījums šajā sesijā nav pieejams.",
       "viewImage": "Skatīt attēlu",
       "viewImageWithAlt": "Skatīt attēlu {{alt}}",
@@ -2371,7 +2376,6 @@
       "selectModelBeforeSending": "Pirms nosūtīšanas izvēlies modeli.",
       "preparingPlaceholder": "Sagatavo vidi…",
       "finalizingPlaceholder": "Pabeidz darbu…",
-      "messagePlaceholder": "Ziņojums",
       "cannotReceiveFiles": "Šī sesija nevar saņemt failus. Noņem pielikumus, lai nosūtītu savu ziņojumu.",
       "couldNotAttachFiles": "Neizdevās pievienot failus. Nospied nosūtīšanas pogu, lai mēģinātu vēlreiz.",
       "discardAttachmentsMessage": "Augšupielādētie faili, kas nav pievienoti nosūtītiem ziņojumiem, tiks dzēsti.",
@@ -2577,6 +2581,10 @@
     "stopped": "Balss ievade ir apturēta. Pieskaries mikrofonam, lai mēģinātu vēlreiz.",
     "unavailableDevice": "Balss ievade šajā ierīcē nav pieejama.",
     "unavailableLanguage": "Balss ievade nav pieejama ierīcē izvēlētajā valodā.",
+    "languageNotInstalledTitle": "Balss ievade valodai {{language}} vēl nav gatava",
+    "languageNotInstalledMessage": "{{language}} valodas bezsauses runas faili šajā tālrunī nav instalēti. Lejupielādē tos un pēc tam mēģini balss ievadi vēlreiz.",
+    "downloadOfflineModel": "Lejupielādēt",
+    "offlineModelDownloadScheduled": "Bezsauses runas faili tiks lejupielādēti fonā. Vēlāk mēģini balss ievadi vēlreiz.",
     "listeningStopped": "Klausīšanās apturēta."
   },
   "share": {
@@ -2798,7 +2806,6 @@
         "void": "Anulēts",
         "uncollectible": "Nepiedzenams"
       },
-      "loadMoreFailed": "Neizdevās ielādēt vairāk.",
       "truncated": "Ir pieejami vecāki rēķini."
     },
     "lowBalanceAlert": {

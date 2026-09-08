@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Ṣe àyẹ̀wò àwọn ẹ̀rọ mìíràn kí o sì mú wọn jáde",
     "feedback": "Fi èrò ránṣẹ́",
     "privacyChoices": "Àwọn àṣàyàn àṣírí",
-    "signOut": "Jáde",
     "deleteAccount": "Pa àpamọ́ rẹ́",
     "confirmationCode": "Kóòdù ìmúdájú",
     "confirmationCodePlaceholder": "kóòdù oní nọ́ńbà mẹ́fà",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Bọ́tìnì ìpadàbọ̀ ń fi ìfiránṣẹ́ ránṣẹ́",
     "returnSendsMessageSubtitle": "Tí èyí bá wà ní pípa, bọ́tìnì ìpadàbọ̀ máa ń fi ìlà tuntun sí ààyè ìkọ̀wé sí aṣojú.",
     "biometricUnlock": "Ṣí títìpa pẹ̀lú ìdánimọ̀ àbùdá ara",
-    "biometricUnlockSubtitle": "Ṣí títìpa nígbà tí o bá ṣí ohun èlò àti lẹ́yìn ìṣẹ́jú márùn-ún tí kò sí níwájú iboju."
+    "biometricUnlockSubtitle": "Ṣí títìpa nígbà tí o bá ṣí ohun èlò àti lẹ́yìn ìṣẹ́jú márùn-ún tí kò sí níwájú iboju.",
+    "featureFlags": "Àṣì ẹ̀yà",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Ènìyàn gbọ́dọ̀ ṣe àtúnyẹ̀wò ètò ìwọlé àkọ́kọ́ rẹ kí o tó lè lò ó lórí fóònù.",
       "iosTitle": "KiloClaw kò sí lórí iOS",
       "iosBody": "Fún àkọọ́lẹ̀ yìí, a ń ṣàkóso àyè sí KiloClaw ní òde ìṣàfilọ́lẹ̀ iOS.",
-      "iosContact": "Ṣé o ní ìbéèrè? Kàn sí hi@kilo.ai."
+      "iosContact": "Ṣé o ní ìbéèrè? Kàn sí hi@kilo.ai.",
+      "quarantinedCta": "Firánṣẹ́ ímeèlì sí ẹgbẹ́ wa",
+      "nonCanonicalEarlybirdCta": "Ṣàyẹ̀wò ètò rẹ lórí kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} nílò àfiyèsí: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "A kò lè ṣí GitHub. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
     },
     "settingsSave": {
-      "keepEditing": "Tẹ̀síwájú pẹ̀lú àtúnṣe",
       "saveChanges": "Fi àwọn àyípadà pamọ́",
       "unsavedTitle": "Àwọn àyípadà tí a kò tíì fi pamọ́",
       "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "A kò lè ṣàkójọ àwọn ìgbà iṣẹ́ tó ń lọ.",
+      "couldNotRefresh": "A kò lè sọ di tuntun",
       "noSessionsYetDescription": "Bẹ̀rẹ̀ iṣẹ́ ìkọ̀wé kóòdù kan láti fóònù rẹ. Àwọn ìgbà iṣẹ́ rẹ yóò hàn níbí.",
       "noMatches": "Kò sí ìgbà iṣẹ́ tó bá ohun tí o wá mu",
       "tryDifferentSearch": "Gbìyànjú ọ̀rọ̀ ìwá mìíràn.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Ń gbé àwòrán wọlé",
       "imageUnavailableRetry": "Àwòrán kò sí, gbìyànjú láti tún un gbé wọlé",
-      "imageUnavailableWithAlt": "Àwòrán kò sí: {{alt}}.",
       "imagePreviewUnavailableInSession": "A kò lè fi àwòrán hàn ṣáájú nínú ìgbà iṣẹ́ yìí.",
       "viewImage": "Wo àwòrán",
       "viewImageWithAlt": "Wo àwòrán {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Yan àwòṣe kí o tó fi ránṣẹ́.",
       "preparingPlaceholder": "Ń ṣètò àyíká iṣẹ́...",
       "finalizingPlaceholder": "Ń parí...",
-      "messagePlaceholder": "Ìfiránṣẹ́",
       "cannotReceiveFiles": "Ìgbà iṣẹ́ yìí kò lè gba fáìlì. Yọ àwọn àsomọ́ kúrò láti fi ìfiránṣẹ́ rẹ ránṣẹ́.",
       "couldNotAttachFiles": "A kò lè so àwọn fáìlì mọ́ ìfiránṣẹ́. Tẹ Fíránṣẹ́ láti gbìyànjú lẹ́ẹ̀kan sí i.",
       "discardAttachmentsMessage": "A ó pa àwọn fáìlì tí a ti gbé sókè tí kò tíì ní ìfiránṣẹ́ tí a so wọ́n mọ́ rẹ́.",
@@ -2556,6 +2560,10 @@
     "stopped": "Títẹ ọ̀rọ̀ pẹ̀lú ohùn ti dá dúró. Tẹ míkírọ́fóònù láti gbìyànjú lẹ́ẹ̀kan sí i.",
     "unavailableDevice": "Ẹ̀rọ yìí kò lè tẹ ọ̀rọ̀ pẹ̀lú ohùn.",
     "unavailableLanguage": "Títẹ ọ̀rọ̀ pẹ̀lú ohùn kò sí fún èdè ẹ̀rọ yìí.",
+    "languageNotInstalledTitle": "Títẹ ọ̀rọ̀ pẹ̀lú ohùn fún {{language}} kò tíì ṣetán",
+    "languageNotInstalledMessage": "Àwọn fáìlù ọ̀rọ̀ tí kì í ṣiṣẹ́ pẹ̀lú ayélujára fún {{language}} kò tíì sí lórí fónù yìí. Gbà wọ́n sílẹ̀, lẹ́yìn náà tún gbìyànjú títẹ ọ̀rọ̀ pẹ̀lú ohùn.",
+    "downloadOfflineModel": "Gbà sílẹ̀",
+    "offlineModelDownloadScheduled": "Àwọn fáìlù ọ̀rọ̀ tí kì í ṣiṣẹ́ pẹ̀lú ayélujára yóò gbà sílẹ̀ ní ẹ̀yẹ. Tún gbìyànjú títẹ ọ̀rọ̀ pẹ̀lú ohùn lẹ́yìn ìgbà díẹ̀.",
     "listeningStopped": "A ti dá fífetí sílẹ̀ dúró."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "A ti fagilé",
         "uncollectible": "Kò ṣeé gbà"
       },
-      "loadMoreFailed": "A kò lè gbé síi wọlé.",
       "truncated": "Àwọn ìwé ìbéèrè owó tó ṣáájú ṣì wà."
     },
     "lowBalanceAlert": {

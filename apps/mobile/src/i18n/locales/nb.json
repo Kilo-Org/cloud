@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Se gjennom og logg ut andre enheter",
     "feedback": "Tilbakemelding",
     "privacyChoices": "Personvernvalg",
-    "signOut": "Logg ut",
     "deleteAccount": "Slett konto",
     "confirmationCode": "Bekreftelseskode",
     "confirmationCodePlaceholder": "6-sifret kode",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Returtasten sender meldingen",
     "returnSendsMessageSubtitle": "Når dette er av, setter returtasten inn et linjeskift i agentenes meldingsfelt.",
     "biometricUnlock": "Lås opp med biometri",
-    "biometricUnlockSubtitle": "Lås opp appen ved oppstart og etter fem minutter i bakgrunnen."
+    "biometricUnlockSubtitle": "Lås opp appen ved oppstart og etter fem minutter i bakgrunnen.",
+    "featureFlags": "Funksjonsflagg",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR-en er utilgjengelig",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Abonnementet ditt for tidlig tilgang må gjennomgås manuelt før det kan brukes på mobilen.",
       "iosTitle": "KiloClaw ikke tilgjengelig på iOS",
       "iosBody": "KiloClaw-tilgang administreres utenfor iOS-appen for denne kontoen.",
-      "iosContact": "Spørsmål? Kontakt hi@kilo.ai."
+      "iosContact": "Spørsmål? Kontakt hi@kilo.ai.",
+      "quarantinedCta": "Send en e-post til teamet vårt",
+      "nonCanonicalEarlybirdCta": "Gå gjennom planen din på kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} må følges opp: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Kunne ikke åpne GitHub. Prøv igjen."
     },
     "settingsSave": {
-      "keepEditing": "Fortsett å redigere",
       "saveChanges": "Lagre endringer",
       "unsavedTitle": "Ulagrede endringer",
       "unsavedMessage": "Vil du lagre endringene før du går ut av dette skjermbildet?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Kunne ikke laste inn aktive økter.",
+      "couldNotRefresh": "Kunne ikke oppdatere",
       "noSessionsYetDescription": "Start en kodeoppgave fra telefonen din. Øktene dine vises her.",
       "noMatches": "Ingen økter passer til søket",
       "tryDifferentSearch": "Prøv et annet søkeord.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Laster inn bilde",
       "imageUnavailableRetry": "Bildet er ikke tilgjengelig. Prøv å laste det inn på nytt",
-      "imageUnavailableWithAlt": "Bildet er ikke tilgjengelig: {{alt}}.",
       "imagePreviewUnavailableInSession": "Bildet kan ikke forhåndsvises i denne økten.",
       "viewImage": "Vis bilde",
       "viewImageWithAlt": "Vis bilde: {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Velg en modell før du sender.",
       "preparingPlaceholder": "Klargjør miljøet…",
       "finalizingPlaceholder": "Avslutter…",
-      "messagePlaceholder": "Melding",
       "cannotReceiveFiles": "Denne økten kan ikke motta filer. Fjern vedleggene for å sende meldingen din.",
       "couldNotAttachFiles": "Kunne ikke legge ved filene. Trykk på sendeknappen for å prøve igjen.",
       "discardAttachmentsMessage": "Opplastede filer som ikke er vedlagt sendte meldinger, blir slettet.",
@@ -2556,6 +2560,10 @@
     "stopped": "Dikteringen stoppet. Trykk på mikrofonen for å prøve igjen.",
     "unavailableDevice": "Diktering er ikke tilgjengelig på denne enheten.",
     "unavailableLanguage": "Diktering er ikke tilgjengelig for språket som er valgt på enheten.",
+    "languageNotInstalledTitle": "Diktering for {{language}} er ikke klar ennå",
+    "languageNotInstalledMessage": "De frakoblede talefilene for {{language}} er ikke installert på denne telefonen. Last dem ned, og prøv diktering igjen.",
+    "downloadOfflineModel": "Last ned",
+    "offlineModelDownloadScheduled": "De frakoblede talefilene lastes ned i bakgrunnen. Prøv diktering igjen senere.",
     "listeningStopped": "Dikteringen har stoppet."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Annullert",
         "uncollectible": "Uinnkrevbar"
       },
-      "loadMoreFailed": "Kunne ikke laste inn flere.",
       "truncated": "Tidligere fakturaer er tilgjengelige."
     },
     "lowBalanceAlert": {

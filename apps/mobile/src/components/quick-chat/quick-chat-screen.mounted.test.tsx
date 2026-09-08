@@ -76,6 +76,7 @@ const orgLoaded = vi.hoisted(() => ({ value: true }));
 const organizationId = vi.hoisted(() => ({ value: null as string | null }));
 const authEpoch = vi.hoisted(() => ({ value: 0 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   I18nManager: { isRTL: false },
   Pressable: 'Pressable',

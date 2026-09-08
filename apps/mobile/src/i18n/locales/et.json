@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Vaata teised seadmed üle ja logi neist välja",
     "feedback": "Anna tagasisidet",
     "privacyChoices": "Privaatsusvalikud",
-    "signOut": "Logi välja",
     "deleteAccount": "Kustuta konto",
     "confirmationCode": "Kinnituskood",
     "confirmationCodePlaceholder": "6-kohaline kood",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Sisestusklahv saadab sõnumi",
     "returnSendsMessageSubtitle": "Kui see on välja lülitatud, lisab sisestusklahv agentide sõnumi sisestusväljadel reavahetuse.",
     "biometricUnlock": "Biomeetriline lukust avamine",
-    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist."
+    "biometricUnlockSubtitle": "Rakendus tuleb lukust avada käivitamisel ja pärast viit minutit taustal olemist.",
+    "featureFlags": "Funktsioonilipud",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Tõmbetaotlus pole saadaval",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Sinu varajase ligipääsu pakett vajab enne mobiilis kasutamist käsitsi kontrollimist.",
       "iosTitle": "KiloClaw pole iOS-is saadaval",
       "iosBody": "Selle konto juurdepääsu KiloClaw’ teenusele hallatakse väljaspool iOS-i rakendust.",
-      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile hi@kilo.ai."
+      "iosContact": "Kas sul on küsimusi? Kirjuta aadressile hi@kilo.ai.",
+      "quarantinedCta": "Kirjuta meie meeskonnale",
+      "nonCanonicalEarlybirdCta": "Vaata oma pakett üle kilo.ai-s"
     },
     "instanceCard": {
       "needsAttention": "{{name}} vajab tähelepanu: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHubi ei õnnestunud avada. Proovi uuesti."
     },
     "settingsSave": {
-      "keepEditing": "Jätka muutmist",
       "saveChanges": "Salvesta muudatused",
       "unsavedTitle": "Salvestamata muudatused",
       "unsavedMessage": "Kas salvestada muudatused enne sellelt ekraanilt lahkumist?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Aktiivseid seansse ei õnnestunud laadida.",
+      "couldNotRefresh": "Värskendamine ebaõnnestus",
       "noSessionsYetDescription": "Alusta telefonis programmeerimisülesannet. Sinu seansid kuvatakse siin.",
       "noMatches": "Sobivaid seansse ei leitud",
       "tryDifferentSearch": "Proovi teistsugust otsingusõna.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Pildi laadimine",
       "imageUnavailableRetry": "Pilt pole saadaval, proovi laadimist uuesti",
-      "imageUnavailableWithAlt": "Pilt „{{alt}}“ pole saadaval.",
       "imagePreviewUnavailableInSession": "Pildi eelvaade pole selles seansis saadaval.",
       "viewImage": "Vaata pilti",
       "viewImageWithAlt": "Vaata pilti {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Enne saatmist vali mudel.",
       "preparingPlaceholder": "Keskkonna seadistamine...",
       "finalizingPlaceholder": "Lõpetamine...",
-      "messagePlaceholder": "Sõnum",
       "cannotReceiveFiles": "See seanss ei saa faile vastu võtta. Sõnumi saatmiseks eemalda manused.",
       "couldNotAttachFiles": "Failide lisamine ebaõnnestus. Uuesti proovimiseks puuduta saatmisnuppu.",
       "discardAttachmentsMessage": "Üles laaditud failid, mida pole ühegi saadetud sõnumiga seotud, kustutatakse.",
@@ -2556,6 +2560,10 @@
     "stopped": "Häälsisestus peatus. Uuesti proovimiseks puuduta mikrofoni.",
     "unavailableDevice": "Häälsisestus pole sellel seadmel saadaval.",
     "unavailableLanguage": "Häälsisestus pole selle seadme keele puhul saadaval.",
+    "languageNotInstalledTitle": "Häälsisestus keele {{language}} jaoks pole veel valmis",
+    "languageNotInstalledMessage": "Keele {{language}} võrguühenduseta kõnefailid pole selles telefonis installitud. Laadi need alla ja proovi häälsisestust uuesti.",
+    "downloadOfflineModel": "Laadi alla",
+    "offlineModelDownloadScheduled": "Võrguühenduseta kõnefailid laaditakse taustal alla. Proovi häälsisestust hiljem uuesti.",
     "listeningStopped": "Kuulamine peatus."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Tühistatud",
         "uncollectible": "Sissenõudmatu"
       },
-      "loadMoreFailed": "Rohkem andmeid ei õnnestunud laadida.",
       "truncated": "Varasemad arved on saadaval."
     },
     "lowBalanceAlert": {

@@ -1,6 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
-import React, { createElement, type ComponentProps } from 'react';
+import React, { act, createElement, type ComponentProps } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { createRequire } from 'node:module';
 import { Button } from '@/components/ui/button';
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import type * as DropdownMenuComponents from '@/components/ui/dropdown-menu';
@@ -116,6 +118,41 @@ function getSessionMenuItemProps(title: string): ComponentProps<typeof DropdownM
   return props;
 }
 
+function installTabsTestDom() {
+  const requireFromHere = createRequire(__filename);
+  const { parseHTML } = requireFromHere(
+    '../../../../../node_modules/.pnpm/linkedom@0.18.12/node_modules/linkedom'
+  ) as { parseHTML: (html: string) => { window: typeof globalThis; document: Document } };
+  const { window, document } = parseHTML('<html><body><div id="root"></div></body></html>');
+  const previous = {
+    window: globalThis.window,
+    document: globalThis.document,
+    HTMLElement: globalThis.HTMLElement,
+    Element: globalThis.Element,
+    Node: globalThis.Node,
+    ResizeObserver: globalThis.ResizeObserver,
+    IS_REACT_ACT_ENVIRONMENT: (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean })
+      .IS_REACT_ACT_ENVIRONMENT,
+  };
+  class ResizeObserver {
+    observe() {}
+    disconnect() {}
+  }
+  Object.assign(window.HTMLElement.prototype, { scrollIntoView: () => {}, select: () => {} });
+  Object.assign(globalThis, {
+    window,
+    document,
+    HTMLElement: window.HTMLElement,
+    Element: window.Element,
+    Node: window.Node,
+    ResizeObserver,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  });
+  const container = document.getElementById('root');
+  if (!container) throw new Error('Missing workspace tabs test root');
+  return { container, cleanup: () => Object.assign(globalThis, previous) };
+}
+
 describe('CloudAgentWorkspaceTabs', () => {
   it('renders complete grouped chat titles and selects only the current session tab', () => {
     const firstTitle = 'Investigate the complete authentication regression across every provider';
@@ -203,8 +240,85 @@ describe('CloudAgentWorkspaceTabs', () => {
       currentSessionId: busy.sessionId,
     });
 
-    expect(findButtonMarkup(html, busy.prompt)).toContain('<title>Busy</title>');
-    expect(findButtonMarkup(html, attention.prompt)).toContain('aria-label="Waiting for answer"');
+    const busyTab = findButtonMarkup(html, busy.prompt);
+    const attentionTab = findButtonMarkup(html, attention.prompt);
+
+    expect(busyTab).toContain('<title>Busy</title>');
+    expect(busyTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center"><svg');
+    expect(attentionTab).toContain('aria-label="Waiting for answer"');
+    expect(attentionTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center"><span');
+  });
+
+  it('overlays current-chat progress without changing a chat tab title anchor or status slot', () => {
+    const first = makeSession('ses_first', 'Short title');
+    const second = makeSession('ses_second', 'Neighboring chat title');
+    const progress =
+      'Preparing a long environment setup command that must truncate instead of resizing tabs';
+    const busyHtml = renderWorkspaceTabs({
+      chatSessions: [first, second],
+      currentSessionId: first.sessionId,
+      currentChatProgress: { sessionId: first.sessionId, message: progress },
+    });
+    const idleHtml = renderWorkspaceTabs({
+      chatSessions: [first, second],
+      currentSessionId: first.sessionId,
+    });
+    const busyFirstTab = findButtonMarkup(busyHtml, progress);
+    const busySecondTab = findButtonMarkup(busyHtml, second.prompt);
+    const idleFirstTab = findButtonMarkup(idleHtml, first.prompt);
+
+    expect(busyFirstTab).toContain('relative min-w-0 max-w-36');
+    expect(busyFirstTab).toContain('block truncate text-transparent');
+    expect(busyFirstTab).toContain('absolute inset-0 block truncate');
+    expect(busyFirstTab).toContain(progress);
+    expect(busyFirstTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
+    expect(busySecondTab).not.toContain(progress);
+    expect(idleFirstTab).toContain('block truncate');
+    expect(idleFirstTab).not.toContain('text-transparent');
+    expect(idleFirstTab).not.toContain('absolute inset-0 block truncate');
+    expect(idleFirstTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
+    expect(busyHtml).toContain(`role="status" aria-live="polite" class="sr-only">${progress}`);
+  });
+
+  it('suppresses the progress overlay while renaming a chat', () => {
+    const progress = 'Preparing workspace';
+    const dom = installTabsTestDom();
+    let root: Root | undefined;
+
+    try {
+      root = createRoot(dom.container);
+      act(() => {
+        root?.render(
+          createElement(CloudAgentWorkspaceTabs, {
+            activeTabId: CHAT_TAB_ID,
+            chatSessions: [makeSession('ses_first', 'First worktree chat')],
+            currentSessionId: 'ses_first',
+            currentChatProgress: { sessionId: 'ses_first', message: progress },
+            onSelectChat: () => undefined,
+            onCloseChat: () => undefined,
+            onRenameChat: async () => undefined,
+            terminals: [],
+            terminalStatuses: {},
+            canCreateTerminal: false,
+            onSelectTab: () => undefined,
+            onCreateTerminal: () => undefined,
+            onCloseTerminal: () => undefined,
+          })
+        );
+      });
+      const tab = dom.container.querySelector<HTMLButtonElement>('[role="tab"]');
+      if (!tab) throw new Error('Missing chat tab');
+      void act(() => tab.dispatchEvent(new window.Event('dblclick', { bubbles: true })));
+
+      expect(dom.container.textContent).not.toContain(progress);
+      expect(dom.container.querySelector('.absolute.inset-0')).toBeNull();
+      expect(
+        dom.container.querySelector('input[aria-label="Rename First worktree chat"]')
+      ).not.toBeNull();
+    } finally {
+      act(() => root?.unmount());
+      dom.cleanup();
+    }
   });
 
   it('keeps the split chat action busy and disables only chat creation while pending', () => {

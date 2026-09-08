@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Dib u eeg aaladaha kale oo ka saar akoonka",
     "feedback": "Jawaab-celin",
     "privacyChoices": "Xulashooyinka asturnaanta",
-    "signOut": "Ka bax",
     "deleteAccount": "Tirtir akoonka",
     "confirmationCode": "Koodhka xaqiijinta",
     "confirmationCodePlaceholder": "koodh ka kooban 6 lambar",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Furaha gelintu wuxuu diraa farriinta",
     "returnSendsMessageSubtitle": "Marka la damiyo, furaha gelintu wuxuu sadar cusub ku daraa goobaha farriimaha wakiilka lagu qoro.",
     "biometricUnlock": "Ku fur aqoonsiga astaamaha jirka",
-    "biometricUnlockSubtitle": "Fur marka barnaamijku bilaabmo iyo marka uu shan daqiiqo gadaal ka shaqaynayay."
+    "biometricUnlockSubtitle": "Fur marka barnaamijku bilaabmo iyo marka uu shan daqiiqo gadaal ka shaqaynayay.",
+    "featureFlags": "Calaamadaha sifooyinka",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Codsiga isku-darka lama heli karo",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Qorshahaaga helitaanka hore wuxuu u baahan yahay dib-u-eegis qof sameeyo ka hor inta aan taleefanka lagu isticmaali karin.",
       "iosTitle": "KiloClaw lagama heli karo iOS",
       "iosBody": "Helitaanka KiloClaw ee akoonkan waxaa laga maamulaa meel ka baxsan abka iOS.",
-      "iosContact": "Su'aalo? La xiriir hi@kilo.ai."
+      "iosContact": "Su'aalo? La xiriir hi@kilo.ai.",
+      "quarantinedCta": "U dir iimayl kooxdayada",
+      "nonCanonicalEarlybirdCta": "Dib u eeg qorshahaaga kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} wuxuu u baahan yahay fiiro: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Lama furi karin GitHub. Fadlan mar kale isku day."
     },
     "settingsSave": {
-      "keepEditing": "Sii wad wax ka beddelka",
       "saveChanges": "Kaydi isbeddellada",
       "unsavedTitle": "Isbeddello aan la kaydin",
       "unsavedMessage": "Ma kaydinaysaa isbeddelladaada ka hor intaadan ka bixin shaashaddan?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Kalfadhiyada firfircoon lama soo rari karin.",
+      "couldNotRefresh": "Lama cusboonaysiin karin",
       "noSessionsYetDescription": "Taleefankaaga ka bilow hawl koodh-qoris ah. Kalfadhiyadaada ayaa halkan ka soo muuqan doona.",
       "noMatches": "Ma jiraan kalfadhiyo u dhigma",
       "tryDifferentSearch": "Isku day erey kale oo raadinta ah.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Sawirka waa la soo shubayaa",
       "imageUnavailableRetry": "Sawirka lama heli karo, mar kale isku day inaad soo shubto",
-      "imageUnavailableWithAlt": "Sawirka {{alt}} lama heli karo.",
       "imagePreviewUnavailableInSession": "Horudhaca sawirka lagama heli karo kalfadhigan.",
       "viewImage": "Eeg sawirka",
       "viewImageWithAlt": "Eeg sawirka {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Dooro moodeel ka hor intaadan dirin.",
       "preparingPlaceholder": "Deegaanka waa la diyaarinayaa...",
       "finalizingPlaceholder": "Waa la dhammaystirayaa...",
-      "messagePlaceholder": "Fariin",
       "cannotReceiveFiles": "Kalfadhigan ma qaabili karo faylal. Ka saar lifaaqyada si aad u dirto farriintaada.",
       "couldNotAttachFiles": "Faylasha lama lifaaqi karin. Taabo Dir si aad mar kale isku daydo.",
       "discardAttachmentsMessage": "Faylasha la gudbiyay ee aan weli la isticmaalin waa la tirtiri doonaa.",
@@ -2556,6 +2560,10 @@
     "stopped": "Gelinta codku way joogsatay. Taabo makarafoonka si aad mar kale isku daydo.",
     "unavailableDevice": "Gelinta codka lagama heli karo qalabkan.",
     "unavailableLanguage": "Gelinta codka looma heli karo luqadda qalabkan.",
+    "languageNotInstalledTitle": "Gelinta codka ee {{language}} weli ma diyaarna",
+    "languageNotInstalledMessage": "Faylasha hadalka khadka la'aanta ee {{language}} lama rakibin telefoonkan. Soo deji iyaga, ka dibna markale isku day gelinta codka.",
+    "downloadOfflineModel": "Soo deji",
+    "offlineModelDownloadScheduled": "Faylasha hadalka khadka la'aanta waxay soo deji doonaan gadaasha. Markale isku day gelinta codka goor dambe.",
     "listeningStopped": "Dhageysigu wuu joogsaday."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "La buriyay",
         "uncollectible": "Lama soo xareyn karo"
       },
-      "loadMoreFailed": "Kuwo kale lama soo rari karin.",
       "truncated": "Qaansheegyada hore waa la heli karaa."
     },
     "lowBalanceAlert": {

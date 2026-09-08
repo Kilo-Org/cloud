@@ -212,6 +212,47 @@ describe('github-integration-helpers', () => {
       ]);
     });
 
+    it('lists a repository shared by two installations exactly once, from the primary installation', async () => {
+      mockGetIntegrationsByOrganization.mockResolvedValue([
+        buildIntegration({
+          id: 'integration-1',
+          platform_account_login: 'acme-core',
+          repositories: [
+            { id: 1, name: 'api', full_name: 'acme-core/api', private: true },
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+        buildIntegration({
+          id: 'integration-2',
+          platform_installation_id: 'installation-2',
+          platform_account_login: 'acme-labs',
+          repositories: [
+            { id: 3, name: 'scanner', full_name: 'acme-labs/scanner', private: true },
+            { id: 2, name: 'shared', full_name: 'acme-core/shared', private: false },
+          ],
+        }),
+      ]);
+
+      const { fetchAllGitHubRepositoriesForOrganization } =
+        await import('./github-integration-helpers');
+      const result = await fetchAllGitHubRepositoriesForOrganization('org-123');
+
+      expect(result.repositories).toEqual([
+        expect.objectContaining({
+          fullName: 'acme-core/api',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-core/shared',
+          platformIntegrationId: 'integration-1',
+        }),
+        expect.objectContaining({
+          fullName: 'acme-labs/scanner',
+          platformIntegrationId: 'integration-2',
+        }),
+      ]);
+    });
+
     it('returns repositories from healthy installations when a sibling fetch fails', async () => {
       mockGetIntegrationsByOrganization.mockResolvedValue([
         buildIntegration({

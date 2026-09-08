@@ -106,6 +106,9 @@ import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
   requestFrameSchema,
+  responseFrameSchema,
+  sessionOperationAckSchema,
+  sessionOperationAuthorizationSchema,
   sessionPromptPayloadSchema,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
@@ -113,6 +116,7 @@ import {
   type RequestFrame,
   type ResponseFrame,
   type SessionAttachPayload,
+  type SessionOperationDelivery,
   sandboxControlSocketAttachmentSchema,
   type SandboxHeartbeatPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
@@ -345,7 +349,12 @@ function persistedSessionEvents(state: DurableObjectState, eventTypes: string[])
 function sendHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
+  } = {}
 ): void {
   ws.send(
     JSON.stringify({
@@ -356,6 +365,17 @@ function sendHello(
         protocolVersion: 1,
         providerInstanceId:
           identity.providerInstanceId ?? cloudflareRef(socketSandboxIds.get(ws) ?? sandboxId),
+        ...(identity.sessionOperationResults
+          ? { capabilities: { sessionOperationResults: true } }
+          : {}),
+        ...(identity.nativeRuntimeRetirement
+          ? {
+              capabilities: {
+                sessionOperationResults: true,
+                nativeRuntimeRetirement: true,
+              },
+            }
+          : {}),
         ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
       },
     })
@@ -365,7 +385,12 @@ function sendHello(
 async function completeHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
+  } = {}
 ): Promise<void> {
   sendHello(ws, requestId, identity);
   await expect(nextMessage(ws)).resolves.toBe(
@@ -376,7 +401,12 @@ async function completeHello(
       result: {
         protocolVersion: 1,
         handshakeComplete: true,
-        capabilities: { kiloVersionHeartbeat: true },
+        capabilities: {
+          kiloVersionHeartbeat: true,
+          sessionOperationResults: true,
+          scopedStopAbort: true,
+          nativeRuntimeRetirement: true,
+        },
       },
     })
   );
@@ -403,7 +433,10 @@ type TerminalRuntimeFixture = {
   wrapperInstanceId?: string;
 };
 
-async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
+async function initializeTerminalRuntime(
+  fixture: TerminalRuntimeFixture,
+  capabilities: { sessionOperationResults?: boolean; nativeRuntimeRetirement?: boolean } = {}
+) {
   const credential = generateSandboxCredential();
   await seedCredential(credential, fixture.sandboxId);
   const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
@@ -431,6 +464,7 @@ async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
   await completeHello(socket, `hello_${fixture.sandboxId}`, {
     providerInstanceId: providerRef,
     ...(fixture.wrapperInstanceId ? { wrapperInstanceId: fixture.wrapperInstanceId } : {}),
+    ...capabilities,
   });
   return { control, credential, socket, providerRef, ...provider };
 }
@@ -4892,7 +4926,7 @@ describe('SandboxControl recovery watchdogs', () => {
         wrapperInstanceId,
         reason: 'preparation_interrupted',
       })
-    ).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
     await runInDurableObject(control, async (_instance, state) => {
       expect(await state.storage.getAlarm()).toBe(repairedAt);
     });
@@ -6427,7 +6461,7 @@ describe('SandboxControl passive status', () => {
             },
           })
         );
-        await Promise.all(fresh['sessionForwardChains'].values());
+        await Promise.all(fresh['sessionForwarding'].values());
         expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
           status: 'active',
           estimatedSleepAt: null,
@@ -6692,7 +6726,7 @@ const savedWorktreeSnapshot: WorktreeChangesSnapshot = {
   capturedAt: '2026-08-20T10:00:00.000Z',
 };
 
-async function worktreeFixture() {
+async function worktreeFixture(options: { sessionOperationResults?: boolean } = {}) {
   const suffix = crypto.randomUUID();
   const userId = `user_worktree_${suffix}`;
   const sessionId = `workspace_${suffix}` as const;
@@ -6779,18 +6813,32 @@ async function worktreeFixture() {
   await control.prepareSessionCredentials({ ownerId: userId, sessionId });
   await control.attachSession({ sessionId, kiloSessionId, directory, worktreeId, ownerId: userId });
   let ws = await connect(credential, sandboxId);
-  await completeHello(ws, `hello_${suffix}`, { wrapperInstanceId });
+  await completeHello(ws, `hello_${suffix}`, {
+    wrapperInstanceId,
+    sessionOperationResults: options.sessionOperationResults,
+  });
   const captures: RequestFrame[] = [];
   const inbox: RequestFrame[] = [];
   const captureWaiters: ((request: RequestFrame) => void)[] = [];
   const prompts: RequestFrame[] = [];
   const promptSeen = Promise.withResolvers<void>();
   const aborts: RequestFrame[] = [];
+  const resultWaiters = new Map<string, (response: ResponseFrame) => void>();
   let nextAttach: ((request: RequestFrame) => void) | undefined;
 
   function receive(client: WebSocket): void {
     client.addEventListener('message', event => {
-      const parsed = requestFrameSchema.safeParse(JSON.parse(String(event.data)));
+      const frame = JSON.parse(String(event.data));
+      const response = responseFrameSchema.safeParse(frame);
+      if (response.success) {
+        const resolve = resultWaiters.get(response.data.requestId);
+        if (resolve) {
+          resultWaiters.delete(response.data.requestId);
+          resolve(response.data);
+        }
+        return;
+      }
+      const parsed = requestFrameSchema.safeParse(frame);
       if (!parsed.success) return;
       const request = parsed.data;
       if (request.operation === 'session.git.summary') {
@@ -6882,6 +6930,20 @@ async function worktreeFixture() {
     reply(request: RequestFrame, result: unknown): void {
       ws.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result }));
     },
+    async sendOperationResult(delivery: SessionOperationDelivery): Promise<ResponseFrame> {
+      const requestId = crypto.randomUUID();
+      const response = new Promise<ResponseFrame>(resolve => resultWaiters.set(requestId, resolve));
+      ws.send(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'session.operation.result',
+          session: delivery.authorization.session,
+          payload: delivery,
+        })
+      );
+      return response;
+    },
     fail(
       request: RequestFrame,
       retryable = false,
@@ -6957,6 +7019,141 @@ async function worktreeFixture() {
 function captureRevision(request: RequestFrame): number {
   return (request.payload as { revision: number }).revision;
 }
+
+describe('SandboxSession operation authorization admission', () => {
+  it('persists dispatch proof before the capability-gated attach and prompt reach the wrapper socket', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_authorization';
+    try {
+      const attach = fixture.holdNextAttach();
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'persist before egress' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+
+      const attachRequest = await attach;
+      expect(attachRequest).toMatchObject({
+        operation: 'session.attach',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: fixture.kiloSessionId,
+          directory: fixture.directory,
+        },
+        authorization: {
+          operation: 'session.attach',
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'queued',
+            unresolvedDispatch: true,
+            operations: {
+              attach: {
+                dispatched: true,
+                authorization: {
+                  operation: 'session.attach',
+                  messageId,
+                  wrapperInstanceId: fixture.wrapperInstanceId,
+                },
+              },
+            },
+          },
+        ]);
+      });
+
+      fixture.reply(attachRequest, { attached: true });
+      await fixture.promptSeen;
+      expect(fixture.prompts).toHaveLength(1);
+      expect(fixture.prompts[0]).toMatchObject({
+        operation: 'session.prompt',
+        authorization: {
+          operation: 'session.prompt',
+          operationId: messageId,
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('returns the exact durable acknowledgement when the wrapper repeats a completed prompt result', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_result_ack';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'retain this completed result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+
+      const first = await fixture.sendOperationResult(delivery);
+      const second = await fixture.sendOperationResult(delivery);
+      const firstAck = sessionOperationAckSchema.parse(first.ok ? first.result : undefined);
+      expect(first).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'applied',
+          decision: { state: 'completed' },
+          resultHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+      });
+      expect(second).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'identical',
+          resultHash: firstAck.resultHash,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'completed',
+            terminalSource: 'operation_result',
+            operations: { prompt: { resultHash: firstAck.resultHash } },
+          },
+        ]);
+      });
+      expect(fixture.prompts).toHaveLength(1);
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+});
 
 describe('SandboxSession worktree changes persistence', () => {
   beforeEach(() => {
@@ -7520,7 +7717,7 @@ describe('SandboxSession worktree changes persistence', () => {
           fixture.session.getMessageResult('msg_failed_reattach')
         ).resolves.toMatchObject({
           type: 'found',
-          result: { status: retry === 'cancelled' ? 'interrupted' : 'failed' },
+          result: { status: retry === 'cancelled' ? 'interrupted' : 'queued' },
         });
         await expect(fixture.session.getWorktreeChanges()).resolves.toEqual(beforeCleanup);
         await expect(fixture.control.getStatus()).resolves.toMatchObject({
@@ -8189,9 +8386,12 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: cloudflareRef(fixture.sandboxId),
       });
       await runInDurableObject(session, (_instance, state) => {
-        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toEqual(cleanup);
       });
-      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
+      expect((await admissionState(session)).messages[1]).toEqual(b);
+      expect(acquisitions.map(input => input.acquisition?.id)).toEqual([
+        preparing.preparationAttemptId,
+      ]);
       expect(provider.create).not.toHaveBeenCalled();
       await runInDurableObject(control, async (_instance, state) => {
         expect(await state.storage.get('acquisition_receipts')).toEqual([
@@ -8206,6 +8406,10 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: null,
       });
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
       expect(provider.launch).toHaveBeenCalledTimes(1);
       const launch = provider.launch.mock.calls[0];
       if (!launch) throw new Error('Expected one replacement launch for B');
@@ -8231,7 +8435,7 @@ describe('SandboxSession control-plane regressions', () => {
           wrapperInstanceId: fixture.wrapperInstanceId,
           reason: 'late_cancelled_runtime_cleanup',
         })
-      ).resolves.toEqual({ quarantined: false });
+      ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
       expect((await admissionState(session)).messages).toMatchObject([
         { messageId: 'msg_ffffffffffff00000000000001', state: 'cancelled' },
         {
@@ -8241,12 +8445,8 @@ describe('SandboxSession control-plane regressions', () => {
         },
       ]);
       const continuations = acquisitions.filter(input => input.acquisition?.id === acquisitionB.id);
-      expect(continuations).toHaveLength(3);
-      expect(continuations.map(input => input.acquisition)).toEqual([
-        acquisitionB,
-        acquisitionB,
-        acquisitionB,
-      ]);
+      expect(continuations).toHaveLength(2);
+      expect(continuations.map(input => input.acquisition)).toEqual([acquisitionB, acquisitionB]);
       expect(continuations.every(input => input.allowCreate === undefined)).toBe(true);
       expect(
         replacementRequests
@@ -8264,6 +8464,193 @@ describe('SandboxSession control-plane regressions', () => {
       stream?.close();
       socket.close();
       replacement?.close();
+    }
+  });
+
+  it('retries a lost completed native cleanup after Session reload without selecting N2', async () => {
+    const { fixture, session: originalSession } = messageFixture();
+    let session = originalSession;
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const { control, socket, provider } = await initializeTerminalRuntime(fixture, {
+      nativeRuntimeRetirement: true,
+    });
+    let dropCleanupResponse = true;
+    const requests: RequestFrame[] = [];
+    socket.addEventListener('message', event => {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      requests.push(request);
+      let result: unknown;
+      switch (request.operation) {
+        case 'session.attach':
+          result = {
+            attached: true,
+            nativeRuntimeId:
+              requests.filter(candidate => candidate.operation === 'session.attach').length === 1
+                ? nativeRuntimeId
+                : replacementRuntimeId,
+          };
+          break;
+        case 'session.prompt':
+          result = {
+            messageId: sessionPromptPayloadSchema.parse(request.payload).messageId,
+            status: 'accepted',
+          };
+          break;
+        case 'session.operation.get':
+          result = { state: 'missing' };
+          break;
+        case 'session.sync':
+          result = { status: { type: 'idle' }, questions: [], permissions: [] };
+          break;
+        case 'session.abort':
+          result = {
+            status: 'aborted',
+            quiescent: true,
+            runtimeRetired: true,
+            nativeRuntimeId,
+          };
+          break;
+        default:
+          throw new Error(`Unexpected control request: ${request.operation}`);
+      }
+      socket.send(
+        JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result })
+      );
+    });
+    await runInDurableObject(control, instance => {
+      const prototype = Object.getPrototypeOf(instance) as typeof instance;
+      const quarantine = instance.quarantineRuntime.bind(instance);
+      vi.spyOn(prototype, 'quarantineRuntime').mockImplementation(async input => {
+        const result = await quarantine(input);
+        if (dropCleanupResponse) throw new Error('lost cleanup response');
+        return result;
+      });
+    });
+    try {
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      await session.createSessionWithInitialAdmission({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+        agent: agentA,
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+        message: {
+          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'A' },
+        },
+      });
+      await waitForAccepted(session, INITIAL_MESSAGE_ID);
+      const attached = sessionOperationAuthorizationSchema.parse({
+        operation: 'session.attach',
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: INITIAL_MESSAGE_ID,
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId,
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        state.storage.kv.put('native_runtime_fence', {
+          sandboxId: fixture.sandboxId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+          nativeRuntimeId,
+          attachmentEpoch: 1,
+          authorization: attached,
+        });
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId }),
+      ]);
+      await runInDurableObject(session, (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        state.storage.kv.put(
+          'session_messages',
+          messages.map(message =>
+            message.messageId === INITIAL_MESSAGE_ID
+              ? {
+                  ...message,
+                  acceptedAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                  lastActivityAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                }
+              : message
+          )
+        );
+      });
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await vi.waitFor(async () => {
+        await expect(control.listRoutes()).resolves.toEqual([
+          expect.not.objectContaining({ nativeRuntimeId }),
+        ]);
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toMatchObject({
+          nativeRuntimeId,
+          authorization: attached,
+        });
+      });
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+
+      const replacementAuthorization = {
+        operation: 'session.attach' as const,
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMo',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      };
+      await expect(
+        control.request({
+          operation: 'session.attach',
+          authorization: replacementAuthorization,
+          session: replacementAuthorization.session,
+          expectedWrapperInstanceId: fixture.wrapperInstanceId,
+          payload: {},
+        })
+      ).resolves.toMatchObject({ ok: true, result: { nativeRuntimeId: replacementRuntimeId } });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      const beforeRetry = await runInDurableObject(control, async (_instance, state) => ({
+        deadlines: await loadDeadlines(state.storage),
+        alarmAt: await state.storage.getAlarm(),
+      }));
+
+      await expect(
+        runInDurableObject(session, (_instance, state) => state.abort('reload after lost cleanup'))
+      ).rejects.toThrow('reload after lost cleanup');
+      session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
+      dropCleanupResponse = false;
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+      expect(provider.stop).not.toHaveBeenCalled();
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadDeadlines(state.storage)).toEqual(beforeRetry.deadlines);
+        expect(await state.storage.getAlarm()).toBe(beforeRetry.alarmAt);
+      });
+    } finally {
+      socket.close();
     }
   });
 
@@ -9296,6 +9683,7 @@ describe('SandboxSession control-plane regressions', () => {
         preparationAttemptId: expect.any(String),
         deliveryDeadlineAt: expect.any(Number),
         terminalAt: expect.any(Number),
+        terminalSource: 'coordinator',
       });
       expect(delivered.messages.slice(1)).toMatchObject([
         { messageId: 'msg_model_less', state: 'accepted' },
@@ -12761,7 +13149,7 @@ describe('SandboxSession running stream state', () => {
 });
 
 describe('SandboxSession root-scoped reconnect sync', () => {
-  it('reconciles an accepted root before connected and replays only its questions and permissions afterward', async () => {
+  it('connects from cached root inputs before sync and preserves scoped background reconciliation', async () => {
     const wrapperInstanceId = crypto.randomUUID();
     const ownerId = 'user_grouped_sync';
     const activeSessionId = GRANT_SESSION_ID;
@@ -12832,20 +13220,6 @@ describe('SandboxSession root-scoped reconnect sync', () => {
     };
     expect(emptyConnected.streamEventType).toBe('connected');
 
-    const pendingActiveResponse = SELF.fetch(
-      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
-      { headers: { Upgrade: 'websocket' } }
-    );
-    const sync = JSON.parse(await incomingSync) as WrapperRequest;
-    expect(sync).toMatchObject({
-      operation: 'session.sync',
-      session: {
-        sessionId: activeSessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/shared',
-      },
-      payload: {},
-    });
     const questions = [
       { id: 'question_root', sessionID: ROOT_ID, questions: [{ question: 'Root?' }] },
       {
@@ -12859,6 +13233,67 @@ describe('SandboxSession root-scoped reconnect sync', () => {
       { id: 'permission_root', sessionID: ROOT_ID },
       { id: 'permission_child', sessionID: THIRD_ROOT_ID, rootKiloSessionId: ROOT_ID },
     ];
+    await runInDurableObject(active, async (_instance, state) => {
+      await state.storage.put('session_pending_interactions', {
+        revision: 1,
+        questions,
+        permissions,
+      });
+    });
+    const activeResponse = await SELF.fetch(
+      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    const sync = JSON.parse(await incomingSync) as WrapperRequest;
+    expect(sync).toMatchObject({
+      operation: 'session.sync',
+      session: {
+        sessionId: activeSessionId,
+        kiloSessionId: ROOT_ID,
+        directory: '/workspace/shared',
+      },
+      payload: {},
+    });
+    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
+      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
+    }
+    activeResponse.webSocket.accept();
+    const events = (await nextMessages(activeResponse.webSocket, 7)).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+    expect(events.map(event => event.streamEventType)).toEqual([
+      'connected',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'cloud.message.queued',
+      'cloud.message.sent',
+    ]);
+    expect(events[0]?.data).toMatchObject({
+      cloudStatus: { type: 'ready' },
+      activeMessageId: INITIAL_MESSAGE_ID,
+      pendingInteractions: { questions, permissions },
+    });
+    expect(events.slice(1, 3)).toEqual(
+      questions.map(question =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'question.asked', event: 'question.asked', properties: question },
+        })
+      )
+    );
+    expect(events.slice(3, 5)).toEqual(
+      permissions.map(permission =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        })
+      )
+    );
+    const incomingStatus = nextMessage(activeResponse.webSocket);
     respondToWrapperRequest(wrapper, sync, {
       status: { type: 'busy' },
       questions: [
@@ -12872,49 +13307,13 @@ describe('SandboxSession root-scoped reconnect sync', () => {
         { id: 'permission_contradictory', sessionID: ROOT_ID, rootKiloSessionId: SECOND_ROOT_ID },
       ],
     });
-    const activeResponse = await pendingActiveResponse;
-    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
-      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
-    }
-    activeResponse.webSocket.accept();
-    const events = (await nextMessages(activeResponse.webSocket, 8)).map(
-      message => JSON.parse(message) as SessionStreamEvent
-    );
-    expect(events.map(event => event.streamEventType)).toEqual([
-      'kilocode',
-      'connected',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'cloud.message.queued',
-      'cloud.message.sent',
-    ]);
-    expect(events[1]?.data).toMatchObject({
-      cloudStatus: { type: 'ready' },
-      activeMessageId: INITIAL_MESSAGE_ID,
-      pendingInteractions: { questions, permissions },
+    expect(JSON.parse(await incomingStatus)).toMatchObject({
+      streamEventType: 'kilocode',
+      data: { type: 'session.status' },
     });
-    expect(events.slice(2, 4)).toEqual(
-      questions.map(question =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'question.asked', event: 'question.asked', properties: question },
-        })
-      )
-    );
-    expect(events.slice(4, 6)).toEqual(
-      permissions.map(permission =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
-        })
-      )
-    );
     await runInDurableObject(active, async (_instance, state) => {
       expect(await state.storage.get('session_pending_interactions')).toMatchObject({
+        revision: 2,
         questions,
         permissions,
       });

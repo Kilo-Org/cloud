@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Kagua vifaa vingine na uondoke kwenye akaunti kwenye vifaa hivyo",
     "feedback": "Maoni",
     "privacyChoices": "Chaguzi za faragha",
-    "signOut": "Toka",
     "deleteAccount": "Futa akaunti",
     "confirmationCode": "Msimbo wa uthibitisho",
     "confirmationCodePlaceholder": "msimbo wa tarakimu 6",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Kitufe cha kuingiza hutuma ujumbe",
     "returnSendsMessageSubtitle": "Kipengele hiki kikiwa kimezimwa, kitufe cha kuingiza huongeza mstari mpya kwenye sehemu za kuandika ujumbe kwa mawakala.",
     "biometricUnlock": "Fungua kwa bayometriki",
-    "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano."
+    "biometricUnlockSubtitle": "Kufungua kunahitajika unapoanzisha programu na baada ya programu kukaa chinichini kwa dakika tano.",
+    "featureFlags": "Alamu za vipengele",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Ombi la kuunganisha halipatikani",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Mpango wako wa ufikiaji wa mapema unahitaji kukaguliwa na mtu kabla ya kutumika kwenye simu.",
       "iosTitle": "KiloClaw haipatikani kwenye iOS",
       "iosBody": "Ufikiaji wa KiloClaw unasimamiwa nje ya programu ya iOS kwa akaunti hii.",
-      "iosContact": "Maswali? Wasiliana na hi@kilo.ai."
+      "iosContact": "Maswali? Wasiliana na hi@kilo.ai.",
+      "quarantinedCta": "Tuma barua pepe kwa timu yetu",
+      "nonCanonicalEarlybirdCta": "Kagua mpango wako kwenye kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} inahitaji kushughulikiwa: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Imeshindikana kufungua GitHub. Tafadhali jaribu tena."
     },
     "settingsSave": {
-      "keepEditing": "Endelea kuhariri",
       "saveChanges": "Hifadhi mabadiliko",
       "unsavedTitle": "Mabadiliko ambayo hayajahifadhiwa",
       "unsavedMessage": "Ungependa kuhifadhi mabadiliko yako kabla ya kuondoka kwenye skrini hii?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Imeshindikana kupakia vikao vinavyoendelea.",
+      "couldNotRefresh": "Imeshindikana kuonyesha upya",
       "noSessionsYetDescription": "Anza kazi ya kuandika msimbo kutoka kwenye simu yako. Vikao vyako vitaonekana hapa.",
       "noMatches": "Hakuna vikao vinavyolingana",
       "tryDifferentSearch": "Jaribu neno lingine la utafutaji.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Inapakia picha",
       "imageUnavailableRetry": "Picha haipatikani, jaribu tena kupakia",
-      "imageUnavailableWithAlt": "Picha haipatikani: {{alt}}.",
       "imagePreviewUnavailableInSession": "Onyesho la awali la picha halipatikani kwenye kikao hiki.",
       "viewImage": "Tazama picha",
       "viewImageWithAlt": "Tazama picha {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Chagua modeli kabla ya kutuma.",
       "preparingPlaceholder": "Inatayarisha mazingira...",
       "finalizingPlaceholder": "Inahitimisha...",
-      "messagePlaceholder": "Ujumbe",
       "cannotReceiveFiles": "Kikao hiki hakiwezi kupokea faili. Ondoa viambatisho ili utume ujumbe wako.",
       "couldNotAttachFiles": "Imeshindikana kuambatisha faili. Gusa Tuma ili ujaribu tena.",
       "discardAttachmentsMessage": "Faili zilizopakiwa ambazo hazijaambatishwa kwenye ujumbe uliotumwa zitafutwa.",
@@ -2556,6 +2560,10 @@
     "stopped": "Uingizaji kwa sauti umesimama. Gusa maikrofoni ili kujaribu tena.",
     "unavailableDevice": "Uingizaji kwa sauti haupatikani kwenye kifaa hiki.",
     "unavailableLanguage": "Uingizaji kwa sauti haupatikani kwa lugha ya kifaa hiki.",
+    "languageNotInstalledTitle": "Uingizaji kwa sauti kwa {{language}} hauko tayari bado",
+    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajasakinishwa kwenye simu hii. Pakua mafaili hayo, kisha ujaribu tena uingizaji kwa sauti.",
+    "downloadOfflineModel": "Pakua",
+    "offlineModelDownloadScheduled": "Mafaili ya sauti ya nje ya mtandao yatapakuliwa nyuma ya pazia. Jaribu tena uingizaji kwa sauti baadaye.",
     "listeningStopped": "Usikilizaji umesimama."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Imebatilishwa",
         "uncollectible": "Haiwezi kulipika"
       },
-      "loadMoreFailed": "Imeshindikana kupakia zaidi.",
       "truncated": "Ankara za zamani zinapatikana."
     },
     "lowBalanceAlert": {

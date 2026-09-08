@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Visa andra enheter och logga ut från dem",
     "feedback": "Skicka synpunkter",
     "privacyChoices": "Integritetsinställningar",
-    "signOut": "Logga ut",
     "deleteAccount": "Ta bort konto",
     "confirmationCode": "Bekräftelsekod",
     "confirmationCodePlaceholder": "6-siffrig kod",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Returtangenten skickar meddelanden",
     "returnSendsMessageSubtitle": "När detta är avstängt infogar returtangenten en radbrytning i agenternas meddelandefält.",
     "biometricUnlock": "Lås upp med biometri",
-    "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden."
+    "biometricUnlockSubtitle": "Upplåsning krävs när appen startas och efter fem minuter i bakgrunden.",
+    "featureFlags": "Funktionsflaggor",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR:en är inte tillgänglig",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Ditt abonnemang för tidig åtkomst behöver granskas manuellt innan det kan användas i mobilen.",
       "iosTitle": "KiloClaw är inte tillgängligt på iOS",
       "iosBody": "För det här kontot hanteras åtkomsten till KiloClaw utanför iOS-appen.",
-      "iosContact": "Frågor? Kontakta hi@kilo.ai."
+      "iosContact": "Frågor? Kontakta hi@kilo.ai.",
+      "quarantinedCta": "Skicka e-post till vårt team",
+      "nonCanonicalEarlybirdCta": "Granska ditt abonnemang på kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} behöver ses över: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Kunde inte öppna GitHub. Försök igen."
     },
     "settingsSave": {
-      "keepEditing": "Fortsätt redigera",
       "saveChanges": "Spara ändringar",
       "unsavedTitle": "Osparade ändringar",
       "unsavedMessage": "Vill du spara ändringarna innan du lämnar den här vyn?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Kunde inte läsa in aktiva sessioner.",
+      "couldNotRefresh": "Kunde inte uppdatera",
       "noSessionsYetDescription": "Starta en programmeringsuppgift från mobilen. Dina sessioner visas här.",
       "noMatches": "Inga matchande sessioner",
       "tryDifferentSearch": "Prova en annan sökterm.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Läser in bild",
       "imageUnavailableRetry": "Bilden är inte tillgänglig. Försök läsa in den igen",
-      "imageUnavailableWithAlt": "Bilden kan inte visas: {{alt}}.",
       "imagePreviewUnavailableInSession": "Bilden kan inte förhandsvisas i den här sessionen.",
       "viewImage": "Visa bild",
       "viewImageWithAlt": "Visa bild {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Välj en modell innan du skickar meddelandet.",
       "preparingPlaceholder": "Förbereder miljön…",
       "finalizingPlaceholder": "Avslutar…",
-      "messagePlaceholder": "Meddelande",
       "cannotReceiveFiles": "Den här sessionen kan inte ta emot filer. Ta bort bilagorna för att skicka ditt meddelande.",
       "couldNotAttachFiles": "Det gick inte att bifoga filerna. Tryck på Skicka för att försöka igen.",
       "discardAttachmentsMessage": "Uppladdade filer som inte har bifogats i skickade meddelanden tas bort.",
@@ -2556,6 +2560,10 @@
     "stopped": "Röstinmatningen stoppades. Tryck på mikrofonen för att försöka igen.",
     "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
     "unavailableLanguage": "Röstinmatning stöds inte för det språk som är valt på enheten.",
+    "languageNotInstalledTitle": "Röstinmatning för {{language}} är inte klar ännu",
+    "languageNotInstalledMessage": "De offlinebaserade talfilerna för {{language}} är inte installerade på den här telefonen. Ladda ned dem och prova röstinmatning igen.",
+    "downloadOfflineModel": "Ladda ned",
+    "offlineModelDownloadScheduled": "De offlinebaserade talfilerna laddas ned i bakgrunden. Prova röstinmatning igen senare.",
     "listeningStopped": "Lyssningen stoppades."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Makulerad",
         "uncollectible": "Oindrivbar"
       },
-      "loadMoreFailed": "Det gick inte att läsa in fler.",
       "truncated": "Äldre fakturor finns tillgängliga."
     },
     "lowBalanceAlert": {

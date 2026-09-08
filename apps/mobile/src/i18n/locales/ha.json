@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Duba sauran na'urori ka fitar da su",
     "feedback": "Ra'ayi",
     "privacyChoices": "Zaɓuɓɓukan sirri",
-    "signOut": "Fita",
     "deleteAccount": "Share asusu",
     "confirmationCode": "Lambar tabbatarwa",
     "confirmationCodePlaceholder": "lamba mai lambobi 6",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Maɓallin sabon layi yana aika saƙo",
     "returnSendsMessageSubtitle": "Idan an kashe wannan, maɓallin sabon layi yana saka sabon layi a wuraren rubuta saƙo ga wakilai.",
     "biometricUnlock": "Buɗe kulle da bayanan halittar jiki",
-    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya."
+    "biometricUnlockSubtitle": "Ana buƙatar buɗe kulle lokacin fara manhajar da bayan ta yi minti biyar a baya.",
+    "featureFlags": "Tutocin sifofi",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Dole mutum ya yi bitar tsarin samun damar amfani da wuri da kake da shi kafin a yi amfani da shi a waya.",
       "iosTitle": "KiloClaw ba ya samuwa a cikin iOS",
       "iosBody": "Ana sarrafa damar amfani da KiloClaw ga wannan asusun a wajen manhajar iOS.",
-      "iosContact": "Tambayoyi? Tuntuɓi hi@kilo.ai."
+      "iosContact": "Tambayoyi? Tuntuɓi hi@kilo.ai.",
+      "quarantinedCta": "Aika imel ga tawagar mu",
+      "nonCanonicalEarlybirdCta": "Bitar da tsarinka a kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} yana buƙatar kulawa: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "An kasa buɗe GitHub. Sake gwadawa."
     },
     "settingsSave": {
-      "keepEditing": "Ci gaba da gyarawa",
       "saveChanges": "Ajiye canje-canje",
       "unsavedTitle": "Canje-canjen da ba a ajiye ba",
       "unsavedMessage": "A ajiye canje-canjenka kafin barin wannan allon?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Ba a iya loda zaman da ke aiki ba.",
+      "couldNotRefresh": "Ba a iya sabuntawa ba",
       "noSessionsYetDescription": "Fara aikin rubuta lamba daga wayarka. Zaman aikinka za su bayyana a nan.",
       "noMatches": "Babu zaman da ya dace",
       "tryDifferentSearch": "Gwada wata kalmar bincike dabam.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Ana loda hoto",
       "imageUnavailableRetry": "Ba a samun hoton, sake gwada loda shi",
-      "imageUnavailableWithAlt": "Ba a samun hoton {{alt}}.",
       "imagePreviewUnavailableInSession": "Ba a iya ganin hoton a wannan zaman.",
       "viewImage": "Duba hoto",
       "viewImageWithAlt": "Duba hoton {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Zaɓi samfuri kafin aikawa.",
       "preparingPlaceholder": "Ana shirya muhallin aiki...",
       "finalizingPlaceholder": "Ana gamawa...",
-      "messagePlaceholder": "Saƙo",
       "cannotReceiveFiles": "Wannan zaman ba zai iya karɓar fayiloli ba. Cire haɗe-haɗen don aika saƙonka.",
       "couldNotAttachFiles": "An kasa haɗa fayiloli. Danna Aika don sake gwadawa.",
       "discardAttachmentsMessage": "Za a share fayilolin da aka ɗora amma ba a haɗa su da saƙonnin da aka aika ba.",
@@ -2556,6 +2560,10 @@
     "stopped": "An daina shigar da rubutu ta murya. Danna makirufo don sake gwadawa.",
     "unavailableDevice": "Ba a iya shigar da rubutu ta murya a wannan na'urar.",
     "unavailableLanguage": "Ba a iya shigar da rubutu ta murya da harshen wannan na'urar.",
+    "languageNotInstalledTitle": "Shigar da rubutu ta murya na {{language}} ba ta shirya ba tukuna",
+    "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a shigar da su a wayar ba. Sauke su, sannan sake gwada shigar da rubutu ta murya.",
+    "downloadOfflineModel": "Sauke",
+    "offlineModelDownloadScheduled": "Za a sauke fayilolin magana na offline a bango. Gwada shigar da rubutu ta murya daga baya.",
     "listeningStopped": "An dakatar da sauraro."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "An soke",
         "uncollectible": "Ba a iya karɓar kuɗin"
       },
-      "loadMoreFailed": "An kasa loda ƙari.",
       "truncated": "Ana samun takardun biyan kuɗi na baya."
     },
     "lowBalanceAlert": {

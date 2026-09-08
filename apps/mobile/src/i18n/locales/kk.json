@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Басқа құрылғыларды көру және олардағы сессияларды аяқтау",
     "feedback": "Кері байланыс",
     "privacyChoices": "Құпиялылық баптаулары",
-    "signOut": "Шығу",
     "deleteAccount": "Аккаунтты жою",
     "confirmationCode": "Растау коды",
     "confirmationCodePlaceholder": "6 цифрлы код",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Enter пернесімен хабарлама жіберу",
     "returnSendsMessageSubtitle": "Бұл баптау өшірулі болса, Enter пернесі агентке хабарлама жазу өрісінде жаңа жолға ауыстырады.",
     "biometricUnlock": "Биометрия арқылы құлыпты ашу",
-    "biometricUnlockSubtitle": "Қолданбаны ашқанда және ол фондық режимде бес минут болғаннан кейін құлыпты ашу қажет."
+    "biometricUnlockSubtitle": "Қолданбаны ашқанда және ол фондық режимде бес минут болғаннан кейін құлыпты ашу қажет.",
+    "featureFlags": "Функция байрақтары",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Ерте қолжетімділік тарифіңізді телефонда пайдалану үшін оны алдымен маман тексеруі керек.",
       "iosTitle": "KiloClaw iOS-та қолжетімсіз",
       "iosBody": "Бұл тіркелгінің KiloClaw қызметіне қол жеткізуі iOS қолданбасынан тыс басқарылады.",
-      "iosContact": "Сұрақтар бар ма? hi@kilo.ai мекенжайына хабарласыңыз."
+      "iosContact": "Сұрақтар бар ма? hi@kilo.ai мекенжайына хабарласыңыз.",
+      "quarantinedCta": "Командамызға хат жіберу",
+      "nonCanonicalEarlybirdCta": "Тарифіңізді kilo.ai сайтында қарап шығу"
     },
     "instanceCard": {
       "needsAttention": "{{name}} данасын тексеру қажет: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub-ты ашу мүмкін болмады. Қайталап көріңіз."
     },
     "settingsSave": {
-      "keepEditing": "Өңдеуді жалғастыру",
       "saveChanges": "Өзгерістерді сақтау",
       "unsavedTitle": "Сақталмаған өзгерістер",
       "unsavedMessage": "Осы экраннан шықпас бұрын өзгерістеріңізді сақтайсыз ба?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Белсенді сеанстарды жүктеу мүмкін болмады.",
+      "couldNotRefresh": "Жаңарту мүмкін болмады",
       "noSessionsYetDescription": "Телефоныңыздан код жазу тапсырмасын бастаңыз. Сеанстарыңыз осында көрсетіледі.",
       "noMatches": "Сәйкес сеанстар жоқ",
       "tryDifferentSearch": "Басқа іздеу сөзін қолданып көріңіз.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Сурет жүктелуде",
       "imageUnavailableRetry": "Сурет қолжетімсіз, жүктеуді қайталаңыз",
-      "imageUnavailableWithAlt": "Сурет қолжетімсіз: {{alt}}.",
       "imagePreviewUnavailableInSession": "Бұл сессияда суретті алдын ала қарау мүмкін емес.",
       "viewImage": "Суретті қарау",
       "viewImageWithAlt": "{{alt}} суретін қарау",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Жібермес бұрын модельді таңдаңыз.",
       "preparingPlaceholder": "Орта дайындалуда...",
       "finalizingPlaceholder": "Аяқталуда...",
-      "messagePlaceholder": "Хабарлама",
       "cannotReceiveFiles": "Бұл сессия файл қабылдай алмайды. Хабарлама жіберу үшін тіркемелерді алып тастаңыз.",
       "couldNotAttachFiles": "Файлдарды тіркеу мүмкін болмады. Қайталап көру үшін жіберу түймесін түртіңіз.",
       "discardAttachmentsMessage": "Ешбір хабарламаға тіркелмеген жүктелген файлдар жойылады.",
@@ -2556,6 +2560,10 @@
     "stopped": "Дауыстық енгізу тоқтады. Микрофонды түртіп, қайталап көріңіз.",
     "unavailableDevice": "Бұл құрылғыда дауыстық енгізу қолжетімсіз.",
     "unavailableLanguage": "Құрылғыда таңдалған тілде дауыстық енгізу қолжетімсіз.",
+    "languageNotInstalledTitle": "{{language}} тілі үшін дауыстық енгізу әлі дайын емес",
+    "languageNotInstalledMessage": "{{language}} тілінің офлайн сөйлеу файлдары бұл телефонда орнатылмаған. Оларды жүктеп алыңыз, содан кейін дауыстық енгізуді қайта көріңіз.",
+    "downloadOfflineModel": "Жүктеп алу",
+    "offlineModelDownloadScheduled": "Офлайн сөйлеу файлдары фондық режимде жүктеледі. Дауыстық енгізуді кейінірек қайта көріңіз.",
     "listeningStopped": "Тыңдау тоқтатылды."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Күші жойылған",
         "uncollectible": "Өндірілмейтін"
       },
-      "loadMoreFailed": "Қосымша деректерді жүктеу мүмкін болмады.",
       "truncated": "Бұрынғы шоттарды да көруге болады."
     },
     "lowBalanceAlert": {

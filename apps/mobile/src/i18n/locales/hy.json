@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Դիտել մյուս սարքերը և դուրս գալ դրանց հաշիվներից",
     "feedback": "Հետադարձ կապ",
     "privacyChoices": "Գաղտնիության կարգավորումներ",
-    "signOut": "Դուրս գալ",
     "deleteAccount": "Ջնջել հաշիվը",
     "confirmationCode": "Հաստատման կոդ",
     "confirmationCodePlaceholder": "6-նիշանոց կոդ",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Մուտքի ստեղնն ուղարկում է հաղորդագրությունը",
     "returnSendsMessageSubtitle": "Երբ անջատված է, մուտքի ստեղնը նոր տող է ավելացնում գործակալների հաղորդագրության մուտքագրման դաշտերում։",
     "biometricUnlock": "Ապակողպել կենսաչափական տվյալներով",
-    "biometricUnlockSubtitle": "Հավելվածը գործարկելիս և ֆոնային ռեժիմում հինգ րոպե մնալուց հետո պահանջվում է ապակողպել այն։"
+    "biometricUnlockSubtitle": "Հավելվածը գործարկելիս և ֆոնային ռեժիմում հինգ րոպե մնալուց հետո պահանջվում է ապակողպել այն։",
+    "featureFlags": "Ֆունկցիաների դրոշներ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Միավորման հարցումը հասանելի չէ",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Նախքան վաղ հասանելիության քո սակագինը հեռախոսով օգտագործելը մասնագետը պետք է ստուգի այն։",
       "iosTitle": "KiloClaw-ը հասանելի չէ iOS-ում",
       "iosBody": "Այս հաշվի համար KiloClaw-ի հասանելիությունը կառավարվում է iOS հավելվածից դուրս։",
-      "iosContact": "Հարցե՞ր ունես։ Գրիր hi@kilo.ai հասցեին։"
+      "iosContact": "Հարցե՞ր ունես։ Գրիր hi@kilo.ai հասցեին։",
+      "quarantinedCta": "Գրել մեր թիմին",
+      "nonCanonicalEarlybirdCta": "Ստուգել Ձեր սակագինեը kilo.ai-ում"
     },
     "instanceCard": {
       "needsAttention": "{{name}}-ն ուշադրության կարիք ունի՝ {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Չհաջողվեց բացել GitHub-ը։ Կրկին փորձիր։"
     },
     "settingsSave": {
-      "keepEditing": "Շարունակել խմբագրել",
       "saveChanges": "Պահպանել փոփոխությունները",
       "unsavedTitle": "Չպահպանված փոփոխություններ",
       "unsavedMessage": "Պահպանե՞լ փոփոխությունները՝ այս էկրանից դուրս գալուց առաջ։"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Չհաջողվեց բեռնել ակտիվ նիստերը։",
+      "couldNotRefresh": "Չհաջողվեց թարմացնել",
       "noSessionsYetDescription": "Հեռախոսիցդ սկսիր ծրագրավորման առաջադրանք։ Քո նիստերը կհայտնվեն այստեղ։",
       "noMatches": "Համապատասխան նիստեր չկան",
       "tryDifferentSearch": "Փորձիր որոնել այլ բառով։",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Պատկերը բեռնվում է",
       "imageUnavailableRetry": "Պատկերն անհասանելի է, կրկին փորձել բեռնել",
-      "imageUnavailableWithAlt": "Պատկերն անհասանելի է՝ {{alt}}։",
       "imagePreviewUnavailableInSession": "Պատկերի նախադիտումն անհասանելի է այս նիստում։",
       "viewImage": "Դիտել պատկերը",
       "viewImageWithAlt": "Դիտել պատկերը՝ {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Ուղարկելուց առաջ ընտրեք մոդել։",
       "preparingPlaceholder": "Միջավայրը նախապատրաստվում է…",
       "finalizingPlaceholder": "Աշխատանքն ավարտվում է…",
-      "messagePlaceholder": "Հաղորդագրություն",
       "cannotReceiveFiles": "Այս նիստը չի կարող ընդունել ֆայլեր։ Հեռացրեք կցումները՝ հաղորդագրությունն ուղարկելու համար։",
       "couldNotAttachFiles": "Չհաջողվեց կցել ֆայլերը։ Հպեք ուղարկելու կոճակին՝ կրկին փորձելու համար։",
       "discardAttachmentsMessage": "Ուղարկված հաղորդագրություններին չկցված վերբեռնված ֆայլերը կջնջվեն։",
@@ -2556,6 +2560,10 @@
     "stopped": "Ձայնային մուտքագրումը դադարեցվել է։ Հպիր խոսափողին՝ կրկին փորձելու համար։",
     "unavailableDevice": "Այս սարքում ձայնային մուտքագրումը հասանելի չէ։",
     "unavailableLanguage": "Ձայնային մուտքագրումը հասանելի չէ սարքի ընտրված լեզվով։",
+    "languageNotInstalledTitle": "Ձայնային մուտքագրումը {{language}} լեզվով դեռ պատրաստ չէ",
+    "languageNotInstalledMessage": "{{language}} լեզվի օֆլայն խոսքի ֆայլերը տեղադրված չեն այս հեռախոսում։ Ներբեռնիր դրանք, ապա կրկին փորձիր ձայնային մուտքագրումը։",
+    "downloadOfflineModel": "Ներբեռնել",
+    "offlineModelDownloadScheduled": "Օֆլայն խոսքի ֆայլերը կներբեռնվեն ֆոնային ռեժիմում։ Փորձիր ձայնային մուտքագրումը ավելի ուշ։",
     "listeningStopped": "Լսումը դադարեցվել է։"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Չեղարկված",
         "uncollectible": "Անհավաքագրելի"
       },
-      "loadMoreFailed": "Չհաջողվեց բեռնել ավելին։",
       "truncated": "Հասանելի են նաև նախորդ հաշիվ-ապրանքագրերը։"
     },
     "lowBalanceAlert": {

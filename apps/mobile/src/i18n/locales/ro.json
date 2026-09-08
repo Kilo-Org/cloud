@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Verifică și deconectează alte dispozitive",
     "feedback": "Trimite păreri",
     "privacyChoices": "Opțiuni de confidențialitate",
-    "signOut": "Deconectează-te",
     "deleteAccount": "Șterge contul",
     "confirmationCode": "Cod de confirmare",
     "confirmationCodePlaceholder": "cod din 6 cifre",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Tasta Enter trimite mesajul",
     "returnSendsMessageSubtitle": "Când opțiunea este dezactivată, tasta Enter inserează o linie nouă în câmpurile de mesaj ale agenților.",
     "biometricUnlock": "Deblocare prin autentificare biometrică",
-    "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal."
+    "biometricUnlockSubtitle": "Deblocarea este necesară la pornirea aplicației și după cinci minute în fundal.",
+    "featureFlags": "Fanioane de funcții",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR indisponibil",
@@ -1181,7 +1185,9 @@
       "nonCanonicalEarlybirdBody": "Planul tău de acces timpuriu necesită o revizuire manuală înainte de a putea fi folosit pe mobil.",
       "iosTitle": "KiloClaw indisponibil pe iOS",
       "iosBody": "Pentru acest cont, accesul la KiloClaw este gestionat în afara aplicației iOS.",
-      "iosContact": "Ai întrebări? Scrie-ne la hi@kilo.ai."
+      "iosContact": "Ai întrebări? Scrie-ne la hi@kilo.ai.",
+      "quarantinedCta": "Trimite un e-mail echipei noastre",
+      "nonCanonicalEarlybirdCta": "Verifică-ți planul pe kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} necesită atenție: {{label}}",
@@ -1712,7 +1718,6 @@
       "couldNotOpenGithub": "Nu s-a putut deschide GitHub. Încearcă din nou."
     },
     "settingsSave": {
-      "keepEditing": "Continuă editarea",
       "saveChanges": "Salvează modificările",
       "unsavedTitle": "Modificări nesalvate",
       "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?"
@@ -1891,6 +1896,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nu s-au putut încărca sesiunile active.",
+      "couldNotRefresh": "Nu s-a putut reîmprospăta",
       "noSessionsYetDescription": "Începe o sarcină de programare de pe telefon. Sesiunile tale vor apărea aici.",
       "noMatches": "Nicio sesiune nu corespunde filtrelor",
       "tryDifferentSearch": "Încearcă un alt termen de căutare.",
@@ -2173,7 +2179,6 @@
     "filePart": {
       "loadingImage": "Se încarcă imaginea",
       "imageUnavailableRetry": "Imagine indisponibilă, reîncearcă încărcarea",
-      "imageUnavailableWithAlt": "Imaginea nu este disponibilă: {{alt}}.",
       "imagePreviewUnavailableInSession": "Previzualizarea imaginii nu este disponibilă în această sesiune.",
       "viewImage": "Vezi imaginea",
       "viewImageWithAlt": "Vezi imaginea {{alt}}",
@@ -2371,7 +2376,6 @@
       "selectModelBeforeSending": "Selectează un model înainte de a trimite mesajul.",
       "preparingPlaceholder": "Se configurează mediul...",
       "finalizingPlaceholder": "Se finalizează...",
-      "messagePlaceholder": "Mesaj",
       "cannotReceiveFiles": "Această sesiune nu poate primi fișiere. Elimină atașamentele pentru a trimite mesajul.",
       "couldNotAttachFiles": "Nu s-au putut atașa fișierele. Atinge butonul de trimitere pentru a încerca din nou.",
       "discardAttachmentsMessage": "Fișierele încărcate care nu sunt atașate la mesaje trimise vor fi șterse.",
@@ -2577,6 +2581,10 @@
     "stopped": "Dictarea s-a oprit. Atinge microfonul pentru a încerca din nou.",
     "unavailableDevice": "Dictarea nu este disponibilă pe acest dispozitiv.",
     "unavailableLanguage": "Dictarea nu este disponibilă pentru limba dispozitivului.",
+    "languageNotInstalledTitle": "Dictarea pentru {{language}} nu este încă gata",
+    "languageNotInstalledMessage": "Fișierele vocale offline pentru {{language}} nu sunt instalate pe acest telefon. Descarcă-le, apoi încearcă dictarea din nou.",
+    "downloadOfflineModel": "Descarcă",
+    "offlineModelDownloadScheduled": "Fișierele vocale offline se vor descărca în fundal. Încearcă dictarea din nou mai târziu.",
     "listeningStopped": "Ascultarea s-a oprit."
   },
   "share": {
@@ -2798,7 +2806,6 @@
         "void": "Anulată",
         "uncollectible": "Neîncasabilă"
       },
-      "loadMoreFailed": "Nu s-au putut încărca mai multe elemente.",
       "truncated": "Sunt disponibile facturi mai vechi."
     },
     "lowBalanceAlert": {

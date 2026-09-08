@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Sprawdzaj inne urządzenia i wylogowuj je",
     "feedback": "Prześlij opinię",
     "privacyChoices": "Ustawienia prywatności",
-    "signOut": "Wyloguj się",
     "deleteAccount": "Usuń konto",
     "confirmationCode": "Kod potwierdzający",
     "confirmationCodePlaceholder": "6-cyfrowy kod",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Klawisz Enter wysyła wiadomość",
     "returnSendsMessageSubtitle": "Gdy ta opcja jest wyłączona, klawisz Enter wstawia nowy wiersz w polach wiadomości agentów.",
     "biometricUnlock": "Odblokowywanie biometryczne",
-    "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle."
+    "biometricUnlockSubtitle": "Odblokowanie jest wymagane przy uruchomieniu aplikacji oraz po pięciu minutach w tle.",
+    "featureFlags": "Flagi funkcji",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Aktywności na żywo",
@@ -602,7 +606,9 @@
       "subscriptionCanceledTitle": "Wykup subskrypcję na stronie internetowej",
       "subscriptionPastDueBody": "Wystąpił problem z twoją ostatnią płatnością. Otwórz kilo.ai/claw w przeglądarce, aby zaktualizować dane płatności. W aplikacji nie można zarządzać rozliczeniami.",
       "subscriptionPastDueTitle": "Aktualizacja płatności w przeglądarce",
-      "trialExpiredBody": "Aby nadal korzystać z KiloClaw, otwórz kilo.ai/claw w przeglądarce. W aplikacji nie można wykupić subskrypcji."
+      "trialExpiredBody": "Aby nadal korzystać z KiloClaw, otwórz kilo.ai/claw w przeglądarce. W aplikacji nie można wykupić subskrypcji.",
+      "quarantinedCta": "Napisz do naszego zespołu",
+      "nonCanonicalEarlybirdCta": "Sprawdź swój plan w serwisie kilo.ai"
     },
     "controls": {
       "redeploying": "Ponowne wdrażanie…",
@@ -1308,7 +1314,6 @@
       "repositoriesCount_many": "Wybrano {{displayCount}} repozytoriów"
     },
     "settingsSave": {
-      "keepEditing": "Kontynuuj edycję",
       "saveChanges": "Zapisz zmiany",
       "unsavedMessage": "Zapisać zmiany przed opuszczeniem tego ekranu?",
       "unsavedTitle": "Niezapisane zmiany"
@@ -1459,6 +1464,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nie udało się wczytać aktywnych sesji.",
+      "couldNotRefresh": "Nie udało się odświeżyć",
       "noSessionsYetDescription": "Rozpocznij zadanie programistyczne na telefonie. Twoje sesje pojawią się tutaj.",
       "noMatches": "Brak pasujących sesji",
       "tryDifferentSearch": "Wpisz inne hasło wyszukiwania.",
@@ -1745,7 +1751,6 @@
     "filePart": {
       "loadingImage": "Wczytywanie obrazu",
       "imageUnavailableRetry": "Obraz jest niedostępny. Wczytaj go ponownie",
-      "imageUnavailableWithAlt": "Obraz jest niedostępny: {{alt}}.",
       "imagePreviewUnavailableInSession": "Podgląd obrazu jest niedostępny w tej sesji.",
       "viewImage": "Wyświetl obraz",
       "viewImageWithAlt": "Wyświetl obraz: {{alt}}",
@@ -1946,7 +1951,6 @@
       "selectModelBeforeSending": "Wybierz model przed wysłaniem wiadomości.",
       "preparingPlaceholder": "Konfigurowanie środowiska…",
       "finalizingPlaceholder": "Kończenie…",
-      "messagePlaceholder": "Wiadomość",
       "cannotReceiveFiles": "Ta sesja nie może odbierać plików. Usuń załączniki, aby wysłać wiadomość.",
       "couldNotAttachFiles": "Nie udało się dołączyć plików. Dotknij „Wyślij”, aby spróbować ponownie.",
       "discardAttachmentsMessage": "Przesłane pliki niedołączone do wysłanych wiadomości zostaną usunięte.",
@@ -2153,6 +2157,10 @@
     "stopped": "Dyktowanie zostało zatrzymane. Dotknij mikrofonu, aby spróbować ponownie.",
     "unavailableDevice": "Dyktowanie nie jest dostępne na tym urządzeniu.",
     "unavailableLanguage": "Dyktowanie nie jest dostępne w języku ustawionym na tym urządzeniu.",
+    "languageNotInstalledTitle": "Dyktowanie dla języka {{language}} nie jest jeszcze gotowe",
+    "languageNotInstalledMessage": "Pliki mowy offline dla języka {{language}} nie są zainstalowane na tym telefonie. Pobierz je, a następnie ponownie spróbuj dyktowania.",
+    "downloadOfflineModel": "Pobierz",
+    "offlineModelDownloadScheduled": "Pliki mowy offline zostaną pobrane w tle. Spróbuj dyktowania ponownie później.",
     "listeningStopped": "Nasłuchiwanie zostało zatrzymane."
   },
   "share": {
@@ -2818,7 +2826,6 @@
         "void": "Unieważniona",
         "uncollectible": "Nieściągalna"
       },
-      "loadMoreFailed": "Nie udało się wczytać kolejnych wyników.",
       "truncated": "Dostępne są starsze faktury."
     },
     "lowBalanceAlert": {

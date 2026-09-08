@@ -648,6 +648,27 @@ type NormalizedPersistedStoredMessage = {
   omittedItemCount: number;
 };
 
+/**
+ * The generated `Part` types declare `text: string` on text and reasoning
+ * parts, but persisted storage can hold a part without the field (Sentry
+ * KILO-APP-99). A single such part fails the strict `kiloSdkPartSchema`, so
+ * the WHOLE history page degrades to `invalid_data` and the agent chat
+ * transcript never renders. Mirror the SDK's `normalizeMissingPartText`
+ * (packages/cloud-agent-sdk/src/part-utils.ts — this package cannot import
+ * the SDK, it depends back on us): fill absent or non-string text with `''`
+ * so the part renders nothing downstream instead of poisoning the page.
+ * Returns `null` when the part needs no fix (not a text/reasoning part, or it
+ * already carries string text); otherwise a copy with `text: ''`.
+ */
+function normalizePersistedMissingPartText(
+  part: Record<string, unknown>
+): Record<string, unknown> | null {
+  const type = part['type'];
+  if (type !== 'text' && type !== 'reasoning') return null;
+  if (typeof part['text'] === 'string') return null;
+  return { ...part, text: '' };
+}
+
 function normalizePersistedKiloSdkParts(value: unknown): {
   parts: unknown;
   omittedItemCount: number;
@@ -658,6 +679,13 @@ function normalizePersistedKiloSdkParts(value: unknown): {
   const parts: unknown[] = [];
   let omittedItemCount = 0;
   for (const part of value) {
+    if (isRecord(part)) {
+      const textNormalized = normalizePersistedMissingPartText(part);
+      if (textNormalized) {
+        parts.push(textNormalized);
+        continue;
+      }
+    }
     if (
       isRecord(part) &&
       typeof part['type'] === 'string' &&

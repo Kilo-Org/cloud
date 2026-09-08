@@ -1,7 +1,7 @@
 import 'server-only';
-import crypto from 'node:crypto';
+
 import { z } from 'zod';
-import { NEXTAUTH_SECRET } from '@/lib/config.server';
+import { createSignedToken, verifySignedTokenDetailed } from '@/lib/signed-token';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 /**
@@ -30,40 +30,8 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
  *     unchanged.
  */
 
-const HMAC_ALGORITHM = 'sha256';
-
 /** Maximum age of a state token in seconds (10 minutes). */
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
-
-/** Number of random bytes for the nonce (16 bytes = 128 bits). */
-const NONCE_BYTES = 16;
-
-function sign(data: string): string {
-  return crypto.createHmac(HMAC_ALGORITHM, NEXTAUTH_SECRET).update(data).digest('base64url');
-}
-
-/**
- * Build a signed OAuth state parameter.
- *
- * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
- * @param userId – the ID of the currently-authenticated user initiating the flow
- */
-export function createOAuthState(owner: string, userId: string, returnTo?: string): string {
-  const iat = Math.floor(Date.now() / 1000);
-  const nonce = crypto.randomBytes(NONCE_BYTES).toString('base64url');
-  const safeReturnTo = returnTo ? validateReturnPath(returnTo) : null;
-  const payload = Buffer.from(
-    JSON.stringify({
-      owner,
-      uid: userId,
-      iat,
-      nonce,
-      ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
-    })
-  ).toString('base64url');
-  const signature = sign(payload);
-  return `${payload}.${signature}`;
-}
 
 export type VerifiedOAuthState = {
   /** The original owner string (`user_<id>` or `org_<id>`) */
@@ -73,6 +41,21 @@ export type VerifiedOAuthState = {
   /** Optional relative path to return to after the OAuth callback. */
   returnTo?: string;
 };
+
+/**
+ * Build a signed OAuth state parameter.
+ *
+ * @param owner  – owner string, e.g. `user_abc123` or `org_xyz789`
+ * @param userId – the ID of the currently-authenticated user initiating the flow
+ */
+export function createOAuthState(owner: string, userId: string, returnTo?: string): string {
+  const safeReturnTo = returnTo ? validateReturnPath(returnTo) : null;
+  return createSignedToken({
+    owner,
+    uid: userId,
+    ...(safeReturnTo ? { returnTo: safeReturnTo } : {}),
+  });
+}
 
 /**
  * Verify a signed OAuth state parameter and return the embedded payload.
@@ -105,45 +88,36 @@ const OAuthStatePayloadSchema = z.object({
 });
 
 export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerificationResult {
-  if (!state) return { status: 'invalid', reason: 'state_missing' };
+  const result = verifySignedTokenDetailed(state, {
+    ttlSeconds: OAUTH_STATE_TTL_SECONDS,
+    parse: payload => {
+      const parsed = OAuthStatePayloadSchema.safeParse(payload);
+      if (!parsed.success) return null;
 
-  const dotIndex = state.indexOf('.');
-  if (dotIndex === -1) return { status: 'invalid', reason: 'state_malformed' };
+      const returnTo =
+        typeof parsed.data.returnTo === 'string' ? validateReturnPath(parsed.data.returnTo) : null;
 
-  const payload = state.slice(0, dotIndex);
-  const providedSig = state.slice(dotIndex + 1);
+      return {
+        owner: parsed.data.owner,
+        userId: parsed.data.uid,
+        ...(returnTo ? { returnTo } : {}),
+      };
+    },
+  });
 
-  // Constant-time comparison to prevent timing attacks
-  const expectedSig = sign(payload);
-  const providedSigBytes = Buffer.from(providedSig);
-  const expectedSigBytes = Buffer.from(expectedSig);
-  if (
-    providedSigBytes.length !== expectedSigBytes.length ||
-    !crypto.timingSafeEqual(providedSigBytes, expectedSigBytes)
-  ) {
-    return { status: 'invalid', reason: 'signature_invalid' };
+  if (result.status === 'valid') return { status: 'valid', state: result.value };
+
+  switch (result.reason) {
+    case 'token_missing':
+      return { status: 'invalid', reason: 'state_missing' };
+    case 'token_malformed':
+    case 'payload_invalid':
+      return { status: 'invalid', reason: 'state_malformed' };
+    case 'signature_invalid':
+      return { status: 'invalid', reason: 'signature_invalid' };
+    case 'token_expired':
+      return { status: 'invalid', reason: 'state_expired' };
+    case 'token_from_future':
+      return { status: 'invalid', reason: 'state_from_future' };
   }
-
-  let data: z.infer<typeof OAuthStatePayloadSchema>;
-  try {
-    const parsed = OAuthStatePayloadSchema.safeParse(
-      JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
-    );
-    if (!parsed.success) return { status: 'invalid', reason: 'state_malformed' };
-    data = parsed.data;
-  } catch {
-    return { status: 'invalid', reason: 'state_malformed' };
-  }
-
-  const ageSeconds = Math.floor(Date.now() / 1000) - data.iat;
-  if (ageSeconds < 0) return { status: 'invalid', reason: 'state_from_future' };
-  if (ageSeconds > OAUTH_STATE_TTL_SECONDS) {
-    return { status: 'invalid', reason: 'state_expired' };
-  }
-
-  const returnTo = typeof data.returnTo === 'string' ? validateReturnPath(data.returnTo) : null;
-  return {
-    status: 'valid',
-    state: { owner: data.owner, userId: data.uid, ...(returnTo ? { returnTo } : {}) },
-  };
 }

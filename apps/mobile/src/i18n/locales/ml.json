@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "മറ്റ് ഉപകരണങ്ങൾ പരിശോധിച്ച് അവയിൽ നിന്ന് സൈൻ ഔട്ട് ചെയ്യുക",
     "feedback": "ഫീഡ്ബാക്ക്",
     "privacyChoices": "സ്വകാര്യതാ തിരഞ്ഞെടുപ്പുകൾ",
-    "signOut": "സൈൻ ഔട്ട് ചെയ്യുക",
     "deleteAccount": "അക്കൗണ്ട് ഇല്ലാതാക്കുക",
     "confirmationCode": "സ്ഥിരീകരണ കോഡ്",
     "confirmationCodePlaceholder": "6 അക്കങ്ങളുള്ള കോഡ്",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "റിട്ടേൺ കീ സന്ദേശം അയയ്ക്കുന്നു",
     "returnSendsMessageSubtitle": "ഇത് ഓഫായിരിക്കുമ്പോൾ റിട്ടേൺ കീ ഏജന്റിന്റെ സന്ദേശ ബോക്സിൽ പുതിയ വരി ചേർക്കും.",
     "biometricUnlock": "ബയോമെട്രിക് അൺലോക്ക്",
-    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം."
+    "biometricUnlockSubtitle": "ആപ്പ് ആരംഭിക്കുമ്പോഴും പശ്ചാത്തലത്തിൽ അഞ്ച് മിനിറ്റ് കഴിഞ്ഞ് തിരികെ വരുമ്പോഴും അൺലോക്ക് ചെയ്യണം.",
+    "featureFlags": "ഫീച്ചർ ഫ്ലാഗുകൾ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "നിങ്ങളുടെ മുൻകൂർ പ്രവേശന പ്ലാൻ മൊബൈലിൽ ഉപയോഗിക്കുന്നതിന് മുമ്പ് നേരിട്ടുള്ള അവലോകനം ആവശ്യമാണ്.",
       "iosTitle": "IOS-ൽ KiloClaw ലഭ്യമല്ല",
       "iosBody": "ഈ അക്കൗണ്ടിന്റെ KiloClaw ഉപയോഗാനുമതി കൈകാര്യം ചെയ്യുന്നത് iOS ആപ്പിന് പുറത്താണ്.",
-      "iosContact": "ചോദ്യങ്ങളുണ്ടോ? hi@kilo.ai-യുമായി ബന്ധപ്പെടുക."
+      "iosContact": "ചോദ്യങ്ങളുണ്ടോ? hi@kilo.ai-യുമായി ബന്ധപ്പെടുക.",
+      "quarantinedCta": "ഞങ്ങളുടെ ടീമിന് ഇമെയിൽ അയയ്ക്കുക",
+      "nonCanonicalEarlybirdCta": "നിങ്ങളുടെ പ്ലാൻ Kilo.ai-ൽ പരിശോധിക്കുക"
     },
     "instanceCard": {
       "needsAttention": "{{name}}-ന് ശ്രദ്ധ ആവശ്യമാണ്: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub തുറക്കാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കുക."
     },
     "settingsSave": {
-      "keepEditing": "തിരുത്തുന്നത് തുടരുക",
       "saveChanges": "മാറ്റങ്ങൾ സംരക്ഷിക്കുക",
       "unsavedTitle": "സംരക്ഷിക്കാത്ത മാറ്റങ്ങൾ",
       "unsavedMessage": "ഈ സ്ക്രീനിൽ നിന്ന് പോകുന്നതിന് മുമ്പ് മാറ്റങ്ങൾ സംരക്ഷിക്കണോ?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "സജീവ സെഷനുകൾ ലോഡ് ചെയ്യാനായില്ല.",
+      "couldNotRefresh": "പുതുക്കാനായില്ല",
       "noSessionsYetDescription": "നിങ്ങളുടെ ഫോണിൽ നിന്ന് ഒരു കോഡിംഗ് ജോലി ആരംഭിക്കുക. നിങ്ങളുടെ സെഷനുകൾ ഇവിടെ ദൃശ്യമാകും.",
       "noMatches": "പൊരുത്തപ്പെടുന്ന സെഷനുകളൊന്നുമില്ല",
       "tryDifferentSearch": "മറ്റൊരു പദം ഉപയോഗിച്ച് തിരയുക.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "ചിത്രം ലോഡ് ചെയ്യുന്നു",
       "imageUnavailableRetry": "ചിത്രം ലഭ്യമല്ല. ലോഡ് ചെയ്യാൻ വീണ്ടും ശ്രമിക്കുക",
-      "imageUnavailableWithAlt": "{{alt}} എന്ന ചിത്രം ലഭ്യമല്ല.",
       "imagePreviewUnavailableInSession": "ഈ സെഷനിൽ ചിത്രത്തിന്റെ പ്രിവ്യൂ ലഭ്യമല്ല.",
       "viewImage": "ചിത്രം കാണുക",
       "viewImageWithAlt": "{{alt}} എന്ന ചിത്രം കാണുക",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "അയയ്ക്കുന്നതിന് മുമ്പ് ഒരു മോഡൽ തിരഞ്ഞെടുക്കുക.",
       "preparingPlaceholder": "പ്രവർത്തനാന്തരീക്ഷം സജ്ജമാക്കുന്നു...",
       "finalizingPlaceholder": "പൂർത്തിയാക്കുന്നു...",
-      "messagePlaceholder": "സന്ദേശം",
       "cannotReceiveFiles": "ഈ സെഷന് ഫയലുകൾ സ്വീകരിക്കാൻ കഴിയില്ല. നിങ്ങളുടെ സന്ദേശം അയയ്ക്കാൻ അറ്റാച്ച്മെന്റുകൾ നീക്കം ചെയ്യുക.",
       "couldNotAttachFiles": "ഫയലുകൾ അറ്റാച്ച് ചെയ്യാൻ കഴിഞ്ഞില്ല. വീണ്ടും ശ്രമിക്കാൻ 'അയയ്ക്കുക' അമർത്തുക.",
       "discardAttachmentsMessage": "ഒരു സന്ദേശത്തിലും ചേർത്തിട്ടില്ലാത്ത അപ്‌ലോഡുകൾ ഇല്ലാതാക്കും.",
@@ -2556,6 +2560,10 @@
     "stopped": "ശബ്ദ ഇൻപുട്ട് നിർത്തി. വീണ്ടും ശ്രമിക്കാൻ മൈക്രോഫോണിൽ ടാപ്പ് ചെയ്യുക.",
     "unavailableDevice": "ഈ ഉപകരണത്തിൽ ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല.",
     "unavailableLanguage": "ഈ ഉപകരണത്തിൽ തിരഞ്ഞെടുത്ത ഭാഷയിൽ ശബ്ദ ഇൻപുട്ട് ലഭ്യമല്ല.",
+    "languageNotInstalledTitle": "{{language}}-നുള്ള ശബ്ദ ഇൻപുട്ട് ഇപ്പോഴും തയ്യാറല്ല",
+    "languageNotInstalledMessage": "{{language}}-നുള്ള ഓഫ്‌ലൈൻ സംഭാഷണ ഫയലുകൾ ഈ ഫോണിൽ ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ല. അവ ഡൗൺലോഡ് ചെയ്യുക, പിന്നീട് ശബ്ദ ഇൻപുട്ട് വീണ്ടും ശ്രമിക്കുക.",
+    "downloadOfflineModel": "ഡൗൺലോഡ്",
+    "offlineModelDownloadScheduled": "ഓഫ്‌ലൈൻ സംഭാഷണ ഫയലുകൾ പശ്ചാത്തലത്തിൽ ഡൗൺലോഡ് ചെയ്യപ്പെടും. പിന്നീട് ശബ്ദ ഇൻപുട്ട് വീണ്ടും ശ്രമിക്കുക.",
     "listeningStopped": "കേൾക്കുന്നത് നിർത്തി."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "റദ്ദാക്കിയത്",
         "uncollectible": "ഈടാക്കാനാവാത്തത്"
       },
-      "loadMoreFailed": "കൂടുതൽ ലോഡ് ചെയ്യാനായില്ല.",
       "truncated": "പഴയ ഇൻവോയ്സുകൾ ലഭ്യമാണ്."
     },
     "lowBalanceAlert": {

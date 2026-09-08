@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Consulter et déconnecter les autres appareils",
     "feedback": "Donner un avis",
     "privacyChoices": "Préférences de confidentialité",
-    "signOut": "Se déconnecter",
     "deleteAccount": "Supprimer le compte",
     "confirmationCode": "Code de confirmation",
     "confirmationCodePlaceholder": "code à 6 chiffres",
@@ -583,7 +582,9 @@
       "subscriptionCanceledTitle": "S'abonner sur le site web",
       "subscriptionPastDueBody": "Nous avons rencontré un problème avec votre dernier paiement. Ouvrez kilo.ai/claw dans votre navigateur pour mettre à jour vos informations de paiement. Vous ne pouvez pas gérer la facturation dans l'application.",
       "subscriptionPastDueTitle": "Mise à jour du paiement en ligne",
-      "trialExpiredBody": "Pour continuer à utiliser KiloClaw, ouvrez kilo.ai/claw dans votre navigateur. Vous ne pouvez pas vous abonner dans l'application."
+      "trialExpiredBody": "Pour continuer à utiliser KiloClaw, ouvrez kilo.ai/claw dans votre navigateur. Vous ne pouvez pas vous abonner dans l'application.",
+      "quarantinedCta": "Écrire à notre équipe",
+      "nonCanonicalEarlybirdCta": "Vérifier votre forfait sur kilo.ai"
     },
     "controls": {
       "redeploying": "Redéploiement…",
@@ -1286,7 +1287,6 @@
       "repositoriesCount_many": "{{displayCount}} dépôts sélectionnés"
     },
     "settingsSave": {
-      "keepEditing": "Continuer à modifier",
       "saveChanges": "Enregistrer les modifications",
       "unsavedMessage": "Enregistrer vos modifications avant de quitter cet écran ?",
       "unsavedTitle": "Modifications non enregistrées"
@@ -1653,7 +1653,6 @@
     "filePart": {
       "loadingImage": "Chargement de l'image",
       "imageUnavailableRetry": "Image indisponible, réessayer le chargement",
-      "imageUnavailableWithAlt": "Image indisponible : {{alt}}.",
       "imagePreviewUnavailableInSession": "Aperçu de l'image indisponible dans cette session.",
       "viewImage": "Voir l'image",
       "viewImageWithAlt": "Voir l'image {{alt}}",
@@ -1851,7 +1850,6 @@
       "selectModelBeforeSending": "Sélectionnez un modèle avant d'envoyer le message.",
       "preparingPlaceholder": "Configuration de l'environnement…",
       "finalizingPlaceholder": "Finalisation…",
-      "messagePlaceholder": "Votre message",
       "cannotReceiveFiles": "Cette session ne peut pas recevoir de fichiers. Retirez les pièces jointes pour envoyer votre message.",
       "couldNotAttachFiles": "Impossible de joindre les fichiers. Touchez Envoyer pour réessayer.",
       "discardAttachmentsMessage": "Les fichiers transférés qui ne sont liés à aucun message envoyé seront supprimés.",
@@ -1982,7 +1980,12 @@
     "returnSendsMessage": "La touche Entrée envoie le message",
     "returnSendsMessageSubtitle": "Si cette option est désactivée, la touche Entrée insère un saut de ligne dans les champs de saisie des agents.",
     "biometricUnlock": "Déverrouillage biométrique",
-    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan."
+    "biometricUnlockSubtitle": "Déverrouillage requis au lancement et après cinq minutes en arrière-plan.",
+    "featureFlags": "Indicateurs de fonctionnalités",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "addCredits": {
     "cta": "Ajouter des crédits",
@@ -2071,6 +2074,10 @@
     "stopped": "La saisie vocale s'est arrêtée. Touchez le microphone pour réessayer.",
     "unavailableDevice": "La saisie vocale n'est pas disponible sur cet appareil.",
     "unavailableLanguage": "La saisie vocale n'est pas disponible pour la langue de cet appareil.",
+    "languageNotInstalledTitle": "La saisie vocale pour {{language}} n'est pas prête",
+    "languageNotInstalledMessage": "Les fichiers de reconnaissance vocale hors ligne pour {{language}} ne sont pas installés sur ce téléphone. Téléchargez-les, puis réessayez la saisie vocale.",
+    "downloadOfflineModel": "Télécharger",
+    "offlineModelDownloadScheduled": "Les fichiers de reconnaissance vocale hors ligne seront téléchargés en arrière-plan. Réessayez la saisie vocale plus tard.",
     "listeningStopped": "Écoute arrêtée."
   },
   "share": {
@@ -2241,6 +2248,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Impossible de charger les sessions actives.",
+      "couldNotRefresh": "Impossible d'actualiser",
       "noSessionsYetDescription": "Lancez une tâche de programmation depuis votre téléphone. Vos sessions apparaîtront ici.",
       "noMatches": "Aucune session ne correspond aux critères",
       "tryDifferentSearch": "Essayez un autre terme de recherche.",
@@ -2797,7 +2805,6 @@
         "void": "Annulée",
         "uncollectible": "Irrecouvrable"
       },
-      "loadMoreFailed": "Impossible de charger la suite.",
       "truncated": "Des factures plus anciennes sont disponibles."
     },
     "lowBalanceAlert": {

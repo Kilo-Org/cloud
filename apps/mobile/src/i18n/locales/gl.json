@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Revisar e pechar as sesións doutros dispositivos",
     "feedback": "Comentarios",
     "privacyChoices": "Opcións de privacidade",
-    "signOut": "Pechar sesión",
     "deleteAccount": "Eliminar a conta",
     "confirmationCode": "Código de confirmación",
     "confirmationCodePlaceholder": "código de 6 díxitos",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "A tecla Intro envía a mensaxe",
     "returnSendsMessageSubtitle": "Cando está desactivado, Intro insire un salto de liña nos campos de mensaxe dos axentes.",
     "biometricUnlock": "Desbloquear con biometría",
-    "biometricUnlockSubtitle": "Solicitar o desbloqueo ao abrir a aplicación e despois de cinco minutos en segundo plano."
+    "biometricUnlockSubtitle": "Solicitar o desbloqueo ao abrir a aplicación e despois de cinco minutos en segundo plano.",
+    "featureFlags": "Bandeiras de funcións",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Solicitude de integración non dispoñible",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "O teu plan de acceso anticipado precisa unha revisión manual antes de poder usarse no móbil.",
       "iosTitle": "KiloClaw non dispoñible en iOS",
       "iosBody": "O acceso a KiloClaw para esta conta xestiónase fóra da aplicación de iOS.",
-      "iosContact": "Tes dúbidas? Escribe a hi@kilo.ai."
+      "iosContact": "Tes dúbidas? Escribe a hi@kilo.ai.",
+      "quarantinedCta": "Escribir ao noso equipo",
+      "nonCanonicalEarlybirdCta": "Revisar o teu plan en kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} necesita atención: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Non se puido abrir GitHub. Téntao de novo."
     },
     "settingsSave": {
-      "keepEditing": "Seguir editando",
       "saveChanges": "Gardar cambios",
       "unsavedTitle": "Cambios sen gardar",
       "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Non se puideron cargar as sesións activas.",
+      "couldNotRefresh": "Non se puido actualizar",
       "noSessionsYetDescription": "Inicia unha tarefa de programación desde o móbil. As túas sesións aparecerán aquí.",
       "noMatches": "Non hai sesións que coincidan",
       "tryDifferentSearch": "Proba con outro termo de busca.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Cargando a imaxe",
       "imageUnavailableRetry": "Imaxe non dispoñible, volver tentar cargala",
-      "imageUnavailableWithAlt": "A imaxe non está dispoñible: {{alt}}.",
       "imagePreviewUnavailableInSession": "A vista previa da imaxe non está dispoñible nesta sesión.",
       "viewImage": "Ver imaxe",
       "viewImageWithAlt": "Ver imaxe {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Selecciona un modelo antes de enviar a mensaxe.",
       "preparingPlaceholder": "Preparando o contorno...",
       "finalizingPlaceholder": "Rematando...",
-      "messagePlaceholder": "Mensaxe",
       "cannotReceiveFiles": "Esta sesión non pode recibir ficheiros. Elimina os anexos para enviar a túa mensaxe.",
       "couldNotAttachFiles": "Non se puideron anexar os ficheiros. Toca Enviar para tentalo de novo.",
       "discardAttachmentsMessage": "Eliminaranse os ficheiros subidos que aínda non se enviaron nunha mensaxe.",
@@ -2556,6 +2560,10 @@
     "stopped": "O ditado detívose. Toca o micrófono para tentalo de novo.",
     "unavailableDevice": "O ditado non está dispoñible neste dispositivo.",
     "unavailableLanguage": "O ditado non está dispoñible no idioma deste dispositivo.",
+    "languageNotInstalledTitle": "O ditado para {{language}} aínda non está listo",
+    "languageNotInstalledMessage": "Os ficheiros de voz sen conexión de {{language}} non están instalados neste teléfono. Descarga-os e tenta o ditado de novo.",
+    "downloadOfflineModel": "Descargar",
+    "offlineModelDownloadScheduled": "Os ficheiros de voz sen conexión descargaránse en segundo plano. Tenta o ditado de novo máis tarde.",
     "listeningStopped": "Detívose o ditado."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
-      "loadMoreFailed": "Non se puideron cargar máis resultados.",
       "truncated": "Hai facturas máis antigas dispoñibles."
     },
     "lowBalanceAlert": {

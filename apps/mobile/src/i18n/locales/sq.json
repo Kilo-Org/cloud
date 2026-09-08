@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Shiko pajisjet e tjera dhe mbyll seancat e tyre",
     "feedback": "Përshtypjet",
     "privacyChoices": "Zgjedhjet e privatësisë",
-    "signOut": "Dil",
     "deleteAccount": "Fshi llogarinë",
     "confirmationCode": "Kodi i konfirmimit",
     "confirmationCodePlaceholder": "kod me 6 shifra",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Tasti Enter dërgon mesazhin",
     "returnSendsMessageSubtitle": "Kur ky opsion është i çaktivizuar, tasti Enter shton një rresht të ri në fushën e mesazhit për agjentin.",
     "biometricUnlock": "Zhbllokim me biometri",
-    "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur hap aplikacionin dhe pasi ai qëndron pesë minuta në sfond."
+    "biometricUnlockSubtitle": "Zhbllokimi kërkohet kur hap aplikacionin dhe pasi ai qëndron pesë minuta në sfond.",
+    "featureFlags": "Flamujt e veçorive",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Kërkesa për bashkim nuk është e disponueshme",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Plani yt i qasjes së hershme kërkon rishikim manual përpara se ta përdorësh në telefon.",
       "iosTitle": "KiloClaw i padisponueshëm në iOS",
       "iosBody": "Qasja te KiloClaw menaxhohet jashtë aplikacionit iOS për këtë llogari.",
-      "iosContact": "Ke pyetje? Shkruaj në hi@kilo.ai."
+      "iosContact": "Ke pyetje? Shkruaj në hi@kilo.ai.",
+      "quarantinedCta": "Dërgo email për ekipin tonë",
+      "nonCanonicalEarlybirdCta": "Shqyrto planin tënd në kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} kërkon vëmendje: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Nuk u hap GitHub. Provo përsëri."
     },
     "settingsSave": {
-      "keepEditing": "Vazhdo redaktimin",
       "saveChanges": "Ruaj ndryshimet",
       "unsavedTitle": "Ndryshime të paruajtura",
       "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nuk u ngarkuan seancat aktive.",
+      "couldNotRefresh": "Rifreskimi dështoi",
       "noSessionsYetDescription": "Nis një detyrë programimi nga telefoni yt. Seancat e tua do të shfaqen këtu.",
       "noMatches": "Asnjë seancë nuk përputhet",
       "tryDifferentSearch": "Provo një term tjetër kërkimi.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Duke u ngarkuar imazhi",
       "imageUnavailableRetry": "Imazhi nuk është i disponueshëm, provo ta ngarkosh përsëri",
-      "imageUnavailableWithAlt": "Imazhi {{alt}} nuk është i disponueshëm.",
       "imagePreviewUnavailableInSession": "Parapamja e imazhit nuk është e disponueshme në këtë seancë.",
       "viewImage": "Shiko imazhin",
       "viewImageWithAlt": "Shiko imazhin {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Zgjidh një model para se të dërgosh mesazhin.",
       "preparingPlaceholder": "Duke konfiguruar mjedisin...",
       "finalizingPlaceholder": "Duke përfunduar...",
-      "messagePlaceholder": "Mesazh",
       "cannotReceiveFiles": "Kjo seancë nuk mund të marrë skedarë. Hiq bashkëngjitjet për të dërguar mesazhin tënd.",
       "couldNotAttachFiles": "Nuk u bashkëngjitën skedarët. Prek butonin e dërgimit për të provuar përsëri.",
       "discardAttachmentsMessage": "Skedarët e ngarkuar që nuk janë bashkëngjitur në mesazhet e dërguara do të fshihen.",
@@ -2556,6 +2560,10 @@
     "stopped": "Diktimi u ndal. Prek mikrofonin për të provuar përsëri.",
     "unavailableDevice": "Diktimi nuk është i disponueshëm në këtë pajisje.",
     "unavailableLanguage": "Diktimi nuk është i disponueshëm për gjuhën e caktuar në këtë pajisje.",
+    "languageNotInstalledTitle": "Diktimi për {{language}} nuk është gati ende",
+    "languageNotInstalledMessage": "Skedarët e të folurit jashtë interneti për {{language}} nuk janë të instaluar në këtë telefon. Shkarkoji dhe pastaj provo diktimin përsëri.",
+    "downloadOfflineModel": "Shkarko",
+    "offlineModelDownloadScheduled": "Skedarët e të folurit jashtë interneti do të shkarkohen në sfond. Provo diktimin përsëri më vonë.",
     "listeningStopped": "Dëgjimi u ndal."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "E anuluar",
         "uncollectible": "E paarkëtueshme"
       },
-      "loadMoreFailed": "Nuk u ngarkuan më shumë të dhëna.",
       "truncated": "Faturat më të vjetra janë të disponueshme."
     },
     "lowBalanceAlert": {

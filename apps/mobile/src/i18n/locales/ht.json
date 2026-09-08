@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Egzamine lòt aparèy yo epi dekonekte yo",
     "feedback": "Kòmantè",
     "privacyChoices": "Chwa konfidansyalite",
-    "signOut": "Dekonekte",
     "deleteAccount": "Efase kont lan",
     "confirmationCode": "Kòd konfimasyon",
     "confirmationCodePlaceholder": "kòd ki gen 6 chif",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Bouton retou a voye mesaj",
     "returnSendsMessageSubtitle": "Lè opsyon sa a dezaktive, bouton retou a ajoute yon nouvo liy nan chan mesaj ajan yo.",
     "biometricUnlock": "Debloke ak byometri",
-    "biometricUnlockSubtitle": "Debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan."
+    "biometricUnlockSubtitle": "Debloke aplikasyon an lè li kòmanse ak apre li pase senk minit an aryèplan.",
+    "featureFlags": "Drapo fonksyon",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Demann fizyon an pa disponib",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Yon moun dwe revize plan aksè bonè ou a anvan ou ka itilize li sou mobil.",
       "iosTitle": "KiloClaw pa disponib sou iOS",
       "iosBody": "Pou kont sa a, jesyon aksè KiloClaw la fèt deyò aplikasyon iOS la.",
-      "iosContact": "Kesyon? Kontakte hi@kilo.ai."
+      "iosContact": "Kesyon? Kontakte hi@kilo.ai.",
+      "quarantinedCta": "Voye imel pou ekip nou an",
+      "nonCanonicalEarlybirdCta": "Gade plan ou sou kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} bezwen atansyon: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Nou pa t ka louvri GitHub. Tanpri eseye ankò."
     },
     "settingsSave": {
-      "keepEditing": "Kontinye modifye",
       "saveChanges": "Anrejistre chanjman yo",
       "unsavedTitle": "Chanjman ki pa anrejistre",
       "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Pa t ka chaje sesyon aktif yo.",
+      "couldNotRefresh": "Pa t ka rafrechi",
       "noSessionsYetDescription": "Kòmanse yon travay pwogramasyon sou telefòn ou. Sesyon ou yo ap parèt isit la.",
       "noMatches": "Pa gen sesyon ki koresponn",
       "tryDifferentSearch": "Eseye yon lòt mo pou rechèch la.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Ap chaje imaj la",
       "imageUnavailableRetry": "Imaj la pa disponib, eseye chaje li ankò",
-      "imageUnavailableWithAlt": "Imaj {{alt}} la pa disponib.",
       "imagePreviewUnavailableInSession": "Apèsi imaj la pa disponib nan sesyon sa a.",
       "viewImage": "Gade imaj la",
       "viewImageWithAlt": "Gade imaj {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Chwazi yon modèl anvan ou voye mesaj la.",
       "preparingPlaceholder": "Ap prepare anviwònman an...",
       "finalizingPlaceholder": "Ap fini...",
-      "messagePlaceholder": "Mesaj",
       "cannotReceiveFiles": "Sesyon sa a pa ka resevwa fichye. Retire fichye atache yo pou voye mesaj ou a.",
       "couldNotAttachFiles": "Nou pa t ka atache fichye yo. Peze Voye pou eseye ankò.",
       "discardAttachmentsMessage": "Tout fichye ou voye ki poko atache ak yon mesaj ap efase.",
@@ -2556,6 +2560,10 @@
     "stopped": "Dikte a sispann. Peze mikwofòn nan pou eseye ankò.",
     "unavailableDevice": "Dikte a pa disponib sou aparèy sa a.",
     "unavailableLanguage": "Dikte a pa disponib nan lang aparèy sa a.",
+    "languageNotInstalledTitle": "Dikte pou {{language}} poko pare",
+    "languageNotInstalledMessage": "Fichye lapawòl offline pou {{language}} pa enstale sou telefòn sa a. Telechaje yo, epi eseye dikte ankò.",
+    "downloadOfflineModel": "Telechaje",
+    "offlineModelDownloadScheduled": "Fichye lapawòl offline yo ap telechaje nan background la. Eseye dikte ankò pita.",
     "listeningStopped": "Sistèm nan sispann koute."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Anile",
         "uncollectible": "Pa ka rekipere"
       },
-      "loadMoreFailed": "Nou pa t kapab chaje plis.",
       "truncated": "Gen fakti ki pi ansyen ki disponib."
     },
     "lowBalanceAlert": {

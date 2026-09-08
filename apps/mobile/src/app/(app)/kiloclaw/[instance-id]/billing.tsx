@@ -27,6 +27,8 @@ import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 const SUBSCRIPTION_PLAN_KEYS = {
+  // i18n-dup-ok: prReview.overview.commit_* is a numeral count unit ('1 commit');
+  // this key is the billing plan name — be/pl/uk translate the two apart.
   commit: 'kiloclaw.billing.commit',
   standard: 'kiloclaw.billing.planName.standard',
 } satisfies Record<string, string>;
@@ -107,6 +109,8 @@ function FinalCommitTermDetails({
 
   return (
     <View>
+      {/* i18n-dup-ok: prReview.overview.commit_* is a numeral count unit ('1 commit');
+          this key is the billing plan name — be/pl/uk translate the two apart. */}
       <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.commit')} />
       <View className="h-px bg-border" />
       <DetailRow label={t('kiloclaw.billing.finalTermEnds')} value={finalDate} />

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "بررسی دستگاه‌های دیگر و خروج از حساب در آن‌ها",
     "feedback": "بازخورد",
     "privacyChoices": "تنظیمات حریم خصوصی",
-    "signOut": "خروج",
     "deleteAccount": "حذف حساب",
     "confirmationCode": "کد تأیید",
     "confirmationCodePlaceholder": "کد ۶ رقمی",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "ارسال پیام با کلید اینتر",
     "returnSendsMessageSubtitle": "اگر این گزینه غیرفعال باشد، کلید اینتر در کادر پیام عامل یک خط جدید ایجاد می‌کند.",
     "biometricUnlock": "باز کردن قفل با احراز هویت زیست‌سنجی",
-    "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است."
+    "biometricUnlockSubtitle": "هنگام راه‌اندازی برنامه و پس از پنج دقیقه ماندن آن در پس‌زمینه، باز کردن قفل الزامی است.",
+    "featureFlags": "پرچم‌های ویژگی",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "درخواست ادغام در دسترس نیست",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "طرح دسترسی زودهنگام شما قبل از استفاده در موبایل نیاز به بررسی دستی دارد.",
       "iosTitle": "KiloClaw در iOS در دسترس نیست",
       "iosBody": "دسترسی این حساب به KiloClaw خارج از برنامهٔ iOS مدیریت می‌شود.",
-      "iosContact": "پرسشی دارید؟ به hi@kilo.ai ایمیل بزنید."
+      "iosContact": "پرسشی دارید؟ به hi@kilo.ai ایمیل بزنید.",
+      "quarantinedCta": "ارسال ایمیل به تیم ما",
+      "nonCanonicalEarlybirdCta": "بررسی طرح خود در kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} نیاز به رسیدگی دارد: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "باز کردن GitHub ممکن نشد. لطفاً دوباره تلاش کنید."
     },
     "settingsSave": {
-      "keepEditing": "ادامه ویرایش",
       "saveChanges": "ذخیره تغییرات",
       "unsavedTitle": "تغییرات ذخیره‌نشده",
       "unsavedMessage": "تغییرات شما پیش از خروج از این صفحه ذخیره شوند؟"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "بارگذاری نشست‌های فعال ممکن نشد.",
+      "couldNotRefresh": "بازخوانی ممکن نشد",
       "noSessionsYetDescription": "با گوشی خود یک کار کدنویسی شروع کنید. نشست‌های شما اینجا نمایش داده می‌شوند.",
       "noMatches": "نشستی مطابق با فیلترها پیدا نشد",
       "tryDifferentSearch": "عبارت دیگری را جست‌وجو کنید.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "در حال بارگذاری تصویر",
       "imageUnavailableRetry": "تصویر در دسترس نیست؛ تلاش دوباره برای بارگذاری",
-      "imageUnavailableWithAlt": "تصویر {{alt}} در دسترس نیست.",
       "imagePreviewUnavailableInSession": "پیش‌نمایش تصویر در این نشست در دسترس نیست.",
       "viewImage": "مشاهده تصویر",
       "viewImageWithAlt": "مشاهده تصویر {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "قبل از ارسال، یک مدل انتخاب کنید.",
       "preparingPlaceholder": "در حال آماده‌سازی محیط…",
       "finalizingPlaceholder": "در حال اتمام کار…",
-      "messagePlaceholder": "پیام",
       "cannotReceiveFiles": "این نشست نمی‌تواند فایل دریافت کند. برای ارسال پیام، پیوست‌ها را حذف کنید.",
       "couldNotAttachFiles": "پیوست کردن فایل‌ها ممکن نشد. برای تلاش دوباره، روی «ارسال» بزنید.",
       "discardAttachmentsMessage": "فایل‌های آپلودشده‌ای که به هیچ پیام ارسالی پیوست نشده‌اند، حذف می‌شوند.",
@@ -2556,6 +2560,10 @@
     "stopped": "ورودی صوتی متوقف شد. برای تلاش مجدد روی میکروفون ضربه بزنید.",
     "unavailableDevice": "ورودی صوتی در این دستگاه در دسترس نیست.",
     "unavailableLanguage": "ورودی صوتی برای زبان این دستگاه در دسترس نیست.",
+    "languageNotInstalledTitle": "ورودی صوتی برای {{language}} هنوز آماده نیست",
+    "languageNotInstalledMessage": "فایل‌های گفتار آفلاین برای {{language}} روی این گوشی نصب نشده‌اند. آن‌ها را دانلود کنید، سپس دوباره ورودی صوتی را امتحان کنید.",
+    "downloadOfflineModel": "دانلود",
+    "offlineModelDownloadScheduled": "فایل‌های گفتار آفلاین در پس‌زمینه دانلود می‌شوند. بعداً دوباره ورودی صوتی را امتحان کنید.",
     "listeningStopped": "گوش دادن متوقف شد."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "باطل",
         "uncollectible": "وصول‌نشدنی"
       },
-      "loadMoreFailed": "بارگذاری موارد بیشتر ناموفق بود.",
       "truncated": "فاکتورهای قدیمی‌تر در دسترس هستند."
     },
     "lowBalanceAlert": {

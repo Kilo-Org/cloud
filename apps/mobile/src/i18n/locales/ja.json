@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "他のデバイスを確認してサインアウト",
     "feedback": "フィードバック",
     "privacyChoices": "プライバシー設定",
-    "signOut": "サインアウト",
     "deleteAccount": "アカウントを削除",
     "confirmationCode": "確認コード",
     "confirmationCodePlaceholder": "6桁のコード",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "リターンキーでメッセージを送信",
     "returnSendsMessageSubtitle": "オフの場合、リターンキーでエージェントのメッセージ入力欄に改行を挿入します。",
     "biometricUnlock": "生体認証でロック解除",
-    "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。"
+    "biometricUnlockSubtitle": "アプリの起動時と、バックグラウンドで5分経過した後は、ロック解除が必要です。",
+    "featureFlags": "機能フラグ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "ライブアクティビティ",
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "ウェブでプランを契約",
       "subscriptionPastDueBody": "直近のお支払いに問題がありました。ブラウザーからkilo.ai/clawにアクセスし、お支払い情報を更新してください。アプリ内では請求に関する設定を変更できません。",
       "subscriptionPastDueTitle": "ウェブでお支払い情報を更新",
-      "trialExpiredBody": "KiloClawを使い続けるには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではプランを契約できません。"
+      "trialExpiredBody": "KiloClawを使い続けるには、ブラウザーからkilo.ai/clawにアクセスしてください。アプリ内ではプランを契約できません。",
+      "quarantinedCta": "サポートチームにメールする",
+      "nonCanonicalEarlybirdCta": "プランをKilo.aiで確認する"
     },
     "controls": {
       "redeploying": "再デプロイ中…",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "セキュリティエージェントが監視するリポジトリを選択"
     },
     "settingsSave": {
-      "keepEditing": "編集を続ける",
       "saveChanges": "変更を保存",
       "unsavedMessage": "この画面を離れる前に変更を保存しますか？",
       "unsavedTitle": "未保存の変更"
@@ -1447,6 +1452,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "アクティブなセッションを読み込めませんでした。",
+      "couldNotRefresh": "更新できませんでした",
       "noSessionsYetDescription": "スマートフォンからコーディングタスクを開始してください。セッションがここに表示されます。",
       "noMatches": "一致するセッションはありません",
       "tryDifferentSearch": "別の検索語をお試しください。",
@@ -1725,7 +1731,6 @@
     "filePart": {
       "loadingImage": "画像を読み込み中",
       "imageUnavailableRetry": "画像を表示できません。読み込みを再試行",
-      "imageUnavailableWithAlt": "画像「{{alt}}」を表示できません。",
       "imagePreviewUnavailableInSession": "このセッションでは画像のプレビューを表示できません。",
       "viewImage": "画像を表示",
       "viewImageWithAlt": "画像「{{alt}}」を表示",
@@ -1920,7 +1925,6 @@
       "selectModelBeforeSending": "送信前にモデルを選択してください。",
       "preparingPlaceholder": "環境を準備中…",
       "finalizingPlaceholder": "終了処理中…",
-      "messagePlaceholder": "メッセージ",
       "cannotReceiveFiles": "このセッションはファイルを受信できません。メッセージを送信するには添付ファイルを削除してください。",
       "couldNotAttachFiles": "ファイルを添付できませんでした。「送信」をタップして、もう一度お試しください。",
       "discardAttachmentsMessage": "送信済みメッセージに添付されていないアップロード済みファイルは削除されます。",
@@ -2125,6 +2129,10 @@
     "stopped": "音声入力が停止しました。マイクをタップして、もう一度お試しください。",
     "unavailableDevice": "このデバイスでは音声入力は利用できません。",
     "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。",
+    "languageNotInstalledTitle": "{{language}}の音声入力の準備がまだできていません",
+    "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがこのスマートフォンにインストールされていません。ダウンロードしてから、音声入力をもう一度お試しください。",
+    "downloadOfflineModel": "ダウンロード",
+    "offlineModelDownloadScheduled": "オフライン音声ファイルはバックグラウンドでダウンロードされます。しばらくしてから、音声入力をもう一度お試しください。",
     "listeningStopped": "聞き取りを停止しました。"
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "無効",
         "uncollectible": "回収不能"
       },
-      "loadMoreFailed": "続きを読み込めませんでした。",
       "truncated": "これより前の請求書も確認できます。"
     },
     "lowBalanceAlert": {

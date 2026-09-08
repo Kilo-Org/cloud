@@ -313,7 +313,7 @@ describe('shouldRouteToVercel', () => {
       isFreeModel: jest.fn(async () => false),
     }));
     jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
-      getVercelModelsFromRedis: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
       getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => ['anthropic']),
     }));
     return (await import('@/lib/ai-gateway/providers/vercel')).shouldRouteToVercel;
@@ -582,7 +582,7 @@ describe('applyVercelSettings managed requests', () => {
       .mockResolvedValue(vercelInferenceProviders);
     jest.doMock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
       getCachedVercelInferenceProviderIdsForModel: getVercelInferenceProvidersMock,
-      getVercelModelsFromRedis: jest.fn(),
+      getVercelModelsFromDatabase: jest.fn(),
     }));
     const { applyVercelSettings: applyManagedSettings } =
       await import('@/lib/ai-gateway/providers/vercel');

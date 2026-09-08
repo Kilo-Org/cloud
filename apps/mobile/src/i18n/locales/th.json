@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ตรวจสอบและออกจากระบบบนอุปกรณ์อื่น",
     "feedback": "ส่งข้อเสนอแนะ",
     "privacyChoices": "ตัวเลือกความเป็นส่วนตัว",
-    "signOut": "ออกจากระบบ",
     "deleteAccount": "ลบบัญชี",
     "confirmationCode": "รหัสยืนยัน",
     "confirmationCodePlaceholder": "รหัส 6 หลัก",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "ปุ่มขึ้นบรรทัดใหม่ใช้ส่งข้อความ",
     "returnSendsMessageSubtitle": "เมื่อปิด ปุ่มขึ้นบรรทัดใหม่จะแทรกบรรทัดใหม่ในช่องป้อนข้อความของเอเจนต์",
     "biometricUnlock": "ปลดล็อกด้วยข้อมูลชีวมิติ",
-    "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที"
+    "biometricUnlockSubtitle": "ต้องปลดล็อกเมื่อเปิดแอปและเมื่อกลับมาใช้งานหลังจากแอปอยู่เบื้องหลังครบห้านาที",
+    "featureFlags": "แฟล็กฟีเจอร์",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "เปิด PR ไม่ได้",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "แพ็กเกจสิทธิ์ใช้งานล่วงหน้าของคุณต้องผ่านการตรวจสอบจากเจ้าหน้าที่ก่อนจึงจะใช้บนมือถือได้",
       "iosTitle": "ใช้ KiloClaw บน iOS ไม่ได้",
       "iosBody": "บัญชีนี้ต้องจัดการสิทธิ์ใช้งาน KiloClaw นอกแอป iOS",
-      "iosContact": "หากมีคำถาม ติดต่อ hi@kilo.ai"
+      "iosContact": "หากมีคำถาม ติดต่อ hi@kilo.ai",
+      "quarantinedCta": "ส่งอีเมลถึงทีมงาน",
+      "nonCanonicalEarlybirdCta": "ตรวจสอบแพ็กเกจของคุณที่ kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ต้องได้รับการตรวจสอบ: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "ไม่สามารถเปิด GitHub ได้ กรุณาลองอีกครั้ง"
     },
     "settingsSave": {
-      "keepEditing": "แก้ไขต่อ",
       "saveChanges": "บันทึกการเปลี่ยนแปลง",
       "unsavedTitle": "การเปลี่ยนแปลงที่ยังไม่บันทึก",
       "unsavedMessage": "บันทึกการเปลี่ยนแปลงก่อนออกจากหน้าจอนี้หรือไม่?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "ไม่สามารถโหลดเซสชันที่กำลังทำงานได้",
+      "couldNotRefresh": "รีเฟรชไม่ได้",
       "noSessionsYetDescription": "เริ่มงานเขียนโค้ดจากมือถือ เซสชันของคุณจะแสดงที่นี่",
       "noMatches": "ไม่มีเซสชันที่ตรงกัน",
       "tryDifferentSearch": "ลองใช้คำค้นหาอื่น",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "กำลังโหลดรูปภาพ",
       "imageUnavailableRetry": "รูปภาพไม่พร้อมใช้งาน ลองโหลดใหม่",
-      "imageUnavailableWithAlt": "ไม่สามารถแสดงรูปภาพ {{alt}} ได้",
       "imagePreviewUnavailableInSession": "ไม่สามารถแสดงตัวอย่างรูปภาพในเซสชันนี้ได้",
       "viewImage": "ดูรูปภาพ",
       "viewImageWithAlt": "ดูรูปภาพ {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "เลือกโมเดลก่อนส่ง",
       "preparingPlaceholder": "กำลังตั้งค่าสภาพแวดล้อม...",
       "finalizingPlaceholder": "กำลังทำงานขั้นสุดท้าย...",
-      "messagePlaceholder": "ข้อความ",
       "cannotReceiveFiles": "เซสชันนี้ไม่สามารถรับไฟล์ได้ นำไฟล์แนบออกเพื่อส่งข้อความของคุณ",
       "couldNotAttachFiles": "แนบไฟล์ไม่สำเร็จ แตะส่งเพื่อลองอีกครั้ง",
       "discardAttachmentsMessage": "ไฟล์ที่อัปโหลดไว้แต่ยังไม่ได้ใช้จะถูกลบ",
@@ -2556,6 +2560,10 @@
     "stopped": "การพิมพ์ด้วยเสียงหยุดแล้ว แตะไมโครโฟนเพื่อลองอีกครั้ง",
     "unavailableDevice": "อุปกรณ์นี้ไม่รองรับการพิมพ์ด้วยเสียง",
     "unavailableLanguage": "การพิมพ์ด้วยเสียงไม่รองรับภาษาที่ตั้งไว้ในอุปกรณ์นี้",
+    "languageNotInstalledTitle": "การพิมพ์ด้วยเสียงสำหรับ{{language}}ยังไม่พร้อม",
+    "languageNotInstalledMessage": "ไฟล์เสียงพูดออฟไลน์สำหรับ{{language}}ยังไม่ได้ติดตั้งในโทรศัพท์เครื่องนี้ ดาวน์โหลดไฟล์ก่อน แล้วลองใช้การพิมพ์ด้วยเสียงอีกครั้ง",
+    "downloadOfflineModel": "ดาวน์โหลด",
+    "offlineModelDownloadScheduled": "ไฟล์เสียงพูดออฟไลน์จะดาวน์โหลดในเบื้องหลัง ลองใช้การพิมพ์ด้วยเสียงอีกครั้งในภายหลัง",
     "listeningStopped": "หยุดฟังแล้ว"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "เป็นโมฆะ",
         "uncollectible": "เรียกเก็บไม่ได้"
       },
-      "loadMoreFailed": "ไม่สามารถโหลดเพิ่มได้",
       "truncated": "ยังมีใบแจ้งหนี้ก่อนหน้านี้ให้ดู"
     },
     "lowBalanceAlert": {

@@ -104,13 +104,19 @@ describe('PrReviewChecksSection check status icons', () => {
       throw new Error('renderer was not created');
     }
 
-    expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(2);
+    expect(renderer.root.findAllByType(SpinningIcon)).toHaveLength(4);
     expect(renderer.root.findAllByType(SpinningIcon).map(node => node.props.icon)).toEqual([
       'Loader2',
       'Loader2',
+      'CheckCircle2',
+      'XCircle',
     ]);
-    expect(renderer.root.findAll(node => String(node.type) === 'CheckCircle2')).toHaveLength(1);
-    expect(renderer.root.findAll(node => String(node.type) === 'XCircle')).toHaveLength(1);
+    expect(renderer.root.findAllByType(SpinningIcon).map(node => node.props.spinning)).toEqual([
+      true,
+      true,
+      false,
+      false,
+    ]);
 
     act(() => {
       renderer.unmount();

@@ -6,7 +6,9 @@ import {
   SANDBOX_CONTROL_PROTOCOL_VERSION,
   controlFrameSchema,
   sandboxHeartbeatPayloadSchema,
+  sandboxEventPublicationPayloadSchema,
   sandboxHelloPayloadSchema,
+  sandboxReconcilePayloadSchema,
   sandboxReadyPayloadSchema,
   sandboxShutdownPayloadSchema,
   sandboxStatusPayloadSchema,
@@ -24,6 +26,8 @@ import {
   sessionTerminalConnectPayloadSchema,
   sessionTerminalCreatePayloadSchema,
   sessionTerminalResizePayloadSchema,
+  sessionOperationAuthorizationSchema,
+  sessionOperationAckSchema,
   worktreeDeletePayloadSchema,
   type ControlError,
   type ControlErrorCode,
@@ -42,6 +46,8 @@ const CONTROL_EVENT_SET = new Set<string>(CONTROL_EVENTS);
 const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'sandbox.hello': sandboxHelloPayloadSchema,
   'sandbox.status': sandboxStatusPayloadSchema,
+  'sandbox.reconcile': sandboxReconcilePayloadSchema,
+  'sandbox.event.publish': sandboxEventPublicationPayloadSchema,
   'sandbox.shutdown': sandboxShutdownPayloadSchema,
   'worktree.prepareDeletion': worktreeDeletePayloadSchema,
   'worktree.delete': worktreeDeletePayloadSchema,
@@ -57,6 +63,8 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'session.terminal.resize': sessionTerminalResizePayloadSchema,
   'session.terminal.close': sessionTerminalClosePayloadSchema,
   'session.terminal.connect': sessionTerminalConnectPayloadSchema,
+  'session.operation.get': sessionOperationAuthorizationSchema,
+  'session.operation.ack': sessionOperationAckSchema,
 };
 
 const EVENT_PAYLOAD_SCHEMAS: Record<ControlEvent, z.ZodType> = {
@@ -173,10 +181,20 @@ export function errorResponse(
   return { type: 'response', requestId, ok: false, error };
 }
 
-export function helloResult(): SandboxHelloResult {
+export function helloResult(capabilities?: {
+  connectionRecovery?: boolean;
+  eventReceipts?: boolean;
+}): SandboxHelloResult {
   return {
     protocolVersion: SANDBOX_CONTROL_PROTOCOL_VERSION,
     handshakeComplete: true,
-    capabilities: { kiloVersionHeartbeat: true },
+    capabilities: {
+      kiloVersionHeartbeat: true,
+      sessionOperationResults: true,
+      scopedStopAbort: true,
+      nativeRuntimeRetirement: true,
+      ...(capabilities?.connectionRecovery ? { connectionRecovery: true } : {}),
+      ...(capabilities?.eventReceipts ? { eventReceipts: true } : {}),
+    },
   };
 }

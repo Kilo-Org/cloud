@@ -6,7 +6,8 @@ import { ChevronDown, ChevronUp, MapPin } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { LinearTransition } from 'react-native-reanimated';
 
 import { Button } from '@/components/ui/button';

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Meeshaalee biroo sakatta'iitii herrega keessaa baasi",
     "feedback": "Yaada",
     "privacyChoices": "Filannoo iccitii",
-    "signOut": "Ba'i",
     "deleteAccount": "Herrega balleessi",
     "confirmationCode": "Koodii mirkaneessuu",
     "confirmationCodePlaceholder": "koodii dijiitii 6",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Furtuun galchii ergaa ergiti",
     "returnSendsMessageSubtitle": "Yoo cufame, furtuun galchii iddoo ergaa ergamaa barreessuu keessatti sarara haaraa galchiti.",
     "biometricUnlock": "Baayoometirikisiin qulfii bani",
-    "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii bani."
+    "biometricUnlockSubtitle": "Appilikeeshinichi yeroo jalqabamu fi duubbee keessatti daqiiqaa shan erga turee booda qulfii bani.",
+    "featureFlags": "Albaasa amalaa",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Gaaffiin walitti makuu hin argamu",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Karoorri kee kan dursanii fayyadamuu bilbila irratti hojiirra ooluu dura gamaaggama namaatiin godhamu barbaada.",
       "iosTitle": "KiloClaw iOS keessatti hin argamu",
       "iosBody": "Herrega kanaaf hayyamni KiloClaw fayyadamuu appii iOS ala bulfama.",
-      "iosContact": "Gaaffii qabdaa? hi@kilo.ai qunnami."
+      "iosContact": "Gaaffii qabdaa? hi@kilo.ai qunnami.",
+      "quarantinedCta": "Imeelii garee keenyaa ergi",
+      "nonCanonicalEarlybirdCta": "Karoorra kee kilo.ai irratti ilaali"
     },
     "instanceCard": {
       "needsAttention": "{{name}} xiyyeeffannoo barbaada: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub banuun hin danda'amne. Irra deebi'ii yaali."
     },
     "settingsSave": {
-      "keepEditing": "Gulaaluu itti fufi",
       "saveChanges": "Jijjiiramoota olkaa'i",
       "unsavedTitle": "Jijjiiramoota hin olkaa'amne",
       "unsavedMessage": "Fuula kana keessaa ba'uu dura jijjiiramoota kee olkaa'uu?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Turtiiwwan hojii irra jiran fe'uu hin danda'amne.",
+      "couldNotRefresh": "Haaromsuun hin danda'amne",
       "noSessionsYetDescription": "Bilbila kee irraa hojii koodii barreessuu jalqabi. Turtiiwwan kee asitti mul'atu.",
       "noMatches": "Turtiin walsimu hin jiru",
       "tryDifferentSearch": "Jecha biraatiin barbaadi.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Suuraa fe'aa jira",
       "imageUnavailableRetry": "Suuraan hin argamu, fe'uuf deebi'ii yaali",
-      "imageUnavailableWithAlt": "Suuraan hin argamu: {{alt}}.",
       "imagePreviewUnavailableInSession": "Turtii kana keessatti durargiin suuraa hin argamu.",
       "viewImage": "Suuraa ilaali",
       "viewImageWithAlt": "Suuraa {{alt}} ilaali",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Erguun dura moodela filadhu.",
       "preparingPlaceholder": "Naannoo qopheessaa jira...",
       "finalizingPlaceholder": "Xumuraa jira...",
-      "messagePlaceholder": "Ergaa",
       "cannotReceiveFiles": "Turtiin kun faayiloota fudhachuu hin danda'u. Ergaa kee erguuf faayiloota qabachiifaman baasi.",
       "couldNotAttachFiles": "Faayiloota qabachiisuu hin danda'amne. Deebi'anii yaaluuf Ergi tuqi.",
       "discardAttachmentsMessage": "Faayiloonni ol fe'aman kan ergaa ergametti hin qabachiifamne ni haqamu.",
@@ -2556,6 +2560,10 @@
     "stopped": "Sagaleen galchuun dhaabbateera. Irra deebi'anii yaaluuf maayikirofoonii tuqi.",
     "unavailableDevice": "Meeshaa kana irratti sagaleen galchuun hin danda'amu.",
     "unavailableLanguage": "Afaan meeshaa kanaatiin sagaleen galchuun hin danda'amu.",
+    "languageNotInstalledTitle": "Sagaleen galchuu afaan {{language}} tiif hin qophaa'i",
+    "languageNotInstalledMessage": "Faayiloota sagalee offlaayinii afaan {{language}} tiif bilbilaa kana irratti hin dhaabbatamin. Isaan buufadhu, ergasii sagaleen galchuu irra deebi'ii yaali.",
+    "downloadOfflineModel": "Buufadhu",
+    "offlineModelDownloadScheduled": "Faayiloota sagalee offlaayinii duubatti buufamu. Sagaleen galchuu booda irra deebi'ii yaali.",
     "listeningStopped": "Dhaggeeffachuun dhaabbateera."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Haqame",
         "uncollectible": "Sassaabamuu hin danda'u"
       },
-      "loadMoreFailed": "Dabalata fe'uun hin danda'amne.",
       "truncated": "Gaaffiiwwan kaffaltii duraanii ni argamu."
     },
     "lowBalanceAlert": {

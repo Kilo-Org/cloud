@@ -83,6 +83,19 @@ export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableVie
 }
 
 /**
+ * The widget's stale frame: the same counts under the delayed copy, for the
+ * timeline entry that lands once a whole stale window has passed with no
+ * refresh. The counts stay — they are still the last thing the device knew —
+ * and only the claim that they are current is dropped.
+ */
+export function buildStaleWidgetProps(
+  snapshot: GlanceableAgentsSnapshot,
+  translate: (key: string) => string
+): Partial<GlanceableViewProps> {
+  return toWidgetProps(buildGlanceableViewProps({ ...snapshot, status: 'stale' }, {}, translate));
+}
+
+/**
  * The widget's expiry frame: the same snapshot with its counts zeroed and the
  * expired copy, for the timeline entry that lands at `expiresAt`.
  */

@@ -569,6 +569,39 @@ describe('createWrapperKiloClient generated SDK HTTP boundary', () => {
     }
   );
 
+  it.each(
+    [null, [], '', { ses_1: null }, { ses_1: {} }, { ses_1: { type: 1 } }].map(body => ({ body }))
+  )('rejects malformed successful session status maps: %j', async ({ body }) => {
+    const result: unknown = await createClient(startStub(200, body).url)
+      .getSessionStatuses()
+      .catch(error => error);
+    expect(result).toBeInstanceOf(Error);
+  });
+
+  it.each([
+    { status: 204, body: undefined },
+    { status: 500, body: {} },
+  ])('rejects unavailable session status: %j', async ({ status, body }) => {
+    const result: unknown = await createClient(startStub(status, body).url)
+      .getSessionStatuses()
+      .catch(error => error);
+    expect(result).toBeInstanceOf(Error);
+  });
+
+  it('validates exact session existence for cleanup without importing', async () => {
+    const directory = '/workspace/exact';
+    const client = createClient(startStub(200, { id: 'ses_1', directory }).url);
+    expect(await client.getSessionDetails('ses_1', directory)).toEqual({ id: 'ses_1', directory });
+    for (const lookup of [
+      () => client.getSessionDetails('ses_other', directory),
+      () => client.getSessionDetails('ses_1', '/other'),
+      () => createClient(startStub(404, {}).url).getSessionDetails('ses_1', directory),
+    ]) {
+      const result: unknown = await lookup().catch(error => error);
+      expect(result).toBeInstanceOf(Error);
+    }
+  });
+
   it('accepts genuinely empty successful session status and pending-input results', async () => {
     expect(await createClient(startStub(200, {}).url).getSessionStatuses()).toEqual({});
     expect(await createClient(startStub(200, []).url).getQuestions()).toEqual([]);

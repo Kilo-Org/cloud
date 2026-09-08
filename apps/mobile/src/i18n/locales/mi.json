@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Arotakengia ngā wātū o ētahi atu pūrere, ka takiputa ai",
     "feedback": "Urupare",
     "privacyChoices": "Ngā kōwhiringa matatapu",
-    "signOut": "Takiputa",
     "deleteAccount": "Mukua te pūkete",
     "confirmationCode": "Waehere whakaū",
     "confirmationCodePlaceholder": "waehere mati e 6",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Ka tukuna te karere mā te pātuhi tāuru",
     "returnSendsMessageSubtitle": "Ina weto, ka whakaurua he rārangi hōu mā te pātuhi tāuru ki ngā pouaka karere māngai.",
     "biometricUnlock": "Wetekina mā te tautuhi koiora",
-    "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri."
+    "biometricUnlockSubtitle": "Me wewete te taupānga ina tīmata, ā, ina hoki mai i muri i te rima meneti i te papamuri.",
+    "featureFlags": "Kāreti āhuatanga",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Kāore i te wātea te tono kume",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Me arotake tō mahere uru moata e te tangata i mua i tō whakamahi i te taupānga pūkoro.",
       "iosTitle": "Kāore a KiloClaw e wātea ana i iOS",
       "iosBody": "Mō tēnei pūkete, kei waho i te taupānga iOS te whakahaere i te uru ki KiloClaw.",
-      "iosContact": "He pātai? Whakapā ki hi@kilo.ai."
+      "iosContact": "He pātai? Whakapā ki hi@kilo.ai.",
+      "quarantinedCta": "Tukua he īmēra ki tā mātou rōpū",
+      "nonCanonicalEarlybirdCta": "Arotakehia tō mahere i kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "Me aro atu ki a {{name}}: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Kāore i taea te whakatuwhera i GitHub. Whakamātau anō."
     },
     "settingsSave": {
-      "keepEditing": "Whakatika tonu",
       "saveChanges": "Tiakina ngā huringa",
       "unsavedTitle": "Ngā huringa kāore i tiakina",
       "unsavedMessage": "Me tiaki ō huringa i mua i te wehe atu i tēnei mata?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Kāore i taea te uta i ngā wātū e haere ana.",
+      "couldNotRefresh": "Kāore i taea te whakahou",
       "noSessionsYetDescription": "Tīmataria he mahi tuhi waehere i tō waea. Ka puta ō wātū ki konei.",
       "noMatches": "Kāore he wātū e hāngai ana",
       "tryDifferentSearch": "Whakamātauhia tētahi kupu rapu rerekē.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Kei te uta i te atahanga",
       "imageUnavailableRetry": "Kāore e wātea ana te atahanga, whakamātau anō ki te uta",
-      "imageUnavailableWithAlt": "Kāore e wātea ana te atahanga {{alt}}.",
       "imagePreviewUnavailableInSession": "Kāore e wātea ana te arokite o te atahanga i tēnei wātū.",
       "viewImage": "Tirohia te atahanga",
       "viewImageWithAlt": "Tirohia te atahanga {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Kōwhiria he tauira i mua i te tuku.",
       "preparingPlaceholder": "Kei te whakarite i te taiao…",
       "finalizingPlaceholder": "Kei te whakaoti…",
-      "messagePlaceholder": "Karere",
       "cannotReceiveFiles": "Kāore e taea e tēnei wātū te whiwhi kōnae. Tangohia ngā whakapirihanga kia taea ai te tuku i tō karere.",
       "couldNotAttachFiles": "Kāore i taea te whakapiri i ngā kōnae. Pāwhiria te pātene tuku hei whakamātau anō.",
       "discardAttachmentsMessage": "Ka mukua ngā kōnae kua tukuna ake kāore anō kia hono ki tētahi karere.",
@@ -2556,6 +2560,10 @@
     "stopped": "Kua mutu te tāuru reo. Patoa te hopuoro kia whakamātau anō.",
     "unavailableDevice": "Kāore e wātea ana te tāuru reo i tēnei pūrere.",
     "unavailableLanguage": "Kāore e wātea ana te tāuru reo mō tēnei reo o te pūrere.",
+    "languageNotInstalledTitle": "Kāore anō te tāuru reo mō {{language}} kia rite",
+    "languageNotInstalledMessage": "Kāore ngā kōnae kōrero kore-ipurangi mō {{language}} kua tāutitia ki tēnei waea. Tikiake, kātahi ka whakamātau anō i te tāuru reo.",
+    "downloadOfflineModel": "Tikiake",
+    "offlineModelDownloadScheduled": "Ka tikiaketia ngā kōnae kōrero kore-ipurangi ki te papamuri. Whakamātau anō i te tāuru reo ā muri atu.",
     "listeningStopped": "Kua mutu te whakarongo."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Kua whakakorea",
         "uncollectible": "Kāore e taea te kohi utu"
       },
-      "loadMoreFailed": "Kāore i taea te uta i ētahi atu.",
       "truncated": "E wātea ana ngā nama tawhito."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "查看其他设备并退出其登录",
     "feedback": "反馈",
     "privacyChoices": "隐私选项",
-    "signOut": "退出登录",
     "deleteAccount": "注销账号",
     "confirmationCode": "验证码",
     "confirmationCodePlaceholder": "6 位验证码",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "回车键发送消息",
     "returnSendsMessageSubtitle": "关闭后，按回车键会在智能体的消息输入框中换行。",
     "biometricUnlock": "使用生物识别解锁",
-    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。"
+    "biometricUnlockSubtitle": "启动应用时以及应用在后台停留五分钟后，均需解锁。",
+    "featureFlags": "功能标志",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "实时活动",
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "前往网页版订阅",
       "subscriptionPastDueBody": "你最近一次付款出现了问题。请在浏览器中打开 kilo.ai/claw 更新付款信息。应用内不支持管理账单。",
       "subscriptionPastDueTitle": "在网页端更新付款方式",
-      "trialExpiredBody": "要继续使用 KiloClaw，请在浏览器中打开 kilo.ai/claw。应用内不支持订阅。"
+      "trialExpiredBody": "要继续使用 KiloClaw，请在浏览器中打开 kilo.ai/claw。应用内不支持订阅。",
+      "quarantinedCta": "给我们的团队发邮件",
+      "nonCanonicalEarlybirdCta": "前往 kilo.ai 查看您的套餐"
     },
     "controls": {
       "redeploying": "正在重新部署…",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "选择安全智能体监控的仓库"
     },
     "settingsSave": {
-      "keepEditing": "继续编辑",
       "saveChanges": "保存更改",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
       "unsavedTitle": "未保存的更改"
@@ -1447,6 +1452,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "无法加载进行中的会话。",
+      "couldNotRefresh": "无法刷新",
       "noSessionsYetDescription": "在手机上发起编程任务，会话就会显示在这里。",
       "noMatches": "暂无匹配的会话",
       "tryDifferentSearch": "请尝试其他搜索词。",
@@ -1725,7 +1731,6 @@
     "filePart": {
       "loadingImage": "正在加载图片",
       "imageUnavailableRetry": "无法加载图片，重新加载",
-      "imageUnavailableWithAlt": "无法加载图片：{{alt}}。",
       "imagePreviewUnavailableInSession": "无法在此会话中预览图片。",
       "viewImage": "查看图片",
       "viewImageWithAlt": "查看图片 {{alt}}",
@@ -1920,7 +1925,6 @@
       "selectModelBeforeSending": "请先选择模型再发送消息。",
       "preparingPlaceholder": "正在准备环境……",
       "finalizingPlaceholder": "正在收尾……",
-      "messagePlaceholder": "消息",
       "cannotReceiveFiles": "此会话无法接收文件。请移除附件后再发送消息。",
       "couldNotAttachFiles": "无法添加附件。请点击“发送”重试。",
       "discardAttachmentsMessage": "已上传但尚未用于发送消息的文件将被删除。",
@@ -2125,6 +2129,10 @@
     "stopped": "语音输入已停止。请点按麦克风重试。",
     "unavailableDevice": "此设备不支持语音输入。",
     "unavailableLanguage": "语音输入不支持此设备的语言。",
+    "languageNotInstalledTitle": "{{language}} 的语音输入尚未就绪",
+    "languageNotInstalledMessage": "此手机尚未安装 {{language}} 的离线语音文件。请下载这些文件，然后重试语音输入。",
+    "downloadOfflineModel": "下载",
+    "offlineModelDownloadScheduled": "离线语音文件将在后台下载。稍后请重试语音输入。",
     "listeningStopped": "已停止收听。"
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "已作废",
         "uncollectible": "无法收款"
       },
-      "loadMoreFailed": "无法加载更多内容。",
       "truncated": "可查看更早的发票。"
     },
     "lowBalanceAlert": {

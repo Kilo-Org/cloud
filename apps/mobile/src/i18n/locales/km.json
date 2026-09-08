@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ពិនិត្យ និងចេញពីគណនីលើឧបករណ៍ផ្សេងទៀត",
     "feedback": "មតិកែលម្អ",
     "privacyChoices": "ជម្រើសឯកជនភាព",
-    "signOut": "ចាកចេញ",
     "deleteAccount": "លុបគណនី",
     "confirmationCode": "លេខកូដបញ្ជាក់",
     "confirmationCodePlaceholder": "លេខកូដ 6 ខ្ទង់",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "គ្រាប់ចុចបញ្ចូលប្រើសម្រាប់ផ្ញើសារ",
     "returnSendsMessageSubtitle": "នៅពេលបិទ គ្រាប់ចុចបញ្ចូលនឹងបញ្ចូលបន្ទាត់ថ្មីក្នុងប្រអប់សរសេរសារទៅភ្នាក់ងារ។",
     "biometricUnlock": "ដោះសោដោយប្រើជីវមាត្រ",
-    "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។"
+    "biometricUnlockSubtitle": "តម្រូវឱ្យដោះសោនៅពេលចាប់ផ្តើមកម្មវិធី និងបន្ទាប់ពីកម្មវិធីស្ថិតនៅផ្ទៃខាងក្រោយរយៈពេលប្រាំនាទី។",
+    "featureFlags": "ទង់លក្ខណៈពិសេស",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "មិនអាចបើកសំណើបញ្ចូលកូដបាន",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "គម្រោងចូលប្រើមុនរបស់អ្នកត្រូវការបុគ្គលិកពិនិត្យ មុនពេលអាចប្រើនៅលើទូរស័ព្ទបាន។",
       "iosTitle": "KiloClaw មិនអាចប្រើបាននៅលើ iOS",
       "iosBody": "ការចូលប្រើ KiloClaw ត្រូវបានគ្រប់គ្រងនៅខាងក្រៅកម្មវិធី iOS សម្រាប់គណនីនេះ។",
-      "iosContact": "មានសំណួរ? ទាក់ទង hi@kilo.ai។"
+      "iosContact": "មានសំណួរ? ទាក់ទង hi@kilo.ai។",
+      "quarantinedCta": "ផ្ញើអ៊ីមែលទៅក្រុមការងារយើង",
+      "nonCanonicalEarlybirdCta": "ពិនិត្យគម្រោងរបស់អ្នកនៅលើ kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ត្រូវការការយកចិត្តទុកដាក់៖ {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "មិនអាចបើក GitHub បានទេ។ សូមព្យាយាមម្តងទៀត។"
     },
     "settingsSave": {
-      "keepEditing": "បន្តកែសម្រួល",
       "saveChanges": "រក្សាទុកការផ្លាស់ប្តូរ",
       "unsavedTitle": "ការផ្លាស់ប្តូរដែលមិនទាន់រក្សាទុក",
       "unsavedMessage": "រក្សាទុកការផ្លាស់ប្តូររបស់អ្នក មុនពេលចាកចេញពីអេក្រង់នេះ?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "មិនអាចផ្ទុកវគ្គសកម្មបានទេ។",
+      "couldNotRefresh": "មិនអាចផ្ទុកឡើងវិញបានទេ",
       "noSessionsYetDescription": "ចាប់ផ្តើមកិច្ចការសរសេរកូដពីទូរស័ព្ទរបស់អ្នក។ វគ្គរបស់អ្នកនឹងបង្ហាញនៅទីនេះ។",
       "noMatches": "គ្មានវគ្គដែលត្រូវគ្នា",
       "tryDifferentSearch": "សូមសាកល្បងពាក្យស្វែងរកផ្សេង។",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "កំពុងផ្ទុករូបភាព",
       "imageUnavailableRetry": "មិនអាចបង្ហាញរូបភាពបានទេ សូមព្យាយាមផ្ទុកម្តងទៀត",
-      "imageUnavailableWithAlt": "មិនអាចបង្ហាញរូបភាព {{alt}} បានទេ។",
       "imagePreviewUnavailableInSession": "មិនអាចមើលរូបភាពជាមុនក្នុងវគ្គនេះបានទេ។",
       "viewImage": "មើលរូបភាព",
       "viewImageWithAlt": "មើលរូបភាព {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "សូមជ្រើសរើសម៉ូដែលមុនពេលផ្ញើ។",
       "preparingPlaceholder": "កំពុងរៀបចំបរិស្ថានដំណើរការ...",
       "finalizingPlaceholder": "កំពុងបញ្ចប់...",
-      "messagePlaceholder": "សារ",
       "cannotReceiveFiles": "វគ្គនេះមិនអាចទទួលឯកសារបានទេ។ ដកឯកសារភ្ជាប់ចេញដើម្បីផ្ញើសាររបស់អ្នក។",
       "couldNotAttachFiles": "មិនអាចភ្ជាប់ឯកសារបានទេ។ ប៉ះ ផ្ញើ ដើម្បីព្យាយាមម្តងទៀត។",
       "discardAttachmentsMessage": "ឯកសារដែលបានផ្ទុកឡើង តែមិនទាន់ភ្ជាប់ទៅសារដែលបានផ្ញើ នឹងត្រូវលុប។",
@@ -2556,6 +2560,10 @@
     "stopped": "ការបញ្ចូលដោយសំឡេងបានឈប់។ សូមប៉ះមីក្រូហ្វូនដើម្បីព្យាយាមម្តងទៀត។",
     "unavailableDevice": "មិនអាចប្រើការបញ្ចូលដោយសំឡេងលើឧបករណ៍នេះបានទេ។",
     "unavailableLanguage": "ការបញ្ចូលដោយសំឡេងមិនគាំទ្រភាសាដែលឧបករណ៍នេះកំពុងប្រើទេ។",
+    "languageNotInstalledTitle": "ការបញ្ចូលដោយសំឡេងសម្រាប់{{language}}មិនទាន់រួចរាល់ទេ",
+    "languageNotInstalledMessage": "ឯកសារសំឡេងក្រៅបណ្តាញសម្រាប់{{language}}មិនទាន់ដំឡើងនៅលើទូរស័ព្ទនេះទេ។ សូមទាញយកវាមុន បន្ទាប់មកសូមព្យាយាមការបញ្ចូលដោយសំឡេងម្តងទៀត។",
+    "downloadOfflineModel": "ទាញយក",
+    "offlineModelDownloadScheduled": "ឯកសារសំឡេងក្រៅបណ្តាញនឹងត្រូវបានទាញយកនៅផ្ទៃខាងក្រោយ។ សូមព្យាយាមការបញ្ចូលដោយសំឡេងម្តងទៀតពេលក្រោយ។",
     "listeningStopped": "បានបញ្ឈប់ការស្តាប់។"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "បានលុបចោល",
         "uncollectible": "មិនអាចទារបាន"
       },
-      "loadMoreFailed": "មិនអាចផ្ទុកបន្ថែមបានទេ។",
       "truncated": "អ្នកអាចមើលវិក្កយបត្រមុនៗបាន។"
     },
     "lowBalanceAlert": {

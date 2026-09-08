@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Прегледај ги и одјави ги другите уреди",
     "feedback": "Испрати повратни информации",
     "privacyChoices": "Поставки за приватност",
-    "signOut": "Одјави се",
     "deleteAccount": "Избриши ја сметката",
     "confirmationCode": "Код за потврда",
     "confirmationCodePlaceholder": "код од 6 цифри",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Копчето за нов ред испраќа порака",
     "returnSendsMessageSubtitle": "Кога е исклучено, копчето за нов ред вметнува нов ред во полињата за внес на пораки на агентите.",
     "biometricUnlock": "Отклучување со биометрија",
-    "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина."
+    "biometricUnlockSubtitle": "Потребно е отклучување при стартување на апликацијата и откако ќе помине пет минути во заднина.",
+    "featureFlags": "Знаменца на функции",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Барањето за спојување е недостапно",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Твојот план за ран пристап бара рачна проверка пред да може да се користи во мобилната апликација.",
       "iosTitle": "KiloClaw е недостапен на iOS",
       "iosBody": "За оваа сметка, со пристапот до KiloClaw се управува надвор од апликацијата за iOS.",
-      "iosContact": "Имаш прашања? Пиши на hi@kilo.ai."
+      "iosContact": "Имаш прашања? Пиши на hi@kilo.ai.",
+      "quarantinedCta": "Испрати е-пошта до нашиот тим",
+      "nonCanonicalEarlybirdCta": "Прегледај го твојот план на kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} бара внимание: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Не можеше да се отвори GitHub. Обиди се повторно."
     },
     "settingsSave": {
-      "keepEditing": "Продолжи со уредување",
       "saveChanges": "Зачувај ги промените",
       "unsavedTitle": "Незачувани промени",
       "unsavedMessage": "Да се зачуваат промените пред да го напуштиш овој екран?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Не успеа вчитувањето на активните сесии.",
+      "couldNotRefresh": "Не успеа освежувањето",
       "noSessionsYetDescription": "Започни задача за програмирање од телефонот. Твоите сесии ќе се појават тука.",
       "noMatches": "Нема сесии што одговараат на пребарувањето",
       "tryDifferentSearch": "Пробај со друг поим за пребарување.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Вчитување слика",
       "imageUnavailableRetry": "Сликата не е достапна. Вчитај ја повторно",
-      "imageUnavailableWithAlt": "Сликата не е достапна: {{alt}}.",
       "imagePreviewUnavailableInSession": "Прегледот на сликата е недостапен во оваа сесија.",
       "viewImage": "Погледни ја сликата",
       "viewImageWithAlt": "Погледни ја сликата {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Избери модел пред да испратиш порака.",
       "preparingPlaceholder": "Подготовка на околината...",
       "finalizingPlaceholder": "Завршување...",
-      "messagePlaceholder": "Порака",
       "cannotReceiveFiles": "Оваа сесија не може да прима датотеки. Отстрани ги прилозите за да ја испратиш пораката.",
       "couldNotAttachFiles": "Не успеа прикачувањето на датотеките. Допри го копчето за испраќање за да се обидеш повторно.",
       "discardAttachmentsMessage": "Прикачените датотеки што не се приложени кон испратени пораки ќе бидат избришани.",
@@ -2556,6 +2560,10 @@
     "stopped": "Гласовниот внес е запрен. Допри го микрофонот за да се обидеш повторно.",
     "unavailableDevice": "Гласовниот внес не е достапен на овој уред.",
     "unavailableLanguage": "Гласовниот внес не е достапен за јазикот на овој уред.",
+    "languageNotInstalledTitle": "Гласовниот внес за {{language}} сè уште не е подготвен",
+    "languageNotInstalledMessage": "Офлајн датотеките со говор за {{language}} не се инсталирани на овој телефон. Преземи ги, а потоа обиди се повторно со гласовниот внес.",
+    "downloadOfflineModel": "Преземи",
+    "offlineModelDownloadScheduled": "Офлајн датотеките со говор ќе се преземат во позадина. Обиди се повторно со гласовниот внес подоцна.",
     "listeningStopped": "Слушањето е запрено."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Поништено",
         "uncollectible": "Ненаплатливо"
       },
-      "loadMoreFailed": "Не се вчитаа дополнителни ставки.",
       "truncated": "Достапни се и постари фактури."
     },
     "lowBalanceAlert": {

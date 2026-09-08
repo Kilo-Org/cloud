@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "צפייה במכשירים אחרים וניתוקם מהחשבון",
     "feedback": "משוב",
     "privacyChoices": "אפשרויות פרטיות",
-    "signOut": "התנתקות",
     "deleteAccount": "מחיקת החשבון",
     "confirmationCode": "קוד אישור",
     "confirmationCodePlaceholder": "קוד בן 6 ספרות",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "מקש אנטר שולח הודעה",
     "returnSendsMessageSubtitle": "כשהאפשרות כבויה, מקש אנטר מוסיף שורה חדשה בשדות ההודעה של הסוכנים.",
     "biometricUnlock": "ביטול נעילה באמצעות זיהוי ביומטרי",
-    "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע."
+    "biometricUnlockSubtitle": "נדרש לבטל את הנעילה בעת הפעלת האפליקציה ולאחר חמש דקות ברקע.",
+    "featureFlags": "דגלי תכונות",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "פעילויות בזמן אמת",
@@ -601,7 +605,9 @@
       "subscriptionCanceledTitle": "רכישת מינוי באתר",
       "subscriptionPastDueBody": "הייתה בעיה בתשלום האחרון שלך. פתח את kilo.ai/claw בדפדפן כדי לעדכן את אמצעי התשלום. לא ניתן לנהל חיובים באפליקציה.",
       "subscriptionPastDueTitle": "עדכון אמצעי התשלום באתר",
-      "trialExpiredBody": "כדי להמשיך להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה."
+      "trialExpiredBody": "כדי להמשיך להשתמש ב-KiloClaw, פתח את kilo.ai/claw בדפדפן. לא ניתן לרכוש מינוי באפליקציה.",
+      "quarantinedCta": "שליחת אימייל לצוות שלנו",
+      "nonCanonicalEarlybirdCta": "בדיקת התוכנית שלך ב-kilo.ai"
     },
     "controls": {
       "redeploying": "פריסה מחדש…",
@@ -1304,7 +1310,6 @@
       "repositoriesCount_two": "{{displayCount}} מאגרים נבחרו"
     },
     "settingsSave": {
-      "keepEditing": "המשך עריכה",
       "saveChanges": "שמירת שינויים",
       "unsavedMessage": "לשמור את השינויים לפני היציאה מהמסך?",
       "unsavedTitle": "שינויים שלא נשמרו"
@@ -1453,6 +1458,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "לא ניתן היה לטעון את השיחות הפעילות.",
+      "couldNotRefresh": "לא ניתן היה לרענן",
       "noSessionsYetDescription": "התחל משימת תכנות מהטלפון שלך. השיחות שלך יופיעו כאן.",
       "noMatches": "אין שיחות תואמות",
       "tryDifferentSearch": "כדאי לנסות מונח חיפוש אחר.",
@@ -1735,7 +1741,6 @@
     "filePart": {
       "loadingImage": "טוען תמונה",
       "imageUnavailableRetry": "התמונה אינה זמינה, ניסיון טעינה נוסף",
-      "imageUnavailableWithAlt": "התמונה אינה זמינה: {{alt}}.",
       "imagePreviewUnavailableInSession": "תצוגה מקדימה של תמונות אינה זמינה בסשן הזה.",
       "viewImage": "הצגת התמונה",
       "viewImageWithAlt": "הצגת התמונה: {{alt}}",
@@ -1933,7 +1938,6 @@
       "selectModelBeforeSending": "בחר מודל לפני השליחה.",
       "preparingPlaceholder": "מכין את הסביבה...",
       "finalizingPlaceholder": "מסיים...",
-      "messagePlaceholder": "הודעה",
       "cannotReceiveFiles": "הסשן הזה אינו יכול לקבל קבצים. הסר את הקבצים המצורפים כדי לשלוח את ההודעה שלך.",
       "couldNotAttachFiles": "לא ניתן היה לצרף קבצים. הקש על שליחה כדי לנסות שוב.",
       "discardAttachmentsMessage": "קבצים שהועלו ולא צורפו להודעות שנשלחו יימחקו.",
@@ -2139,6 +2143,10 @@
     "stopped": "ההכתבה הופסקה. הקש על המיקרופון כדי לנסות שוב.",
     "unavailableDevice": "ההכתבה אינה זמינה במכשיר הזה.",
     "unavailableLanguage": "ההכתבה אינה זמינה בשפה שהוגדרה במכשיר הזה.",
+    "languageNotInstalledTitle": "ההכתבה עבור {{language}} עדיין לא מוכנה",
+    "languageNotInstalledMessage": "קובצי הדיבור הלא מקוונים עבור {{language}} לא מותקנים בטלפון הזה. הורד אותם ואז נסה שוב להשתמש בהכתבה.",
+    "downloadOfflineModel": "הורדה",
+    "offlineModelDownloadScheduled": "קובצי הדיבור הלא מקוונים יורדו ברקע. נסה שוב להשתמש בהכתבה מאוחר יותר.",
     "listeningStopped": "ההאזנה הופסקה."
   },
   "share": {
@@ -2797,7 +2805,6 @@
         "void": "בוטלה",
         "uncollectible": "לא ניתנת לגבייה"
       },
-      "loadMoreFailed": "לא הצלחנו לטעון פריטים נוספים.",
       "truncated": "קיימות חשבוניות ישנות יותר."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "檢視並登出其他裝置",
     "feedback": "意見回饋",
     "privacyChoices": "隱私選項",
-    "signOut": "登出",
     "deleteAccount": "刪除帳戶",
     "confirmationCode": "確認代碼",
     "confirmationCodePlaceholder": "6 位數代碼",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "按換行鍵傳送訊息",
     "returnSendsMessageSubtitle": "關閉後，在智慧代理的訊息輸入框中按換行鍵只會換行。",
     "biometricUnlock": "使用生物辨識解鎖",
-    "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。"
+    "biometricUnlockSubtitle": "啟動應用程式時，以及在背景停留五分鐘後返回時，都需要解鎖。",
+    "featureFlags": "功能旗標",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "即時動態",
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "前往網頁版訂閱",
       "subscriptionPastDueBody": "你最近一次付款出了問題。請透過瀏覽器前往 kilo.ai/claw 更新付款方式。應用程式內無法管理帳單。",
       "subscriptionPastDueTitle": "在網頁上更新付款方式",
-      "trialExpiredBody": "若要繼續使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。"
+      "trialExpiredBody": "若要繼續使用 KiloClaw，請透過瀏覽器前往 kilo.ai/claw。應用程式內無法訂閱。",
+      "quarantinedCta": "寄電子郵件給我們的團隊",
+      "nonCanonicalEarlybirdCta": "前往 kilo.ai 檢視您的方案"
     },
     "controls": {
       "redeploying": "正在重新部署…",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "選取要由資安代理監控的存放庫"
     },
     "settingsSave": {
-      "keepEditing": "繼續編輯",
       "saveChanges": "儲存變更",
       "unsavedMessage": "離開此畫面前，要儲存變更嗎？",
       "unsavedTitle": "未儲存的變更"
@@ -1447,6 +1452,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "無法載入進行中的工作階段。",
+      "couldNotRefresh": "無法重新整理",
       "noSessionsYetDescription": "用手機開始程式開發任務，工作階段就會顯示在這裡。",
       "noMatches": "沒有相符的工作階段",
       "tryDifferentSearch": "請嘗試其他搜尋字詞。",
@@ -1725,7 +1731,6 @@
     "filePart": {
       "loadingImage": "載入圖片中",
       "imageUnavailableRetry": "無法顯示圖片，重新載入",
-      "imageUnavailableWithAlt": "無法顯示圖片：{{alt}}。",
       "imagePreviewUnavailableInSession": "此工作階段中無法預覽圖片。",
       "viewImage": "檢視圖片",
       "viewImageWithAlt": "檢視圖片：{{alt}}",
@@ -1920,7 +1925,6 @@
       "selectModelBeforeSending": "傳送前請先選取模型。",
       "preparingPlaceholder": "設定環境中…",
       "finalizingPlaceholder": "收尾中…",
-      "messagePlaceholder": "訊息",
       "cannotReceiveFiles": "此工作階段無法接收檔案。請移除附件後再傳送訊息。",
       "couldNotAttachFiles": "無法附加檔案。請點一下「傳送」再試一次。",
       "discardAttachmentsMessage": "尚未附加至已傳送訊息的上傳檔案都會刪除。",
@@ -2125,6 +2129,10 @@
     "stopped": "語音輸入已停止。點按麥克風圖示再試一次。",
     "unavailableDevice": "此裝置上無法使用語音輸入。",
     "unavailableLanguage": "語音輸入不支援此裝置目前使用的語言。",
+    "languageNotInstalledTitle": "{{language}} 的語音輸入尚未就緒",
+    "languageNotInstalledMessage": "此手機尚未安裝 {{language}} 的離線語音檔案。請下載這些檔案，然後再試一次語音輸入。",
+    "downloadOfflineModel": "下載",
+    "offlineModelDownloadScheduled": "離線語音檔案將在背景下載。請稍後再試一次語音輸入。",
     "listeningStopped": "已停止聆聽。"
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "已作廢",
         "uncollectible": "無法收款"
       },
-      "loadMoreFailed": "無法載入更多內容。",
       "truncated": "還有更早的發票可供查看。"
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Tarkastele muita laitteita ja kirjaa ne ulos",
     "feedback": "Palaute",
     "privacyChoices": "Tietosuojavalinnat",
-    "signOut": "Kirjaudu ulos",
     "deleteAccount": "Poista tili",
     "confirmationCode": "Vahvistuskoodi",
     "confirmationCodePlaceholder": "6-numeroinen koodi",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Enter-näppäin lähettää viestin",
     "returnSendsMessageSubtitle": "Kun asetus on pois päältä, Enter lisää rivinvaihdon agenttien viestikenttiin.",
     "biometricUnlock": "Avaa lukitus biometrisellä tunnistuksella",
-    "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia."
+    "biometricUnlockSubtitle": "Lukitus on avattava sovelluksen käynnistyessä ja sen oltua taustalla viisi minuuttia.",
+    "featureFlags": "Ominaisuusliput",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Muutospyyntö ei ole käytettävissä",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Ennakkokäyttötilauksesi on tarkistettava manuaalisesti, ennen kuin voit käyttää sitä mobiililaitteella.",
       "iosTitle": "KiloClaw ei ole käytettävissä iOS:ssä",
       "iosBody": "Tämän tilin KiloClaw-käyttöoikeutta hallinnoidaan iOS-sovelluksen ulkopuolella.",
-      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen hi@kilo.ai."
+      "iosContact": "Kysyttävää? Lähetä sähköpostia osoitteeseen hi@kilo.ai.",
+      "quarantinedCta": "Lähetä sähköpostia tiimillemme",
+      "nonCanonicalEarlybirdCta": "Tarkista tilauksesi osoitteessa kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} vaatii huomiota: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHubia ei voitu avata. Yritä uudelleen."
     },
     "settingsSave": {
-      "keepEditing": "Jatka muokkausta",
       "saveChanges": "Tallenna muutokset",
       "unsavedTitle": "Tallentamattomia muutoksia",
       "unsavedMessage": "Tallennetaanko muutokset ennen tältä näytöltä poistumista?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Aktiivisia istuntoja ei voitu ladata.",
+      "couldNotRefresh": "Päivitys epäonnistui",
       "noSessionsYetDescription": "Aloita koodaustehtävä puhelimellasi. Istunnot näkyvät tässä.",
       "noMatches": "Ei hakua vastaavia istuntoja",
       "tryDifferentSearch": "Kokeile toista hakusanaa.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Ladataan kuvaa",
       "imageUnavailableRetry": "Kuva ei ole käytettävissä. Yritä ladata se uudelleen",
-      "imageUnavailableWithAlt": "Kuva ei ole käytettävissä: {{alt}}.",
       "imagePreviewUnavailableInSession": "Kuvan esikatselu ei ole käytettävissä tässä istunnossa.",
       "viewImage": "Näytä kuva",
       "viewImageWithAlt": "Näytä kuva {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Valitse malli ennen lähettämistä.",
       "preparingPlaceholder": "Valmistellaan ympäristöä…",
       "finalizingPlaceholder": "Viimeistellään…",
-      "messagePlaceholder": "Viesti",
       "cannotReceiveFiles": "Tämä istunto ei voi vastaanottaa tiedostoja. Poista liitteet, jotta voit lähettää viestisi.",
       "couldNotAttachFiles": "Tiedostoja ei voitu liittää. Yritä uudelleen napauttamalla lähetyspainiketta.",
       "discardAttachmentsMessage": "Palvelimelle siirretyt tiedostot, joita ei ole liitetty lähetettyihin viesteihin, poistetaan.",
@@ -2556,6 +2560,10 @@
     "stopped": "Puheentunnistus keskeytyi. Yritä uudelleen napauttamalla mikrofonia.",
     "unavailableDevice": "Puheentunnistus ei ole käytettävissä tässä laitteessa.",
     "unavailableLanguage": "Puheentunnistus ei ole käytettävissä laitteen nykyisellä kielellä.",
+    "languageNotInstalledTitle": "Puheentunnistus ei ole vielä valmis kielelle {{language}}",
+    "languageNotInstalledMessage": "Kielen {{language}} offline-puhetiedostoja ei ole asennettu tähän puhelimeen. Lataa ne ja kokeile puheentunnistusta uudelleen.",
+    "downloadOfflineModel": "Lataa",
+    "offlineModelDownloadScheduled": "Offline-puhetiedostot ladataan taustalla. Kokeile puheentunnistusta myöhemmin uudelleen.",
     "listeningStopped": "Kuuntelu lopetettiin."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Mitätöity",
         "uncollectible": "Perimiskelvoton"
       },
-      "loadMoreFailed": "Lisätietojen lataaminen epäonnistui.",
       "truncated": "Vanhempia laskuja on saatavilla."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "மற்ற சாதனங்களைச் சரிபார்த்து அவற்றிலிருந்து வெளியேறவும்",
     "feedback": "கருத்து தெரிவிக்கவும்",
     "privacyChoices": "தனியுரிமைத் தேர்வுகள்",
-    "signOut": "வெளியேறவும்",
     "deleteAccount": "கணக்கை நீக்கவும்",
     "confirmationCode": "உறுதிப்படுத்தல் குறியீடு",
     "confirmationCodePlaceholder": "6 இலக்கக் குறியீடு",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "என்டர் விசை செய்தியை அனுப்பும்",
     "returnSendsMessageSubtitle": "இதை முடக்கினால், ஏஜென்ட்டின் செய்திப் பெட்டியில் என்டர் விசை புதிய வரியைச் செருகும்.",
     "biometricUnlock": "உயிரளவியல் மூலம் பூட்டைத் திறக்கவும்",
-    "biometricUnlockSubtitle": "செயலியைத் தொடங்கும்போதும், பின்னணியில் ஐந்து நிமிடங்கள் இருந்த பிறகும் பூட்டைத் திறக்க வேண்டும்."
+    "biometricUnlockSubtitle": "செயலியைத் தொடங்கும்போதும், பின்னணியில் ஐந்து நிமிடங்கள் இருந்த பிறகும் பூட்டைத் திறக்க வேண்டும்.",
+    "featureFlags": "அம்சக் கொடிகள்",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "இணைப்புக் கோரிக்கை கிடைக்கவில்லை",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "உங்கள் முன்கூட்டிய அணுகல் திட்டத்தை மொபைலில் பயன்படுத்துவதற்கு முன் நேரடி மதிப்பாய்வு தேவை.",
       "iosTitle": "IOS-இல் KiloClaw கிடைக்கவில்லை",
       "iosBody": "இந்தக் கணக்கிற்கான KiloClaw அணுகல் iOS செயலிக்கு வெளியே நிர்வகிக்கப்படுகிறது.",
-      "iosContact": "கேள்விகள் உள்ளனவா? hi@kilo.ai-க்கு மின்னஞ்சல் அனுப்பவும்."
+      "iosContact": "கேள்விகள் உள்ளனவா? hi@kilo.ai-க்கு மின்னஞ்சல் அனுப்பவும்.",
+      "quarantinedCta": "எங்கள் குழுவுக்கு மின்னஞ்சல் அனுப்புங்கள்",
+      "nonCanonicalEarlybirdCta": "உங்கள் திட்டத்தை Kilo.ai-ல் மதிப்பாய்வு செய்யுங்கள்"
     },
     "instanceCard": {
       "needsAttention": "{{name}} — கவனம் தேவை: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub-ஐத் திறக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்."
     },
     "settingsSave": {
-      "keepEditing": "தொடர்ந்து திருத்தவும்",
       "saveChanges": "மாற்றங்களைச் சேமிக்கவும்",
       "unsavedTitle": "சேமிக்கப்படாத மாற்றங்கள்",
       "unsavedMessage": "இந்தத் திரையை விட்டு வெளியேறும் முன் உங்கள் மாற்றங்களைச் சேமிக்கவா?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "செயலில் உள்ள அமர்வுகளை ஏற்ற முடியவில்லை.",
+      "couldNotRefresh": "புதுப்பிக்க முடியவில்லை",
       "noSessionsYetDescription": "உங்கள் மொபைலிலிருந்து ஒரு நிரலாக்கப் பணியைத் தொடங்கவும். உங்கள் அமர்வுகள் இங்கே காட்டப்படும்.",
       "noMatches": "பொருந்தும் அமர்வுகள் இல்லை",
       "tryDifferentSearch": "வேறொரு சொல்லைப் பயன்படுத்தித் தேடவும்.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "படம் ஏற்றப்படுகிறது",
       "imageUnavailableRetry": "படம் கிடைக்கவில்லை. மீண்டும் ஏற்ற முயற்சிக்கவும்",
-      "imageUnavailableWithAlt": "{{alt}} படம் கிடைக்கவில்லை.",
       "imagePreviewUnavailableInSession": "இந்த அமர்வில் பட முன்னோட்டம் கிடைக்கவில்லை.",
       "viewImage": "படத்தைப் பார்க்கவும்",
       "viewImageWithAlt": "{{alt}} படத்தைப் பார்க்கவும்",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "அனுப்பும் முன் ஒரு மாதிரியைத் தேர்ந்தெடுக்கவும்.",
       "preparingPlaceholder": "சூழல் அமைக்கப்படுகிறது...",
       "finalizingPlaceholder": "இறுதிப் பணிகள் நடைபெறுகின்றன...",
-      "messagePlaceholder": "செய்தி",
       "cannotReceiveFiles": "இந்த அமர்வில் கோப்புகளைப் பெற முடியாது. உங்கள் செய்தியை அனுப்ப இணைப்புகளை அகற்றவும்.",
       "couldNotAttachFiles": "கோப்புகளை இணைக்க முடியவில்லை. மீண்டும் முயற்சிக்க அனுப்பும் பொத்தானைத் தட்டவும்.",
       "discardAttachmentsMessage": "அனுப்பிய செய்திகளில் இணைக்கப்படாத பதிவேற்றங்கள் நீக்கப்படும்.",
@@ -2556,6 +2560,10 @@
     "stopped": "குரல் உள்ளீடு நிறுத்தப்பட்டது. மீண்டும் முயற்சிக்க மைக்ரோஃபோனைத் தட்டவும்.",
     "unavailableDevice": "இந்தச் சாதனத்தில் குரல் உள்ளீட்டு வசதி இல்லை.",
     "unavailableLanguage": "இந்தச் சாதனத்தின் மொழிக்குக் குரல் உள்ளீட்டு வசதி இல்லை.",
+    "languageNotInstalledTitle": "{{language}}க்கான குரல் உள்ளீடு இன்னும் தயாராக இல்லை",
+    "languageNotInstalledMessage": "{{language}}க்கான ஆஃப்லைன் பேச்சு கோப்புகள் இந்தத் தொலைபேசியில் நிறுவப்படவில்லை. அவற்றைப் பதிவிறக்கவும், பிறகு குரல் உள்ளீட்டை மீண்டும் முயற்சிக்கவும்.",
+    "downloadOfflineModel": "பதிவிறக்கு",
+    "offlineModelDownloadScheduled": "ஆஃப்லைன் பேச்சு கோப்புகள் பின்னணியில் பதிவிறக்கம் செய்யப்படும். பிறகு குரல் உள்ளீட்டை மீண்டும் முயற்சிக்கவும்.",
     "listeningStopped": "கேட்பது நிறுத்தப்பட்டது."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "ரத்தானது",
         "uncollectible": "வசூலிக்க முடியாதது"
       },
-      "loadMoreFailed": "மேலும் ஏற்ற முடியவில்லை.",
       "truncated": "பழைய விலைப்பட்டியல்கள் கிடைக்கின்றன."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Zkontrolovat a odhlásit ostatní zařízení",
     "feedback": "Zpětná vazba",
     "privacyChoices": "Nastavení soukromí",
-    "signOut": "Odhlásit se",
     "deleteAccount": "Smazat účet",
     "confirmationCode": "Potvrzovací kód",
     "confirmationCodePlaceholder": "6místný kód",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Klávesa Enter odesílá zprávu",
     "returnSendsMessageSubtitle": "Při vypnutí této volby klávesa Enter vloží nový řádek do pole pro zprávu agentovi.",
     "biometricUnlock": "Biometrické odemykání",
-    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí."
+    "biometricUnlockSubtitle": "Vyžaduje odemknutí při spuštění aplikace a po pěti minutách na pozadí.",
+    "featureFlags": "Příznaky funkcí",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "PR není dostupný",
@@ -1189,7 +1193,9 @@
       "nonCanonicalEarlybirdBody": "Než budeš moci svůj tarif s předběžným přístupem používat na mobilu, musí ho náš tým ručně zkontrolovat.",
       "iosTitle": "KiloClaw není v iOS dostupný",
       "iosBody": "Přístup ke KiloClaw se u tohoto účtu spravuje mimo aplikaci pro iOS.",
-      "iosContact": "Máš otázky? Napiš na hi@kilo.ai."
+      "iosContact": "Máš otázky? Napiš na hi@kilo.ai.",
+      "quarantinedCta": "Napsat našemu týmu",
+      "nonCanonicalEarlybirdCta": "Zkontrolovat svůj tarif na kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} vyžaduje pozornost: {{label}}",
@@ -1723,7 +1729,6 @@
       "couldNotOpenGithub": "GitHub se nepodařilo otevřít. Zkuste to znovu."
     },
     "settingsSave": {
-      "keepEditing": "Pokračovat v úpravách",
       "saveChanges": "Uložit změny",
       "unsavedTitle": "Neuložené změny",
       "unsavedMessage": "Uložit změny před opuštěním této obrazovky?"
@@ -1904,6 +1909,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Aktivní relace se nepodařilo načíst.",
+      "couldNotRefresh": "Obnovení se nezdařilo",
       "noSessionsYetDescription": "Zadej programovací úkol z telefonu. Tady se zobrazí tvé relace.",
       "noMatches": "Žádné odpovídající relace",
       "tryDifferentSearch": "Zkus jiný hledaný výraz.",
@@ -2190,7 +2196,6 @@
     "filePart": {
       "loadingImage": "Načítání obrázku",
       "imageUnavailableRetry": "Obrázek není k dispozici, znovu načíst",
-      "imageUnavailableWithAlt": "Obrázek {{alt}} není k dispozici.",
       "imagePreviewUnavailableInSession": "Náhled obrázku není v této relaci k dispozici.",
       "viewImage": "Zobrazit obrázek",
       "viewImageWithAlt": "Zobrazit obrázek {{alt}}",
@@ -2391,7 +2396,6 @@
       "selectModelBeforeSending": "Před odesláním vyberte model.",
       "preparingPlaceholder": "Příprava prostředí…",
       "finalizingPlaceholder": "Dokončování…",
-      "messagePlaceholder": "Zpráva",
       "cannotReceiveFiles": "Tato relace nemůže přijímat soubory. Odeberte přílohy, abyste mohli odeslat zprávu.",
       "couldNotAttachFiles": "Soubory se nepodařilo připojit. Klepnutím na tlačítko pro odeslání to zkuste znovu.",
       "discardAttachmentsMessage": "Nahrané soubory nepřipojené k odeslaným zprávám budou smazány.",
@@ -2598,6 +2602,10 @@
     "stopped": "Diktování se zastavilo. Klepněte na mikrofon a zkuste to znovu.",
     "unavailableDevice": "Diktování není na tomto zařízení k dispozici.",
     "unavailableLanguage": "Diktování není pro aktuální jazyk zařízení k dispozici.",
+    "languageNotInstalledTitle": "Diktování pro jazyk {{language}} zatím není připraveno",
+    "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou v tomto telefonu nainstalovány. Stáhněte je a poté zkuste diktování znovu.",
+    "downloadOfflineModel": "Stáhnout",
+    "offlineModelDownloadScheduled": "Offline soubory řeči se stáhnou na pozadí. Zkuste diktování znovu později.",
     "listeningStopped": "Poslech zastaven."
   },
   "share": {
@@ -2819,7 +2827,6 @@
         "void": "Stornováno",
         "uncollectible": "Nedobytné"
       },
-      "loadMoreFailed": "Další položky se nepodařilo načíst.",
       "truncated": "Starší faktury jsou k dispozici."
     },
     "lowBalanceAlert": {

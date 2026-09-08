@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ਹੋਰ ਡਿਵਾਈਸਾਂ ਦੀ ਜਾਂਚ ਕਰੋ ਅਤੇ ਉਨ੍ਹਾਂ ਤੋਂ ਸਾਈਨ ਆਉਟ ਕਰੋ",
     "feedback": "ਫੀਡਬੈਕ ਦਿਓ",
     "privacyChoices": "ਗੋਪਨੀਯਤਾ ਦੀਆਂ ਚੋਣਾਂ",
-    "signOut": "ਸਾਈਨ ਆਊਟ ਕਰੋ",
     "deleteAccount": "ਖਾਤਾ ਮਿਟਾਓ",
     "confirmationCode": "ਪੁਸ਼ਟੀਕਰਨ ਕੋਡ",
     "confirmationCodePlaceholder": "6 ਅੰਕਾਂ ਵਾਲਾ ਕੋਡ",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "ਰਿਟਰਨ ਕੁੰਜੀ ਸੁਨੇਹਾ ਭੇਜਦੀ ਹੈ",
     "returnSendsMessageSubtitle": "ਇਹ ਸੈਟਿੰਗ ਬੰਦ ਹੋਣ 'ਤੇ, ਰਿਟਰਨ ਕੁੰਜੀ ਏਜੰਟ ਨੂੰ ਸੁਨੇਹਾ ਲਿਖਣ ਵਾਲੇ ਖਾਨੇ ਵਿੱਚ ਨਵੀਂ ਲਾਈਨ ਪਾਉਂਦੀ ਹੈ।",
     "biometricUnlock": "ਬਾਇਓਮੈਟ੍ਰਿਕਸ ਨਾਲ ਅਨਲੌਕ ਕਰੋ",
-    "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ।"
+    "biometricUnlockSubtitle": "ਐਪ ਚਾਲੂ ਕਰਨ ਵੇਲੇ ਅਤੇ ਪਿਛੋਕੜ ਵਿੱਚ ਪੰਜ ਮਿੰਟ ਰਹਿਣ ਤੋਂ ਬਾਅਦ ਅਨਲੌਕ ਕਰੋ।",
+    "featureFlags": "ਫ਼ੀਚਰ ਫ਼ਲੈਗ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "ਪੁੱਲ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "ਮੋਬਾਈਲ 'ਤੇ ਵਰਤਣ ਤੋਂ ਪਹਿਲਾਂ ਤੁਹਾਡੀ ਅਗਾਊਂ ਪਹੁੰਚ ਵਾਲੀ ਯੋਜਨਾ ਦੀ ਟੀਮ ਵੱਲੋਂ ਸਮੀਖਿਆ ਲਾਜ਼ਮੀ ਹੈ।",
       "iosTitle": "IOS ਵਿੱਚ KiloClaw ਉਪਲਬਧ ਨਹੀਂ",
       "iosBody": "ਇਸ ਖਾਤੇ ਦੀ KiloClaw ਤੱਕ ਪਹੁੰਚ ਦਾ ਪ੍ਰਬੰਧ iOS ਐਪ ਤੋਂ ਬਾਹਰ ਹੁੰਦਾ ਹੈ।",
-      "iosContact": "ਕੋਈ ਸਵਾਲ ਹੈ? hi@kilo.ai 'ਤੇ ਸੰਪਰਕ ਕਰੋ।"
+      "iosContact": "ਕੋਈ ਸਵਾਲ ਹੈ? hi@kilo.ai 'ਤੇ ਸੰਪਰਕ ਕਰੋ।",
+      "quarantinedCta": "ਸਾਡੀ ਟੀਮ ਨੂੰ ਈਮੇਲ ਕਰੋ",
+      "nonCanonicalEarlybirdCta": "ਆਪਣੀ ਯੋਜਨਾ Kilo.ai ਉੱਤੇ ਸਮੀਖਿਆ ਕਰੋ"
     },
     "instanceCard": {
       "needsAttention": "{{name}} ਵੱਲ ਧਿਆਨ ਦੇਣ ਦੀ ਲੋੜ ਹੈ: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub ਖੋਲ੍ਹਿਆ ਨਹੀਂ ਜਾ ਸਕਿਆ। ਕਿਰਪਾ ਕਰਕੇ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
     },
     "settingsSave": {
-      "keepEditing": "ਸੋਧਣਾ ਜਾਰੀ ਰੱਖੋ",
       "saveChanges": "ਤਬਦੀਲੀਆਂ ਸੇਵ ਕਰੋ",
       "unsavedTitle": "ਸੇਵ ਨਾ ਕੀਤੀਆਂ ਤਬਦੀਲੀਆਂ",
       "unsavedMessage": "ਇਸ ਸਕ੍ਰੀਨ ਤੋਂ ਜਾਣ ਤੋਂ ਪਹਿਲਾਂ ਤਬਦੀਲੀਆਂ ਸੇਵ ਕਰਨੀਆਂ ਹਨ?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "ਸਰਗਰਮ ਸੈਸ਼ਨ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕੇ।",
+      "couldNotRefresh": "ਰੀਫ੍ਰੈਸ਼ ਨਹੀਂ ਹੋ ਸਕਿਆ",
       "noSessionsYetDescription": "ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਕੋਡਿੰਗ ਦਾ ਕੰਮ ਸ਼ੁਰੂ ਕਰੋ। ਤੁਹਾਡੇ ਸੈਸ਼ਨ ਇੱਥੇ ਦਿਖਾਈ ਦੇਣਗੇ।",
       "noMatches": "ਕੋਈ ਸੈਸ਼ਨ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ",
       "tryDifferentSearch": "ਕਿਸੇ ਹੋਰ ਸ਼ਬਦ ਨਾਲ ਖੋਜੋ।",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "ਚਿੱਤਰ ਲੋਡ ਹੋ ਰਿਹਾ ਹੈ",
       "imageUnavailableRetry": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ, ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
-      "imageUnavailableWithAlt": "ਚਿੱਤਰ ਉਪਲਬਧ ਨਹੀਂ ਹੈ: {{alt}}।",
       "imagePreviewUnavailableInSession": "ਇਸ ਸੈਸ਼ਨ ਵਿੱਚ ਚਿੱਤਰ ਦੀ ਝਲਕ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
       "viewImage": "ਚਿੱਤਰ ਵੇਖੋ",
       "viewImageWithAlt": "{{alt}} ਚਿੱਤਰ ਵੇਖੋ",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "ਭੇਜਣ ਤੋਂ ਪਹਿਲਾਂ ਇੱਕ ਮਾਡਲ ਚੁਣੋ।",
       "preparingPlaceholder": "ਵਾਤਾਵਰਣ ਤਿਆਰ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
       "finalizingPlaceholder": "ਮੁਕੰਮਲ ਕੀਤਾ ਜਾ ਰਿਹਾ ਹੈ...",
-      "messagePlaceholder": "ਸੁਨੇਹਾ",
       "cannotReceiveFiles": "ਇਹ ਸੈਸ਼ਨ ਫਾਈਲਾਂ ਪ੍ਰਾਪਤ ਨਹੀਂ ਕਰ ਸਕਦਾ। ਆਪਣਾ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ ਅਟੈਚਮੈਂਟਾਂ ਹਟਾਓ।",
       "couldNotAttachFiles": "ਫਾਈਲਾਂ ਅਟੈਚ ਨਹੀਂ ਹੋ ਸਕੀਆਂ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ‘ਭੇਜੋ’ 'ਤੇ ਟੈਪ ਕਰੋ।",
       "discardAttachmentsMessage": "ਅੱਪਲੋਡ ਕੀਤੀਆਂ ਉਹ ਫਾਈਲਾਂ ਮਿਟਾ ਦਿੱਤੀਆਂ ਜਾਣਗੀਆਂ ਜੋ ਕਿਸੇ ਭੇਜੇ ਗਏ ਸੁਨੇਹੇ ਨਾਲ ਅਟੈਚ ਨਹੀਂ ਹਨ।",
@@ -2556,6 +2560,10 @@
     "stopped": "ਵੌਇਸ ਇਨਪੁਟ ਰੁਕ ਗਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਮਾਈਕ੍ਰੋਫ਼ੋਨ 'ਤੇ ਟੈਪ ਕਰੋ।",
     "unavailableDevice": "ਇਸ ਡਿਵਾਈਸ 'ਤੇ ਵੌਇਸ ਇਨਪੁਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
     "unavailableLanguage": "ਇਸ ਡਿਵਾਈਸ ਦੀ ਭਾਸ਼ਾ ਲਈ ਵੌਇਸ ਇਨਪੁਟ ਉਪਲਬਧ ਨਹੀਂ ਹੈ।",
+    "languageNotInstalledTitle": "{{language}} ਲਈ ਵੌਇਸ ਇਨਪੁਟ ਹਾਲੇ ਤਿਆਰ ਨਹੀਂ ਹੈ",
+    "languageNotInstalledMessage": "{{language}} ਦੀਆਂ ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਇਸ ਫ਼ੋਨ 'ਤੇ ਇੰਸਟਾਲ ਨਹੀਂ ਹਨ। ਉਨ੍ਹਾਂ ਨੂੰ ਡਾਊਨਲੋਡ ਕਰੋ, ਫਿਰ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
+    "downloadOfflineModel": "ਡਾਊਨਲੋਡ",
+    "offlineModelDownloadScheduled": "ਆਫ਼ਲਾਈਨ ਸਪੀਚ ਫ਼ਾਈਲਾਂ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਊਨਲੋਡ ਹੋਣਗੀਆਂ। ਬਾਅਦ ਵਿੱਚ ਵੌਇਸ ਇਨਪੁਟ ਦੁਬਾਰਾ ਵਰਤੋ।",
     "listeningStopped": "ਸੁਣਨਾ ਰੁਕ ਗਿਆ।"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "ਰੱਦ",
         "uncollectible": "ਵਸੂਲੀ ਅਸੰਭਵ"
       },
-      "loadMoreFailed": "ਹੋਰ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ।",
       "truncated": "ਪੁਰਾਣੇ ਇਨਵੌਇਸ ਉਪਲਬਧ ਹਨ।"
     },
     "lowBalanceAlert": {

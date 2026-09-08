@@ -20,8 +20,9 @@ import {
   type AccessRequiredSubcase,
 } from '@/lib/analytics/onboarding-events';
 import { trackEvent } from '@/lib/appsflyer';
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
+import { accessIssueTargetLabel, resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
 import { cn } from '@/lib/utils';
 
 export type { AccessRequiredSubcase };
@@ -64,7 +65,7 @@ const SUBCASE_CONTENT = {
   },
   quarantined: {
     bodyKey: 'kiloclaw.accessRequired.quarantinedBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.quarantinedCta',
     ctaVariant: 'outline',
     icon: ShieldAlert,
     titleKey: 'kiloclaw.accessRequired.quarantinedTitle',
@@ -80,7 +81,7 @@ const SUBCASE_CONTENT = {
   },
   non_canonical_earlybird: {
     bodyKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdCta',
     ctaVariant: 'outline',
     icon: LifeBuoy,
     titleKey: 'kiloclaw.accessRequired.nonCanonicalEarlybirdTitle',
@@ -112,7 +113,14 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
   }, [subcase]);
 
   const onOpen = () => {
-    void Linking.openURL(resolveAccessIssueUrl(subcase));
+    const url = resolveAccessIssueUrl(subcase);
+    if (url.startsWith('mailto:')) {
+      // Mail clients are optional on both platforms; the failure toast names
+      // the address so the user can still reach the team.
+      void openExternalUrl(url, { label: accessIssueTargetLabel(url) });
+      return;
+    }
+    void Linking.openURL(url);
   };
 
   if (Platform.OS === 'ios') {

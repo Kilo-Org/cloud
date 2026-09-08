@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+import { glanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
@@ -130,10 +132,14 @@ export function RemoteSessionRow({
         });
   const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
 
+  // Tray rows are always live: the eyebrow draws the status glyph from the
+  // shared derivation, so the platform glyph has no slot beside it (and the
+  // spoken label withholds the platform with the icon).
   const { iconKind: platformIconKind, spokenPlatform } = selectRowPlatformPresentation({
     platform: session.createdOnPlatform,
     variant,
     needsInput,
+    statusGlyph: true,
     gitUrl: session.gitUrl,
   });
   const platformIcon =
@@ -216,6 +222,10 @@ export function RemoteSessionRow({
         accessibilityLabel={sessionRowAccessibilityLabel({
           title,
           needsInput,
+          // Tray rows are always live: the glyph below draws the shared
+          // derivation's kind, and the spoken label names the same state.
+          live: true,
+          statusKind: glanceableStatusKind(session.status),
           badge: agentLabel,
           meta: spokenMeta,
           subtitle: session.gitBranch ?? null,
@@ -233,6 +243,7 @@ export function RemoteSessionRow({
             remoteMeta(session)
           )}
           live
+          statusKind={glanceableStatusKind(session.status)}
           needsInput={needsInput}
           metaWhileLive
           platformIcon={platformIcon}

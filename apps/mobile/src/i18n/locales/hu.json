@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Más eszközök áttekintése és kijelentkeztetése",
     "feedback": "Visszajelzés",
     "privacyChoices": "Adatvédelmi beállítások",
-    "signOut": "Kijelentkezés",
     "deleteAccount": "Fiók törlése",
     "confirmationCode": "Megerősítő kód",
     "confirmationCodePlaceholder": "6 jegyű kód",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Az Enter billentyű elküldi az üzenetet",
     "returnSendsMessageSubtitle": "Kikapcsolva az Enter új sort szúr be az ügynökök üzenetbeviteli mezőibe.",
     "biometricUnlock": "Feloldás biometrikus azonosítással",
-    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges."
+    "biometricUnlockSubtitle": "Az alkalmazás indításakor és öt perc háttérben töltött idő után feloldás szükséges.",
+    "featureFlags": "Funkciójelzők",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "A módosítási kérelem nem érhető el",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "A korai hozzáférést biztosító csomagodat előbb kézzel felül kell vizsgálnunk, hogy mobilon is használhasd.",
       "iosTitle": "A KiloClaw nem érhető el iOS-en",
       "iosBody": "Ennél a fióknál a KiloClaw-hozzáférést az iOS-alkalmazáson kívül lehet kezelni.",
-      "iosContact": "Kérdésed van? Írj a hi@kilo.ai címre."
+      "iosContact": "Kérdésed van? Írj a hi@kilo.ai címre.",
+      "quarantinedCta": "E-mail küldése a csapatunknak",
+      "nonCanonicalEarlybirdCta": "Csomag áttekintése a kilo.ai oldalon"
     },
     "instanceCard": {
       "needsAttention": "{{name}} beavatkozást igényel: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Nem sikerült megnyitni a GitHubot. Próbáld újra."
     },
     "settingsSave": {
-      "keepEditing": "Szerkesztés folytatása",
       "saveChanges": "Változtatások mentése",
       "unsavedTitle": "El nem mentett változtatások",
       "unsavedMessage": "Mented a változtatásokat, mielőtt elhagyod ezt a képernyőt?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nem sikerült betölteni az aktív munkameneteket.",
+      "couldNotRefresh": "Nem sikerült frissíteni",
       "noSessionsYetDescription": "Indíts egy programozási feladatot a telefonodról. A munkameneteid itt jelennek meg.",
       "noMatches": "Nincs egyező munkamenet",
       "tryDifferentSearch": "Próbálj másik keresőszót.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Kép betöltése",
       "imageUnavailableRetry": "A kép nem érhető el, a betöltés újrapróbálása",
-      "imageUnavailableWithAlt": "A kép nem érhető el: {{alt}}.",
       "imagePreviewUnavailableInSession": "A kép előnézete nem érhető el ebben a munkamenetben.",
       "viewImage": "Kép megtekintése",
       "viewImageWithAlt": "Kép megtekintése: {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Küldés előtt válassz modellt.",
       "preparingPlaceholder": "Környezet előkészítése…",
       "finalizingPlaceholder": "Befejezés…",
-      "messagePlaceholder": "Üzenet",
       "cannotReceiveFiles": "Ez a munkamenet nem fogadhat fájlokat. Az üzenet elküldéséhez távolítsd el a csatolmányokat.",
       "couldNotAttachFiles": "Nem sikerült csatolni a fájlokat. Az újrapróbáláshoz koppints a küldés gombjára.",
       "discardAttachmentsMessage": "Az elküldött üzenetekhez nem csatolt feltöltések törlődnek.",
@@ -2556,6 +2560,10 @@
     "stopped": "A hangbevitel leállt. Az újrapróbálkozáshoz koppints a mikrofonra.",
     "unavailableDevice": "A hangbevitel nem érhető el ezen az eszközön.",
     "unavailableLanguage": "A hangbevitel nem érhető el az eszközön beállított nyelven.",
+    "languageNotInstalledTitle": "A hangbevitel {{language}} nyelven még nem áll készen",
+    "languageNotInstalledMessage": "A(z) {{language}} nyelv offline beszédfájljai nincsenek telepítve ezen a telefonon. Töltsd le őket, majd próbáld újra a hangbevitelt.",
+    "downloadOfflineModel": "Letöltés",
+    "offlineModelDownloadScheduled": "Az offline beszédfájlok a háttérben töltődnek le. Próbáld újra a hangbevitelt később.",
     "listeningStopped": "A beszéd figyelése leállt."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Érvénytelen",
         "uncollectible": "Behajthatatlan"
       },
-      "loadMoreFailed": "Nem sikerült betölteni a további elemeket.",
       "truncated": "Korábbi számlák érhetők el."
     },
     "lowBalanceAlert": {

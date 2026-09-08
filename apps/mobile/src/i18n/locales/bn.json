@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "অন্য ডিভাইসগুলো দেখুন ও সেগুলো থেকে সাইন আউট করুন",
     "feedback": "মতামত দিন",
     "privacyChoices": "গোপনীয়তার পছন্দসমূহ",
-    "signOut": "সাইন আউট করুন",
     "deleteAccount": "অ্যাকাউন্ট মুছুন",
     "confirmationCode": "নিশ্চিতকরণ কোড",
     "confirmationCodePlaceholder": "৬ অঙ্কের কোড",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "রিটার্ন কী বার্তা পাঠায়",
     "returnSendsMessageSubtitle": "বন্ধ থাকলে, রিটার্ন কী এজেন্টের বার্তা লেখার ঘরে নতুন লাইন যোগ করে।",
     "biometricUnlock": "বায়োমেট্রিক আনলক",
-    "biometricUnlockSubtitle": "অ্যাপ চালু করার সময় এবং ব্যাকগ্রাউন্ডে পাঁচ মিনিট থাকার পর আনলক করতে হবে।"
+    "biometricUnlockSubtitle": "অ্যাপ চালু করার সময় এবং ব্যাকগ্রাউন্ডে পাঁচ মিনিট থাকার পর আনলক করতে হবে।",
+    "featureFlags": "ফিচার ফ্ল্যাগ",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "পুল রিকোয়েস্ট পাওয়া যাচ্ছে না",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "মোবাইলে ব্যবহারের আগে আপনার আগাম ব্যবহারের প্ল্যানটি সরাসরি যাচাই করা প্রয়োজন।",
       "iosTitle": "IOS-এ KiloClaw ব্যবহার করা যাচ্ছে না",
       "iosBody": "এই অ্যাকাউন্টের জন্য KiloClaw অ্যাক্সেস iOS অ্যাপের বাইরে পরিচালিত হয়।",
-      "iosContact": "প্রশ্ন আছে? hi@kilo.ai-এ যোগাযোগ করুন।"
+      "iosContact": "প্রশ্ন আছে? hi@kilo.ai-এ যোগাযোগ করুন।",
+      "quarantinedCta": "আমাদের দলকে ইমেইল করুন",
+      "nonCanonicalEarlybirdCta": "আপনার প্ল্যানটি Kilo.ai-তে পর্যালোচনা করুন"
     },
     "instanceCard": {
       "needsAttention": "{{name}}-এর দিকে নজর দেওয়া প্রয়োজন: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub খোলা যায়নি। আবার চেষ্টা করুন।"
     },
     "settingsSave": {
-      "keepEditing": "সম্পাদনা চালিয়ে যান",
       "saveChanges": "পরিবর্তন সংরক্ষণ করুন",
       "unsavedTitle": "অসংরক্ষিত পরিবর্তন",
       "unsavedMessage": "এই স্ক্রিন ছাড়ার আগে পরিবর্তনগুলো সংরক্ষণ করবেন?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "সক্রিয় সেশন লোড করা যায়নি।",
+      "couldNotRefresh": "রিফ্রেশ করা যায়নি",
       "noSessionsYetDescription": "আপনার ফোন থেকে কোড লেখার একটি কাজ শুরু করুন। আপনার সেশনগুলো এখানে দেখা যাবে।",
       "noMatches": "মিলে যায় এমন কোনো সেশন নেই",
       "tryDifferentSearch": "অন্য শব্দ দিয়ে খুঁজে দেখুন।",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "ছবি লোড হচ্ছে",
       "imageUnavailableRetry": "ছবি পাওয়া যাচ্ছে না, লোড করার জন্য আবার চেষ্টা করুন",
-      "imageUnavailableWithAlt": "ছবিটি পাওয়া যাচ্ছে না: {{alt}}।",
       "imagePreviewUnavailableInSession": "এই সেশনে ছবির প্রিভিউ দেখা যায় না।",
       "viewImage": "ছবি দেখুন",
       "viewImageWithAlt": "{{alt}} ছবিটি দেখুন",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "পাঠানোর আগে একটি মডেল নির্বাচন করুন।",
       "preparingPlaceholder": "পরিবেশ প্রস্তুত হচ্ছে...",
       "finalizingPlaceholder": "কাজ শেষ করা হচ্ছে...",
-      "messagePlaceholder": "বার্তা",
       "cannotReceiveFiles": "এই সেশনটি ফাইল গ্রহণ করতে পারে না। আপনার বার্তা পাঠাতে সংযুক্তিগুলি সরান।",
       "couldNotAttachFiles": "ফাইল সংযুক্ত করা যায়নি। আবার চেষ্টা করতে ‘পাঠান’ বোতামে ট্যাপ করুন।",
       "discardAttachmentsMessage": "আপলোড করা কিন্তু কোনো বার্তায় ব্যবহার না করা ফাইলগুলো মুছে ফেলা হবে।",
@@ -2556,6 +2560,10 @@
     "stopped": "ভয়েস ইনপুট বন্ধ হয়েছে। আবার চেষ্টা করতে মাইক্রোফোনে ট্যাপ করুন।",
     "unavailableDevice": "এই ডিভাইসে ভয়েস ইনপুট ব্যবহার করা যায় না।",
     "unavailableLanguage": "এই ডিভাইসে নির্বাচিত ভাষায় ভয়েস ইনপুট ব্যবহার করা যায় না।",
+    "languageNotInstalledTitle": "{{language}}-এর জন্য ভয়েস ইনপুট এখনও প্রস্তুত নয়",
+    "languageNotInstalledMessage": "{{language}}-এর অফলাইন স্পিচ ফাইলগুলি এই ফোনে ইনস্টল করা নেই। সেগুলি ডাউনলোড করুন, তারপর আবার ভয়েস ইনপুট ব্যবহার করুন।",
+    "downloadOfflineModel": "ডাউনলোড",
+    "offlineModelDownloadScheduled": "অফলাইন স্পিচ ফাইলগুলি ব্যাকগ্রাউন্ডে ডাউনলোড হবে। পরে আবার ভয়েস ইনপুট চেষ্টা করুন।",
     "listeningStopped": "শোনা বন্ধ হয়েছে।"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "বাতিল",
         "uncollectible": "আদায়যোগ্য নয়"
       },
-      "loadMoreFailed": "আরও লোড করা যায়নি।",
       "truncated": "আরও পুরোনো ইনভয়েস দেখা যাবে।"
     },
     "lowBalanceAlert": {

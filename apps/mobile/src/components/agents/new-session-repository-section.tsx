@@ -1,5 +1,6 @@
 import { Fragment, type ReactElement } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, RefreshCw } from '@/components/ui/icons';
 

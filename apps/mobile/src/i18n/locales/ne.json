@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "अन्य यन्त्रहरू जाँचेर तिनबाट साइन आउट गर्नुहोस्",
     "feedback": "प्रतिक्रिया",
     "privacyChoices": "गोपनीयता विकल्पहरू",
-    "signOut": "साइन आउट गर्नुहोस्",
     "deleteAccount": "खाता मेट्नुहोस्",
     "confirmationCode": "पुष्टिकरण कोड",
     "confirmationCodePlaceholder": "६ अङ्कको कोड",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "रिटर्न कुञ्जीले सन्देश पठाउँछ",
     "returnSendsMessageSubtitle": "यो विकल्प बन्द हुँदा रिटर्न कुञ्जीले एजेन्टको सन्देश लेख्ने ठाउँमा नयाँ पङ्क्ति थप्छ।",
     "biometricUnlock": "बायोमेट्रिक अनलक",
-    "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।"
+    "biometricUnlockSubtitle": "एप सुरु गर्दा र पृष्ठभूमिमा पाँच मिनेट रहेपछि अनलक गर्नुपर्छ।",
+    "featureFlags": "विशेषता झन्डा",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट उपलब्ध छैन",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "तपाईंको प्रारम्भिक पहुँचको योजना मोबाइलमा प्रयोग गर्नुअघि टोलीले समीक्षा गर्नुपर्छ।",
       "iosTitle": "KiloClaw iOS मा उपलब्ध छैन",
       "iosBody": "यो खाताको KiloClaw पहुँच iOS एपबाहिर व्यवस्थापन गरिन्छ।",
-      "iosContact": "कुनै प्रश्न छ? hi@kilo.ai मा सम्पर्क गर्नुहोस्।"
+      "iosContact": "कुनै प्रश्न छ? hi@kilo.ai मा सम्पर्क गर्नुहोस्।",
+      "quarantinedCta": "हाम्रो टोलीलाई इमेल गर्नुहोस्",
+      "nonCanonicalEarlybirdCta": "तपाईंको योजना Kilo.ai मा समीक्षा गर्नुहोस्"
     },
     "instanceCard": {
       "needsAttention": "{{name}} मा ध्यान दिनुपर्छ: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub खोल्न सकिएन। फेरि प्रयास गर्नुहोस्।"
     },
     "settingsSave": {
-      "keepEditing": "सम्पादन जारी राख्नुहोस्",
       "saveChanges": "परिवर्तनहरू सेभ गर्नुहोस्",
       "unsavedTitle": "सेभ नगरिएका परिवर्तनहरू",
       "unsavedMessage": "यो स्क्रिन छोड्नुअघि परिवर्तनहरू सेभ गर्ने?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "सक्रिय सत्रहरू लोड गर्न सकिएन।",
+      "couldNotRefresh": "रिफ्रेस गर्न सकिएन",
       "noSessionsYetDescription": "आफ्नो फोनबाट कोडिङको काम सुरु गर्नुहोस्। तपाईंका सत्रहरू यहाँ देखिनेछन्।",
       "noMatches": "मिल्ने कुनै सत्र छैन",
       "tryDifferentSearch": "अर्को शब्द राखेर खोज्नुहोस्।",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "तस्बिर लोड गर्दै",
       "imageUnavailableRetry": "तस्बिर उपलब्ध छैन, लोड गर्न पुनः प्रयास गर्नुहोस्",
-      "imageUnavailableWithAlt": "{{alt}} तस्बिर उपलब्ध छैन।",
       "imagePreviewUnavailableInSession": "यो सत्रमा तस्बिरको पूर्वावलोकन उपलब्ध छैन।",
       "viewImage": "तस्बिर हेर्नुहोस्",
       "viewImageWithAlt": "{{alt}} तस्बिर हेर्नुहोस्",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "पठाउनुअघि एउटा मोडेल चयन गर्नुहोस्।",
       "preparingPlaceholder": "वातावरण तयार गर्दै...",
       "finalizingPlaceholder": "समाप्त गर्दै...",
-      "messagePlaceholder": "सन्देश",
       "cannotReceiveFiles": "यो सत्रले फाइलहरू लिन सक्दैन। आफ्नो सन्देश पठाउन संलग्न फाइलहरू हटाउनुहोस्।",
       "couldNotAttachFiles": "फाइलहरू संलग्न गर्न सकिएन। फेरि प्रयास गर्न ‘पठाउनुहोस्’ मा ट्याप गर्नुहोस्।",
       "discardAttachmentsMessage": "कुनै सन्देशमा संलग्न नभएका अपलोड गरिएका फाइलहरू मेटिनेछन्।",
@@ -2556,6 +2560,10 @@
     "stopped": "भ्वाइस इनपुट रोकियो। फेरि प्रयास गर्न माइक्रोफोनमा ट्याप गर्नुहोस्।",
     "unavailableDevice": "यो यन्त्रमा भ्वाइस इनपुट उपलब्ध छैन।",
     "unavailableLanguage": "यो यन्त्रको भाषाका लागि भ्वाइस इनपुट उपलब्ध छैन।",
+    "languageNotInstalledTitle": "{{language}} का लागि भ्वाइस इनपुट अझै तयार छैन",
+    "languageNotInstalledMessage": "{{language}} का अफलाइन स्पिच फाइलहरू यो फोनमा इन्स्टल छैनन्। तिनीहरूलाई डाउनलोड गर्नुहोस्, अनि भ्वाइस इनपुट फेरि प्रयास गर्नुहोस्।",
+    "downloadOfflineModel": "डाउनलोड",
+    "offlineModelDownloadScheduled": "अफलाइन स्पिच फाइलहरू पृष्ठभूमिमा डाउनलोड हुनेछन्। पछि भ्वाइस इनपुट फेरि प्रयास गर्नुहोस्।",
     "listeningStopped": "सुन्ने प्रक्रिया रोकियो।"
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "रद्द",
         "uncollectible": "असुली नहुने"
       },
-      "loadMoreFailed": "थप लोड गर्न सकिएन।",
       "truncated": "पुराना बिलहरू उपलब्ध छन्।"
     },
     "lowBalanceAlert": {

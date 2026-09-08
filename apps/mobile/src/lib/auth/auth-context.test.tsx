@@ -77,6 +77,14 @@ const hoisted = vi.hoisted(() => {
     setCurrentDeepLinkUserId: vi.fn(),
   };
 
+  // The legacy-exchange branch of the bootstrap load. Resolves null (a failed
+  // or already-done exchange: the load falls through to the main restore)
+  // unless a test overrides it, so tests that never take the legacy branch
+  // keep today's behavior.
+  const exchange = {
+    exchangeLegacyToken: vi.fn().mockResolvedValue(null),
+  };
+
   return {
     callOrder,
     secureStore,
@@ -87,6 +95,7 @@ const hoisted = vi.hoisted(() => {
     sentry,
     appState,
     deepLinkLaunch,
+    exchange,
   };
 });
 
@@ -173,6 +182,10 @@ vi.mock('@/lib/appsflyer', () => ({
 vi.mock('@/lib/deep-link-launch', () => ({
   clearAccountBoundPendingDeepLink: hoisted.deepLinkLaunch.clearAccountBoundPendingDeepLink,
   setCurrentDeepLinkUserId: hoisted.deepLinkLaunch.setCurrentDeepLinkUserId,
+}));
+
+vi.mock('@/lib/auth/exchange-legacy-token', () => ({
+  exchangeLegacyToken: hoisted.exchange.exchangeLegacyToken,
 }));
 
 vi.mock('@/lib/telemetry/controller', () => ({
@@ -287,6 +300,9 @@ vi.mock('@/lib/storage-keys', () => ({
 vi.mock('@/lib/config', () => ({
   API_BASE_URL: 'https://api.example.com',
   SESSION_INGEST_WS_URL: 'wss://ingest.example.com',
+  // The E2E fault hook stays closed: these cases drive the failure through
+  // the SecureStore mock instead.
+  E2E_SECURE_STORE_FAULT_MS: 0,
 }));
 
 vi.mock('react-native', () => ({
@@ -301,6 +317,8 @@ type AuthContextValue = {
   sessionEnded: boolean;
   authEpoch: number;
   isSigningOut: boolean;
+  restoreFailed: boolean;
+  retryRestore: () => void;
   signIn: (token: string) => Promise<void>;
   signOut: (ended?: boolean) => Promise<void>;
 };
@@ -328,7 +346,11 @@ async function loadAuthModule() {
 /** Mount the AuthProvider and extract the auth context value via a
  *  consumer child. The context is captured synchronously once the
  *  component mounts inside act. */
-async function mountAndGetContext(): Promise<{ ctx: AuthContextValue; unmount: () => void }> {
+async function mountAndGetContext(): Promise<{
+  ctx: AuthContextValue;
+  getCtx: () => AuthContextValue;
+  unmount: () => void;
+}> {
   const mod = await loadAuthModule();
 
   let capturedCtx: AuthContextValue | undefined = undefined;
@@ -344,25 +366,51 @@ async function mountAndGetContext(): Promise<{ ctx: AuthContextValue; unmount: (
     await Promise.resolve();
   });
 
-  // After mount, isLoading becomes false because the preloaded token resolves.
-  // We need to wait for the loading effect to complete.
-  await act(async () => {
-    await new Promise<void>(resolve => {
-      void setTimeout(resolve, 0);
-    });
-  });
+  // Wait for the loading effect to complete. Bootstrap can now span the
+  // bounded retry backoff of a transient SecureStore failure (250/500/1000 ms),
+  // so settle on `isLoading` rather than on a single tick — a healthy read
+  // still finishes on the first pass.
+  await settleBootstrap(() => capturedCtx);
 
   // oxlint-disable-next-line @typescript-eslint/no-unnecessary-condition -- safety net for test failures
   if (!capturedCtx) {
     throw new Error('auth context not captured');
   }
 
+  const getCtx = (): AuthContextValue => {
+    if (!capturedCtx) {
+      throw new Error('auth context not captured');
+    }
+    return capturedCtx;
+  };
+
   return {
     ctx: capturedCtx,
+    getCtx,
     unmount: () => {
       renderer?.unmount();
     },
   };
+}
+
+/** Flush act passes on real timers until bootstrap stops loading, bounded so a
+ *  stuck provider fails as a timeout rather than hanging the suite. */
+async function settleBootstrap(
+  read: () => AuthContextValue | undefined,
+  budgetMs = 4000
+): Promise<void> {
+  for (let elapsed = 0; elapsed <= budgetMs; elapsed += 20) {
+    // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 20);
+      });
+    });
+    if (read()?.isLoading === false) {
+      return;
+    }
+  }
+  throw new Error('bootstrap never settled');
 }
 
 // ---- tests ----
@@ -949,6 +997,133 @@ describe('bootstrap and foreground race fencing', () => {
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
 
+    unmount();
+  });
+
+  it('regression: a bootstrap success landing mid-sign-out-teardown never republishes the torn-down credentials', async () => {
+    let releaseRead: (() => void) | undefined = undefined;
+    const readGate = new Promise<void>(resolve => {
+      releaseRead = resolve;
+    });
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken, then the expiry read (held), then the
+    // credential re-read (unchanged, so only a fence can stop the publish).
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce('stored-refresh')
+      .mockImplementationOnce(async () => {
+        // Bootstrap expiry read: hold open so a sign-out can land mid-read.
+        await readGate;
+        return '9999999999999';
+      })
+      .mockResolvedValueOnce(storedToken);
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // Hold the sign-out's remote cleanup open: the teardown is mid-flight and
+    // its epoch bump (which waits for the cleanup) has not happened when the
+    // bootstrap read resolves — the epoch fence alone cannot stop the publish.
+    let releaseCleanup: (() => void) | undefined = undefined;
+    const cleanupGate = new Promise<void>(resolve => {
+      releaseCleanup = resolve;
+    });
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+      await cleanupGate;
+    });
+
+    const signOutPromise = getCtx().signOut(true);
+    await vi.waitFor(() => {
+      expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalled();
+    });
+
+    // Release the bootstrap read while the teardown is still in flight.
+    releaseRead?.();
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The success path must not republish what sign-out is tearing down: no
+    // owner token, no React token, no deep-link binding for the old account.
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()).toBeNull();
+    expect(getCtx().token).toBeUndefined();
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalledWith('user-1');
+
+    // The teardown then finishes into the signed-out end state.
+    releaseCleanup?.();
+    await act(async () => {
+      await signOutPromise;
+    });
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(true);
+
+    unmount();
+  });
+
+  it('regression: a legacy-exchange success landing mid-sign-out-teardown never republishes credentials', async () => {
+    let releaseExchange: (() => void) | undefined = undefined;
+    const exchangeGate = new Promise<void>(resolve => {
+      releaseExchange = resolve;
+    });
+    const storedToken = makeToken({ kiloUserId: 'user-1' });
+    // No stored refresh token: bootstrap takes the legacy-exchange branch.
+    // Mock queue consumed by the bootstrap load: preloadedToken,
+    // preloadedRefreshToken (null), then — after the fenced exchange publish
+    // is refused and the main restore path continues — the expiry read and
+    // the credential re-read.
+    hoisted.secureStore.getItemAsync
+      .mockResolvedValueOnce(storedToken)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('9999999999999')
+      .mockResolvedValueOnce(storedToken);
+    hoisted.exchange.exchangeLegacyToken.mockImplementationOnce(async () => {
+      await exchangeGate;
+      return { token: 'exchanged-token', refreshToken: 'exchanged-refresh', expiresIn: 3600 };
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+
+    // Hold the sign-out's remote cleanup open so the teardown is mid-flight
+    // (epoch not yet bumped) when the exchange resolves: the exchange's own
+    // epoch checks pass inside that window.
+    let releaseCleanup: (() => void) | undefined = undefined;
+    const cleanupGate = new Promise<void>(resolve => {
+      releaseCleanup = resolve;
+    });
+    logoutCleanupMock.runLogoutCleanup.mockImplementationOnce(async () => {
+      await cleanupGate;
+    });
+
+    const signOutPromise = getCtx().signOut(true);
+    await vi.waitFor(() => {
+      expect(logoutCleanupMock.runLogoutCleanup).toHaveBeenCalled();
+    });
+
+    // Release the exchange while the teardown is still in flight.
+    releaseExchange?.();
+    await act(async () => {
+      await new Promise<void>(resolve => {
+        void setTimeout(resolve, 0);
+      });
+    });
+
+    // The fenced exchange must not publish the exchanged pair mid-teardown:
+    // no React token and no deep-link binding for the account being signed out.
+    expect(getCtx().token).toBeUndefined();
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalledWith('user-1');
+
+    // The teardown then finishes into the signed-out end state.
+    releaseCleanup?.();
+    await act(async () => {
+      await signOutPromise;
+    });
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    expect(tokenOwner.getActiveToken()).toBeNull();
+    expect(getCtx().token).toBeUndefined();
+    expect(getCtx().sessionEnded).toBe(true);
     unmount();
   });
 
@@ -1631,4 +1806,215 @@ describe('auth-transition queue and sign-out failure matrix', () => {
 
     unmount();
   });
+});
+
+describe('startup credential read failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    hoisted.callOrder.length = 0;
+  });
+
+  /** The environmental keychain failure: reads of `auth-token` reject for the
+   *  first `failures` attempts and then report the stored session (or
+   *  `recoveredValue`, for the genuinely-no-session case). The refresh and
+   *  expiry reads stay healthy, so only the credential read is faulty. */
+  function failTokenReads(failures: number, recoveredValue: string | null = 'stored-token') {
+    let tokenReads = 0;
+    // eslint-disable-next-line require-await -- mock returning a resolved or rejected promise
+    hoisted.secureStore.getItemAsync.mockImplementation(async (key: string) => {
+      if (key === 'auth-token') {
+        tokenReads += 1;
+        if (tokenReads <= failures) {
+          throw new Error('keychain unavailable');
+        }
+        return recoveredValue;
+      }
+      if (key === 'refresh-token') {
+        return 'stored-refresh';
+      }
+      if (key === 'token-expires-at') {
+        return '9999999999999';
+      }
+      return null;
+    });
+    return () => tokenReads;
+  }
+
+  // No `unhandledRejection` listener is scoped in this suite on purpose: the
+  // fix is that the rejection never escapes `load()`, so an escape must fail
+  // the file rather than be swallowed.
+
+  it('repro: a rejected startup credential read keeps the person signed in', async () => {
+    failTokenReads(1);
+
+    // Fresh module registry: preloadedAuthToken is recreated and rejects.
+    const { ctx, unmount } = await mountAndGetContext();
+
+    // A transient keychain failure at startup must never sign the person
+    // out: the retried read finds the stored session, so bootstrap settles
+    // signed in instead of leaving the app on the login screen.
+    expect(ctx.isLoading).toBe(false);
+    expect(ctx.token).toBe('stored-token');
+    expect(ctx.restoreFailed).toBe(false);
+
+    unmount();
+  });
+
+  it('reports a retryable restore failure when every retry fails, without signing out', async () => {
+    // Four attempts (the first plus three retries) all reject.
+    const readCount = failTokenReads(4);
+
+    const { ctx, unmount } = await mountAndGetContext();
+
+    expect(readCount()).toBe(4);
+    // No token is fabricated and no signed-out path is taken: the session is
+    // not known to be gone, so the person is asked to retry.
+    expect(ctx.isLoading).toBe(false);
+    expect(ctx.restoreFailed).toBe(true);
+    expect(ctx.token).toBeUndefined();
+    expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalled();
+
+    unmount();
+  }, 15_000);
+
+  it('restores the session when retryRestore runs after the storage recovers', async () => {
+    // Every attempt of the first bootstrap fails; the retry's reads succeed.
+    failTokenReads(4);
+
+    const { getCtx, unmount } = await mountAndGetContext();
+    expect(getCtx().restoreFailed).toBe(true);
+
+    act(() => {
+      getCtx().retryRestore();
+    });
+    // The retry holds the settled error surface: the flag clears only once
+    // `load()`'s primary reads resolve, never synchronously on tap, so the
+    // surface never blanks behind a hidden loading gate.
+    expect(getCtx().restoreFailed).toBe(true);
+    expect(getCtx().isLoading).toBe(true);
+
+    await settleBootstrap(getCtx);
+
+    // The recovered read restored the session and cleared the flag.
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(getCtx().token).toBe('stored-token');
+
+    unmount();
+  }, 15_000);
+
+  it('a failed retry settles back onto the restore error surface', async () => {
+    // Four reads for the first bootstrap, four for the retry: every attempt
+    // of both runs rejects.
+    failTokenReads(8);
+
+    const { getCtx, unmount } = await mountAndGetContext();
+    expect(getCtx().restoreFailed).toBe(true);
+
+    act(() => {
+      getCtx().retryRestore();
+    });
+    // The surface holds while the retry's reads are failing.
+    expect(getCtx().restoreFailed).toBe(true);
+    expect(getCtx().isLoading).toBe(true);
+
+    await settleBootstrap(getCtx);
+
+    // The failed retry re-settled the same surface: still flagged, still no
+    // token, and the gate is gone again so Retry (and Sign out) are live.
+    expect(getCtx().restoreFailed).toBe(true);
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+
+    unmount();
+  }, 15_000);
+
+  it('sends the person to login when the retry finds no stored session', async () => {
+    // Every attempt of the first bootstrap fails; the retry's reads resolve
+    // null, so the session is genuinely gone and login is the destination.
+    failTokenReads(4, null);
+
+    const { getCtx, unmount } = await mountAndGetContext();
+    expect(getCtx().restoreFailed).toBe(true);
+
+    act(() => {
+      getCtx().retryRestore();
+    });
+    expect(getCtx().restoreFailed).toBe(true);
+    expect(getCtx().isLoading).toBe(true);
+
+    await settleBootstrap(getCtx);
+
+    // The known-empty answer clears the flag: no error surface and no token —
+    // the login route is the correct destination.
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+
+    unmount();
+  }, 15_000);
+
+  it('does not resurrect the restore error surface when signOut lands mid-retry', async () => {
+    // Four reads for the first bootstrap, four for the in-flight retry: the
+    // abandoned retry's catch fires only after sign-out has begun.
+    const readCount = failTokenReads(8);
+
+    const { getCtx, unmount } = await mountAndGetContext();
+    expect(getCtx().restoreFailed).toBe(true);
+
+    act(() => {
+      getCtx().retryRestore();
+    });
+    expect(getCtx().isLoading).toBe(true);
+
+    // Sign out while the retry's reads are still failing inside their backoff
+    // window: the escape hatch clears the surface and routes to login before
+    // the abandoned load settles.
+    await act(async () => {
+      await getCtx().signOut();
+    });
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+
+    // Let the abandoned retry's remaining reads exhaust (~1.75 s of backoff)
+    // and flush its catch. Resurrecting the flag here would repaint the error
+    // screen over the login route, where the sign-out dedupe makes a second
+    // tap a no-op — the escape hatch would be permanently dead.
+    for (let waited = 0; waited <= 4000 && readCount() < 8; waited += 20) {
+      // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between act cycles
+      await act(async () => {
+        await new Promise<void>(resolve => {
+          setTimeout(resolve, 20);
+        });
+      });
+    }
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // The abandoned load settled onto the sign-out, not onto the error
+    // surface: still false, still no token, still on the signed-out route.
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(getCtx().isLoading).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+
+    unmount();
+  }, 15_000);
+
+  it('clears the restore failure when signOut is used as the escape hatch', async () => {
+    failTokenReads(4);
+
+    const { getCtx, unmount } = await mountAndGetContext();
+    expect(getCtx().restoreFailed).toBe(true);
+
+    await act(async () => {
+      await getCtx().signOut();
+    });
+
+    // The explicit teardown lands on login: the flag is cleared so the error
+    // screen gives way to the login route.
+    expect(getCtx().restoreFailed).toBe(false);
+    expect(getCtx().token).toBeUndefined();
+
+    unmount();
+  }, 15_000);
 });

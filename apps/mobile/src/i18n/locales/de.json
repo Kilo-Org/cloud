@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Andere Geräte prüfen und abmelden",
     "feedback": "Feedback geben",
     "privacyChoices": "Datenschutzoptionen",
-    "signOut": "Abmelden",
     "deleteAccount": "Konto löschen",
     "confirmationCode": "Bestätigungscode",
     "confirmationCodePlaceholder": "6-stelliger Code",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Eingabetaste sendet Nachricht",
     "returnSendsMessageSubtitle": "Ist diese Option deaktiviert, fügt die Eingabetaste im Eingabefeld für Agenten einen Zeilenumbruch ein.",
     "biometricUnlock": "Mit Biometrie entsperren",
-    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich."
+    "biometricUnlockSubtitle": "Beim Start und nach fünf Minuten im Hintergrund ist das Entsperren erforderlich.",
+    "featureFlags": "Feature-Flags",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Live-Aktivitäten",
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "Auf der Website abonnieren",
       "subscriptionPastDueBody": "Bei deiner letzten Zahlung gab es ein Problem. Öffne kilo.ai/claw im Browser, um deine Zahlungsdaten zu aktualisieren. Die Abrechnung kannst du in der App nicht verwalten.",
       "subscriptionPastDueTitle": "Zahlungsdaten im Browser aktualisieren",
-      "trialExpiredBody": "Öffne kilo.ai/claw im Browser, um KiloClaw weiter zu nutzen. In der App kannst du kein Abo abschließen."
+      "trialExpiredBody": "Öffne kilo.ai/claw im Browser, um KiloClaw weiter zu nutzen. In der App kannst du kein Abo abschließen.",
+      "quarantinedCta": "Unser Team per E-Mail kontaktieren",
+      "nonCanonicalEarlybirdCta": "Ihren Tarif auf kilo.ai überprüfen"
     },
     "controls": {
       "redeploying": "Wird erneut bereitgestellt …",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "Wähle aus, welche Repositories Security Agent überwacht"
     },
     "settingsSave": {
-      "keepEditing": "Weiter bearbeiten",
       "saveChanges": "Änderungen speichern",
       "unsavedMessage": "Möchtest du deine Änderungen speichern, bevor du diesen Bildschirm verlässt?",
       "unsavedTitle": "Ungespeicherte Änderungen"
@@ -1447,6 +1452,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Die aktiven Sitzungen konnten nicht geladen werden.",
+      "couldNotRefresh": "Konnte nicht aktualisiert werden",
       "noSessionsYetDescription": "Starte eine Programmieraufgabe auf deinem Handy. Deine Sitzungen erscheinen hier.",
       "noMatches": "Keine Sitzungen gefunden",
       "tryDifferentSearch": "Versuche einen anderen Suchbegriff.",
@@ -1725,7 +1731,6 @@
     "filePart": {
       "loadingImage": "Bild wird geladen",
       "imageUnavailableRetry": "Bild nicht verfügbar, erneut laden",
-      "imageUnavailableWithAlt": "Das Bild „{{alt}}“ ist nicht verfügbar.",
       "imagePreviewUnavailableInSession": "In dieser Sitzung ist keine Bildvorschau verfügbar.",
       "viewImage": "Bild ansehen",
       "viewImageWithAlt": "Bild „{{alt}}“ ansehen",
@@ -1920,7 +1925,6 @@
       "selectModelBeforeSending": "Wähle vor dem Senden ein Modell aus.",
       "preparingPlaceholder": "Umgebung wird eingerichtet…",
       "finalizingPlaceholder": "Wird abgeschlossen…",
-      "messagePlaceholder": "Nachricht",
       "cannotReceiveFiles": "Diese Sitzung kann keine Dateien empfangen. Entferne die Anhänge, um deine Nachricht zu senden.",
       "couldNotAttachFiles": "Die Dateien konnten nicht angehängt werden. Tippe auf „Senden“, um es erneut zu versuchen.",
       "discardAttachmentsMessage": "Hochgeladene Dateien, die keiner gesendeten Nachricht angehängt sind, werden gelöscht.",
@@ -2125,6 +2129,10 @@
     "stopped": "Die Spracheingabe wurde gestoppt. Tippe auf das Mikrofon, um es erneut zu versuchen.",
     "unavailableDevice": "Die Spracheingabe ist auf diesem Gerät nicht verfügbar.",
     "unavailableLanguage": "Die Spracheingabe ist für die eingestellte Gerätesprache nicht verfügbar.",
+    "languageNotInstalledTitle": "Spracheingabe für {{language}} ist noch nicht bereit",
+    "languageNotInstalledMessage": "Die Offline-Sprachdateien für {{language}} sind auf diesem Telefon nicht installiert. Lade sie herunter und versuche die Spracheingabe erneut.",
+    "downloadOfflineModel": "Herunterladen",
+    "offlineModelDownloadScheduled": "Die Offline-Sprachdateien werden im Hintergrund heruntergeladen. Versuche die Spracheingabe später erneut.",
     "listeningStopped": "Die Aufnahme wurde beendet."
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "Storniert",
         "uncollectible": "Uneinbringlich"
       },
-      "loadMoreFailed": "Weitere Einträge konnten nicht geladen werden.",
       "truncated": "Ältere Rechnungen sind verfügbar."
     },
     "lowBalanceAlert": {

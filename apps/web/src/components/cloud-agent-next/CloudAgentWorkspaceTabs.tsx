@@ -1,7 +1,11 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { SessionStatusIndicator } from '@/components/shared/SessionStatusIndicator';
+import {
+  getSessionActivityIndicatorKind,
+  SessionStatusIndicator,
+} from '@/components/shared/SessionStatusIndicator';
+import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { TimeAgo } from '@/components/shared/TimeAgo';
 import { Button } from '@/components/ui/button';
 import {
@@ -52,6 +56,7 @@ const renameHint = 'Double-click to rename.';
 export function CloudAgentWorkspaceTabs({
   activeTabId,
   chatSessions,
+  currentChatProgress,
   currentSessionId,
   worktreeId,
   openChatSessionIds,
@@ -72,6 +77,7 @@ export function CloudAgentWorkspaceTabs({
 }: {
   activeTabId: WorkspaceTabId;
   chatSessions: StoredSession[];
+  currentChatProgress?: { sessionId: string; message: string } | null;
   currentSessionId: string | null;
   worktreeId?: string | null;
   openChatSessionIds?: readonly string[];
@@ -237,6 +243,14 @@ export function CloudAgentWorkspaceTabs({
             const isDeleting = deletingSessionIds.includes(session.sessionId);
             const isEditing = editingSessionId === session.sessionId;
             const canRename = Boolean(onRenameChat) && !isDeleting;
+            const progress =
+              currentChatProgress?.sessionId === session.sessionId ? currentChatProgress : null;
+            const activityKind = isEditing
+              ? null
+              : getSessionActivityIndicatorKind(
+                  session.sessionStatus ?? null,
+                  session.sessionStatusUpdatedAt ?? null
+                );
 
             return (
               <div
@@ -332,25 +346,45 @@ export function CloudAgentWorkspaceTabs({
                     }}
                   >
                     <TooltipTrigger>
-                      <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                      {isEditing ? (
-                        <span className="sr-only">{session.prompt}</span>
-                      ) : (
-                        <>
-                          <span className="min-w-0 max-w-36 truncate">{session.prompt}</span>
+                      <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                        {activityKind ? (
                           <SessionStatusIndicator
                             status={session.sessionStatus ?? null}
                             statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
                           />
-                        </>
+                        ) : progress && !isEditing ? (
+                          <StatusSpinner className="h-4 w-4 shrink-0 text-gray-600" title="Busy" />
+                        ) : (
+                          <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                        )}
+                      </span>
+                      {isEditing ? (
+                        <span className="sr-only">{session.prompt}</span>
+                      ) : (
+                        <span className="relative min-w-0 max-w-36">
+                          <span className={cn('block truncate', progress && 'text-transparent')}>
+                            {session.prompt}
+                          </span>
+                          {progress && (
+                            <span aria-hidden="true" className="absolute inset-0 block truncate">
+                              {progress.message}
+                            </span>
+                          )}
+                        </span>
                       )}
                     </TooltipTrigger>
                   </TabsTrigger>
                   <TooltipContent className="max-w-[min(24rem,calc(100vw-2rem))] wrap-anywhere">
-                    {session.prompt}
+                    <p>{session.prompt}</p>
+                    {progress && <p className="mt-1">{progress.message}</p>}
                     {canRename && <p className="text-muted-foreground mt-1">{renameHint}</p>}
                   </TooltipContent>
                 </Tooltip>
+                {progress && !isEditing && (
+                  <span role="status" aria-live="polite" className="sr-only">
+                    {progress.message}
+                  </span>
+                )}
 
                 {!isEditing && session.associatedPr && (
                   <span className="shrink-0 px-1 [@media(any-pointer:coarse)]:[&_button]:min-h-11 [@media(any-pointer:coarse)]:[&_button]:min-w-11">

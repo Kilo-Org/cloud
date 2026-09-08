@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Revisar las sesiones de otros dispositivos y cerrarlas",
     "feedback": "Enviar comentarios",
     "privacyChoices": "Opciones de privacidad",
-    "signOut": "Cerrar sesión",
     "deleteAccount": "Eliminar cuenta",
     "confirmationCode": "Código de confirmación",
     "confirmationCodePlaceholder": "código de 6 dígitos",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "La tecla Intro envía el mensaje",
     "returnSendsMessageSubtitle": "Si está desactivado, Intro inserta un salto de línea en los campos de mensaje del agente.",
     "biometricUnlock": "Desbloqueo biométrico",
-    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano."
+    "biometricUnlockSubtitle": "Se requiere desbloquear la aplicación al iniciarla y después de cinco minutos en segundo plano.",
+    "featureFlags": "Indicadores de funciones",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "channel": {
@@ -601,7 +605,9 @@
       "subscriptionCanceledTitle": "Suscríbete en la web",
       "subscriptionPastDueBody": "Hubo un problema con tu último pago. Abre kilo.ai/claw en tu navegador para actualizar el método de pago. No puedes gestionar la facturación desde la aplicación.",
       "subscriptionPastDueTitle": "Actualizar el método de pago en la web",
-      "trialExpiredBody": "Para seguir usando KiloClaw, abre kilo.ai/claw en tu navegador. No puedes suscribirte desde la aplicación."
+      "trialExpiredBody": "Para seguir usando KiloClaw, abre kilo.ai/claw en tu navegador. No puedes suscribirte desde la aplicación.",
+      "quarantinedCta": "Escribir a nuestro equipo",
+      "nonCanonicalEarlybirdCta": "Revisar tu plan en kilo.ai"
     },
     "controls": {
       "redeploying": "Desplegando de nuevo…",
@@ -1304,7 +1310,6 @@
       "repositoriesCount_many": "{{displayCount}} repositorios seleccionados"
     },
     "settingsSave": {
-      "keepEditing": "Seguir editando",
       "saveChanges": "Guardar cambios",
       "unsavedMessage": "¿Guardar los cambios antes de salir de esta pantalla?",
       "unsavedTitle": "Cambios sin guardar"
@@ -1453,6 +1458,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "No se pudieron cargar las sesiones activas.",
+      "couldNotRefresh": "No se pudo actualizar",
       "noSessionsYetDescription": "Inicia una tarea de programación desde tu teléfono. Tus sesiones aparecerán aquí.",
       "noMatches": "No hay sesiones que coincidan con los filtros",
       "tryDifferentSearch": "Prueba con otro término de búsqueda.",
@@ -1735,7 +1741,6 @@
     "filePart": {
       "loadingImage": "Cargando imagen",
       "imageUnavailableRetry": "Imagen no disponible. Reintentar la carga",
-      "imageUnavailableWithAlt": "La imagen no está disponible: {{alt}}.",
       "imagePreviewUnavailableInSession": "La vista previa de la imagen no está disponible en esta sesión.",
       "viewImage": "Ver imagen",
       "viewImageWithAlt": "Ver imagen: {{alt}}",
@@ -1933,7 +1938,6 @@
       "selectModelBeforeSending": "Selecciona un modelo antes de enviar el mensaje.",
       "preparingPlaceholder": "Configurando el entorno…",
       "finalizingPlaceholder": "Finalizando…",
-      "messagePlaceholder": "Mensaje",
       "cannotReceiveFiles": "Esta sesión no puede recibir archivos. Quita los archivos adjuntos para enviar tu mensaje.",
       "couldNotAttachFiles": "No se pudieron adjuntar los archivos. Vuelve a enviar el mensaje para intentarlo de nuevo.",
       "discardAttachmentsMessage": "Se eliminarán los archivos subidos que no estén adjuntos a mensajes enviados.",
@@ -2139,6 +2143,10 @@
     "stopped": "El dictado se detuvo. Toca el micrófono para intentarlo de nuevo.",
     "unavailableDevice": "El dictado no está disponible en este dispositivo.",
     "unavailableLanguage": "El dictado no está disponible en el idioma de este dispositivo.",
+    "languageNotInstalledTitle": "El dictado para {{language}} aún no está listo",
+    "languageNotInstalledMessage": "Los archivos de voz sin conexión de {{language}} no están instalados en este teléfono. Descárgalos y vuelve a intentar el dictado.",
+    "downloadOfflineModel": "Descargar",
+    "offlineModelDownloadScheduled": "Los archivos de voz sin conexión se descargarán en segundo plano. Vuelve a probar el dictado más tarde.",
     "listeningStopped": "Se ha detenido la escucha."
   },
   "share": {
@@ -2797,7 +2805,6 @@
         "void": "Anulada",
         "uncollectible": "Incobrable"
       },
-      "loadMoreFailed": "No se pudieron cargar más resultados.",
       "truncated": "Hay facturas más antiguas disponibles."
     },
     "lowBalanceAlert": {

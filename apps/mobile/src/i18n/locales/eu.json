@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Berrikusi beste gailuetako saioak eta itxi",
     "feedback": "Bidali iritzia",
     "privacyChoices": "Pribatutasun-aukerak",
-    "signOut": "Amaitu saioa",
     "deleteAccount": "Ezabatu kontua",
     "confirmationCode": "Berrespen-kodea",
     "confirmationCodePlaceholder": "6 digituko kodea",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Sartu teklak mezua bidaltzen du",
     "returnSendsMessageSubtitle": "Desgaituta dagoenean, Sartu teklak lerro-jauzia txertatzen du agenteen mezu-eremuetan.",
     "biometricUnlock": "Desblokeatu biometriarekin",
-    "biometricUnlockSubtitle": "Desblokeatu aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren."
+    "biometricUnlockSubtitle": "Desblokeatu aplikazioa abiaraztean eta atzeko planoan bost minutu igaro ondoren.",
+    "featureFlags": "Funtzio-bandera",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Bateratze-eskaera ez dago eskuragarri",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Zure sarbide aurreratuko plana eskuz berrikusi behar da mugikorrean erabili ahal izateko.",
       "iosTitle": "KiloClaw ez dago eskuragarri iOS-en",
       "iosBody": "KiloClaw sarbidea iOS aplikaziotik kanpo kudeatzen da kontu honetarako.",
-      "iosContact": "Galderarik? Jarri harremanetan hi@kilo.ai-rekin."
+      "iosContact": "Galderarik? Jarri harremanetan hi@kilo.ai-rekin.",
+      "quarantinedCta": "Idatzi gure taldeari",
+      "nonCanonicalEarlybirdCta": "Berrikusi zure plana kilo.ai-n"
     },
     "instanceCard": {
       "needsAttention": "{{name}} izeneko instantziak arreta behar du: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Ezin izan da GitHub ireki. Saiatu berriro."
     },
     "settingsSave": {
-      "keepEditing": "Jarraitu editatzen",
       "saveChanges": "Gorde aldaketak",
       "unsavedTitle": "Gorde gabeko aldaketak",
       "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Ezin izan dira saio aktiboak kargatu.",
+      "couldNotRefresh": "Ezin izan da freskatu",
       "noSessionsYetDescription": "Hasi programazio-zeregin bat telefonotik. Zure saioak hemen agertuko dira.",
       "noMatches": "Ez dago bat datorren saiorik",
       "tryDifferentSearch": "Saiatu beste bilaketa-termino batekin.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Irudia kargatzen",
       "imageUnavailableRetry": "Irudia ez dago erabilgarri, saiatu berriro kargatzen",
-      "imageUnavailableWithAlt": "Irudia ez dago erabilgarri: {{alt}}.",
       "imagePreviewUnavailableInSession": "Irudiaren aurrebista ez dago erabilgarri saio honetan.",
       "viewImage": "Ikusi irudia",
       "viewImageWithAlt": "Ikusi irudia: {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Hautatu modelo bat bidali aurretik.",
       "preparingPlaceholder": "Ingurunea prestatzen…",
       "finalizingPlaceholder": "Amaitzen…",
-      "messagePlaceholder": "Mezua",
       "cannotReceiveFiles": "Saio honek ezin du fitxategirik jaso. Kendu eranskinak zure mezua bidaltzeko.",
       "couldNotAttachFiles": "Ezin izan dira fitxategiak erantsi. Sakatu Bidali berriro saiatzeko.",
       "discardAttachmentsMessage": "Igotako fitxategietatik mezuei erantsi gabe geratu direnak ezabatuko dira.",
@@ -2556,6 +2560,10 @@
     "stopped": "Ahots-sarrera gelditu da. Sakatu mikrofonoa berriro saiatzeko.",
     "unavailableDevice": "Ahots-sarrera ez dago erabilgarri gailu honetan.",
     "unavailableLanguage": "Ahots-sarrera ez dago erabilgarri gailu honetan hautatutako hizkuntzarako.",
+    "languageNotInstalledTitle": "{{language}} hizkuntzaren ahots-sarrera ez dago prest oraindik",
+    "languageNotInstalledMessage": "{{language}} hizkuntzaren lineaz kanpo ahots-fitxategiak ez daude instalatuta telefono honetan. Deskargatu itzazu eta saiatu berriro ahots-sarrerarekin.",
+    "downloadOfflineModel": "Deskargatu",
+    "offlineModelDownloadScheduled": "Lineaz kanpoko ahots-fitxategiak atzeko planoan deskargatuko dira. Saiatu ahots-sarrerarekin berriro geroago.",
     "listeningStopped": "Entzutea gelditu da."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Baliogabetuta",
         "uncollectible": "Kobratu ezina"
       },
-      "loadMoreFailed": "Ezin izan dira gehiago kargatu.",
       "truncated": "Aurreko fakturak eskuragarri daude."
     },
     "lowBalanceAlert": {

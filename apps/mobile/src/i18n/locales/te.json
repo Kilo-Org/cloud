@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "ఇతర పరికరాలను సమీక్షించి వాటి నుండి సైన్ అవుట్ చేయండి",
     "feedback": "అభిప్రాయం పంపండి",
     "privacyChoices": "గోప్యతా ఎంపికలు",
-    "signOut": "సైన్ అవుట్ చేయండి",
     "deleteAccount": "ఖాతాను తొలగించండి",
     "confirmationCode": "నిర్ధారణ కోడ్",
     "confirmationCodePlaceholder": "6 అంకెల కోడ్",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "రిటర్న్ కీ సందేశాన్ని పంపుతుంది",
     "returnSendsMessageSubtitle": "దీన్ని ఆఫ్ చేస్తే, రిటర్న్ కీ ఏజెంట్ సందేశ పెట్టెల్లో కొత్త పంక్తిని చేర్చుతుంది.",
     "biometricUnlock": "బయోమెట్రిక్స్‌తో అన్‌లాక్ చేయండి",
-    "biometricUnlockSubtitle": "యాప్‌ను తెరిచినప్పుడు, అలాగే అది నేపథ్యంలో ఐదు నిమిషాలు ఉన్న తర్వాత అన్‌లాక్ చేయాలి."
+    "biometricUnlockSubtitle": "యాప్‌ను తెరిచినప్పుడు, అలాగే అది నేపథ్యంలో ఐదు నిమిషాలు ఉన్న తర్వాత అన్‌లాక్ చేయాలి.",
+    "featureFlags": "ఫీచర్ ఫ్లాగులు",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "పుల్ రిక్వెస్ట్ అందుబాటులో లేదు",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "మీ ముందస్తు వినియోగ ప్లాన్‌ను మొబైల్‌లో వాడే ముందు సిబ్బంది సమీక్షించాలి.",
       "iosTitle": "IOSలో KiloClaw అందుబాటులో లేదు",
       "iosBody": "ఈ ఖాతా KiloClaw వినియోగ అనుమతులను iOS యాప్ వెలుపల నిర్వహిస్తాము.",
-      "iosContact": "ప్రశ్నలు ఉన్నాయా? hi@kilo.aiకు ఇమెయిల్ చేయండి."
+      "iosContact": "ప్రశ్నలు ఉన్నాయా? hi@kilo.aiకు ఇమెయిల్ చేయండి.",
+      "quarantinedCta": "మా బృందానికి ఇమెయిల్ పంపండి",
+      "nonCanonicalEarlybirdCta": "మీ ప్లాన్‌ను Kilo.aiలో సమీక్షించండి"
     },
     "instanceCard": {
       "needsAttention": "{{name}}ను సరిచూడాలి: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHubను తెరవలేకపోయాము. దయచేసి మళ్లీ ప్రయత్నించండి."
     },
     "settingsSave": {
-      "keepEditing": "సవరించడం కొనసాగించండి",
       "saveChanges": "మార్పులను సేవ్ చేయండి",
       "unsavedTitle": "సేవ్ చేయని మార్పులు",
       "unsavedMessage": "ఈ స్క్రీన్ నుంచి వెళ్లే ముందు మీ మార్పులను సేవ్ చేయాలా?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "కొనసాగుతున్న సెషన్‌లను లోడ్ చేయలేకపోయాము.",
+      "couldNotRefresh": "రిఫ్రెష్ చేయలేకపోయాము",
       "noSessionsYetDescription": "మీ ఫోన్‌లో కోడింగ్ పనిని ప్రారంభించండి. మీ సెషన్‌లు ఇక్కడ కనిపిస్తాయి.",
       "noMatches": "సరిపోలే సెషన్‌లు లేవు",
       "tryDifferentSearch": "వేరే పదంతో వెతకండి.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "చిత్రాన్ని లోడ్ చేస్తోంది",
       "imageUnavailableRetry": "చిత్రం అందుబాటులో లేదు. లోడ్ చేయడానికి మళ్లీ ప్రయత్నించండి",
-      "imageUnavailableWithAlt": "{{alt}} చిత్రం అందుబాటులో లేదు.",
       "imagePreviewUnavailableInSession": "ఈ సెషన్‌లో చిత్రం ప్రివ్యూ అందుబాటులో లేదు.",
       "viewImage": "చిత్రాన్ని చూడండి",
       "viewImageWithAlt": "{{alt}} చిత్రాన్ని చూడండి",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "పంపడానికి ముందు మోడల్‌ను ఎంచుకోండి.",
       "preparingPlaceholder": "పని వాతావరణాన్ని సిద్ధం చేస్తోంది...",
       "finalizingPlaceholder": "ముగిస్తోంది...",
-      "messagePlaceholder": "సందేశం",
       "cannotReceiveFiles": "ఈ సెషన్ ఫైళ్లను స్వీకరించలేదు. మీ సందేశాన్ని పంపడానికి జోడింపులను తీసివేయండి.",
       "couldNotAttachFiles": "ఫైళ్లను జోడించలేకపోయాము. మళ్లీ ప్రయత్నించడానికి పంపే బటన్‌ను నొక్కండి.",
       "discardAttachmentsMessage": "అప్‌లోడ్ చేసి ఇంకా ఉపయోగించని ఫైళ్లు తొలగిపోతాయి.",
@@ -2556,6 +2560,10 @@
     "stopped": "వాయిస్ ఇన్‌పుట్ ఆగిపోయింది. మళ్లీ ప్రయత్నించడానికి మైక్రోఫోన్‌ను నొక్కండి.",
     "unavailableDevice": "ఈ పరికరంలో వాయిస్ ఇన్‌పుట్ అందుబాటులో లేదు.",
     "unavailableLanguage": "ఈ పరికరంలో ఎంచుకున్న భాషకు వాయిస్ ఇన్‌పుట్ అందుబాటులో లేదు.",
+    "languageNotInstalledTitle": "{{language}} కోసం వాయిస్ ఇన్‌పుట్ ఇంకా సిద్ధం కాలేదు",
+    "languageNotInstalledMessage": "{{language}} భాష ఆఫ్‌లైన్ స్పీచ్ ఫైల్‌లు ఈ ఫోన్‌లో ఇన్‌స్టాల్ చేయలేదు. వాటిని డౌన్‌లోడ్ చేసి, తర్వాత వాయిస్ ఇన్‌పుట్‌ను మళ్లీ ప్రయత్నించండి.",
+    "downloadOfflineModel": "డౌన్‌లోడ్",
+    "offlineModelDownloadScheduled": "ఆఫ్‌లైన్ స్పీచ్ ఫైల్‌లు నేపథ్యంలో డౌన్‌లోడ్ అవుతాయి. తర్వాత వాయిస్ ఇన్‌పుట్‌ను మళ్లీ ప్రయత్నించండి.",
     "listeningStopped": "వినడం ఆగిపోయింది."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "రద్దు",
         "uncollectible": "వసూలు చేయలేనిది"
       },
-      "loadMoreFailed": "మరిన్ని లోడ్ చేయలేకపోయాం.",
       "truncated": "పాత ఇన్వాయిస్‌లు అందుబాటులో ఉన్నాయి."
     },
     "lowBalanceAlert": {

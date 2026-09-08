@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Hlola amanye amadivayisi bese uwakhipha ku-akhawunti",
     "feedback": "Thumela impendulo",
     "privacyChoices": "Izinqumo zobumfihlo",
-    "signOut": "Phuma",
     "deleteAccount": "Susa i-akhawunti",
     "confirmationCode": "Ikhodi yokuqinisekisa",
     "confirmationCodePlaceholder": "ikhodi enezinombolo eziyisi-6",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Inkinobho yokubuyela ithumela umlayezo",
     "returnSendsMessageSubtitle": "Uma lokhu kuvaliwe, inkinobho yokubuyela ifaka umugqa omusha ezindaweni zokubhalela abenzeli.",
     "biometricUnlock": "Vula ngebhayomethrikhi",
-    "biometricUnlockSubtitle": "Vula uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lusebenza ngemuva."
+    "biometricUnlockSubtitle": "Vula uhlelo lokusebenza lapho luqala nangemva kokuba selunemizuzu emihlanu lusebenza ngemuva.",
+    "featureFlags": "Amaflagi ezici",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Isicelo sokuhlanganisa asitholakali",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Uhlelo lwakho lokufinyelela kusenesikhathi ludinga ukubuyekezwa umuntu ngaphambi kokuba lusetshenziswe efonini.",
       "iosTitle": "I-KiloClaw ayitholakali ku-iOS",
       "iosBody": "Ukufinyelela kwe-KiloClaw kule akhawunti kulawulwa ngaphandle kohlelo lokusebenza lwe-iOS.",
-      "iosContact": "Unemibuzo? Xhumana no-hi@kilo.ai."
+      "iosContact": "Unemibuzo? Xhumana no-hi@kilo.ai.",
+      "quarantinedCta": "Thumela i-imeyili eqenjini lethu",
+      "nonCanonicalEarlybirdCta": "Hlole uhlelo lwakho ku-kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} idinga ukunakwa: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Asikwazanga ukuvula i-GitHub. Sicela uzame futhi."
     },
     "settingsSave": {
-      "keepEditing": "Qhubeka uhlela",
       "saveChanges": "Londoloza izinguquko",
       "unsavedTitle": "Izinguquko ezingalondoloziwe",
       "unsavedMessage": "Ulondoloze izinguquko zakho ngaphambi kokuphuma kulesi sikrini?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Asikwazanga ukulayisha iziseshini ezisebenzayo.",
+      "couldNotRefresh": "Asikwazanga ukuvuselela",
       "noSessionsYetDescription": "Qala umsebenzi wokubhala ikhodi efonini yakho. Iziseshini zakho zizovela lapha.",
       "noMatches": "Azikho iziseshini ezihambisanayo",
       "tryDifferentSearch": "Zama igama lokusesha elihlukile.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Isithombe siyalayishwa",
       "imageUnavailableRetry": "Isithombe asitholakali, zama ukusilayisha futhi",
-      "imageUnavailableWithAlt": "Isithombe asitholakali: {{alt}}.",
       "imagePreviewUnavailableInSession": "Ukubuka kuqala isithombe akutholakali kule seshini.",
       "viewImage": "Buka isithombe",
       "viewImageWithAlt": "Buka isithombe {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Khetha imodeli ngaphambi kokuthumela.",
       "preparingPlaceholder": "Kusethwa indawo yokusebenza...",
       "finalizingPlaceholder": "Kuyaphethwa...",
-      "messagePlaceholder": "Umlayezo",
       "cannotReceiveFiles": "Le seshini ayikwazi ukwamukela amafayela. Susa okunamathiselwe ukuze uthumele umlayezo wakho.",
       "couldNotAttachFiles": "Asikwazanga ukunamathisela amafayela. Thepha inkinobho yokuthumela ukuze uzame futhi.",
       "discardAttachmentsMessage": "Amafayela alayishiwe anganamathiselwe emilayezweni ethunyelwe azosuswa.",
@@ -2556,6 +2560,10 @@
     "stopped": "Ukufaka ngezwi kumisiwe. Thepha imakrofoni ukuze uzame futhi.",
     "unavailableDevice": "Ukufaka ngezwi akutholakali kule divayisi.",
     "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi.",
+    "languageNotInstalledTitle": "Ukufaka ngezwi kwe-{{language}} akalungile okwamanje",
+    "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakwanga kule foni. Landa la mafayela, bese uzame futhi ukufaka ngezwi.",
+    "downloadOfflineModel": "Landa",
+    "offlineModelDownloadScheduled": "Amafayela okukhuluma e-offline azolandwa ngemuva. Zama futhi ukufaka ngezwi kamuva.",
     "listeningStopped": "Ukulalela kumisiwe."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Ikhanseliwe",
         "uncollectible": "Ayisakhokheleki"
       },
-      "loadMoreFailed": "Asikwazanga ukulayisha okwengeziwe.",
       "truncated": "Ama-invoyisi amadala ayatholakala."
     },
     "lowBalanceAlert": {

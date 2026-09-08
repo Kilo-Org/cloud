@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Skoða önnur tæki og skrá þau út",
     "feedback": "Ábendingar",
     "privacyChoices": "Persónuverndarstillingar",
-    "signOut": "Skrá út",
     "deleteAccount": "Eyða reikningi",
     "confirmationCode": "Staðfestingarkóði",
     "confirmationCodePlaceholder": "6 tölustafa kóði",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Færsluhnappur sendir skilaboð",
     "returnSendsMessageSubtitle": "Þegar slökkt er á þessu setur færsluhnappurinn inn línuskil í ritlum fulltrúa.",
     "biometricUnlock": "Aflæsing með lífkennum",
-    "biometricUnlockSubtitle": "Krefjast aflæsingar við ræsingu og eftir fimm mínútur í bakgrunni."
+    "biometricUnlockSubtitle": "Krefjast aflæsingar við ræsingu og eftir fimm mínútur í bakgrunni.",
+    "featureFlags": "Eiginleikafánar",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Sameiningarbeiðni ekki tiltæk",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Yfirfara þarf áskriftina þína með snemmbúnum aðgangi handvirkt áður en hægt er að nota hana í símanum.",
       "iosTitle": "KiloClaw ekki fáanlegt í iOS",
       "iosBody": "Fyrir þennan reikning er aðgangi að KiloClaw stýrt utan iOS-appsins.",
-      "iosContact": "Spurningar? Sendu tölvupóst á hi@kilo.ai."
+      "iosContact": "Spurningar? Sendu tölvupóst á hi@kilo.ai.",
+      "quarantinedCta": "Sendu tölvupóst á teymið okkar",
+      "nonCanonicalEarlybirdCta": "Skoðaðu áskriftina þína á kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} þarfnast athygli: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Ekki tókst að opna GitHub. Reyndu aftur."
     },
     "settingsSave": {
-      "keepEditing": "Halda áfram að breyta",
       "saveChanges": "Vista breytingar",
       "unsavedTitle": "Óvistaðar breytingar",
       "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Ekki tókst að hlaða virkum lotum.",
+      "couldNotRefresh": "Ekki tókst að endurnýja",
       "noSessionsYetDescription": "Byrjaðu á forritunarverkefni í símanum þínum. Loturnar þínar birtast hér.",
       "noMatches": "Engar lotur samsvara leitinni",
       "tryDifferentSearch": "Prófaðu annað leitarorð.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Hleður myndinni",
       "imageUnavailableRetry": "Myndin er ekki tiltæk, reyna að hlaða henni aftur",
-      "imageUnavailableWithAlt": "Myndin er ekki tiltæk: {{alt}}.",
       "imagePreviewUnavailableInSession": "Ekki er hægt að forskoða myndir í þessari lotu.",
       "viewImage": "Skoða mynd",
       "viewImageWithAlt": "Skoða mynd {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Veldu líkan áður en þú sendir.",
       "preparingPlaceholder": "Undirbýr umhverfi...",
       "finalizingPlaceholder": "Lýkur verkefninu...",
-      "messagePlaceholder": "Skilaboð",
       "cannotReceiveFiles": "Þessi lota getur ekki tekið við skrám. Fjarlægðu viðhengin til að senda skilaboðin.",
       "couldNotAttachFiles": "Ekki tókst að hengja skrárnar við. Ýttu á sendihnappinn til að reyna aftur.",
       "discardAttachmentsMessage": "Upphlöðnum skrám sem ekki fylgja sendum skilaboðum verður eytt.",
@@ -2556,6 +2560,10 @@
     "stopped": "Raddinnsláttur stöðvaðist. Ýttu á hljóðnemann til að reyna aftur.",
     "unavailableDevice": "Raddinnsláttur er ekki í boði á þessu tæki.",
     "unavailableLanguage": "Raddinnsláttur er ekki í boði á tungumáli tækisins.",
+    "languageNotInstalledTitle": "Raddinnsláttur fyrir {{language}} er ekki tilbúinn ennþá",
+    "languageNotInstalledMessage": "Ónettengdu talgagnaskrárnar fyrir {{language}} eru ekki uppsettar á þessum síma. Hladdu þeim niður og reyndu raddinnslátt aftur.",
+    "downloadOfflineModel": "Hlaða niður",
+    "offlineModelDownloadScheduled": "Ónettengdu talgagnaskrárnar verða hlaðnar niður í bakgrunni. Reyndu raddinnslátt aftur síðar.",
     "listeningStopped": "Hlustun stöðvuð."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Ógildur",
         "uncollectible": "Óinnheimtanlegur"
       },
-      "loadMoreFailed": "Tókst ekki að sækja meira.",
       "truncated": "Hægt er að skoða eldri reikninga."
     },
     "lowBalanceAlert": {

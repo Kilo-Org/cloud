@@ -18,7 +18,7 @@ import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelId
 import { isFreeModel } from '@/lib/ai-gateway/is-free-model';
 import {
   getCachedVercelInferenceProviderIdsForModel,
-  getVercelModelsFromRedis,
+  getVercelModelsFromDatabase,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
 import type { GatewayProviderOptions } from '@ai-sdk/gateway';
@@ -93,7 +93,7 @@ export async function shouldRouteToVercel(
     return false;
   }
 
-  const vercelModels = await getVercelModelsFromRedis();
+  const vercelModels = await getVercelModelsFromDatabase();
   const vercelModelId = mapModelIdToVercel(requestedModel);
   if (!vercelModels.has(vercelModelId)) {
     console.debug(`[shouldRouteToVercel] model not found in Vercel model list`);

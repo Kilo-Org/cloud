@@ -11,7 +11,10 @@ import type {
   PerRecipientResult,
 } from '@kilocode/notifications';
 
-import type { UserNotificationPreferences } from './cloud-agent-session-push';
+import {
+  DEFAULT_USER_NOTIFICATION_PREFERENCES,
+  type UserNotificationPreferences,
+} from './cloud-agent-session-push';
 
 type RecipientDOStub = {
   dispatchPush: (input: DispatchPushInput) => Promise<DispatchPushOutcome>;
@@ -25,16 +28,6 @@ export type InternalDispatchDeps = {
    * read with no row → default-on for every category.
    */
   readPreferences: (userId: string) => Promise<UserNotificationPreferences | null>;
-};
-
-const DEFAULT_PREFERENCES: UserNotificationPreferences = {
-  agentPushEnabled: true,
-  chatMessagesEnabled: true,
-  agentAttentionEnabled: true,
-  sessionStatusEnabled: true,
-  kiloclawActivityEnabled: true,
-  balanceAlertsEnabled: true,
-  securityFindingsEnabled: true,
 };
 
 function securityFindingTitle(
@@ -195,7 +188,7 @@ export async function dispatchInternalPushCore(
       let prefs: UserNotificationPreferences;
       try {
         const row = await deps.readPreferences(userId);
-        prefs = row ?? DEFAULT_PREFERENCES;
+        prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
       } catch {
         return 'failed' as const;
       }

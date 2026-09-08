@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Ara l-apparati l-oħra u oħroġ mill-kont fuqhom",
     "feedback": "Agħti l-fehma tiegħek",
     "privacyChoices": "Għażliet tal-privatezza",
-    "signOut": "Oħroġ",
     "deleteAccount": "Ħassar il-kont",
     "confirmationCode": "Kodiċi ta' konferma",
     "confirmationCodePlaceholder": "kodiċi ta' 6 ċifri",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "It-tast tar-ritorn jibgħat il-messaġġ",
     "returnSendsMessageSubtitle": "Meta din l-għażla tkun mitfija, it-tast tar-ritorn idaħħal linja ġdida fil-qasam tal-messaġġ lill-aġent.",
     "biometricUnlock": "Żblokka bil-bijometrija",
-    "biometricUnlockSubtitle": "Żblokka l-applikazzjoni meta titnieda u wara ħames minuti fl-isfond."
+    "biometricUnlockSubtitle": "Żblokka l-applikazzjoni meta titnieda u wara ħames minuti fl-isfond.",
+    "featureFlags": "Flags tal-karatteristiċi",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "It-talba għall-għaqda mhix disponibbli",
@@ -1197,7 +1201,9 @@
       "nonCanonicalEarlybirdBody": "Il-pjan ta' aċċess bikri tiegħek jeħtieġ reviżjoni manwali qabel ma jintuża fuq il-mowbajl.",
       "iosTitle": "KiloClaw mhux disponibbli fuq iOS",
       "iosBody": "Għal dan il-kont, l-aċċess għal KiloClaw jiġi mmaniġġjat barra mill-app ta' iOS.",
-      "iosContact": "Mistoqsijiet? Ikkuntattja hi@kilo.ai."
+      "iosContact": "Mistoqsijiet? Ikkuntattja hi@kilo.ai.",
+      "quarantinedCta": "Ibgħat email lit-tim tagħna",
+      "nonCanonicalEarlybirdCta": "Irrevedi l-pjan tiegħek fuq kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} jeħtieġ attenzjoni: {{label}}",
@@ -1734,7 +1740,6 @@
       "couldNotOpenGithub": "Ma setax jinfetaħ GitHub. Jekk jogħġbok erġa' pprova."
     },
     "settingsSave": {
-      "keepEditing": "Kompli editja",
       "saveChanges": "Issejvja l-bidliet",
       "unsavedTitle": "Bidliet mhux issejvjati",
       "unsavedMessage": "Trid tissejvja l-bidliet tiegħek qabel ma titlaq minn dan l-iskrin?"
@@ -1917,6 +1922,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Ma setgħux jitgħabbew is-sessjonijiet attivi.",
+      "couldNotRefresh": "Ma setax isir l-aġġornament",
       "noSessionsYetDescription": "Ibda kompitu tal-ipprogrammar mill-mowbajl tiegħek. Is-sessjonijiet tiegħek se jidhru hawn.",
       "noMatches": "L-ebda sessjoni ma taqbel mat-tfittxija",
       "tryDifferentSearch": "Ipprova fittex b'kelma oħra.",
@@ -2207,7 +2213,6 @@
     "filePart": {
       "loadingImage": "Qed titgħabba l-immaġni",
       "imageUnavailableRetry": "L-immaġni mhix disponibbli, erġa' pprova tgħabbiha",
-      "imageUnavailableWithAlt": "L-immaġni {{alt}} mhix disponibbli.",
       "imagePreviewUnavailableInSession": "Il-previżjoni tal-immaġni mhix disponibbli f'din is-sessjoni.",
       "viewImage": "Ara l-immaġni",
       "viewImageWithAlt": "Ara l-immaġni {{alt}}",
@@ -2411,7 +2416,6 @@
       "selectModelBeforeSending": "Agħżel mudell qabel ma tibgħat.",
       "preparingPlaceholder": "Qed jitħejja l-ambjent...",
       "finalizingPlaceholder": "Qed jitlesta...",
-      "messagePlaceholder": "Messaġġ",
       "cannotReceiveFiles": "Din is-sessjoni ma tistax tirċievi fajls. Neħħi l-annessi biex tibgħat il-messaġġ tiegħek.",
       "couldNotAttachFiles": "Ma setgħux jiġu mehmuża l-fajls. Tektek Ibgħat biex terġa' tipprova.",
       "discardAttachmentsMessage": "Il-fajls imtellgħin li mhumiex mehmuża ma' messaġġi mibgħuta se jitħassru.",
@@ -2619,6 +2623,10 @@
     "stopped": "Id-dħul bil-vuċi waqaf. Tektek il-mikrofonu biex terġa' tipprova.",
     "unavailableDevice": "Id-dħul bil-vuċi mhux disponibbli fuq dan l-apparat.",
     "unavailableLanguage": "Id-dħul bil-vuċi mhux disponibbli għal-lingwa ta' dan l-apparat.",
+    "languageNotInstalledTitle": "Id-dħul bil-vuċi għal {{language}} għadux lest",
+    "languageNotInstalledMessage": "Il-fajls tad-diskors offline għal {{language}} mhumiex installati fuq dan it-telefon. Niżżelhom, imbagħad erġa' pprova d-dħul bil-vuċi.",
+    "downloadOfflineModel": "Niżżel",
+    "offlineModelDownloadScheduled": "Il-fajls tad-diskors offline se jinżżlu fl-isfond. Erġa' pprova d-dħul bil-vuċi iktar 'il quddiem.",
     "listeningStopped": "Is-smigħ waqaf."
   },
   "share": {
@@ -2840,7 +2848,6 @@
         "void": "Annullata",
         "uncollectible": "Ma tistax tinġabar"
       },
-      "loadMoreFailed": "Ma stajniex ngħabbu aktar.",
       "truncated": "Hemm fatturi ta' qabel disponibbli."
     },
     "lowBalanceAlert": {

@@ -43,7 +43,12 @@ describe('sandbox control frames', () => {
     expect(sandboxHelloResultSchema.parse(helloResult())).toEqual({
       protocolVersion: 1,
       handshakeComplete: true,
-      capabilities: { kiloVersionHeartbeat: true },
+      capabilities: {
+        kiloVersionHeartbeat: true,
+        sessionOperationResults: true,
+        scopedStopAbort: true,
+        nativeRuntimeRetirement: true,
+      },
     });
     const previous = { protocolVersion: 1, handshakeComplete: true };
     expect(sandboxHelloResultSchema.parse(previous)).toEqual(previous);

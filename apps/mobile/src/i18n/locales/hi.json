@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "अन्य डिवाइस देखें और उनसे साइन आउट करें",
     "feedback": "प्रतिक्रिया",
     "privacyChoices": "गोपनीयता के विकल्प",
-    "signOut": "साइन आउट करें",
     "deleteAccount": "खाता हटाएँ",
     "confirmationCode": "पुष्टि का कोड",
     "confirmationCodePlaceholder": "6 अंकों का कोड",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "रिटर्न की दबाने पर संदेश भेजें",
     "returnSendsMessageSubtitle": "यह विकल्प बंद होने पर रिटर्न की दबाने से एजेंट के संदेश लिखने के बॉक्स में नई पंक्ति जुड़ती है।",
     "biometricUnlock": "बायोमेट्रिक्स से अनलॉक करें",
-    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।"
+    "biometricUnlockSubtitle": "ऐप शुरू करने पर और पृष्ठभूमि में पाँच मिनट रहने के बाद अनलॉक करना आवश्यक है।",
+    "featureFlags": "फ़ीचर फ़्लैग",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "लाइव गतिविधियाँ",
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "वेब पर सदस्यता लें",
       "subscriptionPastDueBody": "आपके सबसे हाल के भुगतान में समस्या आई। इसे अपडेट करने के लिए अपने ब्राउज़र से kilo.ai/claw पर जाएँ। आप ऐप में बिलिंग प्रबंधित नहीं कर सकते।",
       "subscriptionPastDueTitle": "वेब पर भुगतान की जानकारी अपडेट करें",
-      "trialExpiredBody": "KiloClaw का उपयोग जारी रखने के लिए, अपने ब्राउज़र से kilo.ai/claw पर जाएँ। आप ऐप में सदस्यता नहीं ले सकते।"
+      "trialExpiredBody": "KiloClaw का उपयोग जारी रखने के लिए, अपने ब्राउज़र से kilo.ai/claw पर जाएँ। आप ऐप में सदस्यता नहीं ले सकते।",
+      "quarantinedCta": "हमारी टीम को ईमेल करें",
+      "nonCanonicalEarlybirdCta": "अपना प्लान Kilo.ai पर समीक्षा करें"
     },
     "controls": {
       "redeploying": "फिर से तैनात किया जा रहा है…",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "चुनें कि सुरक्षा एजेंट किन रिपॉज़िटरी की निगरानी करे"
     },
     "settingsSave": {
-      "keepEditing": "संपादन जारी रखें",
       "saveChanges": "बदलाव सहेजें",
       "unsavedMessage": "इस स्क्रीन से जाने से पहले अपने बदलाव सहेजना चाहते हैं?",
       "unsavedTitle": "बिना सहेजे गए बदलाव"
@@ -1448,6 +1453,7 @@
     "sessionList": {
       "completedWillAppear": "पूरे हो चुके सत्र यहाँ दिखाई देंगे।",
       "couldNotLoadActive": "सक्रिय सत्र लोड नहीं हो सके।",
+      "couldNotRefresh": "रीफ़्रेश नहीं हो सका",
       "couldNotSearch": "सत्र खोजे नहीं जा सके।",
       "noMatches": "कोई सत्र मेल नहीं खाता",
       "noPastSessions": "कोई पिछला सत्र नहीं",
@@ -1706,7 +1712,6 @@
     "filePart": {
       "loadingImage": "छवि लोड हो रही है",
       "imageUnavailableRetry": "छवि उपलब्ध नहीं, फिर से लोड करें",
-      "imageUnavailableWithAlt": "छवि उपलब्ध नहीं है: {{alt}}।",
       "viewImage": "छवि देखें",
       "viewImageWithAlt": "छवि देखें: {{alt}}",
       "imageOutput": "आउटपुट की छवि",
@@ -1894,7 +1899,6 @@
       "selectModelBeforeSending": "भेजने से पहले एक मॉडल चुनें।",
       "preparingPlaceholder": "एनवायरनमेंट तैयार हो रहा है…",
       "finalizingPlaceholder": "काम पूरा किया जा रहा है…",
-      "messagePlaceholder": "संदेश",
       "cannotReceiveFiles": "यह सत्र फ़ाइलें प्राप्त नहीं कर सकता। अपना संदेश भेजने के लिए अटैचमेंट हटाएँ।",
       "couldNotAttachFiles": "फ़ाइलें जोड़ी नहीं जा सकीं। फिर से कोशिश करने के लिए ‘भेजें’ पर टैप करें।",
       "discardAttachmentsMessage": "अपलोड की गई ऐसी फ़ाइलें हटा दी जाएँगी जो किसी भेजे गए संदेश से जुड़ी नहीं हैं।",
@@ -2125,6 +2129,10 @@
     "stopped": "वॉइस इनपुट रुक गया। फिर से कोशिश करने के लिए माइक्रोफ़ोन पर टैप करें।",
     "unavailableDevice": "इस डिवाइस पर वॉइस इनपुट उपलब्ध नहीं है।",
     "unavailableLanguage": "इस डिवाइस की भाषा के लिए वॉइस इनपुट उपलब्ध नहीं है।",
+    "languageNotInstalledTitle": "{{language}} के लिए वॉइस इनपुट अभी तैयार नहीं है",
+    "languageNotInstalledMessage": "{{language}} की ऑफ़लाइन स्पीच फ़ाइलें इस फ़ोन पर इंस्टॉल नहीं हैं। उन्हें डाउनलोड करें, फिर वॉइस इनपुट फिर से आज़माएँ।",
+    "downloadOfflineModel": "डाउनलोड",
+    "offlineModelDownloadScheduled": "ऑफ़लाइन स्पीच फ़ाइलें बैकग्राउंड में डाउनलोड होंगी। बाद में वॉइस इनपुट फिर से आज़माएँ।",
     "listeningStopped": "सुनना बंद हो गया।"
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "रद्द",
         "uncollectible": "वसूली असंभव"
       },
-      "loadMoreFailed": "और नतीजे लोड नहीं हो सके।",
       "truncated": "पुराने इनवॉइस उपलब्ध हैं।"
     },
     "lowBalanceAlert": {

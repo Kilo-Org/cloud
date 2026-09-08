@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Pregledaj i odjavi druge uređaje",
     "feedback": "Povratne informacije",
     "privacyChoices": "Podešavanja privatnosti",
-    "signOut": "Odjavi se",
     "deleteAccount": "Obriši nalog",
     "confirmationCode": "Kod za potvrdu",
     "confirmationCodePlaceholder": "kod od 6 cifara",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Taster za novi red šalje poruku",
     "returnSendsMessageSubtitle": "Kada je ova opcija isključena, taster za novi red umeće novi red u polje za poruku agentu.",
     "biometricUnlock": "Otključavanje biometrijom",
-    "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini."
+    "biometricUnlockSubtitle": "Otključavanje je obavezno pri pokretanju aplikacije i nakon pet minuta u pozadini.",
+    "featureFlags": "Zastavice funkcija",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Zahtev za spajanje nije dostupan",
@@ -1181,7 +1185,9 @@
       "nonCanonicalEarlybirdBody": "Tvoj plan ranog pristupa mora da prođe ručnu proveru pre korišćenja u mobilnoj aplikaciji.",
       "iosTitle": "KiloClaw nije dostupan u iOS-u",
       "iosBody": "Pristupom usluzi KiloClaw za ovaj nalog upravlja se van iOS aplikacije.",
-      "iosContact": "Imaš pitanja? Piši na hi@kilo.ai."
+      "iosContact": "Imaš pitanja? Piši na hi@kilo.ai.",
+      "quarantinedCta": "Pošalji e-mejl našem timu",
+      "nonCanonicalEarlybirdCta": "Pregledaj svoj plan na kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} zahteva pažnju: {{label}}",
@@ -1712,7 +1718,6 @@
       "couldNotOpenGithub": "GitHub se ne može otvoriti. Pokušaj ponovo."
     },
     "settingsSave": {
-      "keepEditing": "Nastavi uređivanje",
       "saveChanges": "Sačuvaj promene",
       "unsavedTitle": "Nesačuvane promene",
       "unsavedMessage": "Sačuvati promene pre napuštanja ovog ekrana?"
@@ -1891,6 +1896,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Nije moguće učitati aktivne sesije.",
+      "couldNotRefresh": "Nije moguće osvežiti",
       "noSessionsYetDescription": "Započni zadatak programiranja sa telefona. Tvoje sesije će se pojaviti ovde.",
       "noMatches": "Nema odgovarajućih sesija",
       "tryDifferentSearch": "Pokušaj sa drugim pojmom za pretragu.",
@@ -2173,7 +2179,6 @@
     "filePart": {
       "loadingImage": "Učitavanje slike",
       "imageUnavailableRetry": "Slika nije dostupna, pokušaj ponovo da je učitaš",
-      "imageUnavailableWithAlt": "Slika nije dostupna: {{alt}}.",
       "imagePreviewUnavailableInSession": "Pregled slike nije dostupan u ovoj sesiji.",
       "viewImage": "Prikaži sliku",
       "viewImageWithAlt": "Prikaži sliku {{alt}}",
@@ -2371,7 +2376,6 @@
       "selectModelBeforeSending": "Izaberi model pre slanja.",
       "preparingPlaceholder": "Priprema okruženja...",
       "finalizingPlaceholder": "Završavanje...",
-      "messagePlaceholder": "Poruka",
       "cannotReceiveFiles": "Ova sesija ne može da prima fajlove. Ukloni priloge da pošalješ poruku.",
       "couldNotAttachFiles": "Prilaganje fajlova nije uspelo. Dodirni dugme za slanje da pokušaš ponovo.",
       "discardAttachmentsMessage": "Otpremljeni fajlovi koji nisu priloženi poslatim porukama biće obrisani.",
@@ -2577,6 +2581,10 @@
     "stopped": "Glasovni unos je zaustavljen. Dodirni mikrofon da pokušaš ponovo.",
     "unavailableDevice": "Glasovni unos nije dostupan na ovom uređaju.",
     "unavailableLanguage": "Glasovni unos nije dostupan za jezik ovog uređaja.",
+    "languageNotInstalledTitle": "Glasovni unos za {{language}} još nije spreman",
+    "languageNotInstalledMessage": "Datoteke govora za vanmrežni rad za {{language}} nisu instalirane na ovom telefonu. Preuzmi ih, a zatim pokušaj glasovni unos ponovo.",
+    "downloadOfflineModel": "Preuzmi",
+    "offlineModelDownloadScheduled": "Datoteke govora za vanmrežni rad biće preuzete u pozadini. Pokušaj glasovni unos ponovo kasnije.",
     "listeningStopped": "Slušanje je zaustavljeno."
   },
   "share": {
@@ -2798,7 +2806,6 @@
         "void": "Stornirano",
         "uncollectible": "Nenaplativo"
       },
-      "loadMoreFailed": "Učitavanje dodatnih stavki nije uspelo.",
       "truncated": "Starije fakture su dostupne."
     },
     "lowBalanceAlert": {

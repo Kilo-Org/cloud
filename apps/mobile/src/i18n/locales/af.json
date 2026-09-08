@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Bekyk ander toestelle en teken hulle uit",
     "feedback": "Terugvoer",
     "privacyChoices": "Privaatheidskeuses",
-    "signOut": "Meld af",
     "deleteAccount": "Skrap rekening",
     "confirmationCode": "Bevestigingskode",
     "confirmationCodePlaceholder": "6-syferkode",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Return-toets stuur boodskap",
     "returnSendsMessageSubtitle": "Wanneer dit af is, voeg die Return-toets 'n nuwe reël in agente se boodskapinvoer in.",
     "biometricUnlock": "Ontsluit met biometrie",
-    "biometricUnlockSubtitle": "Ontsluit wanneer die toep begin en nadat dit vyf minute in die agtergrond was."
+    "biometricUnlockSubtitle": "Ontsluit wanneer die toep begin en nadat dit vyf minute in die agtergrond was.",
+    "featureFlags": "Funksie-vlae",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "Trekversoek onbeskikbaar",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "Jou plan vir vroeë toegang moet deur 'n persoon hersien word voordat jy dit op jou foon kan gebruik.",
       "iosTitle": "KiloClaw nie op iOS beskikbaar nie",
       "iosBody": "KiloClaw-toegang vir hierdie rekening word buite die iOS-toep bestuur.",
-      "iosContact": "Vrae? Kontak hi@kilo.ai."
+      "iosContact": "Vrae? Kontak hi@kilo.ai.",
+      "quarantinedCta": "Stuur ons span 'n e-pos",
+      "nonCanonicalEarlybirdCta": "Hersien jou plan op kilo.ai"
     },
     "instanceCard": {
       "needsAttention": "{{name}} verg aandag: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "Kon GitHub nie oopmaak nie. Probeer asseblief weer."
     },
     "settingsSave": {
-      "keepEditing": "Gaan voort met wysiging",
       "saveChanges": "Stoor veranderinge",
       "unsavedTitle": "Ongestoorde veranderinge",
       "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Kon nie die aktiewe sessies laai nie.",
+      "couldNotRefresh": "Kon nie verfris nie",
       "noSessionsYetDescription": "Begin 'n kodeertaak op jou foon. Jou sessies sal hier verskyn.",
       "noMatches": "Geen ooreenstemmende sessies nie",
       "tryDifferentSearch": "Probeer 'n ander soekterm.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "Laai afbeelding",
       "imageUnavailableRetry": "Afbeelding onbeskikbaar, probeer weer om dit te laai",
-      "imageUnavailableWithAlt": "Die afbeelding is nie beskikbaar nie: {{alt}}.",
       "imagePreviewUnavailableInSession": "'N Voorskou van die afbeelding is nie in hierdie sessie beskikbaar nie.",
       "viewImage": "Bekyk afbeelding",
       "viewImageWithAlt": "Bekyk afbeelding {{alt}}",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "Kies 'n model voordat jy 'n boodskap stuur.",
       "preparingPlaceholder": "Omgewing word opgestel...",
       "finalizingPlaceholder": "Besig om af te handel...",
-      "messagePlaceholder": "Boodskap",
       "cannotReceiveFiles": "Hierdie sessie kan nie lêers ontvang nie. Verwyder die aanhegsels om jou boodskap te stuur.",
       "couldNotAttachFiles": "Die lêers kon nie aangeheg word nie. Tik op Stuur om weer te probeer.",
       "discardAttachmentsMessage": "Opgelaaide lêers wat nie aan gestuurde boodskappe geheg is nie, sal geskrap word.",
@@ -2556,6 +2560,10 @@
     "stopped": "Steminvoer het gestop. Tik op die mikrofoon om weer te probeer.",
     "unavailableDevice": "Steminvoer is nie op hierdie toestel beskikbaar nie.",
     "unavailableLanguage": "Steminvoer is nie vir die toestel se taal beskikbaar nie.",
+    "languageNotInstalledTitle": "Steminvoer vir {{language}} is nog nie gereed nie",
+    "languageNotInstalledMessage": "Die vanlyn-spraaklêers vir {{language}} is nie op hierdie foon geïnstalleer nie. Laai hulle af en probeer steminvoer weer.",
+    "downloadOfflineModel": "Laai af",
+    "offlineModelDownloadScheduled": "Die vanlyn-spraaklêers sal op die agtergrond afgelaai word. Probeer steminvoer later weer.",
     "listeningStopped": "Die toestel luister nie meer nie."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "Nietig",
         "uncollectible": "Oninbaar"
       },
-      "loadMoreFailed": "Meer items kon nie gelaai word nie.",
       "truncated": "Ouer fakture is beskikbaar."
     },
     "lowBalanceAlert": {

@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "इतर डिव्हाइस तपासा आणि त्यांमधून साइन आउट करा",
     "feedback": "अभिप्राय",
     "privacyChoices": "गोपनीयतेचे पर्याय",
-    "signOut": "साइन आउट करा",
     "deleteAccount": "खाते हटवा",
     "confirmationCode": "पुष्टीकरण कोड",
     "confirmationCodePlaceholder": "6-अंकी कोड",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "रिटर्न कळ संदेश पाठवते",
     "returnSendsMessageSubtitle": "हा पर्याय बंद असताना रिटर्न कळ दाबल्यास एजंटच्या संदेशपेटीत नवीन ओळ घातली जाते.",
     "biometricUnlock": "बायोमेट्रिक्स वापरून अनलॉक करा",
-    "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे."
+    "biometricUnlockSubtitle": "अ‍ॅप सुरू करताना आणि पाच मिनिटे पार्श्वभूमीत राहिल्यानंतर अनलॉक करणे आवश्यक आहे.",
+    "featureFlags": "वैशिष्ट्य ध्वज",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "prReview": {
     "pullRequestUnavailable": "पुल रिक्वेस्ट अनुपलब्ध",
@@ -1173,7 +1177,9 @@
       "nonCanonicalEarlybirdBody": "तुमची लवकर प्रवेश देणारी योजना मोबाइलवर वापरण्यापूर्वी आमच्या टीमने तपासणे आवश्यक आहे.",
       "iosTitle": "IOS वर KiloClaw अनुपलब्ध",
       "iosBody": "या खात्यासाठी KiloClaw वापरण्याची परवानगी iOS अॅपच्या बाहेर व्यवस्थापित केली जाते.",
-      "iosContact": "काही प्रश्न आहेत? hi@kilo.ai वर संपर्क साधा."
+      "iosContact": "काही प्रश्न आहेत? hi@kilo.ai वर संपर्क साधा.",
+      "quarantinedCta": "आमच्या टीमला ईमेल करा",
+      "nonCanonicalEarlybirdCta": "तुमची योजना Kilo.ai वर तपासा"
     },
     "instanceCard": {
       "needsAttention": "{{name}} कडे लक्ष देणे आवश्यक आहे: {{label}}",
@@ -1701,7 +1707,6 @@
       "couldNotOpenGithub": "GitHub उघडता आले नाही. कृपया पुन्हा प्रयत्न करा."
     },
     "settingsSave": {
-      "keepEditing": "संपादन सुरू ठेवा",
       "saveChanges": "बदल जतन करा",
       "unsavedTitle": "जतन न केलेले बदल",
       "unsavedMessage": "ही स्क्रीन सोडण्यापूर्वी तुमचे बदल जतन करायचे?"
@@ -1878,6 +1883,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "सक्रिय सत्रे लोड करता आली नाहीत.",
+      "couldNotRefresh": "रीफ्रेश करता आले नाही",
       "noSessionsYetDescription": "तुमच्या फोनवरून कोडिंगचे काम सुरू करा. तुमची सत्रे येथे दिसतील.",
       "noMatches": "जुळणारी सत्रे नाहीत",
       "tryDifferentSearch": "दुसरा शब्द वापरून शोधा.",
@@ -2156,7 +2162,6 @@
     "filePart": {
       "loadingImage": "प्रतिमा लोड होत आहे",
       "imageUnavailableRetry": "प्रतिमा उपलब्ध नाही, ती लोड करण्याचा पुन्हा प्रयत्न करा",
-      "imageUnavailableWithAlt": "{{alt}} ही प्रतिमा उपलब्ध नाही.",
       "imagePreviewUnavailableInSession": "या सत्रात प्रतिमेचे पूर्वावलोकन उपलब्ध नाही.",
       "viewImage": "प्रतिमा पहा",
       "viewImageWithAlt": "{{alt}} ही प्रतिमा पहा",
@@ -2351,7 +2356,6 @@
       "selectModelBeforeSending": "पाठवण्यापूर्वी मॉडेल निवडा.",
       "preparingPlaceholder": "कार्यपरिसर तयार होत आहे...",
       "finalizingPlaceholder": "पूर्ण होत आहे...",
-      "messagePlaceholder": "संदेश",
       "cannotReceiveFiles": "या सत्रात फाइल्स स्वीकारता येत नाहीत. संदेश पाठवण्यासाठी जोडलेल्या फाइल्स काढा.",
       "couldNotAttachFiles": "फाइल्स जोडता आल्या नाहीत. पुन्हा प्रयत्न करण्यासाठी पाठवा या बटणावर टॅप करा.",
       "discardAttachmentsMessage": "पाठवलेल्या संदेशांना संलग्न नसलेल्या अपलोड केलेल्या फाइल्स हटवल्या जातील.",
@@ -2556,6 +2560,10 @@
     "stopped": "व्हॉइस इनपुट थांबले. पुन्हा प्रयत्न करण्यासाठी मायक्रोफोनवर टॅप करा.",
     "unavailableDevice": "या उपकरणावर व्हॉइस इनपुट उपलब्ध नाही.",
     "unavailableLanguage": "या उपकरणावर निवडलेल्या भाषेसाठी व्हॉइस इनपुट उपलब्ध नाही.",
+    "languageNotInstalledTitle": "{{language}} साठी व्हॉइस इनपुट अजून तयार नाही",
+    "languageNotInstalledMessage": "{{language}} साठीच्या ऑफलाइन स्पीच फाइल्स या फोनवर इंस्टॉल केलेल्या नाहीत. त्या डाउनलोड करा, नंतर व्हॉइस इनपुट पुन्हा वापरून पहा.",
+    "downloadOfflineModel": "डाउनलोड",
+    "offlineModelDownloadScheduled": "ऑफलाइन स्पीच फाइल्स बॅकग्राउंडमध्ये डाउनलोड होतील. नंतर व्हॉइस इनपुट पुन्हा वापरून पहा.",
     "listeningStopped": "ऐकणे थांबले."
   },
   "share": {
@@ -2777,7 +2785,6 @@
         "void": "रद्द",
         "uncollectible": "वसूल करता न येणारे"
       },
-      "loadMoreFailed": "आणखी माहिती लोड करता आली नाही.",
       "truncated": "जुनी बिले उपलब्ध आहेत."
     },
     "lowBalanceAlert": {

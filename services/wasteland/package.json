@@ -24,7 +24,6 @@
     "@hono/trpc-server": "^0.4.2",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
-    "itty-time": "^1.0.6",
     "jose": "catalog:",
     "workers-tagged-logger": "catalog:",
     "zod": "catalog:"

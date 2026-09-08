@@ -1,7 +1,15 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
-jest.mock('@/lib/redis', () => ({
-  redisClient: { get: jest.fn() },
+const mockLimit = jest.fn<() => Promise<Array<{ models: unknown }>>>();
+
+jest.mock('@/lib/drizzle', () => ({
+  readDb: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({
+        orderBy: jest.fn(() => ({ limit: mockLimit })),
+      })),
+    })),
+  },
 }));
 
 import {
@@ -56,40 +64,62 @@ describe('extractVercelInferenceProviderIdsFromModel', () => {
 describe('isValidOpenRouterModelId', () => {
   async function loadValidator() {
     jest.resetModules();
-    const { isValidOpenRouterModelId } =
+    const { isValidOpenRouterModelId, getCachedVercelInferenceProviderIdsForModel } =
       await import('@/lib/ai-gateway/providers/gateway-models-cache');
-    const { redisClient: freshRedisClient } = await import('@/lib/redis');
     return {
       isValidOpenRouterModelId,
-      redisGet: jest.mocked(freshRedisClient.get),
+      getCachedVercelInferenceProviderIdsForModel,
     };
   }
 
-  it('accepts known legacy aliases without consulting Redis', async () => {
-    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
-
-    await expect(isValidOpenRouterModelId('gpt-4o')).resolves.toBe(true);
-    expect(redisGet).not.toHaveBeenCalled();
+  beforeEach(() => {
+    mockLimit.mockReset();
   });
 
-  it('accepts ids present in the Redis catalog', async () => {
-    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
-    redisGet.mockResolvedValue(JSON.stringify(['openai/gpt-4o']));
+  it('accepts ids present in the database catalog', async () => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+    mockLimit.mockResolvedValue([
+      { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
+    ]);
 
     await expect(isValidOpenRouterModelId('openai/gpt-4o')).resolves.toBe(true);
   });
 
-  it('rejects ids missing from a non-empty Redis catalog', async () => {
-    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
-    redisGet.mockResolvedValue(JSON.stringify(['openai/gpt-4o']));
+  it('rejects ids missing from a non-empty database catalog', async () => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+    mockLimit.mockResolvedValue([
+      { models: { 'openai/gpt-4o': storedModel({ id: 'openai/gpt-4o' }) } },
+    ]);
 
     await expect(isValidOpenRouterModelId('not-a-real-model')).resolves.toBe(false);
   });
 
-  it('fails open when Redis has no model ids', async () => {
-    const { isValidOpenRouterModelId, redisGet } = await loadValidator();
-    redisGet.mockResolvedValue(null);
+  it('fails open when the database has no model ids', async () => {
+    const { isValidOpenRouterModelId } = await loadValidator();
+    mockLimit.mockResolvedValue([]);
 
     await expect(isValidOpenRouterModelId('not-a-real-model')).resolves.toBe(true);
+  });
+
+  it('reads Vercel inference providers from the database catalog', async () => {
+    const { getCachedVercelInferenceProviderIdsForModel } = await loadValidator();
+    mockLimit.mockResolvedValue([
+      {
+        models: {
+          'anthropic/claude-sonnet-4.5': storedModel({
+            id: 'anthropic/claude-sonnet-4.5',
+            endpoints: [
+              { provider_name: 'anthropic' },
+              { provider_name: 'bedrock' },
+              { provider_name: 'anthropic' },
+            ],
+          }),
+        },
+      },
+    ]);
+
+    await expect(
+      getCachedVercelInferenceProviderIdsForModel('anthropic/claude-sonnet-4.5')
+    ).resolves.toEqual(['anthropic', 'bedrock']);
   });
 });

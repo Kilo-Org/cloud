@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Andere apparaten bekijken en afmelden",
     "feedback": "Feedback geven",
     "privacyChoices": "Privacykeuzes",
-    "signOut": "Afmelden",
     "deleteAccount": "Account verwijderen",
     "confirmationCode": "Bevestigingscode",
     "confirmationCodePlaceholder": "code van 6 cijfers",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Return-toets verzendt bericht",
     "returnSendsMessageSubtitle": "Als dit uitstaat, voegt Return een nieuwe regel toe in het berichtveld van de agent.",
     "biometricUnlock": "Ontgrendelen met biometrie",
-    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan."
+    "biometricUnlockSubtitle": "Ontgrendelen is vereist bij het starten van de app en nadat de app vijf minuten op de achtergrond heeft gestaan.",
+    "featureFlags": "Functievlaggen",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "channel": {
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "Abonneren via de website",
       "subscriptionPastDueBody": "Er was een probleem met je laatste betaling. Ga in je browser naar kilo.ai/claw om je betaalgegevens bij te werken. Je kunt de facturering niet in de app beheren.",
       "subscriptionPastDueTitle": "Betaalgegevens via de website bijwerken",
-      "trialExpiredBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te blijven gebruiken. Je kunt je niet in de app abonneren."
+      "trialExpiredBody": "Ga vanuit je browser naar kilo.ai/claw om KiloClaw te blijven gebruiken. Je kunt je niet in de app abonneren.",
+      "quarantinedCta": "Ons team een e-mail sturen",
+      "nonCanonicalEarlybirdCta": "Je plan bekijken op kilo.ai"
     },
     "controls": {
       "redeploying": "Opnieuw uitrollen…",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "Kies welke repositories Security Agent bewaakt"
     },
     "settingsSave": {
-      "keepEditing": "Verder bewerken",
       "saveChanges": "Wijzigingen opslaan",
       "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
       "unsavedTitle": "Niet-opgeslagen wijzigingen"
@@ -1447,6 +1452,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "De actieve sessies konden niet worden geladen.",
+      "couldNotRefresh": "Het vernieuwen is mislukt",
       "noSessionsYetDescription": "Start een programmeertaak vanaf je telefoon. Je sessies verschijnen hier.",
       "noMatches": "Geen sessies gevonden",
       "tryDifferentSearch": "Probeer een andere zoekterm.",
@@ -1725,7 +1731,6 @@
     "filePart": {
       "loadingImage": "Afbeelding laden",
       "imageUnavailableRetry": "Afbeelding niet beschikbaar, opnieuw laden",
-      "imageUnavailableWithAlt": "De afbeelding is niet beschikbaar: {{alt}}.",
       "imagePreviewUnavailableInSession": "Er is geen voorbeeld van de afbeelding beschikbaar in deze sessie.",
       "viewImage": "Afbeelding bekijken",
       "viewImageWithAlt": "Afbeelding bekijken: {{alt}}",
@@ -1920,7 +1925,6 @@
       "selectModelBeforeSending": "Selecteer een model voordat je het bericht verzendt.",
       "preparingPlaceholder": "Omgeving voorbereiden…",
       "finalizingPlaceholder": "Afronden…",
-      "messagePlaceholder": "Bericht",
       "cannotReceiveFiles": "Deze sessie kan geen bestanden ontvangen. Verwijder de bijlagen om je bericht te verzenden.",
       "couldNotAttachFiles": "De bestanden konden niet worden bijgevoegd. Tik op Verzenden om het opnieuw te proberen.",
       "discardAttachmentsMessage": "Uploads die nog niet zijn gebruikt, worden verwijderd.",
@@ -2125,6 +2129,10 @@
     "stopped": "De spraakinvoer is gestopt. Tik op de microfoon om het opnieuw te proberen.",
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
     "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
+    "languageNotInstalledTitle": "Spraakinvoer voor {{language}} is nog niet gereed",
+    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet op deze telefoon geïnstalleerd. Download ze en probeer spraakinvoer opnieuw.",
+    "downloadOfflineModel": "Downloaden",
+    "offlineModelDownloadScheduled": "De offline spraakbestanden worden op de achtergrond gedownload. Probeer spraakinvoer later opnieuw.",
     "listeningStopped": "Het luisteren is gestopt."
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "Vervallen",
         "uncollectible": "Oninbaar"
       },
-      "loadMoreFailed": "Meer laden is mislukt.",
       "truncated": "Oudere facturen zijn beschikbaar."
     },
     "lowBalanceAlert": {

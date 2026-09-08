@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Просмотр устройств и выход из аккаунта на них",
     "feedback": "Обратная связь",
     "privacyChoices": "Настройки конфиденциальности",
-    "signOut": "Выйти",
     "deleteAccount": "Удалить аккаунт",
     "confirmationCode": "Код подтверждения",
     "confirmationCodePlaceholder": "6-значный код",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Отправлять сообщение клавишей ввода",
     "returnSendsMessageSubtitle": "Если отключено, клавиша ввода добавляет перенос строки в поле ввода сообщения агенту.",
     "biometricUnlock": "Разблокировка по биометрии",
-    "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме."
+    "biometricUnlockSubtitle": "Разблокировка требуется при запуске приложения и после пяти минут в фоновом режиме.",
+    "featureFlags": "Флаги функций",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Эфир активности",
@@ -602,7 +606,9 @@
       "subscriptionCanceledTitle": "Подписка на сайте",
       "subscriptionPastDueBody": "Возникла проблема с последним платежом. Откройте kilo.ai/claw в браузере, чтобы обновить платёжные данные. Управлять оплатой в приложении нельзя.",
       "subscriptionPastDueTitle": "Обновление платёжных данных на сайте",
-      "trialExpiredBody": "Чтобы продолжить пользоваться KiloClaw, откройте kilo.ai/claw в браузере. Оформить подписку в приложении нельзя."
+      "trialExpiredBody": "Чтобы продолжить пользоваться KiloClaw, откройте kilo.ai/claw в браузере. Оформить подписку в приложении нельзя.",
+      "quarantinedCta": "Написать нашей команде",
+      "nonCanonicalEarlybirdCta": "Проверить свой тариф на kilo.ai"
     },
     "controls": {
       "redeploying": "Повторное развёртывание…",
@@ -1308,7 +1314,6 @@
       "repositoriesCount_many": "Выбрано {{displayCount}} репозиториев"
     },
     "settingsSave": {
-      "keepEditing": "Продолжить редактирование",
       "saveChanges": "Сохранить изменения",
       "unsavedMessage": "Сохранить изменения перед выходом?",
       "unsavedTitle": "Несохраненные изменения"
@@ -1459,6 +1464,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Не удалось загрузить активные сеансы.",
+      "couldNotRefresh": "Не удалось обновить",
       "noSessionsYetDescription": "Запустите задачу по разработке с телефона. Ваши сеансы появятся здесь.",
       "noMatches": "Нет подходящих сеансов",
       "tryDifferentSearch": "Попробуйте другой поисковый запрос.",
@@ -1745,7 +1751,6 @@
     "filePart": {
       "loadingImage": "Загрузка изображения",
       "imageUnavailableRetry": "Изображение недоступно, повторите загрузку",
-      "imageUnavailableWithAlt": "Изображение недоступно: {{alt}}.",
       "imagePreviewUnavailableInSession": "В этом сеансе недоступен предварительный просмотр изображения.",
       "viewImage": "Просмотреть изображение",
       "viewImageWithAlt": "Просмотреть изображение {{alt}}",
@@ -1946,7 +1951,6 @@
       "selectModelBeforeSending": "Выберите модель перед отправкой.",
       "preparingPlaceholder": "Настройка окружения…",
       "finalizingPlaceholder": "Завершение…",
-      "messagePlaceholder": "Сообщение",
       "cannotReceiveFiles": "В этом сеансе нельзя получать файлы. Удалите вложения, чтобы отправить сообщение.",
       "couldNotAttachFiles": "Не удалось прикрепить файлы. Нажмите «Отправить», чтобы повторить.",
       "discardAttachmentsMessage": "Загруженные файлы, не прикреплённые к отправленным сообщениям, будут удалены.",
@@ -2153,6 +2157,10 @@
     "stopped": "Голосовой ввод остановлен. Нажмите на микрофон, чтобы попробовать снова.",
     "unavailableDevice": "Голосовой ввод недоступен на этом устройстве.",
     "unavailableLanguage": "Голосовой ввод не поддерживает выбранный язык устройства.",
+    "languageNotInstalledTitle": "Голосовой ввод для языка {{language}} пока не готов",
+    "languageNotInstalledMessage": "Офлайн-файлы распознавания речи для {{language}} не установлены на этом телефоне. Скачайте их, а затем снова попробуйте голосовой ввод.",
+    "downloadOfflineModel": "Скачать",
+    "offlineModelDownloadScheduled": "Офлайн-файлы распознавания речи будут скачаны в фоновом режиме. Попробуйте голосовой ввод позже.",
     "listeningStopped": "Запись речи остановлена."
   },
   "share": {
@@ -2818,7 +2826,6 @@
         "void": "Аннулирован",
         "uncollectible": "Безнадёжный долг"
       },
-      "loadMoreFailed": "Не удалось загрузить следующие записи.",
       "truncated": "Доступны более ранние счета."
     },
     "lowBalanceAlert": {

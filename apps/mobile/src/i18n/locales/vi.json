@@ -198,7 +198,6 @@
     "deviceSessionsSubtitle": "Xem và đăng xuất khỏi các thiết bị khác",
     "feedback": "Gửi góp ý",
     "privacyChoices": "Tùy chọn quyền riêng tư",
-    "signOut": "Đăng xuất",
     "deleteAccount": "Xóa tài khoản",
     "confirmationCode": "Mã xác nhận",
     "confirmationCodePlaceholder": "mã 6 chữ số",
@@ -240,7 +239,12 @@
     "returnSendsMessage": "Phím xuống dòng gửi tin nhắn",
     "returnSendsMessageSubtitle": "Khi tắt, phím xuống dòng sẽ chèn dòng mới vào ô nhập tin nhắn gửi cho tác nhân.",
     "biometricUnlock": "Mở khóa bằng sinh trắc học",
-    "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút."
+    "biometricUnlockSubtitle": "Yêu cầu mở khóa khi khởi chạy ứng dụng và sau khi ứng dụng ở chế độ nền trong năm phút.",
+    "featureFlags": "Cờ tính năng",
+    "featureFlagsBuild": "v{{version}}",
+    "featureFlagApplied": "remote · ≥ {{min}}",
+    "featureFlagSkipped": "default · < {{min}}",
+    "featureFlagNotLoaded": "default · not loaded"
   },
   "notifications": {
     "liveActivities": "Hoạt động trực tiếp",
@@ -600,7 +604,9 @@
       "subscriptionCanceledTitle": "Đăng ký gói trên trang web",
       "subscriptionPastDueBody": "Đã xảy ra sự cố với khoản thanh toán gần nhất của bạn. Truy cập kilo.ai/claw bằng trình duyệt để cập nhật thông tin thanh toán. Bạn không thể quản lý thanh toán trong ứng dụng.",
       "subscriptionPastDueTitle": "Cập nhật thông tin thanh toán trên web",
-      "trialExpiredBody": "Để tiếp tục sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng."
+      "trialExpiredBody": "Để tiếp tục sử dụng KiloClaw, hãy truy cập kilo.ai/claw từ trình duyệt. Bạn không thể đăng ký trong ứng dụng.",
+      "quarantinedCta": "Gửi email cho đội ngũ của chúng tôi",
+      "nonCanonicalEarlybirdCta": "Xem xét gói của bạn trên kilo.ai"
     },
     "controls": {
       "redeploying": "Đang triển khai lại…",
@@ -1300,7 +1306,6 @@
       "selectRepositoriesSubtitle": "Chọn các kho lưu trữ để Trợ lý bảo mật giám sát"
     },
     "settingsSave": {
-      "keepEditing": "Tiếp tục chỉnh sửa",
       "saveChanges": "Lưu thay đổi",
       "unsavedMessage": "Bạn có muốn lưu thay đổi trước khi rời màn hình này không?",
       "unsavedTitle": "Thay đổi chưa lưu"
@@ -1447,6 +1452,7 @@
     },
     "sessionList": {
       "couldNotLoadActive": "Không thể tải các phiên đang hoạt động.",
+      "couldNotRefresh": "Không thể làm mới",
       "noSessionsYetDescription": "Bắt đầu tác vụ lập trình từ điện thoại. Các phiên của bạn sẽ xuất hiện tại đây.",
       "noMatches": "Không có phiên phù hợp",
       "tryDifferentSearch": "Thử tìm bằng từ khóa khác.",
@@ -1725,7 +1731,6 @@
     "filePart": {
       "loadingImage": "Đang tải hình ảnh",
       "imageUnavailableRetry": "Không thể tải hình ảnh, thử tải lại",
-      "imageUnavailableWithAlt": "Không thể tải hình ảnh: {{alt}}.",
       "imagePreviewUnavailableInSession": "Không thể xem trước hình ảnh trong phiên này.",
       "viewImage": "Xem hình ảnh",
       "viewImageWithAlt": "Xem hình ảnh {{alt}}",
@@ -1920,7 +1925,6 @@
       "selectModelBeforeSending": "Hãy chọn mô hình trước khi gửi.",
       "preparingPlaceholder": "Đang thiết lập môi trường...",
       "finalizingPlaceholder": "Đang hoàn tất...",
-      "messagePlaceholder": "Tin nhắn",
       "cannotReceiveFiles": "Phiên này không thể nhận tệp. Hãy gỡ tệp đính kèm để gửi tin nhắn của bạn.",
       "couldNotAttachFiles": "Không thể đính kèm tệp. Chạm vào Gửi để thử lại.",
       "discardAttachmentsMessage": "Các tệp đã tải lên nhưng chưa gắn với tin nhắn đã gửi sẽ bị xóa.",
@@ -2125,6 +2129,10 @@
     "stopped": "Đã dừng nhập bằng giọng nói. Chạm vào micrô để thử lại.",
     "unavailableDevice": "Thiết bị này không hỗ trợ nhập bằng giọng nói.",
     "unavailableLanguage": "Tính năng nhập bằng giọng nói không hỗ trợ ngôn ngữ hiện tại của thiết bị.",
+    "languageNotInstalledTitle": "Nhập bằng giọng nói cho {{language}} chưa sẵn sàng",
+    "languageNotInstalledMessage": "Các tệp giọng nói ngoại tuyến cho {{language}} chưa được cài đặt trên điện thoại này. Hãy tải các tệp đó xuống, rồi thử nhập bằng giọng nói lại.",
+    "downloadOfflineModel": "Tải xuống",
+    "offlineModelDownloadScheduled": "Các tệp giọng nói ngoại tuyến sẽ được tải xuống trong nền. Hãy thử nhập bằng giọng nói lại sau.",
     "listeningStopped": "Đã dừng nghe."
   },
   "share": {
@@ -2776,7 +2784,6 @@
         "void": "Đã hủy",
         "uncollectible": "Không thể thu tiền"
       },
-      "loadMoreFailed": "Không thể tải thêm.",
       "truncated": "Còn các hóa đơn trước đó để xem."
     },
     "lowBalanceAlert": {

@@ -1096,8 +1096,15 @@ export async function updateIntegrationMetadata(
 
 /**
  * Atomically merges `metadataUpdates` into a platform integration's `metadata`
- * JSONB column, scoped to `owner` + `platform` (and `integrationId`, when an
- * owner can have more than one integration for that platform, e.g. GitHub).
+ * JSONB column, scoped to `owner` + `platform` + `integrationId`.
+ *
+ * `integrationId` is required: the unique index on `platform_integrations` is
+ * `(owner, platform, platform_installation_id)`, not `(owner, platform)`, so
+ * an owner can hold more than one row for a given platform (GitHub's
+ * standard/lite app split, the multiple-installations pilot, or simply a
+ * reconnect that left a second row behind). Without `integrationId` this
+ * would run as an owner+platform-wide UPDATE and silently touch every
+ * matching row instead of the one the caller intended.
  *
  * Uses Postgres's `||` merge operator in a single UPDATE instead of a
  * read-modify-write, so a concurrent writer touching a different key (e.g.
@@ -1109,7 +1116,7 @@ export async function updateIntegrationMetadataForOwner(
   owner: Owner,
   platform: string,
   metadataUpdates: Record<string, unknown>,
-  integrationId?: string
+  integrationId: string
 ): Promise<void> {
   const ownershipCondition =
     owner.type === 'user'
@@ -1126,7 +1133,7 @@ export async function updateIntegrationMetadataForOwner(
       and(
         ownershipCondition,
         eq(platform_integrations.platform, platform),
-        integrationId ? eq(platform_integrations.id, integrationId) : undefined
+        eq(platform_integrations.id, integrationId)
       )
     )
     .returning({ id: platform_integrations.id });

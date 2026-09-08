@@ -31,6 +31,14 @@ export async function withProviderInstallationLocks<T>(input: {
         break;
       }
     }
+    if (!destroyClient) {
+      try {
+        await client.query('RESET lock_timeout');
+        await client.query('RESET statement_timeout');
+      } catch {
+        destroyClient = true;
+      }
+    }
     client.release(destroyClient);
   }
 }

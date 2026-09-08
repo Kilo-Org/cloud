@@ -14,7 +14,6 @@ import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credential-store';
-import { captureException } from '@sentry/nextjs';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import {
   withProviderInstallationLock,
@@ -233,42 +232,6 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 /**
- * Dual-write the bot token into the encrypted `slack_oauth_credentials` store.
- *
- * Deliberately best-effort for now: nothing reads that store yet, so an unconfigured
- * or failing encryption keyset must not break Slack installs. Step 3 moves the read
- * paths onto the store, at which point this write becomes required and must move
- * inside the same transaction as the `platform_integrations` write.
- */
-async function mirrorSlackCredential({
-  integration,
-  owner,
-  teamId,
-  installation,
-}: {
-  integration: PlatformIntegration;
-  owner: Owner;
-  teamId: string;
-  installation: SlackInstallation;
-}): Promise<void> {
-  try {
-    await writeSlackCredential({
-      integrationId: integration.id,
-      slackTeamId: teamId,
-      owner,
-      botToken: installation.botToken,
-      botUserId: installation.botUserId ?? null,
-    });
-  } catch (error) {
-    captureException(error, {
-      level: 'error',
-      tags: { component: 'slack-service', op: 'mirror-slack-credential' },
-      extra: { integrationId: integration.id, teamId },
-    });
-  }
-}
-
-/**
  * Create or update Slack installation from the Chat SDK OAuth callback result.
  */
 export async function upsertSlackInstallation({
@@ -276,11 +239,15 @@ export async function upsertSlackInstallation({
   teamId,
   installation,
   persistInstallation,
+  captureInstallation,
+  restoreInstallation,
 }: {
   owner: Owner;
   teamId: string;
   installation: SlackInstallation;
   persistInstallation?: () => Promise<void>;
+  captureInstallation?: () => Promise<SlackInstallation | null>;
+  restoreInstallation?: (installation: SlackInstallation | null) => Promise<void>;
 }): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
   const teamName = installation.teamName || 'Unknown Team';
@@ -316,6 +283,7 @@ export async function upsertSlackInstallation({
         platform: PLATFORM.SLACK,
         installationIds: [existing.platform_installation_id, teamId],
         callback: async () => {
+          const previousProviderState = await captureInstallation?.();
           const row = await db.transaction(async tx => {
             await assertGitHubAutomationCanBeEnabled(owner, tx);
             const [current] = await tx
@@ -355,12 +323,27 @@ export async function upsertSlackInstallation({
           });
           try {
             await persistInstallation?.();
+            await writeSlackCredential({
+              integrationId: row.id,
+              slackTeamId: teamId,
+              owner,
+              botToken: installation.botToken,
+              botUserId: installation.botUserId ?? null,
+            });
           } catch (error) {
+            await restoreInstallation?.(previousProviderState ?? null);
             await db
               .update(platform_integrations)
               .set({
-                integration_status: INTEGRATION_STATUS.SUSPENDED,
-                auth_invalid_reason: 'provider_state_persist_failed',
+                platform_installation_id: existing.platform_installation_id,
+                platform_account_id: existing.platform_account_id,
+                platform_account_login: existing.platform_account_login,
+                scopes: existing.scopes,
+                integration_status: existing.integration_status,
+                metadata: existing.metadata,
+                auth_invalid_at: existing.auth_invalid_at,
+                auth_invalid_reason: existing.auth_invalid_reason,
+                updated_at: existing.updated_at,
               })
               .where(eq(platform_integrations.id, row.id));
             throw error;
@@ -368,8 +351,6 @@ export async function upsertSlackInstallation({
           return row;
         },
       });
-
-      await mirrorSlackCredential({ integration: updated, owner, teamId, installation });
 
       return updated;
     } catch (error) {
@@ -385,6 +366,7 @@ export async function upsertSlackInstallation({
       platform: PLATFORM.SLACK,
       installationIds: [teamId],
       callback: async () => {
+        const previousProviderState = await captureInstallation?.();
         const row = await db.transaction(async tx => {
           await assertGitHubAutomationCanBeEnabled(owner, tx);
           const [current] = await tx
@@ -421,15 +403,21 @@ export async function upsertSlackInstallation({
         });
         try {
           await persistInstallation?.();
+          await writeSlackCredential({
+            integrationId: row.id,
+            slackTeamId: teamId,
+            owner,
+            botToken: installation.botToken,
+            botUserId: installation.botUserId ?? null,
+          });
         } catch (error) {
+          await restoreInstallation?.(previousProviderState ?? null);
           await db.delete(platform_integrations).where(eq(platform_integrations.id, row.id));
           throw error;
         }
         return row;
       },
     });
-
-    await mirrorSlackCredential({ integration: created, owner, teamId, installation });
 
     return created;
   } catch (error) {
@@ -626,20 +614,38 @@ export async function updateModel(
     }
   }
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
-
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata: {
-        ...existingMetadata,
-        model_slug: modelSlug,
+  let candidate = integration;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const installationId = candidate.platform_installation_id ?? candidate.platform_account_id;
+    if (!installationId) return { success: false, error: 'Slack installation is missing an ID' };
+    const updated = await withProviderInstallationLock({
+      platform: PLATFORM.SLACK,
+      installationId,
+      callback: async () => {
+        const current = await getInstallation(owner);
+        if (
+          !current ||
+          current.id !== candidate.id ||
+          (current.platform_installation_id ?? current.platform_account_id) !== installationId
+        )
+          return false;
+        const metadata = (current.metadata || {}) as Record<string, unknown>;
+        await db
+          .update(platform_integrations)
+          .set({
+            metadata: { ...metadata, model_slug: modelSlug },
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, current.id));
+        return true;
       },
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integration.id));
-
-  return { success: true };
+    });
+    if (updated) return { success: true };
+    const current = await getInstallation(owner);
+    if (!current) return { success: false, error: 'No Slack installation found' };
+    candidate = current;
+  }
+  return { success: false, error: 'Slack installation changed; retry' };
 }
 
 /**

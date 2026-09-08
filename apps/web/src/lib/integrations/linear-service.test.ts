@@ -6,6 +6,7 @@ import type { User } from '@kilocode/db/schema';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { PLATFORM, INTEGRATION_STATUS } from '@/lib/integrations/core/constants';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
+import type { LinearInstallation } from '@chat-adapter/linear';
 import { LinearWorkspaceAlreadyConnectedError, upsertLinearInstallation } from './linear-service';
 
 describe('upsertLinearInstallation', () => {
@@ -165,5 +166,50 @@ describe('upsertLinearInstallation', () => {
         .from(platform_integrations)
         .where(eq(platform_integrations.owned_by_user_id, user.id))
     ).resolves.toHaveLength(0);
+  });
+
+  test('restores the exact prior workspace when a move cannot persist Chat SDK state', async () => {
+    await upsertLinearInstallation({
+      owner: { type: 'user', id: user.id },
+      organizationId: 'workspace-a',
+      organizationName: 'Workspace A',
+      botUserId: 'bot-a',
+    });
+    const previous = {
+      accessToken: 'old-token',
+      botUserId: 'bot-a',
+      organizationId: 'workspace-a',
+      expiresAt: null,
+    };
+    const restoreInstallation = jest.fn(
+      async (_installation: LinearInstallation | null) => undefined
+    );
+
+    await expect(
+      upsertLinearInstallation(
+        {
+          owner: { type: 'user', id: user.id },
+          organizationId: 'workspace-b',
+          organizationName: 'Workspace B',
+          botUserId: 'bot-b',
+        },
+        {
+          captureInstallation: async () => previous,
+          persistInstallation: async () => Promise.reject(new Error('redis unavailable')),
+          restoreInstallation,
+        }
+      )
+    ).rejects.toThrow('redis unavailable');
+
+    expect(restoreInstallation).toHaveBeenCalledWith(previous);
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_user_id, user.id));
+    expect(row).toMatchObject({
+      platform_installation_id: 'workspace-a',
+      platform_account_login: 'Workspace A',
+      integration_status: 'active',
+    });
   });
 });

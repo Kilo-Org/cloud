@@ -312,7 +312,12 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
           botUserId: installation.botUserId,
         },
         {
+          captureInstallation: () => linearAdapter.getInstallation(organizationId),
           persistInstallation: () => linearAdapter.setInstallation(organizationId, installation),
+          restoreInstallation: previous =>
+            previous
+              ? linearAdapter.setInstallation(organizationId, previous)
+              : linearAdapter.deleteInstallation(organizationId),
         }
       );
     } catch (error) {

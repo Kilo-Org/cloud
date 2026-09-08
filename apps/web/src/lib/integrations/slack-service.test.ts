@@ -481,10 +481,7 @@ describe('upsertSlackInstallation', () => {
     );
   });
 
-  // The encrypted store is write-only until reads move onto it, so a failure there
-  // must not take down Slack installs. This expectation flips in the step that
-  // repoints the read paths.
-  it('still completes the install when the credential store write fails', async () => {
+  it('rolls back a new admission when the credential store write fails', async () => {
     mockLimit.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
     mockWriteSlackCredential.mockRejectedValue(new Error('encryption not configured'));
 
@@ -494,12 +491,31 @@ describe('upsertSlackInstallation', () => {
       teamName: 'Kilo Team',
     } satisfies SlackInstallation;
 
-    await expect(
-      upsertSlackInstallation({ owner, teamId: 'T123', installation })
-    ).resolves.toMatchObject({ id: 'integration-1' });
+    await expect(upsertSlackInstallation({ owner, teamId: 'T123', installation })).rejects.toThrow(
+      'encryption not configured'
+    );
+    expect(mockDeleteWhere).toHaveBeenCalled();
+  });
 
-    expect(mockCaptureException).toHaveBeenCalledTimes(1);
-    // The report must not carry token material.
-    expect(JSON.stringify(mockCaptureException.mock.calls[0])).not.toContain('xoxb-new-token');
+  it('restores prior SDK and DB state when a workspace move cannot persist', async () => {
+    const existing = buildSlackIntegration({ platform_installation_id: 'OLD' });
+    mockLimit.mockResolvedValue([existing]);
+    const previous = { botToken: 'old-token' } satisfies SlackInstallation;
+    const restoreInstallation = jest.fn(async () => undefined);
+
+    await expect(
+      upsertSlackInstallation({
+        owner,
+        teamId: 'NEW',
+        installation: { botToken: 'new-token', teamName: 'New' },
+        captureInstallation: async () => previous,
+        persistInstallation: async () => Promise.reject(new Error('redis unavailable')),
+        restoreInstallation,
+      })
+    ).rejects.toThrow('redis unavailable');
+    expect(restoreInstallation).toHaveBeenCalledWith(previous);
+    expect(mockUpdateSet).toHaveBeenLastCalledWith(
+      expect.objectContaining({ platform_installation_id: 'OLD', metadata: existing.metadata })
+    );
   });
 });

@@ -62,4 +62,26 @@ describe('cleanupProviderInstallationIfUnclaimed', () => {
       client.release();
     }
   }, 10_000);
+
+  it('resets session settings after a callback failure before returning the client', async () => {
+    await expect(
+      withProviderInstallationLocks({
+        platform: 'linear',
+        installationIds: ['FAIL'],
+        callback: async () => Promise.reject(new Error('callback failed')),
+      })
+    ).rejects.toThrow('callback failed');
+
+    const client = await pool.connect();
+    try {
+      const lockTimeout = await client.query<{ lock_timeout: string }>('SHOW lock_timeout');
+      const statementTimeout = await client.query<{ statement_timeout: string }>(
+        'SHOW statement_timeout'
+      );
+      expect(lockTimeout.rows[0]?.lock_timeout).toBe('0');
+      expect(statementTimeout.rows[0]?.statement_timeout).toBe('0');
+    } finally {
+      client.release();
+    }
+  });
 });

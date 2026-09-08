@@ -13,6 +13,7 @@ import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
+import { withProviderInstallationLock } from '@/lib/integrations/provider-installation-lock';
 
 // Discord OAuth2 scopes for the bot integration
 // 'bot' scope is needed for the bot to join servers
@@ -382,20 +383,38 @@ export async function updateModel(
     }
   }
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
-
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata: {
-        ...existingMetadata,
-        model_slug: modelSlug,
+  let candidate = integration;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const installationId = candidate.platform_installation_id ?? candidate.platform_account_id;
+    if (!installationId) return { success: false, error: 'Discord installation is missing an ID' };
+    const updated = await withProviderInstallationLock({
+      platform: PLATFORM.DISCORD,
+      installationId,
+      callback: async () => {
+        const current = await getInstallation(owner);
+        if (
+          !current ||
+          current.id !== candidate.id ||
+          (current.platform_installation_id ?? current.platform_account_id) !== installationId
+        )
+          return false;
+        const metadata = (current.metadata || {}) as Record<string, unknown>;
+        await db
+          .update(platform_integrations)
+          .set({
+            metadata: { ...metadata, model_slug: modelSlug },
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, current.id));
+        return true;
       },
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integration.id));
-
-  return { success: true };
+    });
+    if (updated) return { success: true };
+    const current = await getInstallation(owner);
+    if (!current) return { success: false, error: 'No Discord installation found' };
+    candidate = current;
+  }
+  return { success: false, error: 'Discord installation changed; retry' };
 }
 
 /**

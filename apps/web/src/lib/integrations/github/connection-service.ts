@@ -135,14 +135,22 @@ export async function completeGitHubConnectionAttempt(input: {
   authorizeOwner: (owner: Owner) => Promise<void>;
 }) {
   const [initialAttempt] = await db
-    .select({ appType: github_connection_attempts.github_app_type })
+    .select()
     .from(github_connection_attempts)
     .where(eq(github_connection_attempts.id, input.attemptId))
     .limit(1);
   if (!initialAttempt) return { ok: false as const, reason: 'installation_unavailable' as const };
+  if (
+    initialAttempt.completed_integration_id &&
+    initialAttempt.kilo_user_id === input.userId &&
+    initialAttempt.github_user_id === input.githubUserId &&
+    initialAttempt.selected_installation_id === input.candidate.installationId
+  ) {
+    return { ok: true as const, integrationId: initialAttempt.completed_integration_id };
+  }
   const details = await fetchGitHubInstallationDetails(
     input.candidate.installationId,
-    initialAttempt.appType
+    initialAttempt.github_app_type
   );
   if (
     details.account.id.toString() !== input.candidate.accountId ||
@@ -153,7 +161,7 @@ export async function completeGitHubConnectionAttempt(input: {
     details.repository_selection === 'selected'
       ? await fetchGitHubRepositoriesForMaintenance(
           input.candidate.installationId,
-          initialAttempt.appType
+          initialAttempt.github_app_type
         )
       : null;
   return db.transaction(async tx => {
@@ -169,11 +177,13 @@ export async function completeGitHubConnectionAttempt(input: {
       .for('update');
     if (
       !attempt ||
-      attempt.consumed_at ||
-      new Date(attempt.expires_at) <= new Date() ||
       attempt.github_user_id !== input.githubUserId ||
       attempt.selected_installation_id !== input.candidate.installationId
     )
+      return { ok: false as const, reason: 'installation_unavailable' as const };
+    if (attempt.completed_integration_id)
+      return { ok: true as const, integrationId: attempt.completed_integration_id };
+    if (attempt.consumed_at || new Date(attempt.expires_at) <= new Date())
       return { ok: false as const, reason: 'installation_unavailable' as const };
     const storedCandidates = candidatesSchema.safeParse(attempt.eligible_installations);
     if (
@@ -188,8 +198,6 @@ export async function completeGitHubConnectionAttempt(input: {
     ) {
       return { ok: false as const, reason: 'installation_unavailable' as const };
     }
-    if (attempt.completed_integration_id)
-      return { ok: true as const, integrationId: attempt.completed_integration_id };
     const owner = { type: attempt.owner_type, id: attempt.owner_id } as const;
     await input.authorizeOwner(owner);
     const result = await connectVerifiedGitHubInstallation(

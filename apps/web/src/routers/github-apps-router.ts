@@ -70,6 +70,11 @@ export const githubAppsRouter = createTRPCRouter({
   getConnectionAttempt: baseProcedure
     .input(z.object({ attemptId: z.string().uuid(), organizationId: z.string().uuid() }))
     .query(async ({ ctx, input }) => {
+      if (!isGitHubConnectionManagementEnabled())
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'GitHub connection management disabled',
+        });
       await resolveAuthorizedOwner(ctx, input.organizationId, ORGANIZATION_MANAGE_ROLES);
       const attempt = await getGitHubConnectionAttempt(input.attemptId, ctx.user.id);
       if (!attempt || attempt.ownerType !== 'org' || attempt.ownerId !== input.organizationId)

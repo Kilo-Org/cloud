@@ -1,12 +1,29 @@
 import { cleanupDbForTest, db } from '@/lib/drizzle';
-import { github_connection_attempts } from '@kilocode/db/schema';
+import {
+  github_connection_attempts,
+  kilocode_users,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import {
   createGitHubConnectionAttempt,
+  completeGitHubConnectionAttempt,
   getGitHubConnectionAttempt,
   recordGitHubConnectionDiscovery,
   selectGitHubConnectionInstallation,
 } from './connection-service';
+import {
+  fetchGitHubInstallationDetails,
+  fetchGitHubRepositoriesForMaintenance,
+} from '@/lib/integrations/platforms/github/adapter';
+
+jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
+  fetchGitHubInstallationDetails: jest.fn(),
+  fetchGitHubRepositoriesForMaintenance: jest.fn(),
+}));
+
+const mockedFetchInstallation = jest.mocked(fetchGitHubInstallationDetails);
+const mockedFetchRepositories = jest.mocked(fetchGitHubRepositoriesForMaintenance);
 
 const userId = 'oauth/github-picker-user';
 const organizationId = '00000000-0000-4000-8000-000000000001';
@@ -18,7 +35,25 @@ const candidate = {
 };
 
 describe('GitHub connection attempt persistence', () => {
-  beforeEach(cleanupDbForTest);
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    await db.insert(kilocode_users).values({
+      id: userId,
+      google_user_email: 'picker@example.com',
+      google_user_name: 'Picker',
+      google_user_image_url: '',
+      stripe_customer_id: 'cus_picker',
+    });
+    mockedFetchInstallation.mockResolvedValue({
+      id: 123,
+      account: { id: 456, login: 'picker', type: 'User' },
+      permissions: { contents: 'read' },
+      events: ['push'],
+      repository_selection: 'all',
+      created_at: '2026-09-07T00:00:00.000Z',
+    } as never);
+    mockedFetchRepositories.mockResolvedValue([]);
+  });
   afterEach(cleanupDbForTest);
 
   test('binds discovery and selection to the initiating user and eligible candidate', async () => {
@@ -124,5 +159,120 @@ describe('GitHub connection attempt persistence', () => {
     await expect(
       selectGitHubConnectionInstallation({ attemptId, userId, installationId: stored.selected })
     ).resolves.toMatchObject({ selected_installation_id: stored.selected });
+  });
+
+  test('atomically writes, consumes, and idempotently replays a verified completion', async () => {
+    const personalCandidate = {
+      ...candidate,
+      accountLogin: 'picker',
+      accountType: 'User' as const,
+    };
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [personalCandidate],
+    });
+    await selectGitHubConnectionInstallation({ attemptId, userId, installationId: '123' });
+    const input = {
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidate: personalCandidate,
+      authorizeOwner: async () => {},
+    };
+    const completed = await completeGitHubConnectionAttempt(input);
+    expect(completed.ok).toBe(true);
+    if (!completed.ok) throw new Error('Expected completed connection');
+    await expect(completeGitHubConnectionAttempt(input)).resolves.toEqual(completed);
+    const [attempt] = await db
+      .select()
+      .from(github_connection_attempts)
+      .where(eq(github_connection_attempts.id, attemptId));
+    expect(attempt).toMatchObject({
+      completed_integration_id: completed.integrationId,
+      consumed_at: expect.any(String),
+    });
+    await expect(
+      db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.id, completed.integrationId))
+    ).resolves.toHaveLength(1);
+  });
+
+  test('rejects completion when verified identity does not match the locked attempt', async () => {
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({ attemptId, userId, installationId: '123' });
+    await expect(
+      completeGitHubConnectionAttempt({
+        attemptId,
+        userId,
+        githubUserId: '999',
+        candidate,
+        authorizeOwner: async () => {},
+      })
+    ).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+  });
+
+  test('rejects direct completion after expiry or when selection changed', async () => {
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'user', id: userId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidates: [candidate],
+    });
+    await selectGitHubConnectionInstallation({ attemptId, userId, installationId: '123' });
+    const input = {
+      attemptId,
+      userId,
+      githubUserId: '456',
+      candidate,
+      authorizeOwner: async (owner: { type: 'user' | 'org'; id: string }) => {
+        expect(owner).toEqual({ type: 'user', id: userId });
+      },
+    };
+    await db
+      .update(github_connection_attempts)
+      .set({ expires_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(github_connection_attempts.id, attemptId));
+    await expect(completeGitHubConnectionAttempt(input)).resolves.toEqual({
+      ok: false,
+      reason: 'installation_unavailable',
+    });
+    await db
+      .update(github_connection_attempts)
+      .set({
+        expires_at: '2099-01-01T00:00:00.000Z',
+        selected_installation_id: '999',
+      })
+      .where(eq(github_connection_attempts.id, attemptId));
+    await expect(completeGitHubConnectionAttempt(input)).resolves.toEqual({
+      ok: false,
+      reason: 'installation_unavailable',
+    });
   });
 });

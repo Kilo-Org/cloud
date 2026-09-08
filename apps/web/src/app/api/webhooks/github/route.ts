@@ -2,7 +2,10 @@ import { NextRequest, after } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
-import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '@/lib/integrations/github/runtime-authorization';
 
 function cloneGitHubRequest(request: NextRequest, rawBody: string) {
   return new NextRequest(request.url, {
@@ -44,13 +47,20 @@ export async function POST(request: NextRequest) {
   const botRequest = cloneGitHubRequest(request, rawBody);
   const installationId = getGitHubInstallationId(rawBody);
 
+  const response = await handleGitHubWebhook(cloneGitHubRequest(request, rawBody), 'standard');
+  if (!response.ok) return response;
+  if (!installationId) return response;
+  try {
+    await assertGitHubInstallationRuntimeAuthorized(installationId, 'standard');
+  } catch (error) {
+    if (error instanceof GitHubRuntimeAuthorizationError) return response;
+    captureException(error, {
+      tags: { endpoint: 'webhooks/github', source: 'chat_adapter_authorization' },
+    });
+    return new Response('GitHub authorization temporarily unavailable', { status: 503 });
+  }
+
   after(async () => {
-    if (!installationId) return;
-    try {
-      await assertGitHubInstallationRuntimeAuthorized(installationId, 'standard');
-    } catch {
-      return;
-    }
     try {
       const response = await bot.webhooks.github(botRequest, {
         waitUntil: task => after(() => task),
@@ -70,5 +80,5 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return handleGitHubWebhook(cloneGitHubRequest(request, rawBody), 'standard');
+  return response;
 }

@@ -90,6 +90,7 @@ import {
   platform_oauth_credentials,
   platform_access_token_credentials,
   platform_integrations,
+  github_app_installations,
   model_eval_ingestions,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -309,6 +310,7 @@ describe('User', () => {
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db.delete(github_app_installations);
     await db.delete(quick_chat_messages);
     await db.delete(quick_chat_threads);
     await db.delete(organizations);
@@ -4843,6 +4845,38 @@ describe('User', () => {
 
       expect(deletedCredentials).toHaveLength(0);
       expect(retainedCredentials).toHaveLength(1);
+    });
+
+    it('deletes an unshared personal canonical GitHub installation', async () => {
+      const user = await insertTestUser();
+      const [canonical] = await db
+        .insert(github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: '9876501',
+          account_id: '101',
+          account_login: 'personal-login',
+          account_type: 'User',
+          lifecycle_state: 'active',
+          observed_at: new Date().toISOString(),
+        })
+        .returning();
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '9876501',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        integration_status: 'active',
+      });
+      await softDeleteUser(user.id);
+      await expect(
+        db
+          .select()
+          .from(github_app_installations)
+          .where(eq(github_app_installations.id, canonical.id))
+      ).resolves.toHaveLength(0);
     });
 
     it('should nullify free_model_usage FK', async () => {

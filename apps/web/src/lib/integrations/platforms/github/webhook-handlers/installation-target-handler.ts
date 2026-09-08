@@ -10,9 +10,6 @@ export async function handleInstallationTargetRenamed(
   integration: { id: string; github_disconnected_at: string | null },
   appType: GitHubAppType
 ) {
-  if (integration.github_disconnected_at) {
-    return NextResponse.json({ message: 'Installation target ignored' }, { status: 200 });
-  }
   const installationId = payload.installation.id.toString();
   const details = await fetchGitHubInstallationDetails(installationId, appType);
 

@@ -98,7 +98,7 @@ describe('handleInstallationTargetRenamed', () => {
     expect(mockUpdateIntegrationAccountIdentity).not.toHaveBeenCalled();
   });
 
-  it('does not fetch or project a rename after local disconnect', async () => {
+  it('continues canonical identity observation after local disconnect', async () => {
     const response = await handleInstallationTargetRenamed(
       {
         action: 'renamed',
@@ -111,7 +111,11 @@ describe('handleInstallationTargetRenamed', () => {
       'standard'
     );
     expect(response.status).toBe(200);
-    expect(mockFetchGitHubInstallationDetails).not.toHaveBeenCalled();
-    expect(mockUpdateIntegrationAccountIdentity).not.toHaveBeenCalled();
+    expect(mockFetchGitHubInstallationDetails).toHaveBeenCalledWith('98765', 'standard');
+    expect(mockUpdateIntegrationAccountIdentity).toHaveBeenCalledWith(
+      integrationId,
+      '123',
+      'authoritative-current-owner'
+    );
   });
 });

@@ -1,5 +1,8 @@
+import '@/lib/load-env';
+
 import { z } from 'zod';
 import { backfillGitHubInstallations } from '@/lib/integrations/db/github-installations-backfill';
+import { closeAllDrizzleConnections } from '@/lib/drizzle';
 
 const Args = z.object({
   cursor: z.uuid().optional(),
@@ -12,12 +15,19 @@ const rawArgs = Object.fromEntries(
     return [key, value];
   })
 );
-const args = Args.parse(rawArgs);
-const result = await backfillGitHubInstallations(args.limit, args.cursor);
-
-console.log(JSON.stringify(result));
-if (result.skipped > 0) {
-  console.warn(
-    'Backfill scanned rows requiring reconciliation; do not treat scan completion as full coverage.'
-  );
+async function main() {
+  const args = Args.parse(rawArgs);
+  try {
+    const result = await backfillGitHubInstallations(args.limit, args.cursor);
+    console.log(JSON.stringify(result));
+    if (result.skipped > 0) {
+      console.warn(
+        'Backfill scanned rows requiring reconciliation; do not treat scan completion as full coverage.'
+      );
+    }
+  } finally {
+    await closeAllDrizzleConnections();
+  }
 }
+
+void main();

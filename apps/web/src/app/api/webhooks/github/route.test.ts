@@ -1,5 +1,6 @@
 const mockGithubWebhook = jest.fn();
 const mockHandleGitHubWebhook = jest.fn();
+const mockAssertRuntimeAuthorized = jest.fn();
 
 let afterCallbacks: Array<() => Promise<void> | void> = [];
 
@@ -27,10 +28,13 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handler', () => ({
 }));
 
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
-  assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
+  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {},
+  assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
+    mockAssertRuntimeAuthorized(installationId, appType),
 }));
 
 import { POST } from './route';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 
 function githubRequest(
   eventType: string,
@@ -61,6 +65,7 @@ describe('GitHub webhook route', () => {
     jest.clearAllMocks();
     mockHandleGitHubWebhook.mockResolvedValue(new Response('legacy ok'));
     mockGithubWebhook.mockResolvedValue(new Response('bot ok'));
+    mockAssertRuntimeAuthorized.mockResolvedValue(undefined);
   });
 
   it('clones the request body for legacy handling and bot handling', async () => {
@@ -117,5 +122,24 @@ describe('GitHub webhook route', () => {
 
     expect(mockHandleGitHubWebhook).toHaveBeenCalledTimes(1);
     expect(mockGithubWebhook).toHaveBeenCalledTimes(1);
+  });
+
+  it('suppresses only expected local disconnect denial', async () => {
+    mockAssertRuntimeAuthorized.mockRejectedValue(new GitHubRuntimeAuthorizationError());
+    const response = await POST(
+      githubRequest('issue_comment', { installation: { id: 98765 } }) as never
+    );
+    await flushAfterCallbacks();
+    expect(response.status).toBe(200);
+    expect(mockGithubWebhook).not.toHaveBeenCalled();
+  });
+
+  it('returns retryable failure when Chat authorization infrastructure fails', async () => {
+    mockAssertRuntimeAuthorized.mockRejectedValue(new Error('database unavailable'));
+    const response = await POST(
+      githubRequest('issue_comment', { installation: { id: 98765 } }) as never
+    );
+    expect(response.status).toBe(503);
+    expect(mockGithubWebhook).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,10 @@ import { linkKiloUser } from '@/lib/bot-identity';
 import { bot } from '@/lib/bot';
 import { failureResult } from '@/lib/maybe-result';
 import { consumeInstallState } from '@/lib/integrations/github/install-state';
+import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  observeGitHubInstallationLifecycle,
+} from '@/lib/integrations/db/github-installations';
 import type * as InstallStateModule from '@/lib/integrations/github/install-state';
 import { db } from '@/lib/drizzle';
 import {
@@ -18,6 +22,7 @@ import {
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
 import { randomUUID } from 'node:crypto';
+import type { Owner } from '@/lib/integrations/core/types';
 import {
   findIntegrationByInstallationId,
   upsertPlatformIntegrationForOwner,
@@ -83,6 +88,12 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   findPendingInstallationByRequesterId: jest.fn(),
   upsertPlatformIntegrationForOwner: jest.fn(async () => ({ ok: true })),
 }));
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  connectVerifiedGitHubInstallation: jest.fn(),
+  observeGitHubInstallationLifecycle: jest.fn(),
+  bindGitHubIntegrationToCanonicalInstallation: jest.fn(),
+  updateGitHubInstallationRepositories: jest.fn(),
+}));
 jest.mock('@/lib/organizations/organizations', () => ({
   isOrganizationMember: jest.fn(),
 }));
@@ -112,6 +123,10 @@ const mockedCaptureException = jest.mocked(captureException);
 const mockedCaptureMessage = jest.mocked(captureMessage);
 const mockedEnsureOrganizationAccess = jest.mocked(ensureOrganizationAccess);
 const mockedAssertUserAdministersInstallation = jest.mocked(assertUserAdministersInstallation);
+const mockedObserveGitHubInstallationLifecycle = jest.mocked(observeGitHubInstallationLifecycle);
+const mockedBindGitHubIntegrationToCanonicalInstallation = jest.mocked(
+  bindGitHubIntegrationToCanonicalInstallation
+);
 
 function mockConsumedInstallState(state: GitHubInstallState) {
   mockedConsumeInstallState.mockResolvedValue({ status: 'success', state });
@@ -124,9 +139,22 @@ const INSTALLATION_ID = '98765';
 const INSTALL_STATE_TOKEN = 'valid-database-token-for-callback-tests';
 
 beforeEach(() => {
+  let writtenOwner: Owner = { type: 'user', id: USER_ID };
   mockedConsumeInstallState.mockReset();
   mockedConsumeInstallState.mockResolvedValue({ status: 'unusable', reason: 'not_found' });
-  mockedUpsertPlatformIntegrationForOwner.mockResolvedValue({ ok: true });
+  mockedUpsertPlatformIntegrationForOwner.mockImplementation(async owner => {
+    writtenOwner = owner;
+    return { ok: true };
+  });
+  mockedFindIntegrationByInstallationId.mockImplementation(
+    async () =>
+      ({
+        id: '00000000-0000-4000-8000-000000000099',
+        owned_by_user_id: writtenOwner.type === 'user' ? writtenOwner.id : null,
+        owned_by_organization_id: writtenOwner.type === 'org' ? writtenOwner.id : null,
+        github_app_type: 'standard',
+      }) as never
+  );
   mockedExchangeGitHubOAuthCode.mockResolvedValue({
     id: GITHUB_USER_ID,
     login: 'octocat',
@@ -972,6 +1000,14 @@ describe('GET /api/integrations/github/callback database-backed install flow', (
     expect(response.status).toBe(307);
     // No organizationId for user-scoped install.
     expectRedirectLocation(response, '/github-app?fromApp=1&github_install=success');
+    expect(mockedObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: INSTALLATION_ID, state: 'active' })
+    );
+    expect(mockedBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith({
+      integrationId: '00000000-0000-4000-8000-000000000099',
+      installationId: INSTALLATION_ID,
+      appType: 'standard',
+    });
   });
 
   test('app-initiated org pending approval preserves organizationId', async () => {

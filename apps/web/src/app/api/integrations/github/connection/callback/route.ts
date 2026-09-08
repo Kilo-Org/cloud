@@ -34,11 +34,7 @@ export async function GET(request: NextRequest) {
     request.nextUrl.searchParams.get('state'),
     user.id
   );
-  if (!state || request.nextUrl.searchParams.get('error'))
-    return redirect('/github-app', 'invalid_state');
-  const code = request.nextUrl.searchParams.get('code');
-  if (!code || !/^[A-Za-z0-9._~+/-]{1,2048}$/.test(code))
-    return redirect('/github-app', 'missing_code');
+  if (!state) return redirect('/github-app', 'invalid_state');
   const [attempt] = await db
     .select()
     .from(github_connection_attempts)
@@ -55,6 +51,9 @@ export async function GET(request: NextRequest) {
     attempt.owner_type === 'org'
       ? `/organizations/${attempt.owner_id}/integrations/github`
       : '/integrations/github';
+  if (request.nextUrl.searchParams.get('error')) return redirect(path, 'access_denied');
+  const code = request.nextUrl.searchParams.get('code');
+  if (!code || !/^[A-Za-z0-9._~+/-]{1,2048}$/.test(code)) return redirect(path, 'missing_code');
   try {
     if (attempt.owner_type === 'org') {
       await ensureOrganizationAccess(

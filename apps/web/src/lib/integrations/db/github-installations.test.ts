@@ -16,7 +16,10 @@ import {
 } from './github-installations';
 import { backfillGitHubInstallations } from './github-installations-backfill';
 import { assertGitHubInstallationRuntimeAuthorized } from '../github/runtime-authorization';
-import { updateRepositoriesForIntegration } from './platform-integrations';
+import {
+  findIntegrationByInstallationId,
+  updateRepositoriesForIntegration,
+} from './platform-integrations';
 
 const ownerId = 'oauth/github-installation-owner';
 const otherOwnerId = 'oauth/github-installation-other-owner';
@@ -103,6 +106,23 @@ describe('GitHub installation persistence', () => {
     await expect(assertGitHubInstallationRuntimeAuthorized('123456', 'standard')).rejects.toThrow(
       'GitHub installation is unavailable for runtime use'
     );
+  });
+
+  test('finds legacy Standard installations whose app type is null', async () => {
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: ownerId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '654321',
+        github_app_type: null,
+        integration_status: 'active',
+      })
+      .returning();
+    await expect(
+      findIntegrationByInstallationId('github', '654321', 'standard')
+    ).resolves.toMatchObject({ id: legacy.id });
   });
 
   test('keeps canonical repositories aligned with user refresh and suppresses disconnected projection', async () => {

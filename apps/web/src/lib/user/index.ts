@@ -102,6 +102,7 @@ import {
   user_github_app_tokens,
   github_install_states,
   github_connection_attempts,
+  github_app_installations,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -1360,6 +1361,19 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(github_connection_attempts)
     .where(eq(github_connection_attempts.kilo_user_id, userId));
+
+  await tx.execute(sql`
+    DELETE FROM ${github_app_installations} canonical
+    USING ${platform_integrations} owned
+    WHERE owned.owned_by_user_id = ${userId}
+      AND owned.github_installation_id = canonical.id
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ${platform_integrations} retained
+        WHERE retained.github_installation_id = canonical.id
+          AND retained.id <> owned.id
+      )
+  `);
 
   await tx.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
   await tx.execute(sql`

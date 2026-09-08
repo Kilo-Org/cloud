@@ -36,7 +36,14 @@ export async function findIntegrationByInstallationId(
     eq(platform_integrations.platform_installation_id, installationId),
   ];
   if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
+    const appTypeCondition =
+      githubAppType === 'standard'
+        ? or(
+            eq(platform_integrations.github_app_type, 'standard'),
+            isNull(platform_integrations.github_app_type)
+          )
+        : eq(platform_integrations.github_app_type, githubAppType);
+    if (appTypeCondition) conditions.push(appTypeCondition);
   }
 
   const [integration] = await db

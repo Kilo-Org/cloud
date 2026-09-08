@@ -16,6 +16,11 @@ import {
 import { verifyGitHubInstallationAuthorization } from '@/lib/integrations/github/installation-authorization';
 import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
 import { connectVerifiedGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  observeGitHubInstallationLifecycle,
+  updateGitHubInstallationRepositories,
+} from '@/lib/integrations/db/github-installations';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
@@ -675,6 +680,37 @@ async function handleCoreInstallFlow(params: {
       return NextResponse.redirect(
         new URL(appendQueryParam(redirectPath, `error=${error}`), APP_URL)
       );
+    }
+    await observeGitHubInstallationLifecycle({
+      installationId,
+      appType: githubAppType,
+      state: 'active',
+      accountId,
+      accountLogin,
+      accountType: verifiedAccountType ?? ('login' in account ? 'User' : 'Organization'),
+      permissions: installation.permissions as IntegrationPermissions,
+      scopes: installation.events || [],
+      repositoryAccess: installation.repository_selection,
+    });
+    const writtenIntegration = await findIntegrationByInstallationId(
+      PLATFORM.GITHUB,
+      installationId,
+      githubAppType
+    );
+    if (!writtenIntegration) {
+      throw new Error('GitHub integration writer did not resolve to the verified destination');
+    }
+    await bindGitHubIntegrationToCanonicalInstallation({
+      integrationId: writtenIntegration.id,
+      installationId,
+      appType: githubAppType,
+    });
+    if (repositories?.length) {
+      await updateGitHubInstallationRepositories({
+        installationId,
+        appType: githubAppType,
+        repositoriesAdded: repositories,
+      });
     }
   }
 

@@ -162,3 +162,21 @@ test('redirects a known organization attempt failure to its integration page', a
   );
   expect(response.headers.get('location')).toContain('github_connection_error=connection_failed');
 });
+
+test.each([
+  ['?state=state&error=access_denied', 'access_denied'],
+  ['?state=state', 'missing_code'],
+])('redirects known OAuth failure %s to the organization destination', async (query, error) => {
+  mockedConsumeState.mockResolvedValue({
+    attemptId,
+    stage: 'discover',
+    verifierRef: 'ref',
+    codeVerifier: 'verifier',
+  });
+  const { GET } = await import('./route');
+  const response = await GET(new NextRequest(`http://localhost/callback${query}`) as never);
+  expect(response.headers.get('location')).toContain(
+    `/organizations/${organizationId}/integrations/github`
+  );
+  expect(response.headers.get('location')).toContain(`github_connection_error=${error}`);
+});

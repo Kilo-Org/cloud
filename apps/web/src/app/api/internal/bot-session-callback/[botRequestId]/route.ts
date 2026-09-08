@@ -32,6 +32,7 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
 import type { Thread } from 'chat';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 
 type ExecutionCallbackPayload = {
   sessionId: string;
@@ -1018,6 +1019,18 @@ export async function POST(
           await stopIndicator({ handedOff: !workComplete });
         }
       } catch (error) {
+        if (
+          error instanceof PlatformIntegrationUnavailableError ||
+          error instanceof PlatformIntegrationNotFoundError ||
+          error instanceof GitHubRuntimeAuthorizationError
+        ) {
+          await failBotRequest({
+            botRequestId,
+            errorMessage: 'Platform connection was disconnected before callback publication.',
+            responseTimeMs: Date.now() - startedAt,
+          });
+          return;
+        }
         console.error('[BotSessionCallback] Deferred callback processing failed', {
           botRequestId,
           error,

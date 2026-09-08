@@ -126,6 +126,16 @@ let createCaller: (ctx: { user: User }) => {
     organizationId?: string;
     integrationId?: string;
   }) => Promise<{ success: boolean }>;
+  beginConnection: (input: { organizationId: string }) => Promise<{ authorizationUrl: string }>;
+  getConnectionAttempt: (input: { organizationId: string; attemptId: string }) => Promise<unknown>;
+  selectConnectionInstallation: (input: {
+    attemptId: string;
+    installationId: string;
+  }) => Promise<{ authorizationUrl: string }>;
+  disconnectConnection: (input: {
+    organizationId: string;
+    integrationId: string;
+  }) => Promise<{ success: boolean }>;
 };
 
 beforeAll(async () => {
@@ -329,6 +339,32 @@ describe('githubAppsRouter organization install capability', () => {
       success: true,
     });
     expect(mockUninstallApp).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'begin',
+      (caller: ReturnType<typeof createCaller>) => caller.beginConnection({ organizationId }),
+    ],
+    [
+      'read',
+      (caller: ReturnType<typeof createCaller>) =>
+        caller.getConnectionAttempt({ organizationId, attemptId: integrationId }),
+    ],
+    [
+      'select',
+      (caller: ReturnType<typeof createCaller>) =>
+        caller.selectConnectionInstallation({ attemptId: integrationId, installationId: '98765' }),
+    ],
+    [
+      'disconnect',
+      (caller: ReturnType<typeof createCaller>) =>
+        caller.disconnectConnection({ organizationId, integrationId }),
+    ],
+  ])('forbids %s connection management while the flag is off', async (_name, invoke) => {
+    delete process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED;
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+    await expect(invoke(caller)).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 });
 

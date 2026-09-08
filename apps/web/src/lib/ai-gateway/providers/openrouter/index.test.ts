@@ -16,7 +16,11 @@ import {
 } from '@/lib/ai-gateway/models';
 import type { KiloExclusiveModel } from '@/lib/ai-gateway/providers/kilo-exclusive-model';
 import { isFableModel } from '@/lib/ai-gateway/providers/anthropic.constants';
-import { KILO_AUTO_EFFICIENT_MODEL } from '@/lib/ai-gateway/auto-model';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
+} from '@/lib/ai-gateway/auto-model';
 
 jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(() => Promise.resolve({})),
@@ -203,6 +207,13 @@ describe('auto models', () => {
     const models = await getEnhancedOpenRouterModels();
 
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
+  });
+
+  it('marks legacy Efficient aliases as deprecated and uses the same provider settings', () => {
+    for (const alias of [KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FRONTIER_MODEL]) {
+      expect(alias.description).toContain('Deprecated alias for Auto Efficient');
+      expect(alias.opencode_settings).toEqual(KILO_AUTO_EFFICIENT_MODEL.opencode_settings);
+    }
   });
 
   it('excludes OpenRouter batch variants from the public model list', async () => {

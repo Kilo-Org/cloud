@@ -97,22 +97,6 @@ const UNKNOWN_PRICING: AutoModelPricing = {
   completion: '-1',
 };
 
-export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
-  id: 'kilo-auto/frontier',
-  name: 'Auto Frontier',
-  description: 'Highest performance and capability for any task.',
-  context_length: 1_000_000,
-  max_completion_tokens: 128_000,
-  pricing: UNKNOWN_PRICING,
-  supports_images: true,
-  supports_pdf: true,
-  opencode_settings: {
-    ai_sdk_provider: 'anthropic',
-    family: 'claude',
-    prompt: 'anthropic',
-  },
-};
-
 export const KILO_AUTO_FREE_MODEL: AutoModel = {
   id: 'kilo-auto/free',
   name: 'Auto Free',
@@ -134,13 +118,20 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
 export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   id: 'kilo-auto/balanced',
   name: 'Auto Balanced',
-  description: 'Great balance of price and capability.',
+  description: 'Deprecated alias for Auto Efficient. Use Auto Efficient instead.',
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
   pricing: UNKNOWN_PRICING,
   supports_images: true,
   supports_pdf: false,
   opencode_settings: undefined,
+};
+
+export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
+  ...KILO_AUTO_BALANCED_MODEL,
+  id: 'kilo-auto/frontier',
+  name: 'Auto Frontier',
+  description: 'Deprecated alias for Auto Efficient. Use Auto Efficient instead.',
 };
 
 export const KILO_AUTO_SMALL_MODEL: AutoModel = {

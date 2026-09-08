@@ -336,7 +336,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id;
     isAutoEfficientRequest = isAutoEfficientId;
-    const efficientDecision = isAutoEfficientId
+    const mayResolveToAutoEfficient =
+      isAutoEfficientId || requestedModelLowerCased === ORG_AUTO_MODEL.id;
+    const efficientDecision = mayResolveToAutoEfficient
       ? async () => {
           const { user, authFailedResponse, organizationId } = await authPromise;
           // The classifier is a paid call on Kilo's own credential. Skip it

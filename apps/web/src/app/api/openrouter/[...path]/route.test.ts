@@ -1200,6 +1200,38 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(ctx.requested_model).toBe('kilo-auto/balanced');
   });
 
+  it('provides the Efficient classifier to Organization Auto nested aliases', async () => {
+    mockedFetchEfficientAutoDecision.mockResolvedValue({
+      decision: {
+        model: 'anthropic/claude-haiku-4',
+        taskType: 'implementation',
+        subtaskType: 'feature_development',
+        source: 'benchmark',
+        tableVersion: 'v1',
+        sticky: false,
+      },
+      costUsd: 0,
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (params, request) => {
+      const decision = await params.efficientDecision?.();
+      expect(decision?.model).toBe('anthropic/claude-haiku-4');
+      request.body.model = 'anthropic/claude-haiku-4';
+      return {
+        kind: 'ok',
+        resolved: { model: 'anthropic/claude-haiku-4' },
+        routingTarget: 'kilo-auto/frontier',
+      };
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/org')) as never);
+
+    expect(response.status).toBe(200);
+    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'kilo-auto/org' })
+    );
+  });
+
   it('does not bill when classifier cost is 0 (cache hit)', async () => {
     mockedFetchEfficientAutoDecision.mockResolvedValue({
       decision: {

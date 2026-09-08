@@ -535,31 +535,17 @@ function effectiveSessionRegistrationInput(
   };
 }
 
-async function allocateNewSession(
+async function issueSessionRuntimeAuthorization(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
-  options?: { billingOrigin?: string },
-  ledger?: SessionCreationLedgerHooks
-): Promise<NewSessionAllocation> {
-  const sessionService = new SessionService();
-  const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
+  cloudAgentSessionId: string,
+  initialTurn: AcceptedExecutionTurn | undefined
+): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
-  const cloudAgentSessionId = generateSessionId(
-    sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
-  );
-  const kiloSessionId = generateKiloSessionId();
-  const reportingCreatedAt =
-    input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
-      ? new Date().toISOString()
-      : undefined;
-  const worktreeId =
-    ledger?.worktreeEnabled && cloudAgentSessionId.startsWith('workspace_')
-      ? cloudAgentWorktreeIdSchema.parse(
-          `worktree_${cloudAgentSessionId.slice('workspace_'.length)}`
-        )
-      : undefined;
-  const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
   let runtimeAuthorization: NewSessionAllocation['runtimeAuthorization'];
+  // authMiddleware has verified this bearer (including legacy tokens) against
+  // its audience and current pepper. Decode only selects the compatibility path;
+  // createRuntimeAuthorization re-verifies modern claims and runtime admission.
   const claims = jwt.decode(ctx.authToken);
   const isPolicyBearing =
     claims !== null &&
@@ -594,6 +580,40 @@ async function allocateNewSession(
       });
     }
   }
+
+  return runtimeAuthorization;
+}
+
+async function allocateNewSession(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext,
+  options?: { billingOrigin?: string },
+  ledger?: SessionCreationLedgerHooks
+): Promise<NewSessionAllocation> {
+  const sessionService = new SessionService();
+  const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
+  const orgId = input.options?.kilocodeOrganizationId;
+  const cloudAgentSessionId = generateSessionId(
+    sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
+  );
+  const kiloSessionId = generateKiloSessionId();
+  const reportingCreatedAt =
+    input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')
+      ? new Date().toISOString()
+      : undefined;
+  const worktreeId =
+    ledger?.worktreeEnabled && cloudAgentSessionId.startsWith('workspace_')
+      ? cloudAgentWorktreeIdSchema.parse(
+          `worktree_${cloudAgentSessionId.slice('workspace_'.length)}`
+        )
+      : undefined;
+  const createdOnPlatform = input.options?.createdOnPlatform ?? 'cloud-agent';
+  const runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    cloudAgentSessionId,
+    initialTurn
+  );
 
   try {
     if (ledger) {
@@ -1799,6 +1819,12 @@ async function resumeCloneCreate(
   // `ready` continues.
 
   const allocation = rebuildRecordedSessionAllocation(input, ctx, row);
+  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    allocation.cloudAgentSessionId,
+    allocation.initialTurn
+  );
   const billingOrigin = { billingOrigin: options.billingOrigin };
   const result =
     input.initialTurn === undefined
@@ -1866,6 +1892,12 @@ async function resumeFirstWorktreeCreate(
     }
   }
 
+  allocation.runtimeAuthorization = await issueSessionRuntimeAuthorization(
+    input,
+    ctx,
+    allocation.cloudAgentSessionId,
+    allocation.initialTurn
+  );
   const result = await registerAndAdmitInitialTurn(
     input,
     ctx,

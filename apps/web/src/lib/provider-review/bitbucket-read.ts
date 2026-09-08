@@ -46,6 +46,11 @@ const MAX_BITBUCKET_RESPONSE_BYTES = 10 * 1024 * 1024;
 const MAX_SUMMARY_DIFFSTAT_PAGES = 3;
 /** The merge gate checks at most this many pages of the latest builds. */
 const MAX_BUILD_PAGES = 3;
+/** The inbox enumerates at most this many pages of this size of workspace repositories. */
+const INBOX_REPOSITORY_PAGE_SIZE = 100;
+const INBOX_REPOSITORY_PAGES = 3;
+/** How many repository PR collections the inbox fetches at once. */
+const INBOX_REPOSITORY_CONCURRENCY = 8;
 /**
  * The task-collection page bound for the discussion task walk: the same
  * bounded walk the write layer's thread resolution uses, so one discussion
@@ -386,10 +391,6 @@ function repositoryPathGuard(repository: BitbucketRepositoryAccess): (pathname: 
 }
 
 export { repositoryPathGuard };
-
-function inboxPathGuard(pathname: string): boolean {
-  return pathname === '/2.0/pullrequests';
-}
 
 /**
  * One page of any Bitbucket collection. When a cursor carries a validated
@@ -836,9 +837,16 @@ export async function listChecks(
 }
 
 /**
- * Open pull requests awaiting review, for the connected workspace membership.
+ * Open pull requests across the connected workspace, for the PR Review inbox.
  * Each item carries platform, workspace, and repository identity, so the list
  * can never navigate into a different provider's repo.
+ *
+ * Bitbucket removed the aggregate collections that used to answer this in one
+ * request (`/2.0/pullrequests?role=REVIEWER` and the workspace-level twin
+ * both answer "There is no API hosted at this URL" today), and a workspace
+ * access token cannot resolve its own account (`/2.0/user` answers 403), so
+ * "reviewer = me" is not reproducible. The inbox therefore lists every open
+ * PR of the workspace's repositories, newest first.
  */
 export async function listInbox(
   owner: BitbucketReviewOwner,
@@ -847,12 +855,32 @@ export async function listInbox(
   const access = await authorizeWorkspace(owner);
   try {
     const identity = `bitbucket-inbox:${access.workspace.slug}`;
-    const page = await fetchPage(access, '/2.0/pullrequests', identity, cursor, inboxPathGuard, {
-      role: 'REVIEWER',
-      q: 'state="OPEN"',
-    });
+    const page = decodeInboxPageCursor(cursor, identity);
+    const slugs = await listWorkspaceRepositorySlugs(access, access.workspace.slug);
+    const values: unknown[] = [];
+    let hasMore = false;
+    for (let offset = 0; offset < slugs.length; offset += INBOX_REPOSITORY_CONCURRENCY) {
+      const batch = slugs.slice(offset, offset + INBOX_REPOSITORY_CONCURRENCY);
+      const pages = await Promise.all(
+        batch.map(slug =>
+          requestBitbucketJson<unknown>(
+            access,
+            `/2.0/repositories/${encodeURIComponent(access.workspace.slug)}/${encodeURIComponent(slug)}/pullrequests`,
+            { query: { pagelen: BITBUCKET_PAGE_SIZE, page, q: 'state="OPEN"' } }
+          )
+        )
+      );
+      for (const payload of pages) {
+        const parsedPage = BitbucketPageSchema.safeParse(payload);
+        if (!parsedPage.success) {
+          throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
+        }
+        values.push(...parsedPage.data.values);
+        if (parsedPage.data.values.length >= BITBUCKET_PAGE_SIZE) hasMore = true;
+      }
+    }
     const items: ProviderPrInboxItem[] = [];
-    for (const value of page.values) {
+    for (const value of values) {
       const parsed = BitbucketInboxPullRequestSchema.safeParse(value);
       if (!parsed.success) continue;
       const ref = inboxRefFrom(parsed.data, access.workspace.slug);
@@ -866,10 +894,77 @@ export async function listInbox(
         updatedAt: parsed.data.updated_on ?? '',
       });
     }
-    return { items, nextCursor: page.nextCursor };
+    items.sort((left, right) => inboxUpdatedMs(right) - inboxUpdatedMs(left));
+    const trimmed = items.slice(0, BITBUCKET_PAGE_SIZE);
+    if (items.length > trimmed.length) hasMore = true;
+    return {
+      items: trimmed,
+      nextCursor: hasMore ? encodeInboxPageCursor(identity, page + 1) : null,
+    };
   } catch (error) {
     throw classifyBitbucketError(error);
   }
+}
+
+function inboxUpdatedMs(item: ProviderPrInboxItem): number {
+  const ms = Date.parse(item.updatedAt);
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
+/**
+ * The inbox cursor is a plain page counter, not a provider `next` URL: one
+ * inbox page fans out over the workspace's repositories, so no single next
+ * link can represent it. A cursor minted for another workspace, or in the
+ * old next-URL shape, decodes to page 1 — a cursor can never switch the
+ * workspace a request reads.
+ */
+function encodeInboxPageCursor(identity: string, page: number): string {
+  return Buffer.from(JSON.stringify({ identity, page })).toString('base64url');
+}
+
+function decodeInboxPageCursor(cursor: string | undefined, identity: string): number {
+  if (!cursor) return 1;
+  try {
+    const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as {
+      identity?: unknown;
+      page?: unknown;
+    };
+    if (parsed.identity !== identity || !Number.isInteger(parsed.page)) return 1;
+    return Math.max(1, parsed.page as number);
+  } catch {
+    return 1;
+  }
+}
+
+/**
+ * Repository slugs of the workspace, newest enumeration capped: at most
+ * INBOX_REPOSITORY_PAGES pages of INBOX_REPOSITORY_PAGE_SIZE. A workspace
+ * larger than the cap shows PRs of the repositories Bitbucket enumerates
+ * first — a bounded inbox beats an unbounded crawl.
+ */
+async function listWorkspaceRepositorySlugs(
+  access: { accessToken: string },
+  workspaceSlug: string
+): Promise<string[]> {
+  const slugs: string[] = [];
+  for (let repoPage = 1; repoPage <= INBOX_REPOSITORY_PAGES; repoPage += 1) {
+    const payload = await requestBitbucketJson<unknown>(
+      access,
+      `/2.0/repositories/${encodeURIComponent(workspaceSlug)}`,
+      { query: { pagelen: INBOX_REPOSITORY_PAGE_SIZE, page: repoPage } }
+    );
+    const parsed = z
+      .object({ values: z.array(z.object({ slug: z.string().min(1).nullable().optional() })).default([]) })
+      .safeParse(payload);
+    if (!parsed.success) {
+      throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected page.');
+    }
+    for (const repository of parsed.data.values) {
+      if (repository.slug) slugs.push(repository.slug);
+    }
+    if (parsed.data.values.length < INBOX_REPOSITORY_PAGE_SIZE) break;
+  }
+  return slugs;
 }
 
 /**

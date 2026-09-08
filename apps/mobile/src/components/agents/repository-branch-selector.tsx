@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react';
-import { FlatList, Modal, Pressable, View } from 'react-native';
+import { Modal, Pressable, ScrollView, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Check, ChevronDown } from '@/components/ui/icons';
@@ -198,12 +198,13 @@ export function RepositoryBranchSelector({
             <Text accessibilityRole="header" className="text-center text-base font-semibold">
               {t('agentChat.newSession.branchPickerTitle')}
             </Text>
-            <FlatList
-              data={branches.branches}
-              keyExtractor={branch => branch}
-              renderItem={({ item }) => renderBranchRow(item, close)}
-              showsVerticalScrollIndicator={false}
-            />
+            {/* ScrollView, not FlatList: a FlatList stretches to the space
+                its container offers, so two branch rows rendered as a mostly
+                empty sheet. A ScrollView hugs its rows and only scrolls once
+                the card's max height is reached. */}
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {branches.branches.map(branch => renderBranchRow(branch, close))}
+            </ScrollView>
             <View className="flex-row justify-end">
               <Button variant="outline" onPress={close}>
                 <Text>{t('common.cancel')}</Text>
@@ -223,6 +224,9 @@ export function RepositoryBranchSelector({
     const isDefault = branch === branches.defaultBranch;
     return (
       <Pressable
+        // Keyed map rows: the picker lists branches inside a ScrollView, and
+        // a mapped child without a key makes React warn on every open.
+        key={branch}
         className="flex-row items-center gap-3 rounded-lg px-3 py-2.5 active:bg-secondary"
         accessibilityRole="button"
         accessibilityState={{ selected: isSelected }}

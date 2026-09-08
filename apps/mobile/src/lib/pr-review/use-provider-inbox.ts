@@ -137,7 +137,8 @@ export function mergeProviderInboxSources(
   const active = sources.filter(source => source.enabled);
   const items = active
     .flatMap(source => source.rows)
-    .toSorted((left, right) => updatedAtMs(right) - updatedAtMs(left));
+    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; flatMap already copies so nothing shared is mutated
+    .sort((left, right) => updatedAtMs(right) - updatedAtMs(left));
   const failed = active.filter(source => source.error !== null && source.error !== undefined);
   const firstPageFailures = failed.filter(source => !source.hasLoadedPages);
   const allFailed = active.length > 0 && firstPageFailures.length === active.length;

@@ -196,6 +196,12 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   }, [queryClient, queries, pr.data?.headSha]);
 
   const isMergeRequest = queries.platform === 'gitlab';
+  // A first-load failure of the overview leaves the screen without a PR
+  // body: Submit review and share would open sheets or share a link for a
+  // merge request that never loaded, so they stay rendered (no header
+  // shift) but stop responding. The tabs are disabled for the same reason —
+  // their reads cannot succeed while the overview that gates them failed.
+  const loadFailed = pr.isError && pr.data === undefined;
   // The review-submit sheet is a route sibling on every provider (s6), so
   // the affordance is offered wherever its scope can actually be queried:
   // a Bitbucket PR without a selected organization waits at the boundary
@@ -267,12 +273,14 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             {webUrl ? (
               <Pressable
                 onPress={sharePullRequest}
+                disabled={loadFailed}
                 accessibilityRole="button"
                 accessibilityLabel={
                   isMergeRequest
                     ? t('prReview.terms.shareMergeRequest')
                     : t('prReview.screen.shareA11y')
                 }
+                accessibilityState={{ disabled: loadFailed }}
                 className="h-10 w-10 items-center justify-center rounded-full active:bg-muted"
               >
                 <ShareIcon size={18} color={colors.foreground} />
@@ -286,6 +294,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
               <Button
                 size="sm"
                 onPress={openReviewSubmit}
+                disabled={loadFailed}
                 accessibilityLabel={t('prReview.submit.submitReview')}
                 className={cn('px-3')}
               >
@@ -302,6 +311,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
             activeTab={tab}
             onChange={setTab}
             discussionCount={pr.data?.commentCount}
+            disabled={loadFailed}
           />
         </View>
       ) : null}

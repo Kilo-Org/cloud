@@ -48,10 +48,12 @@ export function useFormSheetKeyboardVisible(): boolean {
 export function PrFormSheetHeader(props: { title: string; eyebrow: string; onBack: () => void }) {
   return (
     <View collapsable={false} className="border-b border-border bg-background">
+      {/* Left-aligned heading on the back row: `centerTitle` would split the
+          header into a centered title row and a second row holding a lone
+          dismiss chevron, which read as a stray control under the title. */}
       <ScreenHeader
         title={props.title}
         eyebrow={props.eyebrow}
-        centerTitle
         onBack={props.onBack}
         backIcon="close"
         className="pt-3"

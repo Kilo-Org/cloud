@@ -257,9 +257,6 @@ beforeEach(() => {
     if (parsed.pathname.endsWith('/branch-restrictions')) {
       return jsonResponse(branchRestrictionsFixture);
     }
-    if (parsed.pathname === '/2.0/pullrequests') {
-      return jsonResponse({ pagelen: 50, values: [], next: null });
-    }
     if (parsed.pathname.endsWith('/pullrequests/12')) return jsonResponse(prDetail);
     if (parsed.pathname.includes('/src/')) {
       return new Response('line one\nline two\nline three', {
@@ -695,35 +692,37 @@ describe('listChecks', () => {
 });
 
 describe('listInbox', () => {
-  it('requests the reviewer inbox for the connected workspace and carries full identity', async () => {
+  const inboxPr = (id: number, updatedOn: string, fullName = 'acme/repo') => ({
+    id,
+    title: `PR ${id}`,
+    state: 'OPEN',
+    draft: false,
+    author: { uuid: '{author-uuid}', nickname: 'alice', display_name: 'Alice' },
+    updated_on: updatedOn,
+    source: { branch: { name: 'feature/retry' }, repository: { full_name: fullName } },
+    destination: { branch: { name: 'main' }, repository: { full_name: fullName } },
+  });
+
+  it('fans out over the workspace repositories and carries full identity', async () => {
     fetchMock.mockImplementation(async (url: string | URL) => {
       const full = url.toString();
       if (full.includes('token-service.example.com')) {
         return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
       }
       const parsed = new URL(full);
-      if (parsed.pathname === '/2.0/pullrequests') {
-        expect(parsed.searchParams.get('role')).toBe('REVIEWER');
+      if (parsed.pathname === '/2.0/repositories/acme') {
+        return jsonResponse({
+          pagelen: 100,
+          values: [{ slug: 'repo' }, { slug: 'empty-repo' }],
+          next: null,
+        });
+      }
+      if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
         expect(parsed.searchParams.get('q')).toBe('state="OPEN"');
         return jsonResponse({
           pagelen: 50,
           values: [
-            {
-              id: 12,
-              title: 'Add retry fingerprints',
-              state: 'OPEN',
-              draft: false,
-              author: { uuid: '{author-uuid}', nickname: 'alice', display_name: 'Alice' },
-              updated_on: '2026-09-03T00:00:00.000000+00:00',
-              source: {
-                branch: { name: 'feature/retry' },
-                repository: { full_name: 'acme/repo' },
-              },
-              destination: {
-                branch: { name: 'main' },
-                repository: { full_name: 'acme/repo' },
-              },
-            },
+            inboxPr(12, '2026-09-02T00:00:00.000000+00:00'),
             {
               id: 13,
               title: 'Foreign workspace PR',
@@ -732,16 +731,13 @@ describe('listInbox', () => {
               updated_on: '2026-09-03T00:00:00.000000+00:00',
               destination: { repository: { full_name: 'other-ws/other-repo' } },
             },
-            {
-              id: 14,
-              title: 'No repository identity',
-              state: 'OPEN',
-              draft: false,
-              updated_on: null,
-            },
+            { id: 14, title: 'No repository identity', state: 'OPEN', draft: false, updated_on: null },
           ],
           next: null,
         });
+      }
+      if (parsed.pathname === '/2.0/repositories/acme/empty-repo/pullrequests') {
+        return jsonResponse({ pagelen: 50, values: [], next: null });
       }
       return jsonResponse({ pagelen: 50, values: [], next: null });
     });
@@ -751,11 +747,76 @@ describe('listInbox', () => {
     expect(result.items).toHaveLength(1);
     expect(result.items[0]).toMatchObject({
       ref: { platform: 'bitbucket', workspace: 'acme', repoSlug: 'repo', prId: 12 },
-      title: 'Add retry fingerprints',
+      title: 'PR 12',
       author: { login: 'alice' },
       state: 'open',
       draft: false,
     });
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('merges pages across repositories newest first and continues with a page cursor', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname === '/2.0/repositories/acme') {
+        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
+      }
+      if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
+        const page = parsed.searchParams.get('page');
+        if (page === '2') {
+          return jsonResponse({
+            pagelen: 50,
+            values: [inboxPr(21, '2026-09-04T00:00:00.000000+00:00')],
+            next: null,
+          });
+        }
+        return jsonResponse({
+          pagelen: 50,
+          values: Array.from({ length: 50 }, (_, index) =>
+            inboxPr(100 + index, `2026-09-02T00:00:${String(index).padStart(2, '0')}+00:00`)
+          ),
+          next: null,
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const first = await listInbox(ORG_OWNER);
+    expect(first.items).toHaveLength(50);
+    expect(first.items[0]?.ref).toMatchObject({ prId: 149 });
+    expect(first.nextCursor).toBeTruthy();
+
+    const second = await listInbox(ORG_OWNER, first.nextCursor!);
+    expect(second.items[0]?.ref).toMatchObject({ prId: 21 });
+    expect(second.nextCursor).toBeNull();
+  });
+
+  it('ignores a cursor minted for another workspace', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      const parsed = new URL(full);
+      if (parsed.pathname === '/2.0/repositories/acme') {
+        return jsonResponse({ pagelen: 100, values: [{ slug: 'repo' }], next: null });
+      }
+      if (parsed.pathname === '/2.0/repositories/acme/repo/pullrequests') {
+        expect(parsed.searchParams.get('page')).toBe('1');
+        return jsonResponse({ pagelen: 50, values: [inboxPr(12, '2026-09-02T00:00:00.000000+00:00')], next: null });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const foreign = Buffer.from(
+      JSON.stringify({ identity: 'bitbucket-inbox:evil', page: 7 })
+    ).toString('base64url');
+    const result = await listInbox(ORG_OWNER, foreign);
+    expect(result.items).toHaveLength(1);
   });
 });
 

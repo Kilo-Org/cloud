@@ -736,7 +736,8 @@ export function SessionDetailContent({
     if (kept.length === 0) {
       return base;
     }
-    return [...base, ...kept].toSorted((a, b) => {
+    // eslint-disable-next-line unicorn/no-array-sort -- Hermes does not implement Array.prototype.toSorted; the spread already copies so nothing shared is mutated
+    return [...base, ...kept].sort((a, b) => {
       if (a.info.id < b.info.id) {
         return -1;
       }

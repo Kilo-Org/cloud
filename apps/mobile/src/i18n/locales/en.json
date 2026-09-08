@@ -674,7 +674,7 @@
     "terms": {
       "pullRequest": "Pull request",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Share merge request",
       "viewOnProvider": "View on {{provider}}",
       "mergeRequestUnavailable": "Merge request unavailable",

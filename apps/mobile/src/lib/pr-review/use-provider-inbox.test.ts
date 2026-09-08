@@ -133,6 +133,34 @@ describe('mergeProviderInboxSources', () => {
     expect(merged.items.map(row => row.title)).toEqual(['GitLab MR', 'GitHub PR', 'Bitbucket PR']);
   });
 
+  it('sorts without the ES2023 copy-returning methods Hermes lacks', () => {
+    // The device runtime is Hermes: Array.prototype.{toSorted,toReversed,
+    // toSpliced,with} do not exist there, so the merge must go through the
+    // mutating API. Deleting them in Node reproduces the device crash the
+    // inbox shipped with (e12: `undefined is not a function` on `.toSorted`).
+    const methods = ['toSorted', 'toReversed', 'toSpliced', 'with'];
+    const restored = methods.map(method => [
+      method,
+      Object.getOwnPropertyDescriptor(Array.prototype, method),
+    ] as const);
+    for (const method of methods) {
+      delete (Array.prototype as Record<string, unknown>)[method];
+    }
+    try {
+      const merged = mergeProviderInboxSources([
+        source({ platform: 'github', rows: githubRows }),
+        source({ platform: 'gitlab', rows: gitlabRows }),
+      ]);
+      expect(merged.items.map(row => row.title)).toEqual(['GitLab MR', 'GitHub PR']);
+    } finally {
+      for (const [method, descriptor] of restored) {
+        if (descriptor) {
+          Object.defineProperty(Array.prototype, method, descriptor);
+        }
+      }
+    }
+  });
+
   it('ignores a provider the user has not connected', () => {
     const merged = mergeProviderInboxSources([
       source({ platform: 'github', rows: githubRows }),

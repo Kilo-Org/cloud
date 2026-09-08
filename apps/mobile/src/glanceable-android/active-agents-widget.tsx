@@ -106,7 +106,9 @@ function startEdge(rtl: boolean): 'flex-start' | 'flex-end' {
 
 /** Lay a row's children out in reading order. */
 function inReadingOrder(children: React.ReactNode[], rtl: boolean): React.ReactNode[] {
-  return rtl ? children.toReversed() : children;
+  // Hermes does not implement Array.prototype.toReversed; reverse the copy
+  // so the caller's array is untouched.
+  return rtl ? [...children].reverse() : children;
 }
 
 function dotColor(kind: GlanceableCountKind, palette: Palette): HexColor {

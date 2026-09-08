@@ -21,6 +21,13 @@ import { selectPrReviewGateView } from '@/lib/pr-review/pr-review-connect-gate-v
 import { type ProviderPrPlatform } from '@/lib/pr-review/provider-pr-ref';
 import { useTRPC } from '@/lib/trpc';
 
+/**
+ * Cold deep links land straight on a gate state with no navigation history,
+ * so `ScreenHeader` would render without a back control. The provider-neutral
+ * inbox is the one exit every PR-review surface shares.
+ */
+const PR_REVIEW_ENTRY_HREF = '/(app)/pr-review' as const;
+
 type PrReviewConnectGateProps = {
   readonly children: ReactNode;
   /**
@@ -157,7 +164,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} />
+        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
         <QueryError
           variant="server"
           title={t('prReview.connect.checkFailedTitle')}
@@ -174,7 +181,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} />
+        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
         <CenteredState>
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </CenteredState>
@@ -186,7 +193,7 @@ function GitHubConnectGate({ children }: Readonly<{ children: ReactNode }>) {
     const revoked = view === 'reconnect';
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} />
+        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
         <EmptyState
           icon={revoked ? ShieldAlert : PlugZap}
           title={revoked ? t('prReview.connect.reconnectTitle') : t('common.connectGithub')}
@@ -313,7 +320,7 @@ function ProviderConnectGate({
   if (view === 'org-only') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} />
+        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
         <EmptyState
           icon={ShieldAlert}
           title={t('agentChat.newSession.bitbucketOrganizationsOnly')}
@@ -326,7 +333,7 @@ function ProviderConnectGate({
   if (view === 'error') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} />
+        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
         <QueryError
           variant="server"
           title={
@@ -347,7 +354,7 @@ function ProviderConnectGate({
   if (view === 'loading') {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} />
+        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
         <CenteredState>
           <ActivityIndicator size="small" color={colors.mutedForeground} />
         </CenteredState>
@@ -359,7 +366,7 @@ function ProviderConnectGate({
     const title = platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('common.prReview')} />
+        <ScreenHeader title={t('common.prReview')} backFallback={PR_REVIEW_ENTRY_HREF} />
         <EmptyState
           icon={PlugZap}
           title={title}

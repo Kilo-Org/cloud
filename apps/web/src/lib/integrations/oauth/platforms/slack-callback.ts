@@ -7,7 +7,7 @@ import {
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
-import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -44,6 +44,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // Handle OAuth errors from Slack
     if (error) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'slack' });
       captureMessage('Slack OAuth error', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
@@ -120,6 +121,10 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       if (user.id !== owner.id) {
         return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
       }
+    }
+
+    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
     if (

@@ -32,6 +32,9 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 /** Maximum age of a state token in seconds (10 minutes). */
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
+export const PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS = Math.floor(
+  Date.parse('2026-09-09T00:00:00.000Z') / 1000
+);
 
 export type VerifiedOAuthState = {
   /** The original owner string (`user_<id>` or `org_<id>`) */
@@ -41,6 +44,7 @@ export type VerifiedOAuthState = {
   /** Optional relative path to return to after the OAuth callback. */
   returnTo?: string;
   purpose?: 'provider_install';
+  issuedAt: number;
 };
 
 /**
@@ -108,6 +112,7 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
       return {
         owner: parsed.data.owner,
         userId: parsed.data.uid,
+        issuedAt: parsed.data.iat,
         ...(returnTo ? { returnTo } : {}),
         ...(parsed.data.purpose ? { purpose: parsed.data.purpose } : {}),
       };
@@ -129,4 +134,8 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
     case 'token_from_future':
       return { status: 'invalid', reason: 'state_from_future' };
   }
+}
+
+export function isLegacyProviderOAuthState(state: VerifiedOAuthState): boolean {
+  return !state.purpose && state.issuedAt < PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS;
 }

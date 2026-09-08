@@ -77,9 +77,13 @@ describe('oauth state', () => {
     jest.advanceTimersByTime(600_000);
     expect(verifyOAuthStateDetailed(state)).toEqual({
       status: 'valid',
-      state: { owner: 'user_synthetic', userId: 'oauth/synthetic' },
+      state: { owner: 'user_synthetic', userId: 'oauth/synthetic', issuedAt: expect.any(Number) },
     });
-    expect(verifyOAuthState(state)).toEqual({ owner: 'user_synthetic', userId: 'oauth/synthetic' });
+    expect(verifyOAuthState(state)).toEqual({
+      owner: 'user_synthetic',
+      userId: 'oauth/synthetic',
+      issuedAt: expect.any(Number),
+    });
     jest.advanceTimersByTime(1_000);
     expect(verifyOAuthStateDetailed(state)).toEqual({ status: 'invalid', reason: 'state_expired' });
     expect(verifyOAuthState(state)).toBeNull();
@@ -106,7 +110,11 @@ describe('oauth state', () => {
         returnTo: 123,
       })
     );
-    expect(verifyOAuthState(state)).toEqual({ owner: 'user_synthetic', userId: 'oauth/synthetic' });
+    expect(verifyOAuthState(state)).toEqual({
+      owner: 'user_synthetic',
+      userId: 'oauth/synthetic',
+      issuedAt: expect.any(Number),
+    });
   });
 
   test('round-trips a validated return path', () => {

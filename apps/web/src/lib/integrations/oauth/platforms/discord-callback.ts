@@ -4,7 +4,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
-import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
@@ -37,6 +37,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
     // Handle OAuth errors from Discord
     if (error) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'discord' });
       captureMessage('Discord OAuth error', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
@@ -113,6 +114,10 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       if (user.id !== owner.id) {
         return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
       }
+    }
+
+    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
     if (

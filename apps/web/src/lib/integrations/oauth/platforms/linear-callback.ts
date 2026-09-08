@@ -13,7 +13,7 @@ import {
   revokeLinearToken,
   upsertLinearInstallation,
 } from '@/lib/integrations/linear-service';
-import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { isLegacyProviderOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { linkKiloUser, unlinkTeamKiloUsers } from '@/lib/bot-identity';
@@ -243,6 +243,7 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
     const verifiedOwner = verified?.owner ?? null;
 
     if (error) {
+      await cancelMissingCodeProviderOAuthAttempt({ state, user, provider: 'linear' });
       captureMessage('Linear OAuth error', {
         level: 'warning',
         tags: { endpoint: 'linear/callback', source: 'linear_oauth' },
@@ -314,6 +315,10 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       await ensureOrganizationAccess({ user }, owner.id);
     } else if (user.id !== owner.id) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
+    }
+
+    if (verified.purpose !== 'provider_install' && !isLegacyProviderOAuthState(verified)) {
+      return NextResponse.redirect(new URL('/integrations?error=invalid_state', APP_URL));
     }
 
     if (

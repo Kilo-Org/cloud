@@ -5,23 +5,49 @@ import {
   providerBaseUrlEncodedInToken,
 } from './kilo-targets.js';
 import {
-  historicalCliRoute,
-  historicalRouteFixtures,
-} from './__fixtures__/runtime-url-normalization.js';
+  inferRuntimeCredentialProxyRoute,
+  resolveRuntimeCredentialProxyRoute,
+} from './runtime-credential-proxy-routes.js';
 
-describe('immutable historical Kilo route normalization', () => {
+// Literal requests emitted by supported CLI versions exercise the production
+// facade resolver, without emulating CLI URL construction in this test.
+describe('CLI route compatibility', () => {
   it.each([
-    ['origin facade', 'https://worker.example.test'],
-    ['safe prefixed facade', 'https://worker.example.test/runtime-proxy'],
-  ])('%s keeps v7.4.20 and current requests inside the Worker facade', (_name, facade) => {
-    for (const fixture of historicalRouteFixtures) {
-      const routed = new URL(historicalCliRoute(facade, fixture.path));
-      expect(routed.origin).toBe('https://worker.example.test');
-      expect(routed.pathname).toBe(
-        `${new URL(facade).pathname.replace(/\/+$/, '')}${fixture.path}`
-      );
-      if (new URL(facade).pathname !== '/') expect(routed.pathname).not.toBe(fixture.path);
-    }
+    ['https://worker.example.test/api/profile', 'GET', 'https://api.kilo.ai/api/profile'],
+    ['https://worker.example.test/api/defaults', 'GET', 'https://api.kilo.ai/api/defaults'],
+    [
+      'https://worker.example.test/api/openrouter/models',
+      'GET',
+      'https://api.kilo.ai/api/gateway/models',
+    ],
+    [
+      'https://worker.example.test/api/gateway/v1/chat/completions',
+      'POST',
+      'https://api.kilo.ai/api/gateway/v1/chat/completions',
+    ],
+    [
+      'https://worker.example.test/api/session',
+      'POST',
+      'https://ingest.kilosessions.ai/api/session',
+    ],
+  ])('routes CLI request %s (%s) to %s', (cliUrl, method, expectedUrl) => {
+    const derived = deriveKiloSandboxTargets({}, 'user-token');
+    if (!derived.success) throw new Error('Expected default targets');
+    const url = new URL(cliUrl);
+    const route = inferRuntimeCredentialProxyRoute(url.pathname);
+    if (!route) throw new Error('Expected a supported CLI route');
+    expect(
+      resolveRuntimeCredentialProxyRoute({
+        targets: derived.targets,
+        route,
+        method,
+        pathname: url.pathname,
+        search: url.search,
+        kiloSessionId: 'ses_cli_compatibility',
+        contentType: 'application/json',
+        bodyText: '{"sessionId":"ses_cli_compatibility"}',
+      })?.href
+    ).toBe(expectedUrl);
   });
 });
 

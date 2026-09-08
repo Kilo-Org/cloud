@@ -17,8 +17,8 @@ import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credent
 import { captureException } from '@sentry/nextjs';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import {
+  lockProviderInstallations,
   withProviderInstallationLock,
-  withProviderInstallationLocks,
 } from '@/lib/integrations/provider-installation-lock';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
@@ -312,61 +312,39 @@ export async function upsertSlackInstallation({
 
   if (existing) {
     try {
-      const updated = await withProviderInstallationLocks({
-        platform: PLATFORM.SLACK,
-        installationIds: [existing.platform_installation_id, teamId],
-        callback: async () => {
-          const row = await db.transaction(async tx => {
-            await assertGitHubAutomationCanBeEnabled(owner, tx);
-            const [current] = await tx
-              .select({
-                id: platform_integrations.id,
-                installationId: platform_integrations.platform_installation_id,
-              })
-              .from(platform_integrations)
-              .where(
-                and(
-                  eq(platform_integrations.platform, PLATFORM.SLACK),
-                  ...getOwnershipConditions(owner)
-                )
-              )
-              .for('update');
-            if (
-              !current ||
-              current.id !== existing.id ||
-              current.installationId !== existing.platform_installation_id
-            ) {
-              throw new Error('Slack installation changed concurrently');
-            }
-            const [updatedRow] = await tx
-              .update(platform_integrations)
-              .set({
-                platform_installation_id: teamId,
-                platform_account_id: teamId,
-                platform_account_login: teamName,
-                scopes: SLACK_SCOPES,
-                integration_status: INTEGRATION_STATUS.ACTIVE,
-                metadata,
-                updated_at: new Date().toISOString(),
-              })
-              .where(eq(platform_integrations.id, existing.id))
-              .returning();
-            return updatedRow;
-          });
-          try {
-            await persistInstallation?.();
-          } catch (error) {
-            await db
-              .update(platform_integrations)
-              .set({
-                integration_status: INTEGRATION_STATUS.SUSPENDED,
-                auth_invalid_reason: 'provider_state_persist_failed',
-              })
-              .where(eq(platform_integrations.id, row.id));
-            throw error;
-          }
-          return row;
-        },
+      const updated = await db.transaction(async tx => {
+        await assertGitHubAutomationCanBeEnabled(owner, tx);
+        const [current] = await tx
+          .select({
+            id: platform_integrations.id,
+            installationId: platform_integrations.platform_installation_id,
+          })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.platform, PLATFORM.SLACK),
+              ...getOwnershipConditions(owner)
+            )
+          )
+          .for('update');
+        await lockProviderInstallations(tx, PLATFORM.SLACK, [current?.installationId, teamId]);
+        if (!current || current.id !== existing.id)
+          throw new Error('Slack installation changed concurrently');
+        const [row] = await tx
+          .update(platform_integrations)
+          .set({
+            platform_installation_id: teamId,
+            platform_account_id: teamId,
+            platform_account_login: teamName,
+            scopes: SLACK_SCOPES,
+            integration_status: INTEGRATION_STATUS.ACTIVE,
+            metadata,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(platform_integrations.id, existing.id))
+          .returning();
+        await persistInstallation?.();
+        return row;
       });
 
       await mirrorSlackCredential({ integration: updated, owner, teamId, installation });
@@ -381,52 +359,38 @@ export async function upsertSlackInstallation({
   }
 
   try {
-    const created = await withProviderInstallationLocks({
-      platform: PLATFORM.SLACK,
-      installationIds: [teamId],
-      callback: async () => {
-        const row = await db.transaction(async tx => {
-          await assertGitHubAutomationCanBeEnabled(owner, tx);
-          const [current] = await tx
-            .select({
-              id: platform_integrations.id,
-              installationId: platform_integrations.platform_installation_id,
-            })
-            .from(platform_integrations)
-            .where(
-              and(
-                eq(platform_integrations.platform, PLATFORM.SLACK),
-                ...getOwnershipConditions(owner)
-              )
-            )
-            .for('update');
-          if (current) throw new Error('Slack installation changed concurrently');
-          const [createdRow] = await tx
-            .insert(platform_integrations)
-            .values({
-              owned_by_user_id: owner.type === 'user' ? owner.id : null,
-              owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-              platform: PLATFORM.SLACK,
-              integration_type: 'oauth',
-              platform_installation_id: teamId,
-              platform_account_id: teamId,
-              platform_account_login: teamName,
-              scopes: SLACK_SCOPES,
-              integration_status: INTEGRATION_STATUS.ACTIVE,
-              metadata,
-              installed_at: new Date().toISOString(),
-            })
-            .returning();
-          return createdRow;
-        });
-        try {
-          await persistInstallation?.();
-        } catch (error) {
-          await db.delete(platform_integrations).where(eq(platform_integrations.id, row.id));
-          throw error;
-        }
-        return row;
-      },
+    const created = await db.transaction(async tx => {
+      await assertGitHubAutomationCanBeEnabled(owner, tx);
+      const [current] = await tx
+        .select({
+          id: platform_integrations.id,
+          installationId: platform_integrations.platform_installation_id,
+        })
+        .from(platform_integrations)
+        .where(
+          and(eq(platform_integrations.platform, PLATFORM.SLACK), ...getOwnershipConditions(owner))
+        )
+        .for('update');
+      await lockProviderInstallations(tx, PLATFORM.SLACK, [current?.installationId, teamId]);
+      if (current) throw new Error('Slack installation changed concurrently');
+      const [row] = await tx
+        .insert(platform_integrations)
+        .values({
+          owned_by_user_id: owner.type === 'user' ? owner.id : null,
+          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+          platform: PLATFORM.SLACK,
+          integration_type: 'oauth',
+          platform_installation_id: teamId,
+          platform_account_id: teamId,
+          platform_account_login: teamName,
+          scopes: SLACK_SCOPES,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata,
+          installed_at: new Date().toISOString(),
+        })
+        .returning();
+      await persistInstallation?.();
+      return row;
     });
 
     await mirrorSlackCredential({ integration: created, owner, teamId, installation });
@@ -459,13 +423,6 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   const metadata = integration.metadata as { access_token?: string } | null;
   const teamId = integration.platform_installation_id ?? integration.platform_account_id;
   if (!teamId) {
-    if (shouldDeleteSlackInstallation && metadata?.access_token) {
-      try {
-        await revokeSlackToken(metadata.access_token);
-      } catch (error) {
-        console.error('Failed to revoke Slack token:', error);
-      }
-    }
     if (shouldDeleteSlackInstallation && options.deleteChatSdkInstallation) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

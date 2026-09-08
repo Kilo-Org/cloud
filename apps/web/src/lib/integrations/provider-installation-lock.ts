@@ -1,37 +1,23 @@
-import { db, pool } from '@/lib/drizzle';
+import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq, or } from 'drizzle-orm';
+import { and, eq, or, sql } from 'drizzle-orm';
 
-const LOCK_TIMEOUT_MS = 5_000;
-const STATEMENT_TIMEOUT_MS = 10_000;
+export async function lockProviderInstallation(
+  tx: DrizzleTransaction,
+  platform: string,
+  installationId: string
+): Promise<void> {
+  await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${platform}:${installationId}`}))`);
+}
 
-export async function withProviderInstallationLocks<T>(input: {
-  platform: string;
-  installationIds: Array<string | null | undefined>;
-  callback: () => Promise<T>;
-}): Promise<T> {
-  const ids = [...new Set(input.installationIds.filter((id): id is string => Boolean(id)))].sort();
-  const client = await pool.connect();
-  const acquired: string[] = [];
-  try {
-    await client.query(`SET lock_timeout = '${LOCK_TIMEOUT_MS}ms'`);
-    await client.query(`SET statement_timeout = '${STATEMENT_TIMEOUT_MS}ms'`);
-    for (const id of ids) {
-      await client.query('SELECT pg_advisory_lock(hashtext($1))', [`${input.platform}:${id}`]);
-      acquired.push(id);
-    }
-    return await input.callback();
-  } finally {
-    let destroyClient = false;
-    for (const id of acquired.reverse()) {
-      try {
-        await client.query('SELECT pg_advisory_unlock(hashtext($1))', [`${input.platform}:${id}`]);
-      } catch {
-        destroyClient = true;
-        break;
-      }
-    }
-    client.release(destroyClient);
+export async function lockProviderInstallations(
+  tx: DrizzleTransaction,
+  platform: string,
+  installationIds: Array<string | null | undefined>
+): Promise<void> {
+  const ids = [...new Set(installationIds.filter((id): id is string => Boolean(id)))].sort();
+  for (const installationId of ids) {
+    await lockProviderInstallation(tx, platform, installationId);
   }
 }
 
@@ -40,27 +26,24 @@ export async function cleanupProviderInstallationIfUnclaimed(input: {
   installationId: string;
   cleanup: () => Promise<void>;
 }): Promise<boolean> {
-  return withProviderInstallationLocks({
-    platform: input.platform,
-    installationIds: [input.installationId],
-    callback: async () => {
-      const [claimed] = await db
-        .select({ id: platform_integrations.id })
-        .from(platform_integrations)
-        .where(
-          and(
-            eq(platform_integrations.platform, input.platform),
-            or(
-              eq(platform_integrations.platform_installation_id, input.installationId),
-              eq(platform_integrations.platform_account_id, input.installationId)
-            )
+  return db.transaction(async tx => {
+    await lockProviderInstallation(tx, input.platform, input.installationId);
+    const [claimed] = await tx
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, input.platform),
+          or(
+            eq(platform_integrations.platform_installation_id, input.installationId),
+            eq(platform_integrations.platform_account_id, input.installationId)
           )
         )
-        .limit(1);
-      if (claimed) return false;
-      await input.cleanup();
-      return true;
-    },
+      )
+      .limit(1);
+    if (claimed) return false;
+    await input.cleanup();
+    return true;
   });
 }
 
@@ -69,9 +52,8 @@ export async function withProviderInstallationLock<T>(input: {
   installationId: string;
   callback: () => Promise<T>;
 }): Promise<T> {
-  return withProviderInstallationLocks({
-    platform: input.platform,
-    installationIds: [input.installationId],
-    callback: input.callback,
+  return db.transaction(async tx => {
+    await lockProviderInstallation(tx, input.platform, input.installationId);
+    return input.callback();
   });
 }

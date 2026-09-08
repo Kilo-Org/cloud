@@ -7,9 +7,6 @@ import { withProviderInstallationLock } from '@/lib/integrations/provider-instal
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import { SLACK_SIGNING_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { db } from '@/lib/drizzle';
-import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq } from 'drizzle-orm';
 
 const SLACK_SIGNATURE_VERSION = 'v0';
 const SLACK_SIGNATURE_TOLERANCE_SECONDS = 60 * 5;
@@ -67,37 +64,14 @@ function isSlackAppUninstalledPayload(payload: unknown): payload is SlackAppUnin
 
 async function handleSlackAppUninstalled(
   teamId: string,
-  eventTimestampMs: number,
   chat: Chat,
   slackAdapter: SlackAdapter
 ): Promise<void> {
-  const [candidate] = await db
-    .select({ id: platform_integrations.id, updatedAt: platform_integrations.updated_at })
-    .from(platform_integrations)
-    .where(
-      and(
-        eq(platform_integrations.platform, PLATFORM.SLACK),
-        eq(platform_integrations.platform_installation_id, teamId)
-      )
-    )
-    .limit(1);
-  if (!candidate) return;
   try {
     await withProviderInstallationLock({
       platform: PLATFORM.SLACK,
       installationId: teamId,
       callback: async () => {
-        const [current] = await db
-          .select({ id: platform_integrations.id, updatedAt: platform_integrations.updated_at })
-          .from(platform_integrations)
-          .where(eq(platform_integrations.id, candidate.id))
-          .limit(1);
-        if (
-          !current ||
-          current.updatedAt !== candidate.updatedAt ||
-          Date.parse(current.updatedAt) > eventTimestampMs
-        )
-          return;
         await slackAdapter.deleteInstallation(teamId);
         await deleteInstallationByTeamId(teamId);
         await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, teamId);
@@ -144,16 +118,7 @@ export function createSlackWebhookHandler(chat: Chat, slackAdapter: SlackAdapter
 
     if (isSlackAppUninstalledPayload(payload)) {
       try {
-        const timestampSeconds = Number.parseInt(
-          request.headers.get('x-slack-request-timestamp') ?? '',
-          10
-        );
-        await handleSlackAppUninstalled(
-          payload.team_id,
-          timestampSeconds * 1000,
-          chat,
-          slackAdapter
-        );
+        await handleSlackAppUninstalled(payload.team_id, chat, slackAdapter);
       } catch (error) {
         console.error('[Bot] Failed to handle Slack app_uninstalled event:', error);
         captureException(error, {

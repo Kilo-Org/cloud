@@ -45,7 +45,6 @@ jest.mock('@/lib/integrations/github/sharing-compatibility', () => ({
 }));
 jest.mock('@/lib/integrations/provider-installation-lock', () => ({
   lockProviderInstallations: jest.fn(async () => undefined),
-  withProviderInstallationLocks: jest.fn(async input => input.callback()),
   withProviderInstallationLock: jest.fn(async input => input.callback()),
 }));
 
@@ -100,12 +99,7 @@ describe('slack-service uninstallApp', () => {
   beforeEach(() => {
     mockLimit.mockReset();
     mockForUpdate.mockReset();
-    mockForUpdate.mockImplementation(async () =>
-      ((await mockLimit()) ?? []).map((row: ReturnType<typeof buildSlackIntegration>) => ({
-        id: row.id,
-        installationId: row.platform_installation_id,
-      }))
-    );
+    mockForUpdate.mockImplementation(async () => (await mockLimit()) ?? []);
     mockForUpdate.mockReset();
     mockUpdateSet.mockReset();
     mockUpdateWhere.mockReset();
@@ -202,22 +196,6 @@ describe('slack-service uninstallApp', () => {
     expect(deleteChatSdkIdentityCache).not.toHaveBeenCalled();
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
   });
-
-  it('best-effort revokes a token before deleting a legacy row with no provider ID', async () => {
-    mockLimit.mockResolvedValue([
-      buildSlackIntegration({
-        platform_installation_id: null,
-        platform_account_id: null,
-        metadata: { access_token: 'legacy-token' },
-      }),
-    ]);
-    mockAuthRevoke.mockResolvedValue({ ok: true });
-
-    await expect(uninstallApp(owner)).resolves.toEqual({ success: true });
-
-    expect(mockAuthRevoke).toHaveBeenCalled();
-    expect(mockDeleteWhere).toHaveBeenCalled();
-  });
 });
 
 describe('slack-service deleteInstallationByTeamId', () => {
@@ -310,12 +288,7 @@ describe('upsertSlackInstallation', () => {
   beforeEach(() => {
     mockLimit.mockReset();
     mockForUpdate.mockReset();
-    mockForUpdate.mockImplementation(async () =>
-      ((await mockLimit()) ?? []).map((row: ReturnType<typeof buildSlackIntegration>) => ({
-        id: row.id,
-        installationId: row.platform_installation_id,
-      }))
-    );
+    mockForUpdate.mockImplementation(async () => (await mockLimit()) ?? []);
     mockUpdateSet.mockReset();
     mockUpdateWhere.mockReset();
     mockUpdateReturning.mockReset();

@@ -3,7 +3,6 @@ import type { Chat, WebhookOptions } from 'chat';
 import type { SlackAdapter } from '@chat-adapter/slack';
 import { captureException } from '@sentry/nextjs';
 import { unlinkTeamKiloUsers } from '@/lib/bot-identity';
-import { withProviderInstallationLock } from '@/lib/integrations/provider-installation-lock';
 import { deleteInstallationByTeamId } from '@/lib/integrations/slack-service';
 import { SLACK_SIGNING_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -68,15 +67,9 @@ async function handleSlackAppUninstalled(
   slackAdapter: SlackAdapter
 ): Promise<void> {
   try {
-    await withProviderInstallationLock({
-      platform: PLATFORM.SLACK,
-      installationId: teamId,
-      callback: async () => {
-        await slackAdapter.deleteInstallation(teamId);
-        await deleteInstallationByTeamId(teamId);
-        await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, teamId);
-      },
-    });
+    await deleteInstallationByTeamId(teamId);
+    await slackAdapter.deleteInstallation(teamId);
+    await unlinkTeamKiloUsers(chat.getState(), PLATFORM.SLACK, teamId);
   } catch (error) {
     captureException(error, {
       level: 'error',

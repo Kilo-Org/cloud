@@ -5,8 +5,6 @@ import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
   exchangeSlackOAuthCode,
-  getInstallation as getSlackInstallation,
-  revokeSlackBotToken,
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
@@ -21,7 +19,7 @@ import {
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
-import { cleanupProviderInstallationIfUnclaimed } from '@/lib/integrations/provider-installation-lock';
+import { withChatInstallationLock } from '@/lib/bot/installation-lock';
 
 /**
  * Slack OAuth Callback
@@ -127,16 +125,28 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     await bot.initialize();
     const slackAdapter = bot.getAdapter('slack');
     const { teamId, installation } = await exchangeSlackOAuthCode(code);
-    const previousTeamId = (await getSlackInstallation(owner))?.platform_installation_id;
-    try {
-      await upsertSlackInstallation({
-        owner,
-        teamId,
-        installation,
-        persistInstallation: () => slackAdapter.setInstallation(teamId, installation),
-      });
-    } catch (error) {
-      if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+    const connectionError = await withChatInstallationLock(
+      bot.getState(),
+      PLATFORM.SLACK,
+      teamId,
+      async () => {
+        const previousInstallation = await slackAdapter.getInstallation(teamId);
+        await slackAdapter.setInstallation(teamId, installation);
+        try {
+          await upsertSlackInstallation({ owner, teamId, installation });
+          return null;
+        } catch (error) {
+          if (previousInstallation) {
+            await slackAdapter.setInstallation(teamId, previousInstallation);
+          } else {
+            await slackAdapter.deleteInstallation(teamId);
+          }
+          return error;
+        }
+      }
+    );
+    if (connectionError) {
+      if (connectionError instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(
           new URL(
             buildIntegrationOAuthRedirectPathFromState(
@@ -148,18 +158,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
           )
         );
       }
-      throw error;
-    }
-    if (previousTeamId && previousTeamId !== teamId) {
-      await cleanupProviderInstallationIfUnclaimed({
-        platform: PLATFORM.SLACK,
-        installationId: previousTeamId,
-        cleanup: async () => {
-          const previous = await slackAdapter.getInstallation(previousTeamId);
-          if (previous?.botToken) await revokeSlackBotToken(previous.botToken);
-          await slackAdapter.deleteInstallation(previousTeamId);
-        },
-      });
+      throw connectionError;
     }
 
     // 9. Redirect to success page

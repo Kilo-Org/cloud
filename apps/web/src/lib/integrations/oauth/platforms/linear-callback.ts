@@ -33,7 +33,7 @@ import {
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
-import { cleanupProviderInstallationIfUnclaimed } from '@/lib/integrations/provider-installation-lock';
+import { withChatInstallationLock } from '@/lib/bot/installation-lock';
 
 async function getChatSdkLinearAccessToken(organizationId: string): Promise<string | null> {
   const installation = await bot.getAdapter('linear').getInstallation(organizationId);
@@ -303,20 +303,40 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       ...(token.refreshToken ? { refreshToken: token.refreshToken } : {}),
     };
     const workspaceName = identity.organizationName ?? organizationId;
-    try {
-      await upsertLinearInstallation(
-        {
-          owner,
-          organizationId,
-          organizationName: workspaceName,
-          botUserId: installation.botUserId,
-        },
-        {
-          persistInstallation: () => linearAdapter.setInstallation(organizationId, installation),
+    const connectionError = await withChatInstallationLock(
+      bot.getState(),
+      PLATFORM.LINEAR,
+      organizationId,
+      async () => {
+        const previousInstallation = await linearAdapter.getInstallation(organizationId);
+        await linearAdapter.setInstallation(organizationId, installation);
+        try {
+          await upsertLinearInstallation({
+            owner,
+            organizationId,
+            organizationName: workspaceName,
+            botUserId: installation.botUserId,
+          });
+          return null;
+        } catch (error) {
+          if (previousInstallation) {
+            await linearAdapter.setInstallation(organizationId, previousInstallation);
+          } else {
+            await linearAdapter.deleteInstallation(organizationId);
+            await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
+          }
+          return error;
         }
-      );
-    } catch (error) {
-      if (error instanceof LinearWorkspaceAlreadyConnectedError) {
+      }
+    );
+    if (connectionError) {
+      if (connectionError instanceof LinearWorkspaceAlreadyConnectedError) {
+        // The Chat SDK adapter already persisted the freshly-issued OAuth
+        // token under linear:installation:${organizationId} during
+        // handleOAuthCallback. Since the uniqueness check rejected this
+        // install, we must roll that state back — otherwise we overwrite the
+        // original installer's token and any future bot/webhook traffic for
+        // that workspace runs with mismatched credentials.
         return NextResponse.redirect(
           new URL(
             buildIntegrationOAuthRedirectPathFromOwner(
@@ -329,20 +349,23 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
           )
         );
       }
-      throw error;
+      throw connectionError;
     }
 
     if (previousOrganizationId && previousOrganizationId !== organizationId) {
-      await cleanupProviderInstallationIfUnclaimed({
-        platform: PLATFORM.LINEAR,
-        installationId: previousOrganizationId,
-        cleanup: async () => {
+      await withChatInstallationLock(
+        bot.getState(),
+        PLATFORM.LINEAR,
+        previousOrganizationId,
+        async () => {
+          const current = await getLinearInstallation(owner);
+          if (current?.platform_installation_id === previousOrganizationId) return;
           const previousAccessToken = await getChatSdkLinearAccessToken(previousOrganizationId);
           if (previousAccessToken) await revokeLinearToken(previousAccessToken);
           await deleteChatSdkLinearInstallation(previousOrganizationId);
           await deleteChatSdkLinearIdentityCache(previousOrganizationId);
-        },
-      });
+        }
+      );
     }
 
     const successPath = verified.returnTo

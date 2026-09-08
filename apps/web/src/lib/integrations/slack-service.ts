@@ -16,10 +16,6 @@ import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-
 import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credential-store';
 import { captureException } from '@sentry/nextjs';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
-import {
-  lockProviderInstallations,
-  withProviderInstallationLock,
-} from '@/lib/integrations/provider-installation-lock';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -120,11 +116,6 @@ export async function exchangeSlackOAuthCode(code: string): Promise<{
       isEnterpriseInstall: Boolean(result.is_enterprise_install),
     },
   };
-}
-
-export async function revokeSlackBotToken(token: string): Promise<void> {
-  const result = await new WebClient(token).auth.revoke();
-  if (!result.ok) throw new Error(result.error ?? 'Failed to revoke Slack token');
 }
 
 /**
@@ -275,12 +266,10 @@ export async function upsertSlackInstallation({
   owner,
   teamId,
   installation,
-  persistInstallation,
 }: {
   owner: Owner;
   teamId: string;
   installation: SlackInstallation;
-  persistInstallation?: () => Promise<void>;
 }): Promise<PlatformIntegration> {
   const existing = await getInstallation(owner);
   const teamName = installation.teamName || 'Unknown Team';
@@ -314,22 +303,6 @@ export async function upsertSlackInstallation({
     try {
       const updated = await db.transaction(async tx => {
         await assertGitHubAutomationCanBeEnabled(owner, tx);
-        const [current] = await tx
-          .select({
-            id: platform_integrations.id,
-            installationId: platform_integrations.platform_installation_id,
-          })
-          .from(platform_integrations)
-          .where(
-            and(
-              eq(platform_integrations.platform, PLATFORM.SLACK),
-              ...getOwnershipConditions(owner)
-            )
-          )
-          .for('update');
-        await lockProviderInstallations(tx, PLATFORM.SLACK, [current?.installationId, teamId]);
-        if (!current || current.id !== existing.id)
-          throw new Error('Slack installation changed concurrently');
         const [row] = await tx
           .update(platform_integrations)
           .set({
@@ -343,7 +316,6 @@ export async function upsertSlackInstallation({
           })
           .where(eq(platform_integrations.id, existing.id))
           .returning();
-        await persistInstallation?.();
         return row;
       });
 
@@ -361,18 +333,6 @@ export async function upsertSlackInstallation({
   try {
     const created = await db.transaction(async tx => {
       await assertGitHubAutomationCanBeEnabled(owner, tx);
-      const [current] = await tx
-        .select({
-          id: platform_integrations.id,
-          installationId: platform_integrations.platform_installation_id,
-        })
-        .from(platform_integrations)
-        .where(
-          and(eq(platform_integrations.platform, PLATFORM.SLACK), ...getOwnershipConditions(owner))
-        )
-        .for('update');
-      await lockProviderInstallations(tx, PLATFORM.SLACK, [current?.installationId, teamId]);
-      if (current) throw new Error('Slack installation changed concurrently');
       const [row] = await tx
         .insert(platform_integrations)
         .values({
@@ -389,7 +349,6 @@ export async function upsertSlackInstallation({
           installed_at: new Date().toISOString(),
         })
         .returning();
-      await persistInstallation?.();
       return row;
     });
 
@@ -420,43 +379,33 @@ export async function uninstallApp(owner: Owner, options: SlackUninstallOptions 
   const shouldDeleteSlackInstallation =
     integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 
+  // Revoke the token if we have one
   const metadata = integration.metadata as { access_token?: string } | null;
+  if (shouldDeleteSlackInstallation && metadata?.access_token) {
+    try {
+      await revokeSlackToken(metadata.access_token);
+    } catch (error) {
+      console.error('Failed to revoke Slack token:', error);
+    }
+  }
+
   const teamId = integration.platform_installation_id ?? integration.platform_account_id;
-  if (!teamId) {
-    if (shouldDeleteSlackInstallation && options.deleteChatSdkInstallation) {
+  if (
+    shouldDeleteSlackInstallation &&
+    (options.deleteChatSdkInstallation || options.deleteChatSdkIdentityCache)
+  ) {
+    if (!teamId) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Slack installation is missing a team ID',
       });
     }
-    await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-    return { success: true };
+
+    await options.deleteChatSdkInstallation?.(teamId);
+    await options.deleteChatSdkIdentityCache?.(teamId);
   }
-  await withProviderInstallationLock({
-    platform: PLATFORM.SLACK,
-    installationId: teamId,
-    callback: async () => {
-      const current = await getInstallation(owner);
-      if (
-        current?.id !== integration.id ||
-        (current.platform_installation_id ?? current.platform_account_id) !== teamId
-      ) {
-        throw new TRPCError({ code: 'CONFLICT', message: 'Slack installation changed; retry' });
-      }
-      if (shouldDeleteSlackInstallation && metadata?.access_token) {
-        try {
-          await revokeSlackToken(metadata.access_token);
-        } catch (error) {
-          console.error('Failed to revoke Slack token:', error);
-        }
-      }
-      if (shouldDeleteSlackInstallation) {
-        await options.deleteChatSdkInstallation?.(teamId);
-        await options.deleteChatSdkIdentityCache?.(teamId);
-      }
-      await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-    },
-  });
+
+  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   return { success: true };
 }

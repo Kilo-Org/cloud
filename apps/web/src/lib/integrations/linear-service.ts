@@ -14,10 +14,6 @@ import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
-import {
-  lockProviderInstallations,
-  withProviderInstallationLock,
-} from '@/lib/integrations/provider-installation-lock';
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
 // `app:mentionable` combined with `actor=app` gives us an app-actor install
@@ -316,14 +312,25 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 }
 
 type LinearUpsertOptions = {
-  persistInstallation?: () => Promise<void>;
+  getChatSdkAccessToken?: (organizationId: string) => Promise<string | null>;
+  deleteChatSdkInstallation?: (organizationId: string) => Promise<void>;
+  deleteChatSdkIdentityCache?: (organizationId: string) => Promise<void>;
 };
 
 /**
  * Create or update a Linear `platform_integrations` row after a successful
- * OAuth exchange. The caller can persist Chat SDK state inside the same
- * provider-key database transaction as association admission. Cleanup of a
- * previous workspace happens separately after a globally-unclaimed recheck.
+ * OAuth exchange. The OAuth access/refresh tokens are persisted inside the
+ * Chat SDK's state adapter by `linearAdapter.handleOAuthCallback`; this row
+ * stores only non-secret metadata used by the tRPC router / UI and to gate
+ * bot processing via `metadata.bot_enabled`.
+ *
+ * When the same Kilo owner reinstalls onto a *different* Linear workspace
+ * (`existing.platform_installation_id !== organizationId`), the optional
+ * cleanup callbacks are invoked to revoke the OAuth token Linear-side and
+ * to drop the Chat SDK installation + identity cache for the previous
+ * workspace. Without this, the old workspace stays authorized and keeps
+ * sending webhooks to us with stale credentials, while no DB row connects
+ * that organizationId back to a Kilo owner.
  */
 export async function upsertLinearInstallation(
   {
@@ -344,6 +351,20 @@ export async function upsertLinearInstallation(
   const conflicting = await getConflictingLinearInstallation(owner, organizationId);
   if (conflicting) {
     throw new LinearWorkspaceAlreadyConnectedError(organizationName);
+  }
+
+  if (
+    existing &&
+    existing.platform_installation_id &&
+    existing.platform_installation_id !== organizationId
+  ) {
+    const previousOrganizationId = existing.platform_installation_id;
+    const previousAccessToken = await options.getChatSdkAccessToken?.(previousOrganizationId);
+    if (previousAccessToken) {
+      await revokeLinearToken(previousAccessToken);
+    }
+    await options.deleteChatSdkInstallation?.(previousOrganizationId);
+    await options.deleteChatSdkIdentityCache?.(previousOrganizationId);
   }
 
   const defaultModel =
@@ -370,25 +391,6 @@ export async function upsertLinearInstallation(
     try {
       const updated = await db.transaction(async tx => {
         await assertGitHubAutomationCanBeEnabled(owner, tx);
-        const [current] = await tx
-          .select({
-            id: platform_integrations.id,
-            installationId: platform_integrations.platform_installation_id,
-          })
-          .from(platform_integrations)
-          .where(
-            and(
-              eq(platform_integrations.platform, PLATFORM.LINEAR),
-              ...getOwnershipConditions(owner)
-            )
-          )
-          .for('update');
-        await lockProviderInstallations(tx, PLATFORM.LINEAR, [
-          current?.installationId,
-          organizationId,
-        ]);
-        if (!current || current.id !== existing.id)
-          throw new Error('Linear installation changed concurrently');
         const [row] = await tx
           .update(platform_integrations)
           .set({
@@ -402,7 +404,6 @@ export async function upsertLinearInstallation(
           })
           .where(eq(platform_integrations.id, existing.id))
           .returning();
-        await options.persistInstallation?.();
         return row;
       });
 
@@ -418,21 +419,6 @@ export async function upsertLinearInstallation(
   try {
     const created = await db.transaction(async tx => {
       await assertGitHubAutomationCanBeEnabled(owner, tx);
-      const [current] = await tx
-        .select({
-          id: platform_integrations.id,
-          installationId: platform_integrations.platform_installation_id,
-        })
-        .from(platform_integrations)
-        .where(
-          and(eq(platform_integrations.platform, PLATFORM.LINEAR), ...getOwnershipConditions(owner))
-        )
-        .for('update');
-      await lockProviderInstallations(tx, PLATFORM.LINEAR, [
-        current?.installationId,
-        organizationId,
-      ]);
-      if (current) throw new Error('Linear installation changed concurrently');
       const [row] = await tx
         .insert(platform_integrations)
         .values({
@@ -449,7 +435,6 @@ export async function upsertLinearInstallation(
           installed_at: new Date().toISOString(),
         })
         .returning();
-      await options.persistInstallation?.();
       return row;
     });
 
@@ -481,36 +466,33 @@ export async function uninstallApp(owner: Owner, options: LinearUninstallOptions
   const organizationId = integration.platform_installation_id ?? integration.platform_account_id;
   const isActive = integration.integration_status === INTEGRATION_STATUS.ACTIVE;
 
-  if (!organizationId) {
-    if (isActive && options.deleteChatSdkInstallation) {
+  if (
+    isActive &&
+    (options.getChatSdkAccessToken ||
+      options.deleteChatSdkInstallation ||
+      options.deleteChatSdkIdentityCache)
+  ) {
+    if (!organizationId) {
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
         message: 'Linear installation is missing an organization ID',
       });
     }
-    await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-    return { success: true };
+
+    // Fetch the access token from the chat-sdk adapter BEFORE deleting the
+    // installation, then ask Linear to revoke it. This ensures the OAuth app
+    // is properly uninstalled on Linear's side; otherwise the workspace will
+    // see "already installed" on a reinstall attempt.
+    const accessToken = await options.getChatSdkAccessToken?.(organizationId);
+    if (accessToken) {
+      await revokeLinearToken(accessToken);
+    }
+
+    await options.deleteChatSdkInstallation?.(organizationId);
+    await options.deleteChatSdkIdentityCache?.(organizationId);
   }
-  await withProviderInstallationLock({
-    platform: PLATFORM.LINEAR,
-    installationId: organizationId,
-    callback: async () => {
-      const current = await getInstallation(owner);
-      if (
-        current?.id !== integration.id ||
-        (current.platform_installation_id ?? current.platform_account_id) !== organizationId
-      ) {
-        throw new TRPCError({ code: 'CONFLICT', message: 'Linear installation changed; retry' });
-      }
-      if (isActive) {
-        const accessToken = await options.getChatSdkAccessToken?.(organizationId);
-        if (accessToken) await revokeLinearToken(accessToken);
-        await options.deleteChatSdkInstallation?.(organizationId);
-        await options.deleteChatSdkIdentityCache?.(organizationId);
-      }
-      await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
-    },
-  });
+
+  await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   return { success: true };
 }

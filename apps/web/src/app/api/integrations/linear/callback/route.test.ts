@@ -54,6 +54,14 @@ jest.mock('@/lib/bot/platforms', () => ({
     require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
   },
 }));
+jest.mock('@/lib/bot/installation-lock', () => ({
+  withChatInstallationLock: async (
+    _state: unknown,
+    _platform: string,
+    _installationId: string,
+    callback: () => Promise<unknown>
+  ) => callback(),
+}));
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
 }));
@@ -217,8 +225,7 @@ describe('GET /api/integrations/linear/callback', () => {
         owner: { type: 'user', id: USER_ID },
         organizationId: ORGANIZATION_ID,
         organizationName: 'Acme Workspace',
-      }),
-      expect.objectContaining({ persistInstallation: expect.any(Function) })
+      })
     );
     expectRedirectLocation(response, '/integrations/linear?success=installed');
   });
@@ -264,8 +271,7 @@ describe('GET /api/integrations/linear/callback', () => {
     expect(mockedUpsertLinearInstallation).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationName: ORGANIZATION_ID,
-      }),
-      expect.objectContaining({ persistInstallation: expect.any(Function) })
+      })
     );
   });
 
@@ -288,8 +294,14 @@ describe('GET /api/integrations/linear/callback', () => {
       makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
     );
 
-    expect(deleteInstallation).not.toHaveBeenCalled();
-    expect(mockedUnlinkTeamKiloUsers).not.toHaveBeenCalled();
+    expect(deleteInstallation).toHaveBeenCalledTimes(1);
+    expect(deleteInstallation).toHaveBeenCalledWith(ORGANIZATION_ID);
+    expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledTimes(1);
+    expect(mockedUnlinkTeamKiloUsers).toHaveBeenCalledWith(
+      expect.anything(),
+      'linear',
+      ORGANIZATION_ID
+    );
     expectRedirectLocation(response, '/integrations/linear?error=workspace_already_connected');
   });
 });

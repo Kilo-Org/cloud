@@ -61,7 +61,8 @@ import {
 } from '@/lib/pr-review/use-pr-review-mutations';
 import { type PendingReviewItem, usePendingReview } from '@/lib/pr-review/pending-review-provider';
 import { partitionPendingItems } from '@/lib/pr-review/partition-pending-items';
-import { type ProviderPrRef, providerPrRouteSegments } from '@/lib/pr-review/provider-pr-ref';
+import { providerPrSheetHref } from '@/components/pr-review/pr-review-provider-sheet-href';
+import { type ProviderPrRef } from '@/lib/pr-review/provider-pr-ref';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { usePrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { maybeAskAfterSuccessfulOutcome } from '@/lib/feedback';
@@ -338,22 +339,15 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
     if (prRef) {
       // The pending comment edits through the ref's own composer route, so
       // the composer stays inside the scope its queries run under.
-      const { platform, identity } = providerPrRouteSegments(prRef);
-      const encoded = identity.map(segment => encodeURIComponent(segment)).join('/');
-      const href: Href = {
-        pathname: `/(app)/pr-review/${platform}/${encoded}/comment-composer`,
-        params: {
+      router.push(
+        providerPrSheetHref(prRef, 'comment-composer', {
           path: item.path,
           side: item.side,
           line: String(item.line),
           ...(item.startLine !== undefined ? { startLine: String(item.startLine) } : {}),
           pendingId: item.id,
-          ...(prRef.platform === 'gitlab' && prRef.instanceHint
-            ? { instance: prRef.instanceHint }
-            : {}),
-        },
-      };
-      router.push(href);
+        })
+      );
       return;
     }
     const href: Href = {

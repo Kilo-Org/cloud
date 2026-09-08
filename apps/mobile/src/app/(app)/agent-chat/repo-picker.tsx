@@ -195,7 +195,7 @@ export default function RepoPickerScreen() {
    * rows but no Bitbucket section; a connected org's rows suppress it.
    */
   function renderBitbucketNote() {
-    if (search.trim() || bridge === null) {
+    if (search.trim() || !bridge) {
       return null;
     }
     if (bridge.sections.some(section => section.key === 'bitbucket')) {

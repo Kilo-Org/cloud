@@ -139,12 +139,12 @@ describe('mergeProviderInboxSources', () => {
     // mutating API. Deleting them in Node reproduces the device crash the
     // inbox shipped with (e12: `undefined is not a function` on `.toSorted`).
     const methods = ['toSorted', 'toReversed', 'toSpliced', 'with'];
-    const restored = methods.map(method => [
-      method,
-      Object.getOwnPropertyDescriptor(Array.prototype, method),
-    ] as const);
+    const restored = methods.map(
+      method => [method, Object.getOwnPropertyDescriptor(Array.prototype, method)] as const
+    );
     for (const method of methods) {
-      delete (Array.prototype as Record<string, unknown>)[method];
+      // oxlint-disable-next-line typescript-eslint/no-dynamic-delete -- the test deletes the ES2023 built-ins to reproduce the Hermes runtime, then restores them below
+      delete (Array.prototype as unknown as Record<string, unknown>)[method];
     }
     try {
       const merged = mergeProviderInboxSources([
@@ -155,6 +155,7 @@ describe('mergeProviderInboxSources', () => {
     } finally {
       for (const [method, descriptor] of restored) {
         if (descriptor) {
+          // oxlint-disable-next-line no-extend-native -- restores exactly the built-ins deleted above, so later tests keep the real Array prototype
           Object.defineProperty(Array.prototype, method, descriptor);
         }
       }

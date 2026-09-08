@@ -88,10 +88,18 @@ function hosts(renderer: Awaited<ReturnType<typeof mount>>, type: string) {
   return renderer.root.findAll(node => node.type === type);
 }
 
+// The model picker hosts its rows in a FlatList and manages its own scrolling
+// (PickerSheet scrollable=false); the repository picker renders mapped rows
+// inside the shell ScrollView and so always keeps that ScrollView mounted.
 describe.each([
-  { name: 'model', Component: ModelPickerContent },
-  { name: 'repository', Component: RepoPickerScreen },
-])('$name picker centering', ({ Component }) => {
+  { name: 'model', Component: ModelPickerContent, rowHost: 'FlatList', hasShellScrollView: false },
+  {
+    name: 'repository',
+    Component: RepoPickerScreen,
+    rowHost: 'Pressable',
+    hasShellScrollView: true,
+  },
+])('$name picker centering', ({ Component, rowHost, hasShellScrollView }) => {
   it('keeps the search input and native header mounted when replacing the list', async () => {
     const renderer = await mount(Component);
     const input = hosts(renderer, 'TextInput')[0];
@@ -102,15 +110,17 @@ describe.each([
     const group = header.parent;
     expect(group?.props.collapsable).toBe(false);
     expect(group?.findAll(node => node === input)).toHaveLength(1);
-    expect(hosts(renderer, 'FlatList')).toHaveLength(1);
+    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
 
     const changeSearch = input.props.onChangeText as (text: string) => void;
     act(() => {
       changeSearch('no matching choice');
     });
-    expect(hosts(renderer, 'FlatList')).toHaveLength(0);
-    expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    expect(hosts(renderer, rowHost)).toHaveLength(0);
+    if (!hasShellScrollView) {
+      expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    }
     expect(hosts(renderer, 'CenteredState')).toHaveLength(1);
     expect(hosts(renderer, 'TextInput')[0]).toBe(input);
     expect(hosts(renderer, 'SheetHeader')[0]).toBe(header);
@@ -119,7 +129,7 @@ describe.each([
     act(() => {
       changeSearch('');
     });
-    expect(hosts(renderer, 'FlatList')).toHaveLength(1);
+    expect(hosts(renderer, rowHost).length).toBeGreaterThan(0);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(0);
     expect(hosts(renderer, 'TextInput')[0]).toBe(input);
     expect(header.parent).toBe(group);
@@ -136,7 +146,9 @@ describe.each([
     const renderer = await mount(Component);
     expect(hosts(renderer, 'CenteredState')).toHaveLength(1);
     expect(hosts(renderer, 'FlatList')).toHaveLength(0);
-    expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    if (!hasShellScrollView) {
+      expect(hosts(renderer, 'ScrollView')).toHaveLength(0);
+    }
     expect(hosts(renderer, 'TextInput')).toHaveLength(1);
   });
 });

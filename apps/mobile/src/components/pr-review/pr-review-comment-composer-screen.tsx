@@ -171,10 +171,17 @@ export function PrReviewCommentComposerScreen() {
     );
   }
 
-  let body: ReactNode = null;
+  // A route with no valid comment target is not a broken comment flow: the
+  // route failed, nothing the composer could post. The "Add comment" chrome
+  // over a "Page not found" body read as a comment sheet that cannot save, so
+  // the terminal invalid state renders alone — no misleading title, no lone
+  // dismiss chevron — and carries its own Go back to the shared inbox.
   if (!parsed) {
-    body = <InvalidRouteState backTo="/(app)/pr-review" />;
-  } else if (isEdit) {
+    return <InvalidRouteState backTo="/(app)/pr-review" />;
+  }
+
+  let body: ReactNode = null;
+  if (isEdit) {
     body = null;
   } else if (pr.isLoading) {
     body = (

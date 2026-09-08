@@ -24,16 +24,22 @@ vi.mock('@tanstack/react-query', async importOriginal => ({
   ...(await importOriginal<typeof ReactQuery>()),
   useQuery: () => query,
 }));
-vi.mock('expo-router', () => ({
-  useRouter: () => ({ back: vi.fn(), push: vi.fn() }),
-  useLocalSearchParams: () => ({
+// Mutable so one suite can hand the composer route a malformed param set
+// without re-mocking `expo-router` per test.
+const routeParams = vi.hoisted(() => {
+  const current: Record<string, string> = {
     owner: 'org',
     repo: 'repo',
     number: '1',
     path: 'src/a.ts',
     line: '1',
     side: 'RIGHT',
-  }),
+  };
+  return { current };
+});
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ back: vi.fn(), push: vi.fn(), replace: vi.fn() }),
+  useLocalSearchParams: () => routeParams.current,
 }));
 vi.mock('react-native', () => ({
   View: 'View',
@@ -116,6 +122,14 @@ beforeEach(() => {
   query.isError = true;
   query.isLoading = false;
   query.error.data.code = 'INTERNAL_SERVER_ERROR';
+  routeParams.current = {
+    owner: 'org',
+    repo: 'repo',
+    number: '1',
+    path: 'src/a.ts',
+    line: '1',
+    side: 'RIGHT',
+  };
   vi.clearAllMocks();
 });
 
@@ -202,6 +216,25 @@ describe.each([
     const { renderer, unmount } = await renderWithProviders(createElement(Screen));
     expect(renderer.root.findAll(node => String(node.type) === 'CenteredState')).toHaveLength(1);
     expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+    unmount();
+  });
+});
+
+describe('composer malformed route', () => {
+  it('renders the terminal invalid state without the Add-comment chrome', async () => {
+    // A hand-built or restored composer link with no valid comment target
+    // failed at the ROUTE, not at the comment: the sheet must not announce
+    // "Add comment" over a "Page not found" body.
+    routeParams.current = { owner: 'org', repo: 'repo', number: '1' };
+    const { renderer, unmount } = await renderWithProviders(
+      createElement(PrReviewCommentComposerScreen)
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'InvalidRouteState')).toHaveLength(
+      1
+    );
+    expect(renderer.root.findAll(node => String(node.type) === 'PrFormSheetHeader')).toHaveLength(
+      0
+    );
     unmount();
   });
 });

@@ -24,10 +24,17 @@ export function providerPrSheetHref(
 ): Href {
   const { platform, identity } = providerPrRouteSegments(ref);
   const encoded = identity.map(segment => encodeURIComponent(segment)).join('/');
-  const instance =
-    ref.platform === 'gitlab' && ref.instanceHint ? { instance: ref.instanceHint } : {};
-  return {
-    pathname: `/(app)/pr-review/${platform}/${encoded}/${sheet}`,
-    params: { ...instance, ...params },
-  };
+  // The path is built at runtime, so it never appears in the generated
+  // typed-routes literal union; like `providerPrHref` (provider-pr-ref.ts),
+  // the params ride in an encoded query string and the href is the cast
+  // string.
+  const queryParts: string[] = [];
+  if (ref.platform === 'gitlab' && ref.instanceHint) {
+    queryParts.push(`instance=${encodeURIComponent(ref.instanceHint)}`);
+  }
+  for (const [key, value] of Object.entries(params)) {
+    queryParts.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+  }
+  const search = queryParts.length > 0 ? `?${queryParts.join('&')}` : '';
+  return `/(app)/pr-review/${platform}/${encoded}/${sheet}${search}` as Href;
 }

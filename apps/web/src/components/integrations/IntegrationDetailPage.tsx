@@ -6,6 +6,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { getUserFromAuthOrRedirect } from '@/lib/user/server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { PER_REPO_SETTINGS_ENABLED } from '@/lib/config.server';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { PageLayout } from '@/components/PageLayout';
@@ -53,6 +54,7 @@ const integrationDetailRegistry = {
           appReturnPath={
             search.returnTo ? (validateReturnPath(search.returnTo) ?? undefined) : undefined
           }
+          perRepoSettingsEnabled={PER_REPO_SETTINGS_ENABLED}
         />
       );
     },

@@ -1,5 +1,10 @@
 import { db } from '@/lib/drizzle';
-import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
+import {
+  github_app_installations,
+  repository_customizations,
+  platform_integrations,
+  type NewRepositoryCustomization,
+} from '@kilocode/db/schema';
 import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
   GitHubRequester,
@@ -1090,40 +1095,93 @@ export async function updateIntegrationMetadata(
 }
 
 /**
- * Updates the metadata for a platform integration owned by a specific owner
- * Merges new metadata with existing metadata
+ * Atomically merges `metadataUpdates` into a platform integration's `metadata`
+ * JSONB column, scoped to `owner` + `platform` + `integrationId`.
+ *
+ * `integrationId` is required: the unique index on `platform_integrations` is
+ * `(owner, platform, platform_installation_id)`, not `(owner, platform)`, so
+ * an owner can hold more than one row for a given platform (GitHub's
+ * standard/lite app split, the multiple-installations pilot, or simply a
+ * reconnect that left a second row behind). Without `integrationId` this
+ * would run as an owner+platform-wide UPDATE and silently touch every
+ * matching row instead of the one the caller intended.
+ *
+ * Uses Postgres's `||` merge operator in a single UPDATE instead of a
+ * read-modify-write, so a concurrent writer touching a different key (e.g.
+ * `model_slug` vs `pr_review_mode`) cannot be clobbered by a lost update.
+ * `nullif(metadata, 'null'::jsonb)` normalizes a stored JSON literal `null` to
+ * SQL NULL so `coalesce` can fall back to `{}` in either case.
  */
 export async function updateIntegrationMetadataForOwner(
   owner: Owner,
   platform: string,
-  metadataUpdates: Record<string, unknown>
-) {
+  metadataUpdates: Record<string, unknown>,
+  integrationId: string
+): Promise<void> {
   const ownershipCondition =
     owner.type === 'user'
       ? eq(platform_integrations.owned_by_user_id, owner.id)
       : eq(platform_integrations.owned_by_organization_id, owner.id);
 
-  // Get existing integration to merge metadata
-  const [existing] = await db
-    .select()
-    .from(platform_integrations)
-    .where(and(ownershipCondition, eq(platform_integrations.platform, platform)))
-    .limit(1);
-
-  if (!existing) {
-    throw new Error(`No ${platform} integration found for owner`);
-  }
-
-  const existingMetadata = (existing.metadata as Record<string, unknown>) || {};
-  const mergedMetadata = { ...existingMetadata, ...metadataUpdates };
-
-  await db
+  const updated = await db
     .update(platform_integrations)
     .set({
-      metadata: mergedMetadata,
+      metadata: sql`coalesce(nullif(${platform_integrations.metadata}, 'null'::jsonb), '{}'::jsonb) || ${JSON.stringify(metadataUpdates)}::jsonb`,
       updated_at: new Date().toISOString(),
     })
-    .where(eq(platform_integrations.id, existing.id));
+    .where(
+      and(
+        ownershipCondition,
+        eq(platform_integrations.platform, platform),
+        eq(platform_integrations.id, integrationId)
+      )
+    )
+    .returning({ id: platform_integrations.id });
 
-  return mergedMetadata;
+  if (updated.length === 0) {
+    throw new Error(`No ${platform} integration found for owner`);
+  }
+}
+
+/**
+ * Lists all per-repository overrides for an installation. Repositories
+ * without a row here (or with a null field on their row) inherit the
+ * installation's defaults.
+ */
+export async function listRepositoryCustomizations(integrationId: string) {
+  return db
+    .select()
+    .from(repository_customizations)
+    .where(eq(repository_customizations.platform_integration_id, integrationId));
+}
+
+/**
+ * Upserts a per-repository override, changing only the fields present in
+ * `updates`. Pass `null` for a field to explicitly clear it back to
+ * "inherit the installation default"; omit a field to leave it untouched.
+ * `repositoryId` is the platform's repository identifier (GitHub's numeric
+ * ID stringified, GitLab's project ID, etc.).
+ */
+export async function upsertRepositoryCustomization(
+  integrationId: string,
+  repositoryId: string,
+  updates: Pick<NewRepositoryCustomization, 'bot_mention_model_slug' | 'pr_review_mode'>
+) {
+  const [customization] = await db
+    .insert(repository_customizations)
+    .values({
+      platform_integration_id: integrationId,
+      repository_id: repositoryId,
+      ...updates,
+    })
+    .onConflictDoUpdate({
+      target: [
+        repository_customizations.platform_integration_id,
+        repository_customizations.repository_id,
+      ],
+      set: { ...updates, updated_at: new Date().toISOString() },
+    })
+    .returning();
+
+  return customization;
 }

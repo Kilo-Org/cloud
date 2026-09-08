@@ -1382,7 +1382,7 @@ export async function anonymizeCloudUserData(
   if (githubUserIds.length > 0) {
     await tx.execute(sql`
       DELETE FROM ${github_app_installations} canonical
-      WHERE canonical.account_type = 'User'
+      WHERE (canonical.account_type = 'User' OR canonical.account_type IS NULL)
         AND canonical.account_id IN (${sql.join(
           githubUserIds.map(user => sql`${user.id}`),
           sql`, `

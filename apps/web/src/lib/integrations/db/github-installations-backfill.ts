@@ -28,6 +28,7 @@ export async function backfillGitHubInstallations(
     .where(
       and(
         eq(platform_integrations.platform, 'github'),
+        eq(platform_integrations.integration_type, 'app'),
         isNull(platform_integrations.github_installation_id),
         afterId ? gt(platform_integrations.id, afterId) : undefined
       )
@@ -85,11 +86,13 @@ export async function backfillGitHubInstallations(
       .where(
         and(
           eq(platform_integrations.platform, 'github'),
+          eq(platform_integrations.integration_type, 'app'),
           eq(platform_integrations.platform_installation_id, installationId),
           eq(platform_integrations.integration_status, 'active'),
           isNull(platform_integrations.github_disconnected_at),
           isNull(platform_integrations.suspended_at),
           isNull(platform_integrations.auth_invalid_at),
+          sql`NOT (COALESCE(${platform_integrations.metadata}, '{}'::jsonb) ? 'github_dedup')`,
           appType === 'standard'
             ? sql`(${platform_integrations.github_app_type} = 'standard' OR ${platform_integrations.github_app_type} IS NULL)`
             : eq(platform_integrations.github_app_type, appType)

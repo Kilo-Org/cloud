@@ -4879,6 +4879,44 @@ describe('User', () => {
       ).resolves.toHaveLength(0);
     });
 
+    it('deletes migration-created personal canonical PII but preserves organizations', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_github_app_tokens).values({
+        kilo_user_id: user.id,
+        github_app_type: 'standard',
+        github_user_id: '99101',
+        github_login: 'personal-login',
+        access_token_encrypted: 'encrypted-access',
+        access_token_expires_at: '2026-10-01T00:00:00.000Z',
+        refresh_token_encrypted: 'encrypted-refresh',
+        refresh_token_expires_at: '2027-01-01T00:00:00.000Z',
+      });
+      const canonicals = await db
+        .insert(github_app_installations)
+        .values([
+          {
+            github_app_type: 'standard',
+            installation_id: '9876502',
+            account_id: '99101',
+            account_login: 'personal-login',
+            account_type: null,
+            lifecycle_state: 'active',
+          },
+          {
+            github_app_type: 'standard',
+            installation_id: '9876503',
+            account_id: '99101',
+            account_login: 'organization-login',
+            account_type: 'Organization',
+            lifecycle_state: 'active',
+          },
+        ])
+        .returning();
+      await softDeleteUser(user.id);
+      const retained = await db.select().from(github_app_installations);
+      expect(retained.map(row => row.id)).toEqual([canonicals[1]?.id]);
+    });
+
     it('should nullify free_model_usage FK', async () => {
       const user = await insertTestUser();
 

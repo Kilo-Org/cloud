@@ -45,7 +45,7 @@ export const gpt_6_astra_flex_model: KiloExclusiveModel = {
   status: 'public',
   context_length: 1_050_000,
   max_completion_tokens: 128_000,
-  gateway: 'openrouter',
+  gateway: 'vercel',
   flags: ['reasoning', 'vision', 'flex'],
   pricing: {
     fallbackOnly: true,

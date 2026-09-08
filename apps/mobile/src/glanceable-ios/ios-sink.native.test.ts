@@ -80,6 +80,35 @@ const native = vi.hoisted(() => {
   return { records, ignoredUpdates, snapshots, failures, add, wrap };
 });
 
+// The sink and its ending helpers read the foreground state and watch for the
+// app leaving active while an idle-end debounce is pending.
+const appState = vi.hoisted(() => ({
+  currentState: 'active' as string,
+  listeners: new Set<(state: string) => void>(),
+  emit(next: string) {
+    this.currentState = next;
+    for (const listener of this.listeners) {
+      listener(next);
+    }
+  },
+  reset() {
+    this.currentState = 'active';
+    this.listeners.clear();
+  },
+}));
+
+vi.mock('react-native', () => ({
+  AppState: {
+    get currentState() {
+      return appState.currentState;
+    },
+    addEventListener: (_name: string, listener: (state: string) => void) => {
+      appState.listeners.add(listener);
+      return { remove: () => appState.listeners.delete(listener) };
+    },
+  },
+}));
+
 vi.mock('expo-widgets', async () => {
   const { after } = await import('expo-widgets/src/Widgets');
   return { after, widgetsDirectory: 'file:///app-group/ExpoWidgets/' };
@@ -155,6 +184,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  appState.reset();
   native.records.length = 0;
   native.ignoredUpdates.length = 0;
   native.snapshots.length = 0;
@@ -349,6 +379,22 @@ describe('native adapter idle window', () => {
     expect(firstActivity()).toMatchObject({
       state: 'ended',
       dismissAt: NOW + GLANCEABLE_IDLE_END_DEBOUNCE_MS + GLANCEABLE_IDLE_ONLY_MS,
+      props: { running: 0, idle: 1 },
+      policies: ['after'],
+    });
+  });
+
+  it('submits the idle dismissal at once for a background publish without advancing timers', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    appState.currentState = 'background';
+
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+
+    expect(firstActivity()).toMatchObject({
+      state: 'ended',
+      dismissAt: NOW + GLANCEABLE_IDLE_ONLY_MS,
       props: { running: 0, idle: 1 },
       policies: ['after'],
     });

@@ -318,10 +318,12 @@ export const iosSink: GlanceableSink = {
       lastProps = contentState;
       inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS);
       if (isIdleOnlyGlanceableWork(snapshot)) {
-        // Brief idle↔busy flips must not tear the card down. Debounce, then
-        // hand ActivityKit the dismissal date so the surface still retires
-        // if JavaScript stops. Work that resumes before the timer fires
-        // updates this same card.
+        // Brief idle↔busy flips must not tear the card down: the end waits out
+        // a debounce, then hands ActivityKit the dismissal date so the surface
+        // still retires if JavaScript stops. Work that resumes before the
+        // timer fires updates this same card. While inactive or background,
+        // scheduleIdleEnd submits the end at once instead, so a background
+        // wake can await it through `waitForNativeTerminal`.
         scheduleIdleEnd(() => {
           void endNow(GLANCEABLE_IDLE_ONLY_MS, lastProps);
         }, GLANCEABLE_IDLE_END_DEBOUNCE_MS);

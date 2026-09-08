@@ -5,6 +5,7 @@
  */
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 import { after, type LiveActivity } from 'expo-widgets';
+import { AppState } from 'react-native';
 
 export type Activity = LiveActivity<Partial<GlanceableLiveActivityContentState>>;
 
@@ -108,22 +109,54 @@ export function endExtra(instance: Activity, id: string): void {
 }
 
 let idleEndTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Temporary AppState watch for a pending idle-end debounce. JavaScript can
+ * suspend the moment the app stops being active, so the timer would never
+ * fire and the card would never retire. Leaving active submits the same end
+ * at once; every other exit path removes the watch below.
+ */
+let idleEndAppState: { remove: () => void } | null = null;
+
+function clearIdleEndAppState(): void {
+  idleEndAppState?.remove();
+  idleEndAppState = null;
+}
 
 export function cancelIdleEnd(): void {
   if (idleEndTimer !== null) {
     clearTimeout(idleEndTimer);
     idleEndTimer = null;
   }
+  clearIdleEndAppState();
 }
 
 export function scheduleIdleEnd(end: () => void, delayMs: number): void {
+  // Already inactive or background, JavaScript can suspend before any timer
+  // fires: submit the idle end at once so a background caller can await it.
+  if (AppState.currentState !== 'active') {
+    end();
+    return;
+  }
   if (idleEndTimer !== null) {
     return;
   }
   idleEndTimer = setTimeout(() => {
     idleEndTimer = null;
+    clearIdleEndAppState();
     end();
   }, delayMs);
+  // While active, a later transition out of active must flush the pending end
+  // before iOS suspends the JavaScript context. Every other exit path above
+  // and in `cancelIdleEnd` removes this watch.
+  idleEndAppState = AppState.addEventListener('change', state => {
+    if (state === 'active' || idleEndTimer === null) {
+      return;
+    }
+    clearTimeout(idleEndTimer);
+    idleEndTimer = null;
+    clearIdleEndAppState();
+    end();
+  });
 }
 
 export function endOtherVisible(keptId: string, instances: readonly Activity[]): void {

@@ -97,24 +97,26 @@ export type GlanceableStatusKind = 'needsInput' | 'running' | 'idle';
 
 /**
  * Map one session status to the kind the glanceable surfaces and the session
- * lists both show, or null when the status means nothing to either. The counts
- * below and the list rows share this map, so a row can never disagree with the
- * widget beside it.
+ * lists both show. Total on strings: needs-input statuses → `needsInput`,
+ * `idle` → `idle`, everything else → `running` (starting, empty, unknown
+ * included). A session is idle only when the agent is not working and not
+ * waiting on the user, so a working session can never render idle and a row
+ * can never disagree with the widget beside it. Callers pass null only when
+ * a row has no status at all.
  */
-export function glanceableStatusKind(status: string): GlanceableStatusKind | null {
-  if (status === 'busy') {
-    return 'running';
-  }
+export function glanceableStatusKind(status: string): GlanceableStatusKind {
   if (NEEDS_INPUT_STATUSES.has(status)) {
     return 'needsInput';
   }
-  return status === 'idle' ? 'idle' : null;
+  return status === 'idle' ? 'idle' : 'running';
 }
 
 /**
  * Map session rows to the three glanceable counts. `busy` → running,
- * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any
- * unknown status is ignored. Do not call `isCompletedStatus` here.
+ * `question`/`permission`/`retry` → needs-input, `idle` → idle, and any other
+ * status (starting, empty, unknown, completed) counts as running: a session
+ * is idle only when the agent says so, and no row is dropped from the count
+ * its list row shows.
  *
  * `retry` folds into needs-input because it means one thing to the user: the
  * agent is waiting and cannot go on alone. Session-ingest writes it when a CLI
@@ -126,11 +128,7 @@ export function countGlanceableSessions(
 ): GlanceableCounts {
   const counts = { running: 0, needsInput: 0, idle: 0 };
   for (const session of sessions) {
-    // An unknown status contributes nothing.
-    const kind = glanceableStatusKind(session.status);
-    if (kind !== null) {
-      counts[kind] += 1;
-    }
+    counts[glanceableStatusKind(session.status)] += 1;
   }
   return counts;
 }

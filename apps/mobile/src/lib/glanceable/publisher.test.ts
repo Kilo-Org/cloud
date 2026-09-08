@@ -5,6 +5,7 @@ import {
   buildGlanceableSnapshot,
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   type GlanceableAgentsSnapshot,
+  isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
@@ -97,6 +98,23 @@ describe('GlanceablePublisher', () => {
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
     publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
     expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+
+  it('counts an unrecognized status as running, matching what the row glyph draws', () => {
+    // One session, unknown status: the shared kind map folds every non-idle,
+    // non-needs-input status into running, and the list row's glyph draws the
+    // same kind (`statusKind === 'idle' ? 'idle' : 'running'`), so the tray
+    // and the glanceable sinks can never disagree about this session. A row
+    // the list draws as working must also be startable work for the Live
+    // Activity, and must never be counted idle while it works.
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions([{ status: 'mystery' }], PUB_CTX);
+    const snapshot = lastSnapshot(calls, 'startOrUpdate');
+    expect(snapshot.running).toBe(1);
+    expect(snapshot.idle).toBe(0);
+    expect(isStartableGlanceableWork(snapshot)).toBe(true);
     publisher.dispose();
   });
 

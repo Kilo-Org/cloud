@@ -46,7 +46,9 @@ type SessionRowProps = {
   /**
    * Optional platform-origin icon rendered in the eyebrow-right cluster.
    * When unset, existing callers (incl. Home `variant='card'`) stay
-   * bit-for-bit identical. Suppressed entirely for needs-input rows.
+   * bit-for-bit identical. Suppressed entirely for needs-input rows and
+   * for live rows, whose eyebrow draws the status glyph — the one mark
+   * the cluster shows there.
    */
   platformIcon?: React.ReactNode;
   onPress?: () => void;
@@ -180,7 +182,12 @@ export function SessionRow({
       )}
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
-          <Eyebrow className={color.hueTextClass}>{agentLabel}</Eyebrow>
+          {/* flex-1 basis 0: the right cluster is sized first at its full
+              natural width, so a long agent label truncates instead of
+              crowding the status glyph and relative time out of the row. */}
+          <Eyebrow className={cn('min-w-0 flex-1', color.hueTextClass)} numberOfLines={1}>
+            {agentLabel}
+          </Eyebrow>
           {eyebrowRight}
         </View>
         <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>

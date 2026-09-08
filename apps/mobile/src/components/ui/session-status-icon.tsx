@@ -13,8 +13,9 @@ type SessionStatusIconProps = {
  * in progress, a hollow ring for a connected agent doing nothing. The shapes
  * differ as well as the colors, so the state reads without color.
  *
- * Sized to the platform icon beside it in the eyebrow, not to the dot it
- * replaced, so the cluster keeps one optical weight.
+ * Sized to the 12px platform glyph that shares the eyebrow cluster on
+ * stored rows — the eyebrow decision never pairs the two on a live row —
+ * so either mark alone keeps the cluster's optical weight.
  */
 export function SessionStatusIcon({ kind }: Readonly<SessionStatusIconProps>) {
   const colors = useThemeColors();

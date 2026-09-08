@@ -896,6 +896,7 @@ export async function upsertPlatformIntegrationForOwner(
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${data.platformInstallationId}`}))`
       );
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
       const peers = await tx
         .select()
         .from(platform_integrations)

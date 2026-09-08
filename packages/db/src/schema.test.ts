@@ -26,6 +26,23 @@ afterAll(async () => {
   await schemaTestDb.pool.end();
 });
 
+it('migration 0238 automatically links only deterministic GitHub installation rows', () => {
+  const migration = fs.readFileSync(
+    path.join(__dirname, 'migrations/0238_worried_leo.sql'),
+    'utf8'
+  );
+  expect(migration).toContain("COALESCE(pi.github_app_type, 'standard') AS effective_app_type");
+  expect(migration).toContain(
+    "PARTITION BY COALESCE(pi.github_app_type, 'standard'), pi.platform_installation_id"
+  );
+  expect(migration).toContain('WHERE peer_count = 1');
+  expect(migration).toContain("pi.platform_installation_id ~ '^[1-9][0-9]*$'");
+  expect(migration).toContain("pi.integration_status = 'active'");
+  expect(migration).toContain("NOT (COALESCE(pi.metadata, '{}'::jsonb) ? 'github_dedup')");
+  expect(migration).toContain('ON CONFLICT (github_app_type, installation_id) DO NOTHING');
+  expect(migration).toContain('AND pi.github_installation_id IS NULL');
+});
+
 async function withKiloPassTestUser(
   testFn: (params: { userId: string }) => Promise<void>
 ): Promise<void> {

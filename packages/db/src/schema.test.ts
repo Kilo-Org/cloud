@@ -26,21 +26,144 @@ afterAll(async () => {
   await schemaTestDb.pool.end();
 });
 
-it('migration 0238 automatically links only deterministic GitHub installation rows', () => {
+it('migration 0238 executes the deterministic GitHub installation backfill idempotently', async () => {
   const migration = fs.readFileSync(
     path.join(__dirname, 'migrations/0238_worried_leo.sql'),
     'utf8'
   );
-  expect(migration).toContain("COALESCE(pi.github_app_type, 'standard') AS effective_app_type");
-  expect(migration).toContain(
-    "PARTITION BY COALESCE(pi.github_app_type, 'standard'), pi.platform_installation_id"
-  );
-  expect(migration).toContain('WHERE peer_count = 1');
-  expect(migration).toContain("pi.platform_installation_id ~ '^[1-9][0-9]*$'");
-  expect(migration).toContain("pi.integration_status = 'active'");
-  expect(migration).toContain("NOT (COALESCE(pi.metadata, '{}'::jsonb) ? 'github_dedup')");
-  expect(migration).toContain('ON CONFLICT (github_app_type, installation_id) DO NOTHING');
-  expect(migration).toContain('AND pi.github_installation_id IS NULL');
+  const dml = migration.split('-->  statement-breakpoint').slice(-2);
+  expect(dml).toHaveLength(2);
+  const rollback = new Error('rollback migration 0238 execution test');
+  await expect(
+    schemaTestDb.db.transaction(async tx => {
+      const userId = `github-migration-${crypto.randomUUID()}`;
+      await tx.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'GitHub migration test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const otherUserId = `github-migration-${crypto.randomUUID()}`;
+      await tx.insert(schema.kilocode_users).values({
+        id: otherUserId,
+        google_user_email: `${otherUserId}@example.com`,
+        google_user_name: 'GitHub migration peer',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const prefix = Date.now().toString();
+      const ids = {
+        standard: `${prefix}01`,
+        lite: `${prefix}02`,
+        preexisting: `${prefix}03`,
+        malformed: `bad-${prefix}`,
+        inactive: `${prefix}04`,
+        suspended: `${prefix}05`,
+        authInvalid: `${prefix}06`,
+        disconnected: `${prefix}07`,
+        nonApp: `${prefix}08`,
+        ambiguous: `${prefix}09`,
+      };
+      const [preexisting] = await tx
+        .insert(schema.github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: ids.preexisting,
+          lifecycle_state: 'active',
+        })
+        .returning();
+      const base = {
+        owned_by_user_id: userId,
+        platform: 'github',
+        integration_type: 'app',
+        integration_status: 'active',
+      } as const;
+      const fixtures = await tx
+        .insert(schema.platform_integrations)
+        .values([
+          { ...base, platform_installation_id: ids.standard, github_app_type: null },
+          { ...base, platform_installation_id: ids.lite, github_app_type: 'lite' },
+          { ...base, platform_installation_id: ids.preexisting, github_app_type: 'standard' },
+          { ...base, platform_installation_id: ids.malformed, github_app_type: 'standard' },
+          {
+            ...base,
+            platform_installation_id: ids.inactive,
+            github_app_type: 'standard',
+            integration_status: 'suspended',
+          },
+          {
+            ...base,
+            platform_installation_id: ids.suspended,
+            github_app_type: 'standard',
+            suspended_at: new Date().toISOString(),
+            suspended_by: 'github_suspended',
+          },
+          {
+            ...base,
+            platform_installation_id: ids.authInvalid,
+            github_app_type: 'standard',
+            auth_invalid_at: new Date().toISOString(),
+            auth_invalid_reason: 'test',
+          },
+          {
+            ...base,
+            platform_installation_id: ids.disconnected,
+            github_app_type: 'standard',
+            github_disconnected_at: new Date().toISOString(),
+          },
+          {
+            ...base,
+            platform_installation_id: ids.nonApp,
+            github_app_type: 'standard',
+            integration_type: 'token',
+          },
+          { ...base, platform_installation_id: ids.ambiguous, github_app_type: null },
+          {
+            ...base,
+            owned_by_user_id: otherUserId,
+            platform_installation_id: ids.ambiguous,
+            github_app_type: 'standard',
+          },
+          {
+            ...base,
+            platform_installation_id: null,
+            github_app_type: 'standard',
+            integration_status: 'suspended',
+            suspended_at: new Date().toISOString(),
+            suspended_by: 'migration-0205-github-dedup',
+            metadata: { github_dedup: { original_installation_id: `${prefix}10` } },
+          },
+        ])
+        .returning();
+      for (const statement of dml) await tx.execute(sql.raw(statement));
+      const firstCanonicalCount = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.github_app_installations);
+      const linked = await tx
+        .select()
+        .from(schema.platform_integrations)
+        .where(eq(schema.platform_integrations.owned_by_user_id, userId));
+      const linkedIds = linked
+        .filter(row => row.github_installation_id)
+        .map(row => row.platform_installation_id);
+      expect(linkedIds.sort()).toEqual([ids.lite, ids.preexisting, ids.standard].sort());
+      expect(
+        linked.find(row => row.platform_installation_id === ids.preexisting)?.github_installation_id
+      ).toBe(preexisting.id);
+      for (const statement of dml) await tx.execute(sql.raw(statement));
+      const secondCanonicalCount = await tx
+        .select({ count: sql<number>`count(*)::int` })
+        .from(schema.github_app_installations);
+      expect(secondCanonicalCount).toEqual(firstCanonicalCount);
+      const rebound = await tx
+        .select()
+        .from(schema.platform_integrations)
+        .where(eq(schema.platform_integrations.id, fixtures[2]?.id ?? ''));
+      expect(rebound[0]?.github_installation_id).toBe(preexisting.id);
+      throw rollback;
+    })
+  ).rejects.toBe(rollback);
 });
 
 async function withKiloPassTestUser(

@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { generateDrizzleJson, generateMigration } from 'drizzle-kit/api';
@@ -31,8 +31,13 @@ it('migration 0238 executes the deterministic GitHub installation backfill idemp
     path.join(__dirname, 'migrations/0238_worried_leo.sql'),
     'utf8'
   );
-  const dml = migration.split('-->  statement-breakpoint').slice(-2);
+  const dml = migration
+    .split('-->  statement-breakpoint')
+    .map(statement => statement.trim())
+    .filter(statement => statement.startsWith('WITH eligible AS'));
   expect(dml).toHaveLength(2);
+  expect(dml[0]).toContain('INSERT INTO github_app_installations');
+  expect(dml[1]).toContain('UPDATE platform_integrations');
   const rollback = new Error('rollback migration 0238 execution test');
   await expect(
     schemaTestDb.db.transaction(async tx => {
@@ -64,6 +69,7 @@ it('migration 0238 executes the deterministic GitHub installation backfill idemp
         disconnected: `${prefix}07`,
         nonApp: `${prefix}08`,
         ambiguous: `${prefix}09`,
+        deduplicated: `${prefix}10`,
       };
       const [preexisting] = await tx
         .insert(schema.github_app_installations)
@@ -132,7 +138,7 @@ it('migration 0238 executes the deterministic GitHub installation backfill idemp
             integration_status: 'suspended',
             suspended_at: new Date().toISOString(),
             suspended_by: 'migration-0205-github-dedup',
-            metadata: { github_dedup: { original_installation_id: `${prefix}10` } },
+            metadata: { github_dedup: { original_installation_id: ids.deduplicated } },
           },
         ])
         .returning();
@@ -151,6 +157,37 @@ it('migration 0238 executes the deterministic GitHub installation backfill idemp
       expect(
         linked.find(row => row.platform_installation_id === ids.preexisting)?.github_installation_id
       ).toBe(preexisting.id);
+      const canonicalRows = await tx
+        .select({
+          id: schema.github_app_installations.id,
+          appType: schema.github_app_installations.github_app_type,
+          installationId: schema.github_app_installations.installation_id,
+        })
+        .from(schema.github_app_installations)
+        .where(inArray(schema.github_app_installations.installation_id, Object.values(ids)));
+      expect(
+        canonicalRows
+          .map(row => ({ appType: row.appType, installationId: row.installationId }))
+          .sort((left, right) => left.installationId.localeCompare(right.installationId))
+      ).toEqual(
+        [
+          { appType: 'standard', installationId: ids.standard },
+          { appType: 'lite', installationId: ids.lite },
+          { appType: 'standard', installationId: ids.preexisting },
+        ].sort((left, right) => left.installationId.localeCompare(right.installationId))
+      );
+      for (const excluded of [
+        ids.malformed,
+        ids.inactive,
+        ids.suspended,
+        ids.authInvalid,
+        ids.disconnected,
+        ids.deduplicated,
+        ids.nonApp,
+        ids.ambiguous,
+      ]) {
+        expect(canonicalRows.some(row => row.installationId === excluded)).toBe(false);
+      }
       for (const statement of dml) await tx.execute(sql.raw(statement));
       const secondCanonicalCount = await tx
         .select({ count: sql<number>`count(*)::int` })

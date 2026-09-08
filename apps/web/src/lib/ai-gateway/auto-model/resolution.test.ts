@@ -133,11 +133,7 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
-  it.each([
-    KILO_AUTO_BALANCED_MODEL.id,
-    KILO_AUTO_EFFICIENT_MODEL.id,
-    KILO_AUTO_FRONTIER_MODEL.id,
-  ])(
+  it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_EFFICIENT_MODEL.id, KILO_AUTO_FRONTIER_MODEL.id])(
     'falls back to Kimi K3 with reasoning for %s when the worker returns no decision',
     async model => {
       const result = await resolveAutoModel(

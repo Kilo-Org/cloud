@@ -7,10 +7,7 @@ import {
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
-import {
-  KILO_AUTO_BALANCED_MODEL,
-  KILO_AUTO_FRONTIER_MODEL,
-} from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FRONTIER_MODEL } from '@/lib/ai-gateway/auto-model';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {

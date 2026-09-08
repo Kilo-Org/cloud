@@ -6509,6 +6509,8 @@ describe('SandboxControl passive status', () => {
         } satisfies SessionMessageRecord,
       ]);
     });
+    const routing = Promise.withResolvers<void>();
+    const forwardingTasks: Promise<unknown>[] = [];
     try {
       await runInDurableObject(stub, async (instance, state) => {
         await receiveHeartbeat(instance, state);
@@ -6527,6 +6529,19 @@ describe('SandboxControl passive status', () => {
         const records = await state.storage.list();
         const alarm = await state.storage.getAlarm();
         const send = vi.spyOn(socket, 'send');
+        const waitUntil = state.waitUntil.bind(state);
+        vi.spyOn(state, 'waitUntil').mockImplementation(promise => {
+          forwardingTasks.push(promise);
+          waitUntil(promise);
+        });
+        // Route/physical reads can still be pending when the legacy event handler returns.
+        // Hold forwarding before enqueue so the persistence check cannot win that race.
+        const forward = fresh['forwardRoutedSessionFrame'].bind(fresh);
+        fresh['forwardRoutedSessionFrame'] = async (...args) => {
+          await routing.promise;
+          return forward(...args);
+        };
+
         await fresh.webSocketMessage(
           socket,
           JSON.stringify({
@@ -6539,7 +6554,8 @@ describe('SandboxControl passive status', () => {
             },
           })
         );
-        await Promise.all(fresh['sessionForwarding'].values());
+        expect([...fresh['sessionForwarding'].values()]).toEqual([]);
+        expect(forwardingTasks.length).toBeGreaterThan(0);
         expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
           status: 'active',
           estimatedSleepAt: null,
@@ -6568,6 +6584,9 @@ describe('SandboxControl passive status', () => {
         });
         expect(renew).toHaveBeenCalledTimes(1);
       });
+      routing.resolve();
+      // The waitUntil task includes routing, enqueue, and the session persistence RPC.
+      await Promise.all(forwardingTasks);
       await runInDurableObject(session, async (_instance, state) => {
         const events = createEventQueries(
           drizzle(state.storage, { logger: false }),
@@ -6580,6 +6599,8 @@ describe('SandboxControl passive status', () => {
         });
       });
     } finally {
+      routing.resolve();
+      await Promise.all(forwardingTasks);
       ws.close();
     }
   });

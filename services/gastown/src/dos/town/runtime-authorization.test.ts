@@ -46,11 +46,13 @@ type TestStorage = DurableObjectStorage & { putMock: ReturnType<typeof vi.fn> };
 function storage(): TestStorage {
   const values = new Map<string, unknown>();
   const put = vi.fn(async (key: string, value: unknown) => values.set(key, value));
-  return {
+  const store = {
+    transaction: async (fn: (txn: DurableObjectStorage) => Promise<unknown>) => fn(store),
     get: vi.fn(async <T>(key: string) => values.get(key) as T),
     put,
     putMock: put,
   } as unknown as TestStorage;
+  return store;
 }
 
 const identity = {

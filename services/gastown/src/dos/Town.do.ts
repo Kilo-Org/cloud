@@ -39,7 +39,7 @@ import {
 import * as scm from './town/town-scm';
 import * as reconciler from './town/reconciler';
 import * as wasteland from './town/wasteland';
-import * as legacyTokenRenewal from './town/legacy-token-renewal';
+import * as unattendedTokenRenewal from './town/unattended-token-renewal';
 import * as runtimeAuthorization from './town/runtime-authorization';
 import { pickCanonicalBead, type ReporterBead } from './town/wasteland-reporter';
 import { applyAction } from './town/actions';
@@ -69,10 +69,6 @@ import { query } from '../util/query.util';
 import { getAgentDOStub } from './Agent.do';
 import { getTownContainerDoId, getTownContainerStub } from './TownContainer.do';
 
-import { kiloTokenPayload } from '@kilocode/worker-utils';
-import { jwtVerify } from 'jose';
-import { generateKiloApiToken } from '../util/kilo-token.util';
-import { resolveSecret } from '../util/secret.util';
 import { writeEvent, type GastownEventData } from '../util/analytics.util';
 import { logger, withLogTags } from '../util/log.util';
 import {
@@ -4952,81 +4948,26 @@ export class TownDO extends DurableObject<Env> {
   private lastKilocodeTokenCheckAt = 0;
   private async refreshKilocodeTokenIfExpiring(): Promise<void> {
     const CHECK_INTERVAL_MS = 24 * 60 * 60_000; // once per day
-    const REFRESH_WINDOW_SECONDS = 7 * 24 * 60 * 60; // 7 days
     const now = Date.now();
     if (now - this.lastKilocodeTokenCheckAt < CHECK_INTERVAL_MS) return;
     this.lastKilocodeTokenCheckAt = now;
-
-    if (await this.ctx.storage.get<unknown>(runtimeAuthorization.RUNTIME_AUTHORIZATION_KEY)) return;
-
-    const townConfig = await this.getTownConfig();
-    const token = townConfig.kilocode_token;
-    if (!token) return;
-
-    if (!this.env.NEXTAUTH_SECRET) {
-      logger.warn('refreshKilocodeTokenIfExpiring: NEXTAUTH_SECRET not configured');
-      return;
-    }
-    const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) {
-      logger.warn('refreshKilocodeTokenIfExpiring: failed to resolve NEXTAUTH_SECRET');
-      return;
-    }
-
-    // Verify the existing token's signature before trusting its claims.
-    // This prevents a forged token from being re-signed with real credentials.
-    // Use a very large clockTolerance so that already-expired (but validly
-    // signed) tokens are still accepted — this alarm is the recovery path
-    // for expired tokens, so rejecting them on exp would leave the town
-    // permanently stuck if it missed the 7-day refresh window.
-    let payload: { kiloUserId: string; apiTokenPepper?: string | null; exp?: number };
     try {
-      const TEN_YEARS_SECONDS = 10 * 365 * 24 * 60 * 60;
-      const { payload: raw } = await jwtVerify(token, new TextEncoder().encode(secret), {
-        algorithms: ['HS256'],
-        clockTolerance: TEN_YEARS_SECONDS,
-      });
-      const parsed = kiloTokenPayload.safeParse(raw);
-      if (!parsed.success) {
-        logger.warn('refreshKilocodeTokenIfExpiring: token payload failed schema validation');
-        return;
+      if (
+        await unattendedTokenRenewal.renewUnattendedLegacyTownToken(
+          this.ctx.storage,
+          this.env,
+          this.townId
+        )
+      ) {
+        this._ownerUserId = (await this.getTownConfig()).owner_user_id;
+        await this.syncConfigToContainer();
+        logger.info('refreshKilocodeTokenIfExpiring: reminted KILOCODE_TOKEN proactively');
       }
-      payload = parsed.data;
     } catch {
-      // Signature invalid or token malformed — don't remint from untrusted claims.
-      logger.warn('refreshKilocodeTokenIfExpiring: existing token failed signature verification');
-      return;
+      // Retry on the next alarm after a transient registry/database failure.
+      this.lastKilocodeTokenCheckAt = 0;
+      logger.warn('refreshKilocodeTokenIfExpiring: renewal unavailable');
     }
-
-    const exp = payload.exp;
-    if (!exp) return;
-
-    const nowSeconds = Math.floor(now / 1000);
-    if (exp - nowSeconds > REFRESH_WINDOW_SECONDS) return;
-
-    const identity = await this.getPrivateTownIdentity();
-    const userId = payload.kiloUserId;
-    if (!identity || !userId) return;
-
-    let owner: legacyTokenRenewal.LegacyTokenOwner | null;
-    try {
-      owner = await legacyTokenRenewal.resolveLegacyTownTokenOwner(this.env, identity, {
-        id: userId,
-        apiTokenPepper: payload.apiTokenPepper ?? null,
-      });
-    } catch {
-      // An unavailable authority must never revive a legacy token.
-      logger.warn('refreshKilocodeTokenIfExpiring: current authorization unavailable');
-      return;
-    }
-    if (!owner) return;
-    const newToken = await generateKiloApiToken(owner, secret);
-    await this.updateTownConfig({ kilocode_token: newToken });
-    await this.syncConfigToContainer();
-    logger.info('refreshKilocodeTokenIfExpiring: reminted KILOCODE_TOKEN proactively', {
-      userId,
-      oldExp: new Date(exp * 1000).toISOString(),
-    });
   }
 
   private hasActiveWork(): boolean {

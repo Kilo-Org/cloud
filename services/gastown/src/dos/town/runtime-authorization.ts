@@ -14,7 +14,7 @@ import { resolveSecret } from '../../util/secret.util';
 import type { TownConfig, TownConfigUpdate } from '../../types';
 
 export const RUNTIME_AUTHORIZATION_KEY = 'town:private:runtime-authorization';
-const TOWN_IDENTITY_KEY = 'town:private:identity';
+export const TOWN_IDENTITY_KEY = 'town:private:identity';
 
 export const TownIdentitySchema = z.object({
   ownerType: z.enum(['user', 'org']),
@@ -43,15 +43,20 @@ export async function initializePrivateTownIdentity(
   identity: TownIdentity
 ): Promise<void> {
   const parsed = TownIdentitySchema.parse(identity);
-  const existing = await storage.get<unknown>(TOWN_IDENTITY_KEY);
-  if (existing) throw new Error('Town identity already initialized');
-  await storage.put(TOWN_IDENTITY_KEY, parsed);
-  await config.updateTownConfig(storage, {
-    owner_type: parsed.ownerType,
-    owner_id: parsed.organizationId ?? parsed.ownerUserId,
-    owner_user_id: parsed.ownerUserId,
-    organization_id: parsed.organizationId,
-    created_by_user_id: parsed.createdByUserId,
+  await storage.transaction(async txn => {
+    const existing = await txn.get<unknown>(TOWN_IDENTITY_KEY);
+    if (existing !== undefined) throw new Error('Town identity already initialized');
+    if ((await txn.get<unknown>(RUNTIME_AUTHORIZATION_KEY)) !== undefined) {
+      throw new Error('Town authorization already initialized');
+    }
+    await txn.put(TOWN_IDENTITY_KEY, parsed);
+    await config.updateTownConfig(txn, {
+      owner_type: parsed.ownerType,
+      owner_id: parsed.organizationId ?? parsed.ownerUserId,
+      owner_user_id: parsed.ownerUserId,
+      organization_id: parsed.organizationId,
+      created_by_user_id: parsed.createdByUserId,
+    });
   });
 }
 
@@ -77,7 +82,7 @@ export async function getPrivateTownIdentity(
  * is an authorization failure rather than permission to use stale JWT claims.
  */
 export async function getTownIdentityState(
-  storage: DurableObjectStorage,
+  storage: Pick<DurableObjectStorage, 'get'>,
   townId: string
 ): Promise<TownIdentityState> {
   const [rawIdentity, rawAuthorization] = await Promise.all([

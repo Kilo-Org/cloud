@@ -28,7 +28,7 @@ afterAll(async () => {
 
 it('migration 0238 executes the deterministic GitHub installation backfill idempotently', async () => {
   const migration = fs.readFileSync(
-    path.join(__dirname, 'migrations/0238_worried_leo.sql'),
+    path.join(__dirname, 'migrations/0239_old_hemingway.sql'),
     'utf8'
   );
   const dml = migration

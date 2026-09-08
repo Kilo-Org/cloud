@@ -7,6 +7,9 @@ import { withProviderInstallationLock } from '@/lib/integrations/provider-instal
 import { deleteInstallationByOrganizationId } from '@/lib/integrations/linear-service';
 import { LINEAR_WEBHOOK_SECRET } from '@/lib/config.server';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { db } from '@/lib/drizzle';
+import { platform_integrations } from '@kilocode/db/schema';
+import { and, eq } from 'drizzle-orm';
 
 /**
  * Linear's webhook signature format, confirmed against @linear/sdk's
@@ -78,9 +81,21 @@ function isLinearOAuthAppRevokedPayload(payload: unknown): payload is LinearOAut
 
 async function handleLinearOAuthAppRevoked(
   organizationId: string,
+  eventTimestampMs: number,
   chat: Chat,
   linearAdapter: LinearAdapter
 ): Promise<void> {
+  const [candidate] = await db
+    .select({ id: platform_integrations.id, updatedAt: platform_integrations.updated_at })
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.LINEAR),
+        eq(platform_integrations.platform_installation_id, organizationId)
+      )
+    )
+    .limit(1);
+  if (!candidate) return;
   try {
     // Delete the upstream adapter installation first so that if it fails we
     // keep our own `platform_integrations` row around and can retry. Adapter
@@ -91,6 +106,17 @@ async function handleLinearOAuthAppRevoked(
       platform: PLATFORM.LINEAR,
       installationId: organizationId,
       callback: async () => {
+        const [current] = await db
+          .select({ id: platform_integrations.id, updatedAt: platform_integrations.updated_at })
+          .from(platform_integrations)
+          .where(eq(platform_integrations.id, candidate.id))
+          .limit(1);
+        if (
+          !current ||
+          current.updatedAt !== candidate.updatedAt ||
+          Date.parse(current.updatedAt) > eventTimestampMs
+        )
+          return;
         await linearAdapter.deleteInstallation(organizationId);
         await deleteInstallationByOrganizationId(organizationId);
         await unlinkTeamKiloUsers(chat.getState(), PLATFORM.LINEAR, organizationId);
@@ -137,7 +163,16 @@ export function createLinearWebhookHandler(chat: Chat, linearAdapter: LinearAdap
 
     if (isLinearOAuthAppRevokedPayload(payload)) {
       try {
-        await handleLinearOAuthAppRevoked(payload.organizationId, chat, linearAdapter);
+        const eventTimestampMs = Number.parseInt(
+          request.headers.get(LINEAR_TIMESTAMP_HEADER) ?? '',
+          10
+        );
+        await handleLinearOAuthAppRevoked(
+          payload.organizationId,
+          eventTimestampMs,
+          chat,
+          linearAdapter
+        );
       } catch (error) {
         console.error('[Bot] Failed to handle Linear OAuth revoke event:', error);
         captureException(error, {

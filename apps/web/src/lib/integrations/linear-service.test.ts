@@ -146,4 +146,24 @@ describe('upsertLinearInstallation', () => {
 
     expect(persistInstallation).toHaveBeenCalledTimes(1);
   });
+
+  test('removes a new admission when Chat SDK persistence fails after commit', async () => {
+    await expect(
+      upsertLinearInstallation(
+        {
+          owner: { type: 'user', id: user.id },
+          organizationId: 'workspace-failed',
+          organizationName: 'Workspace Failed',
+          botUserId: 'bot-1',
+        },
+        { persistInstallation: async () => Promise.reject(new Error('redis unavailable')) }
+      )
+    ).rejects.toThrow('redis unavailable');
+    await expect(
+      db
+        .select()
+        .from(platform_integrations)
+        .where(eq(platform_integrations.owned_by_user_id, user.id))
+    ).resolves.toHaveLength(0);
+  });
 });

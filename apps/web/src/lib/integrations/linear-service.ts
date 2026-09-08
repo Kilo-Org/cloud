@@ -15,8 +15,8 @@ import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 import {
-  lockProviderInstallations,
   withProviderInstallationLock,
+  withProviderInstallationLocks,
 } from '@/lib/integrations/provider-installation-lock';
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
@@ -368,42 +368,57 @@ export async function upsertLinearInstallation(
 
   if (existing) {
     try {
-      const updated = await db.transaction(async tx => {
-        await assertGitHubAutomationCanBeEnabled(owner, tx);
-        const [current] = await tx
-          .select({
-            id: platform_integrations.id,
-            installationId: platform_integrations.platform_installation_id,
-          })
-          .from(platform_integrations)
-          .where(
-            and(
-              eq(platform_integrations.platform, PLATFORM.LINEAR),
-              ...getOwnershipConditions(owner)
+      const updated = await withProviderInstallationLocks({
+        platform: PLATFORM.LINEAR,
+        installationIds: [existing.platform_installation_id, organizationId],
+        callback: async () => {
+          const row = await db.transaction(async tx => {
+            await assertGitHubAutomationCanBeEnabled(owner, tx);
+            const [current] = await tx
+              .select({
+                id: platform_integrations.id,
+                installationId: platform_integrations.platform_installation_id,
+              })
+              .from(platform_integrations)
+              .where(
+                and(
+                  eq(platform_integrations.platform, PLATFORM.LINEAR),
+                  ...getOwnershipConditions(owner)
+                )
+              )
+              .for('update');
+            if (
+              !current ||
+              current.id !== existing.id ||
+              current.installationId !== existing.platform_installation_id
             )
-          )
-          .for('update');
-        await lockProviderInstallations(tx, PLATFORM.LINEAR, [
-          current?.installationId,
-          organizationId,
-        ]);
-        if (!current || current.id !== existing.id)
-          throw new Error('Linear installation changed concurrently');
-        const [row] = await tx
-          .update(platform_integrations)
-          .set({
-            platform_installation_id: organizationId,
-            platform_account_id: organizationId,
-            platform_account_login: organizationName,
-            scopes: LINEAR_SCOPES,
-            integration_status: INTEGRATION_STATUS.ACTIVE,
-            metadata,
-            updated_at: new Date().toISOString(),
-          })
-          .where(eq(platform_integrations.id, existing.id))
-          .returning();
-        await options.persistInstallation?.();
-        return row;
+              throw new Error('Linear installation changed concurrently');
+            const [result] = await tx
+              .update(platform_integrations)
+              .set({
+                platform_installation_id: organizationId,
+                platform_account_id: organizationId,
+                platform_account_login: organizationName,
+                scopes: LINEAR_SCOPES,
+                integration_status: INTEGRATION_STATUS.ACTIVE,
+                metadata,
+                updated_at: new Date().toISOString(),
+              })
+              .where(eq(platform_integrations.id, existing.id))
+              .returning();
+            return result;
+          });
+          try {
+            await options.persistInstallation?.();
+          } catch (error) {
+            await db
+              .update(platform_integrations)
+              .set({ integration_status: INTEGRATION_STATUS.SUSPENDED })
+              .where(eq(platform_integrations.id, row.id));
+            throw error;
+          }
+          return row;
+        },
       });
 
       return updated;
@@ -416,41 +431,49 @@ export async function upsertLinearInstallation(
   }
 
   try {
-    const created = await db.transaction(async tx => {
-      await assertGitHubAutomationCanBeEnabled(owner, tx);
-      const [current] = await tx
-        .select({
-          id: platform_integrations.id,
-          installationId: platform_integrations.platform_installation_id,
-        })
-        .from(platform_integrations)
-        .where(
-          and(eq(platform_integrations.platform, PLATFORM.LINEAR), ...getOwnershipConditions(owner))
-        )
-        .for('update');
-      await lockProviderInstallations(tx, PLATFORM.LINEAR, [
-        current?.installationId,
-        organizationId,
-      ]);
-      if (current) throw new Error('Linear installation changed concurrently');
-      const [row] = await tx
-        .insert(platform_integrations)
-        .values({
-          owned_by_user_id: owner.type === 'user' ? owner.id : null,
-          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-          platform: PLATFORM.LINEAR,
-          integration_type: 'oauth',
-          platform_installation_id: organizationId,
-          platform_account_id: organizationId,
-          platform_account_login: organizationName,
-          scopes: LINEAR_SCOPES,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata,
-          installed_at: new Date().toISOString(),
-        })
-        .returning();
-      await options.persistInstallation?.();
-      return row;
+    const created = await withProviderInstallationLocks({
+      platform: PLATFORM.LINEAR,
+      installationIds: [organizationId],
+      callback: async () => {
+        const row = await db.transaction(async tx => {
+          await assertGitHubAutomationCanBeEnabled(owner, tx);
+          const [current] = await tx
+            .select({ id: platform_integrations.id })
+            .from(platform_integrations)
+            .where(
+              and(
+                eq(platform_integrations.platform, PLATFORM.LINEAR),
+                ...getOwnershipConditions(owner)
+              )
+            )
+            .for('update');
+          if (current) throw new Error('Linear installation changed concurrently');
+          const [result] = await tx
+            .insert(platform_integrations)
+            .values({
+              owned_by_user_id: owner.type === 'user' ? owner.id : null,
+              owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+              platform: PLATFORM.LINEAR,
+              integration_type: 'oauth',
+              platform_installation_id: organizationId,
+              platform_account_id: organizationId,
+              platform_account_login: organizationName,
+              scopes: LINEAR_SCOPES,
+              integration_status: INTEGRATION_STATUS.ACTIVE,
+              metadata,
+              installed_at: new Date().toISOString(),
+            })
+            .returning();
+          return result;
+        });
+        try {
+          await options.persistInstallation?.();
+        } catch (error) {
+          await db.delete(platform_integrations).where(eq(platform_integrations.id, row.id));
+          throw error;
+        }
+        return row;
+      },
     });
 
     return created;

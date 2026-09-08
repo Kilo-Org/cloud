@@ -1,7 +1,10 @@
-import { cleanupDbForTest, db } from '@/lib/drizzle';
+import { cleanupDbForTest, db, pool } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { cleanupProviderInstallationIfUnclaimed } from './provider-installation-lock';
+import {
+  cleanupProviderInstallationIfUnclaimed,
+  withProviderInstallationLocks,
+} from './provider-installation-lock';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 
 describe('cleanupProviderInstallationIfUnclaimed', () => {
@@ -42,4 +45,21 @@ describe('cleanupProviderInstallationIfUnclaimed', () => {
       expect(cleanup).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('bounds provider lock acquisition and releases the dedicated client', async () => {
+    const client = await pool.connect();
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', ['slack:BLOCKED']);
+    try {
+      await expect(
+        withProviderInstallationLocks({
+          platform: 'slack',
+          installationIds: ['BLOCKED'],
+          callback: async () => undefined,
+        })
+      ).rejects.toMatchObject({ code: '55P03' });
+    } finally {
+      await client.query('SELECT pg_advisory_unlock(hashtext($1))', ['slack:BLOCKED']);
+      client.release();
+    }
+  }, 10_000);
 });

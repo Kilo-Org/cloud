@@ -14,6 +14,23 @@ jest.mock('@/lib/bot-identity', () => ({
 jest.mock('@/lib/integrations/linear-service', () => ({
   deleteInstallationByOrganizationId: jest.fn(async () => ({ success: true, deleted: true })),
 }));
+jest.mock('@/lib/integrations/provider-installation-lock', () => ({
+  withProviderInstallationLock: async (input: { callback: () => Promise<unknown> }) =>
+    input.callback(),
+}));
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: jest.fn(() => ({
+      from: jest.fn(() => ({
+        where: jest.fn(() => ({
+          limit: jest.fn(async () => [
+            { id: 'linear-integration', updatedAt: '2020-01-01T00:00:00.000Z' },
+          ]),
+        })),
+      })),
+    })),
+  },
+}));
 
 jest.mock('@sentry/nextjs', () => ({
   captureException: jest.fn(),

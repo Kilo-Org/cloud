@@ -1,4 +1,4 @@
-import { stripPartContentIfFile } from './part-utils';
+import { normalizeMissingPartText, stripPartContentIfFile } from './part-utils';
 import type { ChatEvent } from './normalizer';
 import type { SessionStorage } from './storage/types';
 import type { UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
@@ -109,13 +109,18 @@ function createChatProcessor(
           sessionStorage.upsertMessage(event.info);
           break;
         case 'message.part.updated': {
+          // Normalize BEFORE the strip/guard logic: the wire can omit `text` on
+          // text/reasoning parts (KILO-APP-99), and the empty-text guard below
+          // must also see textless updates so they cannot clobber already
+          // streamed text. Identity-preserving for everything else.
+          const normalized = normalizeMissingPartText(event.part);
           if (options?.onToolAttachment) {
-            emitToolAttachmentsBeforeStrip(event.part, options.onToolAttachment);
+            emitToolAttachmentsBeforeStrip(normalized, options.onToolAttachment);
           }
           if (options?.onFilePart) {
-            emitFilePartBeforeStrip(event.part, options.onFilePart);
+            emitFilePartBeforeStrip(normalized, options.onFilePart);
           }
-          const stripped = stripPartContentIfFile(event.part);
+          const stripped = stripPartContentIfFile(normalized);
           if (hasTextField(stripped) && stripped.text === '' && !isSyntheticPart(stripped)) {
             const existingParts = sessionStorage.getParts(stripped.messageID);
             const existing = existingParts.find(p => p.id === stripped.id);

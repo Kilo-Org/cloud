@@ -1433,6 +1433,115 @@ describe('api routes', () => {
     }
   });
 
+  it('GET /session/:sessionId/messages normalizes a persisted textless reasoning part instead of degrading to invalid_data', async () => {
+    // Mirrors the e1 device seed (e1-seed.log): the DO holds a reasoning part
+    // with NO text field. Before the read-seam normalization the strict part
+    // schema rejected it, this endpoint answered `history: {kind:
+    // 'invalid_data'}`, and the agent chat screen showed "Couldn't load this
+    // session" instead of the transcript.
+    const { db, fns } = makeDbFakes();
+    vi.mocked(getWorkerDb).mockReturnValue(db);
+    fns.selectResult.mockResolvedValueOnce([{ session_id: 'ses_12345678901234567890123456' }]);
+
+    const assistantInfo = {
+      id: 'msg_asst_01',
+      sessionID: 'ses_12345678901234567890123456',
+      role: 'assistant',
+      time: { created: 2, completed: 3 },
+      parentID: 'msg_user_01',
+      modelID: 'claude',
+      providerID: 'anthropic',
+      mode: 'code',
+      agent: 'build',
+      path: { cwd: '/', root: '/' },
+      cost: 0,
+      tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } },
+    };
+    const textlessReasoningPart = {
+      id: 'prt_r_bad',
+      sessionID: 'ses_12345678901234567890123456',
+      messageID: 'msg_asst_01',
+      type: 'reasoning',
+      time: { start: 1, end: 2 },
+    };
+    const whitespaceReasoningPart = {
+      ...textlessReasoningPart,
+      id: 'prt_r_ws',
+      time: { start: 2, end: 3 },
+      text: '   \n\t  ',
+    };
+    const answerPart = {
+      id: 'prt_t_ok',
+      sessionID: 'ses_12345678901234567890123456',
+      messageID: 'msg_asst_01',
+      type: 'text',
+      text: 'Release ships on Tuesday',
+    };
+    vi.mocked(getSessionIngestDO).mockReturnValue({
+      readKiloSdkMessages: vi.fn(async () => ({
+        messages: [
+          {
+            info: {
+              id: 'msg_user_01',
+              sessionID: 'ses_12345678901234567890123456',
+              role: 'user',
+              time: { created: 1 },
+              agent: 'build',
+              model: { providerID: 'anthropic', modelID: 'claude' },
+            },
+            parts: [
+              {
+                id: 'prt_q',
+                sessionID: 'ses_12345678901234567890123456',
+                messageID: 'msg_user_01',
+                type: 'text',
+                text: 'Question about the queue',
+              },
+            ],
+          },
+          {
+            info: assistantInfo,
+            parts: [textlessReasoningPart, whitespaceReasoningPart, answerPart],
+          },
+        ],
+        nextCursor: null,
+        omittedItemCount: 0,
+      })),
+    } as never);
+
+    const app = makeApiApp();
+    const res = await app.fetch(
+      new Request('http://local/session/ses_12345678901234567890123456/messages?limit=50', {
+        method: 'GET',
+      }),
+      makeTestEnv()
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      success: true,
+      kiloSessionId: 'ses_12345678901234567890123456',
+      history: {
+        messages: [
+          {
+            info: { id: 'msg_user_01' },
+            parts: [{ id: 'prt_q', type: 'text', text: 'Question about the queue' }],
+          },
+          {
+            info: { id: 'msg_asst_01' },
+            parts: [
+              { id: 'prt_r_bad', type: 'reasoning', text: '' },
+              { id: 'prt_r_ws', type: 'reasoning', text: '   \n\t  ' },
+              { id: 'prt_t_ok', type: 'text', text: 'Release ships on Tuesday' },
+            ],
+          },
+        ],
+        nextCursor: null,
+        omittedItemCount: 0,
+      },
+    });
+  });
+
   it('DELETE /session/:sessionId revokes cache, clears DO, and deletes descendants child-first', async () => {
     const parentSessionId = 'ses_12345678901234567890123456';
     const childSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';

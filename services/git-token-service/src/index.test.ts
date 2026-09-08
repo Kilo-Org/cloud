@@ -1190,6 +1190,9 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     ).resolves.toEqual({
       success: true,
       authorization: `Basic ${Buffer.from('x-access-token:installation-token').toString('base64')}`,
+      installationId: '123',
+      source: 'installation',
+      appType: 'standard',
     });
     expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
   });
@@ -1279,7 +1282,12 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
       expect(redemption).toEqual({
         success: true,
         authorization: `Basic ${Buffer.from('x-access-token:installation-token').toString('base64')}`,
+        installationId: '123',
+        source: 'installation',
+        appType: 'standard',
       });
+      expect(redemption).not.toHaveProperty('githubToken');
+      expect(redemption).not.toHaveProperty('token');
       expect(serviceMocks.selectUserAuthorization).not.toHaveBeenCalled();
       expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
     }
@@ -1332,6 +1340,9 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
     expect(redemption).toEqual({
       success: true,
       authorization: `Basic ${Buffer.from('x-access-token:installation-token').toString('base64')}`,
+      installationId: '123',
+      source: 'installation',
+      appType: 'standard',
     });
     expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
   });
@@ -1369,6 +1380,9 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         authorization: requestUrl.startsWith('https://github.com/')
           ? `Basic ${Buffer.from('x-access-token:installation-token').toString('base64')}`
           : 'Bearer installation-token',
+        installationId: '123',
+        source: 'installation',
+        appType: 'standard',
       });
       expect(serviceMocks.getTokenForRepo).toHaveBeenCalledOnce();
     }
@@ -1403,7 +1417,15 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         requestUrl,
       });
 
-      expect(redemption).toEqual({ success: true, authorization: 'Bearer refreshed-user-token' });
+      expect(redemption).toEqual({
+        success: true,
+        authorization: 'Bearer refreshed-user-token',
+        installationId: '123',
+        source: 'user',
+        appType: 'standard',
+      });
+      expect(redemption).not.toHaveProperty('githubToken');
+      expect(redemption).not.toHaveProperty('token');
       expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
     }
   );
@@ -1426,7 +1448,13 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         requestMethod: 'GET',
         requestUrl: 'https://api.github.com/repos/acme/repo/pulls/42',
       })
-    ).resolves.toEqual({ success: true, authorization: 'Bearer user-token' });
+    ).resolves.toEqual({
+      success: true,
+      authorization: 'Bearer user-token',
+      installationId: '123',
+      source: 'user',
+      appType: 'standard',
+    });
     expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
   });
 
@@ -1465,6 +1493,9 @@ describe('GitTokenRPCEntrypoint GitHub session capability RPCs', () => {
         authorization: requestUrl.startsWith('https://github.com/')
           ? `Basic ${Buffer.from('x-access-token:user-token').toString('base64')}`
           : 'Bearer user-token',
+        installationId: '123',
+        source: 'user',
+        appType: 'standard',
       });
       expect(serviceMocks.selectUserAuthorization).toHaveBeenCalledOnce();
     }

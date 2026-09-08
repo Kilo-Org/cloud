@@ -324,23 +324,27 @@ describe('CloudAgentWorkspaceTabs', () => {
       root = createRoot(dom.container);
       act(() => {
         root?.render(
-          createElement(CloudAgentWorkspaceTabs, {
-            activeTabId: CHAT_TAB_ID,
-            chatSessions: [makeSession('ses_first', 'First worktree chat')],
-            currentSessionId: 'ses_first',
-            currentChatProgress: { sessionId: 'ses_first', message: progress },
-            files: [],
-            onCloseFile: () => undefined,
-            onSelectChat: () => undefined,
-            onCloseChat: () => undefined,
-            onRenameChat: async () => undefined,
-            terminals: [],
-            terminalStatuses: {},
-            canCreateTerminal: false,
-            onSelectTab: () => undefined,
-            onCreateTerminal: () => undefined,
-            onCloseTerminal: () => undefined,
-          })
+          createElement(
+            Tabs,
+            { value: 'chat:ses_first' },
+            createElement(CloudAgentWorkspaceTabs, {
+              activeTabId: CHAT_TAB_ID,
+              chatSessions: [makeSession('ses_first', 'First worktree chat')],
+              currentSessionId: 'ses_first',
+              currentChatProgress: { sessionId: 'ses_first', message: progress },
+              files: [],
+              onCloseFile: () => undefined,
+              onSelectChat: () => undefined,
+              onCloseChat: () => undefined,
+              onRenameChat: async () => undefined,
+              terminals: [],
+              terminalStatuses: {},
+              canCreateTerminal: false,
+              onSelectTab: () => undefined,
+              onCreateTerminal: () => undefined,
+              onCloseTerminal: () => undefined,
+            })
+          )
         );
       });
       const tab = dom.container.querySelector<HTMLButtonElement>('[role="tab"]');

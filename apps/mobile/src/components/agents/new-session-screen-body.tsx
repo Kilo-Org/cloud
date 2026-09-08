@@ -26,7 +26,7 @@ import { useContinueCloudCreate } from '@/components/agents/use-continue-cloud-c
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { useNewSessionDiscardGuard } from '@/app/(app)/agent-chat/use-new-session-discard-guard';
+import { useNewSessionDiscardGuard } from '@/components/agents/use-new-session-discard-guard';
 import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
 import {
   type AgentAttachmentCandidate,

@@ -1386,15 +1386,21 @@ describe('processGooglePlayKiloPassNotification', () => {
     );
   });
   it.each([
-    [19, false],
-    [49, false],
-    [199, false],
-    [19, true],
-    [49, true],
-    [199, true],
+    [19, false, false],
+    [49, false, false],
+    [199, false, false],
+    [19, true, false],
+    [49, true, false],
+    [199, true, false],
+    [19, false, true],
+    [49, false, true],
+    [199, false, true],
+    [19, true, true],
+    [49, true, true],
+    [199, true, true],
   ] as const)(
-    'grants tier %i bonus once and reverses it on refund (returning=%s)',
-    async (tier, returning) => {
+    'grants tier %i bonus once and refunds spent credits (returning=%s, canceled=%s)',
+    async (tier, returning, canceled) => {
       const { user, obfsAccountId } = await insertGooglePlayUser();
       if (returning)
         await db.insert(kilo_pass_subscriptions).values({
@@ -1435,6 +1441,18 @@ describe('processGooglePlayKiloPassNotification', () => {
         toMicrodollars(tier)
       );
       const threshold = paid!.kilo_pass_threshold! - toMicrodollars(1);
+      if (canceled) {
+        mockGetGooglePlaySubscriptionPurchase.mockResolvedValue({
+          ...live,
+          subscriptionState: 'SUBSCRIPTION_STATE_CANCELED',
+        });
+        await send(3, crypto.randomUUID());
+        const pendingCancel = await db.query.kilo_pass_subscriptions.findFirst({
+          where: eq(kilo_pass_subscriptions.provider_subscription_id, token),
+        });
+        expect(pendingCancel?.status).toBe('active');
+        expect(pendingCancel?.cancel_at_period_end).toBe(true);
+      }
       const { maybeIssueKiloPassBonusFromUsageThreshold } = await import('./usage-triggered-bonus');
       const issue = () =>
         maybeIssueKiloPassBonusFromUsageThreshold({ kiloUserId: user.id, nowIso: start });
@@ -1460,6 +1478,12 @@ describe('processGooglePlayKiloPassNotification', () => {
         toMicrodollars(bonusUsd)
       );
       expect(bonus!.kilo_pass_threshold).toBeNull();
+      // Artificial usage must not reduce the refund or erase the spending history.
+      const spent = bonus!.total_microdollars_acquired;
+      await db
+        .update(kilocode_users)
+        .set({ microdollars_used: spent })
+        .where(eq(kilocode_users.id, user.id));
       mockGetGooglePlaySubscriptionPurchase.mockResolvedValue({
         ...live,
         subscriptionState: 'SUBSCRIPTION_STATE_EXPIRED',
@@ -1475,6 +1499,17 @@ describe('processGooglePlayKiloPassNotification', () => {
         where: eq(kilocode_users.id, user.id),
       });
       expect(refunded!.total_microdollars_acquired).toBe(user.total_microdollars_acquired);
+      expect(refunded!.microdollars_used).toBe(spent);
+      expect(refunded!.total_microdollars_acquired - refunded!.microdollars_used).toBe(
+        -toMicrodollars(tier + bonusUsd)
+      );
+      await issue();
+      const afterRefundCheck = await db.query.kilocode_users.findFirst({
+        where: eq(kilocode_users.id, user.id),
+      });
+      expect(afterRefundCheck!.total_microdollars_acquired).toBe(
+        refunded!.total_microdollars_acquired
+      );
       const sub = await db.query.kilo_pass_subscriptions.findFirst({
         where: eq(kilo_pass_subscriptions.provider_subscription_id, token),
       });

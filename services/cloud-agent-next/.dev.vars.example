@@ -45,7 +45,7 @@ CONTROL_PLANE_IDS=*
 WORKTREE_CREATION_ENABLED_IDS=*
 
 # Non-secret rollout control for per-session Kilo runtime isolation.
-RUNTIME_ISOLATION_ENABLED=false
+RUNTIME_ISOLATION_ENABLED=true
 
 CREDENTIAL_CONTAINMENT_ENABLED=false
 

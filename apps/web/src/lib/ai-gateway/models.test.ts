@@ -160,7 +160,7 @@ describe('isFreeModel', () => {
       expect(findKiloExclusiveModel(gpt_6_astra_flex_model.public_id)).toBe(gpt_6_astra_flex_model);
       expect(gpt_6_astra_flex_model).toMatchObject({
         internal_id: 'openai/gpt-6-astra',
-        gateway: 'openrouter',
+        gateway: 'vercel',
         flags: ['reasoning', 'vision', 'flex'],
         inference_provider_restriction: ['openai'],
         pricing: { fallbackOnly: true },

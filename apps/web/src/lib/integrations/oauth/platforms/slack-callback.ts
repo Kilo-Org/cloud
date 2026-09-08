@@ -133,12 +133,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
         owner,
         teamId,
         installation,
-        captureInstallation: () => slackAdapter.getInstallation(teamId),
         persistInstallation: () => slackAdapter.setInstallation(teamId, installation),
-        restoreInstallation: previous =>
-          previous
-            ? slackAdapter.setInstallation(teamId, previous)
-            : slackAdapter.deleteInstallation(teamId),
       });
     } catch (error) {
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {

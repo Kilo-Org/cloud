@@ -1,7 +1,6 @@
 import 'server-only';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { LinearClient } from '@linear/sdk';
-import type { LinearInstallation } from '@chat-adapter/linear';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
@@ -318,8 +317,6 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 
 type LinearUpsertOptions = {
   persistInstallation?: () => Promise<void>;
-  captureInstallation?: () => Promise<LinearInstallation | null>;
-  restoreInstallation?: (installation: LinearInstallation | null) => Promise<void>;
 };
 
 /**
@@ -375,7 +372,6 @@ export async function upsertLinearInstallation(
         platform: PLATFORM.LINEAR,
         installationIds: [existing.platform_installation_id, organizationId],
         callback: async () => {
-          const previousProviderState = await options.captureInstallation?.();
           const row = await db.transaction(async tx => {
             await assertGitHubAutomationCanBeEnabled(owner, tx);
             const [current] = await tx
@@ -415,18 +411,9 @@ export async function upsertLinearInstallation(
           try {
             await options.persistInstallation?.();
           } catch (error) {
-            await options.restoreInstallation?.(previousProviderState ?? null);
             await db
               .update(platform_integrations)
-              .set({
-                platform_installation_id: existing.platform_installation_id,
-                platform_account_id: existing.platform_account_id,
-                platform_account_login: existing.platform_account_login,
-                scopes: existing.scopes,
-                integration_status: existing.integration_status,
-                metadata: existing.metadata,
-                updated_at: existing.updated_at,
-              })
+              .set({ integration_status: INTEGRATION_STATUS.SUSPENDED })
               .where(eq(platform_integrations.id, row.id));
             throw error;
           }
@@ -448,7 +435,6 @@ export async function upsertLinearInstallation(
       platform: PLATFORM.LINEAR,
       installationIds: [organizationId],
       callback: async () => {
-        const previousProviderState = await options.captureInstallation?.();
         const row = await db.transaction(async tx => {
           await assertGitHubAutomationCanBeEnabled(owner, tx);
           const [current] = await tx
@@ -483,7 +469,6 @@ export async function upsertLinearInstallation(
         try {
           await options.persistInstallation?.();
         } catch (error) {
-          await options.restoreInstallation?.(previousProviderState ?? null);
           await db.delete(platform_integrations).where(eq(platform_integrations.id, row.id));
           throw error;
         }
@@ -605,38 +590,20 @@ export async function updateModel(
     }
   }
 
-  let candidate = integration;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const installationId = candidate.platform_installation_id ?? candidate.platform_account_id;
-    if (!installationId) return { success: false, error: 'Linear installation is missing an ID' };
-    const updated = await withProviderInstallationLock({
-      platform: PLATFORM.LINEAR,
-      installationId,
-      callback: async () => {
-        const current = await getInstallation(owner);
-        if (
-          !current ||
-          current.id !== candidate.id ||
-          (current.platform_installation_id ?? current.platform_account_id) !== installationId
-        )
-          return false;
-        const metadata = (current.metadata || {}) as Record<string, unknown>;
-        await db
-          .update(platform_integrations)
-          .set({
-            metadata: { ...metadata, model_slug: modelSlug },
-            updated_at: new Date().toISOString(),
-          })
-          .where(eq(platform_integrations.id, current.id));
-        return true;
+  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+
+  await db
+    .update(platform_integrations)
+    .set({
+      metadata: {
+        ...existingMetadata,
+        model_slug: modelSlug,
       },
-    });
-    if (updated) return { success: true };
-    const current = await getInstallation(owner);
-    if (!current) return { success: false, error: 'No Linear installation found' };
-    candidate = current;
-  }
-  return { success: false, error: 'Linear installation changed; retry' };
+      updated_at: new Date().toISOString(),
+    })
+    .where(eq(platform_integrations.id, integration.id));
+
+  return { success: true };
 }
 
 export async function getModel(owner: Owner): Promise<string | null> {

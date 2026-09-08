@@ -5,10 +5,7 @@ import { ai_gateway_sync_providers_state } from '@kilocode/db/schema';
 import { APP_URL } from '@/lib/constants';
 import { db } from '@/lib/drizzle';
 import { redisClient } from '@/lib/redis';
-import {
-  AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
-  SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY,
-} from '@/lib/redis-keys';
+import { SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY } from '@/lib/redis-keys';
 import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
@@ -16,7 +13,7 @@ import {
 import { eq } from 'drizzle-orm';
 
 export const SYNC_PROVIDERS_STALE_AFTER_MS = 60 * 60 * 1000;
-export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = AI_GATEWAY_STATE_REDIS_TTL_SECONDS;
+export const SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS = 3 * 24 * 60 * 60;
 const SYNC_PROVIDERS_STALE_ALERT_TTL_MS = SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS * 1000;
 
 const STALE_WINDOW_LABEL = 'hour';

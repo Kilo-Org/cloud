@@ -237,7 +237,7 @@ describe('sendTestStaleSyncAlertNotification', () => {
 });
 
 describe('alertIfSyncProvidersStale', () => {
-  it('posts once and stores the alert timestamp with a seven-day TTL', async () => {
+  it('posts once and stores the alert timestamp with a three-day TTL', async () => {
     const sendNotification = jest.fn(
       async (_notification: AdminSlackNotification) => 'posted' as const
     );
@@ -256,7 +256,7 @@ describe('alertIfSyncProvidersStale', () => {
       buildStaleSyncAlertNotification({ lastCompletedAt: STALE_SYNC, now: NOW })
     );
     expect(setLastAlertAt).toHaveBeenCalledWith(NOW.toISOString());
-    expect(SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS).toBe(7 * 24 * 60 * 60);
+    expect(SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS).toBe(3 * 24 * 60 * 60);
     expect(SYNC_PROVIDERS_STALE_AFTER_MS).toBe(60 * 60 * 1000);
   });
 

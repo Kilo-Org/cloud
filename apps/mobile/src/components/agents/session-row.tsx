@@ -177,13 +177,16 @@ export function StoredSessionRow({
         });
   const spokenPrNumber = variant === 'card' ? null : (session.associatedPr?.number ?? null);
 
-  // Platform icon only on the Agents list variant. Home cards stay
-  // byte-identical (platformIcon defaults to undefined).
+  // Platform icon only on the Agents list variant, and only while the
+  // eyebrow draws no live status glyph (a glyph beside the status mark
+  // reads as a stray second mark). Home cards stay byte-identical
+  // (platformIcon defaults to undefined).
   const { iconKind: platformIconKind, spokenPlatform: a11yPlatform } =
     selectRowPlatformPresentation({
       platform: session.created_on_platform,
       variant,
       needsInput,
+      statusGlyph: live,
       gitUrl: session.git_url,
     });
   const platformIcon =

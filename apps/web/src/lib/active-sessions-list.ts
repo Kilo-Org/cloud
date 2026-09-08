@@ -125,6 +125,13 @@ type CloudCandidateRow = EnrichmentRow & {
   git_url: string | null;
   git_branch: string | null;
   cloud_agent_session_id: string | null;
+  /**
+   * The tray's own liveness proof, selected alongside the candidate columns
+   * with the same EXISTS clause the WHERE liveness predicate uses: true when
+   * the session has a run with no `terminal_at` — the agent is working right
+   * now, whatever the asynchronously-synced stored status says.
+   */
+  run_open: boolean;
 };
 
 /**
@@ -170,6 +177,29 @@ export function resolveActiveSessionStatus(
     return storedStatus;
   }
   return liveStatus;
+}
+
+/**
+ * Resolve a cloud candidate's status. `cli_sessions_v2.status` syncs
+ * asynchronously and reads `idle` (or null) while the agent works, so the
+ * open run — the tray's own liveness proof (`cloud_agent_session_runs.
+ * terminal_at IS NULL`) — wins: a non-attention stored status reports `busy`
+ * while the run is open. Attention statuses pass through unchanged (a run
+ * open while the agent waits on the user must still show needs-input), and a
+ * row without an open run keeps its stored status, so the finished state
+ * (terminal run + fresh idle) still reads idle in the warm-idle window.
+ */
+export function resolveCloudCandidateStatus(
+  storedStatus: string | null | undefined,
+  runOpen: boolean
+): string {
+  if (storedStatus === 'question' || storedStatus === 'permission' || storedStatus === 'retry') {
+    return storedStatus;
+  }
+  if (runOpen) {
+    return 'busy';
+  }
+  return storedStatus ?? '';
 }
 
 /**
@@ -229,9 +259,11 @@ function mapEnrichedHeartbeatSession(
 function mapCloudCandidateRow(row: CloudCandidateRow): ActiveSession {
   const mapped: ActiveSession = {
     id: row.session_id,
-    // Cloud rows have no live heartbeat source — use the stored status as-is
-    // (do NOT run resolveActiveSessionStatus).
-    status: row.status ?? '',
+    // Cloud rows have no live heartbeat source (do NOT run
+    // resolveActiveSessionStatus): the stored status is synced
+    // asynchronously, so an open run upgrades a non-attention stored status
+    // to busy — a working session must never render idle.
+    status: resolveCloudCandidateStatus(row.status, row.run_open),
     title: row.title ?? '',
     connectionId: CLOUD_AGENT_CONNECTION_ID,
     gitUrl: row.git_url ?? undefined,
@@ -454,6 +486,13 @@ export async function listActiveSessions({
           status_updated_at: cli_sessions_v2.status_updated_at,
           total_cost_microdollars: cli_sessions_v2.total_cost_microdollars,
           cloud_agent_session_id: cli_sessions_v2.cloud_agent_session_id,
+          // Same EXISTS clause the WHERE livePredicate uses, so the row
+          // carries the proof of its own liveness into the mapping.
+          run_open: sql<boolean>`EXISTS (
+            SELECT 1 FROM ${cloud_agent_session_runs}
+            WHERE ${cloud_agent_session_runs.cloud_agent_session_id} = ${cli_sessions_v2.cloud_agent_session_id}
+              AND ${cloud_agent_session_runs.terminal_at} IS NULL
+          )`,
           session_pr_platform: cli_sessions_v2.platform,
           session_pr_url: cli_sessions_v2.pr_url,
           session_pr_number: cli_sessions_v2.pr_number,

@@ -87,6 +87,14 @@ describe('isPatchPart', () => {
   });
 });
 
+describe('isPartStreaming', () => {
+  it('does not treat a reasoning part with no time as streaming', () => {
+    const part = makeReasoningPart('thinking');
+    delete (part as { time?: unknown }).time;
+    expect(isPartStreaming(part)).toBe(false);
+  });
+});
+
 describe('shouldRenderReasoningPart', () => {
   it('does not render a completed reasoning part with empty text', () => {
     const part = makeReasoningPart('', true);

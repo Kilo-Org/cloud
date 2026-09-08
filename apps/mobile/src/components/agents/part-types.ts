@@ -52,7 +52,7 @@ export function isPartStreaming(part: Part): boolean {
     return !part.time?.end;
   }
   if (part.type === 'reasoning') {
-    return !part.time.end;
+    return part.time !== undefined && !part.time.end;
   }
   if (part.type === 'tool') {
     return part.state.status === 'pending' || part.state.status === 'running';

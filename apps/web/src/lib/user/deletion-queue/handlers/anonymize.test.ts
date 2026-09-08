@@ -25,6 +25,7 @@ import {
   deleteOwnedByUserIdPage,
   OWNED_BY_USER_DELETE_PAGE_SIZE,
 } from '@/lib/user/owned-by-user-batch-delete';
+import type * as OwnedByUserBatchDelete from '@/lib/user/owned-by-user-batch-delete';
 import { enqueueUserDeletionTargets } from '@/lib/user/deletion-queue/deletion-enqueue';
 import { hmacDeletionEmail } from '@/lib/user/deletion-queue/deletion-hmac';
 import { persistHandlerOutcome } from '@/lib/user/deletion-queue/deletion-outcomes';
@@ -42,7 +43,9 @@ jest.mock('@/lib/user', () => ({
 }));
 
 jest.mock('@/lib/user/owned-by-user-batch-delete', () => {
-  const actual = jest.requireActual('@/lib/user/owned-by-user-batch-delete') as typeof import('@/lib/user/owned-by-user-batch-delete');
+  const actual = jest.requireActual(
+    '@/lib/user/owned-by-user-batch-delete'
+  ) as typeof OwnedByUserBatchDelete;
   return {
     ...actual,
     deleteOwnedByUserIdPage: jest.fn(actual.deleteOwnedByUserIdPage),
@@ -60,11 +63,8 @@ describe('handleAnonymize', () => {
     anonymizeCloudUserDataMock.mockClear();
     deleteOwnedByUserIdPageMock.mockReset();
     deleteOwnedByUserIdPageMock.mockImplementation(
-      (
-        jest.requireActual(
-          '@/lib/user/owned-by-user-batch-delete'
-        ) as typeof import('@/lib/user/owned-by-user-batch-delete')
-      ).deleteOwnedByUserIdPage
+      (jest.requireActual('@/lib/user/owned-by-user-batch-delete') as typeof OwnedByUserBatchDelete)
+        .deleteOwnedByUserIdPage
     );
   });
 
@@ -195,6 +195,7 @@ describe('handleAnonymize', () => {
       kind: 'retry',
       errorCode: 'anonymize_page_timeout',
       httpStatusClass: 'error',
+      progress: {},
     });
   });
 });

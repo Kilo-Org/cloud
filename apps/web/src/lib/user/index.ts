@@ -1391,12 +1391,7 @@ export async function anonymizeCloudUserData(
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
   await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
-  await deleteAllOwnedByUserIdPages(
-    tx,
-    'webhook_events',
-    userId,
-    OWNED_BY_USER_DELETE_PAGE_SIZE
-  );
+  await deleteAllOwnedByUserIdPages(tx, 'webhook_events', userId, OWNED_BY_USER_DELETE_PAGE_SIZE);
   await tx
     .delete(security_analysis_owner_state)
     .where(eq(security_analysis_owner_state.owned_by_user_id, userId));

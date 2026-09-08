@@ -37,7 +37,9 @@ describe('owned-by-user batch delete', () => {
     });
     await insertCodeReviews(user.id, 3);
 
-    await db.transaction(tx => deleteAllOwnedByUserIdPages(tx, 'cloud_agent_code_reviews', user.id, 2));
+    await db.transaction(tx =>
+      deleteAllOwnedByUserIdPages(tx, 'cloud_agent_code_reviews', user.id, 2)
+    );
 
     expect(await countOwnedCodeReviews(user.id)).toBe(0);
   });

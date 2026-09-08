@@ -103,7 +103,7 @@ export const handleAnonymize: DeletionHandler = async ({ request, step, context 
   for (const table of OWNED_BY_USER_DELETE_TABLES) {
     const drained = await drainOwnedTable({ userId, table, context, progress });
     if (drained.kind !== 'drained') return drained;
-    progress = drained.progress;
+    progress = drained.progress ?? progress;
   }
 
   const remainingMs = context.remainingMs();
@@ -114,5 +114,7 @@ export const handleAnonymize: DeletionHandler = async ({ request, step, context 
     return { kind: 'continue', progress };
   }
 
-  return (progress?.processed_count ?? 0) > 0 ? { kind: 'succeeded', progress } : { kind: 'succeeded' };
+  return (progress?.processed_count ?? 0) > 0
+    ? { kind: 'succeeded', progress }
+    : { kind: 'succeeded' };
 };

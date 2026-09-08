@@ -32,6 +32,18 @@ type FetchEfficientDecisionOptions = {
   authToken?: string;
   timeoutMs?: number;
   onError?: (message: string, data: { error: string }) => void;
+  onFailure?: (failure: EfficientDecisionFailure) => void;
+};
+
+export type EfficientDecisionFailure = {
+  reason:
+    | 'worker_not_configured'
+    | 'request_normalization_failed'
+    | 'worker_timeout'
+    | 'worker_http_error'
+    | 'worker_response_invalid'
+    | 'worker_request_failed';
+  workerStatus?: number;
 };
 
 function buildDecidePayload(params: EfficientDecisionParams): MirrorPayload | null {
@@ -84,10 +96,16 @@ export async function fetchEfficientAutoDecision(
   const workerUrl = options.workerUrl ?? AUTO_ROUTING_WORKER_URL;
   const authToken = options.authToken ?? INTERNAL_API_SECRET;
   const onError = options.onError ?? warnExceptInTest;
-  if (!workerUrl || !authToken) return null;
+  if (!workerUrl || !authToken) {
+    options.onFailure?.({ reason: 'worker_not_configured' });
+    return null;
+  }
 
   const payload = buildDecidePayload(params);
-  if (!payload) return null;
+  if (!payload) {
+    options.onFailure?.({ reason: 'request_normalization_failed' });
+    return null;
+  }
 
   try {
     const response = await fetch(`${workerUrl}/decide`, {
@@ -101,17 +119,33 @@ export async function fetchEfficientAutoDecision(
     });
     if (!response.ok) {
       onError('Efficient auto decision request failed', { error: `status ${response.status}` });
+      options.onFailure?.({ reason: 'worker_http_error', workerStatus: response.status });
       return null;
     }
-    const parsed = AutoRoutingDecisionResponseSchema.safeParse(await response.json());
+    let responseBody: unknown;
+    try {
+      responseBody = await response.json();
+    } catch {
+      onError('Efficient auto decision response invalid', { error: 'invalid_json' });
+      options.onFailure?.({ reason: 'worker_response_invalid' });
+      return null;
+    }
+    const parsed = AutoRoutingDecisionResponseSchema.safeParse(responseBody);
     if (!parsed.success) {
       onError('Efficient auto decision response invalid', { error: 'invalid_response' });
+      options.onFailure?.({ reason: 'worker_response_invalid' });
       return null;
     }
     return { decision: parsed.data.decision, costUsd: parsed.data.cost };
   } catch (error) {
     onError('Efficient auto decision request failed', {
       error: error instanceof Error ? error.message : String(error),
+    });
+    options.onFailure?.({
+      reason:
+        error instanceof Error && error.name === 'TimeoutError'
+          ? 'worker_timeout'
+          : 'worker_request_failed',
     });
     return null;
   }

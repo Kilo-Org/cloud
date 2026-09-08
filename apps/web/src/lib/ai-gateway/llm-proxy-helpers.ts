@@ -42,6 +42,8 @@ import type {
 } from '@/lib/ai-gateway/processUsage.types';
 import { detectContextOverflow } from '@/lib/ai-gateway/context-overflow';
 import { KILO_AUTO_BALANCED_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
+import type { EfficientFallbackReason } from '@/lib/ai-gateway/auto-model/resolution';
+import type { EfficientDecisionFailure } from '@/lib/ai-gateway/auto-routing-decision';
 import type { GatewayChatApiKind, ProviderId } from '@/lib/ai-gateway/providers/types';
 import { computeOpenRouterCostFields } from '@/lib/ai-gateway/processUsage.shared';
 import { persistExperimentAttribution } from '@/lib/ai-gateway/experiments/persist';
@@ -341,6 +343,31 @@ export function efficientPoolBlockedResponse() {
       message,
     },
     { status: 404 }
+  );
+}
+
+export function efficientRoutingUnavailableResponse(details: {
+  reason: EfficientDecisionFailure['reason'] | EfficientFallbackReason;
+  blockedFallbackModelIds: string[];
+  workerStatus?: number;
+}) {
+  const error = 'Auto Efficient routing is temporarily unavailable.';
+  const message =
+    'Auto Efficient could not select a model, and your organization does not allow any configured fallback model. Please retry. If the problem continues, ask your organization administrator to allow a fallback model.';
+  const responseDetails = {
+    reason: details.reason,
+    blocked_fallback_model_ids: details.blockedFallbackModelIds,
+    ...(details.workerStatus === undefined ? {} : { worker_status: details.workerStatus }),
+  };
+  warnExceptInTest(`[efficientRoutingUnavailableResponse] ${message}`, responseDetails);
+  return NextResponse.json(
+    {
+      error,
+      error_type: ProxyErrorType.temporarily_unavailable,
+      message,
+      details: responseDetails,
+    },
+    { status: 503 }
   );
 }
 

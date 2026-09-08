@@ -4,12 +4,18 @@ import type { GatewayRequest } from './providers/openrouter/types';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from './latest-model-aliases';
 
 let mockInceptionPromoRunning = true;
+const mockedWarnExceptInTest = jest.fn();
 
 jest.mock('@/lib/constants', () => ({
   ...(jest.requireActual('@/lib/constants') as Record<string, unknown>),
   get INCEPTION_PROMO_RUNNING() {
     return mockInceptionPromoRunning;
   },
+}));
+
+jest.mock('@/lib/utils.server', () => ({
+  ...(jest.requireActual('@/lib/utils.server') as Record<string, unknown>),
+  warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
 }));
 
 // `countAndStoreEditUsage` schedules the usage write through `next/server`'s
@@ -38,6 +44,7 @@ import {
   checkOrganizationModelRestrictions,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
+  efficientRoutingUnavailableResponse,
   extractEditPromptInfo,
   extractEmbeddingPromptInfo,
   extractHeaderAndLimitLength,
@@ -46,6 +53,37 @@ import {
   parseEditUsageFromResponse,
   parseTranscriptionUsageFromResponse,
 } from './llm-proxy-helpers';
+
+describe('efficientRoutingUnavailableResponse', () => {
+  it('includes non-sensitive decision failure details', async () => {
+    const response = efficientRoutingUnavailableResponse({
+      reason: 'worker_http_error',
+      blockedFallbackModelIds: ['moonshotai/kimi-k3', 'qwen/qwen3.7-plus'],
+      workerStatus: 503,
+    });
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({
+      error: 'Auto Efficient routing is temporarily unavailable.',
+      error_type: 'temporarily_unavailable',
+      message:
+        'Auto Efficient could not select a model, and your organization does not allow any configured fallback model. Please retry. If the problem continues, ask your organization administrator to allow a fallback model.',
+      details: {
+        reason: 'worker_http_error',
+        blocked_fallback_model_ids: ['moonshotai/kimi-k3', 'qwen/qwen3.7-plus'],
+        worker_status: 503,
+      },
+    });
+    expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+      expect.stringContaining('[efficientRoutingUnavailableResponse]'),
+      {
+        reason: 'worker_http_error',
+        blocked_fallback_model_ids: ['moonshotai/kimi-k3', 'qwen/qwen3.7-plus'],
+        worker_status: 503,
+      }
+    );
+  });
+});
 
 describe('checkOrganizationModelRestrictions', () => {
   describe('enterprise plan - model deny list restrictions', () => {

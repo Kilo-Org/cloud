@@ -151,6 +151,26 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     }
   );
 
+  it('reports why the static fallback was selected', async () => {
+    const onEfficientFallback = jest.fn();
+
+    await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => null,
+        onEfficientFallback,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(onEfficientFallback).toHaveBeenCalledWith({
+      reason: 'worker_returned_no_decision',
+      modelId: BALANCED_FALLBACK_MODEL.model,
+    });
+  });
+
   it('falls back to BALANCED_FALLBACK_MODEL when the worker returns a virtual auto model', async () => {
     const result = await resolveAutoModel(
       {

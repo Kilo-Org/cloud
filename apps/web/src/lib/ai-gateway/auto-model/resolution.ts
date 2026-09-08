@@ -43,6 +43,12 @@ import {
 import { getModelVariants } from '@/lib/ai-gateway/providers/model-settings';
 import type { OpenCodeVariant } from '@kilocode/db/schema-types';
 
+export type EfficientFallbackReason =
+  | 'decision_unavailable'
+  | 'worker_returned_no_decision'
+  | 'virtual_model_decision'
+  | 'catalog_variant_unavailable';
+
 type ResolveAutoModelParams = {
   model: string;
   modeHeader: string | null;
@@ -51,6 +57,7 @@ type ResolveAutoModelParams = {
   apiKind: GatewayRequest['kind'] | null;
   clientIp: string | null;
   isAutoFreeCandidateAllowed: ((modelId: string) => Promise<boolean>) | null;
+  onEfficientFallback?: (fallback: { reason: EfficientFallbackReason; modelId: string }) => void;
   // Lazily fetches the auto-routing worker's decision (route.ts owns the request-body capture).
   efficientDecision?: () => Promise<AutoRoutingDecision | null>;
   organizationContext?: Promise<{
@@ -328,8 +335,20 @@ export async function resolveAutoModel(
       }
       // Exact catalog variant missing or removed: never serve the chosen model
       // with implicit defaults — same balanced fallback as the no-decision path.
+      params.onEfficientFallback?.({
+        reason: 'catalog_variant_unavailable',
+        modelId: BALANCED_FALLBACK_MODEL.model,
+      });
       return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
     }
+    params.onEfficientFallback?.({
+      reason: decision
+        ? 'virtual_model_decision'
+        : params.efficientDecision
+          ? 'worker_returned_no_decision'
+          : 'decision_unavailable',
+      modelId: BALANCED_FALLBACK_MODEL.model,
+    });
     // Static fallback when the worker is slow or unavailable.
     return { kind: 'ok', resolved: BALANCED_FALLBACK_MODEL };
   }

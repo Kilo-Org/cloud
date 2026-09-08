@@ -1193,7 +1193,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     await Promise.resolve();
 
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
-      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
+      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' }),
+      expect.objectContaining({ onFailure: expect.any(Function) })
     );
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
     const [, ctx] = mockedLogMicrodollarUsage.mock.calls[0];
@@ -1345,7 +1346,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         deniedModelIds: ['openai/gpt-4o'],
-      })
+      }),
+      expect.objectContaining({ onFailure: expect.any(Function) })
     );
   });
 
@@ -1385,7 +1387,8 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
       expect.objectContaining({
         deniedModelIds: ['google/gemini-2.5-flash'],
-      })
+      }),
+      expect.objectContaining({ onFailure: expect.any(Function) })
     );
   });
 
@@ -1405,6 +1408,54 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedLogMicrodollarUsage).toHaveBeenCalledTimes(1);
     const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
     expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
+  });
+
+  it('reports decision failure details when organization fallbacks are blocked', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: false,
+      denialSource: 'group_model',
+    });
+    mockedFetchEfficientAutoDecision.mockImplementation(async (_params, options) => {
+      options?.onFailure?.({ reason: 'worker_http_error', workerStatus: 502 });
+      return null;
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (params, request) => {
+      await params.efficientDecision?.();
+      params.onEfficientFallback?.({
+        reason: 'worker_returned_no_decision',
+        modelId: 'moonshotai/kimi-k3',
+      });
+      request.body.model = 'moonshotai/kimi-k3';
+      return { kind: 'ok', resolved: { model: 'moonshotai/kimi-k3' } };
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({
+      error_type: 'temporarily_unavailable',
+      details: {
+        reason: 'worker_http_error',
+        blocked_fallback_model_ids: ['moonshotai/kimi-k3'],
+        worker_status: 502,
+      },
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
   it('guides teams that block every pool model to configure a custom Efficient pool', async () => {
@@ -1511,7 +1562,8 @@ describe('auto-routing shadow classifier', () => {
     expect(response.status).toBe(200);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
     expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
-      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
+      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' }),
+      expect.objectContaining({ onFailure: expect.any(Function) })
     );
     expect(mockedAfter).not.toHaveBeenCalled();
   });

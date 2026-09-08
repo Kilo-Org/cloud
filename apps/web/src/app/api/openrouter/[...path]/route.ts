@@ -47,6 +47,7 @@ import {
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
   efficientPoolBlockedResponse,
+  efficientRoutingUnavailableResponse,
   extractHeaderAndLimitLength,
   noFreeModelsAvailableResponse,
   organizationAutoConfigurationResponse,
@@ -99,8 +100,14 @@ import {
   KILO_AUTO_EFFICIENT_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
-import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
-import { fetchEfficientAutoDecision } from '@/lib/ai-gateway/auto-routing-decision';
+import {
+  applyResolvedAutoModel,
+  type EfficientFallbackReason,
+} from '@/lib/ai-gateway/auto-model/resolution';
+import {
+  fetchEfficientAutoDecision,
+  type EfficientDecisionFailure,
+} from '@/lib/ai-gateway/auto-routing-decision';
 import { collectDeniedAutoRoutingModelIds } from '@/lib/ai-gateway/auto-routing-denied-models';
 import type {
   MicrodollarUsageContext,
@@ -323,6 +330,10 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // validation after resolution.
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
+  const efficientDecisionState: {
+    failure: EfficientDecisionFailure | null;
+    fallback: { reason: EfficientFallbackReason; modelId: string } | null;
+  } = { failure: null, fallback: null };
   // Efficient/balanced requests resolve through the auto-routing pool. Kept for
   // the org policy check below so a team that blocks every pool model gets
   // guidance to configure a custom Efficient model pool instead of the generic
@@ -357,21 +368,24 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
               })
             : [];
           const deniedModelIds = [...new Set([...deniedFromSettings, ...deniedFromPolicy])];
-          const result = await fetchEfficientAutoDecision({
-            apiKind: requestBodyParsed.kind,
-            body: requestBodyParsed.body,
-            requestedModel,
-            providerHints: autoRoutingProviderHints,
-            bodyBytes: Buffer.byteLength(requestBodyText),
-            userId: user.id,
-            organizationId: organizationId ?? null,
-            sessionId: taskId ?? sessionHeader,
-            machineId: machineIdHeader,
-            clientRequestId,
-            mode: modeHeader,
-            userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
-            deniedModelIds,
-          });
+          const result = await fetchEfficientAutoDecision(
+            {
+              apiKind: requestBodyParsed.kind,
+              body: requestBodyParsed.body,
+              requestedModel,
+              providerHints: autoRoutingProviderHints,
+              bodyBytes: Buffer.byteLength(requestBodyText),
+              userId: user.id,
+              organizationId: organizationId ?? null,
+              sessionId: taskId ?? sessionHeader,
+              machineId: machineIdHeader,
+              clientRequestId,
+              mode: modeHeader,
+              userAgent: extractHeaderAndLimitLength(request, 'user-agent'),
+              deniedModelIds,
+            },
+            { onFailure: failure => (efficientDecisionState.failure = failure) }
+          );
           classifierCostUsd = result?.costUsd ?? 0;
           return result?.decision ?? null;
         }
@@ -386,6 +400,7 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         clientIp: ipAddress ?? null,
         efficientDecision,
         organizationContext: organizationContextPromise,
+        onEfficientFallback: fallback => (efficientDecisionState.fallback = fallback),
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;
           return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
@@ -864,14 +879,35 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     // Organization model/provider restrictions check
     // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
+    const efficientFallbackBlockedResponse = () => {
+      const fallback = efficientDecisionState.fallback;
+      if (!isAutoEfficientRequest || !fallback) return null;
+
+      const decisionFailure = efficientDecisionState.failure;
+      return efficientRoutingUnavailableResponse({
+        reason: decisionFailure?.reason ?? fallback.reason,
+        blockedFallbackModelIds: [fallback.modelId],
+        ...(decisionFailure?.workerStatus === undefined
+          ? {}
+          : { workerStatus: decisionFailure.workerStatus }),
+      });
+    };
     if (modelRestrictionError) {
-      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError;
+      return (
+        efficientFallbackBlockedResponse() ??
+        (isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError)
+      );
     }
 
     if (!groupModelAllowed) {
-      return isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      return (
+        efficientFallbackBlockedResponse() ??
+        (isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse())
+      );
     }
-    if (!groupProvidersAllowed) return modelNotAllowedResponse();
+    if (!groupProvidersAllowed) {
+      return efficientFallbackBlockedResponse() ?? modelNotAllowedResponse();
+    }
 
     // Experiment traffic captures prompts to R2 for partner evaluation, which
     // is a form of data collection that the gateway-pinned `data_collection`

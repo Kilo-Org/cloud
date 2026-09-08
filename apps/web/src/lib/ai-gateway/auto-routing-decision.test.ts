@@ -118,60 +118,85 @@ describe('fetchEfficientAutoDecision', () => {
 
   it('returns null and calls onError on a non-OK response', async () => {
     const onError = jest.fn();
+    const onFailure = jest.fn();
     mockedFetch.mockResolvedValueOnce(new Response('Internal Server Error', { status: 500 }));
 
-    const result = await fetchEfficientAutoDecision(makeParams(), { ...options, onError });
+    const result = await fetchEfficientAutoDecision(makeParams(), {
+      ...options,
+      onError,
+      onFailure,
+    });
 
     expect(result).toBeNull();
     expect(onError).toHaveBeenCalledWith('Efficient auto decision request failed', {
       error: 'status 500',
     });
+    expect(onFailure).toHaveBeenCalledWith({ reason: 'worker_http_error', workerStatus: 500 });
   });
 
   it('returns null and calls onError when fetch rejects (timeout/abort)', async () => {
     const onError = jest.fn();
-    mockedFetch.mockRejectedValueOnce(new Error('The operation was aborted'));
+    const onFailure = jest.fn();
+    const timeout = new Error('The operation was aborted');
+    timeout.name = 'TimeoutError';
+    mockedFetch.mockRejectedValueOnce(timeout);
 
-    const result = await fetchEfficientAutoDecision(makeParams(), { ...options, onError });
+    const result = await fetchEfficientAutoDecision(makeParams(), {
+      ...options,
+      onError,
+      onFailure,
+    });
 
     expect(result).toBeNull();
     expect(onError).toHaveBeenCalledWith('Efficient auto decision request failed', {
       error: 'The operation was aborted',
     });
+    expect(onFailure).toHaveBeenCalledWith({ reason: 'worker_timeout' });
   });
 
   it('returns null and calls onError on a schema-invalid response body', async () => {
     const onError = jest.fn();
+    const onFailure = jest.fn();
     mockedFetch.mockResolvedValueOnce(
       new Response(JSON.stringify({ unexpected: 'shape' }), { status: 200 })
     );
 
-    const result = await fetchEfficientAutoDecision(makeParams(), { ...options, onError });
+    const result = await fetchEfficientAutoDecision(makeParams(), {
+      ...options,
+      onError,
+      onFailure,
+    });
 
     expect(result).toBeNull();
     expect(onError).toHaveBeenCalledWith('Efficient auto decision response invalid', {
       error: 'invalid_response',
     });
+    expect(onFailure).toHaveBeenCalledWith({ reason: 'worker_response_invalid' });
   });
 
   it('returns null when normalization fails (unclassifiable body)', async () => {
+    const onFailure = jest.fn();
     const result = await fetchEfficientAutoDecision(
       { ...makeParams(), body: { stream: true } },
-      options
+      { ...options, onFailure }
     );
 
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(result).toBeNull();
+    expect(onFailure).toHaveBeenCalledWith({ reason: 'request_normalization_failed' });
   });
 
   it('returns null when workerUrl is not configured', async () => {
+    const onFailure = jest.fn();
     const result = await fetchEfficientAutoDecision(makeParams(), {
       ...options,
       workerUrl: '',
+      onFailure,
     });
 
     expect(mockedFetch).not.toHaveBeenCalled();
     expect(result).toBeNull();
+    expect(onFailure).toHaveBeenCalledWith({ reason: 'worker_not_configured' });
   });
 
   it('returns null when authToken is not configured', async () => {

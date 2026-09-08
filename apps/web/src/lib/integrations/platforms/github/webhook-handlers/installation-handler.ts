@@ -5,7 +5,7 @@ import {
 } from '@/lib/integrations/db/github-installations';
 import { db } from '@/lib/drizzle';
 import { platform_integrations } from '@kilocode/db/schema';
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, eq, isNull, or } from 'drizzle-orm';
 import {
   autoCompleteInstallation,
   deleteGitHubInstallationRecords,
@@ -48,6 +48,13 @@ export async function handleInstallationCreated(
 
   // Build installation data using helper function
   const installationData = buildInstallationData(installation);
+  const appTypeCondition =
+    appType === 'standard'
+      ? or(
+          eq(platform_integrations.github_app_type, 'standard'),
+          isNull(platform_integrations.github_app_type)
+        )
+      : eq(platform_integrations.github_app_type, 'lite');
 
   logExceptInTest('GitHub App installation created:', {
     installation_id: installationData.installation_id,
@@ -73,7 +80,7 @@ export async function handleInstallationCreated(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.github_app_type, appType),
+        appTypeCondition,
         eq(platform_integrations.platform_installation_id, installationData.installation_id),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
         isNull(platform_integrations.github_installation_id),
@@ -93,7 +100,7 @@ export async function handleInstallationCreated(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
-        eq(platform_integrations.github_app_type, appType),
+        appTypeCondition,
         eq(platform_integrations.platform_account_id, installationData.account_id),
         eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
         isNull(platform_integrations.platform_installation_id)
@@ -107,7 +114,7 @@ export async function handleInstallationCreated(
       .where(
         and(
           eq(platform_integrations.platform, PLATFORM.GITHUB),
-          eq(platform_integrations.github_app_type, appType),
+          appTypeCondition,
           eq(platform_integrations.platform_requester_account_id, requesterId),
           eq(platform_integrations.integration_status, INTEGRATION_STATUS.PENDING),
           isNull(platform_integrations.platform_installation_id),

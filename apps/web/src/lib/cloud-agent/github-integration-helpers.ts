@@ -280,6 +280,10 @@ export async function fetchGitHubRepositoriesForUser(
   }
 
   if (!isPlatformIntegrationHealthy(integration)) {
+    if (integration.github_disconnected_at) {
+      return missingIntegrationResponse('GitHub integration is disconnected');
+    }
+
     if (isPlatformIntegrationSuspended(integration)) {
       return missingIntegrationResponse('GitHub integration is suspended');
     }

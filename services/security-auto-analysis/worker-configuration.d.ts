@@ -45,6 +45,7 @@ declare type GitTokenService = {
     githubRepo: string;
     userId: string;
     orgId?: string;
+    expectedIntegrationId?: string;
   }): Promise<GitTokenForRepoResult>;
   getToken(
     installationId: string,

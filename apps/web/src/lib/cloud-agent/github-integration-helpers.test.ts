@@ -139,7 +139,11 @@ describe('github-integration-helpers', () => {
 
     it('does not return cached repositories for a locally disconnected integration', async () => {
       mockGetIntegrationForOwner.mockResolvedValue(
-        buildIntegration({ github_disconnected_at: '2026-09-04T00:00:00.000Z' })
+        buildIntegration({
+          github_disconnected_at: '2026-09-04T00:00:00.000Z',
+          integration_status: 'suspended',
+          suspended_at: '2026-09-04T00:00:00.000Z',
+        })
       );
 
       const { fetchGitHubRepositoriesForUser } = await import('./github-integration-helpers');

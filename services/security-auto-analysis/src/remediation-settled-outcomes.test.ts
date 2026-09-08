@@ -327,7 +327,12 @@ function extractEqPredicates(node: unknown): Array<{ column: string; value: stri
   return out;
 }
 
-function callbackDb(params: { attempts: unknown[]; ledgerRows?: unknown[]; userRows?: unknown[] }) {
+function callbackDb(params: {
+  attempts: unknown[];
+  ledgerRows?: unknown[];
+  userRows?: unknown[];
+  findingRows?: unknown[];
+}) {
   const rowsFor = (table: unknown) =>
     table === security_remediation_attempts
       ? params.attempts
@@ -335,7 +340,9 @@ function callbackDb(params: { attempts: unknown[]; ledgerRows?: unknown[]; userR
         ? (params.ledgerRows ?? [])
         : table === kilocode_users
           ? (params.userRows ?? [])
-          : [];
+          : table === security_findings
+            ? (params.findingRows ?? [])
+            : [];
   const select = vi.fn(() => ({
     from: vi.fn((table: unknown) => ({
       where: vi.fn(() => ({
@@ -440,6 +447,7 @@ describe('security remediation callback settle wiring', () => {
         attempts: [await callbackAttempt()],
         ledgerRows: [{ id: 'ledger-row-1' }],
         userRows: [{ email: 'owner@example.com' }],
+        findingRows: [{ platformIntegrationId: 'integration-a' }],
       })
     );
 
@@ -470,6 +478,9 @@ describe('security remediation callback settle wiring', () => {
     });
 
     expect(result).toEqual({ status: 'pr_opened-finalized' });
+    expect(getTokenForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedIntegrationId: 'integration-a' })
+    );
     expect(settleOperation).toHaveBeenCalledWith(expect.anything(), settleCallMatcher('completed'));
   });
 

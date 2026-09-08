@@ -48,7 +48,11 @@ import {
   selectGitHubConnectionInstallation,
 } from '@/lib/integrations/github/connection-service';
 import { createGitHubConnectionOAuthState } from '@/lib/integrations/github/connection-state';
-import { disconnectGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  bindGitHubIntegrationToCanonicalInstallation,
+  disconnectGitHubInstallation,
+  observeGitHubInstallationLifecycle,
+} from '@/lib/integrations/db/github-installations';
 
 export const githubAppsRouter = createTRPCRouter({
   disconnectConnection: baseProcedure
@@ -600,6 +604,22 @@ export const githubAppsRouter = createTRPCRouter({
 
       const repositories = await fetchGitHubRepositories(installationId, appType);
       await updateRepositoriesForIntegration(integration.id, repositories);
+      await observeGitHubInstallationLifecycle({
+        installationId,
+        appType,
+        state: 'active',
+        accountId: installationDetails.account.id.toString(),
+        accountLogin: installationDetails.account.login,
+        accountType: installationDetails.account.type === 'Organization' ? 'Organization' : 'User',
+        permissions: installationDetails.permissions,
+        scopes: installationDetails.events,
+        repositoryAccess: installationDetails.repository_selection,
+      });
+      await bindGitHubIntegrationToCanonicalInstallation({
+        integrationId: integration.id,
+        installationId,
+        appType,
+      });
 
       if (input?.organizationId) {
         await createAuditLog({

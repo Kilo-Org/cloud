@@ -1449,10 +1449,17 @@ async function getGitHubTokenForAttempt(params: {
 }): Promise<string | null> {
   const actor = await actorForAttempt(params);
   if (!actor) return null;
+  const [finding] = await params.db
+    .select({ platformIntegrationId: security_findings.platform_integration_id })
+    .from(security_findings)
+    .where(eq(security_findings.id, params.attempt.finding_id))
+    .limit(1);
+  if (!finding?.platformIntegrationId) return null;
   const result = await params.env.GIT_TOKEN_SERVICE.getTokenForRepo({
     githubRepo: params.attempt.repo_full_name,
     userId: actor.id,
     orgId: params.owner.type === 'org' ? params.owner.id : undefined,
+    expectedIntegrationId: finding.platformIntegrationId,
   });
   return result.success ? result.token : null;
 }

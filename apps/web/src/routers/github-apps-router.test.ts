@@ -11,7 +11,7 @@ type TestIntegration = {
   id: string;
   platform_installation_id: string;
   platform_account_login: string;
-  github_app_type: GitHubAppType;
+  github_app_type: GitHubAppType | null;
 };
 
 type InstallationDetails = {
@@ -60,6 +60,8 @@ const mockCreateInstallState =
       returnTo: string | null;
     }) => Promise<string>
   >();
+const mockObserveGitHubInstallationLifecycle = jest.fn();
+const mockBindGitHubIntegrationToCanonicalInstallation = jest.fn();
 
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
@@ -94,6 +96,13 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     mockUpsertPlatformIntegrationForOwner(owner, details),
   updateRepositoriesForIntegration: (integrationId: string, repositories: unknown[]) =>
     mockUpdateRepositoriesForIntegration(integrationId, repositories),
+}));
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  disconnectGitHubInstallation: jest.fn(),
+  bindGitHubIntegrationToCanonicalInstallation: (input: unknown) =>
+    mockBindGitHubIntegrationToCanonicalInstallation(input),
+  observeGitHubInstallationLifecycle: (input: unknown) =>
+    mockObserveGitHubInstallationLifecycle(input),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -398,6 +407,14 @@ describe('githubAppsRouter.refreshInstallation', () => {
       { type: 'user', id: 'user-1' },
       expect.objectContaining({ platformAccountLogin: 'renamed-owner' })
     );
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
+      expect.objectContaining({ installationId: '98765', state: 'active' })
+    );
+    expect(mockBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith({
+      integrationId: 'integration-1',
+      installationId: '98765',
+      appType: 'standard',
+    });
   });
 
   it('does not clear stored identity when GitHub returns no current account login', async () => {
@@ -417,6 +434,22 @@ describe('githubAppsRouter.refreshInstallation', () => {
     expect(mockUpsertPlatformIntegrationForOwner).not.toHaveBeenCalled();
     expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
     expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+  });
+
+  it('canonically binds an unbound legacy Standard row during refresh', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue({
+      id: 'integration-1',
+      platform_installation_id: '98765',
+      platform_account_login: 'old-owner',
+      github_app_type: null,
+    });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    await caller.refreshInstallation();
+    expect(mockBindGitHubIntegrationToCanonicalInstallation).toHaveBeenCalledWith({
+      integrationId: 'integration-1',
+      installationId: '98765',
+      appType: 'standard',
+    });
   });
 });
 

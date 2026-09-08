@@ -10,6 +10,7 @@ import {
   SANDBOX_CONTROL_REQUEST_TIMEOUT_MS,
   sessionSyncResultSchema,
   type SessionEventPayload,
+  type SessionRequestIdentity,
   type SessionGitSummaryResult,
 } from '../../../src/shared/sandbox-control-protocol';
 import { createWrapperKiloClient, type WrapperKiloClient, type WrapperPty } from '../kilo-api';
@@ -84,6 +85,7 @@ function completion(error?: Completion['info']['error']): Completion {
 function fakeKilo(overrides: Partial<WrapperKiloClient> = {}): WrapperKiloClient {
   return {
     getSession: async id => ({ id }),
+    getSessionDetails: async (id, directory) => ({ id, directory }),
     ensureSession: async () => undefined,
     sendPrompt: async () => completion(),
     sendPromptAsync: async () => {},
@@ -463,6 +465,16 @@ describe('handleControlRequest', () => {
     expect(result).toEqual({ ok: true, result: { attached: true } });
   });
 
+  it('attaches while Kilo is not ready', async () => {
+    const result = await handleControlRequest(
+      'session.attach',
+      session,
+      { kilo },
+      deps({ kiloReady: false })
+    );
+    expect(result).toEqual({ ok: true, result: { attached: true } });
+  });
+
   it('registers terminal eligibility only after successful session attachment', async () => {
     const attached: unknown[] = [];
     const terminalRuntime = fakeTerminalRuntime({
@@ -679,7 +691,7 @@ describe('handleControlRequest', () => {
     expect(answered).toEqual([{ permissionId: 'perm_1', response: 'once' }]);
   });
 
-  it('fences new work during feed recovery while preserving pending input replies and Stop', async () => {
+  it('fences prompts during feed recovery while allowing attachments and pending input replies', async () => {
     const kiloClient = fakeKilo({
       getPermissions: async () => [
         {
@@ -707,6 +719,10 @@ describe('handleControlRequest', () => {
         retryable: true,
         admission: 'not-admitted',
       },
+    });
+    expect(await handleControlRequest('session.attach', session, { kilo }, handlerDeps)).toEqual({
+      ok: true,
+      result: { attached: true },
     });
     expect(
       await handleControlRequest(
@@ -1769,7 +1785,7 @@ describe('production worktree deletion routes', () => {
     );
     const aborted: string[] = [];
     const outcomes: Array<{ id: string; event: SessionEventPayload }> = [];
-    const lookups: string[] = [];
+    const lookups: Array<string | SessionRequestIdentity> = [];
     const handlerDeps = deps(
       {
         kiloClient: fakeKilo({
@@ -1811,7 +1827,7 @@ describe('production worktree deletion routes', () => {
     };
     runtimes.get = identity => {
       const worktree = typeof identity === 'string' ? identity : identity.directory;
-      lookups.push(worktree);
+      lookups.push(identity);
       return worktree === directory
         ? selected
         : worktree === siblingDirectory
@@ -1903,7 +1919,10 @@ describe('production worktree deletion routes', () => {
             item.event.properties.status === 'cancelled'
         )
       ).toBe(true);
-      expect(lookups).toEqual([]);
+      expect(lookups.length).toBeGreaterThan(0);
+      expect(
+        lookups.every(value => typeof value !== 'string' && value.directory === directory)
+      ).toBe(true);
       expect(http.requests.every(request => request.directory === directory)).toBe(true);
       expect(http.requests).toContainEqual({
         method: 'POST',
@@ -3424,11 +3443,6 @@ describe('control cancellation and attachments', () => {
     expect(signals).toHaveLength(2);
     expect(signals.every(signal => signal.aborted)).toBe(true);
     expect(terminalStopped).toBe(true);
-    expect(
-      await handleControlRequest('session.attach', session, { kilo }, handlerDeps)
-    ).toMatchObject({
-      ok: false,
-    });
     running.resolve(completion());
   });
 
@@ -4397,6 +4411,7 @@ describe('control wrapper heartbeat source policy', () => {
     expect(source).toContain(
       "onDisconnected: () => shutdown(1, 'Sandbox control connection lost', 'control_disconnected')"
     );
+    expect(source).toContain('shutdown(1, failure.reason, heartbeatReasonFrom(failure.reason))');
     expect(source).toContain(
       'if (!payload.kilo.ready && heartbeatReason) payload.kilo.reason = heartbeatReason;'
     );

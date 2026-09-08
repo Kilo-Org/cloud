@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { canonicalControlEventJson } from '../../../src/shared/control-event-canonical.js';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
@@ -13,7 +12,6 @@ const RETRY_DELAY_MS = 250;
 export type ControlEventPublication = {
   event: 'session.event' | 'session.preparing';
   receiptId: string;
-  receiptHash: string;
   sequence: number;
   session: SessionEventIdentity;
   payload: unknown;
@@ -31,7 +29,7 @@ export type ControlEventOutboxFailure = {
 
 export type ControlEventOutbox = {
   prepare(
-    input: Omit<ControlEventPublication, 'receiptId' | 'receiptHash' | 'sequence'>
+    input: Omit<ControlEventPublication, 'receiptId' | 'sequence'>
   ): PreparedControlEventPublication;
   enqueue(publication: PreparedControlEventPublication): boolean;
   waitForSpace(publication: PreparedControlEventPublication): Promise<boolean>;
@@ -104,21 +102,18 @@ export function createControlEventOutbox(options: {
   };
 
   const prepare = (
-    input: Omit<ControlEventPublication, 'receiptId' | 'receiptHash' | 'sequence'>
+    input: Omit<ControlEventPublication, 'receiptId' | 'sequence'>
   ): PreparedControlEventPublication => {
     const snapshot = JSON.parse(
       canonicalControlEventJson({
         ...input,
         session: sessionEventIdentitySchema.parse(input.session),
       })
-    ) as Omit<ControlEventPublication, 'receiptId' | 'receiptHash' | 'sequence'>;
+    ) as Omit<ControlEventPublication, 'receiptId' | 'sequence'>;
     const sequence = nextSequence + 1;
     const receiptId = crypto.randomUUID();
-    const receiptHash = createHash('sha256')
-      .update(canonicalControlEventJson({ ...snapshot, sequence }))
-      .digest('hex');
     nextSequence = sequence;
-    const publication = { ...snapshot, sequence, receiptId, receiptHash };
+    const publication = { ...snapshot, sequence, receiptId };
     const bytes = Buffer.byteLength(
       JSON.stringify({
         type: 'request',
@@ -184,7 +179,6 @@ export function createControlEventOutbox(options: {
             {
               event: entry.event,
               receiptId: entry.receiptId,
-              receiptHash: entry.receiptHash,
               sequence: entry.sequence,
               session: entry.session,
               payload: entry.payload,

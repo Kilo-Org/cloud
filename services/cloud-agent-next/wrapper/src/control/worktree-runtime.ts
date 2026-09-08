@@ -32,6 +32,7 @@ export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
 type RuntimeIsolation = 'directory-shared' | 'per-session';
 
 type WorktreeKiloFailure = {
+  identity: SessionRequestIdentity;
   retirementId: string;
   directory: string;
   reason: KiloEventFeedError['reason'] | 'process_exited' | 'credential_refresh_failed';
@@ -89,7 +90,7 @@ export type WorktreeKiloRuntimes = {
     target: NativeOperationTarget,
     deadlineAt: number
   ): Promise<boolean>;
-  getRetained?(directory: string): WorktreeKiloRuntime | undefined;
+  getRetained?(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
   get(identity: SessionRequestIdentity | string): WorktreeKiloRuntime | undefined;
   getAll?(directory: string): WorktreeKiloRuntime[];
   isCurrent?(runtime: WorktreeKiloRuntime): boolean;
@@ -426,6 +427,7 @@ export function createWorktreeKiloRuntimes(options: {
     void retire(entry, deadlineAt).then(result => {
       if (result === 'unconfirmed') failedDirectories.add(entry.directory);
       options.onUnexpectedClose({
+        identity: entry.identity,
         retirementId: crypto.randomUUID(),
         directory: entry.directory,
         reason,
@@ -941,16 +943,19 @@ export function createWorktreeKiloRuntimes(options: {
       homesByDirectory.delete(directory);
     },
     async retireRuntime(directory, deadlineAt, target) {
-      const entry =
-        entries.get(directory) ??
-        [...entries.values()].find(entry => entry.directory === directory);
+      const entry = target
+        ? [...entries.values()].find(
+            entry => entry.directory === directory && entry.runtimeId === target.runtimeId
+          )
+        : (entries.get(directory) ??
+          [...entries.values()].find(entry => entry.directory === directory));
       if (!entry) return 'stale';
       return retire(entry, deadlineAt, target);
     },
     async verifyQuiescence(directory, target, deadlineAt) {
-      const entry =
-        entries.get(directory) ??
-        [...entries.values()].find(entry => entry.directory === directory);
+      const entry = [...entries.values()].find(
+        entry => entry.directory === directory && entry.runtimeId === target.runtimeId
+      );
       if (
         !entry ||
         entry.runtimeId !== target.runtimeId ||
@@ -968,8 +973,11 @@ export function createWorktreeKiloRuntimes(options: {
         !entry.abort.signal.aborted
       );
     },
-    getRetained(directory) {
-      return entries.get(directory)?.runtime;
+    getRetained(directory, runtimeId) {
+      if (runtimeId === undefined) return entries.get(directory)?.runtime;
+      return [...entries.values()].find(
+        entry => entry.directory === directory && entry.runtimeId === runtimeId
+      )?.runtime;
     },
     get(identity) {
       const entry =

@@ -188,7 +188,10 @@ function createKiloStub(
         return Response.json(completion);
       }
       if (request.method === 'GET' && url.pathname.startsWith('/session/')) {
-        return Response.json({ id: decodeURIComponent(url.pathname.slice('/session/'.length)) });
+        return Response.json({
+          id: decodeURIComponent(url.pathname.slice('/session/'.length)),
+          directory: url.searchParams.get('directory'),
+        });
       }
       if (request.method === 'POST' && url.pathname === '/pty') {
         return Response.json({
@@ -1627,6 +1630,7 @@ describe('worktree Kilo runtime registry', () => {
     expect(failures).toEqual([
       expect.objectContaining({
         directory: runtime.directory,
+        identity: runtime.identity,
         reason: 'process_exited',
         cleanup: 'confirmed',
         runtimeId: runtime.runtimeId,
@@ -2495,6 +2499,68 @@ setInterval(() => {}, 1000);
     expect(sibling.signal.aborted).toBe(true);
     expect(registry.getRetained?.(sharedDirectory)).toBeUndefined();
     expect(registry.getRetained?.(isolatedDirectory)).toBe(isolatedRuntime);
+  });
+
+  it('aborts the second isolated runtime through handler dependencies without stopping its sibling', async () => {
+    const registry = createWorktreeKiloRuntimes({
+      homeRoot: path.join(tmpDir, 'homes'),
+      inheritedEnv: inherited,
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          spawn: () => {
+            throw new Error('Unexpected process spawn');
+          },
+          run: operation => operation(),
+          seal: () => {},
+          dispose: () => true,
+          observesOccupancy: () => true,
+          captureBaseline: async () => {},
+          stop: async () => true,
+          verify: async () => true,
+        });
+        return { url: server.url, close: () => {} };
+      },
+      onUnexpectedClose: () => {},
+    });
+    registries.push(registry);
+    const directory = path.join(tmpDir, 'shared');
+    const firstIdentity = rootIdentity(directory, 'first');
+    const secondIdentity = rootIdentity(directory, 'second');
+    const first = registry.attach(firstIdentity, auth, {}, undefined, 'per-session');
+    const firstRuntime = await first.ready;
+    first.commit();
+    const second = registry.attach(secondIdentity, auth, {}, undefined, 'per-session');
+    const secondRuntime = await second.ready;
+    second.commit();
+    const target = { runtimeId: secondRuntime.runtimeId, client: secondRuntime.kiloClient };
+
+    expect(registry.getRetained?.(directory, secondRuntime.runtimeId)).toBe(secondRuntime);
+    expect(await registry.verifyQuiescence?.(directory, target, Date.now() + 1_000)).toBe(true);
+    const handlerDeps = createHandlerDeps(registry);
+    expect(
+      await handleControlRequest(
+        'session.abort',
+        secondIdentity,
+        { nativeRuntimeId: secondRuntime.runtimeId, cleanupDeadlineAt: Date.now() + 1_000 },
+        handlerDeps
+      )
+    ).toMatchObject({
+      ok: true,
+      result: {
+        status: 'aborted',
+        quiescent: true,
+        runtimeRetired: true,
+        nativeRuntimeId: secondRuntime.runtimeId,
+      },
+    });
+    expect(second.signal.aborted).toBe(true);
+    expect(first.signal.aborted).toBe(false);
+    expect(registry.get(firstIdentity)).toBe(firstRuntime);
+    expect(registry.getRetained?.(directory, secondRuntime.runtimeId)).toBeUndefined();
+    expect(await registry.retireRuntime?.(directory, Date.now() + 1_000, target)).toBe('stale');
+    expect(first.signal.aborted).toBe(false);
   });
 
   it('retains failed native cleanup ownership without affecting another runtime', async () => {

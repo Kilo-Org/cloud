@@ -63,10 +63,12 @@ type SessionMessageLifecycle = {
   attachFailures?: number;
   promptFailures?: number;
   preparationAttemptId?: string;
+  retryNotBefore?: number;
   executionDeadlineAt?: number;
   cancellation?: { operationId: string; deadlineAt: number };
   operations?: {
     attach?: SessionOperationProof;
+    retiredAttach?: SessionOperationProof;
     prompt?: SessionOperationProof;
   };
 };
@@ -279,6 +281,63 @@ export function failWaitingMessages(
   };
 }
 
+/**
+ * Release queued messages bound to a dying wrapper that never reached a
+ * committed attach or prompt. These are safe to retry on a replacement
+ * runtime. Messages with a completed attach proof, a prompt operation,
+ * or exhausted attach failures remain bound so `failWaitingMessages`
+ * can fail them as today.
+ */
+export function releaseUnadmittedWaitingMessages(
+  messages: readonly SessionMessageRecord[],
+  wrapperInstanceId: string
+): { messages: SessionMessageRecord[]; releasedIds: string[] } {
+  const releasedIds: string[] = [];
+  return {
+    messages: messages.map(message => {
+      if (message.state !== 'queued' || message.wrapperInstanceId !== wrapperInstanceId) {
+        return message;
+      }
+      if (message.unresolvedDispatch) return message;
+      if (message.operations?.prompt) return message;
+      if (message.operations?.attach?.completedAt !== undefined) return message;
+      if ((message.attachFailures ?? 0) >= ATTACH_FAILURE_LIMIT) return message;
+
+      releasedIds.push(message.messageId);
+      return {
+        ...message,
+        wrapperInstanceId: undefined,
+        preparationAttemptId: undefined,
+        retryNotBefore: undefined,
+        deliveryDeadlineAt: undefined,
+        operations: undefined,
+      };
+    }),
+    releasedIds,
+  };
+}
+
+export function releaseCompletedRetryableAttach(
+  messages: readonly SessionMessageRecord[],
+  messageId: string,
+  retryNotBefore: number
+): SessionMessageRecord[] {
+  return messages.map(message => {
+    const attach = message.messageId === messageId ? message.operations?.attach : undefined;
+    if (!attach?.dispatched || attach.result?.ok !== false) return message;
+    const operations = { ...message.operations };
+    operations.retiredAttach = attach;
+    delete operations.attach;
+    return {
+      ...message,
+      unresolvedDispatch: undefined,
+      preparationAttemptId: undefined,
+      retryNotBefore,
+      ...(Object.keys(operations).length > 0 ? { operations } : { operations: undefined }),
+    };
+  });
+}
+
 export function incrementDeliveryFailure(
   messages: readonly SessionMessageRecord[],
   messageId: string,
@@ -352,6 +411,37 @@ export function failQueuedMessage(
   );
 }
 
+export function cancelPendingMessage(
+  messages: readonly SessionMessageRecord[],
+  messageId: string
+): { dropped: boolean; messages?: SessionMessageRecord[] } {
+  const target = messages.find(message => message.messageId === messageId);
+  if (!target) return { dropped: false };
+  if (target.state === 'cancelled' && target.failedReason === 'queued_message_cancelled') {
+    return { dropped: true };
+  }
+  if (
+    target.state !== 'queued' ||
+    target.acceptedAt !== undefined ||
+    target.unresolvedDispatch ||
+    target.preparationAttemptId !== undefined ||
+    target.deliveryDeadlineAt !== undefined ||
+    target.wrapperInstanceId !== undefined ||
+    target.operations !== undefined ||
+    target.cancellation !== undefined
+  ) {
+    return { dropped: false };
+  }
+  return {
+    dropped: true,
+    messages: messages.map(message =>
+      message.messageId === messageId
+        ? { ...message, state: 'cancelled', failedReason: 'queued_message_cancelled' }
+        : message
+    ),
+  };
+}
+
 export function acceptQueuedMessage(
   messages: readonly SessionMessageRecord[],
   messageId: string,
@@ -401,7 +491,11 @@ export function failedMessageSnapshot(
     delivery: accepted ? 'sent' : 'queued',
     accepted,
     reason: cancelled ? 'interrupted' : message.failedReason,
-    ...(cancelled ? { error: 'The message was interrupted' } : {}),
+    ...(cancelled
+      ? { error: 'The message was interrupted' }
+      : message.failedReason
+        ? { error: message.failedReason }
+        : {}),
     timestamp: message.acceptedAt ?? now,
   };
 }
@@ -452,8 +546,19 @@ export function applySessionOperationResult(
   const authorization = delivery.authorization;
   const message = messages.find(item => item.messageId === authorization.messageId);
   const kind = authorization.operation === 'session.attach' ? 'attach' : 'prompt';
-  const proof = message?.operations?.[kind];
-  const storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  let proof = message?.operations?.[kind];
+  let proofSlot: 'attach' | 'retiredAttach' | 'prompt' = kind;
+  let storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  if (
+    kind === 'attach' &&
+    (!proof?.dispatched ||
+      !storedAuthorization.success ||
+      !sameSessionOperation(storedAuthorization.data, authorization))
+  ) {
+    proof = message?.operations?.retiredAttach;
+    proofSlot = 'retiredAttach';
+    storedAuthorization = sessionOperationAuthorizationSchema.safeParse(proof?.authorization);
+  }
   if (
     !message ||
     !proof?.dispatched ||
@@ -508,7 +613,7 @@ export function applySessionOperationResult(
             ...item,
             operations: {
               ...item.operations,
-              [kind]: {
+              [proofSlot]: {
                 ...proof,
                 result: delivery.result,
                 resultHash,

@@ -739,7 +739,7 @@ export function createSandboxControlClient(
     publication: {
       event: 'session.event' | 'session.preparing';
       receiptId: string;
-      receiptHash: string;
+      sequence: number;
       session: SessionEventIdentity;
       payload: unknown;
     },

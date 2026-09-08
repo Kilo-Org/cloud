@@ -1,3 +1,4 @@
+import type { KiloAuthVariables } from '@kilocode/worker-utils/kilo-auth-middleware';
 import type { Context } from 'hono';
 import { createMiddleware } from 'hono/factory';
 import { extractBearerToken } from '@kilocode/worker-utils';
@@ -8,7 +9,7 @@ import type { GastownEnv } from '../gastown.worker';
 
 export type JwtOrgMembership = NonNullable<KiloTokenPayload['orgMemberships']>[number];
 
-export type AuthVariables = {
+export type AuthVariables = KiloAuthVariables & {
   agentJWT: AgentJWTPayload;
   townId: string;
   kiloUserId: string;

@@ -5434,6 +5434,34 @@ export const modelsByProvider = pgTable('models_by_provider', {
   vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
 });
 
+export const ai_gateway_config = pgTable(
+  'ai_gateway_config',
+  {
+    id: integer().primaryKey().default(1),
+    config: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+  },
+  table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
+);
+
+export const ai_gateway_sync_providers_state = pgTable(
+  'ai_gateway_sync_providers_state',
+  {
+    id: integer().primaryKey().default(1),
+    last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [check('ai_gateway_sync_providers_state_singleton', sql`${table.id} = 1`)]
+);
+
+export const ai_gateway_request_logging_opt_ins = pgTable(
+  'ai_gateway_request_logging_opt_ins',
+  {
+    id: integer().primaryKey().default(1),
+    opt_ins: jsonb().$type<unknown[]>().notNull().default([]),
+  },
+  table => [check('ai_gateway_request_logging_opt_ins_singleton', sql`${table.id} = 1`)]
+);
+
 export const direct_byok_model_lists = pgTable('direct_byok_model_lists', {
   provider_id: text().primaryKey(),
   models: jsonb().$type<DirectByokModel[]>().notNull(),

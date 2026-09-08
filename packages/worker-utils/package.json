@@ -16,6 +16,7 @@
     "./runtime-authorization": "./src/runtime-authorization.ts",
     "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
+    "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",

@@ -1,3 +1,4 @@
+import { setTimeout as delay } from 'node:timers/promises';
 import {
   SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS,
   type SessionRequestIdentity,
@@ -6,6 +7,7 @@ import type { WrapperKiloClient } from '../kilo-api.js';
 import { withTimeoutAndAbort } from '../utils.js';
 import { withKiloRequestDeadline } from './sandbox-control-runtime.js';
 import type { OwnedProcessScope } from './owned-processes.js';
+import { directoriesForRoot, rootAttachmentId, rootForSession } from './session-directories.js';
 
 export type NativeOperationTarget = Readonly<{
   runtimeId: string;
@@ -31,7 +33,8 @@ export class SessionOperationCleanup {
       target: NativeOperationTarget,
       deadlineAt: number
     ) => Promise<boolean>,
-    private readonly onConfirmed: () => void
+    private readonly onConfirmed: () => void,
+    private readonly isCurrent: (target: NativeOperationTarget) => boolean
   ) {}
 
   get cleanupDeadline(): number | undefined {
@@ -83,20 +86,9 @@ export class SessionOperationCleanup {
         const retired = await input.preClientCleanup?.(deadlineAt);
         return retired === 'retired' || retired === 'stale';
       }
+      if (!this.isCurrent(target) || Date.now() >= deadlineAt) return false;
       if (!(await this.abortNative(target, deadlineAt))) return false;
-      const statuses = await withTimeoutAndAbort(
-        withKiloRequestDeadline(signal =>
-          client.getSessionStatuses(this.session.directory, signal)
-        ),
-        {
-          timeoutMs: Math.max(1, deadlineAt - Date.now()),
-          timeoutMessage: 'Kilo cleanup status probe timed out',
-          abortMessage: 'Kilo cleanup status probe cancelled',
-        }
-      );
-      const observed = Object.values(statuses);
-      if (observed.length === 0 || !observed.every(value => value.type === 'idle')) return false;
-      return this.verifyQuiescence(target, deadlineAt);
+      return this.observeQuiescence(target, client, deadlineAt);
     })()
       .catch(() => false)
       .then(confirmed => this.confirm(confirmed, deadlineAt));
@@ -110,6 +102,53 @@ export class SessionOperationCleanup {
     this.state = quiescent ? 'confirmed' : 'unconfirmed';
     if (quiescent) this.onConfirmed();
     return quiescent;
+  }
+
+  private async observeQuiescence(
+    target: NativeOperationTarget,
+    client: WrapperKiloClient,
+    deadlineAt: number
+  ): Promise<boolean> {
+    const { kiloSessionId, directory } = this.session;
+    const attachment = rootAttachmentId(kiloSessionId);
+    const current = () =>
+      attachment !== undefined &&
+      rootAttachmentId(kiloSessionId) === attachment &&
+      rootForSession(kiloSessionId, directory) === kiloSessionId &&
+      directoriesForRoot(kiloSessionId, directory).every(value => value === directory) &&
+      this.isCurrent(target) &&
+      Date.now() < Math.min(deadlineAt, this.deadlineAt ?? Infinity);
+    if (!current()) return false;
+    const controller = new AbortController();
+    try {
+      return await withTimeoutAndAbort(
+        withKiloRequestDeadline(async signal => {
+          const session = await client.getSessionDetails(kiloSessionId, directory, signal);
+          if (session.id !== kiloSessionId || session.directory !== directory) return false;
+          while (current()) {
+            const statuses = await client.getSessionStatuses(directory, signal);
+            if (!current()) return false;
+            let idle = true;
+            for (const [id, status] of Object.entries(statuses)) {
+              if (status.type === 'idle') continue;
+              const root = rootForSession(id, directory);
+              if (!root) return false;
+              if (root === kiloSessionId) idle = false;
+            }
+            if (idle) return (await this.verifyQuiescence(target, deadlineAt)) && current();
+            await delay(Math.min(25, Math.max(1, deadlineAt - Date.now())), undefined, { signal });
+          }
+          return false;
+        }, controller.signal),
+        {
+          timeoutMs: Math.max(1, deadlineAt - Date.now()),
+          timeoutMessage: 'Kilo cleanup status probe timed out',
+          abortMessage: 'Kilo cleanup status probe cancelled',
+        }
+      );
+    } finally {
+      controller.abort();
+    }
   }
 
   private abortNative(target: NativeOperationTarget, deadlineAt: number): Promise<boolean> {

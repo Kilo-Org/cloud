@@ -81,6 +81,16 @@ describe('SessionRow mounted layout', () => {
     expect(text.props.maxFontSizeMultiplier).toBeUndefined();
     expect(text.children).toEqual([meta]);
 
+    // The eyebrow label yields before the timestamp: flex-1 basis 0 sizes
+    // the right cluster at its full natural width first, so a long agent
+    // label truncates instead of ellipsizing the relative time (SPOT-DEFECT:
+    // rows clipped "1 HOUR AGO" to "1 HOUR A...").
+    const label = textNode(root, content.agentLabel);
+    expect(label.props.numberOfLines).toBe(1);
+    expect((label.props.className as string).split(' ')).toEqual(
+      expect.arrayContaining(['min-w-0', 'flex-1'])
+    );
+
     if (live) {
       const cluster = root.findByProps({ kind: 'running' }).parent;
       expect((cluster?.props.className as string | undefined)?.split(' ')).toEqual(
@@ -88,8 +98,14 @@ describe('SessionRow mounted layout', () => {
       );
     }
     if (icon) {
-      const cluster = root.findByProps({ testID: 'platform-icon' }).parent;
-      expect((cluster?.props.className as string | undefined)?.split(' ')).toContain('shrink');
+      if (live) {
+        // The live status glyph owns the eyebrow cluster; the platform mark
+        // is suppressed rather than drawn beside it.
+        expect(root.findAllByProps({ testID: 'platform-icon' })).toHaveLength(0);
+      } else {
+        const cluster = root.findByProps({ testID: 'platform-icon' }).parent;
+        expect((cluster?.props.className as string | undefined)?.split(' ')).toContain('shrink');
+      }
     }
   });
 
@@ -123,7 +139,7 @@ describe('SessionRow mounted layout', () => {
       visibleMeta: true,
       needsInput: false,
       kind: 'running',
-      icon: true,
+      icon: false,
     },
     {
       name: 'live without metadata opt-in',
@@ -131,7 +147,7 @@ describe('SessionRow mounted layout', () => {
       visibleMeta: false,
       needsInput: false,
       kind: 'running',
-      icon: true,
+      icon: false,
     },
     {
       name: 'live without metadata',

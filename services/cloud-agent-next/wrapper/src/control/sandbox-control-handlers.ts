@@ -330,7 +330,8 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
     operations: createOperationRegistry({
       native: {
         get: identity => input.kiloRuntimes?.get(identity),
-        getRetained: directory => input.kiloRuntimes?.getRetained?.(directory),
+        getRetained: (directory, runtimeId) =>
+          input.kiloRuntimes?.getRetained?.(directory, runtimeId),
         prepareForNewWork: directory => input.kiloRuntimes?.prepareForNewWork?.(directory) ?? true,
         retireRuntime: (directory, deadlineAt, target) =>
           input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
@@ -506,15 +507,14 @@ export async function handleControlRequest(
   const admission = deps.operations.admission(operation, session, payload, authorization);
   if (admission.kind === 'reply') return admission.result;
   if (
-    (operation === 'session.attach' ||
-      operation === 'session.prompt' ||
-      operation === 'session.terminal.create') &&
+    (operation === 'session.prompt' || operation === 'session.terminal.create') &&
     deps.kiloRuntimes?.prepareForNewWork?.(session.directory) === false
   ) {
     return rejectBeforeAdmission('not_ready', 'Native feed recovery is in progress', true);
   }
   if (
-    (deps.signal?.aborted || (!deps.kiloReady && operation !== 'session.git.summary')) &&
+    (deps.signal?.aborted ||
+      (!deps.kiloReady && operation !== 'session.attach' && operation !== 'session.git.summary')) &&
     operation !== 'session.abort' &&
     operation !== 'session.detach'
   ) {
@@ -972,7 +972,10 @@ async function handleAbort(
   const parsed = sessionAbortPayloadSchema.safeParse(payload ?? {});
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
   if (parsed.data.nativeRuntimeId) {
-    const runtime = deps.kiloRuntimes?.getRetained?.(session.directory);
+    const runtime = deps.kiloRuntimes?.getRetained?.(
+      session.directory,
+      parsed.data.nativeRuntimeId
+    );
     if (!runtime || runtime.runtimeId !== parsed.data.nativeRuntimeId) {
       return ok({
         status: 'aborted',

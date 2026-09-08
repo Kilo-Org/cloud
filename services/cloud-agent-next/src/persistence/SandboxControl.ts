@@ -410,17 +410,10 @@ export class SandboxControl extends DurableObject<Env> {
       onHandshakeComplete: (identity, runtime) => this.onHandshakeComplete(identity, runtime),
       onReady: identity => this.onWrapperReady(identity),
       onHeartbeat: (payload, identity) => this.onHeartbeat(payload, identity),
-      onSessionEvent: (sessionIdentity, payload, identity, receiptId, receiptHash, sequence) =>
-        this.onSessionEvent(sessionIdentity, payload, identity, receiptId, receiptHash, sequence),
-      onSessionPreparing: (sessionIdentity, payload, identity, receiptId, receiptHash, sequence) =>
-        this.onSessionPreparing(
-          sessionIdentity,
-          payload,
-          identity,
-          receiptId,
-          receiptHash,
-          sequence
-        ),
+      onSessionEvent: (sessionIdentity, payload, identity, receiptId, sequence) =>
+        this.onSessionEvent(sessionIdentity, payload, identity, receiptId, sequence),
+      onSessionPreparing: (sessionIdentity, payload, identity, receiptId, sequence) =>
+        this.onSessionPreparing(sessionIdentity, payload, identity, receiptId, sequence),
       onOperationResult: (session, delivery, identity) =>
         this.onOperationResult(session, delivery, identity),
       onNativeRuntimeRetired: (payload, identity) => this.onNativeRuntimeRetired(payload, identity),
@@ -1129,6 +1122,19 @@ export class SandboxControl extends DurableObject<Env> {
       !matchesRoute(route) ||
       !socket
     ) {
+      const guard =
+        physical.state !== 'running'
+          ? 'physical_not_running'
+          : physical.stopTombstone
+            ? 'physical_stopping'
+            : !runtime
+              ? 'runtime_not_ready'
+              : physical.providerRef !== runtime.providerInstanceId
+                ? 'provider_mismatch'
+                : !matchesRoute(route)
+                  ? 'route_mismatch'
+                  : 'socket_not_ready';
+      logControlDiagnostic('worktree_changes_not_ready', { guard }, 'warn');
       return errorResponse(crypto.randomUUID(), 'not_ready', 'Worktree is not attached and ready');
     }
     if (
@@ -1657,6 +1663,7 @@ export class SandboxControl extends DurableObject<Env> {
         if (acquisition) assertAcquisitionDeadline(acquisition);
         this.logDiagnostic('allocation_launch', {
           allocationId: intent.intentId,
+          physicalSandboxId: intent.allocationName,
           phase,
           result: 'started',
         });
@@ -1674,6 +1681,7 @@ export class SandboxControl extends DurableObject<Env> {
         );
         this.logDiagnostic('allocation_launch', {
           allocationId: intent.intentId,
+          physicalSandboxId: intent.allocationName,
           phase,
           result: 'providerRef' in created ? 'completed' : 'unresolved',
           durationMs: Date.now() - startedAt,
@@ -1700,6 +1708,7 @@ export class SandboxControl extends DurableObject<Env> {
           startedAt = Date.now();
           this.logDiagnostic('allocation_launch', {
             allocationId: intent.intentId,
+            physicalSandboxId: intent.allocationName,
             phase,
             result: 'started',
           });
@@ -1713,6 +1722,7 @@ export class SandboxControl extends DurableObject<Env> {
           );
           this.logDiagnostic('allocation_launch', {
             allocationId: intent.intentId,
+            physicalSandboxId: intent.allocationName,
             phase,
             result: 'completed',
             durationMs: Date.now() - startedAt,
@@ -1726,6 +1736,7 @@ export class SandboxControl extends DurableObject<Env> {
             phase,
             durationMs: Date.now() - startedAt,
             allocationId: physical.createIntent?.intentId,
+            physicalSandboxId: physical.createIntent?.allocationName,
           },
           'warn'
         );
@@ -3608,7 +3619,6 @@ export class SandboxControl extends DurableObject<Env> {
     payload: SessionEventPayload,
     connection: SandboxControlConnectionIdentity,
     receiptId?: string,
-    receiptHash?: string,
     sequence?: number
   ): Promise<SandboxControlEventResult> {
     const diagnostic = {
@@ -3627,7 +3637,7 @@ export class SandboxControl extends DurableObject<Env> {
       identity,
       payload.type,
       connection,
-      { identity, payload, ...(receiptId ? { receiptId, receiptHash, sequence } : {}) },
+      { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
       (route, fields, physical) =>
         this.forwardSessionFrame(
           route,
@@ -3640,7 +3650,7 @@ export class SandboxControl extends DurableObject<Env> {
               identity,
               payload,
               wrapperInstanceId: connection.wrapperInstanceId,
-              ...(receiptId ? { receiptId, receiptHash, sequence } : {}),
+              ...(receiptId ? { receiptId, sequence } : {}),
             }),
           receiptId !== undefined
         )
@@ -3657,7 +3667,6 @@ export class SandboxControl extends DurableObject<Env> {
     payload: SessionPreparingPayload,
     connection: SandboxControlConnectionIdentity,
     receiptId?: string,
-    receiptHash?: string,
     sequence?: number
   ): Promise<SandboxControlEventResult> {
     const diagnostic = {
@@ -3676,7 +3685,7 @@ export class SandboxControl extends DurableObject<Env> {
       identity,
       'session.preparing',
       connection,
-      { identity, payload, ...(receiptId ? { receiptId, receiptHash, sequence } : {}) },
+      { identity, payload, ...(receiptId ? { receiptId, sequence } : {}) },
       (route, fields, physical) =>
         this.forwardSessionFrame(
           route,
@@ -3689,7 +3698,7 @@ export class SandboxControl extends DurableObject<Env> {
               identity,
               payload,
               wrapperInstanceId: connection.wrapperInstanceId,
-              ...(receiptId ? { receiptId, receiptHash, sequence } : {}),
+              ...(receiptId ? { receiptId, sequence } : {}),
             }),
           receiptId !== undefined
         )
@@ -4280,6 +4289,7 @@ export class SandboxControl extends DurableObject<Env> {
     const stale = !sameAllocation(current, physical) || current.state === 'stopped';
     this.logDiagnostic('provider_observation', {
       allocationId: physical.createIntent?.intentId,
+      physicalSandboxId: physical.createIntent?.allocationName,
       physicalState: physical.state,
       observation: result.status,
       result: timedOut ? 'timed_out' : failed ? 'failed' : 'completed',
@@ -4562,6 +4572,7 @@ export class SandboxControl extends DurableObject<Env> {
       to.stopTombstone !== null || (to.state !== 'creating' && to.state !== 'running');
     this.logDiagnostic('physical_committed', {
       allocationId: to.createIntent?.intentId ?? from.createIntent?.intentId,
+      physicalSandboxId: to.createIntent?.allocationName ?? from.createIntent?.allocationName,
       wrapperInstanceId,
       fromState: from.state,
       toState: to.state,

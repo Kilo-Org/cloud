@@ -20,7 +20,7 @@ import {
 type OperationRegistryDependencies = {
   native: {
     get(identity: SessionRequestIdentity): ReturnType<WorktreeKiloRuntimes['get']>;
-    getRetained(directory: string): WorktreeKiloRuntime | undefined;
+    getRetained(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
     prepareForNewWork?(directory: string): boolean;
     retireRuntime(
       directory: string,
@@ -73,9 +73,15 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
       if (operation.releaseProcessOwnership()) retained.delete(id);
       else {
         const deadlineAt = operation.captureCleanupDeadline();
-        void operation.cleanupOwnedWork(deadlineAt).then(confirmed => {
-          if (!confirmed) operation.requestRetirement('Owned process cleanup failed', deadlineAt);
-        });
+        void operation
+          .cleanupOwnedWork(deadlineAt)
+          .catch(() => false)
+          .then(confirmed => {
+            if (retained.get(id) !== operation) return;
+            const released = operation.releaseProcessOwnership();
+            if (!confirmed || !released) operation.reportUnreapedProcessCleanup(!released);
+            retained.delete(id);
+          });
       }
     }
   }

@@ -9,12 +9,15 @@ vi.mock('@/lib/hooks/use-language-preference', () => ({
 describe('getKiloPassSubscriptionCardAccessibility', () => {
   it('describes the subscribe action', () => {
     expect(
-      getKiloPassSubscriptionCardAccessibility({
-        action: 'open-native',
-        actionLabel: 'Subscribe',
-        description: 'Monthly credits with bonus progress',
-        title: 'Kilo Pass',
-      })
+      getKiloPassSubscriptionCardAccessibility(
+        {
+          action: 'open-native',
+          actionLabel: 'Subscribe',
+          description: 'Monthly credits with bonus progress',
+          title: 'Kilo Pass',
+        },
+        'ios'
+      )
     ).toEqual({
       accessibilityHint: 'Opens Kilo Pass plans.',
       accessibilityLabel: 'Kilo Pass. Monthly credits with bonus progress. Subscribe',
@@ -23,26 +26,49 @@ describe('getKiloPassSubscriptionCardAccessibility', () => {
 
   it('describes App Store management', () => {
     expect(
-      getKiloPassSubscriptionCardAccessibility({
-        action: 'open-store-management',
-        actionLabel: 'Manage',
-        description: '$19 monthly credits · Managed in App Store',
-        title: 'Kilo Pass active',
-      })
+      getKiloPassSubscriptionCardAccessibility(
+        {
+          action: 'open-store-management',
+          actionLabel: 'Manage',
+          description: '$19 monthly credits · Managed in App Store',
+          title: 'Kilo Pass active',
+        },
+        'ios'
+      )
     ).toEqual({
       accessibilityHint: 'Opens App Store subscription management.',
       accessibilityLabel: 'Kilo Pass active. $19 monthly credits · Managed in App Store. Manage',
     });
   });
 
+  it('describes Google Play management on Android', () => {
+    expect(
+      getKiloPassSubscriptionCardAccessibility(
+        {
+          action: 'open-store-management',
+          actionLabel: 'Manage',
+          description: '$19 monthly credits · Managed on Google Play',
+          title: 'Kilo Pass active',
+        },
+        'android'
+      )
+    ).toEqual({
+      accessibilityHint: 'Opens Google Play subscription management.',
+      accessibilityLabel: 'Kilo Pass active. $19 monthly credits · Managed on Google Play. Manage',
+    });
+  });
+
   it('describes web management', () => {
     expect(
-      getKiloPassSubscriptionCardAccessibility({
-        action: 'open-web',
-        actionLabel: 'Manage',
-        description: '$49 monthly credits · Managed on web',
-        title: 'Kilo Pass active',
-      })
+      getKiloPassSubscriptionCardAccessibility(
+        {
+          action: 'open-web',
+          actionLabel: 'Manage',
+          description: '$49 monthly credits · Managed on web',
+          title: 'Kilo Pass active',
+        },
+        'ios'
+      )
     ).toEqual({
       accessibilityHint: 'Opens Kilo Pass management on web.',
       accessibilityLabel: 'Kilo Pass active. $49 monthly credits · Managed on web. Manage',
@@ -51,12 +77,15 @@ describe('getKiloPassSubscriptionCardAccessibility', () => {
 
   it('omits the hint for inert cards', () => {
     expect(
-      getKiloPassSubscriptionCardAccessibility({
-        action: 'none',
-        actionLabel: null,
-        description: '$49 monthly credits · Managed on Google Play',
-        title: 'Kilo Pass active',
-      })
+      getKiloPassSubscriptionCardAccessibility(
+        {
+          action: 'none',
+          actionLabel: null,
+          description: '$49 monthly credits · Managed on Google Play',
+          title: 'Kilo Pass active',
+        },
+        'ios'
+      )
     ).toEqual({
       accessibilityHint: undefined,
       accessibilityLabel: 'Kilo Pass active. $49 monthly credits · Managed on Google Play',

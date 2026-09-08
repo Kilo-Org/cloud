@@ -21,6 +21,42 @@ const session = {
 const payload = { type: 'session.idle', properties: {} };
 
 describe('native-scoped control event failures', () => {
+  it.each([
+    ['session.preparing', false],
+    ['session.event', true],
+  ] as const)(
+    'retires the runtime after an expired %s only when required',
+    async (event, retires) => {
+      const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+      const runtime = { runtimeId: crypto.randomUUID() };
+      const retired = mock();
+      const handleFailure = createControlEventFailureHandler({
+        getRuntime: () => runtime,
+        onFailure: retired,
+      });
+      const reported = mock((failure: ControlEventOutboxFailure) => handleFailure(failure));
+      const transport = createControlEventTransport({
+        supportsReceipts: () => true,
+        prepare: input => input,
+        publish: async () => {},
+        sendLegacy: () => false,
+        onFailure: reported,
+      });
+      try {
+        expect(
+          transport.enqueue(event, payload, { ...session, nativeRuntimeId: runtime.runtimeId })
+        ).toBe(true);
+        clock.mockReturnValue(31_000);
+        expect(await transport.resume()).toBe(true);
+        expect(reported).toHaveBeenCalledTimes(1);
+        expect(retired).toHaveBeenCalledTimes(retires ? 1 : 0);
+      } finally {
+        transport.close();
+        clock.mockRestore();
+      }
+    }
+  );
+
   it.each(['expired', 'rejected'] as const)(
     'reports an immutable N1 %s publication without retiring or blocking N2',
     async reason => {
@@ -58,7 +94,12 @@ describe('native-scoped control event failures', () => {
         expect(failures).toHaveLength(1);
         expect(failures[0]).toMatchObject({
           reason,
-          publication: { sequence: 1, session: { ...session, nativeRuntimeId: originalNativeId } },
+          publication: {
+            event: 'session.event',
+            receiptId: expect.any(String),
+            sequence: 1,
+            session: { ...session, nativeRuntimeId: originalNativeId },
+          },
         });
         expect(retired).not.toHaveBeenCalled();
         expect(published.at(-1)?.session.nativeRuntimeId).toBe(replacement.runtimeId);
@@ -236,6 +277,32 @@ describe('native-scoped control event failures', () => {
       acknowledgement.resolve(await acknowledgeOperation(sealed));
       await operation.waitForDelivery();
     }
+  });
+
+  it('selects the failed native runtime among isolated roots in the same directory', () => {
+    const first = { runtimeId: 'native_first' };
+    const second = { runtimeId: 'native_second' };
+    const retired = mock();
+    const getRuntime = mock((directory: string, nativeRuntimeId: string) =>
+      directory === session.directory
+        ? [first, second].find(runtime => runtime.runtimeId === nativeRuntimeId)
+        : undefined
+    );
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure: retired });
+    const failure: ControlEventOutboxFailure = {
+      reason: 'expired',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_second',
+        sequence: 1,
+        session: { ...session, nativeRuntimeId: second.runtimeId },
+        payload,
+      },
+    };
+    handleFailure(failure);
+    expect(getRuntime).toHaveBeenCalledWith(session.directory, second.runtimeId);
+    expect(retired).toHaveBeenCalledWith(failure, second);
+    expect(retired).toHaveBeenCalledTimes(1);
   });
 
   it('reports failures without native identity without guessing the current runtime', async () => {

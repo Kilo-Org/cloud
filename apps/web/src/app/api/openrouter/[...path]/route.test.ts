@@ -13,7 +13,7 @@ import { classifyAbuse } from '@/lib/ai-gateway/abuse-service';
 import { getProvider } from '@/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@/lib/ai-gateway/providers/upstream-request';
 import {
-  getOpenRouterModelsFromRedis,
+  getOpenRouterModelsFromDatabase,
   isValidOpenRouterModelId,
 } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { emitApiMetricsForResponse } from '@/lib/ai-gateway/o11y/api-metrics.server';
@@ -138,7 +138,7 @@ const mockedGetBalanceAndOrgSettings = jest.mocked(getBalanceAndOrgSettings);
 const mockedClassifyAbuse = jest.mocked(classifyAbuse);
 const mockedGetProvider = jest.mocked(getProvider);
 const mockedUpstreamRequest = jest.mocked(upstreamRequest);
-const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromRedis);
+const mockedGetOpenRouterModels = jest.mocked(getOpenRouterModelsFromDatabase);
 const mockedIsValidOpenRouterModelId = jest.mocked(isValidOpenRouterModelId);
 const mockedEmitApiMetricsForResponse = jest.mocked(emitApiMetricsForResponse);
 const mockedAccountForMicrodollarUsage = jest.mocked(accountForMicrodollarUsage);
@@ -784,9 +784,11 @@ describe('POST /api/openrouter/v1/chat/completions rules-engine actions', () => 
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it.each(['tencent/hy3:free', 'meituan/longcat-2.0-free'])(
-    'rejects the removed free model %s before upstream',
+  it.each(['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'])(
+    'rejects the unavailable free model %s before upstream',
     async modelId => {
+      mockedCheckFreeModelRateLimit.mockResolvedValue({ allowed: true, requestCount: 0 });
+
       const { POST } = await import('./route');
       const response = await POST(makeRequest(makeBody(modelId)) as never);
 

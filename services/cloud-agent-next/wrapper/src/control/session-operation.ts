@@ -1,6 +1,8 @@
 import { isDeepStrictEqual } from 'node:util';
 import {
+  diagnosticDetail,
   emitControlDiagnostic,
+  OWNED_PROCESS_CLEANUP_UNREAPED,
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
 import {
@@ -196,7 +198,16 @@ export class SessionOperation {
       this.session,
       this.processes,
       deps.verifyQuiescence,
-      () => deps.onCleanupConfirmed()
+      () => deps.onCleanupConfirmed(),
+      target => {
+        const runtime = deps.getRuntime();
+        return (
+          runtime?.runtimeId === target.runtimeId &&
+          runtime.kiloClient === target.client &&
+          runtime.directory === this.session.directory &&
+          !runtime.signal.aborted
+        );
+      }
     );
     this.diagnostic('started');
     this.timeout = setTimeout(
@@ -325,6 +336,23 @@ export class SessionOperation {
     this.deps.retireRuntime(reason, this.captureCleanupDeadline(deadlineAt), this.nativeTarget());
   }
 
+  reportUnreapedProcessCleanup(populated: boolean): void {
+    const detail = diagnosticDetail(
+      `owned_process_unreaped populated=${populated ? '1' : '0'} ${this.session.directory}`
+    );
+    emitControlDiagnostic(this.deps.onDiagnostic, 'session.task', {
+      sessionId: this.session.sessionId,
+      kiloSessionId: this.session.kiloSessionId,
+      messageId: this.messageId,
+      kind: this.work.operation === 'session.attach' ? 'preparation' : 'execution',
+      stage: 'process_cleanup',
+      phase: 'failed',
+      ok: false,
+      ...(detail ? { detail } : {}),
+    });
+    console.error(OWNED_PROCESS_CLEANUP_UNREAPED);
+  }
+
   confirmCleanup(confirmed: boolean, deadlineAt: number): boolean {
     return this.cleanupOwner.confirm(confirmed, deadlineAt);
   }
@@ -403,8 +431,6 @@ export class SessionOperation {
     work: Extract<SessionOperationWork, { operation: 'session.attach' }>
   ): Promise<ControlHandlerResult> {
     this.assertCurrent();
-    if (this.deps.prepareForNewWork?.() === false)
-      return fail('Native feed recovery is in progress', true);
     const result = await work.apply(this.session, work.payload, {
       signal: this.signal,
       assertCurrent: () => this.assertCurrent(),

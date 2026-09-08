@@ -1,5 +1,7 @@
 import * as z from 'zod';
+import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
 import { createCachedFetch } from '@/lib/cached-fetch';
+import { db } from '@/lib/drizzle';
 import { redisClient } from '@/lib/redis';
 import { REQUEST_LOGGING_OPT_INS_REDIS_KEY } from '@/lib/redis-keys';
 
@@ -80,6 +82,17 @@ const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
   []
 );
 
+async function mirrorRequestLoggingOptInsToDatabase(): Promise<void> {
+  const optIns = await getRequestLoggingOptIns();
+  await db
+    .insert(ai_gateway_request_logging_opt_ins)
+    .values({ opt_ins: optIns })
+    .onConflictDoUpdate({
+      target: ai_gateway_request_logging_opt_ins.id,
+      set: { opt_ins: optIns },
+    });
+}
+
 export async function createRequestLoggingOptIn(
   entry: RequestLoggingOptIn
 ): Promise<'created' | 'duplicate' | 'full'> {
@@ -89,7 +102,10 @@ export async function createRequestLoggingOptIn(
     [REQUEST_LOGGING_OPT_INS_REDIS_KEY],
     [JSON.stringify(validated)]
   );
-  if (result === 1) return 'created';
+  if (result === 1) {
+    await mirrorRequestLoggingOptInsToDatabase();
+    return 'created';
+  }
   if (result === 0) return 'duplicate';
   return 'full';
 }
@@ -100,7 +116,9 @@ export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
     [REQUEST_LOGGING_OPT_INS_REDIS_KEY],
     [id]
   );
-  return result === 1;
+  if (result !== 1) return false;
+  await mirrorRequestLoggingOptInsToDatabase();
+  return true;
 }
 
 export async function isDynamicallyOptedIntoRequestLogging(params: {

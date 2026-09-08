@@ -93,7 +93,6 @@ export type SandboxControlSocketHooks = {
     payload: SessionEventPayload,
     identity: SandboxControlConnectionIdentity,
     receiptId?: string,
-    receiptHash?: string,
     sequence?: number
   ): void | SandboxControlEventResult | Promise<void | SandboxControlEventResult | undefined>;
   onSessionPreparing?(
@@ -101,7 +100,6 @@ export type SandboxControlSocketHooks = {
     payload: SessionPreparingPayload,
     identity: SandboxControlConnectionIdentity,
     receiptId?: string,
-    receiptHash?: string,
     sequence?: number
   ): void | SandboxControlEventResult | Promise<void | SandboxControlEventResult | undefined>;
   onOperationResult?(
@@ -723,7 +721,6 @@ export function createSandboxControlSocketHandler(
                   publication.data.payload,
                   identity,
                   publication.data.receiptId,
-                  publication.data.receiptHash,
                   publication.data.sequence
                 )
               : await hooks.onSessionPreparing?.(
@@ -731,7 +728,6 @@ export function createSandboxControlSocketHandler(
                   publication.data.payload,
                   identity,
                   publication.data.receiptId,
-                  publication.data.receiptHash,
                   publication.data.sequence
                 );
           if (!isCurrentConnection(state, ws, identity)) return;

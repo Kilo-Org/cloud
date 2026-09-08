@@ -5,8 +5,6 @@
  * collisions when adding new features.
  */
 
-import type { DirectUserByokInferenceProviderId } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
-
 declare const redisKeyBrand: unique symbol;
 
 export type RedisKey = string & {
@@ -26,21 +24,6 @@ export const SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY = redisKey(
 export const SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY = redisKey(
   'ai-gateway:sync-providers:stale-alert-last-posted-at'
 );
-
-export const GATEWAY_METADATA_REDIS_KEYS = {
-  allProviders: redisKey('ai-gateway.metadata:all-providers'),
-  // Lightweight lists of language model ids used for existence checks without
-  // loading every model's metadata and endpoints.
-  openrouterModelIds: redisKey('ai-gateway.metadata:openrouter-model-ids'),
-  vercelModelIds: redisKey('ai-gateway.metadata:vercel-model-ids'),
-  openrouterProviders: redisKey('ai-gateway.metadata:openrouter-providers'),
-} as const;
-
-export const vercelInferenceProvidersRedisKey = (modelId: string) =>
-  redisKey(`ai-gateway.metadata:vercel-inference-providers:${modelId}`);
-
-export const directByokModelsRedisKey = (providerId: DirectUserByokInferenceProviderId) =>
-  redisKey(`ai-gateway.metadata.direct-byok-models:${providerId}`);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 

@@ -1,19 +1,32 @@
 import { describe, expect, it } from 'vitest';
 import { Hono, type Context } from 'hono';
 import { SignJWT } from 'jose';
-import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { kiloAuthMiddleware } from './kilo-auth.middleware';
-import type { GastownEnv } from '../gastown.worker';
+import { GASTOWN_AUDIENCE } from './internal-service-token-audiences';
+import { createKiloAuthMiddleware, type KiloAuthVariables } from './kilo-auth-middleware';
 
 const TEST_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
+const resolveSecret = async (binding: { get(): Promise<string> } | string) =>
+  typeof binding === 'string' ? binding : await binding.get();
+
+type TestEnv = {
+  Bindings: { NEXTAUTH_SECRET?: string };
+  Variables: KiloAuthVariables;
+};
+
 function createApp() {
   let downstreamCalls = 0;
-  const app = new Hono<GastownEnv>();
+  const authenticated: KiloAuthVariables[] = [];
+  const app = new Hono<TestEnv>();
+  const kiloAuthMiddleware = createKiloAuthMiddleware<TestEnv>({
+    resolveSecret,
+    audiencePolicy: { audience: GASTOWN_AUDIENCE, mode: 'allow-legacy' },
+  });
   app.use('/api/*', kiloAuthMiddleware);
   app.use('/trpc/*', kiloAuthMiddleware);
-  const handler = (c: Context<GastownEnv>) => {
+  const handler = (c: Context<TestEnv>) => {
     downstreamCalls += 1;
+    authenticated.push(c.var);
     return c.json({
       kiloUserId: c.get('kiloUserId'),
       isAdmin: c.get('kiloIsAdmin'),
@@ -24,7 +37,7 @@ function createApp() {
   };
   app.get('/api/whoami', handler);
   app.get('/trpc/whoami', handler);
-  return { app, downstreamCalls: () => downstreamCalls };
+  return { app, downstreamCalls: () => downstreamCalls, authenticated };
 }
 
 async function signToken(
@@ -42,7 +55,7 @@ async function signToken(
 }
 
 async function request(
-  app: Hono<GastownEnv>,
+  app: Hono<TestEnv>,
   token: string | undefined,
   secret: string | { get(): Promise<string | null> } | null = TEST_SECRET
 ) {
@@ -57,7 +70,7 @@ async function request(
   );
 }
 
-describe('kiloAuthMiddleware', () => {
+describe('createKiloAuthMiddleware', () => {
   it.each([
     ['missing authentication', undefined],
     ['malformed authentication', 'Bearer'],
@@ -76,6 +89,43 @@ describe('kiloAuthMiddleware', () => {
 
     expect(responses.map(response => response.status)).toEqual([401, 401]);
     expect(downstreamCalls()).toBe(0);
+  });
+
+  it('captures verified raw claims and control token for authorization', async () => {
+    const { app, authenticated } = createApp();
+    const token = await signToken({
+      aud: GASTOWN_AUDIENCE,
+      tokenPurpose: 'human-api',
+      credentialExchange: false,
+      apiTokenPepper: 'current-pepper',
+      customRestriction: 'retain-for-authorization',
+      orgMemberships: [{ orgId: 'org-a', role: 'admin' }],
+    });
+    const responses = await request(app, token);
+    expect(responses.map(response => response.status)).toEqual([200, 200]);
+    expect(authenticated).toHaveLength(2);
+    for (const variables of authenticated) {
+      expect(variables.kiloControlToken).toBe(token);
+      expect(variables.kiloUsesModernToken).toBe(true);
+      expect(variables.kiloTokenClaims).toMatchObject({
+        tokenPurpose: 'human-api',
+        customRestriction: 'retain-for-authorization',
+      });
+      expect(variables.kiloOrgMemberships).toEqual([{ orgId: 'org-a', role: 'admin' }]);
+    }
+  });
+
+  it.each([
+    { tokenPurpose: 'human-api', credentialExchange: false },
+    { aud: GASTOWN_AUDIENCE, tokenPurpose: 'human-api' },
+    { aud: GASTOWN_AUDIENCE, tokenPurpose: 'unknown', credentialExchange: false },
+    { aud: GASTOWN_AUDIENCE, tokenPurpose: 'delegated-workload', credentialExchange: true },
+  ])('rejects invalid modern claims before authorization: %j', async claims => {
+    const { app, downstreamCalls, authenticated } = createApp();
+    const responses = await request(app, await signToken(claims));
+    expect(responses.map(response => response.status)).toEqual([401, 401]);
+    expect(downstreamCalls()).toBe(0);
+    expect(authenticated).toEqual([]);
   });
 
   it('accepts legacy tokens without an audience or dates', async () => {

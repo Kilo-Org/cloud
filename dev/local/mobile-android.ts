@@ -177,7 +177,41 @@ function emulatorRecordPath(worktreeRoot: string): string {
   );
 }
 
+// The emulator starts through `sg kvm` on Linux, and a setgid exec clears the
+// process dumpable flag: /proc/<pid>/fd becomes root-owned, so lsof cannot
+// list that process's sockets and every port reads as free — a second
+// emulator then reuses the first one's console port and dies. Probe the
+// socket, not the process: the kernel's socket table is world-readable and
+// lists every listener regardless of who owns it. TCP_LISTEN is state 0A and
+// the local port is the second field of local_address, in hex.
+const procNetTcpPaths = ['/proc/net/tcp', '/proc/net/tcp6'];
+
+function procListeningPorts(paths: string[] = procNetTcpPaths): Set<number> | undefined {
+  const ports = new Set<number>();
+  let readable = false;
+  for (const filePath of paths) {
+    let content: string;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+    readable = true;
+    for (const line of content.split('\n')) {
+      const fields = line.trim().split(/\s+/);
+      if (!/^\d+:$/.test(fields[0] ?? '') || fields[3] !== '0A') continue;
+      const port = Number.parseInt(fields[1].split(':')[1] ?? '', 16);
+      if (Number.isInteger(port)) ports.add(port);
+    }
+  }
+  return readable ? ports : undefined;
+}
+
 function portIsListening(port: number): boolean {
+  if (process.platform === 'linux') {
+    const listeners = procListeningPorts();
+    if (listeners) return listeners.has(port);
+  }
   return (
     spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], { stdio: 'ignore' }).status === 0
   );
@@ -201,6 +235,37 @@ function processOwnsListeningPort(
   listeners: (port: number) => number[] = listeningProcessIds
 ): boolean {
   return listeners(port).includes(pid);
+}
+
+function pidCommand(pid: number): string {
+  return (
+    spawnSync('ps', ['-p', String(pid), '-o', 'command='], {
+      encoding: 'utf8',
+    }).stdout?.trim() ?? ''
+  );
+}
+
+// lsof cannot attribute a listening port to a process whose dumpable flag a
+// setgid exec cleared: the emulator starts through `sg kvm` on Linux, so its
+// /proc/<pid>/fd is root-owned and lsof lists no sockets for it. When nothing
+// on the port is attributable at all, accept the launched pid on identity
+// instead — the port is listening, the pid is alive, and its command line is
+// the exact emulator invocation for this AVD and port, so a foreign emulator
+// (attributable to another pid, or alive under another command line) is still
+// refused. The caller checks portIsListening(port) before asking.
+function launchedProcessOwnsConsolePort(
+  env: AndroidEnvironment,
+  avd: string,
+  port: number,
+  pid: number,
+  listeners: (port: number) => number[] = listeningProcessIds,
+  commandOfPid: (pid: number) => string = pidCommand
+): boolean {
+  const attributed = listeners(port);
+  if (attributed.includes(pid)) return true;
+  if (attributed.length > 0) return false;
+  if (!processIsAlive(pid)) return false;
+  return commandMatchesRecordedEmulator(commandOfPid(pid), env.emulator, avd, port);
 }
 
 function findAvailableEmulatorPort(isListening = portIsListening): number | undefined {
@@ -253,16 +318,50 @@ function commandMatchesRecordedEmulator(
   );
 }
 
-function recordedEmulatorStillOwnsPid(record: EmulatorRecord, env: AndroidEnvironment): boolean {
-  if (!processIsAlive(record.pid)) return false;
-  const command =
-    spawnSync('ps', ['-p', String(record.pid), '-o', 'command='], {
-      encoding: 'utf8',
-    }).stdout?.trim() ?? '';
+type EmulatorProcessDeps = {
+  processCommand: (pid: number) => string;
+  processIsAlive: (pid: number) => boolean;
+};
+
+function recordedEmulatorStillOwnsPid(
+  record: EmulatorRecord,
+  env: AndroidEnvironment,
+  deps?: Partial<EmulatorProcessDeps>
+): boolean {
+  const isAlive = deps?.processIsAlive ?? processIsAlive;
+  const processCommand = deps?.processCommand ?? pidCommand;
+  if (!isAlive(record.pid)) return false;
+  const command = processCommand(record.pid);
   return commandMatchesRecordedEmulator(command, env.emulator, record.avd, record.port);
 }
 
 const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+// A cold boot on the Linux VM binds its console port after 45-48 s, and a
+// loaded host stretches that further, so the default budget must cover a
+// cold boot with headroom. Set KILO_EMULATOR_CONSOLE_PORT_WAIT_MS (in
+// milliseconds) to override it for one launch.
+const DEFAULT_CONSOLE_PORT_WAIT_MS = 120_000;
+const DEFAULT_PID_WAIT_MS = 5_000;
+const DEFAULT_POLL_INTERVAL_MS = 100;
+
+function formatSeconds(ms: number): string {
+  const seconds = ms / 1000;
+  return Number.isInteger(seconds) ? String(seconds) : seconds.toFixed(2);
+}
+
+function requirePositiveMs(value: number, name: string): number {
+  if (!Number.isFinite(value) || value <= 0)
+    throw new Error(`${name} must be a positive number of milliseconds`);
+  return value;
+}
+
+function consolePortWaitMs(override?: number): number {
+  if (override !== undefined) return requirePositiveMs(override, 'portWaitMs');
+  const raw = process.env.KILO_EMULATOR_CONSOLE_PORT_WAIT_MS;
+  if (raw === undefined || raw === '') return DEFAULT_CONSOLE_PORT_WAIT_MS;
+  return requirePositiveMs(Number(raw), 'KILO_EMULATOR_CONSOLE_PORT_WAIT_MS');
+}
 
 function isValidEmulatorRecord(record: unknown, worktreeRoot: string): record is EmulatorRecord {
   if (typeof record !== 'object' || record === null) return false;
@@ -320,24 +419,63 @@ async function stopAndroidEmulator(env: AndroidEnvironment, worktreeRoot: string
   fs.rmSync(recordPath, { force: true });
 }
 
+type StartAndroidEmulatorOptions = {
+  // Milliseconds to wait for the console port to bind. Defaults to
+  // KILO_EMULATOR_CONSOLE_PORT_WAIT_MS, then DEFAULT_CONSOLE_PORT_WAIT_MS.
+  portWaitMs?: number;
+  // Milliseconds to wait for the tmux shell to record the emulator PID.
+  pidWaitMs?: number;
+  pollIntervalMs?: number;
+  // Receives progress lines while the console-port wait runs, so a long cold
+  // boot does not read as a hang. Defaults to stderr.
+  report?: (message: string) => void;
+  // Test seams. Defaults run tmux, lsof, ps, and signals on this host.
+  launchSession?: (session: string, command: string, pidFile: string) => void;
+  sessionExists?: (session: string) => boolean;
+  killSession?: (session: string) => void;
+  portIsListening?: (port: number) => boolean;
+  listeningProcessIds?: (port: number) => number[];
+  processIsAlive?: (pid: number) => boolean;
+  processCommand?: (pid: number) => string;
+  signal?: typeof process.kill;
+  sleep?: (ms: number) => Promise<void>;
+};
+
 async function startAndroidEmulator(
   env: AndroidEnvironment,
   worktreeRoot: string,
   avd: string,
-  gpu: string
+  gpu: string,
+  options: StartAndroidEmulatorOptions = {}
 ): Promise<EmulatorRecord> {
   const session = androidEmulatorSession(worktreeRoot);
+  const sessionExists = options.sessionExists ?? tmuxSessionExists;
+  const killSession = (sessionName: string): void => {
+    if (options.killSession) options.killSession(sessionName);
+    else spawnSync('tmux', ['kill-session', '-t', `=${sessionName}`], { stdio: 'ignore' });
+  };
+  const isPortListening = options.portIsListening ?? portIsListening;
+  const listeningPids = options.listeningProcessIds ?? listeningProcessIds;
+  const isProcessAlive = options.processIsAlive ?? processIsAlive;
+  const processCommand = options.processCommand ?? pidCommand;
+  const sleep = options.sleep ?? delay;
+  const report = options.report ?? ((message: string) => console.error(message));
+  const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  requirePositiveMs(pollIntervalMs, 'pollIntervalMs');
+  const pidWaitMs = options.pidWaitMs ?? DEFAULT_PID_WAIT_MS;
+  const portWaitMs = consolePortWaitMs(options.portWaitMs);
+  const pollLimit = (budgetMs: number): number => Math.max(1, Math.ceil(budgetMs / pollIntervalMs));
 
   return withProcessLockAsync(
     path.join(os.tmpdir(), 'kilo-mobile-android-emulators', 'launch.lock'),
     'Android emulator launch',
     async () => {
       const recordPath = emulatorRecordPath(worktreeRoot);
-      if (tmuxSessionExists(session) || fs.existsSync(recordPath))
+      if (sessionExists(session) || fs.existsSync(recordPath))
         throw new Error(
           `${session} already exists; run pnpm dev:mobile:android emulator-stop before launching another`
         );
-      const port = findAvailableEmulatorPort();
+      const port = findAvailableEmulatorPort(isPortListening);
       if (port === undefined) throw new Error('No free Android emulator console port (5554-5680)');
       const serial = `emulator-${port}`;
       const log = path.join(os.tmpdir(), `${session}.log`);
@@ -358,23 +496,50 @@ async function startAndroidEmulator(
       const command = `echo $$ > ${shellQuote(pidFile)}; exec ${[env.emulator, ...emulatorArgs]
         .map(shellQuote)
         .join(' ')} >> ${shellQuote(log)} 2>&1`;
+      const launchSession = (sessionName: string, launchCommand: string): void => {
+        if (options.launchSession) options.launchSession(sessionName, launchCommand, pidFile);
+        else
+          execFileSync('tmux', [
+            'new-session',
+            '-d',
+            '-s',
+            sessionName,
+            '-c',
+            worktreeRoot,
+            launchCommand,
+          ]);
+      };
 
       let pid = 0;
       let sessionStarted = false;
       try {
-        execFileSync('tmux', ['new-session', '-d', '-s', session, '-c', worktreeRoot, command]);
+        launchSession(session, command);
         sessionStarted = true;
-        for (let i = 0; i < 50 && !fs.existsSync(pidFile); i++) await delay(100);
-        pid = Number(fs.readFileSync(pidFile, 'utf8').trim());
-        if (!Number.isInteger(pid) || pid <= 0)
-          throw new Error(`${session} did not record its PID`);
-        for (let i = 0; i < 300 && !portIsListening(port); i++) {
-          if (!processIsAlive(pid)) throw new Error(`${session} exited during launch; see ${log}`);
-          await delay(100);
+        for (let i = 0; i < pollLimit(pidWaitMs) && !fs.existsSync(pidFile); i++)
+          await sleep(pollIntervalMs);
+        try {
+          pid = Number(fs.readFileSync(pidFile, 'utf8').trim());
+        } catch (error) {
+          if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+          throw new Error(`${session} did not record its PID within ${formatSeconds(pidWaitMs)}s`);
         }
-        if (!portIsListening(port))
-          throw new Error(`${session} did not bind console port ${port} within 30s; see ${log}`);
-        if (!processIsAlive(pid) || !processOwnsListeningPort(port, pid))
+        if (!Number.isInteger(pid) || pid <= 0)
+          throw new Error(`${session} did not record its PID within ${formatSeconds(pidWaitMs)}s`);
+        const portPollLimit = pollLimit(portWaitMs);
+        const progressEvery = Math.max(1, Math.ceil(portPollLimit / 4));
+        for (let i = 0; i < portPollLimit && !isPortListening(port); i++) {
+          if (!isProcessAlive(pid)) throw new Error(`${session} exited during launch; see ${log}`);
+          if (i > 0 && i % progressEvery === 0)
+            report(
+              `Waiting for ${session} console port ${port}: ${Math.floor((i * pollIntervalMs) / 1000)}s of ${formatSeconds(portWaitMs)}s elapsed`
+            );
+          await sleep(pollIntervalMs);
+        }
+        if (!isPortListening(port))
+          throw new Error(
+            `${session} did not bind console port ${port} within ${formatSeconds(portWaitMs)}s; see ${log}`
+          );
+        if (!launchedProcessOwnsConsolePort(env, avd, port, pid, listeningPids, processCommand))
           throw new Error(
             `${session} does not own console port ${port}; refusing to record a foreign emulator`
           );
@@ -394,8 +559,9 @@ async function startAndroidEmulator(
         fs.renameSync(tempRecord, recordPath);
         return record;
       } catch (error) {
-        if (sessionStarted && tmuxSessionExists(session))
-          spawnSync('tmux', ['kill-session', '-t', `=${session}`], { stdio: 'ignore' });
+        // A launch that fails for any reason must not leave the emulator it
+        // started behind: no session, no orphan qemu, no record file.
+        if (sessionStarted && sessionExists(session)) killSession(session);
         if (pid > 0) {
           const partialRecord = {
             avd,
@@ -408,12 +574,17 @@ async function startAndroidEmulator(
             session,
             worktreeRoot,
           };
-          if (recordedEmulatorStillOwnsPid(partialRecord, env)) {
-            signalProcessIfPresent(pid, 'SIGTERM');
-            for (let i = 0; i < 50 && processIsAlive(pid); i++) await delay(100);
+          const stillOurs = () =>
+            recordedEmulatorStillOwnsPid(partialRecord, env, {
+              processCommand,
+              processIsAlive: isProcessAlive,
+            });
+          if (stillOurs()) {
+            signalProcessIfPresent(pid, 'SIGTERM', options.signal);
+            for (let i = 0; i < pollLimit(5_000) && isProcessAlive(pid); i++)
+              await sleep(pollIntervalMs);
           }
-          if (recordedEmulatorStillOwnsPid(partialRecord, env))
-            signalProcessIfPresent(pid, 'SIGKILL');
+          if (stillOurs()) signalProcessIfPresent(pid, 'SIGKILL', options.signal);
         }
         fs.rmSync(pidFile, { force: true });
         fs.rmSync(`${recordPath}.${process.pid}.tmp`, { force: true });
@@ -421,9 +592,9 @@ async function startAndroidEmulator(
         throw error;
       }
     },
-    // Two slow holders (pid-file wait + 30s port bind + teardown each) must
-    // not starve a third slot's healthy launch.
-    120_000
+    // Two slow holders (pid-file wait + full console-port budget + teardown
+    // each) must not starve a third slot's healthy launch.
+    300_000
   );
 }
 
@@ -885,14 +1056,19 @@ export {
   androidEmulatorSession,
   claimAndroidDevice,
   commandMatchesRecordedEmulator,
+  DEFAULT_CONSOLE_PORT_WAIT_MS,
   findAvailableEmulatorPort,
   isValidEmulatorRecord,
+  launchedProcessOwnsConsolePort,
   parseEmulatorStartArgs,
+  portIsListening,
   processOwnsListeningPort,
+  procListeningPorts,
   readGradleWrapperVersion,
   releaseAndroidDevice,
   releaseWorktreeAndroidDevices,
   resolveAndroidEnvironment,
   signalProcessIfPresent,
+  startAndroidEmulator,
 };
 export type { AndroidEnvironment };

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { canonicalControlEventJson } from '../shared/control-event-canonical.js';
 import { wrapperInstanceIdSchema } from '../shared/sandbox-control-protocol.js';
 
 export const CONTROL_EVENT_RECEIPTS_KEY = 'control_event_receipts';
@@ -8,7 +7,10 @@ const CONTROL_EVENT_RECEIPT_LIMIT = 64;
 const controlEventReceiptSchema = z
   .object({
     receiptId: z.string().uuid(),
-    receiptHash: z.string().regex(/^[a-f0-9]{64}$/),
+    receiptHash: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/)
+      .optional(),
     wrapperInstanceId: wrapperInstanceIdSchema,
     sequence: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
   })
@@ -87,11 +89,7 @@ export function controlEventReceiptDisposition(
       item.receiptId === receipt.data.receiptId &&
       item.wrapperInstanceId === receipt.data.wrapperInstanceId
   );
-  if (stored)
-    return stored.receiptHash === receipt.data.receiptHash &&
-      stored.sequence === receipt.data.sequence
-      ? 'duplicate'
-      : 'conflict';
+  if (stored) return stored.sequence === receipt.data.sequence ? 'duplicate' : 'conflict';
   return receipt.data.sequence <= (state.highWater[receipt.data.wrapperInstanceId] ?? 0)
     ? 'stale'
     : 'apply';
@@ -110,7 +108,14 @@ export function recordControlEventReceipt(
       ...current.highWater,
       [receipt.data.wrapperInstanceId]: receipt.data.sequence,
     },
-    receipts: [...current.receipts, receipt.data].slice(-CONTROL_EVENT_RECEIPT_LIMIT),
+    receipts: [
+      ...current.receipts,
+      {
+        receiptId: receipt.data.receiptId,
+        wrapperInstanceId: receipt.data.wrapperInstanceId,
+        sequence: receipt.data.sequence,
+      },
+    ].slice(-CONTROL_EVENT_RECEIPT_LIMIT),
   });
 }
 
@@ -148,34 +153,4 @@ export function retireControlEventReceiptIdentity(
     ].slice(-CONTROL_EVENT_RECEIPT_LIMIT),
     receipts: current.receipts.filter(item => item.wrapperInstanceId !== wrapperInstanceId),
   });
-}
-
-export async function hasValidControlEventReceipt(
-  event: 'session.event' | 'session.preparing',
-  input: {
-    identity: unknown;
-    payload: unknown;
-  } & ControlEventReceiptInput
-): Promise<boolean> {
-  if (
-    input.receiptId === undefined &&
-    input.receiptHash === undefined &&
-    input.sequence === undefined
-  )
-    return true;
-  const receipt = parseControlEventReceipt(input);
-  if (!receipt.success) return false;
-  const digest = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(
-      canonicalControlEventJson({
-        event,
-        session: input.identity,
-        payload: input.payload,
-        sequence: receipt.data.sequence,
-      })
-    )
-  );
-  const hash = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
-  return hash === receipt.data.receiptHash;
 }

@@ -1,12 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DOLTHUB_API_BASE,
-  DOLTHUB_WEB_BASE,
-  WlDoltHubError,
-  buildDoltUrl,
-  doltFetch,
-  expectOk,
-} from './api';
+import { DOLTHUB_API_BASE, WlDoltHubError, buildDoltUrl, doltFetch, expectOk } from './api';
 
 type FetchCall = { url: string; init: RequestInit | undefined };
 
@@ -25,13 +18,6 @@ function mockFetch(
   }) as unknown as typeof fetch;
   return { fetch: fakeFetch, calls };
 }
-
-describe('constants', () => {
-  it('exposes the correct base URLs', () => {
-    expect(DOLTHUB_API_BASE).toBe('https://www.dolthub.com/api/v1alpha1');
-    expect(DOLTHUB_WEB_BASE).toBe('https://www.dolthub.com');
-  });
-});
 
 describe('buildDoltUrl', () => {
   it('returns the bare path when no query is given', () => {

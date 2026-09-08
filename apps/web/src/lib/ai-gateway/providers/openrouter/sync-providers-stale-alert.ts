@@ -1,7 +1,9 @@
 import 'server-only';
 
 import { captureException } from '@sentry/nextjs';
+import { ai_gateway_sync_providers_state } from '@kilocode/db/schema';
 import { APP_URL } from '@/lib/constants';
+import { db } from '@/lib/drizzle';
 import { redisClient } from '@/lib/redis';
 import {
   SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
@@ -173,9 +175,17 @@ async function defaultGetLastAlertAt(): Promise<string | null> {
 }
 
 async function defaultSetLastAlertAt(iso: string): Promise<unknown> {
-  return redisClient.set(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY, iso, {
+  const result = await redisClient.set(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY, iso, {
     ex: SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
   });
+  await db
+    .insert(ai_gateway_sync_providers_state)
+    .values({ stale_alert_last_posted_at: iso })
+    .onConflictDoUpdate({
+      target: ai_gateway_sync_providers_state.id,
+      set: { stale_alert_last_posted_at: iso },
+    });
+  return result;
 }
 
 export async function postStaleSyncAlert(input: {

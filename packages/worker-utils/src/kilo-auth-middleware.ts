@@ -1,9 +1,10 @@
+import { decodeJwt, type JWTPayload } from 'jose';
 import { createMiddleware } from 'hono/factory';
 import type { MiddlewareHandler } from 'hono';
 import { extractBearerToken } from './extract-bearer-token.js';
 import type { KiloTokenPayload } from './kilo-token.js';
 import type { KiloResourceAudiencePolicy } from './kilo-token-policy.js';
-import { verifyKiloTokenForResource } from './kilo-token-policy.js';
+import { verifyKiloTokenForPolicy, verifyKiloTokenForResource } from './kilo-token-policy.js';
 import { resError } from './res.js';
 
 /**
@@ -13,12 +14,12 @@ import { resError } from './res.js';
  */
 export type SecretBinding = { get(): Promise<string> } | string;
 
-export type KiloAuthOrgMembership = {
-  orgId: string;
-  role: 'owner' | 'member' | 'billing_manager';
-};
+export type KiloAuthOrgMembership = NonNullable<KiloTokenPayload['orgMemberships']>[number];
 
 export type KiloAuthVariables = {
+  kiloControlToken: string;
+  kiloUsesModernToken: boolean;
+  kiloTokenClaims: JWTPayload;
   kiloUserId: string;
   kiloIsAdmin: boolean;
   kiloApiTokenPepper: string | null;
@@ -74,6 +75,17 @@ export function createKiloAuthMiddleware<E extends KiloAuthEnv>(
 
     try {
       const payload = await verifyKiloTokenForResource(token, secret, audiencePolicy);
+      // Preserve claims stripped by the legacy payload schema for downstream authorization.
+      // Decode only after signature and resource audience verification succeeds.
+      const claims = decodeJwt(token);
+      const usesModernToken =
+        claims.tokenPurpose !== undefined || claims.credentialExchange !== undefined;
+      if (usesModernToken) {
+        await verifyKiloTokenForPolicy(token, secret, audiencePolicy);
+      }
+      c.set('kiloControlToken', token);
+      c.set('kiloUsesModernToken', usesModernToken);
+      c.set('kiloTokenClaims', claims);
       c.set('kiloUserId', payload.kiloUserId);
       c.set('kiloIsAdmin', payload.isAdmin === true);
       c.set('kiloApiTokenPepper', payload.apiTokenPepper ?? null);

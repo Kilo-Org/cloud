@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db, pool } from '@/lib/drizzle';
 import { platform_integrations, kilocode_users, organizations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -139,44 +139,32 @@ describe('upsertPlatformIntegrationForOwner', () => {
   test('serializes concurrent different installations for a non-allowlisted organization', async () => {
     const owner: Owner = { type: 'org', id: orgId };
     const installationIds = [`${INSTALLATION_ID}-concurrent-a`, `${INSTALLATION_ID}-concurrent-b`];
-    let installationLockArrivals = 0;
-    let releaseInstallationBarrier: () => void = () => {};
-    const installationBarrier = new Promise<void>(resolve => {
-      releaseInstallationBarrier = resolve;
-    });
-    let ownerLockEntries = 0;
-    let signalFirstOwnerLock: () => void = () => {};
-    const firstOwnerLock = new Promise<void>(resolve => {
-      signalFirstOwnerLock = resolve;
-    });
-    let releaseFirstOwnerLock: () => void = () => {};
-    const firstOwnerGate = new Promise<void>(resolve => {
-      releaseFirstOwnerLock = resolve;
-    });
-    const synchronization = {
-      afterInstallationLock: async () => {
-        installationLockArrivals += 1;
-        if (installationLockArrivals === 2) releaseInstallationBarrier();
-        await installationBarrier;
-      },
-      afterOwnerLock: async () => {
-        ownerLockEntries += 1;
-        if (ownerLockEntries === 1) {
-          signalFirstOwnerLock();
-          await firstOwnerGate;
-        }
-      },
-    };
-    const pendingResults = Promise.all(
-      installationIds.map(installationId =>
-        upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId), synchronization)
-      )
-    );
-    await firstOwnerLock;
-    expect(installationLockArrivals).toBe(2);
-    expect(ownerLockEntries).toBe(1);
-    releaseFirstOwnerLock();
-    const results = await pendingResults;
+    const lockClient = await pool.connect();
+    const ownerLockKey = `${owner.type}:${owner.id}`;
+    await lockClient.query('SELECT pg_advisory_lock(hashtext($1))', [ownerLockKey]);
+    let pendingResults: Promise<Awaited<ReturnType<typeof upsertPlatformIntegrationForOwner>>[]>;
+    try {
+      pendingResults = Promise.all(
+        installationIds.map(installationId =>
+          upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
+        )
+      );
+      let waitingCount = 0;
+      for (let attempt = 0; attempt < 2000 && waitingCount < 2; attempt += 1) {
+        const result = await lockClient.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM pg_stat_activity
+           WHERE pid <> pg_backend_pid() AND wait_event = 'advisory'
+             AND query LIKE 'SELECT pg_advisory_xact_lock(hashtext(%'`
+        );
+        waitingCount = Number(result.rows[0]?.count ?? 0);
+        if (waitingCount < 2) await new Promise<void>(resolve => setImmediate(resolve));
+      }
+      expect(waitingCount).toBeGreaterThanOrEqual(2);
+    } finally {
+      await lockClient.query('SELECT pg_advisory_unlock(hashtext($1))', [ownerLockKey]);
+      lockClient.release();
+    }
+    const results = await pendingResults!;
     expect(results.filter(result => result.ok)).toHaveLength(1);
     expect(results).toContainEqual({ ok: false, reason: 'multiple_installations_disabled' });
     const rows = await db

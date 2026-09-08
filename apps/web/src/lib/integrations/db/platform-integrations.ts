@@ -865,10 +865,6 @@ export async function upsertPlatformIntegrationForOwner(
     repositories?: PlatformRepository[] | null;
     installedAt?: string;
     githubAppType?: GitHubAppType;
-  },
-  testSynchronization?: {
-    afterInstallationLock?: () => Promise<void>;
-    afterOwnerLock?: () => Promise<void>;
   }
 ): Promise<UpsertPlatformIntegrationResult> {
   const appType = data.githubAppType ?? 'standard';
@@ -900,14 +896,12 @@ export async function upsertPlatformIntegrationForOwner(
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${data.platformInstallationId}`}))`
       );
-      await testSynchronization?.afterInstallationLock?.();
       const requiresOwnerCardinalityLock =
         owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id);
       if (requiresOwnerCardinalityLock) {
         await tx.execute(
           sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`
         );
-        await testSynchronization?.afterOwnerLock?.();
       }
       const peers = await tx
         .select()

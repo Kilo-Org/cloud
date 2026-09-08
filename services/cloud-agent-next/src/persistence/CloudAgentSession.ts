@@ -113,6 +113,8 @@ import {
   RUNTIME_AUTHORIZATION_RECOVERY_KEY,
   RUNTIME_AUTHORIZATION_KEY,
   runtimeAuthorizationRecoveryLockSchema,
+  inspectRuntimeAuthorizationRecoveryLock,
+  RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY,
 } from '../session/runtime-authorization-persistence.js';
 import { RUNTIME_PROXY_GRANT_KEY } from '../runtime-credential-proxy.js';
 import { getEffectiveCredentialContainment } from './session-metadata.js';
@@ -1726,16 +1728,48 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       metadata: await this.getMetadata(),
       getAuthorization: () => this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY),
     });
-    const lock = runtimeAuthorizationRecoveryLockSchema.safeParse(
-      await this.ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
-    );
+    const lock = this.inspectRuntimeAuthorizationRecovery();
     return state.state === 'expired' && lock.success && lock.data.expectedOldId === state.id
       ? { ...state, recoveryId: lock.data.recoveryId }
       : state;
   }
 
+  private inspectRuntimeAuthorizationRecovery() {
+    // Synchronous read/update prevents concurrent inspections from duplicating warnings
+    // or overwriting a replacement lock after an await.
+    const lock = runtimeAuthorizationRecoveryLockSchema.safeParse(
+      this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)
+    );
+    if (lock.success) {
+      const inspection = inspectRuntimeAuthorizationRecoveryLock(
+        lock.data,
+        this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY),
+        Date.now()
+      );
+      if (inspection.changed) {
+        this.ctx.storage.kv.put(
+          RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY,
+          inspection.diagnostics
+        );
+      }
+      if (inspection.warn) {
+        logger
+          .withFields({
+            sessionId: this.sessionId,
+            expectedOldId: lock.data.expectedOldId,
+            recoveryId: lock.data.recoveryId,
+            reason: 'prolonged_recovery_lock',
+            lockAgeMs: Date.now() - inspection.diagnostics.startedAt,
+          })
+          .warn('Runtime authorization recovery requires attention');
+      }
+    }
+    return lock;
+  }
+
   async isRuntimeAuthorizationRecoveryInProgress(): Promise<boolean> {
-    return (await this.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) !== undefined;
+    this.inspectRuntimeAuthorizationRecovery();
+    return this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) !== undefined;
   }
 
   async recoverExpiredRuntimeAuthorization(input: {
@@ -1748,7 +1782,12 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
     const metadata = await this.getMetadata();
     if (!metadata || metadata.identity.userId !== input.ownerId) return { status: 'denied' };
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
-    if (!secret) return { status: 'denied' };
+    if (!secret) {
+      logger
+        .withFields({ sessionId: metadata.identity.sessionId, reason: 'missing_secret' })
+        .error('Runtime authorization recovery denied');
+      return { status: 'denied' };
+    }
     let fresh: RuntimeAuthorization;
     try {
       fresh = await unsealRuntimeAuthorization(input.runtimeAuthorizationSeal, secret, {
@@ -1792,15 +1831,41 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       ) {
         return false;
       }
-      await transaction.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
-        expectedOldId: input.expectedOldId,
-        recoveryId: input.recoveryId,
-      });
+      if (!existingLock.success) {
+        await transaction.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
+          expectedOldId: input.expectedOldId,
+          recoveryId: input.recoveryId,
+        });
+        await transaction.put(RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY, {
+          expectedOldId: input.expectedOldId,
+          recoveryId: input.recoveryId,
+          startedAt: Date.now(),
+        });
+      }
       return true;
     });
     if (!acquired) {
       return { status: 'retry' };
     }
+    type RecoveryFailureReason =
+      | 'physical_inspection_failed'
+      | 'terminal_inspection_failed'
+      | 'physical_retirement_failed'
+      | 'physical_absence_unconfirmed'
+      | 'authorization_state_changed'
+      | 'authorization_commit_failed'
+      | 'wrapper_identity_clear_failed';
+    const diagnostic = (reason: RecoveryFailureReason) => {
+      logger
+        .withFields({
+          sessionId: metadata.identity.sessionId,
+          expectedOldId: input.expectedOldId,
+          recoveryId: input.recoveryId,
+          reason,
+        })
+        .warn('Runtime authorization recovery incomplete');
+    };
+    let failureReason: RecoveryFailureReason = 'physical_inspection_failed';
     try {
       const observation = this.physicalWrapperObserver
         ? await this.physicalWrapperObserver()
@@ -1811,11 +1876,19 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
               metadata,
               this.getAgentSandboxRuntimeContext()
             ).observeWrappersWithoutWaking();
-      if (observation.status === 'inspection-failed') return { status: 'retry' };
+      if (observation.status === 'inspection-failed') {
+        diagnostic('physical_inspection_failed');
+        return { status: 'retry' };
+      }
       if (observation.status === 'present') {
+        failureReason = 'terminal_inspection_failed';
         const terminal = await this.getTerminalClient();
-        if (!terminal.success || !terminal.data) return { status: 'retry' };
+        if (!terminal.success || !terminal.data) {
+          diagnostic('terminal_inspection_failed');
+          return { status: 'retry' };
+        }
         if ((await terminal.data.client.listTerminals()).length > 0) return { status: 'busy' };
+        failureReason = 'physical_retirement_failed';
         const supervisor = this.getWrapperSupervisor();
         await supervisor.requestPhysicalWrapperStop('idle-timeout', { kind: 'session' });
         await supervisor.runMaintenance(Date.now());
@@ -1828,14 +1901,20 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
                 metadata,
                 this.getAgentSandboxRuntimeContext()
               ).observeWrappersWithoutWaking();
-        if (stopped.status !== 'absent') return { status: 'retry' };
+        if (stopped.status !== 'absent') {
+          diagnostic('physical_absence_unconfirmed');
+          return { status: 'retry' };
+        }
       }
+      failureReason = 'authorization_state_changed';
       const latest = await this.getRuntimeAuthorizationRecoveryState();
       if (latest.state !== 'expired' || latest.id !== input.expectedOldId) {
+        diagnostic('authorization_state_changed');
         return latest.state === 'active' || latest.state === 'legacy'
           ? { status: 'not-needed' }
           : { status: 'denied' };
       }
+      failureReason = 'authorization_commit_failed';
       await this.ctx.storage.transaction(async transaction => {
         const current = RuntimeAuthorizationSchema.safeParse(
           await transaction.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
@@ -1868,13 +1947,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
         );
         await transaction.delete(RUNTIME_PROXY_GRANT_KEY);
         await transaction.delete(RUNTIME_AUTHORIZATION_RECOVERY_KEY);
+        await transaction.delete(RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY);
       });
+      failureReason = 'wrapper_identity_clear_failed';
       await clearWrapperRuntimeIdentity(this.ctx.storage, {}, { incrementGeneration: true });
       return { status: 'recovered' };
-    } catch (error) {
-      if (error instanceof Error && error.message === 'runtime_authorization_recovery_cas_failed') {
-        return { status: 'retry' };
-      }
+    } catch {
+      diagnostic(failureReason);
       return { status: 'retry' };
     }
   }

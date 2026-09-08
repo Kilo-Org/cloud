@@ -7,6 +7,9 @@ import {
 } from '@kilocode/worker-utils/runtime-authorization';
 import {
   getRuntimeAuthorizationStatus,
+  inspectRuntimeAuthorizationRecoveryLock,
+  runtimeAuthorizationRecoveryLockSchema,
+  RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS,
   getRuntimeAuthorizationRecoveryState,
   renewStoredRuntimeAuthorization,
 } from './runtime-authorization-persistence.js';
@@ -263,4 +266,69 @@ describe('runtime authorization persistence', () => {
       })
     ).rejects.toBeInstanceOf(RuntimeAuthorizationRevokedError);
   });
+});
+
+describe('recovery lock diagnostics', () => {
+  const lock = {
+    expectedOldId: '00000000-0000-4000-8000-000000000001',
+    recoveryId: '00000000-0000-4000-8000-000000000002',
+  };
+  const start = 1_000;
+  const threshold = RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS;
+
+  it('starts aging legacy locks without modifying their strict two-field contract', () => {
+    const original = { ...lock };
+    const first = inspectRuntimeAuthorizationRecoveryLock(lock, undefined, start);
+    expect(first).toEqual({
+      diagnostics: { ...lock, startedAt: start },
+      changed: true,
+      warn: false,
+    });
+    expect(lock).toEqual(original);
+    expect(runtimeAuthorizationRecoveryLockSchema.parse(lock)).toEqual(original);
+  });
+
+  it('preserves the durable start and warning cadence across repeated inspections', () => {
+    const first = inspectRuntimeAuthorizationRecoveryLock(lock, undefined, start);
+    const early = inspectRuntimeAuthorizationRecoveryLock(
+      lock,
+      first.diagnostics,
+      start + threshold - 1
+    );
+    expect(early.changed).toBe(false);
+    expect(early.warn).toBe(false);
+    const warning = inspectRuntimeAuthorizationRecoveryLock(
+      lock,
+      early.diagnostics,
+      start + threshold
+    );
+    expect(warning.warn).toBe(true);
+    // Round-trip storage as on a new DO instance; warnings are not an in-memory timer.
+    const stored = JSON.parse(JSON.stringify(warning.diagnostics));
+    expect(
+      inspectRuntimeAuthorizationRecoveryLock(lock, stored, start + 2 * threshold - 1).warn
+    ).toBe(false);
+    const next = inspectRuntimeAuthorizationRecoveryLock(lock, stored, start + 2 * threshold);
+    expect(next.warn).toBe(true);
+    expect(next.diagnostics.startedAt).toBe(start);
+    expect(lock).toEqual({ expectedOldId: lock.expectedOldId, recoveryId: lock.recoveryId });
+  });
+
+  it.each([
+    undefined,
+    { ...lock, startedAt: 'invalid' },
+    { ...lock, recoveryId: '00000000-0000-4000-8000-000000000003', startedAt: 0 },
+    { ...lock, expectedOldId: '00000000-0000-4000-8000-000000000003', startedAt: 0 },
+  ])(
+    'does not inherit age from missing, malformed or differently bound diagnostics: %j',
+    diagnostics => {
+      expect(inspectRuntimeAuthorizationRecoveryLock(lock, diagnostics, start + threshold)).toEqual(
+        {
+          diagnostics: { ...lock, startedAt: start + threshold },
+          changed: true,
+          warn: false,
+        }
+      );
+    }
+  );
 });

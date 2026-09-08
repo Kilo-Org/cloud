@@ -1,5 +1,5 @@
 import { env, listDurableObjectIds, runInDurableObject } from 'cloudflare:test';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
 import { sealRuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
@@ -7,11 +7,14 @@ import { RUNTIME_PROXY_GRANT_KEY } from '../../src/runtime-credential-proxy.js';
 import {
   RUNTIME_AUTHORIZATION_KEY,
   RUNTIME_AUTHORIZATION_RECOVERY_KEY,
+  RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY,
+  RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS,
 } from '../../src/session/runtime-authorization-persistence.js';
 import {
   allocateWrapperRuntimeState,
   getWrapperRuntimeState,
 } from '../../src/session/wrapper-runtime-state.js';
+import { logger } from '../../src/logger.js';
 import { registerReadySession } from '../helpers/session-setup.js';
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
@@ -111,6 +114,81 @@ describe('runtime authorization recovery', () => {
       error: 'Runtime authorization recovery is in progress',
     });
     expect(result.prepared).toEqual(result.ordinary);
+  });
+
+  it('logs missing configuration and thrown recovery failures without credential or error data', async () => {
+    const userId = 'user_recovery_diagnostics';
+    const sessionId = 'agent_recovery_diagnostics';
+    const stub = env.CLOUD_AGENT_SESSION.getByName(`${userId}:${sessionId}`);
+    await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        orgId: organizationId,
+        prompt: 'initial',
+        mode: 'code',
+        model: 'test-model',
+      });
+      const old = authorization({
+        id: '00000000-0000-4000-8000-000000000401',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        issuedAt: new Date(Date.now() - 120_000).toISOString(),
+      });
+      const fresh = authorization({
+        id: '00000000-0000-4000-8000-000000000402',
+        sessionId,
+        userId,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      });
+      await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
+      const input = {
+        ownerId: userId,
+        expectedOldId: old.id,
+        recoveryId: '00000000-0000-4000-8000-000000000403',
+        runtimeAuthorizationSeal: await seal(fresh),
+        runtimeToken: 'private-bearer',
+      };
+      const originalSecret = instance['env'].NEXTAUTH_SECRET;
+      const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+      const error = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        instance['env'].NEXTAUTH_SECRET = '';
+        expect(await instance.recoverExpiredRuntimeAuthorization(input)).toEqual({
+          status: 'denied',
+        });
+        expect(fields).toHaveBeenLastCalledWith({ sessionId, reason: 'missing_secret' });
+        expect(error).toHaveBeenCalledWith('Runtime authorization recovery denied');
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toBeUndefined();
+        instance['env'].NEXTAUTH_SECRET = originalSecret;
+        instance['physicalWrapperObserver'] = async () => {
+          throw new Error('private-error-with-bearer');
+        };
+        expect(await instance.recoverExpiredRuntimeAuthorization(input)).toEqual({
+          status: 'retry',
+        });
+        expect(fields).toHaveBeenLastCalledWith({
+          sessionId,
+          expectedOldId: old.id,
+          recoveryId: input.recoveryId,
+          reason: 'physical_inspection_failed',
+        });
+        expect(warn).toHaveBeenCalledWith('Runtime authorization recovery incomplete');
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toEqual({
+          expectedOldId: old.id,
+          recoveryId: input.recoveryId,
+        });
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(old);
+        expect(
+          JSON.stringify([fields.mock.calls, error.mock.calls, warn.mock.calls])
+        ).not.toContain('private-');
+      } finally {
+        instance['env'].NEXTAUTH_SECRET = originalSecret;
+        vi.restoreAllMocks();
+      }
+    });
   });
 
   it('recovers an expired CloudAgentSession authorization only after confirmed idle retirement', async () => {
@@ -314,6 +392,21 @@ describe('runtime authorization recovery', () => {
           stops += 1;
           return { status: 'absent' };
         };
+        const lock = {
+          expectedOldId: old.id,
+          recoveryId: '00000000-0000-4000-8000-000000000253',
+        };
+        // Legacy lock first observation must keep the exact old-reader contract.
+        await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, lock);
+        await instance.getRuntimeAuthorizationRecoveryState();
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toEqual(lock);
+        const startedAt = Date.now() - RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS - 1;
+        await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY, {
+          ...lock,
+          startedAt,
+        });
+        const fields = vi.spyOn(logger, 'withFields').mockReturnValue(logger);
+        const warning = vi.spyOn(logger, 'warn').mockImplementation(() => {});
         const recovery = await instance.recoverExpiredRuntimeAuthorization({
           ownerId: userId,
           expectedOldId: old.id,
@@ -321,6 +414,26 @@ describe('runtime authorization recovery', () => {
           runtimeAuthorizationSeal: await seal(fresh),
           runtimeToken: 'fresh-token',
         });
+        await instance.getRuntimeAuthorizationRecoveryState();
+        await instance.isRuntimeAuthorizationRecoveryInProgress();
+        expect(
+          warning.mock.calls.filter(
+            ([message]) => message === 'Runtime authorization recovery requires attention'
+          )
+        ).toHaveLength(1);
+        expect(fields).toHaveBeenCalledWith({
+          sessionId,
+          expectedOldId: old.id,
+          recoveryId: lock.recoveryId,
+          reason: 'prolonged_recovery_lock',
+          lockAgeMs: expect.any(Number),
+        });
+        warning.mockRestore();
+        fields.mockRestore();
+        expect(await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)).toEqual(lock);
+        expect(
+          await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY)
+        ).toMatchObject({ ...lock, startedAt, lastWarningAt: expect.any(Number) });
         return {
           recovery,
           stops,

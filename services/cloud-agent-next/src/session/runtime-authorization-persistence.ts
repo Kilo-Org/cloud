@@ -15,6 +15,45 @@ export const RUNTIME_AUTHORIZATION_RECOVERY_KEY = 'runtime_authorization_recover
 export const runtimeAuthorizationRecoveryLockSchema = z
   .object({ expectedOldId: z.string().uuid(), recoveryId: z.string().uuid() })
   .strict();
+export const RUNTIME_AUTHORIZATION_RECOVERY_DIAGNOSTICS_KEY =
+  'runtime_authorization_recovery_diagnostics';
+const recoveryDiagnosticsSchema = runtimeAuthorizationRecoveryLockSchema.extend({
+  startedAt: z.number().int().nonnegative(),
+  lastWarningAt: z.number().int().nonnegative().optional(),
+});
+// Observation-driven diagnostics only; this is never a lock expiry deadline.
+export const RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS = 5 * 60_000;
+
+export function inspectRuntimeAuthorizationRecoveryLock(
+  lock: z.infer<typeof runtimeAuthorizationRecoveryLockSchema>,
+  diagnostics: unknown,
+  now: number
+) {
+  const parsed = recoveryDiagnosticsSchema.safeParse(diagnostics);
+  const current =
+    parsed.success &&
+    parsed.data.expectedOldId === lock.expectedOldId &&
+    parsed.data.recoveryId === lock.recoveryId
+      ? parsed.data
+      : undefined;
+  // For legacy locks the true start is unknown; persist the first observation.
+  const startedAt = current?.startedAt ?? now;
+  const warn =
+    now - startedAt >= RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS &&
+    (current?.lastWarningAt === undefined ||
+      now - current.lastWarningAt >= RUNTIME_AUTHORIZATION_RECOVERY_WARNING_MS);
+  return {
+    diagnostics: {
+      ...lock,
+      startedAt,
+      ...(current?.lastWarningAt !== undefined ? { lastWarningAt: current.lastWarningAt } : {}),
+      ...(warn ? { lastWarningAt: now } : {}),
+    },
+    changed: !current || warn,
+    warn,
+  };
+}
+
 const RUNTIME_TOKEN_RENEWAL_WINDOW_MS = 5 * 60_000;
 
 function runtimeAuthorizationId(value: unknown): string | null {

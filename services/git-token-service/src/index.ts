@@ -181,6 +181,9 @@ export type RedeemGitHubSessionCapabilityParams = {
 export type RedeemGitHubSessionCapabilitySuccess = {
   success: true;
   authorization: string;
+  installationId: string;
+  source: 'user' | 'installation';
+  appType: GitHubAppType;
 };
 export type RedeemGitHubSessionCapabilityFailureReason =
   | GitHubSessionCapabilityFailureReason
@@ -1024,6 +1027,9 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return {
       success: true,
       authorization: this.formatUpstreamAuthorization(params.requestUrl, auth.githubToken),
+      installationId: auth.installationId,
+      source: auth.source,
+      appType: auth.appType,
     };
   }
 

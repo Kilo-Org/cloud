@@ -266,7 +266,13 @@ type IssueGitHubSessionCapabilityResult =
     };
 
 type RedeemGitHubSessionCapabilityResult =
-  | { success: true; authorization: string }
+  | {
+      success: true;
+      authorization: string;
+      installationId?: string;
+      source?: 'user' | 'installation';
+      appType?: 'standard' | 'lite';
+    }
   | {
       success: false;
       reason:

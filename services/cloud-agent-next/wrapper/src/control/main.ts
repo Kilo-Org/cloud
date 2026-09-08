@@ -66,7 +66,7 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
       if (
         !identity?.rootKiloSessionId ||
         (runtime.isolation === 'per-session' &&
-          identity.rootKiloSessionId !== runtime.identity.kiloSessionId)
+          identity.rootKiloSessionId !== runtime.identity?.kiloSessionId)
       )
         return;
       updateSessionSnapshots(event, deps.sessions);
@@ -165,7 +165,11 @@ function main(diagnostics: ControlDiagnostics, wrapperInstanceId: string): void 
 
   const mutationNotifications = createWorktreeMutationNotifications({
     sessions: deps.sessions,
-    kiloRuntimes,
+    kiloRuntimes: {
+      get: identity => kiloRuntimes.get(identity),
+      isCurrent: runtime =>
+        kiloRuntimes.isCurrent?.(runtime) ?? kiloRuntimes.get(runtime.directory) === runtime,
+    },
     signal: abort.signal,
     sendEvent: (event, payload, identity) => control?.sendEvent?.(event, payload, identity),
   });

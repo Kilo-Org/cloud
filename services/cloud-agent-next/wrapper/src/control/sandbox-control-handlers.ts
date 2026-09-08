@@ -16,6 +16,7 @@ import {
   sessionPermissionResolvePayloadSchema,
   sessionPromptPayloadSchema,
   sessionQuestionResolvePayloadSchema,
+  sessionRuntimeRetirePayloadSchema,
   sessionSyncPayloadSchema,
   sessionTerminalClosePayloadSchema,
   sessionTerminalCloseResultSchema,
@@ -328,7 +329,7 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
   const deps: HandlerDeps = Object.assign(input, {
     operations: createOperationRegistry({
       native: {
-        get: directory => input.kiloRuntimes?.get(directory),
+        get: identity => input.kiloRuntimes?.get(identity),
         getRetained: directory => input.kiloRuntimes?.getRetained?.(directory),
         prepareForNewWork: directory => input.kiloRuntimes?.prepareForNewWork?.(directory) ?? true,
         retireRuntime: (directory, deadlineAt, target) =>
@@ -367,7 +368,11 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
           directory: directoryForSession(kiloSessionId),
           revision: deps.activity?.revision(kiloSessionId),
         })),
-      getRuntime: directory => deps.kiloRuntimes?.get(directory),
+      getRuntime: (directory, kiloSessionId) =>
+        deps.kiloRuntimes
+          ?.getAll?.(directory)
+          .find(runtime => runtime.identity?.kiloSessionId === kiloSessionId) ??
+        deps.kiloRuntimes?.get(directory),
       reconcileActivity: (statuses, roots) => deps.activity?.reconcile(statuses, roots),
     });
   }
@@ -454,7 +459,7 @@ export async function handleControlRequest(
         return fail('not_ready', 'Worktree cancellation is incomplete', true);
       }
       failureStage = 'runtime_lookup';
-      const runtimes = kiloRuntimes.getAll(input.directory);
+      const runtimes = kiloRuntimes.getAll?.(input.directory) ?? [];
       // An injected cleanup client is a fallback for a checkout whose runtime has
       // already gone away. Live runtimes each retain their own Kilo state.
       const clients =
@@ -751,8 +756,9 @@ async function handleRuntimeRetire(
   try {
     deps.terminalRuntime?.beginRecoveryRetirement(session);
     terminalRetirementStarted = true;
+    if (!runtimes.retireForRecovery) return missingKilo();
     const retirement = await runtimes.retireForRecovery(session, parsed.data.recoveryId, () => {
-      const task = deps.tasks.get(session.kiloSessionId);
+      const task = deps.operations.active(session.kiloSessionId);
       const active = deps.activity
         ?.snapshots()
         .some(

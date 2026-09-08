@@ -338,7 +338,8 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .output(getWorktreeChangesOutputSchema)
     .query(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
       return await client.getWorktreeChanges(input.cloudAgentSessionId);
     }),
 
@@ -347,7 +348,8 @@ export const cloudAgentNextRouter = createTRPCRouter({
     .output(refreshWorktreeChangesOutputSchema)
     .mutation(async ({ ctx, input }) => {
       await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
       return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
     }),
 

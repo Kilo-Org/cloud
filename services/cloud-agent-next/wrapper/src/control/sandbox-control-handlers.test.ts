@@ -121,6 +121,7 @@ function deps(
   const client = Object.hasOwn(overrides, 'kiloClient') ? kiloClient : fakeKilo();
   const runtime: WorktreeKiloRuntime | undefined = client
     ? {
+        identity: { ...identity },
         scopeId: kilo.scopeId,
         runtimeId: 'native_1',
         directory: identity.directory,
@@ -159,7 +160,16 @@ function deps(
             directory === runtime.directory &&
             target.runtimeId === runtime.runtimeId &&
             target.client === runtime.kiloClient,
-          get: directory => (directory === runtime.directory ? runtime : undefined),
+          get: request =>
+            (
+              typeof request === 'string'
+                ? request === runtime.directory
+                : request.directory === runtime.directory
+            )
+              ? runtime
+              : undefined,
+          getAll: directory => (directory === runtime.directory ? [runtime] : []),
+          isCurrent: candidate => candidate === runtime,
           isHealthy: () => true,
           shutdown: () => {},
         } as NonNullable<HandlerDeps['kiloRuntimes']>)
@@ -847,7 +857,12 @@ describe('handleControlRequest', () => {
             target.client === runtime.kiloClient
           );
         },
-        get: directory => runtimes.get(directory),
+        get: identity => runtimes.get(typeof identity === 'string' ? identity : identity.directory),
+        getAll: directory => {
+          const runtime = runtimes.get(directory);
+          return runtime ? [runtime] : [];
+        },
+        isCurrent: runtime => [...runtimes.values()].includes(runtime),
         isHealthy: () => true,
         shutdown: () => {},
       } as NonNullable<HandlerDeps['kiloRuntimes']>,
@@ -1227,7 +1242,7 @@ describe('handleControlRequest', () => {
       result: { detached: true },
     });
     expect(shutdowns).toBe(0);
-    expect(runtimes.get(session.directory)).toBe(runtime);
+    expect(runtimes.getRetained?.(session.directory)).toBe(runtime);
     expect(handlerDeps.operations.active(sibling.kiloSessionId)?.signal.aborted).toBe(false);
     expect(events).toEqual([]);
     expect(aborted).toEqual([session.kiloSessionId]);
@@ -1639,7 +1654,7 @@ describe('production worktree deletion routes', () => {
       const handlerDeps = deps({
         kiloRuntimes: {
           get: identity => {
-            calls.push(`get:${identity.directory}`);
+            calls.push(`get:${typeof identity === 'string' ? identity : identity.directory}`);
             return undefined;
           },
           getAll: () => [],
@@ -1795,10 +1810,11 @@ describe('production worktree deletion routes', () => {
       }),
     };
     runtimes.get = identity => {
-      lookups.push(identity.directory);
-      return identity.directory === directory
+      const worktree = typeof identity === 'string' ? identity : identity.directory;
+      lookups.push(worktree);
+      return worktree === directory
         ? selected
-        : identity.directory === siblingDirectory
+        : worktree === siblingDirectory
           ? otherRuntime
           : undefined;
     };
@@ -1949,8 +1965,9 @@ describe('production worktree deletion routes', () => {
     const selected = runtimes?.get(first);
     if (!runtimes || !selected) throw new Error('Expected selected worktree runtime');
     runtimes.get = identity => {
-      lookups.push(identity.directory);
-      return identity.directory === directory ? selected : undefined;
+      const worktree = typeof identity === 'string' ? identity : identity.directory;
+      lookups.push(worktree);
+      return worktree === directory ? selected : undefined;
     };
     runtimes.deleteDirectory = async dir => {
       retirements.push(dir);
@@ -2042,8 +2059,9 @@ describe('production worktree deletion routes', () => {
         })),
         kiloRuntimes: {
           get: identity => {
-            lookups.push(identity.directory);
-            if (identity.directory === directory) return undefined;
+            const worktree = typeof identity === 'string' ? identity : identity.directory;
+            lookups.push(worktree);
+            if (worktree === directory) return undefined;
             forbidden.push('unscoped lookup');
             return siblingRuntime;
           },
@@ -3374,9 +3392,17 @@ describe('control cancellation and attachments', () => {
     const secondRuntime = secondDeps.kiloRuntimes?.get(secondSession);
     if (!secondRuntime) throw new Error('Expected execution runtime');
     runtimes.get = identity =>
-      identity.kiloSessionId === session.kiloSessionId
+      (
+        typeof identity === 'string'
+          ? identity === session.directory
+          : identity.kiloSessionId === session.kiloSessionId
+      )
         ? firstRuntime
-        : identity.kiloSessionId === secondSession.kiloSessionId
+        : (
+              typeof identity === 'string'
+                ? identity === secondSession.directory
+                : identity.kiloSessionId === secondSession.kiloSessionId
+            )
           ? secondRuntime
           : undefined;
     const attaching = handleControlRequest('session.attach', session, { kilo }, handlerDeps);
@@ -4731,7 +4757,7 @@ describe('refreshHeartbeatPayload', () => {
     }
   });
 
-  it('reconciles attached roots in a shared directory through their exact runtimes', async () => {
+  it('reconciles attached roots in a shared directory with exactly one status read per heartbeat', async () => {
     let now = 100;
     const activity = createSessionActivityRegistry(() => now);
     const sibling = { ...session, sessionId: 'ses_2', kiloSessionId: 'kilo_2' };
@@ -4759,7 +4785,7 @@ describe('refreshHeartbeatPayload', () => {
     now = 150;
 
     const payload = await refreshHeartbeatPayload(handlerDeps);
-    expect(reads).toEqual([session.directory, session.directory]);
+    expect(reads).toEqual([session.directory]);
     expect(payload.state).toBe('active');
     expect(payload.sessions).toEqual([
       { kiloSessionId: 'kilo_1', state: 'idle', idleForMs: 50 },
@@ -4767,12 +4793,7 @@ describe('refreshHeartbeatPayload', () => {
     ]);
     expect(payload).toEqual(buildHeartbeatPayload(handlerDeps));
     await refreshHeartbeatPayload(handlerDeps);
-    expect(reads).toEqual([
-      session.directory,
-      session.directory,
-      session.directory,
-      session.directory,
-    ]);
+    expect(reads).toEqual([session.directory, session.directory]);
   });
 
   it('reconciles each attached worktree from its own directory-scoped statuses', async () => {
@@ -4824,9 +4845,17 @@ describe('refreshHeartbeatPayload', () => {
     if (!runtimes || !firstRuntime || !secondRuntime)
       throw new Error('Expected directory runtimes');
     runtimes.get = identity =>
-      identity.kiloSessionId === first.kiloSessionId
+      (
+        typeof identity === 'string'
+          ? identity === first.directory
+          : identity.kiloSessionId === first.kiloSessionId
+      )
         ? firstRuntime
-        : identity.kiloSessionId === second.kiloSessionId
+        : (
+              typeof identity === 'string'
+                ? identity === second.directory
+                : identity.kiloSessionId === second.kiloSessionId
+            )
           ? secondRuntime
           : undefined;
     runtimes.getAll = directory =>
@@ -4935,21 +4964,18 @@ describe('refreshHeartbeatPayload', () => {
     );
     const runtimes = handlerDeps.kiloRuntimes;
     const firstRuntime = runtimes?.get(first);
-    const firstSiblingRuntime = runtimes?.get(firstSibling);
     const secondRuntime = otherDeps.kiloRuntimes?.get(second);
-    if (!runtimes || !firstRuntime || !firstSiblingRuntime || !secondRuntime)
+    if (!runtimes || !firstRuntime || !secondRuntime)
       throw new Error('Expected directory runtimes');
     runtimes.get = identity =>
-      identity.kiloSessionId === first.kiloSessionId
+      (typeof identity === 'string' ? identity : identity.directory) === first.directory
         ? firstRuntime
-        : identity.kiloSessionId === firstSibling.kiloSessionId
-          ? firstSiblingRuntime
-          : identity.kiloSessionId === second.kiloSessionId
-            ? secondRuntime
-            : undefined;
+        : (typeof identity === 'string' ? identity : identity.directory) === second.directory
+          ? secondRuntime
+          : undefined;
     runtimes.getAll = directory =>
       directory === first.directory
-        ? [firstRuntime, firstSiblingRuntime]
+        ? [firstRuntime]
         : directory === second.directory
           ? [secondRuntime]
           : [];
@@ -5051,9 +5077,17 @@ describe('refreshHeartbeatPayload', () => {
       if (!runtimes || !firstRuntime || !otherRuntime)
         throw new Error('Expected directory runtimes');
       runtimes.get = identity =>
-        identity.kiloSessionId === session.kiloSessionId
+        (
+          typeof identity === 'string'
+            ? identity === session.directory
+            : identity.kiloSessionId === session.kiloSessionId
+        )
           ? firstRuntime
-          : identity.kiloSessionId === other.kiloSessionId
+          : (
+                typeof identity === 'string'
+                  ? identity === other.directory
+                  : identity.kiloSessionId === other.kiloSessionId
+              )
             ? otherRuntime
             : undefined;
       runtimes.getAll = directory =>
@@ -5074,7 +5108,9 @@ describe('refreshHeartbeatPayload', () => {
           idleForMs: failFirst ? 80 : 0,
           waitingOn: failFirst ? 'model' : 'tool',
         },
-        { kiloSessionId: 'kilo_2', state: 'finalizing', idleForMs: 80, waitingOn: 'finalizing' },
+        failFirst
+          ? { kiloSessionId: 'kilo_2', state: 'finalizing', idleForMs: 80, waitingOn: 'finalizing' }
+          : { kiloSessionId: 'kilo_2', state: 'idle', idleForMs: 0 },
         { kiloSessionId: 'kilo_3', state: 'idle', idleForMs: 0 },
       ]);
       expect(payload.pendingMessages).toBe(0);

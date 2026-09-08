@@ -154,11 +154,13 @@ describe('SessionOperation cleanup', () => {
         release: () => {},
       }),
       detach: () => true,
+      retireForRecovery: async () => 'retired',
       deleteDirectory: async () => {},
-      getRetained: () => runtime,
+      getRetained: () => (runtime.signal.aborted ? undefined : runtime),
       retireRuntime: async () => 'unconfirmed',
       verifyQuiescence: async () => false,
-      get: () => runtime,
+      get: () => (runtime.signal.aborted ? undefined : runtime),
+      isCurrent: candidate => candidate === runtime && !runtime.signal.aborted,
       isHealthy: () => true,
       shutdown: () => {},
     };
@@ -265,7 +267,7 @@ describe('SessionOperation cleanup', () => {
       ok: true,
       result: { status: 'aborted', quiescent: true },
     });
-    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBeDefined();
+    expect(handlerDeps.kiloRuntimes?.getRetained?.(session.directory)).toBeDefined();
 
     const authorizationB = operationAuthorization('session.prompt', 'message_b');
     await handleControlRequest(
@@ -306,7 +308,7 @@ describe('SessionOperation cleanup', () => {
         nativeRuntimeId: 'native_1',
       },
     });
-    expect(handlerDeps.kiloRuntimes?.get(session.directory)).toBeUndefined();
+    expect(handlerDeps.kiloRuntimes?.getRetained?.(session.directory)).toBeUndefined();
   });
 
   it('keeps a failed local attachment unconfirmed when its captured cleanup cannot prove retirement', async () => {

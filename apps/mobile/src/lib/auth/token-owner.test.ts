@@ -16,6 +16,7 @@ vi.mock('expo-secure-store', () => ({
     store.delete(key);
   }),
 }));
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 
 /* eslint-disable import/first */
 import * as SecureStore from 'expo-secure-store';
@@ -184,6 +185,27 @@ describe('token-owner', () => {
       );
 
       await expect(getAuthTokenForRequest()).resolves.toBe('api-token');
+      await expect(getAuthTokenForRequest('gateway')).resolves.toBe('gateway-token');
+    });
+
+    it('retries a transient modern bundle read before restoring it', async () => {
+      store.set(
+        NATIVE_CREDENTIAL_BUNDLE_KEY,
+        JSON.stringify({
+          token: 'api-token',
+          refreshToken: 'refresh-token',
+          expiresIn: 3600,
+          metadata: {
+            credentialFormat: 'api-gateway-v1',
+            gatewayToken: 'gateway-token',
+            expiresAt: '2030-01-01T00:00:00.000Z',
+          },
+        })
+      );
+      vi.mocked(SecureStore.getItemAsync).mockRejectedValueOnce(new Error('keychain unavailable'));
+
+      await expect(getAuthTokenForRequest()).resolves.toBe('api-token');
+      expect(SecureStore.getItemAsync).toHaveBeenCalledTimes(2);
       await expect(getAuthTokenForRequest('gateway')).resolves.toBe('gateway-token');
     });
 

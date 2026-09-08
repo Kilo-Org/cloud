@@ -62,6 +62,7 @@ export type SandboxControlOutboundRequest = {
   authorization?: SessionOperationAuthorization;
   timeoutMs?: number;
   expectedWrapperInstanceId?: string;
+  expectedConnection?: SandboxControlConnectionIdentity;
   deadlineAt?: number;
 };
 
@@ -70,6 +71,8 @@ export type SandboxControlConnectionIdentity = {
   providerInstanceId: string;
   wrapperInstanceId?: string;
   recoveryCapable?: boolean;
+  runtimeIsolation?: true;
+  runtimeRecovery?: true;
 };
 
 export type SandboxControlEventResult = { applied: boolean; retryable?: boolean };
@@ -537,6 +540,8 @@ export function createSandboxControlSocketHandler(
           providerInstanceId: payload.providerInstanceId,
           ...(payload.wrapperInstanceId ? { wrapperInstanceId: payload.wrapperInstanceId } : {}),
           ...(payload.capabilities?.connectionRecovery === true ? { recoveryCapable: true } : {}),
+          ...(payload.capabilities?.runtimeIsolation === true ? { runtimeIsolation: true } : {}),
+          ...(payload.capabilities?.runtimeRecovery === true ? { runtimeRecovery: true } : {}),
         };
         const completed: SandboxControlSocketAttachment = {
           handshakeComplete: true,

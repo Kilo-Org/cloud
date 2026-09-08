@@ -1,5 +1,3 @@
-import * as SecureStore from 'expo-secure-store';
-
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import {
   type NativeCredentialBundleMetadata,
@@ -7,6 +5,7 @@ import {
 } from '@kilocode/app-shared/native-auth';
 import { AUTH_TOKEN_KEY, NATIVE_CREDENTIAL_BUNDLE_KEY } from '@/lib/storage-keys';
 import { parseTimestamp } from '@/lib/utils';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 
 export type ActiveToken = {
   token: string;
@@ -112,7 +111,7 @@ export async function getAuthTokenForRequest(
   if (isSignOutTeardownActive()) {
     return null;
   }
-  const rawBundle = await SecureStore.getItemAsync(NATIVE_CREDENTIAL_BUNDLE_KEY);
+  const rawBundle = await readStoredValueWithRetry(NATIVE_CREDENTIAL_BUNDLE_KEY);
   if (rawBundle !== null) {
     const bundle = parseStoredBundle(rawBundle);
     const published = getActiveToken();
@@ -127,7 +126,7 @@ export async function getAuthTokenForRequest(
     setActiveToken(bundle.token, bundle.expiresAtMs, bundle);
     return resource === 'api' ? bundle.token : bundle.gatewayToken;
   }
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const token = await readStoredValueWithRetry(AUTH_TOKEN_KEY);
   // A sign-in or refresh may have published a newer owner while the cold read
   // was in flight: prefer it and never overwrite it with the stale read.
   const published = getActiveToken();

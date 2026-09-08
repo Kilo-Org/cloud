@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import fs from 'node:fs/promises';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../../../wrapper/src/kilo-api.js';
+import { applySessionAttach } from '../../../wrapper/src/control/apply-attach.js';
 import {
   createWorktreeKiloRuntimes,
   type WorktreeKiloAuth,
@@ -25,11 +26,7 @@ import type * as KiloApiModule from '../../../wrapper/src/kilo-api.js';
 import type * as UtilsModule from '../../../wrapper/src/utils.js';
 
 vi.mock('node:fs/promises', () => ({
-  default: {
-    mkdir: vi.fn(async () => undefined),
-    writeFile: vi.fn(async () => undefined),
-    rm: vi.fn(async () => undefined),
-  },
+  default: { mkdir: vi.fn(async () => undefined), writeFile: vi.fn(async () => undefined) },
 }));
 vi.mock('@kilocode/sdk', () => ({ createKiloClient: vi.fn(() => ({})) }));
 vi.mock('../../../wrapper/src/kilo-api.js', async importOriginal => ({
@@ -45,35 +42,49 @@ vi.mock('../../../wrapper/src/control/sandbox-control-runtime.js', async importO
     settled: Promise.resolve(),
   })),
 }));
+vi.mock('../../../wrapper/src/restore-session.js', () => ({
+  seedSessionIngestRegistration: vi.fn(async () => undefined),
+  restoreSession: vi.fn(),
+}));
+vi.mock('../../../wrapper/src/utils.js', async importOriginal => ({
+  ...(await importOriginal<typeof UtilsModule>()),
+  logToFile: vi.fn(),
+  git: vi.fn(),
+  runProcess: vi.fn(),
+  isTimeoutTermination: vi.fn(),
+}));
 
-const first = {
+const identity = {
   sessionId: 'workspace_first',
   kiloSessionId: 'ses_first',
   directory: '/workspace/test-refresh',
 };
-const sibling = { ...first, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' };
+const sibling = { ...identity, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' };
 const auth: WorktreeKiloAuth = {
   scopeId: 'worktree_refresh',
   token: 'real-kilo-original',
   containmentEnabled: false,
+  organizationId: 'org-owner',
   targets: {
     backendBaseUrl: 'https://backend.example.test',
     providerBaseUrl: 'https://provider.example.test',
     sessionIngestBaseUrl: 'https://ingest.example.test',
   },
 };
+const originalEnv = { GH_TOKEN: 'github-original', CUSTOM_VALUE: 'profile-value' };
 const registries: WorktreeKiloRuntimes[] = [];
 
 function fixture() {
+  const statuses = vi.fn<WrapperKiloClient['getSessionStatuses']>(async () => ({}));
+  const createPty = vi.fn<WrapperKiloClient['createPty']>();
   const clients: WrapperKiloClient[] = [];
   vi.mocked(createWrapperKiloClient).mockImplementation((_client, serverUrl) => {
-    const client = {
+    const partial: Partial<WrapperKiloClient> = {
       serverUrl,
-      getSessionStatuses: async () => ({}),
-      createPty: async () => {
-        throw new Error('Unexpected PTY');
-      },
-    } as WrapperKiloClient;
+      getSessionStatuses: statuses,
+      createPty,
+    };
+    const client = partial as WrapperKiloClient;
     clients.push(client);
     return client;
   });
@@ -98,35 +109,36 @@ function fixture() {
       },
     };
   });
+  const onUnexpectedClose = vi.fn();
   const registry = createWorktreeKiloRuntimes({
     homeRoot: '/test-homes',
     inheritedEnv: {},
     startServer,
-    onUnexpectedClose: () => {},
+    onUnexpectedClose,
   });
   registries.push(registry);
   async function attach(
-    identity = first,
     requestedAuth = auth,
-    environment = { GH_TOKEN: 'github-original' }
+    env = originalEnv,
+    session = identity,
+    canRefreshCredentials: (() => boolean) | undefined = () => true
   ) {
-    const attachment = registry.attach(
-      identity,
-      requestedAuth,
-      environment,
-      () => true,
-      'per-session'
-    );
-    const runtime = await attachment.ready;
-    attachment.commit();
-    attachment.release();
-    return runtime;
+    const attachment = registry.attach(session, requestedAuth, env, canRefreshCredentials);
+    try {
+      const runtime = await attachment.ready;
+      attachment.commit();
+      return runtime;
+    } finally {
+      attachment.release();
+    }
   }
-  return { registry, attach, clients, startServer, stops };
+  return { registry, attach, startServer, close, statuses, createPty, clients, onUnexpectedClose };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  resetSessionDirectoryState();
+  resetDirectoryOperationState();
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => Response.json([]))
@@ -136,52 +148,131 @@ beforeEach(() => {
 afterEach(() => {
   for (const registry of registries.splice(0)) registry.shutdown();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
-describe('direct per-session worktree credential refresh', () => {
-  it('starts sibling roots in one directory with independent servers, clients, homes, and auth', async () => {
+describe('direct worktree credential refresh', () => {
+  it('refreshes SCM and Kilo tokens for idle roots without replacing logical runtime identity', async () => {
     const f = fixture();
-    const [firstRuntime, siblingRuntime] = await Promise.all([f.attach(first), f.attach(sibling)]);
+    const first = await f.attach();
+    const second = await f.attach(auth, originalEnv, sibling);
+    const originalClient = first.kiloClient;
+    const rotated = { ...auth, token: 'real-kilo-renewed' };
+    const env = { ...originalEnv, GH_TOKEN: 'github-renewed' };
 
+    const refreshed = await f.attach(rotated, env);
+
+    expect(refreshed).toBe(first);
+    expect(refreshed).toBe(second);
+    expect(refreshed.signal.aborted).toBe(false);
+    expect(refreshed.kiloClient).not.toBe(originalClient);
+    expect(refreshed.env).toMatchObject({
+      ...env,
+      KILOCODE_TOKEN: rotated.token,
+      KILOCODE_ORGANIZATION_ID: auth.organizationId,
+    });
+    expect(JSON.parse(refreshed.env.KILO_CONFIG_CONTENT).provider.kilo.options.kilocodeToken).toBe(
+      rotated.token
+    );
     expect(f.startServer).toHaveBeenCalledTimes(2);
-    expect(firstRuntime).not.toBe(siblingRuntime);
-    expect(firstRuntime.kiloClient).not.toBe(siblingRuntime.kiloClient);
-    expect(firstRuntime.env.HOME).not.toBe(siblingRuntime.env.HOME);
-    expect(firstRuntime.env.KILOCODE_TOKEN).toBe(auth.token);
-    expect(siblingRuntime.env.KILOCODE_TOKEN).toBe(auth.token);
-    expect(f.registry.get(first)).toBe(firstRuntime);
-    expect(f.registry.get(sibling)).toBe(siblingRuntime);
-    expect(f.registry.getAll(first.directory)).toEqual(
-      expect.arrayContaining([firstRuntime, siblingRuntime])
+    expect(f.close).toHaveBeenCalledTimes(1);
+    expect(fs.writeFile).toHaveBeenLastCalledWith(
+      expect.stringContaining('/kilo/auth.json'),
+      JSON.stringify({ kilo: { type: 'api', key: rotated.token } }),
+      { mode: 0o600 }
     );
-    expect(fs.writeFile).toHaveBeenCalledTimes(2);
+    expect(directoryForSession(sibling.kiloSessionId)).toBe(identity.directory);
+    expect(f.registry.get(identity.directory)).toBe(refreshed);
+    expect(f.onUnexpectedClose).not.toHaveBeenCalled();
+    await f.attach(rotated, env, sibling);
+    expect(f.startServer).toHaveBeenCalledTimes(2);
   });
 
-  it('refreshes only the requested root and never blocks its sibling', async () => {
+  it.each([
+    'wrapper-task',
+    'kilo-status',
+    'pty',
+    'status-error',
+    'pty-error',
+    'pty-invalid',
+    'missing-guard',
+  ] as const)('does not stop the runtime when refresh is unsafe: %s', async blocker => {
     const f = fixture();
-    const firstRuntime = await f.attach(first);
-    const siblingRuntime = await f.attach(sibling);
-    const originalSiblingClient = siblingRuntime.kiloClient;
-
-    const refreshed = await f.attach(
-      first,
-      { ...auth, token: 'real-kilo-renewed' },
-      {
-        GH_TOKEN: 'github-renewed',
+    const runtime = await f.attach();
+    await f.attach(auth, originalEnv, sibling);
+    if (blocker === 'kilo-status')
+      f.statuses.mockResolvedValue({ [sibling.kiloSessionId]: { type: 'busy' } });
+    if (blocker === 'pty')
+      vi.mocked(fetch).mockResolvedValue(Response.json([{ id: 'pty-active' }]));
+    if (blocker === 'status-error') f.statuses.mockRejectedValue(new Error('unavailable'));
+    if (blocker === 'pty-error')
+      vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 503 }));
+    if (blocker === 'pty-invalid') vi.mocked(fetch).mockResolvedValue(Response.json({}));
+    const guard = blocker === 'missing-guard' ? undefined : () => blocker !== 'wrapper-task';
+    const attempt = async () => {
+      const attachment = f.registry.attach(
+        identity,
+        auth,
+        { ...originalEnv, GH_TOKEN: 'github-renewed' },
+        guard
+      );
+      try {
+        await attachment.ready;
+      } finally {
+        attachment.release();
       }
-    );
-
-    expect(refreshed).toBe(firstRuntime);
-    expect(refreshed.kiloClient).not.toBe(f.clients[0]);
-    expect(refreshed.env.GH_TOKEN).toBe('github-renewed');
-    expect(siblingRuntime.signal.aborted).toBe(false);
-    expect(siblingRuntime.kiloClient).toBe(originalSiblingClient);
-    expect(siblingRuntime.env.GH_TOKEN).toBe('github-original');
-    expect(f.registry.get(sibling)).toBe(siblingRuntime);
-    expect(f.startServer).toHaveBeenCalledTimes(3);
+    };
+    await expect(attempt()).rejects.toMatchObject({
+      code: ['status-error', 'pty-error', 'pty-invalid'].includes(blocker)
+        ? 'not_ready'
+        : 'session_busy',
+      retryable: true,
+    });
+    expect(f.close).not.toHaveBeenCalled();
+    expect(f.startServer).toHaveBeenCalledTimes(1);
+    expect(runtime.signal.aborted).toBe(false);
+    expect(runtime.env.GH_TOKEN).toBe('github-original');
+    expect(f.registry.get(identity.directory)).toBe(runtime);
+    expect(f.registry.isHealthy()).toBe(true);
+    expect(f.onUnexpectedClose).not.toHaveBeenCalled();
   });
 
-  it('keeps a sibling alive through detach, replacement, and directory-wide deletion', async () => {
+  it('fences lookups during refresh and rechecks wrapper activity after the idle probe', async () => {
+    const f = fixture();
+    const runtime = await f.attach();
+    await f.attach(auth, originalEnv, sibling);
+    const queried = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<Record<string, { type: string }>>();
+    f.statuses.mockImplementation(() => {
+      queried.resolve();
+      return release.promise;
+    });
+    let idle = true;
+    const attachment = f.registry.attach(
+      identity,
+      auth,
+      { ...originalEnv, GH_TOKEN: 'github-renewed' },
+      () => idle
+    );
+    const result = attachment.ready.catch(error => error);
+    await queried.promise;
+    expect(f.registry.get(identity.directory)).toBeUndefined();
+    expect(f.registry.isHealthy()).toBe(true);
+    expect(() => f.registry.attach(sibling, auth, originalEnv, () => true)).toThrow(
+      'Worktree credentials are refreshing'
+    );
+    idle = false;
+    release.resolve({});
+    expect(await result).toMatchObject({ code: 'session_busy', retryable: true });
+    attachment.release();
+    expect(f.close).not.toHaveBeenCalled();
+    expect(f.registry.get(identity.directory)).toBe(runtime);
+    idle = true;
+    await f.attach(auth, { ...originalEnv, GH_TOKEN: 'github-renewed' });
+    expect(f.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports session_busy for an attached sibling during a healthy credential refresh', async () => {
     const f = fixture();
     const runtime = await f.attach();
     await f.attach(auth, originalEnv, sibling);
@@ -743,8 +834,10 @@ describe('direct per-session worktree credential refresh', () => {
       signal: runtimeLifetime.signal,
     };
     const getRuntime = f.registry.get.bind(f.registry);
-    f.registry.get = directory =>
-      directory === sibling.directory ? (fakeRuntime as typeof runtime) : getRuntime(directory);
+    f.registry.get = request =>
+      (typeof request === 'string' ? request : request.directory) === sibling.directory
+        ? (fakeRuntime as typeof runtime)
+        : getRuntime(request);
     const siblingOp = deps.operations.start(
       sibling,
       undefined,

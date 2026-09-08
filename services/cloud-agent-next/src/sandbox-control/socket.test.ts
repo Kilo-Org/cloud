@@ -63,7 +63,7 @@ function helloFrame(
   providerInstanceId: string,
   wrapperInstanceId?: string,
   requestId = 'req_hello',
-  capabilities?: { nativeRuntimeRetirement?: boolean }
+  capabilities?: { nativeRuntimeRetirement?: boolean; runtimeIsolation?: true }
 ): string {
   return JSON.stringify({
     type: 'request',
@@ -106,7 +106,7 @@ describe('sandbox control socket handler', () => {
 
     await handler.handleMessage(
       asWs(incoming),
-      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_isolation', true)
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_isolation', { runtimeIsolation: true })
     );
 
     expect(handler.getConnectionIdentity()).toMatchObject({

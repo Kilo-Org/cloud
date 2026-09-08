@@ -307,6 +307,15 @@ export type SandboxControlStatus = {
   work: WorkState;
   wrapperInstanceId?: string;
   operationResults?: true;
+  runtimeRecovery?: true;
+};
+
+export type ControlRuntimeCredentialProxyFence = {
+  plane: 'control';
+  allocationId: string;
+  providerInstanceId: string;
+  connectionId: string;
+  wrapperInstanceId: string;
 };
 
 export type RuntimeQuarantineResult =
@@ -780,6 +789,14 @@ export class SandboxControl extends DurableObject<Env> {
       runtime.wrapperInstanceId !== expectedWrapperInstanceId
     ) {
       throw new Error('Sandbox wrapper runtime changed');
+    }
+    if (
+      input.expectedConnection &&
+      (runtime.connectionId !== input.expectedConnection.connectionId ||
+        runtime.providerInstanceId !== input.expectedConnection.providerInstanceId ||
+        runtime.wrapperInstanceId !== input.expectedConnection.wrapperInstanceId)
+    ) {
+      throw new Error('Sandbox control connection changed');
     }
     if (
       authorization?.success &&
@@ -2486,6 +2503,7 @@ export class SandboxControl extends DurableObject<Env> {
       this.socketHandler.supportsOperationResults()
         ? { operationResults: true as const }
         : {}),
+      ...(runtime?.runtimeRecovery ? { runtimeRecovery: true as const } : {}),
     };
   }
 

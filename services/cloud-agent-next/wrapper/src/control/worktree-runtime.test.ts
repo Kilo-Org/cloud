@@ -108,7 +108,7 @@ function createKiloStub(
 ) {
   const requests: Array<{ pathname: string; directory: string | null; body?: unknown }> = [];
   const permissions: Awaited<ReturnType<WrapperKiloClient['getPermissions']>> = [];
-  const sessionStatuses: Record<string, { type: string }> = {};
+  const sessionStatuses: Record<string, { type: string }> = { ...statuses };
   const feeds = new Set<ReadableStreamDefaultController<Uint8Array>>();
   const encoder = new TextEncoder();
   let feedConnections = 0;
@@ -783,7 +783,7 @@ describe('worktree Kilo runtime registry', () => {
         ]);
         expect(runtime.signal.aborted).toBe(true);
         expect(harness.registry.isHealthy()).toBe(true);
-        expect(harness.registry.get(runtime.directory)).toBeUndefined();
+        expect(harness.registry.getRetained?.(runtime.directory)).toBeUndefined();
         expect(
           fetchSpy.mock.calls.filter(
             ([request]) =>
@@ -844,7 +844,7 @@ describe('worktree Kilo runtime registry', () => {
     expect(refreshed.runtimeId).not.toBe(originalRuntimeId);
     expect(runtime.signal.aborted).toBe(false);
     expect(await cleanupOriginal?.(Date.now() + 1_000)).toBe('stale');
-    expect(harness.registry.get(identity.directory)).toBe(refreshed);
+    expect(harness.registry.get(identity)).toBe(refreshed);
     refresh.commit();
     refresh.release();
     expect(runtime.kiloClient).not.toBe(originalClient);
@@ -857,13 +857,13 @@ describe('worktree Kilo runtime registry', () => {
     await waitUntil(() => received.includes('session.updated'));
     expect(runtime.signal.aborted).toBe(false);
     expect(harness.registry.isHealthy()).toBe(true);
-    expect(harness.registry.get(identity.directory)).toBe(refreshed);
+    expect(harness.registry.get(identity)).toBe(refreshed);
     expect(harness.unexpectedCloses).toBe(0);
     servers[1]?.endFeeds();
     await waitUntil(() => (servers[1]?.feedConnections ?? 0) === 2);
     expect(runtime.signal.aborted).toBe(false);
     expect(harness.registry.isHealthy()).toBe(true);
-    expect(harness.registry.get(identity.directory)).toBe(refreshed);
+    expect(harness.registry.get(identity)).toBe(refreshed);
     expect(harness.unexpectedCloses).toBe(0);
   });
 
@@ -1374,7 +1374,7 @@ describe('worktree Kilo runtime registry', () => {
       startServer: async options => {
         proveOwnedProcesses(options);
         launched.resolve();
-        await release.promise;
+        if (starts++ === 0) await release.promise;
         return {
           url: server.url,
           close: () => {
@@ -1556,6 +1556,7 @@ describe('worktree Kilo runtime registry', () => {
     expect(first.signal.aborted).toBe(true);
     expect(second.signal.aborted).toBe(true);
     expect(harness.closes).toBe(2);
+    if (!first.identity) throw new Error('Expected runtime identity');
     expect(harness.registry.get(first.identity)).toBeUndefined();
     expect(await rejected(harness.registry.ensure(first.directory, auth))).toMatchObject({
       message: 'Kilo worktrees are closed',
@@ -1602,7 +1603,8 @@ describe('worktree Kilo runtime registry', () => {
     servers[0]?.endFeeds();
     await waitUntil(() => (servers[0]?.feedConnections ?? 0) === 2);
     expect(runtime.signal.aborted).toBe(false);
-    expect(harness.registry.get(runtime.directory)).toBe(runtime);
+    if (!runtime.identity) throw new Error('Expected runtime identity');
+    expect(harness.registry.get(runtime.identity)).toBe(runtime);
     expect(harness.closes).toBe(0);
     expect(harness.unexpectedCloses).toBe(0);
   });
@@ -1631,7 +1633,7 @@ describe('worktree Kilo runtime registry', () => {
       }),
     ]);
     expect(runtime.signal.aborted).toBe(true);
-    expect(harness.registry.get(runtime.directory)).toBeUndefined();
+    expect(harness.registry.getRetained?.(runtime.directory)).toBeUndefined();
   });
 
   it('preserves an admitted operation and its runtime while a real feed recovers', async () => {
@@ -1686,7 +1688,7 @@ describe('worktree Kilo runtime registry', () => {
       server.endFeeds();
       await waitUntil(() => server.feedConnections === 2);
       expect(harness.registry.prepareForNewWork?.(identity.directory)).toBe(false);
-      expect(harness.registry.get(identity.directory)).toBe(runtime);
+      expect(harness.registry.get(identity)).toBe(runtime);
       expect(runtime.kiloClient).toBe(client);
       expect(runtime.kiloClient.serverUrl).toBe(client.serverUrl);
       expect(
@@ -1736,7 +1738,7 @@ describe('worktree Kilo runtime registry', () => {
 
       server.emit({ payload: { type: 'server.heartbeat', properties: {} } });
       await waitUntil(() => harness.registry.prepareForNewWork?.(identity.directory) === true);
-      expect(harness.registry.get(identity.directory)).toBe(runtime);
+      expect(harness.registry.get(identity)).toBe(runtime);
       expect(runtime.kiloClient).toBe(client);
       expect(harness.unexpectedCloses).toBe(0);
     } finally {
@@ -1897,6 +1899,7 @@ describe('worktree directory deletion', () => {
       expect(rootForSession(id)).toBeUndefined();
       expect(directoryForSession(id)).toBeUndefined();
     }
+    if (!other.identity) throw new Error('Expected runtime identity');
     expect(harness.registry.get(other.identity)).toBe(other);
     expect(other.signal.aborted).toBe(false);
     expect(rootForSession('surviving_child')).toBe(otherIdentity.kiloSessionId);
@@ -2490,8 +2493,8 @@ setInterval(() => {}, 1000);
     ).toBe('retired');
     expect(first.signal.aborted).toBe(true);
     expect(sibling.signal.aborted).toBe(true);
-    expect(registry.get(sharedDirectory)).toBeUndefined();
-    expect(registry.get(isolatedDirectory)).toBe(isolatedRuntime);
+    expect(registry.getRetained?.(sharedDirectory)).toBeUndefined();
+    expect(registry.getRetained?.(isolatedDirectory)).toBe(isolatedRuntime);
   });
 
   it('retains failed native cleanup ownership without affecting another runtime', async () => {
@@ -2532,7 +2535,7 @@ setInterval(() => {}, 1000);
     expect(first.signal.aborted).toBe(true);
     expect(sibling.signal.aborted).toBe(true);
     expect(registry.getRetained?.(failedDirectory)).toBe(runtime);
-    expect(registry.get(isolatedDirectory)).toBe(isolatedRuntime);
+    expect(registry.getRetained?.(isolatedDirectory)).toBe(isolatedRuntime);
     expect(() => registry.attach(rootIdentity(failedDirectory, 'retry'), auth)).toThrow(
       'Native runtime retirement is unconfirmed'
     );

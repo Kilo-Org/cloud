@@ -184,7 +184,8 @@ export function createControlTerminalRuntime(options: {
     const runtime = options.getKiloRuntime(identity);
     if (
       runtime !== attached.kiloRuntime ||
-      (runtime?.isolation === 'per-session' && !sameSession(runtime.identity, identity))
+      (runtime?.isolation === 'per-session' &&
+        (!runtime.identity || !sameSession(runtime.identity, identity)))
     ) {
       throw new ControlTerminalRuntimeError('not_ready', 'Kilo worktree is not available', true);
     }
@@ -448,7 +449,7 @@ export function createControlTerminalRuntime(options: {
         shutDown ||
         !kiloRuntime ||
         (kiloRuntime?.isolation === 'per-session' &&
-          !sameSession(kiloRuntime.identity, identity)) ||
+          (!kiloRuntime.identity || !sameSession(kiloRuntime.identity, identity))) ||
         directoryForSession(identity.kiloSessionId) !== identity.directory ||
         rootForSession(identity.kiloSessionId) !== identity.kiloSessionId
       ) {

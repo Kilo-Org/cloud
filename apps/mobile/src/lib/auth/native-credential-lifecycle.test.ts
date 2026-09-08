@@ -42,7 +42,10 @@ vi.mock('expo-secure-store', () => ({
     store.delete(key);
   }),
 }));
-vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.test' }));
+vi.mock('@/lib/config', () => ({
+  API_BASE_URL: 'https://api.example.test',
+  E2E_SECURE_STORE_FAULT_MS: 0,
+}));
 
 function bundle(
   suffix: string,
@@ -190,7 +193,7 @@ describe('native credential bundle lifecycle', () => {
       return JSON.stringify(old);
     });
     const pending = getGatewayAuthTokenForRequest();
-    expect(SecureStore.getItemAsync).toHaveBeenCalledWith(NATIVE_CREDENTIAL_BUNDLE_KEY);
+    expect(SecureStore.getItemAsync).toHaveBeenCalledWith(NATIVE_CREDENTIAL_BUNDLE_KEY, undefined);
     bumpAuthEpoch();
     const next = bundle('new');
     setActiveToken(next.token, Date.parse(next.metadata.expiresAt), next.metadata);

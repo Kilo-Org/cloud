@@ -103,6 +103,7 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
       let runtime = runtimes.get(key(identity));
       if (!runtime) {
         runtime = {
+          identity: { ...identity },
           runtimeId: 'native_1',
           directory,
           scopeId: auth.scopeId,
@@ -134,7 +135,7 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
       }
     },
     retireRuntime: async (directory, _deadlineAt, target) => {
-      const runtime = runtimes.get(directory);
+      const runtime = [...runtimes.values()].find(runtime => runtime.directory === directory);
       if (
         !runtime ||
         !target ||
@@ -142,13 +143,21 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
         target.client !== runtime.kiloClient
       )
         return 'stale';
-      runtimes.delete(directory);
+      if (runtime?.identity) runtimes.delete(key(runtime.identity));
       return 'retired';
     },
     verifyQuiescence: async (directory, target, deadlineAt) =>
-      runtimes.get(directory)?.kiloClient === target.client && Date.now() < deadlineAt,
-    getRetained: directory => runtimes.get(directory),
-    get: directory => runtimes.get(directory),
+      [...runtimes.values()].some(
+        runtime => runtime.directory === directory && runtime.kiloClient === target.client
+      ) && Date.now() < deadlineAt,
+    getRetained: directory =>
+      [...runtimes.values()].find(runtime => runtime.directory === directory),
+    get: identity =>
+      typeof identity === 'string'
+        ? [...runtimes.values()].find(runtime => runtime.directory === identity)
+        : runtimes.get(key(identity)),
+    getAll: directory => [...runtimes.values()].filter(runtime => runtime.directory === directory),
+    isCurrent: runtime => [...runtimes.values()].includes(runtime),
     isHealthy: () => true,
     shutdown: () => {},
   };

@@ -332,7 +332,7 @@ type AuthContextValue = {
   isSigningOut: boolean;
   restoreFailed: boolean;
   retryRestore: () => void;
-  signIn: (token: string) => Promise<void>;
+  signIn: (pair: NativeTokenPair) => Promise<boolean>;
   signOut: (ended?: boolean) => Promise<void>;
 };
 
@@ -1033,6 +1033,34 @@ describe('bootstrap and foreground race fencing', () => {
     remount.unmount();
   });
 
+  it('restores a modern bundle when the legacy refresh-key preload rejects', async () => {
+    hoisted.secureStoreValues.set(
+      'native-credential-bundle',
+      JSON.stringify(modernCredentialBundle)
+    );
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      await Promise.resolve();
+      if (key === 'refresh-token') {
+        throw new Error('keychain unavailable');
+      }
+      return hoisted.secureStoreValues.get(key) ?? null;
+    });
+
+    const { getCtx, unmount } = await mountProvider();
+    const tokenOwner = await import('@/lib/auth/token-owner');
+
+    expect(getCtx().token).toBe(modernCredentialBundle.token);
+    expect(getCtx().restoreFailed).toBe(false);
+    await expect(tokenOwner.getAuthTokenForRequest('gateway')).resolves.toBe(
+      modernCredentialBundle.metadata.gatewayToken
+    );
+    expect(
+      hoisted.secureStore.getItemAsync.mock.calls.filter(([key]) => key === 'refresh-token')
+    ).toHaveLength(1);
+
+    unmount();
+  });
+
   it.each([
     ['invalid JSON', '{not-json'],
     [
@@ -1177,20 +1205,28 @@ describe('bootstrap and foreground race fencing', () => {
       releaseRead = resolve;
     });
     const storedToken = makeToken({ kiloUserId: 'user-1' });
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken, then the expiry read (held), then the
-    // credential re-read (unchanged, so only a fence can stop the publish).
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce(storedToken)
-      .mockResolvedValueOnce('stored-refresh')
-      .mockImplementationOnce(async () => {
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      if (key === 'native-credential-bundle') {
+        return null;
+      }
+      if (key === 'auth-token') {
+        return storedToken;
+      }
+      if (key === 'refresh-token') {
+        return 'stored-refresh';
+      }
+      if (key === 'token-expires-at') {
         // Bootstrap expiry read: hold open so a sign-out can land mid-read.
         await readGate;
         return '9999999999999';
-      })
-      .mockResolvedValueOnce(storedToken);
+      }
+      return null;
+    });
 
     const { getCtx, unmount } = await mountProvider();
+    const tokenOwner = await import('@/lib/auth/token-owner');
+    const ownerBeforeSignOut = tokenOwner.getActiveToken();
+    expect(ownerBeforeSignOut).toEqual({ token: storedToken, expiresAtMs: null });
 
     // Hold the sign-out's remote cleanup open: the teardown is mid-flight and
     // its epoch bump (which waits for the cleanup) has not happened when the
@@ -1216,10 +1252,9 @@ describe('bootstrap and foreground race fencing', () => {
       });
     });
 
-    // The success path must not republish what sign-out is tearing down: no
-    // owner token, no React token, no deep-link binding for the old account.
-    const tokenOwner = await import('@/lib/auth/token-owner');
-    expect(tokenOwner.getActiveToken()).toBeNull();
+    // The success path must not republish what sign-out is tearing down. The
+    // preloaded owner remains available only for the in-flight logout cleanup.
+    expect(tokenOwner.getActiveToken()).toEqual(ownerBeforeSignOut);
     expect(getCtx().token).toBeUndefined();
     expect(hoisted.deepLinkLaunch.setCurrentDeepLinkUserId).not.toHaveBeenCalledWith('user-1');
 
@@ -1228,6 +1263,7 @@ describe('bootstrap and foreground race fencing', () => {
     await act(async () => {
       await signOutPromise;
     });
+    expect(tokenOwner.getActiveToken()).toBeNull();
     expect(getCtx().token).toBeUndefined();
     expect(getCtx().sessionEnded).toBe(true);
 
@@ -1241,15 +1277,19 @@ describe('bootstrap and foreground race fencing', () => {
     });
     const storedToken = makeToken({ kiloUserId: 'user-1' });
     // No stored refresh token: bootstrap takes the legacy-exchange branch.
-    // Mock queue consumed by the bootstrap load: preloadedToken,
-    // preloadedRefreshToken (null), then — after the fenced exchange publish
-    // is refused and the main restore path continues — the expiry read and
-    // the credential re-read.
-    hoisted.secureStore.getItemAsync
-      .mockResolvedValueOnce(storedToken)
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce('9999999999999')
-      .mockResolvedValueOnce(storedToken);
+    hoisted.secureStore.getItemAsync.mockImplementation(async key => {
+      await Promise.resolve();
+      if (key === 'native-credential-bundle') {
+        return null;
+      }
+      if (key === 'auth-token') {
+        return storedToken;
+      }
+      if (key === 'token-expires-at') {
+        return '9999999999999';
+      }
+      return null;
+    });
     hoisted.exchange.exchangeLegacyToken.mockImplementationOnce(async () => {
       await exchangeGate;
       return { token: 'exchanged-token', refreshToken: 'exchanged-refresh', expiresIn: 3600 };

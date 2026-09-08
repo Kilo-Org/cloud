@@ -459,6 +459,8 @@ describe('useNativeAuth created-account announcement', () => {
       sessionEnded: false,
       authEpoch: 0,
       isSigningOut: false,
+      restoreFailed: false,
+      retryRestore: () => undefined,
       signIn,
       signOut: vi.fn(),
     });
@@ -517,6 +519,8 @@ describe('useNativeAuth created-account announcement', () => {
       sessionEnded: false,
       authEpoch: 0,
       isSigningOut: false,
+      restoreFailed: false,
+      retryRestore: () => undefined,
       signIn,
       signOut: vi.fn(),
     });

@@ -173,6 +173,8 @@ export const sandboxHelloPayloadSchema = z.object({
       nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
+      runtimeIsolation: z.literal(true).optional(),
+      runtimeRecovery: z.literal(true).optional(),
     })
     .optional(),
 });
@@ -188,6 +190,8 @@ export const sandboxHelloResultSchema = z.object({
       nativeRuntimeRetirement: z.boolean().optional(),
       connectionRecovery: z.boolean().optional(),
       eventReceipts: z.boolean().optional(),
+      runtimeIsolation: z.literal(true).optional(),
+      runtimeRecovery: z.literal(true).optional(),
     })
     .optional(),
 });
@@ -355,6 +359,7 @@ export const sessionAttachPayloadSchema = z
       .optional(),
     env: z.record(z.string().max(256), z.string().max(8192)).optional(),
     setupCommands: z.array(z.string().max(500)).max(20).optional(),
+    runtimeIsolation: z.enum(['per-session']).optional(),
     preparation: z
       .object({
         attemptId: z.string().min(1).max(128),

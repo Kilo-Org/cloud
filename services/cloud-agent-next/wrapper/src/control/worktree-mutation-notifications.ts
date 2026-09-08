@@ -158,7 +158,9 @@ function mutationSessionId({ type, properties }: KiloEvent): string | undefined 
 
 export function createWorktreeMutationNotifications(options: {
   sessions: readonly HandlerSessionSnapshot[];
-  kiloRuntimes: Pick<WorktreeKiloRuntimes, 'get' | 'isCurrent'>;
+  kiloRuntimes: Pick<WorktreeKiloRuntimes, 'get'> & {
+    isCurrent(runtime: WorktreeKiloRuntime): boolean;
+  };
   signal: AbortSignal;
   sendEvent: (
     event: 'session.event',

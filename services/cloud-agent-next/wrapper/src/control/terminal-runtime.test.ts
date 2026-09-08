@@ -71,10 +71,11 @@ function createRuntime(
       let worktree = worktrees.get(key);
       if (!worktree) {
         worktree = {
+          identity: { ...identity },
           runtimeId: `native_${worktrees.size + 1}`,
-          scopeId: directory,
-          directory,
-          env: { WORKTREE_VALUE: directory },
+          scopeId: identity.directory,
+          directory: identity.directory,
+          env: { WORKTREE_VALUE: identity.directory },
           kiloClient,
           signal: new AbortController().signal,
         };
@@ -551,6 +552,7 @@ describe('control terminal PTY ownership', () => {
     const sibling = { ...secondSession, directory: firstSession.directory };
     const firstRuntime: WorktreeKiloRuntime = {
       identity: { ...firstSession },
+      runtimeId: 'native_first',
       directory: firstSession.directory,
       scopeId: firstSession.directory,
       env: { HOME: '/home/first', KILOCODE_TOKEN: 'first-token' },
@@ -579,7 +581,8 @@ describe('control terminal PTY ownership', () => {
     const worktrees = new Map<string, WorktreeKiloRuntime>();
     for (const identity of [firstSession, secondSession]) {
       const directory = identity.directory;
-      worktrees.set(directory, {
+      worktrees.set(identity.kiloSessionId, {
+        identity: { ...identity },
         runtimeId: `native_${identity.sessionId}`,
         directory,
         scopeId: directory,
@@ -792,7 +795,8 @@ describe('control terminal reverse WebSocket bridge', () => {
       [firstSession, firstServers, 'pty_first'],
       [secondSession, secondServers, 'pty_second'],
     ] as const) {
-      worktrees.set(identity.directory, {
+      worktrees.set(identity.kiloSessionId, {
+        identity: { ...identity },
         runtimeId: `native_${identity.sessionId}`,
         scopeId: identity.directory,
         directory: identity.directory,

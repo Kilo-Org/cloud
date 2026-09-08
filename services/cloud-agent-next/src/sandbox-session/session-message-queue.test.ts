@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import jwt from 'jsonwebtoken';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { canonicalControlEventJson } from '../shared/control-event-canonical.js';
 import { normalizeCliEvent } from '../../../../packages/cloud-agent-sdk/src/normalizer';
@@ -32,6 +33,7 @@ import {
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import { createControlPlaneCredential } from '../sandbox-control/managed-credential.js';
 import { SESSION_DELIVERY_TIMEOUT_MS } from './control-dispatch.js';
+import { RUNTIME_AUTHORIZATION_KEY } from '../session/runtime-authorization-persistence.js';
 import { createControlStopRequest } from '../shared/control-plane-session.js';
 import type {
   AcceptedCommandTurn,
@@ -1019,10 +1021,6 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
     get: async <T>(key: string) => kv.get<T>(key),
     put: async <T>(key: string, value: T) => kv.put(key, value),
     sql: {},
-    get: async <T>(key: string): Promise<T | undefined> => kv.get<T>(key),
-    put: async (key: string, value: unknown): Promise<void> => {
-      kv.put(key, value);
-    },
     transactionSync: <T>(callback: () => T) => callback(),
     getAlarm: vi.fn(async () => alarmAt),
     setAlarm: vi.fn(async (at: number | Date) => {

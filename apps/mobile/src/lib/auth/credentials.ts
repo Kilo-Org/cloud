@@ -25,6 +25,7 @@ import {
 } from '@/lib/storage-keys';
 import { CONTROL_PLANE_DEADLINE_MS, withDeadline } from '@kilocode/event-service';
 import { parseTimestamp } from '@/lib/utils';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 
 // Apple `kSecAttrAccessibleWhenUnlockedThisDeviceOnly` is not in iCloud or
 // iTunes backup and does not migrate to a new device. Pin every bearer-token
@@ -310,7 +311,7 @@ export async function getGatewayAuthTokenForRequest(): Promise<string | null> {
   }
   let expiresAtMs = owner.expiresAtMs;
   if (expiresAtMs === null && !owner.bundle) {
-    const expiresAt = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+    const expiresAt = await readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY);
     if (!isCurrentAuthEpoch(epoch)) {
       return null;
     }
@@ -349,7 +350,7 @@ function shouldRefresh(expiresAtMs: number): boolean {
 }
 
 async function readRefreshToken(): Promise<string | null> {
-  const rawBundle = await SecureStore.getItemAsync(NATIVE_CREDENTIAL_BUNDLE_KEY);
+  const rawBundle = await readStoredValueWithRetry(NATIVE_CREDENTIAL_BUNDLE_KEY);
   if (rawBundle !== null) {
     try {
       const value: unknown = JSON.parse(rawBundle);
@@ -359,5 +360,5 @@ async function readRefreshToken(): Promise<string | null> {
       return null;
     }
   }
-  return SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  return readStoredValueWithRetry(REFRESH_TOKEN_KEY);
 }

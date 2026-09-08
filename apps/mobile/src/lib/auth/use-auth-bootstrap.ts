@@ -1,10 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
-import { type Dispatch, type SetStateAction, useEffect } from 'react';
+import { type Dispatch, type SetStateAction, useCallback, useEffect } from 'react';
 
 import { exchangeLegacyToken } from '@/lib/auth/exchange-legacy-token';
 import { readUserIdFromToken } from '@/lib/auth/auth-user-id';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
+import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import {
   getActiveToken,
   getActiveTokenSnapshot,
@@ -18,56 +19,77 @@ import { AUTH_TOKEN_KEY, REFRESH_TOKEN_KEY, TOKEN_EXPIRES_AT_KEY } from '@/lib/s
 export const preloadedAuthToken = getAuthTokenForRequest();
 const preloadedRefreshToken = SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
 
+async function observePreloadRejection(preload: Promise<string | null>): Promise<void> {
+  try {
+    await preload;
+  } catch {
+    // Bootstrap owns the restore outcome.
+  }
+}
+
+void observePreloadRejection(preloadedAuthToken);
+void observePreloadRejection(preloadedRefreshToken);
+
 type AuthBootstrapOptions = {
   setToken: Dispatch<SetStateAction<string | undefined>>;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
+  setRestoreFailed: Dispatch<SetStateAction<boolean>>;
 };
 
-export function useAuthBootstrap({ setToken, setIsLoading }: AuthBootstrapOptions): void {
-  useEffect(() => {
-    const load = async () => {
+export function useAuthBootstrap({
+  setToken,
+  setIsLoading,
+  setRestoreFailed,
+}: AuthBootstrapOptions) {
+  const load = useCallback(
+    async (preload?: {
+      readonly token: Promise<string | null>;
+      readonly refresh: Promise<string | null>;
+    }) => {
+      const epoch = currentAuthEpoch();
       try {
-        // Capture the epoch before any asynchronous read: every later check
-        // fences against this moment, so a sign-out or newer sign-in during
-        // bootstrap can never be followed by the preloaded token being
-        // restored into React state or the token owner.
-        const epoch = currentAuthEpoch();
-        const stored = await preloadedAuthToken;
-        const storedRefresh = await preloadedRefreshToken;
+        const stored = await (preload?.token ?? getAuthTokenForRequest());
         if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
           return;
         }
         if (stored) {
           const owner = getActiveTokenSnapshot();
           if (owner?.token === stored && owner.bundle) {
-            if (isCurrentAuthEpoch(epoch)) {
-              setToken(stored);
-              setCurrentDeepLinkUserId(readUserIdFromToken(stored));
-            }
+            setRestoreFailed(false);
+            setToken(stored);
+            setCurrentDeepLinkUserId(readUserIdFromToken(stored));
             return;
           }
+          const storedRefresh = await readStoredValueWithRetry(
+            REFRESH_TOKEN_KEY,
+            undefined,
+            preload?.refresh
+          );
+          if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
+            return;
+          }
+          setRestoreFailed(false);
           // Legacy exchange: if we have a token but no refresh token, upgrade once.
           if (!storedRefresh) {
             const pair = await exchangeLegacyToken();
-            if (pair) {
+            if (pair && isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
-              setIsLoading(false);
               return;
             }
           }
           // The session moved while the preload or legacy exchange was in
           // flight: never resurrect the preloaded token.
-          if (!isCurrentAuthEpoch(epoch)) {
+          if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
             return;
           }
-          const expiresAtStr = await SecureStore.getItemAsync(TOKEN_EXPIRES_AT_KEY);
+          const expiresAtStr = await readStoredValueWithRetry(TOKEN_EXPIRES_AT_KEY);
           // Fence the asynchronous expiry read: a sign-out or newer sign-in
           // during the reads owns the session, so the stale snapshot must not
           // be republished and nothing may be surfaced for the torn-down
           // session.
-          const currentStored = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
-          if (!isCurrentAuthEpoch(epoch)) {
+          const currentStored = await readStoredValueWithRetry(AUTH_TOKEN_KEY);
+          if (!isCurrentAuthEpoch(epoch) || isSignOutActive()) {
             return;
           }
           // A same-session refresh replaced the stored pair while the reads
@@ -84,23 +106,28 @@ export function useAuthBootstrap({ setToken, setIsLoading }: AuthBootstrapOption
           setActiveToken(stored, expiresAtStr ? Number(expiresAtStr) : null);
           setToken(stored);
           setCurrentDeepLinkUserId(readUserIdFromToken(stored));
-        } else {
-          const modernToken = await getAuthTokenForRequest();
-          const owner = getActiveTokenSnapshot();
-          if (
-            modernToken &&
-            owner?.token === modernToken &&
-            owner.bundle &&
-            isCurrentAuthEpoch(epoch)
-          ) {
-            setToken(modernToken);
-            setCurrentDeepLinkUserId(readUserIdFromToken(modernToken));
-          }
+          return;
+        }
+        setRestoreFailed(false);
+      } catch {
+        if (isCurrentAuthEpoch(epoch) && !isSignOutActive()) {
+          setRestoreFailed(true);
         }
       } finally {
         setIsLoading(false);
       }
-    };
+    },
+    [setIsLoading, setRestoreFailed, setToken]
+  );
+
+  useEffect(() => {
+    void load({ token: preloadedAuthToken, refresh: preloadedRefreshToken });
+  }, [load]);
+
+  const retryRestore = useCallback(() => {
+    setIsLoading(true);
     void load();
-  }, [setIsLoading, setToken]);
+  }, [load, setIsLoading]);
+
+  return { retryRestore };
 }

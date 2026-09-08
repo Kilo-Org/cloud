@@ -41,7 +41,7 @@ type WorktreeKiloFailure = {
 };
 
 export type WorktreeKiloRuntime = {
-  readonly identity: SessionRequestIdentity;
+  readonly identity?: SessionRequestIdentity;
   readonly isolation?: RuntimeIsolation;
   readonly scopeId: string;
   readonly runtimeId: string;
@@ -68,6 +68,7 @@ export type WorktreeKiloRuntimes = {
     kilo: WorktreeKiloAuth,
     env?: Record<string, string>,
     canRefreshCredentials?: () => boolean,
+    runtimeIsolation?: RuntimeIsolation,
     beforeMutation?: () => void,
     onCleanupTarget?: (cleanup: (deadlineAt: number) => Promise<NativeRetirement>) => void
   ): WorktreeKiloAttachment;
@@ -89,7 +90,9 @@ export type WorktreeKiloRuntimes = {
     deadlineAt: number
   ): Promise<boolean>;
   getRetained?(directory: string): WorktreeKiloRuntime | undefined;
-  get(directory: string): WorktreeKiloRuntime | undefined;
+  get(identity: SessionRequestIdentity | string): WorktreeKiloRuntime | undefined;
+  getAll?(directory: string): WorktreeKiloRuntime[];
+  isCurrent?(runtime: WorktreeKiloRuntime): boolean;
   prepareForNewWork?(directory: string): boolean;
   isHealthy(): boolean;
   shutdown(): void;
@@ -385,8 +388,8 @@ export function createWorktreeKiloRuntimes(options: {
     root.entry.roots.delete(root);
     root.attached = false;
     root.pending.clear();
-    if (roots.get(root.identity.kiloSessionId) === root) {
-      roots.delete(root.identity.kiloSessionId);
+    if (roots.get(identityKey(root.identity)) === root) {
+      roots.delete(identityKey(root.identity));
       forgetAttachedRoot(root.identity.kiloSessionId, root.identity.directory);
     }
   }
@@ -400,8 +403,8 @@ export function createWorktreeKiloRuntimes(options: {
       cleanupDeadline,
       unregisterRoot,
       removeEntry: retiring => {
-        if (entries.get(retiring.directory) === retiring) {
-          entries.delete(retiring.directory);
+        if (entries.get(entryKey(retiring.identity, retiring.isolation)) === retiring) {
+          entries.delete(entryKey(retiring.identity, retiring.isolation));
           if (directoriesByScope.get(retiring.kilo.scopeId) === retiring.directory)
             directoriesByScope.delete(retiring.kilo.scopeId);
         }
@@ -410,7 +413,7 @@ export function createWorktreeKiloRuntimes(options: {
   }
 
   function removeRoot(root: RootAttachment): void {
-    if (roots.get(root.identity.kiloSessionId) !== root) return;
+    if (roots.get(identityKey(root.identity)) !== root) return;
     unregisterRoot(root);
     root.abort.abort();
     if (root.entry.roots.size === 0) void retire(root.entry);
@@ -546,7 +549,7 @@ export function createWorktreeKiloRuntimes(options: {
           signal: abort.signal,
         },
         isCurrent: (runtimeId, client) =>
-          entries.get(entry.directory) === entry &&
+          entries.get(entryKey(entry.identity, entry.isolation)) === entry &&
           entry.runtimeId === runtimeId &&
           entry.kiloClient === client &&
           entry.processAbort === abort,
@@ -664,11 +667,21 @@ export function createWorktreeKiloRuntimes(options: {
     get kiloCliVersion() {
       return observedVersion ?? null;
     },
-    attach(identity, kilo, environment, canRefreshCredentials, beforeMutation, onCleanupTarget) {
+    attach(
+      identity,
+      kilo,
+      environment,
+      canRefreshCredentials,
+      runtimeIsolation,
+      beforeMutation,
+      onCleanupTarget
+    ) {
       if (closed) {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktrees are closed', false);
       }
       const { directory } = identity;
+      const isolation = runtimeIsolation ?? 'directory-shared';
+      const key = entryKey(identity, isolation);
       if (recoveryGates.has(identityKey(identity))) {
         throw new WorktreeKiloRuntimeError('session_busy', 'Kilo runtime is retiring', true);
       }
@@ -679,8 +692,9 @@ export function createWorktreeKiloRuntimes(options: {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is deleted', false);
       }
       let root = findRoot(identity);
-      const scopeDirectory = directoriesByScope.get(kilo.scopeId);
-      const previous = entries.get(directory);
+      const scopeDirectory =
+        isolation === 'directory-shared' ? directoriesByScope.get(kilo.scopeId) : undefined;
+      const previous = entries.get(key);
       if (previous?.retirementResult === 'unconfirmed') {
         throw new WorktreeKiloRuntimeError(
           'not_ready',
@@ -785,10 +799,10 @@ export function createWorktreeKiloRuntimes(options: {
         const homes = homesByDirectory.get(directory) ?? new Set<string>();
         homes.add(home);
         homesByDirectory.set(directory, homes);
-        entries.set(directory, entry);
+        entries.set(key, entry);
         cleanupRequired = true;
         failedDirectories.delete(directory);
-        directoriesByScope.set(kilo.scopeId, directory);
+        if (isolation === 'directory-shared') directoriesByScope.set(kilo.scopeId, directory);
       }
       if (!root) {
         root = {
@@ -854,7 +868,7 @@ export function createWorktreeKiloRuntimes(options: {
       const root = findRoot(identity);
       if (!root) {
         assertIdle();
-        if (entries.has(entryKey(identity, 'per-session')) || entries.has(identity.directory)) {
+        if (entries.has(entryKey(identity, 'per-session'))) {
           throw new WorktreeKiloRuntimeError(
             'not_ready',
             'Session runtime is not recoverable',
@@ -881,7 +895,6 @@ export function createWorktreeKiloRuntimes(options: {
       if (!entry.runtime || !entry.kiloClient || !entry.stopped || entry.starting) {
         throw new WorktreeKiloRuntimeError('not_ready', 'Kilo worktree is not ready', true);
       }
-      const kiloClient = entry.kiloClient;
       let releaseGate: () => void = () => {};
       const gate = new Promise<void>(resolve => {
         releaseGate = resolve;
@@ -890,15 +903,7 @@ export function createWorktreeKiloRuntimes(options: {
       const retirement = (async (): Promise<RecoveryRetirement> => {
         try {
           assertIdle();
-          const statuses = await withKiloRequestDeadline(
-            signal => kiloClient.getSessionStatuses(identity.directory, signal),
-            entry.abort.signal
-          );
-          if (statuses[identity.kiloSessionId]?.type !== 'idle') {
-            throw new WorktreeKiloRuntimeError('session_busy', 'Session runtime is active', true);
-          }
-          assertIdle();
-          removeRoot(root, false);
+          removeRoot(root);
           await retire(entry);
           return 'retired';
         } finally {
@@ -921,7 +926,8 @@ export function createWorktreeKiloRuntimes(options: {
       for (const root of roots.values()) {
         if (root.identity.directory === directory) removeRoot(root);
       }
-      if (entry) {
+      for (const entry of [...entries.values()]) {
+        if (entry.directory !== directory) continue;
         const quiescent = await withTimeoutAndAbort(retire(entry), {
           timeoutMs: KILO_STARTUP_TIMEOUT_MS,
           timeoutMessage: 'Kilo worktree retirement timed out',
@@ -935,12 +941,16 @@ export function createWorktreeKiloRuntimes(options: {
       homesByDirectory.delete(directory);
     },
     async retireRuntime(directory, deadlineAt, target) {
-      const entry = entries.get(directory);
+      const entry =
+        entries.get(directory) ??
+        [...entries.values()].find(entry => entry.directory === directory);
       if (!entry) return 'stale';
       return retire(entry, deadlineAt, target);
     },
     async verifyQuiescence(directory, target, deadlineAt) {
-      const entry = entries.get(directory);
+      const entry =
+        entries.get(directory) ??
+        [...entries.values()].find(entry => entry.directory === directory);
       if (
         !entry ||
         entry.runtimeId !== target.runtimeId ||
@@ -952,7 +962,7 @@ export function createWorktreeKiloRuntimes(options: {
       return (
         verified &&
         Date.now() < deadlineAt &&
-        entries.get(directory) === entry &&
+        entries.get(entryKey(entry.identity, entry.isolation)) === entry &&
         entry.runtimeId === target.runtimeId &&
         entry.kiloClient === target.client &&
         !entry.abort.signal.aborted
@@ -961,18 +971,23 @@ export function createWorktreeKiloRuntimes(options: {
     getRetained(directory) {
       return entries.get(directory)?.runtime;
     },
-    get(directory) {
-      const entry = entries.get(directory);
+    get(identity) {
+      const entry =
+        typeof identity === 'string'
+          ? (entries.get(identity) ??
+            [...entries.values()].find(entry => entry.directory === identity))
+          : (entries.get(entryKey(identity, 'per-session')) ?? entries.get(identity.directory));
       const runtime = entry?.starting ? undefined : entry?.runtime;
       return !closed && runtime && !runtime.signal.aborted ? runtime : undefined;
     },
     prepareForNewWork(directory) {
-      const entry = entries.get(directory);
-      return (
-        !entry ||
-        (!entry.abort.signal.aborted &&
-          (entry.runtime === undefined || entry.feed?.prepareForNewWork() === true))
-      );
+      return [...entries.values()]
+        .filter(entry => entry.directory === directory)
+        .every(
+          entry =>
+            !entry.abort.signal.aborted &&
+            (entry.runtime === undefined || entry.feed?.prepareForNewWork() === true)
+        );
     },
     getAll(directory) {
       return [...entries.values()]
@@ -987,6 +1002,7 @@ export function createWorktreeKiloRuntimes(options: {
     isCurrent(runtime) {
       return (
         !closed &&
+        runtime.identity !== undefined &&
         entries.get(entryKey(runtime.identity, runtime.isolation ?? 'directory-shared'))
           ?.runtime === runtime &&
         !runtime.signal.aborted

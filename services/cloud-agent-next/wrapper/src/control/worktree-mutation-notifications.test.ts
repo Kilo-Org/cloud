@@ -251,8 +251,12 @@ function setup(deliver?: SendEvent, signal?: AbortSignal) {
   const notifications = createWorktreeMutationNotifications({
     sessions,
     kiloRuntimes: {
-      get: identity => runtimes.get(key(identity)),
-      isCurrent: runtime => runtimes.get(key(runtime.identity)) === runtime,
+      get: identity =>
+        typeof identity === 'string'
+          ? [...runtimes.values()].find(runtime => runtime.directory === identity)
+          : runtimes.get(key(identity)),
+      isCurrent: runtime =>
+        runtime.identity !== undefined && runtimes.get(key(runtime.identity)) === runtime,
     },
     signal: signal ?? abort.signal,
     sendEvent,
@@ -265,6 +269,7 @@ function setup(deliver?: SendEvent, signal?: AbortSignal) {
     const controller = new AbortController();
     let client = {} as WrapperKiloClient;
     const runtime: WorktreeKiloRuntime = {
+      identity,
       runtimeId: crypto.randomUUID(),
       directory,
       scopeId: directory,

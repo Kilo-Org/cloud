@@ -503,7 +503,12 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
       return await client.getWorktreeChanges(input.cloudAgentSessionId);
     }),
 
@@ -516,7 +521,12 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         userId: ctx.user.id,
         cloudAgentSessionId: input.cloudAgentSessionId,
       });
-      const client = createCloudAgentNextClient(generateCloudAgentToken(ctx.user));
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
       return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
     }),
 

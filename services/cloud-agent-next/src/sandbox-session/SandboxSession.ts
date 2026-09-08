@@ -152,6 +152,7 @@ import {
   sessionAbortResultSchema,
   sameSessionOperation,
   wrapperInstanceIdSchema,
+  type SessionAttachPayload,
   type SessionOperationAck,
   type SessionOperationAuthorization,
   type SessionRequestIdentity,
@@ -2649,7 +2650,12 @@ export class SandboxSession extends DurableObject<Env> {
     };
     const dispatchAuthorized = async (
       operation: SessionOperationAuthorization['operation'],
-      payload: unknown
+      payload: unknown,
+      expectedConnection?: {
+        providerInstanceId: string;
+        connectionId: string;
+        wrapperInstanceId: string;
+      }
     ) => {
       if (!wrapperInstanceId) throw new Error('Wrapper identity is missing');
       const authorization: SessionOperationAuthorization = {
@@ -2661,7 +2667,7 @@ export class SandboxSession extends DurableObject<Env> {
         dispatchDeadlineAt: deadlineAt,
       };
       const dispatched = await dispatchSessionOperation(
-        { authorization, payload },
+        { authorization, payload, expectedConnection },
         {
           read: () => this.loadMessages(),
           commit: messages => this.saveMessages(messages, epoch, 'wrapper_outcome'),
@@ -2885,6 +2891,66 @@ export class SandboxSession extends DurableObject<Env> {
             ? { preparation: { attemptId: recorder.attemptId, triggerMessageId: messageId } }
             : {}),
         };
+        const authorization = RuntimeAuthorizationSchema.safeParse(
+          this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+        );
+        let proxyKilo: SessionAttachPayload['kilo'] | undefined;
+        let proxyFence:
+          | {
+              providerInstanceId: string;
+              connectionId: string;
+              wrapperInstanceId: string;
+            }
+          | undefined;
+        if (authorization.success && authorization.data.state === 'active') {
+          const proxyBaseUrl = this.env.WORKER_URL
+            ? runtimeCredentialProxyFacadeBaseUrl(this.env.WORKER_URL)
+            : null;
+          if (!proxyBaseUrl) throw new Error('Runtime credential proxy is unavailable');
+          const handle = await wait(
+            () =>
+              this.issueRuntimeCredentialProxyGrant({
+                wrapperRunId: '',
+                wrapperGeneration: 0,
+                wrapperConnectionId: '',
+              }),
+            SANDBOX_CONTROL_ATTACH_TIMEOUT_MS
+          );
+          if (!handle) throw new Error('Runtime credential proxy grant is unavailable');
+          const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+          if (!claims) throw new Error('Runtime credential proxy grant is invalid');
+          const grant = runtimeProxyGrantSchema.safeParse(
+            this.ctx.storage.kv.get<unknown>(RUNTIME_PROXY_GRANT_KEY)
+          );
+          if (!grant.success || grant.data.plane !== 'control') {
+            throw new Error('Runtime credential proxy grant is unavailable');
+          }
+          proxyFence = {
+            providerInstanceId: grant.data.providerInstanceId,
+            connectionId: grant.data.connectionId,
+            wrapperInstanceId: grant.data.wrapperInstanceId,
+          };
+          proxyKilo = {
+            ...status.attachment.kilo,
+            token: handle,
+            targets: {
+              backendBaseUrl: proxyBaseUrl,
+              providerBaseUrl: proxyBaseUrl,
+              sessionIngestBaseUrl: proxyBaseUrl,
+            },
+          };
+          if (getSandboxProvider(metadata) === 'vercel') {
+            await wait(() =>
+              control.bindRuntimeCredentialProxyHandle({
+                ownerId: metadata.identity.userId,
+                sessionId,
+                kiloSessionId,
+                directory: session.directory,
+                handle,
+              })
+            );
+          }
+        }
         phase = 'attach';
         await wait(() =>
           control.attachSession({
@@ -2903,7 +2969,21 @@ export class SandboxSession extends DurableObject<Env> {
           return;
         }
         if (operationResults) {
-          if ((await dispatchAuthorized('session.attach', attachPayload)).state === 'running') {
+          if (
+            (
+              await dispatchAuthorized(
+                'session.attach',
+                proxyKilo
+                  ? {
+                      ...attachPayload,
+                      env: { ...attachPayload.env, KILOCODE_TOKEN: proxyKilo.token },
+                      kilo: proxyKilo,
+                    }
+                  : attachPayload,
+                proxyFence
+              )
+            ).state === 'running'
+          ) {
             await this.armQueueRetry(Math.min(deadlineAt, Date.now() + QUEUE_RETRY_MS));
             return;
           }
@@ -2917,7 +2997,14 @@ export class SandboxSession extends DurableObject<Env> {
                       operation: 'session.attach',
                       session,
                       expectedWrapperInstanceId: wrapperInstanceId,
-                      payload: attachPayload,
+                      ...(proxyFence ? { expectedConnection: proxyFence } : {}),
+                      payload: proxyKilo
+                        ? {
+                            ...attachPayload,
+                            env: { ...attachPayload.env, KILOCODE_TOKEN: proxyKilo.token },
+                            kilo: proxyKilo,
+                          }
+                        : attachPayload,
                       timeoutMs: SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
                     })
                   )

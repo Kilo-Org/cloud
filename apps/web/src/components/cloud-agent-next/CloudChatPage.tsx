@@ -963,6 +963,10 @@ export default function CloudChatPage({
     preparationAttempts.some(attempt => attempt.status === 'running')
       ? null
       : statusIndicator;
+  const currentChatProgress =
+    statusIndicator?.type === 'progress' && isCurrentSession && sessionIdFromParams
+      ? { sessionId: sessionIdFromParams, message: statusIndicator.message }
+      : null;
 
   const placeholder = isLoading
     ? 'Loading session…'
@@ -1063,6 +1067,7 @@ export default function CloudChatPage({
                       <CloudAgentWorkspaceTabs
                         activeTabId={workspaceTabs.activeTabId}
                         chatSessions={worktreeChats}
+                        currentChatProgress={currentChatProgress}
                         openChatSessionIds={openWorktreeChats.map(chat => chat.sessionId)}
                         closedChatSessionIds={closedWorktreeChats.map(chat => chat.sessionId)}
                         currentSessionId={sessionIdFromParams}

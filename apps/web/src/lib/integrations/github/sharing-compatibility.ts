@@ -4,6 +4,7 @@ import { db, type DrizzleTransaction } from '@/lib/drizzle';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import type { Owner } from '@/lib/integrations/core/types';
 import { TRPCError } from '@trpc/server';
+import { hasPendingProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import {
   agent_configs,
   app_builder_projects,
@@ -22,6 +23,7 @@ export type GitHubSharingCompatibilityResult =
       reason:
         | 'active_automation'
         | 'active_chat'
+        | 'active_provider_attempt'
         | 'active_review'
         | 'active_bot_request'
         | 'deployment'
@@ -60,6 +62,17 @@ export async function evaluateGitHubSharingCompatibility(
   ]);
   for (const ownerLockKey of [...ownerLockKeys].sort()) {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${ownerLockKey}))`);
+  }
+  const participatingOwners: Owner[] = [
+    destinationOwner,
+    ...associations.map(association =>
+      association.organizationId
+        ? { type: 'org' as const, id: association.organizationId }
+        : { type: 'user' as const, id: association.userId ?? '' }
+    ),
+  ];
+  if (await hasPendingProviderOAuthAttempt(tx, participatingOwners)) {
+    return { compatible: false, reason: 'active_provider_attempt' };
   }
 
   const ownerConditions = [

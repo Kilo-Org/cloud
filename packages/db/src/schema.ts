@@ -4275,13 +4275,11 @@ export const platform_integrations = pgTable(
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_github_org_canonical')
       .on(table.owned_by_organization_id, table.github_installation_id)
-      .concurrently()
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
       ),
     uniqueIndex('UQ_platform_integrations_github_user_canonical')
       .on(table.owned_by_user_id, table.github_installation_id)
-      .concurrently()
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
       ),
@@ -4416,6 +4414,45 @@ export const github_installation_webhook_receipts = pgTable(
       table.github_installation_id,
       table.delivery_id
     ),
+  ]
+);
+
+export const provider_oauth_attempts = pgTable(
+  'provider_oauth_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    provider: text().$type<'slack' | 'linear' | 'discord'>().notNull(),
+    purpose: text().notNull().default('install'),
+    state_hash: text().notNull().unique(),
+    initiated_by_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    status: text().$type<'pending' | 'consumed' | 'expired'>().notNull().default('pending'),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [
+    check(
+      'provider_oauth_attempts_provider_check',
+      sql`${table.provider} IN ('slack', 'linear', 'discord')`
+    ),
+    check(
+      'provider_oauth_attempts_status_check',
+      sql`${table.status} IN ('pending', 'consumed', 'expired')`
+    ),
+    check(
+      'provider_oauth_attempts_owner_check',
+      sql`num_nonnulls(${table.owned_by_user_id}, ${table.owned_by_organization_id}) = 1`
+    ),
+    uniqueIndex('UQ_provider_oauth_attempts_user_pending')
+      .on(table.owned_by_user_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_user_id} IS NOT NULL`),
+    uniqueIndex('UQ_provider_oauth_attempts_org_pending')
+      .on(table.owned_by_organization_id, table.provider)
+      .where(sql`${table.status} = 'pending' AND ${table.owned_by_organization_id} IS NOT NULL`),
   ]
 );
 

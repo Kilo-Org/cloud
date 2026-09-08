@@ -4,7 +4,6 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
-  exchangeSlackOAuthCode,
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
@@ -12,14 +11,16 @@ import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
+import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
-import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
-import { withChatInstallationLock } from '@/lib/bot/installation-lock';
+import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
+
+const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
 /**
  * Slack OAuth Callback
@@ -78,7 +79,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     // 3. Verify signed state (CSRF protection)
     const verified = verifyOAuthState(state);
-    if (!verified) {
+    if (!state || !verified) {
       captureMessage('Slack callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'slack/callback', source: 'slack_oauth' },
@@ -119,34 +120,30 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       }
     }
 
-    await assertGitHubAutomationCanBeEnabled(owner);
+    if (
+      !(await consumeProviderOAuthAttempt({
+        actorUserId: user.id,
+        owner,
+        provider: 'slack',
+        state,
+      }))
+    ) {
+      throw new Error('Slack OAuth attempt is invalid, expired, or already used');
+    }
 
-    // 7. Exchange first, then serialize state replacement and DB admission by workspace.
+    // 7. Let the Chat SDK exchange the code and seed its installation state
     await bot.initialize();
     const slackAdapter = bot.getAdapter('slack');
-    const { teamId, installation } = await exchangeSlackOAuthCode(code);
-    const connectionError = await withChatInstallationLock(
-      bot.getState(),
-      PLATFORM.SLACK,
-      teamId,
-      async () => {
-        const previousInstallation = await slackAdapter.getInstallation(teamId);
-        await slackAdapter.setInstallation(teamId, installation);
-        try {
-          await upsertSlackInstallation({ owner, teamId, installation });
-          return null;
-        } catch (error) {
-          if (previousInstallation) {
-            await slackAdapter.setInstallation(teamId, previousInstallation);
-          } else {
-            await slackAdapter.deleteInstallation(teamId);
-          }
-          return error;
-        }
-      }
-    );
-    if (connectionError) {
-      if (connectionError instanceof SlackWorkspaceAlreadyConnectedError) {
+    const url = new URL(request.url);
+    url.searchParams.set('redirect_uri', SLACK_REDIRECT_URI);
+    const patchedRequest = new Request(url, request);
+    const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
+
+    // 8. Store installation in database
+    try {
+      await upsertSlackInstallation({ owner, teamId, installation });
+    } catch (error) {
+      if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(
           new URL(
             buildIntegrationOAuthRedirectPathFromState(
@@ -158,7 +155,8 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
           )
         );
       }
-      throw connectionError;
+
+      throw error;
     }
 
     // 9. Redirect to success page

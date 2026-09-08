@@ -13,7 +13,7 @@ import {
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
-import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
+import { consumeProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 
 /**
  * Discord OAuth Callback
@@ -72,7 +72,7 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
 
     // 3. Verify signed state (CSRF protection)
     const verified = verifyOAuthState(state);
-    if (!verified) {
+    if (!state || !verified) {
       captureMessage('Discord callback invalid or tampered state signature', {
         level: 'warning',
         tags: { endpoint: 'discord/callback', source: 'discord_oauth' },
@@ -113,14 +113,21 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       }
     }
 
-    await assertGitHubAutomationCanBeEnabled(owner);
+    if (
+      !(await consumeProviderOAuthAttempt({
+        actorUserId: user.id,
+        owner,
+        provider: 'discord',
+        state,
+      }))
+    ) {
+      throw new Error('Discord OAuth attempt is invalid, expired, or already used');
+    }
 
     // 7. Exchange code for access token
     const oauthData = await exchangeDiscordCode(code);
 
     // 8. Store installation in database
-    // Discord bot membership is guild-global rather than callback-owned. A rejected
-    // callback must not remove a bot that another owner or callback may already use.
     await upsertDiscordInstallation(owner, oauthData);
 
     // 9. Redirect to success page

@@ -13,7 +13,6 @@ import { LINEAR_CLIENT_ID, LINEAR_CLIENT_SECRET } from '@/lib/config.server';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
-import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 // OAuth scopes requested when installing Kilo into a Linear workspace.
 // `app:mentionable` combined with `actor=app` gives us an app-actor install
@@ -389,23 +388,19 @@ export async function upsertLinearInstallation(
 
   if (existing) {
     try {
-      const updated = await db.transaction(async tx => {
-        await assertGitHubAutomationCanBeEnabled(owner, tx);
-        const [row] = await tx
-          .update(platform_integrations)
-          .set({
-            platform_installation_id: organizationId,
-            platform_account_id: organizationId,
-            platform_account_login: organizationName,
-            scopes: LINEAR_SCOPES,
-            integration_status: INTEGRATION_STATUS.ACTIVE,
-            metadata,
-            updated_at: new Date().toISOString(),
-          })
-          .where(eq(platform_integrations.id, existing.id))
-          .returning();
-        return row;
-      });
+      const [updated] = await db
+        .update(platform_integrations)
+        .set({
+          platform_installation_id: organizationId,
+          platform_account_id: organizationId,
+          platform_account_login: organizationName,
+          scopes: LINEAR_SCOPES,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata,
+          updated_at: new Date().toISOString(),
+        })
+        .where(eq(platform_integrations.id, existing.id))
+        .returning();
 
       return updated;
     } catch (error) {
@@ -417,26 +412,22 @@ export async function upsertLinearInstallation(
   }
 
   try {
-    const created = await db.transaction(async tx => {
-      await assertGitHubAutomationCanBeEnabled(owner, tx);
-      const [row] = await tx
-        .insert(platform_integrations)
-        .values({
-          owned_by_user_id: owner.type === 'user' ? owner.id : null,
-          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-          platform: PLATFORM.LINEAR,
-          integration_type: 'oauth',
-          platform_installation_id: organizationId,
-          platform_account_id: organizationId,
-          platform_account_login: organizationName,
-          scopes: LINEAR_SCOPES,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata,
-          installed_at: new Date().toISOString(),
-        })
-        .returning();
-      return row;
-    });
+    const [created] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.type === 'user' ? owner.id : null,
+        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+        platform: PLATFORM.LINEAR,
+        integration_type: 'oauth',
+        platform_installation_id: organizationId,
+        platform_account_id: organizationId,
+        platform_account_login: organizationName,
+        scopes: LINEAR_SCOPES,
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata,
+        installed_at: new Date().toISOString(),
+      })
+      .returning();
 
     return created;
   } catch (error) {

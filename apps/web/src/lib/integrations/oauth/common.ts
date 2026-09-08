@@ -8,6 +8,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { requireActiveSubscriptionOrTrial } from '@/lib/organizations/trial-middleware';
 import { createOAuthState, verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { beginProviderOAuthAttempt } from '@/lib/integrations/provider-oauth-attempts';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 import type { Owner } from '@/lib/integrations/core/types';
 import type { RetainedOAuthPlatform, StandardOAuthPlatform } from '@/lib/integrations/oauth/paths';
@@ -187,6 +188,9 @@ export async function handleStatefulPlatformOAuthConnect(
     const returnToParam = request.nextUrl.searchParams.get('returnTo');
     const returnTo = returnToParam ? validateReturnPath(returnToParam) : null;
     const state = createOAuthState(ownerToOAuthStateOwner(owner), user.id, returnTo ?? undefined);
+    if (platform === 'slack' || platform === 'linear' || platform === 'discord') {
+      await beginProviderOAuthAttempt({ actorUserId: user.id, owner, provider: platform, state });
+    }
 
     return NextResponse.redirect(buildOAuthUrl(state));
   } catch (error) {

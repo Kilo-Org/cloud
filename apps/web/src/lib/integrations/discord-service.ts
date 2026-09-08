@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull, sql } from 'drizzle-orm';
+import { eq, and, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -12,7 +12,6 @@ import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
 import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import { buildDiscordApiUrl, parseDiscordSnowflake } from '@/lib/discord-bot/discord-id';
-import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 // Discord OAuth2 scopes for the bot integration
 // 'bot' scope is needed for the bot to join servers
@@ -189,23 +188,18 @@ export async function upsertDiscordInstallation(
       guild_icon: oauthResponse.guild.icon,
     };
 
-    const updated = await db.transaction(async tx => {
-      await assertGitHubAutomationCanBeEnabled(owner, tx);
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`discord:${guildId}`}))`);
-      const [row] = await tx
-        .update(platform_integrations)
-        .set({
-          platform_account_id: guildId,
-          platform_account_login: guildName,
-          scopes,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata: updatedMetadata,
-          updated_at: new Date().toISOString(),
-        })
-        .where(eq(platform_integrations.id, existing.id))
-        .returning();
-      return row;
-    });
+    const [updated] = await db
+      .update(platform_integrations)
+      .set({
+        platform_account_id: guildId,
+        platform_account_login: guildName,
+        scopes,
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata: updatedMetadata,
+        updated_at: new Date().toISOString(),
+      })
+      .where(eq(platform_integrations.id, existing.id))
+      .returning();
 
     return updated;
   }
@@ -222,27 +216,22 @@ export async function upsertDiscordInstallation(
     model_slug: defaultModel,
   };
 
-  const created = await db.transaction(async tx => {
-    await assertGitHubAutomationCanBeEnabled(owner, tx);
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`discord:${guildId}`}))`);
-    const [row] = await tx
-      .insert(platform_integrations)
-      .values({
-        owned_by_user_id: owner.type === 'user' ? owner.id : null,
-        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-        platform: PLATFORM.DISCORD,
-        integration_type: 'oauth',
-        platform_installation_id: guildId,
-        platform_account_id: guildId,
-        platform_account_login: guildName,
-        scopes,
-        integration_status: INTEGRATION_STATUS.ACTIVE,
-        metadata,
-        installed_at: new Date().toISOString(),
-      })
-      .returning();
-    return row;
-  });
+  const [created] = await db
+    .insert(platform_integrations)
+    .values({
+      owned_by_user_id: owner.type === 'user' ? owner.id : null,
+      owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+      platform: PLATFORM.DISCORD,
+      integration_type: 'oauth',
+      platform_installation_id: guildId,
+      platform_account_id: guildId,
+      platform_account_login: guildName,
+      scopes,
+      integration_status: INTEGRATION_STATUS.ACTIVE,
+      metadata,
+      installed_at: new Date().toISOString(),
+    })
+    .returning();
 
   return created;
 }

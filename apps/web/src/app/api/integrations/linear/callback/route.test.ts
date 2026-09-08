@@ -19,6 +19,15 @@ import {
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
 const mockIsEnabledForBot = jest.fn();
+const mockLinearOrganization = jest.fn(async () => ({ name: 'Acme Workspace', urlKey: 'acme' }));
+
+jest.mock('@linear/sdk', () => ({
+  LinearClient: jest.fn().mockImplementation(() => ({
+    get organization() {
+      return mockLinearOrganization();
+    },
+  })),
+}));
 jest.mock('@/lib/user/server');
 jest.mock('@/lib/bot', () => ({
   bot: {
@@ -34,10 +43,12 @@ jest.mock('@/lib/integrations/linear-service', () => {
     upsertLinearInstallation: jest.fn(),
     exchangeLinearOAuthCode: jest.fn(),
     fetchLinearOAuthIdentity: jest.fn(),
-    getInstallation: jest.fn(),
     revokeLinearToken: jest.fn(async () => true),
   };
 });
+jest.mock('@/lib/integrations/provider-oauth-attempts', () => ({
+  consumeProviderOAuthAttempt: jest.fn(async () => true),
+}));
 jest.mock('@/lib/bot-identity', () => ({
   linkKiloUser: jest.fn(async () => undefined),
   unlinkTeamKiloUsers: jest.fn(async () => 0),
@@ -53,14 +64,6 @@ jest.mock('@/lib/bot/platforms', () => ({
   botPlatforms: {
     require: jest.fn(() => ({ isEnabledForBot: mockIsEnabledForBot })),
   },
-}));
-jest.mock('@/lib/bot/installation-lock', () => ({
-  withChatInstallationLock: async (
-    _state: unknown,
-    _platform: string,
-    _installationId: string,
-    callback: () => Promise<unknown>
-  ) => callback(),
 }));
 jest.mock('@/routers/organizations/utils', () => ({
   ensureOrganizationAccess: jest.fn(),
@@ -123,23 +126,19 @@ describe('GET /api/integrations/linear/callback', () => {
     } as never);
 
     mockedBotGetAdapter.mockReturnValue({
-      getInstallation: jest.fn(async () => null),
-      setInstallation: jest.fn(async () => undefined),
+      handleOAuthCallback: jest.fn(async () => ({
+        organizationId: ORGANIZATION_ID,
+        installation: {
+          accessToken: 'tok',
+          botUserId: 'bot-1',
+          organizationId: ORGANIZATION_ID,
+          expiresAt: null,
+        },
+      })),
       deleteInstallation: jest.fn(async () => undefined),
     } as never);
 
-    mockedExchangeLinearOAuthCode.mockResolvedValue({
-      accessToken: 'tok',
-      refreshToken: null,
-      expiresIn: null,
-      scope: null,
-    });
-    mockedFetchLinearOAuthIdentity.mockResolvedValue({
-      viewerId: 'bot-1',
-      viewerName: 'Kilo',
-      organizationId: ORGANIZATION_ID,
-      organizationName: 'Acme Workspace',
-    });
+    mockLinearOrganization.mockResolvedValue({ name: 'Acme Workspace', urlKey: 'acme' });
   });
 
   test('redirects to sign-in when user is unauthenticated', async () => {
@@ -213,7 +212,7 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations?error=unauthorized');
   });
 
-  test('invokes upsertLinearInstallation with the workspace name from OAuth identity', async () => {
+  test('invokes upsertLinearInstallation with the workspace name from Linear GraphQL', async () => {
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
     const response = await callLinearCallback(
@@ -225,6 +224,11 @@ describe('GET /api/integrations/linear/callback', () => {
         owner: { type: 'user', id: USER_ID },
         organizationId: ORGANIZATION_ID,
         organizationName: 'Acme Workspace',
+      }),
+      expect.objectContaining({
+        getChatSdkAccessToken: expect.any(Function),
+        deleteChatSdkInstallation: expect.any(Function),
+        deleteChatSdkIdentityCache: expect.any(Function),
       })
     );
     expectRedirectLocation(response, '/integrations/linear?success=installed');
@@ -255,13 +259,8 @@ describe('GET /api/integrations/linear/callback', () => {
     );
   });
 
-  test('falls back to organizationId when OAuth identity has no organization name', async () => {
-    mockedFetchLinearOAuthIdentity.mockResolvedValue({
-      viewerId: 'bot-1',
-      viewerName: 'Kilo',
-      organizationId: ORGANIZATION_ID,
-      organizationName: null,
-    });
+  test('falls back to organizationId when the Linear GraphQL query fails', async () => {
+    mockLinearOrganization.mockRejectedValue(new Error('Unauthorized'));
     mockedUpsertLinearInstallation.mockResolvedValue({} as never);
     const state = createOAuthState(`user_${USER_ID}`, USER_ID);
     await callLinearCallback(
@@ -271,7 +270,8 @@ describe('GET /api/integrations/linear/callback', () => {
     expect(mockedUpsertLinearInstallation).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationName: ORGANIZATION_ID,
-      })
+      }),
+      expect.anything()
     );
   });
 
@@ -281,8 +281,15 @@ describe('GET /api/integrations/linear/callback', () => {
     );
     const deleteInstallation = jest.fn<Promise<void>, [string]>(async () => undefined);
     const adapter = {
-      getInstallation: jest.fn(async () => null),
-      setInstallation: jest.fn(async () => undefined),
+      handleOAuthCallback: jest.fn(async () => ({
+        organizationId: ORGANIZATION_ID,
+        installation: {
+          accessToken: 'tok',
+          botUserId: 'bot-1',
+          organizationId: ORGANIZATION_ID,
+          expiresAt: null,
+        },
+      })),
       withInstallation: jest.fn(async <T>(_orgId: unknown, fn: () => Promise<T> | T) => fn()),
       getUser: jest.fn(async () => ({ fullName: 'Acme', userName: 'acme' })),
       deleteInstallation,

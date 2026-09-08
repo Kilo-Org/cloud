@@ -7,7 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@/lib/config.server';
+import { SLACK_CLIENT_ID } from '@/lib/config.server';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
@@ -15,7 +15,6 @@ import { DEFAULT_BOT_MODEL } from '@/lib/bot/constants';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
 import { writeSlackCredential } from '@/lib/integrations/platforms/slack/credential-store';
 import { captureException } from '@sentry/nextjs';
-import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 export class SlackWorkspaceAlreadyConnectedError extends Error {
   constructor(teamName: string) {
@@ -87,35 +86,6 @@ export function getSlackOAuthUrl(state: string): string {
   });
 
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
-}
-
-export async function exchangeSlackOAuthCode(code: string): Promise<{
-  teamId: string;
-  installation: SlackInstallation;
-}> {
-  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
-    throw new Error('SLACK_CLIENT_ID / SLACK_CLIENT_SECRET are not configured');
-  }
-  const result = await new WebClient().oauth.v2.access({
-    client_id: SLACK_CLIENT_ID,
-    client_secret: SLACK_CLIENT_SECRET,
-    code,
-    redirect_uri: SLACK_REDIRECT_URI,
-  });
-  const teamId = result.is_enterprise_install ? result.enterprise?.id : result.team?.id;
-  if (!result.ok || !result.access_token || !teamId) {
-    throw new Error(`Slack OAuth failed: ${result.error ?? 'missing installation identity'}`);
-  }
-  return {
-    teamId,
-    installation: {
-      botToken: result.access_token,
-      botUserId: result.bot_user_id,
-      teamName: result.team?.name ?? result.enterprise?.name,
-      enterpriseId: result.enterprise?.id,
-      isEnterpriseInstall: Boolean(result.is_enterprise_install),
-    },
-  };
 }
 
 /**
@@ -301,23 +271,19 @@ export async function upsertSlackInstallation({
 
   if (existing) {
     try {
-      const updated = await db.transaction(async tx => {
-        await assertGitHubAutomationCanBeEnabled(owner, tx);
-        const [row] = await tx
-          .update(platform_integrations)
-          .set({
-            platform_installation_id: teamId,
-            platform_account_id: teamId,
-            platform_account_login: teamName,
-            scopes: SLACK_SCOPES,
-            integration_status: INTEGRATION_STATUS.ACTIVE,
-            metadata,
-            updated_at: new Date().toISOString(),
-          })
-          .where(eq(platform_integrations.id, existing.id))
-          .returning();
-        return row;
-      });
+      const [updated] = await db
+        .update(platform_integrations)
+        .set({
+          platform_installation_id: teamId,
+          platform_account_id: teamId,
+          platform_account_login: teamName,
+          scopes: SLACK_SCOPES,
+          integration_status: INTEGRATION_STATUS.ACTIVE,
+          metadata,
+          updated_at: new Date().toISOString(),
+        })
+        .where(eq(platform_integrations.id, existing.id))
+        .returning();
 
       await mirrorSlackCredential({ integration: updated, owner, teamId, installation });
 
@@ -331,26 +297,22 @@ export async function upsertSlackInstallation({
   }
 
   try {
-    const created = await db.transaction(async tx => {
-      await assertGitHubAutomationCanBeEnabled(owner, tx);
-      const [row] = await tx
-        .insert(platform_integrations)
-        .values({
-          owned_by_user_id: owner.type === 'user' ? owner.id : null,
-          owned_by_organization_id: owner.type === 'org' ? owner.id : null,
-          platform: PLATFORM.SLACK,
-          integration_type: 'oauth',
-          platform_installation_id: teamId,
-          platform_account_id: teamId,
-          platform_account_login: teamName,
-          scopes: SLACK_SCOPES,
-          integration_status: INTEGRATION_STATUS.ACTIVE,
-          metadata,
-          installed_at: new Date().toISOString(),
-        })
-        .returning();
-      return row;
-    });
+    const [created] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: owner.type === 'user' ? owner.id : null,
+        owned_by_organization_id: owner.type === 'org' ? owner.id : null,
+        platform: PLATFORM.SLACK,
+        integration_type: 'oauth',
+        platform_installation_id: teamId,
+        platform_account_id: teamId,
+        platform_account_login: teamName,
+        scopes: SLACK_SCOPES,
+        integration_status: INTEGRATION_STATUS.ACTIVE,
+        metadata,
+        installed_at: new Date().toISOString(),
+      })
+      .returning();
 
     await mirrorSlackCredential({ integration: created, owner, teamId, installation });
 

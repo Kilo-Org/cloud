@@ -31,7 +31,7 @@
     "update-default-slash-commands": "node scripts/update-default-slash-commands.mjs"
   },
   "dependencies": {
-    "@cloudflare/sandbox": "0.12.1",
+    "@cloudflare/sandbox": "0.12.9",
     "@hono/trpc-server": "0.4.2",
     "@kilocode/cloud-agent-profile": "workspace:*",
     "@kilocode/container-usage": "workspace:*",

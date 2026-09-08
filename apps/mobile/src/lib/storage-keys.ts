@@ -31,6 +31,8 @@ export const LOGIN_EMAIL_DRAFT_KEY = 'login-email-draft';
 /** Login SSO-recovery banner draft, persisted before an RTL language reload. */
 export const LOGIN_SSO_RECOVERY_DRAFT_KEY = 'login-sso-recovery-draft';
 export const KEEP_SCREEN_ON_KEY = 'keep-session-screen-on';
+/** Profile credit balance masked as `*****`. Device preference; survives reboot. */
+export const HIDE_BALANCE_KEY = 'hide-balance';
 export const LIVE_ACTIVITY_KEY = 'live-activity-enabled';
 /** Return key in the agent composer sends/start instead of inserting a newline. */
 export const RETURN_SENDS_MESSAGE_KEY = 'return-sends-message';

@@ -143,8 +143,8 @@ describe('upsertPlatformIntegrationForOwner', () => {
     const ownerLockKey = `${owner.type}:${owner.id}`;
     let lockAcquired = false;
     let operationError: unknown;
-    let pendingResults:
-      | Promise<Awaited<ReturnType<typeof upsertPlatformIntegrationForOwner>>[]>
+    let pendingOperations:
+      | Promise<Awaited<ReturnType<typeof upsertPlatformIntegrationForOwner>>>[]
       | undefined;
     try {
       const identity = await lockClient.query<{ pid: number; database: string }>(
@@ -154,10 +154,8 @@ describe('upsertPlatformIntegrationForOwner', () => {
       expect(holderPid).toBeDefined();
       await lockClient.query('SELECT pg_advisory_lock(hashtext($1))', [ownerLockKey]);
       lockAcquired = true;
-      pendingResults = Promise.all(
-        installationIds.map(installationId =>
-          upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
-        )
+      pendingOperations = installationIds.map(installationId =>
+        upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
       );
       let waitingCount = 0;
       for (let attempt = 0; attempt < 2000 && waitingCount < 2; attempt += 1) {
@@ -187,11 +185,11 @@ describe('upsertPlatformIntegrationForOwner', () => {
       } finally {
         lockClient.release(unlockFailed);
       }
-      if (pendingResults) await Promise.allSettled([pendingResults]);
+      if (pendingOperations) await Promise.allSettled(pendingOperations);
     }
     if (operationError) throw operationError;
-    if (!pendingResults) throw new Error('Concurrent upserts did not start');
-    const results = await pendingResults;
+    if (!pendingOperations) throw new Error('Concurrent upserts did not start');
+    const results = await Promise.all(pendingOperations);
     expect(results.filter(result => result.ok)).toHaveLength(1);
     expect(results).toContainEqual({ ok: false, reason: 'multiple_installations_disabled' });
     const rows = await db

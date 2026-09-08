@@ -93,6 +93,7 @@ import {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
+  RepositoryReviewMode,
   BYOKManagementSource,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
@@ -294,6 +295,7 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  RepositoryReviewMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -4406,6 +4408,45 @@ export const github_connection_attempts = pgTable(
     ),
   ]
 );
+
+// Per-repository overrides for an installation's default bot-mention model
+// and automatic PR review mode. Both columns are nullable: null means
+// "inherit the installation default" (stored in `platform_integrations.metadata`),
+// not "disabled". A row with all-null overrides is equivalent to having no row.
+export const repository_customizations = pgTable(
+  'repository_customizations',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    // The platform's repository identifier (e.g. GitHub's numeric repository
+    // ID, stable across renames/transfers), stored as text so platforms with
+    // non-numeric IDs are representable; not the repository's owner/name string.
+    repository_id: text().notNull(),
+    bot_mention_model_slug: text(),
+    pr_review_mode: text().$type<RepositoryReviewMode>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_repository_customizations_integration_repository').on(
+      table.platform_integration_id,
+      table.repository_id
+    ),
+    enumCheck(
+      'repository_customizations_pr_review_mode_check',
+      table.pr_review_mode,
+      RepositoryReviewMode
+    ),
+  ]
+);
+
+export type RepositoryCustomization = typeof repository_customizations.$inferSelect;
+export type NewRepositoryCustomization = typeof repository_customizations.$inferInsert;
 
 export const user_github_app_tokens = pgTable(
   'user_github_app_tokens',

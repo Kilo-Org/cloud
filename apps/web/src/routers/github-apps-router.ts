@@ -27,6 +27,10 @@ import {
   getGitHubAppTypeForOrganization,
 } from '@/lib/integrations/platforms/github/app-selector';
 import { requireNumericPlatformRepositories } from '@/lib/integrations/core/types';
+import {
+  GitHubInstallationSettingsSchema,
+  GitHubRepositorySettingsSchema,
+} from '@/lib/integrations/github-repository-settings';
 import { createGitHubUserAuthorizationState } from '@/lib/integrations/platforms/github/user-authorization-state';
 import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
 import {
@@ -384,6 +388,96 @@ export const githubAppsRouter = createTRPCRouter({
           message: input.integrationId
             ? `Updated GitHub App installation ${input.integrationId} model to ${input.modelSlug}`
             : `Updated GitHub App integration model to ${input.modelSlug}`,
+        });
+      }
+
+      return result;
+    }),
+
+  // Get an installation's default bot-mention model and PR review mode, plus
+  // every accessible repository's raw override (or `null`, meaning it inherits
+  // the default). Used to render and edit repository customizations.
+  getRepositoryCustomizations: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = resolveOwner(ctx, input.organizationId);
+      return githubAppsService.getRepositoryCustomizations(owner, input.integrationId);
+    }),
+
+  // Update an installation's default bot-mention model and/or PR review mode.
+  updateInstallationSettings: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid(),
+        settings: GitHubInstallationSettingsSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      const result = await githubAppsService.updateInstallationSettings(
+        owner,
+        input.integrationId,
+        input.settings
+      );
+
+      if (input.organizationId && result.success) {
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Updated GitHub App installation ${input.integrationId} default settings: ${JSON.stringify(input.settings)}`,
+        });
+      }
+
+      return result;
+    }),
+
+  // Set or clear a per-repository override. A `null` field explicitly
+  // restores inheritance from the installation default; an omitted field is
+  // left untouched.
+  updateRepositorySettings: baseProcedure
+    .input(
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid(),
+        repositoryId: z.number().int().positive(),
+        settings: GitHubRepositorySettingsSchema,
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = await resolveAuthorizedOwner(ctx, input.organizationId);
+      const result = await githubAppsService.updateRepositorySettings(
+        owner,
+        input.integrationId,
+        input.repositoryId,
+        input.settings
+      );
+
+      if (input.organizationId && result.success) {
+        await createAuditLog({
+          organization_id: input.organizationId,
+          action: 'organization.settings.change',
+          actor_id: ctx.user.id,
+          actor_email: ctx.user.google_user_email,
+          actor_name: ctx.user.google_user_name,
+          message: `Updated GitHub App installation ${input.integrationId} repository ${input.repositoryId} settings: ${JSON.stringify(input.settings)}`,
         });
       }
 

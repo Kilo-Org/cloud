@@ -1,18 +1,35 @@
 import { describe, expect, it } from 'vitest';
 import { Hono, type Context } from 'hono';
 import { SignJWT } from 'jose';
-import { GASTOWN_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { kiloAuthMiddleware } from './kilo-auth.middleware';
-import type { GastownEnv } from '../gastown.worker';
+import { GASTOWN_AUDIENCE } from './internal-service-token-audiences';
+import { createKiloAuthMiddleware } from './kilo-auth-middleware';
 
 const TEST_SECRET = 'test-secret-that-is-long-enough-for-hs256';
 
+const resolveSecret = async (binding: { get(): Promise<string> } | string) =>
+  typeof binding === 'string' ? binding : await binding.get();
+
+type TestEnv = {
+  Bindings: { NEXTAUTH_SECRET?: string };
+  Variables: {
+    kiloUserId: string;
+    kiloIsAdmin: boolean;
+    kiloApiTokenPepper: string | null;
+    kiloGastownAccess: boolean;
+    kiloOrgMemberships: { orgId: string; role: 'owner' | 'member' | 'billing_manager' }[];
+  };
+};
+
 function createApp() {
   let downstreamCalls = 0;
-  const app = new Hono<GastownEnv>();
+  const app = new Hono<TestEnv>();
+  const kiloAuthMiddleware = createKiloAuthMiddleware<TestEnv>({
+    resolveSecret,
+    audiencePolicy: { audience: GASTOWN_AUDIENCE, mode: 'allow-legacy' },
+  });
   app.use('/api/*', kiloAuthMiddleware);
   app.use('/trpc/*', kiloAuthMiddleware);
-  const handler = (c: Context<GastownEnv>) => {
+  const handler = (c: Context<TestEnv>) => {
     downstreamCalls += 1;
     return c.json({
       kiloUserId: c.get('kiloUserId'),
@@ -42,7 +59,7 @@ async function signToken(
 }
 
 async function request(
-  app: Hono<GastownEnv>,
+  app: Hono<TestEnv>,
   token: string | undefined,
   secret: string | { get(): Promise<string | null> } | null = TEST_SECRET
 ) {
@@ -57,7 +74,7 @@ async function request(
   );
 }
 
-describe('kiloAuthMiddleware', () => {
+describe('createKiloAuthMiddleware', () => {
   it.each([
     ['missing authentication', undefined],
     ['malformed authentication', 'Bearer'],

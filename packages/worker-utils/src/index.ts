@@ -160,6 +160,16 @@ export type {
   VerifiedKiloAuthContext,
 } from './kilo-token-policy.js';
 
+export { createKiloAuthMiddleware } from './kilo-auth-middleware.js';
+export type {
+  KiloAuthEnv,
+  KiloAuthMiddlewareOptions,
+  KiloAuthOrgMembership,
+  KiloAuthVariables,
+  ResolveSecret,
+  SecretBinding,
+} from './kilo-auth-middleware.js';
+
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';
 

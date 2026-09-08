@@ -892,63 +892,65 @@ export async function upsertPlatformIntegrationForOwner(
   // Step 2: if the insert was blocked, re-read the row and determine
   // whether this is a same-owner refresh or a cross-owner claim.
   if (data.platform === 'github') {
-    if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
-      const ownerIntegrations = await getIntegrationsByOrganization(owner.id, PLATFORM.GITHUB);
-      const hasExistingInstallation = ownerIntegrations.some(
-        integration => integration.platform_installation_id !== null
+    return db.transaction(async tx => {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${data.platformInstallationId}`}))`
       );
-      const isExistingInstallation = ownerIntegrations.some(
-        integration =>
-          integration.platform_installation_id === data.platformInstallationId &&
-          integration.github_app_type === appType
-      );
-      if (hasExistingInstallation && !isExistingInstallation) {
-        return { ok: false, reason: 'multiple_installations_disabled' };
+      const peers = await tx
+        .select()
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            eq(platform_integrations.platform_installation_id, data.platformInstallationId),
+            appType === 'standard'
+              ? or(
+                  eq(platform_integrations.github_app_type, 'standard'),
+                  isNull(platform_integrations.github_app_type)
+                )
+              : eq(platform_integrations.github_app_type, 'lite')
+          )
+        )
+        .limit(2)
+        .for('update');
+      if (peers.length > 1) return { ok: false, reason: 'claimed_by_other_owner' };
+      const existing = peers[0];
+      const sameOwner =
+        existing &&
+        ((owner.type === 'user' &&
+          existing.owned_by_user_id === owner.id &&
+          existing.owned_by_organization_id === null) ||
+          (owner.type === 'org' &&
+            existing.owned_by_organization_id === owner.id &&
+            existing.owned_by_user_id === null));
+      if (existing && !sameOwner) return { ok: false, reason: 'claimed_by_other_owner' };
+
+      if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
+        const ownerIntegrations = await tx
+          .select({ installationId: platform_integrations.platform_installation_id })
+          .from(platform_integrations)
+          .where(
+            and(
+              eq(platform_integrations.owned_by_organization_id, owner.id),
+              eq(platform_integrations.platform, PLATFORM.GITHUB)
+            )
+          );
+        if (
+          ownerIntegrations.some(
+            integration =>
+              integration.installationId !== null &&
+              integration.installationId !== data.platformInstallationId
+          )
+        ) {
+          return { ok: false, reason: 'multiple_installations_disabled' };
+        }
       }
-    }
 
-    const inserted = await db
-      .insert(platform_integrations)
-      .values(values)
-      .onConflictDoNothing()
-      .returning({ id: platform_integrations.id });
-
-    if (inserted.length > 0) {
-      return { ok: true };
-    }
-
-    // Insert was blocked — another row claims this installation. Look up the
-    // row with the same app type as the unique index
-    // `(platform, github_app_type, installation_id)` so a standard refresh is
-    // never matched against a lite row (or vice versa).
-    const existing = await findIntegrationByInstallationId(
-      'github',
-      data.platformInstallationId,
-      appType
-    );
-
-    if (!existing) {
-      // The blocked insert produced no row and we cannot find the
-      // existing row. This is an edge case from a concurrent delete.
-      // Retry the insert: this time without onConflictDoNothing so
-      // the DB enforces uniqueness (or the call throws).
-      await db.insert(platform_integrations).values(values);
-      return { ok: true };
-    }
-
-    // Compare owners by type and id — a matching id with a different
-    // owner type must not refresh another owner's integration.
-    const sameOwner =
-      (owner.type === 'user' &&
-        existing.owned_by_user_id === owner.id &&
-        existing.owned_by_organization_id === null) ||
-      (owner.type === 'org' &&
-        existing.owned_by_organization_id === owner.id &&
-        existing.owned_by_user_id === null);
-
-    if (sameOwner) {
-      // Same-owner refresh: update by primary key.
-      await db
+      if (!existing) {
+        await tx.insert(platform_integrations).values(values);
+        return { ok: true };
+      }
+      await tx
         .update(platform_integrations)
         .set({
           platform_account_id: values.platform_account_id,
@@ -965,10 +967,7 @@ export async function upsertPlatformIntegrationForOwner(
         })
         .where(eq(platform_integrations.id, existing.id));
       return { ok: true };
-    }
-
-    // Cross-owner claim: refused.
-    return { ok: false, reason: 'claimed_by_other_owner' };
+    });
   }
 
   // Non-GitHub platforms use the existing per-owner pattern.

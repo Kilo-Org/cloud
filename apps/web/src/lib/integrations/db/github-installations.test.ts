@@ -19,6 +19,7 @@ import { assertGitHubInstallationRuntimeAuthorized } from '../github/runtime-aut
 import { getPlatformIntegration } from '../../bot/platform-helpers';
 import {
   findIntegrationByInstallationId,
+  upsertPlatformIntegrationForOwner,
   updateRepositoriesForIntegration,
 } from './platform-integrations';
 
@@ -190,6 +191,37 @@ describe('GitHub installation persistence', () => {
       github_app_type: 'standard',
       platform_installation_id: '123456',
     });
+  });
+
+  test('serializes concurrent legacy writers and fails closed on Standard-null peers', async () => {
+    const payload = {
+      platform: 'github',
+      integrationType: 'app',
+      platformInstallationId: '888881',
+      repositoryAccess: 'all',
+      githubAppType: 'standard' as const,
+    };
+    const results = await Promise.all([
+      upsertPlatformIntegrationForOwner({ type: 'user', id: ownerId }, payload),
+      upsertPlatformIntegrationForOwner({ type: 'user', id: otherOwnerId }, payload),
+    ]);
+    expect(results.filter(result => result.ok)).toHaveLength(1);
+    expect(results).toContainEqual({ ok: false, reason: 'claimed_by_other_owner' });
+
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '888882',
+      github_app_type: null,
+      integration_status: 'active',
+    });
+    await expect(
+      upsertPlatformIntegrationForOwner(
+        { type: 'user', id: otherOwnerId },
+        { ...payload, platformInstallationId: '888882' }
+      )
+    ).resolves.toEqual({ ok: false, reason: 'claimed_by_other_owner' });
   });
 
   test('keeps canonical repositories aligned with user refresh and suppresses disconnected projection', async () => {

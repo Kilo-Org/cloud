@@ -136,6 +136,7 @@ export const githubAppsRouter = createTRPCRouter({
         attemptId: attempt.id,
         userId: ctx.user.id,
         stage: 'confirm',
+        selectedInstallationId: input.installationId,
       });
       const credentials = getGitHubAppCredentials(attempt.github_app_type);
       if (!credentials.clientId)

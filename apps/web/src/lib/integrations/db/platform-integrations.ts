@@ -208,13 +208,22 @@ export async function updateIntegrationRepositories(
   repositories: PlatformRepository[],
   githubAppType?: GitHubAppType
 ) {
+  const appTypeCondition =
+    githubAppType === 'standard'
+      ? or(
+          eq(platform_integrations.github_app_type, 'standard'),
+          isNull(platform_integrations.github_app_type)
+        )
+      : githubAppType
+        ? eq(platform_integrations.github_app_type, githubAppType)
+        : undefined;
   const conditions = [
     eq(platform_integrations.platform, platform),
     eq(platform_integrations.platform_installation_id, installationId),
   ];
-  if (githubAppType) {
-    conditions.push(eq(platform_integrations.github_app_type, githubAppType));
-  }
+  if (appTypeCondition) conditions.push(appTypeCondition);
+  if (platform === PLATFORM.GITHUB)
+    conditions.push(isNull(platform_integrations.github_disconnected_at));
 
   await db
     .update(platform_integrations)
@@ -251,16 +260,41 @@ export async function updateRepositoriesForIntegration(
   integrationId: string,
   repositories: PlatformRepository[]
 ) {
-  await db
-    .update(platform_integrations)
-    .set({
-      repositories,
-      repositories_synced_at: new Date().toISOString(),
-      auth_invalid_at: null,
-      auth_invalid_reason: null,
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integrationId));
+  await db.transaction(async tx => {
+    const [integration] = await tx
+      .select({
+        platform: platform_integrations.platform,
+        canonicalId: platform_integrations.github_installation_id,
+        disconnectedAt: platform_integrations.github_disconnected_at,
+      })
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integrationId))
+      .for('update');
+    if (!integration) return;
+    const now = new Date().toISOString();
+    if (integration.platform === PLATFORM.GITHUB && integration.canonicalId) {
+      await tx
+        .update(github_app_installations)
+        .set({ repositories, repositories_synced_at: now, observed_at: now, updated_at: now })
+        .where(
+          and(
+            eq(github_app_installations.id, integration.canonicalId),
+            ne(github_app_installations.lifecycle_state, 'deleted')
+          )
+        );
+    }
+    if (integration.platform === PLATFORM.GITHUB && integration.disconnectedAt) return;
+    await tx
+      .update(platform_integrations)
+      .set({
+        repositories,
+        repositories_synced_at: now,
+        auth_invalid_at: null,
+        auth_invalid_reason: null,
+        updated_at: now,
+      })
+      .where(eq(platform_integrations.id, integrationId));
+  });
 }
 
 export async function updateIntegrationAccountIdentity(

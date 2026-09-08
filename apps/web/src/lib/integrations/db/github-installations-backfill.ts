@@ -1,6 +1,6 @@
 import { db } from '@/lib/drizzle';
 import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
-import { and, asc, eq, gt, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, isNull, sql } from 'drizzle-orm';
 
 const installationIdPattern = /^[1-9][0-9]*$/;
 
@@ -9,6 +9,10 @@ export type GitHubInstallationBackfillResult = {
   canonicalCreated: number;
   linked: number;
   skipped: number;
+  skippedInvalid: number;
+  skippedDeduplicated: number;
+  skippedAmbiguous: number;
+  scanComplete: boolean;
   nextCursor: string | null;
 };
 
@@ -16,35 +20,50 @@ export async function backfillGitHubInstallations(
   limit = 100,
   afterId?: string
 ): Promise<GitHubInstallationBackfillResult> {
-  const rows = await db
+  const pageSize = Math.max(1, Math.min(limit, 500));
+  const selectedRows = await db
     .select()
     .from(platform_integrations)
     .where(
       and(
         eq(platform_integrations.platform, 'github'),
         isNull(platform_integrations.github_installation_id),
-        isNotNull(platform_integrations.platform_installation_id),
         afterId ? gt(platform_integrations.id, afterId) : undefined
       )
     )
     .orderBy(asc(platform_integrations.id))
-    .limit(Math.max(1, Math.min(limit, 500)));
+    .limit(pageSize + 1);
+  const scanComplete = selectedRows.length <= pageSize;
+  const rows = selectedRows.slice(0, pageSize);
   const result = {
     scanned: rows.length,
     canonicalCreated: 0,
     linked: 0,
     skipped: 0,
-    nextCursor: rows.at(-1)?.id ?? null,
+    skippedInvalid: 0,
+    skippedDeduplicated: 0,
+    skippedAmbiguous: 0,
+    scanComplete,
+    nextCursor: scanComplete ? null : (rows.at(-1)?.id ?? null),
   };
   for (const row of rows) {
     const installationId = row.platform_installation_id;
     if (
-      !installationId ||
-      !installationIdPattern.test(installationId) ||
-      row.integration_status !== 'active' ||
-      (typeof row.metadata === 'object' && row.metadata !== null && 'github_dedup' in row.metadata)
+      typeof row.metadata === 'object' &&
+      row.metadata !== null &&
+      'github_dedup' in row.metadata
     ) {
       result.skipped++;
+      result.skippedDeduplicated++;
+      continue;
+    }
+    if (
+      !installationId ||
+      !installationIdPattern.test(installationId) ||
+      row.integration_status !== 'active'
+    ) {
+      result.skipped++;
+      result.skippedInvalid++;
       continue;
     }
     const appType = row.github_app_type ?? 'standard';
@@ -63,6 +82,7 @@ export async function backfillGitHubInstallations(
       .limit(2);
     if (peers.length !== 1 || peers[0]?.id !== row.id) {
       result.skipped++;
+      result.skippedAmbiguous++;
       continue;
     }
     await db.transaction(async tx => {

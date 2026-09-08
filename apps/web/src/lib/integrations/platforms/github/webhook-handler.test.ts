@@ -51,6 +51,11 @@ jest.mock('@/lib/integrations/platforms/github/user-authorization', () => ({
 }));
 
 jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  GitHubRuntimeAuthorizationError: class GitHubRuntimeAuthorizationError extends Error {
+    constructor(message: string) {
+      super(message);
+    }
+  },
   assertGitHubInstallationRuntimeAuthorized: (installationId: string, appType: string) =>
     mockAssertGitHubInstallationRuntimeAuthorized(installationId, appType),
 }));
@@ -65,8 +70,8 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
     mockHandleInstallationSuspend(payload, appType),
   handleInstallationUnsuspend: (payload: unknown, appType: string) =>
     mockHandleInstallationUnsuspend(payload, appType),
-  handleInstallationTargetRenamed: (payload: unknown, integrationId: string, appType: string) =>
-    mockHandleInstallationTargetRenamed(payload, integrationId, appType),
+  handleInstallationTargetRenamed: (payload: unknown, integration: unknown, appType: string) =>
+    mockHandleInstallationTargetRenamed(payload, integration, appType),
   handleIssue: jest.fn(),
   handlePRReviewComment: (payload: unknown, platformIntegration: unknown) =>
     mockHandlePRReviewComment(payload, platformIntegration),
@@ -90,6 +95,7 @@ jest.mock('next/server', () => {
 });
 
 import { handleGitHubWebhook } from './webhook-handler';
+import { GitHubRuntimeAuthorizationError } from '@/lib/integrations/github/runtime-authorization';
 
 const integration = {
   id: 'pi_github',
@@ -249,7 +255,7 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(200);
     expect(mockHandleInstallationTargetRenamed).toHaveBeenCalledWith(
       expect.objectContaining(payload),
-      integration.id,
+      integration,
       'lite'
     );
     expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
@@ -371,7 +377,7 @@ describe('handleGitHubWebhook', () => {
 
   it('skips deferred GitHub work when the association disconnects after receipt', async () => {
     mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
-      new Error('GitHub installation is unavailable for runtime use')
+      new GitHubRuntimeAuthorizationError()
     );
 
     const response = await handleGitHubWebhook(
@@ -381,6 +387,18 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     await waitForAfterTask();
+    expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
+  });
+
+  it('returns 500 when the runtime availability query fails unexpectedly', async () => {
+    mockAssertGitHubInstallationRuntimeAuthorized.mockRejectedValueOnce(
+      new Error('database unavailable')
+    );
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request_review_comment', reviewCommentPayload()),
+      'standard'
+    );
+    expect(response.status).toBe(500);
     expect(mockHandlePRReviewComment).not.toHaveBeenCalled();
   });
 

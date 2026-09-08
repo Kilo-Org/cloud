@@ -22,6 +22,7 @@ import { useConfirm } from '@/components/ui/confirm';
 import { useOrganizationWithMembers } from '@/app/api/organizations/hooks';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { useModelSelectorList } from '@/app/api/openrouter/hooks';
+import { GitHubConnectionAttemptState } from './GitHubConnectionAttemptState';
 
 type OrganizationGitHubInstallationsProps = {
   organizationId: string;
@@ -246,30 +247,15 @@ export function OrganizationGitHubInstallations({
             <p className="mt-1 text-sm text-muted-foreground">
               Only organizations where you are an active GitHub owner are shown.
             </p>
-            {connectionAttempt.isLoading ? (
-              <p className="mt-3 text-sm text-muted-foreground">Loading eligible installations…</p>
-            ) : connectionAttempt.data?.candidates.length ? (
-              <div className="mt-3 grid gap-2">
-                {connectionAttempt.data.candidates.map(candidate => (
-                  <Button
-                    key={candidate.installationId}
-                    variant="outline"
-                    className="justify-between"
-                    onClick={() => confirmConnection(candidate.installationId)}
-                    disabled={selectConnection.isPending}
-                  >
-                    {candidate.accountLogin}
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {candidate.installationId}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-3 text-sm text-muted-foreground">
-                No eligible existing GitHub installations were found.
-              </p>
-            )}
+            <GitHubConnectionAttemptState
+              isLoading={connectionAttempt.isLoading}
+              isError={connectionAttempt.isError}
+              candidates={connectionAttempt.data?.candidates}
+              isSelecting={selectConnection.isPending}
+              isRestarting={beginConnection.isPending}
+              onRestart={startConnection}
+              onSelect={confirmConnection}
+            />
           </div>
         )}
         {query.isError ? (

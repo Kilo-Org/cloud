@@ -7,9 +7,12 @@ import { logExceptInTest } from '@/lib/utils.server';
 
 export async function handleInstallationTargetRenamed(
   payload: InstallationTargetRenamedPayload,
-  integrationId: string,
+  integration: { id: string; github_disconnected_at: string | null },
   appType: GitHubAppType
 ) {
+  if (integration.github_disconnected_at) {
+    return NextResponse.json({ message: 'Installation target ignored' }, { status: 200 });
+  }
   const installationId = payload.installation.id.toString();
   const details = await fetchGitHubInstallationDetails(installationId, appType);
 
@@ -18,14 +21,14 @@ export async function handleInstallationTargetRenamed(
   }
 
   await updateGitHubInstallationAccountIdentity({
-    integrationId,
+    integrationId: integration.id,
     accountId: details.account.id.toString(),
     accountLogin: details.account.login,
   });
 
   logExceptInTest('GitHub App installation target renamed:', {
     installation_id: installationId,
-    integration_id: integrationId,
+    integration_id: integration.id,
     target_type: payload.target_type,
   });
 

@@ -88,6 +88,7 @@ describe('handleGitHubWebhook — pull_request dispatch to upsertCliSessionPullR
         integration_type: 'app',
         platform_installation_id: INSTALLATION_ID,
         github_app_type: 'standard',
+        integration_status: 'active',
       })
       .returning();
     integrationId = integration.id;
@@ -393,6 +394,7 @@ describe('handleGitHubWebhook — pull_request_review dispatch to upsertCliSessi
         integration_type: 'app',
         platform_installation_id: INSTALLATION_ID,
         github_app_type: 'standard',
+        integration_status: 'active',
       })
       .returning();
     integrationId = integration.id;

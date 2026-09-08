@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { db } from '@/lib/drizzle';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { github_connection_attempts } from '@kilocode/db/schema';
 import type { Owner } from '@/lib/integrations/core/types';
@@ -91,7 +91,18 @@ export async function selectGitHubConnectionInstallation(input: {
   const [selected] = await db
     .update(github_connection_attempts)
     .set({ selected_installation_id: input.installationId })
-    .where(eq(github_connection_attempts.id, attempt.id))
+    .where(
+      and(
+        eq(github_connection_attempts.id, attempt.id),
+        eq(github_connection_attempts.kilo_user_id, input.userId),
+        or(
+          isNull(github_connection_attempts.selected_installation_id),
+          eq(github_connection_attempts.selected_installation_id, input.installationId)
+        ),
+        isNull(github_connection_attempts.consumed_at),
+        sql`${github_connection_attempts.expires_at} > NOW()`
+      )
+    )
     .returning();
   return selected ?? null;
 }

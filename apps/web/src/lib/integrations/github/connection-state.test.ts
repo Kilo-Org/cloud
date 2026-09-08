@@ -36,7 +36,11 @@ describe('GitHub connection OAuth state', () => {
   test.each(['discover', 'confirm'] as const)(
     'round-trips a single-use %s state bound to its attempt and user',
     async stage => {
-      const created = await createGitHubConnectionOAuthState({ attemptId, userId, stage });
+      const created = await createGitHubConnectionOAuthState(
+        stage === 'confirm'
+          ? { attemptId, userId, stage, selectedInstallationId: '123' }
+          : { attemptId, userId, stage }
+      );
       const verifier = mockedSet.mock.calls[0]?.[1];
       if (typeof verifier !== 'string') throw new Error('Expected string verifier');
       expect(created.codeChallenge).toBe(createHash('sha256').update(verifier).digest('base64url'));
@@ -45,6 +49,7 @@ describe('GitHub connection OAuth state', () => {
         stage,
         verifierRef: expect.any(String),
         codeVerifier: verifier,
+        ...(stage === 'confirm' ? { selectedInstallationId: '123' } : {}),
       });
       await expect(consumeGitHubConnectionOAuthState(created.state, userId)).resolves.toBeNull();
     }

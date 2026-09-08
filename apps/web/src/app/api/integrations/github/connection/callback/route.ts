@@ -51,6 +51,10 @@ export async function GET(request: NextRequest) {
     new Date(attempt.expires_at) <= new Date()
   )
     return redirect('/github-app', 'invalid_attempt');
+  const path =
+    attempt.owner_type === 'org'
+      ? `/organizations/${attempt.owner_id}/integrations/github`
+      : '/integrations/github';
   try {
     if (attempt.owner_type === 'org') {
       await ensureOrganizationAccess(
@@ -59,18 +63,14 @@ export async function GET(request: NextRequest) {
         ORGANIZATION_MANAGE_ROLES
       );
     } else if (attempt.owner_id !== user.id) {
-      return redirect('/github-app', 'authorization_revoked');
+      return redirect(path, 'authorization_revoked');
     }
   } catch {
-    return redirect('/github-app', 'authorization_revoked');
+    return redirect(path, 'authorization_revoked');
   }
   try {
     const oauth = await exchangeGitHubOAuthCode(code, attempt.github_app_type, state.codeVerifier);
     const credentials = getGitHubAppCredentials(attempt.github_app_type);
-    const path =
-      attempt.owner_type === 'org'
-        ? `/organizations/${attempt.owner_id}/integrations/github`
-        : '/integrations/github';
     if (state.stage === 'discover') {
       const discovery = await discoverAuthorizedGitHubInstallations({
         accessToken: oauth.accessToken,
@@ -87,7 +87,11 @@ export async function GET(request: NextRequest) {
       url.searchParams.set('github_connection_attempt', attempt.id);
       return NextResponse.redirect(url);
     }
-    if (!attempt.selected_installation_id) return redirect(path, 'invalid_selection');
+    if (
+      !attempt.selected_installation_id ||
+      state.selectedInstallationId !== attempt.selected_installation_id
+    )
+      return redirect(path, 'invalid_selection');
     const proof = await verifyGitHubInstallationAuthorization({
       accessToken: oauth.accessToken,
       githubAppType: attempt.github_app_type,
@@ -116,6 +120,6 @@ export async function GET(request: NextRequest) {
     if (!completed.ok) return redirect(path, completed.reason);
     return redirect(`${path}?github_connection=success`);
   } catch {
-    return redirect('/github-app', 'connection_failed');
+    return redirect(path, 'connection_failed');
   }
 }

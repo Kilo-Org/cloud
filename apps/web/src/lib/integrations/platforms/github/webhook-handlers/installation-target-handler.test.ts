@@ -24,17 +24,20 @@ jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
     mockFetchGitHubInstallationDetails(installationId, appType),
 }));
 
-jest.mock('@/lib/integrations/db/platform-integrations', () => ({
-  updateIntegrationAccountIdentity: (
-    integrationId: string,
-    platformAccountId: string,
-    platformAccountLogin: string
-  ) => mockUpdateIntegrationAccountIdentity(integrationId, platformAccountId, platformAccountLogin),
+jest.mock('@/lib/integrations/db/github-installations', () => ({
+  updateGitHubInstallationAccountIdentity: (input: {
+    integrationId: string;
+    accountId: string;
+    accountLogin: string;
+  }) =>
+    mockUpdateIntegrationAccountIdentity(input.integrationId, input.accountId, input.accountLogin),
 }));
+
+const integrationId = '00000000-0000-4000-8000-000000000001';
 
 let handleInstallationTargetRenamed: (
   payload: InstallationTargetRenamedPayload,
-  integrationId: string,
+  integration: { id: string; github_disconnected_at: string | null },
   appType: GitHubAppType
 ) => Promise<Response>;
 
@@ -60,14 +63,14 @@ describe('handleInstallationTargetRenamed', () => {
         changes: { login: { from: 'old-owner' } },
         target_type: 'User',
       },
-      'integration-1',
+      { id: integrationId, github_disconnected_at: null },
       'lite'
     );
 
     expect(response.status).toBe(200);
     expect(mockFetchGitHubInstallationDetails).toHaveBeenCalledWith('98765', 'lite');
     expect(mockUpdateIntegrationAccountIdentity).toHaveBeenCalledWith(
-      'integration-1',
+      integrationId,
       '123',
       'authoritative-current-owner'
     );
@@ -87,11 +90,28 @@ describe('handleInstallationTargetRenamed', () => {
           changes: {},
           target_type: 'Organization',
         },
-        'integration-1',
+        { id: integrationId, github_disconnected_at: null },
         'standard'
       )
     ).rejects.toThrow('GitHub installation account identity missing after rename event');
 
+    expect(mockUpdateIntegrationAccountIdentity).not.toHaveBeenCalled();
+  });
+
+  it('does not fetch or project a rename after local disconnect', async () => {
+    const response = await handleInstallationTargetRenamed(
+      {
+        action: 'renamed',
+        installation: { id: 98765 },
+        account: {},
+        changes: {},
+        target_type: 'Organization',
+      },
+      { id: integrationId, github_disconnected_at: '2026-09-07T00:00:00.000Z' },
+      'standard'
+    );
+    expect(response.status).toBe(200);
+    expect(mockFetchGitHubInstallationDetails).not.toHaveBeenCalled();
     expect(mockUpdateIntegrationAccountIdentity).not.toHaveBeenCalled();
   });
 });

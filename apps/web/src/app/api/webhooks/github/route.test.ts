@@ -26,6 +26,10 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handler', () => ({
     mockHandleGitHubWebhook(request, appType),
 }));
 
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
+}));
+
 import { POST } from './route';
 
 function githubRequest(

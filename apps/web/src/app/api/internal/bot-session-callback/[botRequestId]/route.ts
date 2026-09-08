@@ -25,7 +25,11 @@ import {
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { runBotAgent, type BotAgentMessageLike } from '@/lib/bot/agent-runner';
 import { botPlatforms } from '@/lib/bot/platforms';
-import { getPlatformIntegrationById } from '@/lib/bot/platform-helpers';
+import {
+  getPlatformIntegrationById,
+  PlatformIntegrationNotFoundError,
+  PlatformIntegrationUnavailableError,
+} from '@/lib/bot/platform-helpers';
 import { findUserById } from '@/lib/user';
 import type { Thread } from 'chat';
 
@@ -881,13 +885,73 @@ export async function POST(
         completedStepCount,
       });
       try {
-        if (!requestRow.platform_integration_id) {
-          throw new Error(`Bot callback is missing a platform integration id for ${botRequestId}`);
+        if (childSessionStatus && trackedCallbackSession) {
+          try {
+            const updated = await markBotRequestCloudAgentSessionTerminalStrict({
+              botRequestId,
+              cloudAgentSessionId: callbackSessionId,
+              status: childSessionStatus,
+              executionId: payload.executionId,
+              kiloSessionId: payload.kiloSessionId,
+              errorMessage:
+                childSessionStatus === 'failed' && payload.status !== 'failed'
+                  ? `Unknown callback status: ${String(payload.status)}`
+                  : payload.errorMessage,
+            });
+            if (!updated) {
+              throw new Error(
+                `Tracked session ${callbackSessionId} was not updated to ${childSessionStatus}.`
+              );
+            }
+          } catch (error) {
+            captureException(error, {
+              tags: { source: 'bot-session-callback-api', op: 'mark-tracked-session-terminal' },
+              extra: {
+                botRequestId,
+                cloudAgentSessionId: callbackSessionId,
+                status: childSessionStatus,
+              },
+            });
+            await failBotRequest({
+              botRequestId,
+              errorMessage: 'Cloud Agent callback processing failed while saving session status.',
+              responseTimeMs: Date.now() - startedAt,
+            });
+            return;
+          }
         }
 
-        const platformIntegration = await getPlatformIntegrationById(
-          requestRow.platform_integration_id
-        );
+        if (!requestRow.platform_integration_id) {
+          await failBotRequest({
+            botRequestId,
+            errorMessage: 'Platform connection was removed before callback publication.',
+            responseTimeMs: Date.now() - startedAt,
+          });
+          return;
+        }
+
+        let platformIntegration: PlatformIntegration;
+        try {
+          platformIntegration = await getPlatformIntegrationById(
+            requestRow.platform_integration_id
+          );
+        } catch (error) {
+          if (
+            !(error instanceof PlatformIntegrationUnavailableError) &&
+            !(error instanceof PlatformIntegrationNotFoundError)
+          )
+            throw error;
+          await failBotRequest({
+            botRequestId,
+            errorMessage: 'Platform connection was disconnected before callback publication.',
+            responseTimeMs: Date.now() - startedAt,
+          });
+          logCallback('Finalized callback without provider publication after disconnect', {
+            botRequestId,
+            platformIntegrationId: requestRow.platform_integration_id,
+          });
+          return;
+        }
         await bot.initialize();
         const thread = bot.thread(requestRow.platform_thread_id);
 
@@ -905,48 +969,6 @@ export async function POST(
 
         let workComplete = false;
         try {
-          if (childSessionStatus && trackedCallbackSession) {
-            try {
-              const updated = await markBotRequestCloudAgentSessionTerminalStrict({
-                botRequestId,
-                cloudAgentSessionId: callbackSessionId,
-                status: childSessionStatus,
-                executionId: payload.executionId,
-                kiloSessionId: payload.kiloSessionId,
-                errorMessage:
-                  childSessionStatus === 'failed' && payload.status !== 'failed'
-                    ? `Unknown callback status: ${String(payload.status)}`
-                    : payload.errorMessage,
-              });
-              if (!updated) {
-                throw new Error(
-                  `Tracked session ${callbackSessionId} was not updated to ${childSessionStatus}.`
-                );
-              }
-            } catch (error) {
-              captureException(error, {
-                tags: {
-                  source: 'bot-session-callback-api',
-                  op: 'mark-tracked-session-terminal',
-                },
-                extra: {
-                  botRequestId,
-                  cloudAgentSessionId: callbackSessionId,
-                  status: childSessionStatus,
-                },
-              });
-              workComplete = await failBotRequestForCallbackProcessingError({
-                botRequestId,
-                platformIntegration,
-                thread,
-                startedAt,
-                errorMessage: 'Cloud Agent callback processing failed while saving session status.',
-                logMessage: 'Failed to mark tracked Cloud Agent session terminal',
-              });
-              return;
-            }
-          }
-
           if (payload.status === 'completed') {
             workComplete = await handleCompletedCallback(
               botRequestId,

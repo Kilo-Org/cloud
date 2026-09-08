@@ -1,6 +1,7 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import type {
   InstallationDeletedPayload,
+  InstallationCreatedPayload,
   InstallationRepositoriesPayload,
   InstallationSuspendPayload,
   InstallationUnsuspendPayload,
@@ -82,6 +83,27 @@ const mockCaptureException = jest.fn<(...args: unknown[]) => void>();
 const mockLogExceptInTest = jest.fn<(...args: unknown[]) => void>();
 const mockObserveGitHubInstallationLifecycle = jest.fn<(...args: unknown[]) => Promise<void>>();
 const mockUpdateGitHubInstallationRepositories = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockAutoCompleteInstallation = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockBindCanonical = jest.fn<(...args: unknown[]) => Promise<void>>();
+const mockFetchGitHubRepositories = jest.fn<() => Promise<PlatformRepository[]>>();
+let connectionManagementEnabled = false;
+let selectResults: unknown[][] = [];
+
+jest.mock('@/lib/drizzle', () => ({
+  db: {
+    select: () => ({
+      from: () => ({ where: async () => selectResults.shift() ?? [] }),
+    }),
+  },
+}));
+
+jest.mock('@/lib/integrations/github/multiple-installations', () => ({
+  isGitHubConnectionManagementEnabled: () => connectionManagementEnabled,
+}));
+
+jest.mock('../adapter', () => ({
+  fetchGitHubRepositories: () => mockFetchGitHubRepositories(),
+}));
 
 jest.mock('@/lib/integrations/db/platform-integrations', () => ({
   findIntegrationByInstallationId: (
@@ -89,7 +111,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
     installationId: string,
     appType: GitHubAppType
   ) => mockFindIntegrationByInstallationId(platform, installationId, appType),
-  autoCompleteInstallation: jest.fn(),
+  autoCompleteInstallation: (...args: unknown[]) => mockAutoCompleteInstallation(...args),
   deleteGitHubInstallationRecords: (installationId: string, appType: GitHubAppType) =>
     mockDeleteGitHubInstallationRecords(installationId, appType),
   suspendIntegration: (
@@ -130,6 +152,7 @@ jest.mock('@/lib/integrations/db/platform-integrations', () => ({
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   observeGitHubInstallationLifecycle: (...args: unknown[]) =>
     mockObserveGitHubInstallationLifecycle(...args),
+  bindGitHubIntegrationToCanonicalInstallation: (...args: unknown[]) => mockBindCanonical(...args),
   updateGitHubInstallationRepositories: (...args: unknown[]) =>
     mockUpdateGitHubInstallationRepositories(...args),
 }));
@@ -158,6 +181,10 @@ let handleInstallationDeleted: (
   payload: InstallationDeletedPayload,
   appType: GitHubAppType
 ) => Promise<Response>;
+let handleInstallationCreated: (
+  payload: InstallationCreatedPayload,
+  appType: GitHubAppType
+) => Promise<Response>;
 let handleInstallationSuspend: (
   payload: InstallationSuspendPayload,
   appType: GitHubAppType
@@ -172,8 +199,12 @@ let handleInstallationRepositories: (
 ) => Promise<Response>;
 
 beforeAll(async () => {
-  ({ handleInstallationDeleted, handleInstallationSuspend, handleInstallationUnsuspend } =
-    await import('./installation-handler'));
+  ({
+    handleInstallationCreated,
+    handleInstallationDeleted,
+    handleInstallationSuspend,
+    handleInstallationUnsuspend,
+  } = await import('./installation-handler'));
   ({ handleInstallationRepositories } = await import('./installation-repositories-handler'));
 });
 
@@ -196,6 +227,73 @@ const userIntegration: GitHubIntegrationRow = {
   owned_by_user_id: 'user_1',
 };
 
+describe('handleInstallationCreated', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    connectionManagementEnabled = true;
+    selectResults = [[], [{ ...orgIntegration, metadata: {} }]];
+    mockFetchGitHubRepositories.mockResolvedValue([]);
+  });
+
+  it.each([false, true])(
+    'completes and canonically binds a pending approval when management enabled is %s',
+    async enabled => {
+      connectionManagementEnabled = enabled;
+      const response = await handleInstallationCreated(
+        {
+          action: 'created',
+          installation: {
+            id: 98765,
+            account: { id: 11, login: 'acme' },
+            repository_selection: 'all',
+            events: [],
+            created_at: '2026-09-07T00:00:00Z',
+            permissions: {},
+          },
+          requester: { id: 22, login: 'owner' },
+          sender: { login: 'owner' },
+        },
+        'standard'
+      );
+      expect(response.status).toBe(200);
+      expect(mockAutoCompleteInstallation).toHaveBeenCalledWith(
+        expect.objectContaining({ integrationId: 'pi_org' })
+      );
+      expect(mockBindCanonical).toHaveBeenCalledWith({
+        integrationId: 'pi_org',
+        installationId: '98765',
+        appType: 'standard',
+      });
+    }
+  );
+
+  it('repairs an active unbound projection after a prior bind failure', async () => {
+    selectResults = [[{ ...orgIntegration, metadata: {} }], []];
+    await handleInstallationCreated(
+      {
+        action: 'created',
+        installation: {
+          id: 98765,
+          account: { id: 11, login: 'acme' },
+          repository_selection: 'all',
+          events: [],
+          created_at: '2026-09-07T00:00:00Z',
+          permissions: {},
+        },
+        requester: { id: 22, login: 'owner' },
+        sender: { login: 'owner' },
+      },
+      'standard'
+    );
+    expect(mockBindCanonical).toHaveBeenCalledWith({
+      integrationId: 'pi_org',
+      installationId: '98765',
+      appType: 'standard',
+    });
+    expect(mockAutoCompleteInstallation).not.toHaveBeenCalled();
+  });
+});
+
 describe('handleInstallationDeleted', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -205,6 +303,7 @@ describe('handleInstallationDeleted', () => {
     mockDeleteGitHubInstallationRecords.mockResolvedValue(undefined);
     mockObserveGitHubInstallationLifecycle.mockResolvedValue(undefined);
     mockUpdateGitHubInstallationRepositories.mockResolvedValue(undefined);
+    connectionManagementEnabled = false;
   });
 
   it('standard app deletion unlinks bot identities and passes the app type', async () => {
@@ -218,6 +317,7 @@ describe('handleInstallationDeleted', () => {
       appType: 'standard',
       state: 'deleted',
     });
+    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'standard');
   });
 
   it('lite app deletion does not unlink bot identities and passes the app type', async () => {
@@ -231,6 +331,18 @@ describe('handleInstallationDeleted', () => {
       appType: 'lite',
       state: 'deleted',
     });
+    expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'lite');
+  });
+
+  it('retains the local association on upstream deletion when management is enabled', async () => {
+    connectionManagementEnabled = true;
+    await handleInstallationDeleted(deletedPayload, 'standard');
+    expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      state: 'deleted',
+    });
+    expect(mockDeleteGitHubInstallationRecords).not.toHaveBeenCalled();
   });
 });
 
@@ -239,6 +351,7 @@ describe('handleInstallationSuspend', () => {
     jest.clearAllMocks();
     mockSuspendIntegration.mockResolvedValue(undefined);
     mockSuspendIntegrationForOwner.mockResolvedValue(undefined);
+    connectionManagementEnabled = false;
   });
 
   it('passes the webhook app type to the organization suspend helper', async () => {
@@ -249,6 +362,13 @@ describe('handleInstallationSuspend', () => {
     expect(response.status).toBe(200);
     expect(mockObserveGitHubInstallationLifecycle).toHaveBeenCalledWith(
       expect.objectContaining({ installationId: '98765', appType: 'standard', state: 'suspended' })
+    );
+    expect(mockSuspendIntegration).toHaveBeenCalledWith(
+      'org_1',
+      'github',
+      'octocat',
+      'standard',
+      '98765'
     );
   });
 
@@ -269,6 +389,7 @@ describe('handleInstallationUnsuspend', () => {
     jest.clearAllMocks();
     mockUnsuspendIntegration.mockResolvedValue(undefined);
     mockUnsuspendIntegrationForOwner.mockResolvedValue(undefined);
+    connectionManagementEnabled = false;
   });
 
   it('passes the webhook app type to the organization unsuspend helper', async () => {
@@ -282,6 +403,7 @@ describe('handleInstallationUnsuspend', () => {
       appType: 'lite',
       state: 'active',
     });
+    expect(mockUnsuspendIntegration).toHaveBeenCalledWith('org_1', 'github', 'lite', '98765');
   });
 
   it('passes the webhook app type to the user unsuspend helper', async () => {

@@ -406,7 +406,8 @@ export async function updateGitHubInstallationRepositories(input: {
           and(
             eq(platform_integrations.platform, PLATFORM.GITHUB),
             eq(platform_integrations.platform_installation_id, input.installationId),
-            effectiveAppTypeCondition(input.appType)
+            effectiveAppTypeCondition(input.appType),
+            isNull(platform_integrations.github_disconnected_at)
           )
         )
         .for('update');
@@ -432,7 +433,8 @@ export async function updateGitHubInstallationRepositories(input: {
               eq(platform_integrations.platform, PLATFORM.GITHUB),
               eq(platform_integrations.platform_installation_id, input.installationId),
               effectiveAppTypeCondition(input.appType),
-              isNull(platform_integrations.github_installation_id)
+              isNull(platform_integrations.github_installation_id),
+              isNull(platform_integrations.github_disconnected_at)
             )
           );
       }
@@ -461,7 +463,8 @@ export async function updateGitHubInstallationRepositories(input: {
       .where(
         and(
           eq(platform_integrations.github_installation_id, canonical.id),
-          eq(platform_integrations.platform, PLATFORM.GITHUB)
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          isNull(platform_integrations.github_disconnected_at)
         )
       );
     await tx
@@ -472,7 +475,8 @@ export async function updateGitHubInstallationRepositories(input: {
           eq(platform_integrations.platform, PLATFORM.GITHUB),
           eq(platform_integrations.platform_installation_id, input.installationId),
           effectiveAppTypeCondition(input.appType),
-          isNull(platform_integrations.github_installation_id)
+          isNull(platform_integrations.github_installation_id),
+          isNull(platform_integrations.github_disconnected_at)
         )
       );
   });
@@ -486,19 +490,29 @@ export async function updateGitHubInstallationAccountIdentity(input: {
   const now = new Date().toISOString();
   await db.transaction(async tx => {
     const [integration] = await tx
-      .select({ canonicalId: platform_integrations.github_installation_id })
+      .select({
+        canonicalId: platform_integrations.github_installation_id,
+        disconnectedAt: platform_integrations.github_disconnected_at,
+      })
       .from(platform_integrations)
       .where(eq(platform_integrations.id, input.integrationId))
       .for('update');
     if (!integration) return;
-    await tx
-      .update(platform_integrations)
-      .set({
-        platform_account_id: input.accountId,
-        platform_account_login: input.accountLogin,
-        updated_at: now,
-      })
-      .where(eq(platform_integrations.id, input.integrationId));
+    if (!integration.disconnectedAt) {
+      await tx
+        .update(platform_integrations)
+        .set({
+          platform_account_id: input.accountId,
+          platform_account_login: input.accountLogin,
+          updated_at: now,
+        })
+        .where(
+          and(
+            eq(platform_integrations.id, input.integrationId),
+            isNull(platform_integrations.github_disconnected_at)
+          )
+        );
+    }
     if (integration.canonicalId) {
       await tx
         .update(github_app_installations)
@@ -510,5 +524,39 @@ export async function updateGitHubInstallationAccountIdentity(input: {
         })
         .where(eq(github_app_installations.id, integration.canonicalId));
     }
+  });
+}
+
+export async function bindGitHubIntegrationToCanonicalInstallation(input: {
+  integrationId: string;
+  installationId: string;
+  appType: 'standard' | 'lite';
+}) {
+  await db.transaction(async tx => {
+    const [canonical] = await tx
+      .select({ id: github_app_installations.id })
+      .from(github_app_installations)
+      .where(
+        and(
+          eq(github_app_installations.github_app_type, input.appType),
+          eq(github_app_installations.installation_id, input.installationId)
+        )
+      )
+      .limit(1);
+    if (!canonical) throw new Error('Canonical GitHub installation not found');
+    const bound = await tx
+      .update(platform_integrations)
+      .set({ github_installation_id: canonical.id, updated_at: new Date().toISOString() })
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, input.installationId),
+          effectiveAppTypeCondition(input.appType),
+          isNull(platform_integrations.github_disconnected_at)
+        )
+      )
+      .returning({ id: platform_integrations.id });
+    if (bound.length !== 1) throw new Error('GitHub integration could not be bound');
   });
 }

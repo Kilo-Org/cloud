@@ -23,6 +23,10 @@ process.env.GITHUB_LITE_APP_PRIVATE_KEY = 'test-lite-private-key';
 
 const mockRequest = jest.fn();
 
+jest.mock('@/lib/integrations/github/runtime-authorization', () => ({
+  assertGitHubInstallationRuntimeAuthorized: jest.fn(async () => undefined),
+}));
+
 jest.mock('@octokit/rest', () => ({
   Octokit: jest.fn().mockImplementation(() => ({
     request: mockRequest,

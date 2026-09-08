@@ -39,6 +39,7 @@ const mockSeedUserGithubToken =
     (input: Record<string, unknown>) => Promise<{ upserted: boolean; githubLogin: string }>
   >();
 const mockListIntegrations = jest.fn<(owner: Owner) => Promise<PlatformIntegration[]>>();
+const mockUninstallApp = jest.fn<() => Promise<{ success: boolean; message: string }>>();
 const mockEnsureOrganizationAccess =
   jest.fn<
     (
@@ -62,6 +63,7 @@ const mockCreateInstallState =
 
 jest.mock('@/lib/integrations/github-apps-service', () => ({
   listIntegrations: (owner: Owner) => mockListIntegrations(owner),
+  uninstallApp: () => mockUninstallApp(),
 }));
 
 jest.mock('@/routers/organizations/utils', () => ({
@@ -120,6 +122,10 @@ let createCaller: (ctx: { user: User }) => {
     githubLogin: string;
     githubUserId: string;
   }) => Promise<{ success: boolean; githubLogin: string }>;
+  uninstallApp: (input: {
+    organizationId?: string;
+    integrationId?: string;
+  }) => Promise<{ success: boolean }>;
 };
 
 beforeAll(async () => {
@@ -184,6 +190,7 @@ describe('githubAppsRouter organization install capability', () => {
     mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
     mockCreateInstallState.mockResolvedValue('install-token');
     mockListIntegrations.mockResolvedValue([]);
+    mockUninstallApp.mockResolvedValue({ success: true, message: 'GitHub App uninstalled' });
   });
 
   it.each(organizationManageRoles)(
@@ -306,6 +313,22 @@ describe('githubAppsRouter organization install capability', () => {
 
     expect(mockGetGitHubAppTypeForOrganization).not.toHaveBeenCalled();
     expect(mockCreateInstallState).not.toHaveBeenCalled();
+  });
+
+  it('preserves upstream uninstall behavior while connection management is disabled', async () => {
+    delete process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED;
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    const caller = createCaller({
+      user: {
+        id: 'user-1',
+        google_user_email: 'owner@example.com',
+        google_user_name: 'Owner',
+      } as User,
+    });
+    await expect(caller.uninstallApp({ organizationId, integrationId })).resolves.toMatchObject({
+      success: true,
+    });
+    expect(mockUninstallApp).toHaveBeenCalledTimes(1);
   });
 });
 

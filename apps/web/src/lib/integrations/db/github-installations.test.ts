@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@/lib/drizzle';
 import {
   github_app_installations,
+  github_connection_attempts,
   kilocode_users,
   platform_integrations,
 } from '@kilocode/db/schema';
@@ -10,9 +11,12 @@ import {
   connectVerifiedGitHubInstallation,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
+  updateGitHubInstallationRepositories,
+  updateGitHubInstallationAccountIdentity,
 } from './github-installations';
 import { backfillGitHubInstallations } from './github-installations-backfill';
 import { assertGitHubInstallationRuntimeAuthorized } from '../github/runtime-authorization';
+import { updateRepositoriesForIntegration } from './platform-integrations';
 
 const ownerId = 'oauth/github-installation-owner';
 const otherOwnerId = 'oauth/github-installation-other-owner';
@@ -101,6 +105,96 @@ describe('GitHub installation persistence', () => {
     );
   });
 
+  test('keeps canonical repositories aligned with user refresh and suppresses disconnected projection', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data()
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+    const refreshed = [{ id: 2, name: 'fresh', full_name: 'acme/fresh', private: false }];
+    await updateRepositoriesForIntegration(connected.integrationId, refreshed);
+    const [association] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, association?.github_installation_id ?? ''));
+    expect(association?.repositories).toEqual(refreshed);
+    expect(canonical?.repositories).toEqual(refreshed);
+
+    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, connected.integrationId);
+    await updateGitHubInstallationRepositories({
+      installationId: '123456',
+      appType: 'standard',
+      repositoriesAdded: [{ id: 3, name: 'late', full_name: 'acme/late', private: false }],
+    });
+    const [disconnected] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    const [updatedCanonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, association?.github_installation_id ?? ''));
+    expect(disconnected?.repositories).toEqual(refreshed);
+    expect(updatedCanonical?.repositories).toContainEqual(
+      expect.objectContaining({ id: 3, full_name: 'acme/late' })
+    );
+  });
+
+  test('clears a retained attempt reference when its integration is deleted', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data()
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+    const [attempt] = await db
+      .insert(github_connection_attempts)
+      .values({
+        kilo_user_id: ownerId,
+        owner_type: 'user',
+        owner_id: ownerId,
+        github_app_type: 'standard',
+        completed_integration_id: connected.integrationId,
+        expires_at: '2026-09-08T00:00:00.000Z',
+      })
+      .returning();
+    await db
+      .delete(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    const [retained] = await db
+      .select()
+      .from(github_connection_attempts)
+      .where(eq(github_connection_attempts.id, attempt.id));
+    expect(retained?.completed_integration_id).toBeNull();
+  });
+
+  test('keeps a late rename out of a disconnected projection while updating canonical identity', async () => {
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'user', id: ownerId },
+      data()
+    );
+    if (!connected.ok) throw new Error('Expected initial connection');
+    await disconnectGitHubInstallation({ type: 'user', id: ownerId }, connected.integrationId);
+    await updateGitHubInstallationAccountIdentity({
+      integrationId: connected.integrationId,
+      accountId: '222',
+      accountLogin: 'renamed-acme',
+    });
+    const [association] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, connected.integrationId));
+    const [canonical] = await db
+      .select()
+      .from(github_app_installations)
+      .where(eq(github_app_installations.id, association?.github_installation_id ?? ''));
+    expect(association?.platform_account_login).toBe('acme');
+    expect(canonical).toMatchObject({ account_id: '222', account_login: 'renamed-acme' });
+  });
+
   test('rejects malformed upstream installation ids', async () => {
     await expect(
       connectVerifiedGitHubInstallation(
@@ -153,7 +247,7 @@ describe('GitHub installation persistence', () => {
       .returning();
     const result = await backfillGitHubInstallations();
     expect(result).toMatchObject({ scanned: 1, canonicalCreated: 1, linked: 1, skipped: 0 });
-    expect(result.nextCursor).toBe(legacy.id);
+    expect(result).toMatchObject({ scanComplete: true, nextCursor: null });
     await expect(
       db.query.platform_integrations.findFirst({ where: eq(platform_integrations.id, legacy.id) })
     ).resolves.toMatchObject({ github_installation_id: expect.any(String) });
@@ -175,10 +269,14 @@ describe('GitHub installation persistence', () => {
       })
       .returning();
     await expect(backfillGitHubInstallations()).resolves.toEqual({
-      scanned: 0,
+      scanned: 1,
       canonicalCreated: 0,
       linked: 0,
-      skipped: 0,
+      skipped: 1,
+      skippedInvalid: 0,
+      skippedDeduplicated: 1,
+      skippedAmbiguous: 0,
+      scanComplete: true,
       nextCursor: null,
     });
     await expect(

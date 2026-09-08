@@ -9,6 +9,20 @@ function isAvailableForBot(integration: PlatformIntegration): boolean {
   return integration.platform !== 'github' || isPlatformIntegrationHealthy(integration);
 }
 
+export class PlatformIntegrationUnavailableError extends Error {
+  constructor(platformIntegrationId: string) {
+    super(`Platform integration ${platformIntegrationId} is unavailable`);
+    this.name = 'PlatformIntegrationUnavailableError';
+  }
+}
+
+export class PlatformIntegrationNotFoundError extends Error {
+  constructor(platformIntegrationId: string) {
+    super(`Could not find platform integration ${platformIntegrationId}`);
+    this.name = 'PlatformIntegrationNotFoundError';
+  }
+}
+
 /**
  * Look up the platform integration row for a given identity.
  * Platform-agnostic: queries by identity.platform + identity.teamId.
@@ -51,11 +65,11 @@ export async function getPlatformIntegrationById(platformIntegrationId: string) 
     .limit(1);
 
   if (!integration) {
-    throw new Error(`Could not find platform integration ${platformIntegrationId}`);
+    throw new PlatformIntegrationNotFoundError(platformIntegrationId);
   }
 
   if (!isAvailableForBot(integration)) {
-    throw new Error(`Platform integration ${platformIntegrationId} is unavailable`);
+    throw new PlatformIntegrationUnavailableError(platformIntegrationId);
   }
 
   return integration;

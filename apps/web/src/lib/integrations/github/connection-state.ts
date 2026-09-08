@@ -15,13 +15,19 @@ const Payload = z.object({
   attemptId: z.uuid(),
   stage: z.enum(['discover', 'confirm']),
   verifierRef: z.string().min(1),
+  selectedInstallationId: z.string().optional(),
 });
 
-export async function createGitHubConnectionOAuthState(input: {
-  attemptId: string;
-  userId: string;
-  stage: 'discover' | 'confirm';
-}) {
+export async function createGitHubConnectionOAuthState(
+  input:
+    | { attemptId: string; userId: string; stage: 'discover' }
+    | {
+        attemptId: string;
+        userId: string;
+        stage: 'confirm';
+        selectedInstallationId: string;
+      }
+) {
   const verifier = randomBytes(32).toString('base64url');
   const verifierRef = randomBytes(16).toString('base64url');
   const stored = await redisClient.set(githubConnectionPkceRedisKey(verifierRef), verifier, {
@@ -29,7 +35,14 @@ export async function createGitHubConnectionOAuthState(input: {
   });
   if (!stored) throw new Error('GitHub connection requires configured transient state storage');
   const payload = Buffer.from(
-    JSON.stringify({ attemptId: input.attemptId, stage: input.stage, verifierRef })
+    JSON.stringify({
+      attemptId: input.attemptId,
+      stage: input.stage,
+      verifierRef,
+      ...(input.stage === 'confirm'
+        ? { selectedInstallationId: input.selectedInstallationId }
+        : {}),
+    })
   ).toString('base64url');
   return {
     state: createOAuthState(`${PREFIX}${payload}`, input.userId),

@@ -4385,7 +4385,7 @@ export const github_connection_attempts = pgTable(
     github_user_id: text(),
     eligible_installations: jsonb(),
     completed_integration_id: uuid().references(() => platform_integrations.id, {
-      onDelete: 'restrict',
+      onDelete: 'set null',
     }),
     expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -4393,6 +4393,9 @@ export const github_connection_attempts = pgTable(
   },
   table => [
     index('IDX_github_connection_attempts_expires_at').on(table.expires_at),
+    index('IDX_github_connection_attempts_completed_integration_id').on(
+      table.completed_integration_id
+    ),
     check(
       'github_connection_attempts_owner_type_check',
       sql`${table.owner_type} IN ('user', 'org')`

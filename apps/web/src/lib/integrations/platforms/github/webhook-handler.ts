@@ -42,7 +42,10 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';
 import { revokeStoredGitHubUserAuthorization } from './user-authorization';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
-import { assertGitHubInstallationRuntimeAuthorized } from '@/lib/integrations/github/runtime-authorization';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '@/lib/integrations/github/runtime-authorization';
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
   platform_installation_id: string | null;
@@ -55,8 +58,9 @@ async function isAvailableForDeferredGitHubDispatch(integration: {
       integration.github_app_type ?? 'standard'
     );
     return true;
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof GitHubRuntimeAuthorizationError) return false;
+    throw error;
   }
 }
 
@@ -384,11 +388,7 @@ export async function handleGitHubWebhook(
 
       // Identity synchronization is idempotent and must finish before delivery deduplication;
       // otherwise GitHub redelivery after a transient API or database failure cannot repair metadata.
-      const result = await handleInstallationTargetRenamed(
-        parseResult.data,
-        integration.id,
-        appType
-      );
+      const result = await handleInstallationTargetRenamed(parseResult.data, integration, appType);
 
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {

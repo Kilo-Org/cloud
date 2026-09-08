@@ -84,6 +84,7 @@ test('records only server-authorized discovery candidates', async () => {
     stage: 'discover',
     verifierRef: 'ref',
     codeVerifier: 'verifier',
+    selectedInstallationId: candidate.installationId,
   });
   mockedDiscover.mockResolvedValue({
     identity: { id: '12', login: 'owner' },
@@ -108,6 +109,7 @@ test('rechecks GitHub and Kilo authority before completing confirmation', async 
     stage: 'confirm',
     verifierRef: 'ref',
     codeVerifier: 'verifier',
+    selectedInstallationId: candidate.installationId,
   });
   mockedVerify.mockResolvedValue({ identity: { id: '12', login: 'owner' }, candidate });
   mockedComplete.mockImplementation(async input => {
@@ -138,4 +140,25 @@ test('fails closed when destination administration was revoked', async () => {
   expect(response.headers.get('location')).toContain(
     'github_connection_error=authorization_revoked'
   );
+  expect(response.headers.get('location')).toContain(
+    `/organizations/${organizationId}/integrations/github`
+  );
+});
+
+test('redirects a known organization attempt failure to its integration page', async () => {
+  mockedConsumeState.mockResolvedValue({
+    attemptId,
+    stage: 'discover',
+    verifierRef: 'ref',
+    codeVerifier: 'verifier',
+  });
+  mockedExchange.mockRejectedValue(new Error('transport failure'));
+  const { GET } = await import('./route');
+  const response = await GET(
+    new NextRequest(`http://localhost/callback?state=state&code=code`) as never
+  );
+  expect(response.headers.get('location')).toContain(
+    `/organizations/${organizationId}/integrations/github`
+  );
+  expect(response.headers.get('location')).toContain('github_connection_error=connection_failed');
 });

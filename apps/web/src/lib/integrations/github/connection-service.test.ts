@@ -87,4 +87,42 @@ describe('GitHub connection attempt persistence', () => {
       .where(eq(github_connection_attempts.id, attemptId));
     expect(attempt?.selected).toBeNull();
   });
+
+  test('allows only one concurrent tab to bind the confirmation selection', async () => {
+    const attemptId = await createGitHubConnectionAttempt({
+      kiloUserId: userId,
+      owner: { type: 'org', id: organizationId },
+      githubAppType: 'standard',
+      returnTo: null,
+    });
+    const secondCandidate = { ...candidate, installationId: '124', accountLogin: 'acme-two' };
+    await recordGitHubConnectionDiscovery({
+      attemptId,
+      userId,
+      githubUserId: '7',
+      candidates: [candidate, secondCandidate],
+    });
+    const selections = await Promise.all([
+      selectGitHubConnectionInstallation({
+        attemptId,
+        userId,
+        installationId: candidate.installationId,
+      }),
+      selectGitHubConnectionInstallation({
+        attemptId,
+        userId,
+        installationId: secondCandidate.installationId,
+      }),
+    ]);
+    expect(selections.filter(Boolean)).toHaveLength(1);
+    const [stored] = await db
+      .select({ selected: github_connection_attempts.selected_installation_id })
+      .from(github_connection_attempts)
+      .where(eq(github_connection_attempts.id, attemptId));
+    expect([candidate.installationId, secondCandidate.installationId]).toContain(stored?.selected);
+    if (!stored?.selected) throw new Error('Expected one selected installation');
+    await expect(
+      selectGitHubConnectionInstallation({ attemptId, userId, installationId: stored.selected })
+    ).resolves.toMatchObject({ selected_installation_id: stored.selected });
+  });
 });

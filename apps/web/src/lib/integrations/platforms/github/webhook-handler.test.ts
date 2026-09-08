@@ -24,6 +24,8 @@ const mockHandleInstallationUnsuspend = jest.fn();
 const mockHandleInstallationRepositories = jest.fn();
 const mockAssertGitHubInstallationRuntimeAuthorized = jest.fn();
 const mockIsSharedGitHubInstallation = jest.fn();
+const mockRecordSharedGitHubInstallationDelivery = jest.fn();
+const mockDeleteSharedGitHubInstallationDelivery = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -86,6 +88,10 @@ jest.mock('@/lib/integrations/platforms/github/webhook-handlers', () => ({
 jest.mock('@/lib/integrations/db/github-installations', () => ({
   isSharedGitHubInstallation: (installationId: string, appType: string) =>
     mockIsSharedGitHubInstallation(installationId, appType),
+  recordSharedGitHubInstallationDelivery: (input: unknown) =>
+    mockRecordSharedGitHubInstallationDelivery(input),
+  deleteSharedGitHubInstallationDelivery: (input: unknown) =>
+    mockDeleteSharedGitHubInstallationDelivery(input),
 }));
 
 jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
@@ -219,6 +225,8 @@ describe('handleGitHubWebhook', () => {
     mockVerifyGitHubWebhookSignature.mockReturnValue(true);
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
     mockIsSharedGitHubInstallation.mockResolvedValue(false);
+    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue(true);
+    mockDeleteSharedGitHubInstallationDelivery.mockResolvedValue(undefined);
     mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: false });
     mockUpdateWebhookEvent.mockResolvedValue(undefined);
     mockHandlePullRequest.mockResolvedValue(Response.json({ message: 'review queued' }));
@@ -551,6 +559,55 @@ describe('handleGitHubWebhook', () => {
     expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
     expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it('deduplicates shared installation lifecycle delivery before side effects', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockRecordSharedGitHubInstallationDelivery
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    const first = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+    const duplicate = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(await first.json()).toEqual({ message: 'Installation removed' });
+    expect(await duplicate.json()).toEqual({ message: 'Duplicate event' });
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(1);
+    expect(mockRecordSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      deliveryId: 'delivery-installation',
+      eventType: 'installation.deleted',
+    });
+  });
+
+  it('releases a shared lifecycle receipt when dispatch fails so redelivery can retry', async () => {
+    mockIsSharedGitHubInstallation.mockResolvedValue(true);
+    mockHandleInstallationDeleted.mockRejectedValueOnce(new Error('transient'));
+    const payload = { action: 'deleted', installation: { id: 98765 } };
+
+    await expect(
+      handleGitHubWebhook(signedGitHubRequest('installation', payload), 'standard')
+    ).rejects.toThrow('transient');
+    const retried = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+
+    expect(await retried.json()).toEqual({ message: 'Installation removed' });
+    expect(mockDeleteSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'standard',
+      deliveryId: 'delivery-installation',
+    });
+    expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
   });
 
   it('routes installation.deleted with a known ID even when no integration is found', async () => {

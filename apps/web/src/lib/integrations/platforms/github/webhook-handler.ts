@@ -46,7 +46,11 @@ import {
   assertGitHubInstallationRuntimeAuthorized,
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
-import { isSharedGitHubInstallation } from '@/lib/integrations/db/github-installations';
+import {
+  deleteSharedGitHubInstallationDelivery,
+  isSharedGitHubInstallation,
+  recordSharedGitHubInstallationDelivery,
+} from '@/lib/integrations/db/github-installations';
 
 async function isAvailableForDeferredGitHubDispatch(integration: {
   platform_installation_id: string | null;
@@ -162,6 +166,31 @@ export async function handleGitHubWebhook(
         return { isDuplicate: false, webhookEventId: undefined };
       }
     };
+    const dispatchSharedOnce = async (
+      installationId: string,
+      action: string,
+      dispatch: () => Promise<Response>
+    ): Promise<Response> => {
+      const firstDelivery = await recordSharedGitHubInstallationDelivery({
+        installationId,
+        appType,
+        deliveryId: eventSignature,
+        eventType: `${eventType}.${action}`,
+      });
+      if (!firstDelivery) {
+        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
+      }
+      try {
+        return await dispatch();
+      } catch (error) {
+        await deleteSharedGitHubInstallationDelivery({
+          installationId,
+          appType,
+          deliveryId: eventSignature,
+        });
+        throw error;
+      }
+    };
 
     // 5. Route based on event type with type-safe Zod parsing
 
@@ -196,7 +225,9 @@ export async function handleGitHubWebhook(
         if (
           await isSharedGitHubInstallation(parseResult.data.installation.id.toString(), appType)
         ) {
-          return NextResponse.json({ message: 'Event received' }, { status: 200 });
+          return dispatchSharedOnce(parseResult.data.installation.id.toString(), action, async () =>
+            NextResponse.json({ message: 'Event received' }, { status: 200 })
+          );
         }
         // Note: For installation.created, webhook logging happens inside handler
         // because we need organization_id which is only available after processing
@@ -228,7 +259,9 @@ export async function handleGitHubWebhook(
         // Get integration before deletion to log the event
         const installationId = installation.id.toString();
         if (await isSharedGitHubInstallation(installationId, appType)) {
-          return handleInstallationDeleted(deletedPayload, appType);
+          return dispatchSharedOnce(installationId, action, () =>
+            handleInstallationDeleted(deletedPayload, appType)
+          );
         }
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
@@ -278,7 +311,9 @@ export async function handleGitHubWebhook(
 
         const installationId = parseResult.data.installation.id.toString();
         if (await isSharedGitHubInstallation(installationId, appType)) {
-          return handleInstallationSuspend(parseResult.data, appType);
+          return dispatchSharedOnce(installationId, action, () =>
+            handleInstallationSuspend(parseResult.data, appType)
+          );
         }
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
@@ -328,7 +363,9 @@ export async function handleGitHubWebhook(
 
         const installationId = parseResult.data.installation.id.toString();
         if (await isSharedGitHubInstallation(installationId, appType)) {
-          return handleInstallationUnsuspend(parseResult.data, appType);
+          return dispatchSharedOnce(installationId, action, () =>
+            handleInstallationUnsuspend(parseResult.data, appType)
+          );
         }
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
@@ -392,7 +429,9 @@ export async function handleGitHubWebhook(
 
       const installationId = parseResult.data.installation.id.toString();
       if (await isSharedGitHubInstallation(installationId, appType)) {
-        return handleInstallationTargetRenamed(parseResult.data, appType);
+        return dispatchSharedOnce(installationId, action, () =>
+          handleInstallationTargetRenamed(parseResult.data, appType)
+        );
       }
       const integration = await findIntegrationByInstallationId(
         PLATFORM.GITHUB,
@@ -446,8 +485,11 @@ export async function handleGitHubWebhook(
       }
 
       const installationId = parseResult.data.installation.id.toString();
+      const action = parseResult.data.action;
       if (await isSharedGitHubInstallation(installationId, appType)) {
-        return handleInstallationRepositories(parseResult.data, appType);
+        return dispatchSharedOnce(installationId, action, () =>
+          handleInstallationRepositories(parseResult.data, appType)
+        );
       }
       const integration = await findIntegrationByInstallationId(
         PLATFORM.GITHUB,
@@ -460,7 +502,6 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
       }
 
-      const action = parseResult.data.action;
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });

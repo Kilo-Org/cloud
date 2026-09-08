@@ -4400,6 +4400,25 @@ export const github_app_installations = pgTable(
   ]
 );
 
+export const github_installation_webhook_receipts = pgTable(
+  'github_installation_webhook_receipts',
+  {
+    id: idPrimaryKeyColumn,
+    github_installation_id: uuid()
+      .notNull()
+      .references(() => github_app_installations.id, { onDelete: 'cascade' }),
+    delivery_id: text().notNull(),
+    event_type: text().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    uniqueIndex('UQ_github_installation_webhook_receipts_delivery').on(
+      table.github_installation_id,
+      table.delivery_id
+    ),
+  ]
+);
+
 export const github_connection_attempts = pgTable(
   'github_connection_attempts',
   {

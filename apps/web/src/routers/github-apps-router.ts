@@ -44,8 +44,11 @@ import {
 } from '@/lib/integrations/platforms/github/user-authorization';
 import { seedUserGithubToken } from '@/lib/github-pr-review/dev-seed';
 import { createInstallState } from '@/lib/integrations/github/install-state';
-import { canOrganizationUseMultipleGitHubInstallations } from '@/lib/integrations/github/multiple-installations';
-import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
+import {
+  canOrganizationCreateSharedGitHubConnection,
+  canOrganizationUseMultipleGitHubInstallations,
+  isGitHubConnectionManagementEnabled,
+} from '@/lib/integrations/github/multiple-installations';
 import {
   createGitHubConnectionAttempt,
   getGitHubConnectionAttempt,
@@ -187,10 +190,24 @@ export const githubAppsRouter = createTRPCRouter({
       });
       const primaryId = integrations.find(isPlatformIntegrationHealthy)?.id ?? null;
       const canManageModel = canManageOrganizationBilling(role);
+      const canManageConnections =
+        canManageOrganization(role) && isGitHubConnectionManagementEnabled();
+      const sharingApproved = canOrganizationCreateSharedGitHubConnection(input.organizationId);
+      const multipleInstallationsApproved =
+        integrations.length === 0 ||
+        canOrganizationUseMultipleGitHubInstallations(input.organizationId);
+      const existingConnectionAdmission = !canManageConnections
+        ? { allowed: false as const, reason: 'not_authorized' as const }
+        : !sharingApproved
+          ? { allowed: false as const, reason: 'sharing_not_approved' as const }
+          : !multipleInstallationsApproved
+            ? { allowed: false as const, reason: 'multiple_installations_not_approved' as const }
+            : { allowed: true as const, reason: null };
 
       return {
         connectionManagementEnabled: isGitHubConnectionManagementEnabled(),
-        canConnectExisting: canManageOrganization(role) && isGitHubConnectionManagementEnabled(),
+        canConnectExisting: existingConnectionAdmission.allowed,
+        existingConnectionAdmission,
         canAdd:
           canManageOrganization(role) &&
           (integrations.length === 0 ||

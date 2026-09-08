@@ -33,6 +33,7 @@ import {
   buildIntegrationOAuthRedirectPathFromOwner,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
+import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 async function getChatSdkLinearAccessToken(organizationId: string): Promise<string | null> {
   const installation = await bot.getAdapter('linear').getInstallation(organizationId);
@@ -313,6 +314,8 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
       return NextResponse.redirect(new URL('/integrations?error=unauthorized', APP_URL));
     }
 
+    await assertGitHubAutomationCanBeEnabled(owner);
+
     // Chat SDK exchanges the code, persists the per-workspace installation in
     // its state adapter, and returns the Linear organizationId + installation.
     await bot.initialize();
@@ -338,6 +341,18 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
         }
       );
     } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'PRECONDITION_FAILED'
+      ) {
+        const currentInstallation = await linearAdapter.getInstallation(organizationId);
+        if (currentInstallation?.accessToken === installation.accessToken) {
+          await linearAdapter.deleteInstallation(organizationId);
+          await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
+        }
+      }
       if (error instanceof LinearWorkspaceAlreadyConnectedError) {
         // The Chat SDK adapter already persisted the freshly-issued OAuth
         // token under linear:installation:${organizationId} during
@@ -345,8 +360,11 @@ export async function handleLinearOAuthCallback(request: NextRequest) {
         // install, we must roll that state back — otherwise we overwrite the
         // original installer's token and any future bot/webhook traffic for
         // that workspace runs with mismatched credentials.
-        await linearAdapter.deleteInstallation(organizationId);
-        await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
+        const currentInstallation = await linearAdapter.getInstallation(organizationId);
+        if (currentInstallation?.accessToken === installation.accessToken) {
+          await linearAdapter.deleteInstallation(organizationId);
+          await unlinkTeamKiloUsers(bot.getState(), PLATFORM.LINEAR, organizationId);
+        }
         return NextResponse.redirect(
           new URL(
             buildIntegrationOAuthRedirectPathFromOwner(

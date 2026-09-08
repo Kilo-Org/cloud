@@ -5,7 +5,11 @@ import type {
   Owner,
   PlatformRepository,
 } from '@/lib/integrations/core/types';
-import { github_app_installations, platform_integrations } from '@kilocode/db/schema';
+import {
+  github_app_installations,
+  github_installation_webhook_receipts,
+  platform_integrations,
+} from '@kilocode/db/schema';
 import { and, eq, isNull, or, sql } from 'drizzle-orm';
 import {
   canOrganizationCreateSharedGitHubConnection,
@@ -74,8 +78,6 @@ export async function connectVerifiedGitHubInstallation(
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${data.githubAppType}:${data.platformInstallationId}`}))`
     );
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
-
     if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
       const ownerIntegrations = await tx
         .select({
@@ -199,7 +201,12 @@ export async function connectVerifiedGitHubInstallation(
       return { ok: false, reason: 'installation_unavailable' };
     }
 
-    if (!existing && otherOwnerAssociations.length > 0) {
+    const requiresSharingAdmission =
+      otherOwnerAssociations.length > 0 &&
+      (!existing ||
+        existing.github_disconnected_at !== null ||
+        canonical.sharing_mode !== 'web_cloud_agent');
+    if (requiresSharingAdmission) {
       if (owner.type !== 'org') return { ok: false, reason: 'claimed_by_other_owner' };
       if (!canOrganizationCreateSharedGitHubConnection(owner.id)) {
         return { ok: false, reason: 'shared_installation_disabled' };
@@ -309,6 +316,7 @@ export async function disconnectGitHubInstallation(
       .select({
         installationId: platform_integrations.platform_installation_id,
         appType: platform_integrations.github_app_type,
+        canonicalId: platform_integrations.github_installation_id,
       })
       .from(platform_integrations)
       .where(
@@ -340,6 +348,112 @@ export async function disconnectGitHubInstallation(
       )
       .returning({ id: platform_integrations.id });
     if (disconnected.length !== 1) throw new Error('GitHub connection not found');
+    if (integration.canonicalId) {
+      const connectedAssociations = await tx
+        .select({ id: platform_integrations.id })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.github_installation_id, integration.canonicalId),
+            isNull(platform_integrations.github_disconnected_at)
+          )
+        )
+        .for('update');
+      if (connectedAssociations.length === 1) {
+        await tx
+          .update(github_app_installations)
+          .set({
+            sharing_mode: 'exclusive',
+            sharing_admission_checked_at: null,
+            updated_at: new Date().toISOString(),
+          })
+          .where(eq(github_app_installations.id, integration.canonicalId));
+      }
+    }
+  });
+}
+
+export async function uninstallExclusiveGitHubInstallation(input: {
+  owner: Owner;
+  integrationId: string;
+  deleteUpstream: (installationId: string, appType: 'standard' | 'lite') => Promise<void>;
+}): Promise<void> {
+  await db.transaction(async tx => {
+    const [identity] = await tx
+      .select({
+        installationId: platform_integrations.platform_installation_id,
+        appType: platform_integrations.github_app_type,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          ownerCondition(input.owner)
+        )
+      )
+      .limit(1);
+    if (!identity?.installationId) throw new Error('GitHub connection not found');
+    const appType = identity.appType ?? 'standard';
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${identity.installationId}`}))`
+    );
+    const [locked] = await tx
+      .select({
+        canonicalId: platform_integrations.github_installation_id,
+        sharingMode: github_app_installations.sharing_mode,
+      })
+      .from(platform_integrations)
+      .leftJoin(
+        github_app_installations,
+        eq(platform_integrations.github_installation_id, github_app_installations.id)
+      )
+      .where(
+        and(
+          eq(platform_integrations.id, input.integrationId),
+          ownerCondition(input.owner),
+          or(
+            isNull(platform_integrations.github_installation_id),
+            and(
+              eq(github_app_installations.installation_id, identity.installationId),
+              eq(github_app_installations.github_app_type, appType)
+            )
+          )
+        )
+      )
+      .for('update', { of: platform_integrations });
+    if (!locked || (locked.canonicalId && locked.sharingMode !== 'exclusive')) {
+      throw new Error('GitHub installation must be disconnected locally');
+    }
+    const connectedAssociations = await tx
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          locked.canonicalId
+            ? eq(platform_integrations.github_installation_id, locked.canonicalId)
+            : and(
+                isNull(platform_integrations.github_installation_id),
+                eq(platform_integrations.platform_installation_id, identity.installationId),
+                effectiveAppTypeCondition(appType)
+              ),
+          isNull(platform_integrations.github_disconnected_at)
+        )
+      )
+      .for('update');
+    if (
+      connectedAssociations.length !== 1 ||
+      connectedAssociations[0]?.id !== input.integrationId
+    ) {
+      throw new Error('GitHub installation must be disconnected locally');
+    }
+
+    await input.deleteUpstream(identity.installationId, appType);
+    await observeGitHubInstallationLifecycle(
+      { installationId: identity.installationId, appType, state: 'deleted' },
+      tx
+    );
+    await tx.delete(platform_integrations).where(eq(platform_integrations.id, input.integrationId));
   });
 }
 
@@ -467,6 +581,9 @@ export async function updateGitHubInstallationRepositories(input: {
 }) {
   const now = new Date().toISOString();
   await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
+    );
     const [canonical] = await tx
       .select()
       .from(github_app_installations)
@@ -624,6 +741,65 @@ export async function isSharedGitHubInstallation(
     )
     .limit(1);
   return installation?.sharingMode === 'web_cloud_agent';
+}
+
+export async function recordSharedGitHubInstallationDelivery(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+  eventType: string;
+}): Promise<boolean> {
+  const [installation] = await db
+    .select({ id: github_app_installations.id })
+    .from(github_app_installations)
+    .where(
+      and(
+        eq(github_app_installations.github_app_type, input.appType),
+        eq(github_app_installations.installation_id, input.installationId),
+        eq(github_app_installations.sharing_mode, 'web_cloud_agent')
+      )
+    )
+    .limit(1);
+  if (!installation) return false;
+  const inserted = await db
+    .insert(github_installation_webhook_receipts)
+    .values({
+      github_installation_id: installation.id,
+      delivery_id: input.deliveryId,
+      event_type: input.eventType,
+    })
+    .onConflictDoNothing({
+      target: [
+        github_installation_webhook_receipts.github_installation_id,
+        github_installation_webhook_receipts.delivery_id,
+      ],
+    })
+    .returning({ id: github_installation_webhook_receipts.id });
+  return inserted.length === 1;
+}
+
+export async function deleteSharedGitHubInstallationDelivery(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+}): Promise<void> {
+  await db.delete(github_installation_webhook_receipts).where(
+    and(
+      eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+      eq(
+        github_installation_webhook_receipts.github_installation_id,
+        db
+          .select({ id: github_app_installations.id })
+          .from(github_app_installations)
+          .where(
+            and(
+              eq(github_app_installations.github_app_type, input.appType),
+              eq(github_app_installations.installation_id, input.installationId)
+            )
+          )
+      )
+    )
+  );
 }
 
 export async function bindGitHubIntegrationToCanonicalInstallation(input: {

@@ -178,6 +178,15 @@ jest.mock('@/lib/github-pr-review/dev-seed', () => ({
 let createCaller: (ctx: { user: User }) => {
   listOrganizationInstallations: (input: { organizationId: string }) => Promise<{
     canAdd: boolean;
+    canConnectExisting: boolean;
+    existingConnectionAdmission: {
+      allowed: boolean;
+      reason:
+        | 'not_authorized'
+        | 'sharing_not_approved'
+        | 'multiple_installations_not_approved'
+        | null;
+    };
     installations: Array<{ id: string }>;
   }>;
   mintInstallState: (input: {
@@ -290,8 +299,10 @@ function organizationIntegration(): PlatformIntegration {
 describe('githubAppsRouter organization install capability', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
     process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS =
       '9d278969-5453-4ae3-a51f-a8d2274a7b56,30f1620a-4aad-4456-bf4d-550f335e6f55';
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = '';
     mockEnsureOrganizationAccess.mockResolvedValue('member');
     mockGetGitHubAppTypeForOrganization.mockResolvedValue('standard');
     mockCreateInstallState.mockResolvedValue('install-token');
@@ -352,6 +363,7 @@ describe('githubAppsRouter organization install capability', () => {
       const listed = await caller.listOrganizationInstallations({ organizationId });
 
       expect(listed.canAdd).toBe(role === 'owner' || role === 'admin');
+      expect(listed.canConnectExisting).toBe(false);
       expect(listed.installations).toHaveLength(0);
     }
   );
@@ -369,6 +381,7 @@ describe('githubAppsRouter organization install capability', () => {
 
   it('reports additional installation capability for allowlisted organizations', async () => {
     mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = multiInstallationOrganizationId;
     mockListIntegrations.mockResolvedValue([
       { ...organizationIntegration(), owned_by_organization_id: multiInstallationOrganizationId },
     ]);
@@ -379,6 +392,23 @@ describe('githubAppsRouter organization install capability', () => {
     });
 
     expect(listed.canAdd).toBe(true);
+    expect(listed.existingConnectionAdmission).toEqual({ allowed: true, reason: null });
+  });
+
+  it('reports why an existing connection cannot be started without both destination flags', async () => {
+    mockEnsureOrganizationAccess.mockResolvedValue('owner');
+    mockListIntegrations.mockResolvedValue([organizationIntegration()]);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationId;
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = '';
+    const caller = createCaller({ user: { id: 'user-1', is_admin: false } as User });
+
+    const listed = await caller.listOrganizationInstallations({ organizationId });
+
+    expect(listed.canConnectExisting).toBe(false);
+    expect(listed.existingConnectionAdmission).toEqual({
+      allowed: false,
+      reason: 'multiple_installations_not_approved',
+    });
   });
 
   it('refuses to mint another install state outside the allowlist', async () => {

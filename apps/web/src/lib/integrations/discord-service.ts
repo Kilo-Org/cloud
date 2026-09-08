@@ -2,7 +2,7 @@ import 'server-only';
 import { db } from '@/lib/drizzle';
 import type { PlatformIntegration } from '@kilocode/db/schema';
 import { platform_integrations } from '@kilocode/db/schema';
-import { eq, and, isNull } from 'drizzle-orm';
+import { eq, and, isNull, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
@@ -191,6 +191,7 @@ export async function upsertDiscordInstallation(
 
     const updated = await db.transaction(async tx => {
       await assertGitHubAutomationCanBeEnabled(owner, tx);
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`discord:${guildId}`}))`);
       const [row] = await tx
         .update(platform_integrations)
         .set({
@@ -223,6 +224,7 @@ export async function upsertDiscordInstallation(
 
   const created = await db.transaction(async tx => {
     await assertGitHubAutomationCanBeEnabled(owner, tx);
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`discord:${guildId}`}))`);
     const [row] = await tx
       .insert(platform_integrations)
       .values({
@@ -261,6 +263,38 @@ export async function uninstallApp(owner: Owner) {
   await db.delete(platform_integrations).where(eq(platform_integrations.id, integration.id));
 
   return { success: true };
+}
+
+export async function leaveDiscordGuild(guildId: string): Promise<void> {
+  const normalizedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  const response = await fetch(buildDiscordApiUrl(['users', '@me', 'guilds', normalizedGuildId]), {
+    method: 'DELETE',
+    headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
+  });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Failed to remove Discord bot from rejected guild: ${response.status}`);
+  }
+}
+
+export async function cleanupRejectedDiscordGuild(guildId: string): Promise<void> {
+  const normalizedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
+  await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`discord:${normalizedGuildId}`}))`
+    );
+    const [existing] = await tx
+      .select({ id: platform_integrations.id })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.DISCORD),
+          eq(platform_integrations.platform_installation_id, normalizedGuildId),
+          eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
+        )
+      )
+      .limit(1);
+    if (!existing) await leaveDiscordGuild(normalizedGuildId);
+  });
 }
 
 /**

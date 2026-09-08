@@ -3,7 +3,11 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
+import {
+  cleanupRejectedDiscordGuild,
+  exchangeDiscordCode,
+  upsertDiscordInstallation,
+} from '@/lib/integrations/discord-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -13,6 +17,7 @@ import {
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
+import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 /**
  * Discord OAuth Callback
@@ -112,11 +117,26 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
       }
     }
 
+    await assertGitHubAutomationCanBeEnabled(owner);
+
     // 7. Exchange code for access token
     const oauthData = await exchangeDiscordCode(code);
 
     // 8. Store installation in database
-    await upsertDiscordInstallation(owner, oauthData);
+    try {
+      await upsertDiscordInstallation(owner, oauthData);
+    } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'PRECONDITION_FAILED' &&
+        oauthData.guild?.id
+      ) {
+        await cleanupRejectedDiscordGuild(oauthData.guild.id);
+      }
+      throw error;
+    }
 
     // 9. Redirect to success page
     const successPath = verified.returnTo

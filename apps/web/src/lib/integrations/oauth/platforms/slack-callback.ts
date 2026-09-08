@@ -18,6 +18,7 @@ import {
   buildIntegrationOAuthRedirectPathFromState,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
+import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
 
 const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
 
@@ -119,6 +120,8 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
       }
     }
 
+    await assertGitHubAutomationCanBeEnabled(owner);
+
     // 7. Let the Chat SDK exchange the code and seed its installation state
     await bot.initialize();
     const slackAdapter = bot.getAdapter('slack');
@@ -131,6 +134,17 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
     try {
       await upsertSlackInstallation({ owner, teamId, installation });
     } catch (error) {
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        error.code === 'PRECONDITION_FAILED'
+      ) {
+        const currentInstallation = await slackAdapter.getInstallation(teamId);
+        if (currentInstallation?.botToken === installation.botToken) {
+          await slackAdapter.deleteInstallation(teamId);
+        }
+      }
       if (error instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(
           new URL(

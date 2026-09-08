@@ -380,6 +380,7 @@ describe('uninstallGitHubOrganizationInstallation', () => {
   });
 
   test('standard deletion webhook reconciles a legacy row retained after local cleanup rolls back', async () => {
+    process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
     const actor = await insertTestUser({ is_admin: true });
     const owner = await insertTestUser();
     const org = await createTestOrganization('Uninstall webhook reconciliation org', owner.id, 0);
@@ -416,5 +417,6 @@ describe('uninstallGitHubOrganizationInstallation', () => {
         where: eq(platform_integrations.id, row.id),
       })
     ).toMatchObject({ integration_status: 'suspended', suspended_by: 'github_deleted' });
+    delete process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED;
   });
 });

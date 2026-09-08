@@ -151,6 +151,7 @@ const platformIdentitySchema = z.object({
   platform: z.enum(PLATFORM),
   teamId: z.string(),
   userId: z.string(),
+  githubAppType: z.enum(['standard', 'lite']).optional(),
 });
 
 const serializedThreadShape = z.looseObject({

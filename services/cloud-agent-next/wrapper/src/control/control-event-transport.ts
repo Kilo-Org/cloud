@@ -8,7 +8,7 @@ import {
 type EventKind = 'session.event' | 'session.preparing';
 
 export function createControlEventFailureHandler<Runtime extends { runtimeId: string }>(options: {
-  getRuntime: (directory: string) => Runtime | undefined;
+  getRuntime: (directory: string, nativeRuntimeId: string) => Runtime | undefined;
   onFailure: (failure: ControlEventOutboxFailure, runtime: Runtime) => void;
 }) {
   const failedRuntimes = new WeakSet<Runtime>();
@@ -17,7 +17,7 @@ export function createControlEventFailureHandler<Runtime extends { runtimeId: st
     if (failure.publication.event === 'session.preparing') return;
     const { directory, nativeRuntimeId } = failure.publication.session;
     if (!nativeRuntimeId) return;
-    const runtime = options.getRuntime(directory);
+    const runtime = options.getRuntime(directory, nativeRuntimeId);
     if (runtime?.runtimeId !== nativeRuntimeId || failedRuntimes.has(runtime)) return;
     failedRuntimes.add(runtime);
     options.onFailure(failure, runtime);

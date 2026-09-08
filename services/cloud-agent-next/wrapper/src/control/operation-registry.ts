@@ -8,7 +8,7 @@ import {
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol.js';
 import { rejectBeforeAdmission } from './control-handler-result.js';
-import type { WorktreeKiloRuntimes } from './worktree-runtime.js';
+import type { WorktreeKiloRuntime, WorktreeKiloRuntimes } from './worktree-runtime.js';
 import type { NativeOperationTarget, NativeRetirement } from './session-operation-cleanup.js';
 import {
   SessionOperation,
@@ -19,12 +19,8 @@ import {
 
 type OperationRegistryDependencies = {
   native: {
-    get(
-      directory: string
-    ): WorktreeKiloRuntimes['get'] extends (directory: string) => infer Runtime ? Runtime : never;
-    getRetained(
-      directory: string
-    ): WorktreeKiloRuntimes['get'] extends (directory: string) => infer Runtime ? Runtime : never;
+    get(identity: SessionRequestIdentity): ReturnType<WorktreeKiloRuntimes['get']>;
+    getRetained(directory: string, runtimeId?: string): WorktreeKiloRuntime | undefined;
     prepareForNewWork?(directory: string): boolean;
     retireRuntime(
       directory: string,
@@ -219,7 +215,7 @@ export function createOperationRegistry(deps: OperationRegistryDependencies) {
     const operation = new SessionOperation(identity, authorization, work, {
       ...effects,
       isCurrent: () => active.get(identity.kiloSessionId) === operation,
-      getRuntime: () => deps.native.get(identity.directory),
+      getRuntime: () => deps.native.get(identity),
       prepareForNewWork: () => deps.native.prepareForNewWork?.(identity.directory) ?? true,
       verifyQuiescence: (target, deadlineAt) =>
         deps.native.verifyQuiescence(identity.directory, target, deadlineAt),

@@ -384,6 +384,22 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
+  it('rejects a new modern control-plane session before durable session effects when isolation is disabled', async () => {
+    generateSessionIdMock.mockReturnValue(WORKSPACE_SESSION_ID);
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.RUNTIME_ISOLATION_ENABLED = 'false';
+    ctx.authToken = 'eyJhbGciOiJub25lIn0.eyJhdWQiOiJhcGkifQ.';
+
+    await expect(runCreate(ctx)).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'runtime_isolation_unavailable',
+    });
+    expect(createSessionReportMock).not.toHaveBeenCalled();
+    expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+  });
+
   describe.each([undefined, 'true', 'false', '', 'False', '0'] as const)(
     'workspace containment samples CREDENTIAL_CONTAINMENT_ENABLED=%s',
     flag => {

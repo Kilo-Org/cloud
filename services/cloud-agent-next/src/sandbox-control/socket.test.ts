@@ -63,7 +63,11 @@ function helloFrame(
   providerInstanceId: string,
   wrapperInstanceId?: string,
   requestId = 'req_hello',
-  capabilities?: { nativeRuntimeRetirement?: boolean; workingBranches?: boolean }
+  capabilities?: {
+    nativeRuntimeRetirement?: boolean;
+    runtimeIsolation?: true;
+    workingBranches?: boolean;
+  }
 ): string {
   return JSON.stringify({
     type: 'request',
@@ -99,6 +103,20 @@ describe('sandbox control socket handler', () => {
       expect(parsed.kilo.version).toBeUndefined();
       expect(JSON.stringify(parsed)).not.toContain('private');
     }
+  });
+  it('retains the optional runtime isolation capability without requiring it from old wrappers', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_isolation', { runtimeIsolation: true })
+    );
+
+    expect(handler.getConnectionIdentity()).toMatchObject({
+      providerInstanceId: 'inst_1',
+      runtimeIsolation: true,
+    });
   });
   it.each([
     ['2.4.0', '2.4.0'],

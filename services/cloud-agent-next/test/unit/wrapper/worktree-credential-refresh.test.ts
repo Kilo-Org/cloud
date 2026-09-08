@@ -834,8 +834,10 @@ describe('direct worktree credential refresh', () => {
       signal: runtimeLifetime.signal,
     };
     const getRuntime = f.registry.get.bind(f.registry);
-    f.registry.get = directory =>
-      directory === sibling.directory ? (fakeRuntime as typeof runtime) : getRuntime(directory);
+    f.registry.get = request =>
+      (typeof request === 'string' ? request : request.directory) === sibling.directory
+        ? (fakeRuntime as typeof runtime)
+        : getRuntime(request);
     const siblingOp = deps.operations.start(
       sibling,
       undefined,

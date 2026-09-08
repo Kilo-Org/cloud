@@ -244,19 +244,32 @@ const disposers: Array<() => void> = [];
 function setup(deliver?: SendEvent, signal?: AbortSignal) {
   const sessions: HandlerSessionSnapshot[] = [];
   const runtimes = new Map<string, WorktreeKiloRuntime>();
+  const key = (identity: { sessionId: string; kiloSessionId: string; directory: string }) =>
+    `${identity.sessionId}\0${identity.kiloSessionId}\0${identity.directory}`;
   const abort = new AbortController();
   const sendEvent = mock(deliver ?? (() => true));
   const notifications = createWorktreeMutationNotifications({
     sessions,
-    kiloRuntimes: { get: directory => runtimes.get(directory) },
+    kiloRuntimes: {
+      get: identity =>
+        typeof identity === 'string'
+          ? [...runtimes.values()].find(runtime => runtime.directory === identity)
+          : runtimes.get(key(identity)),
+      isCurrent: runtime =>
+        runtime.identity !== undefined && runtimes.get(key(runtime.identity)) === runtime,
+    },
     signal: signal ?? abort.signal,
     sendEvent,
   });
   disposers.push(notifications.dispose);
-  function addRuntime(directory: string) {
+  function addRuntime(
+    directory: string,
+    identity = { sessionId: 'workspace_root', kiloSessionId: 'root', directory }
+  ) {
     const controller = new AbortController();
     let client = {} as WrapperKiloClient;
     const runtime: WorktreeKiloRuntime = {
+      identity,
       runtimeId: crypto.randomUUID(),
       directory,
       scopeId: directory,
@@ -266,7 +279,7 @@ function setup(deliver?: SendEvent, signal?: AbortSignal) {
         return client;
       },
     };
-    runtimes.set(directory, runtime);
+    runtimes.set(key(identity), runtime);
     return {
       runtime,
       controller,
@@ -593,6 +606,22 @@ describe('worktree mutation notifications', () => {
       properties: { ...nextProperties, sessionID: 'grandchild' },
     });
     jest.advanceTimersByTime(5_000);
+    expect(h.sendEvent.mock.calls).toEqual([expectedHint(), expectedHint('sibling')]);
+  });
+
+  it('fans a same-directory mutation from an isolated sibling runtime to both roots', () => {
+    const h = setup();
+    const siblingIdentity = {
+      sessionId: 'workspace_sibling',
+      kiloSessionId: 'sibling',
+      directory,
+    };
+    const siblingRuntime = h.addRuntime(directory, siblingIdentity).runtime;
+    h.attach('sibling');
+
+    h.notifications.observe(siblingRuntime, { ...fileEdited, directory });
+    jest.advanceTimersByTime(5_000);
+
     expect(h.sendEvent.mock.calls).toEqual([expectedHint(), expectedHint('sibling')]);
   });
 

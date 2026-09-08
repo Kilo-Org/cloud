@@ -132,8 +132,10 @@ function versionHeartbeat(version: string | null) {
           throw new Error('Unexpected attach');
         },
         detach: () => false,
+        retireForRecovery: async () => 'absent',
         deleteDirectory: async () => {},
         get: () => undefined,
+        isCurrent: () => false,
         isHealthy: () => true,
         shutdown() {},
       },
@@ -363,6 +365,8 @@ describe('createSandboxControlClient', () => {
           nativeRuntimeRetirement?: boolean;
           connectionRecovery?: boolean;
           eventReceipts?: boolean;
+          runtimeIsolation?: boolean;
+          runtimeRecovery?: boolean;
           workingBranches?: boolean;
         };
       };
@@ -378,6 +382,8 @@ describe('createSandboxControlClient', () => {
         nativeRuntimeRetirement: true,
         connectionRecovery: true,
         eventReceipts: true,
+        runtimeIsolation: true,
+        runtimeRecovery: true,
         workingBranches: true,
       },
     });

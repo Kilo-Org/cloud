@@ -58,7 +58,12 @@ function main(
         sessionId: eventKiloSessionId(event.properties),
         runtimeDirectory: runtime.directory,
       });
-      if (!identity?.rootKiloSessionId) return;
+      if (
+        !identity?.rootKiloSessionId ||
+        (runtime.isolation === 'per-session' &&
+          identity.rootKiloSessionId !== runtime.identity?.kiloSessionId)
+      )
+        return;
       updateSessionSnapshots(event, deps.sessions);
       deps.activity?.observeEvent(
         event.type,
@@ -89,7 +94,7 @@ function main(
     onUnexpectedClose: failure => {
       logToFile(`Kilo worktree retired reason=${failure.reason} directory=${failure.directory}`);
       const stillCurrent = () => {
-        const current = kiloRuntimes.get(failure.directory);
+        const current = kiloRuntimes.get(failure.identity);
         return current === undefined || current.runtimeId === failure.runtimeId;
       };
       if (failure.cleanup === 'unconfirmed' || !control?.reportNativeRuntimeRetirement) {
@@ -119,7 +124,7 @@ function main(
     ? createControlTerminalRuntime({
         controlUrl: controlConfig.SANDBOX_CONTROL_URL,
         wrapperInstanceId: controlConfig.wrapperInstanceId,
-        getKiloRuntime: directory => kiloRuntimes.get(directory),
+        getKiloRuntime: identity => kiloRuntimes.get(identity),
       })
     : undefined;
   const deps = createControlHandlerDeps({
@@ -156,7 +161,11 @@ function main(
 
   const mutationNotifications = createWorktreeMutationNotifications({
     sessions: deps.sessions,
-    kiloRuntimes,
+    kiloRuntimes: {
+      get: identity => kiloRuntimes.get(identity),
+      isCurrent: runtime =>
+        kiloRuntimes.isCurrent?.(runtime) ?? kiloRuntimes.get(runtime.directory) === runtime,
+    },
     signal: abort.signal,
     sendEvent: (event, payload, identity) => control?.sendEvent?.(event, payload, identity),
   });
@@ -335,7 +344,10 @@ function main(
     isReady: () => deps.kiloReady,
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
     onEventReceiptFailure: createControlEventFailureHandler({
-      getRuntime: directory => kiloRuntimes.get(directory),
+      getRuntime: (directory, nativeRuntimeId) => {
+        const runtime = kiloRuntimes.getRetained?.(directory, nativeRuntimeId);
+        return runtime && !runtime.signal.aborted ? runtime : undefined;
+      },
       onFailure: (failure, runtime) => {
         reportOutboxRetirement(failure, runtime.runtimeId, 'started');
         void deps.operations

@@ -4088,6 +4088,13 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
   async admitPreparedInitialMessage(
     request: LegacyRegisteredInitialAdmissionRequest
   ): Promise<SessionMessageAdmissionResult> {
+    if (await this.ctx.storage.get<string>(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+      return {
+        success: false,
+        code: 'COMPUTE_STOPPING',
+        error: 'Runtime authorization recovery is in progress',
+      };
+    }
     const deletionPending = await this.deletionPendingAdmissionFailure();
     if (deletionPending) return deletionPending;
     const metadata = await this.getMetadata();

@@ -20,7 +20,11 @@ import {
   LegacyExecutionResponse,
 } from '../schemas.js';
 import type { SessionId } from '../../types/ids.js';
-import { preflightAndQueuePromptMessage, queueMessage } from '../../session/queue-message.js';
+import {
+  preflightAndQueuePromptMessage,
+  preflightRuntimeAuthorizationRecovery,
+  queueMessage,
+} from '../../session/queue-message.js';
 import {
   admitLegacyPreparedInitialMessage,
   replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
@@ -69,6 +73,8 @@ export function createSessionExecutionV2Handlers() {
             admissionContext
           );
           if (replay) return withLegacyExecutionId(replay);
+
+          await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, admissionContext);
 
           await preflightPreparedInitialPromptModel({
             env: ctx.env,

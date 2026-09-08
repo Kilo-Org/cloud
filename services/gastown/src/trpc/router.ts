@@ -16,6 +16,10 @@ import { getGastownOrgStub } from '../dos/GastownOrg.do';
 import type { JwtOrgMembership } from '../middleware/auth.middleware';
 import { generateKiloApiToken } from '../util/kilo-token.util';
 import { resolveSecret } from '../util/secret.util';
+import {
+  LegacyTownTokenRenewalUnavailableError,
+  resolveLegacyTownTokenOwner,
+} from '../dos/town/legacy-token-renewal';
 import { TownConfigSchema, TownConfigUpdateSchema, RigOverrideConfigSchema } from '../types';
 import { resolveModel } from '../dos/town/config';
 import type { UserRigRecord } from '../db/tables/user-rigs.table';
@@ -127,6 +131,11 @@ function listAccessibleOrgIds(memberships: JwtOrgMembership[]): string[] {
  * personal vs org ownership in tRPC procedures.
  */
 type RigOwnerStub = {
+  getTownAsync(townId: string): Promise<{
+    owner_user_id?: string;
+    owner_org_id?: string;
+    created_by_user_id?: string;
+  } | null>;
   listRigs(townId: string): Promise<UserRigRecord[]>;
   createRig(input: {
     town_id: string;
@@ -1437,47 +1446,88 @@ export const gastownRouter = router({
           message: 'Runtime authorization unavailable',
         });
       }
-      await townStub.forceRefreshContainerToken();
 
-      if (runtimeRefresh === 'renewed') return;
+      if (runtimeRefresh === 'renewed') {
+        await townStub.forceRefreshContainerToken();
+        return;
+      }
 
-      // Also remint and push KILOCODE_TOKEN — this is what actually
-      // authenticates GT tool calls and is the main reason users hit 401s.
-      // For personal towns the caller IS the owner; for org towns we must
-      // use the town owner's identity (not the caller's) so that
-      // git-credentials and other owner-scoped APIs continue to work.
-      let tokenUser: { id: string; api_token_pepper: string | null };
-      if (ownership.type === 'user') {
-        tokenUser = userFromCtx(ctx);
-      } else {
-        // Org town: resolve the owner from the town config
-        const config = await townStub.getTownConfig();
-        const ownerId = config.owner_user_id ?? config.created_by_user_id;
-        if (ownerId && ownerId === ctx.userId) {
-          // Caller happens to be the owner — use their live context
-          tokenUser = userFromCtx(ctx);
-        } else if (ownerId) {
-          // Different org member — look up the owner's pepper from the DB
-          if (!ctx.env.HYPERDRIVE) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'HYPERDRIVE binding not configured — cannot resolve town owner',
-            });
-          }
-          const { findUserById } = await import('../util/user-db.util');
-          const ownerUser = await findUserById(ctx.env.HYPERDRIVE.connectionString, ownerId);
-          if (!ownerUser) {
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: 'Town owner not found — cannot refresh KILOCODE_TOKEN',
-            });
-          }
-          tokenUser = { id: ownerUser.id, api_token_pepper: ownerUser.api_token_pepper };
-        } else {
-          // No owner recorded — fall back to caller
-          tokenUser = userFromCtx(ctx);
+      let identityState = await townStub.getTownIdentityState();
+      if (identityState.type !== 'legacy') {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Town legacy authorization is unavailable',
+        });
+      }
+      if (!identityState.identity) {
+        const identity =
+          ownership.type === 'user'
+            ? {
+                ownerType: 'user' as const,
+                ownerUserId: ownership.town.owner_user_id,
+                createdByUserId: ownership.town.owner_user_id,
+                runtimeMode: 'legacy' as const,
+              }
+            : ownership.type === 'org'
+              ? await (async () => {
+                  const town = await ownership.stub.getTownAsync(input.townId);
+                  if (!town || town.owner_org_id !== ownership.orgId || !town.created_by_user_id) {
+                    return null;
+                  }
+                  return {
+                    ownerType: 'org' as const,
+                    ownerUserId: town.created_by_user_id,
+                    organizationId: ownership.orgId,
+                    createdByUserId: town.created_by_user_id,
+                    runtimeMode: 'legacy' as const,
+                  };
+                })()
+              : null;
+        if (!identity) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Town legacy authorization is unavailable',
+          });
+        }
+        await Promise.resolve(townStub.initializePrivateTownIdentity(identity)).catch(
+          () => undefined
+        );
+        identityState = await townStub.getTownIdentityState();
+        const organizationId = 'organizationId' in identity ? identity.organizationId : undefined;
+        if (
+          identityState.type !== 'legacy' ||
+          !identityState.identity ||
+          identityState.identity.ownerType !== identity.ownerType ||
+          identityState.identity.ownerUserId !== identity.ownerUserId ||
+          identityState.identity.organizationId !== organizationId ||
+          identityState.identity.createdByUserId !== identity.createdByUserId ||
+          identityState.identity.runtimeMode !== 'legacy'
+        ) {
+          throw new TRPCError({
+            code: 'PRECONDITION_FAILED',
+            message: 'Town legacy authorization is unavailable',
+          });
         }
       }
+      let tokenUser;
+      try {
+        tokenUser = await resolveLegacyTownTokenOwner(ctx.env, identityState.identity, {
+          id: ctx.userId,
+          apiTokenPepper: ctx.apiTokenPepper,
+        });
+      } catch (error) {
+        if (error instanceof LegacyTownTokenRenewalUnavailableError) {
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message: 'Legacy token authorization unavailable',
+          });
+        }
+        throw error;
+      }
+      if (!tokenUser) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Legacy token authorization revoked' });
+      }
+      await townStub.forceRefreshContainerToken();
       const newKilocodeToken = await mintKilocodeToken(ctx.env, tokenUser);
       await townStub.updateTownConfig({ kilocode_token: newKilocodeToken });
       await townStub.syncConfigToContainer();

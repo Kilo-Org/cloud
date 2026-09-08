@@ -188,7 +188,6 @@ async function assertCurrentOrganizationMembership(
       and(
         eq(organization_memberships.kilo_user_id, userId),
         eq(organization_memberships.organization_id, organizationId),
-        ne(organization_memberships.role, 'billing_manager'),
         isNull(organizations.deleted_at)
       )
     )

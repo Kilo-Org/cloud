@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
-import { device_sessions, kilocode_users } from '@kilocode/db/schema';
+import {
+  device_sessions,
+  kilocode_users,
+  organization_memberships,
+  organizations,
+} from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
@@ -39,6 +44,18 @@ async function user() {
   const row = await insertTestUser({ api_token_pepper: crypto.randomUUID() });
   cleanups.push(row.id);
   return row;
+}
+
+async function organizationFor(userId: string) {
+  const [organization] = await db
+    .insert(organizations)
+    .values({
+      name: `Resource delegation ${crypto.randomUUID()}`,
+      created_by_kilo_user_id: userId,
+      require_seats: false,
+    })
+    .returning();
+  return organization;
 }
 
 function bearer(token: string) {
@@ -87,6 +104,83 @@ function modernToken(
 }
 
 describe('resource delegation authority', () => {
+  test.each([true, false])(
+    'accepts direct billing_manager membership when shared issuance is %s',
+    async enabled => {
+      shared.enabled = enabled;
+      const current = await user();
+      const organization = await organizationFor(current.id);
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: current.id,
+        role: 'billing_manager',
+      });
+      const headers = enabled ? bearer(modernToken(current)) : new Headers();
+      if (!enabled) {
+        jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+          user: current,
+          authFailedResponse: null,
+        });
+      }
+
+      const result = await createControlTokenForRequest(current, 'cloud-agent-next', {
+        headers,
+        organizationId: organization.id,
+      });
+      const claims = jwt.decode(result.token) as jwt.JwtPayload;
+      expect(claims).not.toHaveProperty('organizationRole');
+      if (enabled) {
+        expect(claims.organizationId).toBe(organization.id);
+      } else {
+        expect(claims).not.toHaveProperty('organizationId');
+      }
+    }
+  );
+
+  test.each([
+    [true, 'removed'],
+    [false, 'removed'],
+    [true, 'deleted'],
+    [false, 'deleted'],
+  ] as const)(
+    'denies direct organization access when shared issuance is %s and state is %s',
+    async (enabled, state) => {
+      shared.enabled = enabled;
+      const current = await user();
+      const organization = await organizationFor(current.id);
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: current.id,
+        role: 'billing_manager',
+      });
+      if (state === 'removed') {
+        await db
+          .delete(organization_memberships)
+          .where(eq(organization_memberships.organization_id, organization.id));
+      } else {
+        await db
+          .update(organizations)
+          .set({ deleted_at: new Date().toISOString() })
+          .where(eq(organizations.id, organization.id));
+      }
+
+      const headers = enabled ? bearer(modernToken(current)) : new Headers();
+      if (!enabled) {
+        jest.mocked(getUserFromSessionForCredentialIssuance).mockResolvedValue({
+          user: current,
+          authFailedResponse: null,
+        });
+      }
+
+      await expect(
+        createControlTokenForRequest(current, 'cloud-agent-next', {
+          headers,
+          organizationId: organization.id,
+        })
+      ).rejects.toThrow('Unauthorized resource delegation request');
+    }
+  );
+
   test('accepts an exchangeable modern human API credential and preserves its provenance', async () => {
     const current = await user();
     const authority = await getResourceDelegationAuthority(current, {

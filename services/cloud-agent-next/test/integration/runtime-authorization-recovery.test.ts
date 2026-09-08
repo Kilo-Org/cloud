@@ -75,6 +75,44 @@ beforeEach(async () => {
 });
 
 describe('runtime authorization recovery', () => {
+  it('rejects prepared and ordinary admission while a recovery lock is held', async () => {
+    const userId = 'user_cloud_recovery_lock';
+    const sessionId = 'agent_cloud_recovery_lock';
+    const stub = env.CLOUD_AGENT_SESSION.get(
+      env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`)
+    );
+
+    const result = await runInDurableObject(stub, async instance => {
+      await registerReadySession(instance, {
+        sessionId,
+        userId,
+        kiloSessionId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaab',
+        prompt: 'initial',
+        mode: 'code',
+        model: 'test-model',
+        initialMessageId: 'msg_018f1e2d3c4bRecoveryLockAb',
+      });
+      await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_RECOVERY_KEY, {
+        expectedOldId: '00000000-0000-4000-8000-000000000001',
+        recoveryId: '00000000-0000-4000-8000-000000000002',
+      });
+      return {
+        ordinary: await instance.admitSubmittedMessage({
+          userId,
+          turn: { type: 'prompt', id: 'msg_018f1e2d3c4bRecoveryBusyAb', prompt: 'follow up' },
+        }),
+        prepared: await instance.admitPreparedInitialMessage({ userId }),
+      };
+    });
+
+    expect(result.ordinary).toEqual({
+      success: false,
+      code: 'COMPUTE_STOPPING',
+      error: 'Runtime authorization recovery is in progress',
+    });
+    expect(result.prepared).toEqual(result.ordinary);
+  });
+
   it('recovers an expired CloudAgentSession authorization only after confirmed idle retirement', async () => {
     const userId = 'user_cloud_recovery';
     const sessionId = 'agent_cloud_recovery';
@@ -82,8 +120,8 @@ describe('runtime authorization recovery', () => {
       id: '00000000-0000-4000-8000-000000000101',
       sessionId,
       userId,
-      expiresAt: new Date(Date.now() - 60_000).toISOString(),
-      issuedAt: new Date(Date.now() - 2 * 60 * 60_000).toISOString(),
+      expiresAt: new Date(Date.now() - 24 * 60 * 60_000).toISOString(),
+      issuedAt: new Date(Date.now() - 26 * 60 * 60_000).toISOString(),
     });
     const fresh = authorization({
       id: '00000000-0000-4000-8000-000000000102',
@@ -105,6 +143,7 @@ describe('runtime authorization recovery', () => {
         mode: 'code',
         model: 'test-model',
         kilocodeToken: 'expired-token',
+        initialMessageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
       });
       const previousRuntime = await allocateWrapperRuntimeState(instance.ctx.storage);
       await instance.ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, old);
@@ -127,8 +166,10 @@ describe('runtime authorization recovery', () => {
         runtimeAuthorizationSeal: await seal(fresh),
         runtimeToken: 'fresh-token',
       });
+      const preparedAdmission = await instance.admitPreparedInitialMessage({ userId });
       return {
         outcome,
+        preparedAdmission,
         stops,
         metadata: await instance.getMetadata(),
         authorization: await instance.ctx.storage.get(RUNTIME_AUTHORIZATION_KEY),
@@ -140,6 +181,10 @@ describe('runtime authorization recovery', () => {
     });
 
     expect(result.outcome).toEqual({ status: 'recovered' });
+    expect(result.preparedAdmission).toMatchObject({
+      success: true,
+      messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMn',
+    });
     expect(result.stops).toEqual(['idle-timeout']);
     expect(result.metadata).toMatchObject({
       identity: { userId, sessionId, orgId: organizationId },

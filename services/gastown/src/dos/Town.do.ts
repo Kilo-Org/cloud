@@ -5008,24 +5008,19 @@ export class TownDO extends DurableObject<Env> {
     const userId = payload.kiloUserId;
     if (!identity || !userId) return;
 
+    let owner: legacyTokenRenewal.LegacyTokenOwner | null;
     try {
-      const authorized = await legacyTokenRenewal.isLegacyTownTokenRenewalAuthorized(
-        this.env,
-        identity,
-        userId,
-        payload.apiTokenPepper ?? null
-      );
-      if (!authorized) return;
+      owner = await legacyTokenRenewal.resolveLegacyTownTokenOwner(this.env, identity, {
+        id: userId,
+        apiTokenPepper: payload.apiTokenPepper ?? null,
+      });
     } catch {
       // An unavailable authority must never revive a legacy token.
       logger.warn('refreshKilocodeTokenIfExpiring: current authorization unavailable');
       return;
     }
-
-    const newToken = await generateKiloApiToken(
-      { id: userId, api_token_pepper: payload.apiTokenPepper ?? null },
-      secret
-    );
+    if (!owner) return;
+    const newToken = await generateKiloApiToken(owner, secret);
     await this.updateTownConfig({ kilocode_token: newToken });
     await this.syncConfigToContainer();
     logger.info('refreshKilocodeTokenIfExpiring: reminted KILOCODE_TOKEN proactively', {

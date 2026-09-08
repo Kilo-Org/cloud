@@ -103,8 +103,8 @@ export type QueueMessageContext = {
   authToken?: string;
 };
 
-async function recoverExpiredRuntimeAuthorization(
-  input: QueueMessageInput,
+export async function preflightRuntimeAuthorizationRecovery(
+  cloudAgentSessionId: string,
   ctx: QueueMessageContext
 ): Promise<void> {
   if (!ctx.authToken) return;
@@ -116,17 +116,21 @@ async function recoverExpiredRuntimeAuthorization(
   ) {
     return;
   }
-  const sessionId = input.cloudAgentSessionId as SessionId;
+  const sessionId = cloudAgentSessionId as SessionId;
   const stub = resolveSessionStub(ctx.env, ctx.userId, sessionId);
   const state = await withDORetry(
     () => stub,
     target => target.getRuntimeAuthorizationRecoveryState(),
     'getRuntimeAuthorizationRecoveryState'
   );
-  if (state.state !== 'expired' || !state.id) return;
+  if (state.state === 'legacy' || state.state === 'active') return;
+  if (state.state === 'revoked') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime authorization denied' });
+  }
+  if (!state.id) return;
   const expectedOldId = state.id;
   const recoveryId = state.recoveryId ?? crypto.randomUUID();
-  const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, input.cloudAgentSessionId);
+  const metadata = await fetchSessionMetadata(ctx.env, ctx.userId, cloudAgentSessionId);
   if (!metadata || metadata.identity.userId !== ctx.userId) return;
   const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
   if (!secret)
@@ -200,7 +204,7 @@ export async function preflightAndAdmitPromptMessage<T>(
   procedure: string,
   admit: (input: QueueMessageInput, ctx: QueueMessageContext) => Promise<T>
 ): Promise<T> {
-  await recoverExpiredRuntimeAuthorization(input, ctx);
+  await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
   if (sessionPlaneFromId(input.cloudAgentSessionId) === 'control') return admit(input, ctx);
   if (await hasMessageAdmission(input, ctx)) return admit(input, ctx);
 
@@ -220,14 +224,21 @@ export function preflightAndQueuePromptMessage(
   ctx: QueueMessageContext,
   procedure: string
 ): Promise<QueueAckResponse> {
-  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueMessage);
+  return preflightAndAdmitPromptMessage(input, ctx, procedure, queueMessageAfterRecoveryPreflight);
 }
 
 export async function queueMessage(
   input: QueueMessageInput,
   ctx: QueueMessageContext
 ): Promise<QueueAckResponse> {
-  await recoverExpiredRuntimeAuthorization(input, ctx);
+  await preflightRuntimeAuthorizationRecovery(input.cloudAgentSessionId, ctx);
+  return queueMessageAfterRecoveryPreflight(input, ctx);
+}
+
+async function queueMessageAfterRecoveryPreflight(
+  input: QueueMessageInput,
+  ctx: QueueMessageContext
+): Promise<QueueAckResponse> {
   const sessionId = input.cloudAgentSessionId as SessionId;
   const request: SubmittedSessionMessageRequest = {
     userId: ctx.userId,

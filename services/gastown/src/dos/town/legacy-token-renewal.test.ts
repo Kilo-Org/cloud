@@ -6,7 +6,10 @@ const select = vi.fn();
 
 vi.mock('@kilocode/db/client', () => ({ getWorkerDb: vi.fn(() => ({ select })) }));
 
-import { isLegacyTownTokenRenewalAuthorized } from './legacy-token-renewal';
+import {
+  isLegacyTownTokenRenewalAuthorized,
+  resolveLegacyTownTokenOwner,
+} from './legacy-token-renewal';
 
 const env = { HYPERDRIVE: { connectionString: 'postgres://' } } as Env;
 const personalIdentity = { ownerType: 'user' as const, ownerUserId: 'user-1' };
@@ -85,6 +88,22 @@ describe('isLegacyTownTokenRenewalAuthorized', () => {
     await expect(
       isLegacyTownTokenRenewalAuthorized(env, orgIdentity, 'user-1', 'current')
     ).resolves.toBe(true);
+  });
+
+  it('returns the current owner pepper for an eligible org member', async () => {
+    rows(
+      [{ pepper: 'member-current', blockedAt: null, blockedReason: null }],
+      [{ role: 'member' }],
+      [{ pepper: 'owner-current', blockedAt: null, blockedReason: null }],
+      [{ role: 'owner' }]
+    );
+
+    await expect(
+      resolveLegacyTownTokenOwner(env, orgIdentity, {
+        id: 'member-1',
+        apiTokenPepper: 'member-current',
+      })
+    ).resolves.toEqual({ id: 'user-1', api_token_pepper: 'owner-current' });
   });
 
   it('allows an expired but validly signed token when its current owner is authorized', async () => {

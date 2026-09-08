@@ -247,6 +247,18 @@ describe('applySessionAttach', () => {
       expect(setupBranches).toEqual(['session/worktree_a']);
     });
 
+    it('creates a requested working branch when it is absent from the remote', async () => {
+      const branch = 'kilo/quiet-forest-abc';
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, branch, branchMode: 'working' },
+        deps
+      );
+
+      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(await currentBranch()).toBe(branch);
+    });
+
     it.each(['main', 'feature/existing'])(
       'honors the explicitly requested branch %s',
       async branch => {

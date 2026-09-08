@@ -367,6 +367,7 @@ describe('createSandboxControlClient', () => {
           eventReceipts?: boolean;
           runtimeIsolation?: boolean;
           runtimeRecovery?: boolean;
+          workingBranches?: boolean;
         };
       };
     };
@@ -383,6 +384,7 @@ describe('createSandboxControlClient', () => {
         eventReceipts: true,
         runtimeIsolation: true,
         runtimeRecovery: true,
+        workingBranches: true,
       },
     });
     fake.respond(

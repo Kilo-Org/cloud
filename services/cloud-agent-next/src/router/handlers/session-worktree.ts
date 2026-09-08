@@ -372,6 +372,14 @@ async function assertNewDestinationRuntimeIsolation(ctx: TRPCContext): Promise<v
   if (await requiresRuntimeAuthorization(ctx)) assertRuntimeIsolationAdmission(ctx.env);
 }
 
+function sourceWorktreeBranchName(source: WorktreeSource): string {
+  return (
+    source.workspace.branchName ??
+    source.repository.upstreamBranch ??
+    `session/${source.worktreeId}`
+  );
+}
+
 function buildRegistrationInput(
   source: WorktreeSource,
   ctx: TRPCContext,
@@ -383,6 +391,7 @@ function buildRegistrationInput(
 
   const workspace = { ...source.workspace };
   delete workspace.providerRuntime;
+  workspace.branchName = sourceWorktreeBranchName(source);
 
   return {
     identity: { ...source.metadata.identity, sessionId: progress.cloudAgentSessionId },
@@ -435,7 +444,7 @@ function assertRegisteredMetadata(
     workspace.workspacePath !== source.workspace.workspacePath ||
     workspace.sandboxId !== source.workspace.sandboxId ||
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
-    workspace.branchName !== source.workspace.branchName ||
+    workspace.branchName !== sourceWorktreeBranchName(source) ||
     JSON.stringify(workspace.sandboxRoute) !== JSON.stringify(source.workspace.sandboxRoute) ||
     !metadata.repository ||
     canonicalRepositoryUrl(metadata.repository) !== canonicalRepositoryUrl(source.repository) ||

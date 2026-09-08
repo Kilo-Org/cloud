@@ -63,7 +63,11 @@ function helloFrame(
   providerInstanceId: string,
   wrapperInstanceId?: string,
   requestId = 'req_hello',
-  capabilities?: { nativeRuntimeRetirement?: boolean; runtimeIsolation?: true }
+  capabilities?: {
+    nativeRuntimeRetirement?: boolean;
+    runtimeIsolation?: true;
+    workingBranches?: boolean;
+  }
 ): string {
   return JSON.stringify({
     type: 'request',
@@ -393,6 +397,20 @@ describe('sandbox control socket handler', () => {
     );
 
     expect(handler.supportsNativeRuntimeRetirement()).toBe(true);
+  });
+
+  it('reads the working branch capability from the wrapper handshake', async () => {
+    const incoming = createFakeWebSocket();
+    const handler = createSandboxControlSocketHandler(createFakeState([incoming]), 'sbx_test');
+
+    await handler.handleMessage(
+      asWs(incoming),
+      helloFrame('inst_1', WRAPPER_INSTANCE_ID, 'req_working_branches', {
+        workingBranches: true,
+      })
+    );
+
+    expect(handler.supportsWorkingBranches?.()).toBe(true);
   });
 
   it('rejects duplicate hellos without replacing the current connection', async () => {

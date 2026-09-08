@@ -3,6 +3,7 @@ import type {
   GetWorktreeChangesOutput,
   RefreshWorktreeChangesOutput,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
 import {
@@ -2137,6 +2138,8 @@ export class SandboxSession extends DurableObject<Env> {
             upstreamBranch: input.repository.upstreamBranch ?? input.repository.branch,
           }
         : input.repository;
+    const branchName =
+      input.workspace?.branchName ?? repository?.upstreamBranch ?? `kilo/${generateBranchSlug()}`;
     const metadata = parseSessionMetadata({
       metadataSchemaVersion: 2,
       identity: input.identity,
@@ -2144,7 +2147,7 @@ export class SandboxSession extends DurableObject<Env> {
       agent: input.agent,
       ...(repository ? { repository } : {}),
       ...(initialMessage ? { initialMessage } : {}),
-      workspace: input.workspace ?? {},
+      workspace: { ...(input.workspace ?? {}), branchName },
       ...(input.callback ? { callback: input.callback } : {}),
       ...(input.profile ? { profile: input.profile } : {}),
       ...(input.finalization ? { finalization: input.finalization } : {}),

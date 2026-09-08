@@ -26,18 +26,18 @@ describe('resolveRepositorySettings', () => {
     expect(settings.modelSlug).toBeTruthy();
   });
 
-  it('fails closed to off when the installation has no recognized review mode', () => {
-    expect(resolveRepositorySettings({ metadata: {} }).prReviewMode).toBe('off');
+  it('defaults to on when the installation has no recognized review mode', () => {
+    expect(resolveRepositorySettings({ metadata: {} }).prReviewMode).toBe('on');
     expect(resolveRepositorySettings({ metadata: { pr_review_mode: 'manual' } }).prReviewMode).toBe(
-      'off'
+      'on'
     );
-    expect(resolveRepositorySettings({ metadata: null }).prReviewMode).toBe('off');
+    expect(resolveRepositorySettings({ metadata: null }).prReviewMode).toBe('on');
   });
 
   it('treats a JSON literal null metadata the same as SQL null', () => {
     // Some legacy rows may have stored the JSON literal `null` rather than SQL NULL.
     const settings = resolveRepositorySettings({ metadata: null });
 
-    expect(settings.prReviewMode).toBe('off');
+    expect(settings.prReviewMode).toBe('on');
   });
 });

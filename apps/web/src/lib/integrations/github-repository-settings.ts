@@ -47,8 +47,10 @@ const InstallationReviewModeMetadataSchema = z.object({
  * Resolves the settings that apply to one repository: any override on
  * `customization` wins; otherwise the installation's default from
  * `integration.metadata` applies. An installation without a recognized
- * `pr_review_mode` (not yet migrated, or invalid) fails closed to `'off'`
- * rather than silently enabling automatic reviews.
+ * `pr_review_mode` (not yet migrated, or invalid) defaults to `'on'`:
+ * automatic reviews run unless an installation or repository has explicitly
+ * turned them off. There is no migration that backfills `'on'` onto existing
+ * rows — this default is applied here, at read time, instead.
  */
 export function resolveRepositorySettings(
   integration: Pick<PlatformIntegration, 'metadata'>,
@@ -66,7 +68,7 @@ export function resolveRepositorySettings(
 
   const prReviewMode =
     customization?.pr_review_mode ??
-    (installationReviewMode.success ? installationReviewMode.data : 'off');
+    (installationReviewMode.success ? installationReviewMode.data : 'on');
 
   return { modelSlug, prReviewMode };
 }

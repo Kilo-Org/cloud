@@ -150,6 +150,12 @@ describe('shouldRenderReasoningPart', () => {
   it('does not render a non-reasoning part', () => {
     expect(shouldRenderReasoningPart(makeTextPart('hello'))).toBe(false);
   });
+
+  it('does not render a reasoning part with no text', () => {
+    const part = makeReasoningPart('thinking');
+    delete (part as { text?: unknown }).text;
+    expect(shouldRenderReasoningPart(part)).toBe(false);
+  });
 });
 
 describe('getCloudSessionCreationOperation', () => {

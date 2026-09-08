@@ -139,4 +139,10 @@ describe('shouldRenderReasoningPart', () => {
     expect(isPartStreaming(part)).toBe(true);
     expect(shouldRenderReasoningPart(part, false)).toBe(false);
   });
+
+  it('does not render a reasoning part with no text', () => {
+    const part = makeReasoningPart('thinking');
+    delete (part as { text?: unknown }).text;
+    expect(shouldRenderReasoningPart(part, false)).toBe(false);
+  });
 });

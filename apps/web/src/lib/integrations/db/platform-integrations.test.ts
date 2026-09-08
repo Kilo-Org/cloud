@@ -139,11 +139,44 @@ describe('upsertPlatformIntegrationForOwner', () => {
   test('serializes concurrent different installations for a non-allowlisted organization', async () => {
     const owner: Owner = { type: 'org', id: orgId };
     const installationIds = [`${INSTALLATION_ID}-concurrent-a`, `${INSTALLATION_ID}-concurrent-b`];
-    const results = await Promise.all(
+    let installationLockArrivals = 0;
+    let releaseInstallationBarrier: () => void = () => {};
+    const installationBarrier = new Promise<void>(resolve => {
+      releaseInstallationBarrier = resolve;
+    });
+    let ownerLockEntries = 0;
+    let signalFirstOwnerLock: () => void = () => {};
+    const firstOwnerLock = new Promise<void>(resolve => {
+      signalFirstOwnerLock = resolve;
+    });
+    let releaseFirstOwnerLock: () => void = () => {};
+    const firstOwnerGate = new Promise<void>(resolve => {
+      releaseFirstOwnerLock = resolve;
+    });
+    const synchronization = {
+      afterInstallationLock: async () => {
+        installationLockArrivals += 1;
+        if (installationLockArrivals === 2) releaseInstallationBarrier();
+        await installationBarrier;
+      },
+      afterOwnerLock: async () => {
+        ownerLockEntries += 1;
+        if (ownerLockEntries === 1) {
+          signalFirstOwnerLock();
+          await firstOwnerGate;
+        }
+      },
+    };
+    const pendingResults = Promise.all(
       installationIds.map(installationId =>
-        upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
+        upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId), synchronization)
       )
     );
+    await firstOwnerLock;
+    expect(installationLockArrivals).toBe(2);
+    expect(ownerLockEntries).toBe(1);
+    releaseFirstOwnerLock();
+    const results = await pendingResults;
     expect(results.filter(result => result.ok)).toHaveLength(1);
     expect(results).toContainEqual({ ok: false, reason: 'multiple_installations_disabled' });
     const rows = await db

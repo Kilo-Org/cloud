@@ -865,6 +865,10 @@ export async function upsertPlatformIntegrationForOwner(
     repositories?: PlatformRepository[] | null;
     installedAt?: string;
     githubAppType?: GitHubAppType;
+  },
+  testSynchronization?: {
+    afterInstallationLock?: () => Promise<void>;
+    afterOwnerLock?: () => Promise<void>;
   }
 ): Promise<UpsertPlatformIntegrationResult> {
   const appType = data.githubAppType ?? 'standard';
@@ -896,7 +900,15 @@ export async function upsertPlatformIntegrationForOwner(
       await tx.execute(
         sql`SELECT pg_advisory_xact_lock(hashtext(${`${appType}:${data.platformInstallationId}`}))`
       );
-      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
+      await testSynchronization?.afterInstallationLock?.();
+      const requiresOwnerCardinalityLock =
+        owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id);
+      if (requiresOwnerCardinalityLock) {
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`
+        );
+        await testSynchronization?.afterOwnerLock?.();
+      }
       const peers = await tx
         .select()
         .from(platform_integrations)
@@ -926,7 +938,7 @@ export async function upsertPlatformIntegrationForOwner(
             existing.owned_by_user_id === null));
       if (existing && !sameOwner) return { ok: false, reason: 'claimed_by_other_owner' };
 
-      if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
+      if (requiresOwnerCardinalityLock) {
         const ownerIntegrations = await tx
           .select({ installationId: platform_integrations.platform_installation_id })
           .from(platform_integrations)

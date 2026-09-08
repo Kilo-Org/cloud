@@ -54,7 +54,11 @@ test.each(['standard', 'lite'] as const)(
       githubAppType,
     });
     if (!verified) throw new Error('Expected verified link token');
-    await expect(consumeLinkAccountContext(state as never, verified.contextKey)).resolves.toBe(true);
-    await expect(consumeLinkAccountContext(state as never, verified.contextKey)).resolves.toBe(false);
+    await expect(consumeLinkAccountContext(state as never, verified.contextKey)).resolves.toBe(
+      true
+    );
+    await expect(consumeLinkAccountContext(state as never, verified.contextKey)).resolves.toBe(
+      false
+    );
   }
 );

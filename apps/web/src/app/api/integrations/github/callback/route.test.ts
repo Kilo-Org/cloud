@@ -270,7 +270,11 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     await expect(response.text()).resolves.toContain(
       'not a member of the organization that owns this GitHub integration'
     );
-    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith('github', INSTALLATION_ID);
+    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      INSTALLATION_ID,
+      'standard'
+    );
     expect(mockedExchangeGitHubOAuthCode).not.toHaveBeenCalled();
     expect(mockedLinkKiloUser).not.toHaveBeenCalled();
   });
@@ -284,12 +288,50 @@ describe('GET /api/integrations/github/callback bot link flow', () => {
     expect(response.status).toBe(200);
     await expect(response.text()).resolves.toContain('GitHub account octocat has been linked');
     expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'standard');
-    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith('github', INSTALLATION_ID);
+    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      INSTALLATION_ID,
+      'standard'
+    );
     expect(mockedIsOrganizationMember).toHaveBeenCalledWith('org_1', USER_ID);
     expect(mockedBot.initialize).toHaveBeenCalled();
     expect(mockedLinkKiloUser).toHaveBeenCalledWith(
       mockState,
-      { platform: 'github', teamId: INSTALLATION_ID, userId: GITHUB_USER_ID },
+      {
+        platform: 'github',
+        teamId: INSTALLATION_ID,
+        userId: GITHUB_USER_ID,
+        githubAppType: 'standard',
+      },
+      USER_ID
+    );
+  });
+
+  test('routes a Lite bot-link callback through the Lite app identity', async () => {
+    mockedVerifyGitHubBotLinkState.mockReturnValue({
+      userId: USER_ID,
+      installationId: INSTALLATION_ID,
+      callbackPath: '/github/link',
+      githubAppType: 'lite',
+    });
+    mockedFindIntegrationByInstallationId.mockResolvedValue({
+      owned_by_organization_id: 'org_1',
+      github_app_type: 'lite',
+    } as never);
+    const { GET } = await import('./route');
+    const response = await GET(
+      makeRequest('/api/integrations/github/callback?code=abc&state=signed') as never
+    );
+    expect(response.status).toBe(200);
+    expect(mockedFindIntegrationByInstallationId).toHaveBeenCalledWith(
+      'github',
+      INSTALLATION_ID,
+      'lite'
+    );
+    expect(mockedExchangeGitHubOAuthCode).toHaveBeenCalledWith('abc', 'lite');
+    expect(mockedLinkKiloUser).toHaveBeenCalledWith(
+      mockState,
+      expect.objectContaining({ githubAppType: 'lite' }),
       USER_ID
     );
   });

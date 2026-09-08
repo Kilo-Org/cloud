@@ -100,10 +100,12 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     );
   }
 
-  // Bot-link states carry no GitHub app type, so this lookup is intentionally
-  // unscoped; the integration row's own github_app_type drives the OAuth
-  // exchange below. Ownership checks then restrict the result to this user.
-  const integration = await findIntegrationByInstallationId(PLATFORM.GITHUB, state.installationId);
+  const stateAppType = state.githubAppType ?? 'standard';
+  const integration = await findIntegrationByInstallationId(
+    PLATFORM.GITHUB,
+    state.installationId,
+    stateAppType
+  );
 
   if (!integration) {
     return htmlPage('Link Failed', 'No matching GitHub integration was found.', 404);
@@ -122,7 +124,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
     return htmlPage('Link Failed', 'You are not the owner of this GitHub integration.', 403);
   }
 
-  const appType = (integration.github_app_type ?? 'standard') as GitHubAppType;
+  const appType = (integration.github_app_type ?? stateAppType) as GitHubAppType;
   const githubUser = await exchangeGitHubOAuthCode(code, appType);
 
   await bot.initialize();
@@ -132,6 +134,7 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
       platform: PLATFORM.GITHUB,
       teamId: state.installationId,
       userId: githubUser.id,
+      githubAppType: appType,
     },
     user.id
   );

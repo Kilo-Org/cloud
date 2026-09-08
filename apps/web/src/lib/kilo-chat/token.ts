@@ -9,7 +9,7 @@ import {
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 
 import { getResourceDelegationAuthority } from '@/lib/auth/resource-delegation';
-import { isSharedResourceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
 import { generateApiToken } from '@/lib/tokens';
 
 import type { KiloChatTokenResponse } from './token-schema';
@@ -24,7 +24,12 @@ export async function createKiloChatTokenResponse(
   if (authority.credentialKind !== 'human-api' && authority.credentialKind !== 'device-access') {
     throw new Error('Kilo Chat requires a fresh user credential');
   }
-  if (isSharedResourceTokenIssuanceEnabled()) {
+  // Keep validated device credentials usable after shared issuance is rolled back.
+  const isModernDeviceAuthority =
+    authority.isModern &&
+    authority.credentialKind === 'device-access' &&
+    !!authority.deviceSessionId;
+  if (isResourceTokenIssuanceEnabled('chat') || isModernDeviceAuthority) {
     const now = Math.floor(Date.now() / 1000);
     const expiresIn = Math.min(
       KILO_CHAT_TOKEN_TTL_SECONDS,

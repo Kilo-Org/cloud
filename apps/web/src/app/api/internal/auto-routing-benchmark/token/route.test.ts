@@ -1,3 +1,4 @@
+import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
 import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { validateAuthorizationHeader } from '@/lib/tokens';
@@ -10,7 +11,7 @@ const mockSharedResourceTokens = { enabled: false };
 jest.mock('@/lib/config.server', () => ({
   INTERNAL_API_SECRET: 'internal-secret',
   NEXTAUTH_SECRET: 'benchmark-token-secret',
-  isSharedResourceTokenIssuanceEnabled: jest.fn(() => mockSharedResourceTokens.enabled),
+  isResourceTokenIssuanceEnabled: jest.fn(() => mockSharedResourceTokens.enabled),
 }));
 
 const mockRows: unknown[] = [];
@@ -95,6 +96,7 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
     expect(claims).not.toHaveProperty('aud');
     expect(claims).not.toHaveProperty('tokenPurpose');
     expect(claims).not.toHaveProperty('organizationId');
+    expect(isResourceTokenIssuanceEnabled).toHaveBeenCalledWith('benchmark');
   });
 
   it('preserves the existing organization token and role while shared tokens are disabled', async () => {
@@ -151,6 +153,7 @@ describe('POST /api/internal/auto-routing-benchmark/token', () => {
     });
     expect(claims.exp! - claims.iat!).toBe(6 * 60 * 60);
     expect(claims).not.toHaveProperty('organizationId');
+    expect(isResourceTokenIssuanceEnabled).toHaveBeenCalledWith('benchmark');
     expect(claims).not.toHaveProperty('organizationRole');
 
     const headers = new Headers({ authorization: `Bearer ${token}` });

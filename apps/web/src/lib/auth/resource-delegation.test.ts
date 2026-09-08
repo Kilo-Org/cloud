@@ -1,3 +1,4 @@
+import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
 import { afterEach, describe, expect, test } from '@jest/globals';
 import {
   device_sessions,
@@ -9,10 +10,12 @@ import { eq, inArray } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 
-const shared = { enabled: true };
+const shared = { enabled: true, family: '' };
 jest.mock('@/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'resource-delegation-test-secret',
-  isSharedResourceTokenIssuanceEnabled: () => shared.enabled,
+  isResourceTokenIssuanceEnabled: jest.fn(
+    (family: string) => shared.enabled && (!shared.family || shared.family === family)
+  ),
 }));
 jest.mock('@/lib/user/server', () => ({
   getUserFromSessionForCredentialIssuance: jest.fn(),
@@ -37,6 +40,7 @@ afterEach(async () => {
     cleanups.length = 0;
   }
   shared.enabled = true;
+  shared.family = '';
   jest.clearAllMocks();
 });
 
@@ -368,3 +372,27 @@ describe('resource delegation authority', () => {
     expect(delegated.exp! - delegated.iat!).toBeLessThanOrEqual(30);
   });
 });
+
+test.each(['cloud-agent-next', 'gastown', 'wasteland'] as const)(
+  'isolates request control family %s',
+  async family => {
+    shared.family = family;
+    const current = await user();
+    jest
+      .mocked(getUserFromSessionForCredentialIssuance)
+      .mockResolvedValue({ user: current, authFailedResponse: null });
+    for (const resource of ['cloud-agent-next', 'gastown', 'wasteland'] as const) {
+      const result = await createControlTokenForRequest(current, resource, {
+        headers: new Headers(),
+      });
+      const claims = jwt.decode(result.token) as jwt.JwtPayload;
+      expect(isResourceTokenIssuanceEnabled).toHaveBeenLastCalledWith(resource);
+      expect(claims.aud).toBe(resource === family ? resource : undefined);
+      expect(claims.tokenPurpose).toBe(resource === family ? 'human-api' : undefined);
+    }
+    await expect(
+      createDelegatedResourceToken(current, 'gateway', { headers: new Headers() })
+    ).rejects.toMatchObject({ status: 503, delegationCode: 'MIGRATION_UNAVAILABLE' });
+    expect(isResourceTokenIssuanceEnabled).toHaveBeenLastCalledWith('delegated-resource');
+  }
+);

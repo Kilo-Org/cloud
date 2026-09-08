@@ -1,10 +1,15 @@
 import { describe, expect, test } from '@jest/globals';
 import jwt from 'jsonwebtoken';
 
-const shared = { enabled: true };
+const shared = { enabled: true, family: '' };
+beforeEach(() => {
+  shared.enabled = true;
+  shared.family = '';
+});
 jest.mock('@/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'service-control-test-secret',
-  isSharedResourceTokenIssuanceEnabled: () => shared.enabled,
+  isResourceTokenIssuanceEnabled: (family: string) =>
+    shared.enabled && (!shared.family || shared.family === family),
 }));
 jest.mock('@/lib/user/server', () => ({ getUserFromSessionForCredentialIssuance: jest.fn() }));
 
@@ -96,3 +101,28 @@ describe('workflow service control tokens', () => {
     expect(claims.exp! - claims.iat!).toBe(300);
   });
 });
+
+test.each(['cloud-agent-next', 'workflow-gateway'])(
+  'only enables the selected workflow family %s',
+  family => {
+    shared.family = family;
+    const user = defineTestUser({ api_token_pepper: 'workflow-pepper' });
+    const cloud = jwt.decode(
+      generateCloudAgentWorkflowToken(user, {
+        expiresIn: 300,
+        tokenSource: 'reviewer',
+      })
+    ) as jwt.JwtPayload;
+    const gateway = jwt.decode(
+      generateWorkflowGatewayToken(user, {
+        tokenSource: 'reviewer',
+      })
+    ) as jwt.JwtPayload;
+    expect(cloud.tokenPurpose).toBe(family === 'cloud-agent-next' ? 'internal-service' : undefined);
+    expect(gateway.tokenPurpose).toBe(
+      family === 'workflow-gateway' ? 'delegated-workload' : undefined
+    );
+    expect(cloud.exp! - cloud.iat!).toBe(300);
+    if (family === 'cloud-agent-next') expect(gateway).not.toHaveProperty('aud');
+  }
+);

@@ -26,7 +26,7 @@ import {
   verifyKiloTokenForPolicy,
 } from '@kilocode/worker-utils/kilo-token-policy';
 import type { RuntimeAdmission } from '@kilocode/worker-utils/runtime-authorization-contract';
-import { isSharedResourceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled, NEXTAUTH_SECRET } from '@/lib/config.server';
 import { db } from '@/lib/drizzle';
 import { generateApiToken, TOKEN_EXPIRY } from '@/lib/tokens';
 import { getUserFromSessionForCredentialIssuance } from '@/lib/user/server';
@@ -376,7 +376,7 @@ export async function createControlTokenForRequest(
   if (authority.organizationId) {
     forbidden('Organization-scoped credentials cannot mint resource control tokens');
   }
-  if (!isSharedResourceTokenIssuanceEnabled()) {
+  if (!isResourceTokenIssuanceEnabled(resource)) {
     if (authority.isModern) {
       if (authority.credentialKind === 'device-access' && authority.deviceSessionId) {
         return await createModernControlToken(authority, resource, options);
@@ -426,7 +426,7 @@ export async function createDelegatedResourceToken(
   if (authority.organizationId && authority.audience !== resourceAudience(resource)) {
     forbidden('Scoped credentials cannot broaden their resource audience');
   }
-  if (!isSharedResourceTokenIssuanceEnabled()) {
+  if (!isResourceTokenIssuanceEnabled('delegated-resource')) {
     throw new TypedResourceDelegationError(
       503,
       'MIGRATION_UNAVAILABLE',

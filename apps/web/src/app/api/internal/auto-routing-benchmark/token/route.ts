@@ -33,7 +33,7 @@ import { and, eq } from 'drizzle-orm';
 import { kilocode_users, organization_memberships } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
 import {
-  isSharedResourceTokenIssuanceEnabled,
+  isResourceTokenIssuanceEnabled,
   INTERNAL_API_SECRET,
   NEXTAUTH_SECRET,
 } from '@/lib/config.server';
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 });
   }
-  const sharedResourceTokensEnabled = isSharedResourceTokenIssuanceEnabled();
+  const sharedResourceTokensEnabled = isResourceTokenIssuanceEnabled('benchmark');
   if (
     sharedResourceTokensEnabled &&
     (typeof user.api_token_pepper !== 'string' ||

@@ -9,7 +9,7 @@ import {
   isDelegableResource,
   TypedResourceDelegationError,
 } from '@/lib/auth/resource-delegation';
-import { isSharedResourceTokenIssuanceEnabled } from '@/lib/config.server';
+import { isResourceTokenIssuanceEnabled } from '@/lib/config.server';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const organizationId = (await params).id;
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Unsupported resource' }, { status: 400 });
   }
   if (resource !== undefined) {
-    if (!isSharedResourceTokenIssuanceEnabled()) {
+    if (!isResourceTokenIssuanceEnabled('delegated-resource')) {
       return NextResponse.json(
         { error: 'Shared resource token migration is unavailable' },
         { status: 503 }

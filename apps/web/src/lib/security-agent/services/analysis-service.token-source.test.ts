@@ -18,7 +18,7 @@ const tokenSecret = 'security-agent-token-source-test-secret';
 jest.mock('@/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'security-agent-token-source-test-secret',
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
-  isSharedResourceTokenIssuanceEnabled: () => shared.enabled,
+  isResourceTokenIssuanceEnabled: () => shared.enabled,
 }));
 
 const mockGetSecurityFindingById = jest.fn<typeof securityFindingsModule.getSecurityFindingById>();

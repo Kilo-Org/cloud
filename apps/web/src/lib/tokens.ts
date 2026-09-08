@@ -23,7 +23,7 @@ import jwt from 'jsonwebtoken';
 import { warnExceptInTest } from '@/lib/utils.server';
 import {
   isBoundedInternalServiceTokenIssuanceEnabled,
-  isSharedResourceTokenIssuanceEnabled,
+  isResourceTokenIssuanceEnabled,
   NEXTAUTH_SECRET,
 } from '@/lib/config.server';
 
@@ -294,7 +294,7 @@ export function generateCloudAgentWorkflowToken(
     authorizationUser?: User;
   }
 ): string {
-  if (!isSharedResourceTokenIssuanceEnabled()) {
+  if (!isResourceTokenIssuanceEnabled('cloud-agent-next')) {
     return generateApiToken(
       user,
       {
@@ -356,7 +356,7 @@ export function generateWorkflowGatewayToken(
     expiresIn?: number;
   }
 ): string {
-  if (!isSharedResourceTokenIssuanceEnabled()) {
+  if (!isResourceTokenIssuanceEnabled('workflow-gateway')) {
     return generateApiToken(user, { tokenSource: options.tokenSource });
   }
   if (!user.api_token_pepper) {

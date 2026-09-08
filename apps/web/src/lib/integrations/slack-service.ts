@@ -7,7 +7,7 @@ import { TRPCError } from '@trpc/server';
 import type { Owner } from '@/lib/integrations/core/types';
 import { INTEGRATION_STATUS, PLATFORM } from '@/lib/integrations/core/constants';
 import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
-import { SLACK_CLIENT_ID } from '@/lib/config.server';
+import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET } from '@/lib/config.server';
 import { WebClient } from '@slack/web-api';
 import type { SlackInstallation } from '@chat-adapter/slack';
 import { getDefaultAllowedModel } from '@/lib/slack-bot/model-allow-list';
@@ -87,6 +87,35 @@ export function getSlackOAuthUrl(state: string): string {
   });
 
   return `https://slack.com/oauth/v2/authorize?${params.toString()}`;
+}
+
+export async function exchangeSlackOAuthCode(code: string): Promise<{
+  teamId: string;
+  installation: SlackInstallation;
+}> {
+  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
+    throw new Error('SLACK_CLIENT_ID / SLACK_CLIENT_SECRET are not configured');
+  }
+  const result = await new WebClient().oauth.v2.access({
+    client_id: SLACK_CLIENT_ID,
+    client_secret: SLACK_CLIENT_SECRET,
+    code,
+    redirect_uri: SLACK_REDIRECT_URI,
+  });
+  const teamId = result.is_enterprise_install ? result.enterprise?.id : result.team?.id;
+  if (!result.ok || !result.access_token || !teamId) {
+    throw new Error(`Slack OAuth failed: ${result.error ?? 'missing installation identity'}`);
+  }
+  return {
+    teamId,
+    installation: {
+      botToken: result.access_token,
+      botUserId: result.bot_user_id,
+      teamName: result.team?.name ?? result.enterprise?.name,
+      enterpriseId: result.enterprise?.id,
+      isEnterpriseInstall: Boolean(result.is_enterprise_install),
+    },
+  };
 }
 
 /**

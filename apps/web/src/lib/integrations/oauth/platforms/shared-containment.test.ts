@@ -2,18 +2,22 @@ import { NextRequest } from 'next/server';
 
 const mockAssertGitHubAutomationCanBeEnabled = jest.fn();
 const mockVerifyOAuthState = jest.fn();
-const mockSlackHandleOAuthCallback = jest.fn();
-const mockSlackDeleteInstallation = jest.fn();
+const mockExchangeSlackOAuthCode = jest.fn();
+const mockSlackSetInstallation = jest.fn();
 const mockSlackGetInstallation = jest.fn();
-const mockLinearHandleOAuthCallback = jest.fn();
-const mockLinearDeleteInstallation = jest.fn();
+const mockSlackDeleteInstallation = jest.fn();
+const mockExchangeLinearOAuthCode = jest.fn();
+const mockFetchLinearOAuthIdentity = jest.fn();
+const mockLinearSetInstallation = jest.fn();
 const mockLinearGetInstallation = jest.fn();
+const mockLinearDeleteInstallation = jest.fn();
 const mockUpsertSlackInstallation = jest.fn();
 const mockExchangeDiscordCode = jest.fn();
 const mockUpsertDiscordInstallation = jest.fn();
-const mockCleanupRejectedDiscordGuild = jest.fn();
 const mockUpsertLinearInstallation = jest.fn();
+const mockGetLinearInstallation = jest.fn();
 const mockUnlinkTeamKiloUsers = jest.fn();
+const mockWithChatInstallationLock = jest.fn();
 
 jest.mock('@/lib/user/server', () => ({
   getUserFromAuth: jest.fn().mockResolvedValue({ user: { id: 'user-1' } }),
@@ -39,18 +43,18 @@ jest.mock('@/lib/integrations/oauth/common', () => ({
 }));
 jest.mock('@/lib/integrations/slack-service', () => ({
   SlackWorkspaceAlreadyConnectedError: class SlackWorkspaceAlreadyConnectedError extends Error {},
+  exchangeSlackOAuthCode: (...args: unknown[]) => mockExchangeSlackOAuthCode(...args),
   upsertSlackInstallation: (...args: unknown[]) => mockUpsertSlackInstallation(...args),
 }));
 jest.mock('@/lib/integrations/discord-service', () => ({
   exchangeDiscordCode: (...args: unknown[]) => mockExchangeDiscordCode(...args),
   upsertDiscordInstallation: (...args: unknown[]) => mockUpsertDiscordInstallation(...args),
-  cleanupRejectedDiscordGuild: (...args: unknown[]) => mockCleanupRejectedDiscordGuild(...args),
 }));
 jest.mock('@/lib/integrations/linear-service', () => ({
-  LINEAR_REDIRECT_URI: 'https://app.example.com/linear/callback',
   LinearWorkspaceAlreadyConnectedError: class LinearWorkspaceAlreadyConnectedError extends Error {},
-  exchangeLinearOAuthCode: jest.fn(),
-  fetchLinearOAuthIdentity: jest.fn(),
+  exchangeLinearOAuthCode: (...args: unknown[]) => mockExchangeLinearOAuthCode(...args),
+  fetchLinearOAuthIdentity: (...args: unknown[]) => mockFetchLinearOAuthIdentity(...args),
+  getInstallation: (...args: unknown[]) => mockGetLinearInstallation(...args),
   revokeLinearToken: jest.fn(),
   upsertLinearInstallation: (...args: unknown[]) => mockUpsertLinearInstallation(...args),
 }));
@@ -58,10 +62,8 @@ jest.mock('@/lib/bot-identity', () => ({
   linkKiloUser: jest.fn(),
   unlinkTeamKiloUsers: (...args: unknown[]) => mockUnlinkTeamKiloUsers(...args),
 }));
-jest.mock('@linear/sdk', () => ({
-  LinearClient: class LinearClient {
-    organization = Promise.resolve({ name: 'Workspace' });
-  },
+jest.mock('@/lib/bot/installation-lock', () => ({
+  withChatInstallationLock: (...args: unknown[]) => mockWithChatInstallationLock(...args),
 }));
 jest.mock('@/lib/bot', () => ({
   bot: {
@@ -70,13 +72,13 @@ jest.mock('@/lib/bot', () => ({
     getAdapter: (platform: string) =>
       platform === 'slack'
         ? {
-            handleOAuthCallback: mockSlackHandleOAuthCallback,
             getInstallation: mockSlackGetInstallation,
+            setInstallation: mockSlackSetInstallation,
             deleteInstallation: mockSlackDeleteInstallation,
           }
         : {
-            handleOAuthCallback: mockLinearHandleOAuthCallback,
             getInstallation: mockLinearGetInstallation,
+            setInstallation: mockLinearSetInstallation,
             deleteInstallation: mockLinearDeleteInstallation,
           },
   },
@@ -97,20 +99,38 @@ const request = (platform: string) =>
 describe('shared GitHub chat OAuth containment', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockGetLinearInstallation.mockReset();
+    mockUpsertSlackInstallation.mockReset();
+    mockUpsertSlackInstallation.mockResolvedValue(undefined);
+    mockUpsertLinearInstallation.mockReset();
+    mockUpsertLinearInstallation.mockResolvedValue(undefined);
+    mockUpsertDiscordInstallation.mockReset();
+    mockUpsertDiscordInstallation.mockResolvedValue(undefined);
     jest.spyOn(console, 'error').mockImplementation(() => undefined);
     mockVerifyOAuthState.mockReturnValue({ userId: 'user-1', owner: 'user_user-1' });
     mockAssertGitHubAutomationCanBeEnabled.mockResolvedValue(undefined);
-    mockSlackHandleOAuthCallback.mockResolvedValue({
+    mockExchangeSlackOAuthCode.mockResolvedValue({
       teamId: 'T1',
       installation: { botToken: 'token' },
     });
     mockExchangeDiscordCode.mockResolvedValue({ guild: { id: '123', name: 'Guild' } });
-    mockLinearHandleOAuthCallback.mockResolvedValue({
-      organizationId: 'L1',
-      installation: { accessToken: 'token', botUserId: 'bot' },
+    mockExchangeLinearOAuthCode.mockResolvedValue({
+      accessToken: 'token',
+      refreshToken: null,
+      expiresIn: null,
     });
-    mockSlackGetInstallation.mockResolvedValue({ botToken: 'token' });
-    mockLinearGetInstallation.mockResolvedValue({ accessToken: 'token' });
+    mockFetchLinearOAuthIdentity.mockResolvedValue({
+      organizationId: 'L1',
+      organizationName: 'Workspace',
+      viewerId: 'bot',
+    });
+    mockWithChatInstallationLock.mockImplementation(
+      async (_state: unknown, _platform: string, _id: string, callback: () => Promise<unknown>) =>
+        callback()
+    );
+    mockSlackGetInstallation.mockResolvedValue(null);
+    mockLinearGetInstallation.mockResolvedValue(null);
+    mockGetLinearInstallation.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -118,9 +138,9 @@ describe('shared GitHub chat OAuth containment', () => {
   });
 
   test.each([
-    ['slack', handleSlackOAuthCallback, mockSlackHandleOAuthCallback],
+    ['slack', handleSlackOAuthCallback, mockExchangeSlackOAuthCode],
     ['discord', handleDiscordOAuthCallback, mockExchangeDiscordCode],
-    ['linear', handleLinearOAuthCallback, mockLinearHandleOAuthCallback],
+    ['linear', handleLinearOAuthCallback, mockExchangeLinearOAuthCode],
   ] as const)('rejects %s before exchanging OAuth state', async (platform, handler, exchange) => {
     mockAssertGitHubAutomationCanBeEnabled.mockRejectedValue({ code: 'PRECONDITION_FAILED' });
 
@@ -139,10 +159,9 @@ describe('shared GitHub chat OAuth containment', () => {
     expect(mockSlackDeleteInstallation).toHaveBeenCalledWith('T1');
   });
 
-  it('removes the Discord bot when the transactional backstop loses the race', async () => {
+  it('does not remove guild-global Discord bot membership on a rejected callback', async () => {
     mockUpsertDiscordInstallation.mockRejectedValue({ code: 'PRECONDITION_FAILED' });
     await handleDiscordOAuthCallback(request('discord'));
-    expect(mockCleanupRejectedDiscordGuild).toHaveBeenCalledWith('123');
   });
 
   it('removes Linear Chat SDK and identity state when the backstop loses the race', async () => {
@@ -152,15 +171,52 @@ describe('shared GitHub chat OAuth containment', () => {
     expect(mockUnlinkTeamKiloUsers).toHaveBeenCalled();
   });
 
-  it('does not delete Chat SDK state replaced by a concurrent successful callback', async () => {
+  it('serializes state replacement and rejected cleanup inside one provider installation lock', async () => {
+    const events: string[] = [];
+    mockWithChatInstallationLock.mockImplementation(
+      async (_state: unknown, platform: string, _id: string, callback: () => Promise<unknown>) => {
+        events.push(`${platform}:enter`);
+        const result = await callback();
+        events.push(`${platform}:exit`);
+        return result;
+      }
+    );
+    mockSlackSetInstallation.mockImplementation(async () => {
+      events.push('slack:set');
+    });
+    mockSlackDeleteInstallation.mockImplementation(async () => {
+      events.push('slack:delete');
+    });
     mockUpsertSlackInstallation.mockRejectedValue({ code: 'PRECONDITION_FAILED' });
-    mockSlackGetInstallation.mockResolvedValue({ botToken: 'newer-token' });
     await handleSlackOAuthCallback(request('slack'));
-    expect(mockSlackDeleteInstallation).not.toHaveBeenCalled();
+    expect(events).toEqual(['slack:enter', 'slack:set', 'slack:delete', 'slack:exit']);
+  });
 
-    mockUpsertLinearInstallation.mockRejectedValue({ code: 'PRECONDITION_FAILED' });
-    mockLinearGetInstallation.mockResolvedValue({ accessToken: 'newer-token' });
+  it('restores incumbent credentials before releasing the provider lock', async () => {
+    const incumbent = { botToken: 'incumbent-token' };
+    mockSlackGetInstallation.mockResolvedValue(incumbent);
+    mockUpsertSlackInstallation.mockRejectedValue({ code: 'PRECONDITION_FAILED' });
+
+    await handleSlackOAuthCallback(request('slack'));
+
+    expect(mockSlackSetInstallation).toHaveBeenNthCalledWith(1, 'T1', { botToken: 'token' });
+    expect(mockSlackSetInstallation).toHaveBeenNthCalledWith(2, 'T1', incumbent);
+    expect(mockSlackDeleteInstallation).not.toHaveBeenCalled();
+  });
+
+  it('does not clean an old Linear workspace concurrently restored in the database', async () => {
+    mockGetLinearInstallation
+      .mockResolvedValueOnce({ platform_installation_id: 'OLD' })
+      .mockResolvedValueOnce({ platform_installation_id: 'OLD' });
+
     await handleLinearOAuthCallback(request('linear'));
-    expect(mockLinearDeleteInstallation).not.toHaveBeenCalled();
+
+    expect(mockWithChatInstallationLock).toHaveBeenCalledWith(
+      expect.anything(),
+      'linear',
+      'OLD',
+      expect.any(Function)
+    );
+    expect(mockLinearDeleteInstallation).not.toHaveBeenCalledWith('OLD');
   });
 });

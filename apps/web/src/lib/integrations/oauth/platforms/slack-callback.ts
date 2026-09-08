@@ -4,6 +4,7 @@ import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import {
+  exchangeSlackOAuthCode,
   SlackWorkspaceAlreadyConnectedError,
   upsertSlackInstallation,
 } from '@/lib/integrations/slack-service';
@@ -11,7 +12,6 @@ import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { bot } from '@/lib/bot';
 import { PLATFORM } from '@/lib/integrations/core/constants';
-import { getPlatformOAuthCallbackUrl } from '@/lib/integrations/oauth/urls';
 import {
   appendIntegrationOAuthRedirectQuery,
   buildIntegrationOAuthRedirectPath,
@@ -19,8 +19,7 @@ import {
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 import { assertGitHubAutomationCanBeEnabled } from '@/lib/integrations/github/sharing-compatibility';
-
-const SLACK_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.SLACK);
+import { withChatInstallationLock } from '@/lib/bot/installation-lock';
 
 /**
  * Slack OAuth Callback
@@ -122,30 +121,32 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
 
     await assertGitHubAutomationCanBeEnabled(owner);
 
-    // 7. Let the Chat SDK exchange the code and seed its installation state
+    // 7. Exchange first, then serialize state replacement and DB admission by workspace.
     await bot.initialize();
     const slackAdapter = bot.getAdapter('slack');
-    const url = new URL(request.url);
-    url.searchParams.set('redirect_uri', SLACK_REDIRECT_URI);
-    const patchedRequest = new Request(url, request);
-    const { teamId, installation } = await slackAdapter.handleOAuthCallback(patchedRequest);
-
-    // 8. Store installation in database
-    try {
-      await upsertSlackInstallation({ owner, teamId, installation });
-    } catch (error) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'code' in error &&
-        error.code === 'PRECONDITION_FAILED'
-      ) {
-        const currentInstallation = await slackAdapter.getInstallation(teamId);
-        if (currentInstallation?.botToken === installation.botToken) {
-          await slackAdapter.deleteInstallation(teamId);
+    const { teamId, installation } = await exchangeSlackOAuthCode(code);
+    const connectionError = await withChatInstallationLock(
+      bot.getState(),
+      PLATFORM.SLACK,
+      teamId,
+      async () => {
+        const previousInstallation = await slackAdapter.getInstallation(teamId);
+        await slackAdapter.setInstallation(teamId, installation);
+        try {
+          await upsertSlackInstallation({ owner, teamId, installation });
+          return null;
+        } catch (error) {
+          if (previousInstallation) {
+            await slackAdapter.setInstallation(teamId, previousInstallation);
+          } else {
+            await slackAdapter.deleteInstallation(teamId);
+          }
+          return error;
         }
       }
-      if (error instanceof SlackWorkspaceAlreadyConnectedError) {
+    );
+    if (connectionError) {
+      if (connectionError instanceof SlackWorkspaceAlreadyConnectedError) {
         return NextResponse.redirect(
           new URL(
             buildIntegrationOAuthRedirectPathFromState(
@@ -157,8 +158,7 @@ export async function handleSlackOAuthCallback(request: NextRequest) {
           )
         );
       }
-
-      throw error;
+      throw connectionError;
     }
 
     // 9. Redirect to success page

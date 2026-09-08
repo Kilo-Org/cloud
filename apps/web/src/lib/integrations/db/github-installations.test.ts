@@ -8,7 +8,7 @@ import {
   kilocode_users,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
@@ -125,7 +125,7 @@ describe('GitHub installation persistence', () => {
         deliveryId: 'delivery-1',
         eventType: 'installation.deleted',
       })
-    ).resolves.toBe(true);
+    ).resolves.toBe('claimed');
     await expect(
       recordSharedGitHubInstallationDelivery({
         installationId: '123456',
@@ -133,7 +133,7 @@ describe('GitHub installation persistence', () => {
         deliveryId: 'delivery-1',
         eventType: 'installation.deleted',
       })
-    ).resolves.toBe(false);
+    ).resolves.toBe('duplicate');
     await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
   });
 
@@ -182,6 +182,47 @@ describe('GitHub installation persistence', () => {
 
     await expect(attach).resolves.toMatchObject({ ok: true });
     await expect(enable).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
+  });
+
+  test('rechecks compatibility after a concurrent agent enable commits before attach', async () => {
+    const organizationA = await createTestOrganization('Enable race GitHub A', ownerId, 0);
+    const organizationB = await createTestOrganization('Enable race GitHub B', otherOwnerId, 0);
+    process.env.GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS = organizationB.id;
+    const first = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationA.id },
+      data()
+    );
+    if (!first.ok) throw new Error('Expected incumbent connection');
+    let releaseEnable: (() => void) | undefined;
+    const enableBarrier = new Promise<void>(resolve => {
+      releaseEnable = resolve;
+    });
+    let markEnabled: (() => void) | undefined;
+    const enabledBeforeCommit = new Promise<void>(resolve => {
+      markEnabled = resolve;
+    });
+    const enable = db.transaction(async tx => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`org:${organizationA.id}`}))`);
+      await tx.insert(agent_configs).values({
+        owned_by_organization_id: organizationA.id,
+        agent_type: 'code_review',
+        platform: 'github',
+        config: {},
+        is_enabled: true,
+        created_by: ownerId,
+      });
+      markEnabled?.();
+      await enableBarrier;
+    });
+    await enabledBeforeCommit;
+    const attach = connectVerifiedGitHubInstallation(
+      { type: 'org', id: organizationB.id },
+      { ...data(), kiloUserId: otherOwnerId }
+    );
+    releaseEnable?.();
+
+    await expect(enable).resolves.toBeUndefined();
+    await expect(attach).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
   });
 
   test('orders participant owner locks across inverse concurrent shared attaches', async () => {
@@ -319,6 +360,14 @@ describe('GitHub installation persistence', () => {
       sharing_mode: 'exclusive',
       sharing_admission_checked_at: null,
     });
+    await expect(
+      recordSharedGitHubInstallationDelivery({
+        installationId: '123456',
+        appType: 'standard',
+        deliveryId: 'delivery-after-demotion',
+        eventType: 'installation.deleted',
+      })
+    ).resolves.toBe('not_shared');
     await expect(
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
     ).resolves.toBeUndefined();

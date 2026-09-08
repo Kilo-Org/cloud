@@ -265,38 +265,6 @@ export async function uninstallApp(owner: Owner) {
   return { success: true };
 }
 
-export async function leaveDiscordGuild(guildId: string): Promise<void> {
-  const normalizedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
-  const response = await fetch(buildDiscordApiUrl(['users', '@me', 'guilds', normalizedGuildId]), {
-    method: 'DELETE',
-    headers: { Authorization: `Bot ${DISCORD_BOT_TOKEN}` },
-  });
-  if (!response.ok && response.status !== 404) {
-    throw new Error(`Failed to remove Discord bot from rejected guild: ${response.status}`);
-  }
-}
-
-export async function cleanupRejectedDiscordGuild(guildId: string): Promise<void> {
-  const normalizedGuildId = parseDiscordSnowflake(guildId, 'guild ID');
-  await db.transaction(async tx => {
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtext(${`discord:${normalizedGuildId}`}))`
-    );
-    const [existing] = await tx
-      .select({ id: platform_integrations.id })
-      .from(platform_integrations)
-      .where(
-        and(
-          eq(platform_integrations.platform, PLATFORM.DISCORD),
-          eq(platform_integrations.platform_installation_id, normalizedGuildId),
-          eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE)
-        )
-      )
-      .limit(1);
-    if (!existing) await leaveDiscordGuild(normalizedGuildId);
-  });
-}
-
 /**
  * Remove only the database row for a Discord integration without revoking the token.
  * Useful for development when you want to re-test the OAuth flow.

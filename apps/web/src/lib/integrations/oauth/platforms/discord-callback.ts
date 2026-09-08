@@ -3,11 +3,7 @@ import { NextResponse } from 'next/server';
 import { getUserFromAuth } from '@/lib/user/server';
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import {
-  cleanupRejectedDiscordGuild,
-  exchangeDiscordCode,
-  upsertDiscordInstallation,
-} from '@/lib/integrations/discord-service';
+import { exchangeDiscordCode, upsertDiscordInstallation } from '@/lib/integrations/discord-service';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
 import { APP_URL } from '@/lib/constants';
 import { PLATFORM } from '@/lib/integrations/core/constants';
@@ -123,20 +119,9 @@ export async function handleDiscordOAuthCallback(request: NextRequest) {
     const oauthData = await exchangeDiscordCode(code);
 
     // 8. Store installation in database
-    try {
-      await upsertDiscordInstallation(owner, oauthData);
-    } catch (error) {
-      if (
-        error &&
-        typeof error === 'object' &&
-        'code' in error &&
-        error.code === 'PRECONDITION_FAILED' &&
-        oauthData.guild?.id
-      ) {
-        await cleanupRejectedDiscordGuild(oauthData.guild.id);
-      }
-      throw error;
-    }
+    // Discord bot membership is guild-global rather than callback-owned. A rejected
+    // callback must not remove a bot that another owner or callback may already use.
+    await upsertDiscordInstallation(owner, oauthData);
 
     // 9. Redirect to success page
     const successPath = verified.returnTo

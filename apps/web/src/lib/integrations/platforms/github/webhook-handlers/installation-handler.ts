@@ -187,6 +187,7 @@ export async function handleInstallationDeleted(
       tags: { component: 'kilo-bot', op: 'github-installation-deleted-unlink' },
       extra: { installationId: installationIdStr },
     });
+    throw error;
   }
 
   await observeGitHubInstallationLifecycle({

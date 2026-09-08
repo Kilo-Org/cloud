@@ -346,6 +346,16 @@ describe('handleInstallationDeleted', () => {
     expect(mockDeleteGitHubInstallationRecords).toHaveBeenCalledWith('98765', 'standard');
   });
 
+  it('propagates bot identity infrastructure failure before acknowledging deletion', async () => {
+    mockUnlinkTeamKiloUsers.mockRejectedValue(new Error('identity store unavailable'));
+
+    await expect(handleInstallationDeleted(deletedPayload, 'standard')).rejects.toThrow(
+      'identity store unavailable'
+    );
+    expect(mockCaptureException).toHaveBeenCalled();
+    expect(mockObserveGitHubInstallationLifecycle).not.toHaveBeenCalled();
+  });
+
   it('lite app deletion does not unlink bot identities and passes the app type', async () => {
     const response = await handleInstallationDeleted(deletedPayload, 'lite');
 

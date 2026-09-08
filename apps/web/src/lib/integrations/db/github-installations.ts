@@ -748,34 +748,41 @@ export async function recordSharedGitHubInstallationDelivery(input: {
   appType: 'standard' | 'lite';
   deliveryId: string;
   eventType: string;
-}): Promise<boolean> {
-  const [installation] = await db
-    .select({ id: github_app_installations.id })
-    .from(github_app_installations)
-    .where(
-      and(
-        eq(github_app_installations.github_app_type, input.appType),
-        eq(github_app_installations.installation_id, input.installationId),
-        eq(github_app_installations.sharing_mode, 'web_cloud_agent')
+}): Promise<'claimed' | 'duplicate' | 'not_shared'> {
+  return db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
+    );
+    const [installation] = await tx
+      .select({
+        id: github_app_installations.id,
+        sharingMode: github_app_installations.sharing_mode,
+      })
+      .from(github_app_installations)
+      .where(
+        and(
+          eq(github_app_installations.github_app_type, input.appType),
+          eq(github_app_installations.installation_id, input.installationId)
+        )
       )
-    )
-    .limit(1);
-  if (!installation) return false;
-  const inserted = await db
-    .insert(github_installation_webhook_receipts)
-    .values({
-      github_installation_id: installation.id,
-      delivery_id: input.deliveryId,
-      event_type: input.eventType,
-    })
-    .onConflictDoNothing({
-      target: [
-        github_installation_webhook_receipts.github_installation_id,
-        github_installation_webhook_receipts.delivery_id,
-      ],
-    })
-    .returning({ id: github_installation_webhook_receipts.id });
-  return inserted.length === 1;
+      .for('update');
+    if (!installation || installation.sharingMode !== 'web_cloud_agent') return 'not_shared';
+    const inserted = await tx
+      .insert(github_installation_webhook_receipts)
+      .values({
+        github_installation_id: installation.id,
+        delivery_id: input.deliveryId,
+        event_type: input.eventType,
+      })
+      .onConflictDoNothing({
+        target: [
+          github_installation_webhook_receipts.github_installation_id,
+          github_installation_webhook_receipts.delivery_id,
+        ],
+      })
+      .returning({ id: github_installation_webhook_receipts.id });
+    return inserted.length === 1 ? 'claimed' : 'duplicate';
+  });
 }
 
 export async function deleteSharedGitHubInstallationDelivery(input: {

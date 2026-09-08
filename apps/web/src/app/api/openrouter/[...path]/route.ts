@@ -386,6 +386,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
         clientIp: ipAddress ?? null,
         efficientDecision,
         organizationContext: organizationContextPromise,
+        isAutoEfficientFallbackAllowed: async modelId => {
+          const access = await resolveAccessCheck(modelId);
+          return (
+            !access.modelRestrictionError &&
+            access.groupModelAllowed &&
+            access.groupProvidersAllowed
+          );
+        },
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;
           return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
@@ -397,6 +405,9 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     );
     if (autoResult.kind === 'no_free_models_available') {
       return noFreeModelsAvailableResponse();
+    }
+    if (autoResult.kind === 'no_allowed_efficient_fallback') {
+      return efficientPoolBlockedResponse();
     }
     if (autoResult.kind === 'organization_auto_configuration_error') {
       return organizationAutoConfigurationResponse(autoResult.message);

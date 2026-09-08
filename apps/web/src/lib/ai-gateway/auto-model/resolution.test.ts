@@ -7,6 +7,7 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 import { resolveAutoModel } from './resolution';
 import {
   BALANCED_FALLBACK_MODEL,
+  BALANCED_FALLBACK_MODELS,
   FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
@@ -150,6 +151,37 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
       });
     }
   );
+
+  it('uses the secondary fallback when organization policy denies Kimi K3', async () => {
+    const [, secondaryFallback] = BALANCED_FALLBACK_MODELS;
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => null,
+        isAutoEfficientFallbackAllowed: async modelId => modelId !== BALANCED_FALLBACK_MODEL.model,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'ok', resolved: secondaryFallback });
+  });
+
+  it('fails closed when organization policy denies every static fallback', async () => {
+    const result = await resolveAutoModel(
+      {
+        ...baseParams,
+        apiKind: 'chat_completions',
+        efficientDecision: async () => null,
+        isAutoEfficientFallbackAllowed: async () => false,
+      },
+      nullUserPromise,
+      zeroBalancePromise
+    );
+
+    expect(result).toEqual({ kind: 'no_allowed_efficient_fallback' });
+  });
 
   it('falls back to BALANCED_FALLBACK_MODEL when the worker returns a virtual auto model', async () => {
     const result = await resolveAutoModel(

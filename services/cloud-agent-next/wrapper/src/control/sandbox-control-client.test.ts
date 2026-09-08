@@ -363,6 +363,7 @@ describe('createSandboxControlClient', () => {
           nativeRuntimeRetirement?: boolean;
           connectionRecovery?: boolean;
           eventReceipts?: boolean;
+          workingBranches?: boolean;
         };
       };
     };
@@ -377,6 +378,7 @@ describe('createSandboxControlClient', () => {
         nativeRuntimeRetirement: true,
         connectionRecovery: true,
         eventReceipts: true,
+        workingBranches: true,
       },
     });
     fake.respond(

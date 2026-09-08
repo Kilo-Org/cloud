@@ -679,6 +679,22 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(registration?.repository).not.toHaveProperty('token');
     expect(registration?.auth.kilocodeToken).toBe(CURRENT_AUTH_TOKEN);
   });
+
+  it('preserves the legacy branch fallback for branchless source metadata', async () => {
+    const metadata = sourceMetadata();
+    if (!metadata.workspace || !metadata.repository) throw new Error('Missing source metadata');
+    delete metadata.workspace.branchName;
+    delete metadata.repository.upstreamBranch;
+
+    const { caller, input, destinationStub } = fixture({ metadata });
+    await caller.createWorktreeChat(input);
+
+    expect(destinationStub.registerSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({ branchName: `session/${WORKTREE_ID}` }),
+      })
+    );
+  });
 });
 
 describe('createWorktreeChat operation-ledger replay and conflict handling', () => {

@@ -521,6 +521,7 @@ export function createSandboxControlClient(
               nativeRuntimeRetirement: true,
               connectionRecovery: true,
               eventReceipts: true,
+              workingBranches: true,
             },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
             ...(options.wrapperVersion ? { wrapperVersion: options.wrapperVersion } : {}),

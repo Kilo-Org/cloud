@@ -6,6 +6,7 @@ import {
   filterActiveSessionsByOrganization,
   mergeHeartbeatForActiveSessions,
   mergeSnapshotForActiveSessions,
+  planLiveSystemEventActions,
 } from '@/lib/active-sessions-live';
 
 function makeCached(over: Partial<CachedActiveSession> = {}): CachedActiveSession {
@@ -145,5 +146,92 @@ describe('optimistic rename on an unenriched row', () => {
     // Under D6 an unattributed row is not displayed in a filtered tray, so
     // the reverted title is invisible and AC 4 still holds.
     expect(filterActiveSessionsByOrganization(afterHeartbeat, null)).toEqual([]);
+  });
+});
+
+function v2SessionUpdated(over: { sessionId?: string; title?: string | null } = {}) {
+  return {
+    source: 'v2' as const,
+    changedAt: 'now',
+    session: {
+      source: 'v2' as const,
+      sessionId: over.sessionId ?? 'a',
+      createdAt: 'now',
+      updatedAt: 'now',
+      title: over.title === undefined ? 'Auto Title' : over.title,
+      createdOnPlatform: null,
+      organizationId: null,
+      gitUrl: null,
+      gitBranch: null,
+      parentSessionId: null,
+      status: 'busy' as const,
+      statusUpdatedAt: 'now',
+    },
+  };
+}
+
+describe('session.updated title', () => {
+  it('ignores a null or blank title', () => {
+    expect(
+      planLiveSystemEventActions({
+        event: 'session.updated',
+        data: v2SessionUpdated({ title: null }),
+      })
+    ).toEqual([]);
+    expect(
+      planLiveSystemEventActions({
+        event: 'session.updated',
+        data: v2SessionUpdated({ title: '  ' }),
+      })
+    ).toEqual([]);
+  });
+
+  it('applies the title onto an enriched row', () => {
+    const current = [
+      makeCached({
+        id: 'a',
+        title: 'New session - 2026-01-01T00:00:00.000Z',
+        createdOnPlatform: 'cli',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      }),
+    ];
+    const actions = planLiveSystemEventActions({
+      event: 'session.updated',
+      data: v2SessionUpdated({ title: 'Fix login' }),
+    });
+    expect(actions).toHaveLength(1);
+    const action = actions[0];
+    expect(action?.type).toBe('write');
+    if (action?.type !== 'write') {
+      return;
+    }
+    expect(action.updater(current)[0]?.title).toBe('Fix login');
+  });
+
+  it('keeps the applied title across a later heartbeat', () => {
+    const current = [
+      makeCached({
+        id: 'a',
+        title: 'placeholder',
+        createdOnPlatform: 'cli',
+        createdAt: '2024-01-01T00:00:00Z',
+        updatedAt: '2024-01-02T00:00:00Z',
+      }),
+    ];
+    const actions = planLiveSystemEventActions({
+      event: 'session.updated',
+      data: v2SessionUpdated({ title: 'Fix login' }),
+    });
+    const action = actions[0];
+    if (action?.type !== 'write') {
+      throw new Error('expected write');
+    }
+    const renamed = action.updater(current);
+    const afterHeartbeat = mergeHeartbeatForActiveSessions(renamed, {
+      connectionId: 'c1',
+      sessions: [{ id: 'a', status: 'busy', title: 'cli-title' }],
+    });
+    expect(afterHeartbeat[0]?.title).toBe('Fix login');
   });
 });

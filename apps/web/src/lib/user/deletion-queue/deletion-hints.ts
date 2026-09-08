@@ -326,6 +326,14 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Task claim was lost',
     action: 'Retry. Another worker may have taken the claim.',
   },
+  anonymize_page_timeout: {
+    title: 'Cloud user row cleanup timed out',
+    action: 'Retry. The next attempt will resume from the last committed page.',
+  },
+  anonymize_page_failed: {
+    title: 'Cloud user row cleanup failed',
+    action: 'Retry. If the page keeps failing, investigate the database before retrying.',
+  },
   usage_prefix_page_timeout: {
     title: 'Usage prompt cleanup timed out',
     action: 'Retry. The next attempt will resume from the last committed page.',

@@ -196,6 +196,71 @@ describe('RepositoryBranchSelector', () => {
     expect(pressableWithLabel(loaded, branchLabel('main'))?.props.className).toContain('h-12');
   });
 
+  // Spot check e4-branch-03/04: the screenshots showed a blue "refreshing"
+  // overlay floating over the prompt card and over the screen header while
+  // branches loaded. That overlay belonged to the old inline picker; the row
+  // is now an in-flow fixed-height row and the picker is its own opaque
+  // formSheet route. These two tests pin the replacement: the row never
+  // carries an absolute-positioned node in any state (nothing can cover the
+  // card above or the header), and the three fixed states share one height.
+  it('renders every branch-row state in-flow — no node overlays the form', () => {
+    const states: RepositoryBranchesState[] = [
+      branchesState({ isLoading: true }),
+      branchesState(),
+      branchesState({ isRetryableError: true }),
+      branchesState({ isPermanentError: true }),
+      branchesState({ branches: [], defaultBranch: null }),
+      branchesState({ isEnabled: false }),
+    ];
+    for (const state of states) {
+      const renderer = mountSelector(githubRow, state);
+      const floating = renderer.root.findAll(node => {
+        const classes =
+          typeof node.props.className === 'string' ? node.props.className.split(' ') : [];
+        const style = node.props.style as { position?: string } | undefined;
+        return classes.includes('absolute') || style?.position === 'absolute';
+      });
+      expect(floating).toHaveLength(0);
+    }
+  });
+
+  it('keeps skeleton, trigger, and error row at the same fixed height', () => {
+    for (const state of [
+      branchesState({ isLoading: true }),
+      branchesState(),
+      branchesState({ isRetryableError: true }),
+    ]) {
+      const renderer = mountSelector(githubRow, state);
+      const row = renderer.root.findAll(node => {
+        const classes =
+          typeof node.props.className === 'string' ? node.props.className.split(' ') : [];
+        return classes.includes('h-12');
+      });
+      expect(row).toHaveLength(1);
+    }
+  });
+
+  it('shows the branch name and chevron once a retry loads the branches', () => {
+    // Spot check e4-retry-loaded: after tapping Retry the row rendered as an
+    // empty field — no branch name, no chevron, no skeleton. The loaded
+    // trigger carries both.
+    const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
+    press(renderer.root.findAllByType('Button' as never)[0]);
+    expect(retry).toHaveBeenCalledTimes(1);
+
+    vi.mocked(useRepositoryBranches).mockReturnValue(branchesState());
+    act(() => {
+      renderer.update(
+        createElement(RepositoryBranchSelector, { repository: githubRow, disabled: false })
+      );
+    });
+
+    expect(pressableWithLabel(renderer, branchLabel('main'))).toBeDefined();
+    expect(texts(renderer)).toContain('main');
+    expect(renderer.root.findAllByType('ChevronDown' as never).length).toBeGreaterThan(0);
+    expect(renderer.root.findAllByType('Skeleton' as never)).toHaveLength(0);
+  });
+
   it('offers a retry for a transient failure', () => {
     const renderer = mountSelector(githubRow, branchesState({ isRetryableError: true }));
 

@@ -68,6 +68,9 @@ export function PrDiffFloatingActions({
   // The bar sits on the bottom edge, so its bottom padding must include the
   // Android system inset. The measured height (onLayout) therefore already
   // includes the inset, which `prDiffListBottomPadding` reserves for the list.
+  // The container itself is opaque (`bg-background`): the card floats inside
+  // a transparent ring of padding, and without a solid backdrop the diff text
+  // of rows scrolled under the bar shows through around and below the button.
   const insets = useSafeAreaInsets();
 
   const showSelectionAction = viewMode === 'unified' && selection !== null;
@@ -115,8 +118,7 @@ export function PrDiffFloatingActions({
       onLayout={(event: LayoutChangeEvent) => {
         onHeightChange?.(event.nativeEvent.layout.height);
       }}
-      pointerEvents="box-none"
-      className="absolute inset-x-0 bottom-0 items-center gap-2 px-4 pt-3"
+      className="absolute inset-x-0 bottom-0 items-center gap-2 bg-background px-4 pt-3"
       style={{ paddingBottom: 24 + insets.bottom }}
     >
       <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">

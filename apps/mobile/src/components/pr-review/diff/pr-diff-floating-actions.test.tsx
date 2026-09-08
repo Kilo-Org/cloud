@@ -313,8 +313,8 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
     return findElement({
       node: element,
       type: 'View',
-      prop: 'pointerEvents',
-      value: 'box-none',
+      prop: 'onLayout',
+      value: (element.props as { onLayout?: unknown }).onLayout,
     });
   }
 
@@ -342,8 +342,8 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
     const root = findElement({
       node: element,
       type: 'View',
-      prop: 'pointerEvents',
-      value: 'box-none',
+      prop: 'onLayout',
+      value: (element.props as { onLayout?: unknown }).onLayout,
     });
     if (!root) {
       throw new Error('floating action bar root not found');

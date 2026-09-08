@@ -171,7 +171,16 @@ type ProviderThreadsPage = { threads: ProviderPrThread[]; nextCursor: string | n
 
 export function normalizeProviderThreadsPage(page: ProviderThreadsPage): PrThreadsPageModel {
   return {
-    threads: page.threads.map(normalizeProviderThread),
+    // GitLab reports every MR event (pushes, assignments, "requested review")
+    // as a discussion; the read layer drops the system notes, which leaves
+    // threads with no comments. Those are not discussion content: counted as
+    // content they keep the tab out of its empty state, and filtered by the
+    // list they leave a blank screen — comments, empty state, and error all
+    // absent at once (spot check e7). Drop them here, where the provider
+    // shape is read, so the tab's empty check sees the truth.
+    threads: page.threads
+      .filter(thread => thread.comments.length > 0)
+      .map(thread => normalizeProviderThread(thread)),
     // Providers have no separate conversation leg: an unanchored discussion
     // is already a thread with `path: null`.
     conversation: [],

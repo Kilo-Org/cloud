@@ -7,7 +7,11 @@
 //                   the entire loaded set on every update (R4: a
 //                   later page can insert rows mid-list).
 //   - loading:      first page in flight; render `Skeleton`
-//                   placeholders matching the row dimensions.
+//                   placeholders matching the row dimensions. A first
+//                   page that is pending but PAUSED (offline, or a fetch
+//                   that will never start) is not "in flight": it falls
+//                   to the retryable state below so the tab never sits
+//                   on a skeleton with no escape (spot check e7).
 //   - retryable:    first page failed with a transient error;
 //                   render `QueryError` with the standard Retry
 //                   CTA wired to `refetch()`.
@@ -220,6 +224,10 @@ export function PrReviewDiscussionTab({
   const view = selectDiscussionTabView({
     firstPageErrorState: retainedContentError ? null : firstPageErrorState,
     isPending: query.isPending && isEmpty,
+    // A pending page whose fetch is paused (offline, or a fetch that will
+    // never start) has no end — the retryable state, not the skeleton (spot
+    // check e7).
+    isPaused: query.isPaused,
     isEmpty,
   });
 

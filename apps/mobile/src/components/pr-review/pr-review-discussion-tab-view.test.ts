@@ -5,6 +5,7 @@ import { selectDiscussionTabView } from './pr-review-discussion-tab-view';
 const base = {
   firstPageErrorState: null,
   isPending: false,
+  isPaused: false,
   isEmpty: false,
 };
 
@@ -37,6 +38,15 @@ describe('selectDiscussionTabView', () => {
     expect(selectDiscussionTabView({ ...base, isPending: true })).toEqual({ kind: 'loading' });
   });
 
+  it('returns retryable when the first page is pending but paused', () => {
+    // A paused fetch (offline, or never started) has no end: the skeleton
+    // would sit there with no comments, empty state, or error (spot check
+    // e7). The retryable state carries the working Retry CTA instead.
+    expect(selectDiscussionTabView({ ...base, isPending: true, isPaused: true, isEmpty: true })).toEqual(
+      { kind: 'retryable' }
+    );
+  });
+
   it('returns empty when there is no error, no pending, and no items', () => {
     expect(selectDiscussionTabView({ ...base, isEmpty: true })).toEqual({ kind: 'empty' });
   });
@@ -50,6 +60,7 @@ describe('selectDiscussionTabView', () => {
       selectDiscussionTabView({
         firstPageErrorState: { kind: 'permission' },
         isPending: true,
+        isPaused: false,
         isEmpty: true,
       })
     ).toEqual({ kind: 'permission' });

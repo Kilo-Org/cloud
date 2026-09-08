@@ -13,6 +13,7 @@ const discussionState = vi.hoisted(() => ({
   query: {
     isPending: false,
     isFetching: false,
+    isPaused: false,
     hasNextPage: false,
     isFetchingNextPage: false,
     fetchNextPage: vi.fn(),
@@ -105,6 +106,7 @@ function expectSinglePadding(renderer: TestRenderer.ReactTestRenderer, expected:
 function resetState(): void {
   discussionState.query.isPending = false;
   discussionState.query.isFetching = false;
+  discussionState.query.isPaused = false;
   discussionState.query.hasNextPage = false;
   discussionState.query.isFetchingNextPage = false;
   discussionState.threads = [];
@@ -146,6 +148,23 @@ describe('PrReviewDiscussionTab full-body states', () => {
   it('keeps the loading skeleton padding', () => {
     discussionState.query.isPending = true;
     expectSinglePadding(mountTab(), 32);
+  });
+
+  it('escapes a stuck skeleton when the first page is paused, not in flight', () => {
+    // Spot check e7: the tab showed only skeleton cards — no comments, no
+    // empty state, no error. A pending page whose fetch is paused has no
+    // end, so the tab must render the retryable state with a working Retry
+    // CTA instead of the permanent skeleton.
+    discussionState.query.isPending = true;
+    discussionState.query.isPaused = true;
+    const renderer = mountTab();
+
+    expect(renderer.root.findAll(node => String(node.type) === 'Skeleton')).toHaveLength(0);
+    const error = renderer.root.find(node => String(node.type) === 'QueryError');
+    act(() => {
+      (error.props.onRetry as () => void)();
+    });
+    expect(discussionState.query.refetch).toHaveBeenCalled();
   });
 
   it('lets EmptyState own the empty body and keeps its Files action', () => {

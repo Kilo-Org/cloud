@@ -299,6 +299,19 @@ describe('normalizeProviderThreadsPage', () => {
     expect(first(first(mapped).threads).threadId).toBe('disc-1');
     expect(normalizePrThreadsPages('gitlab', undefined)).toEqual([]);
   });
+
+  it('drops a discussion whose notes are all system events', () => {
+    // GitLab reports every MR event (pushes, assignments) as a discussion,
+    // and the read layer strips the system notes — what remains carries no
+    // discussion content. Kept, it would count as content and the tab would
+    // render a blank list with no comments, no empty state, and no error
+    // (spot check e7).
+    const page = normalizeProviderThreadsPage({
+      threads: [thread, { ...thread, threadId: 'disc-system', comments: [] }],
+      nextCursor: null,
+    });
+    expect(page.threads.map(entry => entry.threadId)).toEqual(['disc-1']);
+  });
 });
 
 describe('normalizeProviderOverview', () => {

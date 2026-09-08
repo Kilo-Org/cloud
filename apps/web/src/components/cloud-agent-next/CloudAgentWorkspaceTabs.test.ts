@@ -329,6 +329,8 @@ describe('CloudAgentWorkspaceTabs', () => {
             chatSessions: [makeSession('ses_first', 'First worktree chat')],
             currentSessionId: 'ses_first',
             currentChatProgress: { sessionId: 'ses_first', message: progress },
+            files: [],
+            onCloseFile: () => undefined,
             onSelectChat: () => undefined,
             onCloseChat: () => undefined,
             onRenameChat: async () => undefined,

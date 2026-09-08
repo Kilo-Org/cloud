@@ -87,7 +87,7 @@ describe('GET /api/openrouter/models/[provider]/[model]/endpoints', () => {
     });
   });
 
-  test.each(['openai/gpt-oss-20b:free', 'tencent/hy3:free', 'meituan/longcat-2.0-free'])(
+  test.each(['google/gemma-4-26b-a4b-it:free', 'google/gemma-4-31b-it:free'])(
     'returns 404 for unavailable model %s without reading cached metadata',
     async modelId => {
       mockedGetOpenRouterModelsMetadataFromDatabase.mockClear();

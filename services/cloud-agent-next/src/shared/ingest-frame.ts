@@ -197,33 +197,94 @@ function compactMessageUpdated(data: Record<string, unknown>): Record<string, un
   return out;
 }
 
+function omitExpensiveMessageInfo(info: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...info };
+  if (isRecord(out.summary)) {
+    const { diffs: _diffs, ...summaryRest } = out.summary;
+    if (Object.keys(summaryRest).length > 0) out.summary = summaryRest;
+    else delete out.summary;
+  }
+  if (out.error !== undefined && out.error !== null) {
+    const safeError = projectSafeAssistantError(out.error);
+    if (safeError !== undefined) out.error = safeError;
+    else delete out.error;
+  }
+  return out;
+}
+
+function omitExpensivePart(part: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...part };
+  delete out.snapshot;
+  delete out.patch;
+  delete out.metadata;
+
+  if (typeof out.url === 'string' && out.url.startsWith('data:')) {
+    out.url = '';
+  }
+
+  const source = out.source;
+  if (isRecord(source)) {
+    const nextSource: Record<string, unknown> = { ...source };
+    delete nextSource.content;
+    if (isRecord(nextSource.text)) {
+      nextSource.text = { ...nextSource.text, value: '' };
+    }
+    if (Object.keys(nextSource).length > 0) out.source = nextSource;
+    else delete out.source;
+  }
+
+  if (isRecord(out.state)) {
+    const { metadata: _metadata, ...stateRest } = out.state;
+    const state: Record<string, unknown> = { ...stateRest };
+    if (Array.isArray(state.attachments)) {
+      state.attachments = state.attachments.map((attachment): unknown =>
+        isRecord(attachment) ? omitExpensivePart(attachment) : attachment
+      );
+    }
+    out.state = state;
+  }
+
+  return out;
+}
+
+function persistedKilocodeEnvelope(
+  data: Record<string, unknown>,
+  properties: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { properties };
+  if (data.event !== undefined) out.event = data.event;
+  if (data.type !== undefined) out.type = data.type;
+  return out;
+}
+
 /**
- * Reduces entity-upserted message events to the fields that the Durable Object
- * coordinator needs for replay and assistant-message lookups. Live clients
- * receive the separately trimmed, complete event payload.
+ * Drops expensive blobs from entity-upserted message events before SQLite
+ * persist. Client stream replay uses this payload, so cheap fields (model,
+ * variant, time, text, tool status) stay. Live broadcasts still use the
+ * unspecialized public payload. Oversized ingest compaction is separate.
+ * Persist keeps only event, type, and sanitized properties so wrapper
+ * top-level info/part aliases are not stored.
  */
 export function slimPersistedKilocodeEvent(data: unknown): unknown {
   if (!isRecord(data)) return data;
 
   const eventName = kiloEventNameOf(data);
-  if (eventName === 'message.updated') return compactMessageUpdated(data);
+  if (eventName === 'message.updated') {
+    const properties = data.properties;
+    if (!isRecord(properties) || !isRecord(properties.info)) return data;
+    return persistedKilocodeEnvelope(data, {
+      ...properties,
+      info: omitExpensiveMessageInfo(properties.info),
+    });
+  }
   if (eventName !== 'message.part.updated') return data;
 
-  const out: Record<string, unknown> = { event: data.event, type: data.type };
   const properties = data.properties;
-  if (!isRecord(properties)) return out;
-
-  const compactProperties: Record<string, unknown> = {};
-  if (typeof properties.sessionID === 'string') compactProperties.sessionID = properties.sessionID;
-
-  const part = properties.part;
-  if (isRecord(part)) {
-    const compactPart = compactMessagePart(part);
-    if (part.type === 'text' && typeof part.text === 'string') compactPart.text = part.text;
-    compactProperties.part = compactPart;
-  }
-  out.properties = compactProperties;
-  return out;
+  if (!isRecord(properties) || !isRecord(properties.part)) return data;
+  return persistedKilocodeEnvelope(data, {
+    ...properties,
+    part: omitExpensivePart(properties.part),
+  });
 }
 
 function compactCommandsAvailable(data: Record<string, unknown>): Record<string, unknown> {

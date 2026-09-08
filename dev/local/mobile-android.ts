@@ -177,7 +177,41 @@ function emulatorRecordPath(worktreeRoot: string): string {
   );
 }
 
+// The emulator starts through `sg kvm` on Linux, and a setgid exec clears the
+// process dumpable flag: /proc/<pid>/fd becomes root-owned, so lsof cannot
+// list that process's sockets and every port reads as free — a second
+// emulator then reuses the first one's console port and dies. Probe the
+// socket, not the process: the kernel's socket table is world-readable and
+// lists every listener regardless of who owns it. TCP_LISTEN is state 0A and
+// the local port is the second field of local_address, in hex.
+const procNetTcpPaths = ['/proc/net/tcp', '/proc/net/tcp6'];
+
+function procListeningPorts(paths: string[] = procNetTcpPaths): Set<number> | undefined {
+  const ports = new Set<number>();
+  let readable = false;
+  for (const filePath of paths) {
+    let content: string;
+    try {
+      content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+      continue;
+    }
+    readable = true;
+    for (const line of content.split('\n')) {
+      const fields = line.trim().split(/\s+/);
+      if (!/^\d+:$/.test(fields[0] ?? '') || fields[3] !== '0A') continue;
+      const port = Number.parseInt(fields[1].split(':')[1] ?? '', 16);
+      if (Number.isInteger(port)) ports.add(port);
+    }
+  }
+  return readable ? ports : undefined;
+}
+
 function portIsListening(port: number): boolean {
+  if (process.platform === 'linux') {
+    const listeners = procListeningPorts();
+    if (listeners) return listeners.has(port);
+  }
   return (
     spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], { stdio: 'ignore' }).status === 0
   );
@@ -201,6 +235,37 @@ function processOwnsListeningPort(
   listeners: (port: number) => number[] = listeningProcessIds
 ): boolean {
   return listeners(port).includes(pid);
+}
+
+function pidCommand(pid: number): string {
+  return (
+    spawnSync('ps', ['-p', String(pid), '-o', 'command='], {
+      encoding: 'utf8',
+    }).stdout?.trim() ?? ''
+  );
+}
+
+// lsof cannot attribute a listening port to a process whose dumpable flag a
+// setgid exec cleared: the emulator starts through `sg kvm` on Linux, so its
+// /proc/<pid>/fd is root-owned and lsof lists no sockets for it. When nothing
+// on the port is attributable at all, accept the launched pid on identity
+// instead — the port is listening, the pid is alive, and its command line is
+// the exact emulator invocation for this AVD and port, so a foreign emulator
+// (attributable to another pid, or alive under another command line) is still
+// refused. The caller checks portIsListening(port) before asking.
+function launchedProcessOwnsConsolePort(
+  env: AndroidEnvironment,
+  avd: string,
+  port: number,
+  pid: number,
+  listeners: (port: number) => number[] = listeningProcessIds,
+  commandOfPid: (pid: number) => string = pidCommand
+): boolean {
+  const attributed = listeners(port);
+  if (attributed.includes(pid)) return true;
+  if (attributed.length > 0) return false;
+  if (!processIsAlive(pid)) return false;
+  return commandMatchesRecordedEmulator(commandOfPid(pid), env.emulator, avd, port);
 }
 
 function findAvailableEmulatorPort(isListening = portIsListening): number | undefined {
@@ -255,11 +320,12 @@ function commandMatchesRecordedEmulator(
 
 function recordedEmulatorStillOwnsPid(record: EmulatorRecord, env: AndroidEnvironment): boolean {
   if (!processIsAlive(record.pid)) return false;
-  const command =
-    spawnSync('ps', ['-p', String(record.pid), '-o', 'command='], {
-      encoding: 'utf8',
-    }).stdout?.trim() ?? '';
-  return commandMatchesRecordedEmulator(command, env.emulator, record.avd, record.port);
+  return commandMatchesRecordedEmulator(
+    pidCommand(record.pid),
+    env.emulator,
+    record.avd,
+    record.port
+  );
 }
 
 const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -374,7 +440,7 @@ async function startAndroidEmulator(
         }
         if (!portIsListening(port))
           throw new Error(`${session} did not bind console port ${port} within 30s; see ${log}`);
-        if (!processIsAlive(pid) || !processOwnsListeningPort(port, pid))
+        if (!launchedProcessOwnsConsolePort(env, avd, port, pid))
           throw new Error(
             `${session} does not own console port ${port}; refusing to record a foreign emulator`
           );
@@ -887,8 +953,11 @@ export {
   commandMatchesRecordedEmulator,
   findAvailableEmulatorPort,
   isValidEmulatorRecord,
+  launchedProcessOwnsConsolePort,
   parseEmulatorStartArgs,
+  portIsListening,
   processOwnsListeningPort,
+  procListeningPorts,
   readGradleWrapperVersion,
   releaseAndroidDevice,
   releaseWorktreeAndroidDevices,

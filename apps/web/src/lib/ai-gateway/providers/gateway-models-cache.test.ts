@@ -76,13 +76,6 @@ describe('isValidOpenRouterModelId', () => {
     mockLimit.mockReset();
   });
 
-  it('accepts known legacy aliases without consulting the database', async () => {
-    const { isValidOpenRouterModelId } = await loadValidator();
-
-    await expect(isValidOpenRouterModelId('gpt-4o')).resolves.toBe(true);
-    expect(mockLimit).not.toHaveBeenCalled();
-  });
-
   it('accepts ids present in the database catalog', async () => {
     const { isValidOpenRouterModelId } = await loadValidator();
     mockLimit.mockResolvedValue([

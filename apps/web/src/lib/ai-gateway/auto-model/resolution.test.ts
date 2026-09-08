@@ -7,10 +7,10 @@ jest.mock('@/lib/ai-gateway/providers/gateway-models-cache', () => ({
 import { resolveAutoModel } from './resolution';
 import {
   BALANCED_FALLBACK_MODEL,
-  FRONTIER_MODE_TO_MODEL,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import type { AutoRoutingDecision } from '@kilocode/auto-routing-contracts';
@@ -37,20 +37,23 @@ const sampleDecision: AutoRoutingDecision = {
 };
 
 describe('resolveAutoModel — kilo-auto/efficient branch', () => {
-  it('resolves kilo-auto/balanced as an alias of kilo-auto/efficient', async () => {
-    const result = await resolveAutoModel(
-      {
-        ...baseParams,
-        model: KILO_AUTO_BALANCED_MODEL.id,
-        apiKind: 'chat_completions',
-        efficientDecision: async () => sampleDecision,
-      },
-      nullUserPromise,
-      zeroBalancePromise
-    );
+  it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_FRONTIER_MODEL.id])(
+    'resolves %s as an alias of kilo-auto/efficient',
+    async model => {
+      const result = await resolveAutoModel(
+        {
+          ...baseParams,
+          model,
+          apiKind: 'chat_completions',
+          efficientDecision: async () => sampleDecision,
+        },
+        nullUserPromise,
+        zeroBalancePromise
+      );
 
-    expect(result).toEqual({ kind: 'ok', resolved: { model: sampleDecision.model } });
-  });
+      expect(result).toEqual({ kind: 'ok', resolved: { model: sampleDecision.model } });
+    }
+  );
 
   it('resolves to decision.model when the thunk returns a decision', async () => {
     const result = await resolveAutoModel(
@@ -130,7 +133,11 @@ describe('resolveAutoModel — kilo-auto/efficient branch', () => {
     expect(result).toEqual({ kind: 'ok', resolved: BALANCED_FALLBACK_MODEL });
   });
 
-  it.each([KILO_AUTO_BALANCED_MODEL.id, KILO_AUTO_EFFICIENT_MODEL.id])(
+  it.each([
+    KILO_AUTO_BALANCED_MODEL.id,
+    KILO_AUTO_EFFICIENT_MODEL.id,
+    KILO_AUTO_FRONTIER_MODEL.id,
+  ])(
     'falls back to Kimi K3 with reasoning for %s when the worker returns no decision',
     async model => {
       const result = await resolveAutoModel(
@@ -490,6 +497,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
         model: ORG_AUTO_MODEL.id,
         modeHeader: 'plan',
         apiKind: 'chat_completions',
+        efficientDecision: async () => sampleDecision,
         organizationContext: Promise.resolve({
           organizationId: 'org-1',
           plan: 'enterprise',
@@ -511,7 +519,7 @@ describe('resolveAutoModel — Organization Auto branch', () => {
 
     expect(result).toEqual({
       kind: 'ok',
-      resolved: FRONTIER_MODE_TO_MODEL.plan,
+      resolved: { model: sampleDecision.model },
       routingTarget: 'kilo-auto/frontier',
     });
   });

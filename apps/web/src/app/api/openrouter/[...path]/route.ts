@@ -97,6 +97,7 @@ import {
   isKiloAutoModel,
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
   ORG_AUTO_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { applyResolvedAutoModel } from '@/lib/ai-gateway/auto-model/resolution';
@@ -323,16 +324,17 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   // validation after resolution.
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
-  // Efficient/balanced requests resolve through the auto-routing pool. Kept for
-  // the org policy check below so a team that blocks every pool model gets
-  // guidance to configure a custom Efficient model pool instead of the generic
-  // model-not-allowed error.
+  // Efficient and legacy alias requests resolve through the auto-routing pool.
+  // Kept for the org policy check below so a team that blocks every pool model
+  // gets guidance to configure a custom Efficient model pool instead of the
+  // generic model-not-allowed error.
   let isAutoEfficientRequest = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;
     const isAutoEfficientId =
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
-      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
+      requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id ||
+      requestedModelLowerCased === KILO_AUTO_FRONTIER_MODEL.id;
     isAutoEfficientRequest = isAutoEfficientId;
     const efficientDecision = isAutoEfficientId
       ? async () => {

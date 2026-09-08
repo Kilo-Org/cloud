@@ -100,17 +100,24 @@ describe('addAutoRoutingModels', () => {
     ]);
   });
 
-  test('annotates balanced as an alias of efficient routing', async () => {
+  test('annotates balanced and frontier as aliases of efficient routing', async () => {
     const balancedModel = makeModel('kilo-auto/balanced');
     const efficientModel = makeModel('kilo-auto/efficient');
+    const frontierModel = makeModel('kilo-auto/frontier');
     const visibleModel = makeModel('google/gemini-2.5-flash');
     mockedGetCachedRoutingTable.mockResolvedValue(routingTable([visibleModel.id]));
 
-    const result = await addAutoRoutingModels([balancedModel, efficientModel, visibleModel]);
+    const result = await addAutoRoutingModels([
+      balancedModel,
+      efficientModel,
+      frontierModel,
+      visibleModel,
+    ]);
 
     expect(result).toEqual([
       { ...balancedModel, autoRouting: { models: [visibleModel.id] } },
       { ...efficientModel, autoRouting: { models: [visibleModel.id] } },
+      { ...frontierModel, autoRouting: { models: [visibleModel.id] } },
       visibleModel,
     ]);
   });

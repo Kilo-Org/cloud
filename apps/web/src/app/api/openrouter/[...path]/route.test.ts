@@ -1501,20 +1501,23 @@ describe('auto-routing shadow classifier', () => {
     });
   });
 
-  it('routes kilo-auto/balanced through the efficient classifier', async () => {
-    const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
-    mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
+  it.each(['kilo-auto/balanced', 'kilo-auto/frontier'])(
+    'routes %s through the efficient classifier',
+    async model => {
+      const { after: mockedAfter } = jest.requireMock<{ after: jest.Mock }>('next/server');
+      mockedFetchEfficientAutoDecision.mockResolvedValue({ decision: null, costUsd: 0 });
 
-    const { POST } = await import('./route');
-    const response = await POST(makeRequest(makeBody('kilo-auto/balanced')) as never);
+      const { POST } = await import('./route');
+      const response = await POST(makeRequest(makeBody(model)) as never);
 
-    expect(response.status).toBe(200);
-    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
-    expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
-      expect.objectContaining({ requestedModel: 'kilo-auto/balanced' })
-    );
-    expect(mockedAfter).not.toHaveBeenCalled();
-  });
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      expect(mockedFetchEfficientAutoDecision).toHaveBeenCalledWith(
+        expect.objectContaining({ requestedModel: model })
+      );
+      expect(mockedAfter).not.toHaveBeenCalled();
+    }
+  );
 });
 
 describe('percentage-routed partner fallback', () => {

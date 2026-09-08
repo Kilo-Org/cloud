@@ -7,6 +7,10 @@ import {
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
+import {
+  KILO_AUTO_BALANCED_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
+} from '@/lib/ai-gateway/auto-model';
 
 describe('OpenRouter Models Config', () => {
   test('preferred models should contain expected models', () => {
@@ -34,6 +38,9 @@ describe('OpenRouter Models Config', () => {
     supersededModels.forEach(model => {
       expect(preferredModels).not.toContain(model);
     });
+
+    expect(preferredModels).not.toContain(KILO_AUTO_BALANCED_MODEL.id);
+    expect(preferredModels).not.toContain(KILO_AUTO_FRONTIER_MODEL.id);
 
     if (gpt_5_6_sol_discounted_model.status === 'public') {
       expect(preferredModels).toContain(gpt_5_6_sol_discounted_model.public_id);

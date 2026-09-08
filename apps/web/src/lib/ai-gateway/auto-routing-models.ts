@@ -3,6 +3,7 @@ import {
   KILO_AUTO_BALANCED_MODEL,
   KILO_AUTO_EFFICIENT_MODEL,
   KILO_AUTO_FREE_MODEL,
+  KILO_AUTO_FRONTIER_MODEL,
 } from '@/lib/ai-gateway/auto-model';
 import { getAutoFreeCandidates } from '@/lib/ai-gateway/auto-model/resolution';
 import { isVirtualAutoModelId } from '@kilocode/auto-routing-contracts';
@@ -21,7 +22,8 @@ export async function addAutoRoutingModels(
   if (
     !availableModelIds.has(KILO_AUTO_BALANCED_MODEL.id) &&
     !availableModelIds.has(KILO_AUTO_EFFICIENT_MODEL.id) &&
-    !availableModelIds.has(KILO_AUTO_FREE_MODEL.id)
+    !availableModelIds.has(KILO_AUTO_FREE_MODEL.id) &&
+    !availableModelIds.has(KILO_AUTO_FRONTIER_MODEL.id)
   ) {
     return models;
   }
@@ -43,6 +45,7 @@ export async function addAutoRoutingModels(
     [KILO_AUTO_BALANCED_MODEL.id, efficientModelIds],
     [KILO_AUTO_EFFICIENT_MODEL.id, efficientModelIds],
     [KILO_AUTO_FREE_MODEL.id, freeModelIds],
+    [KILO_AUTO_FRONTIER_MODEL.id, efficientModelIds],
   ]);
 
   return models.flatMap(model => {

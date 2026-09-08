@@ -1674,6 +1674,13 @@
       "when": 1788868960269,
       "tag": "0238_dizzy_namora",
       "breakpoints": true
+    },
+    {
+      "idx": 239,
+      "version": "7",
+      "when": 1788875357185,
+      "tag": "0239_old_hemingway",
+      "breakpoints": true
     }
   ]
 }

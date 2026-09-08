@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { db } from '@/lib/drizzle';
+import { db, pool } from '@/lib/drizzle';
 import { platform_integrations, kilocode_users, organizations } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -134,6 +134,70 @@ describe('upsertPlatformIntegrationForOwner', () => {
       .where(eq(platform_integrations.owned_by_organization_id, orgId));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.platform_installation_id).toBe(INSTALLATION_ID);
+  });
+
+  test('serializes concurrent different installations for a non-allowlisted organization', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    const installationIds = [`${INSTALLATION_ID}-concurrent-a`, `${INSTALLATION_ID}-concurrent-b`];
+    const lockClient = await pool.connect();
+    const ownerLockKey = `${owner.type}:${owner.id}`;
+    let lockAcquired = false;
+    let operationError: unknown;
+    let pendingOperations:
+      | Promise<Awaited<ReturnType<typeof upsertPlatformIntegrationForOwner>>>[]
+      | undefined;
+    try {
+      const identity = await lockClient.query<{ pid: number; database: string }>(
+        'SELECT pg_backend_pid() AS pid, current_database() AS database'
+      );
+      const holderPid = identity.rows[0]?.pid;
+      expect(holderPid).toBeDefined();
+      await lockClient.query('SELECT pg_advisory_lock(hashtext($1))', [ownerLockKey]);
+      lockAcquired = true;
+      pendingOperations = installationIds.map(installationId =>
+        upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
+      );
+      let waitingCount = 0;
+      for (let attempt = 0; attempt < 2000 && waitingCount < 2; attempt += 1) {
+        const result = await lockClient.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM pg_stat_activity activity
+           WHERE activity.datname = current_database()
+             AND $1::int = ANY(pg_blocking_pids(activity.pid))
+             AND activity.wait_event_type = 'Lock' AND activity.wait_event = 'advisory'
+             AND query LIKE 'SELECT pg_advisory_xact_lock(hashtext(%'`,
+          [holderPid]
+        );
+        waitingCount = Number(result.rows[0]?.count ?? 0);
+        if (waitingCount < 2) await new Promise<void>(resolve => setImmediate(resolve));
+      }
+      expect(waitingCount).toBeGreaterThanOrEqual(2);
+    } catch (error) {
+      operationError = error;
+    } finally {
+      let unlockFailed = false;
+      try {
+        if (lockAcquired) {
+          await lockClient.query('SELECT pg_advisory_unlock(hashtext($1))', [ownerLockKey]);
+        }
+      } catch (error) {
+        unlockFailed = true;
+        operationError ??= error;
+      } finally {
+        lockClient.release(unlockFailed);
+      }
+      if (pendingOperations) await Promise.allSettled(pendingOperations);
+    }
+    if (operationError) throw operationError;
+    if (!pendingOperations) throw new Error('Concurrent upserts did not start');
+    const results = await Promise.all(pendingOperations);
+    expect(results.filter(result => result.ok)).toHaveLength(1);
+    expect(results).toContainEqual({ ok: false, reason: 'multiple_installations_disabled' });
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows).toHaveLength(1);
+    expect(installationIds).toContain(rows[0]?.platform_installation_id);
   });
 
   test('same-owner refresh updates the existing row (by primary key)', async () => {

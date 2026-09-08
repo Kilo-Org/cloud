@@ -1,10 +1,7 @@
 import { modelsByProvider, StoredModelSchema, type StoredModel } from '@kilocode/db';
 import { desc } from 'drizzle-orm';
 import * as z from 'zod';
-import { redisClient } from '@/lib/redis';
 import { createCachedFetch } from '@/lib/cached-fetch';
-import { GATEWAY_METADATA_REDIS_KEYS, vercelInferenceProvidersRedisKey } from '@/lib/redis-keys';
-import type { RedisKey } from '@/lib/redis-keys';
 import { readDb } from '@/lib/drizzle';
 import { warnExceptInTest } from '@/lib/utils.server';
 
@@ -62,7 +59,6 @@ export function extractVercelInferenceProviderIdsFromModel(model: StoredModel): 
   ];
 }
 
-const VercelInferenceProvidersSchema = z.array(z.string());
 const vercelInferenceProviderFetchers = new Map<string, () => Promise<string[] | null>>();
 
 export function getCachedVercelInferenceProviderIdsForModel(
@@ -72,11 +68,9 @@ export function getCachedVercelInferenceProviderIdsForModel(
   if (!fetchProviders) {
     fetchProviders = createCachedFetch<string[] | null>(
       async () => {
-        const raw = await redisClient.get<string>(vercelInferenceProvidersRedisKey(modelId));
-        if (raw === null) {
-          return null;
-        }
-        return VercelInferenceProvidersSchema.parse(JSON.parse(raw));
+        const models = await getVercelModelsMetadataFromDatabase();
+        const model = models[modelId];
+        return model ? extractVercelInferenceProviderIdsFromModel(model) : null;
       },
       TTL_MS,
       null
@@ -87,35 +81,24 @@ export function getCachedVercelInferenceProviderIdsForModel(
   return fetchProviders();
 }
 
-const ModelIdsSchema = z.array(z.string());
-
-function createModelIdsFetcher(redisKey: RedisKey, name: string) {
+function createLanguageModelIdsFetcher(fetchModels: () => Promise<StoredModelMap>) {
   return createCachedFetch<ReadonlySet<string>>(
-    async () => {
-      const raw = JSON.parse((await redisClient.get<string>(redisKey)) ?? 'null');
-      if (!Array.isArray(raw) || raw.length === 0) {
-        console.debug(`[getGatewayModels] no ${name} model ids found in Redis`);
-        return new Set<string>();
-      }
-      return new Set(ModelIdsSchema.parse(raw));
-    },
+    async () => new Set(getLanguageModelIds(await fetchModels())),
     TTL_MS,
     new Set<string>()
   );
 }
 
-export const getVercelModelsFromRedis = createModelIdsFetcher(
-  GATEWAY_METADATA_REDIS_KEYS.vercelModelIds,
-  'Vercel'
+export const getVercelModelsFromDatabase = createLanguageModelIdsFetcher(
+  getVercelModelsMetadataFromDatabase
 );
 
-export const getOpenRouterModelsFromRedis = createModelIdsFetcher(
-  GATEWAY_METADATA_REDIS_KEYS.openrouterModelIds,
-  'OpenRouter'
+export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
+  getOpenRouterModelsMetadataFromDatabase
 );
 
 export async function isValidOpenRouterModelId(modelId: string): Promise<boolean> {
-  const openRouterModelIds = await getOpenRouterModelsFromRedis();
+  const openRouterModelIds = await getOpenRouterModelsFromDatabase();
   if (openRouterModelIds.size === 0) {
     warnExceptInTest(
       '[isValidOpenRouterModelId] no model metadata available, assuming id is valid'

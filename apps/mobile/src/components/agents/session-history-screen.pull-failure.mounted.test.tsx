@@ -283,13 +283,16 @@ describe('SessionHistoryScreen pull-to-refresh with the API down', () => {
     });
     expect(refreshControl().refreshing).toBe(true);
 
-    // The in-flight pull announces Updating instead of a bare native spinner.
+    // The in-flight pull announces Updating without drawing the copy.
     await vi.waitFor(
       () => {
         expect(text()).toContain('Updating');
       },
       { timeout: 2000, interval: 10 }
     );
+    expect(
+      nodes('Text').find(node => node.children.includes('Updating'))?.props.className
+    ).toContain('absolute');
 
     // The refetch settles into the query error state with the rows kept.
     // The error flag lands through the screen's data hook (in production the

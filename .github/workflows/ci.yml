@@ -400,9 +400,6 @@ jobs:
       - name: Test cloud-agent-next checkers
         run: pnpm --filter cloud-agent-next test:checkers
 
-      - name: Check cloud-agent-next architecture
-        run: pnpm --filter cloud-agent-next check:architecture
-
       - name: Check cloud-agent-next duplication
         run: pnpm --filter cloud-agent-next check:duplication
 

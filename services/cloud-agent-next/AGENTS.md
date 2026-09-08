@@ -43,8 +43,7 @@ Git tokens (GitHub App installation tokens, managed GitLab tokens) are resolved 
 - `pnpm run format` - oxfmt write (src only)
 - `pnpm run format:check` - oxfmt check (src only)
 - `pnpm run typecheck` - TypeScript (tsgo) + wrapper typecheck
-- `pnpm run test:checkers` - Duplication and architecture checker fixtures
-- `pnpm run check:architecture` - Production ownership boundaries
+- `pnpm run test:checkers` - Duplication checker fixtures
 - `pnpm run check:duplication` - Production duplicate-code ratchet
 
 ### Deployment

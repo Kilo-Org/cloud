@@ -555,6 +555,40 @@ describe('uuidSchema (organization ID validation)', () => {
 });
 
 describe('getUserFromAuth', () => {
+  test.each(['Bearer', 'bEaReR'])(
+    'returns 401 for a %s token with malformed JSON payload',
+    async scheme => {
+      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString(
+        'base64url'
+      );
+      const payload = Buffer.from('{').toString('base64url');
+      const token = `${header}.${payload}.signature`;
+      expect(() => jwt.decode(token)).toThrow(SyntaxError);
+      mockHeaders.mockResolvedValue(new Headers({ authorization: `${scheme} ${token}` }));
+
+      const result = await getUserFromAuth({ adminOnly: false });
+
+      expect(result.user).toBeNull();
+      expect(result.authFailedResponse?.status).toBe(401);
+      expect(mockGetServerSession).not.toHaveBeenCalled();
+    }
+  );
+
+  test('returns 401 for a token with malformed JSON header', async () => {
+    const header = Buffer.from('{').toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ kiloUserId: 'malformed-token-user' })).toString(
+      'base64url'
+    );
+    const token = `${header}.${payload}.signature`;
+    mockHeaders.mockResolvedValue(new Headers({ authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(mockGetServerSession).not.toHaveBeenCalled();
+  });
+
   test('enforces the requested audience without falling through to a valid session', async () => {
     const user = await insertTestUser({
       api_token_pepper: 'audience-transition-pepper',

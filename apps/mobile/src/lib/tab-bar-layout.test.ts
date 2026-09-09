@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getEffectiveTabBarHeight,
+  getTabBarHorizontalInset,
   getTabBarIconForwardHeight,
   getTabBarIconSize,
   getTabBarOverlayHeight,
@@ -105,6 +106,33 @@ describe('getTabBarIconSize', () => {
 
   it('never drops below the base size for very small font scales', () => {
     expect(getTabBarIconSize(0.85)).toBe(22);
+  });
+});
+
+describe('getTabBarHorizontalInset', () => {
+  it('pads each side by its landscape safe-area inset', () => {
+    expect(getTabBarHorizontalInset({ left: 47, right: 59 })).toEqual({
+      paddingLeft: 47,
+      paddingRight: 59,
+    });
+  });
+
+  it('collapses to a no-op in portrait with zero insets', () => {
+    expect(getTabBarHorizontalInset({ left: 0, right: 0 })).toEqual({
+      paddingLeft: 0,
+      paddingRight: 0,
+    });
+  });
+
+  it('ignores negative insets', () => {
+    expect(getTabBarHorizontalInset({ left: -1, right: -1 })).toEqual({
+      paddingLeft: 0,
+      paddingRight: 0,
+    });
+  });
+
+  it('treats missing insets as zero', () => {
+    expect(getTabBarHorizontalInset({})).toEqual({ paddingLeft: 0, paddingRight: 0 });
   });
 });
 

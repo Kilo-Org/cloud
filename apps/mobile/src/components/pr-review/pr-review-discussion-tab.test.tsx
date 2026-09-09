@@ -102,6 +102,49 @@ function resetState(): void {
   discussionState.laterPageError = false;
 }
 
+describe('PrReviewDiscussionTab loading skeleton side insets (landscape)', () => {
+  beforeEach(() => {
+    insetsState.bottom = 0;
+    insetsState.left = 0;
+    insetsState.right = 0;
+    resetState();
+  });
+
+  function loadingWrapperStyle(): Record<string, number | undefined> {
+    discussionState.query.isPending = true;
+    const views = bottomPaddedViews(mountTab());
+    expect(views).toHaveLength(1);
+    const view = views[0];
+    if (!view) {
+      throw new Error('expected a padded View');
+    }
+    return view.props.style as Record<string, number | undefined>;
+  }
+
+  it('keeps exactly the current style keys at zero portrait insets', () => {
+    const style = loadingWrapperStyle();
+
+    // Spread only when nonzero: the `px-4` className gutter must survive
+    // portrait untouched (inline style wins over className).
+    expect(style.paddingLeft).toBeUndefined();
+    expect(style.paddingRight).toBeUndefined();
+    expect(style.paddingBottom).toBe(32);
+  });
+
+  it('clears the sensor housing with the landscape side insets', () => {
+    insetsState.left = 47;
+    insetsState.right = 59;
+
+    const style = loadingWrapperStyle();
+
+    expect(style.paddingLeft).toBe(47);
+    expect(style.paddingRight).toBe(59);
+    // The skeleton gutter swap is horizontal-only: the paddingBottom that
+    // clears the system bar is unchanged.
+    expect(style.paddingBottom).toBe(32);
+  });
+});
+
 describe('PrReviewDiscussionTab full-body states', () => {
   beforeEach(() => {
     insetsState.bottom = 0;

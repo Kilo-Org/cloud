@@ -257,7 +257,21 @@ export function ProfileScreen() {
 
             {(isLoading || !afterInteractions) && !data && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
-                <Skeleton className="h-12 w-full rounded-lg" />
+                {/* Content-shaped skeleton (icon tile + two text bars in the
+                    row's own bg-secondary card): a plain block read as an
+                    empty box in the e5 spot check (2026-09-07). Heights sum to
+                    the ConfigureRow row (py-3 + 38 text block) so the swap to
+                    real rows does not shift the sections below. Bars are
+                    bg-muted-soft: the theme's bg-muted equals bg-secondary,
+                    so default-tone bars were invisible here (b911 e2 spot
+                    check). */}
+                <View className="flex-row items-center gap-3 rounded-lg bg-secondary px-3 py-3">
+                  <Skeleton className="h-[30px] w-[30px] shrink-0 rounded-lg bg-muted-soft" />
+                  <View className="flex-1 gap-0.5">
+                    <Skeleton className="h-5 w-32 rounded bg-muted-soft" />
+                    <Skeleton className="h-4 w-48 rounded bg-muted-soft" />
+                  </View>
+                </View>
               </Animated.View>
             )}
 

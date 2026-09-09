@@ -391,6 +391,79 @@ describe('GitHub installation persistence', () => {
     ).resolves.toEqual({ ok: false, reason: 'incompatible_workflow' });
   });
 
+  test('serializes distinct installations for a non-allowlisted organization', async () => {
+    const organization = await createTestOrganization('Cardinality lock org', ownerId, 0);
+    let release: (() => void) | undefined;
+    const barrier = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let ready: ((pid: number) => void) | undefined;
+    const holderReady = new Promise<number>(resolve => {
+      ready = resolve;
+    });
+    const first = db.transaction(async tx => {
+      const result = await connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        data('771001'),
+        tx
+      );
+      const backend = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      ready?.(backend.rows[0]!.pid);
+      await barrier;
+      return result;
+    });
+    let second: ReturnType<typeof connectVerifiedGitHubInstallation> | undefined;
+    let observationError: unknown;
+    try {
+      const holderPid = await githubTestTimeout(holderReady, 'owner-cardinality holder');
+      second = connectVerifiedGitHubInstallation(
+        { type: 'org', id: organization.id },
+        data('771002')
+      );
+      await githubTestTimeout(
+        waitForBlockedGitHubOwnerLock(holderPid),
+        'owner-cardinality contender'
+      );
+    } catch (error) {
+      observationError = error;
+    } finally {
+      release?.();
+    }
+    const [firstResult, secondResult] = await Promise.allSettled([
+      first,
+      second ?? Promise.reject(new Error('Second callback did not start')),
+    ]);
+    if (observationError) throw observationError;
+    expect(firstResult).toMatchObject({ status: 'fulfilled', value: { ok: true } });
+    expect(secondResult).toEqual({
+      status: 'fulfilled',
+      value: { ok: false, reason: 'multiple_installations_disabled' },
+    });
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    expect(associations).toHaveLength(1);
+  });
+
+  test('allows distinct installations for an allowlisted organization', async () => {
+    const organization = await createTestOrganization('Multi-install org', ownerId, 0);
+    process.env.GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS = organization.id;
+    const results = await Promise.all([
+      connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('772001')),
+      connectVerifiedGitHubInstallation({ type: 'org', id: organization.id }, data('772002')),
+    ]);
+    expect(results).toEqual([
+      expect.objectContaining({ ok: true }),
+      expect.objectContaining({ ok: true }),
+    ]);
+    const associations = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, organization.id));
+    expect(associations).toHaveLength(2);
+  });
+
   test('serializes upstream uninstall against a concurrent shared attach', async () => {
     const organizationA = await createTestOrganization('Uninstall race GitHub A', ownerId, 0);
     const organizationB = await createTestOrganization('Uninstall race GitHub B', otherOwnerId, 0);
@@ -807,3 +880,34 @@ describe('GitHub installation persistence', () => {
     ).resolves.toMatchObject({ github_installation_id: null, integration_status: 'suspended' });
   });
 });
+
+async function waitForBlockedGitHubOwnerLock(holderPid: number): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const result = await db.execute<{ blocked: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1 FROM pg_stat_activity
+        WHERE datname = current_database()
+          AND ${holderPid} = ANY(pg_blocking_pids(pid))
+          AND wait_event_type = 'Lock'
+          AND lower(query) LIKE '%pg_advisory_xact_lock%'
+      ) AS blocked
+    `);
+    if (result.rows[0]?.blocked) return;
+    await new Promise<void>(resolve => setImmediate(resolve));
+  }
+  throw new Error('Expected callback blocked on the GitHub owner advisory lock');
+}
+
+async function githubTestTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out`)), 5_000);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

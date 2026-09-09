@@ -16,6 +16,7 @@ import {
   canOrganizationUseMultipleGitHubInstallations,
 } from '@/lib/integrations/github/multiple-installations';
 import { evaluateGitHubSharingCompatibility } from '@/lib/integrations/github/sharing-compatibility';
+import { lockProviderOAuthOwnerRow } from '@/lib/integrations/provider-oauth-attempts';
 
 export type DbTransaction = DrizzleTransaction;
 
@@ -78,7 +79,13 @@ export async function connectVerifiedGitHubInstallation(
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${data.githubAppType}:${data.platformInstallationId}`}))`
     );
-    if (owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id)) {
+    const requiresOwnerCardinalityLock =
+      owner.type === 'org' && !canOrganizationUseMultipleGitHubInstallations(owner.id);
+    if (requiresOwnerCardinalityLock) {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
+    }
+    await lockProviderOAuthOwnerRow(tx, owner);
+    if (requiresOwnerCardinalityLock) {
       const ownerIntegrations = await tx
         .select({
           installationId: platform_integrations.platform_installation_id,

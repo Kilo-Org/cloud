@@ -12,8 +12,6 @@ import {
   cloud_agent_code_reviews,
   deployments,
   github_app_installations,
-  kilocode_users,
-  organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
@@ -73,23 +71,6 @@ export async function evaluateGitHubSharingCompatibility(
         : { type: 'user' as const, id: association.userId ?? '' }
     ),
   ];
-  for (const participant of participatingOwners.sort((a, b) =>
-    `${a.type}:${a.id}`.localeCompare(`${b.type}:${b.id}`)
-  )) {
-    if (participant.type === 'org') {
-      await tx
-        .select({ id: organizations.id })
-        .from(organizations)
-        .where(eq(organizations.id, participant.id))
-        .for('update');
-    } else {
-      await tx
-        .select({ id: kilocode_users.id })
-        .from(kilocode_users)
-        .where(eq(kilocode_users.id, participant.id))
-        .for('update');
-    }
-  }
   if (await hasPendingProviderOAuthAttempt(tx, participatingOwners)) {
     return { compatible: false, reason: 'active_provider_attempt' };
   }

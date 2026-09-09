@@ -56,7 +56,20 @@ export function VoiceTranscriptionControl() {
   }, [userId]);
 
   if (supportsOnDevice) {
-    return <Text className="mt-3 text-sm text-muted-foreground">{t('consent.onDevice')}</Text>;
+    // Status row in the toggle row's geometry (label left, value right) so it
+    // reads as the transcription state, not a stray fragment under the Who
+    // line (e4 spot check, 2026-09-07). The label is the neutral section
+    // name: "Online transcription → On device" contradicted itself (vr1
+    // review, 2026-09-07). On-device is always used when supported, so there
+    // is no online choice to offer.
+    return (
+      <View className="mt-3 flex-row items-center justify-between gap-3">
+        <Text className="flex-1 text-sm text-muted-foreground">
+          {t('consent.voiceTranscriptionTitle')}
+        </Text>
+        <Text className="text-sm font-medium text-foreground">{t('consent.onDevice')}</Text>
+      </View>
+    );
   }
 
   if (isLoading) {
@@ -189,6 +202,19 @@ export function ConsentDetails({ mode = 'onboarding' }: ConsentDetailsProps) {
               <View className="mt-3">
                 <View className="rounded-md bg-warn-tile-bg p-3">
                   <Text className="text-xs text-warn">{t('consent.errorScreenshotsNote')}</Text>
+                </View>
+              </View>
+            }
+          />
+          <Section
+            title={t('consent.performanceProfilingTitle')}
+            what={t('consent.performanceProfilingWhat')}
+            why={t('consent.performanceProfilingWhy')}
+            who={t('consent.crashReportingWho')}
+            footer={
+              <View className="mt-3">
+                <View className="rounded-md bg-warn-tile-bg p-3">
+                  <Text className="text-xs text-warn">{t('consent.performanceProfilingNote')}</Text>
                 </View>
               </View>
             }

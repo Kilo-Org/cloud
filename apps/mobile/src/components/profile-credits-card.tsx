@@ -162,7 +162,21 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         </View>
       )}
 
-      {(balanceLoading || balancePending) && <Skeleton className="min-h-16 w-full rounded-lg" />}
+      {(balanceLoading || balancePending) && (
+        // Content-shaped skeleton (number bar + note bar in the card's own
+        // bg-secondary shell): a plain block read as an empty box in the e5
+        // spot check (2026-09-07). Sized to the card's min-h-16 so the swap
+        // to the balance row does not shift the sections below. The bars are
+        // bg-muted-soft because the theme's bg-muted equals bg-secondary —
+        // default-tone bars were invisible in this shell (b911 e2 spot check:
+        // "blank beige block", e2-nav-profile.png).
+        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
+          <View className="flex-1 gap-1">
+            <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
+            <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
+          </View>
+        </View>
+      )}
       {balanceFailed && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
@@ -180,7 +194,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             <Text className="text-2xl font-bold">{formatMoney(balanceDollars, i18n.language)}</Text>
             {creditsLoading ? (
               <Animated.View exiting={FadeOut.duration(150)}>
-                <Skeleton className="mt-1 h-3 w-48 rounded" />
+                <Skeleton className="mt-1 h-3 w-48 rounded bg-muted-soft" />
               </Animated.View>
             ) : (
               expiringTotal > 0 &&

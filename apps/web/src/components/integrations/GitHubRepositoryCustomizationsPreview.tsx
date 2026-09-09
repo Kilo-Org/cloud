@@ -8,9 +8,11 @@ import {
   Github,
   LockKeyhole,
   Pencil,
-  RotateCcw,
   Search,
 } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useTRPC } from '@/lib/trpc/utils';
 import { ModelCombobox, type ModelOption } from '@/components/shared/ModelCombobox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -42,19 +44,21 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-export type PreviewReviewMode = 'on' | 'off' | 'manual';
+
+// Automatic PR review dispatch only, for now — see github-repository-settings.ts.
+// Manual/@mention-triggered reviews are a separate, later change.
+type PreviewReviewMode = 'on' | 'off';
 
 const reviewModes: { value: PreviewReviewMode; label: string }[] = [
   { value: 'on', label: 'On' },
   { value: 'off', label: 'Off' },
-  { value: 'manual', label: 'Manual (@mention)' },
 ];
 
 function reviewModeName(value: PreviewReviewMode) {
   return reviewModes.find(mode => mode.value === value)?.label ?? value;
 }
 
-export type PreviewRepository = {
+type PreviewRepository = {
   id: string;
   name: string;
   private: boolean;
@@ -62,7 +66,7 @@ export type PreviewRepository = {
   prReviews: PreviewReviewMode | null;
 };
 
-export type PreviewInstallation = {
+type PreviewInstallation = {
   id: string;
   account: string;
   access: 'all' | 'selected';
@@ -88,92 +92,161 @@ function repositoryCustomizationSummary(
 
 const PAGE_SIZE = 10;
 
-type PreviewProps = {
-  scope: 'personal' | 'organization';
-  organizationName: string;
-  installations: PreviewInstallation[];
-  models: ModelOption[];
-};
-
-export function GitHubRepositoryCustomizationsPreview({
-  scope,
-  organizationName,
-  installations,
-  models,
-}: PreviewProps) {
-  const [revision, setRevision] = useState(0);
-
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="border-b border-border bg-muted/30">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-8">
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <Badge variant="outline">UI preview</Badge>
-            <span>Mock data only. Changes reset when you reload.</span>
-          </div>
-          <Button variant="ghost" size="sm" onClick={() => setRevision(value => value + 1)}>
-            <RotateCcw className="size-4" aria-hidden="true" />
-            Reset preview
-          </Button>
-        </div>
-      </div>
-      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-8">
-        <header className="space-y-3">
-          <p className="text-sm text-muted-foreground">
-            {scope === 'organization' ? organizationName : 'Personal account'}
-            <span className="px-2" aria-hidden="true">
-              /
-            </span>
-            Integrations
-            <span className="px-2" aria-hidden="true">
-              /
-            </span>
-            <span className="text-foreground">GitHub</span>
-          </p>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-semibold tracking-tight">GitHub integration</h1>
-            <p className="text-sm text-muted-foreground">
-              {scope === 'organization'
-                ? 'Manage connected GitHub organizations and how Kilo responds in their repositories.'
-                : 'Manage your connected GitHub account and how Kilo responds in your repositories.'}
-            </p>
-          </div>
-        </header>
-        <div key={`${scope}-${revision}`} className="space-y-5">
-          {installations
-            .slice(0, scope === 'personal' ? 1 : undefined)
-            .map((installation, index) => (
-              <InstallationCustomizations
-                key={installation.id}
-                installation={installation}
-                models={models}
-                initiallyOpen={index === 0}
-              />
-            ))}
-        </div>
-      </main>
-    </div>
-  );
-}
-
-function InstallationCustomizations({
-  installation,
+export function InstallationCustomizations({
+  integrationId,
+  organizationId,
   models,
   initiallyOpen,
 }: {
-  installation: PreviewInstallation;
+  integrationId: string;
+  organizationId?: string;
   models: ModelOption[];
   initiallyOpen: boolean;
 }) {
-  const [defaultModel, setDefaultModel] = useState(installation.defaultModel);
-  const [defaultPrReviews, setDefaultPrReviews] = useState(installation.defaultPrReviews);
-  const [repositories, setRepositories] = useState(installation.repositories);
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  const queryInput = { organizationId, integrationId };
+  const queryKey = trpc.githubApps.getRepositoryCustomizations.queryKey(queryInput);
+  const { data, isLoading, isError, error, refetch } = useQuery(
+    trpc.githubApps.getRepositoryCustomizations.queryOptions(queryInput)
+  );
+  const updateInstallationSettings = useMutation(
+    trpc.githubApps.updateInstallationSettings.mutationOptions()
+  );
+  const updateRepositorySettings = useMutation(
+    trpc.githubApps.updateRepositorySettings.mutationOptions()
+  );
+
+  const [pendingModel, setPendingModel] = useState<string | null>(null);
+  const [pendingPrReviews, setPendingPrReviews] = useState<PreviewReviewMode | null>(null);
+  const [savingDefaults, setSavingDefaults] = useState(false);
+  const [pendingRepositoryOverrides, setPendingRepositoryOverrides] = useState<
+    Record<string, Pick<PreviewRepository, 'model' | 'prReviews'>>
+  >({});
+  const [savingRepositoryId, setSavingRepositoryId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [editingRepository, setEditingRepository] = useState<PreviewRepository | null>(null);
   const [announcement, setAnnouncement] = useState('');
   const editTrigger = useRef<HTMLButtonElement | null>(null);
   const searchInput = useRef<HTMLInputElement | null>(null);
+
+  if (isLoading) {
+    return (
+      <Card className="p-5 text-sm text-muted-foreground">Loading repository customizations…</Card>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <Card className="flex flex-wrap items-center justify-between gap-3 p-5 text-sm text-muted-foreground">
+        <p>
+          Couldn’t load repository customizations
+          {error instanceof Error && error.message ? `: ${error.message}` : '.'}
+        </p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>
+          Retry
+        </Button>
+      </Card>
+    );
+  }
+
+  const installation: PreviewInstallation = {
+    id: data.id,
+    account: data.account ?? integrationId,
+    access: data.access === 'all' ? 'all' : 'selected',
+    defaultModel: data.defaultModel,
+    defaultPrReviews: data.defaultPrReviews,
+    repositories: data.repositories.map(repository => ({
+      id: String(repository.id),
+      name: repository.name,
+      private: repository.private,
+      model: repository.model,
+      prReviews: repository.prReviews,
+    })),
+  };
+
+  async function saveDefaults(settings: { model?: string; prReviews?: PreviewReviewMode }) {
+    try {
+      const result = await updateInstallationSettings.mutateAsync({
+        organizationId,
+        integrationId,
+        settings: {
+          modelSlug: settings.model,
+          prReviewMode: settings.prReviews,
+        },
+      });
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to update default settings');
+        return false;
+      }
+      queryClient.setQueryData(queryKey, current =>
+        current
+          ? {
+              ...current,
+              defaultModel: settings.model ?? current.defaultModel,
+              defaultPrReviews: settings.prReviews ?? current.defaultPrReviews,
+            }
+          : current
+      );
+      return true;
+    } catch (error) {
+      toast.error('Failed to update default settings', {
+        description: error instanceof Error ? error.message : undefined,
+      });
+      return false;
+    }
+  }
+
+  async function saveRepositorySettings(
+    repositoryId: string,
+    settings: Pick<PreviewRepository, 'model' | 'prReviews'>
+  ) {
+    try {
+      const result = await updateRepositorySettings.mutateAsync({
+        organizationId,
+        integrationId,
+        repositoryId: Number(repositoryId),
+        settings: {
+          modelSlug: settings.model,
+          prReviewMode: settings.prReviews,
+        },
+      });
+      if (!result.success) {
+        toast.error(result.error ?? 'Failed to update repository settings');
+        return false;
+      }
+      queryClient.setQueryData(queryKey, current =>
+        current
+          ? {
+              ...current,
+              repositories: current.repositories.map(repository =>
+                String(repository.id) === repositoryId
+                  ? {
+                      ...repository,
+                      model: settings.model,
+                      prReviews: settings.prReviews,
+                    }
+                  : repository
+              ),
+            }
+          : current
+      );
+      return true;
+    } catch (error) {
+      toast.error('Failed to update repository settings', {
+        description: error instanceof Error ? error.message : undefined,
+      });
+      return false;
+    }
+  }
+
+  const defaultModel = pendingModel ?? installation.defaultModel;
+  const defaultPrReviews = pendingPrReviews ?? installation.defaultPrReviews;
+  const repositories = installation.repositories.map(repository => {
+    const pending = pendingRepositoryOverrides[repository.id];
+    return pending ? { ...repository, ...pending } : repository;
+  });
 
   const customizedCount = repositories.filter(
     repository => repositoryCustomizationSummary(models, repository).length > 0
@@ -250,12 +323,20 @@ function InstallationCustomizations({
                 triggerAriaLabel={`Default AI model for ${installation.account}`}
                 models={models}
                 value={defaultModel}
-                onValueChange={model => {
-                  setDefaultModel(model);
+                disabled={savingDefaults}
+                onValueChange={async model => {
+                  setPendingModel(model);
+                  setSavingDefaults(true);
                   setPage(1);
                   setAnnouncement(
-                    `Default updated to ${modelName(models, model)} in this preview. Custom models are unchanged.`
+                    `Default updated to ${modelName(models, model)}. Custom models are unchanged.`
                   );
+                  const success = await saveDefaults({ model });
+                  setPendingModel(null);
+                  setSavingDefaults(false);
+                  if (!success) {
+                    setAnnouncement(`Couldn't update the default model. Please try again.`);
+                  }
                 }}
               />
             </div>
@@ -265,20 +346,26 @@ function InstallationCustomizations({
                   Default pull request reviews
                 </Label>
                 <p className="max-w-lg text-sm text-muted-foreground">
-                  Review pull requests automatically, only when @mentioned, or not at all.
-                  Repository overrides are unaffected.
+                  Review pull requests automatically on new pull requests, or turn reviews off
+                  entirely. Repository overrides are unaffected.
                 </p>
               </div>
               <ReviewModeSelect
                 id={`${installation.id}-default-reviews`}
                 value={defaultPrReviews}
-                onValueChange={mode => {
+                disabled={savingDefaults}
+                onValueChange={async mode => {
                   if (mode === null) return;
-                  setDefaultPrReviews(mode);
+                  setPendingPrReviews(mode);
+                  setSavingDefaults(true);
                   setPage(1);
-                  setAnnouncement(
-                    `Default PR reviews updated to ${reviewModeName(mode)} in this preview.`
-                  );
+                  setAnnouncement(`Default PR reviews updated to ${reviewModeName(mode)}.`);
+                  const success = await saveDefaults({ prReviews: mode });
+                  setPendingPrReviews(null);
+                  setSavingDefaults(false);
+                  if (!success) {
+                    setAnnouncement(`Couldn't update default PR reviews. Please try again.`);
+                  }
                 }}
               />
             </div>
@@ -375,6 +462,7 @@ function InstallationCustomizations({
                         size="sm"
                         className="min-h-11 px-2 sm:min-h-8"
                         aria-label={`Edit ${repository.name}`}
+                        disabled={savingRepositoryId === repository.id}
                         onClick={event => {
                           editTrigger.current = event.currentTarget;
                           setEditingRepository(repository);
@@ -474,16 +562,25 @@ function InstallationCustomizations({
               defaultPrReviews={defaultPrReviews}
               account={installation.account}
               onCancel={() => setEditingRepository(null)}
-              onSave={settings => {
-                setRepositories(current =>
-                  current.map(repository =>
-                    repository.id === editingRepository.id
-                      ? { ...repository, ...settings }
-                      : repository
-                  )
-                );
-                setAnnouncement(`${editingRepository.name} updated in this preview.`);
+              onSave={async settings => {
+                const repositoryId = editingRepository.id;
+                const repositoryName = editingRepository.name;
+                setPendingRepositoryOverrides(current => ({
+                  ...current,
+                  [repositoryId]: settings,
+                }));
+                setSavingRepositoryId(repositoryId);
+                setAnnouncement(`${repositoryName} updated.`);
                 setEditingRepository(null);
+                const success = await saveRepositorySettings(repositoryId, settings);
+                setPendingRepositoryOverrides(current => {
+                  const { [repositoryId]: _removed, ...rest } = current;
+                  return rest;
+                });
+                setSavingRepositoryId(null);
+                if (!success) {
+                  setAnnouncement(`Couldn't update ${repositoryName}. Please try again.`);
+                }
               }}
             />
           )}
@@ -519,16 +616,19 @@ function ReviewModeSelect({
   id,
   value,
   defaultMode,
+  disabled,
   onValueChange,
 }: {
   id: string;
   value: PreviewReviewMode | null;
   defaultMode?: PreviewReviewMode;
+  disabled?: boolean;
   onValueChange: (value: PreviewReviewMode | null) => void;
 }) {
   return (
     <Select
       value={value ?? 'default'}
+      disabled={disabled}
       onValueChange={selected => {
         if (selected === 'default') {
           onValueChange(null);
@@ -652,8 +752,8 @@ function RepositorySettingsEditor({
         <div className="space-y-3 border-t border-border pt-6">
           <Label htmlFor={`${repository.id}-reviews`}>Pull request reviews</Label>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            On reviews pull requests automatically. Manual requires an @mention. Off disables
-            reviews.
+            On reviews pull requests automatically. Off disables automatic reviews for this
+            repository.
           </p>
           <ReviewModeSelect
             id={`${repository.id}-reviews`}
@@ -699,9 +799,6 @@ function RepositorySettingsEditor({
         </div>
       </div>
       <SheetFooter className="border-t border-border pt-4">
-        <p className="mb-2 text-xs text-muted-foreground">
-          Preview only. No live settings will be changed.
-        </p>
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onCancel}>
             Cancel
@@ -715,5 +812,83 @@ function RepositorySettingsEditor({
         </div>
       </SheetFooter>
     </>
+  );
+}
+
+export function GitHubRepositoryCustomizations({
+  scope,
+  organizationName,
+  organizationId,
+  models,
+}: {
+  scope: 'personal' | 'organization';
+  organizationName: string;
+  organizationId?: string;
+  models: ModelOption[];
+}) {
+  const trpc = useTRPC();
+  const input = organizationId ? { organizationId } : undefined;
+  const {
+    data: integrations,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery(trpc.githubApps.listIntegrations.queryOptions(input));
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <main className="mx-auto max-w-6xl space-y-8 px-4 py-8 sm:px-8">
+        <header className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            {scope === 'organization' ? organizationName : 'Personal account'}
+            <span className="px-2" aria-hidden="true">
+              /
+            </span>
+            Integrations
+            <span className="px-2" aria-hidden="true">
+              /
+            </span>
+            <span className="text-foreground">GitHub</span>
+          </p>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">GitHub integration</h1>
+            <p className="text-sm text-muted-foreground">
+              {scope === 'organization'
+                ? 'Manage connected GitHub organizations and how Kilo responds in their repositories.'
+                : 'Manage your connected GitHub account and how Kilo responds in your repositories.'}
+            </p>
+          </div>
+        </header>
+        <div className="space-y-5">
+          {isLoading && <p className="text-sm text-muted-foreground">Loading installations…</p>}
+          {isError && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-5 text-sm text-muted-foreground">
+              <p>
+                Couldn’t load GitHub App installations
+                {error instanceof Error && error.message ? `: ${error.message}` : '.'}
+              </p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                Retry
+              </Button>
+            </div>
+          )}
+          {!isLoading && !isError && integrations?.length === 0 && (
+            <p className="text-sm text-muted-foreground">No GitHub App installations found.</p>
+          )}
+          {integrations
+            ?.slice(0, scope === 'personal' ? 1 : undefined)
+            .map((integration, index) => (
+              <InstallationCustomizations
+                key={integration.id}
+                integrationId={integration.id}
+                organizationId={organizationId}
+                models={models}
+                initiallyOpen={index === 0}
+              />
+            ))}
+        </div>
+      </main>
+    </div>
   );
 }

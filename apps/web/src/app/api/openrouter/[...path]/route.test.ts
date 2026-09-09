@@ -1439,7 +1439,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(stats.cost_mUsd).toBe(1000); // toMicrodollars(0.001)
   });
 
-  it('guides teams that block every pool model to configure a custom Efficient pool', async () => {
+  it('reports an auto-routing selection failure when a group blocks every pool model', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -1463,15 +1463,15 @@ describe('kilo-auto/efficient classifier billing', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       error_type: 'model_not_allowed',
-      message: expect.stringContaining('custom Efficient model pool'),
+      message: expect.stringContaining('Auto-routing could not select an eligible model'),
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
-  it('guides enterprise teams whose baseline blocks every pool model to configure a custom Efficient pool', async () => {
+  it('reports an auto-routing selection failure when an organization blocks every pool model', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {
         id: 'user-123',
@@ -1496,10 +1496,10 @@ describe('kilo-auto/efficient classifier billing', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       error_type: 'model_not_allowed',
-      message: expect.stringContaining('custom Efficient model pool'),
+      message: expect.stringContaining('Auto-routing could not select an eligible model'),
     });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });

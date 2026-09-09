@@ -325,9 +325,8 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
   let routingTarget: string | null = null;
   let classifierCostUsd = 0;
   // Efficient and legacy alias requests resolve through the auto-routing pool.
-  // Kept for the org policy check below so a team that blocks every pool model
-  // gets guidance to configure a custom Efficient model pool instead of the
-  // generic model-not-allowed error.
+  // the org policy check below so a failed routing decision gets a specific
+  // auto-routing error instead of the generic model-not-allowed error.
   let isAutoEfficientRequest = false;
   if (isKiloAutoModel(requestedModelLowerCased)) {
     autoModel = requestedModelLowerCased;

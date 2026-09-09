@@ -90,6 +90,7 @@ import {
   platform_oauth_credentials,
   platform_access_token_credentials,
   platform_integrations,
+  github_app_installations,
   model_eval_ingestions,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -309,6 +310,7 @@ describe('User', () => {
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db.delete(github_app_installations);
     await db.delete(quick_chat_messages);
     await db.delete(quick_chat_threads);
     await db.delete(organizations);
@@ -4843,6 +4845,76 @@ describe('User', () => {
 
       expect(deletedCredentials).toHaveLength(0);
       expect(retainedCredentials).toHaveLength(1);
+    });
+
+    it('deletes an unshared personal canonical GitHub installation', async () => {
+      const user = await insertTestUser();
+      const [canonical] = await db
+        .insert(github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: '9876501',
+          account_id: '101',
+          account_login: 'personal-login',
+          account_type: 'User',
+          lifecycle_state: 'active',
+          observed_at: new Date().toISOString(),
+        })
+        .returning();
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '9876501',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        integration_status: 'active',
+      });
+      await softDeleteUser(user.id);
+      await expect(
+        db
+          .select()
+          .from(github_app_installations)
+          .where(eq(github_app_installations.id, canonical.id))
+      ).resolves.toHaveLength(0);
+    });
+
+    it('deletes migration-created personal canonical PII but preserves organizations', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_github_app_tokens).values({
+        kilo_user_id: user.id,
+        github_app_type: 'standard',
+        github_user_id: '99101',
+        github_login: 'personal-login',
+        access_token_encrypted: 'encrypted-access',
+        access_token_expires_at: '2026-10-01T00:00:00.000Z',
+        refresh_token_encrypted: 'encrypted-refresh',
+        refresh_token_expires_at: '2027-01-01T00:00:00.000Z',
+      });
+      const canonicals = await db
+        .insert(github_app_installations)
+        .values([
+          {
+            github_app_type: 'standard',
+            installation_id: '9876502',
+            account_id: '99101',
+            account_login: 'personal-login',
+            account_type: null,
+            lifecycle_state: 'active',
+          },
+          {
+            github_app_type: 'standard',
+            installation_id: '9876503',
+            account_id: '99101',
+            account_login: 'organization-login',
+            account_type: 'Organization',
+            lifecycle_state: 'active',
+          },
+        ])
+        .returning();
+      await softDeleteUser(user.id);
+      const retained = await db.select().from(github_app_installations);
+      expect(retained.map(row => row.id)).toEqual([canonicals[1]?.id]);
     });
 
     it('should nullify free_model_usage FK', async () => {

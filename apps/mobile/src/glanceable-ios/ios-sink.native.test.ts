@@ -3,6 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_IDLE_END_DEBOUNCE_MS,
+  GLANCEABLE_IDLE_ONLY_MS,
+  GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
@@ -76,6 +79,35 @@ const native = vi.hoisted(() => {
   }
   return { records, ignoredUpdates, snapshots, failures, add, wrap };
 });
+
+// The sink and its ending helpers read the foreground state and watch for the
+// app leaving active while an idle-end debounce is pending.
+const appState = vi.hoisted(() => ({
+  currentState: 'active' as string,
+  listeners: new Set<(state: string) => void>(),
+  emit(next: string) {
+    this.currentState = next;
+    for (const listener of this.listeners) {
+      listener(next);
+    }
+  },
+  reset() {
+    this.currentState = 'active';
+    this.listeners.clear();
+  },
+}));
+
+vi.mock('react-native', () => ({
+  AppState: {
+    get currentState() {
+      return appState.currentState;
+    },
+    addEventListener: (_name: string, listener: (state: string) => void) => {
+      appState.listeners.add(listener);
+      return { remove: () => appState.listeners.delete(listener) };
+    },
+  },
+}));
 
 vi.mock('expo-widgets', async () => {
   const { after } = await import('expo-widgets/src/Widgets');
@@ -152,12 +184,16 @@ beforeEach(() => {
   vi.resetModules();
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  appState.reset();
   native.records.length = 0;
   native.ignoredUpdates.length = 0;
   native.snapshots.length = 0;
   native.failures.info = false;
 });
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+});
 
 describe('native adapter recovery', () => {
   it.each(['publish then start', 'start only'])(
@@ -337,13 +373,47 @@ describe('native adapter idle window', () => {
     const sink = await loadSink();
     sink.startOrUpdate(snapshot([{ status: 'busy' }, { status: 'idle' }]), CTX);
     sink.publish(snapshot([{ status: 'idle' }], 1));
+    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
     await sink.waitForNativeTerminal?.();
 
     expect(firstActivity()).toMatchObject({
       state: 'ended',
-      dismissAt: NOW + 600_000,
+      dismissAt: NOW + GLANCEABLE_IDLE_END_DEBOUNCE_MS + GLANCEABLE_IDLE_ONLY_MS,
       props: { running: 0, idle: 1 },
       policies: ['after'],
+    });
+  });
+
+  it('submits the idle dismissal at once for a background publish without advancing timers', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    appState.currentState = 'background';
+
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    await sink.waitForNativeTerminal?.();
+
+    expect(firstActivity()).toMatchObject({
+      state: 'ended',
+      dismissAt: NOW + GLANCEABLE_IDLE_ONLY_MS,
+      props: { running: 0, idle: 1 },
+      policies: ['after'],
+    });
+  });
+
+  it('keeps the same card when work resumes before the idle-end debounce', async () => {
+    const sink = await loadSink();
+    sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
+    sink.publish(snapshot([{ status: 'idle' }], 1));
+    const resumed = snapshot([{ status: 'busy' }], 2);
+    sink.publish(resumed);
+    sink.startOrUpdate(resumed, CTX);
+    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
+    await sink.waitForNativeTerminal?.();
+
+    expect(native.records).toHaveLength(1);
+    expect(firstActivity()).toMatchObject({
+      state: 'active',
+      props: { running: 1, idle: 0 },
     });
   });
 
@@ -351,6 +421,7 @@ describe('native adapter idle window', () => {
     const sink = await loadSink();
     sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
     sink.publish(snapshot([{ status: 'idle' }], 1));
+    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
     await sink.waitForNativeTerminal?.();
 
     const resumed = snapshot([{ status: 'busy' }], 2);
@@ -374,18 +445,24 @@ describe('native adapter idle window shortening', () => {
     const sink = await loadSink();
     sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
     sink.publish(snapshot([{ status: 'idle' }], 1));
+    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
     await sink.waitForNativeTerminal?.();
-    expect(firstActivity().dismissAt).toBe(NOW + 600_000);
+    expect(firstActivity().dismissAt).toBe(
+      NOW + GLANCEABLE_IDLE_END_DEBOUNCE_MS + GLANCEABLE_IDLE_ONLY_MS
+    );
 
     sink.publish(snapshot([], 2));
     await sink.waitForNativeTerminal?.();
-    expect(firstActivity().dismissAt).toBe(NOW + 8000);
+    expect(firstActivity().dismissAt).toBe(
+      NOW + GLANCEABLE_IDLE_END_DEBOUNCE_MS + GLANCEABLE_TERMINAL_MS
+    );
   });
 
   it('holds the replacement card until the idle card is dismissed', async () => {
     const sink = await loadSink();
     sink.startOrUpdate(snapshot([{ status: 'busy' }]), CTX);
     sink.publish(snapshot([{ status: 'idle' }], 1));
+    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
     await sink.waitForNativeTerminal?.();
 
     const resumed = snapshot([{ status: 'busy' }], 2);

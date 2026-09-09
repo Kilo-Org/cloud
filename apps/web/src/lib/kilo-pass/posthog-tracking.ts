@@ -24,7 +24,7 @@ type TrackKiloPassPurchaseCompletedBase = {
 
 export type TrackKiloPassPurchaseCompletedParams =
   | (TrackKiloPassPurchaseCompletedBase & {
-      channel: 'app_store';
+      channel: 'app_store' | 'google_play';
       providerTransactionId: string;
       productId: string;
       environment: string;
@@ -55,19 +55,19 @@ export function trackKiloPassPurchaseCompleted(params: TrackKiloPassPurchaseComp
   };
 
   const properties =
-    params.channel === 'app_store'
+    params.channel === 'stripe'
       ? {
-          ...baseProperties,
-          provider_transaction_id: params.providerTransactionId,
-          product_id: params.productId,
-          environment: params.environment,
-        }
-      : {
           ...baseProperties,
           stripe_invoice_id: params.stripeInvoiceId,
           amount_paid_usd: params.amountPaidUsd,
           currency: params.currency,
           livemode: params.livemode,
+        }
+      : {
+          ...baseProperties,
+          provider_transaction_id: params.providerTransactionId,
+          product_id: params.productId,
+          environment: params.environment,
         };
 
   try {

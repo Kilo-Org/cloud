@@ -13,7 +13,7 @@ import {
   KiloPassPaymentProvider,
   KiloPassTier,
 } from '@/lib/kilo-pass/enums';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { reconcileStoreSubscriptionExpiry } from '@/lib/kilo-pass/store-subscription-reconcile';
@@ -87,6 +87,82 @@ describe('reconcileStoreSubscriptionExpiry', () => {
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(kilocode_users);
   });
+
+  test('does not expire a subscription while its renewal commits', async () => {
+    const user = await insertTestUser();
+    const providerSubscriptionId = crypto.randomUUID();
+    const { id: subscriptionId } = await insertStoreSubscription({
+      kiloUserId: user.id,
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+      providerSubscriptionId,
+    });
+    await insertStorePurchase({
+      subscriptionId,
+      kiloUserId: user.id,
+      appAccountToken: user.app_store_account_token!,
+      paymentProvider: KiloPassPaymentProvider.GooglePlay,
+      providerSubscriptionId,
+      providerTransactionId: crypto.randomUUID(),
+      purchasedAt: '2026-01-01T00:00:00Z',
+      expiresAt: '2026-02-01T00:00:00Z',
+    });
+    let release = () => {};
+    const released = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let reportLocked = (_pid: number) => {};
+    const locked = new Promise<number>(resolve => {
+      reportLocked = resolve;
+    });
+    const renewal = db.transaction(async tx => {
+      await tx
+        .select({ id: kilo_pass_subscriptions.id })
+        .from(kilo_pass_subscriptions)
+        .where(eq(kilo_pass_subscriptions.id, subscriptionId))
+        .for('update');
+      const pid = await tx.execute(sql`select pg_backend_pid() as pid`);
+      reportLocked(Number(pid.rows[0]?.pid));
+      await released;
+      await tx.insert(kilo_pass_store_purchases).values({
+        kilo_pass_subscription_id: subscriptionId,
+        kilo_user_id: user.id,
+        payment_provider: KiloPassPaymentProvider.GooglePlay,
+        product_id: 'kilopass_tier19',
+        provider_subscription_id: providerSubscriptionId,
+        provider_transaction_id: crypto.randomUUID(),
+        provider_original_transaction_id: providerSubscriptionId,
+        environment: 'Sandbox',
+        purchased_at: '2026-02-01T00:00:00Z',
+        expires_at: '2026-03-01T00:00:00Z',
+        raw_payload_json: {},
+      });
+    });
+    const pid = await locked;
+    const reconciliation = reconcileStoreSubscriptionExpiry(db, {
+      now: new Date('2026-02-15T00:00:00Z'),
+    });
+    let waiting = false;
+    try {
+      const deadline = Date.now() + 5000;
+      while (!waiting && Date.now() < deadline) {
+        const result = await db.execute(
+          sql`select exists(select 1 from pg_stat_activity where ${pid} = any(pg_blocking_pids(pid))) as waiting`
+        );
+        waiting = result.rows[0]?.waiting === true;
+        if (!waiting) await new Promise(resolve => setTimeout(resolve, 10));
+      }
+    } finally {
+      release();
+      await renewal;
+    }
+    const summary = await reconciliation;
+    expect(waiting).toBe(true);
+    expect(summary.expiredSubscriptionCount).toBe(0);
+    const subscription = await db.query.kilo_pass_subscriptions.findFirst({
+      where: eq(kilo_pass_subscriptions.id, subscriptionId),
+    });
+    expect(subscription!.status).toBe('active');
+  }, 10000);
 
   test('cancels store-managed subscriptions whose latest purchase has expired', async () => {
     const now = new Date('2026-03-01T00:00:00.000Z');

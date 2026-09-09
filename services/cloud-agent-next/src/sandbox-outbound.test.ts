@@ -314,8 +314,27 @@ describe('handleManagedScmOutbound', () => {
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
       authorization: REDEEMED_GIT_AUTHORIZATION,
+      installationId: 'installation-123',
+      source: 'installation',
+      appType: 'standard',
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('forbidden', { status: 403 })));
+    const body = 'upstream-body-secret: permission denied';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          status: 403,
+          headers: {
+            'x-ratelimit-limit': '5000',
+            'x-ratelimit-remaining': '0',
+            'x-ratelimit-used': '5000',
+            'x-ratelimit-reset': '1700000000',
+            'x-ratelimit-resource': 'core',
+            'retry-after': '60',
+          },
+        })
+      )
+    );
 
     const response = await handleOutbound(
       new Request('https://api.github.com/repos/acme/repo/pulls/1', {
@@ -331,7 +350,58 @@ describe('handleManagedScmOutbound', () => {
     expect(logging.logger.withFields).toHaveBeenCalledWith(
       expect.objectContaining({ upstreamStatus: 403 })
     );
-    expect(serializedLogCalls()).not.toContain('upstream-token');
+    expect(logging.logger.withFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubInstallationId: 'installation-123',
+        githubAuthSource: 'installation',
+        githubAppType: 'standard',
+        upstreamStatus: 403,
+        githubRateLimitLimit: '5000',
+        githubRateLimitRemaining: '0',
+        githubRateLimitUsed: '5000',
+        githubRateLimitReset: '1700000000',
+        githubRateLimitResource: 'core',
+        githubRetryAfter: '60',
+        quotaClass: 'primary_exhausted',
+        bodySignal: 'none',
+      })
+    );
+    expect(logging.logger.warn).toHaveBeenCalledWith('Managed GitHub upstream rate-limit response');
+    await expect(response.text()).resolves.toBe(body);
+    const logs = serializedLogCalls();
+    expect(logs).not.toContain('upstream-body-secret');
+    expect(logs).not.toContain('upstream-token');
+  });
+
+  it('keeps forwarding and logs null correlation fields for an older redemption response', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const body = 'Too Many Requests';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 429 })));
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(429);
+    expect(logging.logger.withFields).toHaveBeenCalledWith(
+      expect.objectContaining({
+        githubInstallationId: null,
+        githubAuthSource: null,
+        githubAppType: null,
+        quotaClass: 'unknown',
+        bodySignal: 'too_many_requests',
+      })
+    );
+    await expect(response.text()).resolves.toBe(body);
   });
 
   it('keeps diagnostics failures from changing a successful forwarded response', async () => {
@@ -355,6 +425,88 @@ describe('handleManagedScmOutbound', () => {
     );
 
     expect(response.status).toBe(204);
+    expect(logging.logger.warn).not.toHaveBeenCalledWith(
+      'Managed GitHub upstream rate-limit response'
+    );
+  });
+
+  it('keeps a 429 response when rate-limit diagnostics fail', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const upstreamResponse = new Response('Too Many Requests', { status: 429 });
+    vi.spyOn(upstreamResponse, 'clone').mockImplementation(() => {
+      throw new Error('clone unavailable');
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(upstreamResponse));
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.text()).resolves.toBe('Too Many Requests');
+    expect(logging.logger.withFields).toHaveBeenCalledWith(
+      expect.objectContaining({ quotaClass: 'unknown', bodySignal: 'none' })
+    );
+  });
+
+  it('keeps a 429 response when the rate-limit warning logger fails', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const body = 'Too Many Requests';
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(body, { status: 429 })));
+    logging.logger.warn.mockImplementationOnce(() => {
+      throw new Error('warning logger unavailable');
+    });
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(429);
+    await expect(response.text()).resolves.toBe(body);
+  });
+
+  it('does not inspect or warn for a successful GitHub response', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: REDEEMED_GIT_AUTHORIZATION,
+    });
+    const clone = vi.spyOn(Response.prototype, 'clone');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('forwarded', { status: 200 })));
+
+    const response = await handleOutbound(
+      new Request('https://api.github.com/repos/acme/repo/pulls/1', {
+        headers: {
+          Authorization: `Bearer ${CAPABILITY}`,
+          'User-Agent': 'GitHub CLI 2.82.1',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(200);
+    expect(clone).not.toHaveBeenCalled();
+    expect(logging.logger.warn).not.toHaveBeenCalledWith(
+      'Managed GitHub upstream rate-limit response'
+    );
+    clone.mockRestore();
   });
 
   it('distinguishes upstream forwarding failures without logging their messages', async () => {

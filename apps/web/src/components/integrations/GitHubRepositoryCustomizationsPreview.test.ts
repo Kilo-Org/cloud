@@ -1,16 +1,16 @@
-import { afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { createRequire } from 'node:module';
 import React, { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import type {
-  GitHubRepositoryCustomizationsPreview as PreviewComponent,
-  PreviewInstallation,
-} from './GitHubRepositoryCustomizationsPreview';
+import type { GitHubRepositoryCustomizations as GitHubRepositoryCustomizationsComponent } from './GitHubRepositoryCustomizationsPreview';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
 
 jest.mock('lucide-react', () => new Proxy({}, { get: () => () => null }));
 jest.mock('@/lib/utils', () => ({
   cn: (...values: unknown[]) => values.filter(Boolean).join(' '),
+}));
+jest.mock('sonner', () => ({
+  toast: { success: jest.fn(), error: jest.fn() },
 }));
 jest.mock('@/components/ui/button', () => ({
   Button: ({
@@ -77,10 +77,12 @@ jest.mock('@/components/ui/sheet', () => ({
 jest.mock('@/components/ui/select', () => ({
   Select: ({
     value,
+    disabled,
     onValueChange,
     children,
   }: {
     value: string;
+    disabled?: boolean;
     onValueChange: (value: string) => void;
     children: React.ReactNode;
   }) => {
@@ -93,6 +95,7 @@ jest.mock('@/components/ui/select', () => ({
       {
         id,
         value,
+        disabled,
         onChange: (event: React.ChangeEvent<HTMLSelectElement>) =>
           onValueChange(event.currentTarget.value),
       },
@@ -113,6 +116,7 @@ jest.mock('@/components/shared/ModelCombobox', () => ({
     models,
     label,
     triggerAriaLabel,
+    disabled,
     onValueChange,
   }: {
     id: string;
@@ -120,6 +124,7 @@ jest.mock('@/components/shared/ModelCombobox', () => ({
     models: ModelOption[];
     label: string;
     triggerAriaLabel?: string;
+    disabled?: boolean;
     onValueChange: (value: string) => void;
   }) =>
     createElement(
@@ -127,6 +132,7 @@ jest.mock('@/components/shared/ModelCombobox', () => ({
       {
         id,
         value,
+        disabled,
         'aria-label': triggerAriaLabel ?? label,
         onChange: (event: React.ChangeEvent<HTMLSelectElement>) =>
           onValueChange(event.currentTarget.value),
@@ -135,8 +141,147 @@ jest.mock('@/components/shared/ModelCombobox', () => ({
     ),
 }));
 
+type RepositoryCustomization = {
+  id: number;
+  name: string;
+  private: boolean;
+  model: string | null;
+  prReviews: 'on' | 'off' | null;
+};
+
+type RepositoryCustomizationsData = {
+  id: string;
+  account: string | null;
+  access: 'all' | 'selected';
+  defaultModel: string;
+  defaultPrReviews: 'on' | 'off';
+  repositories: RepositoryCustomization[];
+};
+
+function createRepositoryCustomizationsData(): RepositoryCustomizationsData {
+  return {
+    id: 'first',
+    account: 'first',
+    access: 'all',
+    defaultModel: 'model-a',
+    defaultPrReviews: 'on',
+    repositories: [
+      {
+        id: 1,
+        name: 'first/api',
+        private: true,
+        model: 'model-b',
+        prReviews: 'off',
+      },
+      {
+        id: 2,
+        name: 'first/docs',
+        private: false,
+        model: 'model-a',
+        prReviews: 'off',
+      },
+      {
+        id: 3,
+        name: 'first/billing',
+        private: true,
+        model: null,
+        prReviews: 'on',
+      },
+      ...Array.from({ length: 9 }, (_, index) => ({
+        id: 4 + index,
+        name: `first/repo-${index}`,
+        private: true,
+        model: null,
+        prReviews: null,
+      })),
+    ],
+  };
+}
+
+const models: ModelOption[] = [
+  { id: 'model-a', name: 'Model A' },
+  { id: 'model-b', name: 'Model B' },
+];
+
+let mockRepositoryCustomizationsData: RepositoryCustomizationsData | undefined;
+let mockListIntegrationsError: Error | undefined;
+let mockGetRepositoryCustomizationsError: Error | undefined;
+const mockUpdateInstallationSettingsMutateAsync =
+  jest.fn<(variables: unknown) => Promise<{ success: boolean; error?: string }>>();
+const mockUpdateRepositorySettingsMutateAsync =
+  jest.fn<(variables: unknown) => Promise<{ success: boolean; error?: string }>>();
+const mockListIntegrationsRefetch = jest.fn();
+const mockGetRepositoryCustomizationsRefetch = jest.fn();
+const mockSetQueryData = jest.fn(
+  (
+    _queryKey: unknown,
+    updater: (
+      current: RepositoryCustomizationsData | undefined
+    ) => RepositoryCustomizationsData | undefined
+  ) => {
+    mockRepositoryCustomizationsData = updater(mockRepositoryCustomizationsData);
+  }
+);
+
+jest.mock('@/lib/trpc/utils', () => ({
+  useTRPC: () => ({
+    githubApps: {
+      listIntegrations: {
+        queryOptions: () => ({ __tag: 'listIntegrations' }),
+      },
+      getRepositoryCustomizations: {
+        queryOptions: () => ({ __tag: 'getRepositoryCustomizations' }),
+        queryKey: (input: unknown) => ['githubApps.getRepositoryCustomizations', input],
+      },
+      updateInstallationSettings: {
+        mutationOptions: () => ({ __tag: 'updateInstallationSettings' }),
+      },
+      updateRepositorySettings: {
+        mutationOptions: () => ({ __tag: 'updateRepositorySettings' }),
+      },
+    },
+  }),
+}));
+
+jest.mock('@tanstack/react-query', () => ({
+  useQuery: (options: { __tag: string }) => {
+    if (options.__tag === 'listIntegrations') {
+      return {
+        data: mockListIntegrationsError ? undefined : [{ id: 'first' }],
+        isLoading: false,
+        isError: mockListIntegrationsError !== undefined,
+        error: mockListIntegrationsError,
+        refetch: mockListIntegrationsRefetch,
+      };
+    }
+    if (options.__tag === 'getRepositoryCustomizations') {
+      return {
+        data: mockGetRepositoryCustomizationsError ? undefined : mockRepositoryCustomizationsData,
+        isLoading: false,
+        isError: mockGetRepositoryCustomizationsError !== undefined,
+        error: mockGetRepositoryCustomizationsError,
+        refetch: mockGetRepositoryCustomizationsRefetch,
+      };
+    }
+    throw new Error(`Unexpected query tag: ${options.__tag}`);
+  },
+  useMutation: (options: { __tag: string }) => {
+    if (options.__tag === 'updateInstallationSettings') {
+      return { mutateAsync: mockUpdateInstallationSettingsMutateAsync };
+    }
+    if (options.__tag === 'updateRepositorySettings') {
+      return { mutateAsync: mockUpdateRepositorySettingsMutateAsync };
+    }
+    throw new Error(`Unexpected mutation tag: ${options.__tag}`);
+  },
+  useQueryClient: () => ({ setQueryData: mockSetQueryData }),
+}));
+
 type LinkedomModule = {
-  parseHTML: (html: string) => { window: Record<string, unknown>; document: Document };
+  parseHTML: (html: string) => {
+    window: Record<string, unknown>;
+    document: Document;
+  };
 };
 
 function installDom() {
@@ -168,71 +313,29 @@ function installDom() {
   };
 }
 
-const models: ModelOption[] = [
-  { id: 'model-a', name: 'Model A' },
-  { id: 'model-b', name: 'Model B' },
-];
-
-function createInstallations(): PreviewInstallation[] {
-  return [
-    {
-      id: 'first',
-      account: 'first',
-      access: 'all',
-      defaultModel: 'model-a',
-      defaultPrReviews: 'on',
-      repositories: [
-        {
-          id: 'first/api',
-          name: 'first/api',
-          private: true,
-          model: 'model-b',
-          prReviews: 'manual',
-        },
-        {
-          id: 'first/docs',
-          name: 'first/docs',
-          private: false,
-          model: 'model-a',
-          prReviews: 'off',
-        },
-        { id: 'first/billing', name: 'first/billing', private: true, model: null, prReviews: 'on' },
-        ...Array.from({ length: 9 }, (_, index) => ({
-          id: `first/repo-${index}`,
-          name: `first/repo-${index}`,
-          private: true,
-          model: null,
-          prReviews: null,
-        })),
-      ],
-    },
-    {
-      id: 'second',
-      account: 'second',
-      access: 'selected',
-      defaultModel: 'model-b',
-      defaultPrReviews: 'manual',
-      repositories: [
-        {
-          id: 'second/research',
-          name: 'second/research',
-          private: true,
-          model: null,
-          prReviews: null,
-        },
-      ],
-    },
-  ];
+function createDeferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>(res => {
+    resolve = res;
+  });
+  return { promise, resolve };
 }
 
-let Preview: typeof PreviewComponent;
+let GitHubRepositoryCustomizations: typeof GitHubRepositoryCustomizationsComponent;
 
-beforeAll(async () => {
-  ({ GitHubRepositoryCustomizationsPreview: Preview } =
-    await import('./GitHubRepositoryCustomizationsPreview'));
+beforeEach(async () => {
+  jest.clearAllMocks();
+  mockRepositoryCustomizationsData = createRepositoryCustomizationsData();
+  mockListIntegrationsError = undefined;
+  mockGetRepositoryCustomizationsError = undefined;
+  mockUpdateInstallationSettingsMutateAsync.mockResolvedValue({
+    success: true,
+  });
+  mockUpdateRepositorySettingsMutateAsync.mockResolvedValue({ success: true });
+  ({ GitHubRepositoryCustomizations } = await import('./GitHubRepositoryCustomizationsPreview'));
 });
 
-describe('GitHub repository customizations preview', () => {
+describe('GitHubRepositoryCustomizations (live)', () => {
   let root: Root | undefined;
   let cleanup: (() => void) | undefined;
 
@@ -243,17 +346,20 @@ describe('GitHub repository customizations preview', () => {
     cleanup = undefined;
   });
 
-  function render(scope: 'personal' | 'organization' = 'personal') {
+  function render() {
     const dom = installDom();
     cleanup = dom.cleanup;
     root = createRoot(dom.container);
-    const installations = createInstallations();
-    act(() =>
+    act(() => {
       root?.render(
-        createElement(Preview, { scope, organizationName: 'Test team', installations, models })
-      )
-    );
-    return { container: dom.container, installations };
+        createElement(GitHubRepositoryCustomizations, {
+          scope: 'personal',
+          organizationName: 'Test team',
+          models,
+        })
+      );
+    });
+    return { container: dom.container };
   }
 
   function find<T extends Element>(container: ParentNode, selector: string): T {
@@ -270,30 +376,34 @@ describe('GitHub repository customizations preview', () => {
     return element;
   }
 
-  function click(element: HTMLElement) {
-    act(() => {
+  async function click(element: HTMLElement) {
+    await act(async () => {
       element.dispatchEvent(new Event('click', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
     });
   }
 
-  function select(container: ParentNode, id: string, value: string) {
+  async function select(container: ParentNode, id: string, value: string) {
     const element = find<HTMLSelectElement>(container, `select[id="${id}"]`);
     const options = Array.from(element.options);
     const selected = options.find(option => option.value === value);
     if (!selected) throw new Error(`Missing option: ${value}`);
-    act(() => {
+    await act(async () => {
       for (const option of options) option.selected = false;
       selected.selected = true;
       element.dispatchEvent(new Event('change', { bubbles: true }));
+      await Promise.resolve();
+      await Promise.resolve();
     });
   }
 
-  function search(container: ParentNode, value: string) {
-    const element = find<HTMLInputElement>(container, 'input[type="search"]');
-    act(() => {
-      element.value = value;
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+  function row(container: ParentNode, name: string) {
+    const element = Array.from(container.querySelectorAll('tbody tr')).find(
+      candidate => candidate.querySelector('[title]')?.getAttribute('title') === name
+    );
+    if (!element) throw new Error(`Missing repository row: ${name}`);
+    return element;
   }
 
   function chooseModelSource(container: ParentNode, custom: boolean) {
@@ -306,153 +416,119 @@ describe('GitHub repository customizations preview', () => {
     });
   }
 
-  function row(container: ParentNode, name: string) {
-    const element = Array.from(container.querySelectorAll('tbody tr')).find(
-      candidate => candidate.querySelector('[title]')?.getAttribute('title') === name
-    );
-    if (!element) throw new Error(`Missing repository row: ${name}`);
-    return element;
-  }
-
-  it('shows only the personal installation, paginates all-access repositories, and searches across pages', () => {
+  it('renders installation defaults and repository overrides from the query', () => {
     const { container } = render();
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(10);
     expect(container.textContent).toContain('All repositories');
-    expect(container.textContent).not.toContain('second');
-    expect(container.querySelector('[id$="configuration-filter"]')).toBeNull();
-    expect(container.querySelector('[id$="model-filter"]')).toBeNull();
-    expect(button(container, 'Previous page').disabled).toBe(true);
-    click(button(container, 'Next page'));
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(2);
-    expect(container.textContent).toContain('11–12 of 12 repositories');
-    expect(button(container, 'Next page').disabled).toBe(true);
-    click(button(container, 'Previous page'));
-    search(container, 'FIRST/REPO-8');
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
-    expect(row(container, 'first/repo-8')).toBeDefined();
-    click(button(container, 'Clear search'));
-    expect(container.textContent).toContain('1–10 of 12 repositories');
-  });
-
-  it('searches effective models and review settings, including inherited values, and clears empty results', () => {
-    const { container } = render();
-    search(container, 'model-a');
-    expect(container.textContent).toContain('1–10 of 11 repositories');
+    expect(row(container, 'first/api').textContent).toContain('PR reviews: Off');
     expect(row(container, 'first/repo-0').textContent).toContain('Using integration defaults');
-    expect(row(container, 'first/docs').textContent).toContain('Model: Model A');
-    search(container, 'reviews: manual');
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(1);
-    expect(row(container, 'first/api').textContent).toContain('PR reviews: Manual (@mention)');
-    search(container, 'not-a-repository');
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(0);
-    expect(container.textContent).toContain('No repositories match your search');
-    click(button(container, 'Clear search'));
-    expect(find<HTMLInputElement>(container, 'input[type="search"]').value).toBe('');
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(10);
   });
 
-  it('discards cancelled changes and saves independent model and review overrides', () => {
+  it('saves a repository override and patches the cache with the persisted value', async () => {
     const { container } = render();
-    click(button(container, 'Edit first/repo-0'));
-    let editor = find<HTMLElement>(container, '[role="dialog"]');
-    expect(button(editor, 'Save changes').disabled).toBe(true);
-    chooseModelSource(editor, true);
-    select(editor, 'first/repo-0-custom-model', 'model-b');
-    select(editor, 'first/repo-0-reviews', 'manual');
-    click(button(editor, 'Cancel'));
-    expect(container.querySelector('[role="dialog"]')).toBeNull();
-    expect(row(container, 'first/repo-0').textContent).toContain('Using integration defaults');
-    click(button(container, 'Edit first/repo-0'));
-    editor = find<HTMLElement>(container, '[role="dialog"]');
-    expect(button(editor, 'Save changes').disabled).toBe(true);
-    chooseModelSource(editor, true);
-    select(editor, 'first/repo-0-custom-model', 'model-b');
-    select(editor, 'first/repo-0-reviews', 'manual');
-    click(button(editor, 'Save changes'));
-    expect(row(container, 'first/repo-0').textContent).toContain(
-      'Model: Model B · PR reviews: Manual (@mention)'
-    );
-    click(button(container, 'Edit first/repo-0'));
-    editor = find<HTMLElement>(container, '[role="dialog"]');
-    expect(find<HTMLSelectElement>(editor, 'select[id="first/repo-0-custom-model"]').value).toBe(
-      'model-b'
-    );
-    expect(find<HTMLSelectElement>(editor, 'select[id="first/repo-0-reviews"]').value).toBe(
-      'manual'
-    );
-    expect(button(editor, 'Save changes').disabled).toBe(true);
-  });
-
-  it('follows new defaults for inherited values while keeping equal-value overrides pinned', () => {
-    const { container } = render();
-    select(container, 'first-default-model', 'model-b');
-    select(container, 'first-default-reviews', 'off');
-    click(button(container, 'Edit first/repo-0'));
-    let editor = find<HTMLElement>(container, '[role="dialog"]');
-    expect(editor.textContent).toContain('Model B');
-    expect(find<HTMLSelectElement>(editor, 'select[id="first/repo-0-reviews"]').value).toBe(
-      'default'
-    );
-    expect(editor.textContent).toContain('Use integration default — Off');
-    click(button(editor, 'Cancel'));
-    click(button(container, 'Edit first/docs'));
-    editor = find<HTMLElement>(container, '[role="dialog"]');
-    expect(find<HTMLSelectElement>(editor, 'select[id="first/docs-custom-model"]').value).toBe(
-      'model-a'
-    );
-    click(button(editor, 'Cancel'));
-    click(button(container, 'Edit first/billing'));
-    editor = find<HTMLElement>(container, '[role="dialog"]');
-    expect(find<HTMLSelectElement>(editor, 'select[id="first/billing-reviews"]').value).toBe('on');
-    click(button(editor, 'Cancel'));
-    expect(row(container, 'first/billing').textContent).toContain('PR reviews: On');
-  });
-
-  it('removes overrides when returning to defaults and updates active search results', () => {
-    const { container } = render();
-    select(container, 'first-default-model', 'model-b');
-    search(container, 'docs Model A');
-    click(button(container, 'Edit first/docs'));
+    await click(button(container, 'Edit first/repo-0'));
     const editor = find<HTMLElement>(container, '[role="dialog"]');
-    chooseModelSource(editor, false);
-    select(editor, 'first/docs-reviews', 'default');
-    click(button(editor, 'Save changes'));
-    expect(container.querySelectorAll('tbody tr')).toHaveLength(0);
-    click(button(container, 'Clear search'));
-    expect(row(container, 'first/docs').textContent).toContain('Using integration defaults');
-    expect(container.textContent).toContain('2 customized');
+    chooseModelSource(editor, true);
+    await select(editor, '4-custom-model', 'model-b');
+    await click(button(editor, 'Save changes'));
+
+    expect(mockUpdateRepositorySettingsMutateAsync).toHaveBeenCalledWith({
+      organizationId: undefined,
+      integrationId: 'first',
+      repositoryId: 4,
+      settings: { modelSlug: 'model-b', prReviewMode: null },
+    });
+    expect(row(container, 'first/repo-0').textContent).toContain('Model: Model B');
   });
 
-  it('isolates organization settings and resets local changes without mutating fixtures', () => {
-    const { container, installations } = render('organization');
-    const original = structuredClone(installations);
-    expect(container.textContent).toContain('1 selected repositories');
-    expect(container.querySelector('[aria-label="Edit second/research"]')).toBeNull();
-    click(button(container, 'Toggle settings for second'));
-    select(container, 'first-default-model', 'model-b');
-    select(container, 'first-default-reviews', 'off');
-    expect(find<HTMLSelectElement>(container, 'select[id="second-default-model"]').value).toBe(
-      'model-b'
-    );
-    expect(find<HTMLSelectElement>(container, 'select[id="second-default-reviews"]').value).toBe(
-      'manual'
-    );
-    select(container, 'second-default-model', 'model-a');
+  it('disables the default model control while saving and reverts it if the save fails', async () => {
+    const deferred = createDeferred<{ success: boolean }>();
+    mockUpdateInstallationSettingsMutateAsync.mockReturnValue(deferred.promise);
+    const { container } = render();
+
+    await select(container, 'first-default-model', 'model-b');
     expect(find<HTMLSelectElement>(container, 'select[id="first-default-model"]').value).toBe(
       'model-b'
     );
-    click(button(container, 'Edit second/research'));
-    const editor = find<HTMLElement>(container, '[role="dialog"]');
-    select(editor, 'second/research-reviews', 'off');
-    click(button(editor, 'Save changes'));
-    expect(row(container, 'second/research').textContent).toContain('PR reviews: Off');
-    expect(row(container, 'first/api').textContent).toContain('PR reviews: Manual (@mention)');
-    click(button(container, 'Reset preview'));
+    expect(find<HTMLSelectElement>(container, 'select[id="first-default-model"]').disabled).toBe(
+      true
+    );
+
+    await act(async () => {
+      deferred.resolve({ success: false });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(find<HTMLSelectElement>(container, 'select[id="first-default-model"]').disabled).toBe(
+      false
+    );
     expect(find<HTMLSelectElement>(container, 'select[id="first-default-model"]').value).toBe(
       'model-a'
     );
-    click(button(container, 'Toggle settings for second'));
-    expect(row(container, 'second/research').textContent).toContain('Using integration defaults');
-    expect(installations).toEqual(original);
+    expect(mockSetQueryData).not.toHaveBeenCalled();
+  });
+
+  it('reports a repository policy rejection without applying the edit', async () => {
+    mockUpdateRepositorySettingsMutateAsync.mockResolvedValue({
+      success: false,
+      error: 'Model is not allowed by organization policy',
+    });
+    const { container } = render();
+    await click(button(container, 'Edit first/repo-0'));
+    const editor = find<HTMLElement>(container, '[role="dialog"]');
+    chooseModelSource(editor, true);
+    await select(editor, '4-custom-model', 'model-b');
+    await click(button(editor, 'Save changes'));
+
+    expect(row(container, 'first/repo-0').textContent).toContain('Using integration defaults');
+    expect(mockSetQueryData).not.toHaveBeenCalled();
+    const { toast } = jest.requireMock<{ toast: { error: jest.Mock } }>('sonner');
+    expect(toast.error).toHaveBeenCalledWith('Model is not allowed by organization policy');
+  });
+
+  it('re-enables the Edit button once a repository save settles', async () => {
+    const deferred = createDeferred<{ success: boolean }>();
+    mockUpdateRepositorySettingsMutateAsync.mockReturnValue(deferred.promise);
+    const { container } = render();
+    await click(button(container, 'Edit first/repo-0'));
+    const editor = find<HTMLElement>(container, '[role="dialog"]');
+    chooseModelSource(editor, true);
+    await select(editor, '4-custom-model', 'model-b');
+    await click(button(editor, 'Save changes'));
+
+    expect(button(container, 'Edit first/repo-0').disabled).toBe(true);
+
+    await act(async () => {
+      deferred.resolve({ success: true });
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(button(container, 'Edit first/repo-0').disabled).toBe(false);
+  });
+
+  it('shows a retryable error instead of an endless loading state when the customizations query fails', async () => {
+    mockGetRepositoryCustomizationsError = new Error('Request failed');
+    const { container } = render();
+
+    expect(container.textContent).not.toContain('Loading repository customizations…');
+    expect(container.textContent).toContain(
+      'Couldn’t load repository customizations: Request failed'
+    );
+
+    await click(button(container, 'Retry'));
+    expect(mockGetRepositoryCustomizationsRefetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a retryable error for the installations list when it fails to load', async () => {
+    mockListIntegrationsError = new Error('Request failed');
+    const { container } = render();
+
+    expect(container.textContent).not.toContain('Loading installations…');
+    expect(container.textContent).toContain(
+      'Couldn’t load GitHub App installations: Request failed'
+    );
+    expect(container.textContent).not.toContain('No GitHub App installations found.');
+
+    await click(button(container, 'Retry'));
+    expect(mockListIntegrationsRefetch).toHaveBeenCalledTimes(1);
   });
 });

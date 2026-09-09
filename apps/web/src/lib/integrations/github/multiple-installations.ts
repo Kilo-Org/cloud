@@ -24,3 +24,7 @@ export function canOrganizationUseMultipleGitHubInstallations(organizationId: st
     getEnvVariable('GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS')
   ).has(organizationId);
 }
+
+export function isGitHubConnectionManagementEnabled(): boolean {
+  return getEnvVariable('GITHUB_CONNECTION_MANAGEMENT_ENABLED') === 'true';
+}

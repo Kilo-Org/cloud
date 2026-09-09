@@ -17,7 +17,7 @@ export function useCurrentUserId(options: UseCurrentUserIdOptions = {}) {
     userId: data?.id,
     email: data?.email,
     isLoading,
-    isError: isError || (isLoading && isFetched),
+    isError: data === undefined && (isError || (isLoading && isFetched)),
     refetch: () => {
       void refetch();
     },

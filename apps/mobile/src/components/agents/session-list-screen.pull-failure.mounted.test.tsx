@@ -335,8 +335,8 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
     });
     expect(refreshControl().refreshing).toBe(true);
 
-    // The in-flight pull shows the visible Updating status line (reserved
-    // space beside the rows, announced to assistive tech).
+    // The in-flight pull announces Updating (reserved space beside the
+    // rows) without drawing the copy; the native spinner is the visual.
     await act(async () => {
       await vi.waitFor(
         () => {
@@ -345,6 +345,9 @@ describe('AgentSessionListScreen pull-to-refresh with the API down', () => {
         { timeout: 2000, interval: 10 }
       );
     });
+    expect(
+      nodes('Text').find(node => node.children.includes('Updating'))?.props.className
+    ).toContain('absolute');
 
     // The fetch then fails through the real query lifecycle. The rejected
     // pull holds the in-flight feedback through the beat first, so the

@@ -5,6 +5,7 @@ import {
   initialRenameState,
   type RenameState,
   renameStateReducer,
+  titleFromSessionUpdatedEvent,
 } from './session-detail-rename-state';
 
 describe('getSessionDetailRenameState', () => {
@@ -196,5 +197,38 @@ describe('renameStateReducer', () => {
     const changed = renameStateReducer(submitted, { type: 'sessionChanged' });
     expect(changed.isModalOpen).toBe(false);
     expect(changed.optimisticTitle).toBeNull();
+  });
+});
+
+function sessionUpdatedPayload(
+  over: { sessionId?: string; title?: string | null; source?: string } = {}
+) {
+  return {
+    source: over.source ?? 'v2',
+    session: {
+      sessionId: over.sessionId ?? 'ses-1',
+      title: over.title === undefined ? 'Auto Title' : over.title,
+    },
+  };
+}
+
+describe('titleFromSessionUpdatedEvent', () => {
+  it('returns the title for this session', () => {
+    expect(titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload())).toBe('Auto Title');
+  });
+
+  it('ignores another session', () => {
+    expect(
+      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ sessionId: 'ses-2' }))
+    ).toBeUndefined();
+  });
+
+  it('ignores a blank or null title', () => {
+    expect(
+      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: null }))
+    ).toBeUndefined();
+    expect(
+      titleFromSessionUpdatedEvent('ses-1', sessionUpdatedPayload({ title: '  ' }))
+    ).toBeUndefined();
   });
 });

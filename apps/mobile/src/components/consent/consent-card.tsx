@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConsentRow } from '@/components/consent/consent-row';
 import { type ConsentMode, getConsentActions } from '@/components/consent/consent-mode';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -33,6 +34,14 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   const rootStyle = { paddingTop: top };
   const contentContainerStyle = {
     paddingTop: 24,
+    paddingBottom: 24,
+  };
+  // The action buttons sit in a pinned footer below the ScrollView, not in
+  // the scroll content: the review modal is shorter than the card, and the
+  // primary CTA was clipping off the sheet bottom (b911 vr1 spot check,
+  // e2-pre-revoke.png / p1-declined-off.png). The footer keeps its own
+  // layout space, so scrolling never moves the actions.
+  const footerStyle = {
     paddingBottom: Math.max(bottom, 16) + (Platform.OS === 'android' ? 8 : 0),
   };
   const [pendingAction, setPendingAction] = useState<'primary' | 'secondary' | null>(null);
@@ -40,6 +49,16 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
   // Onboarding pre-selects optional telemetry. Review mode starts off and the
   // stored value loads over it, so a stored decline never flashes as on.
   const [optionalToggle, setOptionalToggle] = useState(mode === 'onboarding');
+  // Review mode must not present a switch state before the stored value has
+  // loaded: the pre-load OFF looked like a completed revoke in the b911 vr5
+  // e3 evidence (e3-toggled-off.png showed the switch off while the realm was
+  // still consented — no toggle had landed). Until loaded, the switch slot
+  // holds a same-size placeholder, so the card never claims a choice the
+  // user has not made and a tap cannot flip the wrong way. With no userId
+  // there is nothing to load: the switch renders as before and its toggle
+  // path shows the account error.
+  const [storedValueLoaded, setStoredValueLoaded] = useState(mode !== 'review');
+  const optionalControlPending = mode === 'review' && userId !== undefined && !storedValueLoaded;
   const [savingOptional, setSavingOptional] = useState(false);
   const loadedRef = useRef(false);
   const userToggledRef = useRef(false);
@@ -55,13 +74,19 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
     void readConsent(userId).then(
       // eslint-disable-next-line promise/always-return
       stored => {
-        if (active && !userToggledRef.current) {
-          setOptionalToggle(stored.optional);
-          loadedRef.current = true;
+        if (active) {
+          if (!userToggledRef.current) {
+            setOptionalToggle(stored.optional);
+            loadedRef.current = true;
+          }
+          setStoredValueLoaded(true);
         }
       },
       () => {
         if (active) {
+          // The error names the unreliability, so the switch may show its
+          // default; the placeholder only covers the silent loading window.
+          setStoredValueLoaded(true);
           setError(t('consent.couldNotLoadConsentSettings'));
         }
       }
@@ -231,12 +256,18 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
                 {t('consent.helpImproveDescription')}
               </Text>
             </View>
-            <Switch
-              value={optionalToggle}
-              disabled={mode === 'review' && savingOptional}
-              accessibilityLabel={t('consent.helpImprove')}
-              onValueChange={handleToggleOptional}
-            />
+            {optionalControlPending ? (
+              // Same footprint as the iOS Switch (51x31), so the real control
+              // swaps in without moving the row.
+              <Skeleton className="h-[31px] w-[51px] shrink-0 rounded-full" />
+            ) : (
+              <Switch
+                value={optionalToggle}
+                disabled={mode === 'review' && savingOptional}
+                accessibilityLabel={t('consent.helpImprove')}
+                onValueChange={handleToggleOptional}
+              />
+            )}
           </View>
 
           <Pressable
@@ -264,34 +295,41 @@ export function ConsentCard({ mode = 'onboarding' }: ConsentCardProps) {
             </Text>
             .
           </Text>
-
-          <AccessibleStatus message={error} className="mt-6 text-sm" />
-
-          <View className="mt-8 gap-3">
-            <Button
-              onPress={() => {
-                void handlePrimaryAction();
-              }}
-              size="lg"
-              accessibilityLabel={actions.primaryLabel}
-              disabled={pendingAction === 'secondary'}
-              loading={pendingAction === 'primary'}
-            >
-              <Text>{actions.primaryLabel}</Text>
-            </Button>
-            <Button
-              variant={mode === 'review' ? 'destructive' : 'outline'}
-              size="lg"
-              onPress={handleSecondaryAction}
-              accessibilityLabel={actions.secondaryLabel}
-              disabled={pendingAction === 'primary'}
-              loading={pendingAction === 'secondary'}
-            >
-              <Text>{actions.secondaryLabel}</Text>
-            </Button>
-          </View>
         </View>
       </ScrollView>
+
+      <View className="gap-3 bg-background px-6 pt-3" style={footerStyle}>
+        {/* The error lives in the pinned footer, not the scroll content: the
+            footer draws over the scroll tail, so a content-placed error was
+            invisible behind the buttons (b911 vr2 device repro — staging
+            error measured at y=792 under the Back/Revoke footer). The
+            one-line slot is always reserved, so an error appears without
+            moving the actions. */}
+        <View className="min-h-5 justify-center">
+          <AccessibleStatus message={error} className="text-sm" />
+        </View>
+        <Button
+          onPress={() => {
+            void handlePrimaryAction();
+          }}
+          size="lg"
+          accessibilityLabel={actions.primaryLabel}
+          disabled={pendingAction === 'secondary'}
+          loading={pendingAction === 'primary'}
+        >
+          <Text>{actions.primaryLabel}</Text>
+        </Button>
+        <Button
+          variant={mode === 'review' ? 'destructive' : 'outline'}
+          size="lg"
+          onPress={handleSecondaryAction}
+          accessibilityLabel={actions.secondaryLabel}
+          disabled={pendingAction === 'primary'}
+          loading={pendingAction === 'secondary'}
+        >
+          <Text>{actions.secondaryLabel}</Text>
+        </Button>
+      </View>
     </View>
   );
 }

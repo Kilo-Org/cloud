@@ -46,7 +46,7 @@ import { withDORetry } from '../utils/do-retry.js';
 import { resolveSessionStub } from '../sandbox-session/session-stub.js';
 import { getPgDb } from '../db/pg.js';
 import { generateSessionId, SessionService } from '../session-service.js';
-import { isWorktreeOwner, sessionPlaneForNewOwner } from '../session-plane.js';
+import { isWorktreeOwner, sessionPlaneForNewOwner, type SessionPlane } from '../session-plane.js';
 import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   createCloudAgentSessionReport,
@@ -93,10 +93,7 @@ function assertSupportedSandboxAllocation(
   }
   if (
     input.runtime?.sandboxAllocation === 'isolated-standard' &&
-    sessionPlaneForNewOwner(ctx.env, {
-      userId: ctx.userId,
-      orgId: input.options?.kilocodeOrganizationId,
-    }) === 'control'
+    sessionPlaneForCreate(input, ctx) === 'control'
   ) {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -499,7 +496,18 @@ function worktreeEnabledForCreate(
   if (recordedIds) return recordedIds.cloudAgentSessionId.startsWith('workspace_');
 
   const owner = { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId };
-  return sessionPlaneForNewOwner(ctx.env, owner) === 'control' && isWorktreeOwner(ctx.env, owner);
+  return sessionPlaneForCreate(input, ctx) === 'control' && isWorktreeOwner(ctx.env, owner);
+}
+
+function sessionPlaneForCreate(
+  input: SessionRegistrationInput,
+  ctx: SessionRegistrationContext
+): SessionPlane {
+  return sessionPlaneForNewOwner(
+    ctx.env,
+    { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId },
+    { createdOnPlatform: input.options?.createdOnPlatform }
+  );
 }
 
 function finalizationVersionForCreate(row: OperationLedgerRow): 1 | 2 {
@@ -532,9 +540,7 @@ async function allocateNewSession(
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const orgId = input.options?.kilocodeOrganizationId;
-  const cloudAgentSessionId = generateSessionId(
-    sessionPlaneForNewOwner(ctx.env, { userId: ctx.userId, orgId })
-  );
+  const cloudAgentSessionId = generateSessionId(sessionPlaneForCreate(input, ctx));
   const kiloSessionId = generateKiloSessionId();
   const reportingCreatedAt =
     input.clone && !initialTurn && cloudAgentSessionId.startsWith('agent_')

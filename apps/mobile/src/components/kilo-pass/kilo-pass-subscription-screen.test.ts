@@ -33,9 +33,14 @@ const mocks = vi.hoisted(() => ({
     ownedByAnotherAccount: false,
     ownedAppleProductId: null as string | null,
     ownedOriginalTransactionId: null as string | null,
+    ownedGoogleProductId: null as string | null,
+    ownedGooglePurchaseToken: null as string | null,
     ownershipChecked: true,
+    ownershipCheckFailed: false,
+    retryOwnershipCheck: vi.fn(),
   },
   routerPush: vi.fn(),
+  openPlayManagement: vi.fn(),
 }));
 
 // ── Mocks ───────────────────────────────────────────────────────────
@@ -91,6 +96,10 @@ vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
 }));
 
+vi.mock('./kilo-pass-play-manage', () => ({
+  openPlaySubscriptionManagement: mocks.openPlayManagement,
+}));
+
 vi.mock('@/lib/config', () => ({
   WEB_BASE_URL: 'https://example.com',
 }));
@@ -112,7 +121,7 @@ vi.mock('@/lib/kilo-pass/legal-links', () => ({
     { url: 'https://example.com/privacy', label: 'Privacy Policy' },
     { url: 'https://example.com/terms', label: 'Terms of Use' },
   ],
-  kiloPassLegalDisclosure: () => '',
+  kiloPassLegalDisclosure: (_platformOS: string) => '',
 }));
 
 vi.mock('@/lib/kilo-pass/navigation', () => ({
@@ -143,9 +152,6 @@ vi.mock('@/lib/utils', () => ({
 vi.mock('@kilocode/app-shared/commerce', () => ({
   KILO_PASS_MANAGE_CTA_LABEL: 'Manage',
   KILO_PASS_TITLE: 'Kilo Pass',
-  KILO_PASS_UNAVAILABLE_DESCRIPTION:
-    'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.',
-  KILO_PASS_WEB_MANAGEMENT_DESCRIPTION: 'This Kilo Pass is managed on the web.',
 }));
 
 // The owner is the single `useIAP` call site (plan assumption 8). The mock
@@ -249,6 +255,19 @@ function setNativeIapPresentation(): void {
   mocks.nativeIap.productsIsLoading = false;
   mocks.nativeIap.ownedAppleProductId = null;
   mocks.nativeIap.ownedOriginalTransactionId = null;
+  mocks.nativeIap.ownedGoogleProductId = null;
+  mocks.nativeIap.ownedGooglePurchaseToken = null;
+  mocks.nativeIap.ownershipChecked = true;
+}
+
+function setAndroidNativeIapPresentation(): void {
+  mockedPlatform.OS = 'android';
+  mocks.presentation.data = { kind: 'native_iap', webUrl: null };
+  mocks.nativeIap.productsIsLoading = false;
+  mocks.nativeIap.ownedAppleProductId = null;
+  mocks.nativeIap.ownedOriginalTransactionId = null;
+  mocks.nativeIap.ownedGoogleProductId = null;
+  mocks.nativeIap.ownedGooglePurchaseToken = null;
   mocks.nativeIap.ownershipChecked = true;
 }
 
@@ -273,7 +292,14 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.nativeIap.productsRefetch.mockReset();
     mocks.nativeIap.purchase.mockReset();
     mocks.nativeIap.ownedByAnotherAccount = false;
+    mocks.nativeIap.ownedAppleProductId = null;
+    mocks.nativeIap.ownedOriginalTransactionId = null;
+    mocks.nativeIap.ownedGoogleProductId = null;
+    mocks.nativeIap.ownedGooglePurchaseToken = null;
+    mocks.nativeIap.ownershipCheckFailed = false;
+    mocks.nativeIap.retryOwnershipCheck.mockReset();
     mocks.routerPush.mockReset();
+    mocks.openPlayManagement.mockReset();
   });
 
   it.each(['web_management', 'unavailable'])(
@@ -294,7 +320,7 @@ describe('KiloPassSubscriptionScreen', () => {
     mocks.presentation.data = { kind: 'web_management', webUrl: null };
     mocks.presentation.isError = true;
     const renderer = await renderScreen();
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on the web.');
+    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
     expect(allText(renderer)).not.toContain("Couldn't load Kilo Pass.");
     renderer.unmount();
   });
@@ -319,6 +345,7 @@ describe('KiloPassSubscriptionScreen', () => {
       platform: 'ios',
       storefront: 'app_store',
       product: 'kilo_pass',
+      supportsNativePlayKiloPass: true,
       appleProductId: product.appleProductId,
       appleOriginalTransactionId: null,
     });
@@ -335,6 +362,31 @@ describe('KiloPassSubscriptionScreen', () => {
     const renderer = await renderScreen();
     const tiles = productTiles(renderer);
     expect((first(tiles).props as { disabled?: boolean }).disabled).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('blocked: a failed ownership lookup keeps tiles disabled and offers a retry', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [product];
+    mocks.nativeIap.ownershipChecked = false;
+    mocks.nativeIap.ownershipCheckFailed = true;
+
+    const renderer = await renderScreen();
+
+    expect((first(productTiles(renderer)).props as { disabled?: boolean }).disabled).toBe(true);
+
+    const retry = renderer.root.findAll(
+      node =>
+        String(node.type) === 'Button' &&
+        (node.props as { accessibilityLabel?: string }).accessibilityLabel ===
+          'Retry loading Kilo Pass'
+    );
+    await press(first(retry));
+
+    expect(mocks.nativeIap.retryOwnershipCheck).toHaveBeenCalledTimes(1);
+    expect(mocks.preflightMutateAsync).not.toHaveBeenCalled();
+    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
 
     renderer.unmount();
   });
@@ -357,6 +409,7 @@ describe('KiloPassSubscriptionScreen', () => {
       platform: 'ios',
       storefront: 'app_store',
       product: 'kilo_pass',
+      supportsNativePlayKiloPass: true,
       appleProductId: product.appleProductId,
       appleOriginalTransactionId: 'orig-123',
     });
@@ -453,9 +506,7 @@ describe('KiloPassSubscriptionScreen', () => {
 
     const renderer = await renderScreen();
 
-    expect(allText(renderer)).toContain(
-      'Kilo Pass is not available as an in-app purchase on Android. Manage it on the web.'
-    );
+    expect(allText(renderer)).toContain('Kilo Pass purchase is not available right now.');
     expect(productTiles(renderer)).toHaveLength(0);
     expect(
       renderer.root.findAll(node => String(node.type) === 'RestorePurchasesButton')
@@ -474,7 +525,7 @@ describe('KiloPassSubscriptionScreen', () => {
 
     const renderer = await renderScreen();
 
-    expect(allText(renderer)).toContain('This Kilo Pass is managed on the web.');
+    expect(allText(renderer)).toContain('This Kilo Pass is managed on web');
     expect(allText(renderer)).toContain('Manage');
     expect(productTiles(renderer)).toHaveLength(0);
     expect(mocks.ownerMount).not.toHaveBeenCalled();
@@ -494,7 +545,7 @@ describe('KiloPassSubscriptionScreen', () => {
 
     const retryButton = renderer.root.find(
       node =>
-        String(node.type) === 'Pressable' &&
+        String(node.type) === 'Button' &&
         (node.props as Record<string, unknown>).accessibilityLabel ===
           'Try loading Kilo Pass products again'
     );
@@ -523,6 +574,121 @@ describe('KiloPassSubscriptionScreen', () => {
     const renderer = await renderScreen();
 
     expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('mounts the IAP owner for native_iap on Android', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+
+    const renderer = await renderScreen();
+
+    expect(mocks.ownerMount).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('renders the native IAP screen under the kilo-pass-native-iap testID', async () => {
+    setNativeIapPresentation();
+    mocks.nativeIap.products = [];
+
+    const renderer = await renderScreen();
+
+    expect(
+      renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'kilo-pass-native-iap'
+      )
+    ).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it('renders the native IAP screen under the kilo-pass-native-iap testID on Android', async () => {
+    setAndroidNativeIapPresentation();
+    mocks.nativeIap.products = [];
+
+    const renderer = await renderScreen();
+
+    expect(
+      renderer.root.findAll(
+        node => (node.props as { testID?: string }).testID === 'kilo-pass-native-iap'
+      )
+    ).toHaveLength(1);
+
+    renderer.unmount();
+  });
+
+  it.each([false, true])(
+    'opens Play management without catalog products while loading=%s',
+    async loading => {
+      setAndroidNativeIapPresentation();
+      mocks.nativeIap.productsIsLoading = loading;
+      mocks.nativeIap.ownedGoogleProductId = 'kilopass_tier19';
+
+      const renderer = await renderScreen();
+      const manage = renderer.root.find(
+        node =>
+          String(node.type) === 'Button' &&
+          node.findAll(child => String(child.type) === 'Text' && child.children.includes('Manage'))
+            .length > 0
+      );
+      await press(manage);
+
+      expect(mocks.openPlayManagement).toHaveBeenCalledWith({
+        skuAndroid: 'kilopass_tier19',
+        invalidateAfter: expect.any(Function),
+      });
+      expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
+      expect(mocks.preflightMutateAsync).not.toHaveBeenCalled();
+      renderer.unmount();
+    }
+  );
+
+  it('sends the Android preflight payload with platform, storefront, googleProductId, and googlePurchaseToken', async () => {
+    setAndroidNativeIapPresentation();
+    const androidProduct = { ...product, googleProductId: 'kilopass_tier49' };
+    mocks.nativeIap.products = [androidProduct];
+    mocks.nativeIap.ownedGooglePurchaseToken = 'play-token-123';
+    mocks.preflightMutateAsync.mockResolvedValue({
+      allowed: true,
+      statusClass: 'healthy',
+      reason: null,
+    });
+
+    const renderer = await renderScreen();
+    await press(first(productTiles(renderer)));
+
+    expect(mocks.preflightMutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        platform: 'android',
+        storefront: 'play',
+        googleProductId: 'kilopass_tier49',
+        googlePurchaseToken: 'play-token-123',
+      })
+    );
+
+    renderer.unmount();
+  });
+
+  it('shows Play copy for an Android preflight owned by another account', async () => {
+    setAndroidNativeIapPresentation();
+    const androidProduct = { ...product, googleProductId: 'kilopass_tier49' };
+    mocks.nativeIap.products = [androidProduct];
+    mocks.preflightMutateAsync.mockResolvedValue({
+      allowed: false,
+      statusClass: 'terminal',
+      reason: 'owned_by_another_account',
+    });
+
+    const renderer = await renderScreen();
+    await press(first(productTiles(renderer)));
+
+    expect(mocks.nativeIap.purchase).not.toHaveBeenCalled();
+    expect(allText(renderer)).toContain(
+      'The Kilo Pass on this Google Play account belongs to a different Kilo account. Sign in to that Kilo account to manage it.'
+    );
+    expect(allText(renderer)).not.toContain('Apple Account');
 
     renderer.unmount();
   });

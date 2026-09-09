@@ -6,7 +6,7 @@ import { Text } from '@/components/ui/text';
 import { cn } from '@/lib/utils';
 
 type SessionListRefreshStatusProps = {
-  /** A pull or retry is in flight: show the visible "Updating" line. */
+  /** A pull or retry is in flight: announce Updating; the spinner is the visual. */
   busy: boolean;
   /** The last refresh failed: show "Couldn't refresh" with an inline Retry. */
   failed: boolean;
@@ -16,9 +16,10 @@ type SessionListRefreshStatusProps = {
 
 /**
  * The Agents lists' reserved refresh-status line. It always occupies the
- * height of its final (failure) state, so Updating -> idle and
- * idle -> "Couldn't refresh" swaps never move the rows below it (the UX
- * rule the invisible 1x1 status nodes broke on device).
+ * height of its final (failure) state, so idle -> "Couldn't refresh" swaps
+ * never move the rows below it (the UX rule the invisible 1x1 status nodes
+ * broke on device). Pull-in-flight copy is screen-reader only: the native
+ * spinner already shows the gesture.
  */
 export function SessionListRefreshStatus({
   busy,
@@ -43,7 +44,7 @@ export function SessionListRefreshStatus({
       <AccessibleStatus
         message={message}
         tone={busy ? 'status' : 'error'}
-        className="flex-1 shrink text-xs"
+        className={busy ? 'absolute size-px overflow-hidden' : 'flex-1 shrink text-xs'}
       />
       {showRetry ? (
         <Pressable

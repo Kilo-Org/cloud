@@ -43,6 +43,7 @@
     "@chat-adapter/state-redis": "4.36.0",
     "@emoji-mart/data": "1.2.1",
     "@emoji-mart/react": "1.1.1",
+    "@googleapis/androidpublisher": "37.0.0",
     "@kilocode/app-shared": "workspace:*",
     "@kilocode/auto-routing-contracts": "workspace:*",
     "@kilocode/cloud-agent-profile": "workspace:*",

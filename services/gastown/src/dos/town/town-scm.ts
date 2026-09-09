@@ -36,10 +36,9 @@ export type GitHubTokenResolution =
  *      before each token's 1h TTL elapses. This is the authoritative
  *      live source whenever an integration is configured.
  *   3. `git_auth.github_token` — stored installation token from a past
- *      `refreshGitCredentials()` write. Kept as a fallback for towns that
- *      never had an integration wired up. NOT preferred over the integration
- *      because the stored value is typically stale (1h TTL, never updated
- *      by anything in the request path).
+ *      `refreshGitCredentials()` write. Used only for towns without a
+ *      configured platform integration because it cannot prove current
+ *      authorization and is typically stale after one hour.
  *
  * Historically this preferred the stored token over the integration,
  * which made every consumer (PR poller, /refresh-git-token, agent
@@ -68,18 +67,17 @@ export async function resolveGitHubToken(ctx: SCMContext): Promise<GitHubTokenRe
   if (integrationId && ctx.env.GIT_TOKEN_SERVICE) {
     tried.push(sourceLabel);
     try {
-      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getToken(integrationId);
-      if (typeof fresh === 'string' && fresh.length > 0) {
-        return { ok: true, token: fresh, source: sourceLabel };
+      const fresh = await ctx.env.GIT_TOKEN_SERVICE.getTokenForIntegration(integrationId);
+      if (fresh.success) {
+        return { ok: true, token: fresh.token, source: sourceLabel };
       }
-      console.warn(
-        `${TOWN_LOG} resolveGitHubToken: platform integration ${integrationId} returned empty token; falling back to stored github_token`
-      );
+      return { ok: false, tried };
     } catch (err) {
       console.warn(
-        `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}; falling back to stored github_token`,
+        `${TOWN_LOG} resolveGitHubToken: platform integration token lookup failed for ${integrationId}`,
         err
       );
+      return { ok: false, tried };
     }
   } else if (!integrationId) {
     tried.push('platform integration (none configured)');

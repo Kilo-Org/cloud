@@ -39,9 +39,6 @@ vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'Invalid
 vi.mock('@/components/security-agent/security-agent-command-observer', () => ({
   SecurityAgentCommandObserver: 'SecurityAgentCommandObserver',
 }));
-vi.mock('@/components/privacy-cover-overlay', () => ({
-  privacyScreenLayout: ({ children }: { children: ReactNode }): ReactNode => children,
-}));
 vi.mock('@/components/app-unlock-screen', () => ({
   appUnlockScreenLayout: ({ children }: { children: ReactNode }): ReactNode => children,
 }));

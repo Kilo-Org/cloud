@@ -10,6 +10,7 @@ import {
   type SessionOperationDelivery,
 } from '../../../src/shared/sandbox-control-protocol';
 import type { AutoCommitResult } from '../auto-commit';
+import { MAX_COMMIT_MESSAGE_BYTES } from '../commit-objects';
 import {
   buildHeartbeatPayload,
   handleControlRequest,
@@ -65,7 +66,7 @@ describe('operation results and delivery', () => {
       runAutoCommit: async options => {
         options.onEvent({
           streamEventType: 'autocommit_completed',
-          data: { success: true, messageId: options.messageId, commitHash: 'original' },
+          data: { success: true, messageId: options.messageId, commitHash: 'a'.repeat(40) },
           timestamp: new Date().toISOString(),
         });
         return { success: true };
@@ -274,7 +275,7 @@ describe('operation results and delivery', () => {
           streamEventType: 'autocommit_completed',
           data: {
             success: result.success,
-            commitHash: 'original-commit',
+            commitHash: 'b'.repeat(40),
             messageId: options.messageId,
           },
           timestamp: new Date().toISOString(),
@@ -308,7 +309,7 @@ describe('operation results and delivery', () => {
     expect(record.snapshot().events).toEqual([
       {
         type: 'autocommit_completed',
-        properties: { success: true, commitHash: 'original-commit', messageId: 'assistant_1' },
+        properties: { success: true, commitHash: 'b'.repeat(40), messageId: 'assistant_1' },
         timestamp: expect.any(String),
       },
     ]);
@@ -656,7 +657,7 @@ describe('operation results and delivery', () => {
           data: {
             success: true,
             messageId: options.messageId,
-            commitHash: 'commit_123',
+            commitHash: 'c'.repeat(40),
             message: 'push failed '.repeat(100_000),
             commitMessage: 'subject '.repeat(100_000),
             ignoredMetadata: { tooLarge: 'metadata '.repeat(100_000) },
@@ -691,11 +692,14 @@ describe('operation results and delivery', () => {
       properties: {
         success: true,
         messageId: 'assistant_1',
-        commitHash: 'commit_123',
+        commitHash: 'c'.repeat(40),
       },
     });
     expect(String(completionEvent?.properties.message).length).toBeLessThanOrEqual(4_096);
-    expect(String(completionEvent?.properties.commitMessage).length).toBeLessThanOrEqual(4_096);
+    expect(
+      Buffer.byteLength(String(completionEvent?.properties.commitMessage))
+    ).toBeLessThanOrEqual(MAX_COMMIT_MESSAGE_BYTES);
+    expect(completionEvent?.properties.commitMessageTruncated).toBe(true);
     expect(completionEvent?.properties).not.toHaveProperty('ignoredMetadata');
     expect(sessionOperationDeliverySchema.parse(delivery)).toEqual(delivery);
 
@@ -731,7 +735,7 @@ describe('operation results and delivery', () => {
             success: true,
             message: 'Changes committed',
             messageId: options.messageId,
-            commitHash: 'commit_123',
+            commitHash: 'c'.repeat(40),
           },
           timestamp: new Date().toISOString(),
         });
@@ -757,7 +761,7 @@ describe('operation results and delivery', () => {
     expect(record.snapshot().events).toEqual([
       expect.objectContaining({
         type: 'autocommit_completed',
-        properties: expect.objectContaining({ commitHash: 'commit_123' }),
+        properties: expect.objectContaining({ commitHash: 'c'.repeat(40) }),
       }),
     ]);
     expect(record.snapshot().outcome?.status).toBe('completed');
@@ -820,7 +824,7 @@ describe('operation results and delivery', () => {
           data: {
             success: false,
             messageId: options.messageId,
-            commitHash: 'commit_123',
+            commitHash: 'c'.repeat(40),
             message: 'git push failed '.repeat(100_000),
           },
           timestamp: new Date().toISOString(),
@@ -847,7 +851,7 @@ describe('operation results and delivery', () => {
     expect(record.snapshot().events).toContainEqual(
       expect.objectContaining({
         type: 'autocommit_completed',
-        properties: expect.objectContaining({ success: false, commitHash: 'commit_123' }),
+        properties: expect.objectContaining({ success: false, commitHash: 'c'.repeat(40) }),
       })
     );
   });

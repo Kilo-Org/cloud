@@ -818,17 +818,16 @@ export async function recordSharedGitHubInstallationDelivery(input: {
   deliveryId: string;
   eventType: string;
 }): Promise<
-  { status: 'claimed'; attemptCount: number } | { status: 'duplicate' } | { status: 'not_shared' }
+  | { status: 'claimed'; attemptCount: number }
+  | { status: 'duplicate' }
+  | { status: 'missing_canonical' }
 > {
   return db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
     );
     const [installation] = await tx
-      .select({
-        id: github_app_installations.id,
-        sharingMode: github_app_installations.sharing_mode,
-      })
+      .select({ id: github_app_installations.id })
       .from(github_app_installations)
       .where(
         and(
@@ -838,7 +837,7 @@ export async function recordSharedGitHubInstallationDelivery(input: {
       )
       .for('update');
     if (!installation) {
-      return { status: 'not_shared' };
+      return { status: 'missing_canonical' };
     }
     const inserted = await tx
       .insert(github_installation_webhook_receipts)

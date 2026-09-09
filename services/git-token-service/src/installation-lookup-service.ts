@@ -272,7 +272,10 @@ export function buildManagedInstallationLookupQuery(db: WorkerDb, params: FindIn
 }
 
 export class InstallationLookupService {
-  constructor(private env: CloudflareEnv) {}
+  constructor(
+    private env: { HYPERDRIVE?: { connectionString: string } },
+    private database?: WorkerDb
+  ) {}
 
   isConfigured(): boolean {
     return Boolean(this.env.HYPERDRIVE);
@@ -282,7 +285,10 @@ export class InstallationLookupService {
     if (!this.env.HYPERDRIVE) {
       throw new Error('Hyperdrive not configured');
     }
-    return getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
+    return (
+      this.database ??
+      getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 })
+    );
   }
 
   private validateParams(params: FindInstallationParams): InstallationLookupFailure | null {
@@ -429,7 +435,8 @@ export class InstallationLookupService {
             isNull(platform_integrations.github_app_type)
           )
         : eq(platform_integrations.github_app_type, 'lite');
-    const rows = await this.getDb()
+    const db = this.getDb();
+    const rows = await db
       .select({ id: platform_integrations.id })
       .from(platform_integrations)
       .leftJoin(
@@ -449,7 +456,26 @@ export class InstallationLookupService {
           appTypeCondition,
           isNull(platform_integrations.github_disconnected_at),
           or(
-            isNull(platform_integrations.github_installation_id),
+            and(
+              isNull(platform_integrations.github_installation_id),
+              notExists(
+                db
+                  .select({ id: github_app_installations.id })
+                  .from(github_app_installations)
+                  .where(
+                    and(
+                      eq(
+                        github_app_installations.github_app_type,
+                        sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+                      ),
+                      eq(
+                        github_app_installations.installation_id,
+                        platform_integrations.platform_installation_id
+                      )
+                    )
+                  )
+              )
+            ),
             and(
               eq(github_app_installations.installation_id, installationId),
               eq(github_app_installations.github_app_type, appType),
@@ -493,7 +519,8 @@ export class InstallationLookupService {
     if (!this.isConfigured() || !z.string().uuid().safeParse(integrationId).success) {
       return { success: false };
     }
-    const rows = await this.getDb()
+    const db = this.getDb();
+    const rows = await db
       .select({
         installationId: sql<
           string | null
@@ -520,7 +547,26 @@ export class InstallationLookupService {
           isNull(platform_integrations.github_disconnected_at),
           isNotNull(platform_integrations.platform_installation_id),
           or(
-            isNull(platform_integrations.github_installation_id),
+            and(
+              isNull(platform_integrations.github_installation_id),
+              notExists(
+                db
+                  .select({ id: github_app_installations.id })
+                  .from(github_app_installations)
+                  .where(
+                    and(
+                      eq(
+                        github_app_installations.github_app_type,
+                        sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+                      ),
+                      eq(
+                        github_app_installations.installation_id,
+                        platform_integrations.platform_installation_id
+                      )
+                    )
+                  )
+              )
+            ),
             and(
               eq(github_app_installations.lifecycle_state, 'active'),
               eq(github_app_installations.sharing_mode, 'exclusive'),

@@ -179,7 +179,7 @@ export async function handleGitHubWebhook(
         deliveryId: eventSignature,
         eventType: `${eventType}.${action}`,
       });
-      if (receipt.status === 'not_shared') return dispatch();
+      if (receipt.status === 'missing_canonical') return dispatch();
       if (receipt.status === 'duplicate') {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }

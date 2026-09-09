@@ -649,9 +649,9 @@ describe('handleGitHubWebhook', () => {
     expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
   });
 
-  it('dispatches lifecycle when sharing is demoted between the initial check and receipt claim', async () => {
+  it('dispatches lifecycle when a canonical receipt cannot be resolved', async () => {
     mockIsSharedGitHubInstallation.mockResolvedValue(true);
-    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue({ status: 'not_shared' });
+    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue({ status: 'missing_canonical' });
     const payload = { action: 'deleted', installation: { id: 98765 } };
 
     const response = await handleGitHubWebhook(

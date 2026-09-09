@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- the section owns every CHECKS state in one file: the card shell, the tone/rollup helpers and the rows share one surface, and splitting the visible-loading fix away from the states it must match scatters it across callers. */
 import { useQuery } from '@tanstack/react-query';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import {
@@ -14,6 +15,7 @@ import { Pressable, View } from 'react-native';
 
 import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -190,16 +192,26 @@ export function PrReviewChecksSection({
 
   // Loading (first time, no cached data): show three skeleton rows in a
   // card so the section matches the final dimensions once the data lands.
+  // The bars must NOT be `bg-muted` here: `--muted` and `--secondary` are
+  // the same colour in both themes (apps/mobile/src/global.css), so a
+  // `bg-muted` bar inside this `bg-secondary` card paints nothing and the
+  // section reads as an empty gray block (spot check e1-nav-mr). The shared
+  // Skeleton gives the pulse + shimmer, and `bg-muted-soft` is the one gray
+  // that contrasts with the card in both themes.
   if (checks.isLoading) {
     return (
       <View className="gap-2">
         <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
           {t('prReview.checks.title')}
         </Text>
-        <View className="gap-2 rounded-lg bg-secondary p-4">
-          <View className="h-3 w-40 rounded bg-muted" />
-          <View className="h-3 w-32 rounded bg-muted" />
-          <View className="h-3 w-44 rounded bg-muted" />
+        <View
+          className="gap-2 rounded-lg bg-secondary p-4"
+          accessibilityRole="progressbar"
+          accessibilityLabel={t('common.loading')}
+        >
+          <Skeleton className="h-3 w-40 bg-muted-soft" />
+          <Skeleton className="h-3 w-32 bg-muted-soft" />
+          <Skeleton className="h-3 w-44 bg-muted-soft" />
         </View>
       </View>
     );

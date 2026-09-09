@@ -552,7 +552,7 @@ describe('handleGitHubWebhook', () => {
   );
 
   it('preserves duplicate installation.deleted handling', async () => {
-    mockLogWebhookEvent.mockResolvedValue({ id: 'we_1', isDuplicate: true });
+    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue({ status: 'duplicate' });
 
     const response = await handleGitHubWebhook(
       signedGitHubRequest('installation', { action: 'deleted', installation: { id: 98765 } }),
@@ -561,8 +561,8 @@ describe('handleGitHubWebhook', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ message: 'Duplicate event' });
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'standard');
-    expect(mockLogWebhookEvent).toHaveBeenCalledTimes(1);
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
     expect(mockHandleInstallationDeleted).not.toHaveBeenCalled();
     expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
   });
@@ -684,15 +684,18 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(mockFindIntegrationByInstallationId).toHaveBeenCalledWith('github', '98765', 'lite');
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
     expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(
       expect.objectContaining(payload),
       'lite'
     );
-    expect(mockUpdateWebhookEvent).toHaveBeenCalledWith(
-      'we_1',
-      expect.objectContaining({ processed: true, handlers_triggered: ['installation_deleted'] })
-    );
+    expect(mockUpdateWebhookEvent).not.toHaveBeenCalled();
+    expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+      deliveryId: 'delivery-installation',
+      attemptCount: 1,
+    });
   });
 
   it('routes installation.suspend to the handler with the webhook app type', async () => {

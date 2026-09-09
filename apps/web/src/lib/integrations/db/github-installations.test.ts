@@ -350,6 +350,9 @@ describe('GitHub installation persistence', () => {
       { ...data(), kiloUserId: otherOwnerId }
     );
     if (!first.ok || !second.ok) throw new Error('Expected shared connections');
+    await expect(assertGitHubInstallationRuntimeAuthorized('123456', 'standard')).rejects.toThrow(
+      'GitHub installation is unavailable for runtime use'
+    );
 
     await disconnectGitHubInstallation({ type: 'org', id: organizationA.id }, first.integrationId);
     await observeGitHubInstallationLifecycle({
@@ -388,13 +391,22 @@ describe('GitHub installation persistence', () => {
       sharing_admission_checked_at: null,
     });
     await expect(
+      assertGitHubInstallationRuntimeAuthorized('123456', 'standard')
+    ).resolves.toBeUndefined();
+    await expect(
       recordSharedGitHubInstallationDelivery({
         installationId: '123456',
         appType: 'standard',
         deliveryId: 'delivery-after-demotion',
         eventType: 'installation.deleted',
       })
-    ).resolves.toEqual({ status: 'not_shared' });
+    ).resolves.toEqual({ status: 'claimed', attemptCount: 1 });
+    await completeSharedGitHubInstallationDelivery({
+      installationId: '123456',
+      appType: 'standard',
+      deliveryId: 'delivery-after-demotion',
+      attemptCount: 1,
+    });
     await expect(
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
     ).resolves.toBeUndefined();

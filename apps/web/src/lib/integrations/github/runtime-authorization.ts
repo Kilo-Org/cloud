@@ -104,6 +104,10 @@ export async function assertGitHubInstallationRuntimeAuthorized(
     .where(
       and(
         eq(platform_integrations.platform, PLATFORM.GITHUB),
+        eq(platform_integrations.integration_status, INTEGRATION_STATUS.ACTIVE),
+        isNull(platform_integrations.github_disconnected_at),
+        isNull(platform_integrations.suspended_at),
+        isNull(platform_integrations.auth_invalid_at),
         expectedIntegrationId ? eq(platform_integrations.id, expectedIntegrationId) : undefined,
         eq(platform_integrations.platform_installation_id, installationId),
         effectiveAppTypeCondition(appType),
@@ -111,7 +115,12 @@ export async function assertGitHubInstallationRuntimeAuthorized(
           isNull(platform_integrations.github_installation_id),
           and(
             eq(github_app_installations.github_app_type, appType),
-            eq(github_app_installations.installation_id, installationId)
+            eq(github_app_installations.installation_id, installationId),
+            eq(github_app_installations.lifecycle_state, 'active'),
+            eq(github_app_installations.sharing_mode, 'exclusive'),
+            isNull(github_app_installations.suspended_at),
+            isNull(github_app_installations.deleted_at),
+            isNull(github_app_installations.auth_invalid_at)
           )
         )
       )

@@ -817,7 +817,7 @@ export async function recordSharedGitHubInstallationDelivery(input: {
         )
       )
       .for('update');
-    if (!installation || installation.sharingMode !== 'web_cloud_agent') {
+    if (!installation) {
       return { status: 'not_shared' };
     }
     const inserted = await tx

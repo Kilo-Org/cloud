@@ -274,45 +274,10 @@ export async function handleGitHubWebhook(
         }
         const deletedPayload = { ...parseResult.data, installation };
 
-        // Get integration before deletion to log the event
         const installationId = installation.id.toString();
-        if (await isSharedGitHubInstallation(installationId, appType)) {
-          return await dispatchSharedOnce(installationId, action, () =>
-            handleInstallationDeleted(deletedPayload, appType)
-          );
-        }
-        const integration = await findIntegrationByInstallationId(
-          PLATFORM.GITHUB,
-          installationId,
-          appType
+        return await dispatchSharedOnce(installationId, action, () =>
+          handleInstallationDeleted(deletedPayload, appType)
         );
-
-        if (integration) {
-          const logResult = await logWebhook(integration, action);
-          if (logResult.isDuplicate) {
-            return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
-          }
-
-          const result = await handleInstallationDeleted(deletedPayload, appType);
-
-          // Mark webhook event as processed
-          if (logResult.webhookEventId) {
-            try {
-              await updateWebhookEvent(logResult.webhookEventId, {
-                processed: true,
-                processed_at: new Date().toISOString(),
-                handlers_triggered: ['installation_deleted'],
-                errors: null,
-              });
-            } catch (error) {
-              logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
-            }
-          }
-
-          return result;
-        }
-
-        return await handleInstallationDeleted(deletedPayload, appType);
       }
 
       if (action === GITHUB_ACTION.SUSPEND) {

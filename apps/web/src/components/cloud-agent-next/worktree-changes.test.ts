@@ -18,13 +18,14 @@ import {
 } from './worktree-changes';
 
 const snapshot: WorktreeChangesSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   revision: 3,
   capturedAt: '2026-08-26T12:00:00.000Z',
   comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
   files: [
     {
       path: 'src/odd\nfile\tname.ts',
+      revision: 3,
       status: 'modified',
       additions: 2,
       deletions: 1,
@@ -739,6 +740,7 @@ describe('buildWorktreeChangesTree', () => {
   it('preserves exact paths and metadata without splitting backslashes or mutating input', () => {
     const rootFile: WorktreeChangesFile = Object.freeze({
       path: 'root\\file\t\n雪.ts',
+      revision: 3,
       status: 'deleted',
       additions: 0,
       deletions: 17,
@@ -748,6 +750,7 @@ describe('buildWorktreeChangesTree', () => {
     });
     const nestedFile: WorktreeChangesFile = Object.freeze({
       path: ' \tdir\\name\n / e\u0301\\雪\t\n.ts ',
+      revision: 3,
       status: 'added',
       additions: 12,
       deletions: 0,

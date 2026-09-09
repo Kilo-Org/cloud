@@ -169,6 +169,80 @@ describe('SessionOperation cleanup', () => {
     await operation.done;
   });
 
+  it('polls root idleness until a busy root becomes idle within the deadline', async () => {
+    const pending = Promise.withResolvers<ReturnType<typeof completion>>();
+    let statusCalls = 0;
+    const client = fakeKilo({
+      sendPrompt: () => pending.promise,
+      abortSession: async () => true,
+      getSessionStatuses: async () => {
+        statusCalls += 1;
+        return { [session.kiloSessionId]: { type: statusCalls === 1 ? 'busy' : 'idle' } };
+      },
+    });
+    const runtime: WorktreeKiloRuntime = {
+      scopeId: 'worktree_1',
+      runtimeId: 'native_1',
+      directory: session.directory,
+      env: {},
+      kiloClient: client,
+      signal: new AbortController().signal,
+    };
+    const operation = new SessionOperation(
+      session,
+      undefined,
+      { operation: 'session.prompt', payload: promptPayload, runtime },
+      {
+        isCurrent: () => true,
+        getRuntime: () => runtime,
+        verifyQuiescence: async () => {
+          throw new Error('Root-scoped cleanup must not use runtime verification');
+        },
+        retireRuntime: () => {},
+        emitSessionEvent: () => {},
+        onLocalCompletion: () => {},
+        onCleanupConfirmed: () => {},
+      }
+    );
+    for (let index = 0; index < 5 && operation.snapshot().native.state !== 'pending'; index += 1)
+      await Promise.resolve();
+
+    operation.markPublicationScoped('event rejected', Date.now() + 200);
+    expect(await operation.runRootScopedCleanup()).toBe('confirmed');
+    expect(statusCalls).toBeGreaterThanOrEqual(2);
+    pending.resolve(completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } }));
+    await operation.done;
+  });
+
+  it('does not infer root idleness from positive completion evidence without a target', async () => {
+    const operation = new SessionOperation(
+      session,
+      undefined,
+      {
+        operation: 'session.attach',
+        payload: {} as never,
+        apply: async () => ({
+          ok: true as const,
+          result: {},
+        }),
+        onAttached: () => {},
+      },
+      {
+        isCurrent: () => true,
+        getRuntime: () => undefined,
+        verifyQuiescence: async () => true,
+        retireRuntime: () => {},
+        emitSessionEvent: () => {},
+        onLocalCompletion: () => {},
+        onCleanupConfirmed: () => {},
+      }
+    );
+
+    await operation.done;
+    operation.markPublicationScoped('targetless completion', Date.now() + 1_000);
+    expect(await operation.runRootScopedCleanup()).toBe('unconfirmed');
+  });
+
   it('does not accept an idle root while a scoped native child is active', async () => {
     const pending = Promise.withResolvers<ReturnType<typeof completion>>();
     let verified = 0;

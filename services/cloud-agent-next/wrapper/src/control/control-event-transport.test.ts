@@ -1,4 +1,4 @@
-import { describe, expect, it, mock, spyOn } from 'bun:test';
+import { beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 import {
   createControlEventFailureHandler,
   createControlEventTransport,
@@ -7,6 +7,11 @@ import type { ControlEventOutboxFailure, ControlEventPublication } from './contr
 import { ControlDeliveryError } from './sandbox-control-client';
 import { createOperationRegistry } from './operation-registry';
 import { acknowledgeOperation, fakeKilo, operationAuthorization } from './control-test-fixtures';
+import {
+  rememberAttachedRoot,
+  rememberChildSession,
+  resetSessionDirectoryState,
+} from './session-directories';
 import type {
   SessionOperationAck,
   SessionOperationDelivery,
@@ -21,6 +26,11 @@ const session = {
 const payload = { type: 'session.idle', properties: {} };
 
 describe('native-scoped control event failures', () => {
+  beforeEach(() => {
+    resetSessionDirectoryState();
+    rememberAttachedRoot(session.kiloSessionId, session.directory);
+  });
+
   it.each([
     ['session.preparing', false],
     ['session.event', true],
@@ -189,6 +199,8 @@ describe('native-scoped control event failures', () => {
   });
 
   it('coalesces distinct roots only during registry cleanup and separates a reused native object incarnation', async () => {
+    rememberAttachedRoot('root_a', session.directory);
+    rememberAttachedRoot('root_b', session.directory);
     const runtime = { runtimeId: 'N1' };
     const cleanup = Promise.withResolvers<void>();
     const failures: ControlEventOutboxFailure[] = [];
@@ -348,5 +360,89 @@ describe('native-scoped control event failures', () => {
     } finally {
       transport.close();
     }
+  });
+
+  it('routes a child receipt failure through its root owner while preserving child identity', () => {
+    rememberAttachedRoot('root', '/root');
+    rememberChildSession({ childId: 'child', parentId: 'root', directory: '/child' });
+    const runtime = { runtimeId: 'native-root' };
+    const getRuntime = mock((directory: string) => (directory === '/root' ? runtime : undefined));
+    const onFailure = mock();
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure });
+    const failure: ControlEventOutboxFailure = {
+      reason: 'rejected',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_child',
+        sequence: 1,
+        session: {
+          directory: '/child',
+          kiloSessionId: 'child',
+          rootKiloSessionId: 'root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        payload,
+      },
+    };
+
+    handleFailure(failure);
+
+    expect(getRuntime).toHaveBeenCalledWith('/root');
+    expect(onFailure).toHaveBeenCalledWith(failure, runtime);
+  });
+
+  it('routes an expired child receipt through the root owner before runtime lookup', () => {
+    rememberAttachedRoot('root', '/root');
+    rememberChildSession({ childId: 'child_expired', parentId: 'root', directory: '/child' });
+    const runtime = { runtimeId: 'native-root' };
+    const getRuntime = mock((directory: string) => (directory === '/root' ? runtime : undefined));
+    const onFailure = mock();
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure });
+    const failure: ControlEventOutboxFailure = {
+      reason: 'expired',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_child_expired',
+        sequence: 2,
+        session: {
+          directory: '/child',
+          kiloSessionId: 'child_expired',
+          rootKiloSessionId: 'root',
+          nativeRuntimeId: runtime.runtimeId,
+        },
+        payload,
+      },
+    };
+
+    handleFailure(failure);
+
+    expect(getRuntime).toHaveBeenCalledWith('/root');
+    expect(onFailure).toHaveBeenCalledWith(failure, runtime);
+  });
+
+  it('fails closed for an unresolved child receipt failure', () => {
+    rememberAttachedRoot('root', '/root');
+    const getRuntime = mock(() => ({ runtimeId: 'native-root' }));
+    const onFailure = mock();
+    const handleFailure = createControlEventFailureHandler({ getRuntime, onFailure });
+
+    handleFailure({
+      reason: 'rejected',
+      publication: {
+        event: 'session.event',
+        receiptId: 'receipt_unknown',
+        sequence: 1,
+        session: {
+          directory: '/child',
+          kiloSessionId: 'unknown-child',
+          rootKiloSessionId: 'root',
+          nativeRuntimeId: 'native-root',
+        },
+        payload,
+      },
+    });
+
+    expect(getRuntime).not.toHaveBeenCalled();
+    expect(onFailure).not.toHaveBeenCalled();
   });
 });

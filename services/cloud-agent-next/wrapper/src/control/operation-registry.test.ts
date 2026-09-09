@@ -12,6 +12,7 @@ import {
   sessionOperationLookupResultSchema,
 } from '../../../src/shared/sandbox-control-protocol';
 import {
+  createControlHandlerDeps,
   handleControlRequest,
   pruneControlOperations,
   type HandlerDeps,
@@ -242,6 +243,48 @@ describe('operation admission and lookup', () => {
     ).toMatchObject({ ok: true, result: { acknowledged: true } });
   });
 
+  it('uses unshared runtime retirement for operation-owned cleanup', async () => {
+    const running = Promise.withResolvers<Completion>();
+    const runtimeRetirement = mock(async () => 'unconfirmed' as const);
+    const unsharedRetirement = mock(async () => 'shared' as const);
+    const handlerDeps = deps({
+      kiloClient: fakeKilo({ sendPrompt: async () => running.promise }),
+    });
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing native runtimes');
+    runtimes.retireRuntime = runtimeRetirement;
+    runtimes.retireRuntimeIfUnshared = unsharedRetirement;
+    const request = handleControlRequest('session.prompt', session, promptPayload, handlerDeps);
+    let task: ReturnType<typeof handlerDeps.operations.active>;
+
+    try {
+      expect(await request).toMatchObject({
+        ok: true,
+        result: { messageId: promptPayload.messageId, status: 'accepted' },
+      });
+      task = handlerDeps.operations.active(session.kiloSessionId);
+      if (!task) throw new Error('Missing active operation');
+      for (let index = 0; index < 10 && !task.nativeTarget(); index += 1) await Promise.resolve();
+      if (!task.nativeTarget()) throw new Error('Missing native operation target');
+      task.requestRetirement('operation cleanup', Date.now() + 1_000);
+      for (let index = 0; index < 10 && unsharedRetirement.mock.calls.length === 0; index += 1)
+        await Promise.resolve();
+
+      expect(unsharedRetirement).toHaveBeenCalledWith(
+        session.directory,
+        expect.objectContaining({ runtimeId: 'native_1' }),
+        session.kiloSessionId,
+        expect.any(Number),
+        'operation cleanup'
+      );
+      expect(runtimeRetirement).not.toHaveBeenCalled();
+    } finally {
+      running.resolve(completion());
+      await Promise.allSettled([request]);
+      if (task) await task.done;
+    }
+  });
+
   it('retains terminal unconfirmed state across routing loss until explicit root notification', async () => {
     const handlerDeps = deps();
     const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
@@ -395,7 +438,11 @@ describe('operation admission and lookup', () => {
     const escalation = handlerDeps.operations.escalateRootPublication(input);
     handlerDeps.operations.notifyRootDisappeared(input);
     rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
-    expect(await escalation.physical).toBe('stale');
+    expect(await escalation.physical).toMatchObject({
+      scope: 'runtime',
+      physical: 'stale',
+      runtimeRetired: false,
+    });
     expect(gateCalls).toBe(0);
     expect(handlerDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
       'continue'
@@ -407,6 +454,615 @@ describe('operation admission and lookup', () => {
       nativeRuntimeId: runtime.runtimeId,
     });
     expect(gateCalls).toBe(0);
+  });
+
+  it.each(['unconfirmed', 'retired'] as const)(
+    'replaces a cached shared disposition when the runtime owner starts a physical attempt (%s)',
+    async result => {
+      const fixture = deps();
+      const runtime = fixture.kiloRuntimes?.get(session.directory);
+      if (!runtime) throw new Error('Missing native runtime');
+      const operations = createOperationRegistry({
+        native: {
+          get: () => runtime,
+          getRetained: () => runtime,
+          rootRetirementScope: () => 'shared',
+          retireRuntime: async () => 'unconfirmed',
+          retireRuntimeIfUnshared: async () => 'shared',
+          verifyQuiescence: async () => false,
+        },
+        onStarted: () => {},
+        onCompleted: () => {},
+        retireRuntime: () => {},
+      });
+      const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+      const input = {
+        directory: session.directory,
+        root: session.kiloSessionId,
+        nativeRuntimeId: runtime.runtimeId,
+        target,
+        reason: 'deferred physical cleanup',
+        deadlineAt: Date.now() + 1_000,
+      };
+      const initial = operations.escalateRootPublication(input);
+      const initialDisposition = await initial.physical;
+      expect(initialDisposition).toMatchObject({
+        scope: 'root',
+        physical: 'shared',
+        runtimeRetired: false,
+      });
+
+      const retirementId = crypto.randomUUID();
+      operations.markRootRetirementStarted({ ...input, retirementId });
+      const retainedStop = operations.escalateRootPublication(input);
+      const originalDisposition = initial.disposition();
+      const retainedDisposition = retainedStop.disposition();
+      expect(originalDisposition).toMatchObject({
+        scope: 'runtime',
+        physical: 'pending',
+        physicalAttemptStarted: true,
+        runtimeRetired: false,
+      });
+      expect(retainedDisposition).toEqual(originalDisposition);
+      operations.settleRootPublication({ ...input, retirementId, result });
+      const settledDisposition = await retainedStop.physical;
+      expect(settledDisposition).toMatchObject({
+        scope: 'runtime',
+        physical: result,
+        runtimeRetired: result === 'retired',
+      });
+    }
+  );
+
+  it('starts a current runtime retirement after a cached root result loses membership', async () => {
+    const fixture = deps();
+    const runtime = fixture.kiloRuntimes?.get(session.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    let scope: 'shared' | 'sole' = 'shared';
+    let attempts = 0;
+    const retirement = Promise.withResolvers<'retired'>();
+    const operations = createOperationRegistry({
+      native: {
+        get: () => runtime,
+        getRetained: () => runtime,
+        rootRetirementScope: () => scope,
+        retireRuntime: async () => 'unconfirmed',
+        retireRuntimeIfUnshared: async () => {
+          attempts += 1;
+          if (attempts === 1) return 'shared';
+          return retirement.promise;
+        },
+        verifyQuiescence: async () => false,
+      },
+      onStarted: () => {},
+      onCompleted: () => {},
+      retireRuntime: () => {},
+    });
+    const target = { runtimeId: runtime.runtimeId, client: runtime.kiloClient };
+    const input = {
+      directory: session.directory,
+      root: session.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target,
+      reason: 'deferred physical cleanup',
+      deadlineAt: Date.now() + 1_000,
+    };
+    try {
+      const initial = operations.escalateRootPublication(input);
+      expect(await initial.physical).toMatchObject({
+        scope: 'root',
+        physical: 'shared',
+        runtimeRetired: false,
+      });
+
+      scope = 'sole';
+      const retainedStop = operations.escalateRootPublication(input);
+      for (let index = 0; index < 10 && attempts < 2; index += 1) await Promise.resolve();
+      expect(attempts).toBe(2);
+      expect(retainedStop.disposition()).toMatchObject({
+        scope: 'runtime',
+        physical: 'pending',
+        runtimeRetired: false,
+      });
+      let settled = false;
+      const physical = retainedStop.physical.then(result => {
+        settled = true;
+        return result;
+      });
+      await Promise.resolve();
+      expect(settled).toBe(false);
+
+      retirement.resolve('retired');
+      expect(await physical).toMatchObject({
+        scope: 'runtime',
+        physical: 'retired',
+        runtimeRetired: true,
+      });
+    } finally {
+      retirement.resolve('retired');
+    }
+  });
+
+  it('does not let a superseded retained A1 Stop retire active A2 after confirmed root cleanup', async () => {
+    const runningA1 = Promise.withResolvers<Completion>();
+    const runningA2 = Promise.withResolvers<Completion>();
+    const startedA1 = Promise.withResolvers<void>();
+    const startedA2 = Promise.withResolvers<void>();
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    const sessionB = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    const client = fakeKilo({
+      sendPrompt: async options => {
+        if (options.messageId === 'message_a1') {
+          startedA1.resolve();
+          return runningA1.promise;
+        }
+        if (options.messageId === 'message_a2') {
+          startedA2.resolve();
+          return runningA2.promise;
+        }
+        return completion();
+      },
+      getSessionStatuses: async () => ({
+        [sessionA.kiloSessionId]: { type: 'idle' },
+        [sessionB.kiloSessionId]: { type: 'idle' },
+      }),
+      abortSession: async () => true,
+    });
+    const handlerDeps = deps({
+      kiloClient: client,
+      scopedCleanupResult: true,
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberAttachedRoot(sessionB.kiloSessionId, sessionB.directory);
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    const runtime = runtimes.get(sessionA.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const attachedRoots = new Set([sessionA.kiloSessionId, sessionB.kiloSessionId]);
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- capture before wrap
+    const originalDetach = runtimes.detach;
+    runtimes.detach = identity => {
+      attachedRoots.delete(identity.kiloSessionId);
+      return originalDetach.call(runtimes, identity);
+    };
+    runtimes.rootRetirementScope = (_directory, _target, retiringRoot) =>
+      attachedRoots.has(retiringRoot) ? (attachedRoots.size > 1 ? 'shared' : 'sole') : 'stale';
+    if (!runtimes.retireRuntime) throw new Error('Missing runtime retirement');
+    let retireRuntimeIfUnsharedCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async (directory, target, retiringRoot, deadlineAt) => {
+      retireRuntimeIfUnsharedCalls += 1;
+      if (runtimes.rootRetirementScope?.(directory, target, retiringRoot) === 'shared')
+        return 'shared';
+      const retirement = await runtimes.retireRuntime?.(directory, deadlineAt, target);
+      if (retirement === undefined) throw new Error('Missing runtime retirement');
+      return retirement;
+    };
+    const integratedDeps = createControlHandlerDeps(handlerDeps);
+    const originalDeadlineAt = Date.now() + 5_000;
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'confirmed publication cleanup',
+      deadlineAt: originalDeadlineAt,
+    };
+    const authorizationA1 = operationAuthorization('session.prompt', 'message_a1', sessionA);
+    const authorizationA2 = operationAuthorization('session.prompt', 'message_a2', sessionA);
+    const requestA1 = handleControlRequest(
+      'session.prompt',
+      sessionA,
+      { ...promptPayload, messageId: 'message_a1' },
+      integratedDeps,
+      authorizationA1
+    );
+    let requestA2: ReturnType<typeof handleControlRequest> | undefined;
+    try {
+      await startedA1.promise;
+      expect(await requestA1).toMatchObject({ ok: true, result: { status: 'accepted' } });
+      const publication = integratedDeps.operations.escalateRootPublication(input);
+      expect(await publication.physical).toMatchObject({
+        scope: 'root',
+        cleanup: 'confirmed',
+        physical: 'not_attempted',
+        runtimeRetired: false,
+      });
+
+      runningA1.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      const retainedA1 = integratedDeps.operations
+        .retained()
+        .find(operation => operation.messageId === 'message_a1');
+      if (!retainedA1) throw new Error('Missing retained A1 operation');
+      await retainedA1.done;
+      await retainedA1.waitForDelivery();
+
+      requestA2 = handleControlRequest(
+        'session.prompt',
+        sessionA,
+        { ...promptPayload, messageId: 'message_a2' },
+        integratedDeps,
+        authorizationA2
+      );
+      expect(await requestA2).toMatchObject({ ok: true, result: { status: 'accepted' } });
+      await startedA2.promise;
+      const a2 = integratedDeps.operations.active(sessionA.kiloSessionId);
+      if (!a2) throw new Error('Missing active A2 operation');
+      expect(integratedDeps.operations.retained()).toContain(retainedA1);
+      const supersededWithoutClaim = integratedDeps.operations.escalateRootPublication(input);
+      expect(supersededWithoutClaim.cleanup).not.toBe(publication.cleanup);
+      expect(a2.publicationScope()?.claim).toBeDefined();
+      expect(a2.signal.aborted).toBe(true);
+      expect(integratedDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
+        'reply'
+      );
+      expect(await supersededWithoutClaim.physical).toMatchObject({
+        scope: 'root',
+        status: 'aborted',
+        cleanup: 'confirmed',
+        physical: 'not_attempted',
+        quiescent: false,
+        runtimeRetired: false,
+      });
+      const unknownClaim = integratedDeps.operations.escalateRootPublication({
+        ...input,
+        expectedClaim: Symbol('unknown-claim'),
+      });
+      expect(await unknownClaim.physical).toMatchObject({
+        scope: 'runtime',
+        status: 'unconfirmed',
+        physical: 'stale',
+        quiescent: false,
+        runtimeRetired: false,
+      });
+
+      expect(
+        await handleControlRequest('session.detach', sessionB, {}, integratedDeps)
+      ).toMatchObject({
+        ok: true,
+        result: { detached: true },
+      });
+      const stopped = await handleControlRequest(
+        'session.abort',
+        sessionA,
+        {
+          messageId: 'message_a1',
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: originalDeadlineAt,
+        },
+        integratedDeps
+      );
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { status: 'already_idle', quiescent: false },
+      });
+      expect(stopped).not.toHaveProperty('result.cleanupScope');
+      expect(stopped).not.toHaveProperty('result.runtimeRetired');
+      expect(retireRuntimeIfUnsharedCalls).toBe(0);
+      expect(integratedDeps.kiloRuntimes?.get(sessionA.directory)).toBe(runtime);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(a2.signal.aborted).toBe(true);
+
+      runningA2.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      await requestA2;
+    } finally {
+      runningA1.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      runningA2.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      await Promise.allSettled([requestA1, ...(requestA2 ? [requestA2] : [])]);
+      for (const operation of integratedDeps.operations.activeOperations()) await operation.done;
+    }
+  });
+
+  it('returns already_idle for a retained A1 Stop without aborting healthy active A2', async () => {
+    const runningA1 = Promise.withResolvers<Completion>();
+    const runningA2 = Promise.withResolvers<Completion>();
+    const startedA1 = Promise.withResolvers<void>();
+    const startedA2 = Promise.withResolvers<void>();
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    const sessionB = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    const client = fakeKilo({
+      sendPrompt: async options => {
+        if (options.messageId === 'message_a1') {
+          startedA1.resolve();
+          return runningA1.promise;
+        }
+        if (options.messageId === 'message_a2') {
+          startedA2.resolve();
+          return runningA2.promise;
+        }
+        return completion();
+      },
+      getSessionStatuses: async () => ({
+        [sessionA.kiloSessionId]: { type: 'idle' },
+        [sessionB.kiloSessionId]: { type: 'idle' },
+      }),
+      abortSession: async () => true,
+    });
+    const handlerDeps = deps({
+      kiloClient: client,
+      scopedCleanupResult: true,
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+    });
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberAttachedRoot(sessionB.kiloSessionId, sessionB.directory);
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    const runtime = runtimes.get(sessionA.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    const attachedRoots = new Set([sessionA.kiloSessionId, sessionB.kiloSessionId]);
+    // eslint-disable-next-line @typescript-eslint/unbound-method -- capture before wrap
+    const originalDetach = runtimes.detach;
+    runtimes.detach = identity => {
+      attachedRoots.delete(identity.kiloSessionId);
+      return originalDetach.call(runtimes, identity);
+    };
+    runtimes.rootRetirementScope = (_directory, _target, retiringRoot) =>
+      attachedRoots.has(retiringRoot) ? (attachedRoots.size > 1 ? 'shared' : 'sole') : 'stale';
+    if (!runtimes.retireRuntime) throw new Error('Missing runtime retirement');
+    let retireRuntimeIfUnsharedCalls = 0;
+    runtimes.retireRuntimeIfUnshared = async (directory, target, retiringRoot, deadlineAt) => {
+      retireRuntimeIfUnsharedCalls += 1;
+      if (runtimes.rootRetirementScope?.(directory, target, retiringRoot) === 'shared')
+        return 'shared';
+      const retirement = await runtimes.retireRuntime?.(directory, deadlineAt, target);
+      if (retirement === undefined) throw new Error('Missing runtime retirement');
+      return retirement;
+    };
+    const integratedDeps = createControlHandlerDeps(handlerDeps);
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'confirmed publication cleanup',
+      deadlineAt: Date.now() + 5_000,
+    };
+    const authorizationA1 = operationAuthorization('session.prompt', 'message_a1', sessionA);
+    const authorizationA2 = operationAuthorization('session.prompt', 'message_a2', sessionA);
+    const requestA1 = handleControlRequest(
+      'session.prompt',
+      sessionA,
+      { ...promptPayload, messageId: 'message_a1' },
+      integratedDeps,
+      authorizationA1
+    );
+    let requestA2: ReturnType<typeof handleControlRequest> | undefined;
+    try {
+      await startedA1.promise;
+      expect(await requestA1).toMatchObject({ ok: true, result: { status: 'accepted' } });
+      const publication = integratedDeps.operations.escalateRootPublication(input);
+      expect(await publication.physical).toMatchObject({
+        scope: 'root',
+        cleanup: 'confirmed',
+        physical: 'not_attempted',
+        runtimeRetired: false,
+      });
+
+      runningA1.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      const retainedA1 = integratedDeps.operations
+        .retained()
+        .find(operation => operation.messageId === 'message_a1');
+      if (!retainedA1) throw new Error('Missing retained A1 operation');
+      await retainedA1.done;
+      await retainedA1.waitForDelivery();
+
+      requestA2 = handleControlRequest(
+        'session.prompt',
+        sessionA,
+        { ...promptPayload, messageId: 'message_a2' },
+        integratedDeps,
+        authorizationA2
+      );
+      expect(await requestA2).toMatchObject({ ok: true, result: { status: 'accepted' } });
+      await startedA2.promise;
+      const a2 = integratedDeps.operations.active(sessionA.kiloSessionId);
+      if (!a2) throw new Error('Missing active A2 operation');
+      expect(a2.publicationScope()).toBeUndefined();
+      expect(integratedDeps.operations.retained()).toContain(retainedA1);
+
+      expect(
+        await handleControlRequest('session.detach', sessionB, {}, integratedDeps)
+      ).toMatchObject({
+        ok: true,
+        result: { detached: true },
+      });
+      const stopped = await handleControlRequest(
+        'session.abort',
+        sessionA,
+        {
+          messageId: 'message_a1',
+          operationId: '11111111-1111-4111-8111-111111111111',
+          cleanupDeadlineAt: input.deadlineAt,
+        },
+        integratedDeps
+      );
+      expect(stopped).toMatchObject({
+        ok: true,
+        result: { status: 'already_idle', quiescent: false },
+      });
+      expect(stopped).not.toHaveProperty('result.cleanupScope');
+      expect(stopped).not.toHaveProperty('result.runtimeRetired');
+      expect(retireRuntimeIfUnsharedCalls).toBe(0);
+      expect(integratedDeps.kiloRuntimes?.get(sessionA.directory)).toBe(runtime);
+      expect(runtime.signal.aborted).toBe(false);
+      expect(a2.signal.aborted).toBe(false);
+
+      runningA2.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      await requestA2;
+    } finally {
+      runningA1.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      runningA2.resolve(
+        completion({ name: 'MessageAbortedError', data: { message: 'cancelled' } })
+      );
+      await Promise.allSettled([requestA1, ...(requestA2 ? [requestA2] : [])]);
+      for (const operation of integratedDeps.operations.activeOperations()) await operation.done;
+    }
+  });
+
+  it('bounds archived publication claims by their operation owners', async () => {
+    const createRun = () => ({
+      started: Promise.withResolvers<void>(),
+      finalizerStarted: Promise.withResolvers<void>(),
+      finalized: Promise.withResolvers<{ success: boolean }>(),
+    });
+    type Run = ReturnType<typeof createRun>;
+    const runs = new Map<string, Run>();
+    const pendingFinalizers: Run[] = [];
+    const client = fakeKilo({
+      sendPrompt: async options => {
+        const run = runs.get(options.messageId);
+        if (!run) throw new Error(`Missing run for ${options.messageId}`);
+        run.started.resolve();
+        pendingFinalizers.push(run);
+        return completion();
+      },
+      getSessionStatuses: async () => ({
+        kilo_a: { type: 'idle' },
+        kilo_b: { type: 'idle' },
+      }),
+      abortSession: async () => true,
+    });
+    const handlerDeps = deps({
+      kiloClient: client,
+      scopedCleanupResult: true,
+      sendOperationResult: (_session, delivery) => acknowledgeOperation(delivery),
+      runAutoCommit: async () => {
+        const run = pendingFinalizers.shift();
+        if (!run) throw new Error('Missing finalizer run');
+        run.finalizerStarted.resolve();
+        return run.finalized.promise;
+      },
+    });
+    const sessionA = { ...session, sessionId: 'ses_a', kiloSessionId: 'kilo_a' };
+    const sessionB = { ...session, sessionId: 'ses_b', kiloSessionId: 'kilo_b' };
+    rememberAttachedRoot(sessionA.kiloSessionId, sessionA.directory);
+    rememberAttachedRoot(sessionB.kiloSessionId, sessionB.directory);
+    const runtimes = handlerDeps.kiloRuntimes;
+    if (!runtimes) throw new Error('Missing worktree runtimes');
+    const runtime = runtimes.get(sessionA.directory);
+    if (!runtime) throw new Error('Missing native runtime');
+    runtimes.rootRetirementScope = () => 'shared';
+    const integratedDeps = createControlHandlerDeps(handlerDeps);
+    const base = Date.now();
+    const dispatchDeadlineAt = (index: number) =>
+      index === 1 ? base + 10_000_000 : base + index * 100_000;
+    const input = {
+      directory: sessionA.directory,
+      root: sessionA.kiloSessionId,
+      nativeRuntimeId: runtime.runtimeId,
+      target: { runtimeId: runtime.runtimeId, client: runtime.kiloClient },
+      reason: 'repeated publication cleanup',
+      deadlineAt: base + 5_000,
+    };
+    const start = async (index: number) => {
+      const messageId = `message_a${index}`;
+      const run = createRun();
+      runs.set(messageId, run);
+      const authorization = {
+        ...operationAuthorization('session.prompt', messageId, sessionA),
+        dispatchDeadlineAt: dispatchDeadlineAt(index),
+      };
+      const request = handleControlRequest(
+        'session.prompt',
+        sessionA,
+        { ...promptPayload, messageId, finalization: { autoCommit: true } },
+        integratedDeps,
+        authorization
+      );
+      await run.started.promise;
+      await run.finalizerStarted.promise;
+      expect(await request).toMatchObject({ ok: true, result: { status: 'accepted' } });
+      const operation = integratedDeps.operations.active(sessionA.kiloSessionId);
+      if (!operation) throw new Error(`Missing active operation for ${messageId}`);
+      return { operation, run };
+    };
+    const finish = async (
+      run: Run,
+      operation: ReturnType<typeof integratedDeps.operations.active>
+    ) => {
+      if (!operation) throw new Error('Missing operation to finish');
+      run.finalized.resolve({ success: true });
+      await operation.done;
+      await operation.waitForDelivery();
+    };
+    try {
+      const first = await start(1);
+      const firstPublication = integratedDeps.operations.escalateRootPublication(input);
+      expect(await firstPublication.physical).toMatchObject({
+        scope: 'root',
+        cleanup: 'confirmed',
+        physical: 'not_attempted',
+        runtimeRetired: false,
+      });
+      const firstClaim = first.operation.publicationScope()?.claim;
+      if (firstClaim === undefined) throw new Error('Missing first publication claim');
+      await finish(first.run, first.operation);
+
+      const second = await start(2);
+      const secondPublication = integratedDeps.operations.escalateRootPublication(input);
+      expect(second.operation.publicationScope()?.claim).toBeDefined();
+      expect(integratedDeps.operations.admission('session.prompt', sessionA, undefined).kind).toBe(
+        'reply'
+      );
+      expect(integratedDeps.operations.admission('session.prompt', sessionB, undefined).kind).toBe(
+        'continue'
+      );
+      expect(await secondPublication.physical).toMatchObject({
+        scope: 'root',
+        cleanup: 'confirmed',
+        physical: 'not_attempted',
+        runtimeRetired: false,
+      });
+      await finish(second.run, second.operation);
+      expect(integratedDeps.operations.counts().archived).toBe(1);
+      expect(
+        await integratedDeps.operations.escalateRootPublication({
+          ...input,
+          expectedClaim: firstClaim,
+        }).physical
+      ).toMatchObject({ status: 'already_idle', physical: 'not_attempted' });
+
+      let previous = second;
+      for (let index = 3; index <= 7; index += 1) {
+        const next = await start(index);
+        const previousClaim = previous.operation.publicationScope()?.claim;
+        if (previousClaim === undefined) throw new Error('Missing previous publication claim');
+        const publication = integratedDeps.operations.escalateRootPublication(input);
+        expect(await publication.physical).toMatchObject({
+          scope: 'root',
+          cleanup: 'confirmed',
+          physical: 'not_attempted',
+          runtimeRetired: false,
+        });
+        expect(integratedDeps.operations.counts().archived).toBe(2);
+        await finish(next.run, next.operation);
+        integratedDeps.operations.prune(base + (index - 1) * 100_000 + 1);
+        expect(integratedDeps.operations.counts().archived).toBe(1);
+        previous = next;
+      }
+
+      integratedDeps.operations.prune(base + 10_000_001);
+      expect(integratedDeps.operations.counts()).toEqual({ active: 0, retained: 0, archived: 0 });
+    } finally {
+      for (const run of runs.values()) run.finalized.resolve({ success: true });
+      await Promise.allSettled(
+        integratedDeps.operations.activeOperations().map(operation => operation.done)
+      );
+    }
   });
 
   it('does not let a retained A1 Stop reselect fresh active A2 after root invalidation', async () => {

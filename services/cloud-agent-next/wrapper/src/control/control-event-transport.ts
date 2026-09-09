@@ -4,6 +4,7 @@ import {
   type ControlEventOutboxFailure,
   type ControlEventPublication,
 } from './control-event-outbox.js';
+import { ownerDirectoryForSession } from './session-directories.js';
 
 type EventKind = 'session.event' | 'session.preparing';
 
@@ -15,11 +16,13 @@ export function createControlEventFailureHandler<Runtime extends { runtimeId: st
   return (failure?: ControlEventOutboxFailure): void => {
     if (!failure) return;
     if (failure.publication.event === 'session.preparing') return;
-    const { directory, nativeRuntimeId } = failure.publication.session;
+    const { nativeRuntimeId } = failure.publication.session;
     const root =
       failure.publication.session.rootKiloSessionId ?? failure.publication.session.kiloSessionId;
     if (!nativeRuntimeId || !root) return;
-    const runtime = options.getRuntime(directory);
+    const ownerDirectory = ownerDirectoryForSession(failure.publication.session);
+    if (!ownerDirectory) return;
+    const runtime = options.getRuntime(ownerDirectory);
     if (runtime?.runtimeId !== nativeRuntimeId) return;
     const key = JSON.stringify([nativeRuntimeId, root]);
     const keys = inFlight.get(runtime) ?? new Set<string>();

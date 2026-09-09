@@ -44,7 +44,11 @@ import { isKiloServerUnreachableError, type WrapperKiloClient } from '../kilo-ap
 import type { materializeMessageAttachments } from '../session-bootstrap.js';
 import type { runAutoCommit } from '../auto-commit.js';
 import { rejectBeforeAdmission, type ControlHandlerResult } from './control-handler-result.js';
-import { createOperationRegistry, type OperationRegistry } from './operation-registry.js';
+import {
+  createOperationRegistry,
+  type OperationRegistry,
+  type RootPublicationDisposition,
+} from './operation-registry.js';
 import { applySessionAttach, type AttachPreparingEmitter } from './apply-attach';
 import {
   directoriesForRoot,
@@ -76,6 +80,7 @@ import {
 } from './delete-worktree';
 import { collectWorktreeChanges, collectWorktreeSnapshot } from './worktree-changes';
 import { createNativeObservations, type NativeObservations } from './native-observations.js';
+import type { NativeOperationTarget } from './session-operation-cleanup.js';
 
 export type { ControlHandlerResult } from './control-handler-result.js';
 export type { SessionOperation as OwnedSessionTask } from './session-operation.js';
@@ -213,6 +218,7 @@ export function createSessionActivityRegistry(
 
 export type HandlerDeps = {
   kiloRuntimes?: WorktreeKiloRuntimes;
+  scopedCleanupResult?: boolean | (() => boolean);
   worktreeCleanupClient?: WorktreeKiloCleanupClient;
   operations: OperationRegistry;
   version: string;
@@ -252,6 +258,44 @@ function ok(result: unknown): ControlHandlerResult {
 
 function fail(code: string, message: string, retryable: boolean): ControlHandlerResult {
   return { ok: false, error: { code, message, retryable } };
+}
+
+function supportsScopedCleanupResult(deps: HandlerDeps): boolean {
+  return typeof deps.scopedCleanupResult === 'function'
+    ? deps.scopedCleanupResult()
+    : deps.scopedCleanupResult === true;
+}
+
+function resultForPublicationDisposition(
+  disposition: RootPublicationDisposition,
+  nativeRuntimeId: string,
+  scopedCleanupResultGranted: boolean,
+  delivery?: SessionOperationDelivery
+): ControlHandlerResult {
+  if (disposition.scope === 'root') {
+    return ok({
+      status: scopedCleanupResultGranted ? disposition.status : 'unconfirmed',
+      quiescent: false,
+      ...(scopedCleanupResultGranted ? { cleanupScope: 'root' as const } : {}),
+      ...(delivery ? { delivery } : {}),
+    });
+  }
+  const hasRuntimeDisposition =
+    disposition.physical !== 'stale' && disposition.physical !== 'not_attempted';
+  return ok({
+    status: disposition.runtimeRetired ? 'aborted' : disposition.status,
+    quiescent: disposition.runtimeRetired,
+    ...(scopedCleanupResultGranted && hasRuntimeDisposition
+      ? {
+          cleanupScope: 'runtime' as const,
+          runtimeRetired: disposition.runtimeRetired,
+          ...(disposition.runtimeRetired ? { nativeRuntimeId } : {}),
+        }
+      : disposition.runtimeRetired
+        ? { runtimeRetired: true, nativeRuntimeId }
+        : {}),
+    ...(delivery ? { delivery } : {}),
+  });
 }
 
 function kiloFailure(error: unknown): ControlHandlerResult {
@@ -331,6 +375,10 @@ export async function refreshHeartbeatPayload(
 }
 
 export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>): HandlerDeps {
+  const rootRetirementScope = input.kiloRuntimes?.rootRetirementScope
+    ? (directory: string, target: NativeOperationTarget, retiringRoot: string) =>
+        input.kiloRuntimes?.rootRetirementScope?.(directory, target, retiringRoot) ?? 'stale'
+    : undefined;
   const deps: HandlerDeps = Object.assign(input, {
     operations: createOperationRegistry({
       native: {
@@ -340,14 +388,20 @@ export function createControlHandlerDeps(input: Omit<HandlerDeps, 'operations'>)
         retireRuntime: (directory, deadlineAt, target) =>
           input.kiloRuntimes?.retireRuntime?.(directory, deadlineAt, target) ??
           Promise.resolve('unconfirmed'),
-        retireRuntimeIfUnshared: (directory, target, retiringRoot, deadlineAt, reason) =>
-          input.kiloRuntimes?.retireRuntimeIfUnshared?.(
-            directory,
-            target,
-            retiringRoot,
-            deadlineAt,
-            reason
-          ) ?? Promise.resolve('unconfirmed'),
+        retireRuntimeIfUnshared: (directory, target, retiringRoot, deadlineAt, reason) => {
+          if (input.kiloRuntimes?.retireRuntimeIfUnshared)
+            return input.kiloRuntimes.retireRuntimeIfUnshared(
+              directory,
+              target,
+              retiringRoot,
+              deadlineAt,
+              reason
+            );
+          if (rootRetirementScope?.(directory, target, retiringRoot) === 'shared')
+            return Promise.resolve<'shared'>('shared');
+          return Promise.resolve<'unconfirmed'>('unconfirmed');
+        },
+        ...(rootRetirementScope ? { rootRetirementScope } : {}),
         verifyQuiescence: (directory, target, deadlineAt) =>
           input.kiloRuntimes?.verifyQuiescence?.(directory, target, deadlineAt) ??
           Promise.resolve(false),
@@ -653,11 +707,39 @@ function sessionKiloRuntime(
   return deps.kiloRuntimes?.get(session.directory);
 }
 
+function currentRuntimeMatchesTarget(
+  session: SessionRequestIdentity,
+  target: NativeOperationTarget | undefined,
+  deps: HandlerDeps
+): boolean {
+  if (!target) return false;
+  const runtime =
+    deps.kiloRuntimes?.getRetained?.(session.directory) ??
+    deps.kiloRuntimes?.get(session.directory);
+  return (
+    runtime !== undefined &&
+    runtime.runtimeId === target.runtimeId &&
+    (target.client === undefined || runtime.kiloClient === target.client)
+  );
+}
+
 function terminalFailure(error: unknown): ControlHandlerResult {
   if (error instanceof ControlTerminalRuntimeError || error instanceof WorktreeKiloRuntimeError) {
     return fail(error.code, error.message, error.retryable);
   }
   return fail('not_ready', 'Terminal request failed', isKiloServerUnreachableError(error));
+}
+
+async function detachAbortedTerminal(
+  session: SessionRequestIdentity,
+  deps: HandlerDeps
+): Promise<ControlHandlerResult | undefined> {
+  try {
+    await deps.terminalRuntime?.detachSession(session);
+    return undefined;
+  } catch (error) {
+    return terminalFailure(error);
+  }
 }
 
 async function handleAttach(
@@ -947,6 +1029,7 @@ async function handleAbort(
 ): Promise<ControlHandlerResult> {
   const parsed = sessionAbortPayloadSchema.safeParse(payload ?? {});
   if (!parsed.success) return fail('protocol_error', 'Invalid payload', false);
+  const scopedCleanupResultGranted = supportsScopedCleanupResult(deps);
   if (parsed.data.nativeRuntimeId) {
     const runtime = deps.kiloRuntimes?.getRetained?.(session.directory);
     if (!runtime || runtime.runtimeId !== parsed.data.nativeRuntimeId) {
@@ -965,16 +1048,25 @@ async function handleAbort(
       deadlineAt,
       { runtimeId: parsed.data.nativeRuntimeId, client: runtime.kiloClient }
     );
+    if (retirement === 'retired') {
+      const terminalError = await detachAbortedTerminal(session, deps);
+      if (terminalError) return terminalError;
+    }
     return ok({
       status: retirement === 'unconfirmed' ? 'unconfirmed' : 'aborted',
       quiescent: retirement !== 'unconfirmed',
       ...(retirement === 'retired'
-        ? { runtimeRetired: true, nativeRuntimeId: parsed.data.nativeRuntimeId }
+        ? {
+            runtimeRetired: true,
+            nativeRuntimeId: parsed.data.nativeRuntimeId,
+            ...(scopedCleanupResultGranted ? { cleanupScope: 'runtime' as const } : {}),
+          }
         : {}),
     });
   }
   const task = deps.operations.abortTarget(session, parsed.data.messageId);
   if (task) {
+    const ownsCurrentTask = deps.operations.active(session.kiloSessionId) === task;
     if (
       parsed.data.cleanupDeadlineAt !== undefined &&
       parsed.data.cleanupDeadlineAt <= Date.now()
@@ -990,23 +1082,33 @@ async function handleAbort(
       const result = await task.done;
       if (task.cleanup === 'unconfirmed')
         return fail('not_ready', 'Kilo cancellation was not confirmed', false);
+      if (ownsCurrentTask) {
+        const terminalError = await detachAbortedTerminal(session, deps);
+        if (terminalError) return terminalError;
+      }
       if (!result.ok && task.kind !== 'preparation') return result;
       return ok({ status: 'aborted' });
     }
     const deadlineAt = task.captureCleanupDeadline(
       parsed.data.cleanupDeadlineAt ?? Date.now() + SANDBOX_CONTROL_CLEANUP_TIMEOUT_MS
     );
-    let quiescent = await task.cleanupOwnedWork(deadlineAt);
-    const publicationScope = task.publicationScope();
-    const scopedCleanup = publicationScope ? await task.runRootScopedCleanup() : undefined;
-    if (publicationScope) quiescent = false;
-    let runtimeRetired = false;
-    let nativeRuntimeId: string | undefined;
+    let publicationScope = task.publicationScope();
     const target = task.nativeTarget();
-    if (!quiescent && target && publicationScope && scopedCleanup === 'unconfirmed') {
-      const retiringRoot =
-        rootForSession(session.kiloSessionId, session.directory) ?? session.kiloSessionId;
-      const escalation = deps.operations.escalateRootPublication({
+    const ownsCurrentRuntime = currentRuntimeMatchesTarget(session, target, deps);
+    const retiringRoot =
+      rootForSession(session.kiloSessionId, session.directory) ?? session.kiloSessionId;
+    const readRootRetirementScope = () =>
+      target
+        ? deps.kiloRuntimes?.rootRetirementScope?.(session.directory, target, retiringRoot)
+        : undefined;
+    const rootScopeBeforeCleanup = readRootRetirementScope();
+    let escalation: ReturnType<HandlerDeps['operations']['escalateRootPublication']> | undefined;
+    const ensureEscalation = ():
+      | ReturnType<HandlerDeps['operations']['escalateRootPublication']>
+      | undefined => {
+      publicationScope = task.publicationScope();
+      if (!publicationScope || !target || escalation) return escalation;
+      escalation = deps.operations.escalateRootPublication({
         directory: session.directory,
         root: retiringRoot,
         nativeRuntimeId: target.runtimeId,
@@ -1015,11 +1117,107 @@ async function handleAbort(
         deadlineAt: publicationScope.deadlineAt,
         ...(publicationScope.claim === undefined ? {} : { expectedClaim: publicationScope.claim }),
       });
-      const retirement = await escalation.physical;
-      runtimeRetired = retirement === 'retired';
-      if (runtimeRetired) nativeRuntimeId = target.runtimeId;
-      quiescent = retirement === 'retired';
-    } else if (!quiescent && !publicationScope && target && Date.now() < deadlineAt) {
+      publicationScope = task.publicationScope();
+      return escalation;
+    };
+    const sharedRootResult = async (): Promise<ControlHandlerResult | undefined> => {
+      const disposition = escalation?.disposition();
+      if (!publicationScope || disposition?.scope !== 'root' || !scopedCleanupResultGranted)
+        return undefined;
+      task.cancel(publicationScope.reason, 'failed', publicationScope.deadlineAt);
+      if (ownsCurrentTask) {
+        const terminalError = await detachAbortedTerminal(session, deps);
+        if (terminalError) return terminalError;
+      }
+      return resultForPublicationDisposition(
+        disposition,
+        target?.runtimeId ?? '',
+        scopedCleanupResultGranted,
+        task.deliveryResult()
+      );
+    };
+
+    let quiescent = false;
+    let runtimeRetired = false;
+    let nativeRuntimeId: string | undefined;
+    if (publicationScope) {
+      quiescent = await task.cleanupOwnedWork(deadlineAt);
+    } else {
+      const cleanup = task.cleanupOwnedWork(deadlineAt).catch(() => false);
+      const first = await Promise.race([
+        cleanup.then(result => ({ kind: 'cleanup' as const, result })),
+        task.waitForPublicationScope().then(() => ({ kind: 'claim' as const })),
+      ]);
+      if (first.kind === 'claim') {
+        ensureEscalation();
+        const claimedSharedRootResult = await sharedRootResult();
+        if (claimedSharedRootResult) return claimedSharedRootResult;
+        quiescent = await cleanup;
+      } else {
+        quiescent = first.result;
+      }
+    }
+
+    publicationScope = task.publicationScope();
+    ensureEscalation();
+    const settledSharedRootResult = await sharedRootResult();
+    if (settledSharedRootResult) return settledSharedRootResult;
+
+    if (publicationScope && escalation) {
+      const currentDisposition = escalation.disposition();
+      if (currentDisposition.physicalAttemptStarted) {
+        if ((ownsCurrentTask || ownsCurrentRuntime) && currentDisposition.scope === 'runtime') {
+          const terminalError = await detachAbortedTerminal(session, deps);
+          if (terminalError) return terminalError;
+        }
+        return resultForPublicationDisposition(
+          currentDisposition,
+          target?.runtimeId ?? '',
+          scopedCleanupResultGranted,
+          task.deliveryResult()
+        );
+      }
+      const disposition = await escalation.physical;
+      const result = await task.done;
+      if (parsed.data.operationId) {
+        if (
+          (ownsCurrentTask && disposition.scope === 'root') ||
+          ((ownsCurrentTask || ownsCurrentRuntime) && disposition.runtimeRetired)
+        ) {
+          const terminalError = await detachAbortedTerminal(session, deps);
+          if (terminalError) return terminalError;
+        }
+        return resultForPublicationDisposition(
+          disposition,
+          target?.runtimeId ?? '',
+          scopedCleanupResultGranted,
+          task.deliveryResult()
+        );
+      }
+      if (!result.ok && task.kind !== 'preparation') return result;
+      return ok({ status: disposition.status });
+    }
+
+    if (
+      !publicationScope &&
+      (rootScopeBeforeCleanup === 'shared' || readRootRetirementScope() === 'shared') &&
+      scopedCleanupResultGranted
+    ) {
+      await task.done;
+      if (ownsCurrentTask) {
+        const terminalError = await detachAbortedTerminal(session, deps);
+        if (terminalError) return terminalError;
+      }
+      const delivery = task.deliveryResult();
+      return ok({
+        status: quiescent ? 'aborted' : 'unconfirmed',
+        quiescent: false,
+        cleanupScope: 'root' as const,
+        ...(delivery ? { delivery } : {}),
+      });
+    }
+
+    if (!quiescent && !publicationScope && target && Date.now() < deadlineAt) {
       const retirementReason = 'Native cancellation did not settle';
       const retirement = await deps.operations.retireDirectory(
         session.directory,
@@ -1031,11 +1229,18 @@ async function handleAbort(
       if (runtimeRetired) nativeRuntimeId = target.runtimeId;
       quiescent = task.confirmCleanup(retirement !== 'unconfirmed', deadlineAt);
       if (retirement === 'unconfirmed') deps.retireRuntime(retirementReason);
-    } else if (!quiescent && !publicationScope) {
+    } else if (!quiescent) {
       task.requestRetirement('Kilo cancellation failed', deadlineAt);
     }
     const result = await task.done;
     if (parsed.data.operationId) {
+      if (
+        (ownsCurrentTask && quiescent) ||
+        ((ownsCurrentTask || ownsCurrentRuntime) && runtimeRetired)
+      ) {
+        const terminalError = await detachAbortedTerminal(session, deps);
+        if (terminalError) return terminalError;
+      }
       const delivery = task.deliveryResult();
       return ok({
         status: quiescent ? 'aborted' : 'unconfirmed',

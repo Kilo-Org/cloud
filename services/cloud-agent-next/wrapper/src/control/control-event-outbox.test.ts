@@ -89,6 +89,71 @@ describe('control event outbox', () => {
     }
   });
 
+  it('recomputes retained bytes from the retained sequence width', async () => {
+    let failed: PreparedControlEventPublication | undefined;
+    let publishCount = 0;
+    const outbox = createControlEventOutbox({
+      publish: async () => {
+        publishCount += 1;
+        if (publishCount === 9) throw new ControlDeliveryError('rejected', false);
+      },
+      onFailure: failure => {
+        failed = failure.publication as PreparedControlEventPublication;
+      },
+    });
+    try {
+      for (let index = 0; index < 8; index += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: {
+                type: 'message.created',
+                properties: { messageId: `barrier_${index}` },
+              },
+            })
+          )
+        ).toBe(true);
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'first'),
+      });
+      const latest = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'latest'),
+      });
+      expect(first.sequence).toBe(9);
+      expect(latest.sequence).toBe(10);
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(latest)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      const retained = failed;
+      if (!retained) throw new Error('Missing retained publication');
+      const bytes = retained.bytes;
+      const wire: ControlEventPublication & { bytes?: number; deadlineAt?: number } = {
+        ...retained,
+      };
+      delete wire.bytes;
+      delete wire.deadlineAt;
+      expect(bytes).toBe(
+        Buffer.byteLength(
+          JSON.stringify({
+            type: 'request',
+            requestId: '00000000-0000-4000-8000-000000000000',
+            operation: 'sandbox.event.publish',
+            payload: wire,
+          })
+        )
+      );
+      expect(bytes).not.toBe(latest.bytes);
+    } finally {
+      outbox.close();
+    }
+  });
+
   it('squashes adjacent same-message updates to the latest payload', async () => {
     const clock = spyOn(Date, 'now').mockReturnValue(1_000);
     const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
@@ -1159,6 +1224,42 @@ describe('control event outbox', () => {
       expect(await outbox.resume()).toBe(true);
       expect(published).toHaveBeenCalledTimes(1);
     } finally {
+      outbox.close();
+    }
+  });
+
+  it('wakes a pending cycle when paused without starting another lane', async () => {
+    const started = Promise.withResolvers<void>();
+    const held = Promise.withResolvers<void>();
+    const published = mock(async (publication: ControlEventPublication) => {
+      if (
+        typeof publication.payload === 'object' &&
+        publication.payload !== null &&
+        'type' in publication.payload &&
+        publication.payload.type === 'first'
+      )
+        started.resolve();
+      await held.promise;
+    });
+    const outbox = createControlEventOutbox({ publish: published, onFailure: mock() });
+    try {
+      outbox.enqueue(
+        outbox.prepare({ event: 'session.event', session, payload: { type: 'first' } })
+      );
+      const pumping = outbox.resume();
+      await started.promise;
+      outbox.pause();
+      expect(await pumping).toBe(false);
+      outbox.enqueue(
+        outbox.prepare({ event: 'session.event', session, payload: { type: 'second' } })
+      );
+      expect(published).toHaveBeenCalledTimes(1);
+      const resumed = outbox.resume();
+      held.resolve();
+      expect(await resumed).toBe(true);
+      expect(published).toHaveBeenCalledTimes(2);
+    } finally {
+      held.resolve();
       outbox.close();
     }
   });

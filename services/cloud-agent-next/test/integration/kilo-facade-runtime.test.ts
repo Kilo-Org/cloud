@@ -1,5 +1,5 @@
 import { SELF, env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, it, expect } from 'vitest';
 import { registerReadySession } from '../helpers/session-setup.js';
 
 const userId = 'user_facade_runtime';
@@ -53,9 +53,7 @@ function createSseDataReader(response: Response): SseDataReader {
 }
 
 async function configureCurrentProducer(identity: WrapperIdentity): Promise<void> {
-  const session = env.CLOUD_AGENT_SESSION.get(
-    env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${cloudAgentSessionId}`)
-  );
+  const session = sessionStub(userId, cloudAgentSessionId);
   await runInDurableObject(session, async instance => {
     const metadata = await instance.getMetadata();
     if (!metadata) {
@@ -82,9 +80,12 @@ async function connectProducer(identity: WrapperIdentity): Promise<WebSocket> {
     wrapperGeneration: String(identity.wrapperGeneration),
     wrapperConnectionId: identity.wrapperConnectionId,
   });
-  const response = await SELF.fetch(`http://worker.test/kilo-global-feed-test?${query}`, {
-    headers: { Upgrade: 'websocket' },
-  });
+  const response = await SELF.fetch(
+    `http://worker.test/kilo-global-feed-test?${query.toString()}`,
+    {
+      headers: { Upgrade: 'websocket' },
+    }
+  );
   if (response.status !== 101 || !response.webSocket) {
     throw new Error(`Unexpected producer upgrade response: ${response.status}`);
   }
@@ -104,6 +105,40 @@ async function readProducerMarker(): Promise<unknown> {
     state.storage.get(`producer:${cloudAgentSessionId}`)
   );
 }
+
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
 
 describe('UserKiloFacade in the Workers runtime', () => {
   it('routes a public facade request to the user Durable Object', async () => {
@@ -128,9 +163,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
     const extensionUserId = 'user_facade_extension';
     const extensionCloudAgentSessionId = 'agent_facade_extension';
     const extensionKiloSessionId = 'ses_abcdefghijklmnopqrstuvwxyz';
-    const session = env.CLOUD_AGENT_SESSION.get(
-      env.CLOUD_AGENT_SESSION.idFromName(`${extensionUserId}:${extensionCloudAgentSessionId}`)
-    );
+    const session = sessionStub(extensionUserId, extensionCloudAgentSessionId);
     await runInDurableObject(session, async instance => {
       await registerReadySession(instance, {
         sessionId: extensionCloudAgentSessionId,
@@ -346,7 +379,7 @@ describe('UserKiloFacade in the Workers runtime', () => {
       wrapperConnectionId: firstIdentity.wrapperConnectionId,
     });
     const staleResponse = await SELF.fetch(
-      `http://worker.test/kilo-global-feed-test?${staleQuery}`,
+      `http://worker.test/kilo-global-feed-test?${staleQuery.toString()}`,
       { headers: { Upgrade: 'websocket' } }
     );
     expect(staleResponse.status).toBe(409);

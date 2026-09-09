@@ -90,6 +90,7 @@ import {
   platform_oauth_credentials,
   platform_access_token_credentials,
   platform_integrations,
+  github_app_installations,
   model_eval_ingestions,
   microdollar_usage,
   microdollar_usage_metadata,
@@ -132,6 +133,7 @@ import {
   user_deletion_requests,
   user_deletion_steps,
   cloud_agent_pending_uploads,
+  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
 } from '@kilocode/db/schema';
 
@@ -204,6 +206,7 @@ describe('User', () => {
   // Shared cleanup for all tests in this suite to prevent data pollution
   afterEach(async () => {
     await db.delete(cloud_agent_worktrees);
+    await db.delete(cloud_agent_workspace_folders);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
     await db.delete(deployments_ephemeral);
@@ -309,6 +312,7 @@ describe('User', () => {
     await db.delete(platform_oauth_credentials);
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
+    await db.delete(github_app_installations);
     await db.delete(quick_chat_messages);
     await db.delete(quick_chat_threads);
     await db.delete(organizations);
@@ -1539,6 +1543,96 @@ describe('User', () => {
         .from(cloud_agent_worktrees)
         .where(eq(cloud_agent_worktrees.kilo_user_id, otherUser.id));
       expect(otherWorktree.name).toBe('Keep this name');
+    });
+
+    it('deletes workspace folder names and assignments in every scope without touching another owner', async () => {
+      const user = await insertTestUser({
+        id: `oauth/github|workspace-folder-privacy-${randomUUID()}`,
+      });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Folder privacy organization',
+        otherUser.id,
+        0
+      );
+      const [personalFolder, organizationFolder, otherFolder] = await db
+        .insert(cloud_agent_workspace_folders)
+        .values([
+          { kilo_user_id: user.id, name: 'Private customer name', color: 'red', position: 0 },
+          {
+            kilo_user_id: user.id,
+            organization_id: organization.id,
+            name: 'Private organization project',
+            color: 'blue',
+            position: 0,
+          },
+          {
+            kilo_user_id: otherUser.id,
+            organization_id: organization.id,
+            name: 'Keep this folder',
+            color: 'green',
+            position: 0,
+          },
+        ])
+        .returning();
+      if (!personalFolder || !organizationFolder || !otherFolder) {
+        throw new Error('Folder privacy fixtures were not inserted');
+      }
+      const personalWorktreeId = `worktree_${randomUUID()}`;
+      const organizationWorktreeId = `worktree_${randomUUID()}`;
+      const otherWorktreeId = `worktree_${randomUUID()}`;
+      const deletionStartedAt = '2026-08-27T08:00:00.000Z';
+      await db.insert(cloud_agent_worktrees).values([
+        {
+          worktree_id: personalWorktreeId,
+          kilo_user_id: user.id,
+          name: 'Private workspace name',
+          folder_id: personalFolder.id,
+          deletion_started_at: deletionStartedAt,
+        },
+        {
+          worktree_id: organizationWorktreeId,
+          kilo_user_id: user.id,
+          organization_id: organization.id,
+          name: 'Private organization workspace',
+          folder_id: organizationFolder.id,
+        },
+        {
+          worktree_id: otherWorktreeId,
+          kilo_user_id: otherUser.id,
+          organization_id: organization.id,
+          name: 'Keep this workspace',
+          folder_id: otherFolder.id,
+        },
+      ]);
+      const [otherWorktreeBefore] = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.worktree_id, otherWorktreeId));
+
+      await softDeleteUser(user.id);
+
+      expect(await db.select().from(cloud_agent_workspace_folders)).toEqual([otherFolder]);
+      const userWorktrees = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.kilo_user_id, user.id));
+      expect(userWorktrees).toHaveLength(2);
+      expect(
+        userWorktrees.every(worktree => worktree.name === null && worktree.folder_id === null)
+      ).toBe(true);
+      const fencedWorktree = userWorktrees.find(
+        worktree => worktree.worktree_id === personalWorktreeId
+      );
+      expect(new Date(fencedWorktree?.deletion_started_at ?? '').toISOString()).toBe(
+        deletionStartedAt
+      );
+      const [otherWorktreeAfter] = await db
+        .select()
+        .from(cloud_agent_worktrees)
+        .where(eq(cloud_agent_worktrees.worktree_id, otherWorktreeId));
+      expect(otherWorktreeAfter).toEqual(otherWorktreeBefore);
+      expect(await findUserById(user.id)).toMatchObject({ google_user_name: 'Deleted User' });
     });
 
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
@@ -4843,6 +4937,76 @@ describe('User', () => {
 
       expect(deletedCredentials).toHaveLength(0);
       expect(retainedCredentials).toHaveLength(1);
+    });
+
+    it('deletes an unshared personal canonical GitHub installation', async () => {
+      const user = await insertTestUser();
+      const [canonical] = await db
+        .insert(github_app_installations)
+        .values({
+          github_app_type: 'standard',
+          installation_id: '9876501',
+          account_id: '101',
+          account_login: 'personal-login',
+          account_type: 'User',
+          lifecycle_state: 'active',
+          observed_at: new Date().toISOString(),
+        })
+        .returning();
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: user.id,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '9876501',
+        github_app_type: 'standard',
+        github_installation_id: canonical.id,
+        integration_status: 'active',
+      });
+      await softDeleteUser(user.id);
+      await expect(
+        db
+          .select()
+          .from(github_app_installations)
+          .where(eq(github_app_installations.id, canonical.id))
+      ).resolves.toHaveLength(0);
+    });
+
+    it('deletes migration-created personal canonical PII but preserves organizations', async () => {
+      const user = await insertTestUser();
+      await db.insert(user_github_app_tokens).values({
+        kilo_user_id: user.id,
+        github_app_type: 'standard',
+        github_user_id: '99101',
+        github_login: 'personal-login',
+        access_token_encrypted: 'encrypted-access',
+        access_token_expires_at: '2026-10-01T00:00:00.000Z',
+        refresh_token_encrypted: 'encrypted-refresh',
+        refresh_token_expires_at: '2027-01-01T00:00:00.000Z',
+      });
+      const canonicals = await db
+        .insert(github_app_installations)
+        .values([
+          {
+            github_app_type: 'standard',
+            installation_id: '9876502',
+            account_id: '99101',
+            account_login: 'personal-login',
+            account_type: null,
+            lifecycle_state: 'active',
+          },
+          {
+            github_app_type: 'standard',
+            installation_id: '9876503',
+            account_id: '99101',
+            account_login: 'organization-login',
+            account_type: 'Organization',
+            lifecycle_state: 'active',
+          },
+        ])
+        .returning();
+      await softDeleteUser(user.id);
+      const retained = await db.select().from(github_app_installations);
+      expect(retained.map(row => row.id)).toEqual([canonicals[1]?.id]);
     });
 
     it('should nullify free_model_usage FK', async () => {

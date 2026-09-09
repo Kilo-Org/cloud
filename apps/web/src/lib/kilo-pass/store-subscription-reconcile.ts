@@ -62,56 +62,63 @@ export async function reconcileStoreSubscriptionExpiry(
   let skippedNoStorePurchaseCount = 0;
 
   for (const candidate of candidates) {
-    const latestStorePurchase = await db.query.kilo_pass_store_purchases.findFirst({
-      where: and(
-        eq(kilo_pass_store_purchases.kilo_pass_subscription_id, candidate.subscriptionId),
-        eq(kilo_pass_store_purchases.payment_provider, candidate.paymentProvider)
-      ),
-      orderBy: desc(kilo_pass_store_purchases.purchased_at),
-    });
+    await db.transaction(async tx => {
+      await tx
+        .select({ id: kilo_pass_subscriptions.id })
+        .from(kilo_pass_subscriptions)
+        .where(eq(kilo_pass_subscriptions.id, candidate.subscriptionId))
+        .for('update');
+      const latestStorePurchase = await tx.query.kilo_pass_store_purchases.findFirst({
+        where: and(
+          eq(kilo_pass_store_purchases.kilo_pass_subscription_id, candidate.subscriptionId),
+          eq(kilo_pass_store_purchases.payment_provider, candidate.paymentProvider)
+        ),
+        orderBy: desc(kilo_pass_store_purchases.purchased_at),
+      });
 
-    if (!latestStorePurchase) {
-      skippedNoStorePurchaseCount += 1;
-      continue;
-    }
+      if (!latestStorePurchase) {
+        skippedNoStorePurchaseCount += 1;
+        return;
+      }
 
-    if (!isExpiredAtOrBeforeNow(latestStorePurchase.expires_at, nowMillis)) {
-      continue;
-    }
+      if (!isExpiredAtOrBeforeNow(latestStorePurchase.expires_at, nowMillis)) {
+        return;
+      }
 
-    const updated = await db
-      .update(kilo_pass_subscriptions)
-      .set({
-        status: 'canceled',
-        cancel_at_period_end: false,
-        ended_at: nowIso,
-      })
-      .where(
-        and(
-          eq(kilo_pass_subscriptions.id, candidate.subscriptionId),
-          ne(kilo_pass_subscriptions.status, 'canceled')
+      const updated = await tx
+        .update(kilo_pass_subscriptions)
+        .set({
+          status: 'canceled',
+          cancel_at_period_end: false,
+          ended_at: nowIso,
+        })
+        .where(
+          and(
+            eq(kilo_pass_subscriptions.id, candidate.subscriptionId),
+            ne(kilo_pass_subscriptions.status, 'canceled')
+          )
         )
-      )
-      .returning({ id: kilo_pass_subscriptions.id });
+        .returning({ id: kilo_pass_subscriptions.id });
 
-    if (updated.length === 0) continue;
+      if (updated.length === 0) return;
 
-    expiredSubscriptionCount += 1;
+      expiredSubscriptionCount += 1;
 
-    await appendKiloPassAuditLog(db, {
-      action: KiloPassAuditLogAction.StoreSubscriptionExpired,
-      result: KiloPassAuditLogResult.Success,
-      kiloUserId: candidate.kiloUserId,
-      kiloPassSubscriptionId: candidate.subscriptionId,
-      payload: {
-        scope: 'subscription',
-        kind: 'store_subscription_reconcile',
-        runId,
-        paymentProvider: candidate.paymentProvider,
-        providerSubscriptionId: candidate.providerSubscriptionId,
-        expiresAt: latestStorePurchase.expires_at,
-        endedAt: nowIso,
-      },
+      await appendKiloPassAuditLog(tx, {
+        action: KiloPassAuditLogAction.StoreSubscriptionExpired,
+        result: KiloPassAuditLogResult.Success,
+        kiloUserId: candidate.kiloUserId,
+        kiloPassSubscriptionId: candidate.subscriptionId,
+        payload: {
+          scope: 'subscription',
+          kind: 'store_subscription_reconcile',
+          runId,
+          paymentProvider: candidate.paymentProvider,
+          providerSubscriptionId: candidate.providerSubscriptionId,
+          expiresAt: latestStorePurchase.expires_at,
+          endedAt: nowIso,
+        },
+      });
     });
   }
 

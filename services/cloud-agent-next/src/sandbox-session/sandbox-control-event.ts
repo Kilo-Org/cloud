@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { extractEntityId } from '../session/ingest-handlers/entity-id.js';
 import type { EventId } from '../types/ids.js';
 import type { StoredEvent } from '../websocket/types.js';
+import { slimPersistedKilocodeEvent } from '../shared/ingest-frame.js';
 
 const PERSISTED_KILO_EVENT_NAMES: ReadonlySet<string> = new Set([
   'message.removed',
@@ -97,7 +98,7 @@ export function persistSandboxControlSessionEvent(params: {
   broadcast: (event: StoredEvent) => void;
 }): { applied: true } {
   const timestamp = params.payload.timestamp ? Date.parse(params.payload.timestamp) : Date.now();
-  const payload = JSON.stringify({
+  const livePayload = JSON.stringify({
     type: params.payload.type,
     event: params.payload.type,
     properties: params.payload.properties,
@@ -109,11 +110,18 @@ export function persistSandboxControlSessionEvent(params: {
       : extractEntityId(params.payload.type, { properties: params.payload.properties });
   let eventId: EventId = 0;
   if (entityId) {
+    const persistedPayload = JSON.stringify(
+      slimPersistedKilocodeEvent({
+        type: params.payload.type,
+        event: params.payload.type,
+        properties: params.payload.properties,
+      })
+    );
     eventId = params.eventQueries.upsert({
       executionId: '',
       sessionId: params.sessionId,
       streamEventType: 'kilocode',
-      payload,
+      payload: persistedPayload,
       timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
       entityId,
     });
@@ -122,7 +130,7 @@ export function persistSandboxControlSessionEvent(params: {
       executionId: '',
       sessionId: params.sessionId,
       streamEventType: 'kilocode',
-      payload,
+      payload: livePayload,
       timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
     });
   }
@@ -132,7 +140,7 @@ export function persistSandboxControlSessionEvent(params: {
     execution_id: '',
     session_id: params.sessionId,
     stream_event_type: 'kilocode',
-    payload,
+    payload: livePayload,
     timestamp: Number.isFinite(timestamp) ? timestamp : Date.now(),
   });
   return { applied: true };

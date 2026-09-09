@@ -24,7 +24,12 @@ declare type Queue<T> = {
 };
 
 declare type GitTokenService = {
-  getToken(installationId: string, appType?: 'standard' | 'lite'): Promise<string>;
+  getToken(
+    installationId: string,
+    appType?: 'standard' | 'lite',
+    expectedIntegrationId?: string,
+    allowAuthenticationRecovery?: boolean
+  ): Promise<string>;
 };
 
 declare type SecretBinding = {

@@ -827,6 +827,17 @@ async function installBuilder(config: ProviderConfig, sessionId: string): Promis
       script: 'sudo dnf install -y git git-lfs jq tar gzip',
     },
     {
+      // AL2023 core dnf does not ship ripgrep; it is SPAL-only.
+      label: 'install ripgrep',
+      script: [
+        'RG_VERSION=15.2.0',
+        'curl -fsSL "https://github.com/BurntSushi/ripgrep/releases/download/${RG_VERSION}/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl.tar.gz" -o /tmp/rg.tar.gz',
+        'tar -xzf /tmp/rg.tar.gz -C /tmp',
+        'sudo install -m 0755 /tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl/rg /usr/local/bin/rg',
+        'rm -rf /tmp/rg.tar.gz /tmp/ripgrep-${RG_VERSION}-x86_64-unknown-linux-musl',
+      ].join('\n'),
+    },
+    {
       label: `install bun ${PINNED_BUN_VERSION}`,
       script: `curl -fsSL https://bun.sh/install | bash -s ${shellQuote(`bun-v${PINNED_BUN_VERSION}`)} && sudo install -m 0755 "$HOME/.bun/bin/bun" /usr/local/bin/bun`,
     },

@@ -72,3 +72,24 @@ export function getSessionDetailRenameState(input: {
     isModalOpen: input.renameState.isModalOpen,
   };
 }
+
+/**
+ * Title from a v2 `session.updated` event for this session, or undefined
+ * when the event is for another session or carries no usable title.
+ */
+export function titleFromSessionUpdatedEvent(
+  sessionId: string,
+  payload: {
+    source: string;
+    session: { sessionId: string; title: string | null };
+  }
+): string | undefined {
+  if (payload.source !== 'v2' || payload.session.sessionId !== sessionId) {
+    return undefined;
+  }
+  const title = payload.session.title;
+  if (title == null || title.trim().length === 0) {
+    return undefined;
+  }
+  return title;
+}

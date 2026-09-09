@@ -9,6 +9,7 @@ import {
   SANDBOX_STATUS_DETAIL_MESSAGES,
   type SandboxStatusSnapshot,
   baseWorktreeChangesNextSchema,
+  baseWorktreeFileNextSchema,
   cloudAgentGetAttachmentDownloadUrlSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
   cloudAgentRelaxedAttachmentFilenameSchema,
@@ -240,6 +241,40 @@ describe('baseWorktreeChangesNextSchema', () => {
       ).toBe(false);
     }
   );
+});
+
+describe('baseWorktreeFileNextSchema', () => {
+  const input = {
+    cloudAgentSessionId: `workspace_${MESSAGE_UUID}`,
+    path: 'src/odd\nfile.ts',
+    expectedRevision: 12,
+  };
+
+  it('preserves the exact relative path and expected revision', () => {
+    expect(baseWorktreeFileNextSchema.parse(input)).toEqual(input);
+  });
+
+  it.each([
+    { path: '' },
+    { path: '/absolute' },
+    { path: '../outside' },
+    { path: 'src/../outside' },
+    { path: 'src/./file' },
+    { path: 'src//file' },
+    { path: 'src/\0file' },
+    { path: 'a'.repeat(4097) },
+    { expectedRevision: 0 },
+    { expectedRevision: 1.5 },
+    { expectedRevision: Number.MAX_SAFE_INTEGER + 1 },
+    { expectedRevision: '12' },
+    { cloudAgentSessionId: `agent_${MESSAGE_UUID}` },
+    { directory: '/workspace' },
+    { baseRef: 'HEAD' },
+    { sandboxId: 'usr_other' },
+    { organizationId: MESSAGE_UUID },
+  ])('rejects invalid or expanded file queries', override => {
+    expect(baseWorktreeFileNextSchema.safeParse({ ...input, ...override }).success).toBe(false);
+  });
 });
 
 describe('cloudAgentGetAttachmentUploadUrlSchema', () => {

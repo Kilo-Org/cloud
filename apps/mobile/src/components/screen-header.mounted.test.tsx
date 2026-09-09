@@ -1,4 +1,4 @@
-/* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
+/* eslint-disable typescript-eslint/no-deprecated, max-lines -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as composer-paste-button.mounted.test.tsx) */
 import { type ComponentProps, createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -313,7 +313,7 @@ describe('ScreenHeader mounted', () => {
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
-      { title: 'Sessions', headerRight: 'RIGHT' },
+      { title: 'Sessions', headerRight: 'RIGHT', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 1, headerRight: 'METRICS' },
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
     ];
@@ -321,13 +321,13 @@ describe('ScreenHeader mounted', () => {
     for (const props of variants) {
       const renderer = renderHeader(props);
       const back = findBackPressable(renderer.root);
-      expect(back.props.className).toContain('h-11 w-11');
-      expect(back.props.className).toContain('items-center');
-      expect(back.props.className).toContain('justify-center');
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       expect(title.props.numberOfLines).toBe(props.titleNumberOfLines ?? 2);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
+      if (props.reserveTitleSpace) {
+        expect(title.parent?.props.className).toContain('min-h-14 justify-center');
+      }
       if (props.context) {
         expect(title.parent?.children).toEqual([title, props.context]);
       }
@@ -337,5 +337,22 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(back.parent?.parent?.parent);
       }
     }
+  });
+
+  it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
+    const renderer = renderHeader({
+      title: 'Submit review',
+      eyebrow: 'KILO-ORG/CLOUD#5058',
+      onBack: () => undefined,
+      backIcon: 'close',
+      showBackButton: true,
+      safeAreaTop: false,
+      className: 'pt-3',
+    });
+    const back = findBackPressable(renderer.root);
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.parent?.parent).toBe(back.parent);
+    expect(renderer.root.props.style).toBeUndefined();
+    expect(renderer.root.props.className).toContain('pt-3');
   });
 });

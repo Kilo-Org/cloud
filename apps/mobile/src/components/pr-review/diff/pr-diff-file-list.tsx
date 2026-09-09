@@ -26,7 +26,8 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshControl, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
+import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { QueryError } from '@/components/query-error';
 import {
@@ -271,7 +272,7 @@ export function PrReviewFileList({
     if (firstPageErrorState?.kind === 'permission') {
       return (
         <TabStateMessage
-          title={t('prReview.accessDenied')}
+          title={t('common.accessDenied')}
           message={t('prReview.accessDeniedDescription')}
         />
       );

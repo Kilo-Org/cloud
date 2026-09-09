@@ -171,6 +171,7 @@ describe('ConsentDetails copy', () => {
     expect(titles).toContain('Crash reporting');
     expect(titles).toContain('Product analytics');
     expect(titles).toContain('Error screenshots and session replay');
+    expect(titles).toContain('Performance profiling');
     expect(titles).toContain('Install attribution');
     expect(titles).toContain('Voice transcription');
   });
@@ -236,6 +237,25 @@ describe('ConsentDetails copy', () => {
     const texts = collectTextStrings(footer);
     expect(texts.some((t: string) => t.includes('masked on your device'))).toBe(true);
   });
+
+  it('profiling disclosure names function names and call stacks', () => {
+    const renderer = mount();
+    const sections = findAllSectionProps(renderer.root);
+    const profiling = sections.find(s => s.title === 'Performance profiling');
+    expect(profiling).toBeDefined();
+
+    const footer = profiling?.footer;
+    expect(footer).toBeDefined();
+
+    const texts = collectTextStrings(footer);
+    expect(
+      texts.some(
+        (t: string) =>
+          t.includes('function names and call stacks') &&
+          t.includes('never your prompts or conversation content')
+      )
+    ).toBe(true);
+  });
 });
 
 describe('Voice transcription section', () => {
@@ -266,7 +286,12 @@ describe('Voice transcription section', () => {
 
   it('shows On device with no switch when on-device is supported', () => {
     const renderer = mountVoiceControl();
-    expect(findTextStrings(renderer.root)).toContain('On device');
+    const strings = findTextStrings(renderer.root);
+    expect(strings).toContain('On device');
+    // The row label is the neutral section name. "Online transcription" next
+    // to an "On device" value contradicted itself (vr1 review, 2026-09-07).
+    expect(strings).toContain('Voice transcription');
+    expect(strings).not.toContain('Online transcription');
     expect(findSwitches(renderer.root).length).toBe(0);
   });
 

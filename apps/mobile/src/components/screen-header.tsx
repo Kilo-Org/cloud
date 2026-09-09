@@ -15,6 +15,8 @@ type ScreenHeaderProps = {
   title?: string;
   titleContent?: React.ReactNode;
   titleNumberOfLines?: number;
+  /** Reserve two title lines so state changes do not move the screen body. */
+  reserveTitleSpace?: boolean;
   /** Optional mono-uppercase line above the title. */
   eyebrow?: string;
   reserveEyebrow?: boolean;
@@ -39,6 +41,11 @@ type ScreenHeaderProps = {
    */
   onTitlePressAccessibilityLabel?: string;
   backIcon?: 'back' | 'close';
+  /**
+   * Apply the status-bar safe-area inset. Form sheets already clear the
+   * grabber; passing false leaves vertical padding to `className`.
+   */
+  safeAreaTop?: boolean;
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
   className?: string;
 };
@@ -47,6 +54,7 @@ export function ScreenHeader({
   title,
   titleContent,
   titleNumberOfLines = 2,
+  reserveTitleSpace = false,
   eyebrow,
   reserveEyebrow = false,
   size = 'default',
@@ -60,6 +68,7 @@ export function ScreenHeader({
   onTitlePress,
   onTitlePressAccessibilityLabel,
   backIcon,
+  safeAreaTop = true,
   className,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useSafeAreaInsets();
@@ -101,6 +110,13 @@ export function ScreenHeader({
         {title}
       </Text>
     );
+    const titleLayout = reserveTitleSpace ? (
+      <View className={cn(size === 'large' ? 'min-h-[72px]' : 'min-h-14', 'justify-center')}>
+        {titleText}
+      </View>
+    ) : (
+      titleText
+    );
     // Title caret removed: rename stays available via the pressable title
     // itself. The backIcon === 'close' ChevronDown on the back control is
     // unrelated and stays.
@@ -115,10 +131,10 @@ export function ScreenHeader({
         }
         className="active:opacity-70"
       >
-        {titleText}
+        {titleLayout}
       </Pressable>
     ) : (
-      titleText
+      titleLayout
     );
   }
 
@@ -141,7 +157,10 @@ export function ScreenHeader({
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
 
   return (
-    <View className={cn('bg-background px-4 pb-3', className)} style={{ paddingTop }}>
+    <View
+      className={cn('bg-background px-4 pb-3', className)}
+      style={safeAreaTop ? { paddingTop } : undefined}
+    >
       {separateHeading && <View className="min-h-11 flex-row items-center">{heading}</View>}
       <View className="flex-row items-center">
         <View className="min-w-0 flex-1 flex-row items-center gap-1">
@@ -158,7 +177,7 @@ export function ScreenHeader({
               }}
               accessibilityRole="button"
               accessibilityLabel={
-                resolvedBackIcon === 'close' ? t('screenHeader.close') : t('screenHeader.goBack')
+                resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')
               }
               className={`${I18nManager.isRTL ? '-mr-4' : '-ml-4'} h-11 w-11 shrink-0 items-center justify-center active:opacity-70`}
             >

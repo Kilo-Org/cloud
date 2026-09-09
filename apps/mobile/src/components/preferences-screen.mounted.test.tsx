@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- Biometric cases share one mounted harness with the feature-flag mock. */
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as image-viewer-modal.mounted.test.tsx) */
 import { type ElementType } from 'react';
 import { act, type ReactTestRenderer } from 'react-test-renderer';
@@ -8,8 +9,21 @@ import { PreferencesScreen } from '@/components/preferences-screen';
 import { AppUnlockProvider } from '@/lib/app-unlock-context';
 import { renderWithProviders } from '@/test/render-with-providers';
 
+vi.hoisted(() => {
+  vi.stubGlobal('__DEV__', false);
+});
 const push = vi.hoisted(() => vi.fn());
 const setLanguagePickerBridge = vi.hoisted(() => vi.fn());
+// The screen mounts the feature-flag debug surface, which reads PostHog flag
+// statuses; seed an empty registry so the section stays out of these tests'
+// snapshots. The debug surface itself is covered in
+// preferences-screen.feature-flags.mounted.test.tsx.
+const posthog = vi.hoisted(() => ({
+  statuses: [] as Record<string, unknown>[],
+}));
+vi.mock('@/lib/analytics/posthog', () => ({
+  useFeatureFlagStatuses: () => posthog.statuses,
+}));
 const native = vi.hoisted(() => ({
   hasHardwareAsync: vi.fn(),
   isEnrolledAsync: vi.fn(),
@@ -24,6 +38,9 @@ const storage = vi.hoisted(() => ({
 }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
@@ -33,6 +50,7 @@ vi.mock('@/components/centered-state-surface', () => ({
   StateSurface: 'StateSurface',
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   Switch: 'Switch',
   View: 'View',
@@ -134,7 +152,9 @@ async function mountPreferences(raw: string | null = null): Promise<ReactTestRen
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal('__DEV__', false);
   vi.resetAllMocks();
+  posthog.statuses = [];
   storage.setItemAsync.mockImplementation(async (_key: string, value: string) => {
     await Promise.resolve();
     storage.value = value;

@@ -32,7 +32,7 @@ import {
   isKiloExclusiveFreeModel,
   selectAutoFreeCandidate,
 } from '@/lib/ai-gateway/models';
-import { getOpenRouterModelsFromRedis } from '@/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsFromDatabase } from '@/lib/ai-gateway/providers/gateway-models-cache';
 import { tryGetProviderById } from '@/lib/ai-gateway/providers/provider-definitions';
 import type { ProviderId } from '@/lib/ai-gateway/providers/types';
 import {
@@ -78,7 +78,7 @@ function resolveMode(modeHeader: string | null, featureHeader: FeatureValue | nu
 export async function getAutoFreeCandidates(
   apiKind: GatewayRequest['kind'] | null
 ): Promise<ReadonlyArray<string>> {
-  const openRouterModels = await getOpenRouterModelsFromRedis();
+  const openRouterModels = await getOpenRouterModelsFromDatabase();
   const candidates = new Set<string>();
   for (const { model } of autoFreeModels) {
     if (isKiloExclusiveFreeModel(model)) {

@@ -309,46 +309,6 @@ export async function getDefaultProfile(
 }
 
 /**
- * Get a profile by name for an owner.
- * Used for profile resolution in the prepare session API.
- */
-export async function getProfileByName(
-  db: WorkerDb,
-  name: string,
-  owner: ProfileOwner
-): Promise<ProfileResponse | null> {
-  const [profile] = await db
-    .select()
-    .from(agent_environment_profiles)
-    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.name, name)))
-    .limit(1);
-
-  if (!profile) {
-    return null;
-  }
-
-  return getProfile(db, profile.id, owner);
-}
-
-/**
- * Get profile ID by name for an owner.
- * Returns null if not found.
- */
-export async function getProfileIdByName(
-  db: WorkerDb,
-  name: string,
-  owner: ProfileOwner
-): Promise<string | null> {
-  const [profile] = await db
-    .select({ id: agent_environment_profiles.id })
-    .from(agent_environment_profiles)
-    .where(and(buildOwnershipCondition(owner), eq(agent_environment_profiles.name, name)))
-    .limit(1);
-
-  return profile?.id ?? null;
-}
-
-/**
  * Get the effective default profile ID for a user in org context.
  * Personal default takes precedence over org default — a user-specific
  * preference overrides the org-wide baseline.

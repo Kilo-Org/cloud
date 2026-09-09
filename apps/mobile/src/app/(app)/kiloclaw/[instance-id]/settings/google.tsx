@@ -139,7 +139,7 @@ export default function GoogleScreen() {
                 isConnected ? 'text-good' : 'text-muted-foreground'
               )}
             >
-              {isConnected ? t('kiloclaw.google.connected') : t('kiloclaw.google.notConnected')}
+              {isConnected ? t('common.connected') : t('common.notConnected')}
             </Text>
           </View>
         </View>
@@ -160,7 +160,7 @@ export default function GoogleScreen() {
                 {!mutations.restartMachine.isPending && (
                   <RefreshCw size={14} color={colors.foreground} />
                 )}
-                <Text>{t('kiloclaw.google.redeploy')}</Text>
+                <Text>{t('kiloclaw.redeploy')}</Text>
               </Button>
             </View>
           )}
@@ -219,9 +219,7 @@ export default function GoogleScreen() {
                 onPress={handleToggleGmail}
                 disabled={mutations.setGmailNotifications.isPending}
               >
-                <Text>
-                  {gmailEnabled ? t('kiloclaw.google.enabled') : t('kiloclaw.google.disabled')}
-                </Text>
+                <Text>{gmailEnabled ? t('common.enabled') : t('common.disabled')}</Text>
               </Button>
             </View>
           </View>

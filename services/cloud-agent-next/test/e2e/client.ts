@@ -646,11 +646,14 @@ export function messageIdFromEvent(event: StreamEvent): string | undefined {
 export function isMessageCompleted(
   event: StreamEvent | null,
   messageId: string
-): event is StreamEvent & { streamEventType: 'cloud.message.completed' } {
+): event is StreamEvent {
   return (
     event !== null &&
-    event.streamEventType === 'cloud.message.completed' &&
-    messageIdFromEvent(event) === messageId
+    ((event.streamEventType === 'cloud.message.completed' &&
+      messageIdFromEvent(event) === messageId) ||
+      (event.streamEventType === 'complete' &&
+        Array.isArray(event.data.messageIds) &&
+        event.data.messageIds.includes(messageId)))
   );
 }
 
@@ -756,9 +759,9 @@ export function openStream(
         event =>
           messageId === undefined
             ? TERMINAL_STREAM_TYPES.has(event.streamEventType)
-            : (event.streamEventType === 'cloud.message.completed' ||
-                event.streamEventType === 'cloud.message.failed') &&
-              messageIdFromEvent(event) === messageId,
+            : isMessageCompleted(event, messageId) ||
+              (event.streamEventType === 'cloud.message.failed' &&
+                messageIdFromEvent(event) === messageId),
         timeoutMs
       ),
     get receivedCount() {

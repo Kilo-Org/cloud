@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type DragEvent } from 'react';
 import {
   SquarePen,
   Search,
@@ -11,6 +11,8 @@ import {
   Pencil,
   LoaderCircle,
   Plus,
+  FolderInput,
+  FolderPlus,
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TimeAgo } from '@/components/shared/TimeAgo';
@@ -38,9 +40,27 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import type { WorkspaceFolder } from '@/lib/cloud-agent/workspace-folders';
+import type { WorkspaceFolderController } from './hooks/useWorkspaceFolders';
+import { WorkspaceFolderSection } from './WorkspaceFolderSection';
+import { WorkspaceFolderDialog } from './WorkspaceFolderDialog';
+import {
+  getWorkspaceFolderColor,
+  getWorkspaceFolderDropAction,
+  getWorkspaceFolderId,
+  groupWorkspacesByFolder,
+  isFolderWorkspace,
+  type WorkspaceFolderDragItem,
+  type WorkspaceFolderDropTarget,
+} from './workspace-folders';
 
 type ActiveSession = {
   id: string;
@@ -77,6 +97,17 @@ type ChatSidebarProps = {
   projectFilter?: string[];
   onProjectChange?: (gitUrls: string[]) => void;
   recentProjects?: Array<{ gitUrl: string; displayName: string }>;
+  workspaceFolders?: WorkspaceFolderController;
+};
+
+type WorktreeFolderControls = {
+  folders: WorkspaceFolder[];
+  folderId: string | null;
+  disabled: boolean;
+  isDragging: boolean;
+  onMove: (folderId: string | null) => void;
+  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
 };
 
 function SessionRow({
@@ -259,6 +290,7 @@ function WorktreeGroupRow({
   isDeleting,
   activeSessionStatuses,
   foregroundSession,
+  folderControls,
 }: {
   group: SidebarWorktreeGroup;
   currentSessionId?: string;
@@ -271,6 +303,7 @@ function WorktreeGroupRow({
   isDeleting: boolean;
   activeSessionStatuses: ReadonlyMap<string, string>;
   foregroundSession?: SidebarForegroundSessionStatus | null;
+  folderControls?: WorktreeFolderControls;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -293,7 +326,9 @@ function WorktreeGroupRow({
     foregroundSession
   );
   const shouldReplaceTime = activity.isLive || activity.status !== null;
-  const hasActions = Boolean(onCreateWorktreeChat || onRenameWorktree || onDeleteWorktree);
+  const hasActions = Boolean(
+    onCreateWorktreeChat || onRenameWorktree || onDeleteWorktree || folderControls
+  );
   const isActive =
     selectedWorktreeId === group.worktreeId ||
     group.sessions.some(session => session.sessionId === currentSessionId);
@@ -348,12 +383,17 @@ function WorktreeGroupRow({
 
   return (
     <div
+      data-worktree-id={group.worktreeId}
+      draggable={Boolean(folderControls && !folderControls.disabled && !isEditing && !isDeleting)}
+      onDragStart={folderControls?.onDragStart}
+      onDragEnd={folderControls?.onDragEnd}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       aria-busy={isDeleting || isSavingRename || isCreatingThisGroup || undefined}
       className={cn(
         'hover:bg-accent rounded-lg text-sm transition-colors',
         isDeleting && 'cursor-wait opacity-60',
+        folderControls?.isDragging && 'opacity-50',
         isActive && 'bg-accent font-medium'
       )}
     >
@@ -492,6 +532,41 @@ function WorktreeGroupRow({
                           Rename worktree
                         </DropdownMenuItem>
                       )}
+                      {folderControls && (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger
+                            disabled={folderControls.disabled}
+                            className="gap-2"
+                          >
+                            <FolderInput className="text-muted-foreground size-4" />
+                            Move to folder
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="max-h-(--radix-dropdown-menu-content-available-height) overflow-y-auto">
+                            <DropdownMenuRadioGroup
+                              value={folderControls.folderId ?? 'ungrouped'}
+                              onValueChange={value =>
+                                folderControls.onMove(value === 'ungrouped' ? null : value)
+                              }
+                            >
+                              <DropdownMenuRadioItem value="ungrouped">
+                                Ungrouped
+                              </DropdownMenuRadioItem>
+                              {folderControls.folders.map(folder => (
+                                <DropdownMenuRadioItem key={folder.id} value={folder.id}>
+                                  <span
+                                    aria-hidden="true"
+                                    className="size-2.5 shrink-0 rounded-full"
+                                    style={{
+                                      backgroundColor: getWorkspaceFolderColor(folder.color),
+                                    }}
+                                  />
+                                  <span className="max-w-48 truncate">{folder.name}</span>
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )}
                       {onDeleteWorktree && (
                         <DropdownMenuItem
                           variant="destructive"
@@ -576,10 +651,29 @@ export function ChatSidebar({
   projectFilter,
   onProjectChange,
   recentProjects = [],
+  workspaceFolders,
 }: ChatSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [showSearch, setShowSearch] = useState(false);
+  const [folderEditor, setFolderEditor] = useState<WorkspaceFolder | 'new' | null>(null);
+  const [dragItem, setDragItem] = useState<WorkspaceFolderDragItem | null>(null);
+  const [dropTarget, setDropTarget] = useState<WorkspaceFolderDropTarget | null>(null);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const newFolderButtonRef = useRef<HTMLButtonElement>(null);
+  const [shouldFocusNewFolder, setShouldFocusNewFolder] = useState(false);
+  const canEditFolders = Boolean(
+    workspaceFolders &&
+    !workspaceFolders.isLoading &&
+    !workspaceFolders.isError &&
+    !workspaceFolders.isSaving
+  );
+
+  useEffect(() => {
+    if (!shouldFocusNewFolder || !canEditFolders) return;
+    newFolderButtonRef.current?.focus();
+    setShouldFocusNewFolder(false);
+  }, [shouldFocusNewFolder, canEditFolders]);
 
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -666,6 +760,155 @@ export function ChatSidebar({
     () => groupSidebarSessionsByDate(sessions, undefined, worktreeDetails),
     [sessions, worktreeDetails]
   );
+  const { folderGroups, ungrouped } = useMemo(
+    () => groupWorkspacesByFolder(dateGroups, workspaceFolders?.folders ?? []),
+    [dateGroups, workspaceFolders?.folders]
+  );
+  const folderWorkspaceIds = useMemo(
+    () =>
+      new Set(
+        dateGroups.flatMap(group =>
+          group.items.flatMap(item =>
+            item.type === 'worktree' && isFolderWorkspace(item) ? [item.worktreeId] : []
+          )
+        )
+      ),
+    [dateGroups]
+  );
+
+  const clearDrag = () => {
+    setDragItem(null);
+    setDropTarget(null);
+  };
+
+  const startDrag = (event: DragEvent<HTMLDivElement>, item: WorkspaceFolderDragItem) => {
+    if (!canEditFolders) {
+      event.preventDefault();
+      return;
+    }
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('application/x-kilo-workspace-folder', JSON.stringify(item));
+    setDragItem(item);
+    setDropTarget(null);
+  };
+
+  const folderTarget = (
+    event: DragEvent<HTMLElement>,
+    folderId: string
+  ): WorkspaceFolderDropTarget => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return {
+      type: 'folder',
+      id: folderId,
+      placement: event.clientY < bounds.top + bounds.height / 2 ? 'before' : 'after',
+    };
+  };
+
+  const dragOver = (event: DragEvent<HTMLElement>, target: WorkspaceFolderDropTarget) => {
+    if (
+      !canEditFolders ||
+      !getWorkspaceFolderDropAction(
+        dragItem,
+        target,
+        workspaceFolders?.folders ?? [],
+        folderWorkspaceIds
+      )
+    ) {
+      setDropTarget(null);
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = 'move';
+    setDropTarget(target);
+  };
+
+  const dragLeave = (event: DragEvent<HTMLElement>) => {
+    if (
+      !(event.relatedTarget instanceof Node) ||
+      !event.currentTarget.contains(event.relatedTarget)
+    ) {
+      setDropTarget(null);
+    }
+  };
+
+  const moveWorktree = async (worktreeId: string, folderId: string | null) => {
+    if (await workspaceFolders?.moveWorktree(worktreeId, folderId)) {
+      requestAnimationFrame(() =>
+        sidebarRef.current
+          ?.querySelector<HTMLButtonElement>(
+            `[data-worktree-id="${CSS.escape(worktreeId)}"] button`
+          )
+          ?.focus({ preventScroll: true })
+      );
+    }
+  };
+
+  const drop = (event: DragEvent<HTMLElement>, target: WorkspaceFolderDropTarget) => {
+    const action = canEditFolders
+      ? getWorkspaceFolderDropAction(
+          dragItem,
+          target,
+          workspaceFolders?.folders ?? [],
+          folderWorkspaceIds
+        )
+      : null;
+    clearDrag();
+    if (!action || !workspaceFolders) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (action.type === 'move-worktree') {
+      void moveWorktree(action.worktreeId, action.folderId);
+    } else {
+      void workspaceFolders.reorderFolders(action.folderIds);
+    }
+  };
+
+  const moveFolder = (folderId: string, direction: 'up' | 'down') => {
+    if (!workspaceFolders || !canEditFolders) return;
+    const index = workspaceFolders.folders.findIndex(folder => folder.id === folderId);
+    const neighbor = workspaceFolders.folders[index + (direction === 'up' ? -1 : 1)];
+    if (!neighbor) return;
+    const action = getWorkspaceFolderDropAction(
+      { type: 'folder', id: folderId },
+      { type: 'folder', id: neighbor.id, placement: direction === 'up' ? 'before' : 'after' },
+      workspaceFolders.folders,
+      folderWorkspaceIds
+    );
+    if (action?.type === 'reorder-folders') void workspaceFolders.reorderFolders(action.folderIds);
+  };
+
+  const renderWorktree = (group: SidebarWorktreeGroup) => (
+    <WorktreeGroupRow
+      key={group.worktreeId}
+      group={group}
+      currentSessionId={currentSessionId}
+      selectedWorktreeId={selectedWorktreeId}
+      onOpenSession={handleSessionClick}
+      onCreateWorktreeChat={onCreateWorktreeChat}
+      creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
+      onRenameWorktree={onRenameWorktree}
+      onDeleteWorktree={onDeleteWorktree}
+      isDeleting={deletingWorktreeId === group.worktreeId}
+      activeSessionStatuses={activeSessionStatuses}
+      foregroundSession={foregroundSession}
+      folderControls={
+        workspaceFolders && isFolderWorkspace(group)
+          ? {
+              folders: workspaceFolders.folders,
+              folderId: getWorkspaceFolderId(workspaceFolders.folders, group.worktreeId),
+              disabled: !canEditFolders,
+              isDragging: dragItem?.type === 'worktree' && dragItem.id === group.worktreeId,
+              onMove: folderId => void moveWorktree(group.worktreeId, folderId),
+              onDragStart: event => startDrag(event, { type: 'worktree', id: group.worktreeId }),
+              onDragEnd: clearDrag,
+            }
+          : undefined
+      }
+    />
+  );
+
   const renderSession = useCallback(
     (session: StoredSession) => (
       <SessionRow
@@ -700,7 +943,7 @@ export function ChatSidebar({
   );
 
   return (
-    <div className="flex h-full flex-col">
+    <div ref={sidebarRef} className="flex h-full flex-col">
       {/* Header */}
       <div className={cn('flex items-center gap-2 border-b px-3 py-2.5', isInSheet && 'pt-14')}>
         <Tooltip>
@@ -715,8 +958,33 @@ export function ChatSidebar({
           </TooltipTrigger>
           <TooltipContent side="bottom">New session</TooltipContent>
         </Tooltip>
+        {workspaceFolders && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                ref={newFolderButtonRef}
+                type="button"
+                aria-label="New folder"
+                disabled={!canEditFolders}
+                onClick={() => setFolderEditor('new')}
+                className="hover:bg-accent focus-visible:ring-ring rounded-md p-1.5 transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50 [@media(any-pointer:coarse)]:min-h-11 [@media(any-pointer:coarse)]:min-w-11"
+              >
+                {workspaceFolders.isSaving ? (
+                  <LoaderCircle
+                    className="text-muted-foreground size-4 animate-spin"
+                    aria-label="Saving folders"
+                  />
+                ) : (
+                  <FolderPlus className="text-muted-foreground size-4" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">New folder</TooltipContent>
+          </Tooltip>
+        )}
         <div className="ml-auto flex items-center gap-1">
           <button
+            aria-label="Search sessions"
             onClick={toggleSearch}
             className={cn(
               'hover:bg-accent rounded-md p-1.5 transition-colors',
@@ -729,6 +997,7 @@ export function ChatSidebar({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
+                  aria-label="Filter sessions"
                   className={cn(
                     'hover:bg-accent rounded-md p-1.5 transition-colors',
                     hasActiveFilter && 'bg-accent'
@@ -837,8 +1106,31 @@ export function ChatSidebar({
       )}
 
       {/* Session list */}
-      <div className="flex-1 space-y-px overflow-y-auto p-2">
-        {sessions.length === 0 && liveOnlySessions.length === 0 ? (
+      <div
+        className="flex-1 space-y-px overflow-y-auto p-2"
+        aria-busy={workspaceFolders?.isSaving || undefined}
+      >
+        {workspaceFolders?.isLoading && (
+          <p role="status" className="text-muted-foreground px-2 py-2 text-xs">
+            Loading folders...
+          </p>
+        )}
+        {workspaceFolders?.isError && (
+          <div
+            role="alert"
+            className="text-muted-foreground flex items-center justify-between gap-2 px-2 py-2 text-xs"
+          >
+            <span>Could not load folders.</span>
+            <button
+              type="button"
+              onClick={() => void workspaceFolders.refresh()}
+              className="focus-visible:ring-ring rounded px-2 py-1 underline focus-visible:ring-2"
+            >
+              Retry
+            </button>
+          </div>
+        )}
+        {sessions.length === 0 && liveOnlySessions.length === 0 && folderGroups.length === 0 ? (
           <div className="py-8 text-center text-sm text-gray-500">No sessions yet</div>
         ) : (
           <>
@@ -877,42 +1169,104 @@ export function ChatSidebar({
               </>
             )}
 
-            {/* Stored sessions grouped by date */}
-            {dateGroups.map((group, groupIdx) => (
-              <div key={group.label}>
-                <div
-                  className={cn(
-                    'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
-                    groupIdx === 0 && liveOnlySessions.length === 0 ? 'pt-2' : 'pt-4'
-                  )}
+            {workspaceFolders &&
+              folderGroups.map(({ folder, worktrees }, index) => (
+                <WorkspaceFolderSection
+                  key={folder.id}
+                  folder={folder}
+                  controller={workspaceFolders}
+                  isFirst={index === 0}
+                  isLast={index === folderGroups.length - 1}
+                  isDragging={dragItem?.type === 'folder' && dragItem.id === folder.id}
+                  dropPlacement={
+                    dropTarget?.type === 'folder' && dropTarget.id === folder.id
+                      ? dragItem?.type === 'worktree'
+                        ? 'inside'
+                        : dropTarget.placement
+                      : null
+                  }
+                  visibleCount={worktrees.length}
+                  onEdit={() => setFolderEditor(folder)}
+                  onDelete={() => {
+                    void workspaceFolders.deleteFolder(folder.id).then(deleted => {
+                      if (deleted) setShouldFocusNewFolder(true);
+                    });
+                  }}
+                  onMove={direction => moveFolder(folder.id, direction)}
+                  onDragStart={event => startDrag(event, { type: 'folder', id: folder.id })}
+                  onDragEnd={clearDrag}
+                  onDragOver={event => dragOver(event, folderTarget(event, folder.id))}
+                  onDragLeave={dragLeave}
+                  onDrop={event => drop(event, folderTarget(event, folder.id))}
                 >
-                  {group.label}
+                  {worktrees.map(renderWorktree)}
+                </WorkspaceFolderSection>
+              ))}
+            <div
+              role="region"
+              aria-label="Ungrouped workspaces"
+              data-folder-drop="ungrouped"
+              onDragEnter={event => dragOver(event, { type: 'ungrouped' })}
+              onDragOver={event => dragOver(event, { type: 'ungrouped' })}
+              onDragLeave={dragLeave}
+              onDrop={event => drop(event, { type: 'ungrouped' })}
+              className={cn(
+                'rounded-md',
+                folderGroups.length > 0 && 'min-h-16',
+                dropTarget?.type === 'ungrouped' && 'bg-accent/50 ring-ring ring-1'
+              )}
+            >
+              {folderGroups.length > 0 && (
+                <div className="text-muted-foreground px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider uppercase">
+                  Ungrouped
                 </div>
-                {group.items.map(item => {
-                  if (item.type === 'session') return renderSession(item.session);
-
-                  return (
-                    <WorktreeGroupRow
-                      key={item.worktreeId}
-                      group={item}
-                      currentSessionId={currentSessionId}
-                      selectedWorktreeId={selectedWorktreeId}
-                      onOpenSession={handleSessionClick}
-                      onCreateWorktreeChat={onCreateWorktreeChat}
-                      creatingWorktreeSourceSessionId={creatingWorktreeSourceSessionId}
-                      onRenameWorktree={onRenameWorktree}
-                      onDeleteWorktree={onDeleteWorktree}
-                      isDeleting={deletingWorktreeId === item.worktreeId}
-                      activeSessionStatuses={activeSessionStatuses}
-                      foregroundSession={foregroundSession}
-                    />
-                  );
-                })}
-              </div>
-            ))}
+              )}
+              {folderGroups.length > 0 && ungrouped.length === 0 && (
+                <p className="text-muted-foreground px-3 py-3 text-xs">Drop workspaces here</p>
+              )}
+              {ungrouped.map((group, groupIdx) => (
+                <div key={group.label}>
+                  <div
+                    className={cn(
+                      'text-muted-foreground px-2 pb-1 text-[11px] font-semibold tracking-wider uppercase',
+                      groupIdx === 0 && liveOnlySessions.length === 0 ? 'pt-2' : 'pt-4'
+                    )}
+                  >
+                    {group.label}
+                  </div>
+                  {group.items.map(item =>
+                    item.type === 'session' ? renderSession(item.session) : renderWorktree(item)
+                  )}
+                </div>
+              ))}
+            </div>
           </>
         )}
       </div>
+      {folderEditor !== null && workspaceFolders && (
+        <WorkspaceFolderDialog
+          key={folderEditor === 'new' ? 'new' : folderEditor.id}
+          folder={folderEditor === 'new' ? null : folderEditor}
+          isSaving={workspaceFolders.isSaving}
+          onSave={values =>
+            workspaceFolders.saveFolder(folderEditor === 'new' ? null : folderEditor.id, values)
+          }
+          onClose={() => {
+            setFolderEditor(null);
+            if (folderEditor === 'new') {
+              setShouldFocusNewFolder(true);
+            } else {
+              requestAnimationFrame(() => {
+                sidebarRef.current
+                  ?.querySelector<HTMLButtonElement>(
+                    `[data-folder-id="${CSS.escape(folderEditor.id)}"] button`
+                  )
+                  ?.focus();
+              });
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

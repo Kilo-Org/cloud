@@ -2,7 +2,8 @@ import { reloadAppAsync } from 'expo';
 import { useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, FlatList, I18nManager, TextInput, View } from 'react-native';
+import { FlatList, I18nManager, TextInput, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
@@ -25,7 +26,6 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
-import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 const SEARCH_RTL = { textAlign: 'right' } as const;
 
@@ -88,8 +88,6 @@ export function LanguagePickerSheet({
       setReloadFailed(false);
     }, [])
   );
-
-  useFocusEffect(useCallback(() => subscribePrivacyCover(closePicker), [closePicker]));
 
   const deviceEndonym = LANGUAGE_ENDONYMS[resolveDeviceLanguage()];
   // The native layout direction, not the catalog's: the row insets and the
@@ -177,7 +175,7 @@ export function LanguagePickerSheet({
   if (restarting) {
     return (
       <PickerSheet
-        title={t('language.title')}
+        title={t('common.language')}
         onDone={() => {
           // Restarting: the native reload replaces this sheet.
         }}
@@ -201,7 +199,7 @@ export function LanguagePickerSheet({
   }
   return (
     <PickerSheet
-      title={t('language.title')}
+      title={t('common.language')}
       onDone={() => {
         void handleDone();
       }}

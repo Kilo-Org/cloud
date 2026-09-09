@@ -10,6 +10,7 @@ import { exchangeAndStoreGitHubUserAuthorization } from '@/lib/integrations/plat
 function redirectWithStatus(key: 'success' | 'error', value: string): NextResponse {
   const target = new URL('/integrations/github', APP_URL);
   target.searchParams.set(key, value);
+  target.searchParams.set('flow', 'user-connect');
   return NextResponse.redirect(target);
 }
 
@@ -19,7 +20,7 @@ function safeCallbackContext(searchParams: URLSearchParams) {
     hasCode: Boolean(searchParams.get('code')),
     hasState: Boolean(state),
     stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
-    providerError: searchParams.get('error'),
+    hasProviderError: Boolean(searchParams.get('error')),
   };
 }
 
@@ -28,20 +29,10 @@ function validOAuthCode(code: string | null): string | null {
   return code;
 }
 
-function logDevelopmentCallbackFailure(stage: string, searchParams: URLSearchParams): void {
-  if (process.env.NODE_ENV !== 'development') return;
-  const context = safeCallbackContext(searchParams);
-  console.error('[GitHub user authorization callback debug]', {
-    stage,
-    hasCode: context.hasCode,
-    hasState: context.hasState,
-    stateHash: context.stateHash,
-    hasProviderError: Boolean(context.providerError),
-  });
-}
+type CallbackStage = 'authenticate_user' | 'consume_state' | 'exchange_and_store_authorization';
 
 export async function GET(request: NextRequest) {
-  let stage = 'authenticate_user';
+  let stage: CallbackStage = 'authenticate_user';
   try {
     const { user, authFailedResponse } = await getUserFromAuth({ adminOnly: false });
     if (authFailedResponse) {
@@ -53,20 +44,31 @@ export async function GET(request: NextRequest) {
       return redirectWithStatus('error', 'authorization_cancelled');
     }
 
-    stage = 'consume_state';
-    const state = await consumeGitHubUserAuthorizationState(searchParams.get('state'), user.id);
-    if (!state) {
-      captureMessage('GitHub user authorization callback invalid state', {
-        level: 'warning',
-        tags: { endpoint: 'github/user-connect/callback' },
-        extra: safeCallbackContext(searchParams),
-      });
-      return redirectWithStatus('error', 'invalid_state');
-    }
-
     const code = validOAuthCode(searchParams.get('code'));
     if (!code) {
       return redirectWithStatus('error', 'missing_code');
+    }
+
+    stage = 'consume_state';
+    const state = await consumeGitHubUserAuthorizationState(searchParams.get('state'), user.id);
+    if (state.status === 'storage_error') {
+      captureMessage('GitHub user authorization callback storage failure', {
+        level: 'error',
+        tags: { endpoint: 'github/user-connect/callback', stage, reason: state.reason },
+        extra: safeCallbackContext(searchParams),
+      });
+      return redirectWithStatus('error', 'connection_failed');
+    }
+    if (state.status === 'invalid') {
+      captureMessage('GitHub user authorization callback invalid state', {
+        level: 'warning',
+        tags: { endpoint: 'github/user-connect/callback', stage, reason: state.reason },
+        extra: safeCallbackContext(searchParams),
+      });
+      return redirectWithStatus(
+        'error',
+        state.reason === 'user_mismatch' ? 'account_mismatch' : 'invalid_state'
+      );
     }
 
     stage = 'exchange_and_store_authorization';
@@ -80,10 +82,9 @@ export async function GET(request: NextRequest) {
     }
 
     return redirectWithStatus('success', 'user_connected');
-  } catch (error) {
-    logDevelopmentCallbackFailure(stage, request.nextUrl.searchParams);
-    captureException(error, {
-      tags: { endpoint: 'github/user-connect/callback' },
+  } catch {
+    captureException(new Error('GitHub user authorization callback failed'), {
+      tags: { endpoint: 'github/user-connect/callback', stage, reason: 'operation_failed' },
       extra: safeCallbackContext(request.nextUrl.searchParams),
     });
     return redirectWithStatus('error', 'connection_failed');

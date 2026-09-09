@@ -11,10 +11,10 @@ export default function GateThresholdRoute() {
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
   const labels = {
-    off: t('codeReviewer.gateThreshold.off'),
-    all: t('codeReviewer.gateThreshold.all'),
+    off: t('common.off'),
+    all: t('common.all'),
     warning: t('codeReviewer.gateThreshold.warning'),
-    critical: t('codeReviewer.gateThreshold.critical'),
+    critical: t('common.critical'),
   } as const;
   const descriptions = {
     off: t('codeReviewer.gate.off'),

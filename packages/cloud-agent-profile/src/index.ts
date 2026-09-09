@@ -54,8 +54,6 @@ export {
   setDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
-  getProfileByName,
-  getProfileIdByName,
   getEffectiveDefaultProfileId,
 } from './profile-service';
 

@@ -1,7 +1,8 @@
 import { GitBranch, GitMerge } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { Button } from '@/components/ui/button';
@@ -19,14 +20,14 @@ const PLATFORM_CONFIG = {
   github: {
     icon: GitBranch,
     label: 'codeReviewer.providerConnect.githubApp',
-    buttonLabel: 'codeReviewer.providerConnect.connectGitHub',
+    buttonLabel: 'common.connectGithub',
     getUrl: getGitHubIntegrationUrl,
     errorMessage: 'codeReviewer.providerConnect.githubError',
   },
   gitlab: {
     icon: GitMerge,
     label: 'codeReviewer.providerConnect.gitlabAccount',
-    buttonLabel: 'codeReviewer.providerConnect.connectGitLab',
+    buttonLabel: 'common.connectGitlab',
     getUrl: getGitLabIntegrationUrl,
     errorMessage: 'codeReviewer.providerConnect.gitlabError',
   },

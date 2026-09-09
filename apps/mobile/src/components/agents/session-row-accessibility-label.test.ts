@@ -135,6 +135,86 @@ describe('sessionRowAccessibilityLabel', () => {
     ).toBe('Fix login bug, needs input, and CLI');
   });
 
+  describe('live statusKind — the state word the glyph draws', () => {
+    it('speaks Working for a running live row', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'running',
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, Working, CLI, and 5 minutes ago');
+    });
+
+    it('speaks Idle for an idle live row', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'idle',
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, Idle, CLI, and 5 minutes ago');
+    });
+
+    it('keeps needs input above the state word', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: true,
+          live: true,
+          statusKind: 'running',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, needs input, and CLI');
+    });
+
+    it('keeps the static LIVE word when no statusKind is passed (byte-identical output)', () => {
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, LIVE, CLI, and 5 minutes ago');
+      // Explicit null behaves like omission.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: null,
+          badge: 'CLI',
+          meta: '5 minutes ago',
+        })
+      ).toBe('Fix login bug, LIVE, CLI, and 5 minutes ago');
+    });
+
+    it('speaks Working for a needsInput kind when attention is not raised (the drawn glyph)', () => {
+      // The ui row draws the running glyph for any set kind but idle, so an
+      // acked question or a `retry` row (needs-input flag down, kind
+      // `needsInput`) draws running; the label names that drawn state.
+      expect(
+        sessionRowAccessibilityLabel({
+          title: 'Fix login bug',
+          needsInput: false,
+          live: true,
+          statusKind: 'needsInput',
+          badge: 'CLI',
+          meta: null,
+        })
+      ).toBe('Fix login bug, Working, and CLI');
+    });
+  });
+
   describe('needs-input variant — StoredSessionRow (meta omitted)', () => {
     it('produces "title, needs input, badge" with meta=null', () => {
       // Stored row, needs-input eyebrow wins: meta is NOT rendered.

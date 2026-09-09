@@ -124,21 +124,23 @@ describe('materializePreparationEvent', () => {
     expect(step.safeError).toBe('Setup command failed');
   });
 
-  it('restarts a terminal attempt with a fresh startedAt', () => {
+  it.each([
+    { outcome: { status: 'completed' as const }, expected: { status: 'completed' } },
+    {
+      outcome: { status: 'failed' as const, safeError: 'boom' },
+      expected: { status: 'failed', safeError: 'boom' },
+    },
+  ])('does not restart a $expected.status attempt', ({ outcome, expected }) => {
     const eventQueries = createMemoryEventQueries();
     const { attemptId, lastEventAt } = seedRunningAttempt(eventQueries, { startedAt: 1000 });
-    finalizePreparationAttempt(eventQueries, attemptId, {
-      status: 'failed',
-      safeError: 'boom',
-      timestamp: lastEventAt,
-    });
-    const failedRevision = readAttempt(eventQueries, attemptId).revision;
+    finalizePreparationAttempt(eventQueries, attemptId, { ...outcome, timestamp: lastEventAt });
+    const terminalAttempt = readAttempt(eventQueries, attemptId);
 
-    materializePreparationEvent(eventQueries, storedEvent(90_000), {
+    const applied = materializePreparationEvent(eventQueries, storedEvent(90_000), {
       version: 2,
       attemptId,
       triggerMessageId: 'msg-1',
-      revision: failedRevision + 1,
+      revision: terminalAttempt.revision + 1,
       timestamp: 90_000,
       step: 'workspace_setup',
       message: 'Preparing environment',
@@ -146,8 +148,42 @@ describe('materializePreparationEvent', () => {
     });
 
     const attempt = readAttempt(eventQueries, attemptId);
-    expect(attempt.status).toBe('running');
-    expect(attempt.startedAt).toBe(90_000);
+    expect(applied).toBe(false);
+    expect(attempt).toEqual({ ...terminalAttempt, ...expected });
+  });
+
+  it('retains late step history without reopening a terminal attempt', () => {
+    const eventQueries = createMemoryEventQueries();
+    const { attemptId, lastEventAt } = seedRunningAttempt(eventQueries);
+    finalizePreparationAttempt(eventQueries, attemptId, {
+      status: 'completed',
+      timestamp: lastEventAt,
+    });
+    const terminalAttempt = readAttempt(eventQueries, attemptId);
+
+    const applied = materializePreparationEvent(eventQueries, storedEvent(90_000), {
+      version: 2,
+      attemptId,
+      triggerMessageId: 'msg-1',
+      revision: terminalAttempt.revision + 1,
+      timestamp: 90_000,
+      step: 'setup_commands',
+      message: 'Installing dependencies',
+      action: 'step_started',
+      stepId: 'command:install',
+      kind: 'setup_command',
+      label: 'Install dependencies',
+    });
+
+    expect(applied).toBe(true);
+    expect(readAttempt(eventQueries, attemptId)).toMatchObject({
+      status: 'completed',
+      revision: terminalAttempt.revision + 1,
+    });
+    expect(readStep(eventQueries, attemptId, 'command:install')).toMatchObject({
+      status: 'running',
+      label: 'Install dependencies',
+    });
   });
 });
 
@@ -342,28 +378,25 @@ describe('cloudStatusForPreparingEvent', () => {
     timestamp: 1000,
   };
 
-  it('maps applied v2 events by action', () => {
+  it('never projects v2 events, including applied events with step and message data', () => {
     expect(
       cloudStatusForPreparingEvent(
         { ...v2, step: 'cloning', message: 'Cloning…', action: 'step_progress' },
         true
       )
-    ).toEqual({ type: 'preparing', step: 'cloning', message: 'Cloning…' });
+    ).toBeNull();
     expect(
       cloudStatusForPreparingEvent(
         { ...v2, step: 'ready', message: 'Preparation complete', action: 'attempt_completed' },
         true
       )
-    ).toEqual({ type: 'ready' });
+    ).toBeNull();
     expect(
       cloudStatusForPreparingEvent(
         { ...v2, step: 'failed', message: 'nope', action: 'attempt_failed', safeError: 'boom' },
         true
       )
-    ).toEqual({ type: 'error', message: 'boom' });
-  });
-
-  it('suppresses the broadcast for stale v2 events', () => {
+    ).toBeNull();
     expect(
       cloudStatusForPreparingEvent(
         { ...v2, step: 'cloning', message: 'Cloning…', action: 'step_progress' },

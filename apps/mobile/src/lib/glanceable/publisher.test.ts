@@ -1,9 +1,11 @@
+/* eslint-disable max-lines -- one cohesive publisher state-machine suite sharing the fake-sink harness */
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   type GlanceableAgentsSnapshot,
+  isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
@@ -99,7 +101,24 @@ describe('GlanceablePublisher', () => {
     publisher.dispose();
   });
 
-  it('coalesces later happy updates and emits only the latest', () => {
+  it('counts an unrecognized status as running, matching what the row glyph draws', () => {
+    // One session, unknown status: the shared kind map folds every non-idle,
+    // non-needs-input status into running, and the list row's glyph draws the
+    // same kind (`statusKind === 'idle' ? 'idle' : 'running'`), so the tray
+    // and the glanceable sinks can never disagree about this session. A row
+    // the list draws as working must also be startable work for the Live
+    // Activity, and must never be counted idle while it works.
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    publisher.handleSessions([{ status: 'mystery' }], PUB_CTX);
+    const snapshot = lastSnapshot(calls, 'startOrUpdate');
+    expect(snapshot.running).toBe(1);
+    expect(snapshot.idle).toBe(0);
+    expect(isStartableGlanceableWork(snapshot)).toBe(true);
+    publisher.dispose();
+  });
+
+  it('coalesces later happy updates but publishes needs-input changes immediately', () => {
     vi.useFakeTimers();
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW, coalesceMs: 1000 });
@@ -110,6 +129,11 @@ describe('GlanceablePublisher', () => {
     vi.advanceTimersByTime(1000);
     expect(count(calls, 'startOrUpdate')).toBe(2);
     expect(lastSnapshot(calls, 'startOrUpdate').running).toBe(3);
+    // The badge reads `needsInput`, so a change to it skips the coalesce wait.
+    publisher.handleSessions([{ status: 'permission' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(1);
+    publisher.handleSessions([{ status: 'busy' }], PUB_CTX);
+    expect(lastSnapshot(calls, 'startOrUpdate').needsInput).toBe(0);
     publisher.dispose();
   });
 

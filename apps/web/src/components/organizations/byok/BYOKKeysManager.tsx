@@ -43,12 +43,14 @@ import {
   DirectUserByokInferenceProviderIdSchema,
   UserByokProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
+  AzureCredentialsSchema,
   BedrockCredentialsSchema,
   VertexCredentialsSchema,
   type VercelUserByokInferenceProviderId,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
+import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
 // Exhaustive map of Vercel BYOK providers to their display names. The `satisfies`
@@ -56,6 +58,7 @@ import * as z from 'zod';
 // VercelUserByokInferenceProviderIdSchema.
 const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
+  azure: 'Azure Foundry (experimental)',
   bedrock: 'AWS Bedrock',
   deepseek: 'DeepSeek',
   openai: 'OpenAI',
@@ -279,11 +282,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const validateStructuredCredentials = (providerId: string, value: string): string | null => {
     if (!value) return null;
     const schema =
-      providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
-        ? BedrockCredentialsSchema
-        : providerId === VercelUserByokInferenceProviderIdSchema.enum.vertex
-          ? VertexCredentialsSchema
-          : null;
+      providerId === VercelUserByokInferenceProviderIdSchema.enum.azure
+        ? AzureCredentialsSchema
+        : providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+          ? BedrockCredentialsSchema
+          : providerId === VercelUserByokInferenceProviderIdSchema.enum.vertex
+            ? VertexCredentialsSchema
+            : null;
     if (!schema) return null;
     let parsed: unknown;
     try {
@@ -293,6 +298,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
     const result = schema.safeParse(parsed);
     if (!result.success) {
+      if (providerId === VercelUserByokInferenceProviderIdSchema.enum.azure) {
+        return result.error.issues.some(issue => issue.path[0] === 'modelMappings')
+          ? 'Each model mapping must include gatewayModelSlug and customModelId.'
+          : 'Enter JSON with apiKey and resourceName.';
+      }
       if (providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
         return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
       }
@@ -394,6 +404,10 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const getProviderModels = (providerId: string): string[] => {
     return supportedModels?.[providerId] ?? [];
   };
+  const usesStructuredCredentials =
+    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure ||
+    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock ||
+    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex;
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -579,42 +593,71 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="apiKey">
-                  {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
-                    ? 'AWS Bedrock Credentials'
-                    : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex
-                      ? 'Google Vertex Credentials'
-                      : 'API Key'}
+                  {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                    ? 'Azure OpenAI Credentials'
+                    : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                      ? 'AWS Bedrock Credentials'
+                      : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex
+                        ? 'Google Vertex Credentials'
+                        : 'API Key'}
                 </Label>
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock ||
-                selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex ? (
+                {usesStructuredCredentials ? (
                   <>
-                    <textarea
-                      id="apiKey"
-                      value={apiKey}
-                      onChange={e => {
-                        setApiKey(e.target.value);
-                        setCredentialError(null);
-                      }}
-                      onBlur={e =>
-                        setCredentialError(
-                          validateStructuredCredentials(selectedProvider, e.target.value)
-                        )
-                      }
-                      placeholder={
-                        selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
-                          ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
-                          : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
-                      }
-                      className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                      rows={6}
-                      aria-label={
-                        selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
-                          ? 'AWS credentials'
-                          : 'Google Vertex credentials'
-                      }
-                      aria-invalid={credentialError ? true : undefined}
-                      aria-describedby={credentialError ? 'credential-error' : undefined}
-                    />
+                    <div className="relative">
+                      <textarea
+                        id="apiKey"
+                        name="provider-credentials"
+                        value={apiKey}
+                        onChange={e => {
+                          setApiKey(e.target.value);
+                          setCredentialError(null);
+                        }}
+                        onBlur={e =>
+                          setCredentialError(
+                            validateStructuredCredentials(selectedProvider, e.target.value)
+                          )
+                        }
+                        placeholder={
+                          selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                            ? '{"apiKey": "...", "resourceName": "..."}'
+                            : selectedProvider ===
+                                VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                              ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
+                              : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                        }
+                        className={cn(
+                          'border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 pr-10 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
+                          showApiKey ? '' : '[-webkit-text-security:disc] [text-security:disc]'
+                        )}
+                        rows={6}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        autoCapitalize="off"
+                        spellCheck={false}
+                        data-1p-ignore="true"
+                        data-lpignore="true"
+                        data-form-type="other"
+                        aria-label={
+                          selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                            ? 'Azure OpenAI credentials'
+                            : selectedProvider ===
+                                VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                              ? 'AWS credentials'
+                              : 'Google Vertex credentials'
+                        }
+                        aria-invalid={credentialError ? true : undefined}
+                        aria-describedby={credentialError ? 'credential-error' : undefined}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showApiKey ? 'Hide credentials' : 'Reveal credentials'}
+                        aria-pressed={showApiKey}
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 absolute top-0 right-0 flex size-10 items-center justify-center rounded-tr-md focus-visible:ring-2 focus-visible:outline-none"
+                      >
+                        {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
                     {credentialError && (
                       <Alert id="credential-error" variant="destructive">
                         <AlertDescription className="whitespace-break-spaces">
@@ -644,6 +687,28 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                     </Button>
                   </div>
+                )}
+                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure && (
+                  <Alert>
+                    <Info className="size-4" />
+                    <AlertDescription>
+                      <p>Enter your Azure OpenAI API key and resource name as JSON:</p>
+                      <code className="mt-1 block text-xs break-all">
+                        {'{"apiKey": "...", "resourceName": "..."}'}
+                      </code>
+                      <p className="mt-1">
+                        The resource name is the subdomain from your Azure OpenAI endpoint, for
+                        example <code className="text-xs">my-resource</code> from{' '}
+                        <code className="text-xs">my-resource.openai.azure.com</code>.
+                      </p>
+                      <p className="mt-1">
+                        For custom deployment names, add{' '}
+                        <code className="text-xs">modelMappings</code> with{' '}
+                        <code className="text-xs">gatewayModelSlug</code> and{' '}
+                        <code className="text-xs">customModelId</code> entries.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
                 )}
                 {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock && (
                   <Alert>

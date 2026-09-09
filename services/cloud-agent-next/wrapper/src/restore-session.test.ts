@@ -1060,34 +1060,6 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
   });
 
   it('prefers top-level patch session diffs over legacy message summaries', async () => {
-    const repo = path.join(tmpDir, 'repo');
-    fs.mkdirSync(path.join(repo, 'src'), { recursive: true });
-    Bun.spawnSync(['git', 'init'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
-    Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    Bun.spawnSync(['git', 'config', 'user.name', 'Test User'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'before\n');
-    Bun.spawnSync(['git', 'add', '.'], { cwd: repo, stdout: 'pipe', stderr: 'pipe' });
-    Bun.spawnSync(['git', 'commit', '-m', 'initial'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    fs.writeFileSync(path.join(repo, 'src/index.ts'), 'after\n');
-    const proc = Bun.spawnSync(['git', 'diff', '--src-prefix=a/', '--dst-prefix=b/'], {
-      cwd: repo,
-      stdout: 'pipe',
-      stderr: 'pipe',
-    });
-    const patch = new TextDecoder().decode(proc.stdout);
-
     fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
     Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
     Bun.spawnSync(['git', 'config', 'user.email', 'test@example.com'], {
@@ -1107,6 +1079,17 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       stdout: 'pipe',
       stderr: 'pipe',
     });
+    const absoluteFile = path.join(workspace, 'src/index.ts');
+    const patch = [
+      `Index: ${absoluteFile}`,
+      '===================================================================',
+      `--- ${absoluteFile}`,
+      `+++ ${absoluteFile}`,
+      '@@ -1 +1 @@',
+      '-before',
+      '+after',
+      '',
+    ].join('\n');
     mockFetchOk(makeSessionDiffSnapshot(patch));
 
     const result = await restoreSession(SESSION_ID, workspace);
@@ -1271,6 +1254,49 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
       diffs: { applied: 0, skipped: 1, total: 1 },
     });
     expect(fs.existsSync(path.join(workspace, 'src/index.ts'))).toBe(false);
+  });
+
+  it('logs patch structure and Git parser diagnostics without patch contents', async () => {
+    fs.mkdirSync(path.join(workspace, 'src'), { recursive: true });
+    Bun.spawnSync(['git', 'init'], { cwd: workspace, stdout: 'pipe', stderr: 'pipe' });
+    const errorSpy = spyOn(console, 'error').mockImplementation(() => undefined);
+    mockFetchOk(
+      JSON.stringify({
+        info: snapshotInfo(),
+        sessionDiff: [
+          {
+            file: 'src/index.ts',
+            patch: 'not a git patch with private source content',
+            status: 'modified',
+          },
+        ],
+      })
+    );
+
+    try {
+      await restoreSession(SESSION_ID, workspace);
+
+      const logs = errorSpy.mock.calls.map(args => String(args[0]));
+      expect(
+        logs.some(
+          message =>
+            message.includes('patch metadata file=src/index.ts phase=raw') &&
+            message.includes('finalNewline=false') &&
+            message.includes('eofMarkers=0') &&
+            message.includes('hunkHeaders=0')
+        )
+      ).toBe(true);
+      for (const mode of ['stat', 'recount-stat', 'check', 'recount-check']) {
+        expect(
+          logs.some(message =>
+            message.includes(`git patch diagnostic file=src/index.ts mode=${mode}`)
+          )
+        ).toBe(true);
+      }
+      expect(logs.every(message => !message.includes('private source content'))).toBe(true);
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 
   it('unlinks a deleted file when its patch cannot be applied', async () => {

@@ -115,8 +115,8 @@ export class ActiveSessionsLiveSync {
     this.kickFetch();
   }
 
-  /** False selects a caller fallback; handled failures must not start another fetch. */
-  async refreshNow(queryKey: QueryKey): Promise<false | { accepted: boolean }> {
+  /** False means no matching owner; canceled marks a detached owner result. */
+  async refreshNow(queryKey: QueryKey): Promise<false | { accepted: boolean; canceled?: true }> {
     const epoch = this.attachmentEpoch;
     if (!this.isCurrentAttachment(epoch) || hashKey(queryKey) !== hashKey(this.options.queryKey)) {
       return false;
@@ -133,11 +133,11 @@ export class ActiveSessionsLiveSync {
       }
     }
     /* eslint-enable no-await-in-loop */
+    if (!this.isCurrentAttachment(epoch)) {
+      return { accepted: false, canceled: true };
+    }
     return {
-      accepted:
-        this.isCurrentAttachment(epoch) &&
-        !this.pendingReasons.has('manual') &&
-        refresh.hasAcceptedResult(),
+      accepted: !this.pendingReasons.has('manual') && refresh.hasAcceptedResult(),
     };
   }
 
@@ -333,9 +333,11 @@ export class ActiveSessionsLiveSync {
 /** One app-level mount owns the registry and socket lease. */
 let attachedSync: ActiveSessionsLiveSync | null = null;
 
+export const refreshActiveSessionsFromPush = (): void => attachedSync?.scheduleRefresh('manual');
+
 /** Returns false if no current owner handles this exact key. */
 export async function refreshActiveSessionsNow(
   queryKey: QueryKey
-): Promise<false | { accepted: boolean }> {
+): Promise<false | { accepted: boolean; canceled?: true }> {
   return (await attachedSync?.refreshNow(queryKey)) ?? false;
 }

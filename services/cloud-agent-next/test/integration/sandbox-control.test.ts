@@ -7,9 +7,13 @@ import {
   runInDurableObject,
 } from 'cloudflare:test';
 import {
+  MAX_WORKTREE_FILE_BYTES,
+  MAX_WORKTREE_SNAPSHOT_BYTES,
   worktreeChangesCaptureRequestSchema,
   type WorktreeChangesCapture,
   type WorktreeChangesSnapshot,
+  type WorktreeFileRecord,
+  type WorktreeSnapshotCapture,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -57,6 +61,7 @@ import {
   SANDBOX_SESSION_METADATA_KEY,
 } from '../../src/sandbox-session/terminal-lifecycle.js';
 import type { AgentSandboxProvider, Env, GitTokenService, SandboxId } from '../../src/types.js';
+import { appRouter } from '../../src/router.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -106,6 +111,9 @@ import { createEventQueries } from '../../src/session/queries/index.js';
 import { throwAdmissionError } from '../../src/session/queue-message.js';
 import {
   requestFrameSchema,
+  responseFrameSchema,
+  sessionOperationAckSchema,
+  sessionOperationAuthorizationSchema,
   sessionPromptPayloadSchema,
   SANDBOX_CONTROL_AUTO_PING,
   SANDBOX_CONTROL_AUTO_PONG,
@@ -113,17 +121,27 @@ import {
   type RequestFrame,
   type ResponseFrame,
   type SessionAttachPayload,
+  type SessionOperationDelivery,
   sandboxControlSocketAttachmentSchema,
   type SandboxHeartbeatPayload,
 } from '../../src/shared/sandbox-control-protocol.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
-import { WORKTREE_CHANGES_KEY } from '../../src/sandbox-session/worktree-changes.js';
 import {
   WORKTREE_CHANGED_EVENT,
   WORKTREE_CHANGES_READY_EVENT,
 } from '../../src/shared/worktree-changes-wire.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import type { StoredEvent } from '../../src/websocket/types.js';
+import {
+  WORKTREE_CHANGES_KEY,
+  WORKTREE_FILE_PREFIX,
+} from '../../src/sandbox-session/worktree-changes.js';
+
+vi.mock('@kilocode/db/client', () => ({
+  getWorkerDb: () => {
+    throw new Error('PostgreSQL must not be accessed by these Workers integration tests');
+  },
+}));
 
 vi.mock('../../src/session-access.js', () => ({
   requireCurrentSessionAccess: vi.fn(),
@@ -345,8 +363,21 @@ function persistedSessionEvents(state: DurableObjectState, eventTypes: string[])
 function sendHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
+    workingBranches?: boolean;
+  } = {}
 ): void {
+  const capabilities = {
+    ...(identity.sessionOperationResults || identity.nativeRuntimeRetirement
+      ? { sessionOperationResults: true }
+      : {}),
+    ...(identity.nativeRuntimeRetirement ? { nativeRuntimeRetirement: true } : {}),
+    ...(identity.workingBranches ? { workingBranches: true } : {}),
+  };
   ws.send(
     JSON.stringify({
       type: 'request',
@@ -356,6 +387,7 @@ function sendHello(
         protocolVersion: 1,
         providerInstanceId:
           identity.providerInstanceId ?? cloudflareRef(socketSandboxIds.get(ws) ?? sandboxId),
+        ...(Object.keys(capabilities).length > 0 ? { capabilities } : {}),
         ...(identity.wrapperInstanceId ? { wrapperInstanceId: identity.wrapperInstanceId } : {}),
       },
     })
@@ -365,7 +397,13 @@ function sendHello(
 async function completeHello(
   ws: WebSocket,
   requestId: string,
-  identity: { providerInstanceId?: string; wrapperInstanceId?: string } = {}
+  identity: {
+    providerInstanceId?: string;
+    wrapperInstanceId?: string;
+    sessionOperationResults?: boolean;
+    nativeRuntimeRetirement?: boolean;
+    workingBranches?: boolean;
+  } = {}
 ): Promise<void> {
   sendHello(ws, requestId, identity);
   await expect(nextMessage(ws)).resolves.toBe(
@@ -376,7 +414,12 @@ async function completeHello(
       result: {
         protocolVersion: 1,
         handshakeComplete: true,
-        capabilities: { kiloVersionHeartbeat: true },
+        capabilities: {
+          kiloVersionHeartbeat: true,
+          sessionOperationResults: true,
+          scopedStopAbort: true,
+          nativeRuntimeRetirement: true,
+        },
       },
     })
   );
@@ -403,7 +446,10 @@ type TerminalRuntimeFixture = {
   wrapperInstanceId?: string;
 };
 
-async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
+async function initializeTerminalRuntime(
+  fixture: TerminalRuntimeFixture,
+  capabilities: { sessionOperationResults?: boolean; nativeRuntimeRetirement?: boolean } = {}
+) {
   const credential = generateSandboxCredential();
   await seedCredential(credential, fixture.sandboxId);
   const control = env.SANDBOX_CONTROL.getByName(fixture.sandboxId);
@@ -431,6 +477,7 @@ async function initializeTerminalRuntime(fixture: TerminalRuntimeFixture) {
   await completeHello(socket, `hello_${fixture.sandboxId}`, {
     providerInstanceId: providerRef,
     ...(fixture.wrapperInstanceId ? { wrapperInstanceId: fixture.wrapperInstanceId } : {}),
+    ...capabilities,
   });
   return { control, credential, socket, providerRef, ...provider };
 }
@@ -2339,7 +2386,10 @@ describe('SandboxControl contained Vercel lifecycle', () => {
     const previousRef = launch.env.PROVIDER_INSTANCE_ID;
     const previous = await connect(credential, sandboxId);
     try {
-      await completeHello(previous, 'hello-previous-wrapper', { providerInstanceId: previousRef });
+      await completeHello(previous, 'hello-previous-wrapper', {
+        providerInstanceId: previousRef,
+        workingBranches: true,
+      });
       signalWrapperReady(previous);
       await vi.waitFor(async () => {
         await expect(control.getStatus()).resolves.toMatchObject({ connection: 'ready' });
@@ -2443,6 +2493,7 @@ describe('SandboxControl contained Vercel lifecycle', () => {
       try {
         await completeHello(replacement, 'hello-replacement-wrapper', {
           providerInstanceId: replacementLaunch.env.PROVIDER_INSTANCE_ID,
+          workingBranches: true,
         });
         signalWrapperReady(replacement);
         await vi.waitFor(async () => {
@@ -3048,7 +3099,10 @@ describe('SandboxControl mandatory worktree credentials', () => {
     expectCredentialFreeLaunch(launch, broker);
     const ws = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
     try {
-      await completeHello(ws, 'hello-joined-containment', { providerInstanceId: providerRef });
+      await completeHello(ws, 'hello-joined-containment', {
+        providerInstanceId: providerRef,
+        workingBranches: true,
+      });
       const stale = await connect(launch.env.SANDBOX_CONTROL_CREDENTIAL, fixture.sandboxId);
       await rejectHello(
         stale,
@@ -4892,7 +4946,7 @@ describe('SandboxControl recovery watchdogs', () => {
         wrapperInstanceId,
         reason: 'preparation_interrupted',
       })
-    ).resolves.toEqual({ quarantined: true });
+    ).resolves.toEqual({ quarantined: true, disposition: 'physical_stopping' });
     await runInDurableObject(control, async (_instance, state) => {
       expect(await state.storage.getAlarm()).toBe(repairedAt);
     });
@@ -6427,7 +6481,7 @@ describe('SandboxControl passive status', () => {
             },
           })
         );
-        await Promise.all(fresh['sessionForwardChains'].values());
+        await Promise.all(fresh['sessionForwarding'].values());
         expect(await fresh.getSandboxStatus(statusInput)).toMatchObject({
           status: 'active',
           estimatedSleepAt: null,
@@ -6686,16 +6740,40 @@ function worktreeCapture(revision: number, empty = false): WorktreeChangesCaptur
   };
 }
 
+function worktreeFileRecord(revision: number, path = 'changed.ts'): WorktreeFileRecord {
+  return {
+    schemaVersion: 1,
+    revision,
+    path,
+    diff: {
+      status: 'available',
+      patch: `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ -1 +1,2 @@\n-old\n+new\n+line\n`,
+    },
+    content: { status: 'available', source: 'current', text: 'new\nline\n' },
+  };
+}
+
+function worktreeSnapshotCapture(revision: number, empty = false): WorktreeSnapshotCapture {
+  const summary = worktreeCapture(revision, empty);
+  return {
+    summary,
+    files: summary.files.map(file => worktreeFileRecord(revision, file.path)),
+  };
+}
+
 const savedWorktreeSnapshot: WorktreeChangesSnapshot = {
   ...worktreeCapture(4),
-  schemaVersion: 1,
+  schemaVersion: 2,
   capturedAt: '2026-08-20T10:00:00.000Z',
+  files: worktreeCapture(4).files.map(file => ({ ...file, revision: 4 })),
 };
 
-async function worktreeFixture() {
+async function worktreeFixture(
+  options: { sessionOperationResults?: boolean; sessionId?: `workspace_${string}` } = {}
+) {
   const suffix = crypto.randomUUID();
   const userId = `user_worktree_${suffix}`;
-  const sessionId = `workspace_${suffix}` as const;
+  const sessionId = options.sessionId ?? (`workspace_${suffix}` as const);
   const sandboxId = `usr-${suffix.replaceAll('-', '').slice(0, 12)}` as const;
   const kiloSessionId = ROOT_ID;
   const worktreeId = `worktree_${suffix}` as const;
@@ -6779,21 +6857,38 @@ async function worktreeFixture() {
   await control.prepareSessionCredentials({ ownerId: userId, sessionId });
   await control.attachSession({ sessionId, kiloSessionId, directory, worktreeId, ownerId: userId });
   let ws = await connect(credential, sandboxId);
-  await completeHello(ws, `hello_${suffix}`, { wrapperInstanceId });
+  await completeHello(ws, `hello_${suffix}`, {
+    wrapperInstanceId,
+    sessionOperationResults: options.sessionOperationResults,
+  });
   const captures: RequestFrame[] = [];
   const inbox: RequestFrame[] = [];
   const captureWaiters: ((request: RequestFrame) => void)[] = [];
   const prompts: RequestFrame[] = [];
   const promptSeen = Promise.withResolvers<void>();
   const aborts: RequestFrame[] = [];
+  const resultWaiters = new Map<string, (response: ResponseFrame) => void>();
   let nextAttach: ((request: RequestFrame) => void) | undefined;
 
   function receive(client: WebSocket): void {
     client.addEventListener('message', event => {
-      const parsed = requestFrameSchema.safeParse(JSON.parse(String(event.data)));
+      const frame = JSON.parse(String(event.data));
+      const response = responseFrameSchema.safeParse(frame);
+      if (response.success) {
+        const resolve = resultWaiters.get(response.data.requestId);
+        if (resolve) {
+          resultWaiters.delete(response.data.requestId);
+          resolve(response.data);
+        }
+        return;
+      }
+      const parsed = requestFrameSchema.safeParse(frame);
       if (!parsed.success) return;
       const request = parsed.data;
-      if (request.operation === 'session.git.summary') {
+      if (
+        request.operation === 'session.git.summary' ||
+        request.operation === 'session.git.snapshot'
+      ) {
         captures.push(request);
         const waiting = captureWaiters.shift();
         if (waiting) waiting(request);
@@ -6882,6 +6977,20 @@ async function worktreeFixture() {
     reply(request: RequestFrame, result: unknown): void {
       ws.send(JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result }));
     },
+    async sendOperationResult(delivery: SessionOperationDelivery): Promise<ResponseFrame> {
+      const requestId = crypto.randomUUID();
+      const response = new Promise<ResponseFrame>(resolve => resultWaiters.set(requestId, resolve));
+      ws.send(
+        JSON.stringify({
+          type: 'request',
+          requestId,
+          operation: 'session.operation.result',
+          session: delivery.authorization.session,
+          payload: delivery,
+        })
+      );
+      return response;
+    },
     fail(
       request: RequestFrame,
       retryable = false,
@@ -6958,6 +7067,141 @@ function captureRevision(request: RequestFrame): number {
   return (request.payload as { revision: number }).revision;
 }
 
+describe('SandboxSession operation authorization admission', () => {
+  it('persists dispatch proof before the capability-gated attach and prompt reach the wrapper socket', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_authorization';
+    try {
+      const attach = fixture.holdNextAttach();
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'persist before egress' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+
+      const attachRequest = await attach;
+      expect(attachRequest).toMatchObject({
+        operation: 'session.attach',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: fixture.kiloSessionId,
+          directory: fixture.directory,
+        },
+        authorization: {
+          operation: 'session.attach',
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'queued',
+            unresolvedDispatch: true,
+            operations: {
+              attach: {
+                dispatched: true,
+                authorization: {
+                  operation: 'session.attach',
+                  messageId,
+                  wrapperInstanceId: fixture.wrapperInstanceId,
+                },
+              },
+            },
+          },
+        ]);
+      });
+
+      fixture.reply(attachRequest, { attached: true });
+      await fixture.promptSeen;
+      expect(fixture.prompts).toHaveLength(1);
+      expect(fixture.prompts[0]).toMatchObject({
+        operation: 'session.prompt',
+        authorization: {
+          operation: 'session.prompt',
+          operationId: messageId,
+          messageId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+        },
+      });
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+
+  it('returns the exact durable acknowledgement when the wrapper repeats a completed prompt result', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation(async () => Response.json({ valid: true }));
+    const fixture = await worktreeFixture({ sessionOperationResults: true });
+    const messageId = 'msg_operation_result_ack';
+    try {
+      await expect(
+        fixture.session.admitSubmittedMessage({
+          userId: fixture.userId,
+          turn: { type: 'prompt', id: messageId, prompt: 'retain this completed result' },
+        })
+      ).resolves.toMatchObject({ success: true, messageId });
+      await fixture.promptSeen;
+      const prompt = fixture.prompts[0];
+      if (!prompt) throw new Error('Missing prompt operation request');
+      const authorization = sessionOperationAuthorizationSchema.parse(prompt.authorization);
+      const delivery: SessionOperationDelivery = {
+        version: 2,
+        authorization,
+        completedAt: Date.now(),
+        result: { ok: true, result: { messageId, status: 'accepted' } },
+        outcome: { messageId, status: 'completed' },
+        events: [],
+        preparing: [],
+      };
+
+      const first = await fixture.sendOperationResult(delivery);
+      const second = await fixture.sendOperationResult(delivery);
+      const firstAck = sessionOperationAckSchema.parse(first.ok ? first.result : undefined);
+      expect(first).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'applied',
+          decision: { state: 'completed' },
+          resultHash: expect.stringMatching(/^[a-f0-9]{64}$/),
+        },
+      });
+      expect(second).toMatchObject({
+        ok: true,
+        result: {
+          authorization,
+          disposition: 'identical',
+          resultHash: firstAck.resultHash,
+        },
+      });
+      await runInDurableObject(fixture.session, async (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        expect(messages).toMatchObject([
+          {
+            messageId,
+            state: 'completed',
+            terminalSource: 'operation_result',
+            operations: { prompt: { resultHash: firstAck.resultHash } },
+          },
+        ]);
+      });
+      expect(fixture.prompts).toHaveLength(1);
+    } finally {
+      fixture.close();
+      fetchMock.mockRestore();
+    }
+  });
+});
+
 describe('SandboxSession worktree changes persistence', () => {
   beforeEach(() => {
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () => Response.json({ valid: true }));
@@ -6973,7 +7217,7 @@ describe('SandboxSession worktree changes persistence', () => {
         const request = await fixture.nextCapture();
         expect(captureRevision(request)).toBe(revision);
         expect(fixture.readyNotifications).toHaveLength(revision - 1);
-        fixture.reply(request, worktreeCapture(revision));
+        fixture.reply(request, worktreeSnapshotCapture(revision));
         const saved = await pending;
         expect(saved.status).toBe('refreshed');
         expect(fixture.readyNotifications).toHaveLength(revision);
@@ -7031,7 +7275,7 @@ describe('SandboxSession worktree changes persistence', () => {
       });
       const pending = fixture.session.refreshWorktreeChanges();
       const request = await fixture.nextCapture();
-      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      fixture.reply(request, worktreeSnapshotCapture(captureRevision(request)));
       await expect(pending).resolves.toEqual({ status: 'failed', snapshot: savedWorktreeSnapshot });
       await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
         snapshot: savedWorktreeSnapshot,
@@ -7057,7 +7301,7 @@ describe('SandboxSession worktree changes persistence', () => {
       });
       const pending = fixture.session.refreshWorktreeChanges();
       const request = await fixture.nextCapture();
-      fixture.reply(request, worktreeCapture(captureRevision(request), true));
+      fixture.reply(request, worktreeSnapshotCapture(captureRevision(request), true));
       const saved = await pending;
       expect(saved).toMatchObject({ status: 'refreshed', snapshot: { revision: 5, files: [] } });
       await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
@@ -7095,7 +7339,7 @@ describe('SandboxSession worktree changes persistence', () => {
       );
       const pending = fixture.session.refreshWorktreeChanges();
       const request = await fixture.nextCapture();
-      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      fixture.reply(request, worktreeSnapshotCapture(captureRevision(request)));
       await expect(pending).resolves.toMatchObject({
         status: 'refreshed',
         snapshot: { revision: 1 },
@@ -7106,6 +7350,279 @@ describe('SandboxSession worktree changes persistence', () => {
           expect.objectContaining({ id: existingId, payload: JSON.stringify({ revision: 1 }) }),
         ]);
       });
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('keeps A on its saved revision for a B-only update, then refreshes A when its payload changes', async () => {
+    const fixture = await worktreeFixture();
+    const captured = (revision: number, aText: string, bText: string): WorktreeSnapshotCapture => {
+      const summary = worktreeCapture(revision);
+      summary.files = summary.files.flatMap(file => [
+        { ...file, path: 'a.ts' },
+        { ...file, path: 'b.ts' },
+      ]);
+      const record = (path: string, text: string): WorktreeFileRecord => ({
+        ...worktreeFileRecord(revision, path),
+        diff: { status: 'available', patch: `diff --git a/${path} b/${path}\n-old\n+${text}` },
+        content: { status: 'available', source: 'current', text },
+      });
+      return { summary, files: [record('a.ts', aText), record('b.ts', bText)] };
+    };
+    try {
+      const first = fixture.session.refreshWorktreeChanges();
+      const firstRequest = await fixture.nextCapture();
+      fixture.reply(firstRequest, captured(captureRevision(firstRequest), 'a1\n', 'b1\n'));
+      await first;
+
+      const bOnly = fixture.session.refreshWorktreeChanges();
+      const bOnlyRequest = await fixture.nextCapture();
+      fixture.reply(bOnlyRequest, captured(captureRevision(bOnlyRequest), 'a1\n', 'b2\n'));
+      const afterB = await bOnly;
+      expect(afterB).toMatchObject({
+        status: 'refreshed',
+        snapshot: {
+          revision: 2,
+          files: [
+            { path: 'a.ts', revision: 1, additions: 2, deletions: 1 },
+            { path: 'b.ts', revision: 2, additions: 2, deletions: 1 },
+          ],
+        },
+      });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'a.ts', expectedRevision: 1 })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { revision: 1, content: { text: 'a1\n' } },
+      });
+      expect(fixture.readyNotifications.at(-1)?.snapshot).toEqual(afterB.snapshot);
+
+      const aChanged = fixture.session.refreshWorktreeChanges();
+      const aChangedRequest = await fixture.nextCapture();
+      fixture.reply(aChangedRequest, captured(captureRevision(aChangedRequest), 'a3\n', 'b2\n'));
+      const afterA = await aChanged;
+      expect(afterA).toMatchObject({
+        status: 'refreshed',
+        snapshot: {
+          revision: 3,
+          files: [
+            { path: 'a.ts', revision: 3, additions: 2, deletions: 1 },
+            { path: 'b.ts', revision: 2, additions: 2, deletions: 1 },
+          ],
+        },
+      });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'a.ts', expectedRevision: 1 })
+      ).resolves.toEqual({ status: 'stale', currentRevision: 3 });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'a.ts', expectedRevision: 3 })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { revision: 3, content: { text: 'a3\n' } },
+      });
+      expect(fixture.readyNotifications.at(-1)?.snapshot).toEqual(afterA.snapshot);
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('parses, validates, and stores a near-10 MiB snapshot as bounded per-file KV records', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      const pending = fixture.session.refreshWorktreeChanges();
+      const request = await fixture.nextCapture();
+      expect(request.operation).toBe('session.git.snapshot');
+      const revision = captureRevision(request);
+      const summary = worktreeCapture(revision);
+      summary.files = Array.from({ length: 20 }, (_, index) => ({
+        ...summary.files[0],
+        path: `large-${index}.ts`,
+      }));
+      const files = summary.files.map(({ path }) => {
+        const line = `+${'界"\\'.repeat(1000)}\n`;
+        const file: WorktreeFileRecord = {
+          ...worktreeFileRecord(revision, path),
+          diff: {
+            status: 'available',
+            patch: `diff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ -1 +1,61 @@\n-old\n${line.repeat(60)}`,
+          },
+          content: { status: 'unavailable', reason: 'too_large' },
+        };
+        const size = new TextEncoder().encode(JSON.stringify(file)).byteLength;
+        if (file.diff.status !== 'available') throw new Error('Expected test patch');
+        file.diff.patch += `+${'x'.repeat(MAX_WORKTREE_FILE_BYTES - 2048 - size - 3)}\n`;
+        return file;
+      });
+      const capture: WorktreeSnapshotCapture = { summary, files };
+      const size = new TextEncoder().encode(JSON.stringify(capture)).byteLength;
+      expect(size).toBeGreaterThan(MAX_WORKTREE_SNAPSHOT_BYTES - 64 * 1024);
+      expect(size).toBeLessThanOrEqual(MAX_WORKTREE_SNAPSHOT_BYTES);
+      fixture.reply(request, capture);
+      const saved = await pending;
+      expect(saved.status).toBe('refreshed');
+      expect(saved.snapshot?.files).toEqual(summary.files.map(file => ({ ...file, revision })));
+      expect(new TextEncoder().encode(JSON.stringify(saved)).byteLength).toBeLessThan(256 * 1024);
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        let records = 0;
+        for (const [, raw] of state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })) {
+          expect(new TextEncoder().encode(JSON.stringify(raw)).byteLength).toBeLessThanOrEqual(
+            MAX_WORKTREE_FILE_BYTES
+          );
+          records++;
+        }
+        expect(records).toBe(20);
+      });
+      const selected = await fixture.session.getWorktreeFile({
+        path: 'large-19.ts',
+        expectedRevision: revision,
+      });
+      expect(selected.status).toBe('available');
+      if (selected.status !== 'available') throw new Error('Expected saved file');
+      expect(selected.file).toEqual(files[19]);
+      const replacing = fixture.session.refreshWorktreeChanges();
+      const replacementRequest = await fixture.nextCapture();
+      const replacementRevision = captureRevision(replacementRequest);
+      capture.summary.revision = replacementRevision;
+      capture.summary.comparison.head = 'c'.repeat(40);
+      for (const file of capture.files) file.revision = replacementRevision;
+      fixture.reply(replacementRequest, capture);
+      await expect(replacing).resolves.toMatchObject({
+        status: 'refreshed',
+        snapshot: { revision: replacementRevision },
+      });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'large-19.ts', expectedRevision: revision })
+      ).resolves.toMatchObject({ status: 'available', file: { revision } });
+      const replaced = await fixture.session.getWorktreeFile({
+        path: 'large-19.ts',
+        expectedRevision: revision,
+      });
+      expect(replaced.status).toBe('available');
+      if (replaced.status !== 'available') throw new Error('Expected replaced file');
+      expect(replaced.file).toEqual({ ...files[19], revision });
+      await fixture.session.deleteSession();
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
+      });
+      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('rolls back a replacement after body writes and deletions when the manifest write fails', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      const initial = fixture.session.refreshWorktreeChanges();
+      const first = await fixture.nextCapture();
+      fixture.reply(first, worktreeSnapshotCapture(captureRevision(first)));
+      const saved = await initial;
+      const restore = await runInDurableObject(fixture.session, (_instance, state) => {
+        const put = state.storage.kv.put.bind(state.storage.kv);
+        const spy = vi.spyOn(state.storage.kv, 'put').mockImplementation((key, value) => {
+          if (key === WORKTREE_CHANGES_KEY) throw new Error('Manifest write failed');
+          put(key, value);
+        });
+        return () => spy.mockRestore();
+      });
+      try {
+        const pending = fixture.session.refreshWorktreeChanges();
+        const request = await fixture.nextCapture();
+        const capture = worktreeSnapshotCapture(captureRevision(request));
+        capture.summary.files = capture.summary.files.map(file => ({
+          ...file,
+          path: 'replacement.ts',
+        }));
+        capture.files = [worktreeFileRecord(captureRevision(request), 'replacement.ts')];
+        fixture.reply(request, capture);
+        await expect(pending).resolves.toEqual({ status: 'failed', snapshot: saved.snapshot });
+        await expect(
+          fixture.session.getWorktreeFile({
+            path: 'changed.ts',
+            expectedRevision: captureRevision(first),
+          })
+        ).resolves.toMatchObject({
+          status: 'available',
+          file: worktreeFileRecord(captureRevision(first)),
+        });
+        await runInDurableObject(fixture.session, (_instance, state) => {
+          expect(state.storage.kv.get(WORKTREE_CHANGES_KEY)).toEqual(saved.snapshot);
+          expect(state.storage.kv.get(`${WORKTREE_FILE_PREFIX}replacement.ts`)).toBeUndefined();
+        });
+      } finally {
+        restore();
+      }
+    } finally {
+      fixture.close();
+    }
+  });
+
+  it('replaces records completely, clears an empty snapshot, and falls back only for an old wrapper', async () => {
+    const fixture = await worktreeFixture();
+    try {
+      const initial = fixture.session.refreshWorktreeChanges();
+      const first = await fixture.nextCapture();
+      fixture.reply(first, worktreeSnapshotCapture(captureRevision(first)));
+      await initial;
+      const replacement = fixture.session.refreshWorktreeChanges();
+      const next = await fixture.nextCapture();
+      const capture = worktreeSnapshotCapture(captureRevision(next));
+      capture.summary.files = capture.summary.files.map(file => ({
+        ...file,
+        path: 'replacement.ts',
+      }));
+      capture.files = [worktreeFileRecord(captureRevision(next), 'replacement.ts')];
+      fixture.reply(next, capture);
+      await expect(replacement).resolves.toMatchObject({ status: 'refreshed' });
+      await expect(
+        fixture.session.getWorktreeFile({
+          path: 'changed.ts',
+          expectedRevision: captureRevision(first),
+        })
+      ).resolves.toEqual({ status: 'no_longer_listed', currentRevision: captureRevision(next) });
+      await expect(
+        fixture.session.getWorktreeFile({
+          path: 'replacement.ts',
+          expectedRevision: captureRevision(first),
+        })
+      ).resolves.toEqual({ status: 'stale', currentRevision: captureRevision(next) });
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(state.storage.kv.get(`${WORKTREE_FILE_PREFIX}changed.ts`)).toBeUndefined();
+      });
+
+      const empty = fixture.session.refreshWorktreeChanges();
+      const emptyRequest = await fixture.nextCapture();
+      fixture.reply(emptyRequest, worktreeSnapshotCapture(captureRevision(emptyRequest), true));
+      await expect(empty).resolves.toMatchObject({ status: 'refreshed', snapshot: { files: [] } });
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
+      });
+
+      const restored = fixture.session.refreshWorktreeChanges();
+      const restoredRequest = await fixture.nextCapture();
+      fixture.reply(restoredRequest, worktreeSnapshotCapture(captureRevision(restoredRequest)));
+      await restored;
+      const legacy = fixture.session.refreshWorktreeChanges();
+      const modernRequest = await fixture.nextCapture();
+      fixture.fail(modernRequest, false, 'unknown_operation');
+      const legacyRequest = await fixture.nextCapture();
+      expect(legacyRequest.operation).toBe('session.git.summary');
+      expect(legacyRequest.payload).toEqual(modernRequest.payload);
+      fixture.reply(legacyRequest, worktreeCapture(captureRevision(legacyRequest)));
+      await expect(legacy).resolves.toMatchObject({ status: 'refreshed' });
+      await expect(
+        fixture.session.getWorktreeFile({
+          path: 'changed.ts',
+          expectedRevision: captureRevision(legacyRequest),
+        })
+      ).resolves.toEqual({ status: 'not_captured' });
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
+      });
+      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
     } finally {
       fixture.close();
     }
@@ -7126,10 +7643,14 @@ describe('SandboxSession worktree changes persistence', () => {
     expect(request.payload).toEqual({ revision: 1, baseRef: 'refs/remotes/origin/main' });
     await fixture.promptSeen;
     expect(fixture.prompts).toHaveLength(1);
-    fixture.reply(request, worktreeCapture(1));
+    fixture.reply(request, worktreeSnapshotCapture(1));
     await fixture.settled();
     await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
-      snapshot: { schemaVersion: 1, revision: 1, files: worktreeCapture(1).files },
+      snapshot: {
+        schemaVersion: 2,
+        revision: 1,
+        files: worktreeCapture(1).files.map(file => ({ ...file, revision: 1 })),
+      },
     });
     await expect(fixture.session.getCurrentMessageWork()).resolves.toMatchObject({
       messageId: 'msg_worktree_attach',
@@ -7147,7 +7668,7 @@ describe('SandboxSession worktree changes persistence', () => {
         turn: { type: 'prompt', id: messageId, prompt: 'edit the worktree' },
       });
       const attached = await fixture.nextCapture();
-      fixture.reply(attached, worktreeCapture(captureRevision(attached), true));
+      fixture.reply(attached, worktreeSnapshotCapture(captureRevision(attached), true));
       await fixture.settled();
       fixture.noWake.ensureReady.mockClear();
       fixture.noWake.attachSession.mockClear();
@@ -7177,13 +7698,13 @@ describe('SandboxSession worktree changes persistence', () => {
       for (let hint = 0; hint < 3; hint++) await fixture.event(WORKTREE_CHANGED_EVENT);
       expect(fixture.captures).toHaveLength(2);
       expect(before.broadcast).not.toHaveBeenCalled();
-      fixture.reply(dirty, worktreeCapture(captureRevision(dirty)));
+      fixture.reply(dirty, worktreeSnapshotCapture(captureRevision(dirty)));
       const trailing = await fixture.nextCapture();
       expect(captureRevision(trailing)).toBe(captureRevision(dirty) + 1);
       await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
         snapshot: { revision: 2, files: worktreeCapture(2).files },
       });
-      fixture.reply(trailing, worktreeCapture(captureRevision(trailing), true));
+      fixture.reply(trailing, worktreeSnapshotCapture(captureRevision(trailing), true));
       await fixture.settled();
       await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
         snapshot: { revision: 3, files: [] },
@@ -7301,7 +7822,7 @@ describe('SandboxSession worktree changes persistence', () => {
         })
       ).resolves.toMatchObject({ success: true, messageId });
       const attached = await fixture.nextCapture();
-      fixture.reply(attached, worktreeCapture(captureRevision(attached)));
+      fixture.reply(attached, worktreeSnapshotCapture(captureRevision(attached)));
       await fixture.settled();
       const saved = await fixture.session.getWorktreeChanges();
 
@@ -7356,15 +7877,23 @@ describe('SandboxSession worktree changes persistence', () => {
         kiloSessionId: fixture.kiloSessionId,
         directory: fixture.directory,
       });
-      const capture = worktreeCapture(captureRevision(finalized));
-      capture.comparison.head = 'c'.repeat(40);
+      const capture = worktreeSnapshotCapture(captureRevision(finalized));
+      capture.summary.comparison.head = 'c'.repeat(40);
       fixture.reply(finalized, capture);
       await fixture.settled();
       await expect(fixture.session.getMessageResult(messageId)).resolves.toMatchObject({
         result: { status: 'completed' },
       });
       const completed = await fixture.session.getWorktreeChanges();
-      expect(completed.snapshot).toMatchObject({ ...capture, schemaVersion: 1 });
+      expect(completed.snapshot).toMatchObject({ ...capture.summary, schemaVersion: 2 });
+      const selectedRevision = completed.snapshot?.files[0]?.revision;
+      if (!selectedRevision) throw new Error('Missing completed file revision');
+      await expect(
+        fixture.session.getWorktreeFile({
+          path: 'changed.ts',
+          expectedRevision: selectedRevision,
+        })
+      ).resolves.toMatchObject({ status: 'available', file: { revision: selectedRevision } });
       expect(fixture.captures).toHaveLength(3);
 
       await fixture.event('session.message.outcome', fixture.kiloSessionId, outcome);
@@ -7409,22 +7938,33 @@ describe('SandboxSession worktree changes persistence', () => {
       const pending = session.refreshWorktreeChanges();
       const request = await fixture.nextCapture();
       expect(request.session).toEqual({ sessionId, kiloSessionId, directory: fixture.directory });
-      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      fixture.reply(request, worktreeSnapshotCapture(captureRevision(request)));
       await expect(pending).resolves.toMatchObject({
         status: 'refreshed',
         snapshot: { revision: 1 },
       });
     }
     const savedSibling = await sibling.getWorktreeChanges();
+    const savedSiblingFile = await sibling.getWorktreeFile({
+      path: 'changed.ts',
+      expectedRevision: 1,
+    });
+    expect(savedSiblingFile.status).toBe('available');
     await fixture.session.deleteSession();
     await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+    await expect(
+      fixture.session.getWorktreeFile({ path: 'changed.ts', expectedRevision: 1 })
+    ).resolves.toEqual({ status: 'not_captured' });
     await expect(sibling.getWorktreeChanges()).resolves.toEqual(savedSibling);
+    await expect(
+      sibling.getWorktreeFile({ path: 'changed.ts', expectedRevision: 1 })
+    ).resolves.toEqual(savedSiblingFile);
     await expect(fixture.control.listRoutes()).resolves.toEqual([
       expect.objectContaining({ sessionId: siblingId, worktreeId: fixture.worktreeId }),
     ]);
     const pending = sibling.refreshWorktreeChanges();
     const request = await fixture.nextCapture();
-    fixture.reply(request, worktreeCapture(captureRevision(request), true));
+    fixture.reply(request, worktreeSnapshotCapture(captureRevision(request), true));
     await expect(pending).resolves.toMatchObject({
       status: 'refreshed',
       snapshot: { revision: 2, files: [] },
@@ -7445,18 +7985,18 @@ describe('SandboxSession worktree changes persistence', () => {
           turn: { type: 'prompt', id: 'msg_initial_attach', prompt: 'initial prompt' },
         });
         const attachedCapture = await fixture.nextCapture();
-        fixture.reply(attachedCapture, worktreeCapture(captureRevision(attachedCapture)));
+        fixture.reply(attachedCapture, worktreeSnapshotCapture(captureRevision(attachedCapture)));
         await fixture.settled();
         await fixture.event('session.turn.close');
         const completedCapture = await fixture.nextCapture();
-        fixture.reply(completedCapture, worktreeCapture(captureRevision(completedCapture)));
+        fixture.reply(completedCapture, worktreeSnapshotCapture(captureRevision(completedCapture)));
         await fixture.settled();
         await fixture.event('session.message.outcome', fixture.kiloSessionId, {
           messageId: 'msg_initial_attach',
           status: 'completed',
         });
         const finalizedCapture = await fixture.nextCapture();
-        fixture.reply(finalizedCapture, worktreeCapture(captureRevision(finalizedCapture)));
+        fixture.reply(finalizedCapture, worktreeSnapshotCapture(captureRevision(finalizedCapture)));
         await fixture.settled();
         await expect(fixture.session.getMessageResult('msg_initial_attach')).resolves.toMatchObject(
           {
@@ -7491,14 +8031,14 @@ describe('SandboxSession worktree changes persistence', () => {
 
         const refreshed = fixture.session.refreshWorktreeChanges();
         const next = await fixture.nextCapture();
-        fixture.reply(next, worktreeCapture(captureRevision(next), true));
+        fixture.reply(next, worktreeSnapshotCapture(captureRevision(next), true));
         await expect(refreshed).resolves.toMatchObject({
           status: 'refreshed',
           snapshot: { files: [] },
         });
         await fixture.event('session.error');
         const terminalCapture = await fixture.nextCapture();
-        fixture.reply(terminalCapture, worktreeCapture(captureRevision(terminalCapture)));
+        fixture.reply(terminalCapture, worktreeSnapshotCapture(captureRevision(terminalCapture)));
         await fixture.settled();
         const beforeCleanup = await fixture.session.getWorktreeChanges();
         expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
@@ -7520,7 +8060,7 @@ describe('SandboxSession worktree changes persistence', () => {
           fixture.session.getMessageResult('msg_failed_reattach')
         ).resolves.toMatchObject({
           type: 'found',
-          result: { status: retry === 'cancelled' ? 'interrupted' : 'failed' },
+          result: { status: retry === 'cancelled' ? 'interrupted' : 'queued' },
         });
         await expect(fixture.session.getWorktreeChanges()).resolves.toEqual(beforeCleanup);
         await expect(fixture.control.getStatus()).resolves.toMatchObject({
@@ -7532,7 +8072,7 @@ describe('SandboxSession worktree changes persistence', () => {
         fixture.noWake.attachSession.mockClear();
         const afterRejection = fixture.session.refreshWorktreeChanges();
         const capture = await fixture.nextCapture();
-        fixture.reply(capture, worktreeCapture(captureRevision(capture)));
+        fixture.reply(capture, worktreeSnapshotCapture(captureRevision(capture)));
         await expect(afterRejection).resolves.toMatchObject({
           status: 'refreshed',
           snapshot: { revision: captureRevision(capture) },
@@ -7595,7 +8135,7 @@ describe('SandboxSession worktree changes persistence', () => {
       expect(fixture.captures).toHaveLength(0);
       await fixture.event(type);
       const request = await fixture.nextCapture();
-      fixture.reply(request, worktreeCapture(1));
+      fixture.reply(request, worktreeSnapshotCapture(1));
       await fixture.settled();
       const saved = await fixture.session.getWorktreeChanges();
       expect(saved.snapshot).toMatchObject({ revision: 1, files: worktreeCapture(1).files });
@@ -7615,10 +8155,10 @@ describe('SandboxSession worktree changes persistence', () => {
     await fixture.event('session.turn.close');
     await fixture.event('session.error');
     expect(fixture.captures).toHaveLength(1);
-    fixture.reply(first, worktreeCapture(captureRevision(first)));
+    fixture.reply(first, worktreeSnapshotCapture(captureRevision(first)));
     const trailing = await fixture.nextCapture();
     expect(captureRevision(trailing)).toBe(captureRevision(first) + 1);
-    fixture.reply(trailing, worktreeCapture(captureRevision(trailing), true));
+    fixture.reply(trailing, worktreeSnapshotCapture(captureRevision(trailing), true));
     const results = await refreshed;
     expect(results[0]).toEqual(results[1]);
     expect(results[0]).toMatchObject({ status: 'refreshed', snapshot: { files: [], revision: 2 } });
@@ -7655,12 +8195,12 @@ describe('SandboxSession worktree changes persistence', () => {
       expect(fixture.captures).toHaveLength(0);
       await fixture.event(WORKTREE_CHANGED_EVENT);
       const dirty = await fixture.nextCapture();
-      fixture.reply(dirty, worktreeCapture(captureRevision(dirty)));
+      fixture.reply(dirty, worktreeSnapshotCapture(captureRevision(dirty)));
       await fixture.settled();
       expect(fixture.captures).toHaveLength(1);
       await fixture.event(type, fixture.kiloSessionId, { status: { type: 'idle' } });
       const request = await fixture.nextCapture();
-      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      fixture.reply(request, worktreeSnapshotCapture(captureRevision(request)));
       await fixture.settled();
       expect(fixture.captures).toHaveLength(2);
       await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
@@ -7675,7 +8215,10 @@ describe('SandboxSession worktree changes persistence', () => {
     async deletion => {
       const fixture = await worktreeFixture();
       await runInDurableObject(fixture.session, async (_instance, state) =>
-        state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+        state.storage.transactionSync(() => {
+          state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+          state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+        })
       );
       const pending = fixture.session.refreshWorktreeChanges();
       const request = await fixture.nextCapture();
@@ -7687,7 +8230,7 @@ describe('SandboxSession worktree changes persistence', () => {
           repository: { ...metadata.repository, upstreamBranch: 'other' },
         });
       });
-      fixture.reply(request, worktreeCapture(captureRevision(request)));
+      fixture.reply(request, worktreeSnapshotCapture(captureRevision(request)));
       await expect(pending).resolves.toEqual({ status: 'failed', snapshot: savedWorktreeSnapshot });
       await runInDurableObject(fixture.session, async (instance, state) => {
         const metadata = await instance.getMetadata();
@@ -7710,17 +8253,26 @@ describe('SandboxSession worktree changes persistence', () => {
           status: 'offline',
           snapshot: null,
         });
+        await expect(
+          fixture.session.getWorktreeFile({ path: 'changed.ts', expectedRevision: 4 })
+        ).resolves.toEqual({ status: 'not_captured' });
         await fixture.session.finishWorktreeDeletion(fixture.worktreeId);
       } else {
         await fixture.session.deleteSession();
       }
-      fixture.reply(lateRequest, worktreeCapture(captureRevision(lateRequest)));
+      fixture.reply(lateRequest, worktreeSnapshotCapture(captureRevision(lateRequest)));
       await expect(deletedCapture).resolves.toEqual({
         status: 'failed',
         snapshot: savedWorktreeSnapshot,
       });
       await fixture.settled();
       await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'changed.ts', expectedRevision: 4 })
+      ).resolves.toEqual({ status: 'not_captured' });
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
+      });
       await expect(fixture.session.getMetadata()).resolves.toBeNull();
       expect(fixture.captures).toHaveLength(2);
       expect(fixture.aborts).toHaveLength(0);
@@ -7729,17 +8281,143 @@ describe('SandboxSession worktree changes persistence', () => {
     }
   );
 
+  it('erases worktree data before cleanup failure and preserves erasure through late capture, route retries, and eviction', async () => {
+    const fixture = await worktreeFixture({ sessionId: `workspace_${crypto.randomUUID()}` });
+    let cleanupStarted = false;
+    let releaseCleanup = false;
+    let deletionResult: Promise<string | null> | undefined;
+    const readErasure = (session: typeof fixture.session) =>
+      runInDurableObject(session, (_instance, state) => ({
+        manifestPresent: state.storage.kv.get(WORKTREE_CHANGES_KEY) !== undefined,
+        fileCount: Array.from(state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })).length,
+        metadataPresent: state.storage.kv.get('session_metadata') !== undefined,
+      }));
+    try {
+      const initial = fixture.session.refreshWorktreeChanges();
+      const first = await fixture.nextCapture();
+      fixture.reply(first, worktreeSnapshotCapture(captureRevision(first)));
+      const saved = await initial;
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        state.storage.kv.put(
+          `${WORKTREE_FILE_PREFIX}superseded.ts`,
+          worktreeFileRecord(1, 'superseded.ts')
+        );
+      });
+      expect(await readErasure(fixture.session)).toEqual({
+        manifestPresent: true,
+        fileCount: 2,
+        metadataPresent: true,
+      });
+      const lateCapture = fixture.session.refreshWorktreeChanges();
+      const lateRequest = await fixture.nextCapture();
+      await runInDurableObject(fixture.control, instance => {
+        const prototype = Object.getPrototypeOf(instance) as typeof instance;
+        vi.spyOn(prototype, 'detachSession').mockImplementation(async () => {
+          cleanupStarted = true;
+          while (!releaseCleanup) await new Promise(resolve => setTimeout(resolve, 1));
+          throw new Error('Injected detach failure');
+        });
+      });
+      deletionResult = fixture.session.deleteSession().then(
+        () => null,
+        (error: unknown) => (error instanceof Error ? error.message : 'Unexpected deletion failure')
+      );
+      await vi.waitFor(() => expect(cleanupStarted).toBe(true));
+      const whileCleanupPending = await readErasure(fixture.session);
+      fixture.reply(lateRequest, worktreeSnapshotCapture(captureRevision(lateRequest)));
+      await expect(lateCapture).resolves.toEqual({ status: 'failed', snapshot: saved.snapshot });
+      const afterLateCapture = await readErasure(fixture.session);
+      releaseCleanup = true;
+      expect(await deletionResult).toContain('Injected detach failure');
+      await expect(fixture.session.getMetadata()).resolves.toBeNull();
+      const caller = appRouter.createCaller({
+        userId: fixture.userId,
+        authToken: 'test-token',
+        env,
+        request: new Request('http://worker.test/trpc/deleteSession'),
+      });
+      await expect(caller.deleteSession({ sessionId: fixture.sessionId })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+      const afterRetry = await readErasure(fixture.session);
+      await fixture.settled();
+      await abortAllDurableObjects();
+      const fresh = env.SANDBOX_SESSION.getByName(`${fixture.userId}:${fixture.sessionId}`);
+      await expect(fresh.getMetadata()).resolves.toBeNull();
+      await expect(caller.deleteSession({ sessionId: fixture.sessionId })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+      });
+      const afterEvictionRetry = await readErasure(fresh);
+      const erased = { manifestPresent: false, fileCount: 0, metadataPresent: true };
+      expect({ whileCleanupPending, afterLateCapture, afterRetry, afterEvictionRetry }).toEqual({
+        whileCleanupPending: erased,
+        afterLateCapture: erased,
+        afterRetry: erased,
+        afterEvictionRetry: erased,
+      });
+      await expect(fresh.getWorktreeChanges()).resolves.toEqual({ snapshot: null });
+      await expect(
+        fresh.getWorktreeFile({ path: 'changed.ts', expectedRevision: 1 })
+      ).resolves.toEqual({ status: 'not_captured' });
+    } finally {
+      releaseCleanup = true;
+      await deletionResult;
+      vi.mocked(requireCurrentSessionAccess).mockReset();
+      fixture.close();
+    }
+  });
+
+  it('rolls back the deletion fence if synchronous worktree erasure fails, allowing a complete retry', async () => {
+    const fixture = await worktreeFixture();
+    let restore: (() => void) | undefined;
+    try {
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+        state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+        const remove = state.storage.kv.delete.bind(state.storage.kv);
+        const spy = vi.spyOn(state.storage.kv, 'delete').mockImplementation(key => {
+          if (key.startsWith(WORKTREE_FILE_PREFIX))
+            throw new Error('Injected worktree erasure failure');
+          return remove(key);
+        });
+        restore = () => spy.mockRestore();
+      });
+      await runInDurableObject(fixture.session, async instance => {
+        await expect(instance.deleteSession()).rejects.toThrow('Injected worktree erasure failure');
+      });
+      await expect(fixture.session.getMetadata()).resolves.not.toBeNull();
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(state.storage.kv.get('session_lifecycle_fence')).toBeUndefined();
+        expect(state.storage.kv.get(WORKTREE_CHANGES_KEY) !== undefined).toBe(true);
+        expect(state.storage.kv.get(`${WORKTREE_FILE_PREFIX}changed.ts`) !== undefined).toBe(true);
+      });
+      restore?.();
+      await fixture.session.deleteSession();
+      await expect(fixture.session.getMetadata()).resolves.toBeNull();
+      await runInDurableObject(fixture.session, (_instance, state) => {
+        expect(state.storage.kv.get(WORKTREE_CHANGES_KEY)).toBeUndefined();
+        expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
+      });
+    } finally {
+      restore?.();
+      fixture.close();
+    }
+  });
+
   it('preserves the exact saved snapshot on failed, malformed and wrong-revision results, then accepts empty', async () => {
     const fixture = await worktreeFixture();
     await runInDurableObject(fixture.session, async (_instance, state) =>
-      state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+      state.storage.transactionSync(() => {
+        state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+        state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+      })
     );
     for (const kind of ['git', 'malformed', 'revision'] as const) {
       const pending = fixture.session.refreshWorktreeChanges();
       const request = await fixture.nextCapture();
       if (kind === 'git') fixture.fail(request);
       else if (kind === 'malformed') fixture.reply(request, { files: [] });
-      else fixture.reply(request, worktreeCapture(captureRevision(request) + 1));
+      else fixture.reply(request, worktreeSnapshotCapture(captureRevision(request) + 1));
       await expect(pending).resolves.toEqual({ status: 'failed', snapshot: savedWorktreeSnapshot });
       await expect(fixture.session.getWorktreeChanges()).resolves.toEqual({
         snapshot: savedWorktreeSnapshot,
@@ -7751,7 +8429,7 @@ describe('SandboxSession worktree changes persistence', () => {
     }
     const pending = fixture.session.refreshWorktreeChanges();
     const request = await fixture.nextCapture();
-    fixture.reply(request, worktreeCapture(captureRevision(request), true));
+    fixture.reply(request, worktreeSnapshotCapture(captureRevision(request), true));
     await expect(pending).resolves.toMatchObject({
       status: 'refreshed',
       snapshot: { revision: 8, files: [] },
@@ -7765,7 +8443,10 @@ describe('SandboxSession worktree changes persistence', () => {
   it('fences credential rotation and requires the new connection to be ready before sending', async () => {
     const fixture = await worktreeFixture();
     await runInDurableObject(fixture.session, async (_instance, state) =>
-      state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+      state.storage.transactionSync(() => {
+        state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+        state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+      })
     );
     const pending = fixture.session.refreshWorktreeChanges();
     await fixture.nextCapture();
@@ -7784,45 +8465,56 @@ describe('SandboxSession worktree changes persistence', () => {
     await fixture.ready();
     const next = fixture.session.refreshWorktreeChanges();
     const request = await fixture.nextCapture();
-    fixture.reply(request, worktreeCapture(captureRevision(request)));
+    fixture.reply(request, worktreeSnapshotCapture(captureRevision(request)));
     await expect(next).resolves.toMatchObject({ status: 'refreshed' });
     fixture.close();
   });
 
-  it('requires a running physical sandbox and matching route at the request boundary', async () => {
-    const fixture = await worktreeFixture();
-    try {
-      for (const identity of [
-        {
-          sessionId: 'workspace_other',
-          kiloSessionId: fixture.kiloSessionId,
-          directory: fixture.directory,
-        },
-        { sessionId: fixture.sessionId, kiloSessionId: 'other_root', directory: fixture.directory },
-        { sessionId: fixture.sessionId, kiloSessionId: fixture.kiloSessionId, directory: '/other' },
-      ]) {
-        await expect(
-          fixture.control.request({
-            operation: 'session.git.summary',
-            session: identity,
-            payload: { revision: 1 },
-          })
-        ).resolves.toMatchObject({ ok: false, error: { code: 'not_ready' } });
+  it.each(['session.git.summary', 'session.git.snapshot'] as const)(
+    'requires a running sandbox and matching route for %s',
+    async operation => {
+      const fixture = await worktreeFixture();
+      try {
+        for (const identity of [
+          {
+            sessionId: 'workspace_other',
+            kiloSessionId: fixture.kiloSessionId,
+            directory: fixture.directory,
+          },
+          {
+            sessionId: fixture.sessionId,
+            kiloSessionId: 'other_root',
+            directory: fixture.directory,
+          },
+          {
+            sessionId: fixture.sessionId,
+            kiloSessionId: fixture.kiloSessionId,
+            directory: '/other',
+          },
+        ]) {
+          await expect(
+            fixture.control.request({
+              operation,
+              session: identity,
+              payload: { revision: 1 },
+            })
+          ).resolves.toMatchObject({ ok: false, error: { code: 'not_ready' } });
+        }
+        await fixture.control.beginStop('test');
+        await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
+          status: 'offline',
+          snapshot: null,
+        });
+        expect(fixture.captures).toHaveLength(0);
+        expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
+        expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
+        await fixture.control.confirmStopped();
+        await fixture.settled();
+      } finally {
+        fixture.close();
       }
-      await fixture.control.beginStop('test');
-      await expect(fixture.session.refreshWorktreeChanges()).resolves.toEqual({
-        status: 'offline',
-        snapshot: null,
-      });
-      expect(fixture.captures).toHaveLength(0);
-      expect(fixture.noWake.ensureReady).not.toHaveBeenCalled();
-      expect(fixture.noWake.attachSession).not.toHaveBeenCalled();
-      await fixture.control.confirmStopped();
-      await fixture.settled();
-    } finally {
-      fixture.close();
     }
-  });
+  );
 
   it.each(['physical stop', 'route detach'] as const)(
     'discards a valid in-flight capture after %s and preserves the saved snapshot',
@@ -7830,13 +8522,16 @@ describe('SandboxSession worktree changes persistence', () => {
       const fixture = await worktreeFixture();
       try {
         await runInDurableObject(fixture.session, async (_instance, state) =>
-          state.storage.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot)
+          state.storage.transactionSync(() => {
+            state.storage.kv.put(WORKTREE_CHANGES_KEY, savedWorktreeSnapshot);
+            state.storage.kv.put(`${WORKTREE_FILE_PREFIX}changed.ts`, worktreeFileRecord(4));
+          })
         );
         const pending = fixture.session.refreshWorktreeChanges();
         const request = await fixture.nextCapture();
         if (change === 'physical stop') await fixture.control.beginStop('test in-flight capture');
         else await fixture.control.detachSession(fixture.sessionId);
-        fixture.reply(request, worktreeCapture(captureRevision(request), true));
+        fixture.reply(request, worktreeSnapshotCapture(captureRevision(request), true));
         await expect(pending).resolves.toEqual({
           status: 'failed',
           snapshot: savedWorktreeSnapshot,
@@ -7861,7 +8556,7 @@ describe('SandboxSession worktree changes persistence', () => {
     const fixture = await worktreeFixture();
     const pending = fixture.session.refreshWorktreeChanges();
     const request = await fixture.nextCapture();
-    fixture.reply(request, worktreeCapture(captureRevision(request)));
+    fixture.reply(request, worktreeSnapshotCapture(captureRevision(request)));
     const saved = await pending;
     expect(saved.status).toBe('refreshed');
     await fixture.control.beginStop('test');
@@ -7886,6 +8581,14 @@ describe('SandboxSession worktree changes persistence', () => {
     await runInDurableObject(freshSession, async instance => {
       expect(instance).not.toBe(previousInstance);
       await expect(instance.getWorktreeChanges()).resolves.toEqual({ snapshot: saved.snapshot });
+      await expect(
+        instance.getWorktreeFile({ path: 'changed.ts', expectedRevision: captureRevision(request) })
+      ).resolves.toEqual({
+        status: 'available',
+        file: worktreeFileRecord(captureRevision(request)),
+        capturedAt: saved.snapshot?.capturedAt,
+        comparison: saved.snapshot?.comparison,
+      });
     });
     expect(noWake.request).not.toHaveBeenCalled();
     await expect(freshSession.refreshWorktreeChanges()).resolves.toEqual({
@@ -8189,9 +8892,12 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: cloudflareRef(fixture.sandboxId),
       });
       await runInDurableObject(session, (_instance, state) => {
-        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toEqual(cleanup);
       });
-      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
+      expect((await admissionState(session)).messages[1]).toEqual(b);
+      expect(acquisitions.map(input => input.acquisition?.id)).toEqual([
+        preparing.preparationAttemptId,
+      ]);
       expect(provider.create).not.toHaveBeenCalled();
       await runInDurableObject(control, async (_instance, state) => {
         expect(await state.storage.get('acquisition_receipts')).toEqual([
@@ -8206,6 +8912,10 @@ describe('SandboxSession control-plane regressions', () => {
         providerRef: null,
       });
       await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(acquisitions.at(-1)?.acquisition).toEqual(acquisitionB);
       expect(provider.launch).toHaveBeenCalledTimes(1);
       const launch = provider.launch.mock.calls[0];
       if (!launch) throw new Error('Expected one replacement launch for B');
@@ -8231,7 +8941,7 @@ describe('SandboxSession control-plane regressions', () => {
           wrapperInstanceId: fixture.wrapperInstanceId,
           reason: 'late_cancelled_runtime_cleanup',
         })
-      ).resolves.toEqual({ quarantined: false });
+      ).resolves.toEqual({ quarantined: false, disposition: 'wrapper_replaced' });
       expect((await admissionState(session)).messages).toMatchObject([
         { messageId: 'msg_ffffffffffff00000000000001', state: 'cancelled' },
         {
@@ -8241,12 +8951,8 @@ describe('SandboxSession control-plane regressions', () => {
         },
       ]);
       const continuations = acquisitions.filter(input => input.acquisition?.id === acquisitionB.id);
-      expect(continuations).toHaveLength(3);
-      expect(continuations.map(input => input.acquisition)).toEqual([
-        acquisitionB,
-        acquisitionB,
-        acquisitionB,
-      ]);
+      expect(continuations).toHaveLength(2);
+      expect(continuations.map(input => input.acquisition)).toEqual([acquisitionB, acquisitionB]);
       expect(continuations.every(input => input.allowCreate === undefined)).toBe(true);
       expect(
         replacementRequests
@@ -8264,6 +8970,193 @@ describe('SandboxSession control-plane regressions', () => {
       stream?.close();
       socket.close();
       replacement?.close();
+    }
+  });
+
+  it('retries a lost completed native cleanup after Session reload without selecting N2', async () => {
+    const { fixture, session: originalSession } = messageFixture();
+    let session = originalSession;
+    const nativeRuntimeId = '11111111-1111-4111-8111-111111111111';
+    const replacementRuntimeId = '22222222-2222-4222-8222-222222222222';
+    const { control, socket, provider } = await initializeTerminalRuntime(fixture, {
+      nativeRuntimeRetirement: true,
+    });
+    let dropCleanupResponse = true;
+    const requests: RequestFrame[] = [];
+    socket.addEventListener('message', event => {
+      const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
+      requests.push(request);
+      let result: unknown;
+      switch (request.operation) {
+        case 'session.attach':
+          result = {
+            attached: true,
+            nativeRuntimeId:
+              requests.filter(candidate => candidate.operation === 'session.attach').length === 1
+                ? nativeRuntimeId
+                : replacementRuntimeId,
+          };
+          break;
+        case 'session.prompt':
+          result = {
+            messageId: sessionPromptPayloadSchema.parse(request.payload).messageId,
+            status: 'accepted',
+          };
+          break;
+        case 'session.operation.get':
+          result = { state: 'missing' };
+          break;
+        case 'session.sync':
+          result = { status: { type: 'idle' }, questions: [], permissions: [] };
+          break;
+        case 'session.abort':
+          result = {
+            status: 'aborted',
+            quiescent: true,
+            runtimeRetired: true,
+            nativeRuntimeId,
+          };
+          break;
+        default:
+          throw new Error(`Unexpected control request: ${request.operation}`);
+      }
+      socket.send(
+        JSON.stringify({ type: 'response', requestId: request.requestId, ok: true, result })
+      );
+    });
+    await runInDurableObject(control, instance => {
+      const prototype = Object.getPrototypeOf(instance) as typeof instance;
+      const quarantine = instance.quarantineRuntime.bind(instance);
+      vi.spyOn(prototype, 'quarantineRuntime').mockImplementation(async input => {
+        const result = await quarantine(input);
+        if (dropCleanupResponse) throw new Error('lost cleanup response');
+        return result;
+      });
+    });
+    try {
+      signalWrapperReady(socket);
+      await waitForWrapperReady(fixture);
+      await session.createSessionWithInitialAdmission({
+        identity: { sessionId: fixture.sessionId, userId: fixture.ownerId },
+        auth: { kiloSessionId: ROOT_ID, kilocodeToken: KILO_TOKEN },
+        agent: agentA,
+        workspace: { sandboxId: fixture.sandboxId, workspacePath: '/workspace/terminal' },
+        message: {
+          initialTurn: { type: 'prompt', messageId: INITIAL_MESSAGE_ID, prompt: 'A' },
+        },
+      });
+      await waitForAccepted(session, INITIAL_MESSAGE_ID);
+      const attached = sessionOperationAuthorizationSchema.parse({
+        operation: 'session.attach',
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: INITIAL_MESSAGE_ID,
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId,
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        state.storage.kv.put('native_runtime_fence', {
+          sandboxId: fixture.sandboxId,
+          wrapperInstanceId: fixture.wrapperInstanceId,
+          nativeRuntimeId,
+          attachmentEpoch: 1,
+          authorization: attached,
+        });
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId }),
+      ]);
+      await runInDurableObject(session, (_instance, state) => {
+        const messages = state.storage.kv.get<SessionMessageRecord[]>('session_messages') ?? [];
+        state.storage.kv.put(
+          'session_messages',
+          messages.map(message =>
+            message.messageId === INITIAL_MESSAGE_ID
+              ? {
+                  ...message,
+                  acceptedAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                  lastActivityAt: Date.now() - DEADLINE_MS.acceptedOverdue,
+                }
+              : message
+          )
+        );
+      });
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+      await vi.waitFor(async () => {
+        await expect(control.listRoutes()).resolves.toEqual([
+          expect.not.objectContaining({ nativeRuntimeId }),
+        ]);
+      });
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toMatchObject({
+          nativeRuntimeId,
+          authorization: attached,
+        });
+      });
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+
+      const replacementAuthorization = {
+        operation: 'session.attach' as const,
+        operationId: '33333333-3333-4333-8333-333333333333',
+        messageId: 'msg_018f1e2d3c4bAbCdEfGhIjKlMo',
+        session: {
+          sessionId: fixture.sessionId,
+          kiloSessionId: ROOT_ID,
+          directory: '/workspace/terminal',
+        },
+        wrapperInstanceId: fixture.wrapperInstanceId ?? '',
+        dispatchDeadlineAt: Date.now() + SESSION_DELIVERY_TIMEOUT_MS,
+      };
+      await expect(
+        control.request({
+          operation: 'session.attach',
+          authorization: replacementAuthorization,
+          session: replacementAuthorization.session,
+          expectedWrapperInstanceId: fixture.wrapperInstanceId,
+          payload: {},
+        })
+      ).resolves.toMatchObject({ ok: true, result: { nativeRuntimeId: replacementRuntimeId } });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      const beforeRetry = await runInDurableObject(control, async (_instance, state) => ({
+        deadlines: await loadDeadlines(state.storage),
+        alarmAt: await state.storage.getAlarm(),
+      }));
+
+      await expect(
+        runInDurableObject(session, (_instance, state) => state.abort('reload after lost cleanup'))
+      ).rejects.toThrow('reload after lost cleanup');
+      session = env.SANDBOX_SESSION.getByName(`${fixture.ownerId}:${fixture.sessionId}`);
+      dropCleanupResponse = false;
+      await expect(runDurableObjectAlarm(session)).resolves.toBe(true);
+
+      await runInDurableObject(session, (_instance, state) => {
+        expect(state.storage.kv.get('pending_runtime_cleanup')).toBeUndefined();
+      });
+      expect(requests.filter(request => request.operation === 'session.abort')).toHaveLength(1);
+      expect(provider.stop).not.toHaveBeenCalled();
+      await expect(control.getPhysicalRecord()).resolves.toMatchObject({
+        state: 'running',
+        stopTombstone: null,
+      });
+      await expect(control.listRoutes()).resolves.toEqual([
+        expect.objectContaining({ nativeRuntimeId: replacementRuntimeId }),
+      ]);
+      await runInDurableObject(control, async (_instance, state) => {
+        expect(await loadDeadlines(state.storage)).toEqual(beforeRetry.deadlines);
+        expect(await state.storage.getAlarm()).toBe(beforeRetry.alarmAt);
+      });
+    } finally {
+      socket.close();
     }
   });
 
@@ -9296,6 +10189,7 @@ describe('SandboxSession control-plane regressions', () => {
         preparationAttemptId: expect.any(String),
         deliveryDeadlineAt: expect.any(Number),
         terminalAt: expect.any(Number),
+        terminalSource: 'coordinator',
       });
       expect(delivered.messages.slice(1)).toMatchObject([
         { messageId: 'msg_model_less', state: 'accepted' },
@@ -11313,11 +12207,18 @@ function receiveAdmissionPrompt(ws: WebSocket, attach: WrapperRequest) {
     try {
       const request = requestFrameSchema.parse(JSON.parse(String(event.data)));
       expect(request.session).toEqual(attach.session);
-      if (request.operation === 'session.git.summary') {
+      if (
+        request.operation === 'session.git.summary' ||
+        request.operation === 'session.git.snapshot'
+      ) {
         const payload = worktreeChangesCaptureRequestSchema.parse(request.payload);
         const capture = worktreeCapture(payload.revision, true);
         if (payload.baseRef) capture.comparison.baseRef = payload.baseRef;
-        respondToWrapperRequest(ws, request, capture);
+        respondToWrapperRequest(
+          ws,
+          request,
+          request.operation === 'session.git.snapshot' ? { summary: capture, files: [] } : capture
+        );
       } else if (request.operation === 'session.prompt') {
         promptCount++;
         prompt.resolve(request);
@@ -11389,27 +12290,34 @@ describe('SandboxSession worktree admission receiver', () => {
     };
   }
 
-  it.each(['capture first', 'prompt first'])(
-    'acknowledges capture and retains the prompt before awaiting it: %s',
-    async order => {
+  it.each([
+    ['session.git.summary', 'capture first'],
+    ['session.git.summary', 'prompt first'],
+    ['session.git.snapshot', 'capture first'],
+    ['session.git.snapshot', 'prompt first'],
+  ] as const)(
+    'acknowledges %s and retains the prompt before awaiting it: %s',
+    async (operation, order) => {
       const f = fixture();
+      const request = { ...capture, operation };
       try {
         const reply = nextMessage(f.server);
-        for (const frame of order === 'capture first' ? [capture, prompt] : [prompt, capture]) {
+        for (const frame of order === 'capture first' ? [request, prompt] : [prompt, request]) {
           f.receive(frame);
         }
         await expect(f.receiver.prompt).resolves.toEqual(prompt);
+        const summary = {
+          ...worktreeCapture(capture.payload.revision, true),
+          comparison: {
+            ...worktreeCapture(capture.payload.revision).comparison,
+            baseRef: capture.payload.baseRef,
+          },
+        };
         expect(JSON.parse(await reply)).toEqual({
           type: 'response',
           requestId: capture.requestId,
           ok: true,
-          result: {
-            ...worktreeCapture(capture.payload.revision, true),
-            comparison: {
-              ...worktreeCapture(capture.payload.revision).comparison,
-              baseRef: capture.payload.baseRef,
-            },
-          },
+          result: operation === 'session.git.snapshot' ? { summary, files: [] } : summary,
         });
         f.receiver.finish();
       } finally {
@@ -12761,7 +13669,7 @@ describe('SandboxSession running stream state', () => {
 });
 
 describe('SandboxSession root-scoped reconnect sync', () => {
-  it('reconciles an accepted root before connected and replays only its questions and permissions afterward', async () => {
+  it('connects from cached root inputs before sync and preserves scoped background reconciliation', async () => {
     const wrapperInstanceId = crypto.randomUUID();
     const ownerId = 'user_grouped_sync';
     const activeSessionId = GRANT_SESSION_ID;
@@ -12832,20 +13740,6 @@ describe('SandboxSession root-scoped reconnect sync', () => {
     };
     expect(emptyConnected.streamEventType).toBe('connected');
 
-    const pendingActiveResponse = SELF.fetch(
-      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
-      { headers: { Upgrade: 'websocket' } }
-    );
-    const sync = JSON.parse(await incomingSync) as WrapperRequest;
-    expect(sync).toMatchObject({
-      operation: 'session.sync',
-      session: {
-        sessionId: activeSessionId,
-        kiloSessionId: ROOT_ID,
-        directory: '/workspace/shared',
-      },
-      payload: {},
-    });
     const questions = [
       { id: 'question_root', sessionID: ROOT_ID, questions: [{ question: 'Root?' }] },
       {
@@ -12859,6 +13753,67 @@ describe('SandboxSession root-scoped reconnect sync', () => {
       { id: 'permission_root', sessionID: ROOT_ID },
       { id: 'permission_child', sessionID: THIRD_ROOT_ID, rootKiloSessionId: ROOT_ID },
     ];
+    await runInDurableObject(active, async (_instance, state) => {
+      await state.storage.put('session_pending_interactions', {
+        revision: 1,
+        questions,
+        permissions,
+      });
+    });
+    const activeResponse = await SELF.fetch(
+      `http://worker.test/stream?sessionId=${activeSessionId}&userId=${ownerId}`,
+      { headers: { Upgrade: 'websocket' } }
+    );
+    const sync = JSON.parse(await incomingSync) as WrapperRequest;
+    expect(sync).toMatchObject({
+      operation: 'session.sync',
+      session: {
+        sessionId: activeSessionId,
+        kiloSessionId: ROOT_ID,
+        directory: '/workspace/shared',
+      },
+      payload: {},
+    });
+    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
+      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
+    }
+    activeResponse.webSocket.accept();
+    const events = (await nextMessages(activeResponse.webSocket, 7)).map(
+      message => JSON.parse(message) as SessionStreamEvent
+    );
+    expect(events.map(event => event.streamEventType)).toEqual([
+      'connected',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'kilocode',
+      'cloud.message.queued',
+      'cloud.message.sent',
+    ]);
+    expect(events[0]?.data).toMatchObject({
+      cloudStatus: { type: 'ready' },
+      activeMessageId: INITIAL_MESSAGE_ID,
+      pendingInteractions: { questions, permissions },
+    });
+    expect(events.slice(1, 3)).toEqual(
+      questions.map(question =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'question.asked', event: 'question.asked', properties: question },
+        })
+      )
+    );
+    expect(events.slice(3, 5)).toEqual(
+      permissions.map(permission =>
+        expect.objectContaining({
+          eventId: 0,
+          sessionId: activeSessionId,
+          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
+        })
+      )
+    );
+    const incomingStatus = nextMessage(activeResponse.webSocket);
     respondToWrapperRequest(wrapper, sync, {
       status: { type: 'busy' },
       questions: [
@@ -12872,49 +13827,13 @@ describe('SandboxSession root-scoped reconnect sync', () => {
         { id: 'permission_contradictory', sessionID: ROOT_ID, rootKiloSessionId: SECOND_ROOT_ID },
       ],
     });
-    const activeResponse = await pendingActiveResponse;
-    if (activeResponse.status !== 101 || !activeResponse.webSocket) {
-      throw new Error(`Unexpected active-session stream status: ${activeResponse.status}`);
-    }
-    activeResponse.webSocket.accept();
-    const events = (await nextMessages(activeResponse.webSocket, 8)).map(
-      message => JSON.parse(message) as SessionStreamEvent
-    );
-    expect(events.map(event => event.streamEventType)).toEqual([
-      'kilocode',
-      'connected',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'kilocode',
-      'cloud.message.queued',
-      'cloud.message.sent',
-    ]);
-    expect(events[1]?.data).toMatchObject({
-      cloudStatus: { type: 'ready' },
-      activeMessageId: INITIAL_MESSAGE_ID,
-      pendingInteractions: { questions, permissions },
+    expect(JSON.parse(await incomingStatus)).toMatchObject({
+      streamEventType: 'kilocode',
+      data: { type: 'session.status' },
     });
-    expect(events.slice(2, 4)).toEqual(
-      questions.map(question =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'question.asked', event: 'question.asked', properties: question },
-        })
-      )
-    );
-    expect(events.slice(4, 6)).toEqual(
-      permissions.map(permission =>
-        expect.objectContaining({
-          eventId: 0,
-          sessionId: activeSessionId,
-          data: { type: 'permission.asked', event: 'permission.asked', properties: permission },
-        })
-      )
-    );
     await runInDurableObject(active, async (_instance, state) => {
       expect(await state.storage.get('session_pending_interactions')).toMatchObject({
+        revision: 2,
         questions,
         permissions,
       });

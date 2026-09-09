@@ -60,6 +60,10 @@ export { announcements, catalogs, lifecycle, native, platform, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
+// The E2E fault hook stays closed: rejected reads come from the SecureStore
+// mock, not the bundle-time fault window.
+vi.mock('@/lib/config', () => ({ E2E_SECURE_STORE_FAULT_MS: 0 }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
@@ -86,11 +90,10 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 12, left: 0, right: 0 }),
 }));
 vi.mock('react-native-reanimated', () => ({
-  default: { View: 'PrivacyCover' },
+  default: { View: 'Animated.View' },
   useSharedValue: (value: number) => ({ value }),
   useAnimatedStyle: (build: () => unknown) => build(),
 }));
-vi.mock('expo-screen-capture', () => ({}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
@@ -112,6 +115,12 @@ vi.mock('@/components/ui/icons', () => ({
   TriangleAlert: 'Icon',
   XCircle: 'Icon',
 }));
+// The organization and security-agent layouts reach real expo-image through
+// the privacy cover's splash logo; the native module cannot load in this
+// DOM-free harness (its expo root import needs __DEV__ and a native binding).
+vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
+// No Vitest project transforms .png.
+vi.mock('@/../assets/images/logo-mark.png', () => ({ default: 1 }));
 vi.mock('expo-router', () => ({
   // One mounted descriptor per navigator exercises its production callback.
   Stack: Object.assign(
@@ -242,6 +251,13 @@ vi.mock('@/lib/hooks/use-trusted-hosts', () => ({
   useTrustedHosts: () => ({ trustedHosts: [], hasLoaded: true }),
 }));
 vi.mock('@/lib/picker-bridge', () => ({ setLanguagePickerBridge: vi.fn() }));
+// The preferences screen mounts the feature-flag debug surface, which reads
+// PostHog flag statuses; the real module pulls in expo-application's native
+// chain, which no mounted test loads. An empty registry keeps the section
+// out of these scenes.
+vi.mock('@/lib/analytics/posthog', () => ({
+  useFeatureFlagStatuses: () => [],
+}));
 
 function Draft() {
   const [value, onChange] = useState('saved draft');

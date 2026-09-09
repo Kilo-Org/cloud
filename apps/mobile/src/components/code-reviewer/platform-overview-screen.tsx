@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Switch, View } from 'react-native';
+import { Switch, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { CenteredState } from '@/components/centered-state';
@@ -60,7 +61,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow={t('codeReviewer.title')}
+        eyebrow={t('common.codeReviewer')}
         onRetry={() => {
           permission.refetch();
         }}
@@ -96,7 +97,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow={t('codeReviewer.title')}
+        eyebrow={t('common.codeReviewer')}
         variant={providerState.variant}
         // A permission/not-found error can't be fixed by retrying — hide retry.
         onRetry={
@@ -123,7 +124,7 @@ export function PlatformOverviewScreen({
     return (
       <PlatformErrorScreen
         title={capabilities.label}
-        eyebrow={t('codeReviewer.title')}
+        eyebrow={t('common.codeReviewer')}
         onRetry={() => {
           void config.refetch();
         }}
@@ -136,7 +137,7 @@ export function PlatformOverviewScreen({
   if (!isLoading && !connected) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.eyebrow')} />
+        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState className="px-6">
           {canEdit ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
@@ -195,7 +196,7 @@ export function PlatformOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow={t('codeReviewer.eyebrow')} />
+      <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {isLoading && (
@@ -281,7 +282,7 @@ export function PlatformOverviewScreen({
                         pushField('repos');
                       }}
                     >
-                      <Text>{t('codeReviewer.selectRepositories')}</Text>
+                      <Text>{t('common.selectRepositories')}</Text>
                     </Button>
                   </View>
                 )}
@@ -314,7 +315,7 @@ export function PlatformOverviewScreen({
 
               {!canEdit && (
                 <Text className="text-center text-xs text-muted-foreground">
-                  {t('codeReviewer.readOnlyDescription')}
+                  {t('securityAgent.sla.permissionNote')}
                 </Text>
               )}
             </Animated.View>

@@ -6,7 +6,6 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useFrameCallback,
-  useReducedMotion,
   useSharedValue,
   withDelay,
   withSequence,
@@ -18,6 +17,7 @@ import logo from '@/../assets/images/logo-mark.png';
 import { Image } from '@/components/ui/image';
 import { SPLASH_CONTENT_OVERSCAN, splashContentScale } from '@/components/splash-reveal';
 import { isStartupComplete, subscribeStartupComplete } from '@/lib/startup-timing';
+import { useMotionPolicy } from '@/lib/a11y/motion';
 
 const HIDE_SAFETY_MS = 2000;
 const LOGO_LOAD_SAFETY_MS = 500;
@@ -59,7 +59,7 @@ export function AnimatedSplashOverlay() {
   const [logoWaived, setLogoWaived] = useState(false);
   const exitStartedRef = useRef(false);
   const revealSafetyRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const reducedMotion = useReducedMotion();
+  const { reducedMotion } = useMotionPolicy();
   const overlayOpacity = useSharedValue(1);
   const discScale = useSharedValue(0);
   const logoScale = useSharedValue(1);

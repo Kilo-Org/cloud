@@ -18,6 +18,7 @@ import {
 import { resolveTicketEmail } from '@/lib/user/deletion-queue/deletion-ticket-resolve';
 import {
   ACTIVE_REQUEST_STATUSES,
+  DUPLICATE_OF_ACTIVE_REQUEST_ATTENTION_CODE,
   type DeletionPreflightOutcome,
 } from '@/lib/user/deletion-queue/deletion-types';
 
@@ -135,7 +136,10 @@ async function applyResolvedTicketEmail(
     )
     .limit(1);
   if (collision && collision.id !== request.id) {
-    return { kind: 'needs_attention', errorCode: 'duplicate_of_active_request' };
+    return {
+      kind: 'needs_attention',
+      errorCode: DUPLICATE_OF_ACTIVE_REQUEST_ATTENTION_CODE,
+    };
   }
 
   const currentUsers = (

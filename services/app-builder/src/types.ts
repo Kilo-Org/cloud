@@ -100,31 +100,6 @@ export interface ReceivePackResult {
 }
 
 // ============================================
-// Git Version Control Types
-// ============================================
-export interface CommitInfo {
-  oid: string;
-  message: string;
-  author: string;
-  timestamp: string;
-}
-
-export interface FileDiff {
-  path: string;
-  diff: string;
-}
-
-export interface GitShowResult {
-  oid: string;
-  message: string;
-  author: string;
-  timestamp: string;
-  files: number;
-  fileList: string[];
-  diffs?: FileDiff[];
-}
-
-// ============================================
 // Filesystem Error Types (Node.js-compatible for isomorphic-git)
 // ============================================
 /**

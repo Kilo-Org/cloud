@@ -2,38 +2,12 @@ import 'server-only';
 
 import type { CodeReviewPayload } from '../triggers/prepare-review-payload';
 import { CODE_REVIEW_WORKER_AUTH_TOKEN } from '@/lib/config.server';
+import { fetchWithTimeout } from '@/lib/fetch-with-timeout';
 import * as z from 'zod';
 
 // Fetch timeout in milliseconds
 const FETCH_TIMEOUT_MS = 10000;
 const CODE_REVIEW_WORKER_URL = process.env.CODE_REVIEW_WORKER_URL;
-
-/**
- * Fetch with timeout support
- */
-async function fetchWithTimeout(
-  url: string,
-  options: RequestInit = {},
-  timeoutMs: number = FETCH_TIMEOUT_MS
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeoutMs}ms`);
-    }
-    throw error;
-  }
-}
 
 // Types for API responses
 export type DispatchReviewResponse = {
@@ -116,13 +90,17 @@ class CodeReviewWorkerClient {
    * Creates a CodeReviewOrchestrator Durable Object and starts the review
    */
   async dispatchReview(payload: CodeReviewPayload): Promise<DispatchReviewResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/review`, {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(payload),
-    });
+    const response = await fetchWithTimeout(
+      `${this.baseUrl}/review`,
+      {
+        method: 'POST',
+        headers: this.getHeaders({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(payload),
+      },
+      FETCH_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -147,13 +125,17 @@ class CodeReviewWorkerClient {
     reason?: string,
     attemptId?: string
   ): Promise<CancelReviewResponse> {
-    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'cancel', attemptId), {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify({ reason, attemptId }),
-    });
+    const response = await fetchWithTimeout(
+      this.buildReviewUrl(reviewId, 'cancel', attemptId),
+      {
+        method: 'POST',
+        headers: this.getHeaders({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify({ reason, attemptId }),
+      },
+      FETCH_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -172,13 +154,17 @@ class CodeReviewWorkerClient {
       retryAttemptId?: string;
     }
   ): Promise<RetryReviewFreshResponse> {
-    const response = await fetchWithTimeout(`${this.baseUrl}/reviews/${reviewId}/retry-fresh`, {
-      method: 'POST',
-      headers: this.getHeaders({
-        'Content-Type': 'application/json',
-      }),
-      body: JSON.stringify(input),
-    });
+    const response = await fetchWithTimeout(
+      `${this.baseUrl}/reviews/${reviewId}/retry-fresh`,
+      {
+        method: 'POST',
+        headers: this.getHeaders({
+          'Content-Type': 'application/json',
+        }),
+        body: JSON.stringify(input),
+      },
+      FETCH_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -192,9 +178,13 @@ class CodeReviewWorkerClient {
     reviewId: string,
     attemptId?: string
   ): Promise<ReviewStatusResponse | null> {
-    const response = await fetchWithTimeout(this.buildReviewUrl(reviewId, 'status', attemptId), {
-      headers: this.getHeaders(),
-    });
+    const response = await fetchWithTimeout(
+      this.buildReviewUrl(reviewId, 'status', attemptId),
+      {
+        headers: this.getHeaders(),
+      },
+      FETCH_TIMEOUT_MS
+    );
 
     if (response.status === 404) {
       return null;

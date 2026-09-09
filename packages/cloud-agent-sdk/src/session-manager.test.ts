@@ -24,7 +24,7 @@ import type {
 } from './session';
 import type { JotaiSessionStorage } from './storage/jotai';
 import { createChatProcessor } from './chat-processor';
-import type { AssistantMessage, UserMessage, TextPart } from '@kilocode/app-shared/opencode';
+import type { AssistantMessage, UserMessage, TextPart, Part } from '@kilocode/app-shared/opencode';
 import { kiloId, cloudAgentId, stubUserMessage, stubTextPart, makeSnapshot } from './test-helpers';
 import type {
   CloudStatus,
@@ -968,6 +968,67 @@ describe('createSessionManager', () => {
       ).toBeNull();
     });
 
+    it('restores sending after a settled preparation failure without clearing its error', async () => {
+      let subscriptionCallback = (): void => {
+        throw new Error('Expected service state subscription callback');
+      };
+      let cloudStatus: CloudStatus | null = null;
+      mockSession.state.getCloudStatus.mockImplementation(() => cloudStatus);
+      mockSession.state.subscribe.mockImplementation(callback => {
+        subscriptionCallback = callback;
+        callback();
+        return () => {};
+      });
+      mockSession.send.mockResolvedValue(undefined);
+
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      await mgr.send({
+        payload: {
+          type: 'prompt',
+          prompt: 'Failed preparation',
+          mode: 'code',
+          model: 'test-model',
+        },
+      });
+      const failedMessageId = mockSession.send.mock.calls[0]?.[0].messageId;
+
+      cloudStatus = { type: 'preparing', message: 'Setting up environment...' };
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+
+      cloudStatus = { type: 'finalizing', message: 'Wrapping up...' };
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+
+      cloudStatus = { type: 'error', message: 'Clone failed' };
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(true);
+      expect(atomValue<CloudStatus | null>(config.store, mgr.atoms.cloudStatus)).toEqual(
+        cloudStatus
+      );
+      expect(
+        atomValue<{ type: string; message: string } | null>(config.store, mgr.atoms.statusIndicator)
+      ).toEqual(expect.objectContaining({ type: 'error', message: 'Clone failed' }));
+
+      const accepted = await mgr.send({
+        payload: { type: 'prompt', prompt: 'Retry preparation', mode: 'code', model: 'test-model' },
+      });
+      const retryMessageId = mockSession.send.mock.calls[1]?.[0].messageId;
+      expect(accepted).toBe(true);
+      expect(retryMessageId).toEqual(expect.stringMatching(/^msg_/));
+      expect(retryMessageId).not.toBe(failedMessageId);
+
+      mockSession.canSend = false;
+      subscriptionCallback();
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+
+      mockSessionCallbacks.onResolved?.({ type: 'read-only', kiloSessionId: kiloId('ses-1') });
+      expect(atomValue<boolean>(config.store, mgr.atoms.canSend)).toBe(false);
+    });
+
     it('exposes active session type and remote model state from the live transport', async () => {
       const config = createMockConfig();
       const mgr = createSessionManager(config);
@@ -1163,6 +1224,58 @@ describe('createSessionManager', () => {
         model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
         variant: 'high',
       });
+    });
+
+    it('ignores a live user message that omits model', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      await mgr.switchSession(kiloId('ses-1'));
+      mockSessionCallbacks.onSessionCreated?.({
+        id: 'ses-1',
+        model: { providerID: 'openai', id: 'gpt-5' },
+      });
+      mockSessionCallbacks.onReplayComplete?.();
+
+      const info = stubUserMessage({
+        id: 'msg-slim',
+        sessionID: 'ses-1',
+      });
+      delete (info as { model?: unknown }).model;
+
+      expect(() => {
+        mockSessionCallbacks.onEvent?.({ type: 'message.updated', info });
+      }).not.toThrow();
+      expect(atomValue(config.store, mgr.atoms.observedModel)).toEqual({
+        model: { providerID: 'openai', modelID: 'gpt-5' },
+      });
+    });
+
+    it('splits messages when a completed reasoning part omits time', async () => {
+      const config = createMockConfig();
+      const mgr = createSessionManager(config);
+
+      mockSession.connect.mockImplementation(() => {
+        mockSessionCallbacks.onSessionCreated?.({ id: 'ses-root' });
+      });
+      await mgr.switchSession(kiloId('ses-root'));
+      if (!latestStorage) throw new Error('expected session storage');
+
+      const completed = createStoredAssistantMessage('msg-slim', 'ses-root', {
+        time: { created: 1, completed: 2 },
+      });
+      latestStorage.upsertMessage(completed.info);
+      latestStorage.upsertPart(completed.info.id, {
+        type: 'reasoning',
+        id: 'part-slim',
+        sessionID: 'ses-root',
+        messageID: completed.info.id,
+        text: 'thinking',
+      } as Part);
+
+      expect(() => atomValue(config.store, mgr.atoms.staticMessages)).not.toThrow();
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.staticMessages)).toHaveLength(1);
+      expect(atomValue<StoredMessage[]>(config.store, mgr.atoms.dynamicMessages)).toHaveLength(0);
     });
 
     it('keeps session metadata above the catalog current model', async () => {

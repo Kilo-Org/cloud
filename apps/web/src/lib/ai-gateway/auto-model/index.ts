@@ -115,10 +115,11 @@ export const KILO_AUTO_FREE_MODEL: AutoModel = {
   opencode_settings: undefined,
 };
 
-export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
-  id: 'kilo-auto/balanced',
-  name: 'Auto Balanced',
-  description: 'Deprecated alias for Auto Efficient. Use Auto Efficient instead.',
+export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
+  id: 'kilo-auto/efficient',
+  name: 'Auto Efficient',
+  description:
+    'Routes each request to the cheapest model that gets the job done, based on continuously benchmarked accuracy and cost.',
   context_length: 1_000_000,
   max_completion_tokens: 65_536,
   pricing: UNKNOWN_PRICING,
@@ -127,8 +128,15 @@ export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
   opencode_settings: undefined,
 };
 
+export const KILO_AUTO_BALANCED_MODEL: AutoModel = {
+  ...KILO_AUTO_EFFICIENT_MODEL,
+  id: 'kilo-auto/balanced',
+  name: 'Auto Balanced',
+  description: 'Deprecated alias for Auto Efficient. Use Auto Efficient instead.',
+};
+
 export const KILO_AUTO_FRONTIER_MODEL: AutoModel = {
-  ...KILO_AUTO_BALANCED_MODEL,
+  ...KILO_AUTO_EFFICIENT_MODEL,
   id: 'kilo-auto/frontier',
   name: 'Auto Frontier',
   description: 'Deprecated alias for Auto Efficient. Use Auto Efficient instead.',
@@ -150,16 +158,8 @@ export const KILO_AUTO_SMALL_MODEL: AutoModel = {
   opencode_settings: undefined,
 };
 
-export const KILO_AUTO_EFFICIENT_MODEL: AutoModel = {
-  ...KILO_AUTO_BALANCED_MODEL,
-  id: 'kilo-auto/efficient',
-  name: 'Auto Efficient',
-  description:
-    'Routes each request to the cheapest model that gets the job done, based on continuously benchmarked accuracy and cost.',
-};
-
 export const ORG_AUTO_MODEL: AutoModel = {
-  ...KILO_AUTO_BALANCED_MODEL,
+  ...KILO_AUTO_EFFICIENT_MODEL,
   id: ORGANIZATION_AUTO_MODEL_ID,
   name: 'Organization Auto',
   description: "Routes requests using your organization's mode-specific model settings.",

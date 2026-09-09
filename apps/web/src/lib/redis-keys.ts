@@ -15,18 +15,6 @@ const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as 
 
 export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
 
-export const AI_GATEWAY_STATE_REDIS_TTL_SECONDS = 7 * 24 * 60 * 60;
-
-export const VERCEL_ROUTING_REDIS_KEY = redisKey('ai-gateway:vercel-routing-percentage');
-
-export const SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY = redisKey(
-  'ai-gateway:sync-providers:last-completed-at'
-);
-
-export const SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY = redisKey(
-  'ai-gateway:sync-providers:stale-alert-last-posted-at'
-);
-
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
 export const codingPlanUsageRedisKey = (input: {
@@ -45,8 +33,6 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
 );
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
-
-export const REQUEST_LOGGING_OPT_INS_REDIS_KEY = redisKey('ai-gateway:request-logging-opt-ins');
 
 export const abuseRulesClassificationRedisKey = (identityKey: string) =>
   redisKey(`ai-gateway.abuse-rules:last-classification:${identityKey}`);

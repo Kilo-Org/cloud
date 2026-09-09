@@ -4,8 +4,6 @@ import { captureException } from '@sentry/nextjs';
 import { ai_gateway_sync_providers_state } from '@kilocode/db/schema';
 import { APP_URL } from '@/lib/constants';
 import { db } from '@/lib/drizzle';
-import { redisClient } from '@/lib/redis';
-import { SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY } from '@/lib/redis-keys';
 import {
   sendAdminSlackNotification,
   type AdminSlackNotification,
@@ -187,8 +185,8 @@ async function defaultGetLastAlertAt(): Promise<string | null> {
   return row?.lastAlertAt ?? null;
 }
 
-async function defaultSetLastAlertAt(iso: string): Promise<unknown> {
-  return db.transaction(async tx => {
+async function defaultSetLastAlertAt(iso: string): Promise<void> {
+  await db.transaction(async tx => {
     await tx.insert(ai_gateway_sync_providers_state).values({ id: 1 }).onConflictDoNothing();
     const [row] = await tx
       .select({ lastAlertAt: ai_gateway_sync_providers_state.stale_alert_last_posted_at })
@@ -204,9 +202,6 @@ async function defaultSetLastAlertAt(iso: string): Promise<unknown> {
       .update(ai_gateway_sync_providers_state)
       .set({ stale_alert_last_posted_at: latestIso })
       .where(eq(ai_gateway_sync_providers_state.id, 1));
-    return redisClient.set(SYNC_PROVIDERS_STALE_ALERT_LAST_POSTED_AT_REDIS_KEY, latestIso, {
-      ex: SYNC_PROVIDERS_STALE_ALERT_TTL_SECONDS,
-    });
   });
 }
 

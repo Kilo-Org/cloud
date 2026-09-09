@@ -22,11 +22,6 @@ import { logAutoModelChangesForAllOrgs } from '@/lib/organizations/auto-model-ch
 import type { Provider } from '@/lib/ai-gateway/providers/types';
 import type { StoredModel } from '@kilocode/db/schema-types';
 import { EndpointsSchema, ModelsSchema } from '@kilocode/db/schema-types';
-import { redisClient } from '@/lib/redis';
-import {
-  AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
-  SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY,
-} from '@/lib/redis-keys';
 import { syncDirectByokModels } from '@/lib/ai-gateway/providers/direct-byok/sync-direct-byok';
 import { ATTRIBUTION_HEADERS } from '@/lib/ai-gateway/providers/openrouter/attribution-headers';
 import {
@@ -411,9 +406,6 @@ export async function syncAndStoreProviders() {
       .update(ai_gateway_sync_providers_state)
       .set({ last_completed_at: completedAt })
       .where(eq(ai_gateway_sync_providers_state.id, 1));
-    await redisClient.set(SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY, completedAt, {
-      ex: AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
-    });
     return completedAt;
   });
 

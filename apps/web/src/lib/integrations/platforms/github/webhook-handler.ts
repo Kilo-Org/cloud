@@ -183,6 +183,15 @@ export async function handleGitHubWebhook(
       if (receipt.status === 'duplicate') {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
+      if (receipt.status === 'in_progress') {
+        return NextResponse.json(
+          { message: 'Event is still processing' },
+          {
+            status: 503,
+            headers: { 'Retry-After': receipt.retryAfterSeconds.toString() },
+          }
+        );
+      }
       try {
         const response = await dispatch();
         await completeSharedGitHubInstallationDelivery({

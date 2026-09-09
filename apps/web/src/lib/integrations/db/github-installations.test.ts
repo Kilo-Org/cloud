@@ -135,7 +135,7 @@ describe('GitHub installation persistence', () => {
         deliveryId: 'delivery-1',
         eventType: 'installation.deleted',
       })
-    ).resolves.toEqual({ status: 'duplicate' });
+    ).resolves.toEqual({ status: 'in_progress', retryAfterSeconds: expect.any(Number) });
     await db
       .update(github_installation_webhook_receipts)
       .set({ lease_expires_at: '2020-01-01T00:00:00.000Z' })

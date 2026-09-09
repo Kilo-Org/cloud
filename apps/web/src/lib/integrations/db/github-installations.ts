@@ -820,6 +820,7 @@ export async function recordSharedGitHubInstallationDelivery(input: {
 }): Promise<
   | { status: 'claimed'; attemptCount: number }
   | { status: 'duplicate' }
+  | { status: 'in_progress'; retryAfterSeconds: number }
   | { status: 'missing_canonical' }
 > {
   return db.transaction(async tx => {
@@ -866,8 +867,12 @@ export async function recordSharedGitHubInstallationDelivery(input: {
       )
       .for('update');
     if (!receipt || receipt.status === 'completed') return { status: 'duplicate' };
-    if (new Date(receipt.lease_expires_at).getTime() > Date.now()) {
-      return { status: 'duplicate' };
+    const leaseExpiresAt = new Date(receipt.lease_expires_at).getTime();
+    if (leaseExpiresAt > Date.now()) {
+      return {
+        status: 'in_progress',
+        retryAfterSeconds: Math.max(1, Math.ceil((leaseExpiresAt - Date.now()) / 1000)),
+      };
     }
     const [reclaimed] = await tx
       .update(github_installation_webhook_receipts)

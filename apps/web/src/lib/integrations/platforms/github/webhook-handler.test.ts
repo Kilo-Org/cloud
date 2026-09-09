@@ -574,7 +574,7 @@ describe('handleGitHubWebhook', () => {
     mockIsSharedGitHubInstallation.mockResolvedValue(true);
     mockRecordSharedGitHubInstallationDelivery
       .mockResolvedValueOnce({ status: 'claimed', attemptCount: 1 })
-      .mockResolvedValueOnce({ status: 'duplicate' });
+      .mockResolvedValueOnce({ status: 'in_progress', retryAfterSeconds: 5 });
     const payload = { action: 'deleted', installation: { id: 98765 } };
 
     const first = await handleGitHubWebhook(
@@ -587,7 +587,9 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(await first.json()).toEqual({ message: 'Installation removed' });
-    expect(await duplicate.json()).toEqual({ message: 'Duplicate event' });
+    expect(duplicate.status).toBe(503);
+    expect(duplicate.headers.get('Retry-After')).toBe('5');
+    expect(await duplicate.json()).toEqual({ message: 'Event is still processing' });
     expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(1);
     expect(mockRecordSharedGitHubInstallationDelivery).toHaveBeenCalledWith({
       installationId: '98765',
@@ -628,23 +630,29 @@ describe('handleGitHubWebhook', () => {
     mockDeleteSharedGitHubInstallationDelivery.mockRejectedValueOnce(
       new Error('receipt cleanup unavailable')
     );
-    mockRecordSharedGitHubInstallationDelivery.mockResolvedValue({
-      status: 'claimed',
-      attemptCount: 1,
-    });
+    mockRecordSharedGitHubInstallationDelivery
+      .mockResolvedValueOnce({ status: 'claimed', attemptCount: 1 })
+      .mockResolvedValueOnce({ status: 'in_progress', retryAfterSeconds: 5 })
+      .mockResolvedValueOnce({ status: 'claimed', attemptCount: 2 });
     const payload = { action: 'deleted', installation: { id: 98765 } };
 
     const failed = await handleGitHubWebhook(
       signedGitHubRequest('installation', payload),
       'standard'
     );
-    const retried = await handleGitHubWebhook(
+    const quickRetry = await handleGitHubWebhook(
+      signedGitHubRequest('installation', payload),
+      'standard'
+    );
+    const leaseRetry = await handleGitHubWebhook(
       signedGitHubRequest('installation', payload),
       'standard'
     );
 
     expect(failed.status).toBe(500);
-    expect(await retried.json()).toEqual({ message: 'Installation removed' });
+    expect(quickRetry.status).toBe(503);
+    expect(quickRetry.headers.get('Retry-After')).toBe('5');
+    expect(await leaseRetry.json()).toEqual({ message: 'Installation removed' });
     expect(mockHandleInstallationDeleted).toHaveBeenCalledTimes(2);
     expect(mockCompleteSharedGitHubInstallationDelivery).toHaveBeenCalledTimes(1);
   });

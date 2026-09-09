@@ -35,6 +35,7 @@ export type PlatformIdentity = {
   teamId: string;
   /** Platform-specific user ID (e.g. Slack's "U123ABC") */
   userId: string;
+  githubAppType?: 'standard' | 'lite';
 };
 
 type LinkTokenPayload = {
@@ -150,6 +151,7 @@ const platformIdentitySchema = z.object({
   platform: z.enum(PLATFORM),
   teamId: z.string(),
   userId: z.string(),
+  githubAppType: z.enum(['standard', 'lite']).optional(),
 });
 
 const serializedThreadShape = z.looseObject({

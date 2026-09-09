@@ -27,6 +27,7 @@ import {
   session,
   type Completion,
 } from './control-test-fixtures';
+import { operationIntent } from './operation-intent';
 import { rememberAttachedRoot, resetSessionDirectoryState } from './session-directories';
 import { resetDirectoryOperationState } from './worktree-operations';
 
@@ -230,6 +231,23 @@ describe('operation admission and lookup', () => {
     await prompt.done;
     await prompt.waitForDelivery();
     expect(handlerDeps.operations.abortTarget(session, 'msg_1')).toBe(prompt);
+  });
+
+  it('includes working branch mode in attach idempotency intent', () => {
+    const workingBranchPayload = {
+      kilo,
+      branch: 'kilo/quiet-forest-abc',
+      branchMode: 'working' as const,
+    };
+    const { branchMode: _branchMode, ...legacyPayload } = workingBranchPayload;
+
+    expect(operationIntent('session.attach', workingBranchPayload)).toMatchObject({
+      branch: 'kilo/quiet-forest-abc',
+      branchMode: 'working',
+    });
+    expect(operationIntent('session.attach', workingBranchPayload)).not.toEqual(
+      operationIntent('session.attach', legacyPayload)
+    );
   });
 });
 

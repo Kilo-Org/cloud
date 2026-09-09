@@ -15,8 +15,17 @@ export function operationIntent(operation: 'session.attach' | 'session.prompt', 
       })),
     };
   }
-  const { kilo, git, env, snapshotIdentity, directory, branch, setupCommands, preparation } =
-    sessionAttachPayloadSchema.parse(payload);
+  const {
+    kilo,
+    git,
+    env,
+    snapshotIdentity,
+    directory,
+    branch,
+    branchMode,
+    setupCommands,
+    preparation,
+  } = sessionAttachPayloadSchema.parse(payload);
   const credentials = new Set([
     'KILOCODE_TOKEN',
     'KILOCODE_ORGANIZATION_ID',
@@ -31,6 +40,7 @@ export function operationIntent(operation: 'session.attach' | 'session.prompt', 
     snapshotIdentity,
     directory,
     branch,
+    branchMode,
     setupCommands,
     preparation,
     kilo: kilo

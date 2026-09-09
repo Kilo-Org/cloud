@@ -65,6 +65,7 @@ beforeEach(() => {
     status: 'open',
     severity: 'high',
     repo_full_name: 'kilo/repo',
+    platform_integration_id: 'integration-a',
   } as never);
   vi.mocked(resolveAutoAnalysisActor).mockResolvedValue({
     user: { id: userId, api_token_pepper: null },
@@ -78,6 +79,7 @@ beforeEach(() => {
 
 describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
   it('passes the claimed queue row into launch and leaves running settlement to the lifecycle module', async () => {
+    const getTokenForRepo = vi.fn(async () => ({ success: true, token: 'github-token' }));
     const message = {
       body: {
         ownerType: 'user',
@@ -98,7 +100,7 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
         INTERNAL_API_SECRET: { get: async () => 'internal-api-secret' },
         CALLBACK_TOKEN_SECRET: { get: async () => 'callback-token-secret' },
         GIT_TOKEN_SERVICE: {
-          getTokenForRepo: async () => ({ success: true, token: 'github-token' }),
+          getTokenForRepo,
         },
       } as unknown as CloudflareEnv
     );
@@ -113,6 +115,9 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
           claimToken: 'scheduled-claim-token',
         },
       })
+    );
+    expect(getTokenForRepo).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedIntegrationId: 'integration-a' })
     );
     expect(updateQueueFromPending).not.toHaveBeenCalled();
     expect(message.ack).toHaveBeenCalledTimes(1);
@@ -253,6 +258,7 @@ describe('consumeOwnerBatch scheduled lifecycle handoff', () => {
       status: 'open',
       severity: 'unexpected',
       repo_full_name: 'kilo/repo',
+      platform_integration_id: 'integration-a',
     } as never);
     const message = {
       body: {

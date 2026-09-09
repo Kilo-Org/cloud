@@ -216,6 +216,10 @@ vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({
   clearAgentModelPreference: vi.fn(),
 }));
 
+vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
+  clearRunOnDestinationPreference: vi.fn(),
+}));
+
 const { clearKeepScreenOnPreference, clearReasoningPreference, clearPrReviewFooterPreference } =
   vi.hoisted(() => ({
     clearKeepScreenOnPreference: vi.fn(),
@@ -616,6 +620,9 @@ describe('sign-out teardown ordering', () => {
     expect(clearKeepScreenOnPreference).toHaveBeenCalled();
     expect(clearReasoningPreference).toHaveBeenCalled();
     expect(clearPrReviewFooterPreference).toHaveBeenCalled();
+    const { clearRunOnDestinationPreference } =
+      await import('@/lib/hooks/use-persisted-run-on-destination');
+    expect(clearRunOnDestinationPreference).toHaveBeenCalled();
   });
 
   it('closes the ownership gate before any await and blocks a late persist', async () => {

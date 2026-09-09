@@ -75,7 +75,7 @@ function completedStep(revision: number): PreparingEventDataV2 {
 }
 
 describe('retained operation notifications', () => {
-  it('evicts multiple optional entries for a larger valid attempt terminal', () => {
+  it('reserves capacity for an attempt terminal after optional updates', () => {
     const recorder = createRetainedOperationNotifications();
     const musicalSymbolGClef = String.fromCodePoint(0x1d11e);
     const message = musicalSymbolGClef.repeat(900);
@@ -101,11 +101,8 @@ describe('retained operation notifications', () => {
     const after = recorder.snapshot();
 
     expect(retained).toBeGreaterThan(1);
-    expect(retainedBytes(before)).toBeGreaterThan(
-      Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES / 2) * 0.99
-    );
     expect(terminal).toBeDefined();
-    expect(before.preparing.length - after.preparing.length).toBe(1);
+    expect(after.preparing.length - before.preparing.length).toBe(1);
     expect(after.events).toHaveLength(0);
     expect(after.preparing.length).toBeLessThanOrEqual(64);
     expect(retainedBytes(after)).toBeLessThanOrEqual(

@@ -422,7 +422,7 @@ async function executeSessionAttach(
             }
             const branch = attach.branch ?? `session/${attach.kilo.scopeId}`;
             let checkoutArgs = ['checkout', '-B', branch, `origin/${branch}`];
-            if (!attach.branch) {
+            if (!attach.branch || attach.branchMode === 'working') {
               const existingBranch = await runGit(
                 ['show-ref', '--verify', '--quiet', `refs/heads/${branch}`],
                 directory,

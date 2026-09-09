@@ -6,6 +6,7 @@ type PlatformIntegrationHealthState = {
   integration_status: string | null;
   suspended_at: string | null;
   auth_invalid_at: string | null;
+  github_disconnected_at?: string | null;
 };
 
 export function isPlatformIntegrationHealthy(
@@ -14,7 +15,8 @@ export function isPlatformIntegrationHealthy(
   return (
     integration?.integration_status === INTEGRATION_STATUS.ACTIVE &&
     integration.suspended_at === null &&
-    integration.auth_invalid_at === null
+    integration.auth_invalid_at === null &&
+    integration.github_disconnected_at == null
   );
 }
 
@@ -37,5 +39,6 @@ export function platformIntegrationHealthSql(): SQL {
     ${platform_integrations.integration_status} = ${INTEGRATION_STATUS.ACTIVE}
     AND ${platform_integrations.suspended_at} IS NULL
     AND ${platform_integrations.auth_invalid_at} IS NULL
+    AND ${platform_integrations.github_disconnected_at} IS NULL
   `;
 }

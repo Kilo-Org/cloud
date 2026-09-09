@@ -48,7 +48,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 3,
+          weight: 1,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
@@ -65,6 +65,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   } satisfies AutoFreeModel,
   {
     model: 'dots-studio/dots-3-note-preview:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
+  {
+    model: 'nex-agi/nex-n2.5-pro:free',
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,

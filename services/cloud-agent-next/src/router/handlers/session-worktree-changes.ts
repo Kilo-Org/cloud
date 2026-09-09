@@ -7,8 +7,10 @@ import { withDORetry } from '../../utils/do-retry.js';
 import { protectedProcedure } from '../auth.js';
 import {
   GetWorktreeChangesOutput,
+  GetWorktreeFileOutput,
   RefreshWorktreeChangesOutput,
   WorktreeChangesInput,
+  WorktreeFileInput,
 } from '../schemas.js';
 
 function requireControlSession(sessionId: string): void {
@@ -37,6 +39,29 @@ export function createSessionWorktreeChangesHandlers() {
             () => getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId),
             session => session.getWorktreeChanges(),
             'getWorktreeChanges'
+          );
+        })
+      ),
+
+    getWorktreeFile: protectedProcedure
+      .input(WorktreeFileInput)
+      .output(GetWorktreeFileOutput)
+      .query(({ input, ctx }) =>
+        withLogTags({ source: 'getWorktreeFile' }, async () => {
+          await requireCurrentSessionAccess({
+            env: ctx.env,
+            kiloUserId: ctx.userId,
+            cloudAgentSessionId: input.cloudAgentSessionId,
+          });
+          requireControlSession(input.cloudAgentSessionId);
+          return withDORetry(
+            () => getSandboxSessionStub(ctx.env, ctx.userId, input.cloudAgentSessionId),
+            async session =>
+              await session.getWorktreeFile({
+                path: input.path,
+                expectedRevision: input.expectedRevision,
+              }),
+            'getWorktreeFile'
           );
         })
       ),

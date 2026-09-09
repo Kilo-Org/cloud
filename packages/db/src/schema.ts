@@ -93,6 +93,7 @@ import {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
+  RepositoryReviewMode,
   BYOKManagementSource,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
@@ -294,6 +295,7 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  RepositoryReviewMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -4241,6 +4243,11 @@ export const platform_integrations = pgTable(
     // GitHub App type (for GitHub platform only)
     // 'standard' = full KiloConnect app, 'lite' = read-only KiloConnect-Lite app
     github_app_type: text().$type<'standard' | 'lite'>().default('standard'),
+    github_installation_id: uuid(),
+    github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    github_authorized_by_user_id: text(),
+    github_authorized_user_id: text(),
+    github_authorized_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     // Timestamps
     installed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4316,6 +4323,130 @@ export const platform_integrations = pgTable(
 );
 
 export type PlatformIntegration = typeof platform_integrations.$inferSelect;
+
+export const github_app_installations = pgTable(
+  'github_app_installations',
+  {
+    id: idPrimaryKeyColumn,
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    installation_id: text().notNull(),
+    account_id: text(),
+    account_login: text(),
+    account_type: text().$type<'Organization' | 'User'>(),
+    permissions: jsonb().$type<IntegrationPermissions>(),
+    scopes: text().array(),
+    repository_access: text(),
+    repositories: jsonb().$type<PlatformRepository<number | string>[]>(),
+    repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
+    lifecycle_state: text()
+      .$type<'unknown' | 'active' | 'suspended' | 'deleted'>()
+      .notNull()
+      .default('unknown'),
+    suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_reason: text(),
+    revision: integer().notNull().default(0),
+    observed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_github_app_installations_app_installation').on(
+      table.github_app_type,
+      table.installation_id
+    ),
+    check(
+      'github_app_installations_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'github_app_installations_installation_id_check',
+      sql`${table.installation_id} ~ '^[1-9][0-9]*$'`
+    ),
+    check(
+      'github_app_installations_lifecycle_state_check',
+      sql`${table.lifecycle_state} IN ('unknown', 'active', 'suspended', 'deleted')`
+    ),
+  ]
+);
+
+export const github_connection_attempts = pgTable(
+  'github_connection_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text().notNull(),
+    owner_type: text().$type<'user' | 'org'>().notNull(),
+    owner_id: text().notNull(),
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    return_to: text(),
+    selected_installation_id: text(),
+    github_user_id: text(),
+    eligible_installations: jsonb(),
+    completed_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_github_connection_attempts_expires_at').on(table.expires_at),
+    index('IDX_github_connection_attempts_completed_integration_id').on(
+      table.completed_integration_id
+    ),
+    check(
+      'github_connection_attempts_owner_type_check',
+      sql`${table.owner_type} IN ('user', 'org')`
+    ),
+    check(
+      'github_connection_attempts_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+  ]
+);
+
+// Per-repository overrides for an installation's default bot-mention model
+// and automatic PR review mode. Both columns are nullable: null means
+// "inherit the installation default" (stored in `platform_integrations.metadata`),
+// not "disabled". A row with all-null overrides is equivalent to having no row.
+export const repository_customizations = pgTable(
+  'repository_customizations',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    // The platform's repository identifier (e.g. GitHub's numeric repository
+    // ID, stable across renames/transfers), stored as text so platforms with
+    // non-numeric IDs are representable; not the repository's owner/name string.
+    repository_id: text().notNull(),
+    bot_mention_model_slug: text(),
+    pr_review_mode: text().$type<RepositoryReviewMode>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_repository_customizations_integration_repository').on(
+      table.platform_integration_id,
+      table.repository_id
+    ),
+    enumCheck(
+      'repository_customizations_pr_review_mode_check',
+      table.pr_review_mode,
+      RepositoryReviewMode
+    ),
+  ]
+);
+
+export type RepositoryCustomization = typeof repository_customizations.$inferSelect;
+export type NewRepositoryCustomization = typeof repository_customizations.$inferInsert;
 
 export const user_github_app_tokens = pgTable(
   'user_github_app_tokens',
@@ -5433,6 +5564,34 @@ export const modelsByProvider = pgTable('models_by_provider', {
   openrouter: jsonb('openrouter').$type<Record<string, StoredModel>>(),
   vercel: jsonb('vercel').$type<Record<string, StoredModel>>(),
 });
+
+export const ai_gateway_config = pgTable(
+  'ai_gateway_config',
+  {
+    id: integer().primaryKey().default(1),
+    config: jsonb().$type<Record<string, unknown>>().notNull().default({}),
+  },
+  table => [check('ai_gateway_config_singleton', sql`${table.id} = 1`)]
+);
+
+export const ai_gateway_sync_providers_state = pgTable(
+  'ai_gateway_sync_providers_state',
+  {
+    id: integer().primaryKey().default(1),
+    last_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    stale_alert_last_posted_at: timestamp({ withTimezone: true, mode: 'string' }),
+  },
+  table => [check('ai_gateway_sync_providers_state_singleton', sql`${table.id} = 1`)]
+);
+
+export const ai_gateway_request_logging_opt_ins = pgTable(
+  'ai_gateway_request_logging_opt_ins',
+  {
+    id: integer().primaryKey().default(1),
+    opt_ins: jsonb().$type<unknown[]>().notNull().default([]),
+  },
+  table => [check('ai_gateway_request_logging_opt_ins_singleton', sql`${table.id} = 1`)]
+);
 
 export const direct_byok_model_lists = pgTable('direct_byok_model_lists', {
   provider_id: text().primaryKey(),

@@ -56,7 +56,8 @@ replays the exact code production runs.
    `benchmarkUserId`.
 3. **Graceful degradation at every layer.** Corrupt KV → treated as a miss;
    origin failure → previous behavior (stale table stays live); classifier
-   failure / `/decide` timeout (2s) → null decision → balanced fallback; publish
+   failure / `/decide` timeout (5s, single attempt) → null decision → balanced
+   fallback; publish
    with any empty tier → skipped, previous table stays live. An
    `efficient` request must never degrade *below* balanced.
 4. **Results are reproducible.** Grading is mechanical only (`exact` /

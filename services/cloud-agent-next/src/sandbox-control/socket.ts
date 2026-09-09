@@ -125,6 +125,7 @@ export type SandboxControlSocketHandler = {
   supportsOperationResults(): boolean;
   supportsScopedStopAbort(): boolean;
   supportsNativeRuntimeRetirement(): boolean;
+  supportsWorkingBranches?(): boolean;
   supportsConnectionRecovery(): boolean;
   getConnectionIdentity(): SandboxControlConnectionIdentity | null;
   getReadySocket(): WebSocket | null;
@@ -367,6 +368,13 @@ export function createSandboxControlSocketHandler(
       return (
         current !== null &&
         readAttachment(current.socket)?.capabilities?.nativeRuntimeRetirement === true
+      );
+    },
+
+    supportsWorkingBranches(): boolean {
+      const current = currentHandshakenSocket(state);
+      return (
+        current !== null && readAttachment(current.socket)?.capabilities?.workingBranches === true
       );
     },
 
@@ -939,7 +947,8 @@ export function createSandboxControlSocketHandler(
       }
 
       const current = currentHandshakenSocket(state);
-      const readyOnly = input.operation === 'session.git.summary';
+      const readyOnly =
+        input.operation === 'session.git.summary' || input.operation === 'session.git.snapshot';
       if (readyOnly && (!current || readAttachment(current.socket)?.kiloReady !== true)) {
         return errorResponse(crypto.randomUUID(), 'not_ready', 'No ready wrapper socket', true);
       }

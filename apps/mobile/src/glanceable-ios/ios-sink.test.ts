@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
+  GLANCEABLE_IDLE_END_DEBOUNCE_MS,
+  GLANCEABLE_IDLE_ONLY_MS,
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -52,7 +54,31 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   frame: () => ({}),
   widgetURL: () => ({}),
 }));
-vi.mock('react-native', () => ({ PlatformColor: (name: string) => name }));
+// The sink reads the foreground state at publish and watches for the app
+// leaving active while an idle-end debounce is pending.
+const mockAppState = vi.hoisted(() => ({
+  currentState: 'active' as string,
+  listeners: new Set<(state: string) => void>(),
+  leaveActive(next: string) {
+    this.currentState = next;
+    for (const listener of this.listeners) {
+      listener(next);
+    }
+  },
+}));
+
+vi.mock('react-native', () => ({
+  PlatformColor: (name: string) => name,
+  AppState: {
+    get currentState() {
+      return mockAppState.currentState;
+    },
+    addEventListener: (_type: string, listener: (state: string) => void) => {
+      mockAppState.listeners.add(listener);
+      return { remove: () => mockAppState.listeners.delete(listener) };
+    },
+  },
+}));
 
 const mockState = vi.hoisted(() => ({
   startError: null as { code: string; message: string } | null,
@@ -174,6 +200,8 @@ function snapshotFor(
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  mockAppState.currentState = 'active';
+  mockAppState.listeners.clear();
   subscriptions.clear();
   mockState.startError = null;
   mockState.instancesError = null;
@@ -944,6 +972,63 @@ describe('iosSink Live Activity content-state', () => {
     ]);
     expect(mockState.updated.length).toBe(0);
     expect(subscriptions.has('activity')).toBe(false);
+  });
+});
+
+describe('iosSink idle end scheduling', () => {
+  it('submits the idle native end at once when the app is already background', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    mockAppState.currentState = 'background';
+
+    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockState.started[0]).toMatchObject({
+      ended: true,
+      dismissAt: NOW + GLANCEABLE_IDLE_ONLY_MS,
+      props: { status: 'happy', running: 0, idle: 1 },
+    });
+  });
+
+  it('flushes a pending idle end when the app leaves active during the debounce', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
+    expect(mockState.started[0]?.ended).toBe(false);
+
+    mockAppState.leaveActive('background');
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockState.started[0]).toMatchObject({
+      ended: true,
+      dismissAt: NOW + GLANCEABLE_IDLE_ONLY_MS,
+    });
+
+    // The debounce is gone with its watch: no second end ever fires.
+    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
+    expect(mockState.ended).toHaveLength(1);
+    expect(mockAppState.listeners.size).toBe(0);
+  });
+
+  it('cancels the pending idle end and its watch when work resumes', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
+    const resumed = snapshotFor([{ status: 'busy' }], 2);
+    iosSink.publish(resumed);
+    iosSink.startOrUpdate(resumed, CTX);
+
+    mockAppState.leaveActive('background');
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
+
+    expect(mockState.started[0]).toMatchObject({ ended: false, props: { running: 1, idle: 0 } });
+    expect(mockState.ended).toEqual([]);
+    expect(mockAppState.listeners.size).toBe(0);
   });
 });
 

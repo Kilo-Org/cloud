@@ -2,6 +2,10 @@ import { NextRequest, after } from 'next/server';
 import { captureException } from '@sentry/nextjs';
 import { bot } from '@/lib/bot';
 import { handleGitHubWebhook } from '@/lib/integrations/platforms/github/webhook-handler';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '@/lib/integrations/github/runtime-authorization';
 
 function cloneGitHubRequest(request: NextRequest, rawBody: string) {
   return new NextRequest(request.url, {
@@ -9,6 +13,26 @@ function cloneGitHubRequest(request: NextRequest, rawBody: string) {
     headers: request.headers,
     body: rawBody,
   });
+}
+
+function getGitHubInstallationId(rawBody: string): string | null {
+  try {
+    const payload: unknown = JSON.parse(rawBody);
+    if (
+      typeof payload === 'object' &&
+      payload !== null &&
+      'installation' in payload &&
+      typeof payload.installation === 'object' &&
+      payload.installation !== null &&
+      'id' in payload.installation &&
+      (typeof payload.installation.id === 'number' || typeof payload.installation.id === 'string')
+    ) {
+      return payload.installation.id.toString();
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 /**
@@ -21,6 +45,20 @@ export async function POST(request: NextRequest) {
   const rawBody = await request.text();
 
   const botRequest = cloneGitHubRequest(request, rawBody);
+  const installationId = getGitHubInstallationId(rawBody);
+
+  const response = await handleGitHubWebhook(cloneGitHubRequest(request, rawBody), 'standard');
+  if (!response.ok) return response;
+  if (!installationId) return response;
+  try {
+    await assertGitHubInstallationRuntimeAuthorized(installationId, 'standard');
+  } catch (error) {
+    if (error instanceof GitHubRuntimeAuthorizationError) return response;
+    captureException(error, {
+      tags: { endpoint: 'webhooks/github', source: 'chat_adapter_authorization' },
+    });
+    return new Response('GitHub authorization temporarily unavailable', { status: 503 });
+  }
 
   after(async () => {
     try {
@@ -42,5 +80,5 @@ export async function POST(request: NextRequest) {
     }
   });
 
-  return handleGitHubWebhook(cloneGitHubRequest(request, rawBody), 'standard');
+  return response;
 }

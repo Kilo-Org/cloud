@@ -228,9 +228,10 @@ export function LiveSessionFeedback({
           className="absolute size-px overflow-hidden"
         />
       )}
-      {/* The live tab's reserved status line: visible Updating while the pull
-          is in flight, visible "Couldn't refresh" + Retry when it failed.
-          Home passes no refresh state and keeps its a11y-only announcement. */}
+      {/* The live tab's reserved status line: screen-reader Updating while
+          the pull is in flight, visible "Couldn't refresh" + Retry when it
+          failed. Home passes no refresh state and keeps its a11y-only
+          announcement. */}
       {refresh && content === 'rows' ? (
         <SessionListRefreshStatus
           busy={refresh.busy}

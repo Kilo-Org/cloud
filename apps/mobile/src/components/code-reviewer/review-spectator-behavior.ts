@@ -1,4 +1,4 @@
-export const TERMINAL_REVIEW_STATUSES = new Set([
+const TERMINAL_REVIEW_STATUSES = new Set([
   'completed',
   'failed',
   'cancelled',

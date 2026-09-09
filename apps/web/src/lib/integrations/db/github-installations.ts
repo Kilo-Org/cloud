@@ -792,6 +792,26 @@ export async function isSharedGitHubInstallation(
   return installation?.sharingMode === 'web_cloud_agent';
 }
 
+export async function materializeGitHubInstallationIdentity(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+}): Promise<void> {
+  await db.transaction(async tx => {
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
+    );
+    await tx
+      .insert(github_app_installations)
+      .values({ github_app_type: input.appType, installation_id: input.installationId })
+      .onConflictDoNothing({
+        target: [
+          github_app_installations.github_app_type,
+          github_app_installations.installation_id,
+        ],
+      });
+  });
+}
+
 export async function recordSharedGitHubInstallationDelivery(input: {
   installationId: string;
   appType: 'standard' | 'lite';

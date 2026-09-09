@@ -14,6 +14,7 @@ import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibil
 import {
   connectVerifiedGitHubInstallation,
   completeSharedGitHubInstallationDelivery,
+  materializeGitHubInstallationIdentity,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
   recordSharedGitHubInstallationDelivery,
@@ -664,6 +665,57 @@ describe('GitHub installation persistence', () => {
     await expect(
       assertGitHubInstallationRuntimeAuthorized('654321', 'standard')
     ).resolves.toBeUndefined();
+    await materializeGitHubInstallationIdentity({ installationId: '654321', appType: 'standard' });
+    await expect(
+      recordSharedGitHubInstallationDelivery({
+        installationId: '654321',
+        appType: 'standard',
+        deliveryId: 'legacy-delete',
+        eventType: 'installation.deleted',
+      })
+    ).resolves.toEqual({ status: 'claimed', attemptCount: 1 });
+    await completeSharedGitHubInstallationDelivery({
+      installationId: '654321',
+      appType: 'standard',
+      deliveryId: 'legacy-delete',
+      attemptCount: 1,
+    });
+    await expect(
+      recordSharedGitHubInstallationDelivery({
+        installationId: '654321',
+        appType: 'standard',
+        deliveryId: 'legacy-delete',
+        eventType: 'installation.deleted',
+      })
+    ).resolves.toEqual({ status: 'duplicate' });
+  });
+
+  test('ignores an unbound shadow when canonical identity already exists', async () => {
+    const organization = await createTestOrganization('Canonical coexistence org', ownerId, 0);
+    const connected = await connectVerifiedGitHubInstallation(
+      { type: 'org', id: organization.id },
+      data('654322')
+    );
+    if (!connected.ok) throw new Error('Expected canonical connection');
+    await db.insert(platform_integrations).values({
+      owned_by_user_id: ownerId,
+      platform: 'github',
+      integration_type: 'app',
+      platform_installation_id: '654322',
+      github_app_type: 'standard',
+      integration_status: 'active',
+    });
+
+    await expect(
+      assertGitHubInstallationRuntimeAuthorized('654322', 'standard')
+    ).resolves.toBeUndefined();
+    await db
+      .update(github_app_installations)
+      .set({ sharing_mode: 'web_cloud_agent' })
+      .where(eq(github_app_installations.installation_id, '654322'));
+    await expect(assertGitHubInstallationRuntimeAuthorized('654322', 'standard')).rejects.toThrow(
+      'GitHub installation is unavailable for runtime use'
+    );
   });
 
   test('routes the same numeric GitHub installation ID by app identity', async () => {

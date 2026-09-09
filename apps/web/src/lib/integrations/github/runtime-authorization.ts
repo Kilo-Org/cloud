@@ -10,7 +10,7 @@ import {
   organizations,
   platform_integrations,
 } from '@kilocode/db/schema';
-import { and, eq, isNull, or } from 'drizzle-orm';
+import { and, eq, isNull, notExists, or } from 'drizzle-orm';
 
 export class GitHubRuntimeAuthorizationError extends Error {
   constructor() {
@@ -112,7 +112,20 @@ export async function assertGitHubInstallationRuntimeAuthorized(
         eq(platform_integrations.platform_installation_id, installationId),
         effectiveAppTypeCondition(appType),
         or(
-          isNull(platform_integrations.github_installation_id),
+          and(
+            isNull(platform_integrations.github_installation_id),
+            notExists(
+              db
+                .select({ id: github_app_installations.id })
+                .from(github_app_installations)
+                .where(
+                  and(
+                    eq(github_app_installations.github_app_type, appType),
+                    eq(github_app_installations.installation_id, installationId)
+                  )
+                )
+            )
+          ),
           and(
             eq(github_app_installations.github_app_type, appType),
             eq(github_app_installations.installation_id, installationId),

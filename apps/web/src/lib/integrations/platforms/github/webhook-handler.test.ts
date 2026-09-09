@@ -27,6 +27,7 @@ const mockIsSharedGitHubInstallation = jest.fn();
 const mockRecordSharedGitHubInstallationDelivery = jest.fn();
 const mockDeleteSharedGitHubInstallationDelivery = jest.fn();
 const mockCompleteSharedGitHubInstallationDelivery = jest.fn();
+const mockMaterializeGitHubInstallationIdentity = jest.fn();
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
   verifyGitHubWebhookSignature: (payload: string, signature: string, appType: string) =>
@@ -95,6 +96,8 @@ jest.mock('@/lib/integrations/db/github-installations', () => ({
     mockDeleteSharedGitHubInstallationDelivery(input),
   completeSharedGitHubInstallationDelivery: (input: unknown) =>
     mockCompleteSharedGitHubInstallationDelivery(input),
+  materializeGitHubInstallationIdentity: (input: unknown) =>
+    mockMaterializeGitHubInstallationIdentity(input),
 }));
 
 jest.mock('@/lib/code-reviews/review-memory/github-feedback', () => ({
@@ -684,6 +687,13 @@ describe('handleGitHubWebhook', () => {
     );
 
     expect(response.status).toBe(200);
+    expect(mockMaterializeGitHubInstallationIdentity).toHaveBeenCalledWith({
+      installationId: '98765',
+      appType: 'lite',
+    });
+    expect(mockMaterializeGitHubInstallationIdentity.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRecordSharedGitHubInstallationDelivery.mock.invocationCallOrder[0]!
+    );
     expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
     expect(mockHandleInstallationDeleted).toHaveBeenCalledWith(
       expect.objectContaining(payload),

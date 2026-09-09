@@ -50,6 +50,7 @@ import {
   completeSharedGitHubInstallationDelivery,
   deleteSharedGitHubInstallationDelivery,
   isSharedGitHubInstallation,
+  materializeGitHubInstallationIdentity,
   recordSharedGitHubInstallationDelivery,
 } from '@/lib/integrations/db/github-installations';
 
@@ -275,6 +276,7 @@ export async function handleGitHubWebhook(
         const deletedPayload = { ...parseResult.data, installation };
 
         const installationId = installation.id.toString();
+        await materializeGitHubInstallationIdentity({ installationId, appType });
         return await dispatchSharedOnce(installationId, action, () =>
           handleInstallationDeleted(deletedPayload, appType)
         );

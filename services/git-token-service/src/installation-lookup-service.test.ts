@@ -88,6 +88,13 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params).toContain(1);
   });
 
+  it('requires exclusive mode for managed lookups without an exact association ID', () => {
+    const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
+    const query = buildManagedInstallationLookupQuery(db, params).toSQL();
+
+    expect(query.params).toContain('exclusive');
+  });
+
   it('uses a supplied integration ID as an exact personal authorization fence', () => {
     const db = getWorkerDb('postgres://unused:unused@localhost:0/unused');
     const expectedIntegrationId = '00000000-0000-4000-8000-000000000002';

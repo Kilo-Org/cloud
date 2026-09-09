@@ -7,7 +7,7 @@ import {
   organizations,
   github_app_installations,
 } from '@kilocode/db/schema';
-import { eq, and, exists, isNull, isNotNull, or, sql } from 'drizzle-orm';
+import { eq, and, exists, isNull, isNotNull, notExists, or, sql } from 'drizzle-orm';
 
 export type FindInstallationParams = {
   githubRepo: string;
@@ -196,13 +196,32 @@ function buildAuthorizedInstallationsQuery(
         isNull(platform_integrations.auth_invalid_at),
         isNull(platform_integrations.github_disconnected_at),
         or(
-          isNull(platform_integrations.github_installation_id),
+          and(
+            isNull(platform_integrations.github_installation_id),
+            notExists(
+              db
+                .select({ id: github_app_installations.id })
+                .from(github_app_installations)
+                .where(
+                  and(
+                    eq(
+                      github_app_installations.github_app_type,
+                      sql`COALESCE(${platform_integrations.github_app_type}, 'standard')`
+                    ),
+                    eq(
+                      github_app_installations.installation_id,
+                      platform_integrations.platform_installation_id
+                    )
+                  )
+                )
+            )
+          ),
           and(
             eq(github_app_installations.lifecycle_state, 'active'),
             isNull(github_app_installations.suspended_at),
             isNull(github_app_installations.deleted_at),
             isNull(github_app_installations.auth_invalid_at),
-            authorizationMode === 'generic'
+            authorizationMode === 'generic' || params.expectedIntegrationId === undefined
               ? eq(github_app_installations.sharing_mode, 'exclusive')
               : undefined
           )

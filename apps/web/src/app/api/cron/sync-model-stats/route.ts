@@ -28,7 +28,7 @@ import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
  * - Artificial Analysis benchmarks
  * - Internal usage statistics from Posthog
  *
- * It ensures all models in the preferredModels list are tracked and marked as active.
+ * It ensures concrete models in the preferredModels list are tracked and marked as active.
  * It also updates OpenRouter data for any other models already in the database.
  * Note: Models are never automatically deactivated - only users can deactivate models.
  */

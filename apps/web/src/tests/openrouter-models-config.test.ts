@@ -13,6 +13,10 @@ import {
 } from '@/lib/ai-gateway/providers/anthropic.constants';
 import { GPT_CURRENT_MODEL_ID } from '@/lib/ai-gateway/providers/openai';
 import { gpt_5_6_sol_discounted_model } from '@/lib/ai-gateway/providers/openai-exclusive';
+import {
+  GEMMA_4_26B_A4B_IT_ID,
+  gemma_4_26b_a4b_it_free_model,
+} from '@/lib/ai-gateway/providers/google';
 import { QWEN37_PLUS_MODEL_ID } from '@/lib/ai-gateway/providers/qwen';
 
 describe('OpenRouter Models Config', () => {
@@ -60,6 +64,7 @@ describe('OpenRouter Models Config', () => {
   test('monitors only concrete preferred models', () => {
     expect(preferredModels).toContain(KILO_AUTO_EFFICIENT_MODEL.id);
     expect(monitoredModels).toEqual(preferredModels.filter(model => !isKiloAutoModel(model)));
-    expect(monitoredModels.every(model => !isKiloAutoModel(model))).toBe(true);
+    expect(monitoredModels).not.toContain(GEMMA_4_26B_A4B_IT_ID);
+    expect(monitoredModels).not.toContain(gemma_4_26b_a4b_it_free_model.public_id);
   });
 });

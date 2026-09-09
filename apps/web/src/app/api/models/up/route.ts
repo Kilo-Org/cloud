@@ -2,7 +2,7 @@ import { db, sql } from '@/lib/drizzle';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { monitoredModels as allPreferredModels } from '@/lib/ai-gateway/monitored-models';
+import { monitoredModels } from '@/lib/ai-gateway/monitored-models';
 
 // Simple hardcoded key for authentication
 const HEALTH_CHECK_KEY = 'kilo-models-health-check';
@@ -98,8 +98,8 @@ export async function GET(
     anchorTime = parsed;
   }
 
-  const monitoredModels = allPreferredModels.filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
-  const nonMonitoredModels = allPreferredModels.filter(m => HEALTH_CHECK_EXCLUSIONS.has(m));
+  const alertingModels = monitoredModels.filter(m => !HEALTH_CHECK_EXCLUSIONS.has(m));
+  const excludedModels = monitoredModels.filter(m => HEALTH_CHECK_EXCLUSIONS.has(m));
 
   try {
     const queryStartTime = Date.now();
@@ -135,7 +135,7 @@ export async function GET(
             created_at >= ${ref} - INTERVAL '2 hours'
             AND created_at <= ${ref}
             AND has_error = false
-            AND requested_model IN (${sql.join(allPreferredModels, sql`, `)})
+            AND requested_model IN (${sql.join(monitoredModels, sql`, `)})
           GROUP BY requested_model
         )
         SELECT
@@ -190,8 +190,8 @@ export async function GET(
       };
     });
 
-    // Ensure all preferred models are in the response (even if no data)
-    for (const model of allPreferredModels) {
+    // Ensure all monitored models are in the response (even if no data)
+    for (const model of monitoredModels) {
       if (!models[model]) {
         models[model] = {
           ...emptyMetrics(),
@@ -236,7 +236,7 @@ export async function GET(
   } catch (error) {
     captureException(error, {
       tags: { endpoint: 'models/up', source: 'model_health_check' },
-      extra: { monitoredModels, nonMonitoredModels },
+      extra: { monitoredModels: alertingModels, nonMonitoredModels: excludedModels },
     });
 
     // Fail open: a query timeout or DB error is not evidence of a model being down.

@@ -1,9 +1,4 @@
-const TERMINAL_REVIEW_STATUSES = new Set([
-  'completed',
-  'failed',
-  'cancelled',
-  'interrupted',
-]);
+const TERMINAL_REVIEW_STATUSES = new Set(['completed', 'failed', 'cancelled', 'interrupted']);
 
 type CodeReviewStreamSnapshot = {
   agentVersion: string;

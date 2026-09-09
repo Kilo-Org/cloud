@@ -995,12 +995,14 @@ export class TownDO extends DurableObject<Env> {
     userId: string,
     organizationId?: string
   ): Promise<string | undefined> {
-    return runtimeAuthorization.createRuntimeAuthorization(
+    const token = await runtimeAuthorization.createRuntimeAuthorization(
       this.runtimeAuthorizationCtx,
       controlToken,
       userId,
       organizationId
     );
+    if (token) this._ownerUserId = (await this.getTownConfig()).owner_user_id;
+    return token;
   }
 
   async reauthorizeRuntime(
@@ -1008,12 +1010,14 @@ export class TownDO extends DurableObject<Env> {
     userId: string,
     organizationId?: string
   ): Promise<boolean> {
-    return runtimeAuthorization.reauthorizeRuntime(
+    const authorized = await runtimeAuthorization.reauthorizeRuntime(
       this.runtimeAuthorizationCtx,
       controlToken,
       userId,
       organizationId
     );
+    if (authorized) this._ownerUserId = (await this.getTownConfig()).owner_user_id;
+    return authorized;
   }
 
   private async renewRuntimeAuthorization(): Promise<string | undefined> {

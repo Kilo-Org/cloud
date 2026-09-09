@@ -1,8 +1,10 @@
 import { env, runInDurableObject } from 'cloudflare:test';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import * as admission from '@kilocode/worker-utils/runtime-authorization';
 import { getTownDOStub } from '../../src/dos/Town.do';
 import {
   initializePrivateTownIdentity,
+  createRuntimeAuthorization,
   TOWN_IDENTITY_KEY,
   RUNTIME_AUTHORIZATION_KEY,
 } from '../../src/dos/town/runtime-authorization';
@@ -76,4 +78,78 @@ describe('private town identity on real Durable Object storage', () => {
       });
     });
   });
+});
+
+// Exercise production admission persistence with real transactional storage;
+// only the external PostgreSQL/token admission is substituted.
+describe('runtime sponsorship on real Durable Object storage', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it.each([false, true])(
+    'atomically persists sponsorship (invalid config: %s)',
+    async invalidConfig => {
+      await runInDurableObject(town(), async (instance, state) => {
+        const organizationId = '00000000-0000-4000-8000-000000000003';
+        const original = { ...identity, ownerType: 'org' as const, organizationId };
+        await initializePrivateTownIdentity(state.storage, original);
+        if (invalidConfig) await state.storage.put('town:config', { kilocode_token: 123 });
+        const previousConfig = await state.storage.get('town:config');
+        const authorization = admission.RuntimeAuthorizationSchema.parse({
+          version: 1,
+          id: '00000000-0000-4000-8000-000000000001',
+          resourceKind: 'gastown',
+          resourceId: instance['townId'],
+          organizationId,
+          userId: 'oauth/new-owner',
+          authorizationUserId: 'oauth/new-owner',
+          issuedAt: '2026-09-09T00:00:00.000Z',
+          delegationExpiresAt: '2026-10-09T00:00:00.000Z',
+          state: 'active',
+          bindings: { userPepperDigest: 'a'.repeat(64), authorizationPepperDigest: 'a'.repeat(64) },
+          source: { admissionSource: 'user' },
+        });
+        vi.spyOn(admission, 'createRuntimeAuthorization').mockResolvedValue({
+          authorization,
+          token: 'runtime-token',
+          expiresAt: '2026-09-09T01:00:00.000Z',
+        });
+        const token = await createRuntimeAuthorization(
+          {
+            storage: state.storage,
+            env: {
+              ...env,
+              NEXTAUTH_SECRET: 'synthetic-test-secret',
+              HYPERDRIVE: { connectionString: 'postgres://test' },
+            } as Env,
+            townId: instance['townId'],
+            hasActiveWork: () => false,
+            updateTownConfig: update => instance.updateTownConfig(update),
+          },
+          'control-token',
+          'oauth/new-owner',
+          organizationId
+        );
+        if (invalidConfig) {
+          expect(token).toBeUndefined();
+          expect(await state.storage.get(TOWN_IDENTITY_KEY)).toEqual(original);
+          expect(await state.storage.get(RUNTIME_AUTHORIZATION_KEY)).toBeUndefined();
+          expect(await state.storage.get('town:config')).toEqual(previousConfig);
+        } else {
+          expect(token).toBe('runtime-token');
+          expect(await instance.getTownIdentityState()).toEqual({
+            type: 'modern',
+            identity: { ...original, ownerUserId: 'oauth/new-owner', runtimeMode: 'modern' },
+          });
+          expect(await state.storage.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(authorization);
+          expect(await instance.getTownConfig()).toMatchObject({
+            owner_type: 'org',
+            owner_id: organizationId,
+            organization_id: organizationId,
+            owner_user_id: 'oauth/new-owner',
+            created_by_user_id: original.createdByUserId,
+          });
+        }
+      });
+    }
+  );
 });

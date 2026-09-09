@@ -34,6 +34,7 @@ import {
   getTownIdentityState,
   initializePrivateTownIdentity,
   RUNTIME_AUTHORIZATION_KEY,
+  TOWN_IDENTITY_KEY,
   reauthorizeRuntime,
   requiresRuntimeAuthorization,
   renewRuntimeAuthorization,
@@ -41,13 +42,24 @@ import {
 import { RuntimeAuthorizationRevokedError } from '@kilocode/worker-utils/runtime-authorization';
 import { RuntimeAuthorizationExpiredError } from '@kilocode/worker-utils/runtime-authorization';
 
-type TestStorage = DurableObjectStorage & { putMock: ReturnType<typeof vi.fn> };
+type TestStorage = DurableObjectStorage & {
+  putMock: ReturnType<typeof vi.fn<(key: string, value: unknown) => Promise<unknown>>>;
+};
 
 function storage(): TestStorage {
   const values = new Map<string, unknown>();
   const put = vi.fn(async (key: string, value: unknown) => values.set(key, value));
   const store = {
-    transaction: async (fn: (txn: DurableObjectStorage) => Promise<unknown>) => fn(store),
+    transaction: async (fn: (txn: DurableObjectStorage) => Promise<unknown>) => {
+      const snapshot = new Map(values);
+      try {
+        return await fn(store);
+      } catch (error) {
+        values.clear();
+        for (const [key, value] of snapshot) values.set(key, value);
+        throw error;
+      }
+    },
     get: vi.fn(async <T>(key: string) => values.get(key) as T),
     put,
     putMock: put,
@@ -329,5 +341,188 @@ describe('runtime authorization persistence', () => {
       createRuntimeAuthorization(context(store), 'control-token', 'user-1')
     ).resolves.toBe('runtime-token');
     await expect(getRuntimeAuthorizationState(store)).resolves.toBe('active');
+  });
+  it('keeps legacy identity intact when the modern identity write fails', async () => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, identity);
+    mocks.create.mockResolvedValue({ authorization: authorization(), token: 'runtime-token' });
+    const originalPut = store.putMock.getMockImplementation();
+    if (!originalPut) throw new Error('Missing storage writer');
+    store.putMock.mockImplementationOnce(async (key: string, value: unknown) => {
+      // Use the normal writer for the authorization, then fail the identity write.
+      store.putMock.mockImplementationOnce(() => {
+        throw new Error('storage failure');
+      });
+      return originalPut(key, value);
+    });
+    await expect(
+      createRuntimeAuthorization(context(store), 'control-token', 'user-1')
+    ).resolves.toBeUndefined();
+    await expect(getTownIdentityState(store, 'town-1')).resolves.toEqual({
+      type: 'legacy',
+      identity,
+    });
+    expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toBeUndefined();
+  });
+
+  it('rebinds an org runtime to the current owner and retains creator attribution', async () => {
+    const store = storage();
+    const orgId = '00000000-0000-4000-8000-000000000003';
+    const orgIdentity = {
+      ...identity,
+      ownerType: 'org' as const,
+      organizationId: orgId,
+      runtimeMode: 'modern' as const,
+    };
+    await initializePrivateTownIdentity(store, orgIdentity);
+    await store.put(RUNTIME_AUTHORIZATION_KEY, {
+      ...authorization('revoked'),
+      organizationId: orgId,
+    });
+    mocks.create.mockResolvedValue({
+      authorization: {
+        ...authorization(),
+        organizationId: orgId,
+        userId: 'new-owner',
+        authorizationUserId: 'new-owner',
+      },
+      token: 'replacement',
+    });
+
+    await expect(
+      reauthorizeRuntime(context(store), 'control-token', 'new-owner', orgId)
+    ).resolves.toBe(true);
+    await expect(getTownIdentityState(store, 'town-1')).resolves.toEqual({
+      type: 'modern',
+      identity: { ...orgIdentity, ownerUserId: 'new-owner' },
+    });
+    expect(mocks.updateConfig).toHaveBeenLastCalledWith(store, { owner_user_id: 'new-owner' });
+  });
+
+  it.each([
+    { userId: 'another-user' },
+    { authorizationUserId: 'another-user' },
+    { organizationId: '00000000-0000-4000-8000-000000000003' },
+  ])('rejects admission bound to another principal or organization: %j', async update => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, identity);
+    mocks.create.mockResolvedValue({
+      authorization: { ...authorization(), ...update },
+      token: 'runtime-token',
+    });
+    await expect(
+      createRuntimeAuthorization(context(store), 'control-token', 'user-1')
+    ).resolves.toBeUndefined();
+    await expect(getTownIdentityState(store, 'town-1')).resolves.toEqual({
+      type: 'legacy',
+      identity,
+    });
+  });
+
+  it('does not allow another user to reauthorize a personal town', async () => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, { ...identity, runtimeMode: 'modern' });
+    await store.put(RUNTIME_AUTHORIZATION_KEY, authorization('revoked'));
+    await expect(reauthorizeRuntime(context(store), 'control-token', 'another-user')).resolves.toBe(
+      false
+    );
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
+
+  it.each(['active', 'revoked'] as const)(
+    'preserves a concurrent %s authorization during admission',
+    async state => {
+      const store = storage();
+      await initializePrivateTownIdentity(store, { ...identity, runtimeMode: 'modern' });
+      await store.put(RUNTIME_AUTHORIZATION_KEY, authorization('revoked'));
+      const concurrent = { ...authorization(state), id: '00000000-0000-4000-8000-000000000002' };
+      mocks.create.mockImplementation(async () => {
+        await store.put(RUNTIME_AUTHORIZATION_KEY, concurrent);
+        return { authorization: authorization(), token: 'runtime-token' };
+      });
+      await expect(reauthorizeRuntime(context(store), 'control-token', 'user-1')).resolves.toBe(
+        false
+      );
+      expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(concurrent);
+    }
+  );
+  it('does not overwrite an identity changed while admission is in flight', async () => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, identity);
+    const changed = { ...identity, createdByUserId: 'corrected-creator' };
+    mocks.create.mockImplementation(async () => {
+      await store.put(TOWN_IDENTITY_KEY, changed);
+      return { authorization: authorization(), token: 'runtime-token' };
+    });
+    await expect(
+      createRuntimeAuthorization(context(store), 'control-token', 'user-1')
+    ).resolves.toBeUndefined();
+    expect(await store.get(TOWN_IDENTITY_KEY)).toEqual(changed);
+    expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toBeUndefined();
+  });
+
+  it('does not replace a revoked authorization changed during the container check', async () => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, { ...identity, runtimeMode: 'modern' });
+    await store.put(RUNTIME_AUTHORIZATION_KEY, authorization('revoked'));
+    const replacement = { ...authorization(), id: '00000000-0000-4000-8000-000000000002' };
+    mocks.getState.mockImplementation(async () => {
+      await store.put(RUNTIME_AUTHORIZATION_KEY, replacement);
+      return { status: 'stopped' };
+    });
+    await expect(reauthorizeRuntime(context(store), 'control-token', 'user-1')).resolves.toBe(
+      false
+    );
+    expect(mocks.create).not.toHaveBeenCalled();
+    expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(replacement);
+  });
+
+  it('does not persist admission if work starts during external verification', async () => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, { ...identity, runtimeMode: 'modern' });
+    const previous = authorization('revoked');
+    await store.put(RUNTIME_AUTHORIZATION_KEY, previous);
+    let active = false;
+    mocks.create.mockImplementation(async () => {
+      active = true;
+      return { authorization: authorization(), token: 'runtime-token' };
+    });
+    await expect(
+      reauthorizeRuntime(
+        { ...context(store), hasActiveWork: () => active },
+        'control-token',
+        'user-1'
+      )
+    ).resolves.toBe(false);
+    expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(previous);
+  });
+
+  it('leaves expired authorization unchanged when admission fails', async () => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, { ...identity, runtimeMode: 'modern' });
+    const previous = authorization();
+    await store.put(RUNTIME_AUTHORIZATION_KEY, previous);
+    mocks.create.mockRejectedValue(new Error('Invalid runtime admission'));
+    await expect(reauthorizeRuntime(context(store), 'control-token', 'user-1')).resolves.toBe(
+      false
+    );
+    expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(previous);
+  });
+
+  it('preserves same-record revocation while expired admission is in flight', async () => {
+    const store = storage();
+    await initializePrivateTownIdentity(store, { ...identity, runtimeMode: 'modern' });
+    await store.put(RUNTIME_AUTHORIZATION_KEY, authorization());
+    mocks.create.mockImplementation(async () => {
+      await store.put(RUNTIME_AUTHORIZATION_KEY, authorization('revoked'));
+      return {
+        authorization: { ...authorization(), id: '00000000-0000-4000-8000-000000000002' },
+        token: 'runtime-token',
+      };
+    });
+    await expect(reauthorizeRuntime(context(store), 'control-token', 'user-1')).resolves.toBe(
+      false
+    );
+    expect(await store.get(RUNTIME_AUTHORIZATION_KEY)).toEqual(authorization('revoked'));
   });
 });

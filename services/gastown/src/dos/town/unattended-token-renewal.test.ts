@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SignJWT, jwtVerify } from 'jose';
+import { CompactSign, SignJWT, jwtVerify } from 'jose';
 
 const mocks = vi.hoisted(() => ({ userTown: vi.fn(), orgTown: vi.fn(), select: vi.fn() }));
 vi.mock('cloudflare:workers', () => ({ DurableObject: class {}, WorkerEntrypoint: class {} }));
@@ -21,6 +21,7 @@ vi.mock('@kilocode/db/client', () => ({ getWorkerDb: () => ({ select: mocks.sele
 
 import { TownDO } from '../Town.do';
 import * as config from './config';
+import * as runtimeAuthorization from './runtime-authorization';
 import {
   getTownIdentityState,
   initializePrivateTownIdentity,
@@ -214,6 +215,31 @@ describe('unattended legacy town renewal entry', () => {
   });
 
   it.each([
+    { exp: 'expired' },
+    { exp: null },
+    { exp: 1.5 },
+    { exp: undefined },
+    { exp: 1, nbf: 0 },
+    { exp: 1, aud: 'kilo-api' },
+    { exp: 1, iat: Math.floor(Date.now() / 1000) + 100 },
+  ])('rejects malformed or restricted expired claims %j', async claims => {
+    const t = await town(false, await token(claims));
+    await t.renew();
+    expect(t.sync).not.toHaveBeenCalled();
+    expect(mocks.userTown).not.toHaveBeenCalled();
+  });
+
+  it('rejects authenticated bytes that are not JSON', async () => {
+    const bearer = await new CompactSign(new TextEncoder().encode('not JSON'))
+      .setProtectedHeader({ alg: 'HS256' })
+      .sign(new TextEncoder().encode(secret));
+    const t = await town(false, bearer);
+    await t.renew();
+    expect(t.sync).not.toHaveBeenCalled();
+    expect(mocks.userTown).not.toHaveBeenCalled();
+  });
+
+  it.each([
     { rows: [] },
     { rows: [{ pepper: 'new', blockedAt: null, blockedReason: null }] },
     { rows: [{ pepper: 'current', blockedAt: '2026-01-01', blockedReason: null }] },
@@ -365,5 +391,45 @@ describe('unattended legacy town renewal entry', () => {
     await Promise.all([t.renew(), t.renew()]);
     expect(t.sync).toHaveBeenCalledOnce();
     expect(mocks.userTown).toHaveBeenCalledOnce();
+  });
+});
+
+describe('runtime sponsorship owner cache', () => {
+  it('refreshes the owner cache after committed reauthorization', async () => {
+    const t = await town(true);
+    Object.assign(t.instance, { _ownerUserId: identity.ownerUserId });
+    const reauthorize = vi
+      .spyOn(runtimeAuthorization, 'reauthorizeRuntime')
+      .mockImplementation(async () => {
+        await config.updateTownConfig(t.store, { owner_user_id: 'new-owner' });
+        return true;
+      });
+    try {
+      await expect(
+        t.instance.reauthorizeRuntime('control-token', 'new-owner', 'org-1')
+      ).resolves.toBe(true);
+      expect(t.instance['_ownerUserId']).toBe('new-owner');
+    } finally {
+      reauthorize.mockRestore();
+    }
+  });
+
+  it('refreshes the owner cache after committed admission', async () => {
+    const t = await town(true);
+    Object.assign(t.instance, { _ownerUserId: identity.ownerUserId });
+    const create = vi
+      .spyOn(runtimeAuthorization, 'createRuntimeAuthorization')
+      .mockImplementation(async () => {
+        await config.updateTownConfig(t.store, { owner_user_id: 'new-owner' });
+        return 'runtime-token';
+      });
+    try {
+      await expect(
+        t.instance.createRuntimeAuthorization('control-token', 'new-owner', 'org-1')
+      ).resolves.toBe('runtime-token');
+      expect(t.instance['_ownerUserId']).toBe('new-owner');
+    } finally {
+      create.mockRestore();
+    }
   });
 });

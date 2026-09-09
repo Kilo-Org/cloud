@@ -124,7 +124,8 @@ export async function createRuntimeAuthorization(
   ctx: RuntimeAuthorizationContext,
   controlToken: string,
   userId: string,
-  organizationId?: string
+  organizationId?: string,
+  expectedAuthorization?: RuntimeAuthorization
 ): Promise<string | undefined> {
   const identity = await getPrivateTownIdentity(ctx.storage, ctx.townId);
   if (
@@ -134,6 +135,13 @@ export async function createRuntimeAuthorization(
     !controlToken ||
     !ctx.env.NEXTAUTH_SECRET ||
     !ctx.env.HYPERDRIVE
+  )
+    return undefined;
+  const previousAuthorization = await ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+  if (
+    expectedAuthorization !== undefined &&
+    JSON.stringify(RuntimeAuthorizationSchema.safeParse(previousAuthorization).data) !==
+      JSON.stringify(expectedAuthorization)
   )
     return undefined;
   const secret = await resolveSecret(ctx.env.NEXTAUTH_SECRET);
@@ -149,13 +157,35 @@ export async function createRuntimeAuthorization(
       now: ctx.now?.(),
     });
     if (
-      created.authorization.userId !== identity.ownerUserId ||
-      created.authorization.authorizationUserId !== identity.ownerUserId
+      created.authorization.userId !== userId ||
+      created.authorization.authorizationUserId !== userId ||
+      created.authorization.organizationId !== identity.organizationId ||
+      created.authorization.resourceKind !== 'gastown' ||
+      created.authorization.resourceId !== ctx.townId
     ) {
       throw new Error('Runtime authorization owner mismatch');
     }
-    await ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, created.authorization);
-    await ctx.storage.put(TOWN_IDENTITY_KEY, { ...identity, runtimeMode: 'modern' });
+    await ctx.storage.transaction(async txn => {
+      const currentIdentity = await txn.get<unknown>(TOWN_IDENTITY_KEY);
+      const currentAuthorization = await txn.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+      if (
+        JSON.stringify(currentIdentity) !== JSON.stringify(identity) ||
+        JSON.stringify(currentAuthorization) !== JSON.stringify(previousAuthorization) ||
+        (expectedAuthorization !== undefined && ctx.hasActiveWork())
+      ) {
+        throw new Error('Town authorization changed during admission');
+      }
+      await txn.put(RUNTIME_AUTHORIZATION_KEY, created.authorization);
+      // An org owner can take over runtime sponsorship; retain creator attribution.
+      await txn.put(TOWN_IDENTITY_KEY, {
+        ...identity,
+        ownerUserId: userId,
+        runtimeMode: 'modern',
+      } satisfies TownIdentity);
+      if (identity.ownerUserId !== userId) {
+        await config.updateTownConfig(txn, { owner_user_id: userId });
+      }
+    });
     return created.token;
   } catch {
     return undefined;
@@ -204,20 +234,15 @@ export async function reauthorizeRuntime(
     return false;
   const container = await getTownContainerStub(ctx.env, ctx.townId).getState();
   if (container.status === 'running' || container.status === 'healthy') return false;
-  if (expired) {
-    const latest = RuntimeAuthorizationSchema.safeParse(
-      await ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
-    );
-    if (!latest.success || latest.data.id !== current.data.id || latest.data.state !== 'active') {
-      return false;
-    }
-    await ctx.storage.put(RUNTIME_AUTHORIZATION_KEY, {
-      ...latest.data,
-      state: 'revoked',
-    } satisfies RuntimeAuthorization);
+  const latest = RuntimeAuthorizationSchema.safeParse(
+    await ctx.storage.get<unknown>(RUNTIME_AUTHORIZATION_KEY)
+  );
+  if (!latest.success || JSON.stringify(latest.data) !== JSON.stringify(current.data)) {
+    return false;
   }
   return (
-    (await createRuntimeAuthorization(ctx, controlToken, userId, organizationId)) !== undefined
+    (await createRuntimeAuthorization(ctx, controlToken, userId, organizationId, current.data)) !==
+    undefined
   );
 }
 

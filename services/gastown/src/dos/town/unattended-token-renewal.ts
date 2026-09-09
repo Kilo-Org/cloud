@@ -1,5 +1,5 @@
 import { kiloTokenPayload } from '@kilocode/worker-utils';
-import { jwtVerify, errors } from 'jose';
+import { compactVerify } from 'jose';
 import { z } from 'zod';
 import { getGastownOrgStub } from '../GastownOrg.do';
 import { getGastownUserStub } from '../GastownUser.do';
@@ -74,15 +74,16 @@ export async function renewUnattendedLegacyTownToken(
   if (!token || !env.NEXTAUTH_SECRET) return false;
   const secret = await resolveSecret(env.NEXTAUTH_SECRET);
   if (!secret) throw new Error('Town token signing unavailable');
-  let raw;
+  let raw: unknown;
   try {
-    raw = (await jwtVerify(token, new TextEncoder().encode(secret), { algorithms: ['HS256'] }))
-      .payload;
-  } catch (error) {
-    // jose checks the signature and nbf before exp. Recover only this precise
-    // expiry failure, with no clock tolerance that also permits future tokens.
-    if (!(error instanceof errors.JWTExpired) || error.claim !== 'exp') return false;
-    raw = error.payload;
+    // Authenticate the bytes before parsing claims. Expiry is intentionally
+    // allowed here; the strict legacy schema rejects all other restrictions.
+    const { payload } = await compactVerify(token, new TextEncoder().encode(secret), {
+      algorithms: ['HS256'],
+    });
+    raw = JSON.parse(new TextDecoder().decode(payload));
+  } catch {
+    return false;
   }
   const parsed = legacyTownPayload.safeParse(raw);
   if (!parsed.success) return false;

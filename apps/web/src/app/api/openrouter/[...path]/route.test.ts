@@ -1431,7 +1431,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       error_type: 'model_not_allowed',
       message: expect.stringContaining('Auto-routing could not select an eligible model'),
@@ -1464,7 +1464,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     const { POST } = await import('./route');
     const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
 
-    expect(response.status).toBe(404);
+    expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       error_type: 'model_not_allowed',
       message: expect.stringContaining('Auto-routing could not select an eligible model'),

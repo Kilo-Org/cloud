@@ -338,7 +338,7 @@ export function efficientPoolBlockedResponse() {
       error_type: ProxyErrorType.model_not_allowed,
       message,
     },
-    { status: 404 }
+    { status: 503 }
   );
 }
 

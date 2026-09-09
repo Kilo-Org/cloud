@@ -8,13 +8,6 @@ jest.mock('@/lib/constants', () => ({
   APP_URL: 'https://app.kilo.ai',
 }));
 
-jest.mock('@/lib/redis', () => ({
-  redisClient: {
-    get: jest.fn(),
-    set: jest.fn(),
-  },
-}));
-
 import type { AdminSlackNotification } from '@/lib/slack/admin-notifications';
 import {
   alertIfSyncProvidersStale,

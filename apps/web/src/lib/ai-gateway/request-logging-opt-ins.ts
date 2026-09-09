@@ -2,11 +2,6 @@ import * as z from 'zod';
 import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { db } from '@/lib/drizzle';
-import { redisClient } from '@/lib/redis';
-import {
-  AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
-  REQUEST_LOGGING_OPT_INS_REDIS_KEY,
-} from '@/lib/redis-keys';
 import { eq } from 'drizzle-orm';
 
 export const RequestLoggingOptInSchema = z.object({
@@ -50,12 +45,6 @@ const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
   []
 );
 
-async function mirrorRequestLoggingOptInsToRedis(optIns: RequestLoggingOptIn[]): Promise<void> {
-  await redisClient.set(REQUEST_LOGGING_OPT_INS_REDIS_KEY, JSON.stringify(optIns), {
-    ex: AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
-  });
-}
-
 export async function createRequestLoggingOptIn(
   entry: RequestLoggingOptIn
 ): Promise<'created' | 'duplicate' | 'full'> {
@@ -88,7 +77,6 @@ export async function createRequestLoggingOptIn(
       .update(ai_gateway_request_logging_opt_ins)
       .set({ opt_ins: updatedOptIns })
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
-    await mirrorRequestLoggingOptInsToRedis(updatedOptIns);
     return 'created' as const;
   });
 }
@@ -110,7 +98,6 @@ export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
       .update(ai_gateway_request_logging_opt_ins)
       .set({ opt_ins: remaining })
       .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
-    await mirrorRequestLoggingOptInsToRedis(remaining);
     return true;
   });
 }

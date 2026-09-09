@@ -1,6 +1,10 @@
 import { describe, expect, it, mock, spyOn } from 'bun:test';
 import { ControlDeliveryError } from './sandbox-control-client';
-import { createControlEventOutbox, type ControlEventPublication } from './control-event-outbox';
+import {
+  createControlEventOutbox,
+  type ControlEventPublication,
+  type PreparedControlEventPublication,
+} from './control-event-outbox';
 import {
   MAX_SANDBOX_CONTROL_FRAME_BYTES,
   sandboxEventPublicationPayloadSchema,
@@ -12,6 +16,27 @@ const session = {
   rootKiloSessionId: 'ses_root',
 };
 
+function messageUpdatedPayload(id: string, marker: string, sessionID = session.kiloSessionId) {
+  return {
+    type: 'message.updated',
+    properties: { info: { id, sessionID, role: 'assistant', marker } },
+  };
+}
+
+function partUpdatedPayload(
+  messageID: string,
+  id: string,
+  marker: string,
+  sessionID = session.kiloSessionId
+) {
+  return {
+    type: 'message.part.updated',
+    properties: {
+      part: { id, messageID, sessionID, type: 'text', text: marker },
+    },
+  };
+}
+
 async function waitFor(condition: () => boolean, attempts = 100): Promise<void> {
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (condition()) return;
@@ -21,6 +46,590 @@ async function waitFor(condition: () => boolean, attempts = 100): Promise<void> 
 }
 
 describe('control event outbox', () => {
+  it('squashes adjacent same-part updates while retaining the original receipt metadata', async () => {
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+      },
+      onFailure: mock(),
+    });
+    try {
+      const barrier = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: { type: 'session.idle', properties: {} },
+      });
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'first'),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'latest'),
+      });
+      expect(outbox.enqueue(barrier)).toBe(true);
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(delivered.map(item => item.publication.sequence)).toEqual([1, 2]);
+      expect(delivered[0]?.publication.payload).toEqual(barrier.payload);
+      expect(delivered[1]?.publication).toMatchObject({
+        receiptId: first.receiptId,
+        sequence: first.sequence,
+        payload: second.payload,
+      });
+      expect(delivered[1]?.deadlineAt).toBe(first.deadlineAt);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('squashes adjacent same-message updates to the latest payload', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1_000);
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'first'),
+      });
+      clock.mockReturnValue(2_000);
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'latest'),
+      });
+      expect(first.deadlineAt).toBe(31_000);
+      expect(second.deadlineAt).toBe(32_000);
+      expect(first.deadlineAt).toBeLessThan(second.deadlineAt);
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered).toHaveLength(1);
+      expect(delivered[0]?.publication).toMatchObject({
+        receiptId: first.receiptId,
+        sequence: first.sequence,
+        payload: second.payload,
+      });
+      expect(delivered[0]?.deadlineAt).toBe(first.deadlineAt);
+    } finally {
+      outbox.close();
+      clock.mockRestore();
+    }
+  });
+
+  it('keeps an in-flight head unchanged while squashing an unsent tail', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+        if (delivered.length === 1) {
+          started.resolve();
+          await release.promise;
+        }
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'in flight'),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_2', 'queued'),
+      });
+      const latest = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_2', 'latest'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(second)).toBe(true);
+      const draining = outbox.resume();
+      await started.promise;
+      expect(outbox.enqueue(latest)).toBe(true);
+      release.resolve();
+
+      expect(await draining).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(delivered[0]).toMatchObject({
+        publication: {
+          receiptId: first.receiptId,
+          sequence: first.sequence,
+          payload: first.payload,
+        },
+        deadlineAt: first.deadlineAt,
+      });
+      expect(delivered[1]).toMatchObject({
+        publication: {
+          receiptId: second.receiptId,
+          sequence: second.sequence,
+          payload: latest.payload,
+        },
+        deadlineAt: second.deadlineAt,
+      });
+    } finally {
+      release.resolve();
+      outbox.close();
+    }
+  });
+
+  it('does not squash a newer update into a single in-flight publication', async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<void>();
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+        if (delivered.length === 1) {
+          started.resolve();
+          await release.promise;
+        }
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'first'),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'latest'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      const draining = outbox.resume();
+      await started.promise;
+      expect(outbox.enqueue(second)).toBe(true);
+      release.resolve();
+
+      expect(await draining).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(delivered[0]).toMatchObject({
+        publication: {
+          receiptId: first.receiptId,
+          sequence: first.sequence,
+          payload: first.payload,
+        },
+        deadlineAt: first.deadlineAt,
+      });
+      expect(delivered[1]).toMatchObject({
+        publication: {
+          receiptId: second.receiptId,
+          sequence: second.sequence,
+          payload: second.payload,
+        },
+        deadlineAt: second.deadlineAt,
+      });
+      expect(first.receiptId).not.toBe(second.receiptId);
+      expect(first.sequence).not.toBe(second.sequence);
+    } finally {
+      release.resolve();
+      outbox.close();
+    }
+  });
+
+  it('squashes the new head after the prior head is removed before its attempt settles', async () => {
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    let replacement: PreparedControlEventPublication | undefined = undefined;
+    let replacementAdmitted = false;
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+        if (delivered.length === 1) {
+          throw new ControlDeliveryError('permanent failure', false);
+        }
+      },
+      onFailure: failure => {
+        if (failure.reason === 'rejected' && replacement !== undefined)
+          replacementAdmitted = outbox.enqueue(replacement);
+      },
+    });
+    const preparedFirst = outbox.prepare({
+      event: 'session.event',
+      session,
+      payload: messageUpdatedPayload('msg_1', 'failed'),
+    });
+    const preparedSecond = outbox.prepare({
+      event: 'session.event',
+      session,
+      payload: messageUpdatedPayload('msg_2', 'queued'),
+    });
+    const preparedLatest = outbox.prepare({
+      event: 'session.event',
+      session,
+      payload: messageUpdatedPayload('msg_2', 'latest'),
+    });
+    replacement = preparedLatest;
+    try {
+      expect(outbox.enqueue(preparedFirst)).toBe(true);
+      expect(outbox.enqueue(preparedSecond)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(replacementAdmitted).toBe(true);
+      expect(delivered).toHaveLength(2);
+      expect(delivered[1]).toMatchObject({
+        publication: {
+          receiptId: preparedSecond.receiptId,
+          sequence: preparedSecond.sequence,
+          payload: preparedLatest.payload,
+        },
+        deadlineAt: preparedSecond.deadlineAt,
+      });
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('does not squash across a message and part entity barrier', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'message before'),
+      });
+      const barrier = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: partUpdatedPayload('msg_1', 'part_1', 'part barrier'),
+      });
+      const last = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'message after'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(barrier)).toBe(true);
+      expect(outbox.enqueue(last)).toBe(true);
+
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(3);
+      expect(published.map(item => item.sequence)).toEqual([1, 2, 3]);
+      expect(published.map(item => item.payload)).toEqual([
+        first.payload,
+        barrier.payload,
+        last.payload,
+      ]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it.each(['entity', 'root', 'native'] as const)(
+    'does not squash when the %s is different',
+    async fence => {
+      const published: ControlEventPublication[] = [];
+      const outbox = createControlEventOutbox({
+        publish: async publication => {
+          published.push(publication);
+        },
+        onFailure: mock(),
+      });
+      const firstNativeRuntimeId = crypto.randomUUID();
+      const secondNativeRuntimeId = crypto.randomUUID();
+      const firstSession =
+        fence === 'root'
+          ? { ...session, kiloSessionId: 'root_a', rootKiloSessionId: 'root_a' }
+          : { ...session, nativeRuntimeId: firstNativeRuntimeId };
+      const secondSession =
+        fence === 'root'
+          ? { ...session, kiloSessionId: 'root_b', rootKiloSessionId: 'root_b' }
+          : fence === 'native'
+            ? { ...session, nativeRuntimeId: secondNativeRuntimeId }
+            : firstSession;
+      const first = outbox.prepare({
+        event: 'session.event',
+        session: firstSession,
+        payload: messageUpdatedPayload('msg_1', 'first', firstSession.kiloSessionId),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session: secondSession,
+        payload: messageUpdatedPayload(
+          fence === 'entity' ? 'msg_2' : 'msg_1',
+          'second',
+          secondSession.kiloSessionId
+        ),
+      });
+      try {
+        expect(outbox.enqueue(first)).toBe(true);
+        expect(outbox.enqueue(second)).toBe(true);
+        expect(await outbox.resume()).toBe(true);
+        expect(published).toHaveLength(2);
+        expect(published.map(item => item.payload)).toEqual([first.payload, second.payload]);
+      } finally {
+        outbox.close();
+      }
+    }
+  );
+
+  it.each([
+    [
+      'outcome',
+      'session.event',
+      { type: 'session.message.outcome', properties: { messageId: 'msg_1', status: 'completed' } },
+    ],
+    [
+      'removed',
+      'session.event',
+      { type: 'message.removed', properties: { sessionID: 'ses_root', messageID: 'msg_1' } },
+    ],
+    [
+      'lifecycle',
+      'session.event',
+      { type: 'session.updated', properties: { info: { id: 'ses_root' } } },
+    ],
+    [
+      'preparing',
+      'session.preparing',
+      {
+        version: 2,
+        attemptId: 'attempt_1',
+        triggerMessageId: 'msg_1',
+        revision: 0,
+        timestamp: 1,
+        step: 'started',
+        message: 'preparing',
+        action: 'start',
+      },
+    ],
+    [
+      'non-entity',
+      'session.event',
+      { type: 'session.status', properties: { sessionID: 'ses_root' } },
+    ],
+  ] as const)('does not squash across a %s barrier', async (_name, event, payload) => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'before'),
+      });
+      const barrier = outbox.prepare({ event, session, payload });
+      const last = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'after'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(outbox.enqueue(barrier)).toBe(true);
+      expect(outbox.enqueue(last)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(3);
+      expect(published.map(item => item.sequence)).toEqual([1, 2, 3]);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('keeps a retry-held head unchanged and queues a newer same-message update behind it', async () => {
+    const delivered: Array<{ publication: ControlEventPublication; deadlineAt: number }> = [];
+    const retried = Promise.withResolvers<void>();
+    const outbox = createControlEventOutbox({
+      publish: async (publication, deadlineAt) => {
+        delivered.push({ publication, deadlineAt });
+        if (delivered.length === 1) throw new ControlDeliveryError('not attached', true);
+        if (delivered.length === 2) retried.resolve();
+      },
+      onFailure: mock(),
+    });
+    try {
+      const first = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'first'),
+      });
+      const second = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('msg_1', 'latest'),
+      });
+      expect(outbox.enqueue(first)).toBe(true);
+      expect(await outbox.resume()).toBe(false);
+      expect(outbox.enqueue(second)).toBe(true);
+      await retried.promise;
+      await waitFor(() => delivered.length === 3, 500);
+      expect(delivered[0]?.publication).toEqual(delivered[1]?.publication);
+      expect(delivered[0]?.deadlineAt).toBe(first.deadlineAt);
+      expect(delivered[2]?.publication).toMatchObject({
+        receiptId: second.receiptId,
+        sequence: second.sequence,
+        payload: second.payload,
+      });
+      expect(await outbox.resume()).toBe(true);
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('uses post-replacement bytes to admit a smaller adjacent update', async () => {
+    const delivered: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+      },
+      onFailure: mock(),
+    });
+    const filler = 'm'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.45));
+    const oldText = 'o'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.35));
+    const smallerText = 's'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.3));
+    try {
+      for (let index = 0; index < 8; index += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: messageUpdatedPayload(`filler_${index}`, filler),
+            })
+          )
+        ).toBe(true);
+      const old = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('target', oldText),
+      });
+      const smaller = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('target', smallerText),
+      });
+      expect(smaller.bytes).toBeLessThan(old.bytes);
+      expect(outbox.enqueue(old)).toBe(true);
+      expect(outbox.enqueue(smaller)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered).toHaveLength(9);
+      expect(delivered.at(-1)).toMatchObject({
+        receiptId: old.receiptId,
+        sequence: old.sequence,
+        payload: smaller.payload,
+      });
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('rejects a larger adjacent replacement without mutating the old payload', async () => {
+    const delivered: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        delivered.push(publication);
+      },
+      onFailure: mock(),
+    });
+    const filler = 'm'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.45));
+    const largerText = 'l'.repeat(Math.floor(MAX_SANDBOX_CONTROL_FRAME_BYTES * 0.7));
+    try {
+      for (let index = 0; index < 8; index += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: messageUpdatedPayload(`filler_${index}`, filler),
+            })
+          )
+        ).toBe(true);
+      const old = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('target', 'old'),
+      });
+      const larger = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('target', largerText),
+      });
+      expect(larger.bytes).toBeGreaterThan(old.bytes);
+      expect(outbox.enqueue(old)).toBe(true);
+      expect(outbox.enqueue(larger)).toBe(false);
+      expect(await outbox.resume()).toBe(true);
+      expect(delivered).toHaveLength(9);
+      expect(delivered.at(-1)).toMatchObject({
+        receiptId: old.receiptId,
+        sequence: old.sequence,
+        payload: old.payload,
+      });
+    } finally {
+      outbox.close();
+    }
+  });
+
+  it('admits a tail replacement at the 256-entry count boundary', async () => {
+    const published: ControlEventPublication[] = [];
+    const outbox = createControlEventOutbox({
+      publish: async publication => {
+        published.push(publication);
+      },
+      onFailure: mock(),
+    });
+    try {
+      for (let index = 0; index < 255; index += 1)
+        expect(
+          outbox.enqueue(
+            outbox.prepare({
+              event: 'session.event',
+              session,
+              payload: { type: 'session.idle', properties: {} },
+            })
+          )
+        ).toBe(true);
+      const old = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('target', 'old'),
+      });
+      const latest = outbox.prepare({
+        event: 'session.event',
+        session,
+        payload: messageUpdatedPayload('target', 'latest'),
+      });
+      expect(outbox.enqueue(old)).toBe(true);
+      expect(outbox.enqueue(latest)).toBe(true);
+      expect(await outbox.resume()).toBe(true);
+      expect(published).toHaveLength(256);
+      expect(published.at(-1)).toMatchObject({
+        receiptId: old.receiptId,
+        sequence: old.sequence,
+        payload: latest.payload,
+      });
+    } finally {
+      outbox.close();
+    }
+  });
+
   it('does not let a retryable root A head delay root B', async () => {
     const published: ControlEventPublication[] = [];
     let attemptsA = 0;

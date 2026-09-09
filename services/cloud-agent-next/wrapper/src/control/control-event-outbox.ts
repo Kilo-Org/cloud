@@ -40,6 +40,12 @@ export type ControlEventOutbox = {
 
 type RootKey = string | undefined;
 
+type SquashKey = {
+  entityId: string;
+  root: RootKey;
+  nativeRuntimeId: string | undefined;
+};
+
 type SpaceWaiter = {
   promise: Promise<boolean>;
   ready: boolean;
@@ -54,6 +60,7 @@ type Lane = {
   waitingBytes: number;
   bytes: number;
   pending?: Promise<void>;
+  pendingEntry?: PreparedControlEventPublication;
   expirePending?: () => void;
   retryAt?: number;
   wakeup?: ReturnType<typeof setTimeout>;
@@ -69,6 +76,47 @@ type PumpCycle = {
 
 function rootFor(publication: PreparedControlEventPublication): RootKey {
   return publication.session.rootKiloSessionId ?? publication.session.kiloSessionId;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function entityIdFor(payload: unknown): string | undefined {
+  if (!isRecord(payload) || !isRecord(payload.properties)) return undefined;
+  if (payload.type === 'message.updated') {
+    const info = payload.properties.info;
+    return isRecord(info) && typeof info.id === 'string' ? `message/${info.id}` : undefined;
+  }
+  if (payload.type === 'message.part.updated') {
+    const part = payload.properties.part;
+    if (!isRecord(part)) return undefined;
+    return typeof part.messageID === 'string' && typeof part.id === 'string'
+      ? `part/${part.messageID}/${part.id}`
+      : undefined;
+  }
+  return undefined;
+}
+
+function squashKeyFor(publication: PreparedControlEventPublication): SquashKey | undefined {
+  if (publication.event !== 'session.event') return undefined;
+  const entityId = entityIdFor(publication.payload);
+  if (!entityId) return undefined;
+  return {
+    entityId,
+    root: rootFor(publication),
+    nativeRuntimeId: publication.session.nativeRuntimeId,
+  };
+}
+
+function sameSquashKey(left: SquashKey | undefined, right: SquashKey | undefined): boolean {
+  return (
+    left !== undefined &&
+    right !== undefined &&
+    left.entityId === right.entityId &&
+    left.root === right.root &&
+    left.nativeRuntimeId === right.nativeRuntimeId
+  );
 }
 
 function isRetryable(error: unknown): boolean {
@@ -113,6 +161,17 @@ export function createControlEventOutbox(options: {
     if (lanes.get(lane.root) === lane) lanes.delete(lane.root);
   };
 
+  const squashTarget = (
+    lane: Lane,
+    publication: PreparedControlEventPublication
+  ): PreparedControlEventPublication | undefined => {
+    const previous = lane.entries.at(-1);
+    if (!previous) return undefined;
+    if (previous === lane.pendingEntry) return undefined;
+    if (previous === lane.entries[0] && lane.retryAt !== undefined) return undefined;
+    return sameSquashKey(squashKeyFor(previous), squashKeyFor(publication)) ? previous : undefined;
+  };
+
   const reportFailure = (failure: ControlEventOutboxFailure): void => {
     try {
       options.onFailure(failure);
@@ -121,9 +180,14 @@ export function createControlEventOutbox(options: {
     }
   };
 
-  const hasSpaceFor = (lane: Lane, publication: PreparedControlEventPublication): boolean => {
-    if (lane.entries.length >= MAX_EVENTS || lane.bytes + publication.bytes > MAX_BYTES)
-      return false;
+  const hasSpaceFor = (
+    lane: Lane,
+    publication: PreparedControlEventPublication,
+    replacement = squashTarget(lane, publication)
+  ): boolean => {
+    const entryCount = lane.entries.length - (replacement ? 1 : 0);
+    const bytes = lane.bytes - (replacement?.bytes ?? 0);
+    if (entryCount >= MAX_EVENTS || bytes + publication.bytes > MAX_BYTES) return false;
     const now = Date.now();
     for (const reserved of lane.spaceWaiters.keys()) {
       if (reserved.sequence < publication.sequence && now < reserved.deadlineAt) return false;
@@ -329,10 +393,14 @@ export function createControlEventOutbox(options: {
         reportFailure({ reason: 'rejected', publication: entry });
       })
       .then(() => {
-        if (lane.pending === pending) lane.pending = undefined;
+        if (lane.pending === pending) {
+          lane.pending = undefined;
+          lane.pendingEntry = undefined;
+        }
         scheduleWakeup(lane);
         cleanupLane(lane);
       });
+    lane.pendingEntry = entry;
     lane.pending = pending;
   };
 
@@ -405,9 +473,20 @@ export function createControlEventOutbox(options: {
         cleanupLane(lane);
         return true;
       }
-      if (!hasSpaceFor(lane, publication)) return false;
-      lane.entries.push({ ...publication });
-      lane.bytes += publication.bytes;
+      const replacement = squashTarget(lane, publication);
+      if (!hasSpaceFor(lane, publication, replacement)) return false;
+      if (replacement) {
+        const index = lane.entries.length - 1;
+        lane.entries[index] = {
+          ...replacement,
+          payload: publication.payload,
+          bytes: publication.bytes,
+        };
+        lane.bytes += publication.bytes - replacement.bytes;
+      } else {
+        lane.entries.push({ ...publication });
+        lane.bytes += publication.bytes;
+      }
       releaseSpaceWaiter(lane, publication)?.resolve(true);
       notifySpace(lane, true);
       if (!paused) void pump();
@@ -461,6 +540,7 @@ export function createControlEventOutbox(options: {
       for (const lane of lanes.values()) {
         clearWakeup(lane);
         lane.expirePending?.();
+        lane.pendingEntry = undefined;
         lane.entries.length = 0;
         lane.bytes = 0;
         notifySpace(lane, false);

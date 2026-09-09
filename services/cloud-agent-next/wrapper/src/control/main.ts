@@ -74,7 +74,7 @@ function main(
     onDiagnostic: diagnostics.onDiagnostic,
     onRootDisappeared: notifyRootDisappeared,
     onRootRetirement: settleRootRetirement,
-    onEvent: async (runtime, event) => {
+    onEvent: (runtime, event) => {
       mutationNotifications.observe(runtime, event);
       const identity = sessionEventIdentity({
         ...event,
@@ -89,21 +89,24 @@ function main(
         identity.rootKiloSessionId,
         event.properties
       );
-      const published =
-        control?.publishSessionEvent === undefined
-          ? false
-          : await control.publishSessionEvent(
-              { type: event.type, properties: event.properties },
-              identity
-            );
-      if (!published) {
-        try {
-          await retirePublicationFailure(runtime, identity, 'Session event delivery failed');
-        } catch {
-          diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
-        }
+      let publication: Promise<boolean>;
+      try {
+        publication = Promise.resolve(
+          control?.publishSessionEvent?.(
+            { type: event.type, properties: event.properties },
+            identity
+          ) ?? false
+        );
+      } catch {
+        reportPublicationAdmissionFailure(runtime, identity);
         return;
       }
+      void publication.then(
+        published => {
+          if (!published) reportPublicationAdmissionFailure(runtime, identity);
+        },
+        () => reportPublicationAdmissionFailure(runtime, identity)
+      );
     },
     onUnexpectedClose: failure => {
       logToFile(`Kilo worktree retired reason=${failure.reason} directory=${failure.directory}`);
@@ -208,6 +211,21 @@ function main(
     const attempt = beginPublicationFailure(runtime, identity, reason);
     if (!attempt) return 'stale';
     return attempt.physical;
+  }
+
+  function reportPublicationAdmissionFailure(
+    runtime: WorktreeKiloRuntime,
+    identity: SessionEventIdentity
+  ): void {
+    try {
+      void retirePublicationFailure(runtime, identity, 'Session event delivery failed').catch(
+        () => {
+          diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
+        }
+      );
+    } catch {
+      diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'failed' });
+    }
   }
 
   function startPublicationFailure(identity: SessionEventIdentity, reason: string): void {

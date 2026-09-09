@@ -1,9 +1,9 @@
 'use client';
 
-import { Component, Suspense, lazy, type ReactNode } from 'react';
+import { Component, Suspense, lazy, useState, type ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { CopyMessageButton } from '@/components/shared/CopyMessageButton';
 import { useWorktreeFile } from './useWorktreeFile';
 import type { WorktreeFileViewMode } from './workspace-tabs';
 
@@ -11,8 +11,8 @@ const WorktreeFileRenderer = lazy(() => import('./WorktreeFileRenderer'));
 
 const stateMessages = {
   loading: 'Loading saved file…',
-  error: 'Could not load this saved file. Try reloading the saved file.',
-  stale: 'The saved capture changed. Reload the saved file to read the latest revision.',
+  error: 'Could not load this saved file.',
+  stale: 'The saved capture changed.',
   not_captured: 'No file content was saved for this capture.',
   no_longer_listed: 'This file is no longer listed in the latest saved changes.',
 };
@@ -38,46 +38,49 @@ function FilePaneStatus({
   onReload,
   message,
   role = 'status',
+  showReload = false,
 }: {
   path: string;
   isFetching: boolean;
   onReload: () => void;
   message: string;
   role?: 'status' | 'alert';
+  showReload?: boolean;
 }) {
   return (
     <>
       <div className="flex h-12 shrink-0 items-center gap-1 border-b px-2 sm:h-10">
-        <p className="min-w-0 flex-1 truncate px-1 font-mono text-xs" title={path}>
-          {path}
-        </p>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground h-11 w-11 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50 motion-reduce:transition-none sm:h-8 sm:w-8"
-              aria-label="Reload saved file"
-              aria-disabled={isFetching}
-              onClick={() => {
-                if (!isFetching) onReload();
-              }}
-            >
-              <RefreshCw
-                aria-hidden="true"
-                className={`size-4 ${isFetching ? 'animate-spin motion-reduce:animate-none' : ''}`}
-              />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">
-            Reload saved file without starting the workspace
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex min-w-0 flex-1 items-center">
+          <p className="min-w-0 truncate px-1 font-mono text-xs" title={path}>
+            {path}
+          </p>
+          <CopyMessageButton
+            getText={() => path}
+            label="Copy path"
+            className="h-11 w-11 shrink-0 sm:h-8 sm:w-8"
+          />
+        </div>
       </div>
-      <p role={role} className="text-muted-foreground p-4 text-sm">
-        {message}
-      </p>
+      <div className="flex flex-col items-start gap-3 p-4">
+        <p role={role} className="text-muted-foreground text-sm">
+          {message}
+        </p>
+        {showReload && (
+          <Button
+            type="button"
+            disabled={isFetching}
+            onClick={() => {
+              if (!isFetching) onReload();
+            }}
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={isFetching ? 'animate-spin motion-reduce:animate-none' : undefined}
+            />
+            Reload saved file
+          </Button>
+        )}
+      </div>
     </>
   );
 }
@@ -100,7 +103,14 @@ export function WorktreeFilePane({
     organizationId,
     path,
   });
-  const statusProps = { path, isFetching, onReload: () => void reload() };
+  const [reloadGeneration, setReloadGeneration] = useState(0);
+  const onReload = () => {
+    setReloadGeneration(generation => generation + 1);
+    void reload();
+  };
+  const statusProps = { path, isFetching, onReload };
+  const showReload =
+    !('file' in state) && (state.status === 'error' || (state.status === 'stale' && !isFetching));
 
   return (
     <div
@@ -109,12 +119,19 @@ export function WorktreeFilePane({
     >
       {'file' in state ? (
         <RendererBoundary
-          key={JSON.stringify([organizationId, cloudAgentSessionId, path, state.file.revision])}
+          key={JSON.stringify([
+            organizationId,
+            cloudAgentSessionId,
+            path,
+            state.file.revision,
+            reloadGeneration,
+          ])}
           fallback={
             <FilePaneStatus
               {...statusProps}
               role="alert"
-              message="This saved file could not be rendered. Try another view or reload the page."
+              showReload
+              message="This saved file could not be rendered."
             />
           }
         >
@@ -124,10 +141,7 @@ export function WorktreeFilePane({
             <WorktreeFileRenderer
               file={state.file}
               mode={mode ?? 'diff'}
-              capturedAt={state.capturedAt}
               onModeChange={onModeChange}
-              isFetching={isFetching}
-              onReload={statusProps.onReload}
             />
           </Suspense>
         </RendererBoundary>
@@ -135,6 +149,7 @@ export function WorktreeFilePane({
         <FilePaneStatus
           {...statusProps}
           role={state.status === 'error' ? 'alert' : 'status'}
+          showReload={showReload}
           message={
             state.status === 'stale' && isFetching
               ? 'The saved capture changed. Loading the latest saved revision…'

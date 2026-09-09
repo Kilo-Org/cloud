@@ -5,17 +5,22 @@ import {
   GatewayConfigInputSchema,
   DEFAULT_GATEWAY_CONFIG,
 } from '@/lib/ai-gateway/gateway-config';
-import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
+import { AI_GATEWAY_STATE_REDIS_TTL_SECONDS, VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
 import type { GatewayConfig } from '@/lib/ai-gateway/gateway-config';
 import { TRPCError } from '@trpc/server';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { db } from '@/lib/drizzle';
+import { eq } from 'drizzle-orm';
 
 async function readConfig(): Promise<GatewayConfig> {
   try {
-    const raw = await redisClient.get<string>(VERCEL_ROUTING_REDIS_KEY);
-    if (!raw) return DEFAULT_GATEWAY_CONFIG;
-    return GatewayConfigSchema.parse(JSON.parse(raw));
+    const [row] = await db
+      .select({ config: ai_gateway_config.config })
+      .from(ai_gateway_config)
+      .where(eq(ai_gateway_config.id, 1))
+      .limit(1);
+    if (!row) return DEFAULT_GATEWAY_CONFIG;
+    return GatewayConfigSchema.parse(row.config);
   } catch {
     return DEFAULT_GATEWAY_CONFIG;
   }
@@ -42,16 +47,20 @@ export const adminGatewayConfigRouter = createTRPCRouter({
       updated_by_email: ctx.user.google_user_email,
       note: input.note,
     };
-    const written = await redisClient.set(VERCEL_ROUTING_REDIS_KEY, JSON.stringify(config));
-    if (!written) {
-      throw new TRPCError({
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'Redis is not configured — cannot save routing override',
+    await db.transaction(async tx => {
+      await tx.insert(ai_gateway_config).values({ config }).onConflictDoUpdate({
+        target: ai_gateway_config.id,
+        set: { config },
       });
-    }
-    await db.insert(ai_gateway_config).values({ config }).onConflictDoUpdate({
-      target: ai_gateway_config.id,
-      set: { config },
+      const written = await redisClient.set(VERCEL_ROUTING_REDIS_KEY, JSON.stringify(config), {
+        ex: AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
+      });
+      if (!written) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Redis is not configured — cannot mirror routing override',
+        });
+      }
     });
     return config;
   }),

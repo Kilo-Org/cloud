@@ -15,6 +15,8 @@ const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as 
 
 export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
 
+export const AI_GATEWAY_STATE_REDIS_TTL_SECONDS = 7 * 24 * 60 * 60;
+
 export const VERCEL_ROUTING_REDIS_KEY = redisKey('ai-gateway:vercel-routing-percentage');
 
 export const SYNC_PROVIDERS_LAST_COMPLETED_AT_REDIS_KEY = redisKey(

@@ -5,8 +5,9 @@ import {
   DEFAULT_VERCEL_PERCENTAGE_FREE,
   GatewayRoutingConfigSchema,
 } from '@/lib/ai-gateway/gateway-config';
-import { redisClient } from '@/lib/redis';
-import { VERCEL_ROUTING_REDIS_KEY } from '@/lib/redis-keys';
+import { db } from '@/lib/drizzle';
+import { ai_gateway_config } from '@kilocode/db/schema';
+import { eq } from 'drizzle-orm';
 
 export type RuntimeGatewayRoutingConfig = {
   vercelPaid: number;
@@ -24,10 +25,14 @@ const DEFAULT_RUNTIME_GATEWAY_ROUTING_CONFIG: RuntimeGatewayRoutingConfig = {
 
 export const getRuntimeGatewayRoutingConfig = createCachedFetch<RuntimeGatewayRoutingConfig>(
   async () => {
-    const raw = await redisClient.get<string>(VERCEL_ROUTING_REDIS_KEY);
-    if (!raw) return DEFAULT_RUNTIME_GATEWAY_ROUTING_CONFIG;
+    const [row] = await db
+      .select({ config: ai_gateway_config.config })
+      .from(ai_gateway_config)
+      .where(eq(ai_gateway_config.id, 1))
+      .limit(1);
+    if (!row) return DEFAULT_RUNTIME_GATEWAY_ROUTING_CONFIG;
 
-    const config = GatewayRoutingConfigSchema.parse(JSON.parse(raw));
+    const config = GatewayRoutingConfigSchema.parse(row.config);
     return {
       vercelPaid: config.vercel_routing_percentage ?? DEFAULT_VERCEL_PERCENTAGE,
       vercelFree: config.vercel_routing_percentage_free ?? DEFAULT_VERCEL_PERCENTAGE_FREE,

@@ -3,7 +3,11 @@ import { ai_gateway_request_logging_opt_ins } from '@kilocode/db/schema';
 import { createCachedFetch } from '@/lib/cached-fetch';
 import { db } from '@/lib/drizzle';
 import { redisClient } from '@/lib/redis';
-import { REQUEST_LOGGING_OPT_INS_REDIS_KEY } from '@/lib/redis-keys';
+import {
+  AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
+  REQUEST_LOGGING_OPT_INS_REDIS_KEY,
+} from '@/lib/redis-keys';
+import { eq } from 'drizzle-orm';
 
 export const RequestLoggingOptInSchema = z.object({
   id: z.string().uuid(),
@@ -17,45 +21,6 @@ export const RequestLoggingOptInSchema = z.object({
 export const RequestLoggingOptInsSchema = z.array(RequestLoggingOptInSchema).max(500);
 
 export type RequestLoggingOptIn = z.infer<typeof RequestLoggingOptInSchema>;
-
-const CREATE_OPT_IN_SCRIPT = `
-local entries = {}
-local raw = redis.call('GET', KEYS[1])
-if raw then entries = cjson.decode(raw) end
-local new_entry = cjson.decode(ARGV[1])
-for _, entry in ipairs(entries) do
-  if entry.target_type == new_entry.target_type and entry.target_id == new_entry.target_id then
-    return 0
-  end
-end
-if #entries >= 500 then return -1 end
-table.insert(entries, new_entry)
-redis.call('SET', KEYS[1], cjson.encode(entries))
-return 1
-`;
-
-const DELETE_OPT_IN_SCRIPT = `
-local raw = redis.call('GET', KEYS[1])
-if not raw then return 0 end
-local entries = cjson.decode(raw)
-local remaining = {}
-local deleted = 0
-for _, entry in ipairs(entries) do
-  if entry.id == ARGV[1] then
-    deleted = 1
-  else
-    table.insert(remaining, entry)
-  end
-end
-if deleted == 1 then
-  if #remaining == 0 then
-    redis.call('DEL', KEYS[1])
-  else
-    redis.call('SET', KEYS[1], cjson.encode(remaining))
-  end
-end
-return deleted
-`;
 
 const REQUEST_LOGGING_OPT_INS_CACHE_TTL_MS = process.env.NODE_ENV === 'test' ? 0 : 10_000;
 
@@ -71,9 +36,12 @@ export function hasMatchingRequestLoggingOptIn(
 }
 
 export async function getRequestLoggingOptIns(): Promise<RequestLoggingOptIn[]> {
-  const raw = await redisClient.get<string>(REQUEST_LOGGING_OPT_INS_REDIS_KEY);
-  if (!raw) return [];
-  return RequestLoggingOptInsSchema.parse(JSON.parse(raw));
+  const [row] = await db
+    .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
+    .from(ai_gateway_request_logging_opt_ins)
+    .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
+    .limit(1);
+  return RequestLoggingOptInsSchema.parse(row?.optIns ?? []);
 }
 
 const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
@@ -82,43 +50,69 @@ const getCachedRequestLoggingOptIns = createCachedFetch<RequestLoggingOptIn[]>(
   []
 );
 
-async function mirrorRequestLoggingOptInsToDatabase(): Promise<void> {
-  const optIns = await getRequestLoggingOptIns();
-  await db
-    .insert(ai_gateway_request_logging_opt_ins)
-    .values({ opt_ins: optIns })
-    .onConflictDoUpdate({
-      target: ai_gateway_request_logging_opt_ins.id,
-      set: { opt_ins: optIns },
-    });
+async function mirrorRequestLoggingOptInsToRedis(optIns: RequestLoggingOptIn[]): Promise<void> {
+  await redisClient.set(REQUEST_LOGGING_OPT_INS_REDIS_KEY, JSON.stringify(optIns), {
+    ex: AI_GATEWAY_STATE_REDIS_TTL_SECONDS,
+  });
 }
 
 export async function createRequestLoggingOptIn(
   entry: RequestLoggingOptIn
 ): Promise<'created' | 'duplicate' | 'full'> {
   const validated = RequestLoggingOptInSchema.parse(entry);
-  const result = await redisClient.eval<[string], number>(
-    CREATE_OPT_IN_SCRIPT,
-    [REQUEST_LOGGING_OPT_INS_REDIS_KEY],
-    [JSON.stringify(validated)]
-  );
-  if (result === 1) {
-    await mirrorRequestLoggingOptInsToDatabase();
-    return 'created';
-  }
-  if (result === 0) return 'duplicate';
-  return 'full';
+  return db.transaction(async tx => {
+    await tx
+      .insert(ai_gateway_request_logging_opt_ins)
+      .values({ opt_ins: [] })
+      .onConflictDoNothing();
+    const [row] = await tx
+      .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
+      .from(ai_gateway_request_logging_opt_ins)
+      .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
+      .for('update');
+    if (!row) throw new Error('Request logging opt-in state row is missing');
+
+    const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    if (
+      optIns.some(
+        optIn =>
+          optIn.target_type === validated.target_type && optIn.target_id === validated.target_id
+      )
+    ) {
+      return 'duplicate' as const;
+    }
+    if (optIns.length >= 500) return 'full' as const;
+
+    const updatedOptIns = [...optIns, validated];
+    await tx
+      .update(ai_gateway_request_logging_opt_ins)
+      .set({ opt_ins: updatedOptIns })
+      .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
+    await mirrorRequestLoggingOptInsToRedis(updatedOptIns);
+    return 'created' as const;
+  });
 }
 
 export async function deleteRequestLoggingOptIn(id: string): Promise<boolean> {
-  const result = await redisClient.eval<[string], number>(
-    DELETE_OPT_IN_SCRIPT,
-    [REQUEST_LOGGING_OPT_INS_REDIS_KEY],
-    [id]
-  );
-  if (result !== 1) return false;
-  await mirrorRequestLoggingOptInsToDatabase();
-  return true;
+  return db.transaction(async tx => {
+    const [row] = await tx
+      .select({ optIns: ai_gateway_request_logging_opt_ins.opt_ins })
+      .from(ai_gateway_request_logging_opt_ins)
+      .where(eq(ai_gateway_request_logging_opt_ins.id, 1))
+      .for('update');
+    if (!row) return false;
+
+    const optIns = RequestLoggingOptInsSchema.parse(row.optIns);
+    const remaining = optIns.filter(entry => entry.id !== id);
+    if (remaining.length === optIns.length) return false;
+
+    await tx
+      .update(ai_gateway_request_logging_opt_ins)
+      .set({ opt_ins: remaining })
+      .where(eq(ai_gateway_request_logging_opt_ins.id, 1));
+    await mirrorRequestLoggingOptInsToRedis(remaining);
+    return true;
+  });
 }
 
 export async function isDynamicallyOptedIntoRequestLogging(params: {

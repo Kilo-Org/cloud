@@ -121,9 +121,13 @@ describe('native-scoped control event failures', () => {
     const original = { runtimeId: crypto.randomUUID() };
     let current = original;
     const retired = mock();
+    const cleanup = Promise.withResolvers<void>();
     const handleFailure = createControlEventFailureHandler({
       getRuntime: () => current,
-      onFailure: retired,
+      onFailure: (...args) => {
+        retired(...args);
+        return cleanup.promise;
+      },
     });
     const failures: ControlEventOutboxFailure[] = [];
     const published: ControlEventPublication[] = [];
@@ -153,6 +157,10 @@ describe('native-scoped control event failures', () => {
       expect(failures).toHaveLength(2);
       expect(retired).toHaveBeenCalledTimes(1);
       expect(retired).toHaveBeenCalledWith(failures[0], original);
+      cleanup.resolve();
+      await Promise.resolve();
+      handleFailure(failures[0]);
+      expect(retired).toHaveBeenCalledTimes(2);
       current = { runtimeId: crypto.randomUUID() };
       expect(
         await transport.publishSessionEvent(payload, {
@@ -162,7 +170,7 @@ describe('native-scoped control event failures', () => {
       ).toBe(true);
       expect(await transport.resume()).toBe(true);
       expect(published.at(-1)?.session.nativeRuntimeId).toBe(current.runtimeId);
-      expect(retired).toHaveBeenCalledTimes(1);
+      expect(retired).toHaveBeenCalledTimes(2);
       const failure = failures[0];
       if (!failure) throw new Error('Missing native failure');
       handleFailure(failure);
@@ -173,11 +181,48 @@ describe('native-scoped control event failures', () => {
           session: { ...session, nativeRuntimeId: current.runtimeId },
         },
       });
-      expect(retired).toHaveBeenCalledTimes(2);
-      expect(retired.mock.calls[1]?.[1]).toBe(current);
+      expect(retired).toHaveBeenCalledTimes(3);
+      expect(retired.mock.calls[2]?.[1]).toBe(current);
     } finally {
       transport.close();
     }
+  });
+
+  it('coalesces distinct roots only during registry cleanup and separates a reused native object incarnation', async () => {
+    const runtime = { runtimeId: 'N1' };
+    const cleanup = Promise.withResolvers<void>();
+    const failures: ControlEventOutboxFailure[] = [];
+    const handleFailure = createControlEventFailureHandler({
+      getRuntime: () => runtime,
+      onFailure: failure => {
+        failures.push(failure);
+        return cleanup.promise;
+      },
+    });
+    const failure = (root: string, nativeRuntimeId: string): ControlEventOutboxFailure => ({
+      reason: 'rejected',
+      publication: {
+        event: 'session.event',
+        receiptId: `${root}-${nativeRuntimeId}`,
+        sequence: failures.length + 1,
+        session: { ...session, kiloSessionId: root, rootKiloSessionId: root, nativeRuntimeId },
+        payload,
+      },
+    });
+
+    handleFailure(failure('root_a', 'N1'));
+    handleFailure(failure('root_a', 'N1'));
+    handleFailure(failure('root_b', 'N1'));
+    expect(failures).toHaveLength(2);
+    cleanup.resolve();
+    await Promise.resolve();
+    handleFailure(failure('root_a', 'N1'));
+    expect(failures).toHaveLength(3);
+
+    runtime.runtimeId = 'N2';
+    handleFailure(failure('root_a', 'N1'));
+    handleFailure(failure('root_a', 'N2'));
+    expect(failures).toHaveLength(4);
   });
 
   it('preserves a sealed result and its acknowledgement when failure retires the matching native runtime', async () => {

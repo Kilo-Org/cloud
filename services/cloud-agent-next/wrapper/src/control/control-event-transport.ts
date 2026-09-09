@@ -9,18 +9,41 @@ type EventKind = 'session.event' | 'session.preparing';
 
 export function createControlEventFailureHandler<Runtime extends { runtimeId: string }>(options: {
   getRuntime: (directory: string) => Runtime | undefined;
-  onFailure: (failure: ControlEventOutboxFailure, runtime: Runtime) => void;
+  onFailure: (failure: ControlEventOutboxFailure, runtime: Runtime) => unknown;
 }) {
-  const failedRuntimes = new WeakSet<Runtime>();
+  const inFlight = new WeakMap<Runtime, Set<string>>();
   return (failure?: ControlEventOutboxFailure): void => {
     if (!failure) return;
     if (failure.publication.event === 'session.preparing') return;
     const { directory, nativeRuntimeId } = failure.publication.session;
-    if (!nativeRuntimeId) return;
+    const root =
+      failure.publication.session.rootKiloSessionId ?? failure.publication.session.kiloSessionId;
+    if (!nativeRuntimeId || !root) return;
     const runtime = options.getRuntime(directory);
-    if (runtime?.runtimeId !== nativeRuntimeId || failedRuntimes.has(runtime)) return;
-    failedRuntimes.add(runtime);
-    options.onFailure(failure, runtime);
+    if (runtime?.runtimeId !== nativeRuntimeId) return;
+    const key = JSON.stringify([nativeRuntimeId, root]);
+    const keys = inFlight.get(runtime) ?? new Set<string>();
+    if (keys.has(key)) return;
+    keys.add(key);
+    inFlight.set(runtime, keys);
+    let result: unknown;
+    try {
+      result = options.onFailure(failure, runtime);
+    } catch {
+      keys.delete(key);
+      if (keys.size === 0) inFlight.delete(runtime);
+      return;
+    }
+    void Promise.resolve(result).then(
+      () => {
+        keys.delete(key);
+        if (keys.size === 0) inFlight.delete(runtime);
+      },
+      () => {
+        keys.delete(key);
+        if (keys.size === 0) inFlight.delete(runtime);
+      }
+    );
   };
 }
 

@@ -76,11 +76,18 @@ export const SESSION_CREATE_FAILURE_STAGES = [
   'initial_admission',
 ] as const;
 export const SESSION_CREATE_ADMISSIONS = ['new', 'takeover'] as const;
+// The four provider-review intents beyond the GitHub set belong to the
+// GitLab/Bitbucket operation ledger (provider-review-router.ts); the ledger
+// taxonomy and the analytics vocabulary stay one list.
 export const PR_INTENTS = [
   'merge',
   'submit_review',
   'create_review_comment',
   'reply_comment',
+  'resolve_thread',
+  'unresolve_thread',
+  'enable_auto_merge',
+  'disable_auto_merge',
 ] as const;
 export const SECURITY_INTENTS = [
   'manual_sync',

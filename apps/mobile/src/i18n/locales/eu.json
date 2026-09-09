@@ -448,6 +448,9 @@
       "acceptTerms": "Onartu",
       "replyBadRequest": "Erantzun hau ezin da argitaratu. Baliteke haria aldatu izana.",
       "replyForbidden": "Ez duzu baimenik bateratze-eskaera honi erantzuteko.",
+      "addCommentCta": "Egin iruzkina bateratze-eskaera honetan",
+      "commentBadRequest": "Iruzkin hau ezin da argitaratu. Baliteke bateratze-eskaera aldatu izana.",
+      "commentForbidden": "Ez duzu baimenik bateratze-eskaera honetan iruzkinik egiteko.",
       "moderation": {
         "reportContent": {
           "terminal": "Iruzkin hau ezin da salatu.",

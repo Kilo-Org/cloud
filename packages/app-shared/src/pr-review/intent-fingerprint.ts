@@ -9,7 +9,12 @@
  * `operation_key_reuse_mismatch`.
  */
 
-export type PrLedgerIntent = 'merge' | 'submit_review' | 'create_review_comment' | 'reply_comment';
+export type PrLedgerIntent =
+  | 'merge'
+  | 'submit_review'
+  | 'create_review_comment'
+  | 'reply_comment'
+  | 'add_pr_comment';
 
 /**
  * The intent inputs folded into the ledger fingerprint. Any change to one
@@ -21,6 +26,7 @@ export type PrLedgerIntent = 'merge' | 'submit_review' | 'create_review_comment'
 const PR_FINGERPRINT_FIELDS: Record<PrLedgerIntent, readonly string[]> = {
   create_review_comment: ['body', 'path', 'line', 'side', 'startLine', 'startSide', 'commitSha'],
   reply_comment: ['commentId', 'body'],
+  add_pr_comment: ['body'],
   submit_review: ['event', 'body', 'commitSha', 'comments'],
   merge: ['method', 'commitTitle', 'commitMessage', 'deleteBranch', 'expectedHeadSha'],
 };

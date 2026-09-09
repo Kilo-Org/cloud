@@ -448,6 +448,9 @@
       "acceptTerms": "Elfogadás",
       "replyBadRequest": "Ez a válasz nem küldhető el. Lehet, hogy a szál megváltozott.",
       "replyForbidden": "Nincs jogosultságod válaszolni erre a módosítási kérelemre.",
+      "addCommentCta": "Hozzászólás ehhez a módosítási kérelemhez",
+      "commentBadRequest": "Ez a hozzászólás nem küldhető el. Lehet, hogy a módosítási kérelem megváltozott.",
+      "commentForbidden": "Nincs jogosultságod hozzászólni ehhez a módosítási kérelemhez.",
       "moderation": {
         "reportContent": {
           "terminal": "Ez a hozzászólás nem jelenthető.",

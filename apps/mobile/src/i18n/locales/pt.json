@@ -450,6 +450,9 @@
       "acceptTerms": "Aceitar",
       "replyBadRequest": "Esta resposta não pode ser publicada. A conversa pode ter mudado.",
       "replyForbidden": "Não tens permissão para responder a este PR.",
+      "addCommentCta": "Comentar neste PR",
+      "commentBadRequest": "Este comentário não pode ser publicado. O PR pode ter mudado.",
+      "commentForbidden": "Não tens permissão para comentar neste PR.",
       "moderation": {
         "reportContent": {
           "terminal": "Este comentário não pode ser denunciado.",

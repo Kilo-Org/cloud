@@ -452,6 +452,9 @@
       "acceptTerms": "Prijať",
       "replyBadRequest": "Túto odpoveď nemožno odoslať. Vlákno sa mohlo zmeniť.",
       "replyForbidden": "Nemáš oprávnenie odpovedať na túto žiadosť o zlúčenie.",
+      "addCommentCta": "Skomentovať túto žiadosť o zlúčenie",
+      "commentBadRequest": "Tento komentár nemožno odoslať. Žiadosť o zlúčenie sa mohla zmeniť.",
+      "commentForbidden": "Nemáš oprávnenie komentovať túto žiadosť o zlúčenie.",
       "moderation": {
         "reportContent": {
           "terminal": "Tento komentár sa nedá nahlásiť.",

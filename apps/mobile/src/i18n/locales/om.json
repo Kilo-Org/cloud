@@ -448,6 +448,9 @@
       "acceptTerms": "Fudhadhu",
       "replyBadRequest": "Deebiin kun maxxanfamuu hin danda'u. Dameen marii jijjiirameera ta'a.",
       "replyForbidden": "Gaaffii walitti makuu kanaaf deebii kennuuf hayyama hin qabdu.",
+      "addCommentCta": "Gaaffii walitti makuu kanaa irratti yaada kenni",
+      "commentBadRequest": "Yaadni kun maxxanfamuu hin danda'u. Gaaffiin walitti makuu jijjiirameera ta'a.",
+      "commentForbidden": "Gaaffii walitti makuu kanaa irratti yaada kennuuf hayyama hin qabdu.",
       "moderation": {
         "reportContent": {
           "terminal": "Yaadni kun gabaafamuu hin danda'u.",

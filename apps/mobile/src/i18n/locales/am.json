@@ -448,6 +448,9 @@
       "acceptTerms": "ተቀበል",
       "replyBadRequest": "ይህን ምላሽ መለጠፍ አይቻልም። የውይይት ሰንሰለቱ ተለውጦ ሊሆን ይችላል።",
       "replyForbidden": "ለዚህ የማዋሃድ ጥያቄ ምላሽ ለመስጠት ፈቃድ የለህም።",
+      "addCommentCta": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ስጥ",
+      "commentBadRequest": "ይህ አስተያየት መለጠፍ አይቻልም። የማዋሃዱ ጥያቄ ተለውጦ ሊሆን ይችላል።",
+      "commentForbidden": "በዚህ የማዋሃድ ጥያቄ ላይ አስተያየት ለመስጠት ፈቃድ የለህም።",
       "moderation": {
         "reportContent": {
           "terminal": "ይህ አስተያየት ሪፖርት ሊደረግ አይችልም።",

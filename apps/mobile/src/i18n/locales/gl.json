@@ -448,6 +448,9 @@
       "acceptTerms": "Aceptar",
       "replyBadRequest": "Non se pode publicar esta resposta. Pode que o fío cambiase.",
       "replyForbidden": "Non tes permiso para responder a esta solicitude de integración.",
+      "addCommentCta": "Comentar esta solicitude de integración",
+      "commentBadRequest": "Non se pode publicar este comentario. Pode que a solicitude de integración cambiase.",
+      "commentForbidden": "Non tes permiso para comentar nesta solicitude de integración.",
       "moderation": {
         "reportContent": {
           "terminal": "Este comentario non se pode denunciar.",

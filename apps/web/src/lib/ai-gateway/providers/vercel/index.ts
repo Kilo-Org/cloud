@@ -190,27 +190,15 @@ export function convertProviderOptions(
   };
 }
 
-function parseBedrockCredentials(input: string) {
+function parseCredentials<T>(
+  input: string,
+  schema: { parse(input: unknown): T },
+  providerName: string
+): T {
   try {
-    return BedrockCredentialsSchema.parse(JSON.parse(input));
+    return schema.parse(JSON.parse(input));
   } catch {
-    throw new Error('Failed to parse AWS credentials');
-  }
-}
-
-function parseAzureCredentials(input: string) {
-  try {
-    return AzureCredentialsSchema.parse(JSON.parse(input));
-  } catch {
-    throw new Error('Failed to parse Azure credentials');
-  }
-}
-
-function parseVertexCredentials(input: string) {
-  try {
-    return VertexCredentialsSchema.parse(JSON.parse(input));
-  } catch {
-    throw new Error('Failed to parse Google Vertex credentials');
+    throw new Error(`Failed to parse ${providerName} credentials`);
   }
 }
 
@@ -254,11 +242,11 @@ export function getVercelInferenceProviderConfigForUserByok(
   }
 
   if (key === VercelUserByokInferenceProviderIdSchema.enum.azure) {
-    list.push(parseAzureCredentials(provider.decryptedAPIKey));
+    list.push(parseCredentials(provider.decryptedAPIKey, AzureCredentialsSchema, 'Azure'));
   } else if (key === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
-    list.push(parseBedrockCredentials(provider.decryptedAPIKey));
+    list.push(parseCredentials(provider.decryptedAPIKey, BedrockCredentialsSchema, 'AWS'));
   } else if (key === VercelUserByokInferenceProviderIdSchema.enum.vertex) {
-    list.push(parseVertexCredentials(provider.decryptedAPIKey));
+    list.push(parseCredentials(provider.decryptedAPIKey, VertexCredentialsSchema, 'Google Vertex'));
   } else {
     list.push({ apiKey: provider.decryptedAPIKey });
   }

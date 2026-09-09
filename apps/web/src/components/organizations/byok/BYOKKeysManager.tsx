@@ -58,7 +58,7 @@ import * as z from 'zod';
 // VercelUserByokInferenceProviderIdSchema.
 const VERCEL_BYOK_PROVIDER_NAMES = {
   anthropic: 'Anthropic',
-  azure: 'Azure OpenAI',
+  azure: 'Azure Foundry',
   bedrock: 'AWS Bedrock',
   deepseek: 'DeepSeek',
   openai: 'OpenAI',

@@ -11,6 +11,7 @@ import type {
   getGitLabInstanceUrlForUser as GetGitLabInstanceUrlForUser,
   getGitLabTokenForUser as GetGitLabTokenForUser,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import type { resolveModelForGitHubRepository as ResolveModelForGitHubRepository } from '@/lib/integrations/github-repository-settings';
 import type SpawnCloudAgentSession from './spawn-cloud-agent-session';
 
 jest.mock('@/lib/config.server', () => ({
@@ -36,6 +37,10 @@ jest.mock('@/lib/cloud-agent/gitlab-integration-helpers', () => ({
   getGitLabInstanceUrlForOrganization: jest.fn(),
   getGitLabInstanceUrlForUser: jest.fn(),
   buildGitLabCloneUrl: jest.fn(),
+}));
+
+jest.mock('@/lib/integrations/github-repository-settings', () => ({
+  resolveModelForGitHubRepository: jest.fn(),
 }));
 
 jest.mock('@sentry/nextjs', () => ({
@@ -73,12 +78,16 @@ let mockGetGitHubTokenForUser: jest.MockedFunction<typeof GetGitHubTokenForUser>
 let mockGetGitLabTokenForUser: jest.MockedFunction<typeof GetGitLabTokenForUser>;
 let mockGetGitLabInstanceUrlForUser: jest.MockedFunction<typeof GetGitLabInstanceUrlForUser>;
 let mockBuildGitLabCloneUrl: jest.MockedFunction<typeof BuildGitLabCloneUrl>;
+let mockResolveModelForGitHubRepository: jest.MockedFunction<
+  typeof ResolveModelForGitHubRepository
+>;
 
 describe('spawnCloudAgentSession delegation', () => {
   beforeAll(async () => {
     const client = await import('@/lib/cloud-agent-next/cloud-agent-client');
     const github = await import('@/lib/cloud-agent/github-integration-helpers');
     const gitlab = await import('@/lib/cloud-agent/gitlab-integration-helpers');
+    const repositorySettings = await import('@/lib/integrations/github-repository-settings');
     const spawn = await import('./spawn-cloud-agent-session');
 
     mockCreateCloudAgentNextClient = jest.mocked(client.createCloudAgentNextClient);
@@ -87,6 +96,9 @@ describe('spawnCloudAgentSession delegation', () => {
     mockGetGitLabTokenForUser = jest.mocked(gitlab.getGitLabTokenForUser);
     mockGetGitLabInstanceUrlForUser = jest.mocked(gitlab.getGitLabInstanceUrlForUser);
     mockBuildGitLabCloneUrl = jest.mocked(gitlab.buildGitLabCloneUrl);
+    mockResolveModelForGitHubRepository = jest.mocked(
+      repositorySettings.resolveModelForGitHubRepository
+    );
     spawnCloudAgentSession = spawn.default;
   });
 
@@ -106,6 +118,7 @@ describe('spawnCloudAgentSession delegation', () => {
     mockGetGitLabTokenForUser.mockResolvedValue('gitlab-token');
     mockGetGitLabInstanceUrlForUser.mockResolvedValue('https://gitlab.com');
     mockBuildGitLabCloneUrl.mockReturnValue('https://gitlab.com/group/repo.git');
+    mockResolveModelForGitHubRepository.mockResolvedValue('model');
   });
 
   it('delegates GitHub profile resolution while preserving repository and organization context', async () => {
@@ -197,4 +210,40 @@ describe('spawnCloudAgentSession delegation', () => {
       );
     }
   );
+
+  it('uses the per-repository model override resolved for the GitHub repo, not the raw model argument', async () => {
+    mockResolveModelForGitHubRepository.mockResolvedValue('repo-override-model');
+
+    await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'installation-default-model',
+      userIntegration,
+      'auth-token',
+      'request-github-override',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(mockResolveModelForGitHubRepository).toHaveBeenCalledWith(userIntegration, 'owner/repo');
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'repo-override-model' })
+    );
+  });
+
+  it('does not resolve a per-repo model override for GitLab sessions', async () => {
+    await spawnCloudAgentSession(
+      { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },
+      'installation-default-model',
+      userIntegration,
+      'auth-token',
+      'request-gitlab-no-override',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(mockResolveModelForGitHubRepository).not.toHaveBeenCalled();
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'installation-default-model' })
+    );
+  });
 });

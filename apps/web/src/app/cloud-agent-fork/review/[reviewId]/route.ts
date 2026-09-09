@@ -3,10 +3,12 @@ import { NextResponse } from 'next/server';
 import { buildFixReviewPrompt } from '@/lib/code-reviews/prompts/fix-review-prompt';
 import { DEFAULT_CODE_REVIEW_MODE } from '@/lib/code-reviews/core/constants';
 import { resolveBotModelSlug } from '@/lib/bot/model';
+import { resolveModelForGitHubRepository } from '@/lib/integrations/github-repository-settings';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCallerFactory, createTRPCContext } from '@/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
 import { TRPCError } from '@trpc/server';
+import { captureException } from '@sentry/nextjs';
 import { z } from 'zod';
 
 const createCaller = createCallerFactory(rootRouter);
@@ -86,11 +88,23 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return redirectToError(url.origin, 'fix_session_failed');
     }
 
+    const model = integration
+      ? await resolveModelForGitHubRepository(integration, review.repo_full_name).catch(
+          error => {
+            captureException(error, {
+              tags: { component: 'cloud-agent-fork', op: 'resolveModelForGitHubRepository' },
+              extra: { reviewId, repoFullName: review.repo_full_name },
+            });
+            return resolveBotModelSlug(integration);
+          }
+        )
+      : resolveBotModelSlug(integration);
+
     const sessionInput = {
       githubRepo: review.repo_full_name,
       prompt: buildFixReviewPrompt(review.pr_url),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: resolveBotModelSlug(integration),
+      model,
       autoInitiate: true,
       autoCommit: false,
     };

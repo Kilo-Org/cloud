@@ -4,6 +4,7 @@ import {
   repository_customizations,
   platform_integrations,
   type NewRepositoryCustomization,
+  type RepositoryCustomization,
 } from '@kilocode/db/schema';
 import { eq, and, or, isNull, asc, desc, sql, ne } from 'drizzle-orm';
 import type {
@@ -1153,6 +1154,29 @@ export async function listRepositoryCustomizations(integrationId: string) {
     .select()
     .from(repository_customizations)
     .where(eq(repository_customizations.platform_integration_id, integrationId));
+}
+
+/**
+ * Looks up a single repository's override row, or `null` if the repository
+ * has no override (it fully inherits the installation's defaults).
+ * `repositoryId` is the platform's repository identifier (GitHub's numeric
+ * ID stringified, GitLab's project ID, etc.).
+ */
+export async function getRepositoryCustomization(
+  integrationId: string,
+  repositoryId: string
+): Promise<RepositoryCustomization | null> {
+  const [row] = await db
+    .select()
+    .from(repository_customizations)
+    .where(
+      and(
+        eq(repository_customizations.platform_integration_id, integrationId),
+        eq(repository_customizations.repository_id, repositoryId)
+      )
+    );
+
+  return row ?? null;
 }
 
 /**

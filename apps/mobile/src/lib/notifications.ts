@@ -239,8 +239,8 @@ export async function applyGlanceablePushData(
   if (appBadgeWrite) {
     await appBadgeWrite;
   }
-  // Do not finish a background task before ActivityKit accepts the native end.
-  // All publication happens before this await, so it cannot restore an old scope.
+  // Do not finish a background task before ActivityKit accepts a native end.
+  // Idle work keeps the same card, so only ineligible snapshots wait here.
   if (!eligible) {
     await Promise.all(
       getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeTerminal?.())

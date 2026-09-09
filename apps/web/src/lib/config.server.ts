@@ -111,6 +111,13 @@ export const IMPACT_ADVOCATE_API_BASE_URL =
 export const IMPACT_ADVOCATE_DEBUG_LOGGING =
   getEnvVariable('IMPACT_ADVOCATE_DEBUG_LOGGING') === 'true';
 
+// Gates the "Repository Customizations" GitHub UI (per-installation default AI
+// model / PR review mode, plus per-repository overrides) on the GitHub
+// integration settings pages for both personal accounts and organizations.
+// Hidden by default so the feature can ship dark; set PER_REPO_SETTINGS=true
+// to reveal it.
+export const PER_REPO_SETTINGS_ENABLED = getEnvVariable('PER_REPO_SETTINGS') === 'true';
+
 // Gates the Coding Plans UI on the /subscriptions route. Hidden by default so
 // the feature can ship dark; set CODING_PLANS_PURCHASE_ENABLED=true to reveal it.
 export const CODING_PLANS_PURCHASE_ENABLED =

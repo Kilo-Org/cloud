@@ -2,12 +2,7 @@
  * Utility functions for working with AI models
  */
 
-import {
-  KILO_AUTO_BALANCED_MODEL,
-  KILO_AUTO_EFFICIENT_MODEL,
-  KILO_AUTO_FREE_MODEL,
-  KILO_AUTO_FRONTIER_MODEL,
-} from '@/lib/ai-gateway/auto-model';
+import { KILO_AUTO_EFFICIENT_MODEL, KILO_AUTO_FREE_MODEL } from '@/lib/ai-gateway/auto-model';
 import {
   claude_opus_4_8_stealth_model,
   claude_opus_4_7_stealth_model,
@@ -45,7 +40,7 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
     ? [
         {
           model: stepfun_37_flash_free_model.public_id,
-          weight: 3,
+          weight: 1,
           reasoning: { enabled: true, effort: 'high' },
         } satisfies AutoFreeModel,
       ]
@@ -62,6 +57,11 @@ export const autoFreeModels: ReadonlyArray<AutoFreeModel> = [
   } satisfies AutoFreeModel,
   {
     model: 'dots-studio/dots-3-note-preview:free',
+    weight: 1,
+    reasoning: { enabled: true, effort: 'high' },
+  } satisfies AutoFreeModel,
+  {
+    model: 'nex-agi/nex-n2.5-pro:free',
     weight: 1,
     reasoning: { enabled: true, effort: 'high' },
   } satisfies AutoFreeModel,
@@ -84,8 +84,6 @@ export function selectAutoFreeCandidate(
 }
 
 export const preferredModels = [
-  KILO_AUTO_FRONTIER_MODEL.id,
-  KILO_AUTO_BALANCED_MODEL.id,
   KILO_AUTO_EFFICIENT_MODEL.id,
   KILO_AUTO_FREE_MODEL.id,
 

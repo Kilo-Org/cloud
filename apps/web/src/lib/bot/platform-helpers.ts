@@ -1,8 +1,27 @@
 import { type PlatformIdentity } from '@/lib/bot-identity';
 import { db } from '@/lib/drizzle';
-import { eq, and, sql } from 'drizzle-orm';
+import { eq, and, isNull, or, sql } from 'drizzle-orm';
 import { platform_integrations, type PlatformIntegration } from '@kilocode/db';
 import { isOrganizationMember } from '@/lib/organizations/organizations';
+import { isPlatformIntegrationHealthy } from '@/lib/integrations/core/health';
+
+function isAvailableForBot(integration: PlatformIntegration): boolean {
+  return integration.platform !== 'github' || isPlatformIntegrationHealthy(integration);
+}
+
+export class PlatformIntegrationUnavailableError extends Error {
+  constructor(platformIntegrationId: string) {
+    super(`Platform integration ${platformIntegrationId} is unavailable`);
+    this.name = 'PlatformIntegrationUnavailableError';
+  }
+}
+
+export class PlatformIntegrationNotFoundError extends Error {
+  constructor(platformIntegrationId: string) {
+    super(`Could not find platform integration ${platformIntegrationId}`);
+    this.name = 'PlatformIntegrationNotFoundError';
+  }
+}
 
 /**
  * Look up the platform integration row for a given identity.
@@ -15,12 +34,20 @@ export async function getPlatformIntegration(identity: PlatformIdentity) {
     .where(
       and(
         eq(platform_integrations.platform, identity.platform),
-        eq(platform_integrations.platform_installation_id, identity.teamId)
+        eq(platform_integrations.platform_installation_id, identity.teamId),
+        identity.platform === 'github'
+          ? identity.githubAppType === 'lite'
+            ? eq(platform_integrations.github_app_type, 'lite')
+            : or(
+                eq(platform_integrations.github_app_type, 'standard'),
+                isNull(platform_integrations.github_app_type)
+              )
+          : undefined
       )
     )
     .limit(1);
 
-  return integration ?? null;
+  return integration && isAvailableForBot(integration) ? integration : null;
 }
 
 export async function canKiloUserAccessPlatformIntegration(
@@ -46,7 +73,11 @@ export async function getPlatformIntegrationById(platformIntegrationId: string) 
     .limit(1);
 
   if (!integration) {
-    throw new Error(`Could not find platform integration ${platformIntegrationId}`);
+    throw new PlatformIntegrationNotFoundError(platformIntegrationId);
+  }
+
+  if (!isAvailableForBot(integration)) {
+    throw new PlatformIntegrationUnavailableError(platformIntegrationId);
   }
 
   return integration;
@@ -69,5 +100,5 @@ export async function getPlatformIntegrationByBotUserId(
     )
     .limit(1);
 
-  return integration ?? null;
+  return integration && isAvailableForBot(integration) ? integration : null;
 }

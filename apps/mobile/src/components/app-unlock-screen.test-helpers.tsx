@@ -90,11 +90,10 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 24, bottom: 12, left: 0, right: 0 }),
 }));
 vi.mock('react-native-reanimated', () => ({
-  default: { View: 'PrivacyCover' },
+  default: { View: 'Animated.View' },
   useSharedValue: (value: number) => ({ value }),
   useAnimatedStyle: (build: () => unknown) => build(),
 }));
-vi.mock('expo-screen-capture', () => ({}));
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,

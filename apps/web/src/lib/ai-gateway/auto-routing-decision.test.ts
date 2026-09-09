@@ -11,7 +11,7 @@ jest.mock('@/lib/utils.server', () => ({
   warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
 }));
 
-import { fetchEfficientAutoDecision } from './auto-routing-decision';
+import { EFFICIENT_DECISION_TIMEOUT_MS, fetchEfficientAutoDecision } from './auto-routing-decision';
 import type { EfficientDecisionParams } from './auto-routing-decision';
 import {
   detectRequiredInputModalities,
@@ -88,6 +88,10 @@ describe('fetchEfficientAutoDecision', () => {
     expect(headers.get('authorization')).toBe('Bearer classifier-token');
     expect(headers.get('content-type')).toBe('application/json');
     expect(result).toEqual({ decision: validDecision, costUsd: 0.001 });
+  });
+
+  it('allows the current worker miss path five seconds to complete', () => {
+    expect(EFFICIENT_DECISION_TIMEOUT_MS).toBe(5_000);
   });
 
   it('includes denied model ids in the worker payload', async () => {

@@ -52,7 +52,31 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   frame: () => ({}),
   widgetURL: () => ({}),
 }));
-vi.mock('react-native', () => ({ PlatformColor: (name: string) => name }));
+// The sink used to watch AppState for idle-end debounce. Keep the mock so
+// leftover listeners in this suite still resolve.
+const mockAppState = vi.hoisted(() => ({
+  currentState: 'active' as string,
+  listeners: new Set<(state: string) => void>(),
+  leaveActive(next: string) {
+    this.currentState = next;
+    for (const listener of this.listeners) {
+      listener(next);
+    }
+  },
+}));
+
+vi.mock('react-native', () => ({
+  PlatformColor: (name: string) => name,
+  AppState: {
+    get currentState() {
+      return mockAppState.currentState;
+    },
+    addEventListener: (_type: string, listener: (state: string) => void) => {
+      mockAppState.listeners.add(listener);
+      return { remove: () => mockAppState.listeners.delete(listener) };
+    },
+  },
+}));
 
 const mockState = vi.hoisted(() => ({
   startError: null as { code: string; message: string } | null,
@@ -174,6 +198,8 @@ function snapshotFor(
 beforeEach(() => {
   _resetLiveActivitySwitchForTests();
   _resetIosSinkForTests();
+  mockAppState.currentState = 'active';
+  mockAppState.listeners.clear();
   subscriptions.clear();
   mockState.startError = null;
   mockState.instancesError = null;
@@ -944,6 +970,37 @@ describe('iosSink Live Activity content-state', () => {
     ]);
     expect(mockState.updated.length).toBe(0);
     expect(subscriptions.has('activity')).toBe(false);
+  });
+});
+
+describe('iosSink idle updates', () => {
+  it('keeps the same card when every agent goes idle', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(mockState.started).toHaveLength(1);
+    expect(mockState.started[0]).toMatchObject({
+      ended: false,
+      props: { status: 'happy', running: 0, idle: 1 },
+    });
+    expect(mockState.ended).toEqual([]);
+  });
+
+  it('updates the same card when work resumes after idle', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
+    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
+    const resumed = snapshotFor([{ status: 'busy' }], 2);
+    iosSink.publish(resumed);
+    iosSink.startOrUpdate(resumed, CTX);
+
+    expect(mockState.started).toHaveLength(1);
+    expect(mockState.started[0]).toMatchObject({ ended: false, props: { running: 1, idle: 0 } });
+    expect(mockState.ended).toEqual([]);
   });
 });
 

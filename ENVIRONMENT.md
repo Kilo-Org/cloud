@@ -107,6 +107,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
+- `GITHUB_CONNECTION_MANAGEMENT_ENABLED` - Set to exact `true` to admit new existing-installation connection management and local disconnect. Unset or any other value keeps new management admission disabled without changing incumbent GitHub integration workflows. [SERVER]
+- `PER_REPO_SETTINGS` - Set to exactly `true` to reveal the Repository Customizations UI (per-installation default AI model / PR review mode, plus per-repository overrides) on the GitHub integration settings pages, for both personal accounts and organizations. Defaults to disabled so the feature can ship dark. [SERVER]
 - `GITHUB_ADMIN_STATS_TOKEN` - Token for admin GitHub API stats lookups; used in `apps/web/src/scripts/backfill-pr-author-github-ids.ts`. `[SECRET]`
 - `GITHUB_CLI_PAT` - GitHub personal access token for `gh` CLI operations inside contractors; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
 - `GITHUB_TOKEN` - Generic GitHub token for API calls used as fallback when `GIT_TOKEN` or `GITHUB_CLI_PAT` is absent; used in `services/gastown/container/src/process-manager.ts`. `[SECRET]`
@@ -390,7 +392,7 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
-- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at session creation. Empty admits nobody. `*` includes personal accounts. Production defaults to empty. Wrangler `dev` defaults to `*`. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
+- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at interactive web (`cloud-agent-web`) session creation. Empty admits nobody. `*` includes personal accounts. Production defaults to empty. Wrangler `dev` defaults to `*`. Non-interactive origins (Slack, scheduled, code review, and similar) keep legacy `agent_` sessions even when enrolled. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
 - `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Production defaults to empty/off. Wrangler `dev` defaults to `*`. Also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
 - `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]

@@ -119,7 +119,7 @@ vi.mock('../utils/do-retry.js', () => ({
 }));
 
 vi.mock('../session-service.js', () => ({
-  generateSessionId: () => generateSessionIdMock(),
+  generateSessionId: (plane?: 'legacy' | 'control') => generateSessionIdMock(plane),
   SessionService: class SessionService {
     createCliSessionViaSessionIngest = createCliSessionMock;
     deleteCliSessionViaSessionIngest = deleteCliSessionMock;
@@ -730,6 +730,7 @@ describe('createSessionWithLedger admission ladder', () => {
       );
 
       expect(result.cloudAgentSessionId).toBe(WORKSPACE_SESSION_ID);
+      expect(generateSessionIdMock).toHaveBeenCalledWith('control');
       expect(createCliSessionMock.mock.calls[0]).toHaveLength(9);
       expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -904,6 +905,35 @@ describe('createSessionWithLedger admission ladder', () => {
       })
     );
   });
+
+  it.each([
+    ['missing platform', undefined, undefined],
+    ['automation origin', 'browser', 'scheduled'],
+    ['integration origin', 'browser', 'slack'],
+    ['code-review origin', undefined, 'code-review'],
+  ] as const)(
+    'keeps enrolled %s creates on agent_ sessions',
+    async (_label, clientProvenance, createdOnPlatform) => {
+      const doStub = makeDoStub();
+      const ctx = makeContext(doStub);
+      ctx.env.CONTROL_PLANE_IDS = '*';
+      ctx.env.WORKTREE_CREATION_ENABLED_IDS = '*';
+
+      await runCreate(
+        ctx,
+        makeRequest({
+          options: { operationKey: OPERATION_KEY, createdOnPlatform, clientProvenance },
+        })
+      );
+
+      expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+      expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+        expect.objectContaining({
+          identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+        })
+      );
+    }
+  );
 
   it.each([
     ['missing provenance', undefined, 'cloud-agent-web'],
@@ -3280,6 +3310,18 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     });
   }
 
+  function cloneWebRequest(): SessionCreateRequest {
+    return makeRequest({
+      initialTurn: undefined,
+      clone: { cloneFromKiloSessionId: SOURCE_KILO_SESSION_ID },
+      options: {
+        operationKey: OPERATION_KEY,
+        createdOnPlatform: 'cloud-agent-web',
+        clientProvenance: 'browser',
+      },
+    });
+  }
+
   it('forwards the clone source into the ingest call and continues on ready', async () => {
     createCliSessionMock.mockResolvedValue({
       status: 'ready',
@@ -3325,10 +3367,11 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     const cloudAgentSessionGet = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
     ctx.env.CONTROL_PLANE_IDS = USER_ID;
 
-    await expect(runCreate(ctx, cloneRequest())).resolves.toEqual({
+    await expect(runCreate(ctx, cloneWebRequest())).resolves.toEqual({
       cloudAgentSessionId: WORKSPACE_SESSION_ID,
       kiloSessionId: KILO_SESSION_ID,
     });
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
 
     expect(sandboxSessionIdFromName).toHaveBeenCalledWith(`${USER_ID}:${WORKSPACE_SESSION_ID}`);
     expect(sandboxSessionGet).toHaveBeenCalledTimes(1);
@@ -3358,7 +3401,11 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
         ctx,
         makeRequest({
           runtime: { sandboxAllocation: 'isolated-standard' },
-          options: { operationKey: OPERATION_KEY },
+          options: {
+            operationKey: OPERATION_KEY,
+            createdOnPlatform: 'cloud-agent-web',
+            clientProvenance: 'browser',
+          },
         })
       )
     ).rejects.toMatchObject({
@@ -3369,6 +3416,30 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     expect(createCliSessionMock).not.toHaveBeenCalled();
     expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
     expect(admitOperationMock).not.toHaveBeenCalled();
+  });
+
+  it('allows isolated Standard allocation for enrolled non-interactive sessions', async () => {
+    const sandboxId = `istd-${'a'.repeat(48)}` as const;
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({ kind: 'isolated', sandboxId });
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    ctx.env.CONTROL_PLANE_IDS = USER_ID;
+
+    await runCreate(
+      ctx,
+      makeRequest({
+        runtime: { sandboxAllocation: 'isolated-standard' },
+        options: { operationKey: OPERATION_KEY, createdOnPlatform: 'slack' },
+      })
+    );
+
+    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identity: expect.objectContaining({ sessionId: CLOUD_AGENT_SESSION_ID }),
+        workspace: expect.objectContaining({ sandboxAllocation: 'isolated-standard' }),
+      })
+    );
   });
 
   it.each([

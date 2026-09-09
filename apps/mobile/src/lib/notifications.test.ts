@@ -34,6 +34,7 @@ type ResponseListener = (response: Response) => void;
 
 const mocks = vi.hoisted(() => ({
   platform: { OS: 'android' as string },
+  appState: { currentState: 'active' as string },
   setBadgeCountAsync: vi.fn(),
   setNotificationChannelAsync: vi.fn(),
   setNotificationHandler: vi.fn(),
@@ -59,6 +60,12 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('react-native', () => ({
   Platform: mocks.platform,
+  AppState: {
+    get currentState() {
+      return mocks.appState.currentState;
+    },
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
 }));
 
 vi.mock('expo-notifications', () => ({
@@ -204,6 +211,7 @@ async function flushMicrotasks(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.platform.OS = 'android';
+  mocks.appState.currentState = 'active';
   mocks.setBadgeCountAsync.mockResolvedValue(true);
   mocks.setNotificationChannelAsync.mockResolvedValue(undefined);
   mocks.getPermissionsAsync.mockResolvedValue({ status: 'denied' });
@@ -1325,6 +1333,8 @@ describe('cold iOS background delivery', () => {
     props: null as string | null,
     contentDate: null as number | null,
     policies: [] as string[],
+    // Counted at end() entry, before any gate: proves submission happened.
+    endCalls: 0,
     observers: new Set<(token: string) => void>(),
   };
 
@@ -1433,6 +1443,7 @@ describe('cold iOS background delivery', () => {
     native.props = null;
     native.contentDate = null;
     native.policies = [];
+    native.endCalls = 0;
     native.observers.clear();
     mocks.nativeInstances.mockImplementation((includeEnded = false) => {
       if (
@@ -1488,6 +1499,7 @@ describe('cold iOS background delivery', () => {
           },
           // eslint-disable-next-line max-params -- match the installed expo-widgets native end contract
           end: async (policy: string, afterDate?: number, props?: string, contentDate?: number) => {
+            native.endCalls += 1;
             await native.endRead;
             if (isDismissed()) {
               throw Object.assign(new Error('Live Activity not found'), {
@@ -1697,6 +1709,25 @@ describe('cold iOS background delivery', () => {
       needsInputSince: null,
     });
     expect(rows.has('scope-token')).toBe(true);
+  });
+
+  it('keeps the adopted card when an idle-only push arrives in the background', async () => {
+    vi.setSystemTime(Date.parse('2026-01-02T00:00:00.000Z'));
+    mocks.appState.currentState = 'background';
+    const background = await loadColdBackground();
+    expect(
+      await background.deliver({
+        status: 'happy',
+        running: 0,
+        needsInput: 0,
+        idle: 1,
+        needsInputSince: null,
+      })
+    ).toBe(0);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(native.endCalls).toBe(0);
+    expect(native.exists).toBe(true);
+    expect(JSON.parse(native.props ?? '{}')).toMatchObject({ status: 'happy', idle: 1 });
   });
 
   it('immediately dismisses an ended adopted handle and rejects old-scope work after privacy', async () => {

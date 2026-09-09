@@ -27,6 +27,7 @@ function createDb(rows: InstallationRow[], updatedRows = [{ id: 'integration-1' 
     where: vi.fn(() => query),
     orderBy: vi.fn(() => query),
     limit: vi.fn((limit: number) => Promise.resolve(rows.slice(0, limit))),
+    for: vi.fn(() => Promise.resolve(rows)),
     then: vi.fn((resolve: (value: InstallationRow[]) => unknown) => resolve(rows)),
   };
   const updateQuery = {
@@ -35,11 +36,13 @@ function createDb(rows: InstallationRow[], updatedRows = [{ id: 'integration-1' 
     returning: vi.fn(async () => updatedRows),
   };
 
-  return {
+  const db = {
     select: vi.fn(() => query),
     update: vi.fn(() => updateQuery),
     updateQuery,
+    transaction: vi.fn(async (callback: (tx: unknown) => Promise<unknown>) => callback(db)),
   };
+  return db;
 }
 
 function createService(rows: InstallationRow[]) {
@@ -111,7 +114,14 @@ describe('InstallationLookupService', () => {
   });
 
   it('reports when refreshed account login metadata is persisted', async () => {
-    const db = createDb([]);
+    const db = createDb([
+      {
+        platform_installation_id: '100',
+        platform_account_login: 'old-owner',
+        github_app_type: 'standard',
+        owned_by_organization_id: null,
+      },
+    ]);
     vi.mocked(getWorkerDb).mockReturnValue(db as never);
     const service = new InstallationLookupService({
       HYPERDRIVE: { connectionString: 'postgres://test' },
@@ -136,7 +146,7 @@ describe('InstallationLookupService', () => {
     const wasUpdated = await service.updateAccountLogin('integration-1', 'renamed-owner');
 
     expect(wasUpdated).toBe(false);
-    expect(db.updateQuery.returning).toHaveBeenCalled();
+    expect(db.updateQuery.returning).not.toHaveBeenCalled();
   });
 
   it('resolves an exact-login integration using the legacy standard app type', async () => {
@@ -306,7 +316,7 @@ describe('InstallationLookupService', () => {
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
   });
 
-  it('does not accept an expected integration without an organization', async () => {
+  it('keeps an unowned expected integration fail-closed without an organization', async () => {
     const service = createService([]);
 
     await expect(
@@ -316,7 +326,7 @@ describe('InstallationLookupService', () => {
         expectedIntegrationId: '00000000-0000-4000-8000-000000000002',
       })
     ).resolves.toEqual({ success: false, reason: 'integration_mismatch' });
-    expect(getWorkerDb).not.toHaveBeenCalled();
+    expect(getWorkerDb).toHaveBeenCalledOnce();
   });
 
   it('returns integration_mismatch when the expected row is not visible to the fenced query', async () => {

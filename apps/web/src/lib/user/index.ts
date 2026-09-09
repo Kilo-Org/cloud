@@ -23,6 +23,7 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   cloud_agent_webhook_triggers,
+  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   enrichment_data,
   source_embeddings,
@@ -99,6 +100,8 @@ import {
   github_branch_pull_requests,
   user_github_app_tokens,
   github_install_states,
+  github_connection_attempts,
+  github_app_installations,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -1181,8 +1184,11 @@ export async function anonymizeCloudUserData(
   `);
   await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));
   await tx
+    .delete(cloud_agent_workspace_folders)
+    .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
+  await tx
     .update(cloud_agent_worktrees)
-    .set({ name: null })
+    .set({ name: null, folder_id: null })
     .where(eq(cloud_agent_worktrees.kilo_user_id, userId));
   await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
   await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
@@ -1349,6 +1355,50 @@ export async function anonymizeCloudUserData(
         isNull(platform_access_token_credentials.provider_resource_id)
       )
     );
+
+  await tx
+    .update(platform_integrations)
+    .set({
+      github_authorized_by_user_id: null,
+      github_authorized_user_id: null,
+      github_authorized_at: null,
+    })
+    .where(eq(platform_integrations.github_authorized_by_user_id, userId));
+  await tx
+    .delete(github_connection_attempts)
+    .where(eq(github_connection_attempts.kilo_user_id, userId));
+
+  const githubUserIds = await tx
+    .select({ id: user_github_app_tokens.github_user_id })
+    .from(user_github_app_tokens)
+    .where(eq(user_github_app_tokens.kilo_user_id, userId));
+
+  await tx.execute(sql`
+    DELETE FROM ${github_app_installations} canonical
+    USING ${platform_integrations} owned
+    WHERE owned.owned_by_user_id = ${userId}
+      AND owned.github_installation_id = canonical.id
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ${platform_integrations} retained
+        WHERE retained.github_installation_id = canonical.id
+          AND retained.id <> owned.id
+      )
+  `);
+  if (githubUserIds.length > 0) {
+    await tx.execute(sql`
+      DELETE FROM ${github_app_installations} canonical
+      WHERE (canonical.account_type = 'User' OR canonical.account_type IS NULL)
+        AND canonical.account_id IN (${sql.join(
+          githubUserIds.map(user => sql`${user.id}`),
+          sql`, `
+        )})
+        AND NOT EXISTS (
+          SELECT 1 FROM ${platform_integrations} retained
+          WHERE retained.github_installation_id = canonical.id
+        )
+    `);
+  }
 
   await tx.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
   await tx.execute(sql`

@@ -33,6 +33,7 @@ import {
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseWorktreeChangesNextSchema,
+  baseWorktreeFileNextSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
@@ -68,6 +69,7 @@ import { isMobileClient } from '@/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from './cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
+  getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
@@ -351,6 +353,16 @@ export const cloudAgentNextRouter = createTRPCRouter({
       const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
       const client = createCloudAgentNextClient(authToken);
       return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
+    }),
+
+  getWorktreeFile: baseProcedure
+    .input(baseWorktreeFileNextSchema)
+    .output(getWorktreeFileOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertUserOwnsSession(ctx.user.id, input.cloudAgentSessionId);
+      const authToken = await createCloudAgentControlToken(ctx.user, ctx.headersList);
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getWorktreeFile(input);
     }),
 
   createTerminal: baseProcedure

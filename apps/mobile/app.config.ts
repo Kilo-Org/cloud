@@ -65,7 +65,7 @@ const config: ExpoConfig = {
   name: 'Kilo',
   owner: 'kilocode',
   slug: 'kilo-app',
-  version: '1.0.8',
+  version: '1.0.9',
   // Portrait-only is an accepted, documented product deviation from WCAG 1.3.4
   // (Orientation). Landscape layouts and iPad split-view/multitasking are out
   // of scope; `ios.requireFullScreen` below enforces that. This is not claimed

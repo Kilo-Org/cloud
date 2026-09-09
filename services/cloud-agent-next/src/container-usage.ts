@@ -44,7 +44,7 @@ export function billingHeartbeatSeconds(value: string | undefined): number {
   return Number.isSafeInteger(seconds) && seconds > 0 ? seconds : DEFAULT_BILLING_HEARTBEAT_SECONDS;
 }
 
-// oxlint-disable-next-line no-empty-object-type -- Matches the Sandbox 0.12.1 constructor.
+// oxlint-disable-next-line no-empty-object-type -- Matches the Sandbox 0.12.9 constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
 type ContainerStopParams = { reason: 'exit' | 'runtime_signal'; exitCode?: number };
 

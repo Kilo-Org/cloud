@@ -427,7 +427,7 @@ export function createSandboxControlClient(
         },
       });
     }
-    if (Buffer.byteLength(response) >= MAX_SANDBOX_CONTROL_FRAME_BYTES) {
+    if (Buffer.byteLength(response) > MAX_SANDBOX_CONTROL_FRAME_BYTES) {
       response = JSON.stringify({
         type: 'response',
         requestId: request.requestId,
@@ -538,7 +538,11 @@ export function createSandboxControlClient(
       }
 
       function onMessage(event: MessageEvent): void {
-        if (typeof event.data !== 'string') return;
+        if (
+          typeof event.data !== 'string' ||
+          Buffer.byteLength(event.data) > MAX_SANDBOX_CONTROL_FRAME_BYTES
+        )
+          return;
         if (state !== starting && !(state.kind === 'ready' && state.socket === ws)) return;
         if (state === starting && phase === 'finished') return;
         let parsedJson: unknown;

@@ -18,6 +18,7 @@ import {
   sessionRuntimeRetirePayloadSchema,
   sessionEventPayloadSchema,
   sessionGitSummaryPayloadSchema,
+  sessionGitSnapshotPayloadSchema,
   sessionPreparingPayloadSchema,
   sessionPermissionResolvePayloadSchema,
   sessionPromptPayloadSchema,
@@ -59,6 +60,7 @@ const REQUEST_PAYLOAD_SCHEMAS: Record<ControlOperation, z.ZodType> = {
   'session.abort': sessionAbortPayloadSchema,
   'session.sync': sessionSyncPayloadSchema,
   'session.git.summary': sessionGitSummaryPayloadSchema,
+  'session.git.snapshot': sessionGitSnapshotPayloadSchema,
   'session.detach': sessionDetachPayloadSchema,
   'session.runtime.retire': sessionRuntimeRetirePayloadSchema,
   'session.terminal.create': sessionTerminalCreatePayloadSchema,
@@ -137,7 +139,7 @@ export function parseControlFrame(message: string | ArrayBuffer): FrameParseResu
   if (bytes > MAX_SANDBOX_CONTROL_FRAME_BYTES) {
     return {
       ok: false,
-      error: { code: 'payload_too_large', message: 'Frame exceeds 1 MiB limit' },
+      error: { code: 'payload_too_large', message: 'Frame exceeds 12 MiB limit' },
     };
   }
 

@@ -26,6 +26,11 @@ export const GLANCEABLE_TERMINAL_MS = 8000;
  */
 export const GLANCEABLE_IDLE_ONLY_MS = 600_000;
 /**
+ * Delay before an idle-only Live Activity is handed to ActivityKit. Brief
+ * idle↔busy flips must update the same card, not end it and start another.
+ */
+export const GLANCEABLE_IDLE_END_DEBOUNCE_MS = 5_000;
+/**
  * A Live Activity that has taken no update for this long reads as unknown, not
  * as current: ActivityKit dims stale content. Every real transition pushes an
  * update well inside the window, and an idle card is already gone by then.

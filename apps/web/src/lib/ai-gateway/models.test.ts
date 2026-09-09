@@ -200,21 +200,21 @@ describe('isFreeModel', () => {
         'poolside/laguna-s-2.1:free': { enabled: true, effort: 'high' },
         'nvidia/nemotron-3-ultra-550b-a55b:free': { enabled: true, effort: 'high' },
         'dots-studio/dots-3-note-preview:free': { enabled: true, effort: 'high' },
+        'nex-agi/nex-n2.5-pro:free': { enabled: true, effort: 'high' },
       });
     });
 
-    test('keeps Step at half of Auto Free selections', () => {
+    test('weights every Auto Free model equally', () => {
       const weights = Object.fromEntries(
         autoFreeModels.map(({ model, weight }) => [model, weight])
       );
       expect(weights).toEqual({
-        'stepfun/step-3.7-flash:free': 3,
+        'stepfun/step-3.7-flash:free': 1,
         'poolside/laguna-s-2.1:free': 1,
         'nvidia/nemotron-3-ultra-550b-a55b:free': 1,
         'dots-studio/dots-3-note-preview:free': 1,
+        'nex-agi/nex-n2.5-pro:free': 1,
       });
-      const halfOfTotalWeight = autoFreeModels.reduce((total, { weight }) => total + weight, 0) / 2;
-      expect(weights['stepfun/step-3.7-flash:free']).toBe(halfOfTotalWeight);
     });
 
     test('uses autoFreeModels weights when selecting a model', () => {

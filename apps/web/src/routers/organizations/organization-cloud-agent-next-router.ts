@@ -42,6 +42,7 @@ import {
   baseGetSandboxStatusNextSchema,
   baseGetSandboxStatusNextOutputSchema,
   baseWorktreeChangesNextSchema,
+  baseWorktreeFileNextSchema,
   baseAnswerQuestionNextSchema,
   baseRejectQuestionNextSchema,
   baseAnswerPermissionNextSchema,
@@ -89,6 +90,7 @@ import { isMobileClient } from '@/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
 import {
   getWorktreeChangesOutputSchema,
+  getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 
@@ -202,6 +204,10 @@ const GetSandboxStatusInput = baseGetSandboxStatusNextSchema.extend({
 });
 
 const WorktreeChangesInput = baseWorktreeChangesNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const WorktreeFileInput = baseWorktreeFileNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -528,6 +534,28 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       const client = createCloudAgentNextClient(authToken);
       return await client.refreshWorktreeChanges(input.cloudAgentSessionId);
+    }),
+
+  getWorktreeFile: organizationMemberProcedure
+    .input(WorktreeFileInput)
+    .output(getWorktreeFileOutputSchema)
+    .query(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+      const authToken = await createCloudAgentControlToken(
+        ctx.user,
+        ctx.headersList,
+        input.organizationId
+      );
+      const client = createCloudAgentNextClient(authToken);
+      return await client.getWorktreeFile({
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        path: input.path,
+        expectedRevision: input.expectedRevision,
+      });
     }),
 
   createTerminal: organizationMemberMutationProcedure

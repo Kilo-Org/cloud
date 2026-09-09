@@ -26,7 +26,6 @@ import {
 } from '@/lib/hooks/use-language-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePreventRemove } from '@/lib/navigation/prevent-remove';
-import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 
 const SEARCH_RTL = { textAlign: 'right' } as const;
 
@@ -89,8 +88,6 @@ export function LanguagePickerSheet({
       setReloadFailed(false);
     }, [])
   );
-
-  useFocusEffect(useCallback(() => subscribePrivacyCover(closePicker), [closePicker]));
 
   const deviceEndonym = LANGUAGE_ENDONYMS[resolveDeviceLanguage()];
   // The native layout direction, not the catalog's: the row insets and the

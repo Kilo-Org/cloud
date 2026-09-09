@@ -45,6 +45,7 @@ import {
   FeedbackFor,
   FeedbackSource,
   CliSessionSharedState,
+  WorkspaceFolderColor,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -93,6 +94,7 @@ import {
   ImpactReferralPaymentProvider,
   ImpactConversionReportState,
   ImpactAdvocateRewardRedemptionState,
+  RepositoryReviewMode,
   BYOKManagementSource,
   CodingPlanCredentialStatus,
   CodingPlanSubscriptionStatus,
@@ -224,6 +226,7 @@ export const SCHEMA_CHECK_ENUMS = {
   KiloPassOrgBonusMode,
   KiloPassOrgIssuanceKind,
   CliSessionSharedState,
+  WorkspaceFolderColor,
   SecurityAuditLogAction,
   SecurityAuditLogActorType,
   SecurityFindingAuditSourceContext,
@@ -294,6 +297,7 @@ export const SCHEMA_CHECK_ENUMS = {
   MCPGatewayAuthorizationRequestStatus,
   MCPGatewayPendingProviderAuthorizationStatus,
   MCPGatewayAuditOutcome,
+  RepositoryReviewMode,
 } as const;
 
 export type AffiliateEventPayloadJson = {
@@ -4241,6 +4245,11 @@ export const platform_integrations = pgTable(
     // GitHub App type (for GitHub platform only)
     // 'standard' = full KiloConnect app, 'lite' = read-only KiloConnect-Lite app
     github_app_type: text().$type<'standard' | 'lite'>().default('standard'),
+    github_installation_id: uuid(),
+    github_disconnected_at: timestamp({ withTimezone: true, mode: 'string' }),
+    github_authorized_by_user_id: text(),
+    github_authorized_user_id: text(),
+    github_authorized_at: timestamp({ withTimezone: true, mode: 'string' }),
 
     // Timestamps
     installed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4316,6 +4325,130 @@ export const platform_integrations = pgTable(
 );
 
 export type PlatformIntegration = typeof platform_integrations.$inferSelect;
+
+export const github_app_installations = pgTable(
+  'github_app_installations',
+  {
+    id: idPrimaryKeyColumn,
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    installation_id: text().notNull(),
+    account_id: text(),
+    account_login: text(),
+    account_type: text().$type<'Organization' | 'User'>(),
+    permissions: jsonb().$type<IntegrationPermissions>(),
+    scopes: text().array(),
+    repository_access: text(),
+    repositories: jsonb().$type<PlatformRepository<number | string>[]>(),
+    repositories_synced_at: timestamp({ withTimezone: true, mode: 'string' }),
+    lifecycle_state: text()
+      .$type<'unknown' | 'active' | 'suspended' | 'deleted'>()
+      .notNull()
+      .default('unknown'),
+    suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
+    deleted_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_at: timestamp({ withTimezone: true, mode: 'string' }),
+    auth_invalid_reason: text(),
+    revision: integer().notNull().default(0),
+    observed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    uniqueIndex('UQ_github_app_installations_app_installation').on(
+      table.github_app_type,
+      table.installation_id
+    ),
+    check(
+      'github_app_installations_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+    check(
+      'github_app_installations_installation_id_check',
+      sql`${table.installation_id} ~ '^[1-9][0-9]*$'`
+    ),
+    check(
+      'github_app_installations_lifecycle_state_check',
+      sql`${table.lifecycle_state} IN ('unknown', 'active', 'suspended', 'deleted')`
+    ),
+  ]
+);
+
+export const github_connection_attempts = pgTable(
+  'github_connection_attempts',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text().notNull(),
+    owner_type: text().$type<'user' | 'org'>().notNull(),
+    owner_id: text().notNull(),
+    github_app_type: text().$type<'standard' | 'lite'>().notNull(),
+    return_to: text(),
+    selected_installation_id: text(),
+    github_user_id: text(),
+    eligible_installations: jsonb(),
+    completed_integration_id: uuid().references(() => platform_integrations.id, {
+      onDelete: 'set null',
+    }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    consumed_at: timestamp({ withTimezone: true, mode: 'string' }),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_github_connection_attempts_expires_at').on(table.expires_at),
+    index('IDX_github_connection_attempts_completed_integration_id').on(
+      table.completed_integration_id
+    ),
+    check(
+      'github_connection_attempts_owner_type_check',
+      sql`${table.owner_type} IN ('user', 'org')`
+    ),
+    check(
+      'github_connection_attempts_app_type_check',
+      sql`${table.github_app_type} IN ('standard', 'lite')`
+    ),
+  ]
+);
+
+// Per-repository overrides for an installation's default bot-mention model
+// and automatic PR review mode. Both columns are nullable: null means
+// "inherit the installation default" (stored in `platform_integrations.metadata`),
+// not "disabled". A row with all-null overrides is equivalent to having no row.
+export const repository_customizations = pgTable(
+  'repository_customizations',
+  {
+    id: idPrimaryKeyColumn,
+    platform_integration_id: uuid()
+      .notNull()
+      .references(() => platform_integrations.id, { onDelete: 'cascade' }),
+    // The platform's repository identifier (e.g. GitHub's numeric repository
+    // ID, stable across renames/transfers), stored as text so platforms with
+    // non-numeric IDs are representable; not the repository's owner/name string.
+    repository_id: text().notNull(),
+    bot_mention_model_slug: text(),
+    pr_review_mode: text().$type<RepositoryReviewMode>(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_repository_customizations_integration_repository').on(
+      table.platform_integration_id,
+      table.repository_id
+    ),
+    enumCheck(
+      'repository_customizations_pr_review_mode_check',
+      table.pr_review_mode,
+      RepositoryReviewMode
+    ),
+  ]
+);
+
+export type RepositoryCustomization = typeof repository_customizations.$inferSelect;
+export type NewRepositoryCustomization = typeof repository_customizations.$inferInsert;
 
 export const user_github_app_tokens = pgTable(
   'user_github_app_tokens',
@@ -5721,6 +5854,9 @@ export const cloud_agent_code_review_attempts = pgTable(
       table.attempt_number
     ),
     index('idx_cloud_agent_code_review_attempts_code_review_id').on(table.code_review_id),
+    index('idx_cloud_agent_code_review_attempts_retry_of_attempt_id')
+      .on(table.retry_of_attempt_id)
+      .concurrently(),
     index('idx_cloud_agent_code_review_attempts_session_id').on(table.session_id),
     index('idx_cloud_agent_code_review_attempts_cli_session_id').on(table.cli_session_id),
     index('idx_cloud_agent_code_review_attempts_status').on(table.status),
@@ -5938,6 +6074,39 @@ export const sharedCliSessions = pgTable(
 
 export type SharedCliSession = typeof sharedCliSessions.$inferSelect;
 
+export const cloud_agent_workspace_folders = pgTable(
+  'cloud_agent_workspace_folders',
+  {
+    id: idPrimaryKeyColumn,
+    kilo_user_id: text()
+      .notNull()
+      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
+    name: text().notNull(),
+    color: text().$type<WorkspaceFolderColor>().notNull().default(WorkspaceFolderColor.Default),
+    position: integer().notNull(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    index('IDX_cloud_agent_workspace_folders_owner_scope_order').on(
+      table.kilo_user_id,
+      table.organization_id,
+      table.position,
+      table.id
+    ),
+    enumCheck('cloud_agent_workspace_folders_color_check', table.color, WorkspaceFolderColor),
+    check(
+      'cloud_agent_workspace_folders_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 200 AND ${table.name} = btrim(${table.name})`
+    ),
+    check('cloud_agent_workspace_folders_position_check', sql`${table.position} >= 0`),
+  ]
+);
+
 export const cloud_agent_worktrees = pgTable(
   'cloud_agent_worktrees',
   {
@@ -5946,6 +6115,7 @@ export const cloud_agent_worktrees = pgTable(
       .notNull()
       .references(() => kilocode_users.id, { onDelete: 'restrict' }),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'restrict' }),
+    folder_id: uuid().references(() => cloud_agent_workspace_folders.id, { onDelete: 'set null' }),
     name: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -5966,6 +6136,9 @@ export const cloud_agent_worktrees = pgTable(
   },
   table => [
     index('IDX_cloud_agent_worktrees_owner_scope').on(table.kilo_user_id, table.organization_id),
+    index('IDX_cloud_agent_worktrees_folder_id')
+      .on(table.folder_id)
+      .where(isNotNull(table.folder_id)),
     check(
       'cloud_agent_worktrees_deletion_check',
       sql`${table.deletion_completed_at} IS NULL OR (${table.deletion_started_at} IS NOT NULL AND ${table.name} IS NULL AND ${table.deletion_manifest} IS NULL AND ${table.runtime_locations} = '[]'::jsonb)`

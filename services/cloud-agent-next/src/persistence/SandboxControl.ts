@@ -711,7 +711,9 @@ export class SandboxControl extends DurableObject<Env> {
 
   async request(input: SandboxControlOutboundRequest): Promise<ResponseFrame> {
     await this.ensureOperationalInitialized();
-    if (input.operation === 'session.git.summary') return this.requestWorktreeChanges(input);
+    if (input.operation === 'session.git.summary' || input.operation === 'session.git.snapshot') {
+      return this.requestWorktreeChanges(input);
+    }
     const scopedStop =
       input.operation === 'session.abort' ? parseScopedStopMaintenance(input.payload) : undefined;
     if (

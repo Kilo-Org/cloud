@@ -41,6 +41,11 @@ type ScreenHeaderProps = {
    */
   onTitlePressAccessibilityLabel?: string;
   backIcon?: 'back' | 'close';
+  /**
+   * Apply the status-bar safe-area inset. Form sheets already clear the
+   * grabber; passing false leaves vertical padding to `className`.
+   */
+  safeAreaTop?: boolean;
   /** Extra classes on the outer header container. Overrides the default `px-4` for screens that need a different horizontal inset. */
   className?: string;
 };
@@ -63,6 +68,7 @@ export function ScreenHeader({
   onTitlePress,
   onTitlePressAccessibilityLabel,
   backIcon,
+  safeAreaTop = true,
   className,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useSafeAreaInsets();
@@ -151,7 +157,10 @@ export function ScreenHeader({
   const separateHeading = centerTitle && (Boolean(title) || Boolean(eyebrow));
 
   return (
-    <View className={cn('bg-background px-4 pb-3', className)} style={{ paddingTop }}>
+    <View
+      className={cn('bg-background px-4 pb-3', className)}
+      style={safeAreaTop ? { paddingTop } : undefined}
+    >
       {separateHeading && <View className="min-h-11 flex-row items-center">{heading}</View>}
       <View className="flex-row items-center">
         <View className="min-w-0 flex-1 flex-row items-center gap-1">

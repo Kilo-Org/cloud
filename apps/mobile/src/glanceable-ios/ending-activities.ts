@@ -106,3 +106,12 @@ export function endExtra(instance: Activity, id: string): void {
   endingActivities.set(id, ending);
   void scheduleEnd(ending);
 }
+
+export function endOtherVisible(keptId: string, instances: readonly Activity[]): void {
+  for (const instance of instances) {
+    const id = instance.getInfo().id;
+    if (id !== keptId && instance.getInfo().state !== 'dismissed') {
+      endExtra(instance, id);
+    }
+  }
+}

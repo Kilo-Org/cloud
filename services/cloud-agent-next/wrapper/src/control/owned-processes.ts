@@ -60,7 +60,8 @@ type Cgroup = {
   kill?: number;
 };
 
-const OBSERVATION_TIMEOUT_MS = 1_000;
+export const OWNED_PROCESS_OBSERVATION_TIMEOUT_MS = 1_000;
+const OBSERVATION_TIMEOUT_MS = OWNED_PROCESS_OBSERVATION_TIMEOUT_MS;
 const current = new AsyncLocalStorage<OwnedProcessScope>();
 
 export function currentOwnedProcessScope(): OwnedProcessScope | undefined {
@@ -392,8 +393,10 @@ export function createOwnedProcessScope(): OwnedProcessScope {
   let removed = false;
   let used = false;
   let stopping: Promise<boolean> | undefined;
+  let stopResult: boolean | undefined;
   let stopDeadline: Deadline | undefined;
   let stopped = false;
+  let cgroupRemoval: Promise<boolean> | undefined;
   const children = new Set<OwnedChild>();
   const baseline = new Set<string>();
   const observations = new Set<Deadline>();
@@ -560,6 +563,7 @@ export function createOwnedProcessScope(): OwnedProcessScope {
     dispose() {
       sealed = true;
       if (removed) return true;
+      if (stopped) return true;
       if (used && (!occupancyObservable() || [...children].some(live))) return false;
       if (
         group &&
@@ -625,7 +629,7 @@ export function createOwnedProcessScope(): OwnedProcessScope {
     },
     async verify(allowBaseline = false, deadlineAt = Date.now() + OBSERVATION_TIMEOUT_MS) {
       if (stopped || removed || !used) return true;
-      if (stopping) return false;
+      if (stopping && stopResult !== false) return false;
       const deadline = createDeadline(deadlineAt);
       observations.add(deadline);
       try {
@@ -646,8 +650,12 @@ export function createOwnedProcessScope(): OwnedProcessScope {
       }
       const deadline = createDeadline(deadlineAt);
       stopDeadline = deadline;
+      let deathProven = false;
       const run = async (): Promise<boolean> => {
-        if (await verify(false, deadline)) return true;
+        if (await verify(false, deadline)) {
+          deathProven = true;
+          return true;
+        }
         await signalChildren('SIGTERM', deadline);
         if ([...children].some(live)) {
           const graceMs = Math.min(250, Math.max(0, (deadline.deadlineAt - Date.now()) / 2));
@@ -667,23 +675,39 @@ export function createOwnedProcessScope(): OwnedProcessScope {
         await signalChildren('SIGKILL', deadline);
         if (!occupancyObservable()) return false;
         while (true) {
-          if (await verify(false, deadline)) return true;
+          if (await verify(false, deadline)) {
+            deathProven = true;
+            return true;
+          }
           await deadline.wait(signal => delay(25, undefined, { signal }));
         }
       };
+      const removeCgroupAfterDeath = (): void => {
+        if (!group || removed || cgroupRemoval) return;
+        const removalDeadline = createDeadline(deadline.deadlineAt);
+        cgroupRemoval = removeCgroupBeforeDeadline(group, removalDeadline)
+          .catch(() => false)
+          .then(result => {
+            if (result) removed = true;
+            return result;
+          })
+          .finally(() => removalDeadline.close());
+      };
       stopping = deadline
-        .wait(async () => {
-          if (!(await run())) return false;
-          deadline.check();
-          if (!group || removed || (await removeCgroupBeforeDeadline(group, deadline))) {
-            removed = true;
-            children.clear();
-          }
-          deadline.check();
+        .wait(run)
+        .catch(() => deathProven)
+        .then(result => {
+          if (!result) return false;
           stopped = true;
+          children.clear();
+          removeCgroupAfterDeath();
           return true;
         })
         .catch(() => false)
+        .then(result => {
+          stopResult = result;
+          return result;
+        })
         .finally(() => deadline.close());
       return stopping;
     },

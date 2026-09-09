@@ -1,5 +1,6 @@
-import { afterEach, describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
 import { once } from 'node:events';
+import * as fs from 'node:fs';
 import { runProcess } from '../utils.js';
 import { createOwnedProcessScope } from './owned-processes.js';
 
@@ -39,6 +40,32 @@ describe('owned process scopes', () => {
     expect(stopped).toBe(await scope.verify(false));
     await exited;
     if (process.platform !== 'linux') expect(await scope.verify(false)).toBe(false);
+  });
+
+  it('keeps proven death after a bounded cgroup removal failure on Linux', async () => {
+    if (process.platform !== 'linux') return;
+    const scope = createOwnedProcessScope();
+    spawned.push(scope);
+    const child = scope.spawn(process.execPath, ['-e', 'process.exit(0)'], {
+      cwd: process.cwd(),
+      env: process.env,
+    });
+    await once(child, 'exit');
+    if (!scope.observesOccupancy()) {
+      throw new Error('Dedicated Linux containment proof requires a usable cgroup');
+    }
+    const removal = spyOn(fs, 'rmdirSync').mockImplementation(() => {
+      throw new Error('simulated cgroup removal failure');
+    });
+    try {
+      expect(await scope.stop(Date.now() + 1_000)).toBe(true);
+      const deadlineAt = Date.now() + 1_000;
+      while (removal.mock.calls.length === 0 && Date.now() < deadlineAt) await Bun.sleep(5);
+      expect(removal).toHaveBeenCalled();
+      expect(await scope.verify(false)).toBe(true);
+    } finally {
+      removal.mockRestore();
+    }
   });
 
   it('removes a delayed descendant that outlives its tracked parent when containment is available', async () => {

@@ -66,7 +66,7 @@ type UncertainOperation = {
   reason: 'missing' | 'unverified' | 'transport';
   error?: unknown;
 };
-type RejectedOperation = { state: 'rejected'; error: ControlError };
+type RejectedOperation = { state: 'rejected'; error: ControlError; rejectionReceived?: true };
 export type SessionOperationObservation =
   | RunningOperation
   | CompletedOperation
@@ -79,11 +79,15 @@ export type SessionOperationDispatch =
   | UncertainOperation
   | RejectedOperation;
 
-function rejectedOrUncertain(error: unknown): RejectedOperation | UncertainOperation {
+function rejectedOrUncertain(
+  error: unknown,
+  captureRejection = false
+): RejectedOperation | UncertainOperation {
   return error instanceof ControlRequestError
     ? {
         state: 'rejected',
         error: { code: error.code, message: error.message, retryable: error.retryable },
+        ...(captureRejection && error.rejectionReceived ? { rejectionReceived: true } : {}),
       }
     : { state: 'uncertain', reason: 'transport', error };
 }
@@ -193,7 +197,11 @@ export async function dispatchSessionOperation(
       );
       if (lookup.state !== 'completed') return lookup;
       if (!lookup.delivery.result.ok)
-        return { state: 'rejected', error: lookup.delivery.result.error };
+        return {
+          state: 'rejected',
+          error: lookup.delivery.result.error,
+          rejectionReceived: true,
+        };
       if (kind === 'attach') {
         const completed = completeSessionOperationAttachment(messages.read(), authorization);
         if (!completed || !messages.commit(completed))
@@ -253,7 +261,7 @@ export async function dispatchSessionOperation(
       return { state: 'response', result: prompt };
     } catch (error) {
       if (rejectedBeforeAdmission(error)) record(false);
-      return rejectedOrUncertain(error);
+      return rejectedOrUncertain(error, true);
     }
   } catch (error) {
     return rejectedOrUncertain(error);
@@ -263,7 +271,11 @@ export async function dispatchSessionOperation(
 export function operationDispatchError(
   result: Exclude<SessionOperationDispatch, { state: 'response' } | { state: 'completed' }>
 ): ControlRequestError {
-  if (result.state === 'rejected') return new ControlRequestError(result.error);
+  if (result.state === 'rejected')
+    return new ControlRequestError(
+      result.error,
+      result.rejectionReceived ? { rejectionReceived: true } : undefined
+    );
   if (result.state === 'running')
     return new ControlRequestError({
       code: 'session_busy',

@@ -2332,6 +2332,20 @@ setInterval(() => {}, 1000);
     expect(registry.get(isolatedDirectory)).toBe(isolatedRuntime);
   });
 
+  it('keeps positive process-death proof authoritative after the cleanup deadline', async () => {
+    const harness = createRegistry();
+    const directory = path.join(tmpDir, 'deadline');
+    const runtime = await harness.registry.ensure(directory, auth);
+
+    expect(
+      await harness.registry.retireRuntime?.(directory, Date.now() - 1, {
+        runtimeId: runtime.runtimeId,
+        client: runtime.kiloClient,
+      })
+    ).toBe('retired');
+    expect(harness.registry.get(directory)).toBeUndefined();
+  });
+
   it('retains failed native cleanup ownership without affecting another runtime', async () => {
     const unresolvedProcesses = { stop: async () => false } as unknown as OwnedProcessScope;
     const registry = createWorktreeKiloRuntimes({
@@ -2374,6 +2388,92 @@ setInterval(() => {}, 1000);
     expect(() => registry.attach(rootIdentity(failedDirectory, 'retry'), auth)).toThrow(
       'Native runtime retirement is unconfirmed'
     );
+  });
+
+  it('re-observes an unconfirmed runtime only for an authorized attach demand', async () => {
+    const absent = Promise.withResolvers<boolean>();
+    const exited = Promise.withResolvers<void>();
+    let launches = 0;
+    let observations = 0;
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        const first = launches++ === 0;
+        options.onProcessScope?.({
+          stop: async () => false,
+          verify: async () => {
+            observations += 1;
+            return first ? absent.promise : true;
+          },
+        } as unknown as OwnedProcessScope);
+        return {
+          url: server.url,
+          close: () => {},
+          ...(first ? { exited: exited.promise } : {}),
+        };
+      },
+    });
+    const directory = path.join(tmpDir, 'demand-attach');
+    const runtime = await harness.registry.ensure(directory, auth);
+    exited.resolve();
+    await waitUntil(() => harness.registry.isHealthy() === false);
+
+    expect(() =>
+      harness.registry.attach(rootIdentity(directory, 'unauthorized'), {
+        ...auth,
+        token: 'wrong-token',
+      })
+    ).toThrow('Kilo worktree auth context mismatch');
+    expect(observations).toBe(0);
+
+    expect(() => harness.registry.attach(rootIdentity(directory, 'retry'), auth)).toThrow(
+      'Native runtime retirement is unconfirmed'
+    );
+    await waitUntil(() => observations === 1);
+    absent.resolve(true);
+    await waitUntil(() => harness.registry.getRetained?.(directory) === undefined);
+    expect(harness.registry.isHealthy()).toBe(true);
+
+    const replacement = harness.registry.attach(rootIdentity(directory, 'replacement'), auth);
+    expect(await replacement.ready).not.toBe(runtime);
+    replacement.commit();
+    replacement.release();
+  });
+
+  it('awaits the same bounded observation when deleting an unconfirmed runtime', async () => {
+    const absent = Promise.withResolvers<boolean>();
+    let observations = 0;
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => false,
+          verify: async () => {
+            observations += 1;
+            return absent.promise;
+          },
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close: () => {} };
+      },
+    });
+    const directory = path.join(tmpDir, 'demand-delete');
+    const runtime = await harness.registry.ensure(directory, auth);
+    harness.registry.detach(rootIdentity(directory));
+    await waitUntil(() => harness.registry.getRetained?.(directory) === runtime);
+
+    let settled = false;
+    const deletion = harness.registry.deleteDirectory(directory).then(() => {
+      settled = true;
+    });
+    await waitUntil(() => observations === 1);
+    expect(settled).toBe(false);
+    absent.resolve(true);
+    await deletion;
+    expect(settled).toBe(true);
+    expect(harness.registry.getRetained?.(directory)).toBeUndefined();
+    expect(fs.existsSync(runtime.env.HOME)).toBe(false);
   });
 
   it('does not treat a stopped parent as native retirement proof without an owned scope', async () => {

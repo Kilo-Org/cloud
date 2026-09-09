@@ -455,9 +455,16 @@ export function createWorktreeKiloRuntimes(options: {
         failedDirectories.delete(entry.directory);
         return true;
       })
-      .finally(() => {
-        if (entry.observing === observation) entry.observing = undefined;
-      });
+      .then(
+        proven => {
+          if (!proven && entry.observing === observation) entry.observing = undefined;
+          return proven;
+        },
+        error => {
+          if (entry.observing === observation) entry.observing = undefined;
+          throw error;
+        }
+      );
     entry.observing = observation;
     return observation;
   }
@@ -901,7 +908,8 @@ export function createWorktreeKiloRuntimes(options: {
           abortMessage: 'Kilo worktree retirement cancelled',
         });
         if (quiescent !== 'retired' && entry.retirementResult === 'unconfirmed') {
-          if (await observeRetained(entry)) quiescent = 'retired';
+          if ((await observeRetained(entry)) || entries.get(directory) !== entry)
+            quiescent = 'retired';
         }
         if (quiescent !== 'retired') throw new Error('Native worktree cleanup is unconfirmed');
       }

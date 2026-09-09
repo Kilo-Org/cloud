@@ -1,5 +1,5 @@
 import type { WorkerDb } from '@kilocode/db/client';
-import { kilocode_users, security_findings } from '@kilocode/db/schema';
+import { kilocode_users, platform_integrations, security_findings } from '@kilocode/db/schema';
 import {
   SecurityAuditLogAction,
   SecurityFindingAuditSourceContext,
@@ -12,7 +12,7 @@ import {
   type SecurityFindingAuditHumanActor,
   type SecurityFindingAuditOwner,
 } from '@kilocode/worker-utils/security-finding-audit';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { SecurityDismissMessage } from './index.js';
 
 type FindingDismissalResult = {
@@ -141,6 +141,7 @@ export async function processSecurityFindingDismissal(params: {
         session_id: security_findings.session_id,
         owned_by_organization_id: security_findings.owned_by_organization_id,
         owned_by_user_id: security_findings.owned_by_user_id,
+        platform_integration_id: security_findings.platform_integration_id,
       })
       .from(security_findings)
       .where(eq(security_findings.id, params.message.findingId))
@@ -190,7 +191,34 @@ export async function processSecurityFindingDismissal(params: {
     }
 
     await timedDismissalStage('github_writeback', stageContext, async () => {
-      const token = await params.gitTokenService.getToken(params.message.installationId);
+      if (!finding.platform_integration_id) {
+        throw new Error('GitHub integration unavailable for finding');
+      }
+      const [integration] = await params.db
+        .select({ githubAppType: platform_integrations.github_app_type })
+        .from(platform_integrations)
+        .where(
+          and(
+            eq(platform_integrations.id, finding.platform_integration_id),
+            eq(platform_integrations.platform, 'github'),
+            eq(platform_integrations.integration_type, 'app'),
+            eq(platform_integrations.integration_status, 'active'),
+            isNull(platform_integrations.github_disconnected_at),
+            params.message.owner.organizationId
+              ? eq(
+                  platform_integrations.owned_by_organization_id,
+                  params.message.owner.organizationId
+                )
+              : eq(platform_integrations.owned_by_user_id, params.message.owner.userId ?? '')
+          )
+        )
+        .limit(1);
+      if (!integration) throw new Error('GitHub integration unavailable for finding');
+      const token = await params.gitTokenService.getToken(
+        params.message.installationId,
+        integration.githubAppType ?? 'standard',
+        finding.platform_integration_id
+      );
       const response = await fetch(
         `https://api.github.com/repos/${target.repoOwner}/${target.repoName}/dependabot/alerts/${target.alertNumber}`,
         {

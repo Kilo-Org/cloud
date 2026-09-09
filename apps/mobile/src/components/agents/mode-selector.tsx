@@ -68,12 +68,14 @@ export function ModeSelector({
       accessibilityLabel={t('agentChat.modeSelector.accessibility', { label: selectedLabel })}
       accessibilityState={{ disabled }}
       className={cn(
-        'flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
+        'shrink-0 flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 active:opacity-70',
         disabled && 'opacity-50'
       )}
     >
       <ModeIcon size={14} color={colors.foreground} />
-      <Text className="text-sm font-medium text-foreground">{selectedLabel}</Text>
+      <Text className="text-sm font-medium text-foreground" numberOfLines={1}>
+        {selectedLabel}
+      </Text>
       <ChevronDown size={14} color={colors.mutedForeground} />
     </Pressable>
   );

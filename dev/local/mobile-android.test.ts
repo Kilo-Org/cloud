@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -8,22 +10,205 @@ import {
   androidEmulatorSession,
   claimAndroidDevice,
   commandMatchesRecordedEmulator,
+  DEFAULT_CONSOLE_PORT_WAIT_MS,
   findAvailableEmulatorPort,
   isValidEmulatorRecord,
+  launchedProcessOwnsConsolePort,
   parseEmulatorStartArgs,
+  portIsListening,
   processOwnsListeningPort,
+  procListeningPorts,
   readGradleWrapperVersion,
   releaseAndroidDevice,
   releaseWorktreeAndroidDevices,
   resolveAndroidEnvironment,
   signalProcessIfPresent,
+  startAndroidEmulator,
 } from './mobile-android';
+import type { AndroidEnvironment } from './mobile-android';
+
+const listeningEnv = { emulator: '/opt/android-sdk/emulator/emulator' } as AndroidEnvironment;
+
+async function listenOn(port: number): Promise<net.Server> {
+  const server = net.createServer(() => {});
+  await new Promise<void>(resolve => server.listen(port, '127.0.0.1', resolve));
+  return server;
+}
+
+async function closeServer(server: net.Server): Promise<void> {
+  await new Promise<void>(resolve => server.close(() => resolve()));
+}
 
 test('allocates the first free even emulator console port', () => {
   const occupied = new Set([5554, 5556]);
   assert.equal(
     findAvailableEmulatorPort(port => occupied.has(port)),
     5558
+  );
+});
+
+test('reads listening ports from the kernel socket table without asking lsof', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-proc-net-'));
+  const tcp = path.join(root, 'tcp');
+  const tcp6 = path.join(root, 'tcp6');
+  fs.writeFileSync(
+    tcp,
+    [
+      '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode',
+      '   0: 0100007F:15B2 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1001        0 59022068 1 0000000000000000 100 0 0 10 0',
+      '   1: 0100007F:15B3 00000000:0000 06 00000000:00000000 00:00000000 00000000  1001        0 59022069 1 0000000000000000 100 0 0 10 0',
+      '',
+    ].join('\n')
+  );
+  fs.writeFileSync(
+    tcp6,
+    [
+      '  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode',
+      '   2: 00000000000000000000000001000000:15B2 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000  1001        0 59022069 1 0000000000000000 100 0 0 10 0',
+      '',
+    ].join('\n')
+  );
+
+  assert.deepEqual([...procListeningPorts([tcp, tcp6])!].sort(), [5554]);
+});
+
+test('distinguishes an empty socket table from an unreadable one', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-proc-net-'));
+  const tcp = path.join(root, 'tcp');
+  fs.writeFileSync(
+    tcp,
+    '  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode\n'
+  );
+  assert.deepEqual([...procListeningPorts([tcp])!].sort(), []);
+  assert.equal(procListeningPorts([path.join(root, 'missing')]), undefined);
+});
+
+test('probes the socket, not the process, to decide a port is listening', async () => {
+  const server = await listenOn(0);
+  const port = (server.address() as net.AddressInfo).port;
+  try {
+    assert.equal(portIsListening(port), true);
+  } finally {
+    await closeServer(server);
+  }
+  assert.equal(portIsListening(port), false);
+});
+
+test('skips a bound console port when scanning for a free one', async () => {
+  const candidate = findAvailableEmulatorPort();
+  assert.ok(candidate !== undefined);
+  const server = await listenOn(candidate);
+  try {
+    assert.notEqual(findAvailableEmulatorPort(), candidate);
+  } finally {
+    await closeServer(server);
+  }
+});
+
+test('reports a listening port whose owning process lsof cannot inspect', async t => {
+  if (process.platform !== 'linux') return t.skip('setgid exec is a Linux mechanism');
+  if (spawnSync('sg', ['kvm', '-c', 'true']).status !== 0)
+    return t.skip('the kvm group is not available through sg');
+  const listenerSource = [
+    "const net = require('node:net');",
+    'const server = net.createServer(() => {});',
+    "server.listen(0, '127.0.0.1', () => console.log(server.address().port));",
+  ].join(';');
+  // sg clears the process dumpable flag on its setgid exec, the same effect
+  // the real emulator launch produces through `sg kvm`: /proc/<pid>/fd becomes
+  // root-owned and lsof cannot list the listener's sockets any more.
+  const child = spawn(
+    'sg',
+    ['kvm', '-c', `${process.execPath} -e ${JSON.stringify(listenerSource)}`],
+    { detached: true, stdio: ['ignore', 'pipe', 'ignore'] }
+  );
+  const port = await new Promise<number>((resolve, reject) => {
+    let out = '';
+    const timer = setTimeout(() => reject(new Error(`no port printed; got ${out}`)), 5000);
+    child.stdout!.on('data', chunk => {
+      out += chunk;
+      const match = out.match(/^\d+/);
+      if (match) {
+        clearTimeout(timer);
+        resolve(Number(match[0]));
+      }
+    });
+    child.on('error', error => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+  try {
+    if (
+      spawnSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN'], { stdio: 'ignore' }).status === 0
+    )
+      return t.skip('lsof can inspect the sg kvm child on this host; mechanism absent');
+    assert.equal(portIsListening(port), true);
+  } finally {
+    try {
+      process.kill(-child.pid!, 'SIGKILL');
+    } catch {
+      child.kill('SIGKILL');
+    }
+  }
+});
+
+test('accepts a launched emulator pid by identity when lsof cannot attribute the port', () => {
+  const command =
+    '/opt/android-sdk/emulator/qemu/linux-x86_64/qemu-system-x86_64 -avd Pixel_9 -port 5554 -no-snapshot-save';
+  assert.equal(
+    launchedProcessOwnsConsolePort(listeningEnv, 'Pixel_9', 5554, 123, () => [123]),
+    true
+  );
+  assert.equal(
+    launchedProcessOwnsConsolePort(listeningEnv, 'Pixel_9', 5554, 123, () => [456]),
+    false
+  );
+  assert.equal(
+    launchedProcessOwnsConsolePort(
+      listeningEnv,
+      'Pixel_9',
+      5554,
+      process.pid,
+      () => [],
+      () => command
+    ),
+    true
+  );
+  assert.equal(
+    launchedProcessOwnsConsolePort(
+      listeningEnv,
+      'Pixel_9',
+      5556,
+      process.pid,
+      () => [],
+      () => command
+    ),
+    false
+  );
+  assert.equal(
+    launchedProcessOwnsConsolePort(
+      listeningEnv,
+      'Pixel_8',
+      5554,
+      process.pid,
+      () => [],
+      () => command
+    ),
+    false
+  );
+  const exited = spawnSync('true');
+  assert.ok(exited.pid && exited.pid > 0);
+  assert.equal(
+    launchedProcessOwnsConsolePort(
+      listeningEnv,
+      'Pixel_9',
+      5554,
+      exited.pid,
+      () => [],
+      () => command
+    ),
+    false
   );
 });
 
@@ -369,4 +554,263 @@ test('reads the Gradle version from the worktree wrapper properties without laun
   );
 
   assert.equal(readGradleWrapperVersion(root), '8.14.3');
+});
+
+const launchEnv = {
+  adb: '/usr/bin/adb',
+  emulator: '/opt/android/emulator/emulator',
+  javaHome: '/usr/lib/jvm/temurin-17',
+  path: '/usr/bin',
+  sdkRoot: '/opt/android-sdk',
+};
+
+function launchHarness() {
+  const worktreeRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kilo-emulator-launch-'));
+  const session = androidEmulatorSession(worktreeRoot);
+  const slug = path.basename(worktreeRoot);
+  return {
+    worktreeRoot,
+    session,
+    pidFile: path.join(os.tmpdir(), `${session}.pid`),
+    recordPath: path.join(os.tmpdir(), 'kilo-mobile-android-emulators', `${slug}.json`),
+    cleanup: () => {
+      fs.rmSync(path.join(os.tmpdir(), `${session}.pid`), { force: true });
+      fs.rmSync(path.join(os.tmpdir(), 'kilo-mobile-android-emulators', `${slug}.json`), {
+        force: true,
+      });
+      fs.rmSync(
+        path.join(os.tmpdir(), 'kilo-mobile-android-emulators', `${slug}.json.${process.pid}.tmp`),
+        { force: true }
+      );
+      fs.rmSync(path.join(os.tmpdir(), `${session}.log`), { force: true });
+      fs.rmSync(worktreeRoot, { recursive: true, force: true });
+    },
+  };
+}
+
+type LaunchFakes = Parameters<typeof startAndroidEmulator>[4];
+// process.kill's signal parameter is `string | number | undefined`.
+type CapturedSignals = Array<string | number | undefined>;
+
+function liveEmulatorFakes(launched: { value: boolean }, signals: CapturedSignals): LaunchFakes {
+  return {
+    sleep: async () => {},
+    launchSession: (_session, _command, pidFile) => {
+      launched.value = true;
+      fs.writeFileSync(pidFile, '4242\n');
+    },
+    sessionExists: () => launched.value,
+    killSession: () => {},
+    portIsListening: () => launched.value,
+    listeningProcessIds: () => [4242],
+    processIsAlive: () => launched.value,
+    processCommand: () =>
+      '/opt/android/emulator/qemu/x86_64/qemu-system-x86_64-headless -avd Pixel_9 -port 5554',
+    signal: (_pid, signal) => {
+      signals.push(signal);
+      return true;
+    },
+  };
+}
+
+test('records an emulator once its process binds the console port', async () => {
+  const harness = launchHarness();
+  try {
+    const record = await startAndroidEmulator(
+      launchEnv,
+      harness.worktreeRoot,
+      'Pixel_9',
+      'host',
+      liveEmulatorFakes({ value: false }, [])
+    );
+
+    assert.equal(record.port, 5554);
+    assert.equal(record.serial, 'emulator-5554');
+    assert.equal(record.pid, 4242);
+    assert.equal(record.session, harness.session);
+    assert.equal(fs.existsSync(harness.recordPath), true);
+    assert.deepEqual(
+      JSON.parse(fs.readFileSync(harness.recordPath, 'utf8')),
+      JSON.parse(JSON.stringify(record))
+    );
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('a launch that misses the console-port budget kills the emulator it started', async () => {
+  const harness = launchHarness();
+  const launched = { value: false };
+  const signals: CapturedSignals = [];
+  const killedSessions: string[] = [];
+  try {
+    await assert.rejects(
+      startAndroidEmulator(launchEnv, harness.worktreeRoot, 'Pixel_9', 'host', {
+        ...liveEmulatorFakes(launched, signals),
+        portWaitMs: 200,
+        pollIntervalMs: 10,
+        report: () => {},
+        killSession: sessionName => killedSessions.push(sessionName),
+        portIsListening: () => false,
+      }),
+      /did not bind console port 5554 within 0\.2/
+    );
+    assert.deepEqual(killedSessions, [harness.session]);
+    assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+    assert.equal(fs.existsSync(harness.recordPath), false);
+    assert.equal(fs.existsSync(harness.pidFile), false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('a launch whose emulator dies while waiting for the console port leaves no record', async () => {
+  const harness = launchHarness();
+  const launched = { value: false };
+  const signals: CapturedSignals = [];
+  const killedSessions: string[] = [];
+  try {
+    await assert.rejects(
+      startAndroidEmulator(launchEnv, harness.worktreeRoot, 'Pixel_9', 'host', {
+        ...liveEmulatorFakes(launched, signals),
+        pollIntervalMs: 10,
+        report: () => {},
+        killSession: sessionName => killedSessions.push(sessionName),
+        portIsListening: () => false,
+        processIsAlive: () => !launched.value,
+        signal: (_pid, signal) => {
+          signals.push(signal);
+          return true;
+        },
+      }),
+      /exited during launch/
+    );
+    assert.deepEqual(killedSessions, [harness.session]);
+    assert.deepEqual(signals, []);
+    assert.equal(fs.existsSync(harness.recordPath), false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('a launch whose session never records its PID tears the session down', async () => {
+  const harness = launchHarness();
+  const launched = { value: false };
+  const signals: CapturedSignals = [];
+  const killedSessions: string[] = [];
+  try {
+    await assert.rejects(
+      startAndroidEmulator(launchEnv, harness.worktreeRoot, 'Pixel_9', 'host', {
+        ...liveEmulatorFakes(launched, signals),
+        pidWaitMs: 100,
+        pollIntervalMs: 10,
+        report: () => {},
+        killSession: sessionName => killedSessions.push(sessionName),
+        launchSession: () => {
+          launched.value = true;
+        },
+        signal: (_pid, signal) => {
+          signals.push(signal);
+          return true;
+        },
+      }),
+      /did not record its PID within 0\.1/
+    );
+    assert.deepEqual(killedSessions, [harness.session]);
+    assert.deepEqual(signals, []);
+    assert.equal(fs.existsSync(harness.recordPath), false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('a launch that fails the ownership check kills the emulator it started', async () => {
+  const harness = launchHarness();
+  const launched = { value: false };
+  const signals: CapturedSignals = [];
+  const killedSessions: string[] = [];
+  try {
+    await assert.rejects(
+      startAndroidEmulator(launchEnv, harness.worktreeRoot, 'Pixel_9', 'host', {
+        ...liveEmulatorFakes(launched, signals),
+        pollIntervalMs: 10,
+        report: () => {},
+        killSession: sessionName => killedSessions.push(sessionName),
+        listeningProcessIds: () => [999],
+      }),
+      /does not own console port 5554/
+    );
+    assert.deepEqual(killedSessions, [harness.session]);
+    assert.deepEqual(signals, ['SIGTERM', 'SIGKILL']);
+    assert.equal(fs.existsSync(harness.recordPath), false);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('reports progress while the console-port wait runs', async () => {
+  const harness = launchHarness();
+  const launched = { value: false };
+  const signals: CapturedSignals = [];
+  const progress: string[] = [];
+  try {
+    await assert.rejects(
+      startAndroidEmulator(launchEnv, harness.worktreeRoot, 'Pixel_9', 'host', {
+        ...liveEmulatorFakes(launched, signals),
+        portWaitMs: 100,
+        pollIntervalMs: 10,
+        report: message => progress.push(message),
+        killSession: () => {},
+        portIsListening: () => false,
+      }),
+      /did not bind console port/
+    );
+    assert.equal(progress.length, 3);
+    for (const message of progress) assert.match(message, /console port 5554/);
+  } finally {
+    harness.cleanup();
+  }
+});
+
+test('the console-port budget covers a cold boot by default and honors its override', async () => {
+  // Observed cold boots on the Linux VM bind the console port at 45-48 s.
+  assert.equal(DEFAULT_CONSOLE_PORT_WAIT_MS, 120_000);
+  assert.ok(DEFAULT_CONSOLE_PORT_WAIT_MS >= 60_000);
+
+  const harness = launchHarness();
+  const launched = { value: false };
+  const signals: CapturedSignals = [];
+  const envName = 'KILO_EMULATOR_CONSOLE_PORT_WAIT_MS';
+  process.env[envName] = '250';
+  try {
+    await assert.rejects(
+      startAndroidEmulator(launchEnv, harness.worktreeRoot, 'Pixel_9', 'host', {
+        ...liveEmulatorFakes(launched, signals),
+        report: () => {},
+        killSession: () => {},
+        portIsListening: () => false,
+      }),
+      /did not bind console port 5554 within 0\.25s/
+    );
+  } finally {
+    delete process.env[envName];
+    harness.cleanup();
+  }
+});
+
+test('rejects a console-port budget override that is not a positive number', async () => {
+  const harness = launchHarness();
+  const envName = 'KILO_EMULATOR_CONSOLE_PORT_WAIT_MS';
+  process.env[envName] = 'soon';
+  try {
+    await assert.rejects(
+      startAndroidEmulator(launchEnv, harness.worktreeRoot, 'Pixel_9', 'host', {
+        sleep: async () => {},
+      }),
+      /KILO_EMULATOR_CONSOLE_PORT_WAIT_MS must be a positive number of milliseconds/
+    );
+  } finally {
+    delete process.env[envName];
+    harness.cleanup();
+  }
 });

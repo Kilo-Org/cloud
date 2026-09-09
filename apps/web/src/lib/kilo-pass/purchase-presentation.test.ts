@@ -50,6 +50,38 @@ describe('buildPurchasePresentation', () => {
     expect(result.webUrl).toBe(`${APP_URL}/subscriptions/kilo-pass`);
   });
 
+  it('maps Android Play Kilo Pass with native support and no sub to native_iap', () => {
+    const result = buildPurchasePresentation({
+      subscription: null,
+      input: {
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+      },
+    });
+
+    expect(result.kind).toBe('native_iap');
+    expect(result.cta).toEqual({ label: null, action: 'none' });
+    expect(result.webUrl).toBeNull();
+  });
+
+  it('maps Android Play Kilo Pass with native support and a live Stripe sub to native_iap', () => {
+    const result = buildPurchasePresentation({
+      subscription: stripeSub('active'),
+      input: {
+        platform: 'android',
+        storefront: 'play',
+        product: 'kilo_pass',
+        supportsNativePlayKiloPass: true,
+      },
+    });
+
+    expect(result.kind).toBe('native_iap');
+    expect(result.cta).toEqual({ label: null, action: 'none' });
+    expect(result.webUrl).toBeNull();
+  });
+
   it('maps Android credits to web_management with the credits web URL', () => {
     const result = buildPurchasePresentation({
       subscription: null,

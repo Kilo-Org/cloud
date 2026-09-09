@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 const EVENT_OPTIONS = [
   { value: 'COMMENT', labelKey: 'prReview.eventChips.comment' },
   { value: 'REQUEST_CHANGES', labelKey: 'prReview.eventChips.requestChanges' },
-  { value: 'APPROVE', labelKey: 'prReview.eventChips.approve' },
+  { value: 'APPROVE', labelKey: 'common.approve' },
 ] as const satisfies readonly { value: ReviewEvent; labelKey: string }[];
 
 export function ReviewEventChips(props: {

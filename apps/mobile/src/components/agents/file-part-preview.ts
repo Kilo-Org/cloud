@@ -42,7 +42,9 @@ export function getFilePartKind(input: { mime: string; filename?: string }): Fil
 }
 
 function resolveName(filename: string | undefined): string {
-  return filename && filename.trim() !== '' ? filename : i18n.t('agentChat.filePart.defaultName');
+  // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'), which
+  // languages inflect by number; this key is the standalone noun label.
+  return filename && filename.trim() !== '' ? filename : i18n.t('common.file');
 }
 
 export function getFilePartAccessibilityLabel(kind: FilePartKind, filename?: string): string {
@@ -53,5 +55,5 @@ export function getFilePartAccessibilityLabel(kind: FilePartKind, filename?: str
   if (kind === 'markdown') {
     return i18n.t('agentChat.filePart.preview', { name });
   }
-  return i18n.t('agentChat.filePart.openFile', { name });
+  return i18n.t('common.open', { name });
 }

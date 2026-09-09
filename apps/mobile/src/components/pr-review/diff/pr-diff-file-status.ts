@@ -6,10 +6,10 @@ import { i18n } from '@/i18n';
 export function fileStatusLabel(status: string): string {
   switch (status) {
     case 'added': {
-      return i18n.t('prReview.fileStatus.added');
+      return i18n.t('common.added');
     }
     case 'removed': {
-      return i18n.t('prReview.fileStatus.deleted');
+      return i18n.t('common.deleted');
     }
     case 'modified': {
       return i18n.t('prReview.fileStatus.modified');

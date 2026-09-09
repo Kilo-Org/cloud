@@ -2214,13 +2214,17 @@ export class SessionService {
         ...(profile.runtimeSkills?.length ? { runtimeSkills: profile.runtimeSkills } : {}),
       },
       session,
-      preparation: {
-        // Reuse the attempt the DO allocated (and may already have started
-        // with early sandbox-provisioning steps) so the wrapper's bootstrap
-        // events continue the same attempt instead of opening a second one.
-        attemptId: plan.preparation?.attemptId ?? crypto.randomUUID(),
-        triggerMessageId: turn.messageId,
-      },
+      ...(plan.preparation
+        ? {
+            preparation: {
+              // Reuse the attempt the DO allocated (and may already have started
+              // with early sandbox-provisioning steps) so the wrapper's bootstrap
+              // events continue the same attempt instead of opening a second one.
+              attemptId: plan.preparation.attemptId,
+              triggerMessageId: turn.messageId,
+            },
+          }
+        : {}),
     };
 
     if (turn.type === 'command') {

@@ -213,6 +213,155 @@ describe('createIngestHandler', () => {
       expect(broadcastFn).toHaveBeenCalledWith(expect.objectContaining({ id: 42 }));
     });
 
+    it('persists a slim assistant message update while broadcasting the live payload', async () => {
+      const eventQueries = createFakeEventQueries();
+      const broadcast = vi.fn();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        broadcast,
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+      const properties = {
+        info: {
+          id: 'asst_1',
+          role: 'assistant',
+          parentID: 'user_1',
+          sessionID: 'kilo_1',
+          time: { completed: 123 },
+          error: { data: { message: 'rate limited', responseBody: 'private' } },
+          summary: { diffs: [{ before: 'large diff' }] },
+          metadata: 'large metadata',
+        },
+      };
+
+      await handler.handleIngestMessage(ws, makeKilocodeMessage('message.updated', properties));
+
+      const persisted = JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload);
+      expect(persisted).toEqual({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'asst_1',
+            role: 'assistant',
+            parentID: 'user_1',
+            sessionID: 'kilo_1',
+            time: { completed: 123 },
+            error: 'Assistant request failed',
+            metadata: 'large metadata',
+          },
+        },
+      });
+      expect(broadcast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: JSON.stringify({
+            event: 'message.updated',
+            properties: {
+              info: {
+                ...properties.info,
+                error: 'Assistant request failed',
+              },
+            },
+          }),
+        })
+      );
+    });
+
+    it.each([
+      [
+        'tool',
+        { metadata: { diff: 'large tool diff' }, input: 'large input', output: 'large output' },
+        { input: 'large input', output: 'large output' },
+      ],
+      [
+        'file',
+        { url: 'data:image/png;base64,large-image', source: { content: 'large source' } },
+        { url: '' },
+      ],
+      ['patch', { patch: 'large patch body' }, {}],
+      ['reasoning', { text: 'large reasoning body' }, { text: 'large reasoning body' }],
+    ])(
+      'persists slim %s parts while broadcasting their live payload',
+      async (type, extraPart, persistedExtra) => {
+        const eventQueries = createFakeEventQueries();
+        const broadcast = vi.fn();
+        const handler = createIngestHandler(
+          createFakeState(),
+          eventQueries,
+          SESSION_ID,
+          broadcast,
+          createFakeDOContext()
+        );
+        const ws = createFakeWebSocket(makeAttachment());
+        const properties = {
+          sessionID: 'kilo_1',
+          part: {
+            type,
+            id: `${type}_1`,
+            sessionID: 'kilo_1',
+            messageID: 'asst_1',
+            status: 'running',
+            state: { status: 'running', metadata: { diff: 'large state diff' } },
+            ...extraPart,
+          },
+        };
+
+        await handler.handleIngestMessage(
+          ws,
+          makeKilocodeMessage('message.part.updated', properties)
+        );
+
+        expect(JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload)).toEqual({
+          event: 'message.part.updated',
+          properties: {
+            sessionID: 'kilo_1',
+            part: {
+              type,
+              id: `${type}_1`,
+              sessionID: 'kilo_1',
+              messageID: 'asst_1',
+              status: 'running',
+              state: { status: 'running' },
+              ...persistedExtra,
+            },
+          },
+        });
+        expect(broadcast).toHaveBeenCalledWith(
+          expect.objectContaining({
+            payload: JSON.stringify({ event: 'message.part.updated', properties }),
+          })
+        );
+      }
+    );
+
+    it('persists text content for text parts', async () => {
+      const eventQueries = createFakeEventQueries();
+      const handler = createIngestHandler(
+        createFakeState(),
+        eventQueries,
+        SESSION_ID,
+        vi.fn(),
+        createFakeDOContext()
+      );
+      const ws = createFakeWebSocket(makeAttachment());
+
+      await handler.handleIngestMessage(
+        ws,
+        makeKilocodeMessage('message.part.updated', {
+          part: { type: 'text', id: 'part_1', messageID: 'asst_1', text: 'Assistant reply' },
+        })
+      );
+
+      expect(JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload)).toEqual({
+        event: 'message.part.updated',
+        properties: {
+          part: { type: 'text', id: 'part_1', messageID: 'asst_1', text: 'Assistant reply' },
+        },
+      });
+    });
+
     // --- kilocode events: plain insert path (PERSISTED_KILO_EVENT_NAMES) ---
 
     it.each([
@@ -1218,8 +1367,22 @@ describe('createIngestHandler', () => {
         },
       });
       expect(eventQueries.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({ entityId: 'message/asst_333', payload: safePayload })
+        expect.objectContaining({ entityId: 'message/asst_333' })
       );
+      expect(JSON.parse(vi.mocked(eventQueries.upsert).mock.calls[0][0].payload)).toEqual({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'asst_333',
+            sessionID: 'kilo_session_333',
+            role: 'assistant',
+            parentID: 'msg_user_333',
+            modelID: 'vendor/model',
+            providerID: 'kilo',
+            error: 'Assistant request was rate limited',
+          },
+        },
+      });
       expect(broadcast).toHaveBeenCalledWith(expect.objectContaining({ payload: safePayload }));
       expect(JSON.stringify(vi.mocked(broadcast).mock.calls)).not.toContain('secret-token');
       expect(JSON.stringify(vi.mocked(eventQueries.upsert).mock.calls)).not.toContain(

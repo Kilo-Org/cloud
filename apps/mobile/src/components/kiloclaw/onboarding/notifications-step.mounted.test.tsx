@@ -21,6 +21,7 @@ const getResolvedLanguage = vi.hoisted(() => vi.fn());
 // render would re-fire the mount effect forever.
 const translation = { t: (key: string) => key };
 vi.mock('react-i18next', () => ({ useTranslation: () => translation }));
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   ScrollView: 'ScrollView',

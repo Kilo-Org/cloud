@@ -140,7 +140,7 @@ export function SessionContextSheet({
           </Row>
 
           {content.capacityKnown ? (
-            <Row label={t('agentChat.contextUsage.remaining')}>
+            <Row label={t('common.remaining')}>
               <Text className="text-base font-medium text-foreground tabular-nums">
                 {content.remainingTokens}
                 <Text className="text-sm text-muted-foreground">
@@ -153,7 +153,7 @@ export function SessionContextSheet({
             </Row>
           ) : null}
 
-          <Row label={t('agentChat.messageDetails.model')}>
+          <Row label={t('common.model')}>
             <Text className="text-base font-medium text-foreground">{modelDisplay}</Text>
           </Row>
 

@@ -27,7 +27,9 @@ import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 const SUBSCRIPTION_PLAN_KEYS = {
-  commit: 'kiloclaw.billing.planName.commit',
+  // i18n-dup-ok: prReview.overview.commit_* is a numeral count unit ('1 commit');
+  // this key is the billing plan name — be/pl/uk translate the two apart.
+  commit: 'kiloclaw.billing.commit',
   standard: 'kiloclaw.billing.planName.standard',
 } satisfies Record<string, string>;
 
@@ -107,7 +109,9 @@ function FinalCommitTermDetails({
 
   return (
     <View>
-      <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.commitPlan')} />
+      {/* i18n-dup-ok: prReview.overview.commit_* is a numeral count unit ('1 commit');
+          this key is the billing plan name — be/pl/uk translate the two apart. */}
+      <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.commit')} />
       <View className="h-px bg-border" />
       <DetailRow label={t('kiloclaw.billing.finalTermEnds')} value={finalDate} />
       <View className="h-px bg-border" />
@@ -164,7 +168,7 @@ function PlanDetails({
       <View>
         <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.freeTrial')} />
         <View className="h-px bg-border" />
-        <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
+        <DetailRow label={t('common.remaining')} value={daysText} />
         <View className="h-px bg-border" />
         <DetailRow
           label={t('kiloclaw.billing.ends')}
@@ -179,7 +183,7 @@ function PlanDetails({
       <View>
         <DetailRow label={t('kiloclaw.billing.plan')} value={t('kiloclaw.billing.earlybird')} />
         <View className="h-px bg-border" />
-        <DetailRow label={t('kiloclaw.billing.remaining')} value={daysText} />
+        <DetailRow label={t('common.remaining')} value={daysText} />
         <View className="h-px bg-border" />
         <DetailRow
           label={t('kiloclaw.billing.expires')}

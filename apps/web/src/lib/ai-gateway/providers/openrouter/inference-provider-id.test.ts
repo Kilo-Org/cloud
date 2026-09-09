@@ -1,4 +1,5 @@
 import {
+  AzureCredentialsSchema,
   BedrockCredentialsSchema,
   DirectUserByokInferenceProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
@@ -9,6 +10,40 @@ import {
   VercelNonUserByokInferenceProviderIdSchema,
   VercelUserByokInferenceProviderIdSchema,
 } from './inference-provider-id';
+
+describe('AzureCredentialsSchema', () => {
+  test('accepts Azure credentials with optional model mappings', () => {
+    const credentials = {
+      apiKey: 'azure-api-key',
+      resourceName: 'example-resource',
+      modelMappings: [
+        {
+          gatewayModelSlug: 'openai/gpt-5.4-nano',
+          customModelId: 'custom-gpt-5.4-nano',
+        },
+      ],
+    };
+
+    expect(AzureCredentialsSchema.parse(credentials)).toEqual(credentials);
+  });
+
+  test.each([
+    null,
+    'azure-api-key',
+    {},
+    { apiKey: 'azure-api-key' },
+    { resourceName: 'example-resource' },
+    { apiKey: '', resourceName: 'example-resource' },
+    { apiKey: 'azure-api-key', resourceName: '' },
+    {
+      apiKey: 'azure-api-key',
+      resourceName: 'example-resource',
+      modelMappings: [{ gatewayModelSlug: 'openai/gpt-5.4-nano' }],
+    },
+  ])('rejects incomplete or invalid Azure credentials: %j', credentials => {
+    expect(AzureCredentialsSchema.safeParse(credentials).success).toBe(false);
+  });
+});
 
 describe('BedrockCredentialsSchema', () => {
   test.each([
@@ -74,6 +109,12 @@ describe('inference provider ids', () => {
     expect(VercelUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(true);
     expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('vertex').success).toBe(false);
     expect(openRouterToVercelInferenceProviderId('google-vertex')).toBe('vertex');
+  });
+
+  test('promotes Azure to a user BYOK provider', () => {
+    expect(VercelUserByokInferenceProviderIdSchema.safeParse('azure').success).toBe(true);
+    expect(VercelNonUserByokInferenceProviderIdSchema.safeParse('azure').success).toBe(false);
+    expect(getVercelUserByokProviderIdForEndpoint('azure')).toBe('azure');
   });
 
   test('uses the Vertex user key for Vertex Anthropic endpoints', () => {

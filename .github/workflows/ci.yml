@@ -22,8 +22,10 @@ jobs:
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     outputs:
-      kilocode_backend: ${{ steps.filter.outputs.kilocode_backend }}
-      cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next }}
+      # Fall back to the retry attempt when the first Detect changes step died
+      # on a transient GitHub API failure (it sets no outputs when it fails).
+      kilocode_backend: ${{ steps.filter.outputs.kilocode_backend || steps.filter_retry.outputs.kilocode_backend }}
+      cloud_agent_next: ${{ steps.filter.outputs.cloud_agent_next || steps.filter_retry.outputs.cloud_agent_next }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
     steps:
       - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
@@ -47,8 +49,47 @@ jobs:
       - name: Test dependency change detection
         run: node --test scripts/changed-dependencies.test.mjs
 
+      - name: Test changes-filter retry wiring
+        run: node --test scripts/changes-filter-retry.test.mjs
+
+      # dorny/paths-filter has no built-in retry: one dropped connection to
+      # api.github.com ("other side closed" while listing the PR's changed
+      # files) fails the step and, with it, every check that needs this job.
+      # The first attempt is allowed to fail so the retry below absorbs
+      # transient resets; a persistent failure still fails the job.
       - name: Detect changes
         id: filter
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            kilocode_backend:
+              - 'apps/web/src/**'
+              - 'apps/web/.env'
+              - 'apps/web/.env.test'
+              - 'apps/web/.env.development.local.example'
+              - '.env.local.example'
+              - 'apps/web/package.json'
+              - 'apps/web/tsconfig.json'
+              - 'apps/web/tsconfig.*.json'
+              - 'apps/web/next.config.mjs'
+              - 'apps/web/jest.config.ts'
+              - 'apps/web/postcss.config.mjs'
+              - 'apps/web/sentry.*'
+              - 'packages/db/**'
+              - 'packages/encryption/**'
+              - 'packages/trpc/**'
+              - 'packages/worker-utils/**'
+              - 'services/deploy-infra/builder/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+            cloud_agent_next:
+              - 'services/cloud-agent-next/**'
+      - name: Detect changes (retry)
+        id: filter_retry
+        # Keep the filters byte-identical to the attempt above:
+        # scripts/changes-filter-retry.test.mjs fails the job when they drift.
+        if: steps.filter.outcome == 'failure'
         uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         with:
           filters: |

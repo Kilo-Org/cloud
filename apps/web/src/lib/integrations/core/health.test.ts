@@ -24,6 +24,12 @@ describe('isPlatformIntegrationHealthy', () => {
         auth_invalid_at: '2026-06-25 18:00:00+00',
       })
     ).toBe(false);
+    expect(
+      isPlatformIntegrationHealthy({
+        ...healthyIntegration,
+        github_disconnected_at: '2026-06-25 18:00:00+00',
+      })
+    ).toBe(false);
   });
 
   it('rejects a missing integration', () => {

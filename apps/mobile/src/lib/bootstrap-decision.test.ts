@@ -18,6 +18,7 @@ const ready = {
   onConsentRoute: false,
   onConsentReviewRoute: false,
   languageReloadFailed: false,
+  restoreFailed: false,
 } as const;
 
 describe('resolveBootstrapDecision tag', () => {
@@ -99,6 +100,51 @@ describe('resolveBootstrapDecision tag', () => {
     expect(resolveBootstrapDecision(ready).tag).toBe('settle-app');
   });
 
+  it('settles the restore error when the startup credential read failed', () => {
+    expect(resolveBootstrapDecision({ ...ready, restoreFailed: true }).tag).toBe(
+      'settle-restore-error'
+    );
+  });
+
+  it('suppresses redirect-login while the restore error is up', () => {
+    // The failed read leaves no token, but the session is not known to be
+    // gone: routing to login would be the silent sign-out this branch exists
+    // to prevent.
+    expect(resolveBootstrapDecision({ ...ready, restoreFailed: true, hasToken: false }).tag).toBe(
+      'settle-restore-error'
+    );
+    expect(
+      resolveBootstrapDecision({
+        ...ready,
+        restoreFailed: true,
+        hasToken: false,
+        inAuthGroup: true,
+      }).tag
+    ).toBe('settle-restore-error');
+  });
+
+  it('keeps the force-update branches ahead of the restore error', () => {
+    expect(
+      resolveBootstrapDecision({ ...ready, restoreFailed: true, updateRequired: true }).tag
+    ).toBe('redirect-force-update');
+    expect(
+      resolveBootstrapDecision({
+        ...ready,
+        restoreFailed: true,
+        updateRequired: true,
+        inForceUpdate: true,
+      }).tag
+    ).toBe('settle-force-update');
+  });
+
+  it('waits while loading rather than settling the restore error', () => {
+    // Retry sets `isLoading` back to true, so the error surface is replaced by
+    // the startup gate instead of flickering back to itself.
+    expect(resolveBootstrapDecision({ ...ready, restoreFailed: true, isLoading: true }).tag).toBe(
+      'wait-loading'
+    );
+  });
+
   it('settles the language error first, before loading, when the RTL reload failed', () => {
     expect(
       resolveBootstrapDecision({ ...ready, languageReloadFailed: true, isLoading: true }).tag
@@ -166,6 +212,26 @@ describe('resolveBootstrapDecision derivations', () => {
     ).toBe(true);
   });
 
+  it('derives hasRestoreError only from restoreFailed', () => {
+    expect(resolveBootstrapDecision(ready).hasRestoreError).toBe(false);
+    expect(resolveBootstrapDecision({ ...ready, restoreFailed: true }).hasRestoreError).toBe(true);
+    expect(
+      resolveBootstrapDecision({ ...ready, hasToken: false, restoreFailed: true }).hasRestoreError
+    ).toBe(true);
+    // The surface stays up while a retry is loading: `hasRestoreError` is
+    // independent of `isLoading`, so the settled error screen is never hidden
+    // behind the loading gate mid-retry (the tag already waits, above).
+    expect(
+      resolveBootstrapDecision({ ...ready, restoreFailed: true, isLoading: true }).hasRestoreError
+    ).toBe(true);
+  });
+
+  it('includes the restore error in hasBootstrapError', () => {
+    expect(resolveBootstrapDecision({ ...ready, restoreFailed: true }).hasBootstrapError).toBe(
+      true
+    );
+  });
+
   it('derives hidden from loading, redirect, or consent loading, unless a bootstrap error shows', () => {
     expect(resolveBootstrapDecision(ready).hidden).toBe(false);
     expect(resolveBootstrapDecision({ ...ready, isLoading: true }).hidden).toBe(true);
@@ -176,6 +242,11 @@ describe('resolveBootstrapDecision derivations', () => {
     expect(resolveBootstrapDecision({ ...ready, languageReloadFailed: true }).hidden).toBe(false);
     expect(
       resolveBootstrapDecision({ ...ready, languageReloadFailed: true, isLoading: true }).hidden
+    ).toBe(false);
+    // The restore error is a settled surface: the tree stays visible instead
+    // of hiding behind the redirect that the missing token would imply.
+    expect(
+      resolveBootstrapDecision({ ...ready, restoreFailed: true, hasToken: false }).hidden
     ).toBe(false);
   });
 });

@@ -12,6 +12,7 @@ import { withDORetry } from './utils/do-retry.js';
 import type { GitTokenService } from './types.js';
 import { MeteredSandbox } from './container-usage.js';
 import type { SandboxClassName } from './container-usage-context.js';
+import { inspectGitHubRateLimitResponse } from './github-rate-limit-diagnostics.js';
 import {
   cloudAgentSessionScopeHeaders,
   cloudAgentSessionScopeProtocolVersion,
@@ -574,6 +575,37 @@ async function handleManagedGitHubOutbound(
     { ...logFields, upstreamStatus: response.status },
     'Managed GitHub outbound request forwarded'
   );
+  if (response.status === 403 || response.status === 429) {
+    let rateLimitDiagnostic;
+    try {
+      rateLimitDiagnostic = await inspectGitHubRateLimitResponse(response);
+    } catch {
+      rateLimitDiagnostic = undefined;
+    }
+    logDiagnostic(
+      'warn',
+      {
+        ...logFields,
+        githubInstallationId: result.installationId ?? null,
+        githubAuthSource: result.source ?? null,
+        githubAppType: result.appType ?? null,
+        upstreamStatus: response.status,
+        quotaClass: rateLimitDiagnostic?.quotaClass ?? 'unknown',
+        bodySignal: rateLimitDiagnostic?.bodySignal ?? 'none',
+        ...(rateLimitDiagnostic
+          ? {
+              githubRateLimitLimit: rateLimitDiagnostic.githubRateLimitLimit,
+              githubRateLimitRemaining: rateLimitDiagnostic.githubRateLimitRemaining,
+              githubRateLimitUsed: rateLimitDiagnostic.githubRateLimitUsed,
+              githubRateLimitReset: rateLimitDiagnostic.githubRateLimitReset,
+              githubRateLimitResource: rateLimitDiagnostic.githubRateLimitResource,
+              githubRetryAfter: rateLimitDiagnostic.githubRetryAfter,
+            }
+          : {}),
+      },
+      'Managed GitHub upstream rate-limit response'
+    );
+  }
   return response;
 }
 

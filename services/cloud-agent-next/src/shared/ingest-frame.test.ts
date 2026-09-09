@@ -6,6 +6,7 @@ import {
   estimateSerializedBytes,
   isLifecycleIngestEvent,
   prepareIngestFrame,
+  slimPersistedKilocodeEvent,
 } from './ingest-frame.js';
 import { MAX_INLINE_FILE_URL_LENGTH } from './trim-payload.js';
 import type { IngestEvent } from './protocol.js';
@@ -103,6 +104,7 @@ describe('prepareIngestFrame', () => {
           part: {
             type: 'tool',
             id: 'part_1',
+            sessionID: 'sess_1',
             messageID: 'msg_1',
             state: {
               status: 'completed',
@@ -129,6 +131,7 @@ describe('prepareIngestFrame', () => {
     expect(sent.streamEventType).toBe('kilocode');
     const part = sent.data.properties.part;
     expect(part.id).toBe('part_1');
+    expect(part.sessionID).toBe('sess_1');
     expect(part.messageID).toBe('msg_1');
     expect(part.state.status).toBe('completed');
   });
@@ -628,5 +631,208 @@ describe('IngestEventBuffer', () => {
         data: {},
       })
     ).toBe(false);
+  });
+});
+
+describe('slimPersistedKilocodeEvent', () => {
+  it('keeps cheap user message fields and drops summary diffs plus raw errors', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'msg_user',
+            sessionID: 'kilo_1',
+            role: 'user',
+            model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+            variant: 'high',
+            agent: 'code',
+            time: { created: 1 },
+            summary: { title: 'compact', diffs: [{ before: 'large diff' }] },
+            error: { data: { message: 'failed', responseBody: 'private' } },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_user',
+          sessionID: 'kilo_1',
+          role: 'user',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          variant: 'high',
+          agent: 'code',
+          time: { created: 1 },
+          summary: { title: 'compact' },
+          error: 'Assistant request failed',
+        },
+      },
+    });
+  });
+
+  it('keeps cheap assistant identity fields', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.updated',
+        properties: {
+          info: {
+            id: 'msg_asst',
+            sessionID: 'kilo_1',
+            role: 'assistant',
+            parentID: 'msg_user',
+            providerID: 'anthropic',
+            modelID: 'claude-sonnet-4',
+            agent: 'code',
+            variant: 'high',
+            time: { created: 1, completed: 2 },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_asst',
+          sessionID: 'kilo_1',
+          role: 'assistant',
+          parentID: 'msg_user',
+          providerID: 'anthropic',
+          modelID: 'claude-sonnet-4',
+          agent: 'code',
+          variant: 'high',
+          time: { created: 1, completed: 2 },
+        },
+      },
+    });
+  });
+
+  it('keeps reasoning text and time while dropping patch, snapshot, and data URLs', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          sessionID: 'kilo_1',
+          part: {
+            type: 'reasoning',
+            id: 'part_1',
+            sessionID: 'kilo_1',
+            messageID: 'msg_asst',
+            text: 'thinking',
+            time: { start: 1 },
+            metadata: { diff: 'large' },
+            snapshot: { huge: true },
+            patch: 'large patch',
+            url: 'data:image/png;base64,abc',
+            source: { content: 'large source', text: { value: 'secret', start: 0, end: 1 } },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        sessionID: 'kilo_1',
+        part: {
+          type: 'reasoning',
+          id: 'part_1',
+          sessionID: 'kilo_1',
+          messageID: 'msg_asst',
+          text: 'thinking',
+          time: { start: 1 },
+          url: '',
+          source: { text: { value: '', start: 0, end: 1 } },
+        },
+      },
+    });
+  });
+
+  it('keeps trimmed tool input/output and drops tool metadata', () => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_tool',
+            messageID: 'msg_asst',
+            state: {
+              status: 'running',
+              input: { path: 'src/a.ts' },
+              output: 'ok',
+              metadata: { diff: 'large' },
+            },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_tool',
+          messageID: 'msg_asst',
+          state: {
+            status: 'running',
+            input: { path: 'src/a.ts' },
+            output: 'ok',
+          },
+        },
+      },
+    });
+  });
+
+  it('drops wrapper top-level info and part aliases from persist payload', () => {
+    const info = {
+      id: 'msg_user',
+      role: 'user',
+      model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+      summary: { diffs: [{ before: 'large diff' }] },
+      error: { data: { message: 'failed', responseBody: 'private' } },
+    };
+    const messageProperties = { info };
+    expect(
+      slimPersistedKilocodeEvent({
+        ...messageProperties,
+        event: 'message.updated',
+        type: 'message.updated',
+        properties: messageProperties,
+      })
+    ).toEqual({
+      event: 'message.updated',
+      type: 'message.updated',
+      properties: {
+        info: {
+          id: 'msg_user',
+          role: 'user',
+          model: { providerID: 'anthropic', modelID: 'claude-sonnet-4' },
+          error: 'Assistant request failed',
+        },
+      },
+    });
+
+    const part = {
+      type: 'reasoning',
+      id: 'part_1',
+      text: 'thinking',
+      time: { start: 1 },
+      snapshot: { huge: true },
+      patch: 'large patch',
+    };
+    const partProperties = { sessionID: 'kilo_1', part };
+    expect(
+      slimPersistedKilocodeEvent({
+        ...partProperties,
+        event: 'message.part.updated',
+        type: 'message.part.updated',
+        properties: partProperties,
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      type: 'message.part.updated',
+      properties: {
+        sessionID: 'kilo_1',
+        part: { type: 'reasoning', id: 'part_1', text: 'thinking', time: { start: 1 } },
+      },
+    });
   });
 });

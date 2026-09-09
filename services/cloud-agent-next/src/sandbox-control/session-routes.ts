@@ -10,6 +10,8 @@ export type SessionRoute = {
   lastStateAt: number | null;
   idleForMs: number | null;
   waitingOn: 'model' | 'tool' | 'finalizing' | 'preparation' | 'input' | null;
+  nativeRuntimeId?: string;
+  retiringNativeRuntimeId?: string;
 };
 
 export type AttachRouteInput = {

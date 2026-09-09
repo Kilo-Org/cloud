@@ -20,6 +20,14 @@ export function generateSessionId(plane: SessionPlane = 'legacy'): SessionId {
   return plane === 'control' ? `workspace_${id}` : `agent_${id}`;
 }
 
+export type SessionCreateOrigin = {
+  createdOnPlatform?: string;
+};
+
+export function isInteractiveWebSession(origin?: SessionCreateOrigin): boolean {
+  return origin?.createdOnPlatform === 'cloud-agent-web';
+}
+
 export function isControlPlaneOwner(
   env: ControlPlaneOwnerEnv,
   owner: { userId: string; orgId?: string }
@@ -42,9 +50,10 @@ export function isWorktreeOwner(
 
 export function sessionPlaneForNewOwner(
   env: ControlPlaneOwnerEnv,
-  owner: { userId: string; orgId?: string }
+  owner: { userId: string; orgId?: string },
+  origin?: SessionCreateOrigin
 ): SessionPlane {
-  return isControlPlaneOwner(env, owner) ? 'control' : 'legacy';
+  return isControlPlaneOwner(env, owner) && isInteractiveWebSession(origin) ? 'control' : 'legacy';
 }
 
 function ownerIdInList(raw: string | undefined, id: string | undefined): boolean {

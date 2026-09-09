@@ -36,14 +36,15 @@ const UsageAggregatesSchema = z.object({
 });
 
 export const adminGatewayUsageRouter = createTRPCRouter({
-  getDailyUsage: adminProcedure
+  getHourlyUsage: adminProcedure
     .input(
       z.object({
         date: UsageDateSchema,
+        hour: z.number().int().min(0).max(23),
         model: z.string().trim().min(1).max(256),
       })
     )
-    .output(z.array(UsageAggregatesSchema.extend({ date: UsageDateSchema })))
+    .output(z.array(UsageAggregatesSchema.extend({ hour_start: z.iso.datetime({ precision: 3 }) })))
     .query(async ({ input, signal }) => {
       try {
         signal?.throwIfAborted();
@@ -51,16 +52,18 @@ export const adminGatewayUsageRouter = createTRPCRouter({
           throw new Error('Gateway usage requires a read replica');
         }
 
+        const hourStart = `${input.date}T${input.hour.toString().padStart(2, '0')}:00:00.000Z`;
         const rows = await timedUsageQuery(
           {
             db: readDb,
-            route: 'admin.gatewayUsage.getDailyUsage',
-            queryLabel: 'daily_model_usage',
+            route: 'admin.gatewayUsage.getHourlyUsage',
+            queryLabel: 'hourly_model_usage',
             scope: 'admin',
-            period: input.date,
+            period: hourStart,
             timeoutMs: 600_000,
           },
           async tx => {
+            signal?.throwIfAborted();
             const result = await tx.execute(sql`
               SELECT
                 mu.provider,
@@ -78,18 +81,19 @@ export const adminGatewayUsageRouter = createTRPCRouter({
               WHERE mu.requested_model = ${input.model}
                 AND meta.is_user_byok = false
                 AND mu.input_tokens > 0
-                AND mu.created_at >= (${input.date}::date::timestamp AT TIME ZONE 'UTC')
-                AND mu.created_at < ((${input.date}::date + 1)::timestamp AT TIME ZONE 'UTC')
+                AND mu.created_at >= ${hourStart}::timestamptz
+                AND mu.created_at < (${hourStart}::timestamptz + interval '1 hour')
               GROUP BY mu.provider, meta.is_byok
               ORDER BY mu.provider, meta.is_byok
             `);
             return result.rows;
           }
         );
+        signal?.throwIfAborted();
         return z
           .array(UsageAggregatesSchema)
           .parse(rows)
-          .map(row => ({ ...row, date: input.date }));
+          .map(row => ({ ...row, hour_start: hourStart }));
       } catch {
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

@@ -1,4 +1,7 @@
-import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  GLANCEABLE_STALE_MS,
+  type GlanceableAgentsSnapshot,
+} from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
 
 import {
@@ -80,6 +83,54 @@ export function buildGlanceableViewProps(
 export function toWidgetProps(props: GlanceableViewProps): Partial<GlanceableViewProps> {
   const entries = Object.entries(props).filter(([, value]) => value !== null);
   return Object.fromEntries(entries) as Partial<GlanceableViewProps>;
+}
+
+/**
+ * The widget's stale frame: the same counts under the delayed copy, for the
+ * timeline entry that lands once a whole stale window has passed with no
+ * refresh. The counts stay — they are still the last thing the device knew —
+ * and only the claim that they are current is dropped.
+ */
+function buildStaleWidgetProps(
+  snapshot: GlanceableAgentsSnapshot,
+  translate: (key: string) => string
+): Partial<GlanceableViewProps> {
+  return toWidgetProps(buildGlanceableViewProps({ ...snapshot, status: 'stale' }, {}, translate));
+}
+
+/**
+ * The delayed frame, when there is a claim worth retracting. Counts only: an
+ * empty or waiting surface asserts nothing that can go out of date, and a
+ * `stale` frame after `expiresAt` would only undo the expiry frame behind it.
+ */
+export function staleTimelineFrame(
+  snapshot: GlanceableAgentsSnapshot,
+  translate: (key: string) => string
+): { date: Date; props: Partial<GlanceableViewProps> }[] {
+  if (snapshot.status !== 'happy') {
+    return [];
+  }
+  const staleAt = Date.parse(snapshot.updatedAt) + GLANCEABLE_STALE_MS;
+  return staleAt >= Date.parse(snapshot.expiresAt)
+    ? []
+    : [{ date: new Date(staleAt), props: buildStaleWidgetProps(snapshot, translate) }];
+}
+
+/**
+ * The widget's expiry frame: the same snapshot with its counts zeroed and the
+ * expired copy, for the timeline entry that lands at `expiresAt`.
+ */
+export function buildExpiredWidgetProps(
+  snapshot: GlanceableAgentsSnapshot,
+  translate: (key: string) => string
+): Partial<GlanceableViewProps> {
+  return toWidgetProps(
+    buildGlanceableViewProps(
+      { ...snapshot, status: 'expired', running: 0, needsInput: 0, idle: 0, needsInputSince: null },
+      {},
+      translate
+    )
+  );
 }
 
 /**

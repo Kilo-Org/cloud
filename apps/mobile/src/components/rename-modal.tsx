@@ -5,7 +5,6 @@ import { Modal, Platform, Pressable, TextInput, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { subscribePrivacyCover } from '@/lib/privacy-cover-events';
 import { withUiDeadline } from '@/lib/ui-deadline';
 import { cn } from '@/lib/utils';
 
@@ -52,9 +51,6 @@ export function RenameModal<TSaveResult>({
     };
   }, []);
 
-  // Close when the privacy cover fires (app backgrounds on a covered route).
-  useEffect(() => subscribePrivacyCover(onClose), [onClose]);
-
   const handleClose = () => {
     if (pending) {
       return;
@@ -81,7 +77,7 @@ export function RenameModal<TSaveResult>({
       await withUiDeadline(operation, SAVE_UI_DEADLINE_MS);
       onClose();
     } catch (error) {
-      setErrorText(error instanceof Error ? error.message : t('kiloclaw.dashboard.renameFailed'));
+      setErrorText(error instanceof Error ? error.message : t('common.somethingWentWrong'));
     } finally {
       setPending(false);
     }

@@ -1,6 +1,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useQuery } from '@tanstack/react-query';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,7 +29,7 @@ export function useContextPicker(orgs: OrgListEntry[] | undefined) {
       return;
     }
     const options = [
-      t('profile.personal'),
+      t('common.personal'),
       ...orgs.map(org => org.organizationName),
       t('common.cancel'),
     ];
@@ -84,9 +85,7 @@ export function ContextControl({
     (isResolved && organizationId !== null && orgs === undefined && !nameError);
   const organizationName = showOrganizationName ? org?.organizationName : undefined;
   let label =
-    organizationId === null
-      ? t('profile.personal')
-      : (organizationName ?? t('profile.organization'));
+    organizationId === null ? t('common.personal') : (organizationName ?? t('common.organization'));
   if (!isResolved) {
     label = t('profile.selectAccount');
   }

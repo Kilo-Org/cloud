@@ -38,6 +38,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push }),
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },

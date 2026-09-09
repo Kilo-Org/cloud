@@ -1,3 +1,5 @@
+import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { i18n } from '@/i18n';
 import { formatList, formatNumber } from '@/lib/format';
 import { platformLabel } from '@/lib/platform-label';
@@ -89,6 +91,16 @@ type SessionRowAccessibilityLabelInputs = {
   /** Opt-in live status for stored list rows; needs-input speech takes priority. */
   live?: boolean;
   /**
+   * The row glyph's kind from the one shared derivation
+   * (`glanceableStatusKind(session.status)` — the exact value the row passes
+   * to its status glyph). When set on a live row whose needs-input flag is
+   * down, the label names the state the glyph draws instead of the static
+   * LIVE eyebrow word: `common.working` for running, `common.idle` for idle.
+   * Omit it (or pass null) to keep the static word, so callers that do not
+   * pass it are byte-identical to before.
+   */
+  statusKind?: GlanceableStatusKind | null;
+  /**
    * Left-eyebrow badge text, always visible (e.g. "CLI", "VSCODE", "LIVE",
    * "CLOUD AGENT"). Pass an empty string only as a defensive fallback —
    * the row always supplies a non-empty badge today.
@@ -125,7 +137,9 @@ type SessionRowAccessibilityLabelInputs = {
 /**
  * Compose the screen-reader label for a `SessionRow`, mirroring its visible
  * content in the order the row renders parts: title, then `needs input`
- * (or localized live status when opted in), then the branch subtitle
+ * (or, on a live row, the state word the status glyph draws when the caller
+ * passes `statusKind` from the shared derivation — else the static LIVE
+ * eyebrow word), then the branch subtitle
  * (when present), then the `pull request <number>` phrase (when `prNumber`
  * is set), then the always-visible left-eyebrow badge, then the meta text
  * (only when the row visibly renders meta), then an optional platform origin
@@ -147,6 +161,7 @@ export function sessionRowAccessibilityLabel({
   title,
   needsInput,
   live = false,
+  statusKind = null,
   badge,
   meta,
   subtitle,
@@ -157,7 +172,14 @@ export function sessionRowAccessibilityLabel({
   if (needsInput) {
     parts.push(i18n.t('agents.sessionRow.needsInput'));
   } else if (live) {
-    parts.push(i18n.t('agents.sessionList.live'));
+    if (statusKind != null) {
+      // Name the state the glyph draws. The ui row renders the running glyph
+      // for any set kind but idle, so a `needsInput` kind with the attention
+      // flag down (acked, or `retry`) draws running and is spoken as working.
+      parts.push(i18n.t(statusKind === 'idle' ? 'common.idle' : 'common.working'));
+    } else {
+      parts.push(i18n.t('agents.sessionList.live'));
+    }
   }
   if (subtitle) {
     parts.push(subtitle);

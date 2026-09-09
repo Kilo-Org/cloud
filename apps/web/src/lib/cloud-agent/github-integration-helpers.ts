@@ -89,7 +89,7 @@ export async function getGitHubTokenForOrganization(
 export async function getGitHubTokenForUser(userId: string): Promise<string | undefined> {
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
 
-  if (!integration?.platform_installation_id) {
+  if (!isPlatformIntegrationHealthy(integration) || !integration.platform_installation_id) {
     return undefined;
   }
 
@@ -126,7 +126,9 @@ export async function getGitHubInstallationIdForOrganization(
  */
 export async function getGitHubInstallationIdForUser(userId: string): Promise<string | undefined> {
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
-  return integration?.platform_installation_id ?? undefined;
+  return isPlatformIntegrationHealthy(integration)
+    ? (integration.platform_installation_id ?? undefined)
+    : undefined;
 }
 
 /**
@@ -207,10 +209,12 @@ const repositoryOwner = (fullName: string) => {
  * more than one GitHub installation (for example the app is installed on two
  * accounts that share a repo, or a reinstall left two active installation rows
  * for the same account). Prefer the installation whose GitHub account owns the
- * repository so sessions use the canonical write identity; otherwise keep the
- * first entry, which is the newest installation (created_at desc).
+ * repository so sessions run against the canonical write identity. Otherwise
+ * keep the first entry: `getIntegrationsByOrganization` returns installations
+ * oldest-first, matching the primary installation a session resolves to by
+ * default.
  */
-function dedupeGitHubRepositories(
+function dedupeRepositories(
   repositories: GitHubRepositoriesResult['repositories']
 ): GitHubRepositoriesResult['repositories'] {
   const byFullName = new Map<string, GitHubRepositoriesResult['repositories'][number]>();
@@ -269,7 +273,7 @@ async function fetchRepositoriesForIntegrations(
     }
     return {
       integrationInstalled: true,
-      repositories: dedupeGitHubRepositories(results.flatMap(result => result.repositories)),
+      repositories: dedupeRepositories(results.flatMap(result => result.repositories)),
       syncedAt: results
         .map(result => result.syncedAt)
         .filter((value): value is string => value !== null)
@@ -294,8 +298,21 @@ export async function fetchGitHubRepositoriesForUser(
     return missingIntegrationResponse('No GitHub integration found for this user');
   }
 
-  if (isPlatformIntegrationSuspended(integration)) {
-    return missingIntegrationResponse('GitHub integration is suspended');
+  if (!isPlatformIntegrationHealthy(integration)) {
+    if (integration.github_disconnected_at) {
+      return missingIntegrationResponse('GitHub integration is disconnected');
+    }
+
+    if (isPlatformIntegrationSuspended(integration)) {
+      return missingIntegrationResponse('GitHub integration is suspended');
+    }
+    if (integration.github_disconnected_at) {
+      return missingIntegrationResponse('GitHub integration is disconnected');
+    }
+    if (integration.auth_invalid_at) {
+      return missingIntegrationResponse('GitHub integration requires reauthorization');
+    }
+    return missingIntegrationResponse('GitHub integration is not properly configured');
   }
 
   if (!integration.platform_installation_id) {
@@ -382,7 +399,7 @@ export async function checkDemoRepositoryFork(
 ): Promise<{ exists: boolean; forkedRepo: string | null; githubUsername: string | null }> {
   const integration = await getIntegrationForOwner({ type: 'user', id: userId }, PLATFORM.GITHUB);
 
-  if (!integration?.platform_installation_id) {
+  if (!isPlatformIntegrationHealthy(integration) || !integration?.platform_installation_id) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'GitHub integration required to check demo repository',

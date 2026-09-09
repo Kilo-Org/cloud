@@ -1,7 +1,7 @@
 export { getCachedSecret, clearSecretCacheForTest } from './cached-secret.js';
 
 export { withDORetry, DEFAULT_DO_RETRY_CONFIG } from './do-retry.js';
-export type { DORetryConfig } from './do-retry.js';
+export type { DORetryConfig, DORetryScope } from './do-retry.js';
 
 export { backendAuthMiddleware } from './backend-auth-middleware.js';
 
@@ -159,6 +159,16 @@ export type {
   SignModernKiloTokenParams,
   VerifiedKiloAuthContext,
 } from './kilo-token-policy.js';
+
+export { createKiloAuthMiddleware } from './kilo-auth-middleware.js';
+export type {
+  KiloAuthEnv,
+  KiloAuthMiddlewareOptions,
+  KiloAuthOrgMembership,
+  KiloAuthVariables,
+  ResolveSecret,
+  SecretBinding,
+} from './kilo-auth-middleware.js';
 
 export { SessionMetricsParamsSchema, TerminationReasons } from './session-metrics-schema.js';
 export type { SessionMetricsParams, SessionMetricsParamsInput } from './session-metrics-schema.js';

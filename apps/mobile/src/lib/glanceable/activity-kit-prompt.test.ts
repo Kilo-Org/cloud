@@ -45,6 +45,7 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 vi.mock('@/glanceable-ios/active-agents-live-activity', () => ({
+  OPEN_AGENTS_URL: 'kiloapp:///cloud/sessions',
   ActiveAgentsLiveActivity: {
     getInstances() {
       if (mocks.instancesError !== null) {

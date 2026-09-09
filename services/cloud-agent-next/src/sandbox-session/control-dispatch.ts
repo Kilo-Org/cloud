@@ -16,12 +16,14 @@ export const SESSION_DELIVERY_TIMEOUT_MS =
 export class ControlRequestError extends Error {
   readonly code: string;
   readonly retryable: boolean;
+  readonly admission: ControlError['admission'];
 
   constructor(error: ControlError) {
     super(error.message);
     this.name = 'ControlRequestError';
     this.code = error.code;
     this.retryable = error.retryable;
+    this.admission = error.admission;
   }
 }
 
@@ -70,6 +72,7 @@ export function deliveryErrorLogFields(error: unknown) {
       error instanceof ControlRequestError
         ? (controlErrorCodes.find(code => code === error.code) ?? 'unknown_control_error')
         : 'transport_or_internal_error',
+    ...(error instanceof ControlRequestError ? { errorMessage: error.message } : {}),
     retryable: isRetryableDeliveryError(error),
   };
 }

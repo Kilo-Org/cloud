@@ -20,8 +20,9 @@ import {
   type AccessRequiredSubcase,
 } from '@/lib/analytics/onboarding-events';
 import { trackEvent } from '@/lib/appsflyer';
+import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
+import { accessIssueTargetLabel, resolveAccessIssueUrl } from '@/lib/kiloclaw/access-issue';
 import { cn } from '@/lib/utils';
 
 export type { AccessRequiredSubcase };
@@ -40,10 +41,10 @@ type SubcaseContent = {
 const SUBCASE_CONTENT = {
   trial_expired: {
     bodyKey: 'kiloclaw.accessRequired.trialExpiredBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.trialExpiredCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionCanceledCta',
     ctaVariant: 'default',
     icon: Clock,
-    titleKey: 'kiloclaw.accessRequired.trialExpiredTitle',
+    titleKey: 'kiloclaw.accessRequired.subscriptionCanceledTitle',
     tone: 'warn',
   },
   subscription_canceled: {
@@ -56,7 +57,7 @@ const SUBCASE_CONTENT = {
   },
   subscription_past_due: {
     bodyKey: 'kiloclaw.accessRequired.subscriptionPastDueBody',
-    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionPastDueCta',
+    ctaLabelKey: 'kiloclaw.accessRequired.subscriptionCanceledCta',
     ctaVariant: 'default',
     icon: AlertTriangle,
     titleKey: 'kiloclaw.accessRequired.subscriptionPastDueTitle',
@@ -75,7 +76,7 @@ const SUBCASE_CONTENT = {
     ctaLabelKey: 'kiloclaw.accessRequired.multipleCurrentConflictCta',
     ctaVariant: 'outline',
     icon: AlertTriangle,
-    titleKey: 'kiloclaw.accessRequired.multipleCurrentConflictTitle',
+    titleKey: 'kiloclaw.list.accessIssue.multipleCurrentConflict',
     tone: 'warn',
   },
   non_canonical_earlybird: {
@@ -112,7 +113,14 @@ export function AccessRequiredScreen({ subcase }: Readonly<AccessRequiredScreenP
   }, [subcase]);
 
   const onOpen = () => {
-    void Linking.openURL(resolveAccessIssueUrl(subcase));
+    const url = resolveAccessIssueUrl(subcase);
+    if (url.startsWith('mailto:')) {
+      // Mail clients are optional on both platforms; the failure toast names
+      // the address so the user can still reach the team.
+      void openExternalUrl(url, { label: accessIssueTargetLabel(url) });
+      return;
+    }
+    void Linking.openURL(url);
   };
 
   if (Platform.OS === 'ios') {

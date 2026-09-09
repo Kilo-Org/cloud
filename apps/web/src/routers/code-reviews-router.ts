@@ -401,9 +401,14 @@ export const personalReviewAgentRouter = createTRPCRouter({
                 );
 
                 // Update integration metadata with new webhook configuration
-                await updateIntegrationMetadataForOwner(owner, PLATFORM.GITLAB, {
-                  configured_webhooks: updatedWebhooks,
-                });
+                await updateIntegrationMetadataForOwner(
+                  owner,
+                  PLATFORM.GITLAB,
+                  {
+                    configured_webhooks: updatedWebhooks,
+                  },
+                  integration.id
+                );
 
                 webhookSyncResult = {
                   created: result.created.length,
@@ -645,9 +650,14 @@ export const personalReviewAgentRouter = createTRPCRouter({
                   instanceUrl
                 );
 
-                await updateIntegrationMetadataForOwner(owner, PLATFORM.GITLAB, {
-                  configured_webhooks: updatedWebhooks,
-                });
+                await updateIntegrationMetadataForOwner(
+                  owner,
+                  PLATFORM.GITLAB,
+                  {
+                    configured_webhooks: updatedWebhooks,
+                  },
+                  integration.id
+                );
 
                 webhookSyncResult = {
                   created: result.created.length,

@@ -101,6 +101,7 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
       let runtime = runtimes.get(directory);
       if (!runtime) {
         runtime = {
+          runtimeId: 'native_1',
           directory,
           scopeId: auth.scopeId,
           env: buildWorktreeKiloEnvironment(
@@ -118,6 +119,7 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
       return {
         ready: Promise.resolve(runtime),
         signal: runtime.signal,
+        cleanup: async () => 'retired',
         commit: () => {},
         release: () => {},
       };
@@ -126,6 +128,21 @@ function fakeKiloRuntimes(overrides: Partial<WrapperKiloClient> = {}): WorktreeK
     deleteDirectory: async directory => {
       runtimes.delete(directory);
     },
+    retireRuntime: async (directory, _deadlineAt, target) => {
+      const runtime = runtimes.get(directory);
+      if (
+        !runtime ||
+        !target ||
+        target.runtimeId !== runtime.runtimeId ||
+        target.client !== runtime.kiloClient
+      )
+        return 'stale';
+      runtimes.delete(directory);
+      return 'retired';
+    },
+    verifyQuiescence: async (directory, target, deadlineAt) =>
+      runtimes.get(directory)?.kiloClient === target.client && Date.now() < deadlineAt,
+    getRetained: directory => runtimes.get(directory),
     get: directory => runtimes.get(directory),
     isHealthy: () => true,
     shutdown: () => {},
@@ -216,6 +233,18 @@ describe('applySessionAttach', () => {
       expect(setupBranches).toEqual(['session/worktree_a']);
     });
 
+    it('creates a requested working branch when it is absent from the remote', async () => {
+      const branch = 'kilo/quiet-forest-abc';
+      const result = await applySessionAttach(
+        { ...session, directory },
+        { ...payload, branch, branchMode: 'working' },
+        deps
+      );
+
+      expect(result).toEqual({ ok: true, result: { attached: true } });
+      expect(await currentBranch()).toBe(branch);
+    });
+
     it.each(['main', 'feature/existing'])(
       'honors the explicitly requested branch %s',
       async branch => {
@@ -231,11 +260,13 @@ describe('applySessionAttach', () => {
 
     it('fails preparation rather than falling back to main for a missing requested branch', async () => {
       let setupRan = false;
+      const diagnostics: Array<Record<string, string | number | boolean | undefined>> = [];
       const result = await applySessionAttach(
         { ...session, directory },
         { ...payload, branch: 'missing', setupCommands: ['prepare'] },
         {
           ...deps,
+          onDiagnostic: (_event, fields) => diagnostics.push(fields),
           runSetup: async () => {
             setupRan = true;
             return { stdout: '', stderr: '', exitCode: 0 };
@@ -247,6 +278,15 @@ describe('applySessionAttach', () => {
         error: { code: 'not_ready', message: 'git checkout failed', retryable: true },
       });
       expect(setupRan).toBe(false);
+      expect(diagnostics).toContainEqual(
+        expect.objectContaining({
+          phase: 'failed',
+          stage: 'git_setup',
+          errorCode: 'not_ready',
+          retryable: true,
+          detail: 'git checkout failed',
+        })
+      );
     });
 
     it('preserves generated-branch commits when retrying failed setup', async () => {

@@ -104,6 +104,7 @@ export type StreamHandlerOptions = {
   deriveQueuedMessages?: () => Promise<QueuedMessageSnapshot[]>;
   deriveSessionStatus?: () => Promise<ConnectedEventData['sessionStatus']>;
   derivePendingInteractions?: () => Promise<ConnectedEventData['pendingInteractions']>;
+  readPendingInteractions?: () => ConnectedEventData['pendingInteractions'];
   getPreparationSnapshots?: () => Promise<StoredEvent[]>;
   reconcileMaterializedEvents?: boolean;
 };
@@ -207,12 +208,17 @@ export function createStreamHandler(
       };
       if (options?.reconcileMaterializedEvents) await sendPreparationSnapshots();
 
-      const pendingInteractions = await options?.derivePendingInteractions?.();
+      const derivedPendingInteractions = options?.readPendingInteractions
+        ? undefined
+        : await options?.derivePendingInteractions?.();
       const [cloudStatus, sessionStatus, queued] = await Promise.all([
         options?.deriveCloudStatus?.(),
         options?.deriveSessionStatus?.(),
         options?.deriveQueuedMessages?.() ?? [],
       ]);
+      const pendingInteractions = options?.readPendingInteractions
+        ? options.readPendingInteractions()
+        : derivedPendingInteractions;
       const sendSnapshot = (
         streamEventType:
           | 'kilocode'

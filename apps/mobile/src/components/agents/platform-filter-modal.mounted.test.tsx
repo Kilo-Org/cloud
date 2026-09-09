@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { type AgentSessionFilters } from '@/lib/agent-session-filters';
-import { emitPrivacyCover } from '@/lib/privacy-cover-events';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { SessionFilterModal } from './platform-filter-modal';
 
@@ -98,7 +97,7 @@ describe('SessionFilterModal', () => {
       i18n.t('agentChat.sessionFilter.platformExtension'),
       i18n.t('agentChat.sessionFilter.platformCli'),
       i18n.t('agentChat.sessionFilter.platformSlack'),
-      i18n.t('agentChat.sessionFilter.platformGithub'),
+      i18n.t('common.github'),
       i18n.t('agentChat.sessionFilter.platformLinear'),
       i18n.t('agentChat.sessionFilter.platformOther'),
       firstProject.displayName,
@@ -224,7 +223,7 @@ describe('SessionFilterModal', () => {
     expect(props.onClose).toHaveBeenCalledOnce();
   });
 
-  it.each(['cancel', 'backdrop', 'native', 'privacy'] as const)(
+  it.each(['cancel', 'backdrop', 'native'] as const)(
     'dismisses through %s without applying draft selections',
     async dismissal => {
       const { renderer, props } = await renderModal();
@@ -235,9 +234,7 @@ describe('SessionFilterModal', () => {
         pressButton(renderer, i18n.t('common.cancel'));
       } else {
         act(() => {
-          if (dismissal === 'privacy') {
-            emitPrivacyCover();
-          } else if (dismissal === 'native') {
+          if (dismissal === 'native') {
             (renderer.root.findByType(Modal).props.onRequestClose as () => void)();
           } else {
             const backdrop = renderer.root.findAllByType(Pressable)[0];

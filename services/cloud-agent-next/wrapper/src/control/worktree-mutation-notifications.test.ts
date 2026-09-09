@@ -14,8 +14,8 @@ import type { WrapperKiloClient } from '../kilo-api';
 import { eventKiloSessionId, sessionEventIdentity, unfilteredKiloEvents } from './feed';
 import {
   buildHeartbeatPayload,
+  createControlHandlerDeps,
   createSessionActivityRegistry,
-  type HandlerDeps,
   type HandlerSessionSnapshot,
 } from './sandbox-control-handlers';
 import {
@@ -257,6 +257,7 @@ function setup(deliver?: SendEvent, signal?: AbortSignal) {
     const controller = new AbortController();
     let client = {} as WrapperKiloClient;
     const runtime: WorktreeKiloRuntime = {
+      runtimeId: crypto.randomUUID(),
       directory,
       scopeId: directory,
       env: {},
@@ -299,7 +300,12 @@ function expectedHint(kiloSessionId = 'root', worktree = directory): Parameters<
   return [
     'session.event',
     { type: WORKTREE_CHANGED_EVENT, properties: {} },
-    { directory: worktree, kiloSessionId, rootKiloSessionId: kiloSessionId },
+    {
+      directory: worktree,
+      kiloSessionId,
+      rootKiloSessionId: kiloSessionId,
+      nativeRuntimeId: expect.any(String),
+    },
   ];
 }
 
@@ -596,12 +602,14 @@ describe('worktree mutation notifications', () => {
     const activity = createSessionActivityRegistry();
     activity.attach('root');
     activity.attach('sibling');
-    const deps = {
+    const deps = createControlHandlerDeps({
       sessions: h.sessions,
-      tasks: new Map(),
       activity,
+      version: 'test',
       kiloReady: true,
-    } as HandlerDeps;
+      emitSessionEvent: () => {},
+      retireRuntime: () => {},
+    });
     const snapshots = structuredClone(h.sessions);
     const heartbeat = buildHeartbeatPayload(deps);
     const routed = [];
@@ -860,6 +868,7 @@ describe('worktree mutation notifications', () => {
     h.notifications.observe(replacement.runtime, { ...fileEdited, directory });
     jest.advanceTimersByTime(5_000);
     expect(h.sendEvent.mock.calls).toEqual([expectedHint()]);
+    expect(h.sendEvent.mock.calls[0]?.[2].nativeRuntimeId).toBe(replacement.runtime.runtimeId);
   });
 
   it('never queues while aborted, disposed, deleting, or without an attached snapshot', async () => {

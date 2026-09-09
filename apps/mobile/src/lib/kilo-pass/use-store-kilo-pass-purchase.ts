@@ -1,7 +1,7 @@
 /* eslint-disable max-lines */
 
 import { useEffect } from 'react';
-import { ErrorCode, type Purchase } from 'expo-iap';
+import { ErrorCode, type Purchase, type RequestSubscriptionAndroidProps } from 'expo-iap';
 import { toast } from 'sonner-native';
 import { z } from 'zod';
 
@@ -16,6 +16,10 @@ const alreadyOwnedPurchaseErrorSchema = z.object({
   code: z.literal(ErrorCode.AlreadyOwned),
 });
 
+const billingUnavailableErrorSchema = z.object({
+  code: z.literal(ErrorCode.BillingUnavailable),
+});
+
 const errorMessageSchema = z.object({
   message: z.string(),
 });
@@ -26,16 +30,35 @@ const APP_STORE_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
   'App Store purchase account token does not match the signed-in user.';
 const APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
   "This App Store purchase isn't linked to your Kilo account. Make sure you're signed in to the Apple ID that made the purchase, then try again.";
+const GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE =
+  'Google Play purchase account token does not match the signed-in user.';
+const GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE =
+  "This Google Play purchase isn't linked to your Kilo account. Make sure you're signed in to the Google account that made the purchase, then try again.";
 const PURCHASE_ERROR_TOAST_DEDUPE_MS = 1500;
 
+type StoreKiloPassPurchaseRequest =
+  | { apple: { appAccountToken: string; sku: string } }
+  | {
+      google: {
+        obfuscatedAccountId: string;
+        skus: string[];
+        subscriptionOffers: { sku: string; offerToken: string }[];
+        purchaseToken?: string;
+        subscriptionProductReplacementParams?: RequestSubscriptionAndroidProps['subscriptionProductReplacementParams'];
+      };
+    };
+
 export type AppStoreKiloPassPurchaseActionsDeps = {
+  // Which storefront the current device buys from. The owner injects this from
+  // `Platform.OS` so this module never imports `react-native`.
+  storefront: 'app_store' | 'play';
   // The real implementations (expo-iap's mutateAsync, the tRPC mutation) each
   // resolve to their own concrete result; this module never reads it, only
   // awaits it, so `Promise<void>` can't stand in here — `Promise<X>` requires
   // its real `X` to be assignable to `void`, which none of the callers' true
   // return types are.
   requestPurchase: (params: {
-    request: { apple: { appAccountToken: string; sku: string } };
+    request: StoreKiloPassPurchaseRequest;
     type: 'subs';
     // oxlint-disable-next-line anti-slop/no-unknown-returns -- see comment above: the resolved value is intentionally unused and varies per real implementation
   }) => Promise<unknown>;
@@ -48,16 +71,26 @@ export type AppStoreKiloPassPurchaseActionsDeps = {
     product: 'kilo_pass';
     // oxlint-disable-next-line anti-slop/no-unknown-returns -- see comment above requestPurchase: the resolved value is intentionally unused and varies per real implementation
   }) => Promise<unknown>;
+  completePlayPurchase: (input: {
+    purchaseToken: string;
+    platform: 'android';
+    storefront: 'play';
+    product: 'kilo_pass';
+    // oxlint-disable-next-line anti-slop/no-unknown-returns -- see comment above requestPurchase: the resolved value is intentionally unused and varies per real implementation
+  }) => Promise<unknown>;
   finishTransaction: (params: { purchase: Purchase; isConsumable: false }) => Promise<void>;
   enabledAppleProductIds: readonly string[];
+  enabledGoogleProductIds: readonly string[];
   loadEnabledAppleProductIds?: () => Promise<readonly string[]>;
+  loadEnabledGoogleProductIds?: () => Promise<readonly string[]>;
   invalidateAfterCompletion: () => Promise<void> | void;
   onPurchaseCompleted?: () => void;
   setPendingPurchaseCompletedCallback?: (callback: (() => void) | null) => void;
   showError: (message: string) => void;
 };
 
-type StoreKiloPassPurchaseOptions = {
+export type StoreKiloPassPurchaseOptions = {
+  googleReplacement?: { purchaseToken: string; productId: string };
   onCompleted?: () => void;
 };
 
@@ -104,25 +137,36 @@ type PurchaseSuccessOptions = PurchaseCompletionOptions & {
 
 type RecoverPurchasesOptions = PurchaseCompletionOptions & {
   enabledAppleProductIds?: readonly string[];
+  enabledGoogleProductIds?: readonly string[];
 };
 
 export function isRecoverableKiloPassPurchase(
   purchase: Purchase,
-  enabledAppleProductIds: readonly string[]
+  enabledAppleProductIds: readonly string[],
+  enabledGoogleProductIds: readonly string[] = []
 ): boolean {
   if (purchase.purchaseState === 'pending') {
     return false;
   }
-  if (purchase.store !== 'apple') {
-    return false;
+  if (purchase.store === 'apple') {
+    return enabledAppleProductIds.includes(purchase.productId);
   }
-  return enabledAppleProductIds.includes(purchase.productId);
+  if (purchase.store === 'google') {
+    return enabledGoogleProductIds.includes(purchase.productId);
+  }
+  return false;
 }
 
 function getPurchaseToken(purchase: Purchase): string {
   const token = purchase.purchaseToken;
   if (!token) {
-    throw new Error(i18n.t('kiloPass.purchaseMissingSignedTransaction'));
+    throw new Error(
+      i18n.t(
+        purchase.store === 'google'
+          ? 'kiloPass.purchaseMissingPurchaseToken'
+          : 'kiloPass.purchaseMissingSignedTransaction'
+      )
+    );
   }
   return token;
 }
@@ -139,13 +183,25 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return errorMessageSchema.safeParse(error).data?.message ?? fallback;
 }
 
-export function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string): string | null {
+export function getKiloPassPurchaseErrorMessage(
+  error: unknown,
+  fallback: string,
+  storefront: 'app_store' | 'play'
+): string | null {
   if (isUserCancelledPurchaseError(error)) {
     return null;
   }
 
   if (isAlreadyOwnedPurchaseError(error)) {
-    return i18n.t('kiloPass.purchaseOwnedByAnotherAccount');
+    return i18n.t(
+      storefront === 'play'
+        ? 'kiloPass.purchaseOwnedByAnotherAccountPlay'
+        : 'kiloPass.purchaseOwnedByAnotherAccount'
+    );
+  }
+
+  if (storefront === 'play' && billingUnavailableErrorSchema.safeParse(error).success) {
+    return i18n.t('kiloPass.purchaseUnavailable');
   }
 
   const message = getErrorMessage(error, fallback);
@@ -154,6 +210,12 @@ export function getKiloPassPurchaseErrorMessage(error: unknown, fallback: string
   }
   if (message === APP_STORE_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE) {
     return i18n.t('kiloPass.purchaseDifferentAccount');
+  }
+  if (message === GOOGLE_PLAY_ACCOUNT_TOKEN_MISMATCH_MESSAGE) {
+    return i18n.t('kiloPass.purchaseOwnedByAnotherAccountPlay');
+  }
+  if (message === GOOGLE_PLAY_PURCHASE_NOT_LINKED_TO_ACCOUNT_MESSAGE) {
+    return i18n.t('kiloPass.purchaseDifferentAccountPlay');
   }
 
   return message;
@@ -186,20 +248,31 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     options: PurchaseCompletionOptions = {}
   ): Promise<PurchaseCompletionResult> {
     try {
-      const signedTransactionJws = getPurchaseToken(purchase);
-      await deps.completeAppStorePurchase({
-        signedTransactionJws,
-        platform: 'ios',
-        storefront: 'app_store',
-        product: 'kilo_pass',
-      });
+      const token = getPurchaseToken(purchase);
+      await (purchase.store === 'google'
+        ? deps.completePlayPurchase({
+            purchaseToken: token,
+            platform: 'android',
+            storefront: 'play',
+            product: 'kilo_pass',
+          })
+        : deps.completeAppStorePurchase({
+            signedTransactionJws: token,
+            platform: 'ios',
+            storefront: 'app_store',
+            product: 'kilo_pass',
+          }));
+      await deps.finishTransaction({ purchase, isConsumable: false });
       if (options.invalidateAfterCompletion ?? true) {
         await deps.invalidateAfterCompletion();
       }
-      await deps.finishTransaction({ purchase, isConsumable: false });
       return { completed: true };
     } catch (error) {
-      const message = getKiloPassPurchaseErrorMessage(error, i18n.t('kiloPass.purchaseFailed'));
+      const message = getKiloPassPurchaseErrorMessage(
+        error,
+        i18n.t('kiloPass.purchaseFailed'),
+        deps.storefront
+      );
       return { completed: false, errorMessage: message };
     }
   }
@@ -253,14 +326,24 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     return (await deps.loadEnabledAppleProductIds?.()) ?? [];
   }
 
+  async function getEnabledGoogleProductIdsForRestore() {
+    if (deps.enabledGoogleProductIds.length > 0) {
+      return deps.enabledGoogleProductIds;
+    }
+    return (await deps.loadEnabledGoogleProductIds?.()) ?? [];
+  }
+
   async function recoverPurchases(
     purchases: Purchase[],
     options: RecoverPurchasesOptions = {}
   ): Promise<Purchase[]> {
     const enabledAppleProductIds = options.enabledAppleProductIds ?? deps.enabledAppleProductIds;
+    const enabledGoogleProductIds = options.enabledGoogleProductIds ?? deps.enabledGoogleProductIds;
     const recoveryResults = await Promise.all(
       purchases
-        .filter(purchase => isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds))
+        .filter(purchase =>
+          isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
+        )
         .map(async purchase => {
           const completed = await handlePurchaseSuccess(purchase, {
             invalidateAfterCompletion: false,
@@ -286,6 +369,45 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
     ): Promise<boolean> => {
       try {
         deps.setPendingPurchaseCompletedCallback?.(options.onCompleted ?? null);
+        if (deps.storefront === 'play') {
+          const offerToken = product.storeProduct.offerToken;
+          if (!offerToken) {
+            deps.showError(i18n.t('kiloPass.purchaseMissingOfferToken'));
+            deps.setPendingPurchaseCompletedCallback?.(null);
+            return false;
+          }
+          const replacement = options.googleReplacement;
+          if (replacement) {
+            // Verify ownership and acknowledge the current purchase before replacing it.
+            await deps.completePlayPurchase({
+              purchaseToken: replacement.purchaseToken,
+              platform: 'android',
+              storefront: 'play',
+              product: 'kilo_pass',
+            });
+          }
+          await deps.requestPurchase({
+            request: {
+              google: {
+                obfuscatedAccountId: product.appAccountToken,
+                ...(replacement
+                  ? {
+                      purchaseToken: replacement.purchaseToken,
+                      subscriptionProductReplacementParams: {
+                        oldProductId: replacement.productId,
+                        replacementMode: 'deferred' as const,
+                      },
+                    }
+                  : {}),
+                skus: [product.googleProductId],
+                subscriptionOffers: [{ sku: product.googleProductId, offerToken }],
+              },
+            },
+            type: 'subs',
+          });
+          return true;
+        }
+
         await deps.requestPurchase({
           request: {
             apple: { appAccountToken: product.appAccountToken, sku: product.appleProductId },
@@ -296,7 +418,12 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
       } catch (error) {
         const message = getKiloPassPurchaseErrorMessage(
           error,
-          i18n.t('kiloPass.purchaseStartFailed')
+          i18n.t(
+            deps.storefront === 'play'
+              ? 'kiloPass.purchaseStartFailedPlay'
+              : 'kiloPass.purchaseStartFailed'
+          ),
+          deps.storefront
         );
         if (message) {
           deps.showError(message);
@@ -312,13 +439,14 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
         await deps.restorePurchases();
         const availablePurchases = await deps.getAvailablePurchases();
         const enabledAppleProductIds = await getEnabledAppleProductIdsForRestore();
-        if (enabledAppleProductIds.length === 0) {
+        const enabledGoogleProductIds = await getEnabledGoogleProductIdsForRestore();
+        if (enabledAppleProductIds.length === 0 && enabledGoogleProductIds.length === 0) {
           deps.showError(i18n.t('kiloPass.restoreFailed'));
           return 'failed';
         }
 
         const kiloPassPurchases = availablePurchases.filter(purchase =>
-          isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds)
+          isRecoverableKiloPassPurchase(purchase, enabledAppleProductIds, enabledGoogleProductIds)
         );
         if (kiloPassPurchases.length === 0) {
           return 'empty';
@@ -326,6 +454,7 @@ export function createAppStoreKiloPassPurchaseActions(deps: AppStoreKiloPassPurc
 
         const completedPurchases = await recoverPurchases(kiloPassPurchases, {
           enabledAppleProductIds,
+          enabledGoogleProductIds,
           notifyErrors: true,
         });
         return completedPurchases.length > 0 ? 'restored' : 'failed';

@@ -131,7 +131,7 @@ export type PersistenceEnv = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
-  /** Comma-separated user or org IDs admitted to the call-home control plane. `*` includes personal. */
+  /** Comma-separated user or org IDs admitted to the call-home control plane for interactive web creates. `*` includes personal. */
   CONTROL_PLANE_IDS?: string;
   /** Service binding for the session ingest worker */
   SESSION_INGEST: SessionIngestBinding;

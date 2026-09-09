@@ -22,9 +22,7 @@ export function EmptyConversationList({ onStart, isStarting, refreshControl }: P
       refreshControl={refreshControl}
       action={
         <Button className="h-11 px-5" onPress={onStart} disabled={isStarting}>
-          <Text>
-            {isStarting ? t('chat.conversationList.starting') : t('chat.conversationList.create')}
-          </Text>
+          <Text>{isStarting ? t('common.starting') : t('chat.conversationList.create')}</Text>
         </Button>
       }
     />

@@ -11,7 +11,10 @@ import {
   deleteIntegrationForOwner,
   findPendingInstallationByKiloUserId,
   getGitHubIntegrationById,
+  listRepositoryCustomizations,
+  updateIntegrationMetadataForOwner,
   updateRepositoriesForIntegration,
+  upsertRepositoryCustomization,
 } from '@/lib/integrations/db/platform-integrations';
 import {
   deleteGitHubInstallation,
@@ -19,6 +22,11 @@ import {
   fetchGitHubRepositories,
 } from '@/lib/integrations/platforms/github/adapter';
 import { isOrganizationModelUpdateAllowed } from '@/lib/organizations/effective-model-access.server';
+import {
+  type GitHubInstallationSettingsInput,
+  type GitHubRepositorySettingsInput,
+  resolveRepositorySettings,
+} from '@/lib/integrations/github-repository-settings';
 
 /**
  * List all integrations for an owner
@@ -321,18 +329,127 @@ export async function updateModel(
     }
   }
 
-  const existingMetadata = (integration.metadata || {}) as Record<string, unknown>;
+  await updateIntegrationMetadataForOwner(
+    owner,
+    PLATFORM.GITHUB,
+    { model_slug: modelSlug },
+    integration.id
+  );
 
-  await db
-    .update(platform_integrations)
-    .set({
-      metadata: {
-        ...existingMetadata,
-        model_slug: modelSlug,
-      },
-      updated_at: new Date().toISOString(),
-    })
-    .where(eq(platform_integrations.id, integration.id));
+  return { success: true };
+}
+
+/**
+ * Returns a GitHub App installation's default bot-mention model and PR
+ * review mode, plus every accessible repository with its raw override (or
+ * `null` when it inherits the installation default). Callers that need the
+ * *effective* value for a specific repository should use
+ * `resolveRepositorySettings` instead of re-deriving it from this shape.
+ */
+export async function getRepositoryCustomizations(owner: Owner, integrationId: string) {
+  const integration = await getGitHubIntegrationById(owner, integrationId);
+  if (!integration) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'GitHub App installation not found' });
+  }
+
+  const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
+  const customizations = await listRepositoryCustomizations(integrationId);
+  const customizationByRepositoryId = new Map(
+    customizations.map(customization => [customization.repository_id, customization])
+  );
+  const defaults = resolveRepositorySettings(integration);
+
+  return {
+    id: integration.id,
+    account: integration.platform_account_login,
+    access: integration.repository_access,
+    defaultModel: defaults.modelSlug,
+    defaultPrReviews: defaults.prReviewMode,
+    repositories: repositories.map(repository => {
+      const customization = customizationByRepositoryId.get(String(repository.id));
+      return {
+        id: repository.id,
+        name: repository.full_name,
+        private: repository.private,
+        model: customization?.bot_mention_model_slug ?? null,
+        prReviews: customization?.pr_review_mode ?? null,
+      };
+    }),
+  };
+}
+
+/**
+ * Updates a GitHub App installation's default bot-mention model and/or PR
+ * review mode. Only the fields present in `settings` change; the merge into
+ * `metadata` is atomic (see `updateIntegrationMetadataForOwner`), so a
+ * concurrent write to the other field cannot be lost.
+ */
+export async function updateInstallationSettings(
+  owner: Owner,
+  integrationId: string,
+  settings: GitHubInstallationSettingsInput
+): Promise<{ success: boolean; error?: string }> {
+  const integration = await getGitHubIntegrationById(owner, integrationId);
+  if (!integration) {
+    return { success: false, error: 'No GitHub App installation found' };
+  }
+
+  if (
+    owner.type === 'org' &&
+    settings.modelSlug !== undefined &&
+    !(await isOrganizationModelUpdateAllowed(owner.id, settings.modelSlug))
+  ) {
+    return { success: false, error: 'Model is not allowed by organization policy' };
+  }
+
+  await updateIntegrationMetadataForOwner(
+    owner,
+    PLATFORM.GITHUB,
+    {
+      ...(settings.modelSlug !== undefined ? { model_slug: settings.modelSlug } : {}),
+      ...(settings.prReviewMode !== undefined ? { pr_review_mode: settings.prReviewMode } : {}),
+    },
+    integrationId
+  );
+
+  return { success: true };
+}
+
+/**
+ * Sets or clears a per-repository override. A `null` field explicitly
+ * restores inheritance from the installation default; an omitted field is
+ * left untouched. `repositoryId` must belong to a repository the
+ * installation currently has access to, so overrides cannot be created for
+ * repositories the installation cannot act on.
+ */
+export async function updateRepositorySettings(
+  owner: Owner,
+  integrationId: string,
+  repositoryId: number,
+  settings: GitHubRepositorySettingsInput
+): Promise<{ success: boolean; error?: string }> {
+  const integration = await getGitHubIntegrationById(owner, integrationId);
+  if (!integration) {
+    return { success: false, error: 'No GitHub App installation found' };
+  }
+
+  const repositories = requireNumericPlatformRepositories(integration.repositories) ?? [];
+  if (!repositories.some(repository => repository.id === repositoryId)) {
+    return { success: false, error: 'Repository is not accessible to this installation' };
+  }
+
+  if (
+    owner.type === 'org' &&
+    settings.modelSlug != null &&
+    !(await isOrganizationModelUpdateAllowed(owner.id, settings.modelSlug))
+  ) {
+    return { success: false, error: 'Model is not allowed by organization policy' };
+  }
+
+  await upsertRepositoryCustomization(integrationId, String(repositoryId), {
+    ...(settings.modelSlug !== undefined ? { bot_mention_model_slug: settings.modelSlug } : {}),
+    ...(settings.prReviewMode !== undefined ? { pr_review_mode: settings.prReviewMode } : {}),
+  });
 
   return { success: true };
 }

@@ -7,6 +7,7 @@ import {
   IOS_SUCCESSES,
   mount,
   native,
+  settleReadRetries,
   state,
   storage,
   SUCCESS,
@@ -27,13 +28,21 @@ describe.each(['active', 'inactive', 'background'])('cold start in %s', initial 
       expectState(false, 'preference-loading', true);
       await action();
       await action(true);
-      await finish(read, raw);
-      if (raw === 'invalid' || raw instanceof Error) {
-        expectState(false, 'preference-error');
-        await action(true);
-        expectState(false, 'preference-error');
-        storage.getItemAsync.mockResolvedValue('disabled');
-        await action();
+      if (raw instanceof Error) {
+        // The first read rejects; the bounded read helper re-reads with
+        // backoff and answers with the resolved retry. Fake timers go in
+        // before the rejection lands, so the backoff runs on the fake clock.
+        vi.useFakeTimers();
+        await finish(read, raw);
+        await settleReadRetries();
+        vi.useRealTimers();
+      } else {
+        await finish(read, raw);
+      }
+      if (raw === 'invalid') {
+        // An invalid stored value is not a choice to lock: the provider
+        // settles at the documented default with no retry and no prompt.
+        expectState(false, 'unlocked');
       } else if (raw === 'enabled') {
         expectState(true, 'locked', initial === 'active');
         await transition('active', 300_000);
@@ -42,12 +51,20 @@ describe.each(['active', 'inactive', 'background'])('cold start in %s', initial 
         await finish(auth, SUCCESS);
       }
       expectState(raw === 'enabled', 'unlocked');
-      expect(storage.getItemAsync).toHaveBeenCalledTimes(
-        raw === 'invalid' || raw instanceof Error ? 2 : 1
-      );
+      expect(storage.getItemAsync).toHaveBeenCalledTimes(raw instanceof Error ? 2 : 1);
       expect(native.authenticateAsync).toHaveBeenCalledTimes(raw === 'enabled' ? 1 : 0);
     }
   );
+});
+
+it('repro: a rejected unlock preference read never gates the app', async () => {
+  // The environmental keychain failure rejects every preference read, past
+  // the read helper's whole retry budget. A read that cannot answer is not a
+  // user choice to lock: the provider must settle at the safe default —
+  // disabled, unlocked — and never gate the app behind the unlock screen.
+  await mount('disabled', true);
+  expectState(false, 'unlocked');
+  expect(native.authenticateAsync).not.toHaveBeenCalled();
 });
 
 it.each(IOS_SUCCESSES)('unlocks cold start with iOS success %j', async result => {

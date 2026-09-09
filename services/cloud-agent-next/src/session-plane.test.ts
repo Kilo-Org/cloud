@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   generateSessionId,
   isControlPlaneOwner,
+  isInteractiveWebSession,
   isWorktreeOwner,
   sessionPlaneForNewOwner,
   sessionPlaneFromId,
@@ -31,21 +32,46 @@ describe('session plane identity', () => {
     );
   });
 
-  it('mints workspace_ only for allowlisted owners', () => {
+  it('mints workspace_ only for allowlisted interactive web sessions', () => {
+    const web = { createdOnPlatform: 'cloud-agent-web' };
     expect(generateSessionId('legacy').startsWith('agent_')).toBe(true);
     expect(generateSessionId('control').startsWith('workspace_')).toBe(true);
     expect(sessionIdSchema.safeParse(generateSessionId('control')).success).toBe(true);
-    expect(sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-1' })).toBe(
-      'control'
-    );
     expect(
-      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: 'org-1' }, { userId: 'user-2', orgId: 'org-1' })
+      sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-1' }, web)
     ).toBe('control');
-    expect(sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: '*' }, { userId: 'user-3' })).toBe(
+    expect(
+      sessionPlaneForNewOwner(
+        { CONTROL_PLANE_IDS: 'org-1' },
+        { userId: 'user-2', orgId: 'org-1' },
+        web
+      )
+    ).toBe('control');
+    expect(sessionPlaneForNewOwner({ CONTROL_PLANE_IDS: '*' }, { userId: 'user-3' }, web)).toBe(
       'control'
     );
-    expect(sessionPlaneForNewOwner({}, { userId: 'user-1', orgId: 'org-1' })).toBe('legacy');
+    expect(sessionPlaneForNewOwner({}, { userId: 'user-1', orgId: 'org-1' }, web)).toBe('legacy');
     expect(isControlPlaneOwner({ CONTROL_PLANE_IDS: 'user-1' }, { userId: 'user-2' })).toBe(false);
+  });
+
+  it.each([undefined, '', 'cloud-agent', 'slack', 'scheduled', 'code-review', 'webhook'] as const)(
+    'keeps enrolled owners on agent_ for non-interactive origin %s',
+    createdOnPlatform => {
+      expect(
+        sessionPlaneForNewOwner(
+          { CONTROL_PLANE_IDS: '*' },
+          { userId: 'user-1' },
+          createdOnPlatform === undefined ? undefined : { createdOnPlatform }
+        )
+      ).toBe('legacy');
+    }
+  );
+
+  it('treats only cloud-agent-web as an interactive web session', () => {
+    expect(isInteractiveWebSession({ createdOnPlatform: 'cloud-agent-web' })).toBe(true);
+    expect(isInteractiveWebSession({ createdOnPlatform: 'slack' })).toBe(false);
+    expect(isInteractiveWebSession({})).toBe(false);
+    expect(isInteractiveWebSession()).toBe(false);
   });
 
   it.each([
@@ -68,12 +94,13 @@ describe('session plane identity', () => {
 
   it('keeps worktree enrollment independent of control-plane routing', () => {
     const owner = { userId: 'user-1' };
+    const web = { createdOnPlatform: 'cloud-agent-web' };
     const controlOnly = { CONTROL_PLANE_IDS: '*', WORKTREE_CREATION_ENABLED_IDS: '' };
     const worktreeOnly = { CONTROL_PLANE_IDS: '', WORKTREE_CREATION_ENABLED_IDS: '*' };
 
-    expect(sessionPlaneForNewOwner(controlOnly, owner)).toBe('control');
+    expect(sessionPlaneForNewOwner(controlOnly, owner, web)).toBe('control');
     expect(isWorktreeOwner(controlOnly, owner)).toBe(false);
-    expect(sessionPlaneForNewOwner(worktreeOnly, owner)).toBe('legacy');
+    expect(sessionPlaneForNewOwner(worktreeOnly, owner, web)).toBe('legacy');
     expect(isWorktreeOwner(worktreeOnly, owner)).toBe(true);
   });
 

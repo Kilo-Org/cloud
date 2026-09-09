@@ -204,6 +204,9 @@
     "confirmDeletion": "Whakaūngia te mukunga",
     "credits": "Ngā moni tōmua",
     "failedToLoadBalance": "Kāore i taea te uta i te toenga. Pāwhiria hei whakamātau anō.",
+    "hideBalance": "Hunaia te toenga",
+    "showBalance": "Whakaaturia te toenga",
+    "balanceHidden": "Kua huna te toenga",
     "bonusCreditsExpiring": "Ka mōnehu ā te {{date}} ngā moni tōmua tāpiri {{amount}}.",
     "creditBalanceEmpty": "Kua pau ō moni tōmua. Ka whakahaeretia ngā moni tōmua mō tēnei pūkete ki waho o te taupānga iOS.",
     "signOutTitle": "Takiputa?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Kua maukatihia e te māngai \"{{agent}}\"",
       "addToFavorites": "Tāpirihia a {{name}} ki ngā makau",
       "removeFromFavorites": "Tangohia {{name}} i ngā makau",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Waenga",
       "sessionModel": "Te tauira o te wātū"
     },
     "attachmentPreview": {

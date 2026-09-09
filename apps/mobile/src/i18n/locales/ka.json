@@ -204,6 +204,9 @@
     "confirmDeletion": "წაშლის დადასტურება",
     "credits": "კრედიტები",
     "failedToLoadBalance": "ბალანსის ჩატვირთვა ვერ მოხერხდა. ხელახლა ჩასატვირთად შეეხეთ.",
+    "hideBalance": "ბალანსის დამალვა",
+    "showBalance": "ბალანსის ჩვენება",
+    "balanceHidden": "ბალანსი დამალულია",
     "bonusCreditsExpiring": "ბონუსური კრედიტების ({{amount}}) ვადა იწურება: {{date}}.",
     "creditBalanceEmpty": "კრედიტების ბალანსი ამოწურულია. ამ ანგარიშის კრედიტები iOS აპის გარეთ იმართება.",
     "signOutTitle": "ანგარიშიდან გასვლა?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", ჩაკეტილია აგენტის „{{agent}}“ მიერ",
       "addToFavorites": "{{name}}-ის რჩეულებში დამატება",
       "removeFromFavorites": "{{name}}-ის რჩეულებიდან ამოღება",
-      "thinkingEffortXhigh": "ძ. მაღ.",
-      "thinkingEffortMedium": "საშ.",
       "sessionModel": "სესიის მოდელი"
     },
     "attachmentPreview": {

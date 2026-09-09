@@ -204,6 +204,9 @@
     "confirmDeletion": "Berretsi ezabaketa",
     "credits": "Kredituak",
     "failedToLoadBalance": "Ezin izan da saldoa kargatu. Sakatu berriro saiatzeko.",
+    "hideBalance": "Ezkutatu saldoa",
+    "showBalance": "Erakutsi saldoa",
+    "balanceHidden": "Saldoa ezkutatuta dago",
     "bonusCreditsExpiring": "{{amount}} hobari-kreditu iraungiko dira data honetan: {{date}}.",
     "creditBalanceEmpty": "Ez duzu krediturik geratzen. Kontu honetan, kredituak iOS aplikaziotik kanpo kudeatzen dira.",
     "signOutTitle": "Itxi saioa?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", \"{{agent}}\" agenteak blokeatuta",
       "addToFavorites": "Gehitu {{name}} gogokoetara",
       "removeFromFavorites": "Kendu {{name}} gogokoetatik",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Ert.",
       "sessionModel": "Saioaren modeloa"
     },
     "attachmentPreview": {

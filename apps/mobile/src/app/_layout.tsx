@@ -47,7 +47,6 @@ import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
-import { PrivacyCoverOverlay } from '@/components/privacy-cover-overlay';
 import { QueryError } from '@/components/query-error';
 import { splashContentScale } from '@/components/splash-reveal';
 import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
@@ -67,6 +66,7 @@ import { useForceUpdate } from '@/lib/hooks/use-force-update';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useRestoreErrorHold } from '@/lib/hooks/use-restore-error-hold';
 import { useScreenTracking } from '@/lib/hooks/use-screen-tracking';
+import { preloadHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useNavigationTheme } from '@/lib/hooks/use-theme-colors';
 import {
   applyThemePreference,
@@ -163,6 +163,7 @@ checkInitialNotification();
 captureLaunchDeepLink();
 prefetchCurrentUser();
 preloadThemePreference();
+preloadHideBalancePreference();
 preloadLanguagePreference();
 preloadStartupFonts();
 
@@ -980,7 +981,6 @@ function RootLayoutNav({
         pointerEvents={hidden || showRestoreError ? 'none' : 'auto'}
       >
         <Slot />
-        <PrivacyCoverOverlay segments={segments} />
       </View>
       {showRestoreError ? (
         <View className="absolute inset-0">

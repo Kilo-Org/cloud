@@ -204,6 +204,9 @@
     "confirmDeletion": "Подтвердить удаление",
     "credits": "Кредиты",
     "failedToLoadBalance": "Не удалось загрузить баланс. Нажмите, чтобы повторить.",
+    "hideBalance": "Скрыть баланс",
+    "showBalance": "Показать баланс",
+    "balanceHidden": "Баланс скрыт",
     "bonusCreditsExpiring": "Срок действия бонусных кредитов на сумму {{amount}} истекает {{date}}.",
     "creditBalanceEmpty": "На вашем балансе нет кредитов. Управлять кредитами этого аккаунта можно только вне приложения для iOS.",
     "signOutTitle": "Выйти?",
@@ -1914,8 +1917,6 @@
       "lockedByAgent": ", Заблокировано агентом «{{agent}}»",
       "addToFavorites": "Добавить {{name}} в избранное",
       "removeFromFavorites": "Убрать {{name}} из избранного",
-      "thinkingEffortXhigh": "ОЧ. ВЫС.",
-      "thinkingEffortMedium": "Сред.",
       "sessionModel": "Модель сеанса"
     },
     "attachmentPreview": {

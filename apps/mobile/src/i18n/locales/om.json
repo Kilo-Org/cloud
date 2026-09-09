@@ -204,6 +204,9 @@
     "confirmDeletion": "Haquu mirkaneessi",
     "credits": "Kiriiditii",
     "failedToLoadBalance": "Haftee fe'uu hin danda'amne. Deebi'anii yaaluuf tuqi.",
+    "hideBalance": "Haftee dhoksi",
+    "showBalance": "Haftee agarsiisi",
+    "balanceHidden": "Hafteen dhokateera",
     "bonusCreditsExpiring": "Kiriiditiin badhaasaa {{amount}} gaafa {{date}} yeroon isaa darba.",
     "creditBalanceEmpty": "Hafteen kiriiditii kee duwwaa dha. Kiriiditiin herrega kanaa appilikeeshinii iOS tiin alatti bulfama.",
     "signOutTitle": "Keessaa baataa?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Ergamaa \"{{agent}}\" dhaan cufame",
       "addToFavorites": "{{name}} kan jaallattetti dabali",
       "removeFromFavorites": "{{name}} kan jaallatte keessaa baasi",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Giddu",
       "sessionModel": "Moodela turtii"
     },
     "attachmentPreview": {

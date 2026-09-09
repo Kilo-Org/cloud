@@ -204,6 +204,9 @@
     "confirmDeletion": "Confirmă ștergerea",
     "credits": "Credite",
     "failedToLoadBalance": "Încărcarea soldului a eșuat. Atinge pentru a reîncerca.",
+    "hideBalance": "Ascunde soldul",
+    "showBalance": "Afișează soldul",
+    "balanceHidden": "Sold ascuns",
     "bonusCreditsExpiring": "Creditele bonus în valoare de {{amount}} expiră la {{date}}.",
     "creditBalanceEmpty": "Nu mai ai credite. Pentru acest cont, creditele se gestionează în afara aplicației iOS.",
     "signOutTitle": "Te deconectezi?",
@@ -2339,8 +2342,6 @@
       "lockedByAgent": ", Blocat de agentul „{{agent}}”",
       "addToFavorites": "Adaugă {{name}} la favorite",
       "removeFromFavorites": "Elimină {{name}} din favorite",
-      "thinkingEffortXhigh": "F. RID.",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Modelul sesiunii"
     },
     "attachmentPreview": {

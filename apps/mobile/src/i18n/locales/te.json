@@ -204,6 +204,9 @@
     "confirmDeletion": "తొలగింపును నిర్ధారించండి",
     "credits": "క్రెడిట్లు",
     "failedToLoadBalance": "బ్యాలెన్స్‌ను లోడ్ చేయలేకపోయాము. మళ్లీ ప్రయత్నించడానికి నొక్కండి.",
+    "hideBalance": "బ్యాలెన్స్ దాచు",
+    "showBalance": "బ్యాలెన్స్ చూపించు",
+    "balanceHidden": "బ్యాలెన్స్ దాచబడింది",
     "bonusCreditsExpiring": "{{amount}} బోనస్ క్రెడిట్ల గడువు {{date}}న ముగుస్తుంది.",
     "creditBalanceEmpty": "మీ ఖాతాలో క్రెడిట్లు లేవు. ఈ ఖాతా క్రెడిట్లను iOS యాప్ వెలుపల నిర్వహించాలి.",
     "signOutTitle": "సైన్ అవుట్ చేయాలా?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", \"{{agent}}\" ఏజెంట్ దీన్ని మార్చకుండా లాక్ చేసింది",
       "addToFavorites": "{{name}}ను ఇష్టమైనవాటికి జోడించండి",
       "removeFromFavorites": "{{name}}ను ఇష్టమైనవాటి నుండి తీసివేయండి",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "మధ్యస్థం",
       "sessionModel": "సెషన్ మోడల్"
     },
     "attachmentPreview": {

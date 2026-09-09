@@ -204,6 +204,9 @@
     "confirmDeletion": "මැකීම තහවුරු කරන්න",
     "credits": "ක්‍රෙඩිට්",
     "failedToLoadBalance": "ශේෂය පූරණය කළ නොහැකි විය. නැවත උත්සාහ කිරීමට තට්ටු කරන්න.",
+    "hideBalance": "ශේෂය සඟවන්න",
+    "showBalance": "ශේෂය පෙන්වන්න",
+    "balanceHidden": "ශේෂය සඟවා ඇත",
     "bonusCreditsExpiring": "{{amount}} ක ප්‍රසාද ක්‍රෙඩිට් {{date}} දින කල් ඉකුත් වේ.",
     "creditBalanceEmpty": "ඔබේ ක්‍රෙඩිට් ශේෂය හිස්ය. මෙම ගිණුමේ ක්‍රෙඩිට් කළමනාකරණය කරන්නේ iOS යෙදුමෙන් පිටතදීය.",
     "signOutTitle": "පිටවන්නද?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", \"{{agent}}\" නියෝජිතයා විසින් අගුළු දමා ඇත",
       "addToFavorites": "ප්‍රියතමයන්ට {{name}} එක් කරන්න",
       "removeFromFavorites": "ප්‍රියතමයන්ගෙන් {{name}} ඉවත් කරන්න",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "මධ්‍යම",
       "sessionModel": "සැසියේ මාදිලිය"
     },
     "attachmentPreview": {

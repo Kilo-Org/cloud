@@ -204,6 +204,9 @@
     "confirmDeletion": "Potvrdi brisanje",
     "credits": "Krediti",
     "failedToLoadBalance": "Učitavanje salda nije uspelo. Dodirni za ponovni pokušaj.",
+    "hideBalance": "Sakrij saldo",
+    "showBalance": "Prikaži saldo",
+    "balanceHidden": "Saldo je sakriven",
     "bonusCreditsExpiring": "Bonus krediti u iznosu od {{amount}} ističu {{date}}.",
     "creditBalanceEmpty": "Nemaš više kredita. Kreditima za ovaj nalog upravlja se van iOS aplikacije.",
     "signOutTitle": "Odjaviti se?",
@@ -2339,8 +2342,6 @@
       "lockedByAgent": ", Zaključano od strane agenta „{{agent}}“",
       "addToFavorites": "Dodaj {{name}} u omiljene",
       "removeFromFavorites": "Ukloni {{name}} iz omiljenih",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Sred.",
       "sessionModel": "Model sesije"
     },
     "attachmentPreview": {

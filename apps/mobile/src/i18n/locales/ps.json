@@ -204,6 +204,9 @@
     "confirmDeletion": "ړنګول تایید کړئ",
     "credits": "کریډیټ",
     "failedToLoadBalance": "بیلانس بار نه شو. د بیا هڅې لپاره ټک وکړئ.",
+    "hideBalance": "بیلانس پټ کړه",
+    "showBalance": "بیلانس ښکاره کړه",
+    "balanceHidden": "بیلانس پټ دی",
     "bonusCreditsExpiring": "د {{amount}} انعامي کریډیټ موده په {{date}} پای ته رسېږي.",
     "creditBalanceEmpty": "ستاسو کریډیټ خلاص شوی دی. د دې حساب کریډیټ د iOS اپلیکیشن څخه بهر اداره کېږي.",
     "signOutTitle": "له حسابه ووځم؟",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": "، د «{{agent}}» ایجنټ له خوا قلف شوی",
       "addToFavorites": "{{name}} د خوښې ماډلونو ته زیات کړئ",
       "removeFromFavorites": "{{name}} د خوښې ماډلونو له لېست څخه لرې کړئ",
-      "thinkingEffortXhigh": "ډېر لوړ",
-      "thinkingEffortMedium": "منځنی",
       "sessionModel": "د ناستې ماډل"
     },
     "attachmentPreview": {

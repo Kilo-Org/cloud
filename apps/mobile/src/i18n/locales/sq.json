@@ -204,6 +204,9 @@
     "confirmDeletion": "Konfirmo fshirjen",
     "credits": "Kreditet",
     "failedToLoadBalance": "Nuk u ngarkua gjendja. Prek për të provuar përsëri.",
+    "hideBalance": "Fshih gjendjen",
+    "showBalance": "Shfaq gjendjen",
+    "balanceHidden": "Gjendja është e fshehur",
     "bonusCreditsExpiring": "Kredite bonus në vlerën {{amount}} skadojnë më {{date}}.",
     "creditBalanceEmpty": "Nuk ke më kredite. Për këtë llogari, kreditet menaxhohen jashtë aplikacionit iOS.",
     "signOutTitle": "Do të dalësh nga llogaria?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", I bllokuar nga agjenti «{{agent}}»",
       "addToFavorites": "Shto {{name}} te të preferuarat",
       "removeFromFavorites": "Hiq {{name}} nga të preferuarat",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mes",
       "sessionModel": "Modeli i seancës"
     },
     "attachmentPreview": {

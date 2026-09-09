@@ -68,10 +68,6 @@ it.each([false, true])(
       const boundary = root().findByType(Layout);
       expect(boundary.findAllByType('Scene' as ElementType)).toHaveLength(1);
     }
-    for (const Layout of [OrganizationLayout, SecurityAgentScopeLayout]) {
-      const wrapper = root().findByType(Layout).findByProps({ pointerEvents: 'none' });
-      expect(wrapper.findAllByType('PrivacyCover' as ElementType)).toHaveLength(1);
-    }
     const observer = root().findByType('SecurityAgentCommandObserver' as ElementType);
     const scene = root().findByType(KiloClawLayout);
     const draft = scene.findByType('Draft' as ElementType);

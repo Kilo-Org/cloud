@@ -204,6 +204,9 @@
     "confirmDeletion": "Jẹ́rìí píparẹ́",
     "credits": "Kirẹ́dítì",
     "failedToLoadBalance": "A kò lè gbé owó tó kù wọlé. Tẹ̀ ẹ́ láti gbìyànjú lẹ́ẹ̀kan sí i.",
+    "hideBalance": "Fi owó tó kù pamọ́",
+    "showBalance": "Fi owó tó kù hàn",
+    "balanceHidden": "Owó tó kù ti pamọ́",
     "bonusCreditsExpiring": "Kirẹ́dítì ẹ̀bùn {{amount}} yóò dópin {{date}}.",
     "creditBalanceEmpty": "Kò sí kirẹ́dítì tó kù fún ọ. Ìṣàkóso kirẹ́dítì àkọọ́lẹ̀ yìí wà ní òde ohun èlò iOS.",
     "signOutTitle": "Jáde?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Aṣojú \"{{agent}}\" ti tì í pa",
       "addToFavorites": "Fi {{name}} kún àwọn àyànfẹ́",
       "removeFromFavorites": "Yọ {{name}} kúrò nínú àwọn àyànfẹ́",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Àárín",
       "sessionModel": "Àwòṣe ìgbà iṣẹ́"
     },
     "attachmentPreview": {

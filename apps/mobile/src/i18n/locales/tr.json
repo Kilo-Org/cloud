@@ -204,6 +204,9 @@
     "confirmDeletion": "Silmeyi onayla",
     "credits": "Krediler",
     "failedToLoadBalance": "Bakiye yüklenemedi. Tekrar denemek için dokun.",
+    "hideBalance": "Bakiyeyi gizle",
+    "showBalance": "Bakiyeyi göster",
+    "balanceHidden": "Bakiye gizli",
     "bonusCreditsExpiring": "{{amount}} tutarındaki bonus kredinin süresi {{date}} tarihinde dolacak.",
     "creditBalanceEmpty": "Kredi bakiyen tükendi. Bu hesabın kredileri iOS uygulamasının dışında yönetilir.",
     "signOutTitle": "Oturum kapatılsın mı?",
@@ -1888,8 +1891,6 @@
       "lockedByAgent": ", \"{{agent}}\" ajanı tarafından kilitlendi",
       "addToFavorites": "{{name}} modelini favorilere ekle",
       "removeFromFavorites": "{{name}} modelini favorilerden kaldır",
-      "thinkingEffortXhigh": "ÇY",
-      "thinkingEffortMedium": "Orta",
       "sessionModel": "Oturum modeli"
     },
     "attachmentPreview": {

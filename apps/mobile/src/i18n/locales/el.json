@@ -204,6 +204,9 @@
     "confirmDeletion": "Επιβεβαίωση διαγραφής",
     "credits": "Πιστώσεις",
     "failedToLoadBalance": "Δεν ήταν δυνατή η φόρτωση του υπολοίπου. Πάτησε για να δοκιμάσεις ξανά.",
+    "hideBalance": "Απόκρυψη υπολοίπου",
+    "showBalance": "Εμφάνιση υπολοίπου",
+    "balanceHidden": "Το υπόλοιπο είναι κρυφό",
     "bonusCreditsExpiring": "Οι πιστώσεις μπόνους ύψους {{amount}} λήγουν {{date}}.",
     "creditBalanceEmpty": "Το υπόλοιπο των πιστώσεών σου είναι μηδενικό. Για αυτόν τον λογαριασμό, η διαχείριση πιστώσεων γίνεται εκτός της εφαρμογής iOS.",
     "signOutTitle": "Αποσύνδεση;",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Κλειδωμένο από τον πράκτορα «{{agent}}»",
       "addToFavorites": "Προσθήκη του {{name}} στα αγαπημένα",
       "removeFromFavorites": "Αφαίρεση του {{name}} από τα αγαπημένα",
-      "thinkingEffortXhigh": "ΠΥ",
-      "thinkingEffortMedium": "Μέσ.",
       "sessionModel": "Μοντέλο συνεδρίας"
     },
     "attachmentPreview": {

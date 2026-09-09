@@ -204,6 +204,9 @@
     "confirmDeletion": "Silməni təsdiqlə",
     "credits": "Kreditlər",
     "failedToLoadBalance": "Balansı yükləmək mümkün olmadı. Yenidən cəhd etmək üçün toxun.",
+    "hideBalance": "Balansı gizlət",
+    "showBalance": "Balansı göstər",
+    "balanceHidden": "Balans gizlidir",
     "bonusCreditsExpiring": "{{amount}} məbləğində bonus kreditin müddəti {{date}} tarixində bitir.",
     "creditBalanceEmpty": "Kredit balansın boşdur. Bu hesabın kreditləri iOS tətbiqindən kənarda idarə olunur.",
     "signOutTitle": "Hesabdan çıxılsın?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", «{{agent}}» agenti tərəfindən kilidlənib",
       "addToFavorites": "{{name}} modelini sevimlilərə əlavə et",
       "removeFromFavorites": "{{name}} modelini sevimlilərdən sil",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Orta",
       "sessionModel": "Sessiya modeli"
     },
     "attachmentPreview": {

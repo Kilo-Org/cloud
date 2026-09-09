@@ -204,6 +204,9 @@
     "confirmDeletion": "ਮਿਟਾਉਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ",
     "credits": "ਕ੍ਰੈਡਿਟ",
     "failedToLoadBalance": "ਬੈਲੰਸ ਲੋਡ ਨਹੀਂ ਹੋ ਸਕਿਆ। ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ।",
+    "hideBalance": "ਬੈਲੰਸ ਲੁਕਾਓ",
+    "showBalance": "ਬੈਲੰਸ ਵਿਖਾਓ",
+    "balanceHidden": "ਬੈਲੰਸ ਲੁਕਾਇਆ ਗਿਆ",
     "bonusCreditsExpiring": "{{amount}} ਦੇ ਬੋਨਸ ਕ੍ਰੈਡਿਟਾਂ ਦੀ ਮਿਆਦ {{date}} ਨੂੰ ਪੁੱਗ ਰਹੀ ਹੈ।",
     "creditBalanceEmpty": "ਤੁਹਾਡੇ ਕੋਲ ਕੋਈ ਕ੍ਰੈਡਿਟ ਬਾਕੀ ਨਹੀਂ ਹੈ। ਇਸ ਖਾਤੇ ਦੇ ਕ੍ਰੈਡਿਟਾਂ ਦਾ ਪ੍ਰਬੰਧ iOS ਐਪ ਤੋਂ ਬਾਹਰ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।",
     "signOutTitle": "ਕੀ ਸਾਈਨ ਆਉਟ ਕਰਨਾ ਹੈ?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", ਏਜੰਟ \"{{agent}}\" ਦੁਆਰਾ ਲਾਕ ਕੀਤਾ ਗਿਆ",
       "addToFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਸੂਚੀ ਵਿੱਚ ਜੋੜੋ",
       "removeFromFavorites": "{{name}} ਨੂੰ ਪਸੰਦੀਦਾ ਸੂਚੀ ਤੋਂ ਹਟਾਓ",
-      "thinkingEffortXhigh": "ਬਹੁਤ ਉੱਚਾ",
-      "thinkingEffortMedium": "ਦਰਮਿਆਨਾ",
       "sessionModel": "ਸੈਸ਼ਨ ਦਾ ਮਾਡਲ"
     },
     "attachmentPreview": {

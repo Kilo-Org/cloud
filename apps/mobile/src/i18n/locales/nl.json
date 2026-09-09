@@ -204,6 +204,9 @@
     "confirmDeletion": "Verwijderen bevestigen",
     "credits": "Tegoed",
     "failedToLoadBalance": "Het saldo kon niet worden geladen. Tik om het opnieuw te proberen.",
+    "hideBalance": "Saldo verbergen",
+    "showBalance": "Saldo tonen",
+    "balanceHidden": "Saldo verborgen",
     "bonusCreditsExpiring": "{{amount}} aan bonustegoed verloopt op {{date}}.",
     "creditBalanceEmpty": "Je hebt geen tegoed meer. Het tegoed voor dit account wordt buiten de iOS-app beheerd.",
     "signOutTitle": "Afmelden?",
@@ -1888,8 +1891,6 @@
       "lockedByAgent": ", Vergrendeld door agent \"{{agent}}\"",
       "addToFavorites": "{{name}} aan favorieten toevoegen",
       "removeFromFavorites": "{{name}} uit favorieten verwijderen",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Gem",
       "sessionModel": "Sessiemodel"
     },
     "attachmentPreview": {

@@ -204,6 +204,9 @@
     "confirmDeletion": "បញ្ជាក់ការលុប",
     "credits": "ឥណទាន",
     "failedToLoadBalance": "មិនអាចផ្ទុកសមតុល្យបានទេ។ ប៉ះដើម្បីព្យាយាមម្តងទៀត។",
+    "hideBalance": "លាក់សមតុល្យ",
+    "showBalance": "បង្ហាញសមតុល្យ",
+    "balanceHidden": "សមតុល្យត្រូវបានលាក់",
     "bonusCreditsExpiring": "ឥណទានបន្ថែមចំនួន {{amount}} នឹងផុតកំណត់នៅ {{date}}។",
     "creditBalanceEmpty": "អ្នកអស់ឥណទានហើយ។ សម្រាប់គណនីនេះ អ្នកត្រូវគ្រប់គ្រងឥណទាននៅខាងក្រៅកម្មវិធី iOS។",
     "signOutTitle": "ចេញពីគណនី?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", បានចាក់សោដោយភ្នាក់ងារ \"{{agent}}\"",
       "addToFavorites": "បន្ថែម {{name}} ទៅចំណូលចិត្ត",
       "removeFromFavorites": "ដក {{name}} ចេញពីចំណូលចិត្ត",
-      "thinkingEffortXhigh": "ខ្ពស់ខ្លាំង",
-      "thinkingEffortMedium": "មធ្យម",
       "sessionModel": "ម៉ូដែលរបស់វគ្គ"
     },
     "attachmentPreview": {

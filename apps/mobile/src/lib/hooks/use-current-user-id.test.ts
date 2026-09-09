@@ -51,4 +51,15 @@ describe('useCurrentUserId', () => {
 
     expect(useCurrentUserId().isError).toBe(false);
   });
+
+  it('does not treat a refetch failure as missing identity when the user is cached', () => {
+    Object.assign(query, {
+      data: { id: 'user-1', email: 'user@example.com' },
+      isError: true,
+      isFetched: true,
+    });
+
+    expect(useCurrentUserId().isError).toBe(false);
+    expect(useCurrentUserId().userId).toBe('user-1');
+  });
 });

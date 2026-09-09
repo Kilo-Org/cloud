@@ -204,6 +204,9 @@
     "confirmDeletion": "削除を確定",
     "credits": "クレジット",
     "failedToLoadBalance": "残高を読み込めませんでした。タップして再試行してください。",
+    "hideBalance": "残高を非表示",
+    "showBalance": "残高を表示",
+    "balanceHidden": "残高は非表示です",
     "bonusCreditsExpiring": "{{amount}}のボーナスクレジットが{{date}}に失効します。",
     "creditBalanceEmpty": "クレジット残高がありません。このアカウントのクレジットは、iOSアプリ外で管理します。",
     "signOutTitle": "サインアウトしますか？",
@@ -1888,8 +1891,6 @@
       "lockedByAgent": "、エージェント「{{agent}}」によってロックされています",
       "addToFavorites": "{{name}}をお気に入りに追加",
       "removeFromFavorites": "{{name}}をお気に入りから削除",
-      "thinkingEffortXhigh": "超高",
-      "thinkingEffortMedium": "中",
       "sessionModel": "セッションのモデル"
     },
     "attachmentPreview": {

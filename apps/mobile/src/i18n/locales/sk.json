@@ -204,6 +204,9 @@
     "confirmDeletion": "Potvrdiť odstránenie",
     "credits": "Kredity",
     "failedToLoadBalance": "Zostatok sa nepodarilo načítať. Klepnutím to skús znova.",
+    "hideBalance": "Skryť zostatok",
+    "showBalance": "Zobraziť zostatok",
+    "balanceHidden": "Zostatok je skrytý",
     "bonusCreditsExpiring": "Platnosť bonusových kreditov v hodnote {{amount}} sa skončí {{date}}.",
     "creditBalanceEmpty": "Nemáš žiadne kredity. Pre tento účet sa kredity spravujú mimo aplikácie pre iOS.",
     "signOutTitle": "Odhlásiť sa?",
@@ -2359,8 +2362,6 @@
       "lockedByAgent": ", Uzamknuté agentom „{{agent}}“",
       "addToFavorites": "Pridať {{name}} do obľúbených",
       "removeFromFavorites": "Odstrániť {{name}} z obľúbených",
-      "thinkingEffortXhigh": "EXTR.",
-      "thinkingEffortMedium": "Str.",
       "sessionModel": "Model relácie"
     },
     "attachmentPreview": {

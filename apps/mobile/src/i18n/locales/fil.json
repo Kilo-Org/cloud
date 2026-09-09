@@ -204,6 +204,9 @@
     "confirmDeletion": "Kumpirmahin ang pagbura",
     "credits": "Kredito",
     "failedToLoadBalance": "Hindi ma-load ang balanse. I-tap para subukang muli.",
+    "hideBalance": "Itago ang balanse",
+    "showBalance": "Ipakita ang balanse",
+    "balanceHidden": "Nakatago ang balanse",
     "bonusCreditsExpiring": "Mawawalan ng bisa sa {{date}} ang {{amount}} na bonus na kredito.",
     "creditBalanceEmpty": "Wala ka nang kredito. Para sa akawnt na ito, pinamamahalaan ang kredito sa labas ng iOS app.",
     "signOutTitle": "Mag-sign out?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Ni-lock ng ahenteng \"{{agent}}\"",
       "addToFavorites": "Idagdag ang {{name}} sa mga paborito",
       "removeFromFavorites": "Alisin ang {{name}} sa mga paborito",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Kat.",
       "sessionModel": "Modelo ng sesyon"
     },
     "attachmentPreview": {

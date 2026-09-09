@@ -204,6 +204,9 @@
     "confirmDeletion": "ಅಳಿಸುವಿಕೆಯನ್ನು ದೃಢೀಕರಿಸಿ",
     "credits": "ಕ್ರೆಡಿಟ್‌ಗಳು",
     "failedToLoadBalance": "ಉಳಿಕೆಯನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ. ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ.",
+    "hideBalance": "ಉಳಿಕೆ ಮರೆಮಾಡಿ",
+    "showBalance": "ಉಳಿಕೆ ತೋರಿಸಿ",
+    "balanceHidden": "ಉಳಿಕೆ ಮರೆಮಾಡಲಾಗಿದೆ",
     "bonusCreditsExpiring": "{{amount}} ಮೊತ್ತದ ಬೋನಸ್ ಕ್ರೆಡಿಟ್‌ಗಳ ಅವಧಿ {{date}} ರಂದು ಮುಗಿಯುತ್ತದೆ.",
     "creditBalanceEmpty": "ನಿಮ್ಮ ಖಾತೆಯಲ್ಲಿ ಕ್ರೆಡಿಟ್‌ಗಳು ಉಳಿದಿಲ್ಲ. ಈ ಖಾತೆಯ ಕ್ರೆಡಿಟ್‌ಗಳನ್ನು iOS ಅಪ್ಲಿಕೇಶನ್‌ನ ಹೊರಗೆ ನಿರ್ವಹಿಸಲಾಗುತ್ತದೆ.",
     "signOutTitle": "ಸೈನ್ ಔಟ್ ಮಾಡಬೇಕೆ?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", \"{{agent}}\" ಏಜೆಂಟ್ ಬದಲಾವಣೆಗಳನ್ನು ನಿರ್ಬಂಧಿಸಿದೆ",
       "addToFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಗೆ ಸೇರಿಸಿ",
       "removeFromFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಂದ ತೆಗೆದುಹಾಕಿ",
-      "thinkingEffortXhigh": "ಅತಿಹೆಚ್ಚು",
-      "thinkingEffortMedium": "ಮಧ್ಯಮ",
       "sessionModel": "ಸೆಶನ್ ಮಾದರಿ"
     },
     "attachmentPreview": {

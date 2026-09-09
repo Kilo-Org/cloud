@@ -204,6 +204,9 @@
     "confirmDeletion": "ဖျက်ခြင်းကို အတည်ပြုပါ",
     "credits": "ခရက်ဒစ်များ",
     "failedToLoadBalance": "လက်ကျန်ကို ရယူ၍မရပါ။ ထပ်ကြိုးစားရန် နှိပ်ပါ။",
+    "hideBalance": "လက်ကျန် ဖျောက်ရန်",
+    "showBalance": "လက်ကျန် ပြရန်",
+    "balanceHidden": "လက်ကျန် ဖျောက်ထားသည်",
     "bonusCreditsExpiring": "အပိုဆုခရက်ဒစ် {{amount}} သည် {{date}} တွင် သက်တမ်းကုန်ပါမည်။",
     "creditBalanceEmpty": "သင့်ခရက်ဒစ်လက်ကျန် ကုန်သွားပါပြီ။ ဤအကောင့်၏ ခရက်ဒစ်များကို iOS အက်ပ်ပြင်ပတွင် စီမံပါသည်။",
     "signOutTitle": "အကောင့်မှထွက်မလား။",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": "၊ အေးဂျင့် “{{agent}}” က ပြောင်းလဲခွင့်ပိတ်ထားသည်",
       "addToFavorites": "{{name}} ကို စိတ်ကြိုက်များသို့ ထည့်ပါ",
       "removeFromFavorites": "{{name}} ကို စိတ်ကြိုက်များမှ ဖယ်ရှားပါ",
-      "thinkingEffortXhigh": "အလွန်မြင့်",
-      "thinkingEffortMedium": "အလယ်အလတ်",
       "sessionModel": "စက်ရှင်မော်ဒယ်"
     },
     "attachmentPreview": {

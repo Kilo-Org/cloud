@@ -204,6 +204,9 @@
     "confirmDeletion": "Confirmar exclusão",
     "credits": "Créditos",
     "failedToLoadBalance": "Não foi possível carregar o saldo. Toque para tentar novamente.",
+    "hideBalance": "Ocultar saldo",
+    "showBalance": "Mostrar saldo",
+    "balanceHidden": "Saldo oculto",
     "bonusCreditsExpiring": "{{amount}} em créditos de bônus expiram em {{date}}.",
     "creditBalanceEmpty": "Seu saldo de créditos está zerado. Nesta conta, os créditos são gerenciados fora do app para iOS.",
     "signOutTitle": "Sair?",
@@ -1878,8 +1881,6 @@
       "lockedByAgent": ", Bloqueado pelo agente \"{{agent}}\"",
       "addToFavorites": "Adicionar {{name}} aos favoritos",
       "removeFromFavorites": "Remover {{name}} dos favoritos",
-      "thinkingEffortXhigh": "MA",
-      "thinkingEffortMedium": "Méd.",
       "sessionModel": "Modelo da sessão"
     },
     "attachmentPreview": {

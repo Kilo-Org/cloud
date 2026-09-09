@@ -204,6 +204,9 @@
     "confirmDeletion": "Törlés megerősítése",
     "credits": "Kreditek",
     "failedToLoadBalance": "Nem sikerült betölteni az egyenleget. Az újrapróbáláshoz koppints.",
+    "hideBalance": "Egyenleg elrejtése",
+    "showBalance": "Egyenleg megjelenítése",
+    "balanceHidden": "Egyenleg elrejtve",
     "bonusCreditsExpiring": "{{amount}} értékű bónuszkredit lejárati ideje: {{date}}.",
     "creditBalanceEmpty": "Elfogytak a kreditjeid. Ennél a fióknál a krediteket az iOS-alkalmazáson kívül kezelheted.",
     "signOutTitle": "Kijelentkezel?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Zároló ügynök: „{{agent}}”",
       "addToFavorites": "{{name}} hozzáadása a kedvencekhez",
       "removeFromFavorites": "{{name}} eltávolítása a kedvencekből",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Köz.",
       "sessionModel": "A munkamenet modellje"
     },
     "attachmentPreview": {

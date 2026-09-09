@@ -204,6 +204,9 @@
     "confirmDeletion": "Xác nhận xóa",
     "credits": "Số dư",
     "failedToLoadBalance": "Không thể tải số dư. Chạm để thử lại.",
+    "hideBalance": "Ẩn số dư",
+    "showBalance": "Hiện số dư",
+    "balanceHidden": "Số dư đã ẩn",
     "bonusCreditsExpiring": "Khoản tiền thưởng {{amount}} sẽ hết hạn vào {{date}}.",
     "creditBalanceEmpty": "Số dư của bạn đã hết. Với tài khoản này, bạn cần quản lý số dư bên ngoài ứng dụng iOS.",
     "signOutTitle": "Đăng xuất?",
@@ -1888,8 +1891,6 @@
       "lockedByAgent": ", Do tác nhân \"{{agent}}\" khóa",
       "addToFavorites": "Thêm {{name}} vào mục yêu thích",
       "removeFromFavorites": "Xóa {{name}} khỏi mục yêu thích",
-      "thinkingEffortXhigh": "RẤT CAO",
-      "thinkingEffortMedium": "TB",
       "sessionModel": "Mô hình của phiên"
     },
     "attachmentPreview": {

@@ -204,6 +204,9 @@
     "confirmDeletion": "Bekräfta borttagning",
     "credits": "Krediter",
     "failedToLoadBalance": "Kunde inte läsa in saldot. Tryck för att försöka igen.",
+    "hideBalance": "Dölj saldo",
+    "showBalance": "Visa saldo",
+    "balanceHidden": "Saldo dolt",
     "bonusCreditsExpiring": "{{amount}} i bonuskrediter går ut {{date}}.",
     "creditBalanceEmpty": "Du har inga krediter kvar. För det här kontot hanteras krediter utanför iOS-appen.",
     "signOutTitle": "Logga ut?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Låst av agenten ”{{agent}}”",
       "addToFavorites": "Lägg till {{name}} i favoriter",
       "removeFromFavorites": "Ta bort {{name}} från favoriter",
-      "thinkingEffortXhigh": "EH",
-      "thinkingEffortMedium": "Med",
       "sessionModel": "Sessionmodell"
     },
     "attachmentPreview": {

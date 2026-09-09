@@ -204,6 +204,9 @@
     "confirmDeletion": "Deimhnigh scriosadh",
     "credits": "Creidmheasanna",
     "failedToLoadBalance": "Níorbh fhéidir an t-iarmhéid a lódáil. Tapáil chun triail eile a bhaint as.",
+    "hideBalance": "Folaigh an t-iarmhéid",
+    "showBalance": "Taispeáin an t-iarmhéid",
+    "balanceHidden": "Tá an t-iarmhéid folaithe",
     "bonusCreditsExpiring": "Rachaidh {{amount}} de chreidmheasanna bónais in éag {{date}}.",
     "creditBalanceEmpty": "Níl aon chreidmheas fágtha agat. Déantar creidmheasanna an chuntais seo a bhainistiú lasmuigh den aip iOS.",
     "signOutTitle": "Ar mhaith leat síniú amach?",
@@ -2379,8 +2382,6 @@
       "lockedByAgent": ", Glasáilte ag an ngníomhaire \"{{agent}}\"",
       "addToFavorites": "Cuir {{name}} leis na cinn is fearr leat",
       "removeFromFavorites": "Bain {{name}} ó na cinn is fearr leat",
-      "thinkingEffortXhigh": "AN-ARD",
-      "thinkingEffortMedium": "Meán",
       "sessionModel": "Samhail an tseisiúin"
     },
     "attachmentPreview": {

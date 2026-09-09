@@ -204,6 +204,9 @@
     "confirmDeletion": "Bekræft sletning",
     "credits": "Kreditter",
     "failedToLoadBalance": "Kunne ikke indlæse saldoen. Tryk for at prøve igen.",
+    "hideBalance": "Skjul saldo",
+    "showBalance": "Vis saldo",
+    "balanceHidden": "Saldo skjult",
     "bonusCreditsExpiring": "{{amount}} i bonuskreditter udløber {{date}}.",
     "creditBalanceEmpty": "Din kreditsaldo er 0. Kreditter til denne konto administreres uden for iOS-appen.",
     "signOutTitle": "Log ud?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Låst af agenten \"{{agent}}\"",
       "addToFavorites": "Tilføj {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
-      "thinkingEffortXhigh": "EH",
-      "thinkingEffortMedium": "Mid.",
       "sessionModel": "Sessionsmodel"
     },
     "attachmentPreview": {

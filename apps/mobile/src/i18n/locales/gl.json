@@ -204,6 +204,9 @@
     "confirmDeletion": "Confirmar a eliminación",
     "credits": "Créditos",
     "failedToLoadBalance": "Non se puido cargar o saldo. Toca para volver tentalo.",
+    "hideBalance": "Agochar o saldo",
+    "showBalance": "Amosar o saldo",
+    "balanceHidden": "Saldo agochado",
     "bonusCreditsExpiring": "Tes {{amount}} en créditos extra que caducan o {{date}}.",
     "creditBalanceEmpty": "Non tes créditos. Nesta conta, os créditos xestiónanse fóra da aplicación para iOS.",
     "signOutTitle": "Pechar sesión?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Bloqueado polo axente «{{agent}}»",
       "addToFavorites": "Engadir {{name}} aos favoritos",
       "removeFromFavorites": "Eliminar {{name}} dos favoritos",
-      "thinkingEffortXhigh": "MA",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Modelo da sesión"
     },
     "attachmentPreview": {

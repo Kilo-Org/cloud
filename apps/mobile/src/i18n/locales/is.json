@@ -204,6 +204,9 @@
     "confirmDeletion": "Staðfesta eyðingu",
     "credits": "Inneign",
     "failedToLoadBalance": "Ekki tókst að hlaða inneigninni. Ýttu til að reyna aftur.",
+    "hideBalance": "Fela inneign",
+    "showBalance": "Sýna inneign",
+    "balanceHidden": "Inneign falin",
     "bonusCreditsExpiring": "Bónusinneign að upphæð {{amount}} rennur út {{date}}.",
     "creditBalanceEmpty": "Þú átt enga inneign. Inneign þessa reiknings er stjórnað utan iOS-forritsins.",
     "signOutTitle": "Skrá út?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Læst af fulltrúanum „{{agent}}“",
       "addToFavorites": "Bæta {{name}} við eftirlæti",
       "removeFromFavorites": "Fjarlægja {{name}} úr eftirlæti",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Miðl.",
       "sessionModel": "Lotulíkan"
     },
     "attachmentPreview": {

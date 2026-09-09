@@ -204,6 +204,9 @@
     "confirmDeletion": "ยืนยันการลบ",
     "credits": "เครดิต",
     "failedToLoadBalance": "โหลดยอดคงเหลือไม่สำเร็จ แตะเพื่อลองอีกครั้ง",
+    "hideBalance": "ซ่อนยอดคงเหลือ",
+    "showBalance": "แสดงยอดคงเหลือ",
+    "balanceHidden": "ยอดคงเหลือถูกซ่อน",
     "bonusCreditsExpiring": "เครดิตโบนัส {{amount}} จะหมดอายุ {{date}}",
     "creditBalanceEmpty": "คุณไม่มีเครดิตเหลืออยู่ บัญชีนี้ต้องจัดการเครดิตนอกแอป iOS",
     "signOutTitle": "ออกจากระบบหรือไม่?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", ถูกล็อกโดยเอเจนต์ \"{{agent}}\"",
       "addToFavorites": "เพิ่ม {{name}} ในรายการโปรด",
       "removeFromFavorites": "นำ {{name}} ออกจากรายการโปรด",
-      "thinkingEffortXhigh": "สูงมาก",
-      "thinkingEffortMedium": "กลาง",
       "sessionModel": "โมเดลของเซสชัน"
     },
     "attachmentPreview": {

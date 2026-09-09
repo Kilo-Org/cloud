@@ -204,6 +204,9 @@
     "confirmDeletion": "Hamarino ny famafana",
     "credits": "Kireditra",
     "failedToLoadBalance": "Tsy voaray ny ambim-bola. Tsindrio hanandramana indray.",
+    "hideBalance": "Afeno ny ambim-bola",
+    "showBalance": "Aseho ny ambim-bola",
+    "balanceHidden": "Voafeno ny ambim-bola",
     "bonusCreditsExpiring": "Kireditra fanampiny {{amount}} ho lany daty amin'ny {{date}}.",
     "creditBalanceEmpty": "Tsy misy kireditra sisa ao amin'ny kaontinao. Ivelan'ny rindranasa iOS no itantanana ny kireditra ho an'ity kaonty ity.",
     "signOutTitle": "Hivoaka ve?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Nohidin'ny mpanampy \"{{agent}}\"",
       "addToFavorites": "Ampio ao amin'ny ankafizinao ny {{name}}",
       "removeFromFavorites": "Esory ao amin'ny ankafizinao ny {{name}}",
-      "thinkingEffortXhigh": "AVO BE",
-      "thinkingEffortMedium": "Ant.",
       "sessionModel": "Modelin'ny fotoam-piasana"
     },
     "attachmentPreview": {

@@ -204,6 +204,9 @@
     "confirmDeletion": "Потврди бришење",
     "credits": "Кредити",
     "failedToLoadBalance": "Не успеа вчитувањето на состојбата. Допри за да се обидеш повторно.",
+    "hideBalance": "Скриј ја состојбата",
+    "showBalance": "Прикажи ја состојбата",
+    "balanceHidden": "Состојбата е скриена",
     "bonusCreditsExpiring": "Бонус-кредитите во износ од {{amount}} истекуваат на {{date}}.",
     "creditBalanceEmpty": "Немаш преостанати кредити. За оваа сметка, со кредитите се управува надвор од апликацијата за iOS.",
     "signOutTitle": "Да се одјавиш?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Заклучено од агентот „{{agent}}“",
       "addToFavorites": "Додај {{name}} во омилени",
       "removeFromFavorites": "Отстрани {{name}} од омилени",
-      "thinkingEffortXhigh": "МВ",
-      "thinkingEffortMedium": "Сред.",
       "sessionModel": "Модел на сесијата"
     },
     "attachmentPreview": {

@@ -204,6 +204,9 @@
     "confirmDeletion": "हटाने की पुष्टि करें",
     "credits": "क्रेडिट",
     "failedToLoadBalance": "बैलेंस लोड नहीं हो सका। फिर से कोशिश करने के लिए टैप करें।",
+    "hideBalance": "बैलेंस छिपाएँ",
+    "showBalance": "बैलेंस दिखाएँ",
+    "balanceHidden": "बैलेंस छिपा हुआ है",
     "bonusCreditsExpiring": "{{amount}} के बोनस क्रेडिट की समय-सीमा {{date}} को समाप्त होगी।",
     "creditBalanceEmpty": "आपके पास कोई क्रेडिट नहीं बचा है। इस खाते के क्रेडिट iOS ऐप के बाहर प्रबंधित किए जाते हैं।",
     "signOutTitle": "साइन आउट करें?",
@@ -1862,8 +1865,6 @@
       "lockedByAgent": ", एजेंट \"{{agent}}\" द्वारा लॉक",
       "addToFavorites": "{{name}} को पसंदीदा में जोड़ें",
       "removeFromFavorites": "{{name}} को पसंदीदा से हटाएँ",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "मध्यम",
       "sessionModel": "सत्र का मॉडल"
     },
     "attachmentPreview": {

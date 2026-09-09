@@ -204,6 +204,9 @@
     "confirmDeletion": "Apstiprināt dzēšanu",
     "credits": "Kredīti",
     "failedToLoadBalance": "Neizdevās ielādēt atlikumu. Pieskaries, lai mēģinātu vēlreiz.",
+    "hideBalance": "Slēpt atlikumu",
+    "showBalance": "Rādīt atlikumu",
+    "balanceHidden": "Atlikums ir paslēpts",
     "bonusCreditsExpiring": "Bonusa kredītu {{amount}} apmērā derīguma termiņš beidzas {{date}}.",
     "creditBalanceEmpty": "Tavi kredīti ir iztērēti. Šim kontam kredītus var pārvaldīt ārpus iOS lietotnes.",
     "signOutTitle": "Izrakstīties?",
@@ -2339,8 +2342,6 @@
       "lockedByAgent": ", Bloķējis aģents „{{agent}}”",
       "addToFavorites": "Pievienot {{name}} izlasei",
       "removeFromFavorites": "Noņemt {{name}} no izlases",
-      "thinkingEffortXhigh": "ĪA",
-      "thinkingEffortMedium": "Vid.",
       "sessionModel": "Sesijas modelis"
     },
     "attachmentPreview": {

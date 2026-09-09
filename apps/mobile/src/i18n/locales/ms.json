@@ -204,6 +204,9 @@
     "confirmDeletion": "Sahkan pemadaman",
     "credits": "Kredit",
     "failedToLoadBalance": "Gagal memuatkan baki. Ketik untuk mencuba semula.",
+    "hideBalance": "Sembunyikan baki",
+    "showBalance": "Tunjukkan baki",
+    "balanceHidden": "Baki disembunyikan",
     "bonusCreditsExpiring": "Kredit bonus sebanyak {{amount}} akan tamat tempoh pada {{date}}.",
     "creditBalanceEmpty": "Baki kredit anda kosong. Kredit diuruskan di luar apl iOS untuk akaun ini.",
     "signOutTitle": "Log keluar?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Dikunci oleh ejen \"{{agent}}\"",
       "addToFavorites": "Tambah {{name}} ke kegemaran",
       "removeFromFavorites": "Buang {{name}} daripada kegemaran",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Sederhana",
       "sessionModel": "Model sesi"
     },
     "attachmentPreview": {

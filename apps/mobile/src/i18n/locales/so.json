@@ -204,6 +204,9 @@
     "confirmDeletion": "Xaqiiji tirtirista",
     "credits": "Lacagta isticmaalka",
     "failedToLoadBalance": "Hadhaaga lama soo shubi karin. Taabo si aad mar kale isku daydo.",
+    "hideBalance": "Qari hadhaaga",
+    "showBalance": "Muuji hadhaaga",
+    "balanceHidden": "Hadhaaga waa la qariyay",
     "bonusCreditsExpiring": "Lacag gunno ah oo dhan {{amount}} ayaa dhacaysa {{date}}.",
     "creditBalanceEmpty": "Lacagtii isticmaalka way kaa dhammaatay. Lacagta akoonkan waxaa laga maamulaa meel ka baxsan barnaamijka iOS.",
     "signOutTitle": "Ma ka baxaysaa?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Waxaa xiray wakiilka \"{{agent}}\"",
       "addToFavorites": "Ku dar {{name}} kuwa la jecel yahay",
       "removeFromFavorites": "Ka saar {{name}} kuwa la jecel yahay",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Dhexe",
       "sessionModel": "Moodeelka kalfadhiga"
     },
     "attachmentPreview": {

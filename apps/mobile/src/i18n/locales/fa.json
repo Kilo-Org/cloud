@@ -204,6 +204,9 @@
     "confirmDeletion": "تأیید حذف",
     "credits": "اعتبار",
     "failedToLoadBalance": "بارگذاری موجودی ممکن نشد. برای تلاش مجدد ضربه بزنید.",
+    "hideBalance": "پنهان کردن موجودی",
+    "showBalance": "نمایش موجودی",
+    "balanceHidden": "موجودی پنهان است",
     "bonusCreditsExpiring": "{{amount}} اعتبار هدیه در {{date}} منقضی می‌شود.",
     "creditBalanceEmpty": "موجودی اعتبار شما صفر است. اعتبار این حساب خارج از برنامهٔ iOS مدیریت می‌شود.",
     "signOutTitle": "از حساب خود خارج می‌شوید؟",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": "، قفل‌شده توسط عامل «{{agent}}»",
       "addToFavorites": "افزودن {{name}} به موارد دلخواه",
       "removeFromFavorites": "حذف {{name}} از موارد دلخواه",
-      "thinkingEffortXhigh": "خیلی زیاد",
-      "thinkingEffortMedium": "متوسط",
       "sessionModel": "مدل نشست"
     },
     "attachmentPreview": {

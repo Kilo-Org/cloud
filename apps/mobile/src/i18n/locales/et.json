@@ -204,6 +204,9 @@
     "confirmDeletion": "Kinnita kustutamine",
     "credits": "Krediit",
     "failedToLoadBalance": "Saldo laadimine ebaõnnestus. Uuesti proovimiseks puuduta.",
+    "hideBalance": "Peida saldo",
+    "showBalance": "Näita saldot",
+    "balanceHidden": "Saldo on peidetud",
     "bonusCreditsExpiring": "Boonuskrediit summas {{amount}} aegub {{date}}.",
     "creditBalanceEmpty": "Sinu krediidisaldo on null. Selle konto krediiti hallatakse väljaspool iOS-i rakendust.",
     "signOutTitle": "Kas logida välja?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Lukustanud agent „{{agent}}“",
       "addToFavorites": "Lisa {{name}} lemmikutesse",
       "removeFromFavorites": "Eemalda {{name}} lemmikutest",
-      "thinkingEffortXhigh": "VK",
-      "thinkingEffortMedium": "Kesk",
       "sessionModel": "Seansi mudel"
     },
     "attachmentPreview": {

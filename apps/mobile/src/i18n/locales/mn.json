@@ -204,6 +204,9 @@
     "confirmDeletion": "Устгахыг баталгаажуулах",
     "credits": "Кредит",
     "failedToLoadBalance": "Үлдэгдлийг ачаалж чадсангүй. Дахин оролдохын тулд товшино уу.",
+    "hideBalance": "Үлдэгдэл нуух",
+    "showBalance": "Үлдэгдэл харуулах",
+    "balanceHidden": "Үлдэгдэл нуугдсан",
     "bonusCreditsExpiring": "{{amount}} урамшууллын кредитийн хугацаа {{date}} өдөр дуусна.",
     "creditBalanceEmpty": "Таны кредит дууссан байна. Энэ бүртгэлийн кредитийг iOS аппын гаднаас удирдана.",
     "signOutTitle": "Гарах уу?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", «{{agent}}» агент түгжсэн",
       "addToFavorites": "{{name}} загварыг дуртай загваруудад нэмэх",
       "removeFromFavorites": "{{name}} загварыг дуртай загваруудаас хасах",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Дунд",
       "sessionModel": "Сессийн загвар"
     },
     "attachmentPreview": {

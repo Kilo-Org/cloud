@@ -204,6 +204,9 @@
     "confirmDeletion": "Potrdi izbris",
     "credits": "Krediti",
     "failedToLoadBalance": "Stanja ni bilo mogoče naložiti. Tapni za ponovni poskus.",
+    "hideBalance": "Skrij stanje",
+    "showBalance": "Prikaži stanje",
+    "balanceHidden": "Stanje je skrito",
     "bonusCreditsExpiring": "Veljavnost dodatnih kreditov v vrednosti {{amount}} poteče {{date}}.",
     "creditBalanceEmpty": "Nimaš več kreditov. Kredite za ta račun upravljaš zunaj aplikacije za iOS.",
     "signOutTitle": "Želiš se odjaviti?",
@@ -2359,8 +2362,6 @@
       "lockedByAgent": ", Zaklenil agent »{{agent}}«",
       "addToFavorites": "Dodaj {{name}} med priljubljene",
       "removeFromFavorites": "Odstrani {{name}} s seznama priljubljenih",
-      "thinkingEffortXhigh": "ZV",
-      "thinkingEffortMedium": "Sred.",
       "sessionModel": "Model seje"
     },
     "attachmentPreview": {

@@ -204,6 +204,9 @@
     "confirmDeletion": "אישור המחיקה",
     "credits": "קרדיטים",
     "failedToLoadBalance": "לא ניתן לטעון את היתרה. הקש כדי לנסות שוב.",
+    "hideBalance": "הסתר יתרה",
+    "showBalance": "הצג יתרה",
+    "balanceHidden": "היתרה מוסתרת",
     "bonusCreditsExpiring": "תוקפם של קרדיטי בונוס בסך {{amount}} יפוג ב-{{date}}.",
     "creditBalanceEmpty": "יתרת הקרדיטים שלך היא אפס. בחשבון הזה, הקרדיטים מנוהלים מחוץ לאפליקציית iOS.",
     "signOutTitle": "להתנתק?",
@@ -1901,8 +1904,6 @@
       "lockedByAgent": ", נעול על ידי הסוכן \"{{agent}}\"",
       "addToFavorites": "הוספת {{name}} למועדפים",
       "removeFromFavorites": "הסרת {{name}} מהמועדפים",
-      "thinkingEffortXhigh": "גבוה מאוד",
-      "thinkingEffortMedium": "בינוני",
       "sessionModel": "המודל של הסשן"
     },
     "attachmentPreview": {

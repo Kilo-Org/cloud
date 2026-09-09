@@ -204,6 +204,9 @@
     "confirmDeletion": "پشتڕاستکردنەوەی سڕینەوە",
     "credits": "کرێدیت",
     "failedToLoadBalance": "نەتوانرا باڵانسەکە بار بکرێت. بۆ دووبارە هەوڵدانەوە، لێی بدە.",
+    "hideBalance": "شاردنەوەی باڵانس",
+    "showBalance": "پیشاندانی باڵانس",
+    "balanceHidden": "باڵانس شاردراوەتەوە",
     "bonusCreditsExpiring": "{{amount}} کرێدیتی پاداشت لە {{date}} بەسەر دەچێت.",
     "creditBalanceEmpty": "باڵانسی کرێدیتەکەت بەتاڵە. کرێدیتی ئەم هەژمارە لە دەرەوەی ئەپی iOS بەڕێوە دەبرێت.",
     "signOutTitle": "دەرچوون؟",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": "، لەلایەن ئەجێنتی «{{agent}}» ـەوە قوفڵ کراوە",
       "addToFavorites": "زیادکردنی {{name}} بۆ دڵخوازەکان",
       "removeFromFavorites": "لابردنی {{name}} لە دڵخوازەکان",
-      "thinkingEffortXhigh": "زۆر بەرز",
-      "thinkingEffortMedium": "مامناوەند",
       "sessionModel": "مۆدێلی سێشن"
     },
     "attachmentPreview": {

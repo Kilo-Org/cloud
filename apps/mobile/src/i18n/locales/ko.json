@@ -204,6 +204,9 @@
     "confirmDeletion": "삭제 확인",
     "credits": "크레딧",
     "failedToLoadBalance": "잔액을 불러오지 못했습니다. 눌러서 다시 시도하세요.",
+    "hideBalance": "잔액 숨기기",
+    "showBalance": "잔액 표시",
+    "balanceHidden": "잔액이 숨겨짐",
     "bonusCreditsExpiring": "{{date}}에 만료되는 보너스 크레딧은 {{amount}}입니다.",
     "creditBalanceEmpty": "남은 크레딧이 없습니다. 이 계정의 크레딧은 iOS 앱 외부에서 관리됩니다.",
     "signOutTitle": "로그아웃할까요?",
@@ -1888,8 +1891,6 @@
       "lockedByAgent": ", 에이전트 \"{{agent}}\"에서 고정한 설정",
       "addToFavorites": "{{name}} 즐겨찾기에 추가",
       "removeFromFavorites": "{{name}} 즐겨찾기에서 제거",
-      "thinkingEffortXhigh": "매우 높음",
-      "thinkingEffortMedium": "보통",
       "sessionModel": "세션 모델"
     },
     "attachmentPreview": {

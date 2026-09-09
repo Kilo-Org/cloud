@@ -204,6 +204,9 @@
     "confirmDeletion": "Ikkonferma t-tħassir",
     "credits": "Krediti",
     "failedToLoadBalance": "Ma setax jitgħabba l-bilanċ. Tektek biex terġa' tipprova.",
+    "hideBalance": "Aħbi l-bilanċ",
+    "showBalance": "Uri l-bilanċ",
+    "balanceHidden": "Il-bilanċ huwa moħbi",
     "bonusCreditsExpiring": "{{amount}} fi krediti bonus jiskadu: {{date}}.",
     "creditBalanceEmpty": "M'għad fadal l-ebda kreditu fil-bilanċ tiegħek. Għal dan il-kont, il-krediti jiġu mmaniġġjati barra mill-applikazzjoni tal-iOS.",
     "signOutTitle": "Toħroġ mill-kont?",
@@ -2379,8 +2382,6 @@
       "lockedByAgent": ", Imsakkar mill-aġent \"{{agent}}\"",
       "addToFavorites": "Żid {{name}} mal-favoriti",
       "removeFromFavorites": "Neħħi {{name}} mill-favoriti",
-      "thinkingEffortXhigh": "GĦ+",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Mudell tas-sessjoni"
     },
     "attachmentPreview": {

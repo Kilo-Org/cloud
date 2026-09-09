@@ -204,6 +204,9 @@
     "confirmDeletion": "Tabbatar da sharewa",
     "credits": "Kuɗin amfani",
     "failedToLoadBalance": "An kasa loda ragowar kuɗi. Danna don sake gwadawa.",
+    "hideBalance": "Ɓoye ragowar kuɗi",
+    "showBalance": "Nuna ragowar kuɗi",
+    "balanceHidden": "An ɓoye ragowar kuɗi",
     "bonusCreditsExpiring": "Kuɗin amfani na kyauta {{amount}} za su ƙare {{date}}.",
     "creditBalanceEmpty": "Ba ka da ragowar kuɗin amfani. Ana sarrafa kuɗin amfani na wannan asusun a wajen manhajar iOS.",
     "signOutTitle": "Fita?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Wakili \"{{agent}}\" ya kulle shi",
       "addToFavorites": "Ƙara {{name}} cikin waɗanda ka fi so",
       "removeFromFavorites": "Cire {{name}} daga waɗanda ka fi so",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mats.",
       "sessionModel": "Samfurin zaman"
     },
     "attachmentPreview": {

@@ -204,6 +204,9 @@
     "confirmDeletion": "Kwado ihichapụ ahụ",
     "credits": "Ego ojiji",
     "failedToLoadBalance": "Enweghị ike ibudata ego fọdụrụ. Pịa ka ị nwaa ọzọ.",
+    "hideBalance": "Zoo ego fọdụrụ",
+    "showBalance": "Gosi ego fọdụrụ",
+    "balanceHidden": "Ezoro ego fọdụrụ",
     "bonusCreditsExpiring": "Ego ojiji mgbakwunye {{amount}} ga-agwụ na {{date}}.",
     "creditBalanceEmpty": "Ego ojiji gị agwụla. A na-ejikwa ego ojiji maka akaụntụ a na mpụga ngwa iOS.",
     "signOutTitle": "Pụọ?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Onye nnọchi anya \"{{agent}}\" kpọchiri ya",
       "addToFavorites": "Tinye {{name}} n'ihe kacha amasị gị",
       "removeFromFavorites": "Wepụ {{name}} n'ihe kacha amasị gị",
-      "thinkingEffortXhigh": "ELU+",
-      "thinkingEffortMedium": "Etiti",
       "sessionModel": "Ihe nlereanya nnọkọ"
     },
     "attachmentPreview": {

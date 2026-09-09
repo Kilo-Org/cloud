@@ -204,6 +204,9 @@
     "confirmDeletion": "মুছে ফেলা নিশ্চিত করুন",
     "credits": "ক্রেডিট",
     "failedToLoadBalance": "ব্যালেন্স লোড করা যায়নি। আবার চেষ্টা করতে ট্যাপ করুন।",
+    "hideBalance": "ব্যালেন্স লুকান",
+    "showBalance": "ব্যালেন্স দেখান",
+    "balanceHidden": "ব্যালেন্স লুকানো আছে",
     "bonusCreditsExpiring": "{{amount}} বোনাস ক্রেডিটের মেয়াদ শেষ হবে {{date}} তারিখে।",
     "creditBalanceEmpty": "আপনার কোনো ক্রেডিট বাকি নেই। এই অ্যাকাউন্টের ক্রেডিট iOS অ্যাপের বাইরে পরিচালনা করা হয়।",
     "signOutTitle": "সাইন আউট করবেন?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", \"{{agent}}\" এজেন্ট লক করেছে",
       "addToFavorites": "{{name}} পছন্দের তালিকায় যোগ করুন",
       "removeFromFavorites": "{{name}} পছন্দের তালিকা থেকে সরান",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "মাঝারি",
       "sessionModel": "সেশনের মডেল"
     },
     "attachmentPreview": {

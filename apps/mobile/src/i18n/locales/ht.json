@@ -204,6 +204,9 @@
     "confirmDeletion": "Konfime efasman",
     "credits": "Kredi",
     "failedToLoadBalance": "Nou pa t ka chaje balans lan. Peze pou eseye ankò.",
+    "hideBalance": "Kache balans",
+    "showBalance": "Montre balans",
+    "balanceHidden": "Balans kache",
     "bonusCreditsExpiring": "{{amount}} nan kredi bonis ap ekspire {{date}}.",
     "creditBalanceEmpty": "Ou pa gen kredi ki rete. Pou kont sa a, ou jere kredi yo deyò aplikasyon iOS la.",
     "signOutTitle": "Dekonekte?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", Bloke pa ajan \"{{agent}}\"",
       "addToFavorites": "Ajoute {{name}} nan favori",
       "removeFromFavorites": "Retire {{name}} nan favori",
-      "thinkingEffortXhigh": "TW",
-      "thinkingEffortMedium": "Mway.",
       "sessionModel": "Modèl sesyon"
     },
     "attachmentPreview": {

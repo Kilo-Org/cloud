@@ -204,6 +204,9 @@
     "confirmDeletion": "કાઢી નાખવાની પુષ્ટિ કરો",
     "credits": "ક્રેડિટ",
     "failedToLoadBalance": "બેલેન્સ લોડ કરી શકાયું નહીં. ફરી પ્રયાસ કરવા ટેપ કરો.",
+    "hideBalance": "બેલેન્સ છુપાવો",
+    "showBalance": "બેલેન્સ બતાવો",
+    "balanceHidden": "બેલેન્સ છુપાયેલ છે",
     "bonusCreditsExpiring": "{{amount}}ના બોનસ ક્રેડિટની મુદત {{date}}ના રોજ પૂરી થાય છે.",
     "creditBalanceEmpty": "તમારું ક્રેડિટ બેલેન્સ ખાલી છે. આ એકાઉન્ટના ક્રેડિટનું સંચાલન iOS એપની બહાર થાય છે.",
     "signOutTitle": "સાઇન આઉટ કરવું છે?",
@@ -2319,8 +2322,6 @@
       "lockedByAgent": ", એજન્ટ \"{{agent}}\" દ્વારા લૉક કરેલ",
       "addToFavorites": "{{name}}ને મનપસંદમાં ઉમેરો",
       "removeFromFavorites": "{{name}}ને મનપસંદમાંથી દૂર કરો",
-      "thinkingEffortXhigh": "અતિ ઉચ્ચ",
-      "thinkingEffortMedium": "મધ્યમ",
       "sessionModel": "સત્રનું મોડલ"
     },
     "attachmentPreview": {

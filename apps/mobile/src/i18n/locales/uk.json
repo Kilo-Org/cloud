@@ -204,6 +204,9 @@
     "confirmDeletion": "Підтвердити видалення",
     "credits": "Кредити",
     "failedToLoadBalance": "Не вдалося завантажити баланс. Торкніться, щоб повторити.",
+    "hideBalance": "Приховати баланс",
+    "showBalance": "Показати баланс",
+    "balanceHidden": "Баланс приховано",
     "bonusCreditsExpiring": "Термін дії бонусних кредитів на суму {{amount}} спливає {{date}}.",
     "creditBalanceEmpty": "На балансі немає кредитів. Для цього облікового запису керування кредитами доступне поза застосунком для iOS.",
     "signOutTitle": "Вийти?",
@@ -1914,8 +1917,6 @@
       "lockedByAgent": ", Заблоковано агентом «{{agent}}»",
       "addToFavorites": "Додати {{name}} до обраного",
       "removeFromFavorites": "Прибрати {{name}} з обраного",
-      "thinkingEffortXhigh": "ДВ",
-      "thinkingEffortMedium": "Сер.",
       "sessionModel": "Модель сеансу"
     },
     "attachmentPreview": {

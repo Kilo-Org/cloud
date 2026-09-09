@@ -204,6 +204,9 @@
     "confirmDeletion": "Cadarnhau dileu",
     "credits": "Credydau",
     "failedToLoadBalance": "Methu llwytho'r balans. Tapiwch i geisio eto.",
+    "hideBalance": "Cuddio'r balans",
+    "showBalance": "Dangos y balans",
+    "balanceHidden": "Balans wedi'i guddio",
     "bonusCreditsExpiring": "Mae {{amount}} o gredydau bonws yn dod i ben ar {{date}}.",
     "creditBalanceEmpty": "Nid oes credydau ar ôl yn eich balans. Rheolir credydau'r cyfrif hwn y tu allan i'r ap iOS.",
     "signOutTitle": "Allgofnodi?",
@@ -2399,8 +2402,6 @@
       "lockedByAgent": ", Wedi'i gloi gan yr asiant \"{{agent}}\"",
       "addToFavorites": "Ychwanegu {{name}} i'r ffefrynnau",
       "removeFromFavorites": "Tynnu {{name}} o'r ffefrynnau",
-      "thinkingEffortXhigh": "UI",
-      "thinkingEffortMedium": "Can",
       "sessionModel": "Model y sesiwn"
     },
     "attachmentPreview": {

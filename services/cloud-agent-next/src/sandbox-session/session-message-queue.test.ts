@@ -1,3 +1,9 @@
+import { signModernKiloToken } from '@kilocode/worker-utils/kilo-token-policy';
+import {
+  verifyRuntimeProxyAttestation,
+  RUNTIME_PROXY_ATTESTATION_HEADER,
+} from '@kilocode/worker-utils/runtime-proxy-attestation';
+import { assertKiloModelAvailable } from '../model-validation.js';
 import jwt from 'jsonwebtoken';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { normalizeCliEvent } from '../../../../packages/cloud-agent-sdk/src/normalizer';
@@ -1084,6 +1090,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
   const values = new Map<string, unknown>();
   let alarmAt: number | null = null;
   const errors: unknown[] = [];
+  const background: Promise<unknown>[] = [];
   const kv: SyncKvStorage = {
     get: <T>(key: string): T | undefined => structuredClone(values.get(key)) as T | undefined,
     put: <T>(key: string, value: T) => {
@@ -1136,6 +1143,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
     blockConcurrencyWhile: async (callback: () => Promise<void>) => callback(),
     getWebSockets: () => [],
     waitUntil: (promise: Promise<unknown>) => {
+      background.push(promise);
       void promise.catch(error => {
         errors.push(error);
       });
@@ -1204,6 +1212,7 @@ function sessionFixture(overrides: Partial<SessionMetadata> = {}, sharedControl?
     },
     control,
     env,
+    settleBackground: () => Promise.all(background),
     metadata,
     storage,
     values,
@@ -1753,6 +1762,119 @@ describe('SandboxSession orchestration', () => {
     await fixture.flush();
     expect(fixture.record('b')?.state).toBe('accepted');
     expect(fixture.record('b')?.deliveryDeadlineAt).toBe(Date.now() + SESSION_DELIVERY_TIMEOUT_MS);
+  });
+
+  it.each(['modern', 'legacy'] as const)(
+    'wires %s control events through the production bridge',
+    async mode => {
+      vi.setSystemTime(new Date('2026-01-01T12:00:00.000Z'));
+      const fixture = sessionFixture();
+      await fixture.admit('bridge');
+      await fixture.flush();
+      const requests: Request[] = [];
+      fixture.env.SESSION_INGEST = {
+        fetch: async (request: Request) => {
+          requests.push(request);
+          return Response.json({ success: true });
+        },
+      } as Env['SESSION_INGEST'];
+      let token = fixture.metadata.auth.kilocodeToken;
+      if (mode === 'modern') {
+        installModernRuntimeAuthorization(fixture);
+        const signed = await signModernKiloToken({
+          secret: 'test-secret',
+          userId: 'user_1',
+          pepper: null,
+          audience: ['kilo-api', 'kilo-gateway', 'session-ingest'],
+          tokenPurpose: 'delegated-workload',
+          credentialExchange: false,
+          expiresInSeconds: 3600,
+          extra: {
+            runtimeAuthorization: {
+              id: '44444444-4444-4444-8444-444444444444',
+              resourceKind: 'cloud-agent-next',
+              resourceId: SESSION_ID,
+            },
+          },
+        });
+        token = signed.token;
+        fixture.storage.kv.put(
+          'session_metadata',
+          serializeSessionMetadata({
+            ...fixture.metadata,
+            auth: { ...fixture.metadata.auth, kilocodeToken: token },
+          })
+        );
+      } else {
+        fixture.env.NEXTAUTH_SECRET = '';
+      }
+      await expect(
+        fixture.session.receiveSandboxControlEvent(
+          receiptedEvent(1, {
+            type: 'message.updated',
+            properties: { info: { id: 'msg_bridge', sessionID: 'kilo_root', role: 'user' } },
+          })
+        )
+      ).resolves.toEqual({ applied: true });
+      await fixture.flush();
+      await fixture.settleBackground();
+      expect(requests).toHaveLength(1);
+      expect(requests[0].headers.get('Authorization')).toBe(`Bearer ${token}`);
+      if (mode === 'modern') {
+        expect(
+          await verifyRuntimeProxyAttestation({
+            value: requests[0].headers.get(RUNTIME_PROXY_ATTESTATION_HEADER),
+            secret: 'test-secret',
+            audience: 'session-ingest',
+            userId: 'user_1',
+            authorizationId: '44444444-4444-4444-8444-444444444444',
+            resourceId: SESSION_ID,
+            bearer: token ?? '',
+          })
+        ).toBe(true);
+      } else expect(requests[0].headers.has(RUNTIME_PROXY_ATTESTATION_HEADER)).toBe(false);
+    }
+  );
+
+  it('refreshes the modern followup model-validation credential and preserves the legacy path', async () => {
+    const fixture = sessionFixture();
+    const runtimeToken = vi
+      .spyOn(fixture.session, 'getRuntimeToken')
+      .mockResolvedValue('refreshed-token');
+    await fixture.admit('legacy-preflight');
+    expect(runtimeToken).not.toHaveBeenCalled();
+    installModernRuntimeAuthorization(fixture);
+    await fixture.admit('modern-preflight');
+    expect(runtimeToken).toHaveBeenCalled();
+    expect(assertKiloModelAvailable).toHaveBeenLastCalledWith(
+      expect.objectContaining({ originalToken: 'refreshed-token' })
+    );
+  });
+
+  it('maps modern credential infrastructure failure to retryable model-validation failure', async () => {
+    const fixture = sessionFixture();
+    installModernRuntimeAuthorization(fixture);
+    vi.spyOn(fixture.session, 'getRuntimeToken').mockRejectedValue(new Error('unavailable'));
+    await expect(fixture.admit('unavailable')).resolves.toMatchObject({
+      success: false,
+      code: 'MODEL_VALIDATION_UNAVAILABLE',
+    });
+    expect(fixture.record('unavailable')).toBeUndefined();
+  });
+
+  it('does not admit when recovery starts during model validation', async () => {
+    const fixture = sessionFixture();
+    vi.mocked(assertKiloModelAvailable).mockImplementationOnce(async () => {
+      fixture.storage.kv.put('runtime_authorization_recovery', {
+        expectedOldId: 'old',
+        recoveryId: 'new',
+      });
+    });
+    await expect(fixture.admit('recovering')).resolves.toMatchObject({
+      success: false,
+      code: 'COMPUTE_STOPPING',
+    });
+    expect(fixture.record('recovering')).toBeUndefined();
   });
 
   it('commits one canonical outcome with its receipt and replays it after a lost response', async () => {
@@ -5804,12 +5926,8 @@ describe('SandboxSession orchestration', () => {
   });
 
   it('keeps a persisted modern attachment isolated after the rollout flag is disabled', async () => {
-    const fixture = sessionFixture({
-      auth: {
-        kiloSessionId: 'kilo_root',
-        kilocodeToken: 'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6e319.',
-      },
-    });
+    const fixture = sessionFixture();
+    installModernRuntimeAuthorization(fixture);
     fixture.env.RUNTIME_ISOLATION_ENABLED = 'false';
 
     await fixture.admit('modern');

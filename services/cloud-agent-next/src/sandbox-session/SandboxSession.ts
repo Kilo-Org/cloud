@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import { DurableObject } from 'cloudflare:workers';
 import type {
   GetWorktreeChangesOutput,
@@ -8,6 +9,8 @@ import { TRPCError } from '@trpc/server';
 import { withTimeout } from '@kilocode/worker-utils';
 import {
   renewRuntimeAuthorization,
+  RuntimeAuthorizationExpiredError,
+  RuntimeAuthorizationRevokedError,
   unsealRuntimeAuthorization,
 } from '@kilocode/worker-utils/runtime-authorization';
 import type { RuntimeAuthorization } from '@kilocode/worker-utils/runtime-authorization-contract';
@@ -771,11 +774,46 @@ export class SandboxSession extends DurableObject<Env> {
       if (!isChild || internalSecret) {
         const publication = this.ingestPublicationChain
           .catch(() => undefined)
-          .then(() => {
+          .then(async () => {
             if (!this.terminalLifecycle.isCurrent(epoch)) return;
+            const storedAuthorization = this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
+            const decoded = jwt.decode(token);
+            // Classification only: the bridge cryptographically verifies every
+            // modern claim before granting any attestation.
+            const modern =
+              storedAuthorization !== undefined ||
+              (typeof decoded === 'object' &&
+                decoded !== null &&
+                'runtimeAuthorization' in decoded);
+            const currentToken = modern ? await this.getRuntimeToken() : token;
+            const secret = modern ? await resolveSecret(this.env.NEXTAUTH_SECRET) : undefined;
+            const currentMetadata = await this.getMetadata();
+            if (
+              !currentToken ||
+              (modern && !secret) ||
+              !currentMetadata ||
+              currentMetadata.auth.kiloSessionId !== rootKiloSessionId
+            )
+              return;
+            const authorization = this.ctx.storage.kv.get<unknown>(RUNTIME_AUTHORIZATION_KEY);
             return publishControlPlaneSessionIngest({
               fetchIngest: request => this.env.SESSION_INGEST.fetch(request),
-              token,
+              token: currentToken,
+              runtimeContext:
+                modern && secret
+                  ? {
+                      secret,
+                      userId: currentMetadata.identity.userId,
+                      organizationId: currentMetadata.identity.orgId,
+                      authorization,
+                      isCurrent: () =>
+                        this.terminalLifecycle.isCurrent(epoch) &&
+                        !this.deletedWorktreeId &&
+                        !this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY) &&
+                        JSON.stringify(this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY)) ===
+                          JSON.stringify(authorization),
+                    }
+                  : undefined,
               rootKiloSessionId,
               eventKiloSessionId,
               cloudAgentSessionId: metadata.identity.sessionId,
@@ -784,8 +822,13 @@ export class SandboxSession extends DurableObject<Env> {
               items: ingestItems,
             });
           });
-        this.ingestPublicationChain = publication;
-        this.ctx.waitUntil(publication);
+        const settledPublication = publication.catch(() => {
+          logger
+            .withFields({ sessionId: this.sessionId })
+            .warn('Control-plane session ingest authorization unavailable');
+        });
+        this.ingestPublicationChain = settledPublication;
+        this.ctx.waitUntil(settledPublication);
       }
     }
     const applied = this.terminalLifecycle.isCurrent(epoch);
@@ -2565,10 +2608,37 @@ export class SandboxSession extends DurableObject<Env> {
     let validationFailure: Extract<SessionMessageAdmissionResult, { success: false }> | undefined;
     if (intent?.turn.type === 'prompt' && origin === 'followup') {
       try {
+        let validationToken = metadata.auth.kilocodeToken;
+        if (
+          this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_KEY) !== undefined ||
+          hasModernRuntimeAuthorization(metadata)
+        ) {
+          try {
+            validationToken = (await this.getRuntimeToken()) ?? undefined;
+          } catch (error) {
+            throw new TRPCError({
+              code:
+                error instanceof RuntimeAuthorizationExpiredError ||
+                error instanceof RuntimeAuthorizationRevokedError
+                  ? 'FORBIDDEN'
+                  : 'SERVICE_UNAVAILABLE',
+              message: 'Runtime credential unavailable for model validation',
+            });
+          }
+          if (!validationToken)
+            throw new TRPCError({ code: 'FORBIDDEN', message: 'Runtime credential unavailable' });
+          if (this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+            return {
+              success: false,
+              code: 'COMPUTE_STOPPING',
+              error: 'Runtime authorization recovery is in progress',
+            };
+          }
+        }
         await assertKiloModelAvailable({
           env: this.env,
           submittedModel: intent.agent.model,
-          originalToken: metadata.auth.kilocodeToken,
+          originalToken: validationToken,
           originalOrganizationId: metadata.identity.orgId,
           createdOnPlatform: metadata.identity.createdOnPlatform,
           procedure: 'admitSubmittedMessage',
@@ -2590,6 +2660,13 @@ export class SandboxSession extends DurableObject<Env> {
     }
     let admitted = false;
     const result = this.ctx.storage.transactionSync((): SessionMessageAdmissionResult => {
+      if (this.ctx.storage.kv.get(RUNTIME_AUTHORIZATION_RECOVERY_KEY)) {
+        return {
+          success: false,
+          code: 'COMPUTE_STOPPING',
+          error: 'Runtime authorization recovery is in progress',
+        };
+      }
       const latestMetadata = this.terminalLifecycle.getStoredMetadata();
       if (!this.terminalLifecycle.isCurrent(epoch) || !latestMetadata) {
         return { success: false, code: 'NOT_FOUND', error: 'Session not found' };

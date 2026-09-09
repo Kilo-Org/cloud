@@ -85,6 +85,10 @@ vi.mock('../../drizzle/vercel-snapshot/migrations', async () => {
             .pathname,
           'utf8'
         ),
+        m0001: readFileSync(
+          new URL('../../drizzle/vercel-snapshot/0001_stormy_shriek.sql', import.meta.url).pathname,
+          'utf8'
+        ),
       },
     },
   };
@@ -138,17 +142,26 @@ vi.mock('../logger.js', () => ({
   },
 }));
 
-const { VercelSnapshotBuild } = await import('./VercelSnapshotBuild.js');
+const {
+  VercelSnapshotBuild,
+  ownerCredentialFetchInput,
+  ownerFromInput,
+  ownerFromRow,
+  ownerToProjection,
+  ownerToRowKey,
+} = await import('./VercelSnapshotBuild.js');
 
 const ORGANIZATION_ID = '11111111-1111-4111-8111-111111111111';
 const CREDENTIAL_ID = '22222222-2222-4222-8222-222222222222';
 const FIRST_GENERATION = '33333333-3333-4333-8333-333333333333';
 const SECOND_GENERATION = '44444444-4444-4444-8444-444444444444';
 const THIRD_GENERATION = '55555555-5555-4555-8555-555555555555';
+const PERSONAL_USER_ID = 'oauth/vercel-user';
 
 type BuildRow = typeof vercelSnapshotBuilds.$inferSelect;
 type BuildChanges = Partial<typeof vercelSnapshotBuilds.$inferInsert>;
 type ManagedSandboxKind = 'builder' | 'validator';
+type BuildOwnerInput = { organizationId: string } | { userId: string };
 
 type StorageFixture = ReturnType<typeof createStorage>;
 type BuildFixture = {
@@ -157,18 +170,24 @@ type BuildFixture = {
   build: InstanceType<typeof VercelSnapshotBuild>;
 };
 
-function makeCredential(buildGeneration = FIRST_GENERATION) {
+function makeCredential(
+  buildGeneration = FIRST_GENERATION,
+  owner: BuildOwnerInput = { organizationId: ORGANIZATION_ID }
+) {
   return {
-    organizationId: ORGANIZATION_ID,
+    ...owner,
     credentialId: CREDENTIAL_ID,
     buildGeneration,
     runtimeBuildId: `runtime-${buildGeneration}`,
   };
 }
 
-function startInput(buildGeneration = FIRST_GENERATION) {
+function startInput(
+  buildGeneration = FIRST_GENERATION,
+  owner: BuildOwnerInput = { organizationId: ORGANIZATION_ID }
+) {
   return {
-    organizationId: ORGANIZATION_ID,
+    ...owner,
     credentialId: CREDENTIAL_ID,
     buildGeneration,
   };
@@ -216,9 +235,12 @@ function createStorage(database: DatabaseSync) {
   };
 }
 
-function createBuild(storage: StorageFixture): InstanceType<typeof VercelSnapshotBuild> {
+function createBuild(
+  storage: StorageFixture,
+  ownerKey = ORGANIZATION_ID
+): InstanceType<typeof VercelSnapshotBuild> {
   const ctx = {
-    id: { name: ORGANIZATION_ID },
+    id: { name: ownerKey },
     storage,
     blockConcurrencyWhile: vi.fn((action: () => Promise<void>) => action()),
   };
@@ -236,18 +258,22 @@ function createFixture(): BuildFixture {
 }
 
 function storedRow(fixture: BuildFixture): BuildRow | undefined {
+  return storedRowAt(fixture, ORGANIZATION_ID);
+}
+
+function storedRowAt(fixture: BuildFixture, ownerKey: string): BuildRow | undefined {
   return drizzle(fixture.storage as never)
     .select()
     .from(vercelSnapshotBuilds)
-    .where(eq(vercelSnapshotBuilds.organization_id, ORGANIZATION_ID))
+    .where(eq(vercelSnapshotBuilds.organization_id, ownerKey))
     .get();
 }
 
-function updateRow(fixture: BuildFixture, changes: BuildChanges): void {
+function updateRow(fixture: BuildFixture, changes: BuildChanges, ownerKey = ORGANIZATION_ID): void {
   drizzle(fixture.storage as never)
     .update(vercelSnapshotBuilds)
     .set(changes)
-    .where(eq(vercelSnapshotBuilds.organization_id, ORGANIZATION_ID))
+    .where(eq(vercelSnapshotBuilds.organization_id, ownerKey))
     .run();
 }
 
@@ -412,6 +438,99 @@ describe('VercelSnapshotBuild persistence isolation', () => {
       expect.arrayContaining(['events', 'command_queue', 'execution_leases'])
     );
     expect(sessionTables).not.toContain('vercel_snapshot_builds');
+  });
+
+  it('maps personal owners to prefixed rows and owner-shaped resolver inputs', () => {
+    const owner = { type: 'user' as const, userId: PERSONAL_USER_ID };
+
+    expect(ownerToRowKey(owner)).toBe(`user:${PERSONAL_USER_ID}`);
+    expect(
+      ownerFromRow({ organization_id: `user:${PERSONAL_USER_ID}`, owner_type: 'user' })
+    ).toEqual(owner);
+    expect(ownerFromRow({ organization_id: ORGANIZATION_ID, owner_type: 'org' })).toEqual({
+      type: 'org',
+      organizationId: ORGANIZATION_ID,
+    });
+    expect(ownerToProjection(owner)).toEqual({ userId: PERSONAL_USER_ID });
+    expect(ownerCredentialFetchInput(owner, CREDENTIAL_ID)).toEqual({
+      userId: PERSONAL_USER_ID,
+      credentialId: CREDENTIAL_ID,
+    });
+    expect(ownerFromInput(startInput(FIRST_GENERATION, { userId: PERSONAL_USER_ID }))).toEqual(
+      owner
+    );
+  });
+
+  it('persists and cleans personal snapshot builds through the user-keyed row', async () => {
+    const database = new DatabaseSync(':memory:');
+    const storage = createStorage(database);
+    const build = createBuild(storage, `user:${PERSONAL_USER_ID}`);
+    const input = startInput(FIRST_GENERATION, { userId: PERSONAL_USER_ID });
+    mocks.fetchCredential.mockResolvedValueOnce(
+      makeCredential(FIRST_GENERATION, { userId: PERSONAL_USER_ID })
+    );
+
+    await build.start(input);
+
+    expect(storedRowAt({ database, storage, build }, `user:${PERSONAL_USER_ID}`)).toMatchObject({
+      organization_id: `user:${PERSONAL_USER_ID}`,
+      owner_type: 'user',
+      credential_id: CREDENTIAL_ID,
+    });
+    expect(mocks.fetchCredential).toHaveBeenCalledWith(expect.anything(), {
+      userId: PERSONAL_USER_ID,
+      credentialId: CREDENTIAL_ID,
+    });
+
+    await build.cleanup(input);
+
+    expect(storedRowAt({ database, storage, build }, `user:${PERSONAL_USER_ID}`)).toBeUndefined();
+  });
+
+  it('uses persisted personal ownership for alarm projection', async () => {
+    const database = new DatabaseSync(':memory:');
+    const storage = createStorage(database);
+    const build = createBuild(storage, `user:${PERSONAL_USER_ID}`);
+    const input = startInput(FIRST_GENERATION, { userId: PERSONAL_USER_ID });
+    mocks.fetchCredential.mockResolvedValueOnce(
+      makeCredential(FIRST_GENERATION, { userId: PERSONAL_USER_ID })
+    );
+
+    await build.start(input);
+    updateRow(
+      { database, storage, build },
+      { next_attempt_at: Date.now() - 1 },
+      `user:${PERSONAL_USER_ID}`
+    );
+    await build.alarm();
+
+    expect(mocks.projectStatus).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        userId: PERSONAL_USER_ID,
+        credentialId: CREDENTIAL_ID,
+        setupStatus: 'building',
+      })
+    );
+  });
+
+  it('rejects a persisted owner discriminator that disagrees with the row key before lookup', async () => {
+    const database = new DatabaseSync(':memory:');
+    const storage = createStorage(database);
+    const build = createBuild(storage, `user:${PERSONAL_USER_ID}`);
+    await build.start(startInput(FIRST_GENERATION, { userId: PERSONAL_USER_ID }));
+    updateRow(
+      { database, storage, build },
+      { owner_type: 'org', next_attempt_at: Date.now() - 1 },
+      `user:${PERSONAL_USER_ID}`
+    );
+    mocks.fetchCredential.mockClear();
+    mocks.control.initializeSnapshotValidator.mockClear();
+
+    await expect(build.alarm()).rejects.toThrow('snapshot_owner_row_key_mismatch');
+
+    expect(mocks.fetchCredential).not.toHaveBeenCalled();
+    expect(mocks.control.initializeSnapshotValidator).not.toHaveBeenCalled();
   });
 });
 
@@ -1652,6 +1771,35 @@ describe('VercelSnapshotBuild runtime preparation', () => {
       validator_wrapper_requested: 1,
       validator_wrapper_command_id: 'command-test',
     });
+  });
+
+  it('passes persisted personal ownership to validator initialization', async () => {
+    const database = new DatabaseSync(':memory:');
+    const storage = createStorage(database);
+    const build = createBuild(storage, `user:${PERSONAL_USER_ID}`);
+    const input = startInput(FIRST_GENERATION, { userId: PERSONAL_USER_ID });
+    await build.start(input);
+    updateRow(
+      { database, storage, build },
+      {
+        step: 'launch_validator_wrapper',
+        snapshot_id: 'snapshot-validator',
+        validator_session_id: 'validator-session',
+      },
+      `user:${PERSONAL_USER_ID}`
+    );
+
+    await build.alarm();
+
+    expect(mocks.control.initializeSnapshotValidator).toHaveBeenCalledWith(
+      expect.objectContaining({
+        build: {
+          userId: PERSONAL_USER_ID,
+          credentialId: CREDENTIAL_ID,
+          generation: FIRST_GENERATION,
+        },
+      })
+    );
   });
 
   it('waits for the validator allocation to run before registering or launching the wrapper', async () => {

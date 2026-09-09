@@ -27,11 +27,7 @@ export function createAgentSandbox(
     const source = binding.kind === 'vercel' ? binding.source : undefined;
     if (source?.kind === 'byoc') {
       return new VercelAgentSandbox(metadata, undefined, runtimeContext, {
-        resolveConfig: () =>
-          resolveByocVercelRuntimeConfig(env, {
-            organizationId: source.organizationId,
-            credentialId: source.credentialId,
-          }),
+        resolveConfig: () => resolveByocVercelRuntimeConfig(env, source),
       });
     }
     const config = resolveVercelSandboxRuntimeConfig(env, metadata.workspace?.providerRuntime);

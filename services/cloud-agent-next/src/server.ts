@@ -71,6 +71,32 @@ import { isOrgInList } from './sandbox-id.js';
 
 const app = new Hono<HonoContext>();
 
+const SnapshotBuildOwnerSchema = z.union([
+  z.object({ organizationId: z.uuid(), userId: z.never().optional() }),
+  z.object({ organizationId: z.never().optional(), userId: z.string().min(1) }),
+]);
+const SnapshotBuildStartInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+const SnapshotBuildCleanupInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+    snapshotId: z.string().min(1).max(256).optional(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+
+function snapshotBuildOwnerKey(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : `user:${input.userId}`;
+}
+
+function snapshotBuildOwnerId(input: z.infer<typeof SnapshotBuildOwnerSchema>): string {
+  return input.organizationId !== undefined ? input.organizationId : input.userId;
+}
+
 function isAllowedWebSocketOrigin(env: Env, origin: string | undefined): boolean {
   const allowedOrigins = (env.WS_ALLOWED_ORIGINS || '')
     .split(',')
@@ -309,7 +335,19 @@ app.get('/internal/byoc/vercel-enrollment/:organizationId', (c: Context<HonoCont
   const organizationId = z.uuid().safeParse(c.req.param('organizationId'));
   if (!organizationId.success) return c.text('Invalid organization ID', 400);
 
-  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_ORG_IDS, organizationId.data) }, 200, {
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, organizationId.data) }, 200, {
+    'Cache-Control': 'no-store',
+  });
+});
+
+app.get('/internal/byoc/vercel-enrollment/user/:userId', (c: Context<HonoContext>) => {
+  const unauthorized = requireInternalApi(c);
+  if (unauthorized) return unauthorized;
+
+  const userId = z.string().min(1).safeParse(c.req.param('userId'));
+  if (!userId.success) return c.text('Invalid user ID', 400);
+
+  return c.json({ enrolled: isOrgInList(c.env.BYOC_VERCEL_IDS, userId.data) }, 200, {
     'Cache-Control': 'no-store',
   });
 });
@@ -329,21 +367,15 @@ app.post('/internal/byoc/vercel-snapshot-build/start', async (c: Context<HonoCon
   const unauthorized = requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
-  const input = z
-    .object({
-      organizationId: z.uuid(),
-      credentialId: z.uuid(),
-      buildGeneration: z.uuid(),
-    })
-    .safeParse(await c.req.json().catch(() => null));
+  const input = SnapshotBuildStartInputSchema.safeParse(await c.req.json().catch(() => null));
   if (!input.success) return c.text('Invalid request', 400);
-  if (!isOrgInList(c.env.BYOC_VERCEL_ORG_IDS, input.data.organizationId)) {
-    return c.text('Organization is not enrolled in Vercel compute', 403);
+  if (!isOrgInList(c.env.BYOC_VERCEL_IDS, snapshotBuildOwnerId(input.data))) {
+    return c.text('Owner is not enrolled in Vercel compute', 403);
   }
 
   try {
     await withDORetry(
-      () => getVercelSnapshotBuildStub(c.env, input.data.organizationId),
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
       stub => stub.start(input.data),
       'startVercelSnapshotBuild'
     );
@@ -357,19 +389,12 @@ app.post('/internal/byoc/vercel-snapshot-build/cleanup', async (c: Context<HonoC
   const unauthorized = requireInternalApi(c);
   if (unauthorized) return unauthorized;
 
-  const input = z
-    .object({
-      organizationId: z.uuid(),
-      credentialId: z.uuid(),
-      buildGeneration: z.uuid(),
-      snapshotId: z.string().min(1).max(256).optional(),
-    })
-    .safeParse(await c.req.json().catch(() => null));
+  const input = SnapshotBuildCleanupInputSchema.safeParse(await c.req.json().catch(() => null));
   if (!input.success) return c.text('Invalid request', 400);
 
   try {
     await withDORetry(
-      () => getVercelSnapshotBuildStub(c.env, input.data.organizationId),
+      () => getVercelSnapshotBuildStub(c.env, snapshotBuildOwnerKey(input.data)),
       stub => stub.cleanup(input.data),
       'cleanupVercelSnapshotBuild'
     );

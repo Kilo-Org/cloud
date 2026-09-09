@@ -290,10 +290,7 @@ export class VercelSandboxLifecycle implements AgentSandboxLifecycle {
     binding: SandboxProviderBinding | undefined
   ): Promise<VercelSandboxCredentials | undefined> {
     if (binding?.kind === 'vercel' && binding.source.kind === 'byoc') {
-      return resolveByocVercelCredentials(this.env, {
-        organizationId: binding.source.organizationId,
-        credentialId: binding.source.credentialId,
-      });
+      return resolveByocVercelCredentials(this.env, binding.source);
     }
     return parseVercelSandboxCredentials(this.env);
   }

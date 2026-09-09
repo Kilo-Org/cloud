@@ -11,6 +11,16 @@ export type SandboxProviderBinding =
       source: {
         kind: 'byoc';
         organizationId: string;
+        userId?: never;
+        credentialId: string;
+      };
+    }
+  | {
+      kind: 'vercel';
+      source: {
+        kind: 'byoc';
+        userId: string;
+        organizationId?: never;
         credentialId: string;
       };
     };
@@ -23,12 +33,19 @@ export const SandboxProviderBindingSchema: z.ZodType<SandboxProviderBinding> = z
     z
       .object({
         kind: z.literal('vercel'),
-        source: z.discriminatedUnion('kind', [
+        source: z.union([
           z.object({ kind: z.literal('platform') }).strict(),
           z
             .object({
               kind: z.literal('byoc'),
               organizationId: z.string().min(1),
+              credentialId: z.string().min(1),
+            })
+            .strict(),
+          z
+            .object({
+              kind: z.literal('byoc'),
+              userId: z.string().min(1),
               credentialId: z.string().min(1),
             })
             .strict(),
@@ -56,8 +73,12 @@ export function sameSandboxProviderBinding(
   if (left.kind !== 'vercel' || right.kind !== 'vercel') return true;
   if (left.source.kind !== right.source.kind) return false;
   if (left.source.kind !== 'byoc' || right.source.kind !== 'byoc') return true;
-  return (
-    left.source.organizationId === right.source.organizationId &&
-    left.source.credentialId === right.source.credentialId
-  );
+  if (left.source.credentialId !== right.source.credentialId) return false;
+  if (left.source.organizationId !== undefined && right.source.organizationId !== undefined) {
+    return left.source.organizationId === right.source.organizationId;
+  }
+  if (left.source.userId !== undefined && right.source.userId !== undefined) {
+    return left.source.userId === right.source.userId;
+  }
+  return false;
 }

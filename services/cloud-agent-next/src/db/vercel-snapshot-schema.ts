@@ -2,6 +2,7 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const vercelSnapshotBuilds = sqliteTable('vercel_snapshot_builds', {
   organization_id: text('organization_id').primaryKey(),
+  owner_type: text('owner_type').notNull().default('org'),
   credential_id: text('credential_id').notNull(),
   build_generation: text('build_generation').notNull(),
   runtime_build_id: text('runtime_build_id').notNull(),

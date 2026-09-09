@@ -11,6 +11,7 @@ import type { Env } from '../types.js';
 import {
   ByocCredentialResolverError,
   fetchByocVercelCredential,
+  fetchByocVercelEnrollmentForUser,
   projectByocVercelSnapshotMissing,
   resolveByocVercelCredentials,
   resolveByocVercelRuntimeConfig,
@@ -30,6 +31,10 @@ const identity = {
   organizationId: '11111111-1111-4111-8111-111111111111',
   credentialId: '22222222-2222-4222-8222-222222222222',
 };
+const personalIdentity = {
+  userId: 'oauth/vercel-user',
+  credentialId: '44444444-4444-4444-8444-444444444444',
+};
 const snapshot = {
   ...identity,
   buildGeneration: '33333333-3333-4333-8333-333333333333',
@@ -42,26 +47,27 @@ const env = {
   INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
 } as Env;
 
-function encryptCredentialToken(input = identity): VercelComputeCredentialEnvelope {
+type CredentialOwnerInput = {
+  credentialId: string;
+  tokenEncrypted?: unknown;
+} & ({ organizationId: string } | { userId: string });
+
+function encryptCredentialToken(
+  input: CredentialOwnerInput = identity
+): VercelComputeCredentialEnvelope {
+  const ownerKey = 'organizationId' in input ? input.organizationId : `user:${input.userId}`;
   return parseKeyedEnvelope(
     encryptKeyedEnvelope(
       accessToken,
       scheme,
       { keyId, publicKeyPem: keys.publicKey },
-      `byoc-vercel-credential:v1:${input.organizationId}:${input.credentialId}`
+      `byoc-vercel-credential:v1:${ownerKey}:${input.credentialId}`
     ),
     scheme
   );
 }
 
-function credentialResponse(
-  input: {
-    organizationId: string;
-    credentialId: string;
-    tokenEncrypted: unknown;
-  },
-  overrides: Record<string, unknown> = {}
-) {
+function credentialResponse(input: CredentialOwnerInput, overrides: Record<string, unknown> = {}) {
   return {
     ...input,
     tokenScope: 'team',
@@ -81,11 +87,7 @@ function credentialResponse(
   };
 }
 
-function stubCredentialResponse(input: {
-  organizationId: string;
-  credentialId: string;
-  tokenEncrypted: unknown;
-}): void {
+function stubCredentialResponse(input: CredentialOwnerInput): void {
   vi.stubGlobal(
     'fetch',
     vi.fn(async () => Response.json(credentialResponse(input)))
@@ -113,6 +115,87 @@ describe('BYOC Vercel credential encryption', () => {
     expect(() =>
       decryptSecrets({ STOLEN_BYOC_TOKEN: envelope.ciphertext }, keys.privateKey)
     ).toThrow();
+  });
+
+  it('decrypts a personal envelope with the user-scoped AAD', async () => {
+    stubCredentialResponse({
+      ...personalIdentity,
+      tokenEncrypted: encryptCredentialToken(personalIdentity),
+    });
+
+    await expect(resolveByocVercelCredentials(env, personalIdentity)).resolves.toEqual({
+      accessToken,
+      teamId: 'team-1',
+      scope: 'team',
+    });
+  });
+
+  it('rejects a personal credential response when the owner changes', async () => {
+    stubCredentialResponse({
+      userId: 'oauth/another-user',
+      credentialId: personalIdentity.credentialId,
+      tokenEncrypted: encryptCredentialToken(personalIdentity),
+    });
+
+    await expect(resolveByocVercelCredentials(env, personalIdentity)).rejects.toBeInstanceOf(
+      ByocCredentialResolverError
+    );
+  });
+
+  it('rejects personal ciphertext encrypted with a different owner AAD', async () => {
+    stubCredentialResponse({
+      ...personalIdentity,
+      tokenEncrypted: encryptCredentialToken({
+        userId: 'oauth/another-user',
+        credentialId: personalIdentity.credentialId,
+      }),
+    });
+
+    await expect(resolveByocVercelCredentials(env, personalIdentity)).rejects.toBeInstanceOf(
+      ByocCredentialResolverError
+    );
+  });
+
+  it('fetches personal credentials with an encoded user owner query', async () => {
+    stubCredentialResponse({
+      ...personalIdentity,
+      tokenEncrypted: encryptCredentialToken(personalIdentity),
+    });
+    const fetchMock = vi.mocked(globalThis.fetch);
+
+    await fetchByocVercelCredential(env, personalIdentity);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      `https://backend.example.test/api/internal/byoc/vercel-credentials/${personalIdentity.credentialId}?userId=${encodeURIComponent(personalIdentity.userId)}`,
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('fetches personal enrollment from the user owner endpoint', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({
+          ...personalIdentity,
+          setupStatus: 'ready',
+          setupStep: null,
+          setupError: null,
+          buildGeneration: snapshot.buildGeneration,
+          runtimeBuildId: 'runtime-build-1',
+          runtimeSnapshotId: snapshot.runtimeSnapshotId,
+          teamSlug: 'team-slug',
+          projectSlug: 'project-slug',
+        })
+      )
+    );
+
+    await expect(
+      fetchByocVercelEnrollmentForUser(env, personalIdentity.userId)
+    ).resolves.toMatchObject(personalIdentity);
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      `https://backend.example.test/api/internal/byoc/vercel-credentials/user/${encodeURIComponent(personalIdentity.userId)}`,
+      expect.objectContaining({ method: 'GET' })
+    );
   });
 
   it.each([

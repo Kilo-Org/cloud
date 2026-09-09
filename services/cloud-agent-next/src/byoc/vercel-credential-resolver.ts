@@ -43,9 +43,13 @@ const SetupStepSchema = z.enum([
   'confirm_terminal',
 ]);
 
-const CredentialSchema = z.object({
+const CredentialOwnerSchema = z.union([
+  z.object({ organizationId: z.uuid(), userId: z.never().optional() }),
+  z.object({ organizationId: z.never().optional(), userId: z.string().min(1) }),
+]);
+
+const CredentialFieldsSchema = z.object({
   credentialId: z.uuid(),
-  organizationId: z.uuid(),
   tokenEncrypted: EnvelopeSchema,
   tokenScope: z.enum(['team', 'project']),
   teamId: z.string().min(1),
@@ -61,10 +65,10 @@ const CredentialSchema = z.object({
   setupStartedAt: z.string().nullable(),
   setupCompletedAt: z.string().nullable(),
 });
+const CredentialSchema = CredentialFieldsSchema.and(CredentialOwnerSchema);
 
-const EnrollmentSchema = z.object({
+const EnrollmentFieldsSchema = z.object({
   credentialId: z.uuid(),
-  organizationId: z.uuid(),
   setupStatus: z.enum(['pending', 'building', 'ready', 'failed']),
   setupStep: SetupStepSchema.nullable(),
   setupError: z.string().nullable(),
@@ -74,24 +78,29 @@ const EnrollmentSchema = z.object({
   teamSlug: z.string().nullable(),
   projectSlug: z.string().nullable(),
 });
+const EnrollmentSchema = EnrollmentFieldsSchema.and(CredentialOwnerSchema);
 
-export type ByocVercelCredential = z.infer<typeof CredentialSchema> & {
-  tokenEncrypted: VercelComputeCredentialEnvelope;
-  setupStatus: VercelComputeSetupStatus;
-  setupStep: VercelComputeSetupStep | null;
-};
+export type ByocVercelOwner =
+  | { organizationId: string; userId?: never }
+  | { userId: string; organizationId?: never };
+export type ByocVercelCredentialFetchInput = ByocVercelOwner & { credentialId: string };
 
-export type ByocVercelEnrollment = z.infer<typeof EnrollmentSchema>;
+export type ByocVercelCredential = ByocVercelOwner &
+  z.infer<typeof CredentialFieldsSchema> & {
+    tokenEncrypted: VercelComputeCredentialEnvelope;
+    setupStatus: VercelComputeSetupStatus;
+    setupStep: VercelComputeSetupStep | null;
+  };
 
-export type ByocVercelRuntimeSnapshot = {
-  organizationId: string;
+export type ByocVercelEnrollment = ByocVercelOwner & z.infer<typeof EnrollmentFieldsSchema>;
+
+export type ByocVercelRuntimeSnapshot = ByocVercelOwner & {
   credentialId: string;
   buildGeneration: string;
   runtimeSnapshotId: string;
 };
 
-export type ByocVercelStatusProjection = {
-  organizationId: string;
+export type ByocVercelStatusProjection = ByocVercelOwner & {
   credentialId: string;
   buildGeneration: string;
   setupStatus: VercelComputeSetupStatus;
@@ -141,6 +150,28 @@ function backendUrl(env: Env): string {
   return value;
 }
 
+function ownerId(owner: ByocVercelOwner): string {
+  return owner.organizationId !== undefined ? owner.organizationId : owner.userId;
+}
+
+function ownerAadKey(owner: ByocVercelOwner): string {
+  return owner.organizationId !== undefined ? owner.organizationId : `user:${owner.userId}`;
+}
+
+function ownerMatches(left: ByocVercelOwner, right: ByocVercelOwner): boolean {
+  if (left.organizationId !== undefined && right.organizationId !== undefined) {
+    return left.organizationId === right.organizationId;
+  }
+  if (left.userId !== undefined && right.userId !== undefined) return left.userId === right.userId;
+  return false;
+}
+
+function ownerFields(owner: ByocVercelOwner): ByocVercelOwner {
+  return owner.organizationId !== undefined
+    ? { organizationId: owner.organizationId }
+    : { userId: owner.userId };
+}
+
 async function internalSecret(env: Env): Promise<string> {
   try {
     const secret = await env.INTERNAL_API_SECRET_PROD.get();
@@ -153,12 +184,16 @@ async function internalSecret(env: Env): Promise<string> {
 
 export async function fetchByocVercelCredential(
   env: Env,
-  input: { organizationId: string; credentialId: string }
+  input: ByocVercelCredentialFetchInput
 ): Promise<ByocVercelCredential> {
+  const ownerQuery =
+    input.organizationId !== undefined
+      ? `organizationId=${encodeURIComponent(input.organizationId)}`
+      : `userId=${encodeURIComponent(input.userId)}`;
   let response: Response;
   try {
     response = await fetch(
-      `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${encodeURIComponent(input.credentialId)}?organizationId=${encodeURIComponent(input.organizationId)}`,
+      `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${encodeURIComponent(input.credentialId)}?${ownerQuery}`,
       {
         method: 'GET',
         headers: { 'x-internal-api-key': await internalSecret(env) },
@@ -178,10 +213,7 @@ export async function fetchByocVercelCredential(
 
   const parsed = CredentialSchema.safeParse(await response.json().catch(() => null));
   if (!parsed.success) throw new ByocCredentialResolverError();
-  if (
-    parsed.data.organizationId !== input.organizationId ||
-    parsed.data.credentialId !== input.credentialId
-  ) {
+  if (!ownerMatches(parsed.data, input) || parsed.data.credentialId !== input.credentialId) {
     throw new ByocCredentialResolverError();
   }
   return parsed.data as ByocVercelCredential;
@@ -191,10 +223,25 @@ export async function fetchByocVercelEnrollment(
   env: Env,
   organizationId: string
 ): Promise<ByocVercelEnrollment> {
+  return fetchByocVercelEnrollmentForOwner(env, { organizationId }, 'organization');
+}
+
+export async function fetchByocVercelEnrollmentForUser(
+  env: Env,
+  userId: string
+): Promise<ByocVercelEnrollment> {
+  return fetchByocVercelEnrollmentForOwner(env, { userId }, 'user');
+}
+
+async function fetchByocVercelEnrollmentForOwner(
+  env: Env,
+  owner: ByocVercelOwner,
+  path: 'organization' | 'user'
+): Promise<ByocVercelEnrollment> {
   let response: Response;
   try {
     response = await fetch(
-      `${backendUrl(env)}/api/internal/byoc/vercel-credentials/organization/${encodeURIComponent(organizationId)}`,
+      `${backendUrl(env)}/api/internal/byoc/vercel-credentials/${path}/${encodeURIComponent(ownerId(owner))}`,
       {
         method: 'GET',
         headers: { 'x-internal-api-key': await internalSecret(env) },
@@ -206,12 +253,12 @@ export async function fetchByocVercelEnrollment(
   }
 
   if (response.status === 404) {
-    throw new ByocCredentialMissingError(organizationId);
+    throw new ByocCredentialMissingError(ownerId(owner));
   }
   if (!response.ok) throw new ByocCredentialResolverError();
 
   const parsed = EnrollmentSchema.safeParse(await response.json().catch(() => null));
-  if (!parsed.success || parsed.data.organizationId !== organizationId) {
+  if (!parsed.success || !ownerMatches(parsed.data, owner)) {
     throw new ByocCredentialResolverError();
   }
   return parsed.data;
@@ -262,7 +309,7 @@ export async function projectByocVercelSnapshotMissing(
   }
 
   return projectByocVercelStatus(env, {
-    organizationId: credential.organizationId,
+    ...ownerFields(credential),
     credentialId: credential.credentialId,
     buildGeneration: credential.buildGeneration,
     setupStatus: 'failed',
@@ -281,7 +328,7 @@ export async function projectByocVercelSnapshotMissing(
 
 export async function resolveByocVercelRuntimeConfig(
   env: Env,
-  input: { organizationId: string; credentialId: string },
+  input: ByocVercelCredentialFetchInput,
   onSnapshotResolved?: (snapshot: ByocVercelRuntimeSnapshot) => void
 ): Promise<VercelSandboxRuntimeConfig> {
   const credential = await fetchByocVercelCredential(env, input);
@@ -291,7 +338,7 @@ export async function resolveByocVercelRuntimeConfig(
 
   const config = decryptCredentialRuntimeConfig(env, credential);
   onSnapshotResolved?.({
-    organizationId: credential.organizationId,
+    ...ownerFields(credential),
     credentialId: credential.credentialId,
     buildGeneration: credential.buildGeneration,
     runtimeSnapshotId: credential.runtimeSnapshotId,
@@ -301,7 +348,7 @@ export async function resolveByocVercelRuntimeConfig(
 
 export async function resolveByocVercelCredentials(
   env: Env,
-  input: { organizationId: string; credentialId: string }
+  input: ByocVercelCredentialFetchInput
 ): Promise<VercelSandboxCredentials> {
   const credential = await fetchByocVercelCredential(env, input);
   return {
@@ -313,7 +360,7 @@ export async function resolveByocVercelCredentials(
 
 export async function resolveByocVercelAccessConfig(
   env: Env,
-  input: { organizationId: string; credentialId: string }
+  input: ByocVercelCredentialFetchInput
 ): Promise<VercelSandboxRuntimeConfig> {
   const credential = await fetchByocVercelCredential(env, input);
   return decryptCredentialRuntimeConfig(env, credential);
@@ -353,7 +400,7 @@ function decryptCredentialAccessToken(env: Env, credential: ByocVercelCredential
           privateKeyPem: env.AGENT_ENV_VARS_PRIVATE_KEY,
         },
       },
-      `byoc-vercel-credential:v1:${credential.organizationId}:${credential.credentialId}`
+      `byoc-vercel-credential:v1:${ownerAadKey(credential)}:${credential.credentialId}`
     ).trim();
     if (!accessToken) throw new Error('empty credential');
     return accessToken;

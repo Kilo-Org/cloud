@@ -67,7 +67,9 @@ import {
 } from '../sandbox-provider-binding.js';
 import {
   fetchByocVercelEnrollment,
+  fetchByocVercelEnrollmentForUser,
   ByocCredentialMissingError,
+  type ByocVercelEnrollment,
 } from '../byoc/vercel-credential-resolver.js';
 import { logger } from '../logger.js';
 import { withDORetry } from '../utils/do-retry.js';
@@ -131,6 +133,24 @@ function sessionPlaneForCreate(
       );
 }
 
+type ByocEnrollmentOwner = { organizationId: string } | { userId: string };
+
+function selectByocEnrollmentOwner(
+  env: Pick<Env, 'BYOC_VERCEL_IDS'>,
+  userId: string,
+  organizationId: string | undefined,
+  billingOrigin: string | undefined
+): ByocEnrollmentOwner | undefined {
+  if (billingOrigin === 'code-review') return undefined;
+  if (organizationId !== undefined && isOrgInList(env.BYOC_VERCEL_IDS, organizationId)) {
+    return { organizationId };
+  }
+  if (organizationId === undefined && isOrgInList(env.BYOC_VERCEL_IDS, userId)) {
+    return { userId };
+  }
+  return undefined;
+}
+
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext,
@@ -141,6 +161,12 @@ function assertSupportedSandboxAllocation(
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
   }
+  const byocEnrollmentOwner = selectByocEnrollmentOwner(
+    ctx.env,
+    ctx.userId,
+    input.options?.kilocodeOrganizationId,
+    options?.billingOrigin
+  );
   if (
     input.runtime?.devcontainer === true ||
     options?.billingOrigin === 'code-review' ||
@@ -155,6 +181,7 @@ function assertSupportedSandboxAllocation(
   if (
     allocation === 'isolated-standard' &&
     (sessionPlaneForCreate(input, ctx) === 'control' ||
+      byocEnrollmentOwner !== undefined ||
       (input.options?.kilocodeOrganizationId !== undefined &&
         isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, input.options.kilocodeOrganizationId)))
   ) {
@@ -656,10 +683,13 @@ async function allocateNewSession(
   const sessionService = new SessionService();
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
   const isCodeReviewSession = options?.billingOrigin === 'code-review';
-  // BYOC enrollment is organization-only. A wildcard must not redirect
-  // personal sessions into a credentialed provider path.
-  const byocEnrolled =
-    !isCodeReviewSession && orgId !== undefined && isOrgInList(ctx.env.BYOC_VERCEL_ORG_IDS, orgId);
+  const byocEnrollmentOwner = selectByocEnrollmentOwner(
+    ctx.env,
+    ctx.userId,
+    orgId,
+    options?.billingOrigin
+  );
+  const byocEnrolled = byocEnrollmentOwner !== undefined;
   const cloudAgentSessionId = generateSessionId(
     byocEnrolled ? 'control' : sessionPlaneForCreate(input, ctx)
   );
@@ -719,18 +749,20 @@ async function allocateNewSession(
   let sandboxRoute: SharedSandboxRouteMetadata | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
   let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
-  let byocEnrollment: Awaited<ReturnType<typeof fetchByocVercelEnrollment>> | undefined;
+  let byocEnrollment: ByocVercelEnrollment | undefined;
   try {
-    if (byocEnrolled) {
-      if (!orgId || input.runtime?.devcontainer) {
+    if (byocEnrollmentOwner) {
+      if (input.runtime?.devcontainer) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'byoc_vercel_not_ready',
         });
       }
-      const enrolledOrganizationId = orgId;
       try {
-        byocEnrollment = await fetchByocVercelEnrollment(ctx.env, enrolledOrganizationId);
+        byocEnrollment =
+          'organizationId' in byocEnrollmentOwner
+            ? await fetchByocVercelEnrollment(ctx.env, byocEnrollmentOwner.organizationId)
+            : await fetchByocVercelEnrollmentForUser(ctx.env, byocEnrollmentOwner.userId);
       } catch (error) {
         if (error instanceof ByocCredentialMissingError) {
           throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
@@ -770,14 +802,24 @@ async function allocateNewSession(
       sandboxId = target.sandboxId;
       if (byocEnrollment) {
         sandboxProvider = 'vercel';
-        sandboxProviderBinding = {
-          kind: 'vercel',
-          source: {
-            kind: 'byoc',
-            organizationId: byocEnrollment.organizationId,
-            credentialId: byocEnrollment.credentialId,
-          },
-        };
+        sandboxProviderBinding =
+          byocEnrollment.organizationId !== undefined
+            ? {
+                kind: 'vercel',
+                source: {
+                  kind: 'byoc',
+                  organizationId: byocEnrollment.organizationId,
+                  credentialId: byocEnrollment.credentialId,
+                },
+              }
+            : {
+                kind: 'vercel',
+                source: {
+                  kind: 'byoc',
+                  userId: byocEnrollment.userId,
+                  credentialId: byocEnrollment.credentialId,
+                },
+              };
       } else {
         sandboxProvider = selectSandboxProvider({
           env: ctx.env,

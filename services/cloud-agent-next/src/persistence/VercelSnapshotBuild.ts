@@ -51,15 +51,25 @@ const SNAPSHOT_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1_000;
 const PINNED_BUN_VERSION = VERCEL_RUNTIME_BUN_VERSION;
 const PINNED_KILO_VERSION = VERCEL_RUNTIME_KILO_CLI_VERSION;
 
-const StartInputSchema = z.object({
-  organizationId: z.uuid(),
-  credentialId: z.uuid(),
-  buildGeneration: z.uuid(),
-});
+const SnapshotBuildOwnerSchema = z.union([
+  z.object({ organizationId: z.uuid(), userId: z.never().optional() }),
+  z.object({ organizationId: z.never().optional(), userId: z.string().min(1) }),
+]);
 
-const CleanupInputSchema = StartInputSchema.extend({
-  snapshotId: z.string().min(1).optional(),
-});
+const StartInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+  })
+  .and(SnapshotBuildOwnerSchema);
+
+const CleanupInputSchema = z
+  .object({
+    credentialId: z.uuid(),
+    buildGeneration: z.uuid(),
+    snapshotId: z.string().min(1).optional(),
+  })
+  .and(SnapshotBuildOwnerSchema);
 
 const BuildStepSchema = z.enum([
   'validating_access',
@@ -78,7 +88,57 @@ const BuildStepSchema = z.enum([
 
 type BuildDb = ReturnType<typeof drizzle>;
 type BuildRow = typeof vercelSnapshotBuilds.$inferSelect;
-type BuildOwnership = Pick<BuildRow, 'organization_id' | 'credential_id' | 'build_generation'>;
+type BuildOwnership = Pick<
+  BuildRow,
+  'organization_id' | 'owner_type' | 'credential_id' | 'build_generation'
+>;
+
+export type SnapshotBuildOwner =
+  | { type: 'org'; organizationId: string }
+  | { type: 'user'; userId: string };
+
+export function ownerToRowKey(owner: SnapshotBuildOwner): string {
+  return owner.type === 'org' ? owner.organizationId : `user:${owner.userId}`;
+}
+
+export function ownerFromRow(
+  row: Pick<BuildRow, 'organization_id' | 'owner_type'>
+): SnapshotBuildOwner {
+  const ownerType = z.enum(['org', 'user']).parse(row.owner_type);
+  if (ownerType === 'org') {
+    if (row.organization_id.startsWith('user:')) {
+      throw new Error('snapshot_owner_row_key_mismatch');
+    }
+    return { type: 'org', organizationId: row.organization_id };
+  }
+  if (!row.organization_id.startsWith('user:') || row.organization_id.length <= 'user:'.length) {
+    throw new Error('snapshot_owner_row_key_mismatch');
+  }
+  return { type: 'user', userId: row.organization_id.slice('user:'.length) };
+}
+
+export function ownerToProjection(
+  owner: SnapshotBuildOwner
+): { organizationId: string } | { userId: string } {
+  return owner.type === 'org' ? { organizationId: owner.organizationId } : { userId: owner.userId };
+}
+
+export function ownerFromInput(
+  input: z.infer<typeof StartInputSchema> | z.infer<typeof CleanupInputSchema>
+): SnapshotBuildOwner {
+  return input.organizationId !== undefined
+    ? { type: 'org', organizationId: input.organizationId }
+    : { type: 'user', userId: input.userId };
+}
+
+export function ownerCredentialFetchInput(
+  owner: SnapshotBuildOwner,
+  credentialId: string
+): { organizationId: string; credentialId: string } | { userId: string; credentialId: string } {
+  return owner.type === 'org'
+    ? { organizationId: owner.organizationId, credentialId }
+    : { userId: owner.userId, credentialId };
+}
 
 class SnapshotBuildOwnershipLostError extends Error {
   constructor() {
@@ -177,10 +237,12 @@ function logSnapshotBuildFailure(
   outcome: 'retry' | 'terminal',
   extra?: Record<string, string | number | boolean | undefined>
 ): void {
+  const owner = ownerFromRow(state);
   logger
     .withFields({
       logTag: 'byoc_vercel_snapshot_build',
-      orgId: state.organization_id,
+      ownerId: owner.type === 'org' ? owner.organizationId : owner.userId,
+      ownerType: owner.type,
       credentialId: state.credential_id,
       buildGeneration: state.build_generation,
       step: state.step,
@@ -241,18 +303,30 @@ function sameOwnership(
   first: BuildOwnership | undefined,
   second: BuildOwnership | undefined
 ): boolean {
+  if (!first || !second) return false;
   return (
-    first?.organization_id === second?.organization_id &&
-    first?.credential_id === second?.credential_id &&
-    first?.build_generation === second?.build_generation
+    ownerToRowKey(ownerFromRow(first)) === ownerToRowKey(ownerFromRow(second)) &&
+    first.credential_id === second.credential_id &&
+    first.build_generation === second.build_generation
   );
 }
 
 function ownershipFromInput(input: z.infer<typeof StartInputSchema>): BuildOwnership {
+  const owner = ownerFromInput(input);
   return {
-    organization_id: input.organizationId,
+    organization_id: ownerToRowKey(owner),
+    owner_type: owner.type,
     credential_id: input.credentialId,
     build_generation: input.buildGeneration,
+  };
+}
+
+function ownershipFromRow(row: BuildRow): BuildOwnership {
+  return {
+    organization_id: row.organization_id,
+    owner_type: row.owner_type,
+    credential_id: row.credential_id,
+    build_generation: row.build_generation,
   };
 }
 
@@ -267,31 +341,29 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     });
   }
 
-  async start(input: {
-    organizationId: string;
-    credentialId: string;
-    buildGeneration: string;
-  }): Promise<void> {
+  async start(input: z.infer<typeof StartInputSchema>): Promise<void> {
     const parsed = StartInputSchema.parse(input);
-    if (parsed.organizationId !== this.ctx.id.name) {
-      throw new Error('snapshot_organization_mismatch');
+    const owner = ownerFromInput(parsed);
+    if (ownerToRowKey(owner) !== this.ctx.id.name) {
+      throw new Error('snapshot_owner_mismatch');
     }
 
     const observed = this.load();
-    const credential = await fetchByocVercelCredential(this.env, {
-      organizationId: parsed.organizationId,
-      credentialId: parsed.credentialId,
-    });
+    const credential = await fetchByocVercelCredential(
+      this.env,
+      ownerCredentialFetchInput(owner, parsed.credentialId)
+    );
     if (credential.buildGeneration !== parsed.buildGeneration) return;
 
-    const owner = ownershipFromInput(parsed);
+    const ownership = ownershipFromInput(parsed);
     const current = this.load();
-    if (sameOwnership(current, owner)) return;
+    if (sameOwnership(current, ownership)) return;
     if (current && !sameOwnership(current, observed)) return;
 
     const timestamp = now();
     const next = {
-      organization_id: parsed.organizationId,
+      organization_id: ownerToRowKey(owner),
+      owner_type: owner.type,
       credential_id: parsed.credentialId,
       build_generation: parsed.buildGeneration,
       runtime_build_id: credential.runtimeBuildId ?? `vercel-runtime-${parsed.buildGeneration}`,
@@ -361,10 +433,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     if (previousResources) {
       try {
         const config = await this.external(handover, () =>
-          resolveByocVercelAccessConfig(this.env, {
-            organizationId: parsed.organizationId,
-            credentialId: parsed.credentialId,
-          })
+          resolveByocVercelAccessConfig(
+            this.env,
+            ownerCredentialFetchInput(owner, parsed.credentialId)
+          )
         );
         await this.removeBuildResources(handover, this.createClient(config), previousResources);
         if (!this.save(next)) return;
@@ -378,44 +450,37 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     await this.arm(next, timestamp);
   }
 
-  async cleanup(input: {
-    organizationId: string;
-    credentialId: string;
-    buildGeneration: string;
-    snapshotId?: string;
-  }): Promise<void> {
+  async cleanup(input: z.infer<typeof CleanupInputSchema>): Promise<void> {
     const parsed = CleanupInputSchema.parse(input);
-    if (parsed.organizationId !== this.ctx.id.name) {
-      throw new Error('snapshot_organization_mismatch');
+    const owner = ownerFromInput(parsed);
+    if (ownerToRowKey(owner) !== this.ctx.id.name) {
+      throw new Error('snapshot_owner_mismatch');
     }
 
-    const owner = ownershipFromInput(parsed);
+    const ownership = ownershipFromInput(parsed);
     const observed = this.load();
-    if (observed && !sameOwnership(observed, owner)) return;
+    if (observed && !sameOwnership(observed, ownership)) return;
 
     try {
-      const credential = await this.cleanupExternal(owner, () =>
-        fetchByocVercelCredential(this.env, {
-          organizationId: parsed.organizationId,
-          credentialId: parsed.credentialId,
-        })
+      const credential = await this.cleanupExternal(ownership, () =>
+        fetchByocVercelCredential(this.env, ownerCredentialFetchInput(owner, parsed.credentialId))
       );
       if (credential.buildGeneration !== parsed.buildGeneration) return;
 
-      const current = this.loadOwned(owner);
+      const current = this.loadOwned(ownership);
       if (!parsed.snapshotId && (!current || !this.hasBuildResources(current))) {
         if (current) await this.erase(current);
         return;
       }
 
-      const config = await this.cleanupExternal(owner, () =>
-        resolveByocVercelAccessConfig(this.env, {
-          organizationId: parsed.organizationId,
-          credentialId: parsed.credentialId,
-        })
+      const config = await this.cleanupExternal(ownership, () =>
+        resolveByocVercelAccessConfig(
+          this.env,
+          ownerCredentialFetchInput(owner, parsed.credentialId)
+        )
       );
       const client = this.createClient(config);
-      const latest = this.loadOwned(owner);
+      const latest = this.loadOwned(ownership);
       const explicitSnapshotIds = [
         parsed.snapshotId,
         observed?.snapshot_id,
@@ -425,19 +490,19 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       ].filter((snapshotId): snapshotId is string => Boolean(snapshotId));
 
       await this.removeBuildResources(
-        owner,
+        ownership,
         client,
         latest ?? current ?? observed,
         explicitSnapshotIds,
         true
       );
 
-      const remaining = this.loadOwned(owner);
+      const remaining = this.loadOwned(ownership);
       if (remaining) await this.erase(remaining);
     } catch (error) {
       if (error instanceof SnapshotBuildOwnershipLostError) return;
       if (error instanceof ByocCredentialMissingError) {
-        const remaining = this.loadOwned(owner);
+        const remaining = this.loadOwned(ownership);
         if (remaining) await this.erase(remaining);
         return;
       }
@@ -448,33 +513,32 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
   async alarm(): Promise<void> {
     const state = this.load();
     if (!state || state.next_attempt_at === null) return;
+    const ownership = ownershipFromRow(state);
+    const owner = ownerFromRow(state);
     if (state.next_attempt_at > now()) {
-      await this.arm(state, state.next_attempt_at);
+      await this.arm(ownership, state.next_attempt_at);
       return;
     }
 
     let credential: ByocVercelCredential;
     try {
-      credential = await this.external(state, () =>
-        fetchByocVercelCredential(this.env, {
-          organizationId: state.organization_id,
-          credentialId: state.credential_id,
-        })
+      credential = await this.external(ownership, () =>
+        fetchByocVercelCredential(this.env, ownerCredentialFetchInput(owner, state.credential_id))
       );
     } catch (error) {
       if (error instanceof SnapshotBuildOwnershipLostError) return;
-      await this.handleFailure(state, error);
+      await this.handleFailure(ownership, error);
       return;
     }
 
     try {
       if (credential.buildGeneration !== state.build_generation) {
-        await this.abandon(state);
+        await this.abandon(ownership);
         return;
       }
       if (state.step === 'project_failure' || state.step === 'cleanup') {
         if (state.step === 'project_failure') {
-          await this.external(state, () =>
+          await this.external(ownership, () =>
             projectByocVercelStatus(this.env, {
               ...this.projection(state),
               setupStatus: 'failed',
@@ -485,15 +549,15 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             })
           );
         }
-        await this.abandon(state);
+        await this.abandon(ownership);
         return;
       }
 
-      const config = await this.external(state, () =>
-        resolveByocVercelAccessConfig(this.env, {
-          organizationId: state.organization_id,
-          credentialId: state.credential_id,
-        })
+      const config = await this.external(ownership, () =>
+        resolveByocVercelAccessConfig(
+          this.env,
+          ownerCredentialFetchInput(owner, state.credential_id)
+        )
       );
       const client = this.createClient(config);
       const next = await this.runStep(state, client, config);
@@ -501,7 +565,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
 
       const terminalConfirmed = state.step === 'confirm_terminal';
       const identity = terminalConfirmed
-        ? await this.external(next, async () => {
+        ? await this.external(ownershipFromRow(next), async () => {
             try {
               return await getVercelRuntimeIdentity();
             } catch {
@@ -510,11 +574,11 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           })
         : undefined;
       const previousSnapshotId = credential.runtimeSnapshotId;
-      const projected = await this.external(next, () =>
+      const projected = await this.external(ownershipFromRow(next), () =>
         projectByocVercelStatus(this.env, this.projection(next, terminalConfirmed, identity))
       );
       if (!projected) {
-        await this.abandon(next, client);
+        await this.abandon(ownershipFromRow(next), client);
         return;
       }
 
@@ -525,20 +589,22 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         previousSnapshotId !== next.snapshot_id
       ) {
         try {
-          await this.external(next, () => client.deleteSnapshot(previousSnapshotId));
+          await this.external(ownershipFromRow(next), () =>
+            client.deleteSnapshot(previousSnapshotId)
+          );
         } catch (error) {
           if (!(error instanceof VercelSandboxRestError) || error.status !== 404) throw error;
         }
       }
 
       if (terminalConfirmed && next.step === 'confirm_terminal') {
-        await this.erase(next);
+        await this.erase(ownershipFromRow(next));
       } else {
-        await this.arm(next, now() + BUILD_ALARM_DELAY_MS);
+        await this.arm(ownershipFromRow(next), now() + BUILD_ALARM_DELAY_MS);
       }
     } catch (error) {
       if (error instanceof SnapshotBuildOwnershipLostError) return;
-      await this.handleFailure(state, error);
+      await this.handleFailure(ownership, error);
     }
   }
 
@@ -547,6 +613,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     client: VercelSandboxRestClient,
     config: VercelSandboxRuntimeConfig
   ): Promise<BuildRow | null> {
+    const owner = ownerFromRow(state);
     switch (BuildStepSchema.parse(state.step)) {
       case 'validating_access': {
         if (config.scope !== 'project' && !state.team_slug) {
@@ -735,7 +802,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
             stub =>
               stub.initializeSnapshotValidator({
                 build: {
-                  organizationId: state.organization_id,
+                  ...ownerToProjection(owner),
                   credentialId: state.credential_id,
                   generation: state.build_generation,
                 },
@@ -803,7 +870,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           logger
             .withFields({
               logTag: 'byoc_vercel_snapshot_build',
-              orgId: state.organization_id,
+              ownerId: owner.type === 'org' ? owner.organizationId : owner.userId,
+              ownerType: owner.type,
               credentialId: state.credential_id,
               buildGeneration: state.build_generation,
               step: state.step,
@@ -826,7 +894,8 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           logger
             .withFields({
               logTag: 'byoc_vercel_snapshot_build',
-              orgId: state.organization_id,
+              ownerId: owner.type === 'org' ? owner.organizationId : owner.userId,
+              ownerType: owner.type,
               credentialId: state.credential_id,
               buildGeneration: state.build_generation,
               step: state.step,
@@ -977,10 +1046,11 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     terminalConfirmed = false,
     identity?: { wrapperVersion: string; releasedAt: string; digest: string }
   ) {
+    const owner = ownerFromRow(state);
     const ready =
       terminalConfirmed && state.step === 'confirm_terminal' && state.snapshot_id !== null;
     return {
-      organizationId: state.organization_id,
+      ...ownerToProjection(owner),
       credentialId: state.credential_id,
       buildGeneration: state.build_generation,
       setupStatus: ready ? ('ready' as const) : ('building' as const),
@@ -1001,7 +1071,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     };
   }
 
-  private async handleFailure(owner: BuildRow, error: unknown): Promise<void> {
+  private async handleFailure(owner: BuildOwnership, error: unknown): Promise<void> {
     const state = this.loadOwned(owner);
     if (!state) return;
 
@@ -1075,10 +1145,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       let credential: ByocVercelCredential;
       try {
         credential = await this.external(cleanup, () =>
-          fetchByocVercelCredential(this.env, {
-            organizationId: cleanup.organization_id,
-            credentialId: cleanup.credential_id,
-          })
+          fetchByocVercelCredential(
+            this.env,
+            ownerCredentialFetchInput(ownerFromRow(cleanup), cleanup.credential_id)
+          )
         );
       } catch (error) {
         if (error instanceof ByocCredentialMissingError) {
@@ -1090,10 +1160,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
 
       if (!client || credential.buildGeneration !== cleanup.build_generation) {
         const config = await this.external(cleanup, () =>
-          resolveByocVercelAccessConfig(this.env, {
-            organizationId: cleanup.organization_id,
-            credentialId: cleanup.credential_id,
-          })
+          resolveByocVercelAccessConfig(
+            this.env,
+            ownerCredentialFetchInput(ownerFromRow(cleanup), cleanup.credential_id)
+          )
         );
         client = this.createClient(config);
       }
@@ -1304,10 +1374,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     }
 
     try {
-      await fetchByocVercelCredential(this.env, {
-        organizationId: owner.organization_id,
-        credentialId: owner.credential_id,
-      });
+      await fetchByocVercelCredential(
+        this.env,
+        ownerCredentialFetchInput(ownerFromRow(owner), owner.credential_id)
+      );
     } catch (error) {
       if (error instanceof ByocCredentialMissingError) return;
       throw error;
@@ -1374,10 +1444,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
     snapshotId: string
   ): Promise<void> {
     try {
-      await fetchByocVercelCredential(this.env, {
-        organizationId: owner.organization_id,
-        credentialId: owner.credential_id,
-      });
+      await fetchByocVercelCredential(
+        this.env,
+        ownerCredentialFetchInput(ownerFromRow(owner), owner.credential_id)
+      );
     } catch (error) {
       if (error instanceof ByocCredentialMissingError) return;
       throw error;
@@ -1410,8 +1480,10 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
   }
 
   private ownerCondition(owner: BuildOwnership) {
+    const ownerDescriptor = ownerFromRow(owner);
     return and(
-      eq(vercelSnapshotBuilds.organization_id, owner.organization_id),
+      eq(vercelSnapshotBuilds.organization_id, ownerToRowKey(ownerDescriptor)),
+      eq(vercelSnapshotBuilds.owner_type, ownerDescriptor.type),
       eq(vercelSnapshotBuilds.credential_id, owner.credential_id),
       eq(vercelSnapshotBuilds.build_generation, owner.build_generation)
     );
@@ -1426,7 +1498,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
   }
 
   private loadOwned(owner: BuildOwnership): BuildRow | undefined {
-    if (owner.organization_id !== this.ctx.id.name) return undefined;
+    if (ownerToRowKey(ownerFromRow(owner)) !== this.ctx.id.name) return undefined;
     return this.db.select().from(vercelSnapshotBuilds).where(this.ownerCondition(owner)).get();
   }
 

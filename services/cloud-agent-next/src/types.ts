@@ -545,7 +545,7 @@ export type Env = {
   CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
-  /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */
+  /** Durable Object namespace for owner-scoped BYOC runtime snapshot builds. */
   VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
@@ -616,6 +616,8 @@ export type Env = {
   PER_SESSION_SANDBOX_ORG_IDS?: string;
   /** Comma-separated organization IDs explicitly enrolled in customer-paid Vercel. */
   BYOC_VERCEL_ORG_IDS?: string;
+  /** Comma-separated user or organization IDs explicitly enrolled in customer-paid Vercel. */
+  BYOC_VERCEL_IDS?: string;
   /** Comma-separated user or org IDs admitted to the call-home control plane for interactive web creates. `*` includes personal. */
   CONTROL_PLANE_IDS?: string;
   WORKTREE_CREATION_ENABLED_IDS?: string;

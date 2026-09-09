@@ -68,6 +68,7 @@ const {
   recordSessionFailureMock,
   generateSandboxRoutingTargetMock,
   fetchByocVercelEnrollmentMock,
+  fetchByocVercelEnrollmentForUserMock,
 } = vi.hoisted(() => ({
   admitOperationMock: vi.fn(),
   settleOperationMock: vi.fn().mockResolvedValue({ settled: true }),
@@ -83,6 +84,7 @@ const {
   recordSessionFailureMock: vi.fn().mockResolvedValue(undefined),
   generateSandboxRoutingTargetMock: vi.fn(),
   fetchByocVercelEnrollmentMock: vi.fn(),
+  fetchByocVercelEnrollmentForUserMock: vi.fn(),
 }));
 
 vi.mock('@kilocode/worker-utils/runtime-authorization', () => ({
@@ -172,6 +174,7 @@ vi.mock('../byoc/vercel-credential-resolver.js', async importOriginal => {
   return {
     ...actual,
     fetchByocVercelEnrollment: fetchByocVercelEnrollmentMock,
+    fetchByocVercelEnrollmentForUser: fetchByocVercelEnrollmentForUserMock,
   };
 });
 
@@ -1931,7 +1934,7 @@ describe('createSessionWithLedger admission ladder', () => {
     async byocOrgIds => {
       const doStub = makeDoStub();
       const ctx = makeContext(doStub);
-      Object.assign(ctx.env, { BYOC_VERCEL_ORG_IDS: byocOrgIds, CONTROL_PLANE_IDS: '' });
+      Object.assign(ctx.env, { BYOC_VERCEL_IDS: byocOrgIds, CONTROL_PLANE_IDS: '' });
 
       await expect(
         runCreate(
@@ -2000,7 +2003,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const getControlSession = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
     const getLegacySession = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
     Object.assign(ctx.env, {
-      BYOC_VERCEL_ORG_IDS: organizationId,
+      BYOC_VERCEL_IDS: organizationId,
       CONTROL_PLANE_IDS: '',
     });
     generateSessionIdMock.mockImplementationOnce((plane: 'legacy' | 'control') =>
@@ -2108,7 +2111,7 @@ describe('createSessionWithLedger admission ladder', () => {
     const getControlSession = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
     const getLegacySession = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
     Object.assign(ctx.env, {
-      BYOC_VERCEL_ORG_IDS: organizationId,
+      BYOC_VERCEL_IDS: organizationId,
       CONTROL_PLANE_IDS: '',
     });
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({
@@ -2173,6 +2176,43 @@ describe('createSessionWithLedger admission ladder', () => {
     });
   });
 
+  it('keeps enrolled personal Code Reviewer sessions on their existing Cloudflare plane', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    const getControlSession = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
+    const getLegacySession = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: '*', CONTROL_PLANE_IDS: '' });
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'isolated',
+      sandboxId: 'crv-review-personal',
+    });
+
+    await createSessionWithLedger(
+      makeRequest({ options: { operationKey: OPERATION_KEY, createdOnPlatform: 'code-review' } }),
+      ctx,
+      { ...CREATE_OPTIONS, billingOrigin: 'code-review' }
+    );
+
+    expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
+      sandboxId: 'crv-review-personal',
+      sandboxProvider: 'cloudflare',
+      sandboxProviderBinding: { kind: 'cloudflare' },
+    });
+    expect(getLegacySession).toHaveBeenCalledOnce();
+    expect(getControlSession).not.toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxId: 'crv-review-personal',
+          sandboxProvider: 'cloudflare',
+          sandboxProviderBinding: { kind: 'cloudflare' },
+        }),
+      })
+    );
+  });
+
   it('does not exempt BYOC sessions using an untrusted Code Reviewer platform label', async () => {
     const organizationId = 'f47ac10b-58cc-4372-a567-0e02b2c3d483';
     admitOperationMock.mockResolvedValueOnce({
@@ -2180,7 +2220,7 @@ describe('createSessionWithLedger admission ladder', () => {
       row: makeLedgerRow({ organization_id: organizationId }),
     });
     const ctx = makeContext(makeDoStub());
-    Object.assign(ctx.env, { BYOC_VERCEL_ORG_IDS: organizationId, CONTROL_PLANE_IDS: '' });
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: organizationId, CONTROL_PLANE_IDS: '' });
     generateSessionIdMock.mockReturnValueOnce(CONTROL_CLOUD_AGENT_SESSION_ID);
     generateSandboxRoutingTargetMock.mockResolvedValueOnce({
       kind: 'isolated',
@@ -2220,25 +2260,82 @@ describe('createSessionWithLedger admission ladder', () => {
     );
   });
 
-  it('does not enroll personal sessions when the BYOC allowlist contains a wildcard', async () => {
-    const ctx = makeContext(makeDoStub());
-    Object.assign(ctx.env, { BYOC_VERCEL_ORG_IDS: '*', CONTROL_PLANE_IDS: '' });
+  it('enrolls personal sessions when the BYOC allowlist contains a wildcard', async () => {
+    const doStub = makeDoStub();
+    const ctx = makeContext(doStub);
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: '*', CONTROL_PLANE_IDS: '' });
+    const credentialId = 'f47ac10b-58cc-4372-a567-0e02b2c3d486';
+    fetchByocVercelEnrollmentForUserMock.mockResolvedValueOnce({
+      userId: USER_ID,
+      credentialId,
+      setupStatus: 'ready',
+    });
+    generateSessionIdMock.mockReturnValueOnce(CONTROL_CLOUD_AGENT_SESSION_ID);
+    generateSandboxRoutingTargetMock.mockResolvedValueOnce({
+      kind: 'isolated',
+      sandboxId: 'ses-byoc-personal',
+    });
 
     await runCreate(ctx);
 
-    expect(generateSessionIdMock).toHaveBeenCalledWith('legacy');
+    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
     expect(fetchByocVercelEnrollmentMock).not.toHaveBeenCalled();
+    expect(fetchByocVercelEnrollmentForUserMock).toHaveBeenCalledWith(ctx.env, USER_ID);
     expect(generateSandboxRoutingTargetMock).toHaveBeenCalledWith(
       undefined,
       undefined,
       USER_ID,
-      CLOUD_AGENT_SESSION_ID,
+      CONTROL_CLOUD_AGENT_SESSION_ID,
       undefined,
       {
         devcontainer: undefined,
         createdOnPlatform: undefined,
+        byoc: true,
       }
     );
+    expect(recordOperationProgressMock).toHaveBeenNthCalledWith(2, expect.any(Object), ROW_ID, {
+      sandboxId: 'ses-byoc-personal',
+      sandboxProvider: 'vercel',
+      sandboxProviderBinding: {
+        kind: 'vercel',
+        source: { kind: 'byoc', userId: USER_ID, credentialId },
+      },
+    });
+    expect(createCliSessionMock).toHaveBeenCalled();
+    expect(doStub.createSessionWithInitialAdmission).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workspace: expect.objectContaining({
+          sandboxId: 'ses-byoc-personal',
+          sandboxProvider: 'vercel',
+          sandboxProviderBinding: {
+            kind: 'vercel',
+            source: { kind: 'byoc', userId: USER_ID, credentialId },
+          },
+        }),
+      })
+    );
+  });
+
+  it('rejects isolated Standard allocation for an enrolled personal BYOC session', async () => {
+    const ctx = makeContext(makeDoStub());
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: USER_ID, CONTROL_PLANE_IDS: '' });
+
+    await expect(
+      runCreate(
+        ctx,
+        makeRequest({
+          runtime: { sandboxAllocation: 'isolated-standard' },
+          options: { operationKey: OPERATION_KEY },
+        })
+      )
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Isolated Standard allocation is not supported for control-plane sessions',
+    });
+
+    expect(admitOperationMock).not.toHaveBeenCalled();
+    expect(generateSessionIdMock).not.toHaveBeenCalled();
+    expect(fetchByocVercelEnrollmentForUserMock).not.toHaveBeenCalled();
   });
 
   it('preserves the existing rejection for BYOC devcontainer sessions', async () => {
@@ -2248,7 +2345,7 @@ describe('createSessionWithLedger admission ladder', () => {
       row: makeLedgerRow({ organization_id: organizationId }),
     });
     const ctx = makeContext(makeDoStub());
-    Object.assign(ctx.env, { BYOC_VERCEL_ORG_IDS: organizationId, CONTROL_PLANE_IDS: '' });
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: organizationId, CONTROL_PLANE_IDS: '' });
     generateSessionIdMock.mockReturnValueOnce(CONTROL_CLOUD_AGENT_SESSION_ID);
 
     await expect(
@@ -3535,7 +3632,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
     });
     const doStub = makeDoStub({ getMetadata: vi.fn().mockResolvedValue(null) });
     const ctx = context(doStub);
-    ctx.env.BYOC_VERCEL_ORG_IDS = organizationId;
+    ctx.env.BYOC_VERCEL_IDS = organizationId;
     admitOperationMock.mockResolvedValueOnce({
       admission: 'admitted',
       row: makeLedgerRow({ organization_id: organizationId }),
@@ -3562,7 +3659,7 @@ describe('createSessionWithLedger worktree rollout and ownership reconciliation'
       sandboxProvider: 'vercel',
       sandboxProviderBinding,
     });
-    ctx.env.BYOC_VERCEL_ORG_IDS = '';
+    ctx.env.BYOC_VERCEL_IDS = '';
     ctx.env.CONTROL_PLANE_IDS = '';
     ctx.env.WORKTREE_CREATION_ENABLED_IDS = '';
     admitOperationMock.mockResolvedValueOnce({
@@ -4801,7 +4898,7 @@ describe('createSessionWithLedger clone allocation outcomes', () => {
     const ctx = makeContext(doStub);
     const getControlSession = vi.spyOn(ctx.env.SANDBOX_SESSION, 'get');
     const getLegacySession = vi.spyOn(ctx.env.CLOUD_AGENT_SESSION, 'get');
-    Object.assign(ctx.env, { BYOC_VERCEL_ORG_IDS: organizationId, CONTROL_PLANE_IDS: '' });
+    Object.assign(ctx.env, { BYOC_VERCEL_IDS: organizationId, CONTROL_PLANE_IDS: '' });
     generateSessionIdMock.mockImplementationOnce((plane: 'legacy' | 'control') =>
       plane === 'control' ? CONTROL_CLOUD_AGENT_SESSION_ID : CLOUD_AGENT_SESSION_ID
     );

@@ -66,6 +66,21 @@ vi.mock('./agent-sandbox/factory.js', () => ({
   })),
 }));
 
+vi.mock('./agent-sandbox/vercel/vercel-agent-sandbox.js', () => ({
+  VERCEL_SANDBOX_UNAVAILABLE_MESSAGE: 'Terminal access is unavailable for Vercel sandbox sessions',
+}));
+
+vi.mock('./byoc/vercel-snapshot-build-stub.js', () => ({
+  getVercelSnapshotBuildStub: (
+    env: { VERCEL_SNAPSHOT_BUILD: { getByName: (ownerKey: string) => unknown } },
+    ownerKey: string
+  ) => env.VERCEL_SNAPSHOT_BUILD.getByName(ownerKey),
+}));
+
+vi.mock('./byoc/vercel-runtime-identity.js', () => ({
+  getVercelRuntimeIdentity: vi.fn(),
+}));
+
 vi.mock('cloudflare:workers', () => ({
   DurableObject: class DurableObject {
     constructor(_state: unknown, _env: unknown) {}
@@ -162,7 +177,7 @@ type MockEnv = {
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
   INTERNAL_API_SECRET?: string;
-  BYOC_VERCEL_ORG_IDS?: string;
+  BYOC_VERCEL_IDS?: string;
   VERCEL_SNAPSHOT_BUILD: {
     getByName: ReturnType<typeof vi.fn>;
   };
@@ -2354,7 +2369,7 @@ describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
     { enrolledOrganizations: '*', enrolled: true },
   ])('returns Worker-configured enrollment for $enrolledOrganizations', async value => {
     const env = createEnv();
-    env.BYOC_VERCEL_ORG_IDS = value.enrolledOrganizations;
+    env.BYOC_VERCEL_IDS = value.enrolledOrganizations;
 
     const response = await fetchWorker(
       new Request(`http://worker.test/internal/byoc/vercel-enrollment/${organizationId}`, {
@@ -2366,6 +2381,42 @@ describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('Cache-Control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({ enrolled: value.enrolled });
+  });
+});
+
+describe('server /internal/byoc/vercel-enrollment/user/:userId', () => {
+  const userId = 'oauth/vercel-user';
+
+  it('returns Worker-configured enrollment for an encoded personal user id', async () => {
+    const env = createEnv();
+    env.BYOC_VERCEL_IDS = userId;
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
+        { headers: { 'x-internal-api-key': 'test-internal-secret' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ enrolled: true });
+  });
+
+  it('keeps an empty personal enrollment list disabled', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
+        { headers: { 'x-internal-api-key': 'test-internal-secret' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ enrolled: false });
   });
 });
 
@@ -2398,7 +2449,7 @@ describe('server /internal/byoc/vercel-snapshot-build/start', () => {
 
   it('starts snapshot builds for enrolled organizations', async () => {
     const env = createEnv();
-    env.BYOC_VERCEL_ORG_IDS = buildInput.organizationId;
+    env.BYOC_VERCEL_IDS = buildInput.organizationId;
     const start = vi.fn().mockResolvedValue(undefined);
     env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ start });
 
@@ -2406,6 +2457,57 @@ describe('server /internal/byoc/vercel-snapshot-build/start', () => {
 
     expect(response.status).toBe(202);
     expect(start).toHaveBeenCalledWith(buildInput);
+  });
+
+  it('starts snapshot builds for an enrolled personal owner without inferring UUID ownership', async () => {
+    const env = createEnv();
+    const input = {
+      userId: 'oauth/vercel-user',
+      credentialId: buildInput.credentialId,
+      buildGeneration: buildInput.buildGeneration,
+    };
+    env.BYOC_VERCEL_IDS = input.userId;
+    const start = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ start });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(202);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).toHaveBeenCalledWith('user:oauth/vercel-user');
+    expect(start).toHaveBeenCalledWith(input);
+  });
+
+  it('rejects snapshot starts that provide both owner identities', async () => {
+    const env = createEnv();
+    const input = {
+      ...buildInput,
+      userId: 'oauth/vercel-user',
+    };
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
   });
 });
 
@@ -2472,6 +2574,57 @@ describe('server /internal/byoc/vercel-snapshot-build/cleanup', () => {
     expect(response.status).toBe(204);
     expect(env.VERCEL_SNAPSHOT_BUILD.getByName).toHaveBeenCalledWith(cleanupInput.organizationId);
     expect(cleanup).toHaveBeenCalledWith(cleanupInput);
+  });
+
+  it('passes personal cleanup to the user-keyed Durable Object', async () => {
+    const env = createEnv();
+    const input = {
+      userId: 'oauth/vercel-user',
+      credentialId: cleanupInput.credentialId,
+      buildGeneration: cleanupInput.buildGeneration,
+      snapshotId: cleanupInput.snapshotId,
+    };
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ cleanup });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).toHaveBeenCalledWith('user:oauth/vercel-user');
+    expect(cleanup).toHaveBeenCalledWith(input);
+  });
+
+  it('rejects snapshot cleanup that provides both owner identities', async () => {
+    const env = createEnv();
+    const input = {
+      ...cleanupInput,
+      userId: 'oauth/vercel-user',
+    };
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
   });
 
   it('returns a safe error when cleanup cannot be completed', async () => {

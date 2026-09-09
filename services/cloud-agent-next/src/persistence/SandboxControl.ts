@@ -338,12 +338,17 @@ const sandboxAcquisitionSchema = z.object({
 
 export type SandboxAcquisition = z.infer<typeof sandboxAcquisitionSchema>;
 
+const snapshotValidatorOwnerSchema = z.union([
+  z.object({ organizationId: z.uuid(), userId: z.never().optional() }),
+  z.object({ organizationId: z.never().optional(), userId: z.string().min(1) }),
+]);
 const snapshotValidatorInputSchema = z.object({
-  build: z.object({
-    organizationId: z.uuid(),
-    credentialId: z.uuid(),
-    generation: z.uuid(),
-  }),
+  build: z
+    .object({
+      credentialId: z.uuid(),
+      generation: z.uuid(),
+    })
+    .and(snapshotValidatorOwnerSchema),
   allocation: z.object({
     providerRef: z.string().min(1),
     locator: vercelProviderLocatorSchema,
@@ -971,14 +976,24 @@ export class SandboxControl extends DurableObject<Env> {
     if (this.sandboxId !== expectedId || !reference) {
       throw new Error('Snapshot validator identity mismatch');
     }
-    const binding: SandboxProviderBinding = {
-      kind: 'vercel',
-      source: {
-        kind: 'byoc',
-        organizationId: build.organizationId,
-        credentialId: build.credentialId,
-      },
-    };
+    const binding: SandboxProviderBinding =
+      build.organizationId !== undefined
+        ? {
+            kind: 'vercel',
+            source: {
+              kind: 'byoc',
+              organizationId: build.organizationId,
+              credentialId: build.credentialId,
+            },
+          }
+        : {
+            kind: 'vercel',
+            source: {
+              kind: 'byoc',
+              userId: build.userId,
+              credentialId: build.credentialId,
+            },
+          };
     const intentId = `byoc-validator-${build.generation}`;
     await this.ctx.storage.transaction(async () => {
       const record = await this.readCanonicalAllocation();
@@ -2666,7 +2681,9 @@ export class SandboxControl extends DurableObject<Env> {
         binding.kind !== input.location.provider ||
         (binding.kind === 'vercel' &&
           binding.source.kind === 'byoc' &&
-          binding.source.organizationId !== input.organizationId)
+          (binding.source.organizationId !== undefined
+            ? binding.source.organizationId !== input.organizationId
+            : binding.source.userId !== input.kiloUserId || input.organizationId !== undefined))
       ) {
         throw new Error('Sandbox provider binding mismatch');
       }
@@ -3633,9 +3650,12 @@ export class SandboxControl extends DurableObject<Env> {
     if (state.kind === 'stopped') return undefined;
     const vercel = state.target?.vercel;
     if (vercel?.buildGeneration === undefined || vercel.snapshotId === undefined) return undefined;
+    const source = binding.source;
     return {
-      organizationId: binding.source.organizationId,
-      credentialId: binding.source.credentialId,
+      ...(source.organizationId !== undefined
+        ? { organizationId: source.organizationId }
+        : { userId: source.userId }),
+      credentialId: source.credentialId,
       buildGeneration: vercel.buildGeneration,
       runtimeSnapshotId: vercel.snapshotId,
     };

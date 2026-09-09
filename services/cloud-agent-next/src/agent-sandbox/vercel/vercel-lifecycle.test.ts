@@ -104,10 +104,10 @@ describe('VercelSandboxLifecycle', () => {
     );
 
     await expect(lifecycle.reconcilePendingDeletion(100)).resolves.toBe('handled');
-    expect(mocks.resolveByocVercelCredentials).toHaveBeenCalledWith(expect.anything(), {
-      organizationId: binding.source.organizationId,
-      credentialId: binding.source.credentialId,
-    });
+    expect(mocks.resolveByocVercelCredentials).toHaveBeenCalledWith(
+      expect.anything(),
+      binding.source
+    );
     expect(lifecycleHost.eraseDurableObjectState).toHaveBeenCalledOnce();
     expect(lifecycleHost.scheduleAlarmAtOrBefore).not.toHaveBeenCalled();
   });

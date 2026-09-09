@@ -19,6 +19,14 @@ describe('SandboxProviderBinding', () => {
           credentialId: 'credential-1',
         },
       },
+      {
+        kind: 'vercel',
+        source: {
+          kind: 'byoc',
+          userId: 'oauth/user-1',
+          credentialId: 'credential-1',
+        },
+      },
     ] as const;
 
     for (const binding of bindings) {
@@ -49,6 +57,20 @@ describe('SandboxProviderBinding', () => {
     ).toBe(false);
     expect(
       SandboxProviderBindingSchema.safeParse({ kind: 'vercel', source: { kind: 'byoc' } }).success
+    ).toBe(false);
+  });
+
+  it('pins BYOC personal user and credential identity', () => {
+    const binding = {
+      kind: 'vercel' as const,
+      source: { kind: 'byoc' as const, userId: 'oauth/user-1', credentialId: 'credential-1' },
+    };
+    expect(sameSandboxProviderBinding(binding, { ...binding })).toBe(true);
+    expect(
+      sameSandboxProviderBinding(binding, {
+        ...binding,
+        source: { ...binding.source, userId: 'oauth/user-2' },
+      })
     ).toBe(false);
   });
 });

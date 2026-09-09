@@ -3301,6 +3301,102 @@ describe('prepareWrapperBootstrapWorkspace', () => {
     expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
   });
 
+  it('falls back to the bounded streaming read when a buffered retry has no content-length', async () => {
+    const localPath = path.join(tmpDir, 'no-content-length.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_no_content_length',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'no-content-length.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/no-content-length.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    let attempts = 0;
+    const result = await materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('socket hang up');
+        }
+        const response = new Response('png-bytes', { status: 200 });
+        response.headers.delete('content-length');
+        return response;
+      }),
+    });
+
+    expect(attempts).toBe(2);
+    expect(result.message.parts).toEqual([
+      { type: 'text', text: 'Look at this image' },
+      {
+        type: 'file',
+        mime: 'image/png',
+        url: `file://${localPath}`,
+        filename: 'no-content-length.png',
+      },
+    ]);
+    expect(await fsp.readFile(localPath, 'utf8')).toBe('png-bytes');
+  });
+
+  it('propagates a caller abort instead of retrying or masking it as an exhausted attachment', async () => {
+    const localPath = path.join(tmpDir, 'aborted.png');
+    const prompt: WrapperPromptRequest = {
+      message: {
+        id: 'msg_aborted',
+        prompt: 'Look at this image',
+        attachments: [
+          {
+            filename: 'aborted.png',
+            mime: 'image/png',
+            signedUrl: 'https://r2.example.com/aborted.png',
+            localPath,
+          },
+        ],
+      },
+      session: {
+        ingestUrl: 'wss://worker.example.com/sessions/user/agent/ingest',
+        workerAuthToken: 'token',
+        wrapperRunId: 'wr_test',
+        wrapperGeneration: 1,
+        wrapperConnectionId: 'conn_test',
+      },
+    };
+
+    const controller = new AbortController();
+    let attempts = 0;
+    const result = materializePromptAttachments(prompt, {
+      fetch: asFetch(async () => {
+        attempts += 1;
+        if (attempts < 3) {
+          throw new Error('socket hang up');
+        }
+        controller.abort();
+        return new Response('png-bytes', {
+          status: 200,
+          headers: { 'content-length': '9' },
+        });
+      }),
+      signal: controller.signal,
+    });
+
+    await expect(result).rejects.toThrow();
+    expect(attempts).toBe(3);
+    expect(fs.existsSync(localPath)).toBe(false);
+  });
+
   it('materializes a generic binary attachment as a text part describing the saved file', async () => {
     const localPath = path.join(tmpDir, 'payload.zip');
     const prompt: WrapperPromptRequest = {

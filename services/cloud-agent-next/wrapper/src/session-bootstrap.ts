@@ -1139,7 +1139,7 @@ async function downloadBuffered(
     Number.isNaN(contentLength) ||
     contentLength > MAX_ATTACHMENT_BYTES
   ) {
-    throw new Error('Attachment download failed: unbounded body');
+    return downloadBounded(filePath, response, signal);
   }
 
   const bytes = new Uint8Array(await response.arrayBuffer());
@@ -1274,6 +1274,7 @@ async function materializeAttachment(
     } finally {
       clearTimeout(timeout);
     }
+    externalSignal?.throwIfAborted();
     if (attempt < MAX_ATTACHMENT_DOWNLOAD_ATTEMPTS) {
       await sleep(ATTACHMENT_RETRY_BACKOFF_MS[attempt] ?? 0);
     }

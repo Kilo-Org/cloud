@@ -72,7 +72,7 @@ const MODEL_CAPABILITIES_IN_MEMORY_TTL_MS = 60_000;
 const MODEL_CAPABILITIES_KV_TTL_SECONDS = 3_600;
 
 // Hard ceiling for the whole lookup (in-memory check + KV read + DB query).
-// 500ms leaves headroom inside the gateway's 2s /decide budget when other
+// 500ms leaves headroom inside the gateway's 5s /decide budget when other
 // steps are slow; the `statement_timeout: 2_000` on the Postgres side alone
 // could otherwise let a slow-failing Hyperdrive connection eat the entire
 // request budget.

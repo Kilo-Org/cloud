@@ -23,6 +23,7 @@ import {
 import {
   UserByokProviderIdSchema,
   UserByokTestModels,
+  AzureCredentialsSchema,
   getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
 } from '@/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -434,17 +435,25 @@ export const byokRouter = createTRPCRouter({
 
       function setup() {
         const provider = UserByokProviderIdSchema.parse(decryptedKey.providerId);
-        const model = UserByokTestModels[provider];
+        const defaultModel = UserByokTestModels[provider];
 
         const directByokProvider = DIRECT_BYOK_PROVIDERS.find(plan => plan.id === provider);
         if (directByokProvider) {
           return {
             finalProvider: provider,
-            model: createAiSdkProvider(directByokProvider, decryptedKey.decryptedAPIKey)(model),
+            model: createAiSdkProvider(
+              directByokProvider,
+              decryptedKey.decryptedAPIKey
+            )(defaultModel),
           };
         }
 
         const [finalProvider, byokList] = getVercelInferenceProviderConfigForUserByok(decryptedKey);
+        const model =
+          finalProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+            ? (AzureCredentialsSchema.parse(byokList[0]).modelMappings?.[0]?.gatewayModelSlug ??
+              defaultModel)
+            : defaultModel;
         return {
           finalProvider,
           model: createGateway({

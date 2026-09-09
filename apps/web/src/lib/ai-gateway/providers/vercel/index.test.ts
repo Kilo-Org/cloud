@@ -395,6 +395,16 @@ describe('applyVercelSettings BYOK pinning', () => {
     secretAccessKey: 'secret',
     region: 'us-east-1',
   });
+  const azureCredentials = JSON.stringify({
+    apiKey: 'azure-api-key',
+    resourceName: 'example-resource',
+    modelMappings: [
+      {
+        gatewayModelSlug: 'openai/gpt-5.4-nano',
+        customModelId: 'custom-gpt-5.4-nano',
+      },
+    ],
+  });
   const vertexCredentials = JSON.stringify({
     project: 'example-project',
     location: 'us-east5',
@@ -509,6 +519,27 @@ describe('applyVercelSettings BYOK pinning', () => {
 
     expect(request.body.providerOptions?.gateway?.byok).toEqual({ bedrock: [credentials] });
     expect(request.body.providerOptions?.gateway?.only).toEqual(['bedrock']);
+  });
+
+  it('forwards structured Azure credentials', async () => {
+    const request = byokRequest([]);
+
+    await applyVercelSettings('openai/gpt-5.4-nano', request, [
+      { decryptedAPIKey: azureCredentials, providerId: 'azure' },
+    ]);
+
+    expect(request.body.providerOptions?.gateway?.byok).toEqual({
+      azure: [JSON.parse(azureCredentials)],
+    });
+    expect(request.body.providerOptions?.gateway?.only).toEqual(['azure']);
+  });
+
+  it('rejects malformed Azure credentials without including credential contents', async () => {
+    await expect(
+      applyVercelSettings('openai/gpt-5.4-nano', byokRequest([]), [
+        { decryptedAPIKey: '{"apiKey":"secret"}', providerId: 'azure' },
+      ])
+    ).rejects.toEqual(new Error('Failed to parse Azure credentials'));
   });
 
   it.each([

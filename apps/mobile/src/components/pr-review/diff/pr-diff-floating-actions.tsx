@@ -143,19 +143,23 @@ export function PrDiffFloatingActions({
             </Button>
           </View>
         ) : null}
+        {/* The Button row is `flex-row items-center justify-center gap-2`, so
+            the count badge is an in-flow pill AFTER the label. It used to ride
+            the label's top-right corner (`absolute -right-2.5 -top-2.5`),
+            which drew the opaque badge over the last glyphs of the label
+            (spot check e1-select-line / e1-line1-comment). In-flow the badge
+            can never cover the label, at any pending count or font scale. */}
         <Button
           onPress={openReviewSubmit}
           accessibilityLabel={t('prReview.floatingActions.finishReview')}
           className={cn(showSelectionAction && 'mt-1')}
         >
-          <View className="relative flex-row items-center">
-            <Text>{t('prReview.floatingActions.finishReview')}</Text>
-            {pending.items.length > 0 ? (
-              <View className="absolute -right-2.5 -top-2.5 min-h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground px-1.5">
-                <Text className="text-xs font-semibold text-primary">{pending.items.length}</Text>
-              </View>
-            ) : null}
-          </View>
+          <Text>{t('prReview.floatingActions.finishReview')}</Text>
+          {pending.items.length > 0 ? (
+            <View className="min-h-5 min-w-5 items-center justify-center rounded-full bg-primary-foreground px-1.5">
+              <Text className="text-xs font-semibold text-primary">{pending.items.length}</Text>
+            </View>
+          ) : null}
         </Button>
       </View>
     </View>

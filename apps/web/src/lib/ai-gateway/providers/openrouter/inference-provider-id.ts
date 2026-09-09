@@ -81,6 +81,7 @@ export const OpenRouterInferenceProviderIdSchema = z.enum([
 
 export const VercelUserByokInferenceProviderIdSchema = z.enum([
   'anthropic',
+  'azure',
   'bedrock',
   'deepseek',
   'fireworks',
@@ -136,6 +137,7 @@ export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
 export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.anthropic]: 'anthropic/claude-haiku-4.5',
+  [VercelUserByokInferenceProviderIdSchema.enum.azure]: 'openai/gpt-5.4-nano',
   [VercelUserByokInferenceProviderIdSchema.enum.bedrock]: 'anthropic/claude-haiku-4.5',
   [VercelUserByokInferenceProviderIdSchema.enum.deepseek]: 'deepseek/deepseek-v3.2',
   [VercelUserByokInferenceProviderIdSchema.enum.fireworks]: 'openai/gpt-oss-20b',
@@ -178,7 +180,6 @@ export const UserByokTestModels = {
 export const VercelNonUserByokInferenceProviderIdSchema = z.enum([
   'alibaba',
   'arcee-ai',
-  'azure',
   'baseten',
   'bfl',
   'blackbox',
@@ -304,6 +305,21 @@ export const BedrockCredentialsSchema = z.union([
 ]);
 
 export type BedrockCredentials = z.infer<typeof BedrockCredentialsSchema>;
+
+export const AzureCredentialsSchema = z.object({
+  apiKey: z.string().trim().min(1),
+  resourceName: z.string().trim().min(1),
+  modelMappings: z
+    .array(
+      z.object({
+        gatewayModelSlug: z.string().trim().min(1),
+        customModelId: z.string().trim().min(1),
+      })
+    )
+    .optional(),
+});
+
+export type AzureCredentials = z.infer<typeof AzureCredentialsSchema>;
 
 export const VertexCredentialsSchema = z.object({
   project: z.string().min(1),

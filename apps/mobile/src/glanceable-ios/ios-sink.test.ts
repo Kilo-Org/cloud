@@ -989,7 +989,7 @@ describe('iosSink idle updates', () => {
     expect(mockState.ended).toEqual([]);
   });
 
-  it('updates the same card when work resumes after idle', async () => {
+  it('updates the same card when work resumes after idle', () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);

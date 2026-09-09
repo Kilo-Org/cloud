@@ -1,0 +1,6 @@
+ALTER TABLE "organization_vercel_compute_credentials" DROP CONSTRAINT "UQ_organization_vercel_compute_credentials_organization";--> statement-breakpoint
+ALTER TABLE "organization_vercel_compute_credentials" ALTER COLUMN "organization_id" DROP NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization_vercel_compute_credentials" ADD COLUMN "user_id" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_organization_vercel_compute_credentials_organization" ON "organization_vercel_compute_credentials" USING btree ("organization_id") WHERE "organization_vercel_compute_credentials"."organization_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "UQ_organization_vercel_compute_credentials_user" ON "organization_vercel_compute_credentials" USING btree ("user_id") WHERE "organization_vercel_compute_credentials"."user_id" IS NOT NULL;--> statement-breakpoint
+ALTER TABLE "organization_vercel_compute_credentials" ADD CONSTRAINT "organization_vercel_compute_credentials_owner_check" CHECK (("organization_vercel_compute_credentials"."organization_id" IS NOT NULL AND "organization_vercel_compute_credentials"."user_id" IS NULL) OR ("organization_vercel_compute_credentials"."organization_id" IS NULL AND "organization_vercel_compute_credentials"."user_id" IS NOT NULL));

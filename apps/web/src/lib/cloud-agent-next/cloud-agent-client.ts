@@ -1288,7 +1288,9 @@ export async function closeCloudAgentOrgStreams(
 }
 
 export type VercelSnapshotBuildStartInput = {
-  organizationId: string;
+  // Exactly one of organizationId or userId must be set.
+  organizationId?: string;
+  userId?: string;
   credentialId: string;
   buildGeneration: string;
 };
@@ -1392,6 +1394,7 @@ export async function getVercelComputeEnrollment(organizationId: string): Promis
   return body.enrolled;
 }
 
+/** Exactly one of organizationId or userId must be set. */
 export type VercelSnapshotBuildCleanupInput = VercelSnapshotBuildStartInput & {
   snapshotId?: string;
 };

@@ -3874,9 +3874,11 @@ export const organization_vercel_compute_credentials = pgTable(
   'organization_vercel_compute_credentials',
   {
     id: idPrimaryKeyColumn,
-    organization_id: uuid()
-      .notNull()
-      .references(() => organizations.id, { onDelete: 'cascade', onUpdate: 'cascade' }),
+    organization_id: uuid().references(() => organizations.id, {
+      onDelete: 'cascade',
+      onUpdate: 'cascade',
+    }),
+    user_id: text(),
     token_encrypted: jsonb().$type<VercelComputeCredentialEnvelope>().notNull(),
     token_scope: text().$type<VercelComputeTokenScope>().notNull().default('team'),
     team_id: text().notNull(),
@@ -3906,7 +3908,16 @@ export const organization_vercel_compute_credentials = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    unique('UQ_organization_vercel_compute_credentials_organization').on(table.organization_id),
+    uniqueIndex('UQ_organization_vercel_compute_credentials_organization')
+      .on(table.organization_id)
+      .where(sql`${table.organization_id} IS NOT NULL`),
+    uniqueIndex('UQ_organization_vercel_compute_credentials_user')
+      .on(table.user_id)
+      .where(sql`${table.user_id} IS NOT NULL`),
+    check(
+      'organization_vercel_compute_credentials_owner_check',
+      sql`(${table.organization_id} IS NOT NULL AND ${table.user_id} IS NULL) OR (${table.organization_id} IS NULL AND ${table.user_id} IS NOT NULL)`
+    ),
     check(
       'organization_vercel_compute_credentials_ids_non_empty',
       sql`length(trim(${table.team_id})) > 0 AND length(trim(${table.project_id})) > 0`

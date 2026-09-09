@@ -1,5 +1,5 @@
 import { timingSafeEqual } from '@kilocode/encryption';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, type SQL } from 'drizzle-orm';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -30,9 +30,13 @@ const SetupStepSchema = z
   ])
   .nullable();
 
+const CredentialOwnerSchema = z.union([
+  z.object({ organizationId: z.uuid(), userId: z.never().optional() }),
+  z.object({ organizationId: z.never().optional(), userId: z.string().min(1) }),
+]);
+
 const CredentialUpdateSchema = z
   .object({
-    organizationId: z.uuid(),
     buildGeneration: z.uuid(),
     setupStatus: SetupStatusSchema,
     setupStep: SetupStepSchema,
@@ -55,6 +59,7 @@ const CredentialUpdateSchema = z
       .optional(),
     runtimeDigest: z.string().min(1).max(512).nullable().optional(),
   })
+  .and(CredentialOwnerSchema)
   .superRefine((value, ctx) => {
     if (value.setupStatus !== 'ready') return;
     const required: Array<keyof typeof value> = [
@@ -89,9 +94,8 @@ function isAuthorized(request: NextRequest): boolean {
 }
 
 function toCredentialResponse(row: OrganizationVercelComputeCredential) {
-  return {
+  const response = {
     credentialId: row.id,
-    organizationId: row.organization_id,
     tokenEncrypted: row.token_encrypted,
     tokenScope: row.token_scope,
     teamId: row.team_id,
@@ -115,6 +119,14 @@ function toCredentialResponse(row: OrganizationVercelComputeCredential) {
       ? new Date(row.setup_completed_at).toISOString()
       : null,
   };
+
+  if (row.organization_id !== null && row.user_id === null) {
+    return { ...response, organizationId: row.organization_id };
+  }
+  if (row.organization_id === null && row.user_id !== null) {
+    return { ...response, userId: row.user_id };
+  }
+  throw new Error('Vercel compute credential has invalid ownership');
 }
 
 export async function GET(
@@ -124,22 +136,48 @@ export async function GET(
   if (!isAuthorized(request)) return unauthorized();
 
   const { credentialId } = await params;
-  const organizationIdResult = z
-    .uuid()
-    .safeParse(request.nextUrl.searchParams.get('organizationId'));
-  if (!z.uuid().safeParse(credentialId).success || !organizationIdResult.success) {
+  if (!z.uuid().safeParse(credentialId).success) {
     return NextResponse.json(
       { error: 'Invalid request' },
       { status: 400, headers: responseHeaders() }
     );
   }
-  const organizationId = organizationIdResult.data;
+
+  const organizationIdParam = request.nextUrl.searchParams.get('organizationId');
+  const userIdParam = request.nextUrl.searchParams.get('userId');
+  if ((organizationIdParam === null) === (userIdParam === null)) {
+    return NextResponse.json(
+      { error: 'Invalid request' },
+      { status: 400, headers: responseHeaders() }
+    );
+  }
+
+  let ownerFilter: SQL;
+  if (organizationIdParam !== null) {
+    const organizationIdResult = z.uuid().safeParse(organizationIdParam);
+    if (!organizationIdResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request' },
+        { status: 400, headers: responseHeaders() }
+      );
+    }
+    ownerFilter = eq(
+      organization_vercel_compute_credentials.organization_id,
+      organizationIdResult.data
+    );
+  } else {
+    const userIdResult = z.string().min(1).safeParse(userIdParam);
+    if (!userIdResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request' },
+        { status: 400, headers: responseHeaders() }
+      );
+    }
+    ownerFilter = eq(organization_vercel_compute_credentials.user_id, userIdResult.data);
+  }
 
   const row = await db.query.organization_vercel_compute_credentials.findFirst({
-    where: and(
-      eq(organization_vercel_compute_credentials.id, credentialId),
-      eq(organization_vercel_compute_credentials.organization_id, organizationId)
-    ),
+    where: and(eq(organization_vercel_compute_credentials.id, credentialId), ownerFilter),
   });
   if (!row) {
     return NextResponse.json(
@@ -174,10 +212,22 @@ export async function PATCH(
   }
 
   const { data } = parsed;
+  let ownerFilter: SQL;
+  if (data.organizationId !== undefined) {
+    ownerFilter = eq(organization_vercel_compute_credentials.organization_id, data.organizationId);
+  } else if (data.userId !== undefined) {
+    ownerFilter = eq(organization_vercel_compute_credentials.user_id, data.userId);
+  } else {
+    return NextResponse.json(
+      { error: 'Invalid status update' },
+      { status: 400, headers: responseHeaders() }
+    );
+  }
+
   const current = await db.query.organization_vercel_compute_credentials.findFirst({
     where: and(
       eq(organization_vercel_compute_credentials.id, credentialId),
-      eq(organization_vercel_compute_credentials.organization_id, data.organizationId),
+      ownerFilter,
       eq(organization_vercel_compute_credentials.build_generation, data.buildGeneration)
     ),
   });
@@ -209,7 +259,7 @@ export async function PATCH(
     .where(
       and(
         eq(organization_vercel_compute_credentials.id, credentialId),
-        eq(organization_vercel_compute_credentials.organization_id, data.organizationId),
+        ownerFilter,
         eq(organization_vercel_compute_credentials.build_generation, data.buildGeneration)
       )
     )

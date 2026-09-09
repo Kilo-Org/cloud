@@ -67,6 +67,13 @@ const VercelComputeStatusOutput = z.object({
 type VercelComputeStatus = z.infer<typeof VercelComputeStatusOutput>;
 
 function statusFromRow(row: OrganizationVercelComputeCredential): VercelComputeStatus {
+  if (row.organization_id === null) {
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Vercel compute credential is not organization-owned',
+    });
+  }
+
   return {
     credentialId: row.id,
     organizationId: row.organization_id,
@@ -183,6 +190,8 @@ function rethrowVercelApiError(error: unknown): never {
 async function cleanupExistingVercelBuild(
   credential: OrganizationVercelComputeCredential
 ): Promise<void> {
+  if (credential.organization_id === null) return;
+
   await cleanupVercelSnapshotBuild({
     organizationId: credential.organization_id,
     credentialId: credential.id,

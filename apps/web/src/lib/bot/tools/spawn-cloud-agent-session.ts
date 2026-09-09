@@ -201,8 +201,20 @@ export default async function spawnCloudAgentSession(
       // A per-repository model override (`repository_customizations`) takes
       // precedence over the installation-default `model` resolved earlier for
       // this whole bot conversation — the repo is only known now that the LLM
-      // has picked one via this tool call.
-      resolveModelForGitHubRepository(platformIntegration, args.githubRepo),
+      // has picked one via this tool call. Guard this lookup independently so
+      // a customization-query failure falls back to the incoming `model`
+      // instead of aborting session creation entirely.
+      resolveModelForGitHubRepository(platformIntegration, args.githubRepo).catch(error => {
+        console.error(
+          '[KiloBot] Failed to resolve per-repository model override, falling back to installation model:',
+          error
+        );
+        captureException(error, {
+          tags: { component: 'kilo-bot', op: 'resolve-model-for-github-repository' },
+          extra: { botRequestId, githubRepo: args.githubRepo },
+        });
+        return model;
+      }),
     ]);
 
     if (!githubToken) {

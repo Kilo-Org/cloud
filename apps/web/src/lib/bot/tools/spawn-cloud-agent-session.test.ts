@@ -230,6 +230,25 @@ describe('spawnCloudAgentSession delegation', () => {
     );
   });
 
+  it('falls back to the incoming model when the per-repository model lookup rejects', async () => {
+    mockResolveModelForGitHubRepository.mockRejectedValue(new Error('customization query failed'));
+
+    const result = await spawnCloudAgentSession(
+      { githubRepo: 'owner/repo', prompt: 'Use the files', mode: 'code' },
+      'installation-default-model',
+      userIntegration,
+      'auth-token',
+      'request-github-lookup-failure',
+      undefined,
+      { chatPlatform: 'slack' }
+    );
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'installation-default-model' })
+    );
+    expect(result.cloudAgentSessionId).toBe('cloud-session-1');
+  });
+
   it('does not resolve a per-repo model override for GitLab sessions', async () => {
     await spawnCloudAgentSession(
       { gitlabProject: 'group/repo', prompt: 'Use the files', mode: 'code' },

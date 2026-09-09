@@ -89,15 +89,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const model = integration
-      ? await resolveModelForGitHubRepository(integration, review.repo_full_name).catch(
-          error => {
-            captureException(error, {
-              tags: { component: 'cloud-agent-fork', op: 'resolveModelForGitHubRepository' },
-              extra: { reviewId, repoFullName: review.repo_full_name },
-            });
-            return resolveBotModelSlug(integration);
-          }
-        )
+      ? await resolveModelForGitHubRepository(integration, review.repo_full_name).catch(error => {
+          captureException(error, {
+            tags: { component: 'cloud-agent-fork', op: 'resolveModelForGitHubRepository' },
+            extra: { reviewId, repoFullName: review.repo_full_name },
+          });
+          return resolveBotModelSlug(integration);
+        })
       : resolveBotModelSlug(integration);
 
     const sessionInput = {

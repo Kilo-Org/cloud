@@ -601,7 +601,7 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** Comma-separated user or org IDs admitted to the call-home control plane. `*` includes personal. */
+  /** Comma-separated user or org IDs admitted to the call-home control plane for interactive web creates. `*` includes personal. */
   CONTROL_PLANE_IDS?: string;
   WORKTREE_CREATION_ENABLED_IDS?: string;
   CREDENTIAL_CONTAINMENT_ENABLED?: string;

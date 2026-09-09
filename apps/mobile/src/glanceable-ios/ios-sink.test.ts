@@ -3,8 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
-  GLANCEABLE_IDLE_END_DEBOUNCE_MS,
-  GLANCEABLE_IDLE_ONLY_MS,
   GLANCEABLE_STALE_MS,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
@@ -54,8 +52,8 @@ vi.mock('@expo/ui/swift-ui/modifiers', () => ({
   frame: () => ({}),
   widgetURL: () => ({}),
 }));
-// The sink reads the foreground state at publish and watches for the app
-// leaving active while an idle-end debounce is pending.
+// The sink used to watch AppState for idle-end debounce. Keep the mock so
+// leftover listeners in this suite still resolve.
 const mockAppState = vi.hoisted(() => ({
   currentState: 'active' as string,
   listeners: new Set<(state: string) => void>(),
@@ -975,45 +973,23 @@ describe('iosSink Live Activity content-state', () => {
   });
 });
 
-describe('iosSink idle end scheduling', () => {
-  it('submits the idle native end at once when the app is already background', async () => {
+describe('iosSink idle updates', () => {
+  it('keeps the same card when every agent goes idle', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
-    mockAppState.currentState = 'background';
-
     iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
     await vi.advanceTimersByTimeAsync(0);
 
+    expect(mockState.started).toHaveLength(1);
     expect(mockState.started[0]).toMatchObject({
-      ended: true,
-      dismissAt: NOW + GLANCEABLE_IDLE_ONLY_MS,
+      ended: false,
       props: { status: 'happy', running: 0, idle: 1 },
     });
+    expect(mockState.ended).toEqual([]);
   });
 
-  it('flushes a pending idle end when the app leaves active during the debounce', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(NOW);
-    iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
-    iosSink.publish(snapshotFor([{ status: 'idle' }], 1));
-    expect(mockState.started[0]?.ended).toBe(false);
-
-    mockAppState.leaveActive('background');
-    await vi.advanceTimersByTimeAsync(0);
-
-    expect(mockState.started[0]).toMatchObject({
-      ended: true,
-      dismissAt: NOW + GLANCEABLE_IDLE_ONLY_MS,
-    });
-
-    // The debounce is gone with its watch: no second end ever fires.
-    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
-    expect(mockState.ended).toHaveLength(1);
-    expect(mockAppState.listeners.size).toBe(0);
-  });
-
-  it('cancels the pending idle end and its watch when work resumes', async () => {
+  it('updates the same card when work resumes after idle', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(NOW);
     iosSink.startOrUpdate(snapshotFor([{ status: 'busy' }], 0), CTX);
@@ -1022,13 +998,9 @@ describe('iosSink idle end scheduling', () => {
     iosSink.publish(resumed);
     iosSink.startOrUpdate(resumed, CTX);
 
-    mockAppState.leaveActive('background');
-    await vi.advanceTimersByTimeAsync(0);
-    await vi.advanceTimersByTimeAsync(GLANCEABLE_IDLE_END_DEBOUNCE_MS);
-
+    expect(mockState.started).toHaveLength(1);
     expect(mockState.started[0]).toMatchObject({ ended: false, props: { running: 1, idle: 0 } });
     expect(mockState.ended).toEqual([]);
-    expect(mockAppState.listeners.size).toBe(0);
   });
 });
 

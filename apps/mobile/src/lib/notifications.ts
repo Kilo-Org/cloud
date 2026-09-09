@@ -22,7 +22,6 @@ import {
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
-  isIdleOnlyGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { captureEvent } from '@/lib/analytics/posthog';
@@ -223,7 +222,6 @@ export async function applyGlanceablePushData(
 
   const ctx = { userId, organizationId };
   const eligible = isEligibleGlanceableWork(snapshot);
-  const idleOnly = isIdleOnlyGlanceableWork(snapshot);
   if (eligible) {
     cancelGlanceableTerminalEnd();
     for (const sink of getGlanceableSinks()) {
@@ -241,12 +239,9 @@ export async function applyGlanceablePushData(
   if (appBadgeWrite) {
     await appBadgeWrite;
   }
-  // Do not finish a background task before ActivityKit accepts the native end.
-  // All publication happens before this await, so it cannot restore an old
-  // scope. An idle-only eligible snapshot also schedules its native end during
-  // publish (at once, because a background wake can suspend before the
-  // foreground debounce timer fires), so it waits here too.
-  if (!eligible || idleOnly) {
+  // Do not finish a background task before ActivityKit accepts a native end.
+  // Idle work keeps the same card, so only ineligible snapshots wait here.
+  if (!eligible) {
     await Promise.all(
       getGlanceableSinks().map((sink): Promise<void> | undefined => sink.waitForNativeTerminal?.())
     );

@@ -15,11 +15,9 @@ type SessionListRefreshStatusProps = {
 };
 
 /**
- * The Agents lists' reserved refresh-status line. It always occupies the
- * height of its final (failure) state, so idle -> "Couldn't refresh" swaps
- * never move the rows below it (the UX rule the invisible 1x1 status nodes
- * broke on device). Pull-in-flight copy is screen-reader only: the native
- * spinner already shows the gesture.
+ * Agents-list refresh status. Pull-in-flight copy is screen-reader only and
+ * takes no layout: the native spinner is the visual. Failure shows
+ * "Couldn't refresh" + Retry on its own line.
  */
 export function SessionListRefreshStatus({
   busy,
@@ -29,36 +27,36 @@ export function SessionListRefreshStatus({
 }: Readonly<SessionListRefreshStatusProps>) {
   const { t } = useTranslation();
   const showRetry = failed && !busy;
-  let message: string | null = null;
   if (busy) {
-    message = t('agents.sessionList.updating');
-  } else if (showRetry) {
-    // The line's full accessibility label must stay exactly this copy: the
-    // device verifier asserts the full label, not a substring. The shared
-    // `common.couldNotRefresh` carries the pull-down guidance for the toast
-    // screens; this line has its own Retry action beside it instead.
-    message = t('agents.sessionList.couldNotRefresh');
+    return (
+      <AccessibleStatus
+        message={t('agents.sessionList.updating')}
+        tone="status"
+        className="absolute size-px overflow-hidden"
+      />
+    );
+  }
+  if (!showRetry) {
+    return null;
   }
   return (
     <View className={cn('h-5 flex-row items-center gap-2', className)}>
       <AccessibleStatus
-        message={message}
-        tone={busy ? 'status' : 'error'}
-        className={busy ? 'absolute size-px overflow-hidden' : 'flex-1 shrink text-xs'}
+        message={t('agents.sessionList.couldNotRefresh')}
+        tone="error"
+        className="flex-1 shrink text-xs"
       />
-      {showRetry ? (
-        <Pressable
-          onPress={onRetry}
-          accessibilityRole="button"
-          accessibilityLabel={t('common.retry')}
-          hitSlop={12}
-          className="justify-center active:opacity-70"
-        >
-          <Text className="font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
-            {t('common.retry')}
-          </Text>
-        </Pressable>
-      ) : null}
+      <Pressable
+        onPress={onRetry}
+        accessibilityRole="button"
+        accessibilityLabel={t('common.retry')}
+        hitSlop={12}
+        className="justify-center active:opacity-70"
+      >
+        <Text className="font-mono-medium text-[11px] uppercase tracking-[1.5px] text-primary">
+          {t('common.retry')}
+        </Text>
+      </Pressable>
     </View>
   );
 }

@@ -12,7 +12,7 @@ type SectionHeaderProps = {
 
 export function SectionHeader({ label, actionLabel, onActionPress }: Readonly<SectionHeaderProps>) {
   return (
-    <View className="flex-row flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-5">
+    <View className="flex-row flex-wrap items-center justify-between gap-2 px-4 pb-2 pt-2">
       <Text variant="eyebrow" className="max-w-full grow">
         {label}
       </Text>

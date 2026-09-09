@@ -1,7 +1,6 @@
 import { Platform, ScrollView, type ScrollViewProps, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { RefreshProgress } from '@/components/ui/refresh-progress';
 import { getEffectiveTabBarHeight } from '@/lib/tab-bar-layout';
 
 const TAB_SCREEN_BOTTOM_GAP = 16;
@@ -36,7 +35,6 @@ export function TabScreenScrollView({
       refreshControl={refreshControl}
       style={[style, { marginBottom: paddingBottom }]}
     >
-      {refreshControl ? <RefreshProgress refreshControl={refreshControl} /> : null}
       {children}
     </ScrollView>
   );

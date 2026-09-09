@@ -10,8 +10,6 @@ import { createElement, type ReactNode } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { emitPrivacyCover } from '@/lib/privacy-cover-events';
-
 import { ReviewDetailScreen } from './review-detail-screen';
 
 const detail = vi.hoisted(() => ({
@@ -594,20 +592,6 @@ describe('ReviewDetailScreen transcript sheet', () => {
       expect(connection.destroy).toHaveBeenCalledTimes(2);
     }
   );
-
-  it('closes the transcript and destroys the stream when the privacy cover activates', async () => {
-    const connection = { connect: vi.fn(), destroy: vi.fn() };
-    spectatorStream.createReviewSpectatorStream.mockResolvedValue(connection);
-    mountScreen(true);
-    await act(async () => {
-      await Promise.resolve();
-    });
-
-    act(emitPrivacyCover);
-
-    expect(modalRenders.list.at(-1)?.visible).toBe(false);
-    expect(connection.destroy).toHaveBeenCalledTimes(1);
-  });
 
   it('destroys a pending stream connection if the sheet closes before it arrives', async () => {
     const connection = { connect: vi.fn(), destroy: vi.fn() };

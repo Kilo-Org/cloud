@@ -45,6 +45,7 @@ import {
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
 import { chainSave } from '@/lib/hooks/save-chain';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
+import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
@@ -476,6 +477,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // Synchronous preference clears (best-effort) so nothing leaks to
           // the next signed-in account.
           clearAgentModelPreference();
+          clearRunOnDestinationPreference();
           clearReasoningPreference();
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();

@@ -39,6 +39,7 @@ import { useInstanceModelCatalog } from '@/lib/hooks/use-instance-model-catalog'
 import { useLaunchFolder } from '@/lib/hooks/use-launch-folder';
 import { useModelPreferences } from '@/lib/hooks/use-model-preferences';
 import { usePersistedAgentModel } from '@/lib/hooks/use-persisted-agent-model';
+import { usePersistedRunOnDestination } from '@/lib/hooks/use-persisted-run-on-destination';
 import { createRemoteModelOverride } from '@/lib/hooks/use-session-model-options';
 import {
   resolveContinueStartDisabled,
@@ -54,6 +55,7 @@ import {
 import { useDraftFlushOnBackground } from '@/lib/persist/use-draft-flush';
 import { useFencedDraftLoad, useRemoteSpawnDraftCleanup } from '@/lib/persist/use-draft-load';
 import { type InstancePickerInstance, type ModelPickerSelection } from '@/lib/picker-bridge';
+import { resolvePersistedRunOn } from '@/lib/run-on-destination';
 import { shouldShowRunOnSelector } from '@/lib/should-show-run-on-selector';
 import { peekSharePayload } from '@/lib/share-payload';
 import { useNewSessionShareRemote } from '@/lib/use-new-session-share-remote';
@@ -115,6 +117,8 @@ export function NewSessionScreenBody() {
   // without navigating (failure), so an abandon after a failed spawn still
   // confirms.
   const skipDiscardGuardRef = useRef(false);
+  const runOnRestoredRef = useRef(false);
+  const runOnUserPickedRef = useRef(false);
 
   const showRunOnSelector = shouldShowRunOnSelector(organizationId);
 
@@ -186,6 +190,11 @@ export function NewSessionScreenBody() {
   );
   const { setLastSelected: persistServerLastSelected } = useModelPreferences(organizationId);
   const { saveModel } = usePersistedAgentModel();
+  const {
+    storedConnectionId,
+    hasLoaded: hasLoadedRunOn,
+    saveRunOn,
+  } = usePersistedRunOnDestination();
   const attachments = useAgentAttachmentUpload({ organizationId });
 
   // Custom modes and the pinned model come from the effective default profile.
@@ -260,6 +269,17 @@ export function NewSessionScreenBody() {
     () => instancesData?.instances ?? [],
     [instancesData]
   );
+
+  useEffect(() => {
+    if (runOnRestoredRef.current || runOnUserPickedRef.current) {
+      return;
+    }
+    if (!hasLoadedRunOn || instancesData === undefined) {
+      return;
+    }
+    runOnRestoredRef.current = true;
+    setRunOnInstance(resolvePersistedRunOn(storedConnectionId, instanceList));
+  }, [hasLoadedRunOn, instanceList, instancesData, storedConnectionId]);
 
   // A successful session creation owns clearing the new-session draft; a
   // failure must preserve it for the retry. The success path navigates via
@@ -410,11 +430,13 @@ export function NewSessionScreenBody() {
 
   const handleRunOnChange = useCallback(
     (next: InstancePickerInstance | null) => {
+      runOnUserPickedRef.current = true;
+      saveRunOn(next?.connectionId ?? null);
       setRemoteOverride(null);
       setCloneImportFailureKey(null);
       handleRunOnInstanceChange(next);
     },
-    [handleRunOnInstanceChange]
+    [handleRunOnInstanceChange, saveRunOn]
   );
 
   function handlePromptChange(text: string) {

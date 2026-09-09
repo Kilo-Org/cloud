@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import {
   WORKTREE_CHANGES_SCHEMA_VERSION,
+  finalizeWorktreeChangesSnapshot,
   worktreeChangesCaptureSchema,
   worktreeChangesSnapshotSchema,
   worktreeFileQuerySchema,
@@ -104,10 +105,34 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
     const parsed = worktreeChangesSnapshotSchema.safeParse(
       deps.storage.kv.get(WORKTREE_CHANGES_KEY)
     );
-    return parsed.success &&
-      new Set(parsed.data.files.map(file => file.path)).size === parsed.data.files.length
-      ? parsed.data
-      : null;
+    return parsed.success ? parsed.data : null;
+  }
+
+  function readRecordAgainstManifest(snapshot: WorktreeChangesSnapshot, path: string) {
+    const listed = snapshot.files.find(file => file.path === path);
+    if (!listed) return null;
+    const parsed = worktreeFileRecordSchema.safeParse(
+      deps.storage.kv.get(`${WORKTREE_FILE_PREFIX}${path}`)
+    );
+    if (
+      !parsed.success ||
+      parsed.data.revision !== listed.revision ||
+      parsed.data.path !== listed.path ||
+      (parsed.data.content.status === 'available' &&
+        parsed.data.content.source !==
+          (listed.status === 'deleted' ? 'deleted-original' : 'current'))
+    ) {
+      return null;
+    }
+    return { listed, record: parsed.data };
+  }
+
+  function canReuseFileRevision(previous: WorktreeFileRecord, next: WorktreeFileRecord): boolean {
+    return (
+      (next.diff.status === 'available' || next.content.status === 'available') &&
+      JSON.stringify(previous.diff) === JSON.stringify(next.diff) &&
+      JSON.stringify(previous.content) === JSON.stringify(next.content)
+    );
   }
 
   function replaceSnapshot(snapshot: WorktreeChangesSnapshot, files: WorktreeFileRecord[]): void {
@@ -172,12 +197,6 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       ) {
         return { status: 'failed', snapshot };
       }
-      const saved = worktreeChangesSnapshotSchema.safeParse({
-        ...captured.summary,
-        schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
-        capturedAt: new Date().toISOString(),
-      });
-      if (!saved.success) return { status: 'failed', snapshot };
       const current = await deps.readContext();
       if (
         suppressed ||
@@ -188,8 +207,31 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
       ) {
         return { status: 'failed', snapshot };
       }
-      replaceSnapshot(saved.data, captured.files);
-      return { status: 'refreshed', snapshot: saved.data };
+      const capturedRecords = new Map(captured.files.map(file => [file.path, file]));
+      const selectedFiles = captured.summary.files.map(file => {
+        const capturedRecord = capturedRecords.get(file.path);
+        const previous =
+          capturedRecord && snapshot ? readRecordAgainstManifest(snapshot, file.path) : null;
+        const selectedRevision =
+          previous && capturedRecord && canReuseFileRevision(previous.record, capturedRecord)
+            ? previous.listed.revision
+            : requestedRevision;
+        return { ...file, revision: selectedRevision };
+      });
+      const saved = finalizeWorktreeChangesSnapshot({
+        ...captured.summary,
+        schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
+        capturedAt: new Date().toISOString(),
+        files: selectedFiles,
+      });
+      if (!saved) return { status: 'failed', snapshot };
+      const retainedRevisions = new Map(saved.files.map(file => [file.path, file.revision]));
+      const records = captured.files.flatMap(file => {
+        const selectedRevision = retainedRevisions.get(file.path);
+        return selectedRevision === undefined ? [] : [{ ...file, revision: selectedRevision }];
+      });
+      replaceSnapshot(saved, records);
+      return { status: 'refreshed', snapshot: saved };
     } catch {
       return { status: 'failed', snapshot };
     }
@@ -241,25 +283,13 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         if (!snapshot) return { status: 'not_captured' };
         const listed = snapshot.files.find(file => file.path === query.data.path);
         if (!listed) return { status: 'no_longer_listed', currentRevision: snapshot.revision };
-        if (snapshot.revision !== query.data.expectedRevision) {
-          return { status: 'stale', currentRevision: snapshot.revision };
-        }
-        const parsed = worktreeFileRecordSchema.safeParse(
-          deps.storage.kv.get(`${WORKTREE_FILE_PREFIX}${query.data.path}`)
-        );
-        if (
-          !parsed.success ||
-          parsed.data.revision !== snapshot.revision ||
-          parsed.data.path !== query.data.path ||
-          (parsed.data.content.status === 'available' &&
-            parsed.data.content.source !==
-              (listed.status === 'deleted' ? 'deleted-original' : 'current'))
-        ) {
-          return { status: 'not_captured' };
-        }
+        if (listed.revision !== query.data.expectedRevision)
+          return { status: 'stale', currentRevision: listed.revision };
+        const selected = readRecordAgainstManifest(snapshot, query.data.path);
+        if (!selected) return { status: 'not_captured' };
         return {
-          status: parsed.data.diff.status,
-          file: parsed.data,
+          status: selected.record.diff.status,
+          file: selected.record,
           capturedAt: snapshot.capturedAt,
           comparison: snapshot.comparison,
         };

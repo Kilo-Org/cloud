@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const WORKTREE_CHANGES_SCHEMA_VERSION = 1;
+export const WORKTREE_CHANGES_SCHEMA_VERSION = 2;
 export const MAX_WORKTREE_CHANGES_FILES = 1_000;
 export const MAX_WORKTREE_CHANGES_BYTES = 256 * 1024;
 export const WORKTREE_FILE_SCHEMA_VERSION = 1;
@@ -77,9 +77,13 @@ export const worktreeChangesCaptureSchema = z
     'Worktree summary exceeds the size limit'
   );
 
-export const worktreeChangesSnapshotSchema = z
+const savedWorktreeChangesFileSchema = worktreeChangesFileSchema
+  .extend({ revision: revisionSchema })
+  .strict();
+
+const legacyWorktreeChangesSnapshotSchema = z
   .object({
-    schemaVersion: z.literal(WORKTREE_CHANGES_SCHEMA_VERSION),
+    schemaVersion: z.literal(1),
     capturedAt: z.string().datetime({ offset: true }),
     ...captureFields,
   })
@@ -89,6 +93,60 @@ export const worktreeChangesSnapshotSchema = z
       new TextEncoder().encode(JSON.stringify(snapshot)).byteLength <= MAX_WORKTREE_CHANGES_BYTES,
     'Saved worktree summary exceeds the size limit'
   );
+
+const savedWorktreeChangesSnapshotSchema = z
+  .object({
+    schemaVersion: z.literal(WORKTREE_CHANGES_SCHEMA_VERSION),
+    capturedAt: z.string().datetime({ offset: true }),
+    revision: revisionSchema,
+    comparison: captureFields.comparison,
+    files: z.array(savedWorktreeChangesFileSchema).max(MAX_WORKTREE_CHANGES_FILES),
+    truncated: z.boolean(),
+  })
+  .strict()
+  .refine(
+    snapshot => new Set(snapshot.files.map(file => file.path)).size === snapshot.files.length,
+    'Saved worktree summary paths must be unique'
+  );
+
+export type WorktreeChangesSnapshot = z.infer<typeof savedWorktreeChangesSnapshotSchema>;
+
+export function finalizeWorktreeChangesSnapshot(
+  candidate: unknown
+): WorktreeChangesSnapshot | null {
+  const parsed = savedWorktreeChangesSnapshotSchema.safeParse(candidate);
+  if (!parsed.success) return null;
+
+  for (let length = parsed.data.files.length; length >= 0; length--) {
+    const snapshot = {
+      ...parsed.data,
+      files: parsed.data.files.slice(0, length),
+      truncated: parsed.data.truncated || length !== parsed.data.files.length,
+    };
+    if (
+      new TextEncoder().encode(JSON.stringify(snapshot)).byteLength <= MAX_WORKTREE_CHANGES_BYTES
+    ) {
+      return snapshot;
+    }
+  }
+
+  return null;
+}
+
+export const worktreeChangesSnapshotSchema = z.unknown().transform((value, context) => {
+  const legacy = legacyWorktreeChangesSnapshotSchema.safeParse(value);
+  const candidate = legacy.success
+    ? {
+        ...legacy.data,
+        schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
+        files: legacy.data.files.map(file => ({ ...file, revision: legacy.data.revision })),
+      }
+    : value;
+  const finalized = finalizeWorktreeChangesSnapshot(candidate);
+  if (finalized !== null) return finalized;
+  context.addIssue({ code: 'custom', message: 'Invalid saved worktree summary' });
+  return z.NEVER;
+});
 
 export const getWorktreeChangesOutputSchema = z
   .object({ snapshot: worktreeChangesSnapshotSchema.nullable() })
@@ -218,7 +276,6 @@ export const getWorktreeFileOutputSchema = z.discriminatedUnion('status', [
 export type WorktreeChangesFile = z.infer<typeof worktreeChangesFileSchema>;
 export type WorktreeChangesCaptureRequest = z.infer<typeof worktreeChangesCaptureRequestSchema>;
 export type WorktreeChangesCapture = z.infer<typeof worktreeChangesCaptureSchema>;
-export type WorktreeChangesSnapshot = z.infer<typeof worktreeChangesSnapshotSchema>;
 export type GetWorktreeChangesOutput = z.infer<typeof getWorktreeChangesOutputSchema>;
 export type RefreshWorktreeChangesOutput = z.infer<typeof refreshWorktreeChangesOutputSchema>;
 export type WorktreeFileOmissionReason = z.infer<typeof worktreeFileOmissionReasonSchema>;

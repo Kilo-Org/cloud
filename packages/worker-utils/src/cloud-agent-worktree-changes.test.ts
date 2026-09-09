@@ -8,6 +8,7 @@ import {
   MAX_WORKTREE_PATCH_LINES,
   MAX_WORKTREE_SNAPSHOT_BYTES,
   WORKTREE_FILE_SCHEMA_VERSION,
+  WORKTREE_CHANGES_SCHEMA_VERSION,
   getWorktreeChangesOutputSchema,
   getWorktreeFileOutputSchema,
   refreshWorktreeChangesOutputSchema,
@@ -33,7 +34,7 @@ const file: WorktreeChangesFile = {
   countsComplete: true,
 };
 const snapshot: WorktreeChangesSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
   revision: 3,
   capturedAt: '2026-08-26T12:00:00.000Z',
   comparison: {
@@ -41,11 +42,11 @@ const snapshot: WorktreeChangesSnapshot = {
     mergeBase: 'a'.repeat(40),
     head: 'b'.repeat(40),
   },
-  files: [file],
+  files: [{ ...file, revision: 3 }],
   truncated: false,
 };
 
-function capture(files = snapshot.files) {
+function capture(files = snapshot.files.map(({ revision: _revision, ...file }) => file)) {
   return { revision: snapshot.revision, comparison: snapshot.comparison, files, truncated: false };
 }
 
@@ -87,7 +88,7 @@ describe('cloud agent worktree changes contracts', () => {
   });
 
   it.each([
-    { schemaVersion: 2 },
+    { schemaVersion: 3 },
     { revision: 0 },
     { revision: Number.MAX_SAFE_INTEGER + 1 },
     { capturedAt: 'not a timestamp' },
@@ -98,6 +99,80 @@ describe('cloud agent worktree changes contracts', () => {
     expect(worktreeChangesSnapshotSchema.safeParse({ ...snapshot, ...invalid }).success).toBe(
       false
     );
+  });
+
+  it('normalizes strict legacy v1 saved snapshots to canonical v2 at direct and API boundaries', () => {
+    const legacy = { ...snapshot, schemaVersion: 1, files: [file] };
+    const normalized = { ...snapshot, files: [{ ...file, revision: snapshot.revision }] };
+    expect(worktreeChangesSnapshotSchema.parse(legacy)).toEqual(normalized);
+    expect(getWorktreeChangesOutputSchema.parse({ snapshot: legacy })).toEqual({
+      snapshot: normalized,
+    });
+    expect(
+      refreshWorktreeChangesOutputSchema.parse({ status: 'refreshed', snapshot: legacy })
+    ).toEqual({
+      status: 'refreshed',
+      snapshot: normalized,
+    });
+  });
+
+  it('requires per-file revisions in v2 and rejects unsupported saved versions', () => {
+    expect(
+      worktreeChangesSnapshotSchema.safeParse({
+        ...snapshot,
+        files: [{ ...file }],
+      }).success
+    ).toBe(false);
+    expect(worktreeChangesSnapshotSchema.safeParse({ ...snapshot, schemaVersion: 3 }).success).toBe(
+      false
+    );
+  });
+
+  it('trims whole trailing escaped multibyte entries from near-limit v1 and v2 manifests', () => {
+    const files = Array.from({ length: 1_000 }, (_, index) => ({
+      ...file,
+      path: `${index}/${'漢"\\\n'.repeat(25)}`,
+    }));
+    const legacy = { ...snapshot, schemaVersion: 1, files };
+    while (
+      new TextEncoder().encode(JSON.stringify(legacy)).byteLength > MAX_WORKTREE_CHANGES_BYTES
+    ) {
+      legacy.files.pop();
+    }
+    expect(new TextEncoder().encode(JSON.stringify(legacy)).byteLength).toBeGreaterThan(
+      MAX_WORKTREE_CHANGES_BYTES - 20_000
+    );
+    for (const input of [
+      legacy,
+      {
+        ...legacy,
+        schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
+        files: legacy.files.map(entry => ({ ...entry, revision: legacy.revision })),
+      },
+    ]) {
+      const normalized = worktreeChangesSnapshotSchema.parse(input);
+      expect(normalized.files).toEqual(
+        input.files.slice(0, normalized.files.length).map(entry => ({
+          ...entry,
+          revision: 'revision' in entry ? entry.revision : input.revision,
+        }))
+      );
+      expect(normalized.files.length).toBeLessThan(input.files.length);
+      expect(normalized.truncated).toBe(true);
+      expect(new TextEncoder().encode(JSON.stringify(normalized)).byteLength).toBeLessThanOrEqual(
+        MAX_WORKTREE_CHANGES_BYTES
+      );
+    }
+  });
+
+  it('keeps an empty truncated manifest canonical', () => {
+    expect(
+      worktreeChangesSnapshotSchema.parse({
+        ...snapshot,
+        files: [],
+        truncated: true,
+      })
+    ).toEqual({ ...snapshot, files: [], truncated: true });
   });
 
   it('accepts SHA-256 object IDs without weakening commit validation', () => {

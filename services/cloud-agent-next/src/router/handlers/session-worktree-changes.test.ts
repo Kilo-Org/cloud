@@ -23,7 +23,7 @@ const access: AccessibleCloudAgentSession = {
   organizationId: 'org_current',
 };
 const snapshot: WorktreeChangesSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   revision: 1,
   capturedAt: '2026-08-20T10:00:00.000Z',
   comparison: {
@@ -31,7 +31,18 @@ const snapshot: WorktreeChangesSnapshot = {
     mergeBase: 'a'.repeat(40),
     head: 'b'.repeat(40),
   },
-  files: [],
+  files: [
+    {
+      path: 'src/saved.ts',
+      revision: 1,
+      status: 'modified',
+      additions: 1,
+      deletions: 0,
+      tracked: true,
+      binary: false,
+      countsComplete: true,
+    },
+  ],
   truncated: false,
 };
 
@@ -146,6 +157,18 @@ describe('Worker worktree changes procedures', () => {
     expect(harness.control.getByName).not.toHaveBeenCalled();
   });
 
+  it('normalizes a valid v1 session result at the API boundary', async () => {
+    const harness = setup();
+    harness.stub.getWorktreeChanges.mockResolvedValue({
+      snapshot: {
+        ...snapshot,
+        schemaVersion: 1,
+        files: snapshot.files.map(({ revision: _revision, ...file }) => file),
+      },
+    });
+    await expect(harness.call('getWorktreeChanges', sessionId)).resolves.toEqual({ snapshot });
+  });
+
   describe.each(['getWorktreeChanges', 'refreshWorktreeChanges', 'getWorktreeFile'] as const)(
     '%s access checks',
     procedure => {
@@ -217,7 +240,7 @@ describe('Worker worktree changes procedures', () => {
         const harness = setup();
         harness.stub[procedure].mockResolvedValue({
           status: 'refreshed',
-          snapshot: { ...snapshot, schemaVersion: 2 },
+          snapshot: { ...snapshot, schemaVersion: 3 },
         });
         await expect(harness.call(procedure, sessionId)).rejects.toMatchObject({
           code: 'INTERNAL_SERVER_ERROR',

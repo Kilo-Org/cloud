@@ -13,12 +13,14 @@ export type SavedWorktreeFileState =
 export function getSavedWorktreeFileState({
   snapshot,
   path,
+  selectedEntry,
   result,
   summaryError,
   fileError,
 }: {
   snapshot: WorktreeChangesSnapshot | null | undefined;
   path: string;
+  selectedEntry: WorktreeChangesSnapshot['files'][number] | undefined;
   result: GetWorktreeFileOutput | undefined;
   summaryError: boolean;
   fileError: boolean;
@@ -26,12 +28,12 @@ export function getSavedWorktreeFileState({
   if (summaryError) return { status: 'error' };
   if (snapshot === undefined) return { status: 'loading' };
   if (snapshot === null) return { status: 'not_captured' };
-  if (!snapshot.files.some(file => file.path === path)) return { status: 'no_longer_listed' };
+  if (!selectedEntry || selectedEntry.path !== path) return { status: 'no_longer_listed' };
   if (fileError) return { status: 'error' };
   if (!result) return { status: 'loading' };
   if (result.status === 'available' || result.status === 'omitted') {
     if (result.file.path !== path) return { status: 'error' };
-    if (result.file.revision !== snapshot.revision) return { status: 'stale' };
+    if (result.file.revision !== selectedEntry.revision) return { status: 'stale' };
     return result;
   }
   return { status: result.status };

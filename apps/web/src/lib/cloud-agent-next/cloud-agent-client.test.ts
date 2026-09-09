@@ -105,13 +105,14 @@ const { closeCloudAgentOrgStreams, CloudAgentNextClient, createAppBuilderCloudAg
 describe('CloudAgentNextClient worktree changes', () => {
   const cloudAgentSessionId = 'workspace_12345678-1234-4234-9234-123456789abc';
   const snapshot: WorktreeChangesSnapshot = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     revision: 1,
     capturedAt: '2026-08-26T12:00:00.000Z',
     comparison: { baseRef: 'origin/main', mergeBase: 'a'.repeat(40), head: 'b'.repeat(40) },
     files: [
       {
         path: 'src/odd\nfile.ts',
+        revision: 1,
         status: 'modified',
         additions: 2,
         deletions: 1,
@@ -146,6 +147,18 @@ describe('CloudAgentNextClient worktree changes', () => {
     }
   );
 
+  it('normalizes a valid v1 response before returning it to callers', async () => {
+    const legacy = {
+      ...snapshot,
+      schemaVersion: 1,
+      files: snapshot.files.map(({ revision: _revision, ...file }) => file),
+    };
+    mockGetWorktreeChanges.mockResolvedValue({ snapshot: legacy });
+    await expect(
+      new CloudAgentNextClient('token').getWorktreeChanges(cloudAgentSessionId)
+    ).resolves.toEqual({ snapshot });
+  });
+
   it.each(['refreshed', 'offline', 'failed'] as const)(
     'validates %s refresh responses',
     async status => {
@@ -169,7 +182,7 @@ describe('CloudAgentNextClient worktree changes', () => {
   });
 
   it.each([
-    { snapshot: { ...snapshot, schemaVersion: 2 } },
+    { snapshot: { ...snapshot, schemaVersion: 3 } },
     { snapshot: { ...snapshot, revision: 0 } },
     { snapshot: { ...snapshot, capturedAt: 'not-a-date' } },
     { snapshot: { ...snapshot, files: [{ ...snapshot.files[0], patch: 'file content' }] } },

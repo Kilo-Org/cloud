@@ -6763,8 +6763,9 @@ function worktreeSnapshotCapture(revision: number, empty = false): WorktreeSnaps
 
 const savedWorktreeSnapshot: WorktreeChangesSnapshot = {
   ...worktreeCapture(4),
-  schemaVersion: 1,
+  schemaVersion: 2,
   capturedAt: '2026-08-20T10:00:00.000Z',
+  files: worktreeCapture(4).files.map(file => ({ ...file, revision: 4 })),
 };
 
 async function worktreeFixture(
@@ -7354,6 +7355,78 @@ describe('SandboxSession worktree changes persistence', () => {
     }
   });
 
+  it('keeps A on its saved revision for a B-only update, then refreshes A when its payload changes', async () => {
+    const fixture = await worktreeFixture();
+    const captured = (revision: number, aText: string, bText: string): WorktreeSnapshotCapture => {
+      const summary = worktreeCapture(revision);
+      summary.files = summary.files.flatMap(file => [
+        { ...file, path: 'a.ts' },
+        { ...file, path: 'b.ts' },
+      ]);
+      const record = (path: string, text: string): WorktreeFileRecord => ({
+        ...worktreeFileRecord(revision, path),
+        diff: { status: 'available', patch: `diff --git a/${path} b/${path}\n-old\n+${text}` },
+        content: { status: 'available', source: 'current', text },
+      });
+      return { summary, files: [record('a.ts', aText), record('b.ts', bText)] };
+    };
+    try {
+      const first = fixture.session.refreshWorktreeChanges();
+      const firstRequest = await fixture.nextCapture();
+      fixture.reply(firstRequest, captured(captureRevision(firstRequest), 'a1\n', 'b1\n'));
+      await first;
+
+      const bOnly = fixture.session.refreshWorktreeChanges();
+      const bOnlyRequest = await fixture.nextCapture();
+      fixture.reply(bOnlyRequest, captured(captureRevision(bOnlyRequest), 'a1\n', 'b2\n'));
+      const afterB = await bOnly;
+      expect(afterB).toMatchObject({
+        status: 'refreshed',
+        snapshot: {
+          revision: 2,
+          files: [
+            { path: 'a.ts', revision: 1, additions: 2, deletions: 1 },
+            { path: 'b.ts', revision: 2, additions: 2, deletions: 1 },
+          ],
+        },
+      });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'a.ts', expectedRevision: 1 })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { revision: 1, content: { text: 'a1\n' } },
+      });
+      expect(fixture.readyNotifications.at(-1)?.snapshot).toEqual(afterB.snapshot);
+
+      const aChanged = fixture.session.refreshWorktreeChanges();
+      const aChangedRequest = await fixture.nextCapture();
+      fixture.reply(aChangedRequest, captured(captureRevision(aChangedRequest), 'a3\n', 'b2\n'));
+      const afterA = await aChanged;
+      expect(afterA).toMatchObject({
+        status: 'refreshed',
+        snapshot: {
+          revision: 3,
+          files: [
+            { path: 'a.ts', revision: 3, additions: 2, deletions: 1 },
+            { path: 'b.ts', revision: 2, additions: 2, deletions: 1 },
+          ],
+        },
+      });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'a.ts', expectedRevision: 1 })
+      ).resolves.toEqual({ status: 'stale', currentRevision: 3 });
+      await expect(
+        fixture.session.getWorktreeFile({ path: 'a.ts', expectedRevision: 3 })
+      ).resolves.toMatchObject({
+        status: 'available',
+        file: { revision: 3, content: { text: 'a3\n' } },
+      });
+      expect(fixture.readyNotifications.at(-1)?.snapshot).toEqual(afterA.snapshot);
+    } finally {
+      fixture.close();
+    }
+  });
+
   it('parses, validates, and stores a near-10 MiB snapshot as bounded per-file KV records', async () => {
     const fixture = await worktreeFixture();
     try {
@@ -7388,7 +7461,7 @@ describe('SandboxSession worktree changes persistence', () => {
       fixture.reply(request, capture);
       const saved = await pending;
       expect(saved.status).toBe('refreshed');
-      expect(saved.snapshot?.files).toEqual(summary.files);
+      expect(saved.snapshot?.files).toEqual(summary.files.map(file => ({ ...file, revision })));
       expect(new TextEncoder().encode(JSON.stringify(saved)).byteLength).toBeLessThan(256 * 1024);
       await runInDurableObject(fixture.session, (_instance, state) => {
         let records = 0;
@@ -7420,14 +7493,14 @@ describe('SandboxSession worktree changes persistence', () => {
       });
       await expect(
         fixture.session.getWorktreeFile({ path: 'large-19.ts', expectedRevision: revision })
-      ).resolves.toEqual({ status: 'stale', currentRevision: replacementRevision });
+      ).resolves.toMatchObject({ status: 'available', file: { revision } });
       const replaced = await fixture.session.getWorktreeFile({
         path: 'large-19.ts',
-        expectedRevision: replacementRevision,
+        expectedRevision: revision,
       });
       expect(replaced.status).toBe('available');
       if (replaced.status !== 'available') throw new Error('Expected replaced file');
-      expect(replaced.file).toEqual(files[19]);
+      expect(replaced.file).toEqual({ ...files[19], revision });
       await fixture.session.deleteSession();
       await runInDurableObject(fixture.session, (_instance, state) => {
         expect([...state.storage.kv.list({ prefix: WORKTREE_FILE_PREFIX })]).toEqual([]);
@@ -7573,7 +7646,11 @@ describe('SandboxSession worktree changes persistence', () => {
     fixture.reply(request, worktreeSnapshotCapture(1));
     await fixture.settled();
     await expect(fixture.session.getWorktreeChanges()).resolves.toMatchObject({
-      snapshot: { schemaVersion: 1, revision: 1, files: worktreeCapture(1).files },
+      snapshot: {
+        schemaVersion: 2,
+        revision: 1,
+        files: worktreeCapture(1).files.map(file => ({ ...file, revision: 1 })),
+      },
     });
     await expect(fixture.session.getCurrentMessageWork()).resolves.toMatchObject({
       messageId: 'msg_worktree_attach',
@@ -7808,13 +7885,15 @@ describe('SandboxSession worktree changes persistence', () => {
         result: { status: 'completed' },
       });
       const completed = await fixture.session.getWorktreeChanges();
-      expect(completed.snapshot).toMatchObject({ ...capture.summary, schemaVersion: 1 });
+      expect(completed.snapshot).toMatchObject({ ...capture.summary, schemaVersion: 2 });
+      const selectedRevision = completed.snapshot?.files[0]?.revision;
+      if (!selectedRevision) throw new Error('Missing completed file revision');
       await expect(
         fixture.session.getWorktreeFile({
           path: 'changed.ts',
-          expectedRevision: capture.summary.revision,
+          expectedRevision: selectedRevision,
         })
-      ).resolves.toMatchObject({ status: 'available', file: capture.files[0] });
+      ).resolves.toMatchObject({ status: 'available', file: { revision: selectedRevision } });
       expect(fixture.captures).toHaveLength(3);
 
       await fixture.event('session.message.outcome', fixture.kiloSessionId, outcome);

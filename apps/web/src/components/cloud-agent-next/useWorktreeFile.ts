@@ -22,14 +22,15 @@ export function useWorktreeFile({
     enabled: true,
   });
   const snapshot = saved.data?.snapshot;
-  const expectedRevision = snapshot?.revision ?? 1;
+  const selectedEntry = snapshot?.files.find(file => file.path === path);
+  const expectedRevision = selectedEntry?.revision ?? 1;
   const input = { cloudAgentSessionId, path, expectedRevision };
   const queryOptions = organizationId
     ? trpc.organizations.cloudAgentNext.getWorktreeFile.queryOptions({ ...input, organizationId })
     : trpc.cloudAgentNext.getWorktreeFile.queryOptions(input);
   const file = useQuery({
     ...queryOptions,
-    enabled: !saved.isError && snapshot?.files.some(file => file.path === path) === true,
+    enabled: !saved.isError && selectedEntry !== undefined,
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,
@@ -39,6 +40,7 @@ export function useWorktreeFile({
   const state = getSavedWorktreeFileState({
     snapshot,
     path,
+    selectedEntry,
     result: file.data,
     summaryError: saved.isError,
     fileError: file.isError,
@@ -58,7 +60,8 @@ export function useWorktreeFile({
         if (
           activeRequest.current === requestKey &&
           !result.isError &&
-          result.data?.snapshot?.revision === expectedRevision
+          result.data?.snapshot?.files.find(file => file.path === path)?.revision ===
+            expectedRevision
         ) {
           void file.refetch();
         }
@@ -75,8 +78,7 @@ export function useWorktreeFile({
     if (
       activeRequest.current === requestKey &&
       !result.isError &&
-      result.data?.snapshot?.revision === expectedRevision &&
-      result.data.snapshot.files.some(file => file.path === path)
+      result.data?.snapshot?.files.find(file => file.path === path)?.revision === expectedRevision
     ) {
       await file.refetch();
     }

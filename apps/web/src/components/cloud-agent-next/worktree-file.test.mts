@@ -65,7 +65,7 @@ const file: WorktreeFileRecord = {
   content: { status: 'available', source: 'current', text: 'first\nnew value\nlast\n' },
 };
 const snapshot: WorktreeChangesSnapshot = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   revision: 3,
   capturedAt: '2026-08-28T10:00:00Z',
   comparison: {
@@ -76,6 +76,7 @@ const snapshot: WorktreeChangesSnapshot = {
   files: [
     {
       path: file.path,
+      revision: file.revision,
       status: 'modified',
       additions: 1,
       deletions: 1,
@@ -1316,6 +1317,7 @@ describe('saved file response identity', () => {
   const input = {
     snapshot,
     path: file.path,
+    selectedEntry: snapshot.files[0],
     result: available,
     summaryError: false,
     fileError: false,
@@ -1325,9 +1327,20 @@ describe('saved file response identity', () => {
     assert.equal(getSavedWorktreeFileState(input), available);
   });
 
-  it('never relabels an old record with the current revision', () => {
+  it('keeps a body valid when only the global snapshot revision advances', () => {
     assert.deepEqual(
       getSavedWorktreeFileState({ ...input, snapshot: { ...snapshot, revision: 4 } }),
+      available
+    );
+  });
+
+  it('marks a body stale when its selected entry revision changes', () => {
+    assert.deepEqual(
+      getSavedWorktreeFileState({
+        ...input,
+        snapshot: { ...snapshot, revision: 4, files: [{ ...snapshot.files[0], revision: 4 }] },
+        selectedEntry: { ...snapshot.files[0], revision: 4 },
+      }),
       { status: 'stale' }
     );
   });
@@ -1344,7 +1357,11 @@ describe('saved file response identity', () => {
 
   it('hides cached bodies when the file is no longer listed or no capture exists', () => {
     assert.deepEqual(
-      getSavedWorktreeFileState({ ...input, snapshot: { ...snapshot, files: [] } }),
+      getSavedWorktreeFileState({
+        ...input,
+        snapshot: { ...snapshot, files: [] },
+        selectedEntry: undefined,
+      }),
       { status: 'no_longer_listed' }
     );
     assert.deepEqual(getSavedWorktreeFileState({ ...input, snapshot: null }), {

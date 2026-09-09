@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { MAX_WORKTREE_CHANGES_BYTES } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type {
   WorktreeChangesCapture,
   WorktreeChangesCaptureRequest,
@@ -56,8 +57,9 @@ function captureResult(revision: number): WorktreeChangesCapture {
 
 const oldSnapshot: WorktreeChangesSnapshot = {
   ...captureResult(8),
-  schemaVersion: 1,
+  schemaVersion: 2,
   capturedAt: '2026-08-20T10:00:00.000Z',
+  files: captureResult(8).files.map(file => ({ ...file, revision: 8 })),
 };
 
 function response(result: unknown): ResponseFrame {
@@ -220,10 +222,22 @@ describe('worktree changes capture coordination', () => {
   it('reads only persisted, validated storage without resolving runtime context', async () => {
     const harness = setup();
     await expect(harness.changes.get()).resolves.toEqual({ snapshot: oldSnapshot });
-    harness.values.set(WORKTREE_CHANGES_KEY, { ...oldSnapshot, schemaVersion: 2 });
+    harness.values.set(WORKTREE_CHANGES_KEY, { ...oldSnapshot, schemaVersion: 3 });
     await expect(harness.changes.get()).resolves.toEqual({ snapshot: null });
     expect(harness.readContext).not.toHaveBeenCalled();
     expect(harness.requestCapture).not.toHaveBeenCalled();
+    expect(harness.storage.kv.put).not.toHaveBeenCalled();
+  });
+
+  it('normalizes a raw persisted v1 manifest when read', async () => {
+    const legacy = {
+      ...oldSnapshot,
+      schemaVersion: 1,
+      files: oldSnapshot.files.map(({ revision: _revision, ...file }) => file),
+    };
+    const harness = setup(legacy);
+    await expect(harness.changes.get()).resolves.toEqual({ snapshot: oldSnapshot });
+    expect(harness.values.get(WORKTREE_CHANGES_KEY)).toEqual(legacy);
     expect(harness.storage.kv.put).not.toHaveBeenCalled();
   });
 
@@ -617,7 +631,7 @@ describe('worktree changes capture coordination', () => {
       status: 'refreshed',
       snapshot: { revision: 10, comparison: { baseRef: replaced.baseRef } },
     });
-    expect(harness.values.get(`${WORKTREE_FILE_PREFIX}src/changed.ts`)).toEqual(fileRecord(10));
+    expect(harness.values.get(`${WORKTREE_FILE_PREFIX}src/changed.ts`)).toEqual(fileRecord(8));
     expect(harness.requestCapture).toHaveBeenCalledTimes(2);
   });
 
@@ -740,6 +754,286 @@ describe('worktree changes capture coordination', () => {
     expect(harness.values.get(WORKTREE_CHANGES_KEY)).toEqual(result.snapshot);
     expect(harness.values.has(`${WORKTREE_FILE_PREFIX}src/changed.ts`)).toBe(false);
     expect(harness.values.get(`${WORKTREE_FILE_PREFIX}new.ts`)).toEqual(fileRecord(9, 'new.ts'));
+  });
+
+  it('trims the manifest and removes KV records for unretained paths', async () => {
+    const harness = setup();
+    const summary = captureResult(9);
+    let suffix = 'x'.repeat(256);
+    const makeFiles = () =>
+      Array.from({ length: 1_000 }, (_, index) => ({
+        ...captureResult(9).files[0],
+        path: `${index}/${suffix}`,
+      }));
+    summary.files = makeFiles();
+    while (
+      new TextEncoder().encode(JSON.stringify(summary)).byteLength >
+      MAX_WORKTREE_CHANGES_BYTES - 1_000
+    ) {
+      suffix = suffix.slice(0, -1);
+      summary.files = makeFiles();
+    }
+    const files = summary.files.map(file => fileRecord(9, file.path));
+    harness.requestCapture.mockResolvedValueOnce(response({ summary, files }));
+
+    const result = await harness.changes.refresh();
+    if (result.status !== 'refreshed') throw new Error('Expected a refreshed manifest');
+    expect(result.snapshot.truncated).toBe(true);
+    expect(result.snapshot.files).toEqual(
+      summary.files.slice(0, result.snapshot.files.length).map(file => ({ ...file, revision: 9 }))
+    );
+    expect(result.snapshot.files.length).toBeGreaterThan(0);
+    expect(result.snapshot.files.length).toBeLessThan(summary.files.length);
+    const retainedKeys = new Set(
+      result.snapshot.files.map(file => `${WORKTREE_FILE_PREFIX}${file.path}`)
+    );
+    expect(
+      [...harness.values.keys()].filter(key => key.startsWith(WORKTREE_FILE_PREFIX)).sort()
+    ).toEqual([...retainedKeys].sort());
+    const removed = summary.files.at(-1);
+    if (!removed) throw new Error('Expected a trimmed fixture path');
+    expect(harness.values.has(`${WORKTREE_FILE_PREFIX}${removed.path}`)).toBe(false);
+  });
+
+  it('preserves A identity when only B changes, then advances A for a same-count payload change', async () => {
+    const harness = setup();
+    const a = oldSnapshot.files[0];
+    if (!a) throw new Error('Missing A fixture');
+    const b = { ...a, path: 'src/other.ts' };
+    harness.values.set(WORKTREE_CHANGES_KEY, { ...oldSnapshot, files: [a, b] });
+    harness.values.set(`${WORKTREE_FILE_PREFIX}${b.path}`, fileRecord(8, b.path));
+
+    const { revision: _aRevision, ...capturedA } = a;
+    const { revision: _bRevision, ...capturedB } = b;
+    const bOnly = captureResult(9);
+    bOnly.files = [capturedA, capturedB];
+    harness.requestCapture.mockResolvedValueOnce(
+      response({
+        summary: bOnly,
+        files: [
+          fileRecord(9, a.path),
+          {
+            ...fileRecord(9, b.path),
+            diff: {
+              status: 'available',
+              patch: 'diff --git a/src/other.ts b/src/other.ts\n-old\n+other\n',
+            },
+            content: { status: 'available', source: 'current', text: 'other\n' },
+          },
+        ],
+      })
+    );
+    const afterB = await harness.changes.refresh();
+    expect(afterB).toMatchObject({
+      status: 'refreshed',
+      snapshot: {
+        revision: 9,
+        files: [
+          { path: a.path, revision: 8 },
+          { path: b.path, revision: 9 },
+        ],
+      },
+    });
+    expect(harness.changes.getFile({ path: a.path, expectedRevision: 8 })).toMatchObject({
+      status: 'available',
+      file: { revision: 8 },
+    });
+
+    const aChanged = captureResult(10);
+    aChanged.files = bOnly.files;
+    harness.requestCapture.mockResolvedValueOnce(
+      response({
+        summary: aChanged,
+        files: [
+          {
+            ...fileRecord(10, a.path),
+            diff: {
+              status: 'available',
+              patch: 'diff --git a/src/changed.ts b/src/changed.ts\n-old\n+changed\n',
+            },
+            content: { status: 'available', source: 'current', text: 'changed\n' },
+          },
+          {
+            ...fileRecord(10, b.path),
+            diff: {
+              status: 'available',
+              patch: 'diff --git a/src/other.ts b/src/other.ts\n-old\n+other\n',
+            },
+            content: { status: 'available', source: 'current', text: 'other\n' },
+          },
+        ],
+      })
+    );
+    const afterA = await harness.changes.refresh();
+    expect(afterA).toMatchObject({
+      status: 'refreshed',
+      snapshot: {
+        revision: 10,
+        files: [
+          { path: a.path, revision: 10 },
+          { path: b.path, revision: 9 },
+        ],
+      },
+    });
+    expect(harness.changes.getFile({ path: a.path, expectedRevision: 8 })).toEqual({
+      status: 'stale',
+      currentRevision: 10,
+    });
+  });
+
+  it('advances omission-only records on every capture', async () => {
+    const harness = setup();
+    const omission: WorktreeFileRecord = {
+      ...fileRecord(9),
+      diff: { status: 'omitted', reason: 'budget_exhausted' },
+      content: { status: 'unavailable', reason: 'budget_exhausted' },
+    };
+    harness.requestCapture.mockResolvedValueOnce(
+      response({ summary: captureResult(9), files: [omission] })
+    );
+    const first = await harness.changes.refresh();
+    expect(first).toMatchObject({ status: 'refreshed', snapshot: { files: [{ revision: 9 }] } });
+    const repeat: WorktreeFileRecord = { ...omission, revision: 10 };
+    harness.requestCapture.mockResolvedValueOnce(
+      response({ summary: captureResult(10), files: [repeat] })
+    );
+    await expect(harness.changes.refresh()).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { files: [{ revision: 10 }] },
+    });
+  });
+
+  it.each([
+    ['malformed', { ...fileRecord(8), revision: '8' }],
+    ['schema-valid but inconsistent', { ...fileRecord(8), path: 'src/other.ts' }],
+  ])('does not reuse a revision from a %s predecessor record', async (_name, predecessor) => {
+    const harness = setup();
+    harness.values.set(`${WORKTREE_FILE_PREFIX}src/changed.ts`, predecessor);
+    harness.requestCapture.mockResolvedValueOnce(snapshotResponse(captureResult(9)));
+    await expect(harness.changes.refresh()).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { files: [{ path: 'src/changed.ts', revision: 9 }] },
+    });
+  });
+
+  it('reuses a revision when matching available content is empty', async () => {
+    const harness = setup();
+    const empty = {
+      ...fileRecord(8),
+      content: { status: 'available' as const, source: 'current' as const, text: '' },
+    };
+    harness.values.set(`${WORKTREE_FILE_PREFIX}src/changed.ts`, empty);
+    harness.requestCapture.mockResolvedValueOnce(
+      response({
+        summary: captureResult(9),
+        files: [{ ...empty, revision: 9 }],
+      })
+    );
+    await expect(harness.changes.refresh()).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { files: [{ revision: 8 }] },
+    });
+  });
+
+  it.each([
+    [
+      'available diff and unavailable content',
+      {
+        ...fileRecord(8),
+        content: { status: 'unavailable' as const, reason: 'too_large' as const },
+      },
+    ],
+    [
+      'omitted diff and available content',
+      {
+        ...fileRecord(8),
+        diff: { status: 'omitted' as const, reason: 'too_large' as const },
+      },
+    ],
+  ] satisfies [string, WorktreeFileRecord][])(
+    'reuses a revision for matching %s',
+    async (_name, record) => {
+      const harness = setup();
+      harness.values.set(`${WORKTREE_FILE_PREFIX}src/changed.ts`, record);
+      harness.requestCapture.mockResolvedValueOnce(
+        response({ summary: captureResult(9), files: [{ ...record, revision: 9 }] })
+      );
+      await expect(harness.changes.refresh()).resolves.toMatchObject({
+        status: 'refreshed',
+        snapshot: { files: [{ revision: 8 }] },
+      });
+    }
+  );
+
+  it.each([
+    [
+      'diff availability',
+      fileRecord(8),
+      { ...fileRecord(9), diff: { status: 'omitted' as const, reason: 'too_large' as const } },
+    ],
+    [
+      'content unavailability reason',
+      {
+        ...fileRecord(8),
+        content: { status: 'unavailable' as const, reason: 'too_large' as const },
+      },
+      {
+        ...fileRecord(9),
+        content: { status: 'unavailable' as const, reason: 'budget_exhausted' as const },
+      },
+    ],
+    [
+      'content source',
+      fileRecord(8),
+      {
+        ...fileRecord(9),
+        content: {
+          status: 'available' as const,
+          source: 'deleted-original' as const,
+          text: 'new\n',
+        },
+      },
+    ],
+  ] satisfies [string, WorktreeFileRecord, WorktreeFileRecord][])(
+    'advances a revision when %s changes',
+    async (_name, predecessor, next) => {
+      const harness = setup();
+      harness.values.set(`${WORKTREE_FILE_PREFIX}src/changed.ts`, predecessor);
+      const summary = captureResult(9);
+      if (next.content.status === 'available' && next.content.source === 'deleted-original') {
+        summary.files = summary.files.map(file => ({ ...file, status: 'deleted' }));
+      }
+      harness.requestCapture.mockResolvedValueOnce(response({ summary, files: [next] }));
+      await expect(harness.changes.refresh()).resolves.toMatchObject({
+        status: 'refreshed',
+        snapshot: { files: [{ revision: 9 }] },
+      });
+    }
+  );
+
+  it('advances a revision when a path is removed and then re-added', async () => {
+    const harness = setup();
+    harness.requestCapture.mockResolvedValueOnce(
+      response({ summary: { ...captureResult(9), files: [] }, files: [] })
+    );
+    await expect(harness.changes.refresh()).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { revision: 9, files: [] },
+    });
+    expect(harness.changes.getFile({ path: 'src/changed.ts', expectedRevision: 8 })).toEqual({
+      status: 'no_longer_listed',
+      currentRevision: 9,
+    });
+
+    harness.requestCapture.mockResolvedValueOnce(snapshotResponse(captureResult(10)));
+    await expect(harness.changes.refresh()).resolves.toMatchObject({
+      status: 'refreshed',
+      snapshot: { files: [{ path: 'src/changed.ts', revision: 10 }] },
+    });
+    expect(harness.changes.getFile({ path: 'src/changed.ts', expectedRevision: 8 })).toEqual({
+      status: 'stale',
+      currentRevision: 10,
+    });
   });
 
   it('does not pair a newly omitted diff with old complete content for the same path', async () => {

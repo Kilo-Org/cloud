@@ -4,10 +4,6 @@ import { type RefreshControlProps } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import {
-  PR_DIFF_FLOATING_ACTIONS_FALLBACK_HEIGHT,
-  PR_DIFF_LIST_FOOTER_GAP,
-} from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 import { ProviderPrScopeProvider } from '@/lib/pr-review/provider-pr-ref';
 
 import { PrReviewFileList } from './pr-diff-file-list';
@@ -318,16 +314,15 @@ describe('PrReviewFileList write affordances per provider', () => {
     });
   });
 
-  it('reserves the bar-sized gap under a provider diff list too', () => {
+  it('keeps the small footer gap under a provider diff list too', () => {
     const githubPadding = listBottomPadding(mountList());
     const gitlabPadding = listBottomPadding(
       mountListInScope({ platform: 'gitlab', projectPath: 'group/repo', mrIid: 12 })
     );
-    // The bar renders on every provider (s6), so every list reserves the
-    // bar's fallback height plus the footer gap — the last diff row is
-    // never hidden under the bar.
-    const expected = PR_DIFF_FLOATING_ACTIONS_FALLBACK_HEIGHT + PR_DIFF_LIST_FOOTER_GAP;
-    expect(githubPadding).toBe(expected);
-    expect(gitlabPadding).toBe(expected);
+    // The bar is an in-flow footer below the list (spot check e3), so no
+    // row can ever scroll under it; the list only keeps a 12-point gap
+    // between its last row and the footer's top edge, on every provider.
+    expect(githubPadding).toBe(12);
+    expect(gitlabPadding).toBe(12);
   });
 });

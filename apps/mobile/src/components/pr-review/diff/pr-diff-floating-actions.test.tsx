@@ -310,18 +310,13 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
   function findRootBar(): React.ReactElement | null {
     // eslint-disable-next-line new-cap
     const element = PrDiffFloatingActions(baseProps);
-    return findElement({
-      node: element,
-      type: 'View',
-      prop: 'onLayout',
-      value: (element.props as { onLayout?: unknown }).onLayout,
-    });
+    return element;
   }
 
   function rootPaddingBottom(): number | undefined {
     const root = findRootBar();
     if (!root) {
-      throw new Error('floating action bar root not found');
+      throw new Error('footer action bar root not found');
     }
     return (root.props as { style?: { paddingBottom?: number } }).style?.paddingBottom;
   }
@@ -335,27 +330,17 @@ describe('PrDiffFloatingActions bottom inset (plan §6)', () => {
     expect(rootPaddingBottom()).toBe(58);
   });
 
-  it('reports the measured layout height through onHeightChange', () => {
-    const onHeightChange = vi.fn(() => undefined);
-    // eslint-disable-next-line new-cap
-    const element = PrDiffFloatingActions({ ...baseProps, onHeightChange });
-    const root = findElement({
-      node: element,
-      type: 'View',
-      prop: 'onLayout',
-      value: (element.props as { onLayout?: unknown }).onLayout,
-    });
+  it('renders in-flow, not as an overlay over the list', () => {
+    // Spot check e3: the bar used to sit `absolute inset-x-0 bottom-0` over
+    // the FlashList, so a partly-scrolled diff row was clipped at its top
+    // edge. As an in-flow footer the list ends above it at every scroll
+    // position.
+    const root = findRootBar();
     if (!root) {
-      throw new Error('floating action bar root not found');
+      throw new Error('footer action bar root not found');
     }
-    const onLayout = (
-      root.props as {
-        onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
-      }
-    ).onLayout;
-    onLayout?.({ nativeEvent: { layout: { height: 150 } } });
-
-    expect(onHeightChange).toHaveBeenCalledTimes(1);
-    expect(onHeightChange).toHaveBeenCalledWith(150);
+    const classes = ((root.props as { className?: string }).className ?? '').split(' ');
+    expect(classes).not.toContain('absolute');
+    expect(classes).toContain('w-full');
   });
 });

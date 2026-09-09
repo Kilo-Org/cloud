@@ -12,8 +12,9 @@
 //   * S7a adds diff-line selection: tapping a line runs the pure
 //     `selectLine` reducer; the result is mirrored into the
 //     `diff-selection-bridge` (so the comment composer can read it on
-//     mount) and a floating action bar (`PrDiffFloatingActions`)
-//     hosts the "Comment" and "Finish review" affordances.
+//     mount) and a footer action bar (`PrDiffFloatingActions`) rendered
+//     in-flow below the list hosts the "Comment" and "Finish review"
+//     affordances.
 //
 // Cold first paint: FlashList mounts only after the first page of files is
 // present. The first-load waiting state is a plain skeleton outside the list
@@ -41,7 +42,6 @@ import {
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
-import { prDiffListBottomPadding } from '@/lib/pr-review/diff/pr-diff-list-bottom-padding';
 import { useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
@@ -59,6 +59,9 @@ import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scrol
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
+
+// Gap between the last diff row and the in-flow footer bar's top edge.
+const PR_DIFF_LIST_FOOTER_GAP = 12;
 
 type PrReviewFileListProps = {
   readonly owner: string;
@@ -127,30 +130,13 @@ export function PrReviewFileList({
     [owner, repo, number]
   );
 
-  // Measured floating-bar height (null until the first layout event).
-  const [barHeight, setBarHeight] = useState<number | null>(null);
-
-  // Stable callback: ignore sub-one-point noise to avoid unnecessary
-  // re-renders.  Layout events can fire with fractional-pixel deltas.
-  const handleHeightChange = useCallback((height: number) => {
-    setBarHeight(prev => {
-      if (prev !== null && Math.abs(prev - height) < 1) {
-        return prev;
-      }
-      return height;
-    });
-  }, []);
-
   // The write bar renders on every provider (s6): its two routes — the
   // comment composer and the review-submit sheet — are siblings of the
   // GitHub route AND of the provider route, so the bar pushes the sheet
-  // inside the scope its queries run under. The list's bottom padding
-  // reserves the bar's space at its measured (or fallback) height, so the
-  // last diff row is never hidden under it.
-  const listContentStyle = useMemo(
-    () => ({ paddingBottom: prDiffListBottomPadding(barHeight) }),
-    [barHeight]
-  );
+  // inside the scope its queries run under. The bar is an in-flow footer
+  // below the list (spot check e3), so the list only keeps a small gap
+  // between its last row and the footer's top edge.
+  const listContentStyle = useMemo(() => ({ paddingBottom: PR_DIFF_LIST_FOOTER_GAP }), []);
 
   // Which provider's words the terminal and empty states use.
   const copy = usePrDiffStateCopy({ owner, repo, number });
@@ -377,7 +363,6 @@ export function PrReviewFileList({
           viewMode={effectiveViewMode}
           selection={selection}
           onClearSelection={clearSelection}
-          onHeightChange={handleHeightChange}
         />
       </View>
     </DiffFontMetricsContext.Provider>

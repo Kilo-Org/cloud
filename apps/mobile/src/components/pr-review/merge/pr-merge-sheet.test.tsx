@@ -606,6 +606,37 @@ describe('PrMergeSheet provider merge arm (s6)', () => {
       findElement({ node: element, type: 'Button', prop: 'accessibilityLabel', value: 'Cancel' })
     ).not.toBeNull();
   });
+
+  it('pins the blocked-arm footer to the sheet bottom (spot check e7)', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrMergeSheet({
+      ...baseProps,
+      prRef: GITLAB_REF,
+      mergeState: mergeState({
+        canMerge: false,
+        blockedReasons: [{ code: 'failing_pipeline', message: 'Pipeline #123 failed' }],
+      }),
+    });
+    // The sheet opens at the full detent; a growing spacer plus a content
+    // container that fills the viewport keep Cancel on the sheet's bottom
+    // edge instead of floating mid-sheet over an empty region.
+    const scroll = findElement({
+      node: element,
+      type: 'ScrollView',
+      prop: 'className',
+      value: 'flex-1 bg-background',
+    });
+    expect(scroll).not.toBeNull();
+    if (!scroll) {
+      return;
+    }
+    expect(
+      (scroll.props as { contentContainerStyle?: Record<string, unknown> }).contentContainerStyle
+    ).toEqual({ flexGrow: 1, paddingBottom: 4 });
+    expect(
+      findElement({ node: scroll, type: 'View', prop: 'className', value: 'flex-1' })
+    ).not.toBeNull();
+  });
 });
 
 // ── s6f: reviewer blocking findings ──────────────────────────────────

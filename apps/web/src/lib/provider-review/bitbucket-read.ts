@@ -242,7 +242,29 @@ export async function requestBitbucketJson<T>(
  * One bearer request with a bounded read: the body is streamed with a cap so
  * a hostile response cannot stream unbounded bytes (same rule as the GitLab
  * transport). Returns null for a bodyless 204/205/304.
+ *
+ * Bitbucket Cloud legitimately answers some GET endpoints with a 30x redirect
+ * (the pull-request diffstat endpoint redirects onto its `/diffstat/<spec>`
+ * form), so the transport follows redirect responses itself: `fetch` runs
+ * with `redirect: 'manual'`, and a redirect is re-issued only when it is a
+ * GET whose `location` resolves back onto the Bitbucket API origin under
+ * `/2.0/` — the bearer token never leaves that origin. Everything else keeps
+ * the pre-existing behavior: the bare status is raised and classified.
  */
+const BITBUCKET_REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
+const BITBUCKET_MAX_REDIRECT_HOPS = 3;
+
+function sameApiOriginRedirectTarget(currentUrl: string, location: string): string | null {
+  try {
+    const target = new URL(location, currentUrl);
+    if (target.origin !== BITBUCKET_API_ORIGIN) return null;
+    if (!target.pathname.startsWith('/2.0/')) return null;
+    return target.toString();
+  } catch {
+    return null;
+  }
+}
+
 async function fetchBoundedText(
   url: string,
   request: {
@@ -253,59 +275,79 @@ async function fetchBoundedText(
   }
 ): Promise<string | null> {
   const method = request.method ?? 'GET';
-  const response = await fetch(url, {
-    method,
-    headers: {
-      Authorization: `Bearer ${request.accessToken}`,
-      Accept: request.accept ?? 'application/json',
-      ...(request.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    },
-    body: request.body !== undefined ? JSON.stringify(request.body) : undefined,
-    redirect: 'manual',
-    signal: AbortSignal.timeout(BITBUCKET_REQUEST_TIMEOUT_MS),
-  });
-  if (!response.ok) {
-    throw new BitbucketApiStatusError(
-      response.status,
-      `Bitbucket ${method} request failed: ${response.status}`
-    );
-  }
-  if (response.status === 204 || response.status === 205 || response.status === 304) return null;
-  const reader = response.body?.getReader();
-  if (!reader) return '';
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (!(value instanceof Uint8Array)) {
-        throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected response.');
+  let requestUrl = url;
+  for (let hop = 0; hop <= BITBUCKET_MAX_REDIRECT_HOPS; hop += 1) {
+    const response = await fetch(requestUrl, {
+      method,
+      headers: {
+        Authorization: `Bearer ${request.accessToken}`,
+        Accept: request.accept ?? 'application/json',
+        ...(request.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      },
+      body: request.body !== undefined ? JSON.stringify(request.body) : undefined,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(BITBUCKET_REQUEST_TIMEOUT_MS),
+    });
+    if (BITBUCKET_REDIRECT_STATUSES.has(response.status)) {
+      const location = response.headers.get('location');
+      const target =
+        method === 'GET' && location !== null
+          ? sameApiOriginRedirectTarget(requestUrl, location)
+          : null;
+      if (target !== null && hop < BITBUCKET_MAX_REDIRECT_HOPS) {
+        requestUrl = target;
+        continue;
       }
-      totalBytes += value.byteLength;
-      if (totalBytes > MAX_BITBUCKET_RESPONSE_BYTES) {
-        try {
-          await reader.cancel();
-        } catch {
-          // The bounded read remains failed if cancellation itself fails.
-        }
-        throw new BitbucketReviewError(
-          'retryable',
-          'The Bitbucket response exceeded the size limit.'
-        );
-      }
-      chunks.push(value);
+      throw new BitbucketApiStatusError(
+        response.status,
+        `Bitbucket ${method} request failed: ${response.status}`
+      );
     }
-  } finally {
-    reader.releaseLock();
+    if (!response.ok) {
+      throw new BitbucketApiStatusError(
+        response.status,
+        `Bitbucket ${method} request failed: ${response.status}`
+      );
+    }
+    if (response.status === 204 || response.status === 205 || response.status === 304) return null;
+    const reader = response.body?.getReader();
+    if (!reader) return '';
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!(value instanceof Uint8Array)) {
+          throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected response.');
+        }
+        totalBytes += value.byteLength;
+        if (totalBytes > MAX_BITBUCKET_RESPONSE_BYTES) {
+          try {
+            await reader.cancel();
+          } catch {
+            // The bounded read remains failed if cancellation itself fails.
+          }
+          throw new BitbucketReviewError(
+            'retryable',
+            'The Bitbucket response exceeded the size limit.'
+          );
+        }
+        chunks.push(value);
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const merged = new Uint8Array(totalBytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(merged);
   }
-  const merged = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    merged.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return new TextDecoder().decode(merged);
+  // The loop always returns or throws; this line is unreachable.
+  throw new BitbucketReviewError('retryable', 'Bitbucket returned an unexpected response.');
 }
 
 /** One raw-text request (the `/src` file endpoint answers plain text). */

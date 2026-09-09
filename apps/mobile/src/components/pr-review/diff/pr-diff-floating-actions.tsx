@@ -1,4 +1,7 @@
-// Floating action bar rendered over the PR diff FlashList. Hosts:
+// Footer action bar rendered in-flow below the PR diff FlashList. The list
+// ends at its top edge, so a diff row is never clipped by it at any scroll
+// position (spot check e3: the bar floated over the list and cut the last
+// src/beta.ts line). Hosts:
 //   - The "Comment" affordance that pushes the comment-composer route
 //     when a diff-line selection exists, plus a "Clear" button that
 //     drops the selection.
@@ -13,7 +16,7 @@
 import { type Href, useRouter } from 'expo-router';
 import { MessageCirclePlus } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
-import { type LayoutChangeEvent, View } from 'react-native';
+import { View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/button';
@@ -47,8 +50,6 @@ type PrDiffFloatingActionsProps = Readonly<{
   selection: SelectionState | null;
   /** Setter for the parent's selection state — `null` clears. */
   onClearSelection: () => void;
-  /** Optional callback for the measured root layout height (points). */
-  onHeightChange?: (height: number) => void;
 }>;
 
 export function PrDiffFloatingActions({
@@ -59,18 +60,15 @@ export function PrDiffFloatingActions({
   viewMode,
   selection,
   onClearSelection,
-  onHeightChange,
 }: PrDiffFloatingActionsProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const pending = usePendingReview();
-  // The bar sits on the bottom edge, so its bottom padding must include the
-  // Android system inset. The measured height (onLayout) therefore already
-  // includes the inset, which `prDiffListBottomPadding` reserves for the list.
-  // The container itself is opaque (`bg-background`): the card floats inside
-  // a transparent ring of padding, and without a solid backdrop the diff text
-  // of rows scrolled under the bar shows through around and below the button.
+  // The footer sits on the bottom edge, so its bottom padding must include
+  // the Android system inset. The container is opaque (`bg-background`) and
+  // in-flow: the diff list ends at its top edge, so no row is ever clipped
+  // by it and nothing shows through around the card.
   const insets = useSafeAreaInsets();
 
   const showSelectionAction = viewMode === 'unified' && selection !== null;
@@ -115,10 +113,7 @@ export function PrDiffFloatingActions({
 
   return (
     <View
-      onLayout={(event: LayoutChangeEvent) => {
-        onHeightChange?.(event.nativeEvent.layout.height);
-      }}
-      className="absolute inset-x-0 bottom-0 items-center gap-2 bg-background px-4 pt-3"
+      className="w-full items-center gap-2 bg-background px-4 pt-3"
       style={{ paddingBottom: 24 + insets.bottom }}
     >
       <View className="w-full gap-2 rounded-2xl border border-border bg-background px-3 py-3 shadow-lg shadow-[#0000001A]">

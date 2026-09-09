@@ -315,6 +315,59 @@ describe('getPullRequest', () => {
 
     expect(summary.state).toBe('merged');
   });
+
+  it('follows a same-origin 302 the diffstat endpoint answers with', async () => {
+    const redirectTarget =
+      'https://api.bitbucket.org/2.0/repositories/acme/repo/diffstat/acme/repo:abc%0Ddef?pagelen=50&from_pullrequest_id=12&topic=true';
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (new URL(full).pathname.endsWith('/pullrequests/12')) {
+        return jsonResponse(prDetail);
+      }
+      if (full === redirectTarget) {
+        return jsonResponse(diffstatPage1);
+      }
+      if (new URL(full).pathname.endsWith('/pullrequests/12/diffstat')) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: redirectTarget },
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const result = await listChangedFiles(ORG_OWNER, 'acme', 'repo', 12);
+
+    expect(result.files).toHaveLength(diffstatPage1.values.length);
+    expect(fetchMock).toHaveBeenCalledWith(redirectTarget, expect.anything());
+  });
+
+  it('raises the bare status for a redirect that leaves the Bitbucket API origin', async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      const full = url.toString();
+      if (full.includes('token-service.example.com')) {
+        return jsonResponse({ status: 'available', token: 'at-mock-token', workspace: WORKSPACE });
+      }
+      if (new URL(full).pathname.endsWith('/pullrequests/12')) {
+        return jsonResponse(prDetail);
+      }
+      if (new URL(full).pathname.endsWith('/pullrequests/12/diffstat')) {
+        return new Response(null, {
+          status: 302,
+          headers: { location: 'https://evil.example.com/2.0/steal' },
+        });
+      }
+      return jsonResponse({ pagelen: 50, values: [], next: null });
+    });
+
+    const error = await captureRejection(listChangedFiles(ORG_OWNER, 'acme', 'repo', 12));
+
+    expect(error.kind).toBe('retryable');
+    expect(error.message).toBe('Bitbucket returned an unexpected error.');
+  });
 });
 
 describe('listChangedFiles — pagination', () => {

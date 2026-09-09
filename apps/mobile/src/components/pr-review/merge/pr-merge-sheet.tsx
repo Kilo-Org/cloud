@@ -519,6 +519,16 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
     onDismiss();
   }
 
+  // The short arms (blocked merge, capability banner, provider auto-merge)
+  // carry a small body; the sheet still opens at the full detent, so their
+  // footers are pinned to the sheet's bottom edge with a growing spacer
+  // (spot check e7: Cancel sat mid-sheet over a large empty region). The
+  // ScrollView's content container grows to at least the viewport, so the
+  // spacer only expands when the body is shorter than the sheet.
+  function bodySpacer() {
+    return <View className="flex-1" />;
+  }
+
   // The body a settled draft renders: the arm the provider state selects —
   // the Bitbucket auto-merge capability banner, the GitLab auto-merge body,
   // a blocked merge state's restrictions, or the form. The cancel-only
@@ -548,6 +558,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
           <View className="gap-4 px-6 pt-4">
             <PrReviewCapabilityBanner capability={autoMergeCapability} />
           </View>
+          {bodySpacer()}
           {cancelOnlyFooter()}
         </>
       );
@@ -556,6 +567,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       return (
         <>
           <ProviderAutoMergeBody mergeState={mergeState} term={providerTerm} />
+          {bodySpacer()}
           <PrFormSheetFooter>
             <Button
               onPress={handleConfirmPress}
@@ -586,6 +598,7 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
           <View className="gap-4 px-6 pt-4">
             <MergeRestrictionsList mergeState={mergeState} term={providerTerm} />
           </View>
+          {bodySpacer()}
           {cancelOnlyFooter()}
         </>
       );
@@ -635,7 +648,9 @@ export function PrMergeSheet(props: PrMergeSheetProps) {
       <ScrollView
         ref={scrollRef}
         className="flex-1 bg-background"
-        contentContainerClassName="pb-1"
+        // flexGrow makes the content container at least the viewport tall,
+        // so a short arm's spacer can push its footer to the sheet's bottom.
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: 4 }}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
         keyboardDismissMode="interactive"

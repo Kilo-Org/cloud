@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { z } from 'zod';
+import { isGitHubConnectionManagementEnabled } from '@/lib/integrations/github/multiple-installations';
 import { createSignedToken, verifySignedTokenDetailed } from '@/lib/signed-token';
 import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
@@ -32,9 +33,6 @@ import { validateReturnPath } from '@/lib/integrations/validate-return-path';
 
 /** Maximum age of a state token in seconds (10 minutes). */
 export const OAUTH_STATE_TTL_SECONDS = 10 * 60;
-export const PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS = Math.floor(
-  Date.parse('2026-09-09T00:00:00.000Z') / 1000
-);
 
 export type VerifiedOAuthState = {
   /** The original owner string (`user_<id>` or `org_<id>`) */
@@ -137,5 +135,5 @@ export function verifyOAuthStateDetailed(state: string | null): OAuthStateVerifi
 }
 
 export function isLegacyProviderOAuthState(state: VerifiedOAuthState): boolean {
-  return !state.purpose && state.issuedAt < PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS;
+  return !state.purpose && !isGitHubConnectionManagementEnabled();
 }

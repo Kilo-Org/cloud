@@ -98,7 +98,8 @@ export class GitHubInstallationAccessDeniedError extends Error {
 function buildAuthorizedInstallationsQuery(
   db: WorkerDb,
   params: FindInstallationParams,
-  repoOwner?: string
+  repoOwner: string | undefined,
+  authorizationMode: 'generic' | 'managed'
 ) {
   const accountLoginFilter =
     repoOwner === undefined
@@ -200,7 +201,10 @@ function buildAuthorizedInstallationsQuery(
             eq(github_app_installations.lifecycle_state, 'active'),
             isNull(github_app_installations.suspended_at),
             isNull(github_app_installations.deleted_at),
-            isNull(github_app_installations.auth_invalid_at)
+            isNull(github_app_installations.auth_invalid_at),
+            authorizationMode === 'generic'
+              ? eq(github_app_installations.sharing_mode, 'exclusive')
+              : undefined
           )
         ),
         or(
@@ -227,7 +231,7 @@ function buildAuthorizedInstallationsQuery(
 
 export function buildInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner, 'generic').limit(
     params.expectedIntegrationId === undefined ? 2 : 1
   );
 }
@@ -236,14 +240,14 @@ export function buildInstallationRefreshCandidatesQuery(
   db: WorkerDb,
   params: FindInstallationParams
 ) {
-  return buildAuthorizedInstallationsQuery(db, params).limit(
+  return buildAuthorizedInstallationsQuery(db, params, undefined, 'generic').limit(
     MAX_INSTALLATION_LOGIN_REFRESH_CANDIDATES
   );
 }
 
 export function buildManagedInstallationLookupQuery(db: WorkerDb, params: FindInstallationParams) {
   const [repoOwner = ''] = params.githubRepo.split('/');
-  return buildAuthorizedInstallationsQuery(db, params, repoOwner).limit(
+  return buildAuthorizedInstallationsQuery(db, params, repoOwner, 'managed').limit(
     params.expectedIntegrationId === undefined ? 2 : 1
   );
 }

@@ -1085,6 +1085,13 @@ export async function anonymizeCloudUserData(
   tx: DrizzleTransaction,
   userId: string
 ): Promise<void> {
+  const [user] = await tx
+    .select()
+    .from(kilocode_users)
+    .where(eq(kilocode_users.id, userId))
+    .for('update')
+    .limit(1);
+  if (!user) return;
   await tx
     .delete(provider_oauth_attempts)
     .where(
@@ -1093,13 +1100,6 @@ export async function anonymizeCloudUserData(
         eq(provider_oauth_attempts.owned_by_user_id, userId)
       )
     );
-  const [user] = await tx
-    .select()
-    .from(kilocode_users)
-    .where(eq(kilocode_users.id, userId))
-    .for('update')
-    .limit(1);
-  if (!user) return;
 
   const originalEmail = user.google_user_email;
   const deletedEmail = `deleted+${userId}@deleted.invalid`;

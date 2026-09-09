@@ -46,6 +46,7 @@ describe('buildInstallationLookupQuery', () => {
     expect(query.params.filter(param => param === 'user-1')).toHaveLength(4);
     expect(query.params).toContain('00000000-0000-4000-8000-000000000001');
     expect(query.params).toContain(2);
+    expect(query.params).toContain('exclusive');
   });
 
   it('requires current membership for every organization-scoped credential candidate', () => {

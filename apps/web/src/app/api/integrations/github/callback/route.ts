@@ -681,7 +681,9 @@ async function handleCoreInstallFlow(params: {
             ? 'shared_installation_disabled'
             : upsertResult.reason === 'incompatible_workflow'
               ? 'incompatible_workflow'
-              : 'installation_already_claimed';
+              : upsertResult.reason === 'retryable_conflict'
+                ? 'connection_temporarily_unavailable'
+                : 'installation_already_claimed';
       if (isAppInitiated) {
         return NextResponse.redirect(new URL(appFallbackPath(`error=${error}`), APP_URL));
       }

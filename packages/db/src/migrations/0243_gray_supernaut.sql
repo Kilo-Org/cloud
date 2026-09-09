@@ -3,7 +3,12 @@ CREATE TABLE "github_installation_webhook_receipts" (
 	"github_installation_id" uuid NOT NULL,
 	"delivery_id" text NOT NULL,
 	"event_type" text NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"status" text DEFAULT 'pending' NOT NULL,
+	"lease_expires_at" timestamp with time zone NOT NULL,
+	"attempt_count" integer DEFAULT 1 NOT NULL,
+	"completed_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "github_installation_webhook_receipts_status_check" CHECK ("github_installation_webhook_receipts"."status" IN ('pending', 'completed'))
 );
 --> statement-breakpoint
 CREATE TABLE "provider_oauth_attempts" (
@@ -38,8 +43,10 @@ CREATE UNIQUE INDEX "UQ_provider_oauth_attempts_user_pending" ON "provider_oauth
 CREATE UNIQUE INDEX "UQ_provider_oauth_attempts_org_pending" ON "provider_oauth_attempts" USING btree ("owned_by_organization_id","provider") WHERE "provider_oauth_attempts"."status" = 'pending' AND "provider_oauth_attempts"."owned_by_organization_id" IS NOT NULL;--> statement-breakpoint
 CREATE INDEX "IDX_provider_oauth_attempts_expires_at" ON "provider_oauth_attempts" USING btree ("expires_at");--> statement-breakpoint
 ALTER TABLE "platform_integrations" ADD CONSTRAINT "platform_integrations_github_installation_id_github_app_installations_id_fk" FOREIGN KEY ("github_installation_id") REFERENCES "public"."github_app_installations"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_github_org_canonical" ON "platform_integrations" USING btree ("owned_by_organization_id","github_installation_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_organization_id" IS NOT NULL AND "platform_integrations"."github_installation_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_github_user_canonical" ON "platform_integrations" USING btree ("owned_by_user_id","github_installation_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_user_id" IS NOT NULL AND "platform_integrations"."github_installation_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_github_org_pending_target" ON "platform_integrations" USING btree ("owned_by_organization_id","platform","github_app_type","platform_account_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_organization_id" IS NOT NULL AND "platform_integrations"."integration_status" = 'pending' AND "platform_integrations"."platform_installation_id" IS NULL AND "platform_integrations"."platform_account_id" IS NOT NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "UQ_platform_integrations_github_user_pending_target" ON "platform_integrations" USING btree ("owned_by_user_id","platform","github_app_type","platform_account_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_user_id" IS NOT NULL AND "platform_integrations"."integration_status" = 'pending' AND "platform_integrations"."platform_installation_id" IS NULL AND "platform_integrations"."platform_account_id" IS NOT NULL;--> statement-breakpoint
+COMMIT;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_org_canonical" ON "platform_integrations" USING btree ("owned_by_organization_id","github_installation_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_organization_id" IS NOT NULL AND "platform_integrations"."github_installation_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_user_canonical" ON "platform_integrations" USING btree ("owned_by_user_id","github_installation_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_user_id" IS NOT NULL AND "platform_integrations"."github_installation_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_org_pending_target" ON "platform_integrations" USING btree ("owned_by_organization_id","platform","github_app_type","platform_account_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_organization_id" IS NOT NULL AND "platform_integrations"."integration_status" = 'pending' AND "platform_integrations"."platform_installation_id" IS NULL AND "platform_integrations"."platform_account_id" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX CONCURRENTLY "UQ_platform_integrations_github_user_pending_target" ON "platform_integrations" USING btree ("owned_by_user_id","platform","github_app_type","platform_account_id") WHERE "platform_integrations"."platform" = 'github' AND "platform_integrations"."owned_by_user_id" IS NOT NULL AND "platform_integrations"."integration_status" = 'pending' AND "platform_integrations"."platform_installation_id" IS NULL AND "platform_integrations"."platform_account_id" IS NOT NULL;--> statement-breakpoint
+BEGIN;--> statement-breakpoint
 ALTER TABLE "github_app_installations" ADD CONSTRAINT "github_app_installations_sharing_mode_check" CHECK ("github_app_installations"."sharing_mode" IN ('exclusive', 'web_cloud_agent'));

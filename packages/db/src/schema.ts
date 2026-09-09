@@ -4275,11 +4275,13 @@ export const platform_integrations = pgTable(
       .where(sql`${table.platform} = 'linear' AND ${table.platform_installation_id} IS NOT NULL`),
     uniqueIndex('UQ_platform_integrations_github_org_canonical')
       .on(table.owned_by_organization_id, table.github_installation_id)
+      .concurrently()
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
       ),
     uniqueIndex('UQ_platform_integrations_github_user_canonical')
       .on(table.owned_by_user_id, table.github_installation_id)
+      .concurrently()
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.github_installation_id} IS NOT NULL`
       ),
@@ -4290,11 +4292,13 @@ export const platform_integrations = pgTable(
         table.github_app_type,
         table.platform_account_id
       )
+      .concurrently()
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_organization_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
       ),
     uniqueIndex('UQ_platform_integrations_github_user_pending_target')
       .on(table.owned_by_user_id, table.platform, table.github_app_type, table.platform_account_id)
+      .concurrently()
       .where(
         sql`${table.platform} = 'github' AND ${table.owned_by_user_id} IS NOT NULL AND ${table.integration_status} = 'pending' AND ${table.platform_installation_id} IS NULL AND ${table.platform_account_id} IS NOT NULL`
       ),
@@ -4407,12 +4411,20 @@ export const github_installation_webhook_receipts = pgTable(
       .references(() => github_app_installations.id, { onDelete: 'cascade' }),
     delivery_id: text().notNull(),
     event_type: text().notNull(),
+    status: text().$type<'pending' | 'completed'>().notNull().default('pending'),
+    lease_expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
+    attempt_count: integer().notNull().default(1),
+    completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
     uniqueIndex('UQ_github_installation_webhook_receipts_delivery').on(
       table.github_installation_id,
       table.delivery_id
+    ),
+    check(
+      'github_installation_webhook_receipts_status_check',
+      sql`${table.status} IN ('pending', 'completed')`
     ),
   ]
 );

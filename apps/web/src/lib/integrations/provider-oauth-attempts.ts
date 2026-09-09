@@ -23,6 +23,8 @@ const ownerCondition = (owner: Owner) =>
     : eq(provider_oauth_attempts.owned_by_user_id, owner.id);
 
 export async function lockProviderOAuthOwnerRow(tx: DrizzleTransaction, owner: Owner) {
+  await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+  await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
   const rows =
     owner.type === 'org'
       ? await tx

@@ -13,6 +13,7 @@ import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { assertGitHubAutomationCanBeEnabled } from '../github/sharing-compatibility';
 import {
   connectVerifiedGitHubInstallation,
+  completeSharedGitHubInstallationDelivery,
   disconnectGitHubInstallation,
   observeGitHubInstallationLifecycle,
   recordSharedGitHubInstallationDelivery,
@@ -125,7 +126,7 @@ describe('GitHub installation persistence', () => {
         deliveryId: 'delivery-1',
         eventType: 'installation.deleted',
       })
-    ).resolves.toBe('claimed');
+    ).resolves.toEqual({ status: 'claimed', attemptCount: 1 });
     await expect(
       recordSharedGitHubInstallationDelivery({
         installationId: '123456',
@@ -133,7 +134,33 @@ describe('GitHub installation persistence', () => {
         deliveryId: 'delivery-1',
         eventType: 'installation.deleted',
       })
-    ).resolves.toBe('duplicate');
+    ).resolves.toEqual({ status: 'duplicate' });
+    await db
+      .update(github_installation_webhook_receipts)
+      .set({ lease_expires_at: '2020-01-01T00:00:00.000Z' })
+      .where(eq(github_installation_webhook_receipts.delivery_id, 'delivery-1'));
+    await expect(
+      recordSharedGitHubInstallationDelivery({
+        installationId: '123456',
+        appType: 'standard',
+        deliveryId: 'delivery-1',
+        eventType: 'installation.deleted',
+      })
+    ).resolves.toEqual({ status: 'claimed', attemptCount: 2 });
+    await completeSharedGitHubInstallationDelivery({
+      installationId: '123456',
+      appType: 'standard',
+      deliveryId: 'delivery-1',
+      attemptCount: 2,
+    });
+    await expect(
+      recordSharedGitHubInstallationDelivery({
+        installationId: '123456',
+        appType: 'standard',
+        deliveryId: 'delivery-1',
+        eventType: 'installation.deleted',
+      })
+    ).resolves.toEqual({ status: 'duplicate' });
     await expect(db.select().from(github_installation_webhook_receipts)).resolves.toHaveLength(1);
   });
 
@@ -367,7 +394,7 @@ describe('GitHub installation persistence', () => {
         deliveryId: 'delivery-after-demotion',
         eventType: 'installation.deleted',
       })
-    ).resolves.toBe('not_shared');
+    ).resolves.toEqual({ status: 'not_shared' });
     await expect(
       assertGitHubAutomationCanBeEnabled({ type: 'org', id: organizationB.id })
     ).resolves.toBeUndefined();
@@ -498,6 +525,31 @@ describe('GitHub installation persistence', () => {
 
     await expect(uninstall).resolves.toBeUndefined();
     await expect(attach).resolves.toEqual({ ok: false, reason: 'installation_unavailable' });
+  });
+
+  test('maps bounded lock waits to a retryable connection conflict', async () => {
+    const statements: string[] = [];
+    const transaction = {
+      execute: async (query: { toQuery: (config: unknown) => { sql: string } }) => {
+        const rendered = query.toQuery({
+          escapeName: (name: string) => name,
+          escapeParam: (index: number) => `$${index + 1}`,
+          escapeString: (value: string) => `'${value}'`,
+          casing: { getColumnCasing: (column: { name: string }) => column.name },
+        });
+        statements.push(rendered.sql);
+        if (statements.length === 4) {
+          throw { cause: { code: '55P03' } };
+        }
+      },
+    } as never;
+
+    await expect(
+      connectVerifiedGitHubInstallation({ type: 'user', id: ownerId }, data(), transaction)
+    ).resolves.toEqual({ ok: false, reason: 'retryable_conflict' });
+    expect(statements.slice(0, 3).join(' ')).toContain('SET LOCAL lock_timeout');
+    expect(statements.slice(0, 3).join(' ')).toContain('SET LOCAL statement_timeout');
+    expect(statements.slice(0, 3).join(' ')).toContain('idle_in_transaction_session_timeout');
   });
 
   test.each([

@@ -12,6 +12,7 @@ const association = {
   },
   installation: {
     lifecycle_state: 'active',
+    sharing_mode: 'exclusive',
     suspended_at: null,
     deleted_at: null,
     auth_invalid_at: null,
@@ -24,6 +25,15 @@ const association = {
 describe('isGitHubRuntimeAssociationAuthorized', () => {
   it('allows a healthy association with an active canonical installation', () => {
     expect(isGitHubRuntimeAssociationAuthorized(association)).toBe(true);
+  });
+
+  it('rejects a shared canonical installation on generic runtime paths', () => {
+    expect(
+      isGitHubRuntimeAssociationAuthorized({
+        ...association,
+        installation: { ...association.installation!, sharing_mode: 'web_cloud_agent' },
+      })
+    ).toBe(false);
   });
 
   it('preserves an unbound healthy legacy association without accepting a broken canonical link', () => {
@@ -74,6 +84,7 @@ describe('isGitHubRuntimeAssociationAuthorized', () => {
         ...association,
         installation: {
           lifecycle_state: 'suspended',
+          sharing_mode: 'exclusive',
           suspended_at: '2026-09-04T00:00:00.000Z',
           deleted_at: null,
           auth_invalid_at: null,

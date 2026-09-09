@@ -47,6 +47,7 @@ import {
   GitHubRuntimeAuthorizationError,
 } from '@/lib/integrations/github/runtime-authorization';
 import {
+  completeSharedGitHubInstallationDelivery,
   deleteSharedGitHubInstallationDelivery,
   isSharedGitHubInstallation,
   recordSharedGitHubInstallationDelivery,
@@ -177,18 +178,32 @@ export async function handleGitHubWebhook(
         deliveryId: eventSignature,
         eventType: `${eventType}.${action}`,
       });
-      if (receipt === 'not_shared') return dispatch();
-      if (receipt === 'duplicate') {
+      if (receipt.status === 'not_shared') return dispatch();
+      if (receipt.status === 'duplicate') {
         return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
       }
       try {
-        return await dispatch();
-      } catch (error) {
-        await deleteSharedGitHubInstallationDelivery({
+        const response = await dispatch();
+        await completeSharedGitHubInstallationDelivery({
           installationId,
           appType,
           deliveryId: eventSignature,
+          attemptCount: receipt.attemptCount,
         });
+        return response;
+      } catch (error) {
+        try {
+          await deleteSharedGitHubInstallationDelivery({
+            installationId,
+            appType,
+            deliveryId: eventSignature,
+            attemptCount: receipt.attemptCount,
+          });
+        } catch (releaseError) {
+          captureException(releaseError, {
+            tags: { source: 'shared_github_delivery_release' },
+          });
+        }
         throw error;
       }
     };

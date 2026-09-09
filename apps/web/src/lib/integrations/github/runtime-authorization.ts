@@ -40,6 +40,7 @@ type RuntimeAssociation = {
   };
   installation: {
     lifecycle_state: 'unknown' | 'active' | 'suspended' | 'deleted';
+    sharing_mode: 'exclusive' | 'web_cloud_agent';
     suspended_at: string | null;
     deleted_at: string | null;
     auth_invalid_at: string | null;
@@ -68,6 +69,7 @@ export function isGitHubRuntimeAssociationAuthorized(
     integration.github_installation_id === null
       ? installation === null
       : installation?.lifecycle_state === 'active' &&
+        installation.sharing_mode === 'exclusive' &&
         installation.suspended_at === null &&
         installation.deleted_at === null &&
         installation.auth_invalid_at === null;

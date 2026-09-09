@@ -18,7 +18,6 @@ import {
 } from '@/lib/bot/platform-helpers';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { createSignedToken } from '@/lib/signed-token';
-import { PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS } from '@/lib/integrations/oauth-state';
 
 const mockIsEnabledForBot = jest.fn();
 const mockHandleOAuthCallback = jest.fn();
@@ -231,12 +230,13 @@ describe('GET /api/integrations/linear/callback', () => {
     expectRedirectLocation(response, '/integrations?error=unauthorized');
   });
 
-  test('accepts a purpose-less state issued before rollout while still inside the TTL', async () => {
+  test('accepts a purpose-less state within TTL while connection management is disabled', async () => {
     jest.useFakeTimers();
     try {
-      jest.setSystemTime((PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS - 30) * 1000);
+      process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
+      jest.setSystemTime(new Date('2026-09-09T12:00:00.000Z'));
       const state = createOAuthState(`user_${USER_ID}`, USER_ID);
-      jest.setSystemTime((PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS + 1) * 1000);
+      jest.advanceTimersByTime(30_000);
       mockedUpsertLinearInstallation.mockResolvedValue({} as never);
 
       const response = await callLinearCallback(
@@ -252,10 +252,11 @@ describe('GET /api/integrations/linear/callback', () => {
     }
   });
 
-  test('rejects a post-rollout purpose-less state without provider mutation', async () => {
+  test('rejects a purpose-less state when connection management is enabled', async () => {
     jest.useFakeTimers();
     try {
-      jest.setSystemTime((PROVIDER_OAUTH_RESERVATION_ROLLOUT_SECONDS + 1) * 1000);
+      process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'true';
+      jest.setSystemTime(new Date('2026-09-09T12:00:00.000Z'));
       const state = createOAuthState(`user_${USER_ID}`, USER_ID);
       const response = await callLinearCallback(
         makeRequest(`/api/integrations/linear/callback?code=abc&state=${state}`)
@@ -266,6 +267,7 @@ describe('GET /api/integrations/linear/callback', () => {
       expect(mockConsumeProviderOAuthAttempt).not.toHaveBeenCalled();
       expect(mockCancelProviderOAuthAttempt).not.toHaveBeenCalled();
     } finally {
+      process.env.GITHUB_CONNECTION_MANAGEMENT_ENABLED = 'false';
       jest.useRealTimers();
     }
   });

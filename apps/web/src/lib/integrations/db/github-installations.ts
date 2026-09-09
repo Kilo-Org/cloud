@@ -44,6 +44,7 @@ export type ConnectVerifiedGitHubInstallationResult =
         | 'claimed_by_other_owner'
         | 'shared_installation_disabled'
         | 'incompatible_workflow'
+        | 'retryable_conflict'
         | 'multiple_installations_disabled'
         | 'installation_unavailable';
     };
@@ -73,6 +74,9 @@ export async function connectVerifiedGitHubInstallation(
   transaction?: DbTransaction
 ): Promise<ConnectVerifiedGitHubInstallationResult> {
   const execute = async (tx: DbTransaction): Promise<ConnectVerifiedGitHubInstallationResult> => {
+    await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+    await tx.execute(sql`SET LOCAL statement_timeout = '30s'`);
+    await tx.execute(sql`SET LOCAL idle_in_transaction_session_timeout = '60s'`);
     if (!isCanonicalInstallationId(data.platformInstallationId)) {
       return { ok: false, reason: 'installation_unavailable' };
     }
@@ -84,7 +88,34 @@ export async function connectVerifiedGitHubInstallation(
     if (requiresOwnerCardinalityLock) {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`${owner.type}:${owner.id}`}))`);
     }
-    await lockProviderOAuthOwnerRow(tx, owner);
+    const participantRows = await tx
+      .select({
+        userId: platform_integrations.owned_by_user_id,
+        organizationId: platform_integrations.owned_by_organization_id,
+      })
+      .from(platform_integrations)
+      .where(
+        and(
+          eq(platform_integrations.platform, PLATFORM.GITHUB),
+          eq(platform_integrations.platform_installation_id, data.platformInstallationId),
+          effectiveAppTypeCondition(data.githubAppType)
+        )
+      );
+    const participants = new Map<string, Owner>();
+    participants.set(`${owner.type}:${owner.id}`, owner);
+    for (const participant of participantRows) {
+      const participantOwner: Owner | null = participant.organizationId
+        ? { type: 'org', id: participant.organizationId }
+        : participant.userId
+          ? { type: 'user', id: participant.userId }
+          : null;
+      if (participantOwner) {
+        participants.set(`${participantOwner.type}:${participantOwner.id}`, participantOwner);
+      }
+    }
+    for (const participant of [...participants.entries()].sort(([a], [b]) => a.localeCompare(b))) {
+      await lockProviderOAuthOwnerRow(tx, participant[1]);
+    }
     if (requiresOwnerCardinalityLock) {
       const ownerIntegrations = await tx
         .select({
@@ -311,7 +342,18 @@ export async function connectVerifiedGitHubInstallation(
     return { ok: true, integrationId: created.id };
   };
 
-  return transaction ? execute(transaction) : db.transaction(execute);
+  try {
+    return await (transaction ? execute(transaction) : db.transaction(execute));
+  } catch (error) {
+    const code =
+      error && typeof error === 'object' && 'cause' in error
+        ? (error.cause as { code?: string } | undefined)?.code
+        : (error as { code?: string } | undefined)?.code;
+    if (code === '55P03' || code === '40P01' || code === '57014') {
+      return { ok: false, reason: 'retryable_conflict' };
+    }
+    throw error;
+  }
 }
 
 export async function disconnectGitHubInstallation(
@@ -755,7 +797,9 @@ export async function recordSharedGitHubInstallationDelivery(input: {
   appType: 'standard' | 'lite';
   deliveryId: string;
   eventType: string;
-}): Promise<'claimed' | 'duplicate' | 'not_shared'> {
+}): Promise<
+  { status: 'claimed'; attemptCount: number } | { status: 'duplicate' } | { status: 'not_shared' }
+> {
   return db.transaction(async tx => {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtext(${`${input.appType}:${input.installationId}`}))`
@@ -773,13 +817,16 @@ export async function recordSharedGitHubInstallationDelivery(input: {
         )
       )
       .for('update');
-    if (!installation || installation.sharingMode !== 'web_cloud_agent') return 'not_shared';
+    if (!installation || installation.sharingMode !== 'web_cloud_agent') {
+      return { status: 'not_shared' };
+    }
     const inserted = await tx
       .insert(github_installation_webhook_receipts)
       .values({
         github_installation_id: installation.id,
         delivery_id: input.deliveryId,
         event_type: input.eventType,
+        lease_expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
       })
       .onConflictDoNothing({
         target: [
@@ -787,8 +834,32 @@ export async function recordSharedGitHubInstallationDelivery(input: {
           github_installation_webhook_receipts.delivery_id,
         ],
       })
-      .returning({ id: github_installation_webhook_receipts.id });
-    return inserted.length === 1 ? 'claimed' : 'duplicate';
+      .returning({ attemptCount: github_installation_webhook_receipts.attempt_count });
+    if (inserted[0]) return { status: 'claimed', attemptCount: inserted[0].attemptCount };
+    const [receipt] = await tx
+      .select()
+      .from(github_installation_webhook_receipts)
+      .where(
+        and(
+          eq(github_installation_webhook_receipts.github_installation_id, installation.id),
+          eq(github_installation_webhook_receipts.delivery_id, input.deliveryId)
+        )
+      )
+      .for('update');
+    if (!receipt || receipt.status === 'completed') return { status: 'duplicate' };
+    if (new Date(receipt.lease_expires_at).getTime() > Date.now()) {
+      return { status: 'duplicate' };
+    }
+    const [reclaimed] = await tx
+      .update(github_installation_webhook_receipts)
+      .set({
+        lease_expires_at: new Date(Date.now() + 5 * 60_000).toISOString(),
+        attempt_count: sql`${github_installation_webhook_receipts.attempt_count} + 1`,
+      })
+      .where(eq(github_installation_webhook_receipts.id, receipt.id))
+      .returning({ attemptCount: github_installation_webhook_receipts.attempt_count });
+    if (!reclaimed) throw new Error('Shared GitHub delivery reclaim failed');
+    return { status: 'claimed', attemptCount: reclaimed.attemptCount };
   });
 }
 
@@ -796,24 +867,62 @@ export async function deleteSharedGitHubInstallationDelivery(input: {
   installationId: string;
   appType: 'standard' | 'lite';
   deliveryId: string;
+  attemptCount: number;
 }): Promise<void> {
-  await db.delete(github_installation_webhook_receipts).where(
-    and(
-      eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
-      eq(
-        github_installation_webhook_receipts.github_installation_id,
-        db
-          .select({ id: github_app_installations.id })
-          .from(github_app_installations)
-          .where(
-            and(
-              eq(github_app_installations.github_app_type, input.appType),
-              eq(github_app_installations.installation_id, input.installationId)
+  await db
+    .update(github_installation_webhook_receipts)
+    .set({
+      lease_expires_at: new Date(0).toISOString(),
+    })
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.attempt_count, input.attemptCount),
+        eq(
+          github_installation_webhook_receipts.github_installation_id,
+          db
+            .select({ id: github_app_installations.id })
+            .from(github_app_installations)
+            .where(
+              and(
+                eq(github_app_installations.github_app_type, input.appType),
+                eq(github_app_installations.installation_id, input.installationId)
+              )
             )
-          )
+        )
+      )
+    );
+}
+
+export async function completeSharedGitHubInstallationDelivery(input: {
+  installationId: string;
+  appType: 'standard' | 'lite';
+  deliveryId: string;
+  attemptCount: number;
+}): Promise<void> {
+  const completed = await db
+    .update(github_installation_webhook_receipts)
+    .set({ status: 'completed', completed_at: new Date().toISOString() })
+    .where(
+      and(
+        eq(github_installation_webhook_receipts.delivery_id, input.deliveryId),
+        eq(github_installation_webhook_receipts.attempt_count, input.attemptCount),
+        eq(
+          github_installation_webhook_receipts.github_installation_id,
+          db
+            .select({ id: github_app_installations.id })
+            .from(github_app_installations)
+            .where(
+              and(
+                eq(github_app_installations.github_app_type, input.appType),
+                eq(github_app_installations.installation_id, input.installationId)
+              )
+            )
+        )
       )
     )
-  );
+    .returning({ id: github_installation_webhook_receipts.id });
+  if (completed.length !== 1) throw new Error('Shared GitHub delivery completion failed');
 }
 
 export async function bindGitHubIntegrationToCanonicalInstallation(input: {

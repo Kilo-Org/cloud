@@ -328,10 +328,8 @@ export function modelNotAllowedResponse() {
 }
 
 export function efficientPoolBlockedResponse() {
-  const error = 'Your organization blocks every model in the auto-routing pool.';
-  const message =
-    `${error} Configure a custom Efficient model pool with allowed models, ` +
-    `or adjust your organization model restrictions.`;
+  const error = 'Auto-routing could not select an eligible model for this request.';
+  const message = `${error} Please try again or contact support if the problem persists.`;
   const logMessage = `[efficientPoolBlockedResponse] ${message}`;
   warnExceptInTest(logMessage);
   return NextResponse.json(
@@ -340,7 +338,7 @@ export function efficientPoolBlockedResponse() {
       error_type: ProxyErrorType.model_not_allowed,
       message,
     },
-    { status: 404 }
+    { status: 503 }
   );
 }
 

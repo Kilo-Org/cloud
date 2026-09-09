@@ -879,9 +879,16 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
 
     // Organization model/provider restrictions check
     // Provider/model access policy applies to Enterprise plans; data collection applies to all plans.
+    const isAutoEfficientAccessCheck = isAutoEfficientRequest && abuseDowngradedFrom === null;
     const efficientFallbackBlockedResponse = () => {
       const fallback = efficientDecisionState.fallback;
-      if (!isAutoEfficientRequest || !fallback) return null;
+      if (
+        !isAutoEfficientAccessCheck ||
+        !fallback ||
+        effectiveModelIdLowerCased !== fallback.modelId
+      ) {
+        return null;
+      }
 
       const decisionFailure = efficientDecisionState.failure;
       return efficientRoutingUnavailableResponse({
@@ -895,14 +902,14 @@ export async function POST(request: NextRequest): Promise<NextResponseType<unkno
     if (modelRestrictionError) {
       return (
         efficientFallbackBlockedResponse() ??
-        (isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelRestrictionError)
+        (isAutoEfficientAccessCheck ? efficientPoolBlockedResponse() : modelRestrictionError)
       );
     }
 
     if (!groupModelAllowed) {
       return (
         efficientFallbackBlockedResponse() ??
-        (isAutoEfficientRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse())
+        (isAutoEfficientAccessCheck ? efficientPoolBlockedResponse() : modelNotAllowedResponse())
       );
     }
     if (!groupProvidersAllowed) {

@@ -1458,6 +1458,56 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('does not report stale fallback details when quarantine replaces the fallback model', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-123',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    mockedGetEffectiveModelDecision.mockResolvedValue({
+      allowed: false,
+      denialSource: 'group_model',
+    });
+    mockedGetOpenRouterModels.mockResolvedValue(new Set([stepfun_37_flash_free_model.public_id]));
+    mockedRedisGet.mockResolvedValue(cachedRulesEngineAction('quarantine-3'));
+    mockedClassifyAbuse.mockResolvedValue(classifyResult('quarantine-3'));
+    mockedFetchEfficientAutoDecision.mockImplementation(async (_params, options) => {
+      options?.onFailure?.({ reason: 'worker_timeout' });
+      return null;
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (params, request) => {
+      await params.efficientDecision?.();
+      params.onEfficientFallback?.({
+        reason: 'worker_returned_no_decision',
+        modelId: 'moonshotai/kimi-k3',
+      });
+      request.body.model = 'moonshotai/kimi-k3';
+      return { kind: 'ok', resolved: { model: 'moonshotai/kimi-k3' } };
+    });
+
+    const { POST } = await import('./route');
+    const response = await POST(makeRequest(makeBody('kilo-auto/efficient')) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body).toMatchObject({ error_type: 'model_not_allowed' });
+    expect(body).not.toHaveProperty('details');
+    expect(mockedWarnExceptInTest).not.toHaveBeenCalledWith(
+      expect.stringContaining('[efficientRoutingUnavailableResponse]'),
+      expect.anything()
+    );
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('guides teams that block every pool model to configure a custom Efficient pool', async () => {
     mockedGetUserFromAuth.mockResolvedValue({
       user: {

@@ -21,6 +21,7 @@ import { CALLBACK_TOKEN_SECRET } from '@/lib/config.server';
 import { parseBotCallbackStep } from '@/lib/bot/step-budget';
 import { ownerFromIntegration } from '@/lib/integrations/core/owner';
 import type { Owner } from '@/lib/integrations/core/types';
+import { resolveModelForGitHubRepository } from '@/lib/integrations/github-repository-settings';
 import { createHmac } from 'crypto';
 import { captureException } from '@sentry/nextjs';
 import type { PlatformIntegration } from '@kilocode/db';
@@ -184,10 +185,37 @@ export default async function spawnCloudAgentSession(
     };
   } else {
     // GitHub path: get token, use githubRepo/githubToken
-    const githubToken =
+    if (!args.githubRepo) {
+      // Unreachable given the guard above (one of githubRepo/gitlabProject
+      // is always set here), but keeps the repo-model lookup below type-safe.
+      return { response: 'Error: You must specify either a githubRepo or a gitlabProject.' };
+    }
+
+    // The token fetch and the per-repository model override lookup are
+    // independent of each other, so resolve them concurrently rather than
+    // paying for two sequential round trips.
+    const [githubToken, effectiveModel] = await Promise.all([
       owner.type === 'org'
-        ? await getGitHubTokenForOrganization(owner.id)
-        : await getGitHubTokenForUser(owner.id);
+        ? getGitHubTokenForOrganization(owner.id)
+        : getGitHubTokenForUser(owner.id),
+      // A per-repository model override (`repository_customizations`) takes
+      // precedence over the installation-default `model` resolved earlier for
+      // this whole bot conversation — the repo is only known now that the LLM
+      // has picked one via this tool call. Guard this lookup independently so
+      // a customization-query failure falls back to the incoming `model`
+      // instead of aborting session creation entirely.
+      resolveModelForGitHubRepository(platformIntegration, args.githubRepo).catch(error => {
+        console.error(
+          '[KiloBot] Failed to resolve per-repository model override, falling back to installation model:',
+          error
+        );
+        captureException(error, {
+          tags: { component: 'kilo-bot', op: 'resolve-model-for-github-repository' },
+          extra: { botRequestId, githubRepo: args.githubRepo },
+        });
+        return model;
+      }),
+    ]);
 
     if (!githubToken) {
       return {
@@ -200,7 +228,7 @@ export default async function spawnCloudAgentSession(
       githubRepo: args.githubRepo,
       prompt,
       mode,
-      model,
+      model: effectiveModel,
       githubToken,
       kilocodeOrganizationId,
       createdOnPlatform: chatPlatform,

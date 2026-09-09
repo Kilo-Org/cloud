@@ -3,6 +3,11 @@ import { z } from 'zod';
 import type { RepositoryCustomization, PlatformIntegration } from '@kilocode/db/schema';
 import { RepositoryReviewMode } from '@kilocode/db/schema-types';
 import { resolveBotModelSlug } from '@/lib/bot/model';
+import { getRepositoryCustomization } from '@/lib/integrations/db/platform-integrations';
+import {
+  findRepositoryIdByFullName,
+  requireNumericPlatformRepositories,
+} from '@/lib/integrations/core/types';
 
 const GitHubReviewModeSchema = z.enum(
   Object.values(RepositoryReviewMode) as [RepositoryReviewMode, ...RepositoryReviewMode[]]
@@ -71,4 +76,28 @@ export function resolveRepositorySettings(
     (installationReviewMode.success ? installationReviewMode.data : 'on');
 
   return { modelSlug, prReviewMode };
+}
+
+/**
+ * Resolves the effective bot-mention model for one GitHub repository,
+ * applying its `repository_customizations` override (if any) on top of the
+ * installation default. `repoFullName` is matched against the installation's
+ * cached repository list (`integration.repositories`) to recover the numeric
+ * ID that `repository_customizations.repository_id` is keyed on; a repo not
+ * found in that cache (e.g. stale sync, or access lost) falls back to the
+ * installation default rather than failing.
+ */
+export async function resolveModelForGitHubRepository(
+  integration: PlatformIntegration,
+  repoFullName: string
+): Promise<string> {
+  const repositories = requireNumericPlatformRepositories(integration.repositories);
+  const repositoryId = findRepositoryIdByFullName(repositories, repoFullName);
+
+  const customization =
+    repositoryId != null
+      ? await getRepositoryCustomization(integration.id, String(repositoryId))
+      : null;
+
+  return resolveRepositorySettings(integration, customization).modelSlug;
 }

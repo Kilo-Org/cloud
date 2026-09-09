@@ -18,6 +18,23 @@ export function requireNumericPlatformRepositories(
 }
 
 /**
+ * Finds a cached repository's numeric ID by its "owner/repo" full name.
+ * Comparison is case-insensitive: GitHub repo full names are effectively
+ * case-insensitive, and callers get `fullName` from sources (stored review
+ * rows, LLM-echoed tool arguments) that aren't guaranteed to match the
+ * cached casing exactly.
+ */
+export function findRepositoryIdByFullName(
+  repositories: PlatformRepository[] | null,
+  fullName: string
+): number | null {
+  const match = repositories?.find(
+    repository => repository.full_name.toLowerCase() === fullName.toLowerCase()
+  );
+  return match?.id ?? null;
+}
+
+/**
  * Represents ownership of an integration
  * Can be either a user or an organization
  */

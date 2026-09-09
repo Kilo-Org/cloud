@@ -4,6 +4,7 @@ export type AuthVariables = {
   kiloUserId: string;
   kiloIsAdmin: boolean;
   kiloApiTokenPepper: string | null;
+  kiloGastownAccess: boolean;
   kiloOrgMemberships: JwtOrgMembership[];
   requestStartTime: number;
 };

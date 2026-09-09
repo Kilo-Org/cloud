@@ -70,7 +70,7 @@ export function EmptyStateContent({
   return (
     <EmptyState
       icon={Server}
-      title={t('kiloclaw.empty.noInstances')}
+      title={t('common.noKiloclawInstances')}
       description={t('kiloclaw.empty.noInstancesDescription')}
       action={
         <Button variant="outline" onPress={onCreate}>

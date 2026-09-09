@@ -6,7 +6,7 @@
  */
 
 import { env, runInDurableObject, listDurableObjectIds } from 'cloudflare:test';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import type { CloudAgentSession } from '../../../src/persistence/CloudAgentSession.js';
 import type { CallbackJob } from '../../../src/callbacks/types.js';
 import {
@@ -42,6 +42,40 @@ function removeCallbackQueue(instance: CloudAgentSession): void {
   ).env.CALLBACK_QUEUE = undefined;
 }
 
+// Registered sessions leave dispatch, alarm, and fire-and-forget publication
+// work in the session DO. Interrupt every session a test touched, clear its
+// alarm, and drain its publication tail, or that work wakes after this file
+// closes and its logs race the vitest worker shutdown as pending
+// onUserConsoleLog rejections (EnvironmentTeardownError).
+const touchedSessions = new Set<string>();
+
+function sessionStub(userId: string, sessionId: string) {
+  const sessionName = `${userId}:${sessionId}`;
+  touchedSessions.add(sessionName);
+  return env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName));
+}
+
+afterEach(async () => {
+  for (const sessionName of touchedSessions) {
+    await runInDurableObject(
+      env.CLOUD_AGENT_SESSION.get(env.CLOUD_AGENT_SESSION.idFromName(sessionName)),
+      async (instance, state) => {
+        try {
+          await instance.interruptExecution();
+        } catch {
+          // A session that never registered has no work to interrupt.
+        }
+        await state.storage.deleteAlarm();
+        const publicationTail = (instance as any).publicExtensionPublicationTail as
+          | Promise<unknown>
+          | undefined;
+        await publicationTail?.catch(() => undefined);
+      }
+    ).catch(() => undefined);
+  }
+  touchedSessions.clear();
+});
+
 describe('callback outbox — missing target or queue', () => {
   beforeEach(async () => {
     const ids = await listDurableObjectIds(env.CLOUD_AGENT_SESSION);
@@ -57,8 +91,7 @@ describe('callback outbox — missing target or queue', () => {
   it('records callbackLastError when callbackTarget is missing on a callback-required message', async () => {
     const userId = 'user_cb_no_target';
     const sessionId = 'agent_cb_no_target';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 
@@ -108,8 +141,7 @@ describe('callback outbox — missing target or queue', () => {
   it('records callbackLastError when CALLBACK_QUEUE binding is missing', async () => {
     const userId = 'user_cb_no_queue';
     const sessionId = 'agent_cb_no_queue';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     await runInDurableObject(stub, async instance => {
       removeCallbackQueue(instance);
@@ -155,8 +187,7 @@ describe('callback outbox — missing target or queue', () => {
   it('records callbackRetryAt when queue send throws', async () => {
     const userId = 'user_cb_retry';
     const sessionId = 'agent_cb_retry';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const failingQueue: CapturedQueue = {
       captured: [],
@@ -215,8 +246,7 @@ describe('callback outbox — missing target or queue', () => {
   it('does not record error when callback is not required and target is missing', async () => {
     const userId = 'user_cb_optional';
     const sessionId = 'agent_cb_optional';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     await runInDurableObject(stub, async instance => {
       removeCallbackQueue(instance);
@@ -262,8 +292,7 @@ describe('callback outbox — missing target or queue', () => {
   it('collapses a multi-message idle batch into the last callback-relevant message', async () => {
     const userId = 'user_cb_batch';
     const sessionId = 'agent_cb_batch';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
     const queue = createCapturedQueue();
 
     const result = await runInDurableObject(stub, async instance => {
@@ -348,8 +377,7 @@ describe('callback outbox — missing target or queue', () => {
   it('includes idempotencyKey set to messageId in callback payload', async () => {
     const userId = 'user_cb_idempotency';
     const sessionId = 'agent_cb_idempotency';
-    const doId = env.CLOUD_AGENT_SESSION.idFromName(`${userId}:${sessionId}`);
-    const stub = env.CLOUD_AGENT_SESSION.get(doId);
+    const stub = sessionStub(userId, sessionId);
 
     const queue = createCapturedQueue();
 

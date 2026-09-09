@@ -256,7 +256,7 @@ export default function DevicePairingScreen() {
                       <Monitor size={18} color={colors.foreground} />
                       <View className="flex-1 gap-0.5">
                         <Text className="text-sm font-medium">
-                          {request.role ?? t('kiloclaw.devicePairing.device')}
+                          {request.role ?? t('common.device')}
                         </Text>
                         <Text variant="muted" className="text-xs">
                           {[request.platform, request.requestId.slice(0, 12)]

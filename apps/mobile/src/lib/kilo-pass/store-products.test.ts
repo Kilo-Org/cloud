@@ -26,6 +26,7 @@ describe('joinAppStoreKiloPassProducts', () => {
           suggestedStoreMonthlyPriceUsd: 63.7,
         },
       ],
+      storefront: 'app_store',
       storeProducts: [
         {
           id: 'kilopass.tier19.monthly.v1',
@@ -44,6 +45,44 @@ describe('joinAppStoreKiloPassProducts', () => {
         displayPrice: '$24.99',
         title: 'Kilo Pass 19',
         appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      }),
+    ]);
+  });
+
+  it('joins backend Google product ids to localized Play subscription metadata', () => {
+    const products = joinAppStoreKiloPassProducts({
+      appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+      storefront: 'play',
+      backendProducts: [
+        {
+          tier: 'tier_19',
+          cadence: 'monthly',
+          appleProductId: 'kilopass.tier19.monthly.v1',
+          googleProductId: 'kilopass_tier19',
+          googleBasePlanId: 'monthly-v1',
+          webMonthlyPriceUsd: 19,
+          suggestedStoreMonthlyPriceUsd: 24.7,
+        },
+      ],
+      storeProducts: [
+        {
+          id: 'kilopass_tier19',
+          displayPrice: '$24.99',
+          title: 'Kilo Pass 19',
+          description: 'Kilo Pass',
+          offerToken: 'offer-123',
+        },
+      ],
+    });
+
+    expect(products).toEqual([
+      expect.objectContaining({
+        tier: 'tier_19',
+        googleProductId: 'kilopass_tier19',
+        displayPrice: '$24.99',
+        title: 'Kilo Pass 19',
+        appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
+        storeProduct: expect.objectContaining({ offerToken: 'offer-123' }),
       }),
     ]);
   });

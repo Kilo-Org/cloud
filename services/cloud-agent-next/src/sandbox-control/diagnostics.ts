@@ -1,7 +1,14 @@
-import { withDORetry } from '@kilocode/worker-utils';
+import { withDORetry, type DORetryConfig } from '@kilocode/worker-utils';
 import { logger } from '../logger.js';
 
 export type ControlDiagnosticFields = Record<string, string | number | boolean | null | undefined>;
+type ControlDiagnosticOptions = { coalesceIdentity?: string };
+
+export const CONTROL_DIAGNOSTIC_COALESCE_LIMIT = 128;
+const coalescedDiagnostics = new Map<
+  string,
+  { fields: ControlDiagnosticFields; stableFields: string; occurrences: number }
+>();
 
 const EVENT_TYPES = new Set([
   'sandbox.ready',
@@ -62,7 +69,9 @@ export function diagnosticEventType(value: string): string {
 }
 
 export function diagnosticCause(value: string): string {
-  return CAUSES.has(value) ? value.replaceAll(' ', '_') : 'other';
+  return CAUSES.has(value)
+    ? value.replaceAll(' ', '_')
+    : value.replace(/[^a-zA-Z0-9_.:-]/g, '_').slice(0, 128);
 }
 
 const DELTA_PROGRESS_EVENTS = new Set([
@@ -75,7 +84,8 @@ const DELTA_PROGRESS_EVENTS = new Set([
 export function logControlDiagnostic(
   event: string,
   fields: ControlDiagnosticFields,
-  level: 'info' | 'warn' = 'info'
+  level: 'info' | 'warn' = 'info',
+  options?: ControlDiagnosticOptions
 ): void {
   try {
     if (
@@ -100,12 +110,39 @@ export function logControlDiagnostic(
         bounded[key] = value;
       }
     }
-    const scoped = logger.withFields({
-      ...bounded,
-      logTag: 'sandbox_control',
-      diagnosticEvent: /^[a-z_]{1,64}$/.test(event) ? event : 'unknown',
+    const emit = (diagnosticFields: ControlDiagnosticFields) => {
+      const scoped = logger.withFields({
+        ...diagnosticFields,
+        logTag: 'sandbox_control',
+        diagnosticEvent: /^[a-z_]{1,64}$/.test(event) ? event : 'unknown',
+      });
+      scoped[level]('Sandbox control diagnostic');
+    };
+    if (!options?.coalesceIdentity) {
+      emit(bounded);
+      return;
+    }
+    const stableFields = JSON.stringify(
+      Object.entries(bounded)
+        .filter(([key]) => key !== 'durationMs' && key !== 'occurrences')
+        .sort(([left], [right]) => left.localeCompare(right))
+    );
+    const previous = coalescedDiagnostics.get(options.coalesceIdentity);
+    if (previous?.stableFields === stableFields) {
+      previous.occurrences = Math.min(Number.MAX_SAFE_INTEGER, previous.occurrences + 1);
+      return;
+    }
+    if (previous) emit({ ...previous.fields, occurrences: previous.occurrences });
+    else if (coalescedDiagnostics.size >= CONTROL_DIAGNOSTIC_COALESCE_LIMIT) {
+      const oldest = coalescedDiagnostics.keys().next().value;
+      if (oldest !== undefined) coalescedDiagnostics.delete(oldest);
+    }
+    coalescedDiagnostics.set(options.coalesceIdentity, {
+      fields: bounded,
+      stableFields,
+      occurrences: 1,
     });
-    scoped[level]('Sandbox control diagnostic');
+    emit(bounded);
   } catch {
     return;
   }
@@ -126,7 +163,8 @@ export function diagnosticConnection(
 export function withControlDORetry<TStub, TResult>(
   getStub: () => TStub,
   operation: (stub: TStub) => Promise<TResult>,
-  operationName: string
+  operationName: string,
+  config?: DORetryConfig
 ): Promise<TResult> {
   const logRetry = (_message: unknown, fields: unknown) => {
     try {
@@ -169,7 +207,7 @@ export function withControlDORetry<TStub, TResult>(
       return;
     }
   };
-  return withDORetry(getStub, operation, operationName, undefined, {
+  return withDORetry(getStub, operation, operationName, config, {
     warn: logRetry,
     error: logRetry,
   });

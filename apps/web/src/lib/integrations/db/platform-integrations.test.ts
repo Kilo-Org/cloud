@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { db } from '@/lib/drizzle';
-import { platform_integrations, kilocode_users, organizations } from '@kilocode/db/schema';
+import { db, pool } from '@/lib/drizzle';
+import {
+  repository_customizations,
+  platform_integrations,
+  kilocode_users,
+  organizations,
+} from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
   deleteIntegration,
@@ -8,11 +13,14 @@ import {
   deleteIntegrationForOwner,
   createPendingIntegration,
   findIntegrationByInstallationId,
+  listRepositoryCustomizations,
   suspendIntegration,
   suspendIntegrationForOwner,
   unsuspendIntegration,
   unsuspendIntegrationForOwner,
+  updateIntegrationMetadataForOwner,
   updateIntegrationRepositories,
+  upsertRepositoryCustomization,
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
@@ -134,6 +142,70 @@ describe('upsertPlatformIntegrationForOwner', () => {
       .where(eq(platform_integrations.owned_by_organization_id, orgId));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.platform_installation_id).toBe(INSTALLATION_ID);
+  });
+
+  test('serializes concurrent different installations for a non-allowlisted organization', async () => {
+    const owner: Owner = { type: 'org', id: orgId };
+    const installationIds = [`${INSTALLATION_ID}-concurrent-a`, `${INSTALLATION_ID}-concurrent-b`];
+    const lockClient = await pool.connect();
+    const ownerLockKey = `${owner.type}:${owner.id}`;
+    let lockAcquired = false;
+    let operationError: unknown;
+    let pendingOperations:
+      | Promise<Awaited<ReturnType<typeof upsertPlatformIntegrationForOwner>>>[]
+      | undefined;
+    try {
+      const identity = await lockClient.query<{ pid: number; database: string }>(
+        'SELECT pg_backend_pid() AS pid, current_database() AS database'
+      );
+      const holderPid = identity.rows[0]?.pid;
+      expect(holderPid).toBeDefined();
+      await lockClient.query('SELECT pg_advisory_lock(hashtext($1))', [ownerLockKey]);
+      lockAcquired = true;
+      pendingOperations = installationIds.map(installationId =>
+        upsertPlatformIntegrationForOwner(owner, baseInstallData(installationId))
+      );
+      let waitingCount = 0;
+      for (let attempt = 0; attempt < 2000 && waitingCount < 2; attempt += 1) {
+        const result = await lockClient.query<{ count: string }>(
+          `SELECT count(*)::text AS count FROM pg_stat_activity activity
+           WHERE activity.datname = current_database()
+             AND $1::int = ANY(pg_blocking_pids(activity.pid))
+             AND activity.wait_event_type = 'Lock' AND activity.wait_event = 'advisory'
+             AND query LIKE 'SELECT pg_advisory_xact_lock(hashtext(%'`,
+          [holderPid]
+        );
+        waitingCount = Number(result.rows[0]?.count ?? 0);
+        if (waitingCount < 2) await new Promise<void>(resolve => setImmediate(resolve));
+      }
+      expect(waitingCount).toBeGreaterThanOrEqual(2);
+    } catch (error) {
+      operationError = error;
+    } finally {
+      let unlockFailed = false;
+      try {
+        if (lockAcquired) {
+          await lockClient.query('SELECT pg_advisory_unlock(hashtext($1))', [ownerLockKey]);
+        }
+      } catch (error) {
+        unlockFailed = true;
+        operationError ??= error;
+      } finally {
+        lockClient.release(unlockFailed);
+      }
+      if (pendingOperations) await Promise.allSettled(pendingOperations);
+    }
+    if (operationError) throw operationError;
+    if (!pendingOperations) throw new Error('Concurrent upserts did not start');
+    const results = await Promise.all(pendingOperations);
+    expect(results.filter(result => result.ok)).toHaveLength(1);
+    expect(results).toContainEqual({ ok: false, reason: 'multiple_installations_disabled' });
+    const rows = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.owned_by_organization_id, orgId));
+    expect(rows).toHaveLength(1);
+    expect(installationIds).toContain(rows[0]?.platform_installation_id);
   });
 
   test('same-owner refresh updates the existing row (by primary key)', async () => {
@@ -909,5 +981,205 @@ describe('upsertPlatformIntegrationForOwner', () => {
       expect(matched?.integration_status).toBe('active');
       expect(sibling?.integration_status).toBe('suspended');
     });
+  });
+});
+
+describe('updateIntegrationMetadataForOwner', () => {
+  const orgId = crypto.randomUUID();
+  const otherOrgId = crypto.randomUUID();
+  const installationId = `test-metadata-merge-${Date.now()}`;
+  const otherInstallationId = `test-metadata-merge-other-${Date.now()}`;
+  let integrationId: string;
+  let otherIntegrationId: string;
+
+  beforeEach(async () => {
+    await db.insert(organizations).values([
+      { id: orgId, name: `Metadata merge org ${Date.now()}` },
+      { id: otherOrgId, name: `Metadata merge other org ${Date.now()}` },
+    ]);
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: orgId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        integration_status: 'active',
+        repository_access: 'all',
+        metadata: { model_slug: 'model-a' },
+      })
+      .returning();
+    integrationId = integration.id;
+    const [otherIntegration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: orgId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: otherInstallationId,
+        integration_status: 'active',
+        repository_access: 'all',
+        metadata: { model_slug: 'model-c' },
+      })
+      .returning();
+    otherIntegrationId = otherIntegration.id;
+  });
+
+  afterEach(async () => {
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+    await db.delete(organizations).where(eq(organizations.id, otherOrgId));
+  });
+
+  test('merges without deleting unrelated keys and without a read-then-write race', async () => {
+    // Two concurrent writers touching different keys must both survive: a
+    // read-modify-write implementation would let one overwrite the other.
+    await Promise.all([
+      updateIntegrationMetadataForOwner(
+        { type: 'org', id: orgId },
+        'github',
+        { model_slug: 'model-b' },
+        integrationId
+      ),
+      updateIntegrationMetadataForOwner(
+        { type: 'org', id: orgId },
+        'github',
+        { pr_review_mode: 'off' },
+        integrationId
+      ),
+    ]);
+
+    const [row] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integrationId));
+
+    expect(row?.metadata).toMatchObject({ model_slug: 'model-b', pr_review_mode: 'off' });
+  });
+
+  test('scopes the update to integrationId, leaving a sibling integration untouched', async () => {
+    await updateIntegrationMetadataForOwner(
+      { type: 'org', id: orgId },
+      'github',
+      { model_slug: 'model-b' },
+      integrationId
+    );
+
+    const [updated] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, integrationId));
+    const [untouched] = await db
+      .select()
+      .from(platform_integrations)
+      .where(eq(platform_integrations.id, otherIntegrationId));
+
+    expect(updated?.metadata).toMatchObject({ model_slug: 'model-b' });
+    expect(untouched?.metadata).toMatchObject({ model_slug: 'model-c' });
+  });
+
+  test('throws when owner or platform does not match any integration', async () => {
+    await expect(
+      updateIntegrationMetadataForOwner(
+        { type: 'org', id: otherOrgId },
+        'github',
+        { model_slug: 'model-b' },
+        integrationId
+      )
+    ).rejects.toThrow('No github integration found for owner');
+  });
+});
+
+describe('repository_customizations accessors', () => {
+  const orgId = crypto.randomUUID();
+  const installationId = `test-repo-custom-${Date.now()}`;
+  let integrationId: string;
+
+  beforeEach(async () => {
+    await db.insert(organizations).values({ id: orgId, name: `Repo custom org ${Date.now()}` });
+    const [integration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: orgId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: installationId,
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+    integrationId = integration.id;
+  });
+
+  afterEach(async () => {
+    await db.delete(organizations).where(eq(organizations.id, orgId));
+  });
+
+  test('upsertRepositoryCustomization inserts, then updates only the supplied fields', async () => {
+    await upsertRepositoryCustomization(integrationId, '1', {
+      bot_mention_model_slug: 'model-a',
+      pr_review_mode: 'on',
+    });
+
+    await upsertRepositoryCustomization(integrationId, '1', {
+      pr_review_mode: 'off',
+    });
+
+    const [row] = await listRepositoryCustomizations(integrationId);
+
+    expect(row).toMatchObject({
+      repository_id: '1',
+      bot_mention_model_slug: 'model-a',
+      pr_review_mode: 'off',
+    });
+  });
+
+  test('upsertRepositoryCustomization clears a field back to inherited with null', async () => {
+    await upsertRepositoryCustomization(integrationId, '1', {
+      bot_mention_model_slug: 'model-a',
+      pr_review_mode: 'on',
+    });
+
+    await upsertRepositoryCustomization(integrationId, '1', {
+      bot_mention_model_slug: null,
+    });
+
+    const [row] = await listRepositoryCustomizations(integrationId);
+
+    expect(row).toMatchObject({ bot_mention_model_slug: null, pr_review_mode: 'on' });
+  });
+
+  test('listRepositoryCustomizations only returns rows for the given integration', async () => {
+    const [otherIntegration] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_organization_id: orgId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: `${installationId}-other`,
+        integration_status: 'active',
+        repository_access: 'all',
+      })
+      .returning();
+
+    await upsertRepositoryCustomization(integrationId, '1', { pr_review_mode: 'on' });
+    await upsertRepositoryCustomization(otherIntegration.id, '1', { pr_review_mode: 'off' });
+
+    const rows = await listRepositoryCustomizations(integrationId);
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ platform_integration_id: integrationId, pr_review_mode: 'on' });
+  });
+
+  test('deleting the parent integration cascades to its customizations', async () => {
+    await upsertRepositoryCustomization(integrationId, '1', { pr_review_mode: 'on' });
+
+    await db.delete(platform_integrations).where(eq(platform_integrations.id, integrationId));
+
+    const remaining = await db
+      .select()
+      .from(repository_customizations)
+      .where(eq(repository_customizations.platform_integration_id, integrationId));
+
+    expect(remaining).toHaveLength(0);
   });
 });

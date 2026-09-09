@@ -464,7 +464,7 @@ describe('SessionHistoryScreen', () => {
     const renderer = await renderScreen();
     const header = findNodeByType(renderer, 'ScreenHeader');
 
-    expect(header.props.title).toBe(i18n.t('tabs.agents'));
+    expect(header.props.title).toBe(i18n.t('common.agents'));
     expect(header.props.size).toBeUndefined();
     expect(header.props.showBackButton).toBe(true);
   });

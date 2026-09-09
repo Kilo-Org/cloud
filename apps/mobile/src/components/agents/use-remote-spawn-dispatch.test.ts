@@ -585,7 +585,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     onStart();
     await vi.waitFor(() => {
-      expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.session.notFound');
+      expect(onCloneImportFailure).toHaveBeenCalledWith('common.notFound');
     });
     // The inline reason, never the generic spawn toast.
     expect(toastErrorMock).not.toHaveBeenCalled();

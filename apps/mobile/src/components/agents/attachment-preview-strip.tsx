@@ -3,13 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   type AccessibilityActionEvent,
   type AccessibilityActionInfo,
-  ActivityIndicator,
   type LayoutChangeEvent,
   Platform,
   Pressable,
   ScrollView,
   View,
 } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import {
   Gesture,
   GestureDetector,

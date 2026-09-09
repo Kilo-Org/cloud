@@ -9,13 +9,17 @@ import {
   type WorktreeKiloAuth,
   type WorktreeKiloRuntimes,
 } from './worktree-runtime';
+import type { OwnedProcessScope } from './owned-processes';
 import {
+  SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS,
+  SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS,
   sessionMessageOutcomeSchema,
   type SessionEventIdentity,
   type SessionRequestIdentity,
 } from '../../../src/shared/sandbox-control-protocol';
 import {
   buildHeartbeatPayload,
+  createControlHandlerDeps,
   handleControlRequest,
   type HandlerDeps,
 } from './sandbox-control-handlers';
@@ -101,9 +105,11 @@ function asFetch(
 function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) {
   const requests: Array<{ pathname: string; directory: string | null; body?: unknown }> = [];
   const permissions: Awaited<ReturnType<WrapperKiloClient['getPermissions']>> = [];
+  const sessionStatuses: Record<string, { type: string }> = {};
   const feeds = new Set<ReadableStreamDefaultController<Uint8Array>>();
   const encoder = new TextEncoder();
   let feedConnections = 0;
+  let heldPrompts: PromiseWithResolvers<void> | undefined;
   const server = Bun.serve({
     port: 0,
     hostname: '127.0.0.1',
@@ -142,7 +148,8 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
       if (request.method === 'GET' && url.pathname === '/permission') {
         return Response.json(permissions);
       }
-      if (request.method === 'GET' && url.pathname === '/session/status') return Response.json({});
+      if (request.method === 'GET' && url.pathname === '/session/status')
+        return Response.json(sessionStatuses);
       if (request.method === 'GET' && url.pathname === '/pty') return Response.json([]);
       if (request.method === 'POST' && url.pathname.startsWith('/permission/')) {
         const id = decodeURIComponent(url.pathname.split('/')[2]);
@@ -152,6 +159,7 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
         return Response.json(true);
       }
       if (request.method === 'POST' && url.pathname.endsWith('/abort')) {
+        heldPrompts?.resolve();
         return Response.json(true);
       }
       if (request.method === 'POST' && /\/session\/[^/]+\/(message|command)$/.test(url.pathname)) {
@@ -173,10 +181,14 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
           },
           parts: [],
         };
+        await heldPrompts?.promise;
         return Response.json(completion);
       }
       if (request.method === 'GET' && url.pathname.startsWith('/session/')) {
-        return Response.json({ id: decodeURIComponent(url.pathname.slice('/session/'.length)) });
+        return Response.json({
+          id: decodeURIComponent(url.pathname.slice('/session/'.length)),
+          directory: url.searchParams.get('directory'),
+        });
       }
       if (request.method === 'POST' && url.pathname === '/pty') {
         return Response.json({
@@ -196,11 +208,18 @@ function createKiloStub(health: unknown = { healthy: true, version: '7.4.20' }) 
     url: server.url.toString(),
     requests,
     permissions,
+    sessionStatuses,
     get feedConnections() {
       return feedConnections;
     },
     emit(event: unknown) {
       for (const feed of feeds) feed.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+    },
+    holdPrompts() {
+      heldPrompts ??= Promise.withResolvers<void>();
+    },
+    releasePrompts() {
+      heldPrompts?.resolve();
     },
     endFeeds() {
       for (const feed of feeds) feed.close();
@@ -214,6 +233,18 @@ function rootIdentity(directory: string, name = path.basename(directory)): Sessi
   return { sessionId: `workspace_${name}`, kiloSessionId: `root_${name}`, directory };
 }
 
+function proveOwnedProcesses(
+  options: Parameters<typeof startWorktreeKiloServer>[0],
+  stopped?: Promise<unknown>
+): void {
+  options.onProcessScope?.({
+    stop: async () => {
+      await stopped;
+      return true;
+    },
+  } as unknown as OwnedProcessScope);
+}
+
 function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloRuntimes>[0]> = {}) {
   const launches: Array<Parameters<typeof startWorktreeKiloServer>[0]> = [];
   let closes = 0;
@@ -225,6 +256,7 @@ function createRegistry(overrides: Partial<Parameters<typeof createWorktreeKiloR
       launches.push(options);
       const server = createKiloStub();
       servers.push(server);
+      options.onProcessScope?.({ stop: async () => true } as unknown as OwnedProcessScope);
       return {
         url: server.url,
         close: () => {
@@ -272,16 +304,15 @@ function createHandlerDeps(registry: WorktreeKiloRuntimes): HandlerDeps {
     getKiloRuntime: directory => registry.get(directory),
   });
   terminalRuntimes.push(terminalRuntime);
-  return {
+  return createControlHandlerDeps({
     kiloRuntimes: registry,
     terminalRuntime,
     version: 'test',
     kiloReady: true,
     sessions: [],
-    tasks: new Map(),
     emitSessionEvent: () => {},
     retireRuntime: () => {},
-  };
+  });
 }
 
 beforeEach(() => {
@@ -359,7 +390,8 @@ describe('observed Kilo runtime version', () => {
     async secondHealth => {
       let count = 0;
       const { registry } = createRegistry({
-        startServer: async () => {
+        startServer: async options => {
+          proveOwnedProcesses(options);
           const server = createKiloStub(
             count++ === 0 ? { healthy: true, version: '7.4.20' } : secondHealth
           );
@@ -579,7 +611,7 @@ describe('worktree Kilo runtime registry', () => {
   });
 
   it.each(['stream-error', 'feed-end', 'reconnect'] as const)(
-    'classifies real SDK SSE %s without exposing private errors or reconnecting',
+    'retires real SDK SSE %s only after bounded observer recovery fails',
     async failure => {
       const connected = 'data: {"payload":{"type":"server.connected","properties":{}}}\n\n';
       const encoder = new TextEncoder();
@@ -611,7 +643,7 @@ describe('worktree Kilo runtime registry', () => {
         else stream.enqueue(encoder.encode(connected));
         await waitUntil(() => failures.length > 0);
         expect(failures).toEqual([
-          {
+          expect.objectContaining({
             directory: runtime.directory,
             reason:
               failure === 'stream-error'
@@ -619,17 +651,19 @@ describe('worktree Kilo runtime registry', () => {
                 : failure === 'feed-end'
                   ? 'feed_ended'
                   : 'feed_reconnected',
-          },
+            cleanup: 'confirmed',
+            runtimeId: expect.any(String),
+          }),
         ]);
         expect(runtime.signal.aborted).toBe(true);
-        expect(harness.registry.isHealthy()).toBe(false);
+        expect(harness.registry.isHealthy()).toBe(true);
         expect(harness.registry.get(runtime.directory)).toBeUndefined();
         expect(
           fetchSpy.mock.calls.filter(
             ([request]) =>
               request instanceof Request && new URL(request.url).pathname === '/global/event'
           )
-        ).toHaveLength(1);
+        ).toHaveLength(1 + SANDBOX_CONTROL_RECOVERY_MAX_ATTEMPTS);
       } finally {
         harness.registry.shutdown();
         fetchSpy.mockRestore();
@@ -640,10 +674,11 @@ describe('worktree Kilo runtime registry', () => {
   it('keeps the refreshed SDK event feed healthy after intentional old-process shutdown', async () => {
     const received: string[] = [];
     const harness = createRegistry({
-      startServer: async () => {
+      startServer: async options => {
         const server = createKiloStub();
         servers.push(server);
         const stopped = Promise.withResolvers<void>();
+        proveOwnedProcesses(options, stopped.promise);
         return {
           url: server.url,
           stopped: stopped.promise,
@@ -659,16 +694,25 @@ describe('worktree Kilo runtime registry', () => {
     const identity = rootIdentity(path.join(tmpDir, 'shared'));
     const first = harness.registry.attach(identity, directAuth);
     const runtime = await first.ready;
+    const cleanupOriginal = first.cleanup
+      ? (deadlineAt: number) => first.cleanup?.(deadlineAt)
+      : undefined;
     first.commit();
     first.release();
     const originalClient = runtime.kiloClient;
+    const originalRuntimeId = runtime.runtimeId;
     const refresh = harness.registry.attach(
       identity,
       { ...directAuth, token: 'rotated-token' },
       undefined,
       () => true
     );
-    expect(await refresh.ready).toBe(runtime);
+    const refreshed = await refresh.ready;
+    expect(refreshed).toBe(runtime);
+    expect(refreshed.runtimeId).not.toBe(originalRuntimeId);
+    expect(runtime.signal.aborted).toBe(false);
+    expect(await cleanupOriginal?.(Date.now() + 1_000)).toBe('stale');
+    expect(harness.registry.get(identity.directory)).toBe(refreshed);
     refresh.commit();
     refresh.release();
     expect(runtime.kiloClient).not.toBe(originalClient);
@@ -678,12 +722,14 @@ describe('worktree Kilo runtime registry', () => {
     await waitUntil(() => received.includes('session.updated'));
     expect(runtime.signal.aborted).toBe(false);
     expect(harness.registry.isHealthy()).toBe(true);
-    expect(harness.registry.get(identity.directory)).toBe(runtime);
+    expect(harness.registry.get(identity.directory)).toBe(refreshed);
     expect(harness.unexpectedCloses).toBe(0);
     servers[1]?.endFeeds();
-    await waitUntil(() => harness.unexpectedCloses === 1);
-    expect(runtime.signal.aborted).toBe(true);
-    expect(harness.registry.isHealthy()).toBe(false);
+    await waitUntil(() => (servers[1]?.feedConnections ?? 0) === 2);
+    expect(runtime.signal.aborted).toBe(false);
+    expect(harness.registry.isHealthy()).toBe(true);
+    expect(harness.registry.get(identity.directory)).toBe(refreshed);
+    expect(harness.unexpectedCloses).toBe(0);
   });
 
   it('isolates different worktrees with separate servers, homes, auth files, and event clients', async () => {
@@ -768,13 +814,12 @@ describe('worktree Kilo runtime registry', () => {
       wrapperInstanceId: crypto.randomUUID(),
       getKiloRuntime: directory => harness.registry.get(directory),
     });
-    const deps: HandlerDeps = {
+    const deps: HandlerDeps = createControlHandlerDeps({
       kiloRuntimes: harness.registry,
       terminalRuntime: terminals,
       version: 'test',
       kiloReady: true,
       sessions: [],
-      tasks: new Map(),
       emitSessionEvent: (identity, event) => {
         if (event.type === 'session.message.outcome') {
           const { messageId, status } = sessionMessageOutcomeSchema.parse(event.properties);
@@ -782,8 +827,9 @@ describe('worktree Kilo runtime registry', () => {
         }
       },
       retireRuntime: () => {},
-    };
-    const waitForTasks = () => Promise.all([...deps.tasks.values()].map(task => task.done));
+    });
+    const waitForTasks = () =>
+      Promise.all(deps.operations.activeOperations().map(task => task.done));
     try {
       const attached = await Promise.all(
         identities.map((identity, index) =>
@@ -1168,7 +1214,8 @@ describe('worktree Kilo runtime registry', () => {
     servers.push(server);
     let closes = 0;
     const { registry } = createRegistry({
-      startServer: async () => {
+      startServer: async options => {
+        proveOwnedProcesses(options);
         launched.resolve();
         await release.promise;
         return {
@@ -1215,6 +1262,7 @@ describe('worktree Kilo runtime registry', () => {
     const steps: string[] = [];
     const harness = createRegistry({
       startServer: async options => {
+        proveOwnedProcesses(options);
         const old = options.env.KILOCODE_TOKEN === auth.token;
         steps.push(old ? 'start-old' : 'start-new');
         if (old) {
@@ -1313,7 +1361,8 @@ describe('worktree Kilo runtime registry', () => {
     const stub = createKiloStub();
     servers.push(stub);
     const { registry } = createRegistry({
-      startServer: async () => {
+      startServer: async options => {
+        proveOwnedProcesses(options);
         attempts += 1;
         if (attempts === 1) throw new Error('actual-managed-token');
         return { url: stub.url, close: () => {} };
@@ -1364,7 +1413,8 @@ describe('worktree Kilo runtime registry', () => {
     servers.push(stub);
     let closes = 0;
     const { registry } = createRegistry({
-      startServer: async () => {
+      startServer: async options => {
+        proveOwnedProcesses(options);
         launched.resolve();
         await released.promise;
         return {
@@ -1388,14 +1438,153 @@ describe('worktree Kilo runtime registry', () => {
     expect(stub.feedConnections).toBe(0);
   });
 
-  it('invalidates a runtime and reports an unexpected event-feed closure', async () => {
+  it('replaces an unexpected event-feed closure without invalidating its runtime', async () => {
     const harness = createRegistry();
     const runtime = await harness.registry.ensure(path.join(tmpDir, 'a'), auth);
     servers[0]?.endFeeds();
-    await waitUntil(() => harness.unexpectedCloses === 1);
+    await waitUntil(() => (servers[0]?.feedConnections ?? 0) === 2);
+    expect(runtime.signal.aborted).toBe(false);
+    expect(harness.registry.get(runtime.directory)).toBe(runtime);
+    expect(harness.closes).toBe(0);
+    expect(harness.unexpectedCloses).toBe(0);
+  });
+
+  it('retires a runtime on process exit independently of feed recovery', async () => {
+    const exited = Promise.withResolvers<void>();
+    const server = createKiloStub();
+    const failures: unknown[] = [];
+    servers.push(server);
+    const harness = createRegistry({
+      startServer: async options => {
+        options.onProcessScope?.({ stop: async () => true } as unknown as OwnedProcessScope);
+        return { url: server.url, close() {}, exited: exited.promise };
+      },
+      onUnexpectedClose: failure => failures.push(failure),
+    });
+    const runtime = await harness.registry.ensure(path.join(tmpDir, 'process-exit'), auth);
+    exited.resolve();
+    await waitUntil(() => failures.length === 1);
+    expect(failures).toEqual([
+      expect.objectContaining({
+        directory: runtime.directory,
+        reason: 'process_exited',
+        cleanup: 'confirmed',
+        runtimeId: runtime.runtimeId,
+      }),
+    ]);
     expect(runtime.signal.aborted).toBe(true);
     expect(harness.registry.get(runtime.directory)).toBeUndefined();
-    expect(harness.closes).toBe(1);
+  });
+
+  it('preserves an admitted operation and its runtime while a real feed recovers', async () => {
+    const timers = spyOn(globalThis, 'setTimeout');
+    const harness = createRegistry({
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.({
+          stop: async () => true,
+          verify: async () => true,
+        } as unknown as OwnedProcessScope);
+        return { url: server.url, close() {} };
+      },
+    });
+    const identity = rootIdentity(path.join(tmpDir, 'recovery'));
+    const runtime = await harness.registry.ensure(identity.directory, auth);
+    const server = servers.find(item => item.url === runtime.kiloClient.serverUrl);
+    if (!server) throw new Error('Missing Kilo test server');
+    const deps = createHandlerDeps(harness.registry);
+    const client = runtime.kiloClient;
+    const prompt = {
+      messageId: 'feed_recovery',
+      turn: { type: 'prompt' as const, prompt: 'continue the admitted work' },
+      agent: { mode: 'code', model: 'test' },
+    };
+    server.sessionStatuses[identity.kiloSessionId] = { type: 'idle' };
+    server.holdPrompts();
+    server.permissions.push({
+      id: 'permission_recovery',
+      sessionID: identity.kiloSessionId,
+      permission: 'bash',
+      patterns: [],
+      metadata: {},
+      always: [],
+    });
+    try {
+      expect(await handleControlRequest('session.prompt', identity, prompt, deps)).toEqual({
+        ok: true,
+        result: { messageId: prompt.messageId, status: 'accepted' },
+      });
+      await waitUntil(() =>
+        server.requests.some(
+          request => request.pathname === `/session/${identity.kiloSessionId}/message`
+        )
+      );
+      const executionDeadlineCount = timers.mock.calls.filter(
+        ([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS
+      ).length;
+      expect(executionDeadlineCount).toBeGreaterThan(0);
+
+      server.endFeeds();
+      await waitUntil(() => server.feedConnections === 2);
+      expect(harness.registry.prepareForNewWork?.(identity.directory)).toBe(false);
+      expect(harness.registry.get(identity.directory)).toBe(runtime);
+      expect(runtime.kiloClient).toBe(client);
+      expect(runtime.kiloClient.serverUrl).toBe(client.serverUrl);
+      expect(
+        await handleControlRequest(
+          'session.prompt',
+          identity,
+          { ...prompt, messageId: 'feed_recovery_rejected' },
+          deps
+        )
+      ).toEqual({
+        ok: false,
+        error: {
+          code: 'not_ready',
+          message: 'Native feed recovery is in progress',
+          retryable: true,
+          admission: 'not-admitted',
+        },
+      });
+      expect(
+        await handleControlRequest(
+          'session.permission.resolve',
+          identity,
+          { permissionId: 'permission_recovery', response: 'once' },
+          deps
+        )
+      ).toEqual({ ok: true, result: { success: true } });
+      const stopping = handleControlRequest(
+        'session.abort',
+        identity,
+        { messageId: prompt.messageId },
+        deps
+      );
+      await waitUntil(() =>
+        server.requests.some(
+          request => request.pathname === `/session/${identity.kiloSessionId}/abort`
+        )
+      );
+      expect(await stopping).toEqual({ ok: true, result: { status: 'aborted' } });
+      expect(
+        server.requests.filter(
+          request => request.pathname === `/session/${identity.kiloSessionId}/message`
+        )
+      ).toHaveLength(1);
+      expect(
+        timers.mock.calls.filter(([, ms]) => ms === SANDBOX_CONTROL_EXECUTION_TIMEOUT_MS)
+      ).toHaveLength(executionDeadlineCount);
+
+      server.emit({ payload: { type: 'server.heartbeat', properties: {} } });
+      await waitUntil(() => harness.registry.prepareForNewWork?.(identity.directory) === true);
+      expect(harness.registry.get(identity.directory)).toBe(runtime);
+      expect(runtime.kiloClient).toBe(client);
+      expect(harness.unexpectedCloses).toBe(0);
+    } finally {
+      server.releasePrompts();
+      timers.mockRestore();
+    }
   });
 });
 
@@ -1406,6 +1595,7 @@ describe('worktree directory deletion', () => {
     const closed: string[] = [];
     const harness = createRegistry({
       startServer: async options => {
+        proveOwnedProcesses(options, stopped.promise);
         const stub = createKiloStub();
         servers.push(stub);
         return {
@@ -1454,13 +1644,16 @@ describe('worktree directory deletion', () => {
     servers.push(stub);
     let closes = 0;
     const harness = createRegistry({
-      startServer: async () => ({
-        url: stub.url,
-        close: () => {
-          closes++;
-        },
-        stopped: stopped.promise,
-      }),
+      startServer: async options => {
+        proveOwnedProcesses(options, stopped.promise);
+        return {
+          url: stub.url,
+          close: () => {
+            closes++;
+          },
+          stopped: stopped.promise,
+        };
+      },
     });
     const directory = path.join(tmpDir, 'stuck-exit');
     const runtime = await harness.registry.ensure(directory, auth);
@@ -1619,6 +1812,7 @@ describe('worktree directory deletion', () => {
       servers.push(stub);
       const harness = createRegistry({
         startServer: async options => {
+          proveOwnedProcesses(options);
           launches++;
           launched.resolve(options);
           await release.promise;
@@ -2094,5 +2288,119 @@ setInterval(() => {}, 1000);
     options.abort.abort();
     expect(await rejected(startWorktreeKiloServer(options))).toBeInstanceOf(Error);
     expect(fs.existsSync(options.env.PID_PATH)).toBe(false);
+  });
+
+  it('retires both roots that share a native process without stopping an isolated runtime', async () => {
+    const sharedProcesses = { stop: async () => true } as unknown as OwnedProcessScope;
+    const registry = createWorktreeKiloRuntimes({
+      homeRoot: path.join(tmpDir, 'homes'),
+      inheritedEnv: inherited,
+      startServer: async options => {
+        proveOwnedProcesses(options);
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.(sharedProcesses);
+        return { url: server.url, close: () => {} };
+      },
+      onUnexpectedClose: () => {},
+    });
+    registries.push(registry);
+    const sharedDirectory = path.join(tmpDir, 'shared');
+    const isolatedDirectory = path.join(tmpDir, 'isolated');
+    const first = registry.attach(rootIdentity(sharedDirectory, 'first'), auth);
+    const runtime = await first.ready;
+    first.commit();
+    const sibling = registry.attach(rootIdentity(sharedDirectory, 'second'), auth);
+    await sibling.ready;
+    sibling.commit();
+    const isolated = registry.attach(rootIdentity(isolatedDirectory, 'isolated'), {
+      ...auth,
+      scopeId: 'worktree_isolated',
+    });
+    const isolatedRuntime = await isolated.ready;
+    isolated.commit();
+
+    expect(
+      await registry.retireRuntime?.(sharedDirectory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId ?? '',
+        client: runtime.kiloClient,
+      })
+    ).toBe('retired');
+    expect(first.signal.aborted).toBe(true);
+    expect(sibling.signal.aborted).toBe(true);
+    expect(registry.get(sharedDirectory)).toBeUndefined();
+    expect(registry.get(isolatedDirectory)).toBe(isolatedRuntime);
+  });
+
+  it('retains failed native cleanup ownership without affecting another runtime', async () => {
+    const unresolvedProcesses = { stop: async () => false } as unknown as OwnedProcessScope;
+    const registry = createWorktreeKiloRuntimes({
+      homeRoot: path.join(tmpDir, 'homes'),
+      inheritedEnv: inherited,
+      startServer: async options => {
+        const server = createKiloStub();
+        servers.push(server);
+        options.onProcessScope?.(unresolvedProcesses);
+        return { url: server.url, close: () => {} };
+      },
+      onUnexpectedClose: () => {},
+    });
+    registries.push(registry);
+    const failedDirectory = path.join(tmpDir, 'failed');
+    const isolatedDirectory = path.join(tmpDir, 'isolated');
+    const first = registry.attach(rootIdentity(failedDirectory, 'first'), auth);
+    const runtime = await first.ready;
+    first.commit();
+    const sibling = registry.attach(rootIdentity(failedDirectory, 'second'), auth);
+    await sibling.ready;
+    sibling.commit();
+    const isolated = registry.attach(rootIdentity(isolatedDirectory, 'isolated'), {
+      ...auth,
+      scopeId: 'worktree_isolated',
+    });
+    const isolatedRuntime = await isolated.ready;
+    isolated.commit();
+
+    expect(
+      await registry.retireRuntime?.(failedDirectory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId ?? '',
+        client: runtime.kiloClient,
+      })
+    ).toBe('unconfirmed');
+    expect(first.signal.aborted).toBe(true);
+    expect(sibling.signal.aborted).toBe(true);
+    expect(registry.getRetained?.(failedDirectory)).toBe(runtime);
+    expect(registry.get(isolatedDirectory)).toBe(isolatedRuntime);
+    expect(() => registry.attach(rootIdentity(failedDirectory, 'retry'), auth)).toThrow(
+      'Native runtime retirement is unconfirmed'
+    );
+  });
+
+  it('does not treat a stopped parent as native retirement proof without an owned scope', async () => {
+    const stopped = Promise.withResolvers<void>();
+    const registry = createWorktreeKiloRuntimes({
+      homeRoot: path.join(tmpDir, 'homes'),
+      inheritedEnv: inherited,
+      startServer: async () => {
+        const server = createKiloStub();
+        servers.push(server);
+        return { url: server.url, close: () => {}, stopped: stopped.promise };
+      },
+      onUnexpectedClose: () => {},
+    });
+    registries.push(registry);
+    const directory = path.join(tmpDir, 'unowned');
+    const attachment = registry.attach(rootIdentity(directory), auth);
+    const runtime = await attachment.ready;
+    attachment.commit();
+
+    expect(
+      await registry.retireRuntime?.(directory, Date.now() + 1_000, {
+        runtimeId: runtime.runtimeId ?? '',
+        client: runtime.kiloClient,
+      })
+    ).toBe('unconfirmed');
+    expect(attachment.signal.aborted).toBe(true);
+    stopped.resolve();
   });
 });

@@ -66,6 +66,7 @@ vi.mock('@/lib/pr-review/file-navigator-bridge', () => ({
   requestScrollToFile: vi.fn(),
 }));
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
   View: 'View',
   Pressable: 'Pressable',

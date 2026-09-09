@@ -107,11 +107,7 @@ export function InstanceControls({ status, mutations }: Readonly<InstanceControl
       <View className="flex-row gap-2">
         <ActionButton
           icon={Play}
-          label={
-            mutations.start.isPending
-              ? t('kiloclaw.controls.starting')
-              : t('kiloclaw.controls.start')
-          }
+          label={mutations.start.isPending ? t('common.starting') : t('kiloclaw.controls.start')}
           tone="accent"
           disabled={!canStart || isLifecycleBusy}
           loading={mutations.start.isPending}

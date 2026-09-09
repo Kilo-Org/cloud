@@ -87,3 +87,5 @@ export const ACTIVE_REQUEST_STATUSES = [
   UserDeletionRequestStatus.InProgress,
   UserDeletionRequestStatus.Finalizing,
 ] as const;
+
+export const DUPLICATE_OF_ACTIVE_REQUEST_ATTENTION_CODE = 'duplicate_of_active_request';

@@ -10,6 +10,7 @@ import {
 import { eq, inArray } from 'drizzle-orm';
 import type { User } from '@kilocode/db/schema';
 import { CLOUD_AGENT_CONNECTION_ID, resolveActiveSessionStatus } from './active-sessions-router';
+import { resolveCloudCandidateStatus } from '@/lib/active-sessions-list';
 
 jest.mock('@/lib/config.server', () => {
   const actual: Record<string, unknown> = jest.requireActual('@/lib/config.server');
@@ -226,6 +227,29 @@ describe('active-sessions-router.list cloud merge', () => {
 
     expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
     expect(result.sessions[0]?.status).toBe('idle');
+  });
+
+  it('flag on + open run + stored idle → reported busy (run-open wins)', async () => {
+    // The stored status syncs asynchronously and reads `idle` while the agent
+    // works. The open run is the repo's proof the session is working, so the
+    // row must report busy — never the stale idle.
+    const sessionId = nextId('run-open-idle');
+    const casId = nextId('cas');
+    await seedCloudSession({
+      sessionId,
+      cloudAgentSessionId: casId,
+      kiloUserId: regularUser.id,
+      status: 'idle',
+      title: 'Working, status not yet synced',
+      run: { terminalAt: null },
+    });
+
+    fetchSpy = mockWorkerSessions([]);
+    const caller = await createCallerForUser(regularUser.id);
+    const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
+
+    expect(result.sessions.map(s => s.id)).toEqual([sessionId]);
+    expect(result.sessions[0]?.status).toBe('busy');
   });
 
   it('flag on + terminal run + stale idle → excluded', async () => {
@@ -483,7 +507,7 @@ describe('active-sessions-router.list cloud merge', () => {
     expect(byId.get(cloudNull)).not.toHaveProperty('lastActivityAt');
   });
 
-  it('NULL title/status on cloud rows map to empty string', async () => {
+  it('NULL title maps to empty string; NULL status with an open run reads busy', async () => {
     const sessionId = nextId('null-fields');
     const casId = nextId('cas');
     await seedCloudSession({
@@ -499,7 +523,7 @@ describe('active-sessions-router.list cloud merge', () => {
     const caller = await createCallerForUser(regularUser.id);
     const result = await caller.activeSessions.list({ includeCloudAgentSessions: true });
 
-    expect(result.sessions[0]).toMatchObject({ status: '', title: '' });
+    expect(result.sessions[0]).toMatchObject({ status: 'busy', title: '' });
   });
 
   it('cloud rows are not run through resolveActiveSessionStatus', async () => {
@@ -766,5 +790,29 @@ describe('active-sessions-router.list cloud merge', () => {
 
     expect(result.sessions).toHaveLength(1);
     expect(result.sessions[0]?.totalCostMicrodollars).toBe(0);
+  });
+});
+
+describe('resolveCloudCandidateStatus', () => {
+  it('reports a non-attention stored status as busy while the run is open', () => {
+    expect(resolveCloudCandidateStatus('idle', true)).toBe('busy');
+    expect(resolveCloudCandidateStatus('busy', true)).toBe('busy');
+    expect(resolveCloudCandidateStatus('starting', true)).toBe('busy');
+  });
+
+  it('reports an unknown or empty stored status as busy while the run is open', () => {
+    expect(resolveCloudCandidateStatus(null, true)).toBe('busy');
+    expect(resolveCloudCandidateStatus('', true)).toBe('busy');
+  });
+
+  it('passes attention statuses through unchanged while the run is open', () => {
+    expect(resolveCloudCandidateStatus('question', true)).toBe('question');
+    expect(resolveCloudCandidateStatus('permission', true)).toBe('permission');
+    expect(resolveCloudCandidateStatus('retry', true)).toBe('retry');
+  });
+
+  it('keeps the stored status when no run is open (warm-idle window)', () => {
+    expect(resolveCloudCandidateStatus('idle', false)).toBe('idle');
+    expect(resolveCloudCandidateStatus(null, false)).toBe('');
   });
 });

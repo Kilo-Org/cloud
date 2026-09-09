@@ -53,6 +53,7 @@ function worktree(values: Partial<CloudAgentWorktree> = {}): CloudAgentWorktree 
     kilo_user_id: userId,
     organization_id: null,
     name: 'Private worktree name',
+    folder_id: null,
     created_at: createdAt,
     updated_at: '2026-08-27 01:00:00+00',
     deletion_started_at: null,

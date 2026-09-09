@@ -75,3 +75,13 @@ export function getMobileStoreKiloPassProductByAppleProductId(
     ) ?? null
   );
 }
+
+export function getMobileStoreKiloPassProductByGoogleProductId(
+  googleProductId: string
+): MobileStoreKiloPassProduct | null {
+  return (
+    getAllMobileStoreKiloPassProducts().find(
+      product => product.googleProductId === googleProductId
+    ) ?? null
+  );
+}

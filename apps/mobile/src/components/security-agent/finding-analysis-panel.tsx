@@ -5,7 +5,8 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, ScanSearch } from '@/components/ui/icons';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { Alert, Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { MarkdownText } from '@/components/agents/markdown-text';
@@ -278,7 +279,7 @@ export function FindingAnalysisPanel({
               value={humanize(sandbox.suggestedAction)}
             />
             <KvRow
-              label={t('securityAgent.analysis.model')}
+              label={t('common.model')}
               value={firstNonEmpty(
                 sandbox.modelUsed,
                 analysis.analysis?.analysisModel,

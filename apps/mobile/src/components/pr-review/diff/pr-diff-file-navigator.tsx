@@ -24,14 +24,8 @@ import { useRouter } from 'expo-router';
 import { Search } from '@/components/ui/icons';
 import { memo, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  TextInput,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { Platform, Pressable, TextInput, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CenteredState } from '@/components/centered-state';
@@ -233,7 +227,7 @@ export function PrDiffFileNavigator({
       <CenteredState>
         <View className="items-center px-6">
           <Text className="text-center text-lg font-semibold text-foreground">
-            {t('prReview.accessDenied')}
+            {t('common.accessDenied')}
           </Text>
           <Text variant="muted" className="mt-1 text-center">
             {t('prReview.accessDeniedDescription')}
@@ -249,7 +243,7 @@ export function PrDiffFileNavigator({
             {t('prReview.fileNavigator.couldNotLoadFiles')}
           </Text>
           <Text variant="muted" className="text-center">
-            {t('prReview.fileNavigator.checkConnection')}
+            {t('organization.boundary.loadErrorMessage')}
           </Text>
           <Pressable
             onPress={() => {

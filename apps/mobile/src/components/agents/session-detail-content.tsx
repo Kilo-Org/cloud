@@ -760,8 +760,8 @@ export function SessionDetailContent({
     detailsBusy && isQueuedCancellationEligible(detailsMessage, detailsDelivery, false);
 
   const transcript = useMemo(
-    () => mergeSessionTranscript(visibleMessages, preparationAttempts),
-    [visibleMessages, preparationAttempts]
+    () => mergeSessionTranscript(visibleMessages, preparationAttempts, pendingMessages),
+    [visibleMessages, preparationAttempts, pendingMessages]
   );
 
   // Render-phase state adjustment: hold queued ids across queue → dequeue
@@ -1262,7 +1262,7 @@ export function SessionDetailContent({
     if (cloudStatus?.type === 'finalizing') {
       return t('agentChat.composer.finalizingPlaceholder');
     }
-    return t('agentChat.composer.messagePlaceholder');
+    return t('common.message');
   }, [cloudStatus, t]);
   const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
@@ -1391,7 +1391,7 @@ export function SessionDetailContent({
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={rename.title}
-          titleNumberOfLines={1}
+          reserveTitleSpace
           backFallback="/(app)/(tabs)/(2_agents)"
           headerRight={headerRight}
           {...(rename.isTitleInteractive
@@ -1588,10 +1588,10 @@ export function SessionDetailContent({
             <Button
               variant="outline"
               size="sm"
-              accessibilityLabel={t('agentChat.session.continue')}
+              accessibilityLabel={t('common.continue')}
               onPress={handleContinueInNewSession}
             >
-              <Text>{t('agentChat.session.continue')}</Text>
+              <Text>{t('common.continue')}</Text>
             </Button>
           </View>
         ) : null}

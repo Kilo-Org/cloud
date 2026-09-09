@@ -4,7 +4,7 @@ import { captureException, captureMessage } from '@sentry/nextjs';
 import { verifyGitHubWebhookSignature } from '@/lib/integrations/platforms/github/adapter';
 import {
   InstallationCreatedPayloadSchema,
-  InstallationDeletedPayloadSchema,
+  InstallationDeletedWebhookPayloadSchema,
   InstallationSuspendPayloadSchema,
   InstallationUnsuspendPayloadSchema,
   InstallationTargetRenamedPayloadSchema,
@@ -42,6 +42,27 @@ import type { Owner } from '@/lib/integrations/core/types';
 import type { GitHubAppType } from './app-selector';
 import { revokeStoredGitHubUserAuthorization } from './user-authorization';
 import { redactSensitiveHeaders } from '@kilocode/worker-utils/redact-headers';
+import {
+  assertGitHubInstallationRuntimeAuthorized,
+  GitHubRuntimeAuthorizationError,
+} from '@/lib/integrations/github/runtime-authorization';
+
+async function isAvailableForDeferredGitHubDispatch(integration: {
+  platform_installation_id: string | null;
+  github_app_type: GitHubAppType | null;
+}): Promise<boolean> {
+  if (!integration.platform_installation_id) return false;
+  try {
+    await assertGitHubInstallationRuntimeAuthorized(
+      integration.platform_installation_id,
+      integration.github_app_type ?? 'standard'
+    );
+    return true;
+  } catch (error) {
+    if (error instanceof GitHubRuntimeAuthorizationError) return false;
+    throw error;
+  }
+}
 
 /**
  * Shared GitHub App Webhook Handler
@@ -177,7 +198,7 @@ export async function handleGitHubWebhook(
       }
 
       if (action === GITHUB_ACTION.DELETED) {
-        const parseResult = InstallationDeletedPayloadSchema.safeParse(payload);
+        const parseResult = InstallationDeletedWebhookPayloadSchema.safeParse(payload);
         if (!parseResult.success) {
           logExceptInTest(`Invalid installation.deleted payload${logSuffix}:`, parseResult.error);
           captureMessage('Invalid GitHub webhook payload structure', {
@@ -188,8 +209,18 @@ export async function handleGitHubWebhook(
           return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
         }
 
+        const { installation } = parseResult.data;
+        if (installation === null) {
+          logExceptInTest(`Ignoring installation.deleted without an installation ID${logSuffix}`);
+          return NextResponse.json(
+            { message: 'Event ignored: missing installation ID' },
+            { status: 200 }
+          );
+        }
+        const deletedPayload = { ...parseResult.data, installation };
+
         // Get integration before deletion to log the event
-        const installationId = parseResult.data.installation.id.toString();
+        const installationId = installation.id.toString();
         const integration = await findIntegrationByInstallationId(
           PLATFORM.GITHUB,
           installationId,
@@ -202,7 +233,7 @@ export async function handleGitHubWebhook(
             return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
           }
 
-          const result = await handleInstallationDeleted(parseResult.data, appType);
+          const result = await handleInstallationDeleted(deletedPayload, appType);
 
           // Mark webhook event as processed
           if (logResult.webhookEventId) {
@@ -221,7 +252,7 @@ export async function handleGitHubWebhook(
           return result;
         }
 
-        return await handleInstallationDeleted(parseResult.data, appType);
+        return await handleInstallationDeleted(deletedPayload, appType);
       }
 
       if (action === GITHUB_ACTION.SUSPEND) {
@@ -357,11 +388,7 @@ export async function handleGitHubWebhook(
 
       // Identity synchronization is idempotent and must finish before delivery deduplication;
       // otherwise GitHub redelivery after a transient API or database failure cannot repair metadata.
-      const result = await handleInstallationTargetRenamed(
-        parseResult.data,
-        integration.id,
-        appType
-      );
+      const result = await handleInstallationTargetRenamed(parseResult.data, integration, appType);
 
       const logResult = await logWebhook(integration, action);
       if (logResult.isDuplicate) {
@@ -457,9 +484,9 @@ export async function handleGitHubWebhook(
       return NextResponse.json({ message: 'Integration not found' }, { status: 404 });
     }
 
-    if (integration.suspended_at) {
-      logExceptInTest(`Integration suspended, skipping event${logSuffix}`);
-      return NextResponse.json({ message: 'Integration suspended' }, { status: 200 });
+    if (!(await isAvailableForDeferredGitHubDispatch(integration))) {
+      logExceptInTest(`Integration unavailable, skipping event${logSuffix}`);
+      return NextResponse.json({ message: 'Integration unavailable' }, { status: 200 });
     }
 
     const primaryIntegration = integration.owned_by_organization_id
@@ -489,6 +516,7 @@ export async function handleGitHubWebhook(
       if (!parseResult.data.deleted) {
         // Process async
         after(async () => {
+          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await handlePushEvent(parseResult.data, integration);
         });
       }
@@ -544,6 +572,7 @@ export async function handleGitHubWebhook(
       if (action === GITHUB_ACTION.CLOSED) {
         if (upsertOwner) {
           after(async () => {
+            if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
             await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
             if (logResult.webhookEventId) {
               try {
@@ -564,6 +593,7 @@ export async function handleGitHubWebhook(
 
       if (upsertOwner) {
         after(async () => {
+          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await upsertCliSessionPullRequestsFromWebhook(parseResult.data, upsertOwner);
         });
       }
@@ -617,6 +647,7 @@ export async function handleGitHubWebhook(
       if (upsertOwner) {
         after(async () => {
           try {
+            if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
             await upsertCliSessionPullRequestReviewFromWebhook(parseResult.data, upsertOwner);
             if (logResult.webhookEventId) {
               await updateWebhookEvent(logResult.webhookEventId, {
@@ -692,6 +723,7 @@ export async function handleGitHubWebhook(
       after(async () => {
         const handlersTriggered = ['pr_review_comment_fix'];
         try {
+          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
           await handlePRReviewComment(parseResult.data, integration);
           try {
             const reviewMemoryResult = await handleGitHubReviewCommentReply({

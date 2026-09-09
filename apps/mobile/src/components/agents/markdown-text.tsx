@@ -4,6 +4,7 @@ import { useMarkdown } from 'react-native-marked';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
+import { MarkdownHtml, splitMarkdownHtml } from './markdown-html';
 import {
   getMarkdownStyles,
   getPalette,
@@ -42,7 +43,50 @@ export function MarkdownText({
   const colors = useThemeColors();
 
   const palette = useMemo(() => getPalette(variant, colors), [variant, colors]);
+  const segments = useMemo(() => splitMarkdownHtml(value), [value]);
 
+  // Always render through the same wrapping View with index keys: switching to
+  // a bare MarkdownContent when no HTML token exists would change the root
+  // element type, remounting the markdown prefix (and wiping its table
+  // snapshot and CodeBlock keys) as soon as the first HTML token streams in.
+  return (
+    <View>
+      {segments.map((segment, index) =>
+        segment.type === 'html' ? (
+          <MarkdownHtml
+            key={`md-html-${index}`}
+            html={segment.raw}
+            palette={palette}
+            selectable={selectable}
+            onLongPressLink={onLongPressLink}
+            onPressLink={onPressLink}
+          />
+        ) : (
+          <MarkdownContent
+            key={`md-content-${index}`}
+            value={segment.raw}
+            palette={palette}
+            selectable={selectable}
+            onLongPressLink={onLongPressLink}
+            onPressLink={onPressLink}
+          />
+        )
+      )}
+    </View>
+  );
+}
+
+type MarkdownContentProps = Omit<MarkdownTextProps, 'variant'> & {
+  palette: MarkdownPalette;
+};
+
+function MarkdownContent({
+  value,
+  palette,
+  selectable = true,
+  onLongPressLink,
+  onPressLink,
+}: Readonly<MarkdownContentProps>) {
   // Tables are extracted before any renderer runs: each table becomes a chip
   // (parsed on open), and the remaining markdown runs render through useMarkdown.
   const [snapshot, setSnapshot] = useState(() => ({ value, segments: splitMarkdownTables(value) }));

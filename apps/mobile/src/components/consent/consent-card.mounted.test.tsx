@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- react-test-renderer is the DOM-free renderer used to mount React/RN trees under vitest (same pattern as src/components/agents/markdown-image.mounted.test.tsx) */
+/* oxlint-disable eslint/max-lines -- loading and error state coverage grows the file past 300 lines */
 import { createElement } from 'react';
 import TestRenderer, { act } from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -50,6 +51,7 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/consent/consent-row', () => ({ ConsentRow: 'ConsentRow' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://kilo.ai' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
@@ -98,6 +100,10 @@ function singleSwitch(root: I): I {
     throw new Error('switch not found');
   }
   return n;
+}
+
+function countByType(root: I, type: string): number {
+  return root.findAll(n => typeof n.type === 'string' && (n.type as string) === type).length;
 }
 
 function findButton(root: I, label: string): I {
@@ -201,6 +207,43 @@ describe('ConsentCard', () => {
     await act(flush);
     expect(mockedReadConsent).toHaveBeenCalledWith('test-user-1');
     expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('shows a same-size placeholder, not a default-off switch, while the stored value loads', async () => {
+    let resolveLoad: ((v: { mandatory: boolean; optional: boolean }) => void) | undefined =
+      undefined;
+    mockedReadConsent.mockReturnValue(
+      new Promise(resolve => {
+        resolveLoad = resolve;
+      })
+    );
+    const renderer = mountCard('review');
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // The pre-load state must not claim "off": an e3 revoke check mistook the
+    // pre-load off for a completed revoke (b911 vr5, e3-toggled-off.png).
+    expect(countByType(renderer.root, 'Switch')).toBe(0);
+    expect(countByType(renderer.root, 'Skeleton')).toBe(1);
+
+    await act(() => {
+      resolveLoad?.({ mandatory: true, optional: true });
+    });
+    await act(flush);
+    expect(countByType(renderer.root, 'Skeleton')).toBe(0);
+    expect(singleSwitch(renderer.root).props.value).toBe(true);
+  });
+
+  it('shows the switch with an error when the stored value fails to load', async () => {
+    mockedReadConsent.mockRejectedValue(new Error('keychain read failed'));
+    const renderer = mountCard('review');
+    await act(flush);
+    expect(texts(renderer.root)).toContain(
+      'Could not load your consent settings. Please try again.'
+    );
+    // The placeholder is gone: the error names the unreliability, so the
+    // control is at least operable (a failed toggle reverts with its error).
+    expect(singleSwitch(renderer.root)).toBeTruthy();
   });
 
   it('writes optional choice immediately without sign-out on toggle', async () => {

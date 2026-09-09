@@ -52,6 +52,7 @@ import {
   platform_integrations,
   type User,
 } from '@kilocode/db/schema';
+import type { ManualCodeReviewConfig } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
 import { or } from 'drizzle-orm';
 import { tryDispatchPendingReviews } from './dispatch-pending-reviews';
@@ -70,6 +71,30 @@ type ReviewOwner = { type: 'user'; id: string } | { type: 'org'; id: string };
 
 function minutesAgo(minutes: number) {
   return new Date(Date.now() - minutes * 60 * 1000).toISOString();
+}
+
+// A manual review carries a `manual_config` parsed by a strict zod schema, so
+// the shape must match `ManualCodeReviewConfigSchema` exactly.
+function manualReviewConfig(): ManualCodeReviewConfig {
+  return {
+    agentConfig: {
+      review_style: 'balanced',
+      focus_areas: [],
+      model_slug: 'anthropic/claude-sonnet-4.6',
+    },
+    instructions: null,
+    outputMode: 'kilo',
+  };
+}
+
+// What undici `fetch` throws when nothing listens behind the worker URL: a
+// `fetch failed` TypeError whose cause carries the ECONNREFUSED code.
+function workerConnectionRefused() {
+  const cause = Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:8789'), {
+    code: 'ECONNREFUSED',
+    syscall: 'connect',
+  });
+  return new TypeError('fetch failed', { cause });
 }
 
 function createDeferred<T>() {
@@ -190,6 +215,7 @@ describe('tryDispatchPendingReviews', () => {
     updatedAt,
     startedAt = null,
     platform = 'github',
+    manualConfig = null,
   }: {
     owner: ReviewOwner;
     status: ReviewStatus;
@@ -197,6 +223,7 @@ describe('tryDispatchPendingReviews', () => {
     updatedAt: string;
     startedAt?: string | null;
     platform?: 'github' | 'bitbucket';
+    manualConfig?: ManualCodeReviewConfig | null;
   }) {
     const sequence = reviewSequence++;
 
@@ -218,6 +245,7 @@ describe('tryDispatchPendingReviews', () => {
       started_at: startedAt,
       created_at: createdAt,
       updated_at: updatedAt,
+      manual_config: manualConfig,
     };
   }
 
@@ -1560,6 +1588,103 @@ describe('tryDispatchPendingReviews', () => {
       .limit(1);
     expect(mockGetReviewStatus).toHaveBeenCalledWith(review.id, attempt?.id);
     expect(storedReview?.status).toBe('queued');
+  });
+
+  it('fails a manual review when the worker refuses both the dispatch and the status probe', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockDispatchReview.mockRejectedValue(workerConnectionRefused());
+    mockGetReviewStatus.mockRejectedValue(workerConnectionRefused());
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+          manualConfig: manualReviewConfig(),
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await getStoredReview(review.id);
+
+    expect(result).toEqual({
+      dispatched: 0,
+      notDispatched: 1,
+      activeCount: 0,
+    });
+    // The connection was refused twice, so the worker never accepted the
+    // review. The waiting user must see a retryable failure, not an eternal
+    // "Queued" with the transcript sheet stuck on "Waiting". upstream_error
+    // is the machine-readable cause (the review worker is the upstream service).
+    expect(storedReview).toEqual(
+      expect.objectContaining({
+        status: 'failed',
+        dispatchReservationId: null,
+        terminalReason: 'upstream_error',
+      })
+    );
+    expect(storedReview?.errorMessage).toContain('could not reach the code review service');
+  });
+
+  it('keeps a webhook review queued when the worker refuses both the dispatch and the status probe', async () => {
+    const recentTimestamp = minutesAgo(1);
+    const owner = { type: 'user', id: testUser.id } satisfies ReviewOwner;
+    await setTestUserBalance(DEFAULT_TIER_BALANCE_MICRODOLLARS);
+    mockDispatchReview.mockRejectedValue(workerConnectionRefused());
+    mockGetReviewStatus.mockRejectedValue(workerConnectionRefused());
+
+    const [review] = await db
+      .insert(cloud_agent_code_reviews)
+      .values(
+        reviewValues({
+          owner,
+          status: 'pending',
+          createdAt: recentTimestamp,
+          updatedAt: recentTimestamp,
+        })
+      )
+      .returning({ id: cloud_agent_code_reviews.id });
+
+    if (!review) {
+      throw new Error('Expected review to be inserted');
+    }
+
+    const result = await tryDispatchPendingReviews({
+      type: 'user',
+      id: testUser.id,
+      userId: testUser.id,
+    });
+
+    const storedReview = await getStoredReview(review.id);
+
+    expect(result).toEqual({
+      dispatched: 0,
+      notDispatched: 1,
+      activeCount: 0,
+    });
+    // Webhook reviews have no user waiting on the screen; the stale-queued
+    // recovery cron re-dispatches them once the worker is back.
+    expect(storedReview).toEqual(
+      expect.objectContaining({
+        status: 'queued',
+        dispatchReservationId: expect.any(String),
+      })
+    );
   });
 
   it('sends the current attempt id to the worker dispatch payload', async () => {

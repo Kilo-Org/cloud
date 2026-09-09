@@ -167,17 +167,18 @@ The internal `getWrapperLogs` path also discovers these sandbox-side files direc
 
 ## Control-plane Diagnostics
 
-Control-plane (`workspace_*`) sessions use verbose structured wrapper diagnostics, not the legacy raw wrapper/Kilo tarball. Records include heartbeat attempts, feed freshness, control socket and request outcomes, event-send metadata, task phases, and retirement causes. They exclude prompts, assistant/tool content, raw errors, credentials, and URLs.
+Control-plane (`workspace_*`) sessions use verbose structured wrapper diagnostics plus a bounded wrapper/Kilo file archive. JSON records include heartbeat attempts, feed freshness, control socket and request outcomes, event-send metadata, task phases, and retirement causes. They exclude prompts, assistant/tool content, raw errors, credentials, and URLs. The file archive can contain prompts and code, same as legacy session tarballs.
 
-The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. Shutdown attempts a final flush within the existing shutdown deadline. R2 keys are:
+The wrapper uploads JSON batches to the existing R2 bucket every five seconds and when a batch fills. It also uploads `/tmp/kilocode-control-wrapper.log` plus worktree Kilo log dirs (`/tmp/kilo-worktrees/<home>/.local/share/kilo/log`) as one gzip archive every 30 seconds, and again during shutdown after the JSON flush. R2 keys are:
 
 ```text
 logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/<batchId>.json
+logs/control/<sandboxId>/<allocationId>/<wrapperInstanceId>/files.tar.gz
 ```
 
 `sandboxId` is the logical SandboxControl ID, not the `workspace_*` session ID or physical provider allocation name. Use Worker logs to correlate these IDs. Each allocation/wrapper has separate immutable batches; sort them by the batch `sequence` and record `timestamp`, not the random batch ID. Check `droppedRecords` and `droppedTerminalRecords` for buffer overflow or rejected diagnostic records.
 
-List and download these JSON batches directly from R2 using local tooling and the key prefix above. Uploaded batches remain available after the container disappears, subject to the bucket's retention policy. The legacy `getWrapperLogs` live-file reader and tarball retrieval do not read these JSON archives.
+List and download these JSON batches and the overwriteable `files.tar.gz` object from R2 using local tooling and the key prefix above. Each wrapper incarnation keeps one file archive; later uploads replace it. Uploaded objects remain available after the container disappears, subject to the bucket's retention policy. The legacy `getWrapperLogs` live-file reader and tarball retrieval do not read these control-plane archives.
 
 Worker/DO diagnostics remain in Cloudflare logs/Axiom, not these wrapper archives. Successful `message.part.delta` forwarding is summarized in heartbeat counters and peak queue/RPC/total forwarding times instead of per-frame Worker logs. These counters and peaks reset when the DO is reconstructed. Failure and lifecycle records remain verbose, and wrapper archive logging is unchanged. Upload result markers on wrapper stderr distinguish HTTP rejection, network failure, timeout, and acceptance. An upload-only grant expires four hours after allocation launch and is not renewed; runtime credential revocation does not revoke it. Grant expiry does not delete archives. R2 retention remains governed by external bucket policy, not the session/report cleanup jobs.
 

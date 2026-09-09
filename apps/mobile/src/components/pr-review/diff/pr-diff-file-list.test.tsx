@@ -22,6 +22,7 @@ const listQueryState = vi.hoisted(() => ({
   firstPageErrorState: null as { kind: string } | null,
 }));
 
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   View: 'View',
   RefreshControl: 'RefreshControl',

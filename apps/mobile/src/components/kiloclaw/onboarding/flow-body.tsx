@@ -104,7 +104,7 @@ export function FlowBody(props: Readonly<FlowBodyProps>) {
               {t('kiloclaw.onboarding.flow.provisioning')}
             </Text>
             <Text className="text-center text-2xl font-semibold">
-              {t('kiloclaw.onboarding.flow.somethingWentWrong')}
+              {t('common.somethingWentWrong')}
             </Text>
             <Text variant="muted" className="text-center text-base">
               {t('kiloclaw.onboarding.flow.genericErrorBody')}

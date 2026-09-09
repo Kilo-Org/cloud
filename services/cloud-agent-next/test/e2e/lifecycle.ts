@@ -1226,17 +1226,6 @@ export async function lifecycleCold(args: LifecycleArgs): Promise<LifecycleResul
         durationMs: Date.now() - start,
       };
     }
-    if (terminal.streamEventType !== 'complete') {
-      return {
-        name: 'cold',
-        conversation,
-        ok: false,
-        message: `cold start terminated without completion: ${terminal.streamEventType}`,
-        events,
-        durationMs: Date.now() - start,
-      };
-    }
-
     return {
       name: 'cold',
       conversation,

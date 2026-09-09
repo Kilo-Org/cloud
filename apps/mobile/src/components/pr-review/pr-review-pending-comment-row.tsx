@@ -52,13 +52,13 @@ export function PrReviewPendingCommentRow({
           {location}
         </Text>
         <Text className="text-xs leading-4 text-foreground" numberOfLines={1}>
-          {item.body.trim().length > 0 ? item.body : t('prReview.pendingComment.emptyBody')}
+          {item.body.trim().length > 0 ? item.body : t('prReview.diff.emptyLine')}
         </Text>
         {stale ? (
           <View className="flex-row items-center gap-1.5">
             <View className="rounded-full border border-warn-tile-border bg-warn-tile-bg px-2 py-0.5">
               <Text className="text-[10px] font-medium uppercase tracking-wide text-warn">
-                {t('prReview.pendingComment.outdated')}
+                {t('prReview.discussion.outdated')}
               </Text>
             </View>
             <Text className="flex-1 text-[10px] text-muted-foreground">

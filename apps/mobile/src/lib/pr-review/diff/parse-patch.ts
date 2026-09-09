@@ -42,10 +42,10 @@ type DiffLineMarker = '+' | '-' | '·';
  */
 export function diffLineStatusWord(type: DiffLineType): string {
   if (type === 'add') {
-    return i18n.t('prReview.diff.statusAdded');
+    return i18n.t('common.added');
   }
   if (type === 'del') {
-    return i18n.t('prReview.diff.statusDeleted');
+    return i18n.t('common.deleted');
   }
   return i18n.t('prReview.diff.statusContext');
 }

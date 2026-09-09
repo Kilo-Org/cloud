@@ -23,6 +23,7 @@ import {
   kilo_pass_store_purchases,
   kilo_pass_subscriptions,
   cloud_agent_webhook_triggers,
+  cloud_agent_workspace_folders,
   cloud_agent_worktrees,
   enrichment_data,
   source_embeddings,
@@ -50,7 +51,6 @@ import {
   platform_access_token_credentials,
   byok_api_keys,
   agent_configs,
-  webhook_events,
   agent_environment_profiles,
   security_findings,
   security_finding_notifications,
@@ -61,7 +61,6 @@ import {
   auto_fix_tickets,
   slack_bot_requests,
   bot_requests,
-  cloud_agent_code_reviews,
   cloud_agent_pending_uploads,
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -101,6 +100,8 @@ import {
   github_branch_pull_requests,
   user_github_app_tokens,
   github_install_states,
+  github_connection_attempts,
+  github_app_installations,
   model_eval_ingestions,
   stripe_dispute_actions,
   stripe_dispute_cases,
@@ -141,6 +142,10 @@ import {
 } from '@/lib/ai-gateway/providerHash';
 import { normalizeEmail } from '@/lib/utils';
 import { authPassesDeletionFence } from '@/lib/user/deletion-queue/deletion-identity-fence';
+import {
+  deleteAllOwnedByUserIdPages,
+  OWNED_BY_USER_DELETE_PAGE_SIZE,
+} from '@/lib/user/owned-by-user-batch-delete';
 import { extractEmailDomain } from '@/lib/email-domain';
 import { purgeUserPendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
 import { recordAffiliateAttributionAndQueueParentEvent } from '@/lib/impact/affiliate-events';
@@ -1179,8 +1184,11 @@ export async function anonymizeCloudUserData(
   `);
   await tx.delete(user_data_exports).where(eq(user_data_exports.kilo_user_id, userId));
   await tx
+    .delete(cloud_agent_workspace_folders)
+    .where(eq(cloud_agent_workspace_folders.kilo_user_id, userId));
+  await tx
     .update(cloud_agent_worktrees)
-    .set({ name: null })
+    .set({ name: null, folder_id: null })
     .where(eq(cloud_agent_worktrees.kilo_user_id, userId));
   await tx.delete(enrichment_data).where(eq(enrichment_data.user_id, userId));
   await tx.delete(user_admin_notes).where(eq(user_admin_notes.kilo_user_id, userId));
@@ -1348,6 +1356,50 @@ export async function anonymizeCloudUserData(
       )
     );
 
+  await tx
+    .update(platform_integrations)
+    .set({
+      github_authorized_by_user_id: null,
+      github_authorized_user_id: null,
+      github_authorized_at: null,
+    })
+    .where(eq(platform_integrations.github_authorized_by_user_id, userId));
+  await tx
+    .delete(github_connection_attempts)
+    .where(eq(github_connection_attempts.kilo_user_id, userId));
+
+  const githubUserIds = await tx
+    .select({ id: user_github_app_tokens.github_user_id })
+    .from(user_github_app_tokens)
+    .where(eq(user_github_app_tokens.kilo_user_id, userId));
+
+  await tx.execute(sql`
+    DELETE FROM ${github_app_installations} canonical
+    USING ${platform_integrations} owned
+    WHERE owned.owned_by_user_id = ${userId}
+      AND owned.github_installation_id = canonical.id
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ${platform_integrations} retained
+        WHERE retained.github_installation_id = canonical.id
+          AND retained.id <> owned.id
+      )
+  `);
+  if (githubUserIds.length > 0) {
+    await tx.execute(sql`
+      DELETE FROM ${github_app_installations} canonical
+      WHERE (canonical.account_type = 'User' OR canonical.account_type IS NULL)
+        AND canonical.account_id IN (${sql.join(
+          githubUserIds.map(user => sql`${user.id}`),
+          sql`, `
+        )})
+        AND NOT EXISTS (
+          SELECT 1 FROM ${platform_integrations} retained
+          WHERE retained.github_installation_id = canonical.id
+        )
+    `);
+  }
+
   await tx.delete(platform_integrations).where(eq(platform_integrations.owned_by_user_id, userId));
   await tx.execute(sql`
      UPDATE coding_plan_key_inventory
@@ -1389,7 +1441,7 @@ export async function anonymizeCloudUserData(
     .delete(coding_plan_availability_intents)
     .where(eq(coding_plan_availability_intents.user_id, userId));
   await tx.delete(agent_configs).where(eq(agent_configs.owned_by_user_id, userId));
-  await tx.delete(webhook_events).where(eq(webhook_events.owned_by_user_id, userId));
+  await deleteAllOwnedByUserIdPages(tx, 'webhook_events', userId, OWNED_BY_USER_DELETE_PAGE_SIZE);
   await tx
     .delete(security_analysis_owner_state)
     .where(eq(security_analysis_owner_state.owned_by_user_id, userId));
@@ -1424,9 +1476,12 @@ export async function anonymizeCloudUserData(
   await tx
     .delete(cloud_agent_pending_uploads)
     .where(eq(cloud_agent_pending_uploads.kilo_user_id, userId));
-  await tx
-    .delete(cloud_agent_code_reviews)
-    .where(eq(cloud_agent_code_reviews.owned_by_user_id, userId));
+  await deleteAllOwnedByUserIdPages(
+    tx,
+    'cloud_agent_code_reviews',
+    userId,
+    OWNED_BY_USER_DELETE_PAGE_SIZE
+  );
   await tx
     .delete(code_review_memory_proposals)
     .where(eq(code_review_memory_proposals.owned_by_user_id, userId));
@@ -1954,7 +2009,8 @@ async function getEmailAccountCandidates(email: string) {
 
 export async function getCrossAccountEmailConflicts(
   emails: string[],
-  currentUserId: string
+  currentUserId: string,
+  database: typeof db | DrizzleTransaction = db
 ): Promise<Map<string, boolean>> {
   const uniqueEmails = [...new Set(emails)];
   if (uniqueEmails.length === 0) return new Map();
@@ -1962,7 +2018,7 @@ export async function getCrossAccountEmailConflicts(
   const lowerEmails = [...new Set(uniqueEmails.map(email => email.toLowerCase().trim()))];
   const normalizedEmails = [...new Set(uniqueEmails.map(normalizeEmail))];
   const [linkedProviderMatches, primaryEmailMatches] = await Promise.all([
-    db
+    database
       .select({ email: user_auth_provider.email })
       .from(user_auth_provider)
       .where(
@@ -1971,7 +2027,7 @@ export async function getCrossAccountEmailConflicts(
           ne(user_auth_provider.kilo_user_id, currentUserId)
         )
       ),
-    db
+    database
       .select({
         normalizedEmail: kilocode_users.normalized_email,
         primaryEmail: kilocode_users.google_user_email,

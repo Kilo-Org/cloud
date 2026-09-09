@@ -1,7 +1,9 @@
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { ChevronDown } from '@/components/ui/icons';
-import { ActivityIndicator, Platform, Pressable, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
+import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
+import { Platform, Pressable, View } from 'react-native';
+import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
@@ -14,11 +16,14 @@ import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
 import { formatDate, formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
+
+const HIDDEN_BALANCE = '*****';
 
 type CreditsCardProps = {
   readonly enabled: boolean;
@@ -33,6 +38,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const { organizationId, error, isSaving, retry } = useOrganization();
   const selectedOrgId = organizationId ?? undefined;
 
+  const { hideBalance, hasLoaded: hideBalanceLoaded, setHideBalance } = useHideBalancePreference();
   const { userId, isError: userIdError, refetch: refetchUserId } = useCurrentUserId({ enabled });
   const hasUserId = userId !== undefined;
 
@@ -88,6 +94,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   // is still undefined. Treat "no data yet" as loading so the card shows a
   // skeleton instead of `$0` on a cold launch before NetInfo settles.
   const balancePending = balance === undefined && !balanceFailed;
+  const showBalanceSkeleton =
+    (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
   const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
   const expiringTotal = fromMicrodollars(
     expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
@@ -100,8 +108,8 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
 
   const selectedLabel = selectedOrgId
     ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
-      t('profile.organization'))
-    : t('profile.personal');
+      t('common.organization'))
+    : t('common.personal');
 
   const canPickContext = orgs !== undefined;
 
@@ -161,7 +169,21 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         </View>
       )}
 
-      {(balanceLoading || balancePending) && <Skeleton className="min-h-16 w-full rounded-lg" />}
+      {showBalanceSkeleton && (
+        // Content-shaped skeleton (number bar + note bar in the card's own
+        // bg-secondary shell): a plain block read as an empty box in the e5
+        // spot check (2026-09-07). Sized to the card's min-h-16 so the swap
+        // to the balance row does not shift the sections below. The bars are
+        // bg-muted-soft because the theme's bg-muted equals bg-secondary —
+        // default-tone bars were invisible in this shell (b911 e2 spot check:
+        // "blank beige block", e2-nav-profile.png).
+        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
+          <View className="flex-1 gap-1">
+            <Skeleton className="h-8 w-28 rounded-md bg-muted-soft" />
+            <Skeleton className="h-3 w-40 rounded bg-muted-soft" />
+          </View>
+        </View>
+      )}
       {balanceFailed && (
         <Pressable
           className="min-h-16 justify-center rounded-lg bg-secondary px-3 py-3 active:opacity-70"
@@ -173,27 +195,53 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           <Text className="text-sm text-destructive">{t('profile.failedToLoadBalance')}</Text>
         </Pressable>
       )}
-      {!balanceLoading && !balancePending && !balanceFailed && (
+      {!showBalanceSkeleton && !balanceFailed && (
         <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
           <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
-            <Text className="text-2xl font-bold">{formatMoney(balanceDollars, i18n.language)}</Text>
-            {creditsLoading ? (
-              <Animated.View exiting={FadeOut.duration(150)}>
-                <Skeleton className="mt-1 h-3 w-48 rounded" />
-              </Animated.View>
-            ) : (
-              expiringTotal > 0 &&
-              earliestExpiry != null && (
-                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                  <Text className="text-xs text-muted-foreground">
-                    {t('profile.bonusCreditsExpiring', {
-                      amount: formatMoney(expiringTotal, i18n.language),
-                      date: formatDate(parseTimestamp(earliestExpiry), i18n.language),
-                    })}
-                  </Text>
+            <View className="flex-row items-center gap-1">
+              <Text
+                className="text-2xl font-bold tabular-nums"
+                accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+              >
+                {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+              </Text>
+              <Pressable
+                className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
+                onPress={() => {
+                  void Haptics.selectionAsync();
+                  setHideBalance(!hideBalance);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  hideBalance ? t('profile.showBalance') : t('profile.hideBalance')
+                }
+                hitSlop={4}
+              >
+                {hideBalance ? (
+                  <Eye size={18} color={colors.mutedForeground} />
+                ) : (
+                  <EyeOff size={18} color={colors.mutedForeground} />
+                )}
+              </Pressable>
+            </View>
+            {!hideBalance &&
+              (creditsLoading ? (
+                <Animated.View exiting={FadeOut.duration(150)}>
+                  <Skeleton className="mt-1 h-3 w-48 rounded bg-muted-soft" />
                 </Animated.View>
-              )
-            )}
+              ) : (
+                expiringTotal > 0 &&
+                earliestExpiry != null && (
+                  <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+                    <Text className="text-xs text-muted-foreground">
+                      {t('profile.bonusCreditsExpiring', {
+                        amount: formatMoney(expiringTotal, i18n.language),
+                        date: formatDate(parseTimestamp(earliestExpiry), i18n.language),
+                      })}
+                    </Text>
+                  </Animated.View>
+                )
+              ))}
           </Animated.View>
           {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
         </View>

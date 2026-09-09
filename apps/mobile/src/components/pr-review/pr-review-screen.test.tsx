@@ -60,6 +60,7 @@ vi.mock('expo-router', () => ({
   useRouter: () => ({ push: routerPush, back: routerBack, canGoBack: routerCanGoBack }),
 }));
 
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',

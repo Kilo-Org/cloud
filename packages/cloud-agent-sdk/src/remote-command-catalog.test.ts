@@ -307,17 +307,3 @@ describe('parseRemoteCommandCatalog', () => {
     }
   });
 });
-
-describe('RemoteCommandState', () => {
-  it('always carries a `commands` array (empty when none discovered)', () => {
-    // The state is a public surface; consumers must be able to read
-    // `state.commands` unconditionally instead of tracking the cache
-    // separately.
-    const state = {
-      ownerConnectionId: null,
-      refresh: 'idle' as const,
-      commands: [] as never[],
-    };
-    expect(Array.isArray(state.commands)).toBe(true);
-  });
-});

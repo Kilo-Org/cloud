@@ -27,6 +27,8 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 let previousOnline = true;
 let mintFailed = false;
 
+vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
+vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('@/lib/trpc', async () => {
   const { createTRPCContext } = await import('@trpc/tanstack-react-query');
   const { createTRPCClient, httpLink } = await import('@trpc/client');

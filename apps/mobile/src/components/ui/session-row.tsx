@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Pressable, View } from 'react-native';
 
+import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
+
 import { AgentBadge } from '@/components/ui/agent-badge';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { selectSessionRowEyebrowRight } from '@/components/ui/session-row-eyebrow-right';
-import { StatusDot } from '@/components/ui/status-dot';
+import { SessionStatusIcon } from '@/components/ui/session-status-icon';
 import { Text } from '@/components/ui/text';
 import { agentColor } from '@/lib/agent-color';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -19,10 +21,17 @@ type SessionRowProps = {
   /** Small mono line shown below the title (e.g. git branch). */
   subtitle?: string | null;
   meta?: string;
-  /** When true, renders a good-tone StatusDot in the eyebrow. */
+  /** When true, renders the session's status glyph in the eyebrow. */
   live?: boolean;
   /**
-   * When true, replaces the live dot / meta with a pulsing warn-tone dot
+   * What the session is doing, from the shared status map. Picks between the
+   * working and idle glyphs on a live row; `needsInput` is driven by the flag
+   * below, which the attention-ack rules own. Absent falls back to working,
+   * which is what every live row drew before the idle glyph existed.
+   */
+  statusKind?: GlanceableStatusKind | null;
+  /**
+   * When true, replaces the status glyph / meta with the needs-input glyph
    * and a `NEEDS INPUT` label. Highest priority in the eyebrow row.
    */
   needsInput?: boolean;
@@ -37,7 +46,9 @@ type SessionRowProps = {
   /**
    * Optional platform-origin icon rendered in the eyebrow-right cluster.
    * When unset, existing callers (incl. Home `variant='card'`) stay
-   * bit-for-bit identical. Suppressed entirely for needs-input rows.
+   * bit-for-bit identical. Suppressed entirely for needs-input rows and
+   * for live rows, whose eyebrow draws the status glyph — the one mark
+   * the cluster shows there.
    */
   platformIcon?: React.ReactNode;
   onPress?: () => void;
@@ -65,6 +76,7 @@ export function SessionRow({
   subtitle,
   meta,
   live,
+  statusKind = null,
   needsInput = false,
   metaWhileLive = false,
   platformIcon,
@@ -77,6 +89,7 @@ export function SessionRow({
   const { t } = useTranslation();
   const color = agentColor(agentLabel);
   const dimStrip = !live && !needsInput;
+  const liveKind: GlanceableStatusKind = statusKind === 'idle' ? 'idle' : 'running';
 
   const eyebrowDecision = selectSessionRowEyebrowRight({
     needsInput,
@@ -90,7 +103,7 @@ export function SessionRow({
   if (eyebrowDecision.kind === 'needs-input') {
     branchContent = (
       <View className="flex-row items-center gap-1.5">
-        <StatusDot tone="warn" pulse />
+        <SessionStatusIcon kind="needsInput" />
         <Text variant="mono" className="shrink text-xs text-warn">
           {t('sessionRow.needsInput')}
         </Text>
@@ -99,7 +112,7 @@ export function SessionRow({
   } else if (eyebrowDecision.kind === 'live-and-meta') {
     branchContent = (
       <View className="min-w-0 shrink flex-row items-center gap-1.5">
-        <StatusDot tone="good" />
+        <SessionStatusIcon kind={liveKind} />
         <Text
           variant="mono"
           className="shrink text-xs text-ink2"
@@ -111,7 +124,7 @@ export function SessionRow({
       </View>
     );
   } else if (eyebrowDecision.kind === 'live') {
-    branchContent = <StatusDot tone="good" />;
+    branchContent = <SessionStatusIcon kind={liveKind} />;
   } else if (eyebrowDecision.kind === 'meta' && meta) {
     branchContent = (
       <Text
@@ -169,7 +182,12 @@ export function SessionRow({
       )}
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
-          <Eyebrow className={color.hueTextClass}>{agentLabel}</Eyebrow>
+          {/* flex-1 basis 0: the right cluster is sized first at its full
+              natural width, so a long agent label truncates instead of
+              crowding the status glyph and relative time out of the row. */}
+          <Eyebrow className={cn('min-w-0 flex-1', color.hueTextClass)} numberOfLines={1}>
+            {agentLabel}
+          </Eyebrow>
           {eyebrowRight}
         </View>
         <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>

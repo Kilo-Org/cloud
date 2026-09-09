@@ -195,6 +195,7 @@ describe('security remediation launch contract', () => {
       model: 'kilo-auto/frontier',
       repoFullName: 'Kilo-Org/security-agent-testbed',
       organizationId: undefined,
+      githubIntegrationId: 'integration-a',
       callbackTarget: {
         url: 'https://security-auto-analysis.test/internal/security-remediation-callback/attempt',
         headers: { 'X-Callback-Token': 'callback-token' },

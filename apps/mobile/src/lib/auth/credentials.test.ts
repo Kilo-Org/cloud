@@ -58,6 +58,9 @@ vi.mock('@/lib/query-client', () => ({
 }));
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({ setTrpcUnauthorizedHandler: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({ clearAgentModelPreference: vi.fn() }));
+vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
+  clearRunOnDestinationPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   clearKeepScreenOnPreference: vi.fn(),
 }));
@@ -199,20 +202,32 @@ describe('bearer credential writes', () => {
 });
 
 describe('sign-out deletes', () => {
+  // mountAndSignOut resets modules and imports the whole auth graph; under the
+  // full related-suite running concurrently with the device stack that exceeds
+  // the 5 s default (b911 gate flake, 2026-09-08).
+  const mountSignOutTimeoutMs = 30_000;
+
   beforeEach(() => {
     vi.clearAllMocks();
     store.clear();
   });
 
-  it('deletes the three bearer keys with WHEN_UNLOCKED_THIS_DEVICE_ONLY', async () => {
-    await mountAndSignOut();
+  it(
+    'deletes the three bearer keys with WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+    async () => {
+      await mountAndSignOut();
 
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, expectedOptions);
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expectedOptions);
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(TOKEN_EXPIRES_AT_KEY, expectedOptions);
-    // The legacy-exchange marker is not a bearer key: it keeps the default class.
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(LEGACY_EXCHANGE_DONE_KEY);
-  });
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, expectedOptions);
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(REFRESH_TOKEN_KEY, expectedOptions);
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(
+        TOKEN_EXPIRES_AT_KEY,
+        expectedOptions
+      );
+      // The legacy-exchange marker is not a bearer key: it keeps the default class.
+      expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(LEGACY_EXCHANGE_DONE_KEY);
+    },
+    mountSignOutTimeoutMs
+  );
 });
 
 /** Mount the AuthProvider and run sign-out so the credential deletes execute. */

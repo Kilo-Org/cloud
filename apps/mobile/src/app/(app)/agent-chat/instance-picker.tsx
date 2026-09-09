@@ -189,7 +189,7 @@ export default function InstancePickerScreen() {
           icon={Server}
           placement="center"
           title={t('agentChat.instancePicker.couldNotLoad')}
-          description={t('agentChat.instancePicker.couldNotLoadDescription')}
+          description={t('organization.boundary.loadErrorMessage')}
           action={
             <Button
               variant="outline"

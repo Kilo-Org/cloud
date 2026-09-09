@@ -30,6 +30,7 @@ const native = vi.hoisted(() => {
 });
 
 vi.mock('@/components/centered-state-surface', () => ({ useStateSurface: () => native.surface }));
+vi.mock('@/components/ui/icons', () => ({ Loader2: 'Loader2' }));
 vi.mock('@/lib/utils', () => ({ cn: (...values: unknown[]) => values.filter(Boolean).join(' ') }));
 vi.mock('react-native', () => ({
   PixelRatio: {

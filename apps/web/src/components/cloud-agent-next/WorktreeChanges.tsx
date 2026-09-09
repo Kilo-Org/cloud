@@ -36,7 +36,7 @@ const compactCountFormatter = new Intl.NumberFormat('en', {
   maximumFractionDigits: 0,
 });
 
-function useSavedWorktreeChanges({
+export function useSavedWorktreeChanges({
   cloudAgentSessionId,
   organizationId,
   enabled,
@@ -197,6 +197,7 @@ export function WorktreeChangesDrawer({
   organizationId,
   open,
   onOpenChange,
+  onSelectFile,
   onCloseAutoFocus,
   portalContainer,
 }: {
@@ -204,6 +205,7 @@ export function WorktreeChangesDrawer({
   organizationId?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSelectFile: (path: string) => void;
   onCloseAutoFocus: (event: Event) => void;
   portalContainer: HTMLElement | null;
 }) {
@@ -245,6 +247,7 @@ export function WorktreeChangesDrawer({
           open={open}
           viewMode={viewMode}
           onViewModeChange={setViewMode}
+          onSelectFile={onSelectFile}
           activeTabRef={activeTabRef}
         />
       </SheetContent>
@@ -252,37 +255,59 @@ export function WorktreeChangesDrawer({
   );
 }
 
-function ChangedFile({ file }: { file: WorktreeChangesFile }) {
+function ChangedFile({
+  file,
+  onSelectFile,
+}: {
+  file: WorktreeChangesFile;
+  onSelectFile: (path: string) => void;
+}) {
   const status = fileStatusStyles[file.status];
   const name = file.path.slice(file.path.lastIndexOf('/') + 1);
 
   return (
-    <li className="hover:bg-muted/50 flex h-7 min-w-0 items-center gap-2 rounded-sm px-2 text-xs">
-      <span
-        role="img"
-        aria-label={`${status.label}${file.tracked ? '' : ', untracked'}`}
-        className={`mx-1 size-1.5 shrink-0 rounded-full ${status.dot}`}
-      />
-      <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
-        {name}
-      </span>
-      {file.binary ? (
-        <span className="sr-only">Binary file; line counts unavailable.</span>
-      ) : (
-        <ChangeLineCounts
-          additions={file.additions}
-          deletions={file.deletions}
-          countsComplete={file.countsComplete}
+    <li className="min-w-0">
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        className="h-11 w-full min-w-0 justify-start gap-2 rounded-sm px-2 py-0 text-xs font-normal sm:h-7"
+        title={file.path}
+        onClick={() => onSelectFile(file.path)}
+      >
+        <span
+          role="img"
+          aria-label={`${status.label}${file.tracked ? '' : ', untracked'}`}
+          className={`mx-1 size-1.5 shrink-0 rounded-full ${status.dot}`}
         />
-      )}
+        <span className="min-w-0 flex-1 truncate text-left font-mono" aria-hidden="true">
+          {name}
+        </span>
+        <span className="sr-only">{file.path}</span>
+        {file.binary ? (
+          <span className="sr-only">Binary file; line counts unavailable.</span>
+        ) : (
+          <ChangeLineCounts
+            additions={file.additions}
+            deletions={file.deletions}
+            countsComplete={file.countsComplete}
+          />
+        )}
+      </Button>
     </li>
   );
 }
 
-function ChangedFileTree({ nodes }: { nodes: WorktreeChangesTreeNode[] }) {
+function ChangedFileTree({
+  nodes,
+  onSelectFile,
+}: {
+  nodes: WorktreeChangesTreeNode[];
+  onSelectFile: (path: string) => void;
+}) {
   return nodes.map(node =>
     node.kind === 'file' ? (
-      <ChangedFile key={`file:${node.path}`} file={node.file} />
+      <ChangedFile key={`file:${node.path}`} file={node.file} onSelectFile={onSelectFile} />
     ) : (
       <Collapsible key={`directory:${node.path}`} asChild defaultOpen>
         <li className="min-w-0">
@@ -303,7 +328,7 @@ function ChangedFileTree({ nodes }: { nodes: WorktreeChangesTreeNode[] }) {
           </CollapsibleTrigger>
           <CollapsibleContent>
             <ul className="ml-4">
-              <ChangedFileTree nodes={node.children} />
+              <ChangedFileTree nodes={node.children} onSelectFile={onSelectFile} />
             </ul>
           </CollapsibleContent>
         </li>
@@ -318,6 +343,7 @@ function WorktreeChanges({
   open,
   viewMode,
   onViewModeChange,
+  onSelectFile,
   activeTabRef,
 }: {
   cloudAgentSessionId: string;
@@ -325,6 +351,7 @@ function WorktreeChanges({
   open: boolean;
   viewMode: WorktreeChangesViewMode;
   onViewModeChange: (value: WorktreeChangesViewMode) => void;
+  onSelectFile: (path: string) => void;
   activeTabRef: RefObject<HTMLButtonElement | null>;
 }) {
   const trpcClient = useRawTRPCClient();
@@ -440,7 +467,7 @@ function WorktreeChanges({
                   </h3>
                   <ul aria-label={`Files in ${directory || 'repository root'}`}>
                     {files.map(file => (
-                      <ChangedFile key={file.path} file={file} />
+                      <ChangedFile key={file.path} file={file} onSelectFile={onSelectFile} />
                     ))}
                   </ul>
                 </li>
@@ -451,7 +478,7 @@ function WorktreeChanges({
         <TabsContent value="tree" className="m-0">
           {tree.length > 0 && (
             <ul aria-label="Changed files">
-              <ChangedFileTree nodes={tree} />
+              <ChangedFileTree nodes={tree} onSelectFile={onSelectFile} />
             </ul>
           )}
         </TabsContent>

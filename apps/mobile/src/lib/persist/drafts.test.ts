@@ -155,7 +155,20 @@ describe('draft scope and entity keys', () => {
     expect(resolvePrefillOverDraft(null, 'draft text')).toBe('draft text');
     expect(resolvePrefillOverDraft('  ', 'draft text')).toBe('draft text');
     expect(resolvePrefillOverDraft(null, null)).toBeUndefined();
-    expect(resolvePrefillOverDraft('', '')).toBe('');
+    expect(resolvePrefillOverDraft('', '')).toBeUndefined();
+  });
+
+  // b911 spot check p7-nav.png: a draft that holds only whitespace survives
+  // sign-out, restores as the uncontrolled input's defaultValue, and hides the
+  // placeholder while showing nothing — the prompt reads as blank. A draft
+  // with no visible content must never seed the input.
+  it('resolvePrefillOverDraft never seeds a whitespace-only stored draft', () => {
+    expect(resolvePrefillOverDraft(null, ' ')).toBeUndefined();
+    expect(resolvePrefillOverDraft(undefined, '   ')).toBeUndefined();
+    expect(resolvePrefillOverDraft(null, '\n')).toBeUndefined();
+    expect(resolvePrefillOverDraft(null, ' \t\n ')).toBeUndefined();
+    // Visible content keeps its surrounding whitespace untouched.
+    expect(resolvePrefillOverDraft('  ', ' hi there \n')).toBe(' hi there \n');
   });
 });
 

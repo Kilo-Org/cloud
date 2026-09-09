@@ -24,7 +24,8 @@ type StartupOutcome =
   | 'force-update'
   | 'user-error'
   | 'consent-error'
-  | 'language-error';
+  | 'language-error'
+  | 'restore-error';
 
 let origin: number | undefined = undefined;
 const marks = new Map<StartupMark, number>();

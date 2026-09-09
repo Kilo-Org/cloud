@@ -72,7 +72,7 @@ beforeEach(() => {
   });
   repoPickerSlot.set(UNFENCED_ROUTE_KEY, {
     repositories: [repo],
-    sections: [{ key: 'github', titleKey: 'agentChat.repoPicker.platformGithub', repos: [repo] }],
+    sections: [{ key: 'github', titleKey: 'common.github', repos: [repo] }],
     currentValue: '',
     onSelect: vi.fn<() => void>(),
   });

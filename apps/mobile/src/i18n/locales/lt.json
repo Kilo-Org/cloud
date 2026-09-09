@@ -2359,8 +2359,6 @@
       "lockedByAgent": ", Užrakino agentas „{{agent}}“",
       "addToFavorites": "Įtraukti {{name}} į mėgstamiausius",
       "removeFromFavorites": "Pašalinti {{name}} iš mėgstamiausių",
-      "thinkingEffortXhigh": "YA",
-      "thinkingEffortMedium": "Vid.",
       "sessionModel": "Sesijos modelis"
     },
     "attachmentPreview": {

@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Læst af fulltrúanum „{{agent}}“",
       "addToFavorites": "Bæta {{name}} við eftirlæti",
       "removeFromFavorites": "Fjarlægja {{name}} úr eftirlæti",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Miðl.",
       "sessionModel": "Lotulíkan"
     },
     "attachmentPreview": {

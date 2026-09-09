@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Заклучено од агентот „{{agent}}“",
       "addToFavorites": "Додај {{name}} во омилени",
       "removeFromFavorites": "Отстрани {{name}} од омилени",
-      "thinkingEffortXhigh": "МВ",
-      "thinkingEffortMedium": "Сред.",
       "sessionModel": "Модел на сесијата"
     },
     "attachmentPreview": {

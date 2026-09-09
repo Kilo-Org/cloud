@@ -1888,8 +1888,6 @@
       "lockedByAgent": "，已由智慧代理「{{agent}}」鎖定",
       "addToFavorites": "將 {{name}} 加入我的最愛",
       "removeFromFavorites": "將 {{name}} 從我的最愛移除",
-      "thinkingEffortXhigh": "極高",
-      "thinkingEffortMedium": "中",
       "sessionModel": "工作階段模型"
     },
     "attachmentPreview": {

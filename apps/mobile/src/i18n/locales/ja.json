@@ -1888,8 +1888,6 @@
       "lockedByAgent": "、エージェント「{{agent}}」によってロックされています",
       "addToFavorites": "{{name}}をお気に入りに追加",
       "removeFromFavorites": "{{name}}をお気に入りから削除",
-      "thinkingEffortXhigh": "超高",
-      "thinkingEffortMedium": "中",
       "sessionModel": "セッションのモデル"
     },
     "attachmentPreview": {

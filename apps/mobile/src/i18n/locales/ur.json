@@ -2319,8 +2319,6 @@
       "lockedByAgent": "، ایجنٹ \"{{agent}}\" نے مقفل کیا ہے",
       "addToFavorites": "{{name}} کو پسندیدہ میں شامل کریں",
       "removeFromFavorites": "{{name}} کو پسندیدہ سے ہٹائیں",
-      "thinkingEffortXhigh": "بہت زیادہ",
-      "thinkingEffortMedium": "درمیانی",
       "sessionModel": "سیشن کا ماڈل"
     },
     "attachmentPreview": {

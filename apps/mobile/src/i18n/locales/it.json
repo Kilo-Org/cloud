@@ -1878,8 +1878,6 @@
       "lockedByAgent": ", Bloccato dall'agente \"{{agent}}\"",
       "addToFavorites": "Aggiungi {{name}} ai preferiti",
       "removeFromFavorites": "Rimuovi {{name}} dai preferiti",
-      "thinkingEffortXhigh": "MA",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Modello della sessione"
     },
     "attachmentPreview": {

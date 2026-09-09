@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" ஏஜென்ட்டால் மாற்ற முடியாதபடி அமைக்கப்பட்டது",
       "addToFavorites": "{{name}}-ஐப் பிடித்தவற்றில் சேர்க்கவும்",
       "removeFromFavorites": "{{name}}-ஐப் பிடித்தவற்றிலிருந்து அகற்றவும்",
-      "thinkingEffortXhigh": "மிக அதிகம்",
-      "thinkingEffortMedium": "நடுத்தரம்",
       "sessionModel": "அமர்வு மாதிரி"
     },
     "attachmentPreview": {

@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" agenteak blokeatuta",
       "addToFavorites": "Gehitu {{name}} gogokoetara",
       "removeFromFavorites": "Kendu {{name}} gogokoetatik",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Ert.",
       "sessionModel": "Saioaren modeloa"
     },
     "attachmentPreview": {

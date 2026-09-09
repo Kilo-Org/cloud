@@ -2339,8 +2339,6 @@
       "lockedByAgent": ", Bloquejat per l'agent «{{agent}}»",
       "addToFavorites": "Afegeix {{name}} als preferits",
       "removeFromFavorites": "Treu {{name}} dels preferits",
-      "thinkingEffortXhigh": "MA",
-      "thinkingEffortMedium": "Mitjà",
       "sessionModel": "Model de la sessió"
     },
     "attachmentPreview": {

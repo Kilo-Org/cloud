@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", «{{agent}}» агент түгжсэн",
       "addToFavorites": "{{name}} загварыг дуртай загваруудад нэмэх",
       "removeFromFavorites": "{{name}} загварыг дуртай загваруудаас хасах",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Дунд",
       "sessionModel": "Сессийн загвар"
     },
     "attachmentPreview": {

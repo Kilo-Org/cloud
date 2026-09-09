@@ -2339,8 +2339,6 @@
       "lockedByAgent": ", Bloķējis aģents „{{agent}}”",
       "addToFavorites": "Pievienot {{name}} izlasei",
       "removeFromFavorites": "Noņemt {{name}} no izlases",
-      "thinkingEffortXhigh": "ĪA",
-      "thinkingEffortMedium": "Vid.",
       "sessionModel": "Sesijas modelis"
     },
     "attachmentPreview": {

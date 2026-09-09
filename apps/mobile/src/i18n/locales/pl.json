@@ -1914,8 +1914,6 @@
       "lockedByAgent": ", Zablokowane przez agenta „{{agent}}”",
       "addToFavorites": "Dodaj {{name}} do ulubionych",
       "removeFromFavorites": "Usuń {{name}} z ulubionych",
-      "thinkingEffortXhigh": "B. WYS.",
-      "thinkingEffortMedium": "Śr.",
       "sessionModel": "Model sesji"
     },
     "attachmentPreview": {

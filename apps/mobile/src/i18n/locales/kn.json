@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" ಏಜೆಂಟ್ ಬದಲಾವಣೆಗಳನ್ನು ನಿರ್ಬಂಧಿಸಿದೆ",
       "addToFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಗೆ ಸೇರಿಸಿ",
       "removeFromFavorites": "{{name}} ಅನ್ನು ಮೆಚ್ಚಿನವುಗಳಿಂದ ತೆಗೆದುಹಾಕಿ",
-      "thinkingEffortXhigh": "ಅತಿಹೆಚ್ಚು",
-      "thinkingEffortMedium": "ಮಧ್ಯಮ",
       "sessionModel": "ಸೆಶನ್ ಮಾದರಿ"
     },
     "attachmentPreview": {

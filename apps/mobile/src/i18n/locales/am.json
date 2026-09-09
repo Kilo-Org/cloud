@@ -2319,8 +2319,6 @@
       "lockedByAgent": "፣ በወኪሉ «{{agent}}» ተቆልፏል",
       "addToFavorites": "{{name}}ን ወደ ተወዳጆች ያክሉ",
       "removeFromFavorites": "{{name}}ን ከተወዳጆች ያስወግዱ",
-      "thinkingEffortXhigh": "እጅግ ከፍ",
-      "thinkingEffortMedium": "መካከለኛ",
       "sessionModel": "የክፍለ ጊዜ ሞዴል"
     },
     "attachmentPreview": {

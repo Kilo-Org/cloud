@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Vergrendel deur agent \"{{agent}}\"",
       "addToFavorites": "Voeg {{name}} by gunstelinge",
       "removeFromFavorites": "Verwyder {{name}} uit gunstelinge",
-      "thinkingEffortXhigh": "EH",
-      "thinkingEffortMedium": "Matig",
       "sessionModel": "Sessiemodel"
     },
     "attachmentPreview": {

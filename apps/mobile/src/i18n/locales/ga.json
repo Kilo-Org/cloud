@@ -2379,8 +2379,6 @@
       "lockedByAgent": ", Glasáilte ag an ngníomhaire \"{{agent}}\"",
       "addToFavorites": "Cuir {{name}} leis na cinn is fearr leat",
       "removeFromFavorites": "Bain {{name}} ó na cinn is fearr leat",
-      "thinkingEffortXhigh": "AN-ARD",
-      "thinkingEffortMedium": "Meán",
       "sessionModel": "Samhail an tseisiúin"
     },
     "attachmentPreview": {

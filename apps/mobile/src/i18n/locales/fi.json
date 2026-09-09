@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Agentin \"{{agent}}\" lukitsema",
       "addToFavorites": "Lisää {{name}} suosikkeihin",
       "removeFromFavorites": "Poista {{name}} suosikeista",
-      "thinkingEffortXhigh": "EK",
-      "thinkingEffortMedium": "Keski",
       "sessionModel": "Istunnon malli"
     },
     "attachmentPreview": {

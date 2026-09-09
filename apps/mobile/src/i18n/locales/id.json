@@ -1888,8 +1888,6 @@
       "lockedByAgent": ", Dikunci oleh agen \"{{agent}}\"",
       "addToFavorites": "Tambahkan {{name}} ke favorit",
       "removeFromFavorites": "Hapus {{name}} dari favorit",
-      "thinkingEffortXhigh": "ST",
-      "thinkingEffortMedium": "Sdg",
       "sessionModel": "Model sesi"
     },
     "attachmentPreview": {

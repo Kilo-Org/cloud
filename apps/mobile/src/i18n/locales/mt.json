@@ -2379,8 +2379,6 @@
       "lockedByAgent": ", Imsakkar mill-aġent \"{{agent}}\"",
       "addToFavorites": "Żid {{name}} mal-favoriti",
       "removeFromFavorites": "Neħħi {{name}} mill-favoriti",
-      "thinkingEffortXhigh": "GĦ+",
-      "thinkingEffortMedium": "Med.",
       "sessionModel": "Mudell tas-sessjoni"
     },
     "attachmentPreview": {

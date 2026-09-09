@@ -1940,8 +1940,6 @@
       "lockedByAgent": "، مقفل بواسطة الوكيل \"{{agent}}\"",
       "addToFavorites": "إضافة {{name}} إلى المفضلة",
       "removeFromFavorites": "إزالة {{name}} من المفضلة",
-      "thinkingEffortXhigh": "عالٍ جدًا",
-      "thinkingEffortMedium": "متوسط",
       "sessionModel": "نموذج الجلسة"
     },
     "attachmentPreview": {

@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", \"{{agent}}\" නියෝජිතයා විසින් අගුළු දමා ඇත",
       "addToFavorites": "ප්‍රියතමයන්ට {{name}} එක් කරන්න",
       "removeFromFavorites": "ප්‍රියතමයන්ගෙන් {{name}} ඉවත් කරන්න",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "මධ්‍යම",
       "sessionModel": "සැසියේ මාදිලිය"
     },
     "attachmentPreview": {

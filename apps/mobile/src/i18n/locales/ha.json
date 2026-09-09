@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Wakili \"{{agent}}\" ya kulle shi",
       "addToFavorites": "Ƙara {{name}} cikin waɗanda ka fi so",
       "removeFromFavorites": "Cire {{name}} daga waɗanda ka fi so",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mats.",
       "sessionModel": "Samfurin zaman"
     },
     "attachmentPreview": {

@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Låst av agenten «{{agent}}»",
       "addToFavorites": "Legg {{name}} til favoritter",
       "removeFromFavorites": "Fjern {{name}} fra favoritter",
-      "thinkingEffortXhigh": "EH",
-      "thinkingEffortMedium": "Mid.",
       "sessionModel": "Øktmodell"
     },
     "attachmentPreview": {

@@ -2359,8 +2359,6 @@
       "lockedByAgent": ", Zaklenil agent »{{agent}}«",
       "addToFavorites": "Dodaj {{name}} med priljubljene",
       "removeFromFavorites": "Odstrani {{name}} s seznama priljubljenih",
-      "thinkingEffortXhigh": "ZV",
-      "thinkingEffortMedium": "Sred.",
       "sessionModel": "Model seje"
     },
     "attachmentPreview": {

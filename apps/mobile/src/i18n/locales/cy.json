@@ -2399,8 +2399,6 @@
       "lockedByAgent": ", Wedi'i gloi gan yr asiant \"{{agent}}\"",
       "addToFavorites": "Ychwanegu {{name}} i'r ffefrynnau",
       "removeFromFavorites": "Tynnu {{name}} o'r ffefrynnau",
-      "thinkingEffortXhigh": "UI",
-      "thinkingEffortMedium": "Can",
       "sessionModel": "Model y sesiwn"
     },
     "attachmentPreview": {

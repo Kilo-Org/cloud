@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Lukustanud agent „{{agent}}“",
       "addToFavorites": "Lisa {{name}} lemmikutesse",
       "removeFromFavorites": "Eemalda {{name}} lemmikutest",
-      "thinkingEffortXhigh": "VK",
-      "thinkingEffortMedium": "Kesk",
       "sessionModel": "Seansi mudel"
     },
     "attachmentPreview": {

@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", ჩაკეტილია აგენტის „{{agent}}“ მიერ",
       "addToFavorites": "{{name}}-ის რჩეულებში დამატება",
       "removeFromFavorites": "{{name}}-ის რჩეულებიდან ამოღება",
-      "thinkingEffortXhigh": "ძ. მაღ.",
-      "thinkingEffortMedium": "საშ.",
       "sessionModel": "სესიის მოდელი"
     },
     "attachmentPreview": {

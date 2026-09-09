@@ -2319,8 +2319,6 @@
       "lockedByAgent": "، د «{{agent}}» ایجنټ له خوا قلف شوی",
       "addToFavorites": "{{name}} د خوښې ماډلونو ته زیات کړئ",
       "removeFromFavorites": "{{name}} د خوښې ماډلونو له لېست څخه لرې کړئ",
-      "thinkingEffortXhigh": "ډېر لوړ",
-      "thinkingEffortMedium": "منځنی",
       "sessionModel": "د ناستې ماډل"
     },
     "attachmentPreview": {

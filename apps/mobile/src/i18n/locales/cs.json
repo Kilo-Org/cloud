@@ -2359,8 +2359,6 @@
       "lockedByAgent": ", Uzamčeno agentem „{{agent}}“",
       "addToFavorites": "Přidat {{name}} do oblíbených",
       "removeFromFavorites": "Odebrat {{name}} z oblíbených",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Stř.",
       "sessionModel": "Model relace"
     },
     "attachmentPreview": {

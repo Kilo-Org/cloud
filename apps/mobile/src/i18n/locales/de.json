@@ -1888,8 +1888,6 @@
       "lockedByAgent": ", Durch den Agenten „{{agent}}“ gesperrt",
       "addToFavorites": "{{name}} zu den Favoriten hinzufügen",
       "removeFromFavorites": "{{name}} aus den Favoriten entfernen",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Mittel",
       "sessionModel": "Sitzungsmodell"
     },
     "attachmentPreview": {

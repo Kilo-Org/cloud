@@ -2319,8 +2319,6 @@
       "lockedByAgent": "، قفل‌شده توسط عامل «{{agent}}»",
       "addToFavorites": "افزودن {{name}} به موارد دلخواه",
       "removeFromFavorites": "حذف {{name}} از موارد دلخواه",
-      "thinkingEffortXhigh": "خیلی زیاد",
-      "thinkingEffortMedium": "متوسط",
       "sessionModel": "مدل نشست"
     },
     "attachmentPreview": {

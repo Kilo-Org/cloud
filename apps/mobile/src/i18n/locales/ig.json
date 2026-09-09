@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Onye nnọchi anya \"{{agent}}\" kpọchiri ya",
       "addToFavorites": "Tinye {{name}} n'ihe kacha amasị gị",
       "removeFromFavorites": "Wepụ {{name}} n'ihe kacha amasị gị",
-      "thinkingEffortXhigh": "ELU+",
-      "thinkingEffortMedium": "Etiti",
       "sessionModel": "Ihe nlereanya nnọkọ"
     },
     "attachmentPreview": {

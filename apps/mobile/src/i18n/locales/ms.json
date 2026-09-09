@@ -2319,8 +2319,6 @@
       "lockedByAgent": ", Dikunci oleh ejen \"{{agent}}\"",
       "addToFavorites": "Tambah {{name}} ke kegemaran",
       "removeFromFavorites": "Buang {{name}} daripada kegemaran",
-      "thinkingEffortXhigh": "XH",
-      "thinkingEffortMedium": "Sederhana",
       "sessionModel": "Model sesi"
     },
     "attachmentPreview": {

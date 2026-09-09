@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { createRequire } from 'node:module';
 import type {
+  PersistedWorktreeReviewDraft,
   WorktreeReviewDraft,
   WorktreeReviewOutcome,
   WorktreeReviewScope,
@@ -16,6 +17,7 @@ const {
   snapshotWorktreeReviewConfiguration,
   worktreeReviewSavedReadOptions,
   worktreeReviewScopeKey,
+  WORKTREE_REVIEW_PERSISTENCE_TIMEOUT_MS,
 }: typeof import('./worktree-review-state') = require('./worktree-review-state');
 import type { WorktreeReviewAnchor, WorktreeReviewResult } from './worktree-review';
 import type { WorktreeReviewConfiguration, WorktreeReviewSubmission } from './worktree-review-send';
@@ -58,10 +60,16 @@ const anchor: WorktreeReviewAnchor = {
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>(done => {
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => {
     resolve = done;
+    reject = fail;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
+}
+
+async function flushPromises() {
+  for (let index = 0; index < 6; index += 1) await Promise.resolve();
 }
 
 function submission(
@@ -80,7 +88,7 @@ function submission(
 function savedCapture(revision: number): GetWorktreeChangesOutput {
   return {
     snapshot: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       revision,
       capturedAt: anchor.capture.capturedAt,
       comparison: anchor.capture.comparison,
@@ -149,7 +157,7 @@ function setup() {
 }
 
 describe('review saved capture reads', () => {
-  it('keeps late inactive sibling reads behind newer revisions and blocks stale submission', async () => {
+  it('keeps late inactive sibling reads behind newer revisions', async () => {
     const context = setup();
     const sibling = 'workspace_inactive_sibling';
     context.store.setEditor(scope, {
@@ -194,10 +202,7 @@ describe('review saved capture reads', () => {
         })
         .map(comment => comment.id);
       assert.deepEqual(staleCommentIds, ['comment-b']);
-      const serialized = serializeWorktreeReview(draft.comments, {
-        staleCommentIds,
-        allowOlderCapture: draft.allowOlderCapture,
-      });
+      const serialized = serializeWorktreeReview(draft.comments);
       return serialized.ok ? { ok: true, value: context.frozen } : serialized;
     };
     const pendingSend = context.send();
@@ -208,10 +213,6 @@ describe('review saved capture reads', () => {
     assert.equal(latestSibling?.data?.snapshot?.revision, 2);
     assert.equal(client.getQueryData<GetWorktreeChangesOutput>(siblingKey)?.snapshot?.revision, 2);
     assert.equal((await reads[0])?.data?.snapshot?.revision, 1);
-    assert.equal(context.submitted.length, 0);
-    assert.match(context.store.getDraft(scope).error ?? '', /Confirm/);
-    context.store.setAllowOlderCapture(scope, true);
-    await context.send();
     assert.equal(context.submitted.length, 1);
     observers.forEach(observer => observer.destroy());
     client.clear();
@@ -360,6 +361,262 @@ describe('review configuration snapshots', () => {
 });
 
 describe('page-owned worktree review state', () => {
+  it('tracks an optional overall comment as pending work', () => {
+    const { store } = setup();
+    assert.equal(hasPendingWorktreeReview(store.getDraft(scope)), true);
+    store.removeComment(scope, 'comment-a');
+    assert.equal(hasPendingWorktreeReview(store.getDraft(scope)), false);
+    store.setOverall(scope, 'Overall direction');
+    assert.equal(store.getDraft(scope).overall, 'Overall direction');
+    assert.equal(hasPendingWorktreeReview(store.getDraft(scope)), true);
+    store.setOverall(scope, '  ');
+    assert.equal(hasPendingWorktreeReview(store.getDraft(scope)), false);
+  });
+
+  it('discards an idle draft, clears persistence, and refuses locked delivery', async () => {
+    const cleared: string[] = [];
+    const persistence = {
+      load: async () => null,
+      save: async () => {},
+      clear: async (key: string) => {
+        cleared.push(key);
+      },
+    };
+    const store = createWorktreeReviewStore(persistence);
+    const key = worktreeReviewScopeKey(scope);
+    store.getDraft(scope);
+    await flushPromises();
+    cleared.length = 0;
+
+    store.setEditor(scope, { anchor, text: 'Discard this draft' });
+    store.saveEditor(scope, 'discarded-comment');
+    store.setEditor(scope, { anchor, text: 'Unsaved editor' });
+    store.setOverall(scope, 'Discard this summary');
+    store.setDestination(scope, 'ses_target');
+    store.setAllowOlderCapture(scope, true);
+
+    assert.equal(store.discardDraft(scope), true);
+    const reset = store.getDraft(scope);
+    assert.deepEqual(reset.comments, []);
+    assert.equal(reset.editor, null);
+    assert.equal(reset.overall, '');
+    assert.equal(reset.destinationKiloSessionId, null);
+    assert.equal(reset.allowOlderCapture, false);
+    assert.deepEqual(cleared, [key]);
+
+    store.setEditor(scope, { anchor, text: 'Lock this draft' });
+    store.saveEditor(scope, 'locked-comment');
+    store.setDestination(scope, 'ses_target');
+    const preparation = deferred<WorktreeReviewResult<WorktreeReviewSubmission>>();
+    const sending = store.send({
+      scope,
+      prepare: async () => preparation.promise,
+      submit: async () => ({ status: 'accepted', delivery: 'sent' }),
+      isScopeCurrent: () => true,
+      onAccepted: () => {},
+    });
+    await Promise.resolve();
+    assert.notEqual(store.getDraft(scope).delivery.phase, 'idle');
+    assert.equal(store.discardDraft(scope), false);
+    preparation.resolve({ ok: false, error: 'Preparation stopped' });
+    await sending;
+  });
+
+  it('restores comments and editors after hydration while overlaying local fields', async () => {
+    const loading = deferred<PersistedWorktreeReviewDraft | null>();
+    const saves: Array<{ key: string; value: PersistedWorktreeReviewDraft }> = [];
+    const persistence = {
+      load: () => loading.promise,
+      save: (key: string, value: PersistedWorktreeReviewDraft) => {
+        saves.push({ key, value });
+      },
+      clear: async () => {},
+    };
+    const store = createWorktreeReviewStore(persistence);
+    store.setDestination(scope, 'local-destination');
+    store.setOverall(scope, 'Local overall');
+    assert.equal(store.getHydration(worktreeReviewScopeKey(scope)), 'pending');
+    assert.equal(store.setEditor(scope, { anchor, text: 'Local editor' }), false);
+    assert.equal(store.saveEditor(scope, 'pending-comment'), false);
+    assert.equal(store.removeComment(scope, 'restored'), false);
+    assert.equal(store.getDraft(scope).editor, null);
+    assert.equal(saves.length, 0);
+
+    const restored: PersistedWorktreeReviewDraft = {
+      version: 1,
+      comments: [{ id: 'restored', anchor, text: 'Restored comment' }],
+      editor: { anchor, text: 'Restored editor' },
+      overall: 'Restored overall',
+      destinationKiloSessionId: 'restored-destination',
+      allowOlderCapture: true,
+    };
+    loading.resolve(restored);
+    await flushPromises();
+    assert.equal(store.getHydration(worktreeReviewScopeKey(scope)), 'ready');
+    assert.deepEqual(store.getDraft(scope).comments, restored.comments);
+    assert.equal(store.getDraft(scope).editor?.text, 'Restored editor');
+    assert.equal(store.getDraft(scope).destinationKiloSessionId, 'local-destination');
+    assert.equal(store.getDraft(scope).overall, 'Local overall');
+    assert.equal(store.getDraft(scope).allowOlderCapture, true);
+    assert.equal(saves.length, 1);
+    assert.equal(saves[0]?.key, worktreeReviewScopeKey(scope));
+    assert.equal(Object.hasOwn(saves[0]?.value ?? {}, 'delivery'), false);
+  });
+
+  it('keeps restored fields when pending local overlays are empty', async () => {
+    const loading = deferred<PersistedWorktreeReviewDraft | null>();
+    const persistence = {
+      load: () => loading.promise,
+      save: async () => {},
+      clear: async () => {},
+    };
+    const store = createWorktreeReviewStore(persistence);
+    store.getDraft(scope);
+    store.setDestination(scope, null);
+    store.setOverall(scope, ' \n\t ');
+
+    loading.resolve({
+      version: 1,
+      comments: [{ id: 'restored', anchor, text: 'Restored comment' }],
+      editor: null,
+      overall: 'Restored overall',
+      destinationKiloSessionId: 'restored-destination',
+      allowOlderCapture: false,
+    });
+    await flushPromises();
+
+    assert.equal(store.getDraft(scope).destinationKiloSessionId, 'restored-destination');
+    assert.equal(store.getDraft(scope).overall, 'Restored overall');
+  });
+
+  it('settles an empty database and enables authoring without opening Review', async () => {
+    let loads = 0;
+    const persistence = {
+      load: async () => {
+        loads += 1;
+        return null;
+      },
+      save: async () => {},
+      clear: async () => {},
+    };
+    const store = createWorktreeReviewStore(persistence);
+    const key = worktreeReviewScopeKey(scope);
+    store.getDraft(scope);
+    assert.equal(loads, 1);
+    assert.equal(store.getHydration(key), 'pending');
+    await flushPromises();
+    assert.equal(store.getHydration(key), 'ready');
+    assert.equal(store.setEditor(scope, { anchor, text: 'Authoring works' }), true);
+    assert.equal(store.getDraft(scope).editor?.text, 'Authoring works');
+  });
+
+  it('enables authoring after hydration fails and keeps the in-memory draft', async () => {
+    const persistence = {
+      load: async () => {
+        throw new Error('IndexedDB unavailable');
+      },
+      save: async () => {},
+      clear: async () => {},
+    };
+    const store = createWorktreeReviewStore(persistence);
+    store.getDraft(scope);
+    await flushPromises();
+    assert.equal(store.getHydration(worktreeReviewScopeKey(scope)), 'failed');
+    assert.equal(store.setEditor(scope, { anchor, text: 'In memory' }), true);
+    assert.equal(store.getDraft(scope).editor?.text, 'In memory');
+  });
+
+  it('resets an accepted review when persistence clear rejects', async () => {
+    const persistence = {
+      load: async () => null,
+      save: async () => {},
+      clear: async () => {
+        throw new Error('IndexedDB unavailable');
+      },
+    };
+    const store = createWorktreeReviewStore(persistence);
+    store.getDraft(scope);
+    await flushPromises();
+    store.setEditor(scope, { anchor, text: 'Send this' });
+    store.saveEditor(scope, 'sent-comment');
+    store.setDestination(scope, 'ses_target');
+    const accepted: string[] = [];
+    const result = await store.send({
+      scope,
+      prepare: async () => ({ ok: true, value: submission() }),
+      submit: async () => ({ status: 'accepted', delivery: 'sent' }),
+      isScopeCurrent: () => true,
+      onAccepted: destination => accepted.push(destination),
+    });
+    assert.deepEqual(result, { status: 'accepted', delivery: 'sent' });
+    assert.deepEqual(accepted, ['ses_target']);
+    assert.equal(store.getDraft(scope).comments.length, 0);
+  });
+
+  it('completes an accepted review when persistence clear hangs', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    try {
+      const persistence = {
+        load: async () => null,
+        save: async () => {},
+        clear: async () => await new Promise<void>(() => {}),
+      };
+      const store = createWorktreeReviewStore(persistence);
+      store.getDraft(scope);
+      await flushPromises();
+      store.setEditor(scope, { anchor, text: 'Send this' });
+      store.saveEditor(scope, 'sent-comment');
+      store.setDestination(scope, 'ses_target');
+      const accepted: string[] = [];
+      const resultPromise = store.send({
+        scope,
+        prepare: async () => ({ ok: true, value: submission() }),
+        submit: async () => ({ status: 'accepted', delivery: 'sent' }),
+        isScopeCurrent: () => true,
+        onAccepted: destination => accepted.push(destination),
+      });
+      await flushPromises();
+      t.mock.timers.tick(WORKTREE_REVIEW_PERSISTENCE_TIMEOUT_MS);
+      const result = await resultPromise;
+      assert.deepEqual(result, { status: 'accepted', delivery: 'sent' });
+      assert.deepEqual(accepted, ['ses_target']);
+      assert.equal(store.getDraft(scope).comments.length, 0);
+    } finally {
+      t.mock.timers.reset();
+    }
+  });
+
+  it('persists configuration-only fields and restores them in a new store', async () => {
+    const stored = new Map<string, PersistedWorktreeReviewDraft>();
+    const persistence = {
+      load: async (key: string) => stored.get(key) ?? null,
+      save: (key: string, value: PersistedWorktreeReviewDraft) => {
+        stored.set(key, value);
+      },
+      clear: async (key: string) => {
+        stored.delete(key);
+      },
+    };
+    const key = worktreeReviewScopeKey(scope);
+    const first = createWorktreeReviewStore(persistence);
+    first.getDraft(scope);
+    await flushPromises();
+    first.setDestination(scope, 'destination-only');
+    first.setAllowOlderCapture(scope, true);
+    assert.equal(stored.get(key)?.comments.length, 0);
+    assert.equal(stored.get(key)?.destinationKiloSessionId, 'destination-only');
+    assert.equal(stored.get(key)?.allowOlderCapture, true);
+
+    const second = createWorktreeReviewStore(persistence);
+    second.getDraft(scope);
+    await flushPromises();
+    assert.equal(second.getDraft(scope).destinationKiloSessionId, 'destination-only');
+    assert.equal(second.getDraft(scope).allowOlderCapture, true);
+    assert.equal(second.getDraft(scope).comments.length, 0);
+    assert.equal(second.getDraft(scope).editor, null);
+    assert.equal(second.getDraft(scope).overall, '');
+  });
+
   it('isolates account, organization, and worktree drafts while retaining edits', () => {
     const { store } = setup();
     const scopes = [

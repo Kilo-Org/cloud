@@ -717,6 +717,13 @@ export default function CloudChatPage({
     api: reviewApi,
     onAccepted: handleReviewAccepted,
   });
+  const reviewCommentCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const comment of review.draft?.comments ?? []) {
+      counts.set(comment.anchor.path, (counts.get(comment.anchor.path) ?? 0) + 1);
+    }
+    return counts;
+  }, [review.draft?.comments]);
   const reviewAgainFile = useRef<{
     userId: string;
     organizationId?: string;
@@ -725,13 +732,13 @@ export default function CloudChatPage({
     cloudAgentSessionId: string;
     path: string;
   } | null>(null);
-  const handleReviewAgain = (comment: WorktreeReviewComment) => {
+  const handleOpenReviewComment = (comment: WorktreeReviewComment) => {
     if (!review.scope || review.locked) return;
     const source = review.destinations.find(
       destination =>
         destination.cloudAgentSessionId === comment.anchor.capture.sourceCloudAgentSessionId
     );
-    if (!source || !review.removeComment(comment.id)) return;
+    if (!source) return;
     review.setOpen(false);
     if (source.sessionId === sessionIdFromParams && canOpenChanges) {
       setWorkspaceTabs(state =>
@@ -1251,7 +1258,7 @@ export default function CloudChatPage({
                       />
                     )}
                   </div>
-                  <WorktreeReviewDialog review={review} onReviewAgain={handleReviewAgain} />
+                  <WorktreeReviewDialog review={review} onOpenComment={handleOpenReviewComment} />
                   {sessionIdFromParams && <div className="ml-auto shrink-0">{sessionActions}</div>}
                 </div>
 
@@ -1557,6 +1564,7 @@ export default function CloudChatPage({
                 onCloseAutoFocus={handleChangesDrawerCloseAutoFocus}
                 onSelectFile={handleSelectWorktreeFile}
                 portalContainer={childSessionDrawerContainer}
+                commentCounts={reviewCommentCounts}
               />
             )}
           </div>

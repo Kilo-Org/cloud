@@ -161,24 +161,32 @@ export function bindWorktreeReviewSelection(
   }
   let active = true;
   let textSelectionActive = false;
+  let textSelectionConsumed = false;
   let anchor: HTMLElement | undefined;
   let keyboardSelection: SelectionResult | undefined;
   const isActive = () => active && root.host.isConnected;
   const selectionChanged = () => {
-    if (!isActive()) return;
+    if (!isActive() || textSelectionConsumed) return;
     const result = readWorktreeReviewTextSelection(root);
-    if (!result.ok || result.value) {
+    if (result.ok && result.value) {
       textSelectionActive = true;
       anchor = undefined;
       keyboardSelection = undefined;
       onSelection(result);
-    } else if (textSelectionActive) {
+    } else if (textSelectionActive || !result.ok) {
       textSelectionActive = false;
       onSelection(result);
     }
   };
+  const pointerUp = () => {
+    if (!isActive() || !textSelectionActive) return;
+    textSelectionActive = false;
+    onSelection(readWorktreeReviewTextSelection(root));
+  };
+  const touchEnd = () => pointerUp();
   const ElementClass = root.ownerDocument.defaultView?.HTMLElement;
   const KeyboardEventClass = root.ownerDocument.defaultView?.KeyboardEvent;
+  const supportsPointerEvents = Boolean(root.ownerDocument.defaultView?.PointerEvent);
   const focusChanged = (event: Event) => {
     if (!isActive() || !ElementClass || !(event.target instanceof ElementClass)) return;
     if (!rows.includes(event.target)) return;
@@ -202,7 +210,10 @@ export function bindWorktreeReviewSelection(
       const result = keyboardSelection ?? readWorktreeReviewTextSelection(root);
       const selected = result.ok && !result.value ? rangeForRows(rows, index, index) : result;
       onSelection(selected);
-      if (selected.ok && selected.value) onComment(selected.value);
+      if (selected.ok && selected.value) {
+        textSelectionConsumed = true;
+        onComment(selected.value);
+      }
     } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
       event.preventDefault();
       const nextIndex = Math.max(
@@ -220,6 +231,7 @@ export function bindWorktreeReviewSelection(
   };
   const pointerDown = (event: Event) => {
     if (!isActive()) return;
+    textSelectionConsumed = false;
     textSelectionActive = false;
     anchor = undefined;
     keyboardSelection = undefined;
@@ -228,6 +240,8 @@ export function bindWorktreeReviewSelection(
     }
   };
   root.ownerDocument.addEventListener('selectionchange', selectionChanged);
+  root.ownerDocument.addEventListener('pointerup', pointerUp);
+  if (!supportsPointerEvents) root.ownerDocument.addEventListener('touchend', touchEnd);
   root.addEventListener('focusin', focusChanged);
   root.addEventListener('keydown', keyDown);
   root.addEventListener('pointerdown', pointerDown);
@@ -235,6 +249,8 @@ export function bindWorktreeReviewSelection(
     if (!active) return;
     active = false;
     root.ownerDocument.removeEventListener('selectionchange', selectionChanged);
+    root.ownerDocument.removeEventListener('pointerup', pointerUp);
+    if (!supportsPointerEvents) root.ownerDocument.removeEventListener('touchend', touchEnd);
     root.removeEventListener('focusin', focusChanged);
     root.removeEventListener('keydown', keyDown);
     root.removeEventListener('pointerdown', pointerDown);

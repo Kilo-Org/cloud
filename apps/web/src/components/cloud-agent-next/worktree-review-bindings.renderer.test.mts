@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { describe, it } from 'node:test';
-import { createElement } from 'react';
+import React, { act, createElement } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { parsePatchFiles, type SelectedLineRange } from '@pierre/diffs';
 import type { WorktreeFileRecord } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { WorktreeReviewCapture, WorktreeReviewComment } from './worktree-review';
 import type { WorktreeReviewDiffProps } from './WorktreeReviewEditor';
-import type { WorktreeFileReviewBindings } from './worktree-review-bindings';
+import type {
+  WorktreeFileReviewBindings,
+  WorktreeReviewAnnotationItem,
+} from './worktree-review-bindings';
 
 const require = createRequire(import.meta.url);
 const {
   formatWorktreeReviewRange,
   getWorktreeReviewAnnotations,
+  getWorktreeReviewSelectedLines,
+  worktreeReviewRangeHighlightCSS,
 }: typeof import('./worktree-review-bindings') = require('./worktree-review-bindings');
 const {
   WorktreeReviewEditor,
@@ -23,6 +29,36 @@ const {
   readWorktreeReviewTextSelection,
   validateWorktreeReviewRenderedRange,
 }: typeof import('./worktree-review-selection') = require('./worktree-review-selection');
+
+type LinkedomModule = {
+  parseHTML: (html: string) => { window: Record<string, unknown>; document: Document };
+};
+
+function installDom() {
+  const requireFromNext = createRequire(require.resolve('next/package.json'));
+  const { window, document } = (requireFromNext('linkedom') as LinkedomModule).parseHTML(
+    '<!doctype html><html><body><div id="root"></div></body></html>'
+  );
+  const globals = globalThis as typeof globalThis & Record<string, unknown>;
+  const values = {
+    React,
+    window,
+    document,
+    HTMLElement: (window as { HTMLElement: typeof HTMLElement }).HTMLElement,
+    Element: (window as { Element: typeof Element }).Element,
+    Node: (window as { Node: typeof Node }).Node,
+    Event: (window as { Event: typeof Event }).Event,
+    IS_REACT_ACT_ENVIRONMENT: true,
+  };
+  const previous = new Map(Object.keys(values).map(name => [name, globals[name]]));
+  Object.assign(globals, values);
+  const container = document.getElementById('root');
+  if (!container) throw new Error('worktree review test root missing');
+  return {
+    container,
+    cleanup: () => previous.forEach((value, name) => (globals[name] = value)),
+  };
+}
 
 class TestNode {
   nodeType = 3;
@@ -254,9 +290,17 @@ describe('worktree review renderer annotations', () => {
     const comments = Object.freeze([first, second]);
     const annotations = getWorktreeReviewAnnotations(comments, capture, first.anchor.path);
     assert.deepEqual(annotations, [
-      { side: 'additions', lineNumber: 5, metadata: [first, second] },
+      {
+        side: 'additions',
+        lineNumber: 5,
+        metadata: [
+          { kind: 'comment', comment: first },
+          { kind: 'comment', comment: second },
+        ],
+      },
     ]);
-    assert.equal(annotations[0]?.metadata[0]?.anchor, first.anchor);
+    assert.equal(annotations[0]?.metadata[0]?.kind, 'comment');
+    assert.equal(annotations[0]?.metadata[0]?.comment.anchor, first.anchor);
     assert.equal(first.anchor.range.startLine, 4);
   });
 
@@ -300,12 +344,39 @@ describe('worktree review renderer annotations', () => {
   it('shows the whole reviewed range although its annotation sits at the end', () => {
     assert.equal(
       formatWorktreeReviewRange({ side: 'deletions', startLine: 4, endLine: 9 }),
-      'Old lines 4–9'
+      'Lines 4–9'
     );
     assert.equal(
       formatWorktreeReviewRange({ side: 'additions', startLine: 5, endLine: 5 }),
-      'New line 5'
+      'Line 5'
     );
+  });
+
+  it('replaces a saved comment with the editor when that comment is being edited', () => {
+    const saved = comment('saved');
+    const editor = { commentId: saved.id, anchor: saved.anchor, text: saved.text };
+    assert.deepEqual(getWorktreeReviewAnnotations([saved], capture, saved.anchor.path, editor), [
+      { side: 'additions', lineNumber: 5, metadata: [{ kind: 'editor' }] },
+    ]);
+  });
+
+  it('does not keep Pierre selection after a comment is saved', () => {
+    const saved = comment('saved');
+    assert.equal(getWorktreeReviewSelectedLines(capture, saved.anchor.path), null);
+    assert.match(
+      worktreeReviewRangeHighlightCSS([saved], capture, saved.anchor.path),
+      /data-line="4"/
+    );
+  });
+
+  it('attaches an unsaved editor at the selected end line after saved comments', () => {
+    const saved = comment('saved');
+    const editor = { anchor: saved.anchor, text: 'Draft feedback' };
+    const annotations = getWorktreeReviewAnnotations([saved], capture, saved.anchor.path, editor);
+    assert.deepEqual(annotations[0]?.metadata, [
+      { kind: 'comment', comment: saved },
+      { kind: 'editor' },
+    ]);
   });
 });
 
@@ -451,7 +522,7 @@ describe('worktree review rendered selection', () => {
     assert.equal(second.getAttribute('tabindex'), '2');
   });
 
-  it('keeps copy and touch selection passive, provides one keyboard entry, and cleans listeners', () => {
+  it('does not open a comment from text selection, keeps keyboard entry, and cleans listeners', () => {
     const { root, rows, select } = renderedRows();
     const selected: Array<ReturnType<typeof readWorktreeReviewTextSelection>> = [];
     const comments: SelectedLineRange[] = [];
@@ -469,6 +540,13 @@ describe('worktree review rendered selection', () => {
     root.documentEvents.emit('selectionchange');
     assert.equal(root.selection, nativeSelection);
     assert.equal(root.activeElement, null);
+    assert.equal(comments.length, 0);
+    select(rows[1], rows[2]);
+    root.documentEvents.emit('selectionchange');
+    assert.equal(comments.length, 0);
+    root.documentEvents.emit('pointerup');
+    assert.equal(comments.length, 0);
+    root.documentEvents.emit('pointerup');
     assert.equal(comments.length, 0);
     root.selection = null;
     root.documentEvents.emit('selectionchange');
@@ -539,13 +617,9 @@ describe('worktree review rendering readiness', () => {
   const diff = parsePatchFiles(patch, undefined, true)[0]?.files[0];
   assert.ok(diff);
 
-  function renderReview(
-    renderStatus: 'loading' | 'ready' | 'error',
-    editor: WorktreeFileReviewBindings['editor'] = null,
-    onEditorChange: WorktreeFileReviewBindings['onEditorChange'] = () => {
-      assert.fail('Rendering must not replace a retained editor.');
-    },
-    displayedFile = file
+  function createReview(
+    editor: WorktreeFileReviewBindings['editor'],
+    onEditorChange: WorktreeFileReviewBindings['onEditorChange']
   ) {
     const saved = comment('saved');
     const review: WorktreeFileReviewBindings = Object.freeze({
@@ -559,6 +633,18 @@ describe('worktree review rendering readiness', () => {
         assert.fail('Rendering must not remove comments.');
       },
     });
+    return { saved, review };
+  }
+
+  function renderReview(
+    renderStatus: 'loading' | 'ready' | 'error',
+    editor: WorktreeFileReviewBindings['editor'] = null,
+    onEditorChange: WorktreeFileReviewBindings['onEditorChange'] = () => {
+      assert.fail('Rendering must not replace a retained editor.');
+    },
+    displayedFile = file
+  ) {
+    const { saved, review } = createReview(editor, onEditorChange);
     const emitted: WorktreeReviewDiffProps[] = [];
     const markup = renderToStaticMarkup(
       createElement(WorktreeReviewEditor, {
@@ -581,37 +667,72 @@ describe('worktree review rendering readiness', () => {
     return { props, markup };
   }
 
+  function mountReview(
+    renderStatus: 'loading' | 'ready' | 'error',
+    editor: WorktreeFileReviewBindings['editor'] = null,
+    onEditorChange: WorktreeFileReviewBindings['onEditorChange'] = () => {
+      assert.fail('Rendering must not replace a retained editor.');
+    },
+    displayedFile = file
+  ) {
+    const { saved, review } = createReview(editor, onEditorChange);
+    const emitted: WorktreeReviewDiffProps[] = [];
+    const dom = installDom();
+    const root: Root = createRoot(dom.container);
+    act(() => {
+      root.render(
+        createElement(WorktreeReviewEditor, {
+          file: displayedFile,
+          diff,
+          capture,
+          review,
+          renderStatus,
+          children(props) {
+            emitted.push(props);
+            return null;
+          },
+        })
+      );
+    });
+    const props = emitted[0];
+    assert.ok(props);
+    assert.equal(review.editor, editor);
+    assert.equal(review.disabledReason, undefined);
+    assert.equal(saved.anchor.quote.lines[0]?.text, 'saved source\n');
+    return { dom, root, props };
+  }
+
   for (const status of ['loading', 'error'] as const) {
     it(`blocks new anchors while ${status}, but retains annotations and edit/remove actions`, () => {
       const { props, markup } = renderReview(status);
       assert.equal(props.options?.enableLineSelection, false);
       assert.equal(props.options?.enableGutterUtility, false);
-      assert.equal(props.renderGutterUtility, undefined);
-      assert.match(markup, /aria-disabled="true"/);
+      assert.match(markup, /saved diff|saved diff viewer/);
       const annotation = props.lineAnnotations?.[0];
       assert.ok(annotation);
       const card = renderToStaticMarkup(props.renderAnnotation?.(annotation));
-      assert.match(card, />Edit<\/button>/);
-      assert.match(card, />Remove<\/button>/);
+      assert.match(card, /aria-label="Comment actions"/);
+      assert.doesNotMatch(card, />Edit<\/button>/);
+      assert.doesNotMatch(card, />Discard<\/button>/);
       assert.doesNotMatch(card, /disabled=""/);
     });
   }
 
   it('enables saved-hunk comments after readiness even without full content', () => {
     const { props, markup } = renderReview('ready');
-    assert.equal(props.options?.enableLineSelection, true);
-    assert.equal(props.options?.enableGutterUtility, false);
-    assert.equal(props.renderGutterUtility, undefined);
+    assert.equal(props.selectedLines, null);
+    assert.equal(props.options?.enableLineSelection, false);
+    assert.equal(props.options?.enableGutterUtility, true);
+    assert.match(props.options?.unsafeCSS ?? '', /data-line="4"/);
     assert.equal(props.options?.onLineNumberClick, undefined);
-    assert.match(markup, /aria-disabled="true"/);
-    assert.match(markup, /select code and choose Comment/);
-    assert.match(markup, /min-h-11/);
+    assert.doesNotMatch(markup, /select code and choose Comment/);
+    assert.doesNotMatch(markup, />Comment<\/button>/);
     assert.doesNotMatch(
       markup,
       /type="number"|inputmode="numeric"|Start line|End line|Use selected lines|role="combobox"/
     );
     assert.equal(props.options?.onLineSelected, undefined);
-    assert.equal(props.options?.onGutterUtilityClick, undefined);
+    assert.equal(typeof props.options?.onGutterUtilityClick, 'function');
     assert.equal(typeof props.options?.onLineSelectionStart, 'function');
     assert.equal(typeof props.options?.onLineSelectionChange, 'function');
     assert.equal(typeof props.options?.onLineSelectionEnd, 'function');
@@ -626,7 +747,7 @@ describe('worktree review rendering readiness', () => {
       [5, 'change-addition'],
     ]);
     const node = { shadowRoot: root.dom } as HTMLElement;
-    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewComment[]>;
+    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewAnnotationItem[]>;
     props.options?.onPostRender?.(node, instance, 'mount');
     const range: SelectedLineRange = { side: 'additions', start: 5, end: 4 };
     props.options?.onLineSelectionStart?.(range);
@@ -635,6 +756,9 @@ describe('worktree review rendering readiness', () => {
     assert.equal(editors.length, 0);
     props.options?.onLineSelectionEnd?.(range);
     props.options?.onLineSelectionEnd?.(range);
+    assert.equal(editors.length, 0);
+    props.options?.onGutterUtilityClick?.(range);
+    props.options?.onGutterUtilityClick?.(range);
     assert.equal(editors.length, 1);
     assert.deepEqual(editors[0]?.anchor.range, { side: 'additions', startLine: 4, endLine: 5 });
     assert.deepEqual(editors[0]?.anchor.capture, capture);
@@ -645,7 +769,35 @@ describe('worktree review rendering readiness', () => {
     props.options?.onPostRender?.(node, instance, 'unmount');
   });
 
-  it('opens a single old line through completion without a competing gutter click handler', () => {
+  it('deduplicates Pierre gutter completion and selection-end callbacks in one tick', () => {
+    const editors: WorktreeFileReviewBindings['editor'][] = [];
+    const mounted = mountReview('ready', null, editor => editors.push(editor));
+    const { root } = renderedRows([
+      [4, 'change-addition'],
+      [5, 'change-addition'],
+    ]);
+    const node = { shadowRoot: root.dom } as HTMLElement;
+    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewAnnotationItem[]>;
+    try {
+      mounted.props.options?.onPostRender?.(node, instance, 'mount');
+      const range: SelectedLineRange = { side: 'additions', start: 4, end: 5 };
+      act(() => {
+        mounted.props.options?.onGutterUtilityClick?.(range);
+        mounted.props.options?.onLineSelectionEnd?.(range);
+      });
+      assert.equal(editors.length, 1);
+      assert.deepEqual(editors[0]?.anchor.range, { side: 'additions', startLine: 4, endLine: 5 });
+      assert.doesNotMatch(mounted.dom.container.innerHTML, /role="alert"/);
+    } finally {
+      act(() => {
+        mounted.props.options?.onPostRender?.(node, instance, 'unmount');
+        mounted.root.unmount();
+      });
+      mounted.dom.cleanup();
+    }
+  });
+
+  it('opens a single old line through completion without a competing line-number click handler', () => {
     const editors: WorktreeFileReviewBindings['editor'][] = [];
     const { props } = renderReview('ready', null, editor => editors.push(editor));
     const { root } = renderedRows([
@@ -653,50 +805,50 @@ describe('worktree review rendering readiness', () => {
       [5, 'change-deletion'],
     ]);
     const node = { shadowRoot: root.dom } as HTMLElement;
-    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewComment[]>;
+    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewAnnotationItem[]>;
     props.options?.onPostRender?.(node, instance, 'mount');
     props.options?.onLineSelectionEnd?.(null);
     assert.equal(editors.length, 0);
     assert.equal(props.options?.onLineNumberClick, undefined);
-    assert.equal(props.options?.enableGutterUtility, false);
+    assert.equal(props.options?.enableGutterUtility, true);
     const range: SelectedLineRange = { side: 'deletions', start: 4, end: 4 };
     props.options?.onLineSelectionEnd?.(range);
     props.options?.onLineSelectionEnd?.(range);
+    assert.equal(editors.length, 0);
+    props.options?.onGutterUtilityClick?.(range);
     assert.equal(editors.length, 1);
     assert.deepEqual(editors[0]?.anchor.range, { side: 'deletions', startLine: 4, endLine: 4 });
     props.options?.onPostRender?.(node, instance, 'unmount');
   });
 
-  it('rebinds the DOM bridge without duplicate listeners and retires stale capture handlers', () => {
+  it('renders the unsaved editor in the annotation slot without a comment dialog', () => {
+    const saved = comment('saved');
+    const editor = { anchor: saved.anchor, text: 'Draft feedback' };
+    const { props } = renderReview('ready', editor);
+    const annotation = props.lineAnnotations?.[0];
+    assert.ok(annotation);
+    const card = renderToStaticMarkup(props.renderAnnotation?.(annotation));
+    assert.match(card, /Draft feedback/);
+    assert.match(card, /textarea/);
+    assert.doesNotMatch(card, /Quoted saved lines/);
+    assert.doesNotMatch(card, /role="dialog"/);
+  });
+
+  it('does not attach a text-selection comment bridge', () => {
     const editors: WorktreeFileReviewBindings['editor'][] = [];
     const { props } = renderReview('ready', null, editor => editors.push(editor));
     const first = renderedRows([
       [4, 'change-addition'],
       [5, 'change-addition'],
     ]);
-    const second = renderedRows([
-      [4, 'change-addition'],
-      [5, 'change-addition'],
-    ]);
-    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewComment[]>;
+    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewAnnotationItem[]>;
     const node = { shadowRoot: first.root.dom } as HTMLElement;
     props.options?.onPostRender?.(node, instance, 'mount');
-    const listenerCount = first.root.events.size;
-    assert.ok(listenerCount > 0);
-    props.options?.onPostRender?.(node, instance, 'update');
-    assert.equal(first.root.events.size, listenerCount);
-    assert.equal(first.root.documentEvents.size, 1);
-    const nextNode = { shadowRoot: second.root.dom } as HTMLElement;
-    props.options?.onPostRender?.(nextNode, instance, 'update');
     assert.equal(first.root.events.size, 0);
     assert.equal(first.root.documentEvents.size, 0);
-    first.root.events.emit('keydown', new TestKeyEvent(first.rows[0], 'Enter'));
-    assert.equal(editors.length, 0);
-    props.options?.onPostRender?.(nextNode, instance, 'unmount');
-    assert.equal(second.root.events.size, 0);
-    assert.equal(second.root.documentEvents.size, 0);
     props.options?.onLineSelectionEnd?.({ side: 'additions', start: 4, end: 5 });
     assert.equal(editors.length, 0);
+    props.options?.onPostRender?.(node, instance, 'unmount');
   });
 
   it('does not open an anchor when the saved file revision no longer matches the capture', () => {
@@ -710,7 +862,7 @@ describe('worktree review rendering readiness', () => {
       [5, 'change-addition'],
     ]);
     const node = { shadowRoot: root.dom } as HTMLElement;
-    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewComment[]>;
+    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewAnnotationItem[]>;
     props.options?.onPostRender?.(node, instance, 'mount');
     props.options?.onLineSelectionEnd?.({ side: 'additions', start: 4, end: 5 });
     assert.equal(editors.length, 0);
@@ -726,7 +878,7 @@ describe('worktree review rendering readiness', () => {
       [5, 'change-addition'],
     ]);
     const node = { shadowRoot: root.dom } as HTMLElement;
-    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewComment[]>;
+    const instance = {} as import('@pierre/diffs').FileDiff<WorktreeReviewAnnotationItem[]>;
     retained.props.options?.onPostRender?.(node, instance, 'mount');
     retained.props.options?.onLineSelectionEnd?.({ side: 'additions', start: 4, end: 5 });
     assert.equal(editor.text, 'Keep this feedback');
@@ -737,9 +889,8 @@ describe('worktree review rendering readiness', () => {
       content: { status: 'unavailable', reason: 'binary' },
     });
     assert.equal(binary.props.options?.enableLineSelection, false);
-    assert.equal(binary.props.renderGutterUtility, undefined);
     assert.match(binary.markup, /Binary files/);
-    assert.match(binary.markup, /Continue comment/);
+    assert.doesNotMatch(binary.markup, /Continue comment/);
   });
 
   it('keeps an older editor reachable with its exact quote after rendering fails', () => {
@@ -748,7 +899,7 @@ describe('worktree review rendering readiness', () => {
     const editor = Object.freeze({ anchor: saved.anchor, text: 'Unsaved feedback' });
     const { props, markup } = renderReview('error', editor);
     assert.equal(props.options?.enableLineSelection, false);
-    assert.match(markup, /Continue comment/);
+    assert.doesNotMatch(markup, /Continue comment/);
     assert.equal(editor.anchor.capture.revision, capture.revision - 1);
     assert.equal(editor.text, 'Unsaved feedback');
   });

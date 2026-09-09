@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { skipToken, useQueries, useQuery } from '@tanstack/react-query';
+import { skipToken, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { v4 as uuidv4 } from 'uuid';
 import { useTRPC } from '@/lib/trpc/utils';
 import { isNewSession } from '@/lib/cloud-agent/session-type';
@@ -12,9 +12,12 @@ import { cloudAgentWorktreeIdSchema } from '@kilocode/session-ingest-contracts';
 import type { WorktreeReviewSendApi } from './worktree-review-send';
 import {
   getWorktreeReviewFreshness,
+  rebaseWorktreeReviewComment,
+  sameWorktreeReviewCapture,
   serializeWorktreeReview,
   type WorktreeReviewComment,
 } from './worktree-review';
+import { parsePatchFiles } from '../../../node_modules/@pierre/diffs/dist/utils/parsePatchFiles.js';
 import {
   createWorktreeReviewDraft,
   createWorktreeReviewStore,
@@ -25,6 +28,7 @@ import {
   worktreeReviewScopeKey,
   type WorktreeReviewScope,
 } from './worktree-review-state';
+import { createWorktreeReviewPersistence } from './worktree-review-persistence';
 
 export type WorktreeReviewDestination = {
   sessionId: string;
@@ -56,11 +60,12 @@ export function useWorktreeReview({
   onAccepted: (destinationKiloSessionId: string) => void;
 }) {
   const trpc = useTRPC();
+  const queryClient = useQueryClient();
   const parsedWorktreeId = cloudAgentWorktreeIdSchema.safeParse(selectedWorktreeId);
   const worktreeId = parsedWorktreeId.success ? parsedWorktreeId.data : null;
   const deletingRef = useRef(deletingSessionIds);
   deletingRef.current = deletingSessionIds;
-  const [store] = useState(createWorktreeReviewStore);
+  const [store] = useState(() => createWorktreeReviewStore(createWorktreeReviewPersistence()));
   const drafts = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot);
   const scope = useMemo<WorktreeReviewScope | null>(
     () =>
@@ -78,7 +83,15 @@ export function useWorktreeReview({
     () => scope && (drafts.get(worktreeReviewScopeKey(scope)) ?? createWorktreeReviewDraft(scope)),
     [drafts, scope]
   );
+  const hydration = key ? store.getHydration(key) : 'ready';
+  useEffect(() => {
+    if (scope) store.getDraft(scope);
+  }, [scope, store]);
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const isOpen = key !== null && openKey === key;
+  useEffect(() => {
+    if (isOpen && (draft?.comments.length ?? 0) === 0) setOpenKey(null);
+  }, [draft?.comments.length, isOpen]);
   const identity = JSON.stringify([userId, organizationId]);
   const identityRef = useRef({ identity, generation: 0 });
   if (identityRef.current.identity !== identity) {
@@ -182,13 +195,15 @@ export function useWorktreeReview({
   const locked = Boolean(draft && draft.delivery.phase !== 'idle');
   const disabledReason = !enabled
     ? 'Reviews are available only in your editable worktree chats.'
-    : sessions.isError
-      ? 'Could not verify access to this worktree. Reload the session list before sending.'
-      : destinations.length === 0
-        ? 'No eligible destination chat is available in this worktree.'
-        : locked
-          ? 'This review is locked until delivery is confirmed.'
-          : undefined;
+    : hydration === 'pending'
+      ? 'Restoring saved review…'
+      : sessions.isError
+        ? 'Could not verify access to this worktree. Reload the session list before sending.'
+        : destinations.length === 0
+          ? 'No eligible destination chat is available in this worktree.'
+          : locked
+            ? 'This review is locked until delivery is confirmed.'
+            : undefined;
 
   const setEditor = (editor: WorktreeReviewEditor | null) => {
     if (scope && !locked && (!editor || !disabledReason)) store.setEditor(scope, editor);
@@ -200,6 +215,12 @@ export function useWorktreeReview({
     if (scope && !locked) return store.removeComment(scope, id);
     return false;
   };
+  const discardDraft = () => {
+    if (scope && !locked) {
+      store.discardDraft(scope);
+      setOpenKey(null);
+    }
+  };
   const bindings: WorktreeFileReviewBindings = {
     comments: draft?.comments ?? [],
     editor: draft?.editor ?? null,
@@ -208,6 +229,9 @@ export function useWorktreeReview({
     onEditorChange: setEditor,
     onSaveEditor: saveEditor,
     onRemoveComment: removeComment,
+    onReplacePathComments: (path, comments) => {
+      if (scope && !locked) store.replacePathComments(scope, path, comments);
+    },
   };
 
   const pending = [...drafts.values()].some(hasPendingWorktreeReview);
@@ -244,7 +268,7 @@ export function useWorktreeReview({
         return;
       if (
         window.confirm(
-          'Leave this page? Unsent review comments and unresolved delivery state are stored only in memory and will be lost.'
+          'Leave this page? Unsent review comments are saved in this browser; unresolved delivery state will be lost.'
         )
       )
         return;
@@ -295,26 +319,69 @@ export function useWorktreeReview({
               'The selected chat is no longer available. Choose an eligible chat in this worktree.',
           };
         }
-        const staleCommentIds = frozenDraft.comments
-          .filter(comment => {
-            const source = comment.anchor.capture.sourceCloudAgentSessionId;
-            const latest = latestCaptures[sources.indexOf(source)];
-            const sourceExists = latestSessions.data?.cliSessions.some(
+        const rebased: WorktreeReviewComment[] = [];
+        for (const comment of frozenDraft.comments) {
+          const source = comment.anchor.capture.sourceCloudAgentSessionId;
+          const latest = latestCaptures[sources.indexOf(source)];
+          const snapshot =
+            latest?.isSuccess &&
+            latestSessions.data?.cliSessions.some(
               session => session.cloud_agent_session_id === source
-            );
-            return (
-              getWorktreeReviewFreshness(
-                comment,
-                sourceExists && latest?.isSuccess
-                  ? currentWorktreeReviewCapture(scope, source, latest.data?.snapshot)
-                  : null
-              ) !== 'current'
-            );
-          })
-          .map(comment => comment.id);
-        const serialized = serializeWorktreeReview(frozenDraft.comments, {
-          allowOlderCapture: frozenDraft.allowOlderCapture,
-          staleCommentIds,
+            )
+              ? latest.data?.snapshot
+              : undefined;
+          const listed = snapshot?.files?.find(file => file.path === comment.anchor.path);
+          if (!snapshot) continue;
+          const capture = listed
+            ? {
+                ...scope,
+                sourceCloudAgentSessionId: source,
+                revision: listed.revision,
+                capturedAt: snapshot.capturedAt,
+                comparison: snapshot.comparison,
+              }
+            : currentWorktreeReviewCapture(scope, source, snapshot);
+          if (!capture) continue;
+          if (sameWorktreeReviewCapture(comment.anchor.capture, capture)) {
+            rebased.push(comment);
+            continue;
+          }
+          if (!listed) continue;
+          const fileQuery = organizationId
+            ? trpc.organizations.cloudAgentNext.getWorktreeFile.queryOptions({
+                organizationId,
+                cloudAgentSessionId: source,
+                path: comment.anchor.path,
+                expectedRevision: listed.revision,
+              })
+            : trpc.cloudAgentNext.getWorktreeFile.queryOptions({
+                cloudAgentSessionId: source,
+                path: comment.anchor.path,
+                expectedRevision: listed.revision,
+              });
+          const fileResult = await queryClient.fetchQuery(fileQuery);
+          if (fileResult.status !== 'available' && fileResult.status !== 'omitted') continue;
+          const parsed =
+            fileResult.file.diff.status === 'available'
+              ? parsePatchFiles(fileResult.file.diff.patch, undefined, true)[0]?.files[0]
+              : undefined;
+          const diff = parsed
+            ? { ...parsed, name: comment.anchor.path, prevName: undefined }
+            : null;
+          if (!diff) continue;
+          const next = rebaseWorktreeReviewComment(comment, capture, fileResult.file, diff);
+          if (next) rebased.push(next);
+        }
+        const paths = new Set(frozenDraft.comments.map(comment => comment.anchor.path));
+        for (const path of paths) {
+          store.replacePathComments(
+            scope,
+            path,
+            rebased.filter(comment => comment.anchor.path === path)
+          );
+        }
+        const serialized = serializeWorktreeReview(rebased, {
+          overall: frozenDraft.overall,
         });
         if (!serialized.ok) return serialized;
         if (!isScopeCurrent())
@@ -338,6 +405,18 @@ export function useWorktreeReview({
     });
   };
 
+  useEffect(() => {
+    if (!scope || !key || !isOpen || hydration === 'pending') return;
+    const current = store.getDraft(scope);
+    if (current.delivery.phase !== 'idle') return;
+    if (
+      current.destinationKiloSessionId &&
+      destinations.some(destination => destination.sessionId === current.destinationKiloSessionId)
+    )
+      return;
+    if (destinations.length === 1) store.setDestination(scope, destinations[0].sessionId);
+  }, [destinations, hydration, isOpen, key, scope, store]);
+
   return {
     scope,
     draft,
@@ -348,21 +427,9 @@ export function useWorktreeReview({
     locked,
     disabledReason,
     canSubmit,
-    visible: Boolean(
-      scope && (destinations.length > 0 || (draft && hasPendingWorktreeReview(draft)))
-    ),
-    open: key !== null && openKey === key,
+    visible: Boolean(scope && (draft?.comments.length ?? 0) > 0),
+    open: isOpen,
     setOpen(open: boolean) {
-      if (open && scope) {
-        const current = store.getDraft(scope);
-        if (current.delivery.phase === 'idle' && !current.destinationKiloSessionId) {
-          store.setDestination(
-            scope,
-            destinations.find(destination => destination.sessionId === activeKiloSessionId)
-              ?.sessionId ?? null
-          );
-        }
-      }
       setOpenKey(open ? key : null);
     },
     setDestination(destination: string) {
@@ -372,10 +439,14 @@ export function useWorktreeReview({
     setAllowOlderCapture(allow: boolean) {
       if (scope) store.setAllowOlderCapture(scope, allow);
     },
+    setOverall(overall: string) {
+      if (scope) store.setOverall(scope, overall);
+    },
     editComment(comment: WorktreeReviewComment) {
       setEditor({ commentId: comment.id, anchor: comment.anchor, text: comment.text });
     },
     removeComment,
+    discardDraft,
     setEditor,
     saveEditor,
     send,

@@ -37,6 +37,7 @@ export type WorktreeReviewDraft = {
   scope: WorktreeReviewScope;
   comments: readonly WorktreeReviewComment[];
   editor: WorktreeReviewEditor | null;
+  overall: string;
   destinationKiloSessionId: string | null;
   allowOlderCapture: boolean;
   delivery:
@@ -48,6 +49,30 @@ export type WorktreeReviewDraft = {
 
 export type WorktreeReviewOutcome = WorktreeReviewSendResult;
 
+export type PersistedWorktreeReviewDraft = {
+  version: 1;
+  comments: readonly WorktreeReviewComment[];
+  editor: WorktreeReviewEditor | null;
+  overall: string;
+  destinationKiloSessionId: string | null;
+  allowOlderCapture: boolean;
+};
+
+export type WorktreeReviewPersistence = {
+  load: (key: string) => Promise<PersistedWorktreeReviewDraft | null>;
+  save: (key: string, value: PersistedWorktreeReviewDraft) => Promise<void> | void;
+  clear: (key: string) => Promise<void> | void;
+};
+
+export type WorktreeReviewHydrationStatus = 'pending' | 'ready' | 'failed';
+
+export const WORKTREE_REVIEW_PERSISTENCE_TIMEOUT_MS = 3_000;
+
+type WorktreeReviewHydrationOverlay = {
+  destinationKiloSessionId: string | null;
+  overall: string;
+};
+
 export function worktreeReviewScopeKey(scope: WorktreeReviewScope): string {
   return JSON.stringify([scope.userId, scope.organizationId, scope.workspaceScope]);
 }
@@ -57,6 +82,7 @@ export function createWorktreeReviewDraft(scope: WorktreeReviewScope): WorktreeR
     scope,
     comments: [],
     editor: null,
+    overall: '',
     destinationKiloSessionId: null,
     allowOlderCapture: false,
     delivery: { phase: 'idle' },
@@ -64,7 +90,12 @@ export function createWorktreeReviewDraft(scope: WorktreeReviewScope): WorktreeR
 }
 
 export function hasPendingWorktreeReview(draft: WorktreeReviewDraft): boolean {
-  return draft.comments.length > 0 || draft.editor !== null || draft.delivery.phase !== 'idle';
+  return (
+    draft.comments.length > 0 ||
+    draft.editor !== null ||
+    draft.overall.trim().length > 0 ||
+    draft.delivery.phase !== 'idle'
+  );
 }
 
 export function getWorktreeReviewSourceSessionIds(draft: WorktreeReviewDraft | null): string[] {
@@ -141,15 +172,154 @@ function sameEditorAnchor(left: WorktreeReviewEditor, right: WorktreeReviewEdito
   );
 }
 
-export function createWorktreeReviewStore() {
+function persistedDraft(draft: WorktreeReviewDraft): PersistedWorktreeReviewDraft {
+  return {
+    version: 1,
+    comments: draft.comments,
+    editor: draft.editor,
+    overall: draft.overall,
+    destinationKiloSessionId: draft.destinationKiloSessionId,
+    allowOlderCapture: draft.allowOlderCapture,
+  };
+}
+
+function hasPersistedDraftContent(value: PersistedWorktreeReviewDraft): boolean {
+  return (
+    value.comments.length > 0 ||
+    value.editor !== null ||
+    value.overall.trim().length > 0 ||
+    value.destinationKiloSessionId !== null ||
+    value.allowOlderCapture
+  );
+}
+
+function draftFromPersisted(
+  scope: WorktreeReviewScope,
+  persisted: PersistedWorktreeReviewDraft
+): WorktreeReviewDraft {
+  return {
+    scope,
+    comments: persisted.comments,
+    editor: persisted.editor,
+    overall: persisted.overall,
+    destinationKiloSessionId: persisted.destinationKiloSessionId,
+    allowOlderCapture: persisted.allowOlderCapture,
+    delivery: { phase: 'idle' },
+  };
+}
+
+function withTimeout<T>(
+  promise: PromiseLike<T>,
+  timeoutMs = WORKTREE_REVIEW_PERSISTENCE_TIMEOUT_MS
+) {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Worktree review persistence timed out.')),
+      timeoutMs
+    );
+    Promise.resolve(promise).then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
+export function createWorktreeReviewStore(persistence?: WorktreeReviewPersistence) {
   let drafts: ReadonlyMap<string, WorktreeReviewDraft> = new Map();
   const listeners = new Set<() => void>();
-  const getDraft = (scope: WorktreeReviewScope) =>
-    drafts.get(worktreeReviewScopeKey(scope)) ?? createWorktreeReviewDraft(scope);
-  const write = (draft: WorktreeReviewDraft) => {
-    drafts = new Map(drafts).set(worktreeReviewScopeKey(draft.scope), draft);
+  const hydration = new Map<string, WorktreeReviewHydrationStatus>();
+  const hydrationGeneration = new Map<string, number>();
+  const hydrationOverlays = new Map<string, WorktreeReviewHydrationOverlay>();
+  const getHydrationOverlay = (key: string) =>
+    hydrationOverlays.get(key) ?? {
+      destinationKiloSessionId: null,
+      overall: '',
+    };
+
+  const notify = () => {
     listeners.forEach(listener => listener());
   };
+
+  const touch = () => {
+    drafts = new Map(drafts);
+    notify();
+  };
+
+  const getDraft = (scope: WorktreeReviewScope) => {
+    const key = worktreeReviewScopeKey(scope);
+    ensureHydration(scope);
+    return drafts.get(key) ?? createWorktreeReviewDraft(scope);
+  };
+
+  const savePersistedDraft = (draft: WorktreeReviewDraft) => {
+    if (!persistence || hydration.get(worktreeReviewScopeKey(draft.scope)) !== 'ready') return;
+    const key = worktreeReviewScopeKey(draft.scope);
+    const value = persistedDraft(draft);
+    try {
+      const operation = hasPersistedDraftContent(value)
+        ? persistence.save(key, value)
+        : persistence.clear(key);
+      void Promise.resolve(operation).catch(() => undefined);
+    } catch {
+      // Persistence is best effort; the in-memory draft remains authoritative.
+    }
+  };
+
+  const write = (draft: WorktreeReviewDraft, persist = true) => {
+    const key = worktreeReviewScopeKey(draft.scope);
+    drafts = new Map(drafts).set(key, draft);
+    if (persist) savePersistedDraft(draft);
+    notify();
+  };
+
+  const failHydration = (key: string, generation: number) => {
+    if (hydrationGeneration.get(key) !== generation) return;
+    hydration.set(key, 'failed');
+    touch();
+  };
+
+  const hydrate = async (scope: WorktreeReviewScope, key: string, generation: number) => {
+    if (!persistence) return;
+    let restored: PersistedWorktreeReviewDraft | null;
+    try {
+      restored = await withTimeout(persistence.load(key));
+    } catch {
+      failHydration(key, generation);
+      return;
+    }
+    if (hydrationGeneration.get(key) !== generation) return;
+    const current = drafts.get(key);
+    const base = restored ? draftFromPersisted(scope, restored) : createWorktreeReviewDraft(scope);
+    const overlay = hydrationOverlays.get(key);
+    const merged = {
+      ...base,
+      destinationKiloSessionId: overlay?.destinationKiloSessionId ?? base.destinationKiloSessionId,
+      overall: overlay?.overall.trim() ? overlay.overall : base.overall,
+      allowOlderCapture: current?.allowOlderCapture || base.allowOlderCapture,
+      delivery: { phase: 'idle' as const },
+      error: undefined,
+    };
+    hydration.set(key, 'ready');
+    hydrationOverlays.delete(key);
+    write(merged);
+  };
+
+  function ensureHydration(scope: WorktreeReviewScope) {
+    if (!persistence) return;
+    const key = worktreeReviewScopeKey(scope);
+    if (hydration.has(key)) return;
+    const generation = (hydrationGeneration.get(key) ?? 0) + 1;
+    hydrationGeneration.set(key, generation);
+    hydration.set(key, 'pending');
+    void hydrate(scope, key, generation);
+  }
+
   const edit = (
     scope: WorktreeReviewScope,
     update: (draft: WorktreeReviewDraft) => WorktreeReviewDraft
@@ -169,14 +339,36 @@ export function createWorktreeReviewStore() {
       };
     },
     getDraft,
+    getHydration(key: string): WorktreeReviewHydrationStatus {
+      return hydration.get(key) ?? (persistence ? 'pending' : 'ready');
+    },
     setDestination(scope: WorktreeReviewScope, destinationKiloSessionId: string | null) {
+      if (persistence) {
+        const key = worktreeReviewScopeKey(scope);
+        const overlay = getHydrationOverlay(key);
+        hydrationOverlays.set(key, {
+          ...overlay,
+          destinationKiloSessionId,
+        });
+      }
       edit(scope, draft => ({ ...draft, destinationKiloSessionId, error: undefined }));
     },
     setAllowOlderCapture(scope: WorktreeReviewScope, allowOlderCapture: boolean) {
       edit(scope, draft => ({ ...draft, allowOlderCapture, error: undefined }));
     },
+    setOverall(scope: WorktreeReviewScope, overall: string) {
+      if (persistence) {
+        const key = worktreeReviewScopeKey(scope);
+        const overlay = getHydrationOverlay(key);
+        hydrationOverlays.set(key, { ...overlay, overall });
+      }
+      edit(scope, draft => ({ ...draft, overall, error: undefined }));
+    },
     setEditor(scope: WorktreeReviewScope, editor: WorktreeReviewEditor | null) {
-      edit(scope, draft => {
+      ensureHydration(scope);
+      const key = worktreeReviewScopeKey(scope);
+      if (hydration.get(key) === 'pending') return false;
+      return edit(scope, draft => {
         if (editor && !sameWorktreeReviewScope(scope, editor.anchor.capture)) return draft;
         if (draft.editor && editor && !sameEditorAnchor(draft.editor, editor)) {
           return {
@@ -188,7 +380,9 @@ export function createWorktreeReviewStore() {
       });
     },
     saveEditor(scope: WorktreeReviewScope, newCommentId: string) {
-      edit(scope, draft => {
+      ensureHydration(scope);
+      if (hydration.get(worktreeReviewScopeKey(scope)) === 'pending') return false;
+      return edit(scope, draft => {
         const editor = draft.editor;
         if (!editor) return draft;
         const result = editor.commentId
@@ -210,6 +404,8 @@ export function createWorktreeReviewStore() {
       });
     },
     removeComment(scope: WorktreeReviewScope, id: string) {
+      ensureHydration(scope);
+      if (hydration.get(worktreeReviewScopeKey(scope)) === 'pending') return false;
       return edit(scope, draft => ({
         ...draft,
         comments: removeWorktreeReviewComment(draft.comments, id),
@@ -217,6 +413,27 @@ export function createWorktreeReviewStore() {
         allowOlderCapture: false,
         error: undefined,
       }));
+    },
+    replacePathComments(
+      scope: WorktreeReviewScope,
+      path: string,
+      comments: readonly WorktreeReviewComment[]
+    ) {
+      ensureHydration(scope);
+      if (hydration.get(worktreeReviewScopeKey(scope)) === 'pending') return false;
+      return edit(scope, draft => ({
+        ...draft,
+        comments: [
+          ...draft.comments.filter(comment => comment.anchor.path !== path),
+          ...comments.filter(comment => comment.anchor.path === path),
+        ],
+        error: undefined,
+      }));
+    },
+    discardDraft(scope: WorktreeReviewScope) {
+      if (getDraft(scope).delivery.phase !== 'idle') return false;
+      write(createWorktreeReviewDraft(scope));
+      return true;
     },
     async send({
       scope,
@@ -296,7 +513,20 @@ export function createWorktreeReviewStore() {
         };
       }
       if (outcome.status === 'accepted') {
-        write(createWorktreeReviewDraft(scope));
+        if (persistence) {
+          try {
+            await withTimeout(
+              Promise.resolve().then(() => persistence.clear(worktreeReviewScopeKey(scope)))
+            );
+          } catch {
+            // An IDB failure must not block an accepted review or leave its memory state locked.
+          }
+        }
+        const key = worktreeReviewScopeKey(scope);
+        hydrationGeneration.set(key, (hydrationGeneration.get(key) ?? 0) + 1);
+        hydration.set(key, 'ready');
+        hydrationOverlays.delete(key);
+        write(createWorktreeReviewDraft(scope), false);
         if (isScopeCurrent()) onAccepted(batch.destinationKiloSessionId, outcome.delivery);
       } else {
         write({

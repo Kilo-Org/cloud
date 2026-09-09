@@ -24,6 +24,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { stripImageContext } from '@/lib/app-builder/message-utils';
 import { toSafeHttpUrl } from '@/lib/safe-http-url';
 import { getDeliveryBadge, type DeliveryBadge } from './delivery-badge';
+import { parseWorktreeReviewMessage } from './worktree-review';
+import { WorktreeReviewMessageCard } from './WorktreeReviewMessageCard';
 
 import LinkifyIt from 'linkify-it';
 
@@ -252,6 +254,7 @@ export function MessageBubble({
     }
 
     const userContent = getUserTextContent(message.parts);
+    const review = parseWorktreeReviewMessage(userContent);
     const fileParts = message.parts.filter(isFilePart);
     const imageFileParts = fileParts.filter(part => part.mime.startsWith('image/'));
     const nonImageFileParts = fileParts.filter(part => !part.mime.startsWith('image/'));
@@ -260,10 +263,14 @@ export function MessageBubble({
       <div className="group/msg flex flex-col items-end py-2" data-message-role="user">
         <div className="bg-primary text-primary-foreground relative max-w-[95%] rounded-md px-3 py-2 sm:max-w-[85%] md:max-w-[80%]">
           {deliveryBadge && <DeliveryStatusIcon badge={deliveryBadge} />}
-          {userContent && (
-            <p className="overflow-wrap-anywhere text-sm leading-relaxed wrap-break-word whitespace-pre-wrap">
-              <TextWithLinks text={userContent} />
-            </p>
+          {review ? (
+            <WorktreeReviewMessageCard review={review} />
+          ) : (
+            userContent && (
+              <p className="overflow-wrap-anywhere text-sm leading-relaxed wrap-break-word whitespace-pre-wrap">
+                <TextWithLinks text={userContent} />
+              </p>
+            )
           )}
           {imageFileParts.length > 0 && (
             <InlineImageAttachmentCount count={imageFileParts.length} />

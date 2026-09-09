@@ -281,8 +281,11 @@ function HighlightedWorktreeDiff({
       options={{
         ...fileOptions,
         ...reviewProps?.options,
+        unsafeCSS: [fileOptions.unsafeCSS, reviewProps?.options?.unsafeCSS]
+          .filter(Boolean)
+          .join('\n'),
         diffStyle: 'unified',
-        diffIndicators: 'classic',
+        diffIndicators: 'none',
         hunkSeparators: 'line-info-basic',
         expandUnchanged: expanded,
         onPostRender,

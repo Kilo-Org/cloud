@@ -1,17 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
-jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
-  iterateOverDiff: () => [],
-}));
-
-it('evaluates worktree review as an ESM module', async () => {
-  await expect(import('./worktree-review')).resolves.toMatchObject({
-    parseWorktreeReviewMessage: expect.any(Function),
-  });
-});
-
-it('passes the worktree review ESM domain regressions', () => {
+it('passes worktree review persistence failure and key-isolation regressions', () => {
   const result = spawnSync(
     process.execPath,
     [
@@ -19,7 +9,7 @@ it('passes the worktree review ESM domain regressions', () => {
       '--import',
       'tsx',
       '--test',
-      join(__dirname, 'worktree-review.test.mts'),
+      join(__dirname, 'worktree-review-persistence.test.mts'),
     ],
     { timeout: 25_000, stdio: 'pipe', encoding: 'utf8' }
   );

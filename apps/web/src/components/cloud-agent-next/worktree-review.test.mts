@@ -28,6 +28,7 @@ const {
   MAX_WORKTREE_REVIEW_PROMPT_LENGTH,
   createWorktreeReviewAnchor,
   normalizeWorktreeReviewRange,
+  rebaseWorktreeReviewComment,
   sameWorktreeReviewScope,
   sameWorktreeReviewCapture,
   getWorktreeReviewFreshness,
@@ -35,6 +36,8 @@ const {
   updateWorktreeReviewComment,
   removeWorktreeReviewComment,
   serializeWorktreeReview,
+  parseWorktreeReviewMessage,
+  WORKTREE_REVIEW_PROMPT_INTRO,
 }: typeof import('./worktree-review') = require('./worktree-review');
 
 const capture: WorktreeReviewCapture = {
@@ -140,10 +143,11 @@ function comment(
 }
 
 function serialize(comments: readonly WorktreeReviewComment[]) {
-  return serializeWorktreeReview(comments, { allowOlderCapture: false, staleCommentIds: [] });
+  return serializeWorktreeReview(comments);
 }
 
 function payload(message: string): {
+  overall?: string;
   comments: Array<WorktreeReviewComment & { contextStatus: string }>;
 } {
   return JSON.parse(message.slice(message.indexOf('\n\n') + 2));
@@ -523,6 +527,36 @@ describe('worktree review scope and freshness', () => {
   });
 });
 
+describe('worktree review rebase', () => {
+  it('keeps a comment when the same range still matches after whitespace-only changes', () => {
+    const source = fixture();
+    const reviewed = comment();
+    const nextCapture = { ...capture, revision: 4, capturedAt: '2026-09-01T11:00:00Z' };
+    const nextFile = { ...source.file, revision: 4 };
+    const spaced = {
+      ...source.diff,
+      additionLines: source.diff.additionLines.map(line => `  ${line}`),
+    };
+    const kept = rebaseWorktreeReviewComment(reviewed, nextCapture, nextFile, spaced);
+    assert.ok(kept);
+    assert.equal(kept.id, reviewed.id);
+    assert.equal(kept.anchor.capture.revision, 4);
+    assert.deepEqual(kept.anchor.range, reviewed.anchor.range);
+  });
+
+  it('drops a comment when the range text changed', () => {
+    const source = fixture();
+    const reviewed = comment();
+    const nextCapture = { ...capture, revision: 4, capturedAt: '2026-09-01T11:00:00Z' };
+    const nextFile = { ...source.file, revision: 4 };
+    const changed = {
+      ...source.diff,
+      additionLines: source.diff.additionLines.map(() => 'different\n'),
+    };
+    assert.equal(rebaseWorktreeReviewComment(reviewed, nextCapture, nextFile, changed), null);
+  });
+});
+
 describe('worktree review draft operations', () => {
   it('adds cross-file feedback and copies the incoming anchor', () => {
     const first = comment();
@@ -642,26 +676,62 @@ describe('worktree review serialization', () => {
     assert.equal(result.comments.length, 1);
   });
 
-  it('requires explicit confirmation for older or unknown context and labels comments individually', () => {
+  it('labels every sent comment as the current saved capture', () => {
     const comments = [comment(), comment('second')];
-    assert.equal(
-      serializeWorktreeReview(comments, { allowOlderCapture: false, staleCommentIds: ['second'] })
-        .ok,
-      false
-    );
-    const message = value(
-      serializeWorktreeReview(comments, { allowOlderCapture: true, staleCommentIds: ['second'] })
-    );
+    const message = value(serializeWorktreeReview(comments));
     assert.deepEqual(
       payload(message).comments.map(item => item.contextStatus),
-      ['current-saved-capture', 'older-or-unverified-capture']
-    );
-    assert.equal(
-      serializeWorktreeReview(comments, { allowOlderCapture: true, staleCommentIds: ['missing'] })
-        .ok,
-      false
+      ['current-saved-capture', 'current-saved-capture']
     );
     assert.equal(serialize([]).ok, false);
+  });
+
+  it('includes a trimmed optional overall comment and parses the JSON review shape', () => {
+    const reviewed = comment();
+    const message = value(
+      serializeWorktreeReview([reviewed], {
+        overall: '  Keep the boundary small.  ',
+      })
+    );
+    const parsedPayload = payload(message);
+    assert.equal(parsedPayload.overall, 'Keep the boundary small.');
+    assert.deepEqual(parseWorktreeReviewMessage(message)?.comments, [
+      { ...reviewed, anchor: { ...reviewed.anchor, capture: { ...reviewed.anchor.capture } } },
+    ]);
+    assert.equal(parseWorktreeReviewMessage(message)?.overall, 'Keep the boundary small.');
+  });
+
+  it('omits an empty overall comment and rejects malformed or empty review payloads', () => {
+    const message = value(
+      serializeWorktreeReview([comment()], {
+        overall: ' \n\t ',
+      })
+    );
+    assert.equal(Object.hasOwn(payload(message), 'overall'), false);
+    assert.equal(parseWorktreeReviewMessage(`${message} trailing`), null);
+    assert.equal(parseWorktreeReviewMessage('not a worktree review'), null);
+    assert.equal(
+      parseWorktreeReviewMessage(
+        `${WORKTREE_REVIEW_PROMPT_INTRO}\n\n${JSON.stringify({ version: 1, comments: [] })}`
+      ),
+      null
+    );
+    assert.equal(
+      parseWorktreeReviewMessage(
+        `${WORKTREE_REVIEW_PROMPT_INTRO}\n\n${JSON.stringify({ version: 2, comments: [] })}`
+      ),
+      null
+    );
+    assert.equal(parseWorktreeReviewMessage(`${WORKTREE_REVIEW_PROMPT_INTRO}\n\n{garbage`), null);
+  });
+
+  it('limits overall feedback', () => {
+    assert.equal(
+      serializeWorktreeReview([comment()], {
+        overall: 'x'.repeat(MAX_WORKTREE_REVIEW_COMMENT_LENGTH + 1),
+      }).ok,
+      false
+    );
   });
 
   it('revalidates scope when serializing a draft', () => {

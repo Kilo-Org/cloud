@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
-import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
-import { VercelComputeSettings } from './VercelComputeSettings';
 
-export default async function OrganizationComputePage({
+import { VercelComputeSettings } from '@/components/integrations/cloud/VercelComputeSettings';
+import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
+
+export default async function OrganizationVercelComputePage({
   params,
 }: {
   params: Promise<{ id: string }>;

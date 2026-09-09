@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useLayoutEffect, useRef, useState, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { inferRouterOutputs } from '@trpc/server';
 import { AlertTriangle, Check, Circle, ExternalLink, Loader2, MoreHorizontal } from 'lucide-react';
 import { toast } from 'sonner';
-import { useTRPC } from '@/lib/trpc/utils';
+import type { RootRouter } from '@/routers/root-router';
+import { useTRPC, useRawTRPCClient } from '@/lib/trpc/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
@@ -35,6 +37,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import type { VercelProject, VercelTeam } from '@/lib/vercel-client';
 
 const SETUP_STEPS = [
   ['validating_access', 'Validate Vercel access'],
@@ -110,34 +113,94 @@ function statusCopy(
   }
 }
 
-export function VercelComputeSettings({ organizationId }: { organizationId: string }) {
+type VercelComputeRemoveError = {
+  data?: { code?: string } | null;
+  message: string;
+};
+
+type VercelComputeDataCallbacks = {
+  onRemoveSuccess: () => void;
+  onRemoveError: (error: VercelComputeRemoveError) => void;
+};
+
+type VercelComputeDiscoveryInput = {
+  token: string;
+};
+
+type VercelComputeProjectsInput = {
+  token: string;
+  teamId: string;
+};
+
+type VercelComputeSetupInput = {
+  token: string;
+  teamId: string;
+  projectId: string;
+};
+
+type VercelComputeRemoveInput = {
+  acknowledgeCleanupFailure: boolean;
+};
+
+type VercelComputeDiscoveryMutationInput =
+  | VercelComputeDiscoveryInput
+  | (VercelComputeDiscoveryInput & { organizationId: string });
+
+type VercelComputeProjectsMutationInput =
+  | VercelComputeProjectsInput
+  | (VercelComputeProjectsInput & { organizationId: string });
+
+type VercelComputeSetupMutationInput =
+  | VercelComputeSetupInput
+  | (VercelComputeSetupInput & { organizationId: string });
+
+type VercelComputeRetryMutationInput = { organizationId: string } | undefined;
+
+type VercelComputeRemoveMutationInput =
+  | VercelComputeRemoveInput
+  | (VercelComputeRemoveInput & { organizationId: string });
+
+type VercelComputeStatus = NonNullable<
+  inferRouterOutputs<RootRouter>['vercelCompute']['getStatus']
+>;
+
+function matchesOwner(
+  variables: { token: string; organizationId?: string },
+  organizationId: string | undefined
+): boolean {
+  return variables.organizationId === organizationId;
+}
+
+function useVercelComputeData(
+  organizationId: string | undefined,
+  normalizedToken: string,
+  teamId: string,
+  { onRemoveSuccess, onRemoveError }: VercelComputeDataCallbacks
+) {
   const trpc = useTRPC();
+  const trpcClient = useRawTRPCClient();
   const queryClient = useQueryClient();
-  const [token, setToken] = useState('');
-  const [teamId, setTeamId] = useState('');
-  const [projectId, setProjectId] = useState('');
-  const [setupError, setSetupError] = useState<string | null>(null);
-  const [removeOpen, setRemoveOpen] = useState(false);
-  const [cleanupFailed, setCleanupFailed] = useState(false);
-  const [removedDashboardUrl, setRemovedDashboardUrl] = useState<string | null>(null);
-  const requestGeneration = useRef(0);
-  const tokenInputRef = useRef<HTMLInputElement>(null);
-  const connectionTitleRef = useRef<HTMLDivElement>(null);
+  const organizationOwner = organizationId !== undefined;
 
   const enrollmentQuery = useQuery(
-    trpc.organizations.vercelCompute.getEnrollment.queryOptions({ organizationId })
+    organizationOwner
+      ? trpc.organizations.vercelCompute.getEnrollment.queryOptions({ organizationId })
+      : trpc.vercelCompute.getEnrollment.queryOptions()
   );
-  const enrollmentState = enrollmentQuery.isPending
-    ? 'checking'
-    : enrollmentQuery.isError
-      ? 'unavailable'
-      : enrollmentQuery.data?.enrolled
-        ? 'enrolled'
-        : 'not-enrolled';
+  const enrollmentState: 'checking' | 'unavailable' | 'enrolled' | 'not-enrolled' =
+    enrollmentQuery.isPending
+      ? 'checking'
+      : enrollmentQuery.isError
+        ? 'unavailable'
+        : enrollmentQuery.data?.enrolled
+          ? 'enrolled'
+          : 'not-enrolled';
   const isEnrolled = enrollmentState === 'enrolled';
 
   const statusQuery = useQuery({
-    ...trpc.organizations.vercelCompute.getStatus.queryOptions({ organizationId }),
+    ...(organizationOwner
+      ? trpc.organizations.vercelCompute.getStatus.queryOptions({ organizationId })
+      : trpc.vercelCompute.getStatus.queryOptions()),
     refetchInterval: query =>
       query.state.data?.setupStatus === 'pending' ||
       query.state.data?.setupStatus === 'building' ||
@@ -151,51 +214,234 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
 
   const invalidateStatus = () =>
     queryClient.invalidateQueries({
-      queryKey: trpc.organizations.vercelCompute.getStatus.queryKey({ organizationId }),
+      queryKey: organizationOwner
+        ? trpc.organizations.vercelCompute.getStatus.queryKey({ organizationId })
+        : trpc.vercelCompute.getStatus.queryKey(),
     });
 
-  const discoverTeamsMutation = useMutation(
-    trpc.organizations.vercelCompute.discoverTeams.mutationOptions({ gcTime: 0 })
-  );
-  const discoverProjectsMutation = useMutation(
-    trpc.organizations.vercelCompute.discoverProjects.mutationOptions({ gcTime: 0 })
-  );
-  const addMutation = useMutation(
-    trpc.organizations.vercelCompute.add.mutationOptions({ gcTime: 0 })
-  );
-  const retryMutation = useMutation(
-    trpc.organizations.vercelCompute.retrySetup.mutationOptions({
-      onSuccess: () => {
-        toast.success('Vercel compute setup restarted');
-        void invalidateStatus();
-      },
-      onError: error => toast.error(error.message || 'Could not retry setup'),
-    })
-  );
-  const upgradeMutation = useMutation(
-    trpc.organizations.vercelCompute.upgradeRuntime.mutationOptions({
-      onSuccess: () => {
-        toast.success('Runtime upgrade started');
-        void invalidateStatus();
-      },
-      onError: error => toast.error(error.message || 'Could not start runtime upgrade'),
-    })
-  );
-  const removeMutation = useMutation(
-    trpc.organizations.vercelCompute.remove.mutationOptions({
-      onSuccess: () => {
-        setRemoveOpen(false);
-        setCleanupFailed(false);
-        setRemovedDashboardUrl(current => current ?? 'https://vercel.com/dashboard');
-        toast.success('Vercel compute credentials removed');
-        void invalidateStatus();
-      },
-      onError: error => {
-        if (error.data?.code === 'PRECONDITION_FAILED') setCleanupFailed(true);
-        toast.error(error.message || 'Could not remove credentials');
-      },
-    })
-  );
+  const discoverTeamsMutation = useMutation<
+    VercelTeam[],
+    Error,
+    VercelComputeDiscoveryMutationInput
+  >({
+    mutationKey: organizationOwner
+      ? trpc.organizations.vercelCompute.discoverTeams.mutationKey()
+      : trpc.vercelCompute.discoverTeams.mutationKey(),
+    gcTime: 0,
+    mutationFn: input => {
+      if (organizationId !== undefined) {
+        return trpcClient.organizations.vercelCompute.discoverTeams.mutate({
+          organizationId,
+          token: input.token,
+        });
+      }
+      return trpcClient.vercelCompute.discoverTeams.mutate({ token: input.token });
+    },
+  });
+  const discoverProjectsMutation = useMutation<
+    VercelProject[],
+    Error,
+    VercelComputeProjectsMutationInput
+  >({
+    mutationKey: organizationOwner
+      ? trpc.organizations.vercelCompute.discoverProjects.mutationKey()
+      : trpc.vercelCompute.discoverProjects.mutationKey(),
+    gcTime: 0,
+    mutationFn: input => {
+      if (organizationId !== undefined) {
+        return trpcClient.organizations.vercelCompute.discoverProjects.mutate({
+          organizationId,
+          token: input.token,
+          teamId: input.teamId,
+        });
+      }
+      return trpcClient.vercelCompute.discoverProjects.mutate({
+        token: input.token,
+        teamId: input.teamId,
+      });
+    },
+  });
+  const addMutation = useMutation<VercelComputeStatus, Error, VercelComputeSetupMutationInput>({
+    mutationKey: organizationOwner
+      ? trpc.organizations.vercelCompute.add.mutationKey()
+      : trpc.vercelCompute.add.mutationKey(),
+    gcTime: 0,
+    mutationFn: input => {
+      if (organizationId !== undefined) {
+        return trpcClient.organizations.vercelCompute.add.mutate({
+          organizationId,
+          token: input.token,
+          teamId: input.teamId,
+          projectId: input.projectId,
+        });
+      }
+      return trpcClient.vercelCompute.add.mutate({
+        token: input.token,
+        teamId: input.teamId,
+        projectId: input.projectId,
+      });
+    },
+    onSettled: () => void invalidateStatus(),
+  });
+  const mutationSuccess = (message: string) => () => {
+    toast.success(message);
+    void invalidateStatus();
+  };
+  const retryMutation = useMutation<VercelComputeStatus, Error, VercelComputeRetryMutationInput>({
+    mutationKey: organizationOwner
+      ? trpc.organizations.vercelCompute.retrySetup.mutationKey()
+      : trpc.vercelCompute.retrySetup.mutationKey(),
+    mutationFn: _input => {
+      if (organizationId !== undefined) {
+        return trpcClient.organizations.vercelCompute.retrySetup.mutate({ organizationId });
+      }
+      return trpcClient.vercelCompute.retrySetup.mutate();
+    },
+    onSuccess: mutationSuccess('Vercel compute setup restarted'),
+    onError: error => toast.error(error.message || 'Could not retry setup'),
+  });
+  const upgradeMutation = useMutation<VercelComputeStatus, Error, VercelComputeRetryMutationInput>({
+    mutationKey: organizationOwner
+      ? trpc.organizations.vercelCompute.upgradeRuntime.mutationKey()
+      : trpc.vercelCompute.upgradeRuntime.mutationKey(),
+    mutationFn: _input => {
+      if (organizationId !== undefined) {
+        return trpcClient.organizations.vercelCompute.upgradeRuntime.mutate({ organizationId });
+      }
+      return trpcClient.vercelCompute.upgradeRuntime.mutate();
+    },
+    onSuccess: mutationSuccess('Runtime upgrade started'),
+    onError: error => toast.error(error.message || 'Could not start runtime upgrade'),
+  });
+  const removeMutation = useMutation<{ success: true }, Error, VercelComputeRemoveMutationInput>({
+    mutationKey: organizationOwner
+      ? trpc.organizations.vercelCompute.remove.mutationKey()
+      : trpc.vercelCompute.remove.mutationKey(),
+    mutationFn: input => {
+      if (organizationId !== undefined) {
+        return trpcClient.organizations.vercelCompute.remove.mutate({
+          organizationId,
+          acknowledgeCleanupFailure: input.acknowledgeCleanupFailure,
+        });
+      }
+      return trpcClient.vercelCompute.remove.mutate({
+        acknowledgeCleanupFailure: input.acknowledgeCleanupFailure,
+      });
+    },
+    onSuccess: () => {
+      onRemoveSuccess();
+      void invalidateStatus();
+    },
+    onError: onRemoveError,
+  });
+
+  const teamsVariables = discoverTeamsMutation.variables;
+  const teams =
+    teamsVariables !== undefined &&
+    matchesOwner(teamsVariables, organizationId) &&
+    teamsVariables.token === normalizedToken
+      ? discoverTeamsMutation.data
+      : undefined;
+  const projectsVariables = discoverProjectsMutation.variables;
+  const projects =
+    projectsVariables !== undefined &&
+    matchesOwner(projectsVariables, organizationId) &&
+    projectsVariables.token === normalizedToken &&
+    projectsVariables.teamId === teamId
+      ? discoverProjectsMutation.data
+      : undefined;
+
+  const dispatchDiscoverTeams = (input: VercelComputeDiscoveryInput) =>
+    organizationOwner
+      ? discoverTeamsMutation.mutateAsync({ organizationId, ...input })
+      : discoverTeamsMutation.mutateAsync(input);
+  const dispatchDiscoverProjects = (input: VercelComputeProjectsInput) =>
+    organizationOwner
+      ? discoverProjectsMutation.mutateAsync({ organizationId, ...input })
+      : discoverProjectsMutation.mutateAsync(input);
+  const dispatchAdd = (input: VercelComputeSetupInput) =>
+    organizationOwner
+      ? addMutation.mutateAsync({ organizationId, ...input })
+      : addMutation.mutateAsync(input);
+  const dispatchRetrySetup = () =>
+    organizationOwner ? retryMutation.mutate({ organizationId }) : retryMutation.mutate(undefined);
+  const dispatchUpgradeRuntime = () =>
+    organizationOwner
+      ? upgradeMutation.mutate({ organizationId })
+      : upgradeMutation.mutate(undefined);
+  const dispatchRemove = (input: VercelComputeRemoveInput) =>
+    organizationOwner
+      ? removeMutation.mutate({ organizationId, ...input })
+      : removeMutation.mutate(input);
+
+  return {
+    enrollmentState,
+    isEnrolled,
+    status,
+    isSetupFormVisible,
+    discoverTeamsMutation,
+    discoverProjectsMutation,
+    addMutation,
+    retryMutation,
+    upgradeMutation,
+    removeMutation,
+    teams,
+    projects,
+    dispatchDiscoverTeams,
+    dispatchDiscoverProjects,
+    dispatchAdd,
+    dispatchRetrySetup,
+    dispatchUpgradeRuntime,
+    dispatchRemove,
+  };
+}
+
+export function VercelComputeSettings({ organizationId }: { organizationId?: string }) {
+  const [token, setToken] = useState('');
+  const [teamId, setTeamId] = useState('');
+  const [projectId, setProjectId] = useState('');
+  const [setupError, setSetupError] = useState<string | null>(null);
+  const [removeOpen, setRemoveOpen] = useState(false);
+  const [cleanupFailed, setCleanupFailed] = useState(false);
+  const [removedDashboardUrl, setRemovedDashboardUrl] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
+  const tokenInputRef = useRef<HTMLInputElement>(null);
+  const connectionTitleRef = useRef<HTMLDivElement>(null);
+
+  const removeMutationSuccess = () => {
+    setRemoveOpen(false);
+    setCleanupFailed(false);
+    setRemovedDashboardUrl(current => current ?? 'https://vercel.com/dashboard');
+    toast.success('Vercel compute credentials removed');
+  };
+  const removeMutationError = (error: VercelComputeRemoveError) => {
+    if (error.data?.code === 'PRECONDITION_FAILED') setCleanupFailed(true);
+    toast.error(error.message || 'Could not remove credentials');
+  };
+  const normalizedToken = token.trim();
+  const {
+    enrollmentState,
+    isEnrolled,
+    status,
+    isSetupFormVisible,
+    discoverTeamsMutation,
+    discoverProjectsMutation,
+    addMutation,
+    retryMutation,
+    upgradeMutation,
+    removeMutation,
+    teams,
+    projects,
+    dispatchDiscoverTeams,
+    dispatchDiscoverProjects,
+    dispatchAdd,
+    dispatchRetrySetup,
+    dispatchUpgradeRuntime,
+    dispatchRemove,
+  } = useVercelComputeData(organizationId, normalizedToken, teamId, {
+    onRemoveSuccess: removeMutationSuccess,
+    onRemoveError: removeMutationError,
+  });
 
   const resetTeamsMutation = discoverTeamsMutation.reset;
   const resetProjectsMutation = discoverProjectsMutation.reset;
@@ -228,18 +474,6 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
     upgradeMutation.isPending ||
     removeMutation.isPending;
   const isFormBusy = isBusy || isDiscovering;
-  const normalizedToken = token.trim();
-  const teams =
-    discoverTeamsMutation.variables?.organizationId === organizationId &&
-    discoverTeamsMutation.variables.token === normalizedToken
-      ? discoverTeamsMutation.data
-      : undefined;
-  const projects =
-    discoverProjectsMutation.variables?.organizationId === organizationId &&
-    discoverProjectsMutation.variables.token === normalizedToken &&
-    discoverProjectsMutation.variables.teamId === teamId
-      ? discoverProjectsMutation.data
-      : undefined;
   const hasTeams = !!teams?.length;
 
   useLayoutEffect(() => {
@@ -274,8 +508,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
     resetAddMutation();
 
     try {
-      const discoveredProjects = await discoverProjectsMutation.mutateAsync({
-        organizationId,
+      const discoveredProjects = await dispatchDiscoverProjects({
         token: normalizedToken,
         teamId: nextTeamId,
       });
@@ -296,10 +529,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
     setSetupError(null);
 
     try {
-      const discoveredTeams = await discoverTeamsMutation.mutateAsync({
-        organizationId,
-        token: normalizedToken,
-      });
+      const discoveredTeams = await dispatchDiscoverTeams({ token: normalizedToken });
       if (generation !== requestGeneration.current) return;
 
       const onlyTeam = discoveredTeams.length === 1 ? discoveredTeams[0] : undefined;
@@ -321,8 +551,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
     setSetupError(null);
 
     try {
-      await addMutation.mutateAsync({
-        organizationId,
+      await dispatchAdd({
         token: normalizedToken,
         teamId: selectedTeam.id,
         projectId: selectedProject.id,
@@ -339,7 +568,6 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
       return;
     } finally {
       if (generation === requestGeneration.current) resetAddMutation();
-      void invalidateStatus();
     }
 
     if (generation !== requestGeneration.current) return;
@@ -373,7 +601,8 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
         <header className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">Vercel compute</h1>
           <p className="text-muted-foreground text-sm">
-            Run Cloud Agent on your team&apos;s Vercel account.
+            Run Cloud Agent on your {organizationId !== undefined ? "team's" : 'own'} Vercel
+            account.
           </p>
         </header>
 
@@ -382,7 +611,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
             <Loader2 className="animate-spin" />
             <AlertTitle>Checking Vercel compute availability</AlertTitle>
             <AlertDescription>
-              Setup stays unavailable until organization enrollment is confirmed.
+              Setup stays unavailable until enrollment is confirmed.
             </AlertDescription>
           </Alert>
         )}
@@ -403,8 +632,8 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
             <AlertTriangle />
             <AlertTitle>Customer-paid Vercel is not enabled</AlertTitle>
             <AlertDescription>
-              This organization is not enrolled in customer-paid Vercel compute. Existing
-              credentials can still be removed.
+              This owner is not enrolled in customer-paid Vercel compute. Existing credentials can
+              still be removed.
             </AlertDescription>
           </Alert>
         )}
@@ -701,7 +930,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
                           ? 'Checking whether new sessions can use this configured project.'
                           : enrollmentState === 'unavailable'
                             ? 'Enrollment could not be verified. This project cannot be confirmed as active.'
-                            : 'This organization is not enrolled. New sessions will not use this project.'
+                            : 'This owner is not enrolled. New sessions will not use this project.'
                       : 'Setup status is updated automatically while the runtime is built.'}
                   </CardDescription>
                 </div>
@@ -846,10 +1075,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
 
                 {status.setupStatus === 'failed' && (
                   <div className="flex flex-wrap justify-end gap-2">
-                    <Button
-                      disabled={isBusy || !isEnrolled}
-                      onClick={() => retryMutation.mutate({ organizationId })}
-                    >
+                    <Button disabled={isBusy || !isEnrolled} onClick={dispatchRetrySetup}>
                       {retryMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
                       Retry setup
                     </Button>
@@ -860,10 +1086,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
                     (status.upgradeAvailable && !isUpgradeRunning)) && (
                     <div className="flex flex-wrap justify-end gap-2">
                       {status.upgradeStatus === 'failed' && (
-                        <Button
-                          disabled={isBusy || !isEnrolled}
-                          onClick={() => upgradeMutation.mutate({ organizationId })}
-                        >
+                        <Button disabled={isBusy || !isEnrolled} onClick={dispatchUpgradeRuntime}>
                           {upgradeMutation.isPending && (
                             <Loader2 className="mr-2 size-4 animate-spin" />
                           )}
@@ -873,10 +1096,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
                       {status.upgradeAvailable &&
                         !isUpgradeRunning &&
                         status.upgradeStatus !== 'failed' && (
-                          <Button
-                            disabled={isBusy || !isEnrolled}
-                            onClick={() => upgradeMutation.mutate({ organizationId })}
-                          >
+                          <Button disabled={isBusy || !isEnrolled} onClick={dispatchUpgradeRuntime}>
                             {upgradeMutation.isPending && (
                               <Loader2 className="mr-2 size-4 animate-spin" />
                             )}
@@ -967,12 +1187,7 @@ export function VercelComputeSettings({ organizationId }: { organizationId: stri
             <AlertDialogAction
               variant="destructive"
               disabled={removeMutation.isPending}
-              onClick={() =>
-                removeMutation.mutate({
-                  organizationId,
-                  acknowledgeCleanupFailure: cleanupFailed,
-                })
-              }
+              onClick={() => dispatchRemove({ acknowledgeCleanupFailure: cleanupFailed })}
             >
               {removeMutation.isPending && <Loader2 className="mr-2 size-4 animate-spin" />}
               {cleanupFailed ? 'Remove without cleanup' : 'Remove credentials'}

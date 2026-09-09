@@ -53,6 +53,7 @@ import { moderationRouter } from '@/routers/moderation-router';
 import { userExportsRouter } from '@/routers/user-exports-router';
 import { quickChatRouter } from '@/routers/quick-chat-router';
 import { spendAlertRouter } from '@/routers/spend-alert-router';
+import { personalVercelComputeRouter } from '@/routers/organizations/organization-vercel-compute-router';
 export const rootRouter = createTRPCRouter({
   test: testRouter,
   organizations: organizationsRouter,
@@ -107,6 +108,7 @@ export const rootRouter = createTRPCRouter({
   userExports: userExportsRouter,
   quickChat: quickChatRouter,
   spendAlerts: spendAlertRouter,
+  vercelCompute: personalVercelComputeRouter,
 });
 // export type definition of API
 export type RootRouter = typeof rootRouter;

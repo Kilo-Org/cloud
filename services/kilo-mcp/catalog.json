@@ -30488,6 +30488,32 @@
     ],
     "searchBlob": "organizations.vercelCompute.discoverTeams List the Vercel teams the supplied token can access for BYOC Vercel compute setup. Use before choosing the team to enroll. organizations vercelcompute discoverteams organizationid token organizationId token"
   },
+  "organizations.vercelCompute.getCloudCardVisibility": {
+    "path": "organizations.vercelCompute.getCloudCardVisibility",
+    "kind": "query",
+    "summary": "Get whether the Integrations Cloud Vercel compute card is visible for the organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "vercelcompute",
+      "getcloudcardvisibility",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.vercelCompute.getCloudCardVisibility Get whether the Integrations Cloud Vercel compute card is visible for the organization. organizations vercelcompute getcloudcardvisibility organizationid organizationId"
+  },
   "organizations.vercelCompute.getEnrollment": {
     "path": "organizations.vercelCompute.getEnrollment",
     "kind": "query",
@@ -37691,6 +37717,177 @@
       "context_json"
     ],
     "searchBlob": "userFeedback.create Submit user feedback or a bug report to the Kilo team along with context about the app area and source it came from. userfeedback create feedback_text feedback_for feedback_batch source context_json feedback_text feedback_for feedback_batch source context_json"
+  },
+  "vercelCompute.add": {
+    "path": "vercelCompute.add",
+    "kind": "mutation",
+    "summary": "Set up personal BYOC Vercel compute for the current user: validate and store the Vercel token, team and project, then start the runtime setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "teamId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "projectId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "token",
+        "teamId",
+        "projectId"
+      ]
+    },
+    "tags": [
+      "vercelcompute",
+      "add",
+      "token",
+      "teamid",
+      "projectid"
+    ],
+    "searchBlob": "vercelCompute.add Set up personal BYOC Vercel compute for the current user: validate and store the Vercel token, team and project, then start the runtime setup. vercelcompute add token teamid projectid token teamId projectId"
+  },
+  "vercelCompute.discoverProjects": {
+    "path": "vercelCompute.discoverProjects",
+    "kind": "mutation",
+    "summary": "List the Vercel projects available in a selected team for personal BYOC Vercel compute setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "teamId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
+      },
+      "required": [
+        "token",
+        "teamId"
+      ]
+    },
+    "tags": [
+      "vercelcompute",
+      "discoverprojects",
+      "token",
+      "teamid"
+    ],
+    "searchBlob": "vercelCompute.discoverProjects List the Vercel projects available in a selected team for personal BYOC Vercel compute setup. vercelcompute discoverprojects token teamid token teamId"
+  },
+  "vercelCompute.discoverTeams": {
+    "path": "vercelCompute.discoverTeams",
+    "kind": "mutation",
+    "summary": "List the Vercel teams the supplied token can access for personal BYOC Vercel compute setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "token"
+      ]
+    },
+    "tags": [
+      "vercelcompute",
+      "discoverteams",
+      "token"
+    ],
+    "searchBlob": "vercelCompute.discoverTeams List the Vercel teams the supplied token can access for personal BYOC Vercel compute setup. vercelcompute discoverteams token token"
+  },
+  "vercelCompute.getCloudCardVisibility": {
+    "path": "vercelCompute.getCloudCardVisibility",
+    "kind": "query",
+    "summary": "Get whether the personal Integrations Cloud Vercel compute card is visible to the current user.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getcloudcardvisibility"
+    ],
+    "searchBlob": "vercelCompute.getCloudCardVisibility Get whether the personal Integrations Cloud Vercel compute card is visible to the current user. vercelcompute getcloudcardvisibility"
+  },
+  "vercelCompute.getEnrollment": {
+    "path": "vercelCompute.getEnrollment",
+    "kind": "query",
+    "summary": "Get the current user's personal BYOC Vercel compute enrollment state.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getenrollment"
+    ],
+    "searchBlob": "vercelCompute.getEnrollment Get the current user's personal BYOC Vercel compute enrollment state. vercelcompute getenrollment"
+  },
+  "vercelCompute.getStatus": {
+    "path": "vercelCompute.getStatus",
+    "kind": "query",
+    "summary": "Get the current user's personal BYOC Vercel compute status, including setup progress, runtime identity and upgrade availability.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "getstatus"
+    ],
+    "searchBlob": "vercelCompute.getStatus Get the current user's personal BYOC Vercel compute status, including setup progress, runtime identity and upgrade availability. vercelcompute getstatus"
+  },
+  "vercelCompute.remove": {
+    "path": "vercelCompute.remove",
+    "kind": "mutation",
+    "summary": "Remove the current user's personal BYOC Vercel compute credentials and tear down its runtime.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "acknowledgeCleanupFailure": {
+          "type": "boolean"
+        }
+      }
+    },
+    "tags": [
+      "vercelcompute",
+      "remove",
+      "acknowledgecleanupfailure"
+    ],
+    "searchBlob": "vercelCompute.remove Remove the current user's personal BYOC Vercel compute credentials and tear down its runtime. vercelcompute remove acknowledgecleanupfailure acknowledgeCleanupFailure"
+  },
+  "vercelCompute.retrySetup": {
+    "path": "vercelCompute.retrySetup",
+    "kind": "mutation",
+    "summary": "Retry a failed personal BYOC Vercel compute setup.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "retrysetup"
+    ],
+    "searchBlob": "vercelCompute.retrySetup Retry a failed personal BYOC Vercel compute setup. vercelcompute retrysetup"
+  },
+  "vercelCompute.upgradeRuntime": {
+    "path": "vercelCompute.upgradeRuntime",
+    "kind": "mutation",
+    "summary": "Upgrade the current user's personal BYOC Vercel compute runtime to the latest wrapper version.",
+    "inputSchema": {},
+    "tags": [
+      "vercelcompute",
+      "upgraderuntime"
+    ],
+    "searchBlob": "vercelCompute.upgradeRuntime Upgrade the current user's personal BYOC Vercel compute runtime to the latest wrapper version. vercelcompute upgraderuntime"
   },
   "webhookTriggers.capabilities": {
     "path": "webhookTriggers.capabilities",

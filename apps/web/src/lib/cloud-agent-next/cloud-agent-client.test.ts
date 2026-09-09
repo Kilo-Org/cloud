@@ -109,6 +109,7 @@ const {
   CloudAgentNextClient,
   createAppBuilderCloudAgentNextClient,
   getVercelComputeEnrollment,
+  getVercelComputeEnrollmentForUser,
   getVercelRuntimeIdentity,
   cleanupVercelSnapshotBuild,
 } = realCloudAgentClientModule;
@@ -1295,6 +1296,22 @@ describe('getVercelComputeEnrollment', () => {
 
     await expect(getVercelComputeEnrollment('org_1')).rejects.toThrow(
       'Cloud Agent Vercel compute enrollment could not be verified'
+    );
+  });
+
+  it('encodes OAuth user ids on the personal enrollment endpoint', async () => {
+    const fetchMock = jest
+      .fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(Response.json({ enrolled: true }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(getVercelComputeEnrollmentForUser('oauth/provider/user id')).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://cloud-agent-next/internal/byoc/vercel-enrollment/user/oauth%2Fprovider%2Fuser%20id',
+      expect.objectContaining({
+        headers: { 'x-internal-api-key': 'test-secret' },
+        cache: 'no-store',
+      })
     );
   });
 });

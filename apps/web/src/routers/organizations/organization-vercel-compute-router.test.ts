@@ -1,6 +1,7 @@
 jest.mock('@/lib/cloud-agent-next/cloud-agent-client', () => ({
   cleanupVercelSnapshotBuild: jest.fn(),
   getVercelComputeEnrollment: jest.fn(),
+  getVercelComputeEnrollmentForUser: jest.fn(),
   getVercelRuntimeIdentity: jest.fn(),
   startVercelSnapshotBuild: jest.fn(),
 }));
@@ -19,7 +20,7 @@ jest.mock('@/lib/config.server', () => {
 import type * as NodeCryptoModule from 'node:crypto';
 import type * as ConfigServerModule from '@/lib/config.server';
 import { TRPCError } from '@trpc/server';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import {
   organization_memberships,
   organization_vercel_compute_credentials,
@@ -29,13 +30,17 @@ import {
 import {
   cleanupVercelSnapshotBuild,
   getVercelComputeEnrollment,
+  getVercelComputeEnrollmentForUser,
   getVercelRuntimeIdentity,
   startVercelSnapshotBuild,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { db } from '@/lib/drizzle';
 import { createCallerFactory } from '@/lib/trpc/init';
 import { insertTestUser } from '@/tests/helpers/user.helper';
-import { organizationVercelComputeRouter } from './organization-vercel-compute-router';
+import {
+  organizationVercelComputeRouter,
+  personalVercelComputeRouter,
+} from './organization-vercel-compute-router';
 
 const TOKEN = 'vercel-router-test-token-do-not-expose';
 const PROVIDER_DETAIL = 'private-provider-response-detail';
@@ -45,7 +50,9 @@ const organizationId = crypto.randomUUID();
 const setupInput = { organizationId, token: TOKEN, teamId: TEAM.id, projectId: PROJECT.id };
 const providerProcedures = ['discoverTeams', 'discoverProjects', 'add'] as const;
 const createCaller = createCallerFactory(organizationVercelComputeRouter);
+const createPersonalCaller = createCallerFactory(personalVercelComputeRouter);
 const mockEnrollment = jest.mocked(getVercelComputeEnrollment);
+const mockPersonalEnrollment = jest.mocked(getVercelComputeEnrollmentForUser);
 const mockStartBuild = jest.mocked(startVercelSnapshotBuild);
 const mockCleanupBuild = jest.mocked(cleanupVercelSnapshotBuild);
 const mockRuntimeIdentity = jest.mocked(getVercelRuntimeIdentity);
@@ -55,6 +62,7 @@ let organizationAdmin: User;
 let billingManager: User;
 let member: User;
 let outsider: User;
+let personalUser: User;
 let fetchMock: jest.SpiedFunction<typeof fetch>;
 
 beforeAll(async () => {
@@ -63,6 +71,7 @@ beforeAll(async () => {
   billingManager = await insertTestUser();
   member = await insertTestUser();
   outsider = await insertTestUser();
+  personalUser = await insertTestUser();
   await db.insert(organizations).values({ id: organizationId, name: 'Vercel Discovery Test' });
   await db.insert(organization_memberships).values([
     { organization_id: organizationId, kilo_user_id: owner.id, role: 'owner' },
@@ -75,9 +84,15 @@ beforeAll(async () => {
 beforeEach(async () => {
   await db
     .delete(organization_vercel_compute_credentials)
-    .where(eq(organization_vercel_compute_credentials.organization_id, organizationId));
+    .where(
+      or(
+        eq(organization_vercel_compute_credentials.organization_id, organizationId),
+        eq(organization_vercel_compute_credentials.user_id, personalUser.id)
+      )
+    );
   jest.resetAllMocks();
   mockEnrollment.mockResolvedValue(true);
+  mockPersonalEnrollment.mockResolvedValue(true);
   mockStartBuild.mockResolvedValue(undefined);
   mockCleanupBuild.mockResolvedValue(undefined);
   mockRuntimeIdentity.mockRejectedValue(new Error('runtime identity unused'));
@@ -118,8 +133,20 @@ function getCredential() {
   });
 }
 
+function getPersonalCredential() {
+  return db.query.organization_vercel_compute_credentials.findFirst({
+    where: eq(organization_vercel_compute_credentials.user_id, personalUser.id),
+  });
+}
+
 async function expectNoSetup() {
   expect(await getCredential()).toBeUndefined();
+  expect(mockStartBuild).not.toHaveBeenCalled();
+  expect(mockCleanupBuild).not.toHaveBeenCalled();
+}
+
+async function expectNoPersonalSetup() {
+  expect(await getPersonalCredential()).toBeUndefined();
   expect(mockStartBuild).not.toHaveBeenCalled();
   expect(mockCleanupBuild).not.toHaveBeenCalled();
 }
@@ -240,6 +267,100 @@ describe('Vercel discovery authorization', () => {
     for (const [, options] of fetchMock.mock.calls) {
       expect(options?.headers).toMatchObject({ Authorization: `Bearer ${TOKEN}` });
     }
+  });
+});
+
+describe('Vercel cloud card authorization', () => {
+  it('allows organization owners and admins to query cloud visibility', async () => {
+    for (const user of [owner, organizationAdmin]) {
+      await expect(
+        createCaller({ user }).getCloudCardVisibility({ organizationId })
+      ).resolves.toEqual({ visible: true });
+      expect(mockEnrollment).toHaveBeenCalledWith(organizationId);
+      mockEnrollment.mockClear();
+    }
+  });
+
+  it('returns UNAUTHORIZED for billing managers, members, and outsiders', async () => {
+    for (const user of [billingManager, member, outsider]) {
+      await expectSanitizedError(
+        createCaller({ user }).getCloudCardVisibility({ organizationId }),
+        'UNAUTHORIZED'
+      );
+    }
+    expect(mockEnrollment).not.toHaveBeenCalled();
+  });
+});
+
+describe('Personal Vercel compute authorization', () => {
+  it('allows an enrolled personal user to add a credential and starts the snapshot with userId', async () => {
+    const caller = createPersonalCaller({ user: personalUser });
+    mockSelectionValidation();
+
+    const status = await caller.add({ token: TOKEN, teamId: TEAM.id, projectId: PROJECT.id });
+    const credential = await getPersonalCredential();
+
+    expect(status).toMatchObject({
+      userId: personalUser.id,
+      teamId: TEAM.id,
+      projectId: PROJECT.id,
+      setupStatus: 'pending',
+      setupStep: 'validating_access',
+    });
+    expect(status).not.toHaveProperty('organizationId');
+    expect(credential).toMatchObject({
+      user_id: personalUser.id,
+      organization_id: null,
+    });
+    expect(mockPersonalEnrollment).toHaveBeenCalledWith(personalUser.id);
+    expect(mockStartBuild).toHaveBeenCalledWith({
+      userId: personalUser.id,
+      credentialId: status.credentialId,
+      buildGeneration: status.buildGeneration,
+    });
+  });
+
+  it('hides and rejects setup for an unenrolled personal user without a credential', async () => {
+    mockPersonalEnrollment.mockResolvedValue(false);
+    const caller = createPersonalCaller({ user: personalUser });
+
+    await expect(caller.getCloudCardVisibility()).resolves.toEqual({ visible: false });
+    await expectSanitizedError(
+      caller.add({ token: TOKEN, teamId: TEAM.id, projectId: PROJECT.id }),
+      'FORBIDDEN'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    await expectNoPersonalSetup();
+  });
+
+  it('keeps an unenrolled personal credential visible and allows removal', async () => {
+    const caller = createPersonalCaller({ user: personalUser });
+    mockSelectionValidation();
+    const added = await caller.add({ token: TOKEN, teamId: TEAM.id, projectId: PROJECT.id });
+    mockStartBuild.mockClear();
+    mockCleanupBuild.mockClear();
+    mockPersonalEnrollment.mockResolvedValue(false);
+
+    await expect(caller.getCloudCardVisibility()).resolves.toEqual({ visible: true });
+    await expectSanitizedError(
+      caller.add({ token: TOKEN, teamId: TEAM.id, projectId: PROJECT.id }),
+      'FORBIDDEN'
+    );
+    await expect(caller.remove({})).resolves.toEqual({ success: true });
+    expect(mockCleanupBuild).toHaveBeenCalledWith({
+      userId: personalUser.id,
+      credentialId: added.credentialId,
+      buildGeneration: added.buildGeneration,
+    });
+    await expect(caller.getStatus()).resolves.toBeNull();
+  });
+
+  it('does not expose a personal credential through the organization path', async () => {
+    const personalCaller = createPersonalCaller({ user: personalUser });
+    mockSelectionValidation();
+    await personalCaller.add({ token: TOKEN, teamId: TEAM.id, projectId: PROJECT.id });
+
+    await expect(createCaller({ user: owner }).getStatus({ organizationId })).resolves.toBeNull();
   });
 });
 

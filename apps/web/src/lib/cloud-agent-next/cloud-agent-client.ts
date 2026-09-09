@@ -1394,6 +1394,38 @@ export async function getVercelComputeEnrollment(organizationId: string): Promis
   return body.enrolled;
 }
 
+export async function getVercelComputeEnrollmentForUser(userId: string): Promise<boolean> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
+      {
+        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  const body: unknown = await response.json().catch(() => null);
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('enrolled' in body) ||
+    typeof body.enrolled !== 'boolean'
+  ) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  return body.enrolled;
+}
+
 /** Exactly one of organizationId or userId must be set. */
 export type VercelSnapshotBuildCleanupInput = VercelSnapshotBuildStartInput & {
   snapshotId?: string;

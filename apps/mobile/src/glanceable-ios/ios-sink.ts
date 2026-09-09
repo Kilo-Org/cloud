@@ -1,11 +1,9 @@
+/* eslint-disable max-lines -- one ActivityKit sink: adopt, start, update, and end */
 import {
-  GLANCEABLE_IDLE_END_DEBOUNCE_MS,
-  GLANCEABLE_IDLE_ONLY_MS,
   GLANCEABLE_STALE_MS,
   GLANCEABLE_TERMINAL_MS,
   type GlanceableAgentsSnapshot,
   isEligibleGlanceableWork,
-  isIdleOnlyGlanceableWork,
   isStartableGlanceableWork,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type GlanceableLiveActivityContentState } from '@kilocode/notifications';
@@ -21,13 +19,11 @@ import { getLiveActivityEnabled } from '@/lib/glanceable/live-activity-switch';
 import { ActiveAgentsLiveActivity, OPEN_AGENTS_URL } from './active-agents-live-activity';
 import {
   type Activity,
-  cancelIdleEnd,
   endExtra,
   endingActivities,
   endOtherVisible,
   readEndingToken,
   scheduleEnd,
-  scheduleIdleEnd,
   settleEnds,
 } from './ending-activities';
 import { ActiveAgentsWidget } from './active-agents-widget';
@@ -82,6 +78,24 @@ function startCard(
   ctx: GlanceableSinkContext
 ): void {
   try {
+    // Adopt a card that appeared while we waited. A second start stacks Lock
+    // Screen cards that Activity.activities cannot see after process death.
+    if (!refreshActivity()) {
+      return;
+    }
+    if (activity !== null) {
+      lastProps = contentState;
+      revision = snapshot.revision;
+      getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
+      inFlightUpdate = activity.update(contentState, STALE_AFTER_SECONDS);
+      return;
+    }
+    const remaining = ActiveAgentsLiveActivity.getInstances(true).filter(
+      instance => instance.getInfo().state !== 'dismissed'
+    );
+    if (remaining.length > 0) {
+      return;
+    }
     const started = ActiveAgentsLiveActivity.start(
       contentState,
       OPEN_AGENTS_URL,
@@ -92,8 +106,6 @@ function startCard(
     lastProps = contentState;
     revision = snapshot.revision;
     getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, started);
-    // A push-to-start or an idle card still waiting out its dismissal can share
-    // the Lock Screen with this start. Retire every other visible instance now.
     endOtherVisible(started.getInfo().id, ActiveAgentsLiveActivity.getInstances(true));
   } catch (error) {
     // Only ActivityKit unavailability is permanent; transient starts retry later.
@@ -117,19 +129,19 @@ function refreshActivity(): boolean {
       }
     }
     // Wrappers change on discovery; only native IDs identify pending ends.
-    const live = ActiveAgentsLiveActivity.getInstances().filter(
-      instance => !endingActivities.has(instance.getInfo().id)
-    );
+    // Include ended-but-visible cards so a later start cannot stack beside them.
+    const visible = ActiveAgentsLiveActivity.getInstances(true).filter(instance => {
+      const info = instance.getInfo();
+      return info.state !== 'dismissed' && !endingActivities.has(info.id);
+    });
+    const live = visible.filter(instance => {
+      const state = instance.getInfo().state;
+      return state === 'active' || state === 'stale';
+    });
     activity ??= live.at(-1) ?? null;
-    // Exactly one card may ever be on screen. A push-to-start that raced a
-    // local start, or a card left behind by an earlier organization scope, is
-    // adopted by nobody: it is never updated and never ended, so it sits frozen
-    // on the Lock Screen for the whole 8 hour lifetime. Retire every instance
-    // except the adopted one here, in the one native read every path shares.
-    // Which one is adopted does not matter — native order is a dictionary
-    // order, not a start order — only that the others do not survive it.
+    // Exactly one card may ever be on screen. Retire every other instance here.
     const keptId = activity?.getInfo().id;
-    for (const instance of live) {
+    for (const instance of visible) {
       const id = instance.getInfo().id;
       if (id !== keptId) {
         endExtra(instance, id);
@@ -158,7 +170,6 @@ function endNow(
   props: Partial<GlanceableLiveActivityContentState> | null = lastProps,
   reachEnded = dismissMs === null
 ): Promise<void> | null {
-  cancelIdleEnd();
   const targets = new Map<string, Activity>();
   if (reachEnded) {
     try {
@@ -274,7 +285,6 @@ export function _resetIosSinkForTests(): void {
   pendingStart = null;
   pendingStartInput = null;
   pendingStartAt = 0;
-  cancelIdleEnd();
 }
 
 export const iosSink: GlanceableSink = {
@@ -317,19 +327,6 @@ export const iosSink: GlanceableSink = {
     if (refreshActivity() && activity !== null) {
       lastProps = contentState;
       inFlightUpdate = activity.update(lastProps, STALE_AFTER_SECONDS);
-      if (isIdleOnlyGlanceableWork(snapshot)) {
-        // Brief idle↔busy flips must not tear the card down: the end waits out
-        // a debounce, then hands ActivityKit the dismissal date so the surface
-        // still retires if JavaScript stops. Work that resumes before the
-        // timer fires updates this same card. While inactive or background,
-        // scheduleIdleEnd submits the end at once instead, so a background
-        // wake can await it through `waitForNativeTerminal`.
-        scheduleIdleEnd(() => {
-          void endNow(GLANCEABLE_IDLE_ONLY_MS, lastProps);
-        }, GLANCEABLE_IDLE_END_DEBOUNCE_MS);
-      } else {
-        cancelIdleEnd();
-      }
     }
   },
 
@@ -381,10 +378,13 @@ export const iosSink: GlanceableSink = {
         pendingStart = (async () => {
           await dismissal;
           const input = pendingStartInput;
-          pendingStart = null;
-          pendingStartInput = null;
-          pendingStartAt = 0;
-          startCard(input.contentState, input.snapshot, input.ctx);
+          try {
+            startCard(input.contentState, input.snapshot, input.ctx);
+          } finally {
+            pendingStart = null;
+            pendingStartInput = null;
+            pendingStartAt = 0;
+          }
         })();
         return;
       }
@@ -395,9 +395,6 @@ export const iosSink: GlanceableSink = {
     // publish can adopt an activity before this method sees it. Bind its token
     // listener here too; delivery deduplicates the sink's stable native handle.
     getGlanceableDelivery().registerTokens(snapshot, ctx.organizationId, ctx.userId, activity);
-    if (isStartableGlanceableWork(snapshot)) {
-      cancelIdleEnd();
-    }
     // The publisher coalesces and guards revisions, but keep the sink monotonic
     // so a late or replayed emit can never move the surface backwards.
     if (snapshot.revision <= revision) {

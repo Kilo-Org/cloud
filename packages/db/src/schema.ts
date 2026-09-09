@@ -5854,6 +5854,9 @@ export const cloud_agent_code_review_attempts = pgTable(
       table.attempt_number
     ),
     index('idx_cloud_agent_code_review_attempts_code_review_id').on(table.code_review_id),
+    index('idx_cloud_agent_code_review_attempts_retry_of_attempt_id')
+      .on(table.retry_of_attempt_id)
+      .concurrently(),
     index('idx_cloud_agent_code_review_attempts_session_id').on(table.session_id),
     index('idx_cloud_agent_code_review_attempts_cli_session_id').on(table.cli_session_id),
     index('idx_cloud_agent_code_review_attempts_status').on(table.status),

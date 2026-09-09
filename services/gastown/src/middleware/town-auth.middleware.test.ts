@@ -34,22 +34,25 @@ describe('townAuthMiddleware', () => {
     expect((await app.request('/api/towns/town-1/config', {}, {} as Env)).status).toBe(403);
   });
 
-  it('preserves the cached admin bypass for legacy towns', async () => {
-    mocks.getTownIdentityState.mockResolvedValue({
-      type: 'legacy',
-      identity: { ownerType: 'user', ownerUserId: 'owner', runtimeMode: 'legacy' },
-    });
-    const app = new Hono<GastownEnv>();
-    app.use('*', async (c, next) => {
-      c.set('kiloUserId', 'admin');
-      c.set('kiloIsAdmin', true);
-      await next();
-    });
-    app.use('/api/towns/:townId/*', townAuthMiddleware);
-    app.get('/api/towns/:townId/config', c => c.text('allowed'));
+  it.each([null, { ownerType: 'user', ownerUserId: 'owner', runtimeMode: 'legacy' }])(
+    'preserves the cached admin bypass for legacy identity %j',
+    async identity => {
+      mocks.getTownIdentityState.mockResolvedValue({
+        type: 'legacy',
+        identity,
+      });
+      const app = new Hono<GastownEnv>();
+      app.use('*', async (c, next) => {
+        c.set('kiloUserId', 'admin');
+        c.set('kiloIsAdmin', true);
+        await next();
+      });
+      app.use('/api/towns/:townId/*', townAuthMiddleware);
+      app.get('/api/towns/:townId/config', c => c.text('allowed'));
 
-    expect((await app.request('/api/towns/town-1/config', {}, {} as Env)).status).toBe(200);
-  });
+      expect((await app.request('/api/towns/town-1/config', {}, {} as Env)).status).toBe(200);
+    }
+  );
 
   it('fails closed for an invalid persisted authorization state', async () => {
     mocks.getTownIdentityState.mockResolvedValue({ type: 'invalid' });

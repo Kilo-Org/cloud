@@ -41,8 +41,8 @@ export const townAuthMiddleware = createMiddleware<GastownEnv>(async (c, next) =
       throw error;
     }
   }
+  if (c.get('kiloIsAdmin')) return next();
   if (identity) {
-    if (c.get('kiloIsAdmin')) return next();
     if (identity.ownerType === 'user') {
       if (identity.ownerUserId !== userId) return c.json(resError('Forbidden'), 403);
       return next();

@@ -51,6 +51,7 @@ import { createTestOrganization } from '@/tests/helpers/organization.helper';
 import { insertTestUser } from '@/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@/lib/tokens';
+import { ORGANIZATION_ID_HEADER } from '@/lib/constants';
 import { eq } from 'drizzle-orm';
 import { v5 as uuidv5 } from 'uuid';
 import jwt from 'jsonwebtoken';
@@ -609,6 +610,89 @@ describe('getUserFromAuth', () => {
     expect(gatewayResult.user?.id).toBe(user.id);
     expect(apiResult.user).toBeNull();
     expect(apiResult.authFailedResponse?.status).toBe(401);
+  });
+
+  test('uses the signed organization instead of a conflicting request header', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'signed-organization-pepper' });
+    const signedOrganization = await createTestOrganization(
+      `Signed Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const headerOrganization = await createTestOrganization(
+      `Header Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const token = signPolicyClaims({
+      version: JWT_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_GATEWAY_AUDIENCE,
+      organizationId: signedOrganization.id,
+    });
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: headerOrganization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.organizationId).toBe(signedOrganization.id);
+  });
+
+  test('uses the signed organization when no request header is supplied', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'signed-organization-no-header-pepper' });
+    const organization = await createTestOrganization(
+      `Signed Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const token = signPolicyClaims({
+      version: JWT_TOKEN_VERSION,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      aud: KILO_GATEWAY_AUDIENCE,
+      organizationId: organization.id,
+    });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({
+      adminOnly: false,
+      expectedAudience: KILO_GATEWAY_AUDIENCE,
+    });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.organizationId).toBe(organization.id);
+  });
+
+  test('uses the request header for a token without a signed organization', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'unbound-organization-pepper' });
+    const organization = await createTestOrganization(
+      `Header Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.organizationId).toBe(organization.id);
   });
 
   test('allows API-token authentication for users from SSO-protected domains', async () => {

@@ -58,6 +58,9 @@ vi.mock('@/lib/query-client', () => ({
 }));
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({ setTrpcUnauthorizedHandler: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({ clearAgentModelPreference: vi.fn() }));
+vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
+  clearRunOnDestinationPreference: vi.fn(),
+}));
 vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
   clearKeepScreenOnPreference: vi.fn(),
 }));

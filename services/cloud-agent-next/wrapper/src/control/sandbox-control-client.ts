@@ -110,6 +110,7 @@ export type SandboxControlClient = {
     reason: string;
     cleanupDeadlineAt: number;
   }): Promise<boolean>;
+  supportsScopedCleanupResult?(): boolean;
 };
 
 type ClientState =
@@ -122,6 +123,7 @@ type ClientState =
       kiloVersionHeartbeat: boolean;
       connectionRecovery: boolean;
       eventReceipts: boolean;
+      scopedCleanupResult: boolean;
     }
   | { kind: 'closed' };
 
@@ -461,6 +463,7 @@ export function createSandboxControlClient(
       let kiloVersionHeartbeat = false;
       let connectionRecovery = false;
       let negotiatedEventReceipts = false;
+      let negotiatedScopedCleanupResult = false;
       let timeout = setTimeout(fail, Math.min(CONNECT_TIMEOUT_MS, deadlineAt - Date.now()));
 
       function dispose(): void {
@@ -521,6 +524,7 @@ export function createSandboxControlClient(
               nativeRuntimeRetirement: true,
               connectionRecovery: true,
               eventReceipts: true,
+              scopedCleanupResult: true,
               workingBranches: true,
             },
             ...(wrapperInstanceId ? { wrapperInstanceId } : {}),
@@ -572,6 +576,7 @@ export function createSandboxControlClient(
           kiloVersionHeartbeat = hello.data.capabilities?.kiloVersionHeartbeat === true;
           connectionRecovery = hello.data.capabilities?.connectionRecovery === true;
           negotiatedEventReceipts = hello.data.capabilities?.eventReceipts === true;
+          negotiatedScopedCleanupResult = hello.data.capabilities?.scopedCleanupResult === true;
           phase = 'status';
           diagnostic('hello_accepted', ws);
           return;
@@ -616,6 +621,7 @@ export function createSandboxControlClient(
           kiloVersionHeartbeat,
           connectionRecovery,
           eventReceipts: negotiatedEventReceipts,
+          scopedCleanupResult: negotiatedScopedCleanupResult,
           dispose: () => {
             clearInterval(keepalive);
             dispose();
@@ -1041,6 +1047,10 @@ export function createSandboxControlClient(
       const report = sendNativeRuntimeRetirement(payload, payload.cleanupDeadlineAt);
       nativeRetirementReports.set(key, report);
       return report;
+    },
+
+    supportsScopedCleanupResult(): boolean {
+      return state.kind === 'ready' && state.scopedCleanupResult;
     },
 
     async publishSessionEvent(payload, session): Promise<boolean> {

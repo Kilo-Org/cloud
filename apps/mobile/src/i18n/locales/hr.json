@@ -450,6 +450,9 @@
       "acceptTerms": "Prihvati",
       "replyBadRequest": "Ovaj odgovor nije moguće objaviti. Nit se možda promijenila.",
       "replyForbidden": "Nemaš dopuštenje za odgovaranje u ovom zahtjevu za spajanje.",
+      "addCommentCta": "Komentiraj ovaj zahtjev za spajanje",
+      "commentBadRequest": "Ovaj komentar nije moguće objaviti. Zahtjev za spajanje se možda promijenio.",
+      "commentForbidden": "Nemaš dopuštenje za komentiranje u ovom zahtjevu za spajanje.",
       "moderation": {
         "reportContent": {
           "terminal": "Ovaj komentar nije moguće prijaviti.",

@@ -448,6 +448,9 @@
       "acceptTerms": "Gba",
       "replyBadRequest": "A kò lè fi ìdáhùn yìí ránṣẹ́. Ọ̀wọ́ ìjíròrò náà lè ti yí padà.",
       "replyForbidden": "O kò ní àṣẹ láti dáhùn sí ìbéèrè ìṣọ̀kan yìí.",
+      "addCommentCta": "Fi àsọyé sí ìbéèrè ìṣọ̀kan yìí",
+      "commentBadRequest": "A kò lè fi àsọyé yìí ránṣẹ́. Ìbéèrè ìṣọ̀kan náà lè ti yí padà.",
+      "commentForbidden": "O kò ní àṣẹ láti fi àsọyé sí ìbéèrè ìṣọ̀kan yìí.",
       "moderation": {
         "reportContent": {
           "terminal": "A kò lè fi ẹ̀sùn àsọyé yìí hàn.",

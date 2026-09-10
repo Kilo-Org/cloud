@@ -450,6 +450,9 @@
       "acceptTerms": "Accepta",
       "replyBadRequest": "Aquesta resposta no es pot publicar. Pot ser que el fil hagi canviat.",
       "replyForbidden": "No tens permís per respondre a aquesta sol·licitud d'integració.",
+      "addCommentCta": "Comenta aquesta sol·licitud d'integració",
+      "commentBadRequest": "Aquest comentari no es pot publicar. Pot ser que la sol·licitud d'integració hagi canviat.",
+      "commentForbidden": "No tens permís per comentar aquesta sol·licitud d'integració.",
       "moderation": {
         "reportContent": {
           "terminal": "Aquest comentari no es pot denunciar.",

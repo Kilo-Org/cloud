@@ -151,9 +151,14 @@ tsx services/cloud-agent-next/test/e2e/run.ts unknown-model _
 tsx services/cloud-agent-next/test/e2e/run.ts waiters-clean _
 
 # Callback delivery — driver stands up a local HTTP sink and asserts on receipt.
-tsx services/cloud-agent-next/test/e2e/run.ts callback-completion echo:done
-tsx services/cloud-agent-next/test/e2e/run.ts callback-batch-followup _
-tsx services/cloud-agent-next/test/e2e/run.ts callback-interrupt _
+# `callbackTarget` is accepted by prepareSession only (workerd can POST
+# http://127.0.0.1:<ephemeral> on the same host; no tunnel). Use the
+# cloud-worktree-setup user so GitHub-backed clones have an installation token.
+E2E_USER_EMAIL=evgeny@kilocode.ai E2E_GITHUB_REPO=na2-org/hi-how-are-you \
+  WORKER_URL=http://localhost:<8794+offset> FAKE_LLM_URL=http://localhost:<8811+offset> \
+  tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy callback-completion echo:done
+tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy callback-batch-followup _
+tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy callback-interrupt _
 
 # Legacy API (prepareSession + initiateFromKilocodeSessionV2 / sendMessageV2).
 tsx services/cloud-agent-next/test/e2e/run.ts --api=legacy cold-hot echo:legacy
@@ -180,6 +185,9 @@ for any other offset, compute the real ports from `pnpm dev:status --json`
 | `WORKER_URL` | `http://localhost:8794` |
 | `FAKE_LLM_URL` | `http://localhost:8811` (host-side view) |
 | `E2E_GIT_URL` | `https://github.com/octocat/Hello-World.git` |
+| `E2E_GITHUB_REPO` | unset. When set (`owner/repo`), start uses GitHub-app clone instead of `gitUrl`. Pair with `E2E_USER_EMAIL` for the seeded installation. |
+| `E2E_USER_EMAIL` | unset (ephemeral `usr_e2e_*`). Set to the cloud-worktree-setup email to reuse that user and its GitHub integration. |
+| `E2E_BRANCH` | unset. Optional checkout ref (`upstreamBranch` / `repository.branch`). |
 | `E2E_MODEL` | `kilo/fake-deterministic` (the only model the fake serves) |
 | `DATABASE_URL` | Optional direct database URL override for this harness |
 | `POSTGRES_URL` | Repo database fallback loaded from root `.env.local` / `.env` |

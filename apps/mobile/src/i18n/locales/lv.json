@@ -450,6 +450,9 @@
       "acceptTerms": "Pieņemt",
       "replyBadRequest": "Šo atbildi nevar publicēt. Pavediens, iespējams, ir mainījies.",
       "replyForbidden": "Tev nav atļaujas atbildēt šajā izmaiņu pieprasījumā.",
+      "addCommentCta": "Komentēt šo izmaiņu pieprasījumu",
+      "commentBadRequest": "Šo komentāru nevar publicēt. Iespējams, izmaiņu pieprasījums ir mainījies.",
+      "commentForbidden": "Tev nav atļaujas komentēt šajā izmaiņu pieprasījumā.",
       "moderation": {
         "reportContent": {
           "terminal": "Par šo komentāru nevar ziņot.",

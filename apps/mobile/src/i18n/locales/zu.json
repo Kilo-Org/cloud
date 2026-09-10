@@ -448,6 +448,9 @@
       "acceptTerms": "Yamukela",
       "replyBadRequest": "Le mpendulo ayikwazi ukuthunyelwa. Kungenzeka uchungechunge lwengxoxo lushintshile.",
       "replyForbidden": "Awunayo imvume yokuphendula kulesi sicelo sokuhlanganisa.",
+      "addCommentCta": "Phawula kulesi sicelo sokuhlanganisa",
+      "commentBadRequest": "Le phawula ayikwazi ukuthunyelwa. Kungenzeka lesi sicelo sokuhlanganisa sishintshile.",
+      "commentForbidden": "Awunayo imvume yokuphawula kulesi sicelo sokuhlanganisa.",
       "moderation": {
         "reportContent": {
           "terminal": "La mazwana awakwazi ukubikwa.",

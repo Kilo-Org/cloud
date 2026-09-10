@@ -46,9 +46,10 @@ describe('controlRequestResult', () => {
       failure = error;
     }
     expect(failure).toBeInstanceOf(ControlRequestError);
-    expect(failure).toMatchObject(error);
+    expect(failure).toMatchObject({ ...error, rejectionReceived: true });
     expect(isRetryableDeliveryError(failure)).toBe(true);
     expect(Object.assign(new Error(error.message), error)).not.toBeInstanceOf(ControlRequestError);
+    expect(new ControlRequestError(error).rejectionReceived).toBeUndefined();
   });
 
   it.each([undefined, { retryable: true }, { code: '', message: 'Invalid', retryable: true }])(

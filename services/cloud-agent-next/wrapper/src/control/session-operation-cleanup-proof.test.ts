@@ -56,10 +56,33 @@ function fixture(overrides: Partial<WrapperKiloClient> = {}) {
         completionEvidence: 'unconfirmed',
         cancel: () => {},
       }),
+    runRoot: (deadlineAt = Date.now() + 150) =>
+      cleanup.cleanupRootScoped({
+        deadlineAt,
+        target,
+        completionEvidence: 'unconfirmed',
+        cancel: () => {},
+      }),
   };
 }
 
 describe('native cancellation proof', () => {
+  it('keeps normal cleanup runtime-wide while explicit root cleanup skips verification', async () => {
+    const f = fixture({ abortSession: async () => true });
+    expect(await f.run()).toBe(true);
+    expect(f.verify).toHaveBeenCalledTimes(1);
+    f.verify.mockClear();
+    expect(await f.runRoot()).toBe('confirmed');
+    expect(f.verify).not.toHaveBeenCalled();
+  });
+
+  it('reports root-scoped cleanup as unconfirmed when owned process stop fails', async () => {
+    const f = fixture({ abortSession: async () => true });
+    f.stop.mockResolvedValue(false);
+    expect(await f.runRoot()).toBe('unconfirmed');
+    expect(f.verify).not.toHaveBeenCalled();
+  });
+
   it('accepts native empty-map idle only with exact process proof after acknowledged abort', async () => {
     const abort = jest.fn(async () => true);
     const f = fixture({ abortSession: abort });

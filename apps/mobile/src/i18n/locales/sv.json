@@ -448,6 +448,9 @@
       "acceptTerms": "Godkänn",
       "replyBadRequest": "Det här svaret kan inte publiceras. Tråden kan ha ändrats.",
       "replyForbidden": "Du har inte behörighet att svara på den här PR:en.",
+      "addCommentCta": "Kommentera den här PR:en",
+      "commentBadRequest": "Den här kommentaren kan inte publiceras. PR:en kan ha ändrats.",
+      "commentForbidden": "Du har inte behörighet att kommentera den här PR:en.",
       "moderation": {
         "reportContent": {
           "terminal": "Den här kommentaren kan inte anmälas.",

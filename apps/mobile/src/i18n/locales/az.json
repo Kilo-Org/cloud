@@ -448,6 +448,9 @@
       "acceptTerms": "Qəbul et",
       "replyBadRequest": "Bu cavabı göndərmək mümkün deyil. Müzakirə dəyişmiş ola bilər.",
       "replyForbidden": "Bu birləşdirmə sorğusuna cavab vermək icazən yoxdur.",
+      "addCommentCta": "Bu birləşdirmə sorğusuna şərh yaz",
+      "commentBadRequest": "Bu şərhi göndərmək mümkün deyil. Birləşdirmə sorğusu dəyişmiş ola bilər.",
+      "commentForbidden": "Bu birləşdirmə sorğusuna şərh yazmaq icazən yoxdur.",
       "moderation": {
         "reportContent": {
           "terminal": "Bu şərhdən şikayət etmək mümkün deyil.",

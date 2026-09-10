@@ -438,7 +438,7 @@ describe('GitHub installation persistence', () => {
         data('771002')
       );
       await githubTestTimeout(
-        waitForBlockedGitHubOwnerLock(holderPid),
+        waitForBlockedGitHubOwnerLock(holderPid, `org:${organization.id}`),
         'owner-cardinality contender'
       );
     } catch (error) {
@@ -548,7 +548,7 @@ describe('GitHub installation persistence', () => {
         { id: 99, name: 'revived', full_name: 'acme/revived', private: true },
       ]);
       await githubTestTimeout(
-        waitForBlockedGitHubOwnerLock(holderPid),
+        waitForBlockedGitHubOwnerLock(holderPid, 'standard:773001'),
         'repository refresh lock observation'
       );
     } catch (error) {
@@ -634,7 +634,7 @@ describe('GitHub installation persistence', () => {
       const holderPid = await githubTestTimeout(holderReady, 'duplicate deletion holder readiness');
       second = processDeletion();
       await githubTestTimeout(
-        waitForBlockedGitHubOwnerLock(holderPid),
+        waitForBlockedGitHubOwnerLock(holderPid, 'standard:773002'),
         'duplicate deletion lock observation'
       );
     } catch (error) {
@@ -1130,7 +1130,10 @@ describe('GitHub installation persistence', () => {
   });
 });
 
-async function waitForBlockedGitHubOwnerLock(holderPid: number): Promise<void> {
+async function waitForBlockedGitHubOwnerLock(
+  holderPid: number,
+  expectedLockKey: string
+): Promise<void> {
   for (let attempt = 0; attempt < 200; attempt += 1) {
     const result = await db.execute<{ blocked: boolean }>(sql`
       SELECT EXISTS (
@@ -1138,13 +1141,14 @@ async function waitForBlockedGitHubOwnerLock(holderPid: number): Promise<void> {
         WHERE datname = current_database()
           AND ${holderPid} = ANY(pg_blocking_pids(pid))
           AND wait_event_type = 'Lock'
-          AND lower(query) LIKE '%pg_advisory_xact_lock%'
+          AND wait_event = 'advisory'
+          AND query LIKE 'SELECT pg_advisory_xact_lock(hashtext(%'
       ) AS blocked
     `);
     if (result.rows[0]?.blocked) return;
     await new Promise<void>(resolve => setImmediate(resolve));
   }
-  throw new Error('Expected callback blocked on the GitHub owner advisory lock');
+  throw new Error(`Expected contender blocked on advisory lock ${expectedLockKey}`);
 }
 
 async function githubTestTimeout<T>(promise: Promise<T>, label: string): Promise<T> {

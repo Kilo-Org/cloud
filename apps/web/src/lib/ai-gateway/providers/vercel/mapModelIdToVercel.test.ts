@@ -16,7 +16,10 @@ import {
 } from '@/lib/ai-gateway/providers/openai';
 import { mapModelIdToVercel } from '@/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { GROK_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/xai';
-import { GLM_CURRENT_VERCEL_MODEL_ID } from '@/lib/ai-gateway/providers/zai';
+import {
+  GLM_CURRENT_VERCEL_MODEL_ID,
+  GLM_FLASH_CURRENT_VERCEL_MODEL_ID,
+} from '@/lib/ai-gateway/providers/zai';
 import {
   CLAUDE_FABLE_LATEST_MODEL_ALIAS,
   CLAUDE_HAIKU_LATEST_MODEL_ALIAS,
@@ -27,6 +30,7 @@ import {
   GEMINI_PRO_LATEST_MODEL_ALIAS,
   GPT_LATEST_MODEL_ALIAS,
   GPT_MINI_LATEST_MODEL_ALIAS,
+  GLM_FLASH_LATEST_MODEL_ALIAS,
   GLM_LATEST_MODEL_ALIAS,
   GROK_LATEST_MODEL_ALIAS,
   KIMI_LATEST_MODEL_ALIAS,
@@ -47,6 +51,7 @@ describe('mapModelIdToVercel', () => {
       [GEMINI_FLASH_LATEST_MODEL_ALIAS, GEMINI_FLASH_CURRENT_VERCEL_MODEL_ID],
       [GROK_LATEST_MODEL_ALIAS, GROK_CURRENT_VERCEL_MODEL_ID],
       [GLM_LATEST_MODEL_ALIAS, GLM_CURRENT_VERCEL_MODEL_ID],
+      [GLM_FLASH_LATEST_MODEL_ALIAS, GLM_FLASH_CURRENT_VERCEL_MODEL_ID],
       [DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS, 'deepseek/deepseek-v4-flash-0731'],
     ])('maps %s to the current Vercel model id', (input, expected) => {
       expect(mapModelIdToVercel(input)).toBe(expected);
@@ -65,6 +70,7 @@ describe('mapModelIdToVercel', () => {
         GEMINI_FLASH_LATEST_MODEL_ALIAS,
         GROK_LATEST_MODEL_ALIAS,
         GLM_LATEST_MODEL_ALIAS,
+        GLM_FLASH_LATEST_MODEL_ALIAS,
         DEEPSEEK_V4_FLASH_LATEST_MODEL_ALIAS,
       ]);
     });

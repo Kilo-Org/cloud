@@ -48,6 +48,20 @@ catalog:
 minimumReleaseAge: 6842
 minimumReleaseAgeExclude:
   - tsx
+  # Expo SDK 57 alignment: the 2026-09-08 patch releases `expo install --check`
+  # expects, plus the exact transitive versions that aligned graph resolves to.
+  # Each entry exempts exactly the listed package@version required by that
+  # alignment; any other or future version of these packages stays age-gated.
+  - expo@57.0.21
+  - '@expo/ui@57.0.17'
+  - expo-router@57.0.20
+  - expo-widgets@57.0.18
+  - babel-preset-expo@57.0.11
+  - expo-modules-core@57.0.17
+  - expo-modules-jsi@57.1.0
+  - '@expo/cli@57.0.23'
+  - '@expo/metro-file-map@57.0.3'
+  - expo-glass-effect@57.0.2
   - expo-dev-client
   - expo-dev-launcher
   - expo-dev-menu
@@ -147,9 +161,9 @@ overrides:
   # and constructs its own WebClient, so the versions must agree. 7.x is the
   # ceiling until @chat-adapter/slack moves to @slack/web-api 8.
   '@slack/web-api': 7.19.0
-  # Direct `@expo/ui@57.0.12` (expo-widgets peer) and expo-router's `^57.0.9`
+  # Direct `@expo/ui@57.0.17` (expo-widgets peer) and expo-router's `^57.0.9`
   # otherwise resolve to two native-module copies. Force one version.
-  '@expo/ui': 57.0.12
+  '@expo/ui': 57.0.17
 packageExtensions:
   # Undeclared upstream deps that break config evaluation outside the Expo CLI
   # under pnpm's isolated linker (autoInstallPeers is false).
@@ -169,9 +183,13 @@ packageExtensions:
 patchedDependencies:
   # query-string 7 requires this dependency as CommonJS. Keep the 0.5.0 security fix.
   decode-uri-component@0.5.0: patches/decode-uri-component@0.5.0.patch
-  expo-router@57.0.15: patches/expo-router@57.0.15.patch
+  # Repo-local features the SDK lacks, carried onto each SDK patch release:
+  # router — unhandled deep links when getInitialURL resolves later;
+  # widgets — Live Activity state query (getInfo), areLiveActivitiesEnabled,
+  # includeEnded instance reads, factory-registered push-to-start URL.
+  expo-router@57.0.20: patches/expo-router@57.0.20.patch
   expo-server-sdk: patches/expo-server-sdk.patch
-  expo-widgets@57.0.11: patches/expo-widgets@57.0.11.patch
+  expo-widgets@57.0.18: patches/expo-widgets@57.0.18.patch
   react-native-appsflyer@6.18.0: patches/react-native-appsflyer@6.18.0.patch
 publicHoistPattern:
   - '@types/*'

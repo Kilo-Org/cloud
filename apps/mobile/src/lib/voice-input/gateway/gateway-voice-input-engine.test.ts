@@ -13,9 +13,11 @@ import {
   type GatewayVoiceInputEngineDeps,
 } from './gateway-voice-input-engine';
 
-vi.mock('expo-file-system/legacy', () => ({
-  FileSystemUploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
-  createUploadTask: vi.fn(),
+vi.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
+  File: class {
+    createUploadTask = vi.fn();
+  },
 }));
 
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));

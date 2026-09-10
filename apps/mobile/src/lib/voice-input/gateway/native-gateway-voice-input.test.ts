@@ -1,3 +1,4 @@
+/* eslint-disable max-classes-per-file -- the File mock sits beside the FakeAudioRecorder mock in one suite. */
 /* eslint-disable require-await, @typescript-eslint/require-await -- the binding's fakes resolve immediately, so they settle without await */
 import { setAudioModeAsync } from 'expo-audio';
 import * as SecureStore from 'expo-secure-store';
@@ -9,10 +10,14 @@ import {
 } from './native-gateway-voice-input';
 
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
-vi.mock('expo-file-system/legacy', () => ({
-  FileSystemUploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
-  createUploadTask: vi.fn(),
-  deleteAsync: vi.fn(async (): Promise<void> => undefined),
+vi.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
+  File: class {
+    uri: string;
+    constructor(uri: string) {
+      this.uri = uri;
+    }
+  },
 }));
 vi.mock('@/lib/auth/token-owner', () => ({
   getAuthTokenForRequest: vi.fn(async (): Promise<string | null> => 'token-1'),

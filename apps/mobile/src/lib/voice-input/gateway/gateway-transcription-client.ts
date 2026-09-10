@@ -1,8 +1,7 @@
+import { File, UploadType } from 'expo-file-system';
 import { z } from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
-
-import { createUploadTask, FileSystemUploadType } from 'expo-file-system/legacy';
 
 /**
  * The single Kilo gateway entry point for voice transcription. Every call to
@@ -99,42 +98,30 @@ export async function transcribeRecording({
     parameters.language = trimmedLanguage;
   }
 
-  const task = createUploadTask(`${API_BASE_URL}${GATEWAY_TRANSCRIPTIONS_PATH}`, recordingUri, {
-    uploadType: FileSystemUploadType.MULTIPART,
+  const recordingFile = new File(recordingUri);
+  const task = recordingFile.createUploadTask(`${API_BASE_URL}${GATEWAY_TRANSCRIPTIONS_PATH}`, {
+    uploadType: UploadType.MULTIPART,
     fieldName: 'file',
     mimeType: 'audio/mp4',
     parameters,
     headers,
     httpMethod: 'POST',
+    // The task cancels the native request on caller abort and rejects with
+    // an AbortError, which the catch below maps to the caller's outcome.
+    signal,
   });
 
-  // The timeout aborts through its own controller so the catch can read
-  // `aborted` off the signal object: a closure-assigned boolean stays
+  // The timeout aborts through its own controller so the catch can tell our
+  // timeout apart from a caller abort: a closure-assigned boolean stays
   // control-flow-narrowed to its initializer for the type checker.
   const timeoutAbort = new AbortController();
   const timeoutId = setTimeout(() => {
     timeoutAbort.abort();
-    void task.cancelAsync();
+    task.cancel();
   }, TRANSCRIPTION_REQUEST_TIMEOUT_MS);
-  const onCallerAbort = () => {
-    void task.cancelAsync();
-  };
-  signal?.addEventListener('abort', onCallerAbort);
 
   try {
     const response = await task.uploadAsync();
-
-    if (!response) {
-      // A cancelled task resolves without a response. When our own timeout
-      // fired, that cancellation is the timeout surfacing — not a bad body.
-      if (timeoutAbort.signal.aborted) {
-        return { ok: false, isTimeout: true, isNetworkError: false };
-      }
-      // The caller aborted (e.g. unmount) or the task ended without a
-      // response: the caller owns its own abort; otherwise map to
-      // invalid-response if surfaced.
-      return { ok: false, isTimeout: false, isNetworkError: false };
-    }
 
     if (response.status < 200 || response.status >= 300) {
       // A gateway refusal carries its status.
@@ -151,7 +138,7 @@ export async function transcribeRecording({
     }
   } catch {
     if (timeoutAbort.signal.aborted) {
-      // Our own timeout fired; the cancellation surfaces here.
+      // Our own timeout fired; the rejection is that cancellation surfacing.
       return { ok: false, isTimeout: true, isNetworkError: false };
     }
     if (signal?.aborted) {
@@ -159,12 +146,10 @@ export async function transcribeRecording({
       // the outcome; the shape still maps to invalid-response if surfaced.
       return { ok: false, isTimeout: false, isNetworkError: false };
     }
-    // A cancelled task rejects without a status: treat any other rejection
-    // as the upload never having completed.
+    // A task rejection without a status: the upload never completed.
     return { ok: false, isTimeout: false, isNetworkError: true };
   } finally {
     clearTimeout(timeoutId);
-    signal?.removeEventListener('abort', onCallerAbort);
   }
 }
 

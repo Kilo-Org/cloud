@@ -41,9 +41,10 @@ export type GatewayVoiceInputEngineDeps = {
    * Best-effort delete of a recording file once the engine is done with it.
    * `release()` frees the native object, not the file on disk. A failure must
    * never change the session outcome. Declared as a property (not a method) so
-   * the engine can hold a detached reference.
+   * the engine can hold a detached reference; void-returning is allowed because
+   * the modern File API deletes synchronously.
    */
-  deleteRecording: (uri: string) => Promise<void>;
+  deleteRecording: (uri: string) => void | Promise<void>;
   /**
    * Defaults to the real gateway client; tests inject a fake. Declared as a
    * property (not a method) so the engine can hold a detached reference.
@@ -93,7 +94,7 @@ function releaseRecorder(handle: RecorderHandle): void {
  * empty URI means the recorder never produced a file.
  */
 async function deleteRecordingFile(
-  deleteRecording: (uri: string) => Promise<void>,
+  deleteRecording: (uri: string) => void | Promise<void>,
   uri: string | null
 ): Promise<void> {
   if (uri === null || uri === '') {
@@ -112,7 +113,7 @@ async function deleteRecordingFile(
  */
 async function releaseAndDeleteRecording(
   handle: RecorderHandle,
-  deleteRecording: (uri: string) => Promise<void>
+  deleteRecording: (uri: string) => void | Promise<void>
 ): Promise<void> {
   let uri: string | null = null;
   try {
@@ -131,7 +132,7 @@ async function releaseAndDeleteRecording(
  */
 async function discardRecording(
   handle: RecorderHandle,
-  deleteRecording: (uri: string) => Promise<void>
+  deleteRecording: (uri: string) => void | Promise<void>
 ): Promise<void> {
   try {
     await handle.recorder.stop();

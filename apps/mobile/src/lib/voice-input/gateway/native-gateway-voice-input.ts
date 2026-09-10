@@ -1,5 +1,5 @@
 import { AudioModule, AudioQuality, RecordingPresets, setAudioModeAsync } from 'expo-audio';
-import { deleteAsync } from 'expo-file-system/legacy';
+import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 
 import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
@@ -112,10 +112,13 @@ export const gatewayVoiceInputNative = createGatewayVoiceInputEngine({
   readModelId: resolveGatewayTranscriptionModelId,
   readAuthToken: getAuthTokenForRequest,
   readOrganizationId: readStoredOrganizationId,
-  deleteRecording: async (uri: string) => {
+  deleteRecording: (uri: string) => {
     // `release()` frees the native object, not the file: delete the recording
-    // so dictation does not accumulate audio on disk. `idempotent` maps a
-    // missing file to success.
-    await deleteAsync(uri, { idempotent: true });
+    // so dictation does not accumulate audio on disk. The modern File API
+    // deletes synchronously; a missing file is a no-op.
+    const file = new File(uri);
+    if (file.exists) {
+      file.delete();
+    }
   },
 });

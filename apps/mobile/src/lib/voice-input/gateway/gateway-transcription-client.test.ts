@@ -4,14 +4,21 @@ import {
   transcribeRecording,
   TRANSCRIPTION_REQUEST_TIMEOUT_MS,
 } from './gateway-transcription-client';
+/* eslint-disable class-methods-use-this -- the File mock mirrors the instance-only native File surface. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.example.com' }));
 
 const createUploadTaskMock = vi.fn();
-vi.mock('expo-file-system/legacy', () => ({
-  FileSystemUploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
-  createUploadTask: (...args: unknown[]) => createUploadTaskMock(...args),
+const fileUris: string[] = [];
+vi.mock('expo-file-system', () => ({
+  UploadType: { BINARY_CONTENT: 0, MULTIPART: 1 },
+  File: class {
+    createUploadTask = (...args: unknown[]): unknown => createUploadTaskMock(...args);
+    constructor(uri: string) {
+      fileUris.push(uri);
+    }
+  },
 }));
 
 /** The last createUploadTask call, captured for request-shape assertions. */
@@ -29,7 +36,6 @@ function lastTaskCall(): {
 } {
   const call = createUploadTaskMock.mock.calls.at(-1) as [
     string,
-    string,
     {
       uploadType: number;
       fieldName: string;
@@ -39,14 +45,14 @@ function lastTaskCall(): {
       httpMethod: string;
     },
   ];
-  return { url: call[0], fileUri: call[1], options: call[2] };
+  return { url: call[0], fileUri: fileUris.at(-1) ?? '', options: call[1] };
 }
 
 /** Replace the upload outcome for subsequent calls. */
-function mockUpload(implementation: () => Promise<{ status: number; body: string } | null>): void {
+function mockUpload(implementation: () => Promise<{ status: number; body: string }>): void {
   createUploadTaskMock.mockImplementation(() => ({
     uploadAsync: implementation,
-    cancelAsync: vi.fn(),
+    cancel: vi.fn(),
   }));
 }
 
@@ -103,45 +109,27 @@ describe('transcribeRecording', () => {
     expect(lastTaskCall().options.parameters.language).toBeUndefined();
   });
 
-  it('classifies our timeout cancel as a timeout', async () => {
+  it('cancels the task on timeout and classifies it as a timeout', async () => {
     vi.useFakeTimers();
-    // The upload stays pending until the timeout's own cancel rejects it;
-    // the executor hands the rejector out before any await settles.
-    let rejectUpload: (error: Error) => void = vi.fn<() => void>();
-    mockUpload(
-      async () =>
+    // The upload stays pending until the timeout cancels the task; the mock's
+    // cancel rejects the native promise the way the real task does.
+    let rejectUpload: ((error: Error) => void) | undefined = undefined;
+    const cancel = vi.fn(() => {
+      rejectUpload?.(new Error('Task cancelled'));
+    });
+    createUploadTaskMock.mockImplementation(() => ({
+      uploadAsync: async () =>
         new Promise((_resolve, reject) => {
           rejectUpload = reject;
-        })
-    );
+        }),
+      cancel,
+    }));
 
     const pending = transcribeRecording(BASE_INPUT);
     await vi.advanceTimersByTimeAsync(TRANSCRIPTION_REQUEST_TIMEOUT_MS);
-    rejectUpload(new Error('Task cancelled'));
     const result = await pending;
 
-    expect(result).toEqual({ ok: false, isTimeout: true, isNetworkError: false });
-    expect(classifyTranscriptionFailure(result)).toBe('timeout');
-  });
-
-  it('classifies a timeout cancel that resolves without a response as a timeout', async () => {
-    vi.useFakeTimers();
-    // iOS resolves the native upload promise with null on cancel
-    // (NSURLErrorCancelled), so the timeout cancellation can surface as a
-    // resolve without a response instead of a rejection.
-    let resolveUpload: (value: null) => void = vi.fn<() => void>();
-    mockUpload(
-      async () =>
-        new Promise(resolve => {
-          resolveUpload = resolve;
-        })
-    );
-
-    const pending = transcribeRecording(BASE_INPUT);
-    await vi.advanceTimersByTimeAsync(TRANSCRIPTION_REQUEST_TIMEOUT_MS);
-    resolveUpload(null);
-    const result = await pending;
-
+    expect(cancel).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: false, isTimeout: true, isNetworkError: false });
     expect(classifyTranscriptionFailure(result)).toBe('timeout');
   });

@@ -436,6 +436,11 @@ const PrepareSessionSharedFields = {
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),
   model: modelIdSchema.describe('AI model to use'),
+  smallModel: modelIdSchema
+    .optional()
+    .describe(
+      'Optional cheap same-vendor model for title/aux calls (Code Reviewer). When omitted, CLI defaults apply.'
+    ),
   variant: z
     .string()
     .max(50)

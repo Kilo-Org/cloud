@@ -447,6 +447,7 @@ function isSameInitialAdmissionConfiguration(
       JSON.stringify(input.workspace?.sandboxRoute) &&
     metadata.agent?.mode === input.agent.mode &&
     metadata.agent.model === input.agent.model &&
+    metadata.agent.smallModel === input.agent.smallModel &&
     metadata.agent.variant === input.agent.variant &&
     metadata.finalization?.autoCommit === input.finalization?.autoCommit &&
     metadata.finalization?.condenseOnComplete === input.finalization?.condenseOnComplete
@@ -2551,6 +2552,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       agent: {
         mode: input.agent.mode,
         model: input.agent.model,
+        smallModel: input.agent.smallModel,
         variant: input.agent.variant,
         appendSystemPrompt: input.agent.appendSystemPrompt,
       },
@@ -3766,6 +3768,7 @@ export class CloudAgentSession extends DurableObject<WorkerEnv> {
       agent: {
         mode: metadata.agent.mode,
         model: metadata.agent.model,
+        smallModel: metadata.agent.smallModel,
         variant: metadata.agent.variant,
       },
       finalization: {

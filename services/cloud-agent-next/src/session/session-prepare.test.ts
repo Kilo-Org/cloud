@@ -4125,4 +4125,36 @@ describe('prepareInputToSessionCreateRequest clone mapping', () => {
 
     expect(request.runtime).toEqual({ sandboxAllocation: 'isolated-standard' });
   });
+
+  it('maps a Code Reviewer smallModel into the grouped agent selection', () => {
+    const request = prepareInputToSessionCreateRequest({
+      prompt: 'Review the PR',
+      mode: 'code',
+      model: 'anthropic/claude-sonnet-4.6',
+      smallModel: 'anthropic/claude-haiku-4.5',
+      githubRepo: 'acme/repo',
+      shallow: false,
+      devcontainer: false,
+    });
+
+    expect(request.agent).toEqual({
+      mode: 'code',
+      model: 'anthropic/claude-sonnet-4.6',
+      smallModel: 'anthropic/claude-haiku-4.5',
+      variant: undefined,
+    });
+  });
+
+  it('omits smallModel from the grouped agent selection when absent', () => {
+    const request = prepareInputToSessionCreateRequest({
+      prompt: 'Review the PR',
+      mode: 'code',
+      model: 'anthropic/claude-sonnet-4.6',
+      githubRepo: 'acme/repo',
+      shallow: false,
+      devcontainer: false,
+    });
+
+    expect(request.agent).not.toHaveProperty('smallModel');
+  });
 });

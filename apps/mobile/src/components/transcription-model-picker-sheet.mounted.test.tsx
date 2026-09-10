@@ -69,8 +69,17 @@ const hookState = vi.hoisted(() => {
   };
   return { current };
 });
+const hookArgs = vi.hoisted(() => ({ organizationId: undefined as string | undefined }));
 vi.mock('@/lib/hooks/use-transcription-models', () => ({
-  useTranscriptionModels: () => hookState.current,
+  useTranscriptionModels: (organizationId?: string) => {
+    hookArgs.organizationId = organizationId;
+    return hookState.current;
+  },
+}));
+
+const orgState = vi.hoisted(() => ({ organizationId: 'org-1' as string | null }));
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: orgState.organizationId, isLoaded: true }),
 }));
 
 const MODELS = [
@@ -162,6 +171,8 @@ describe('TranscriptionModelPickerSheet', () => {
     routerBack.mockClear();
     secureStore.map.clear();
     writeGatewayTranscriptionModel(null);
+    orgState.organizationId = 'org-1';
+    hookArgs.organizationId = undefined;
     setHookState({
       models: [],
       isLoading: true,
@@ -178,6 +189,24 @@ describe('TranscriptionModelPickerSheet', () => {
   it('renders the sheet with the transcription model title', async () => {
     const renderer = await mountSheet();
     expect(mountPickerSheetProps(renderer).title).toBe('Transcription model');
+    renderer.unmount();
+  });
+
+  it('scopes the model catalogue read to the selected organization', async () => {
+    orgState.organizationId = 'org-42';
+    setHookState({ models: MODELS, isLoading: false, isError: false, error: null });
+    const renderer = await mountSheet();
+
+    expect(hookArgs.organizationId).toBe('org-42');
+    renderer.unmount();
+  });
+
+  it('reads the catalogue unscoped for a personal account', async () => {
+    orgState.organizationId = null;
+    setHookState({ models: MODELS, isLoading: false, isError: false, error: null });
+    const renderer = await mountSheet();
+
+    expect(hookArgs.organizationId).toBeUndefined();
     renderer.unmount();
   });
 

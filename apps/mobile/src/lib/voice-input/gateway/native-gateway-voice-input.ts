@@ -13,6 +13,11 @@ import {
 
 const HIGH_QUALITY = RecordingPresets.HIGH_QUALITY;
 
+/** The organization scope the voice flow reads and uploads under; null is personal. */
+async function readStoredOrganizationId(): Promise<string | null> {
+  return await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
+}
+
 /**
  * The model the gateway engine transcribes with: the stored choice, else the
  * first model the gateway catalogue offers, else null. A catalogue that
@@ -25,7 +30,11 @@ export async function resolveGatewayTranscriptionModelId(): Promise<GatewayTrans
     return stored;
   }
   try {
-    const models = await fetchTranscriptionModels();
+    // Scope the catalogue read to the selected organization: the upload that
+    // follows carries the same organization header, so an unscoped default
+    // could pick a model the scoped upload then rejects.
+    const organizationId = await readStoredOrganizationId();
+    const models = await fetchTranscriptionModels(organizationId ?? undefined);
     return models[0] ?? null;
   } catch {
     return null;
@@ -100,8 +109,5 @@ export const gatewayVoiceInputNative = createGatewayVoiceInputEngine({
   },
   readModelId: resolveGatewayTranscriptionModelId,
   readAuthToken: getAuthTokenForRequest,
-  readOrganizationId: async () => {
-    const value = await SecureStore.getItemAsync(ORGANIZATION_STORAGE_KEY);
-    return value;
-  },
+  readOrganizationId: readStoredOrganizationId,
 });

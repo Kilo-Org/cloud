@@ -11,6 +11,7 @@ import { ChoiceRow } from '@/components/ui/choice-row';
 import { Mic } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTranscriptionModels } from '@/lib/hooks/use-transcription-models';
+import { useOrganization } from '@/lib/organization-context';
 import {
   useGatewayTranscriptionModel,
   useGatewayTranscriptionModelLoaded,
@@ -48,7 +49,12 @@ export function TranscriptionModelPickerSheet() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { models, isLoading, isError, refetch } = useTranscriptionModels();
+  const { organizationId } = useOrganization();
+  // Scope the catalogue to the selected organization so the picker cannot
+  // offer, or check-mark, a model the scoped upload then rejects.
+  const { models, isLoading, isError, refetch } = useTranscriptionModels(
+    organizationId ?? undefined
+  );
   const storedModel = useGatewayTranscriptionModel();
   // With no explicit choice the gateway's first catalogue model is the
   // default, so the check mark lands on the row the engine will run.

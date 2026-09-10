@@ -1,5 +1,6 @@
 /* eslint-disable require-await, @typescript-eslint/require-await -- the binding's fakes resolve immediately, so they settle without await */
 import { setAudioModeAsync } from 'expo-audio';
+import * as SecureStore from 'expo-secure-store';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -191,6 +192,7 @@ describe('resolveGatewayTranscriptionModelId', () => {
   beforeEach(() => {
     storedModel.current = null;
     transcriptionModels.fetchTranscriptionModels.mockReset();
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValue(null);
   });
 
   it('returns the stored model without reading the catalogue', async () => {
@@ -201,6 +203,19 @@ describe('resolveGatewayTranscriptionModelId', () => {
       name: 'Stored Model',
     });
     expect(transcriptionModels.fetchTranscriptionModels).not.toHaveBeenCalled();
+  });
+
+  it('scopes the catalogue read to the stored organization', async () => {
+    vi.mocked(SecureStore.getItemAsync).mockResolvedValueOnce('org-42');
+    transcriptionModels.fetchTranscriptionModels.mockResolvedValue([
+      { id: 'org-model', name: 'Org Model' },
+    ]);
+
+    await expect(resolveGatewayTranscriptionModelId()).resolves.toEqual({
+      id: 'org-model',
+      name: 'Org Model',
+    });
+    expect(transcriptionModels.fetchTranscriptionModels).toHaveBeenCalledWith('org-42');
   });
 
   it('falls back to the first catalogue entry when none is stored', async () => {

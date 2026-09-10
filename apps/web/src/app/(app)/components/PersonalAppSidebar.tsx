@@ -40,11 +40,6 @@ import { useFeatureFlagEnabled } from 'posthog-js/react';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import {
-  DEPLOY_FEATURE_FLAG,
-  DEPLOY_FEATURE_QUERY_STALE_TIME_MS,
-  shouldShowDeployFeature,
-} from '@/lib/user-deployments/feature-access';
 
 const SIDEBAR_PROMO_ELIGIBILITY_STALE_TIME_MS = 5 * 60_000;
 
@@ -63,19 +58,8 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
   const isAutoTriageFeatureEnabled = useFeatureFlagEnabled('auto-triage-feature');
   const isGastownEnabled = useFeatureFlagEnabled('gastown-access');
   const isAppBuilderEnabled = useFeatureFlagEnabled('app-builder-feature');
-  const isDeployFlagEnabled = useFeatureFlagEnabled(DEPLOY_FEATURE_FLAG);
+  const isDeployEnabled = useFeatureFlagEnabled('deploy-feature');
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const { data: hasExistingDeployments } = useQuery(
-    trpc.deployments.hasExistingDeployments.queryOptions(undefined, {
-      enabled: !isDevelopment && isDeployFlagEnabled !== true,
-      staleTime: DEPLOY_FEATURE_QUERY_STALE_TIME_MS,
-    })
-  );
-  const isDeployEnabled = shouldShowDeployFeature({
-    isDevelopment,
-    isFlagEnabled: isDeployFlagEnabled,
-    hasExistingDeployments,
-  });
 
   // Dashboard group
   const dashboardItems: Array<{
@@ -189,7 +173,7 @@ export default function PersonalAppSidebar(props: React.ComponentProps<typeof Si
           { title: 'Auto Fix', icon: Wrench, url: '/auto-fix' },
         ]
       : []),
-    ...(isDeployEnabled
+    ...(isDeployEnabled || isDevelopment
       ? [
           {
             title: 'Deploy',

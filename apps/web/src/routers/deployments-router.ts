@@ -22,10 +22,6 @@ export const deploymentsRouter = createTRPCRouter({
     return deploymentsService.listDeployments({ type: 'user', id: ctx.user.id });
   }),
 
-  hasExistingDeployments: baseProcedure.query(async ({ ctx }) => {
-    return deploymentsService.hasExistingDeployments({ type: 'user', id: ctx.user.id });
-  }),
-
   getDeployment: baseProcedure
     .input(z.object({ id: z.string().uuid() }))
     .query(async ({ ctx, input }) => {

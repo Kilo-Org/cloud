@@ -27,13 +27,6 @@ export const organizationDeploymentsRouter = createTRPCRouter({
     });
   }),
 
-  hasExistingDeployments: organizationMemberProcedure.query(async ({ input }) => {
-    return deploymentsService.hasExistingDeployments({
-      type: 'org',
-      id: input.organizationId,
-    });
-  }),
-
   getDeployment: organizationMemberProcedure
     .input(
       z.object({

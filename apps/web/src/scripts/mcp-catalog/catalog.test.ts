@@ -20,6 +20,7 @@ import {
   buildCatalogRows,
   collectCatalogLeaves,
   generateMissingSummaries,
+  parseKiloCompletion,
   readCommittedSummaries,
   runKiloCompletion,
   type CatalogLeaf,
@@ -248,7 +249,7 @@ describe('mcp-catalog catalog', () => {
       const bin = join(dir, 'fake-kilo');
       writeFileSync(
         bin,
-        `#!/bin/sh\ncat > /dev/null\nprintf '%s\\n' '{"type":"step_start","part":{"type":"step-start"}}' '{"type":"text","part":{"type":"text","text":"{\\"usageAnalytics.probe\\":\\"ok\\"}"}}'\n`,
+        `#!/bin/sh\ncat > /dev/null\nprintf '%s\\n' '{"type":"step_start","part":{"type":"step-start"}}' '{"type":"text","part":{"type":"text","text":"{\\"usageAnalytics.probe\\":\\"ok\\"}","time":{"end":1}}}'\n`,
         { mode: 0o755 }
       );
       const previous = process.env.KILO_BIN;
@@ -262,6 +263,40 @@ describe('mcp-catalog catalog', () => {
         else process.env.KILO_BIN = previous;
         rmSync(dir, { recursive: true, force: true });
       }
+    });
+
+    it('takes only completed text events, ignoring in-progress streaming deltas', () => {
+      // Same contract as services/auto-routing-benchmark/src/kilo-events.ts.
+      // Concatenating the deltas would garble the JSON the dump has to parse.
+      expect(
+        parseKiloCompletion([
+          JSON.stringify({
+            type: 'text',
+            part: { type: 'text', text: '{"a"', time: { start: 1 } },
+          }),
+          JSON.stringify({
+            type: 'text',
+            part: { type: 'text', text: '{"a":1}', time: { end: 2 } },
+          }),
+        ])
+      ).toBe('{"a":1}');
+    });
+
+    it('accepts the flattened top-level event shape', () => {
+      expect(
+        parseKiloCompletion([JSON.stringify({ type: 'text', text: '{"a":1}', time: { end: 2 } })])
+      ).toBe('{"a":1}');
+    });
+
+    it('skips malformed lines without throwing', () => {
+      expect(
+        parseKiloCompletion([
+          'not json',
+          '',
+          '{ broken',
+          JSON.stringify({ type: 'text', part: { type: 'text', text: 'x', time: { end: 1 } } }),
+        ])
+      ).toBe('x');
     });
 
     it('marks a non-zero Kilo CLI exit as retryable and names the failed batch', () => {

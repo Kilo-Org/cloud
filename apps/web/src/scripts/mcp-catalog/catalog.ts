@@ -504,13 +504,48 @@ function isNonRetryableCliFailure(detail: string): boolean {
 }
 
 /**
+ * Reduce the `kilo run --format json` NDJSON stream to the assistant answer.
+ *
+ * Mirrors the in-repo contract in
+ * `services/auto-routing-benchmark/src/kilo-events.ts`: only *completed* text
+ * events count (`part.time.end` set), so in-progress streaming deltas are not
+ * concatenated onto the final text. Both the nested `evt.part.*` and the
+ * flattened `evt.*` shapes are accepted, because the event shape varies
+ * across CLI versions. Malformed lines are skipped, never thrown on.
+ */
+export function parseKiloCompletion(lines: string[]): string {
+  const texts: string[] = [];
+  for (const line of lines) {
+    let event: unknown;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (event === null || typeof event !== 'object') continue;
+    const evt = event as {
+      type?: unknown;
+      text?: unknown;
+      time?: { end?: unknown };
+      part?: { type?: unknown; text?: unknown; time?: { end?: unknown } };
+    };
+    if (evt.type !== 'text') continue;
+    const end = evt.part?.time?.end ?? evt.time?.end;
+    if (end === undefined || end === null) continue;
+    const text = typeof evt.part?.text === 'string' ? evt.part.text : evt.text;
+    if (typeof text === 'string') texts.push(text);
+  }
+  return texts.join('\n');
+}
+
+/**
  * Run one summary completion through the Kilo CLI:
  * `kilo run --model <pinned> --variant <pinned> --format json`.
  *
  * The prompt arrives on stdin, so batch size is never bounded by `ARGV_MAX`.
  * The CLI runs in the OS temp directory so it does not load this repo's
  * project config or agent instructions. Its JSON event stream is reduced to
- * the concatenated assistant text parts.
+ * the concatenated completed assistant text parts.
  *
  * Never logs credentials: stdout is the model reply, stderr is only surfaced
  * (truncated) inside error messages.
@@ -552,26 +587,7 @@ export function runKiloCompletion(prompt: string, batchLabel: string): string {
     );
   }
 
-  const texts: string[] = [];
-  for (const line of (result.stdout ?? '').split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('{')) continue;
-    let event: unknown;
-    try {
-      event = JSON.parse(trimmed);
-    } catch {
-      continue;
-    }
-    const part = (event as { part?: { type?: unknown; text?: unknown } }).part;
-    if (
-      (event as { type?: unknown }).type === 'text' &&
-      part?.type === 'text' &&
-      typeof part.text === 'string'
-    ) {
-      texts.push(part.text);
-    }
-  }
-  const content = texts.join('');
+  const content = parseKiloCompletion((result.stdout ?? '').split('\n'));
   if (content.trim() === '') {
     throw new CatalogSummaryError(
       `Kilo CLI returned no summary completion for ${batchLabel}${detail ? ` — ${detail}` : ''}`,

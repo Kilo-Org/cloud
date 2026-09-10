@@ -58,6 +58,7 @@ import {
 } from '@/components/agents/composer-paste-text';
 import {
   COMPOSER_CHROME_HEIGHT,
+  COMPOSER_INPUT_MAX_HEIGHT,
   COMPOSER_INPUT_PADDING_HORIZONTAL,
   resolveComposerMaxHeight,
   resolveComposerTextContentWidth,
@@ -373,6 +374,7 @@ export function ChatComposer({
     sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
     composerChromeHeight: COMPOSER_CHROME_HEIGHT * fontScale,
     minHeight: inputMinHeight,
+    absoluteMaxHeight: COMPOSER_INPUT_MAX_HEIGHT * fontScale,
   });
 
   // Track the keyboard's reported height so the remaining-space cap follows it.
@@ -1127,128 +1129,136 @@ export function ChatComposer({
       </Animated.View>
     ) : null;
 
+  // Landscape safe area: pad the whole composer content (suggestion card,
+  // toolbar, attachment strip, voice row, counter, input row with the send
+  // control) by the sensor side insets while the BlurBar background stays
+  // full-bleed. The insets are 0 in portrait, so portrait geometry is
+  // unchanged, and the rotation applies as a style-only re-render — no
+  // remount, so the uncontrolled input keeps its text.
   return (
     <BlurBar>
-      {measure.measureElement}
+      <View style={{ paddingLeft: insets.left, paddingRight: insets.right }}>
+        {measure.measureElement}
 
-      {suggestionRow}
+        {suggestionRow}
 
-      {!suggestionRow && control.showToolbar ? (
-        <Animated.View
-          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
-        >
-          <ChatToolbar
-            mode={mode}
-            onModeChange={onModeChange}
-            model={model}
-            variant={variant}
-            modelOptions={modelOptions}
-            onModelSelect={onModelSelect}
-            disabled={control.toolbarDisabled}
-            onPaste={attachmentsEnabled ? pasteClipboard : undefined}
-            pasteDisabled={!control.inputEditable}
-            customOptions={customOptions}
-            modelLocked={modelLocked}
-            modelLockLabel={modelLockLabel}
-          />
-        </Animated.View>
-      ) : null}
-
-      {showAttachments ? (
-        <AttachmentPreviewStrip
-          attachments={upload.attachments}
-          onRemove={removeAttachment}
-          onRetry={retryAttachment}
-          onMove={moveAttachment}
-          onReorder={reorderAttachments}
-        />
-      ) : null}
-
-      {upload.attachments.some(attachment => attachment.metadataStripFailed === true) ? (
-        <AccessibleStatus
-          tone="error"
-          message={i18n.t('agentChat.composer.photoMetadataNotRemoved')}
-          className="mb-2 px-4 text-xs"
-        />
-      ) : null}
-
-      {slashCommandSuggestions.length > 0 && !isSending ? (
-        <Animated.View
-          entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
-          exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
-        >
-          <SlashCommandSuggestions
-            commands={slashCommandSuggestions}
-            onSelect={handleSelectSlashCommand}
-          />
-        </Animated.View>
-      ) : null}
-
-      <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>
-        <VoiceInputStatus status={voiceInput.status} />
-      </View>
-
-      {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
-        <View className="flex-row justify-end px-4 pb-1">
-          <Text
-            className="text-xs font-normal text-muted-foreground"
-            accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
-              count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
-            })}
+        {!suggestionRow && control.showToolbar ? (
+          <Animated.View
+            entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+            exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
           >
-            {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount}
-          </Text>
-        </View>
-      ) : null}
+            <ChatToolbar
+              mode={mode}
+              onModeChange={onModeChange}
+              model={model}
+              variant={variant}
+              modelOptions={modelOptions}
+              onModelSelect={onModelSelect}
+              disabled={control.toolbarDisabled}
+              onPaste={attachmentsEnabled ? pasteClipboard : undefined}
+              pasteDisabled={!control.inputEditable}
+              customOptions={customOptions}
+              modelLocked={modelLocked}
+              modelLockLabel={modelLockLabel}
+            />
+          </Animated.View>
+        ) : null}
 
-      <GestureDetector gesture={dismissKeyboardPan}>
-        <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
-          <ChatComposerInputRow
-            key={inputEpoch}
-            attachmentsEnabled={attachmentsEnabled}
-            canSend={control.canSend}
-            disabled={disabled}
-            hasSendableContent={control.hasSendableContent}
-            inputAccessibilityDisabled={control.inputAccessibilityDisabled}
-            inputEditable={control.inputEditable}
-            inputRef={inputRef}
-            isSending={isSending}
-            isStreaming={isStreaming}
-            maxInputHeight={inputMaxHeight}
-            measureHeight={measure.height}
-            onAddAttachment={() => {
-              void handleAddAttachment();
-            }}
-            onChangeText={handleChangeText}
-            onInputBlur={() => {
-              inputFocusedRef.current = false;
-              setIsFocused(false);
-            }}
-            onInputFocus={() => {
-              inputFocusedRef.current = true;
-              setIsFocused(true);
-            }}
-            onInputLayout={handleInputLayout}
-            onInsertNewline={handleInsertNewline}
-            onSelectionChange={handleSelectionChange}
-            onStop={handleStop}
-            onSubmit={() => {
-              void submit();
-            }}
-            onToggleVoice={() => {
-              void voiceInput.toggle();
-            }}
-            paperclipDisabled={control.paperclipDisabled}
-            placeholder={placeholder}
-            returnSendsMessage={returnSendsMessage}
-            textInputStyle={textInputStyle}
-            voiceDisabled={control.voiceDisabled}
-            voiceInputAvailable={voiceInput.available}
-            voiceInputStatus={voiceInput.status}
+        {showAttachments ? (
+          <AttachmentPreviewStrip
+            attachments={upload.attachments}
+            onRemove={removeAttachment}
+            onRetry={retryAttachment}
+            onMove={moveAttachment}
+            onReorder={reorderAttachments}
           />
+        ) : null}
+
+        {upload.attachments.some(attachment => attachment.metadataStripFailed === true) ? (
+          <AccessibleStatus
+            tone="error"
+            message={i18n.t('agentChat.composer.photoMetadataNotRemoved')}
+            className="mb-2 px-4 text-xs"
+          />
+        ) : null}
+
+        {slashCommandSuggestions.length > 0 && !isSending ? (
+          <Animated.View
+            entering={selectReducedMotionEntrance(reducedMotion, FadeIn.duration(150))}
+            exiting={selectReducedMotionEntrance(reducedMotion, FadeOut.duration(100))}
+          >
+            <SlashCommandSuggestions
+              commands={slashCommandSuggestions}
+              onSelect={handleSelectSlashCommand}
+            />
+          </Animated.View>
+        ) : null}
+
+        <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>
+          <VoiceInputStatus status={voiceInput.status} />
         </View>
-      </GestureDetector>
+
+        {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount <= COMPOSER_COUNTER_VISIBLE_REMAINING ? (
+          <View className="flex-row justify-end px-4 pb-1">
+            <Text
+              className="text-xs font-normal text-muted-foreground"
+              accessibilityLabel={i18n.t('agentChat.composer.charactersRemaining', {
+                count: CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount,
+              })}
+            >
+              {CLOUD_AGENT_PROMPT_MAX_LENGTH - characterCount}
+            </Text>
+          </View>
+        ) : null}
+
+        <GestureDetector gesture={dismissKeyboardPan}>
+          <View collapsable={false} className="w-full" {...androidDismissKeyboardTouchProps}>
+            <ChatComposerInputRow
+              key={inputEpoch}
+              attachmentsEnabled={attachmentsEnabled}
+              canSend={control.canSend}
+              disabled={disabled}
+              hasSendableContent={control.hasSendableContent}
+              inputAccessibilityDisabled={control.inputAccessibilityDisabled}
+              inputEditable={control.inputEditable}
+              inputRef={inputRef}
+              isSending={isSending}
+              isStreaming={isStreaming}
+              maxInputHeight={inputMaxHeight}
+              measureHeight={measure.height}
+              onAddAttachment={() => {
+                void handleAddAttachment();
+              }}
+              onChangeText={handleChangeText}
+              onInputBlur={() => {
+                inputFocusedRef.current = false;
+                setIsFocused(false);
+              }}
+              onInputFocus={() => {
+                inputFocusedRef.current = true;
+                setIsFocused(true);
+              }}
+              onInputLayout={handleInputLayout}
+              onInsertNewline={handleInsertNewline}
+              onSelectionChange={handleSelectionChange}
+              onStop={handleStop}
+              onSubmit={() => {
+                void submit();
+              }}
+              onToggleVoice={() => {
+                void voiceInput.toggle();
+              }}
+              paperclipDisabled={control.paperclipDisabled}
+              placeholder={placeholder}
+              returnSendsMessage={returnSendsMessage}
+              textInputStyle={textInputStyle}
+              voiceDisabled={control.voiceDisabled}
+              voiceInputAvailable={voiceInput.available}
+              voiceInputStatus={voiceInput.status}
+            />
+          </View>
+        </GestureDetector>
+      </View>
     </BlurBar>
   );
 }

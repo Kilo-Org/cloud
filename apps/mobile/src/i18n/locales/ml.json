@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Kilo Gateway വഴിയുള്ള ശബ്ദം ടെക്സ്റ്റാക്കൽ",
+    "gatewayTranscriptionSubtitle": "ഉപകരണത്തിന്റെ സ്പീച്ച് റെക്കഗ്നിഷന് പകരം Kilo Gateway മോഡൽ ഉപയോഗിച്ച് ശബ്ദ ഇൻപുട്ട് ടെക്സ്റ്റാക്കുക. നിങ്ങളുടെ റെക്കോർഡിംഗ് Kilo Gateway-ലേക്ക് അയയ്ക്കുന്നു.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "പുൾ റിക്വസ്റ്റ് ലഭ്യമല്ല",
@@ -2568,7 +2571,13 @@
     "languageNotInstalledMessage": "{{language}}-നുള്ള ഓഫ്‌ലൈൻ സംഭാഷണ ഫയലുകൾ ഈ ഫോണിൽ ഇൻസ്റ്റാൾ ചെയ്തിട്ടില്ല. അവ ഡൗൺലോഡ് ചെയ്യുക, പിന്നീട് ശബ്ദ ഇൻപുട്ട് വീണ്ടും ശ്രമിക്കുക.",
     "downloadOfflineModel": "ഡൗൺലോഡ്",
     "offlineModelDownloadScheduled": "ഓഫ്‌ലൈൻ സംഭാഷണ ഫയലുകൾ പശ്ചാത്തലത്തിൽ ഡൗൺലോഡ് ചെയ്യപ്പെടും. പിന്നീട് ശബ്ദ ഇൻപുട്ട് വീണ്ടും ശ്രമിക്കുക.",
-    "listeningStopped": "കേൾക്കുന്നത് നിർത്തി."
+    "listeningStopped": "കേൾക്കുന്നത് നിർത്തി.",
+    "transcribing": "ടെക്സ്റ്റാക്കുന്നു...",
+    "gatewayUnreachable": "Kilo Gateway-നെ ബന്ധപ്പെടാനായില്ല. നിങ്ങളുടെ കണക്ഷൻ പരിശോധിച്ച് വീണ്ടും ശ്രമിക്കുക.",
+    "gatewayTimeout": "ശബ്ദം ടെക്സ്റ്റാക്കാൻ വളരെ സമയമെടുത്തു. വീണ്ടും ശ്രമിക്കുക.",
+    "gatewayModelUnavailable": "ഈ ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ ലഭ്യമല്ല. മുൻഗണനകളിൽ മറ്റൊന്ന് തിരഞ്ഞെടുക്കുക.",
+    "gatewaySignInRequired": "Kilo Gateway വഴിയുള്ള ടെക്സ്റ്റാക്കൽ ഉപയോഗിക്കാൻ സൈൻ ഇൻ ചെയ്യുക.",
+    "gatewayNoModel": "ആദ്യം മുൻഗണനകളിൽ ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ തിരഞ്ഞെടുക്കുക."
   },
   "share": {
     "title": "Kilo-യിലേക്ക് പങ്കിടുക",
@@ -2950,5 +2959,12 @@
     "needsInput": "നിങ്ങളുടെ പ്രതികരണം വേണം",
     "channelName": "സജീവ ഏജന്റുകൾ",
     "activityKitDisabledBody": "ലോക്ക് സ്ക്രീനിൽ സജീവ ഏജന്റുകളെ കാണാൻ ക്രമീകരണങ്ങളിൽ തത്സമയ പ്രവർത്തനങ്ങൾ പ്രവർത്തനക്ഷമമാക്കുക."
+  },
+  "transcriptionModel": {
+    "title": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡൽ",
+    "noneChosen": "ഒന്നും തിരഞ്ഞെടുത്തിട്ടില്ല",
+    "emptyTitle": "ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകളില്ല",
+    "emptyDescription": "Kilo Gateway ഇപ്പോൾ ശബ്ദം ടെക്സ്റ്റാക്കാൻ മോഡലുകൾ നൽകുന്നില്ല.",
+    "loadFailed": "ശബ്ദം ടെക്സ്റ്റാക്കുന്ന മോഡലുകൾ ലോഡ് ചെയ്യാനായില്ല."
   }
 }

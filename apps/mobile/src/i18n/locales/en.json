@@ -247,7 +247,10 @@
     "featureFlagsBuild": "v{{version}}",
     "featureFlagApplied": "remote · ≥ {{min}}",
     "featureFlagSkipped": "default · < {{min}}",
-    "featureFlagNotLoaded": "default · not loaded"
+    "featureFlagNotLoaded": "default · not loaded",
+    "gatewayTranscription": "Gateway transcription",
+    "gatewayTranscriptionSubtitle": "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
+    "transcriptionModel": "$t(transcriptionModel.title)"
   },
   "prReview": {
     "pullRequestUnavailable": "Pull request unavailable",
@@ -2584,7 +2587,13 @@
     "languageNotInstalledTitle": "Voice input for {{language}} isn't ready",
     "languageNotInstalledMessage": "The {{language}} offline speech files aren't installed on this phone. Download them, then try voice input again.",
     "downloadOfflineModel": "Download",
-    "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later."
+    "offlineModelDownloadScheduled": "The offline speech files will download in the background. Try voice input again later.",
+    "transcribing": "Transcribing...",
+    "gatewayUnreachable": "Couldn't reach the Kilo gateway. Check your connection and try again.",
+    "gatewayTimeout": "Transcription took too long. Try again.",
+    "gatewayModelUnavailable": "This transcription model isn't available. Pick another one in Preferences.",
+    "gatewaySignInRequired": "Sign in to use gateway transcription.",
+    "gatewayNoModel": "Choose a transcription model in Preferences first."
   },
   "share": {
     "title": "Share to Kilo",
@@ -2950,5 +2959,12 @@
     "needsInput": "Needs input",
     "channelName": "Active agents",
     "activityKitDisabledBody": "Turn on Live Activities in Settings to see Active Agents on the Lock Screen."
+  },
+  "transcriptionModel": {
+    "title": "Transcription model",
+    "noneChosen": "None chosen",
+    "emptyTitle": "No transcription models",
+    "emptyDescription": "The gateway offers no transcription models right now.",
+    "loadFailed": "Couldn't load transcription models."
   }
 }

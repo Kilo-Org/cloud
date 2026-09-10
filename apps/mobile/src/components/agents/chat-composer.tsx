@@ -299,7 +299,8 @@ export function ChatComposer({
   // mounts with editable=true from the start. Draft text is restored after
   // remount.
   const [inputEpoch, setInputEpoch] = useState(0);
-  const pendingDraftRestoreRef = useRef<string | null>(null);
+  // Armed by handleStop; the remount effect restores the live text once.
+  const pendingDraftRestoreRef = useRef(false);
   const stopRemountPhaseRef = useRef<StopRemountPhase>('idle');
   const [stopCompleted, setStopCompleted] = useState(false);
   const stopGenerationRef = useRef(0);
@@ -460,11 +461,18 @@ export function ChatComposer({
   }, []);
 
   useEffect(() => {
-    const draft = pendingDraftRestoreRef.current;
-    if (draft === null) {
+    if (!pendingDraftRestoreRef.current) {
       return;
     }
-    pendingDraftRestoreRef.current = null;
+    pendingDraftRestoreRef.current = false;
+    // Read the live text at remount time, never the stop-tap snapshot: the
+    // gateway transcript lands after Stop (the upload resolves post-stop),
+    // so a stop-time snapshot is the pre-transcript text. Restoring it — or
+    // skipping the restore when it is empty — left the remounted row blank
+    // while the live ref and the durable draft kept the transcript, and the
+    // next dictation then appended to the hidden text: the draft showed the
+    // same transcript twice (spot check e12-back).
+    const draft = textRef.current;
     if (!draft) {
       return;
     }
@@ -1053,7 +1061,10 @@ export function ChatComposer({
 
   function handleStop() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    pendingDraftRestoreRef.current = textRef.current;
+    // Arm the remount restore; the remount effect reads the live text, so
+    // a transcript that lands between this tap and the remount is kept (the
+    // gateway upload resolves after Stop).
+    pendingDraftRestoreRef.current = true;
     Keyboard.dismiss();
     setIsFocused(false);
     // Arm the state machine and clear the completion flag.  The effect
@@ -1194,7 +1205,14 @@ export function ChatComposer({
           </Animated.View>
         ) : null}
 
-        <View className={cn('px-3', voiceInput.status === 'listening' ? 'pb-1' : 'pb-0')}>
+        <View
+          className={cn(
+            'px-3',
+            voiceInput.status === 'listening' || voiceInput.status === 'transcribing'
+              ? 'pb-1'
+              : 'pb-0'
+          )}
+        >
           <VoiceInputStatus status={voiceInput.status} />
         </View>
 

@@ -1,7 +1,7 @@
 import { adminProcedure, createTRPCRouter } from '@/lib/trpc/init';
 import { db } from '@/lib/drizzle';
 import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/schema';
-import { and, desc, eq, gte, isNotNull, lt, sql, type SQL } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, lt, or, sql, type SQL } from 'drizzle-orm';
 import * as z from 'zod';
 import {
   CloudAgentFailureReasonSchema,
@@ -191,8 +191,19 @@ export const adminCloudAgentNextRouter = createTRPCRouter({
         .from(cloud_agent_sessions)
         .where(
           and(
-            gte(cloud_agent_sessions.created_at, input.startDate),
-            lt(cloud_agent_sessions.created_at, input.endDate),
+            // Setup rate denominator: sessions exposed to setup in the window —
+            // created in it, or whose session-level setup failure occurred in it.
+            // The failure set (failure_at) is always a subset of this population.
+            or(
+              and(
+                gte(cloud_agent_sessions.created_at, input.startDate),
+                lt(cloud_agent_sessions.created_at, input.endDate)
+              ),
+              and(
+                gte(cloud_agent_sessions.failure_at, input.startDate),
+                lt(cloud_agent_sessions.failure_at, input.endDate)
+              )
+            ),
             retainedSessionCondition()
           )
         ),

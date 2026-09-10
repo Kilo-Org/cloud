@@ -212,13 +212,13 @@ describe('adminCloudAgentNextRouter', () => {
       completedRuns: 1,
       failedRuns: 2,
       interruptedRuns: 1,
-      sessionsObserved: 3,
+      sessionsObserved: 4,
       setupFailures: 2,
       platformFailures: 1,
       userFailures: 2,
       unknownFailures: 1,
       runFailureRate: 2 / 3,
-      setupFailureRate: 2 / 3,
+      setupFailureRate: 2 / 4,
     });
     expect(health.topErrors).toEqual(
       expect.arrayContaining([

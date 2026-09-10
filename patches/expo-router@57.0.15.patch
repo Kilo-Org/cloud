@@ -1,6 +1,3 @@
-diff --git a/android/src/main/java/expo/modules/router/ExpoRouterModule.kt b/android/src/main/java/expo/modules/router/ExpoRouterModule.kt
-deleted file mode 100644
-index 369cd65886415cb894b858e38604dc59b5c6ba95..0000000000000000000000000000000000000000
 diff --git a/build/fork/getStateFromPath-forks.js b/build/fork/getStateFromPath-forks.js
 index 63374a73c024945b5b7dc9db410ebb248f1b67e1..1e31faa0cebd6b8a37801328f1c1841b3c816804 100644
 --- a/build/fork/getStateFromPath-forks.js

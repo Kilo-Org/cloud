@@ -40,6 +40,12 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/agents/model-selector', () => ({
   ModelPickerOptionRow: 'ModelPickerOptionRow',
 }));
+// RepoPickerScreen reads the organization scope for its Bitbucket note; the
+// real context pulls in expo-secure-store, which the node environment cannot
+// load, so the scope rides through this mock (personal, like the fixtures).
+vi.mock('@/lib/organization-context', () => ({
+  useOrganization: () => ({ organizationId: null }),
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/hooks/use-model-preferences', () => ({
   useModelPreferences: () => ({ favorites: [], addFavorite: vi.fn(), removeFavorite: vi.fn() }),

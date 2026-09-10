@@ -9,6 +9,7 @@ import { EmptyState } from '@/components/empty-state';
 import { PickerSheet } from '@/components/picker-sheet';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useOrganization } from '@/lib/organization-context';
 import { REPO_PLATFORM_LABEL_KEYS, type RepoOption } from '@/lib/picker-bridge';
 import { repoPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
@@ -23,6 +24,7 @@ export default function RepoPickerScreen() {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [bridge, setBridge] = useState(() => repoPickerSlot.get(UNFENCED_ROUTE_KEY));
+  const { organizationId } = useOrganization();
 
   const bridgeRef = useRef(bridge);
   useRouteRegistry(UNFENCED_ROUTE_KEY);
@@ -191,14 +193,14 @@ export default function RepoPickerScreen() {
   /**
    * Personal Bitbucket never lists repositories (organization-only), so the
    * grouped list would end at GitLab with nothing explaining the gap. The
-   * note renders once, after the provider sections, whenever the picker has
-   * rows but no Bitbucket section; a connected org's rows suppress it.
+   * note is the PERSONAL-context explanation the owner request asks for: in
+   * an organization context the copy would be wrong — Bitbucket is available
+   * there, and the form's connect card (or the connected org's rows) already
+   * says which state the user is in — so the note renders only in personal
+   * scope, whenever rows exist and the search box is empty.
    */
   function renderBitbucketNote() {
-    if (search.trim() || !bridge) {
-      return null;
-    }
-    if (bridge.sections.some(section => section.key === 'bitbucket')) {
+    if (search.trim() || !bridge || organizationId !== null) {
       return null;
     }
     return (

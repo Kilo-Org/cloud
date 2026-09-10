@@ -110,6 +110,10 @@ export default function ProviderPrReviewLayout() {
             instead of a retry that could not succeed. */}
         <PrReviewConnectGate platform={ref.platform} organizationId={organizationId}>
           <Stack screenLayout={appUnlockScreenLayout} screenOptions={{ headerShown: false }}>
+            {/* Register the overview first: unregistered routes sort after
+                registered siblings, so without this the initial screen is the
+                comment-composer formSheet instead of the PR overview. */}
+            <Stack.Screen name="index" />
             {/* The three write sheets (s6) are siblings of the GitHub route's
                 sheets: they mount inside this layout, so they see the provider
                 scope and this PR's single `PendingReviewProvider` queue. */}

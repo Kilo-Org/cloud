@@ -7,15 +7,16 @@
 // cursor its own provider handed back, and a source that has run out simply
 // stops contributing rows.
 //
-// A provider the user has not connected is never queried: the GitLab and
-// Bitbucket sources stay disabled until their connection status says so, so
-// a GitHub-only user sees no provider errors at all.
+// A provider the user has not connected is never queried: every source stays
+// disabled until its connection status says so, so a GitHub-only user sees no
+// provider errors at all and a GitLab- or Bitbucket-only user sees no GitHub
+// errors.
 //
 // `mergeProviderInboxSources` is pure so the merge, the sort and the
 // partial-failure rules are testable without mounting the hook.
 
 import { type ProviderPrInboxItem } from '@kilocode/app-shared/provider-review';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
 import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
@@ -227,18 +228,36 @@ export function buildBitbucketInboxQueryOptions(
 }
 
 /**
- * The merged inbox. GitHub keeps `usePrInbox` untouched; the two provider
- * sources are gated on their connection status so an unconnected provider
- * is never called.
+ * The merged inbox. Every source is gated on its own connection status so an
+ * unconnected provider is never called: GitHub through the same user
+ * authorization the connect gate checks, GitLab and Bitbucket through the s4
+ * integration status.
  */
 export function useProviderInbox(enabled: boolean) {
   const trpc = useTRPC();
   const { organizationId } = useOrganization();
   const scope = organizationId ?? PERSONAL_SCOPE;
+  // GitHub's own connection status (separate from a per-org App install): the
+  // entry screen's gate is a pass-through, so without this gate a GitLab- or
+  // Bitbucket-only user's inbox would fire `githubPrReview.listInbox`, get
+  // PRECONDITION_FAILED, and render a permanent "couldn't load more" retry —
+  // or, with no other provider answering, blank the whole list behind a
+  // GitHub reconnect notice. While the status is pending the source stays in
+  // the merge as pending (query disabled), so the list never flashes the
+  // empty state before its statuses resolve.
+  const githubAuthorization = useQuery(trpc.githubApps.getUserAuthorization.queryOptions());
+  const githubConnected = githubAuthorization.data?.connected === true;
+  // A FAILED first status fetch leaves the connection UNKNOWN, not
+  // disconnected: the source stays active and contributes the status error
+  // (a retryable first-page failure) instead of silently disabling GitHub
+  // and flashing the empty state behind a network blip. Once the query has
+  // data, a later background failure keeps the known state.
+  const githubStatusFailed = githubAuthorization.isError && githubAuthorization.data === undefined;
+  const githubEnabled = enabled && githubConnected;
   const gitlabStatus = useGitLabStatus(scope);
   const bitbucketReadiness = useBitbucketReadiness(scope);
 
-  const github = usePrInbox(enabled);
+  const github = usePrInbox(githubEnabled);
   const gitlabEnabled = enabled && gitlabStatus.data?.connected === true;
   const bitbucketEnabled = enabled && bitbucketReadiness.data?.connected === true;
   const gitlab = useInfiniteQuery(
@@ -262,17 +281,29 @@ export function useProviderInbox(enabled: boolean) {
 
   const githubSource: ProviderInboxSource = {
     platform: 'github',
-    enabled,
+    // In the merge, "enabled" means "contributes rows, its own pending, or
+    // its own failure": while the connection status is still resolving the
+    // source stays active as pending (the query itself is disabled), so a
+    // cold open cannot flash the empty state before the statuses settle; a
+    // FAILED status stays active as an error for the same reason — unknown
+    // is not disconnected.
+    enabled: enabled && (githubAuthorization.isPending || githubStatusFailed || githubConnected),
     rows: githubRows,
-    isPending: github.query.isPending,
+    // The gated inbox query is permanently pending while it is disabled, so
+    // only a connected GitHub may contribute that pending here; a failed
+    // status must report settled, or its error would never surface.
+    isPending: githubAuthorization.isPending || (githubConnected && github.query.isPending),
     hasLoadedPages: (github.query.data?.pages.length ?? 0) > 0,
-    error: github.query.error,
+    error: githubStatusFailed ? githubAuthorization.error : github.query.error,
     hasNextPage: github.query.hasNextPage,
     isFetchingNextPage: github.query.isFetchingNextPage,
   };
   const gitlabSource: ProviderInboxSource = {
     platform: 'gitlab',
-    enabled: gitlabEnabled,
+    // Active as pending while the integration status resolves: the GitHub
+    // status answering first (either way) must not leave an empty merge and
+    // flash the "No review requests" state before GitLab's rows can load.
+    enabled: gitlabEnabled || (enabled && gitlabStatus.isPending),
     rows: gitlabRows,
     isPending: gitlab.isPending,
     hasLoadedPages: (gitlabPages?.length ?? 0) > 0,
@@ -282,7 +313,11 @@ export function useProviderInbox(enabled: boolean) {
   };
   const bitbucketSource: ProviderInboxSource = {
     platform: 'bitbucket',
-    enabled: bitbucketEnabled,
+    // Same pending arm as GitLab, but org-only: Bitbucket's readiness query
+    // is disabled (and therefore permanently pending) in personal scope,
+    // where the provider itself is organization-only.
+    enabled:
+      bitbucketEnabled || (enabled && organizationId !== null && bitbucketReadiness.isPending),
     rows: bitbucketRows,
     isPending: bitbucket.isPending,
     hasLoadedPages: (bitbucketPages?.length ?? 0) > 0,
@@ -306,14 +341,33 @@ export function useProviderInbox(enabled: boolean) {
   }, [github.query, gitlab, bitbucket, gitlabEnabled, bitbucketEnabled]);
 
   const refetch = useCallback(() => {
-    void github.query.refetch();
+    // `refetch()` bypasses `enabled`, so each arm checks the same gate its
+    // query options use — an unconnected provider is never called, even from
+    // the empty-state retry. The GitHub status is the gate itself: the
+    // empty-state retry re-checks it, so a connection made elsewhere (or a
+    // status that only failed on a network blip) recovers on the next pull.
+    if (enabled) {
+      void githubAuthorization.refetch();
+    }
+    if (githubEnabled) {
+      void github.query.refetch();
+    }
     if (gitlabEnabled) {
       void gitlab.refetch();
     }
     if (bitbucketEnabled) {
       void bitbucket.refetch();
     }
-  }, [github.query, gitlab, bitbucket, gitlabEnabled, bitbucketEnabled]);
+  }, [
+    enabled,
+    github.query,
+    githubAuthorization,
+    githubEnabled,
+    gitlab,
+    gitlabEnabled,
+    bitbucket,
+    bitbucketEnabled,
+  ]);
 
   // The "couldn't load more" retry: it must load the page that FAILED, not
   // re-run the whole inbox. Each failed provider gets exactly the call its
@@ -322,14 +376,28 @@ export function useProviderInbox(enabled: boolean) {
   // a memo keyed on the query results would fire the previous render's
   // decision whenever only an `enabled` flag moved.
   const retryFailedPages = () => {
-    runInboxRetry(githubSource, github.query);
+    // A failed GitHub STATUS has no inbox page to advance — the inbox query
+    // never ran, and firing it blind for an unknown connection is the exact
+    // error this gate exists to prevent. The retry reloads the status.
+    if (githubStatusFailed) {
+      void githubAuthorization.refetch();
+    } else {
+      runInboxRetry(githubSource, github.query);
+    }
     runInboxRetry(gitlabSource, gitlab);
     runInboxRetry(bitbucketSource, bitbucket);
   };
 
   return {
     ...merged,
-    isFetching: github.query.isFetching || gitlab.isFetching || bitbucket.isFetching,
+    // The status query is part of the retry surface: the empty-state CTA
+    // shows its retrying state from this, and a failed status retry runs
+    // THROUGH the status query.
+    isFetching:
+      githubAuthorization.isFetching ||
+      github.query.isFetching ||
+      gitlab.isFetching ||
+      bitbucket.isFetching,
     fetchNextPage,
     retryFailedPages,
     refetch,

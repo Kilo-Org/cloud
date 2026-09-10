@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';
-import { db, pool } from '@/lib/drizzle';
+import { cleanupDbForTest, db, pool } from '@/lib/drizzle';
 import {
   repository_customizations,
   platform_integrations,
   kilocode_users,
   organizations,
+  github_app_installations,
 } from '@kilocode/db/schema';
 import { and, eq } from 'drizzle-orm';
 import {
@@ -13,6 +14,7 @@ import {
   deleteIntegrationForOwner,
   createPendingIntegration,
   findIntegrationByInstallationId,
+  findGitHubBotLinkIntegrations,
   getRepositoryCustomization,
   listRepositoryCustomizations,
   suspendIntegration,
@@ -25,6 +27,7 @@ import {
   upsertPlatformIntegrationForOwner,
 } from './platform-integrations';
 import type { Owner } from '../core/types';
+import { insertTestUser } from '@/tests/helpers/user.helper';
 
 const INSTALLATION_ID = `test-github-install-${Date.now()}`;
 
@@ -982,6 +985,102 @@ describe('upsertPlatformIntegrationForOwner', () => {
       expect(matched?.integration_status).toBe('active');
       expect(sibling?.integration_status).toBe('suspended');
     });
+  });
+});
+
+describe('findGitHubBotLinkIntegrations', () => {
+  afterEach(cleanupDbForTest);
+
+  test('resolves exact shared associations and rejects ambiguous, wrong, or disconnected choices', async () => {
+    const userA = (await insertTestUser()).id;
+    const userB = (await insertTestUser()).id;
+    const [canonical] = await db
+      .insert(github_app_installations)
+      .values({
+        github_app_type: 'standard',
+        installation_id: '881122',
+        lifecycle_state: 'active',
+        sharing_mode: 'web_cloud_agent',
+      })
+      .returning();
+    const associations = await db
+      .insert(platform_integrations)
+      .values([
+        {
+          owned_by_user_id: userA,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '881122',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+        {
+          owned_by_user_id: userB,
+          platform: 'github',
+          integration_type: 'app',
+          platform_installation_id: '881122',
+          github_app_type: 'standard',
+          github_installation_id: canonical.id,
+          integration_status: 'active',
+        },
+      ])
+      .returning();
+
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([expect.objectContaining({ id: associations[0]!.id })]);
+    await expect(
+      findGitHubBotLinkIntegrations({ installationId: '881122', appType: 'standard' })
+    ).resolves.toEqual([]);
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: crypto.randomUUID(),
+      })
+    ).resolves.toEqual([]);
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'lite',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+
+    await db
+      .update(platform_integrations)
+      .set({ github_disconnected_at: new Date().toISOString() })
+      .where(eq(platform_integrations.id, associations[0]!.id));
+    await expect(
+      findGitHubBotLinkIntegrations({
+        installationId: '881122',
+        appType: 'standard',
+        platformIntegrationId: associations[0]!.id,
+      })
+    ).resolves.toEqual([]);
+  });
+
+  test('accepts one true legacy Standard/null association', async () => {
+    const userId = (await insertTestUser()).id;
+    const [legacy] = await db
+      .insert(platform_integrations)
+      .values({
+        owned_by_user_id: userId,
+        platform: 'github',
+        integration_type: 'app',
+        platform_installation_id: '881123',
+        github_app_type: null,
+        integration_status: 'active',
+      })
+      .returning();
+    await expect(
+      findGitHubBotLinkIntegrations({ installationId: '881123', appType: 'standard' })
+    ).resolves.toEqual([expect.objectContaining({ id: legacy.id })]);
   });
 });
 

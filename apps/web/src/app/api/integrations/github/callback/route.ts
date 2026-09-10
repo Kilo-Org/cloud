@@ -24,7 +24,7 @@ import {
 import { ensureOrganizationAccess } from '@/routers/organizations/utils';
 import {
   createPendingIntegration,
-  findIntegrationByInstallationId,
+  findGitHubBotLinkIntegrations,
   findIntegrationByInstallationIdForOwner,
   upsertPlatformIntegrationForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -47,6 +47,7 @@ import {
   type InstallStateRejectionReason,
 } from '@/lib/integrations/github/install-state';
 import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
+import { isGitHubSharedInstallationAdmissionEnabled } from '@/lib/integrations/github/multiple-installations';
 
 const appendQueryParam = (path: string, queryParam: string): string =>
   `${path}${path.includes('?') ? '&' : '?'}${queryParam}`;
@@ -102,11 +103,18 @@ async function handleGitHubBotLinkCallback(request: NextRequest, user: { id: str
   }
 
   const stateAppType = state.githubAppType ?? 'standard';
-  const integration = await findIntegrationByInstallationId(
-    PLATFORM.GITHUB,
-    state.installationId,
-    stateAppType
-  );
+  const usableCandidates = await findGitHubBotLinkIntegrations({
+    installationId: state.installationId,
+    appType: stateAppType,
+    platformIntegrationId: state.platformIntegrationId,
+  });
+  const legacyAllowed =
+    !isGitHubConnectionManagementEnabled() && !isGitHubSharedInstallationAdmissionEnabled();
+  const integration = state.platformIntegrationId
+    ? usableCandidates[0]
+    : legacyAllowed && usableCandidates.length === 1
+      ? usableCandidates[0]
+      : undefined;
 
   if (!integration) {
     return htmlPage('Link Failed', 'No matching GitHub integration was found.', 404);

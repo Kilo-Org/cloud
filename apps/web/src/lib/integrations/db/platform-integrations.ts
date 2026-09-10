@@ -16,7 +16,7 @@ import type {
 } from '../core/types';
 import { INTEGRATION_STATUS, PLATFORM, PENDING_APPROVAL_STATUS } from '../core/constants';
 import type { IntegrationStatus } from '../core/constants';
-import { platformIntegrationHealthSql } from '../core/health';
+import { isPlatformIntegrationHealthy, platformIntegrationHealthSql } from '../core/health';
 import { PendingInstallationMetadataWrapperSchema } from '../core/schemas';
 import type { GitHubAppType } from '../platforms/github/app-selector';
 import { canOrganizationUseMultipleGitHubInstallations } from '../github/multiple-installations';
@@ -59,6 +59,62 @@ export async function findIntegrationByInstallationId(
     .limit(1);
 
   return integration || null;
+}
+
+export async function findGitHubBotLinkIntegrations(input: {
+  installationId: string;
+  appType: GitHubAppType;
+  platformIntegrationId?: string;
+}): Promise<(typeof platform_integrations.$inferSelect)[]> {
+  const canonicalIdentity = await db.query.github_app_installations.findFirst({
+    where: and(
+      eq(github_app_installations.github_app_type, input.appType),
+      eq(github_app_installations.installation_id, input.installationId)
+    ),
+  });
+  const rows = await db
+    .select({ integration: platform_integrations, canonical: github_app_installations })
+    .from(platform_integrations)
+    .leftJoin(
+      github_app_installations,
+      eq(platform_integrations.github_installation_id, github_app_installations.id)
+    )
+    .where(
+      input.platformIntegrationId
+        ? eq(platform_integrations.id, input.platformIntegrationId)
+        : and(
+            eq(platform_integrations.platform, PLATFORM.GITHUB),
+            eq(platform_integrations.platform_installation_id, input.installationId),
+            input.appType === 'standard'
+              ? or(
+                  eq(platform_integrations.github_app_type, 'standard'),
+                  isNull(platform_integrations.github_app_type)
+                )
+              : eq(platform_integrations.github_app_type, 'lite')
+          )
+    )
+    .limit(input.platformIntegrationId ? 1 : 2);
+  return rows.flatMap(({ integration, canonical }) => {
+    if (
+      integration.platform !== PLATFORM.GITHUB ||
+      integration.platform_installation_id !== input.installationId ||
+      (integration.github_app_type ?? 'standard') !== input.appType ||
+      !isPlatformIntegrationHealthy(integration)
+    ) {
+      return [];
+    }
+    if (!integration.github_installation_id) return canonicalIdentity ? [] : [integration];
+    const canonicalUsable =
+      canonical?.id === integration.github_installation_id &&
+      canonical.installation_id === input.installationId &&
+      canonical.github_app_type === input.appType &&
+      canonical.lifecycle_state === 'active' &&
+      !canonical.suspended_at &&
+      !canonical.deleted_at &&
+      !canonical.auth_invalid_at &&
+      (input.platformIntegrationId !== undefined || canonical.sharing_mode === 'exclusive');
+    return canonicalUsable ? [integration] : [];
+  });
 }
 
 export async function findIntegrationByInstallationIdForOwner(

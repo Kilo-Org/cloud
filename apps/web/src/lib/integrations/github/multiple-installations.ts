@@ -19,6 +19,14 @@ export function canOrganizationCreateSharedGitHubConnection(organizationId: stri
   ).has(organizationId);
 }
 
+export function isGitHubSharedInstallationAdmissionEnabled(): boolean {
+  return (
+    parseSharedGitHubInstallationOrganizationIds(
+      getEnvVariable('GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS')
+    ).size > 0
+  );
+}
+
 export function parseSharedGitHubInstallationOrganizationIds(value: string): Set<string> {
   return parseGitHubOrganizationIds(value, 'GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS');
 }
